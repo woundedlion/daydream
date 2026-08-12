@@ -382,16 +382,29 @@ test('parameter definitions separate rendered and requested state', () => {
 test('ShaderBall reports an invalid selector without changing its neighbors', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
-  const before = engine.getParameterDefinitions();
+  let before = engine.getParameterDefinitions();
+  const warp = before.find((d) => d.name === 'Planar Warp 1');
+  const curlFlow = warp?.options?.indexOf('Projected Curl Flow');
+  assert.notEqual(curlFlow, undefined);
+  assert.notEqual(curlFlow, -1);
+  assert.equal(engine.setParameter('Planar Warp 1', curlFlow), M.ParamSetResult.APPLIED);
+  assert.equal(engine.setParameter('Planar Warp 1 Strength', 0), M.ParamSetResult.APPLIED);
+  assert.equal(engine.setParameter('Planar Warp 1 Time', 0), M.ParamSetResult.APPLIED);
+  assert.equal(engine.setParameter('Planar Warp 1 Scale', 1), M.ParamSetResult.APPLIED);
+  before = engine.getParameterDefinitions();
   const rootValue = (name) => before.find((d) => d.name === name)?.requestedValue;
 
-  assert.equal(engine.setParameter('Projection', 3), M.ParamSetResult.APPLIED);
+  const projectionBefore = before.find((d) => d.name === 'Projection');
+  const bonne = projectionBefore?.options?.indexOf('Bonne');
+  assert.notEqual(bonne, undefined);
+  assert.notEqual(bonne, -1);
+  assert.equal(engine.setParameter('Projection', bonne), M.ParamSetResult.APPLIED);
   const after = engine.getParameterDefinitions();
   const projection = after.find((d) => d.name === 'Projection');
-  assert.equal(projection?.requestedValue, 3);
+  assert.equal(projection?.requestedValue, bonne);
   assert.equal(projection?.acceptedValue, rootValue('Projection'),
     'the renderer seed remains on the last accepted projection');
-  assert.match(projection?.warning ?? '', /requires Projection = Stereographic/);
+  assert.match(projection?.warning ?? '', /requires seam-safe stages/);
   for (const name of [
     'Function', 'Lens', 'Planar Warp 1', 'Planar Warp 2', 'Coverage',
   ]) {
@@ -410,8 +423,9 @@ test('ShaderBall exposes rejected Curl Flow separately from the accepted warp', 
   assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
   assert.equal(engine.setParameter('Planar Warp 1', 0), M.ParamSetResult.APPLIED);
   const outer = engine.getParameterDefinitions().find((d) => d.name === 'Planar Warp 1');
-  const curlFlow = outer?.options?.indexOf('Curl Flow');
+  const curlFlow = outer?.options?.indexOf('Projected Curl Flow');
   assert.notEqual(curlFlow, undefined);
+  assert.notEqual(curlFlow, -1);
 
   assert.equal(engine.setParameter('Planar Warp 1', curlFlow), M.ParamSetResult.APPLIED);
   const rejected = engine.getParameterDefinitions().find((d) => d.name === 'Planar Warp 1');
@@ -421,7 +435,7 @@ test('ShaderBall exposes rejected Curl Flow separately from the accepted warp', 
   assert.match(rejected?.warning ?? '', /Planar Warp 1 Curl Flow rejected/);
 });
 
-test('ShaderBall keeps Mirror Tile when dodecahedral Grid becomes Primitive Lattice', () => {
+test('ShaderBall keeps planar warps when dodecahedral Grid becomes Primitive Lattice', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
   assert.equal(engine.selectPreset(18), true);
@@ -432,15 +446,15 @@ test('ShaderBall keeps Mirror Tile when dodecahedral Grid becomes Primitive Latt
   const innerDef = before.find((d) => d.name === 'Planar Warp 2');
   const primitiveLattice = functionDef?.options?.indexOf('Primitive Lattice');
   const mirrorTile = outerDef?.options?.indexOf('Mirror Tile');
-  const stereoNoise = innerDef?.options?.indexOf('Stereo Noise');
+  const noInnerWarp = innerDef?.options?.indexOf('None');
   assert.equal(outerDef?.requestedValue, mirrorTile);
-  assert.equal(innerDef?.requestedValue, stereoNoise);
+  assert.equal(innerDef?.requestedValue, noInnerWarp);
 
   assert.equal(engine.setParameter('Function', primitiveLattice), M.ParamSetResult.APPLIED);
   const requested = engine.getParameterDefinitions();
   assert.equal(requested.find((d) => d.name === 'Planar Warp 1')?.requestedValue, mirrorTile,
     'the Function edit must not rewrite requested Planar Warp 1');
-  assert.equal(requested.find((d) => d.name === 'Planar Warp 2')?.requestedValue, stereoNoise,
+  assert.equal(requested.find((d) => d.name === 'Planar Warp 2')?.requestedValue, noInnerWarp,
     'the Function edit must not rewrite requested Planar Warp 2');
   assert.equal(requested.find((d) => d.name === 'Function')?.warning, undefined);
 
@@ -449,8 +463,8 @@ test('ShaderBall keeps Mirror Tile when dodecahedral Grid becomes Primitive Latt
   assert.equal(rendered.find((d) => d.name === 'Function')?.value, primitiveLattice);
   assert.equal(rendered.find((d) => d.name === 'Planar Warp 1')?.value, mirrorTile,
     'rendered Planar Warp 1 must remain Mirror Tile');
-  assert.equal(rendered.find((d) => d.name === 'Planar Warp 2')?.value, stereoNoise,
-    'rendered Planar Warp 2 must remain Stereo Noise');
+  assert.equal(rendered.find((d) => d.name === 'Planar Warp 2')?.value, noInnerWarp,
+    'rendered Planar Warp 2 must remain None');
 });
 
 test('strobeColumns and getEffectSizes return the shapes daydream consumes', () => {
