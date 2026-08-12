@@ -6,6 +6,7 @@ import {
   addParamControl,
   EXPORT_COPIED,
   EXPORT_FAILED,
+  FULL_CONFIG_STORAGE_KEY,
   FLASH_MS,
   SHADERBALL_STAGE_ORDER,
   legacyShaderBallParamNames,
@@ -106,6 +107,9 @@ function fakeGui(hydrated = {}, stored = {}) {
       if (!legacy) return undefined;
       this.stored[property] = this.stored[legacy];
       delete this.stored[legacy];
+      return this.stored[property];
+    },
+    readStoredString(property) {
       return this.stored[property];
     },
     writeStoredValue(property, value) {
@@ -242,6 +246,10 @@ function makeHarness({
   presetIndex = 0,
   presetSelectionAccepted = true,
   presetSyncAccepted = true,
+  fullConfig = false,
+  fullConfigSnapshot = null,
+  restoreFullConfigAccepted = true,
+  configImportNotice = '',
 } = {}) {
   const state = {
     params,
@@ -254,10 +262,14 @@ function makeHarness({
     presetCount,
     presetIndex,
     hostPresetIndex: presetIndex,
+    fullConfigSnapshot,
   };
   const writes = [];
   const warnings = [];
   const acceptedSnapshots = [];
+  const restoredFullConfigs = [];
+  const configNotices = [];
+  let configNoticeClears = 0;
   const guis = [];
   const dragTarget = fakeElement('window');
   // Engine double: owns the animation-pause state the panel now reads back,
@@ -312,11 +324,22 @@ function makeHarness({
     isMobile: () => isMobile,
     dragTarget,
     copyText: state.copyText,
+    usesFullConfigSnapshot: () => fullConfig,
+    getFullConfigSnapshot: () => state.fullConfigSnapshot,
+    restoreFullConfigSnapshot: (snapshot) => {
+      restoredFullConfigs.push(snapshot);
+      return restoreFullConfigAccepted;
+    },
+    getConfigImportNotice: () => configImportNotice,
+    clearConfigImportNotice: () => { configNoticeClears += 1; },
+    showConfigImportNotice: (message) => configNotices.push(message),
     logWarn: (...args) => warnings.push(args.join(' ')),
   });
 
   return { panel, state, writes, warnings, guis, dragTarget, container, engine,
            acceptedSnapshots,
+           restoredFullConfigs, configNotices,
+           configNoticeClears: () => configNoticeClears,
            gui: () => guis[guis.length - 1] };
 }
 
@@ -476,6 +499,82 @@ test('build restores the last accepted value before replaying an invalid request
   assert.deepEqual(h.acceptedSnapshots.at(-1), [
     { name: 'Planar Warp 1', value: 0 },
   ]);
+});
+
+test('ShaderBall restores one versioned snapshot before building session controls', () => {
+  const stored = {
+    accepted: [0, 4294967295],
+    requested: [0, 4294967295],
+    pendingFieldIds: [],
+    hasRuntime: false,
+    runtime: [],
+  };
+  const current = {
+    schemaVersion: 2,
+    accepted: [0, 4294967295],
+    requested: [0, 4294967295],
+    pendingFieldIds: [],
+    hasRuntime: false,
+    runtime: [],
+  };
+  const h = makeHarness({
+    params: shaderBallParams(),
+    fullConfig: true,
+    fullConfigSnapshot: current,
+    acceptedStored: { [FULL_CONFIG_STORAGE_KEY]: JSON.stringify(stored) },
+    configImportNotice: 'Imported legacy ShaderBall config.',
+  });
+
+  h.panel.build();
+
+  assert.deepEqual(h.restoredFullConfigs, [{ ...stored, schemaVersion: 1 }]);
+  assert.deepEqual(h.configNotices, ['Imported legacy ShaderBall config.']);
+  assert.equal(h.configNoticeClears(), 1);
+  assert.equal(h.gui().ctrl('Lens').session, true);
+  assert.equal(h.gui().stored[FULL_CONFIG_STORAGE_KEY], JSON.stringify(current));
+  assert.equal(h.gui().stored['__accepted.Lens'], undefined);
+});
+
+test('Lens Glitch to None persists the exhaustive snapshot bit-exactly', () => {
+  const initial = {
+    schemaVersion: 2,
+    accepted: [1, 2147483648],
+    requested: [1, 2147483648],
+    pendingFieldIds: [],
+    hasRuntime: false,
+    runtime: [],
+  };
+  const updated = {
+    schemaVersion: 2,
+    accepted: [0, 4294967295],
+    requested: [0, 4294967295],
+    pendingFieldIds: [17],
+    hasRuntime: true,
+    runtime: [1],
+  };
+  const params = shaderBallParams();
+  Object.assign(params.find((parameter) => parameter.name === 'Lens'), {
+    value: 1, requestedValue: 1, options: ['None', 'Glitch'],
+  });
+  const h = makeHarness({
+    params,
+    fullConfig: true,
+    fullConfigSnapshot: initial,
+    onEngineParam: (name, value, state) => {
+      if (name === 'Lens' && value === 0) state.fullConfigSnapshot = updated;
+    },
+  });
+  h.panel.build();
+  h.gui().storedWrites.length = 0;
+  h.writes.length = 0;
+
+  h.gui().ctrl('Lens').setValue(0);
+
+  assert.deepEqual(h.writes, ['engine:Lens=0', 'worker:Lens=0']);
+  assert.deepEqual(h.gui().storedWrites, [
+    [FULL_CONFIG_STORAGE_KEY, JSON.stringify(updated)],
+  ]);
+  assert.deepEqual(JSON.parse(h.gui().stored[FULL_CONFIG_STORAGE_KEY]), updated);
 });
 
 test('build warns when engine params collide with effect controls', () => {
@@ -1169,6 +1268,28 @@ test('Export copies the live values as a C++ brace-init list', async () => {
   await Promise.resolve();
 
   assert.deepEqual(h.state.copyText.copied, ['{ 0.25f, 0.5f }']);
+  assert.equal(h.gui().ctrl('export').label, EXPORT_COPIED);
+});
+
+test('ShaderBall Export copies the versioned full-config snapshot', async () => {
+  const snapshot = {
+    schemaVersion: 2,
+    accepted: [0, 4294967295],
+    requested: [1, 4294967295],
+    pendingFieldIds: [0],
+    hasRuntime: false,
+    runtime: [],
+  };
+  const h = makeHarness({
+    params: shaderBallParams(), fullConfig: true,
+    fullConfigSnapshot: snapshot,
+  });
+  h.panel.build();
+
+  h.gui().ctrl('export').object.export();
+  await Promise.resolve();
+
+  assert.deepEqual(h.state.copyText.copied, [JSON.stringify(snapshot, null, 2)]);
   assert.equal(h.gui().ctrl('export').label, EXPORT_COPIED);
 });
 

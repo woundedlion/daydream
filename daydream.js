@@ -178,6 +178,7 @@ const applyNotice = createApplyNotice({ doc: document });
 const PARAM_NOTICE = 'param';
 const SWITCH_NOTICE = 'switch';
 const RECORD_NOTICE = 'record';
+const CONFIG_NOTICE = 'config';
 
 /**
  * Write one parameter value to the main engine. setParameter returns a
@@ -408,6 +409,17 @@ const effectGui = createEffectGui({
   isMobile: () => daydream.isMobile,
   dragTarget: window,
   copyText: copyToClipboard,
+  usesFullConfigSnapshot: () => appState.get('effect') === 'ShaderBall'
+    && typeof host.engine.getFullConfigSnapshot === 'function'
+    && typeof host.engine.restoreFullConfigSnapshot === 'function',
+  getFullConfigSnapshot: () => host.engine.getFullConfigSnapshot?.() ?? null,
+  restoreFullConfigSnapshot: (snapshot) => {
+    const result = host.engine.restoreFullConfigSnapshot?.(snapshot);
+    return result === host.module.FullConfigRestoreResult?.APPLIED;
+  },
+  getConfigImportNotice: () => host.engine.getConfigImportNotice?.() ?? '',
+  clearConfigImportNotice: () => host.engine.clearConfigImportNotice?.(),
+  showConfigImportNotice: (message) => applyNotice.show(message, CONFIG_NOTICE),
 });
 
 const apply = createApplyPipeline({
