@@ -30,7 +30,7 @@ export const FLASH_MS = 1500;
 export const EXPORT_COPIED = '\u2713 Copied!';
 export const EXPORT_FAILED = '\u2717 Copy failed';
 const RESERVED_CONTROL_NAMES = new Set([
-  'reset', 'export', 'presetPosition', 'previousPreset', 'nextPreset', 'pause'
+  'reset', 'export', 'presetIndex', 'previousPreset', 'nextPreset', 'pause'
 ]);
 
 /**
@@ -216,9 +216,8 @@ export function createEffectGui({
 
   function adoptPresetDisplay(fx, count, index) {
     if (!fx.preset || count <= 0) return;
-    const position = `${index + 1} / ${count}`;
-    if (fx.preset.state.presetPosition === position) return;
-    fx.preset.state.presetPosition = position;
+    if (fx.preset.state.presetIndex === index) return;
+    fx.preset.state.presetIndex = index;
     fx.preset.controller.updateDisplay();
   }
 
@@ -357,21 +356,30 @@ export function createEffectGui({
     const exportCtrl = fx.gui.add(effectActions, 'export').name('Export');
     const presetCount = getPresetCount();
     if (presetCount > 0) {
-      effectActions.presetPosition = `${getPresetIndex() + 1} / ${presetCount}`;
-      const addPosition = typeof fx.gui.addSession === 'function'
+      effectActions.presetIndex = getPresetIndex();
+      const presetOptions = enumChoices(
+        Array.from({ length: presetCount }, (_, index) => String(index)));
+      const addPreset = typeof fx.gui.addSession === 'function'
         ? (...args) => fx.gui.addSession(...args)
         : (...args) => fx.gui.add(...args);
-      const position = addPosition(effectActions, 'presetPosition')
-        .name('Preset').disable();
-      fx.preset = { state: effectActions, controller: position };
-      const move = (delta) => {
+      const preset = addPreset(effectActions, 'presetIndex', presetOptions)
+        .name('Preset');
+      fx.preset = { state: effectActions, controller: preset };
+      const choose = (index) => {
         const count = getPresetCount();
-        if (count <= 0) return;
-        const index = (getPresetIndex() + delta + count) % count;
-        if (!selectPreset(index)) return;
+        if (count <= 0 || !selectPreset(index)) {
+          adoptPresetDisplay(fx, count, getPresetIndex());
+          return;
+        }
         persistAcceptedParams(fx.gui);
         adoptPresetDisplay(fx, count, index);
         adoptPauseDisplay(fx, engineAnimationsPaused() ?? true);
+      };
+      preset.onChange(choose);
+      const move = (delta) => {
+        const count = getPresetCount();
+        if (count <= 0) return;
+        choose((getPresetIndex() + delta + count) % count);
       };
       effectActions.previousPreset = () => move(-1);
       effectActions.nextPreset = () => move(1);

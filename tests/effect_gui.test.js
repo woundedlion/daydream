@@ -936,14 +936,16 @@ test('an effect switch clears the skew latch', () => {
 // The Export action copies the live values, and reports the outcome on its own
 // button.
 
-test('preset effects put Previous and Next side by side below Export', () => {
+test('preset effects expose zero-indexed selection and navigation', () => {
   const h = makeHarness({ presetCount: 3, presetIndex: 0 });
   h.panel.build();
 
   assert.deepEqual(h.gui().controllers.slice(0, 5).map((c) => c.property),
-    ['reset', 'export', 'presetPosition', 'previousPreset', 'nextPreset']);
-  assert.equal(h.gui().ctrl('presetPosition').getValue(), '1 / 3');
-  assert.equal(h.gui().ctrl('presetPosition').disabled, true);
+    ['reset', 'export', 'presetIndex', 'previousPreset', 'nextPreset']);
+  assert.equal(h.gui().ctrl('presetIndex').getValue(), 0);
+  assert.deepEqual(h.gui().ctrl('presetIndex').args, [{ 0: 0, 1: 1, 2: 2 }]);
+  assert.equal(h.gui().ctrl('presetIndex').disabled, false);
+  assert.equal(h.gui().ctrl('presetIndex').session, true);
   assert.equal(h.gui().ctrl('previousPreset').label, 'Previous Preset');
   assert.equal(h.gui().ctrl('nextPreset').label, 'Next Preset');
   assert.ok(h.gui().ctrl('previousPreset').domElement.classList
@@ -952,11 +954,22 @@ test('preset effects put Previous and Next side by side below Export', () => {
     .contains('preset-nav-next'));
 
   h.gui().ctrl('previousPreset').object.previousPreset();
-  assert.equal(h.gui().ctrl('presetPosition').getValue(), '3 / 3');
+  assert.equal(h.gui().ctrl('presetIndex').getValue(), 2);
   h.gui().ctrl('nextPreset').object.nextPreset();
   assert.deepEqual(h.writes, ['preset:2', 'preset:0']);
-  assert.equal(h.gui().ctrl('presetPosition').getValue(), '1 / 3');
+  assert.equal(h.gui().ctrl('presetIndex').getValue(), 0);
   assert.equal(h.gui().ctrl('pause'), undefined);
+});
+
+test('the preset dropdown selects its zero-indexed value', () => {
+  const h = makeHarness({ presetCount: 4, presetIndex: 1 });
+  h.panel.build();
+
+  h.gui().ctrl('presetIndex').setValue(3);
+
+  assert.deepEqual(h.writes, ['preset:3']);
+  assert.equal(h.state.presetIndex, 3);
+  assert.equal(h.gui().ctrl('presetIndex').getValue(), 3);
 });
 
 test('natural worker preset advancement keeps live transition values', () => {
@@ -991,7 +1004,7 @@ test('natural worker preset advancement keeps live transition values', () => {
   assert.equal(oldGui.destroyed, 1);
   assert.equal(h.gui().ctrl('Function').getValue(), 4);
   assert.equal(h.gui().ctrl('Speed').getValue(), 0.1);
-  assert.equal(h.gui().ctrl('presetPosition').getValue(), '3 / 3');
+  assert.equal(h.gui().ctrl('presetIndex').getValue(), 2);
   assert.equal(h.gui().ctrl('pause').getValue(), false);
   assert.deepEqual(h.writes, ['syncPreset:2']);
 
@@ -1014,10 +1027,11 @@ test('a rejected preset selection does not change the pause state', () => {
   h.panel.applyAnimationPause();
   h.writes.length = 0;
 
-  h.gui().ctrl('nextPreset').object.nextPreset();
+  h.gui().ctrl('presetIndex').setValue(2);
 
   assert.equal(h.panel.active().animationState.pause, false);
   assert.equal(h.engine.paused, false);
+  assert.equal(h.gui().ctrl('presetIndex').getValue(), 1);
   assert.deepEqual(h.writes, ['preset:2']);
 });
 
@@ -1026,7 +1040,7 @@ test('effects without presets do not show preset navigation', () => {
   h.panel.build();
   assert.equal(h.gui().ctrl('previousPreset'), undefined);
   assert.equal(h.gui().ctrl('nextPreset'), undefined);
-  assert.equal(h.gui().ctrl('presetPosition'), undefined);
+  assert.equal(h.gui().ctrl('presetIndex'), undefined);
 });
 
 test('Export copies the live values as a C++ brace-init list', async () => {
