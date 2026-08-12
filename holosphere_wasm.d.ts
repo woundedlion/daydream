@@ -105,6 +105,20 @@ export type ParameterDefinition =
   | BooleanParameterDefinition
   | NumericParameterDefinition;
 
+export interface FullConfigSnapshot {
+  schemaVersion: number;
+  accepted: number[];
+  requested: number[];
+  pendingFieldIds: number[];
+  hasRuntime: boolean;
+  runtime: number[];
+}
+
+export interface FullConfigFieldDefinition {
+  id: number;
+  name: string;
+}
+
 export interface HolosphereEngine {
   /** RESIZED tears the effect down; ALREADY_ACTIVE is a pure no-op; UNSUPPORTED keeps the old geometry. */
   setResolution(w: number, h: number): EnumValue;
@@ -145,6 +159,13 @@ export interface HolosphereEngine {
    * this beside a snapshot and rebuild the definitions when it moves.
    */
   getParamGeneration(): number;
+  /** Complete ShaderBall state, independent of the visible parameter schema. */
+  getFullConfigSnapshot?(): FullConfigSnapshot | null;
+  /** Atomically restore accepted, requested, pending, and optional runtime state. */
+  restoreFullConfigSnapshot?(snapshot: FullConfigSnapshot): EnumValue;
+  getFullConfigFieldDefinitions?(): FullConfigFieldDefinition[];
+  getConfigImportNotice?(): string;
+  clearConfigImportNotice?(): void;
   /**
    * True when the effect strobes each POV column to black after it is shown
    * (discrete columns with dark gaps), false when columns persist and smear
@@ -173,6 +194,15 @@ export interface HolosphereModule {
     UNKNOWN_PARAM: EnumValue;
     READONLY: EnumValue;
     NON_FINITE: EnumValue;
+  };
+  FullConfigRestoreResult?: {
+    APPLIED: EnumValue;
+    NOT_SHADERBALL: EnumValue;
+    UNSUPPORTED_VERSION: EnumValue;
+    INVALID_LENGTH: EnumValue;
+    INVALID_VALUE: EnumValue;
+    INVALID_ACCEPTED: EnumValue;
+    INVALID_PENDING: EnumValue;
   };
   ResolutionSetResult: {
     RESIZED: EnumValue;

@@ -13,6 +13,12 @@ export const ENGINE_METHODS = [
   'getParamGeneration', 'getEffectSizes', 'strobeColumns',
 ];
 
+export const ENGINE_OPTIONAL_METHODS = [
+  'getFullConfigSnapshot', 'restoreFullConfigSnapshot',
+  'getFullConfigFieldDefinitions', 'getConfigImportNotice',
+  'clearConfigImportNotice',
+];
+
 /**
  * Mirror of the module-level ParamSetResult embind enum (targets/wasm/wasm.cpp)
  * that setParameter returns. Values are distinct frozen objects so identity
@@ -66,6 +72,16 @@ export const EffectSetResult = Object.freeze({
   UNSUPPORTED_RESOLUTION: Object.freeze({ value: 2 }),
 });
 
+export const FullConfigRestoreResult = Object.freeze({
+  APPLIED: Object.freeze({ value: 0 }),
+  NOT_SHADERBALL: Object.freeze({ value: 1 }),
+  UNSUPPORTED_VERSION: Object.freeze({ value: 2 }),
+  INVALID_LENGTH: Object.freeze({ value: 3 }),
+  INVALID_VALUE: Object.freeze({ value: 4 }),
+  INVALID_ACCEPTED: Object.freeze({ value: 5 }),
+  INVALID_PENDING: Object.freeze({ value: 6 }),
+});
+
 /**
  * Method names an object exposes that ENGINE_METHODS does not pin — a fake
  * mocking one of these would pass its own tests against a method the real
@@ -77,7 +93,7 @@ export const EffectSetResult = Object.freeze({
  * @returns {Array<string>} Unpinned method names, sorted.
  */
 export function unpinnedEngineMethods(obj) {
-  const pinned = new Set(ENGINE_METHODS);
+  const pinned = new Set([...ENGINE_METHODS, ...ENGINE_OPTIONAL_METHODS]);
   const names = new Set();
   for (let o = obj; o && o !== Object.prototype; o = Object.getPrototypeOf(o))
     for (const name of Object.getOwnPropertyNames(o)) names.add(name);
