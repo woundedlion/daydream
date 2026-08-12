@@ -606,13 +606,13 @@ test('sync adopts programmatic changes to an ordinary parameter', () => {
   assert.equal(h.gui().ctrl('Speed').getValue(), 0.9);
 });
 
-test('a Lens dropdown always adopts the rendered value', () => {
+test('a Lens dropdown keeps requested state ahead of the renderer', () => {
   const lens = {
-    name: 'Lens', value: 3,
+    name: 'Lens', value: 3, requestedValue: 0, acceptedValue: 0,
     options: ['None', 'Glitch', 'Twist', 'Kaleidoscope', 'Mobius', 'Tangent Noise'],
     animated: true,
   };
-  const h = makeHarness({ params: [lens], segmentValues: [4], ownsDisplay: true });
+  const h = makeHarness({ params: [lens], segmentValues: [3], ownsDisplay: true });
   h.panel.build();
   const controller = h.gui().ctrl('Lens');
 
@@ -622,7 +622,7 @@ test('a Lens dropdown always adopts the rendered value', () => {
 
   h.panel.sync();
 
-  assert.equal(controller.getValue(), 4, 'the dropdown displays the renderer-owned Lens');
+  assert.equal(controller.getValue(), 0);
 });
 
 test('sync reads the worker pool once it owns the display', () => {
@@ -678,36 +678,35 @@ test('a schema generation change atomically rebuilds and remounts the panel', ()
   assert.equal(h.gui().ctrl('Bonne Parallel').getValue(), 0.6);
 });
 
-test('a selector rebuild adopts the renderer snapshot when it arrives', () => {
-  const projection = {
-    name: 'Projection', value: 6,
-    options: ['Folded Sinusoidal', 'Stereographic', 'Gnomonic', 'Bonne',
-      'Peirce Quincuncial', 'Dymaxion / Airocean', 'Equirectangular'],
+test('Lens Glitch to None survives a rebuild before the renderer advances', () => {
+  const lens = {
+    name: 'Lens', value: 1, requestedValue: 1, acceptedValue: 1,
+    options: ['None', 'Glitch', 'Twist', 'Kaleidoscope', 'Mobius', 'Tangent Noise'],
     animated: true,
   };
   const h = makeHarness({
-    params: [projection],
-    segmentValues: [6],
+    params: [lens],
+    segmentValues: [1],
     ownsDisplay: true,
     onEngineParam(name, value, state) {
-      if (name !== 'Projection' || value !== 0) return;
-      state.params = [{ ...projection }];
+      if (name !== 'Lens' || value !== 0) return;
+      state.params = [{ ...lens, requestedValue: 0, acceptedValue: 0 }];
       state.generation = 2;
     },
   });
   h.panel.build();
 
-  h.gui().ctrl('Projection').setValue(0);
+  h.gui().ctrl('Lens').setValue(0);
   h.state.segmentValues = null;
   h.panel.sync();
-  assert.equal(h.gui().ctrl('Projection').getValue(), 6);
+  assert.equal(h.gui().ctrl('Lens').getValue(), 0);
 
   h.state.segmentValues = [0];
   h.panel.sync();
-  assert.equal(h.gui().ctrl('Projection').getValue(), 0);
+  assert.equal(h.gui().ctrl('Lens').getValue(), 0);
 });
 
-test('rendered state stays authoritative across edits, drags, presets, and lerps', () => {
+test('requested selectors and rendered numeric values stay authoritative', () => {
   const functionDef = {
     name: 'Function', value: 4,
     options: ['Twin Wave', 'Rings', 'Spiral', 'Grid', 'Coupled / Direct',
@@ -728,7 +727,8 @@ test('rendered state stays authoritative across edits, drags, presets, and lerps
     presetIndex: 0,
     onEngineParam(name, value, state) {
       if (name !== 'Projection' || value !== 0) return;
-      state.params = [functionDef, projectionDef, SPEED];
+      state.params = [functionDef,
+        { ...projectionDef, requestedValue: 0, acceptedValue: 0 }, SPEED];
       state.generation = 2;
     },
     onSynchronizePreset(_index, state) {
@@ -745,7 +745,7 @@ test('rendered state stays authoritative across edits, drags, presets, and lerps
   h.gui().ctrl('Projection').setValue(0);
   h.state.segmentValues = null;
   h.panel.sync();
-  assert.equal(h.gui().ctrl('Projection').getValue(), 6);
+  assert.equal(h.gui().ctrl('Projection').getValue(), 0);
 
   h.state.segmentValues = [4, 0, 0.2];
   h.panel.sync();
@@ -763,7 +763,7 @@ test('rendered state stays authoritative across edits, drags, presets, and lerps
   h.state.presetIndex = 2;
   h.state.segmentValues = [4, 0, 0.55];
   h.panel.sync();
-  assert.equal(h.gui().ctrl('Function').getValue(), 4);
+  assert.equal(h.gui().ctrl('Function').getValue(), 6);
   assert.equal(h.gui().ctrl('Speed').getValue(), 0.55);
 
   h.state.segmentValues = [6, 0, 0.9];
@@ -1002,7 +1002,7 @@ test('natural worker preset advancement keeps live transition values', () => {
   h.panel.sync();
 
   assert.equal(oldGui.destroyed, 1);
-  assert.equal(h.gui().ctrl('Function').getValue(), 4);
+  assert.equal(h.gui().ctrl('Function').getValue(), 6);
   assert.equal(h.gui().ctrl('Speed').getValue(), 0.1);
   assert.equal(h.gui().ctrl('presetIndex').getValue(), 2);
   assert.equal(h.gui().ctrl('pause').getValue(), false);

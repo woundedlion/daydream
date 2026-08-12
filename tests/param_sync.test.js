@@ -8,6 +8,7 @@ import {
   paramValueSkew,
   paramExportBlocker,
   paramGenerationStale,
+  selectorControlValue,
 } from '../param_sync.js';
 
 // resolveParamSync is the DOM-free core of syncGUI()'s per-controller "fight-the-
@@ -69,6 +70,11 @@ test('boolean: a NaN engine value never flips the toggle', () => {
 test('enum: labels map to their option indices in order', () => {
   assert.deepEqual(enumChoices(['None', 'Warp', 'Sparkle']),
     { None: 0, Warp: 1, Sparkle: 2 });
+});
+
+test('selector state follows a request before the rendered value advances', () => {
+  assert.equal(selectorControlValue({ value: 1, requestedValue: 0 }), 0);
+  assert.equal(selectorControlValue({ value: 2 }), 2);
 });
 
 test('enum: a single option still yields a valid choices object', () => {
