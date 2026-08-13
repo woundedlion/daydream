@@ -336,6 +336,7 @@ function setupCtx(mesh, log) {
     H: 4,
     DOT_SIZE: 3,
     dotMesh: mesh,
+    matrixCache: new Map(),
     scene: {
       add: () => log.push('scene.add'),
       remove: () => log.push('scene.remove'),
@@ -378,6 +379,7 @@ function disposeCtx(mesh, log) {
     scene: { remove: (obj) => log.push(`scene.remove:${obj?.name ?? 'dotMesh'}`) },
     dotMesh: mesh,
     pixels: mesh.instanceColor.array,
+    matrixCache: new Map(),
     dotMaterial: { dispose: () => log.push('material.dispose') },
     xAxis: axis('xAxis'),
     yAxis: axis('yAxis'),
@@ -967,6 +969,7 @@ function matricesCtx(w, h) {
     H: h,
     H_OFFSET: Daydream.H_OFFSET,
     pixels: null,
+    matrixCache: new Map(),
     matrices,
     dotMesh: {
       count: w * h,
@@ -1056,6 +1059,36 @@ test('precomputeMatrices flags both instance attributes for upload', () => {
 
   assert.equal(ctx.dotMesh.instanceMatrix.needsUpdate, true);
   assert.equal(ctx.dotMesh.instanceColor.version, 1);
+});
+
+// The composition runs synchronously inside the resolution handler over W*H
+// instances, and a user toggling back to a preset asks for matrices already
+// derived once.
+test('precomputeMatrices reuses a grid it has already composed', () => {
+  const first = matricesCtx(8, 5);
+  Daydream.prototype.precomputeMatrices.call(first);
+
+  const again = matricesCtx(8, 5);
+  again.matrixCache = first.matrixCache;
+  Daydream.prototype.precomputeMatrices.call(again);
+
+  assert.equal(first.matrixCache.size, 1, 'one entry per grid');
+  // Compared at the precision the instanceMatrix attribute carries, which is
+  // what the cache stores and the GPU reads.
+  const carried = (m) => Float32Array.from(m.elements);
+  for (let i = 0; i < 8 * 5; i++) {
+    assert.deepEqual(carried(again.matrices[i]), carried(first.matrices[i]),
+      `instance ${i} replayed a different matrix`);
+  }
+
+  const wider = matricesCtx(9, 5);
+  wider.matrixCache = first.matrixCache;
+  Daydream.prototype.precomputeMatrices.call(wider);
+  assert.equal(first.matrixCache.size, 2, 'another grid composes its own entry');
+  // Row 0 is the north pole, where every column shares a position; row 1 is the
+  // first that separates the two column counts.
+  assert.notDeepEqual(wider.matrices[9].elements, first.matrices[9].elements,
+    'the wider grid took the cached grid\'s matrices');
 });
 
 test('updateResolution rebuilds the mesh and buffer at the new grid', () => {
