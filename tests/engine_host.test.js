@@ -39,6 +39,22 @@ test('refresh() reuses a live view without re-fetching or re-notifying', () => {
   assert.equal(notifyCalls, 0);
 });
 
+// SegmentController's composite elides its clear on the premise that the driver
+// already zeroed the buffer it is about to blit into; a re-fetch replaces that
+// buffer, and the aliases move with it, so this report is the only signal.
+test('refresh() reports whether it fetched a fresh view', () => {
+  const fresh = new Uint16Array(4);
+  const host = new EngineHost();
+  assert.equal(host.refresh(), false, 'no engine fetches nothing');
+
+  host.engine = { getPixels: () => fresh };
+  assert.equal(host.refresh(), true, 'the first refresh fetches');
+  assert.equal(host.refresh(), false, 'a live view is reused');
+
+  host.invalidateView();
+  assert.equal(host.refresh(), true, 'an invalidated view is re-fetched');
+});
+
 test('invalidateView() forces the next refresh() to re-fetch', () => {
   const first = new Uint16Array(4);
   const second = new Uint16Array(4);

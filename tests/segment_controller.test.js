@@ -1696,6 +1696,37 @@ test('composite() heals a diverged mesh alias even while driver.pixels is aligne
     'the heal flags the attribute for re-upload');
 });
 
+// The composite blits over driver.render()'s zero-fill instead of clearing. A
+// refresh that re-fetched moves the aliases onto a buffer the driver never
+// cleared, so the divergence check sees nothing and only the report is left.
+test('composite() clears a buffer the refresh re-fetched', () => {
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3);
+
+  const c = makeController();
+  // The fresh view carries the engine's last frame, not the driver's clear.
+  const fetched = new Uint16Array(4 * 2 * 3).fill(999);
+  let refreshed = false;
+  c.refreshPixelView = () => {
+    if (!refreshed) return false;
+    repointDisplayAliases(driver, fetched);
+    return true;
+  };
+  c.getMemoryView = () => driver.pixels;
+  const band = new Uint16Array(2 * 2 * 3).fill(111);
+  c.results = [{ pixels: band, x0: 0, x1: 2, y0: 0, y1: 2 }, null];
+  c.count = 2;
+
+  refreshed = true;
+  c.composite();
+
+  assert.equal(driver.pixels, fetched, 'the refresh moved both aliases with it');
+  assert.equal(fetched[0], 111, 'the reported band still lands');
+  // Row 0, columns 2-3: segment 1's band, which reported nothing this frame.
+  assert.ok(fetched.subarray(6, 12).every((v) => v === 0),
+    'the columns no segment reported are cleared, not the engine\'s last frame');
+});
+
 test('a controller cannot be built without a two-alias display repointer', () => {
   assert.throws(
     () => new SegmentController({

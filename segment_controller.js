@@ -245,7 +245,7 @@ export class SegmentController {
    * @param {{get: (key: string) => any}} deps.appState - Read-only view of the host's pub/sub state; reads the 'resolution' and 'effect' keys.
    * @param {{W: number, H: number, pixels: Uint16Array|null, dotMesh: {instanceColor: {array: Uint16Array|null, needsUpdate: boolean}}}} deps.driver - Renderer instance owning the live pixel grid (W/H), the display buffer the compositor blits into, and the dot mesh carrying the second display alias: composite() reads both aliases to detect a divergence, and the heal re-points them.
    * @param {() => (import('./holosphere_wasm.js').HolosphereEngine|null)} deps.getWasmEngine - Returns the current main-thread HolosphereEngine, or null when none is bound.
-   * @param {() => unknown} deps.refreshPixelView - Re-fetches the (possibly detached) WASM pixel view.
+   * @param {() => unknown} deps.refreshPixelView - Re-fetches the (possibly detached) WASM pixel view, reporting `true` when it fetched a fresh one. A refresh re-points the display aliases itself, so without that report composite() cannot tell that the buffer it is about to blit into is one the driver never cleared.
    * @param {() => (Uint16Array|null)} deps.getMemoryView - Returns the current Uint16Array view of the display buffer.
    * @param {(view: Uint16Array) => void} deps.repointDisplayAliases - Re-points BOTH display aliases (Three.js instanceColor.array + driver.pixels) at the given view. Required: only the host knows the mesh, and an implementation that moves one alias leaves the composite in a buffer the GPU never reads.
    * @param {Document} [deps.statsDoc] - DOM document the stats overlay renders into; defaults to the global `document`.
@@ -1174,13 +1174,18 @@ export class SegmentController {
    *   marking a black buffer as a real composited frame.
    */
   composite() {
-    this.refreshPixelView();
+    const refreshed = this.refreshPixelView() === true;
     const dst = this.getMemoryView();
     if (!dst) return 0;
 
     // No clear: driver.render() already zero-filled this buffer; we blit over it.
-    // That elision holds only while dst aliases the buffer render() clears. On a
-    // divergence, self-heal rather than fault the render loop (mirrors the
+    // That elision holds only while dst is the buffer render() cleared, and a
+    // refresh that re-fetched hands back one it never was. The refresh re-points
+    // both aliases with it, so the divergence check below sees nothing wrong —
+    // this report is the only signal.
+    if (refreshed) dst.fill(0);
+
+    // On a divergence, self-heal rather than fault the render loop (mirrors the
     // single-engine path): re-point both display aliases at the composite target.
     // driver.render() re-clears driver.pixels next frame, restoring the elision.
     if (displayAliasesDiverged(this.driver, dst)) {
