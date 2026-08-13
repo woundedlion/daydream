@@ -6,6 +6,13 @@
     "noResolve": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
+    // The protocol union is carried by a 260-line switch on each side of the
+    // postMessage boundary, half of whose message fields are optional: a missed
+    // return, a fallen-through case, and a present-but-undefined field are all
+    // shapes only these three reject.
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": true,
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
