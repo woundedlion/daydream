@@ -156,6 +156,109 @@ function recipeStepCpp(step) {
 
 // solids.h is clang-formatted at 80 columns, and the paste goes in verbatim.
 const COLUMN_LIMIT = 80;
+const INDENT = 4;
+
+/**
+ * A doc comment wrapped the way clang-format wraps the ones already in
+ * solids.h: one line where it fits, else a block comment whose text is filled
+ * at the column limit.
+ * @param {string} text - The comment body, one line of words.
+ * @returns {string} The comment.
+ */
+function docCommentCpp(text) {
+  const single = `/** ${text} */`;
+  if (single.length <= COLUMN_LIMIT) return single;
+  const lines = [];
+  let line = ' *';
+  for (const word of text.split(' ')) {
+    if (line.length + 1 + word.length > COLUMN_LIMIT) {
+      lines.push(line);
+      line = ' *';
+    }
+    line += ` ${word}`;
+  }
+  lines.push(line);
+  return ['/**', ...lines, ' */'].join('\n');
+}
+
+/**
+ * Greedy fill of a token list at the column limit, the way clang-format packs
+ * the islamic_registry entries already in solids.h.
+ * @param {Array<string>} tokens - The space-separated tokens, in order.
+ * @param {number} first - Column the first line starts at.
+ * @param {number} rest - Column every later line starts at.
+ * @returns {string} The filled text.
+ */
+function fillCpp(tokens, first, rest) {
+  const lines = [];
+  let line = ' '.repeat(first) + tokens[0];
+  for (const token of tokens.slice(1)) {
+    if (line.length + 1 + token.length > COLUMN_LIMIT) {
+      lines.push(line);
+      line = ' '.repeat(rest) + token;
+    } else {
+      line += ` ${token}`;
+    }
+  }
+  lines.push(line);
+  return lines.join('\n');
+}
+
+/**
+ * The head of a namespace-scope constant definition, wrapped the way
+ * clang-format wraps the ones already in solids.h: the declarator and its open
+ * brace on one line where they fit, else the brace alone on a continuation
+ * line, else the declarator moved to that line too and the initializer indented
+ * one level further.
+ * @param {string} type - The declared type.
+ * @param {string} declarator - The declared name plus any array suffix.
+ * @returns {{prefix: string, indent: number}} The text up to and including the
+ *   first initializer element's indentation, and the column that element
+ *   starts at.
+ */
+function definitionHeadCpp(type, declarator) {
+  const assign = `inline constexpr ${type} ${declarator} =`;
+  const pad = ' '.repeat(INDENT);
+  // ' {' is what the one-line form adds past the assignment.
+  if (assign.length + 2 <= COLUMN_LIMIT) {
+    return { prefix: `${assign} {\n${pad}`, indent: INDENT };
+  }
+  if (assign.length <= COLUMN_LIMIT) {
+    return { prefix: `${assign}\n${pad}{`, indent: INDENT + 1 };
+  }
+  const deeper = ' '.repeat(2 * INDENT);
+  return {
+    prefix: `inline constexpr ${type}\n${pad}${declarator} = {\n${deeper}`,
+    indent: 2 * INDENT,
+  };
+}
+
+/**
+ * The Recipe initializer body: the seed constant and the step-table name share
+ * a line where they fit, and the element-count expression breaks at the
+ * innermost call that keeps its argument inside the column limit — the same
+ * shapes solids.h already carries.
+ * @param {string} constName - The SEED_* constant the recipe seeds on.
+ * @param {string} stepsName - The step table's name.
+ * @param {number} indent - Column the body's lines start at.
+ * @returns {string} The body, ending in ';'.
+ */
+function recipeBodyCpp(constName, stepsName, indent) {
+  const names = `${constName}, ${stepsName},`;
+  const lines = indent + names.length <= COLUMN_LIMIT
+    ? [names] : [`${constName},`, `${stepsName},`];
+  const size = `static_cast<uint8_t>(std::size(${stepsName}))};`;
+  if (indent + size.length <= COLUMN_LIMIT) {
+    lines.push(size);
+  } else {
+    const deeper = ' '.repeat(indent + INDENT);
+    const argument = `std::size(${stepsName}))};`;
+    lines.push(deeper.length + argument.length <= COLUMN_LIMIT
+      ? `static_cast<uint8_t>(\n${deeper}${argument}`
+      : `static_cast<uint8_t>(std::size(\n${deeper}${stepsName}))};`);
+  }
+  return lines.join(`\n${' '.repeat(indent)}`);
+}
 
 /**
  * The registry-order static_assert that pins a SEED_* constant to the
@@ -252,14 +355,18 @@ export function generateRegistryCpp(item, baseRecipe = null) {
       + `steps; a Recipe carries at most ${MAX_RECIPE_STEPS}, above which its `
       + 'uint8_t count wraps and the pasted Recipe would replay a different chain');
   }
-  const steps = stepList.join(',\n    ');
+  const table = definitionHeadCpp('OpStep', `${stepsName}[]`);
+  const recipe = definitionHeadCpp('Recipe', recipeName);
   return seedConstant
-    + `/** Step table for ${funcName}. */\n`
-    + `inline constexpr OpStep ${stepsName}[] = {\n    ${steps}};\n`
-    + `/** Recipe mirror of IslamicStarPatterns::${funcName}. */\n`
-    + `inline constexpr Recipe ${recipeName} = {\n`
-    + `    SEED_${upperSnake(seedName)}, ${stepsName},\n`
-    + `    static_cast<uint8_t>(std::size(${stepsName}))};\n\n`
-    + `    {"${funcName}",\n     IslamicStarPatterns::${funcName}, Category::Complex,\n`
-    + `     &${recipeName}},`;
+    + `${docCommentCpp(`Step table for ${funcName}.`)}\n`
+    + `${table.prefix}${stepList.join(`,\n${' '.repeat(table.indent)}`)}};\n`
+    + `${docCommentCpp(`Recipe mirror of IslamicStarPatterns::${funcName}.`)}\n`
+    + `${recipe.prefix}`
+    + `${recipeBodyCpp(`SEED_${upperSnake(seedName)}`, stepsName, recipe.indent)}\n\n`
+    + fillCpp([
+      `{"${funcName}",`,
+      `IslamicStarPatterns::${funcName},`,
+      'Category::Complex,',
+      `&${recipeName}},`,
+    ], INDENT, INDENT + 1);
 }
