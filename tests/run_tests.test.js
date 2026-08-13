@@ -353,6 +353,20 @@ test('--update-floors refuses a file calling assert as a function', () => {
   );
 });
 
+/**
+ * Verifies cases above their floors are reported, and refused past the bound:
+ * a floor left behind covers none of the cases that landed since, so those can
+ * be deleted again without tripping the per-file floors.
+ */
+test('cases above the committed floors are reported and bounded', () => {
+  writeFileSync(join(root, 'tests', 'a.test.js'), passing(4, 3));
+  assert.match(run(PATTERN), /2 cases above their committed floors \(bound 64\)/);
+  writeFileSync(join(root, 'tests', 'a.test.js'), passing(80, 3));
+  const err = runExpectingFailure(PATTERN);
+  assert.match(err, /78 cases above their committed floors, past the bound of 64/);
+  assert.match(err, /tests\/a\.test\.js: 80 ran, floor 2/);
+});
+
 /** Verifies a pattern-less invocation is refused instead of walking the tree. */
 test('no test pattern fails', () => {
   assert.match(runExpectingFailure(), /test file patterns/);
