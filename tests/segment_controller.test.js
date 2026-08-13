@@ -1535,6 +1535,25 @@ test('composite() faults when the layout admits no band for a segment', () => {
   assert.match(c.faultInfo.message, /no segment-0 band exists/);
 });
 
+// The pre-pass validates against the band table on every composited frame, so
+// the table is derived once per layout rather than once per segment per frame.
+test('the band table is reused until the layout moves', () => {
+  const c = makeController();
+  const first = c.segmentBands(2, 4, 4);
+  assert.equal(c.segmentBands(2, 4, 4), first, 'an unchanged layout reuses the table');
+
+  c.renderGen++;
+  const afterGen = c.segmentBands(2, 4, 4);
+  assert.notEqual(afterGen, first, 'a new generation rebuilds the table');
+
+  const resized = c.segmentBands(2, 8, 4);
+  assert.notEqual(resized, afterGen, 'a resize rebuilds the table');
+  assert.equal(resized[1].x0, 4, 'the rebuilt table describes the new width');
+
+  const recounted = c.segmentBands(4, 8, 4);
+  assert.notEqual(recounted, resized, 'a segment-count change rebuilds the table');
+});
+
 test('composite() marks both the internal split and the x=0 wrap seam', () => {
   // On the wrapped cylinder a 2-arm split has two boundaries: the internal split
   // at x=2 and the wrap seam at x=0 where arm 1 meets arm 0.
