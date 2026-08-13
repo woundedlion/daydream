@@ -71,8 +71,9 @@ export class SegmentStatsView {
     this.statsSegCount = 0;   // segment count the cached table was built for
     /** @type {SegmentStatsCells | null} */
     this.statsCells = null;
-    // Overlay containers, resolved once. An id the document does not carry yet
-    // is left uncached, so a repaint before the page is built re-queries.
+    // Overlay containers, resolved once and re-resolved when one leaves the
+    // document. An id the document does not carry yet is left uncached, so a
+    // repaint before the page is built re-queries.
     /** @type {Object<string, HTMLElement>} */
     this.byId = {};
     // Inline display each hidden stat bar carried, keyed by id; an entry exists
@@ -82,15 +83,20 @@ export class SegmentStatsView {
   }
 
   /**
-   * The overlay element of the given id, cached across repaints.
+   * The overlay element of the given id, cached across repaints. These are
+   * page-owned containers this view does not create, so a cached node that has
+   * left the document is dropped and re-resolved: writing into a detached node
+   * stops the overlay updating in silence, and showStatBars() would hand the
+   * display back to the detached bar and leave the live one hidden.
    * @param {string} id - Element id to resolve.
    * @returns {HTMLElement | null} The element, or null while it is absent.
    */
   element(id) {
     const cached = this.byId[id];
-    if (cached) return cached;
+    if (cached?.isConnected) return cached;
     const found = this.doc.getElementById(id);
     if (found) this.byId[id] = found;
+    else delete this.byId[id];
     return found;
   }
 

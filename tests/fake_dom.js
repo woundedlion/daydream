@@ -166,6 +166,9 @@ export function fakeElement(tag = 'div') {
     attributes: {},
     children: [],
     parentNode: null,
+    // The fake stands in for a node the page already carries, so it starts
+    // connected; remove() clears it, which is what a liveness check reads.
+    isConnected: true,
     focusCalls: 0,
     scrollIntoViewCalls: 0,
     get firstElementChild() {
@@ -199,6 +202,7 @@ export function fakeElement(tag = 'div') {
     remove() {
       detach([this]);
       this.parentNode = null;
+      this.isConnected = false;
     },
     matches(selector) { return matches(this, selector); },
     closest(selector) {
