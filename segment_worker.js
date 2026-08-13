@@ -100,15 +100,16 @@ function applyClip() {
   // wasmModule is non-null whenever engine is — the engine is built from it.
   if (!wasmModule || !engine || !segRange) return false;
   const result = engine.setClip(segRange.x0, segRange.x1, segRange.y0, segRange.y1);
-  clipFullFrame = result === wasmModule.ClipSetResult.FULL_FRAME_KEPT;
   if (result === wasmModule.ClipSetResult.INVALID_BOUNDS) {
     post({
       type: 'engineRejected',
       reason: `setClip(${segRange.x0}, ${segRange.x1}, `
         + `${segRange.y0}, ${segRange.y1}) rejected`,
     });
+    // The engine kept its previous clip, so the latch keeps describing it.
     return false;
   }
+  clipFullFrame = result === wasmModule.ClipSetResult.FULL_FRAME_KEPT;
   return true;
 }
 
@@ -237,7 +238,8 @@ async function handleMessage(msg) {
           engine.setAnimationsPaused(msg.paused);
         }
         paramRevision = msg.paramRevision;
-        applyClip();
+        // A rejected clip leaves no usable render geometry, as in 'init'.
+        if (!applyClip()) break;
       }
       break;
     }
