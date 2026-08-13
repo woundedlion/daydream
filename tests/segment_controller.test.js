@@ -1976,7 +1976,7 @@ test('a fault latched by the overrun re-blit paints the overlay on the same tick
 
     c.tick(); // overrun branch: composite() latches the fault mid-tick
     assert.equal(c.faulted, true, 'the re-blit pre-pass latched the fault');
-    assert.equal(statsShown, 1, 'the overlay painted on the faulting tick, not the next one');
+    assert.ok(statsShown >= 1, 'the overlay painted on the faulting tick, not the next one');
   } finally {
     restore();
   }
@@ -2028,6 +2028,25 @@ test('the fault overlay is an alert focused once for recovery', () => {
   c.updateStats();
   assert.equal(stats.firstElementChild, alert);
   assert.equal(alert.focusCount, 1);
+});
+
+test('a fault latched outside tick() paints the overlay without waiting for one', () => {
+  // tick() is unreachable while the host is paused, so the fault path must paint
+  // the banner itself.
+  const stats = makeElement();
+  const c = makeController();
+  c.statsView.doc = {
+    getElementById: (id) => id === 'segment-stats' ? stats : null,
+    createElement: makeElement,
+  };
+  c.active = true;
+  c.create(2);
+
+  c.workers[0].onerror({ message: 'hang', filename: 'w.js', lineno: 1, colno: 1 });
+
+  assert.equal(c.faulted, true);
+  assert.equal(stats.firstElementChild.getAttribute('role'), 'alert',
+    'the fault banner painted without a tick');
 });
 
 test('a spawning pool reports the spawn and does not own the display', () => {
