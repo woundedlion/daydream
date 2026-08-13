@@ -165,6 +165,15 @@ test('hue key hit testing ignores blank wheel space', () => {
   assert.equal(hitTestHueKeyMarker(50, 50, points, 12), null);
 });
 
+test('oklchLinearRgb fills a caller-owned triple in place', () => {
+  const out = [9, 9, 9];
+  const returned = oklchLinearRgb(0.62, 0.1, 0.25, out);
+
+  assert.equal(returned, out, 'the caller-owned array is what comes back');
+  assert.deepEqual(out, oklchLinearRgb(0.62, 0.1, 0.25),
+    'filling in place must not change the conversion');
+});
+
 test('gamut chroma scale finds the widest OKLCH hue boundary', () => {
   const maximum = maxSrgbGamutChroma(0.5);
   const hueSamples = 360;
