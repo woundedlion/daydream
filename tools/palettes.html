@@ -1105,16 +1105,26 @@
         `${Number(degrees.toFixed(1))}°`;
     }
 
+    /**
+     * Switch the controls into CUSTOM hue mode, authoring the three keys the
+     * handoff starts from.
+     * @param {Object} sourceRecipe - The recipe the keys are resampled from.
+     * @returns {boolean} False when the resample dropped the key a drag had
+     *   grabbed — a four-key harmony resamples to three, and clamping the grab
+     *   onto a neighbour would silently move a different key.
+     */
     function activateCustomHue(sourceRecipe) {
       const state = customHueKeyState(sourceRecipe);
       customHueOffsets = state.offsets;
       selectedHueKey = Math.min(selectedHueKey, customHueOffsets.length - 1);
-      if (activeHueKey !== null)
-        activeHueKey = Math.min(activeHueKey, customHueOffsets.length - 1);
+      const grabKept = activeHueKey === null
+        || activeHueKey < customHueOffsets.length;
+      if (!grabKept) activeHueKey = null;
       setCustomBaseTurns(state.baseTurns);
       document.getElementById('gen_hue_mode').value = 'CUSTOM';
       previousHueMode = PaletteV4.hueMode.CUSTOM;
       syncRecipeControlAvailability();
+      return grabKept;
     }
 
     function currentHueKeyState(recipe) {
@@ -1310,7 +1320,11 @@
         return;
       }
       const recipe = readPaletteRecipe();
-      if (recipe.hue.mode !== PaletteV4.hueMode.CUSTOM) activateCustomHue(recipe);
+      if (recipe.hue.mode !== PaletteV4.hueMode.CUSTOM
+          && !activateCustomHue(recipe)) {
+        handleHueWheelPointerEnd(event);
+        return;
+      }
       updateHueKeyFromPointer(event);
     }
 
