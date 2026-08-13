@@ -838,6 +838,10 @@ export function createEffectGui({
     }
   }
 
+  function scrollElement(gui) {
+    return gui?.domElement?.querySelector?.('.lil-children') ?? null;
+  }
+
   /**
    * Replace a stale parameter schema without reloading the effect. Definitions
    * always come from the main engine; segmented workers only supply live values.
@@ -849,6 +853,7 @@ export function createEffectGui({
 
     const generation = paramGeneration();
     const wasMounted = Boolean(previous.gui?.domElement?.parentNode);
+    const scrollTop = scrollElement(previous.gui)?.scrollTop ?? 0;
     const preservedPause = engineAnimationsPaused()
       ?? Boolean(previous.animationState?.pause);
     let next;
@@ -877,7 +882,11 @@ export function createEffectGui({
     activeEffect = next;
     rebuildFailureGeneration = undefined;
     skewLogged = false;
-    if (wasMounted) mountEffect(next);
+    if (wasMounted) {
+      mountEffect(next);
+      const scroller = scrollElement(next.gui);
+      if (scroller) scroller.scrollTop = scrollTop;
+    }
     return true;
   }
 
