@@ -228,3 +228,19 @@ test('a dataset write is reachable by an [attr] selector', () => {
   assert.equal(tagged.matches('[data-index]'), true);
   assert.equal(bare.matches('[data-index]'), false);
 });
+
+test('replaceChildren moves a node out of the parent it came from', () => {
+  const from = fakeElement('div');
+  const to = fakeElement('div');
+  const moved = fakeElement('span');
+  const dropped = fakeElement('span');
+  from.append(moved);
+  to.append(dropped);
+
+  to.replaceChildren(moved);
+
+  assert.deepEqual(from.children, [], 'the old parent must not still list the node');
+  assert.deepEqual(to.children, [moved]);
+  assert.equal(moved.parentNode, to);
+  assert.equal(dropped.parentNode, null);
+});
