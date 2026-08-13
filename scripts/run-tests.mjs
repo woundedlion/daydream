@@ -19,6 +19,7 @@
 //   node scripts/run-tests.mjs --update-floors "tests/*.test.js"
 import { spawnSync } from 'node:child_process';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -37,6 +38,10 @@ const UPDATE_FLAG = '--update-floors';
 // without limit. scripts/require-tests.mjs holds the file count to exact
 // equality for the same reason.
 const MAX_SURPLUS_CASES = 64;
+
+// The one spelling of the Node version the committed floors are measured
+// against, read rather than copied so a bump cannot leave this behind.
+const NODE_PIN_PATH = '.github/workflows/js-unit-suite.yml';
 const COUNTER = new URL('./count-assertions.mjs', import.meta.url).href;
 const CASE_REPORTER = new URL('./report-cases.mjs', import.meta.url).href;
 
@@ -51,6 +56,31 @@ if (!args.some((a) => !a.startsWith('-'))) {
       '`node scripts/run-tests.mjs "tests/*.test.js"`.',
   );
   process.exit(1);
+}
+
+// node:test retallies cases across majors, so floors measured on one major are
+// not reproducible on another: a re-measurement here reds CI on files nobody
+// touched. Only the write is gated — a plain run on another major is the
+// developer's own business — and only inside a checkout of this repository,
+// since this script's own fixture repos carry floors with no pin behind them.
+if (updating && existsSync(NODE_PIN_PATH)) {
+  const pin = readFileSync(NODE_PIN_PATH, 'utf8').match(/node-version: *'([\d.]+)'/)?.[1];
+  if (!pin) {
+    console.error(
+      `run-tests: ${NODE_PIN_PATH} no longer spells a node-version pin, so the ` +
+        'major the committed floors were measured on is unknown.',
+    );
+    process.exit(1);
+  }
+  const [pinMajor] = pin.split('.');
+  const [runningMajor] = process.versions.node.split('.');
+  if (runningMajor !== pinMajor) {
+    console.error(
+      `run-tests: ${UPDATE_FLAG} must run on Node ${pinMajor}.x — CI measures the ` +
+        `floors on ${pin}, and this is v${process.versions.node}.`,
+    );
+    process.exit(1);
+  }
 }
 
 // What each pattern accepts past its last wildcard, or the whole path for a

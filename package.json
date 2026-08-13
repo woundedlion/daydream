@@ -19,7 +19,7 @@
     "three": "0.183.1"
   },
   "engines": {
-    "node": ">=22.3.0"
+    "node": ">=22.23.2"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
