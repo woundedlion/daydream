@@ -55,10 +55,12 @@ export class EngineHost {
    * a resolution the engine no longer renders, and notify the caller so it can
    * re-point its display aliases at the fresh view. A no-op before the WASM load
    * and after dispose(), when there is no engine to fetch from.
-   * @returns {void}
+   * @returns {boolean} Whether a fresh view was fetched. A caller that writes
+   *   into the view has to know: the buffer behind a fresh one carries whatever
+   *   the engine last left there, not what the previous view's holder did to it.
    */
   refresh() {
-    if (!this.engine) return;
+    if (!this.engine) return false;
     const { view, refreshed } = computePixelView(
       this.pixelView, () => this.engine.getPixels(),
       this.engine.getBufferLength?.());
@@ -66,6 +68,7 @@ export class EngineHost {
       this.pixelView = view;
       this.onViewRefreshed(view);
     }
+    return refreshed;
   }
 
   /**
