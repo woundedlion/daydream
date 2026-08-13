@@ -109,7 +109,7 @@ export function showBootstrapFailure(error, {
  * @returns {Promise<boolean>} True when the application module loaded.
  */
 export async function bootstrap({
-  loader = () => import('./daydream.js'),
+  loader = async () => (await import('./daydream.js')).start(),
   document: doc = globalThis.document,
   location: pageLocation = globalThis.location,
   logger = globalThis.console,

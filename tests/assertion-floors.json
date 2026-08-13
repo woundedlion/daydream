@@ -31,6 +31,10 @@
     "cases": 13,
     "assertions": 42
   },
+  "tests/daydream_start.test.js": {
+    "cases": 7,
+    "assertions": 17
+  },
   "tests/driver.test.js": {
     "cases": 66,
     "assertions": 490
