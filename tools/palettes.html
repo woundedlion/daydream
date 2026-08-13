@@ -2037,7 +2037,11 @@
      */
     function paletteGradientCss(entry) {
       const preview = new ProceduralPalette(entry.a, entry.b, entry.c, entry.d);
-      const STOPS = 16;
+      // The swatch is 3rem wide, so this is a stop per device pixel at 2x: CSS
+      // interpolates between stops in gamma-encoded sRGB while the strip below
+      // interpolates per column in linear light, and a palette with a high
+      // coefficient frequency aliases visibly at a coarser sampling.
+      const STOPS = 96;
       const stops = [];
       for (let i = 0; i < STOPS; i++) {
         const [r, g, b] = preview.get(i / (STOPS - 1));
