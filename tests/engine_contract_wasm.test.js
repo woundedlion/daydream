@@ -422,7 +422,7 @@ test('ShaderBall reports an invalid selector without changing its neighbors', ()
   assert.notEqual(curlFlow, -1);
   assert.equal(engine.setParameter('Planar Warp 1', curlFlow), M.ParamSetResult.APPLIED);
   assert.equal(engine.setParameter('Planar Warp 1 Strength', 0), M.ParamSetResult.APPLIED);
-  assert.equal(engine.setParameter('Planar Warp 1 Time', 0), M.ParamSetResult.APPLIED);
+  assert.equal(engine.setParameter('Planar Warp 1 Speed', 0), M.ParamSetResult.APPLIED);
   assert.equal(engine.setParameter('Planar Warp 1 Scale', 1), M.ParamSetResult.APPLIED);
   before = engine.getParameterDefinitions();
   const rootValue = (name) => before.find((d) => d.name === name)?.requestedValue;
@@ -447,11 +447,12 @@ test('ShaderBall reports an invalid selector without changing its neighbors', ()
 
   assert.equal(engine.setParameter('Planar Warp 1', 0), M.ParamSetResult.APPLIED);
   const repaired = engine.getParameterDefinitions().find((d) => d.name === 'Projection');
-  assert.match(repaired?.warning ?? '', /no compiled pipeline/,
-    'a seam-safe tuple still needs a compiled program to admit the Projection');
+  assert.equal(repaired?.acceptedValue, bonne,
+    'repairing the cross-stage conflict admits the dynamic topology');
+  assert.equal(repaired?.warning, undefined);
 });
 
-test('ShaderBall exposes rejected Curl Flow separately from the accepted warp', () => {
+test('ShaderBall accepts valid Curl Flow through the dynamic backend', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
   assert.equal(engine.setParameter('Planar Warp 1', 0), M.ParamSetResult.APPLIED);
@@ -461,12 +462,10 @@ test('ShaderBall exposes rejected Curl Flow separately from the accepted warp', 
   assert.notEqual(curlFlow, -1);
 
   assert.equal(engine.setParameter('Planar Warp 1', curlFlow), M.ParamSetResult.APPLIED);
-  const rejected = engine.getParameterDefinitions().find((d) => d.name === 'Planar Warp 1');
-  assert.equal(rejected?.requestedValue, curlFlow);
-  assert.equal(rejected?.acceptedValue, 0,
-    'reload must seed the renderer with None, not the preset Stereo Noise');
-  assert.match(rejected?.warning ?? '',
-    /Planar Warp 1 Projected Curl Flow rejected/);
+  const accepted = engine.getParameterDefinitions().find((d) => d.name === 'Planar Warp 1');
+  assert.equal(accepted?.requestedValue, curlFlow);
+  assert.equal(accepted?.acceptedValue, curlFlow);
+  assert.equal(accepted?.warning, undefined);
 });
 
 test('ShaderBall keeps planar warps when dodecahedral Grid becomes Primitive Lattice', () => {
