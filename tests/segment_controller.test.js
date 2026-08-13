@@ -31,6 +31,7 @@ const {
   WARM_INTERVAL_MS,
   maxSegmentCount,
   warmModules,
+  ModuleWarmer,
 } = await import('../segment_controller.js');
 const { PROTOCOL_VERSION } = await import('../worker_protocol.js');
 
@@ -211,6 +212,39 @@ test('a binary the engine refuses is reported, not left to the spawn to discover
     'the rejection is carried, so the operator sees why it failed');
 });
 
+// The artifacts are unversioned, so a warm that re-fetched and then failed to
+// compile has evidence the module it holds describes a binary the engine no
+// longer accepts. Keeping it would spawn workers on it for the rest of the page.
+test('a compile failure drops the module the previous warm left', async () => {
+  const warmer = new ModuleWarmer();
+  const serve = (bytes) => ({
+    baseUrl: 'http://localhost:8000/rebuilt/segment_controller.js',
+    minIntervalMs: 0,
+    fetch: (url) => Promise.resolve({
+      arrayBuffer: () => Promise.resolve(
+        url.href.endsWith('.wasm') ? bytes.buffer : new ArrayBuffer(0)),
+    }),
+  });
+
+  await warmer.warm(serve(EMPTY_WASM));
+  assert.ok(warmer.module instanceof WebAssembly.Module, 'the good binary compiled');
+
+  const stub = mock.method(console, 'warn', () => {});
+  try {
+    await warmer.warm(serve(Uint8Array.of(0, 0x61, 0x73, 0x6d, 9, 9, 9, 9)));
+  } finally {
+    stub.mock.restore();
+  }
+  assert.equal(warmer.module, null,
+    'the refused binary drops the module rather than leaving the stale one');
+
+  const c = makeController({ moduleWarmer: warmer });
+  c.create(2);
+  assert.equal(FakeWorker.instances[0].posted.find((m) => m.type === 'init').wasmModule,
+    undefined, 'each worker compiles its own instead of being handed a stale module');
+  c.destroy();
+});
+
 test('a device cap moves with the memory hint and the mobile layout', () => {
   assert.equal(maxSegmentCount({}, false), 8,
     'no hint (Firefox/Safari) on a desktop layout keeps the full range');
@@ -296,12 +330,15 @@ class FakeWorker {
  * @param {string} [config.resolution] - Initial app-state resolution key.
  * @param {string} [config.effect] - Initial app-state effect name.
  * @param {Object} [config.presets] - Resolution-preset map keyed by resolution name.
+ * @param {Object} [config.moduleWarmer] - Warmer whose compilation the spawn hands to its workers; omitted leaves the page's.
  * @returns {SegmentController} Controller wired to fake injected deps.
  */
 function makeController({ resolution = 'lo', effect = 'TestEffect',
-                         presets = { lo: { w: 4, h: 4 } } } = {}) {
+                         presets = { lo: { w: 4, h: 4 } },
+                         moduleWarmer } = {}) {
   const state = { resolution, effect };
   return new SegmentController({
+    moduleWarmer,
     resolutionPresets: presets,
     appState: { get: (k) => state[k], set: (k, v) => { state[k] = v; } },
     driver,
