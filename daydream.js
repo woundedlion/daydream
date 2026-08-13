@@ -29,7 +29,6 @@ import {
   createSegmentSpawnGuard,
   createSegmentedFallback,
   createTestAllTicker,
-  createUnhandledRejectionHandler,
   repointDisplayAliases,
 } from "./app_lifecycle.js";
 import { AppState, URLSync, replaceUrl } from "./state.js";
@@ -41,7 +40,7 @@ import {
   warmModules,
 } from "./segment_controller.js";
 import { EngineHost } from "./engine_host.js";
-import { showFatalError } from "./tools/banner.js";
+import { reportPageFailures, showFatalError } from "./tools/banner.js";
 import { showBootstrapFailure } from "./bootstrap.js";
 import { copyToClipboard } from "./tools/copy_text.js";
 
@@ -615,8 +614,9 @@ recordCtrl.disable();
 const onKeyDown = createGlobalKeydownHandler({ dispatch: (e) => daydream.keydown(e) });
 window.addEventListener("keydown", onKeyDown);
 
-const onUnhandledRejection = createUnhandledRejectionHandler({ report: showFatalError });
-window.addEventListener("unhandledrejection", onUnhandledRejection);
+// Covers a synchronous throw as well as a rejection: a sidebar rAF, a lil-gui
+// onChange, or a DOM listener that throws is otherwise console-only.
+const pageFailureListeners = reportPageFailures('simulator', window);
 
 daydream.renderer.setAnimationLoop(createFrameLoopGuard({
   frame: () => {
@@ -642,7 +642,7 @@ appTeardown = createAppTeardown({
   pageTarget: window,
   listeners: [
     ["keydown", onKeyDown],
-    ["unhandledrejection", onUnhandledRejection],
+    ...pageFailureListeners,
     ...(applyNoticeDismiss
       ? [["click", onApplyNoticeDismiss, applyNoticeDismiss]]
       : []),
