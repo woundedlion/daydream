@@ -1,5 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const PALETTES_HTML = readFileSync(new URL('../tools/palettes.html', import.meta.url), 'utf8');
+const PALETTE_CONTROLS_SRC =
+  readFileSync(new URL('../tools/palette_controls.js', import.meta.url), 'utf8');
 
 const {
   paletteTabFromSearch, paletteTabUrl, tablistKeyTarget,
@@ -310,8 +315,13 @@ test('recipe availability exposes only controls that can affect the result', () 
     baseHue: true,
     hueMode: true,
     harmony: true,
+    hueSpread: true,
+    hueSweep: false,
+    hueTorsion: true,
     colorPath: true,
     hueDirection: true,
+    chromaHeadroom: true,
+    falloffStart: false,
     chromaEndpoints: true,
     chromaMaximum: false,
     lightnessEndpoints: true,
@@ -320,11 +330,36 @@ test('recipe availability exposes only controls that can affect the result', () 
 
   recipe.hue.mode = PaletteV4.hueMode.SWEEP;
   assert.equal(paletteRecipeAvailability(recipe).harmony, false);
+  assert.equal(paletteRecipeAvailability(recipe).hueSpread, false);
+  assert.equal(paletteRecipeAvailability(recipe).hueSweep, true);
 
   recipe.hue.mode = PaletteV4.hueMode.HARMONY;
   recipe.hue.harmony = PaletteV4.harmony.MONOCHROMATIC;
   assert.equal(paletteRecipeAvailability(recipe).colorPath, false);
   assert.equal(paletteRecipeAvailability(recipe).hueDirection, false);
+  assert.equal(paletteRecipeAvailability(recipe).hueSpread, false,
+    'a monochromatic harmony places its one anchor without a spread');
+  assert.equal(paletteRecipeAvailability(recipe).hueSweep, false);
+
+  recipe.hue.harmony = PaletteV4.harmony.SPLIT_COMPLEMENTARY;
+  assert.equal(paletteRecipeAvailability(recipe).hueSpread, true);
+  recipe.hue.harmony = PaletteV4.harmony.SQUARE;
+  assert.equal(paletteRecipeAvailability(recipe).hueSpread, false,
+    'a square harmony is fixed quarter-turns, whatever the spread says');
+  recipe.hue.harmony = PaletteV4.harmony.MONOCHROMATIC;
+
+  recipe.domain = PaletteV4.domain.FALLOFF;
+  assert.equal(paletteRecipeAvailability(recipe).falloffStart, true);
+  recipe.domain = PaletteV4.domain.STRAIGHT;
+  assert.equal(paletteRecipeAvailability(recipe).falloffStart, false);
+
+  recipe.chroma.center = 1;
+  assert.equal(paletteRecipeAvailability(recipe).chromaHeadroom, false,
+    'a fully saturated center takes the whole headroom');
+  recipe.chroma.center = 0.62;
+  recipe.chroma.basis = PaletteV4.chromaBasis.ABSOLUTE;
+  assert.equal(paletteRecipeAvailability(recipe).chromaHeadroom, false);
+  recipe.chroma.basis = PaletteV4.chromaBasis.LOCAL_GAMUT;
 
   recipe.chroma.center = 0;
   let availability = paletteRecipeAvailability(recipe);
@@ -364,6 +399,12 @@ const CONTROL_READINGS = {
   chromaCurve: 'BELL',
   lightness: { minimum: 0.2, maximum: 0.8 },
   chroma: { minimum: 0.3, maximum: 0.5 },
+  easing: 'SMOOTHSTEP',
+  spreadTurns: 0.11,
+  sweepTurns: 2.5,
+  headroom: 0.8,
+  hueTorsion: 1.5,
+  falloffStart: 0.85,
 };
 
 test('control readings marshal into a recipe by enum name', () => {
@@ -378,6 +419,82 @@ test('control readings marshal into a recipe by enum name', () => {
   assert.equal(recipe.hue.baseTurns, 0.25);
   assert.equal(recipe.lightness.curve, PaletteV4.curve.ASCENDING);
   assert.equal(recipe.chroma.curve, PaletteV4.curve.BELL);
+});
+
+/**
+ * The tab exports every field of the recipe, so a reading that never reaches
+ * one leaves the control it belongs to decorative and the recipe stuck at the
+ * template's value.
+ */
+test('every recipe field a control carries is marshalled', () => {
+  const recipe = paletteRecipeFromControls(defaultPaletteRecipe(), CONTROL_READINGS);
+
+  assert.equal(recipe.easing, PaletteV4.easing.SMOOTHSTEP);
+  assert.equal(recipe.hue.spreadTurns, 0.11);
+  assert.equal(recipe.hue.sweepTurns, 2.5);
+  assert.equal(recipe.chroma.headroom, 0.8);
+  assert.equal(recipe.hueTorsion, 1.5);
+});
+
+/**
+ * The marshal is the whole contract between the tab and the exported recipe, so
+ * a reading it consumes that the page never assembles leaves that recipe field
+ * pinned to the template — a control the tool offers no way to reach.
+ */
+test('the generative tab assembles every reading the marshal consumes', () => {
+  const marshal = PALETTE_CONTROLS_SRC.match(
+    /export function paletteRecipeFromControls[\s\S]*?\n\}/)?.[0];
+  assert.ok(marshal, 'paletteRecipeFromControls must stay an exported function declaration');
+  const reader = PALETTES_HTML.match(/function readPaletteRecipe\(\) \{[\s\S]*?\n {4}\}/)?.[0];
+  assert.ok(reader, 'readPaletteRecipe must stay a named function in palettes.html');
+
+  const consumed = new Set([...marshal.matchAll(/controls\.(\w+)/g)].map((m) => m[1]));
+  assert.ok(consumed.size >= 12, 'the marshal must still read its readings by name');
+  for (const key of consumed) {
+    // Shorthand counts: the reading may be a local of the same name.
+    assert.match(reader, new RegExp(`\\b${key}\\s*[,:]`),
+      `the tab must read ${key} off a control`);
+  }
+});
+
+/**
+ * The tab reads its recipe off the controls, so a markup default that disagrees
+ * with the default recipe silently authors a different palette at load.
+ */
+test('the generative tab opens on the default recipe', () => {
+  const recipe = defaultPaletteRecipe();
+  const sliderValue = (id) => {
+    const tag = PALETTES_HTML.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`))?.[0];
+    assert.ok(tag, `palettes.html must carry a ${id} control`);
+    return Number(tag.match(/value="([^"]*)"/)[1]);
+  };
+
+  assert.ok(Math.abs(sliderValue('gen_spread') / 360 - recipe.hue.spreadTurns) < 1e-9);
+  assert.equal(sliderValue('gen_sweep'), recipe.hue.sweepTurns);
+  assert.equal(sliderValue('gen_torsion'), recipe.hueTorsion);
+  assert.equal(sliderValue('gen_headroom'), recipe.chroma.headroom);
+  assert.equal(sliderValue('gen_falloff'), recipe.falloffStart);
+  const easing = PALETTES_HTML.match(/<option value="(\w+)" selected>/)?.[1];
+  assert.equal(PaletteV4.easing[easing], recipe.easing,
+    'the easing option marked selected must be the default recipe\'s');
+});
+
+/** Verifies the two fields the engine canonicalizes are canonical before it sees them. */
+test('a falloff start and a loop sweep are canonicalized by domain', () => {
+  const straight = paletteRecipeFromControls(defaultPaletteRecipe(), CONTROL_READINGS);
+  assert.equal(straight.falloffStart, 0.9, 'only a FALLOFF domain carries its own start');
+
+  const falloff = paletteRecipeFromControls(defaultPaletteRecipe(),
+    { ...CONTROL_READINGS, domain: 'FALLOFF' });
+  assert.equal(falloff.falloffStart, 0.85);
+
+  const loop = paletteRecipeFromControls(defaultPaletteRecipe(),
+    { ...CONTROL_READINGS, domain: 'LOOP', hueMode: 'SWEEP' });
+  assert.equal(loop.hue.sweepTurns, 3, 'a loop closes only on whole turns');
+
+  const open = paletteRecipeFromControls(defaultPaletteRecipe(),
+    { ...CONTROL_READINGS, hueMode: 'SWEEP' });
+  assert.equal(open.hue.sweepTurns, 2.5);
 });
 
 test('an axis endpoint pair becomes its center and range', () => {
