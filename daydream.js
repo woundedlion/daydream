@@ -16,7 +16,7 @@ import {
   resolutionCorrection,
   resolutionEffects,
 } from "./effect_sequencing.js";
-import { createEffectGui } from "./effect_gui.js";
+import { createEffectGui, isShaderBallSchema } from "./effect_gui.js";
 import {
   createAppTeardown,
   createApplyNotice,
@@ -409,6 +409,31 @@ export function start({
   // Composition — the effect panel, the apply path, and the switch transaction
   ///////////////////////////////////////////////////////////////////////////////
 
+  // Which effect is loaded is read off its parameter schema, the same signal the
+  // panel groups its controls by. Definitions are the expensive read and this
+  // runs on every parameter write, so the answer is held for the load generation
+  // it was taken from.
+  let fullConfigGeneration = null;
+  let fullConfigSchema = false;
+  /**
+   * @returns {boolean} Whether the live effect persists through the exhaustive
+   *   versioned snapshot API rather than through per-parameter values.
+   */
+  function usesFullConfigSnapshot() {
+    if (typeof host.engine?.getFullConfigSnapshot !== 'function'
+        || typeof host.engine.restoreFullConfigSnapshot !== 'function') {
+      return false;
+    }
+    // An engine without a generation counter reports undefined for every load,
+    // so there is nothing to hold the answer against and it is re-read.
+    const generation = host.paramGeneration();
+    if (generation === undefined || generation !== fullConfigGeneration) {
+      fullConfigGeneration = generation;
+      fullConfigSchema = isShaderBallSchema(host.engine.getParameterDefinitions());
+    }
+    return fullConfigSchema;
+  }
+
   const effectGui = createEffectGui({
     createGui: () => createGui({ autoPlace: false }, 'fx'),
     getParameterDefinitions: () => host.engine.getParameterDefinitions(),
@@ -444,9 +469,7 @@ export function start({
     dragTarget: win,
     focusedElement: () => doc.activeElement,
     copyText: copyToClipboard,
-    usesFullConfigSnapshot: () => appState.get('effect') === 'ShaderBall'
-      && typeof host.engine.getFullConfigSnapshot === 'function'
-      && typeof host.engine.restoreFullConfigSnapshot === 'function',
+    usesFullConfigSnapshot,
     getFullConfigSnapshot: () => host.engine.getFullConfigSnapshot?.() ?? null,
     restoreFullConfigSnapshot: (snapshot) => {
       const result = host.engine.restoreFullConfigSnapshot?.(snapshot);

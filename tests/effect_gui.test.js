@@ -9,6 +9,7 @@ import {
   FULL_CONFIG_STORAGE_KEY,
   FLASH_MS,
   SHADERBALL_STAGE_ORDER,
+  isShaderBallSchema,
   legacyShaderBallParamNames,
   shaderBallStageAssignments,
 } from '../effect_gui.js';
@@ -391,6 +392,14 @@ test('an enumerated param becomes a dropdown of labels to engine indices', () =>
   assert.deepEqual(controller.args, [{ Off: 0, On: 1, Auto: 2 }]);
   assert.equal(controller.isBoolean, false);
   assert.equal(controller.isContinuous, false);
+});
+
+test('the ShaderBall schema is recognized by its stage selectors alone', () => {
+  assert.equal(isShaderBallSchema(shaderBallParams()), true);
+  assert.equal(
+    isShaderBallSchema(shaderBallParams().filter((p) => p.name !== 'Coverage')),
+    false, 'a missing stage selector is not the ShaderBall schema');
+  assert.equal(isShaderBallSchema([SPEED, GLOW]), false);
 });
 
 test('ShaderBall parameters map to banks in evaluation order', () => {
