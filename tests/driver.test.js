@@ -373,6 +373,7 @@ function disposeCtx(mesh, log) {
   canvas.addEventListener('blur', handlers.onCanvasBlur);
   return {
     resizeObserver: { disconnect: () => log.push('observer.disconnect') },
+    clock: { dispose: () => log.push('timer.dispose') },
     canvas,
     ...handlers,
     contextLostOverlay: { remove: () => log.push('overlay.remove') },
@@ -448,7 +449,7 @@ test('dispose releases the observer, listeners, and GPU resources', () => {
   const ctx = disposeCtx(fakeMesh(log), log);
   Daydream.prototype.dispose.call(ctx);
 
-  for (const step of ['observer.disconnect',
+  for (const step of ['observer.disconnect', 'timer.dispose',
                       'overlay.remove', 'material.dispose', 'axisMaterial.dispose',
                       'controls.dispose', 'labelLayer.remove',
                       'renderer.dispose', 'renderer.loseContext']) {
@@ -549,7 +550,7 @@ function renderCtx(colors, log) {
     labelAxes: false,
     recorder: null,
     heldCaptures: 0,
-    clock: { getDelta: () => 0 },
+    clock: { update: () => {}, getDelta: () => 0 },
     advanceFrameClock: Daydream.prototype.advanceFrameClock,
     controls: { update: () => log.push('controls.update') },
     dotMesh: { instanceColor: fakeColorAttribute(colors) },
