@@ -534,17 +534,8 @@
     overflow-y: visible;
   }
 
-  .effect-gui-container {
-    width: 100%;
-    height: auto;
-    flex-shrink: 0;
-    z-index: 1000;
-    background: rgba(0, 0, 0, 0.8);
-  }
-
   /* lil-gui panels stretch to full width on mobile */
-  .gui-container .lil-gui,
-  .effect-gui-container .lil-gui {
+  .gui-container .lil-gui {
     width: 100%;
   }
 
@@ -640,48 +631,27 @@
     min-height: 50vh;
   }
 
-  .effect-gui-container .effect-gui .preset-nav-previous,
-  .effect-gui-container .effect-gui .preset-nav-next {
+  .gui-container .effect-gui .preset-nav-previous,
+  .gui-container .effect-gui .preset-nav-next {
     display: inline-flex;
     vertical-align: top;
     width: 50%;
   }
 
-  .effect-gui-container .effect-gui .preset-nav-previous > .lil-widget,
-  .effect-gui-container .effect-gui .preset-nav-next > .lil-widget {
+  .gui-container .effect-gui .preset-nav-previous > .lil-widget,
+  .gui-container .effect-gui .preset-nav-next > .lil-widget {
     width: 100%;
   }
 }
 
 /* --- Desktop Styles --- */
 @media only screen and (width > 900px) {
-  .main-area {
-    display: grid;
-    grid-template-columns: max-content minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-  }
-
-  .effect-sidebar {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .canvas-container,
-  .effect-gui-container {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  .effect-gui-container {
-    align-self: stretch;
-    justify-self: start;
-    container-type: size;
-    pointer-events: none;
-    z-index: 2000;
-  }
-
   .gui-container {
     position: absolute;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    flex-wrap: wrap;
     width: auto;
     right: 0;
     top: 0;
@@ -691,11 +661,18 @@
     z-index: 2000;
   }
 
+  .gui-container>.global-gui {
+    order: 1;
+  }
+
+  .gui-container>.effect-gui {
+    order: 2;
+  }
+
   /* Re-enable pointer events for lil-gui panels */
-  .gui-container > .lil-gui,
-  .effect-gui-container > .lil-gui {
+  .gui-container > .lil-gui {
     pointer-events: auto;
-    margin: 0 0 1px 0;
+    margin: 0 0 1px 10px;
     width: auto;
     --spacing: 4px;
     --padding: 4px;
@@ -704,79 +681,53 @@
     max-height: 100vh;
   }
 
-  .effect-gui-container > .effect-gui {
-    width: max-content;
-    max-height: 100cqh;
-  }
-
-  .effect-gui-container > .lil-gui.effect-gui > .lil-children {
-    display: flex;
-    flex-flow: column wrap;
-    align-content: flex-start;
-    max-height: calc(100cqh - var(--title-height));
-    overflow: visible;
-    padding: var(--spacing) var(--padding) var(--spacing);
-  }
-
-  .effect-gui-container > .effect-gui > .lil-children > .lil-controller,
-  .effect-gui-container > .effect-gui > .lil-children > .lil-gui {
-    flex: none;
-    width: 320px;
-  }
-
-  .effect-gui-container > .effect-gui > .lil-children > .lil-controller {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
   /* Grid layout: labels auto-size to widest, controls fill the rest */
-  .gui-container .lil-gui > .lil-children,
-  .effect-gui-container .lil-gui > .lil-children {
+  .gui-container .lil-gui > .lil-children {
     display: grid;
     grid-template-columns: auto 1fr;
     row-gap: var(--spacing);
     padding: var(--spacing) var(--padding) var(--spacing);
   }
 
-  .gui-container .lil-gui .lil-controller,
-  .effect-gui-container .lil-gui .lil-controller {
+  .gui-container .lil-gui .lil-controller {
     display: contents;
   }
 
-  .gui-container .lil-gui .lil-controller > .lil-name,
-  .effect-gui-container .lil-gui .lil-controller > .lil-name {
+  .gui-container .lil-gui .lil-controller > .lil-name {
     padding-right: 10px;
     line-height: var(--widget-height);
     align-self: center;
   }
 
   /* Folders span both columns so they stack vertically */
-  .gui-container .lil-gui .lil-children > .lil-gui,
-  .effect-gui-container .lil-gui .lil-children > .lil-gui {
+  .gui-container .lil-gui .lil-children > .lil-gui {
     grid-column: 1 / -1;
   }
 
   /* Function/button controllers: span both columns */
-  .gui-container .lil-gui .lil-controller.lil-function > .lil-name,
-  .effect-gui-container .lil-gui .lil-controller.lil-function > .lil-name {
+  .gui-container .lil-gui .lil-controller.lil-function > .lil-name {
     display: none;
   }
 
-  .gui-container .lil-gui .lil-controller.lil-function > .lil-widget,
-  .effect-gui-container .lil-gui .lil-controller.lil-function > .lil-widget {
+  .gui-container .lil-gui .lil-controller.lil-function > .lil-widget {
     grid-column: 1 / -1;
   }
 
-  .effect-gui-container .lil-gui .preset-nav-previous > .lil-widget {
+  .gui-container .lil-gui .preset-nav-previous > .lil-widget {
     grid-column: 1;
   }
 
-  .effect-gui-container .lil-gui .preset-nav-next > .lil-widget {
+  .gui-container .lil-gui .preset-nav-next > .lil-widget {
     grid-column: 2;
+  }
+
+  /* 1px gap between adjacent panels */
+  .gui-container > .lil-gui + .lil-gui {
+    margin-left: 1px;
   }
 }
 
-.effect-gui-container .effect-gui .lil-controller.param-warning > .lil-name::after {
+.gui-container .effect-gui .lil-controller.param-warning > .lil-name::after {
   content: "\26a0";
   color: #facc15;
   margin-left: 0.4em;
