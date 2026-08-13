@@ -501,6 +501,31 @@ test('build restores the last accepted value before replaying an invalid request
   ]);
 });
 
+// The engine reports a bool param's values as JS booleans, but the companion
+// deep-link key is read back through the URL number grammar, so it must hold
+// the float form both writers already agree on.
+test('a bool parameter stores its accepted value as a float', () => {
+  const glow = {
+    name: 'Glow', value: false, requestedValue: false, acceptedValue: false,
+  };
+  const h = makeHarness({
+    params: [glow],
+    onEngineParam: (_name, value) => {
+      glow.value = value > 0.5;
+      glow.requestedValue = glow.value;
+      glow.acceptedValue = glow.value;
+    },
+  });
+
+  h.panel.build();
+  h.gui().ctrl('Glow').setValue(true);
+
+  assert.equal(h.gui().stored['__accepted.Glow'], 1);
+  assert.deepEqual(h.acceptedSnapshots.at(-1), [{ name: 'Glow', value: 1 }]);
+  const nonNumeric = h.gui().storedWrites.filter(([, v]) => typeof v !== 'number');
+  assert.deepEqual(nonNumeric, []);
+});
+
 test('ShaderBall restores one versioned snapshot before building session controls', () => {
   const stored = {
     accepted: [0, 4294967295],
