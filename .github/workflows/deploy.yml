@@ -117,6 +117,9 @@ jobs:
           ref: ${{ steps.engine.outputs.ref }}
           token: ${{ secrets.POV_TOKEN || github.token }}
           path: engine
+          # The gate builds and runs CMake code out of this tree; nothing below
+          # fetches, so the token must not be left in engine/.git/config.
+          persist-credentials: false
 
       - name: Verify the committed segment-map golden matches the pinned engine
         # pov_segment_map.json is the firmware segment→canvas table
