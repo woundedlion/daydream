@@ -230,7 +230,8 @@ export class Daydream {
     // Captures owed by advanced ticks whose repaint a detached view held.
     this.heldCaptures = 0;
 
-    this.clock = new THREE.Clock(true);
+    this.clock = new THREE.Timer();
+    this.clock.connect(document);
     this.frameInterval = 1 / Daydream.FPS; // seconds per simulation frame
     this.timeAccumulator = 0;
 
@@ -586,6 +587,7 @@ export class Daydream {
    * @returns {boolean} True when a frame interval was consumed and the sim should advance.
    */
   advanceFrameClock() {
+    this.clock.update();
     const delta = this.clock.getDelta();
     // Drain getDelta each frame but don't accrue while paused, so unpause neither
     // stalls on an emptied accumulator nor replays the paused span as backlog.
@@ -938,6 +940,7 @@ export class Daydream {
    */
   dispose() {
     this.resizeObserver?.disconnect();
+    this.clock?.dispose();
 
     if (this.onContextLost) {
       this.canvas.removeEventListener(
