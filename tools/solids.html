@@ -1745,6 +1745,18 @@
         buttons.map((btn) => btn.dataset.op));
       if (!probe) return;
 
+      if (probe.abandoned) {
+        // The gate has stopped probing, so no later pass will ever revise this
+        // verdict: an unchecked gate fails open rather than stranding whatever
+        // the last complete pass happened to disable for the rest of the session.
+        for (const btn of buttons) {
+          btn.disabled = false;
+          btn.removeAttribute('title');
+        }
+        showGateMsg('op availability is no longer checked: the validator module will not start');
+        return;
+      }
+
       for (const btn of buttons) {
         const blocked = probe.blocked.has(btn.dataset.op);
         // An incomplete pass names only a lower bound on what would trap, so an
@@ -1753,10 +1765,6 @@
         btn.disabled = blocked;
         if (blocked) btn.title = 'Would exceed an engine mesh limit on the current solid';
         else btn.removeAttribute('title');
-      }
-
-      if (probe.abandoned) {
-        showGateMsg('op availability is no longer checked: the validator module will not start');
       }
     }
 
