@@ -464,7 +464,7 @@ export function start({
     },
     engineAnimationsPaused: () => host.engine.getAnimationsPaused?.(),
     applyEffect: () => apply.applyEffect(),
-    guiContainer: () => doc.getElementById('gui-container'),
+    guiContainer: () => doc.getElementById('effect-gui-container'),
     isMobile: () => daydream.isMobile,
     dragTarget: win,
     focusedElement: () => doc.activeElement,
