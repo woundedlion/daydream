@@ -43,7 +43,8 @@ function shaderBallParams() {
     { name: 'Value Transfer', ...ENUM },
     { name: 'Coverage', ...ENUM },
     { name: 'Palette', ...ENUM },
-    { name: 'Hue Noise Amount', value: 0, min: 0, max: 1, animated: true },
+    { name: 'Hue Shift Mode', ...ENUM },
+    { name: 'Hue Shift Amount', value: 0, min: 0, max: 1, animated: true },
   ];
 }
 
@@ -425,12 +426,13 @@ test('ShaderBall parameters map to banks in evaluation order', () => {
   assert.deepEqual(SHADERBALL_STAGE_ORDER, [
     'Camera', 'Lens', 'Surface Noise', 'Projection Frame', 'Projection',
     'Planar Warp 1', 'Planar Warp 2', 'Function', 'Signal Weight',
-    'Value Transfer', 'Coverage', 'Palette',
+    'Value Transfer', 'Coverage', 'Colorize',
   ]);
   assert.equal(assignments.get('Projection Wander'), 'Projection Frame');
   assert.equal(assignments.get('Surface Noise Scale'), 'Surface Noise');
   assert.equal(assignments.get('Planar Warp 1 Strength'), 'Planar Warp 1');
-  assert.equal(assignments.get('Hue Noise Amount'), 'Palette');
+  assert.equal(assignments.get('Hue Shift Mode'), 'Colorize');
+  assert.equal(assignments.get('Hue Shift Amount'), 'Colorize');
 });
 
 test('ShaderBall builds one URL-transparent bank for every pipeline stage', () => {
@@ -452,7 +454,9 @@ test('ShaderBall builds one URL-transparent bank for every pipeline stage', () =
   assert.equal(h.gui().ctrl('Function').folder, 'Function');
   assert.equal(h.gui().ctrl('Surface Noise').folder, 'Surface Noise');
   assert.equal(h.gui().ctrl('Surface Noise').label, 'Mode');
-  assert.equal(h.gui().ctrl('Palette').folder, 'Palette');
+  assert.equal(h.gui().ctrl('Palette').folder, 'Colorize');
+  assert.equal(h.gui().ctrl('Palette').label, 'Palette');
+  assert.equal(h.gui().ctrl('Hue Shift Mode').folder, 'Colorize');
 });
 
 test('renamed ShaderBall controls accept every legacy deep-link name', () => {
@@ -465,7 +469,8 @@ test('renamed ShaderBall controls accept every legacy deep-link name', () => {
   assert.deepEqual(legacyShaderBallParamNames('Planar Warp 2 Noise Basis'),
     ['Inner Noise Basis']);
   assert.deepEqual(legacyShaderBallParamNames('Palette'), ['Colorizer']);
-  assert.deepEqual(legacyShaderBallParamNames('Hue Noise Amount'), ['Hue Shift']);
+  assert.deepEqual(legacyShaderBallParamNames('Hue Shift Amount'),
+    ['Hue Noise Amount', 'Hue Shift']);
 });
 
 test('an invalid param carries an actionable warning indicator and tooltip', () => {
@@ -1682,11 +1687,11 @@ test('a ShaderBall drag writes one full-config snapshot, at the release', () => 
     fullConfig: true,
     fullConfigSnapshot: snapshot(0),
     onEngineParam: (name, value, state) => {
-      if (name === 'Hue Noise Amount') state.fullConfigSnapshot = snapshot(value);
+      if (name === 'Hue Shift Amount') state.fullConfigSnapshot = snapshot(value);
     },
   });
   h.panel.build();
-  const controller = h.gui().ctrl('Hue Noise Amount');
+  const controller = h.gui().ctrl('Hue Shift Amount');
   h.gui().storedWrites.length = 0;
 
   controller.domElement.dispatch('pointerdown');
