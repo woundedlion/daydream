@@ -298,8 +298,11 @@ export function createEffectGui({
       if (parameter.readonly) continue;
       const accepted = parameter.acceptedValue
         ?? parameter.requestedValue ?? parameter.value;
-      acceptedParams.push({ name: parameter.name, value: engineParamValue(accepted) });
-      gui?.writeStoredValue?.(acceptedStorageKey(parameter.name), accepted);
+      // The float form, not the raw value: restoreAcceptedParams() reads the
+      // companion key back through the URL number grammar, which rejects a bool.
+      const value = engineParamValue(accepted);
+      acceptedParams.push({ name: parameter.name, value });
+      gui?.writeStoredValue?.(acceptedStorageKey(parameter.name), value);
     }
     rememberWorkerAcceptedParams(acceptedParams);
   }
