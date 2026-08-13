@@ -102,7 +102,8 @@ test('showFatalError does not throw when neither body nor documentElement exists
 /**
  * A stand-in for `window`: records listeners so a test can fire the failure
  * events the browser would, and reports what was dispatched to whom.
- * @returns {{addEventListener: Function, dispatch: Function, types: () => string[]}}
+ * @returns {{addEventListener: Function, removeEventListener: Function,
+ *   dispatch: Function, types: () => string[]}}
  */
 function fakeTarget() {
   const listeners = new Map();
@@ -110,6 +111,13 @@ function fakeTarget() {
     addEventListener(type, fn) {
       if (!listeners.has(type)) listeners.set(type, []);
       listeners.get(type).push(fn);
+    },
+    removeEventListener(type, fn) {
+      const held = listeners.get(type);
+      if (!held) return;
+      const at = held.indexOf(fn);
+      if (at >= 0) held.splice(at, 1);
+      if (held.length === 0) listeners.delete(type);
     },
     dispatch(type, event = {}) {
       for (const fn of listeners.get(type) ?? []) fn(event);
@@ -140,6 +148,28 @@ test('reportPageFailures listens for both uncaught errors and unhandled rejectio
   const target = fakeTarget();
   reportPageFailures('solids tool', target);
   assert.deepEqual(target.types().sort(), ['error', 'unhandledrejection']);
+});
+
+/**
+ * The simulator installs this surface at module scope and drops it on a page
+ * discard. Returning the pairs it registered is what lets that teardown remove
+ * the same functions; a handler surviving the discard reports into a dead page.
+ */
+test('reportPageFailures returns the pairs its caller needs to deregister', () => {
+  const { bodyEl } = fakeDocument();
+  const target = fakeTarget();
+
+  const installed = reportPageFailures('simulator', target);
+
+  assert.deepEqual(installed.map(([type]) => type),
+    ['error', 'unhandledrejection']);
+  for (const [type, handler] of installed) target.removeEventListener(type, handler);
+  assert.deepEqual(target.types(), [], 'a returned handler was not the one installed');
+
+  withCapturedConsole(() => {
+    target.dispatch('error', { error: new Error('after discard') });
+  });
+  assert.equal(bodyEl.children.length, 0, 'a removed listener still raised a banner');
 });
 
 test('a post-boot uncaught error raises the banner, not just a console line', () => {

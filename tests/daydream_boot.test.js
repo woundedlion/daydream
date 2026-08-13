@@ -66,6 +66,17 @@ test('the teardown is retained and reachable from the module-load handlers', () 
     'the handlers must read the teardown lazily; it is built after them');
 });
 
+test('the page-failure surface is the shared one, and it is torn down', () => {
+  assert.match(SOURCE, /reportPageFailures\('simulator', window\)/,
+    'a synchronous throw from an animation frame, a lil-gui onChange, or a DOM '
+    + 'listener is console-only without the error listener the shared surface '
+    + 'installs alongside the rejection one');
+  const at = SOURCE.indexOf('appTeardown = createAppTeardown(');
+  const args = balanced(SOURCE, SOURCE.indexOf('(', at));
+  assert.match(args, /\.\.\.pageFailureListeners/,
+    'a listener that outlives the page discard reports into a dead app');
+});
+
 test('the composition root rejects a stale segmented-controller module', () => {
   assert.match(SOURCE, /SEGMENT_CONTROLLER_API_VERSION/,
     'a fresh daydream.js must require a named export absent from stale cached controllers');

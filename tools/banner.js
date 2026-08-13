@@ -82,7 +82,8 @@ export function showFatalError(message) {
  *
  * @param {string} label - Page name used in the messages, e.g. 'Lissajous tool'.
  * @param {EventTarget} [target=window] - Where to listen for the failures.
- * @returns {void}
+ * @returns {Array<[string, EventListener]>} The registered listeners as
+ *   [type, handler] pairs, for a page that tears itself down on discard.
  */
 export function reportPageFailures(label, target = window) {
   /**
@@ -95,18 +96,29 @@ export function reportPageFailures(label, target = window) {
     const reason = detail?.message ?? String(detail ?? 'unknown error');
     showFatalError(`The ${label} hit an error — ${reason} — see the browser console for details.`);
   };
-  target.addEventListener('error', (event) => {
+  /**
+   * @param {Event} event - The uncaught-error event.
+   * @returns {void}
+   */
+  const onError = (event) => {
     const e = /** @type {ErrorEvent} */ (event);
     // A failed subresource fires an error event that does not bubble, so only a
     // script error reaches this listener with the target still the window.
     if (e.target && e.target !== target) return;
     surface('error', e.error ?? e.message);
-  });
-  target.addEventListener('unhandledrejection', (event) => {
+  };
+  /**
+   * @param {Event} event - The unhandled-rejection event.
+   * @returns {void}
+   */
+  const onRejection = (event) => {
     const e = /** @type {PromiseRejectionEvent} */ (event);
     e.preventDefault?.();
     surface('unhandled rejection', e.reason);
-  });
+  };
+  target.addEventListener('error', onError);
+  target.addEventListener('unhandledrejection', onRejection);
+  return [['error', onError], ['unhandledrejection', onRejection]];
 }
 
 /**

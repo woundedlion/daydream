@@ -1,11 +1,11 @@
 {
   "tests/app_lifecycle.test.js": {
-    "cases": 64,
-    "assertions": 145
+    "cases": 62,
+    "assertions": 140
   },
   "tests/banner.test.js": {
-    "cases": 12,
-    "assertions": 29
+    "cases": 13,
+    "assertions": 32
   },
   "tests/bootstrap.test.js": {
     "cases": 18,
@@ -28,8 +28,8 @@
     "assertions": 29
   },
   "tests/daydream_boot.test.js": {
-    "cases": 12,
-    "assertions": 40
+    "cases": 13,
+    "assertions": 42
   },
   "tests/driver.test.js": {
     "cases": 66,
