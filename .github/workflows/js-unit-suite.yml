@@ -113,6 +113,9 @@ jobs:
           ref: ${{ steps.engine.outputs.ref }}
           token: ${{ secrets.POV_TOKEN || github.token }}
           path: engine
+          # The suite runs code out of this tree; nothing below fetches, so the
+          # token must not be left in engine/.git/config.
+          persist-credentials: false
 
       - name: Test
         env:
