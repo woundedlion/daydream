@@ -97,6 +97,12 @@ export const URL_FLUSH_DEBOUNCE_MS = 200;
 // waiting out.
 export const URL_FLUSH_RETRY_MS = 2000;
 
+// Consecutive refused writes before the retry gives up and the buffer is
+// dropped. The product outlasts WebKit's 30 s rate-limit window, which is the
+// refusal a wait clears; a sandboxed iframe or a file:// document refuses every
+// write for the page's lifetime, and no number of retries reaches one.
+export const URL_FLUSH_MAX_RETRIES = 20;
+
 /**
  * Replace the current history entry with a URL, reporting a refused write
  * instead of propagating it.
@@ -281,6 +287,7 @@ export class URLSync {
     this.disposed = false;
     this.adhoc = new Map(); // GUI-set params (key -> string), merged on flush
     this.pendingReset = null; // reset()'s excluded keys, applied by the next flush
+    this.retries = 0; // consecutive refused writes, cleared by one that lands
 
     const params = new URLSearchParams(window.location.search);
     const patch = {};
@@ -429,8 +436,11 @@ export class URLSync {
    * @details A refused write (replaceState rate limit) leaves the URL as it was,
    *   so the buffered ad-hoc writes and any pending reset are kept and a retry is
    *   armed. Tracked keys are re-read from state on every flush and need no such
-   *   hold. Dropping the buffer here would lose a GUI param permanently, since
-   *   nothing but the next write on that same key would re-assert it.
+   *   hold. Dropping the buffer immediately would lose a GUI param permanently,
+   *   since nothing but the next write on that same key would re-assert it — but
+   *   the ladder is bounded at URL_FLUSH_MAX_RETRIES, past which the refusal is a
+   *   standing one and the buffer is dropped rather than held by a timer that
+   *   re-arms for the page's lifetime.
    * @returns {void}
    */
   flush() {
@@ -446,11 +456,22 @@ export class URLSync {
       else params.set(key, val);
     }
     if (!writeUrl(params)) {
-      this.schedule(URL_FLUSH_RETRY_MS);
+      this.retries += 1;
+      if (this.retries < URL_FLUSH_MAX_RETRIES) {
+        this.schedule(URL_FLUSH_RETRY_MS);
+        return;
+      }
+      if (this.retries === URL_FLUSH_MAX_RETRIES) {
+        console.warn(`URLSync: ${URL_FLUSH_MAX_RETRIES} consecutive refused URL `
+          + 'writes; dropping the buffered params and leaving the URL as it is.');
+      }
+      this.pendingReset = null;
+      this.adhoc.clear();
       return;
     }
     // The URL is now the store of record; clear the buffer so a stale ad-hoc entry
     // can't re-apply on every flush.
+    this.retries = 0;
     this.pendingReset = null;
     this.adhoc.clear();
   }

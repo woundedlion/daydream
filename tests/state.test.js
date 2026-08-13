@@ -7,6 +7,7 @@ import {
   overlayUrlParam,
   replaceUrl,
   roundUrlNumber,
+  URL_FLUSH_MAX_RETRIES,
   URL_FLUSH_RETRY_MS,
   writeUrl,
 } from '../state.js';
@@ -268,6 +269,52 @@ test('URLSync holds its ad-hoc buffer through a refused history write', () => {
     sync.flush();
     assert.deepEqual(written.at(-1), '/sim?effect=Voronoi',
       'a landed ad-hoc write is not replayed from the buffer');
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+    console.warn = warn;
+  }
+});
+
+/**
+ * The rate limit the retry waits out clears on its own. A sandboxed iframe or a
+ * file:// document refuses every write for the page's lifetime, and an unbounded
+ * retry answers that with a 2-second timer and a console line per iteration,
+ * forever, holding a buffer nothing will ever land.
+ */
+test('URLSync bounds its retries of a refused history write', () => {
+  const written = [];
+  let refuse = true;
+  const delays = [];
+  const warnings = [];
+  const realSetTimeout = globalThis.setTimeout;
+  const warn = console.warn;
+  console.warn = (...args) => { warnings.push(String(args[0])); };
+  globalThis.setTimeout = (fn, ms) => { delays.push(ms); return 0; };
+  globalThis.window = {
+    location: { search: '', pathname: '/sim', hash: '' },
+    history: {
+      replaceState: (state, title, url) => {
+        if (refuse) throw new Error('SecurityError');
+        written.push(url);
+      },
+    },
+  };
+  try {
+    const sync = new URLSync(new AppState({ effect: 'Voronoi' }), ['effect']);
+    sync.setParam('scale', 3);
+    delays.length = 0;
+
+    for (let i = 0; i < URL_FLUSH_MAX_RETRIES + 3; i++) sync.flush();
+
+    assert.equal(delays.length, URL_FLUSH_MAX_RETRIES - 1,
+      'the retry kept re-arming past the bound');
+    assert.equal(warnings.filter((m) => m.startsWith('URLSync:')).length, 1,
+      'the exhaustion is reported once, not once per refused write');
+
+    refuse = false;
+    sync.flush();
+    assert.deepEqual(written, ['/sim?effect=Voronoi'],
+      'a tracked key is re-read from state, but the abandoned ad-hoc param is gone');
   } finally {
     globalThis.setTimeout = realSetTimeout;
     console.warn = warn;
