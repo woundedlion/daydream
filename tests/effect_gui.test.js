@@ -270,6 +270,7 @@ function makeHarness({
   const restoredFullConfigs = [];
   const configNotices = [];
   let configNoticeClears = 0;
+  let paramDefinitionReads = 0;
   const guis = [];
   const dragTarget = fakeElement('window');
   // Engine double: owns the animation-pause state the panel now reads back,
@@ -282,7 +283,7 @@ function makeHarness({
       guis.push(gui);
       return gui;
     },
-    getParameterDefinitions: () => state.params,
+    getParameterDefinitions: () => { paramDefinitionReads += 1; return state.params; },
     paramGeneration: () => state.generation,
     segmentsOwnDisplay: () => state.ownsDisplay,
     segmentParamValues: () => state.segmentValues,
@@ -340,6 +341,7 @@ function makeHarness({
            acceptedSnapshots,
            restoredFullConfigs, configNotices,
            configNoticeClears: () => configNoticeClears,
+           paramDefinitionReads: () => paramDefinitionReads,
            gui: () => guis[guis.length - 1] };
 }
 
@@ -879,6 +881,36 @@ test('sync reads the worker pool once it owns the display', () => {
   h.panel.sync();
 
   assert.equal(h.gui().ctrl('Speed').getValue(), 0.25);
+});
+
+// getParamValues() is the per-frame stream; the definitions are a snapshot, and
+// only an enum selector needs the requestedValue they alone carry.
+test('sync marshals no definitions for an effect with no enum control', () => {
+  const h = makeHarness({ params: [SPEED, GLOW], engineValues: [0.4, 1] });
+  h.panel.build();
+  const before = h.paramDefinitionReads();
+
+  h.panel.sync();
+
+  assert.equal(h.paramDefinitionReads(), before);
+  assert.equal(h.gui().ctrl('Speed').getValue(), 0.4, 'values still track');
+  assert.equal(h.gui().ctrl('Glow').getValue(), true);
+});
+
+test('sync marshals the definitions once for an effect with an enum control', () => {
+  const mode = {
+    name: 'Mode', value: 0, requestedValue: 0, options: ['Off', 'On'],
+    animated: true,
+  };
+  const h = makeHarness({ params: [mode, SPEED], engineValues: [0, 0.4] });
+  h.panel.build();
+  const before = h.paramDefinitionReads();
+  h.state.params = [{ ...mode, requestedValue: 1 }, SPEED];
+
+  h.panel.sync();
+
+  assert.equal(h.paramDefinitionReads(), before + 1);
+  assert.equal(h.gui().ctrl('Mode').getValue(), 1, 'the requested enum is adopted');
 });
 
 test('sync rebuilds before reading the main engine value stream', () => {

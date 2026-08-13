@@ -369,7 +369,16 @@ export function createEffectGui({
     fx.preset.controller.updateDisplay();
   }
 
+  /**
+   * Re-seat the effect's enum selectors on the requested values the engine
+   * holds. Only the definitions carry `requestedValue`, so this reads the
+   * definitions snapshot rather than the per-frame value stream — an effect
+   * with no enum control skips it and keeps sync() off that marshal.
+   * @param {Object} fx - The active effect record.
+   * @returns {void}
+   */
   function adoptRequestedEnums(fx) {
+    if (!fx.hasEnumControls) return;
     for (const parameter of getParameterDefinitions()) {
       const controller = fx.controllerByName.get(parameter.name);
       if (!controller?.isEnum) continue;
@@ -677,6 +686,7 @@ export function createEffectGui({
     fx.writableParamNames = [];
     fx.controllerByName = new Map();
     fx.hasParams = params.length > 0;
+    fx.hasEnumControls = false;
     const stageAssignments = shaderBallStageAssignments(params);
     const stageFolders = new Map();
     if (stageAssignments) {
@@ -701,6 +711,7 @@ export function createEffectGui({
       if (stage) controller.name(shaderBallControlLabel(stage, p.name));
       fx.paramNames.push(p.name);
       fx.controllerByName.set(p.name, controller);
+      if (controller.isEnum) fx.hasEnumControls = true;
 
       if (p.readonly) {
         if (typeof controller.disable === 'function') controller.disable();
