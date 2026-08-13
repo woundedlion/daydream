@@ -310,10 +310,22 @@ const moduleLoad = createModuleLoadHandlers({
     recordCtrl.enable();
 
     const loadingOverlay = document.getElementById('loading-overlay');
-    applyInitialState(
-      () => apply.applyResolution(true),
-      () => loadingOverlay?.remove(),
-    );
+    // The module is loaded and the engine is built, so a refused initial apply
+    // is a state failure, not a load failure: report it as its own thing and
+    // leave the page (and its teardown) standing.
+    try {
+      applyInitialState(
+        () => apply.applyResolution(true),
+        () => loadingOverlay?.remove(),
+      );
+    } catch (err) {
+      console.error('Initial resolution/effect could not be applied:', err);
+      const title = 'No supported resolution and effect could be applied.';
+      if (!showBootstrapFailure(err, { title })) {
+        const detailText = (err && err.message) ? err.message : String(err);
+        showFatalError(`${title} ${detailText}`);
+      }
+    }
   },
   discardStartup: () => {
     host.dispose();
