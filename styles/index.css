@@ -477,9 +477,27 @@
    Range syntax, so a fractional width (page zoom, fractional DPR) still lands
    in exactly one of this query and the desktop complement below. */
 @media only screen and (width <= 900px) {
-  /* Hide entire nav-tabs header on mobile */
+  /* Compact tool links; the header's stats table is covered by .stats-bar. */
   .nav-tabs {
+    padding: 6px;
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  #global-stats-desktop {
     display: none;
+  }
+
+  .nav-label {
+    font-size: 12px;
+    padding: 4px 0;
+    margin-right: 2px;
+  }
+
+  .tab {
+    padding: 5px 8px;
+    font-size: 12px;
   }
 
   /* Show stats bar below effect selectors */
