@@ -2371,6 +2371,8 @@ params.forEach(p => {
 });
 ```
 
+One presentation rule lives in the simulator rather than in the definitions: ShaderBall's controls are grouped into per-stage banks. The panel recognizes that schema by its stage selectors (`isShaderBallSchema()` in `effect_gui.js`), and the app keys its choice of persistence strategy — the exhaustive versioned snapshot instead of per-parameter values — off the same predicate, so grouping and persistence cannot disagree about which effect is loaded.
+
 `getParamValues()` is polled each frame to sync the GUI with parameter values that the animation system has changed autonomously. The sync skips any control the user is currently interacting with to avoid fighting the slider. A per-effect **Reset** rebuilds the GUI from defaults, and **Export** copies the current `{ name, value }` set as a C++-formatted initializer suitable for `Presets<…>` arrays. If a segmented-render parameter snapshot is temporarily unavailable after an edit, Export uses the values displayed by the current parameter schema. An effect that reports presets also gets a disabled **Preset** readout of the live index plus **Previous Preset** / **Next Preset** buttons that step it, and each per-frame sync first mirrors the live preset into the engine that owns the definitions, skipping the rest of the update when that mirror fails.
 
 ### 10.7 Segmented POV Workers (`segment_worker.js`)

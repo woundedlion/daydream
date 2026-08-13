@@ -44,8 +44,8 @@
     "assertions": 9
   },
   "tests/effect_gui.test.js": {
-    "cases": 83,
-    "assertions": 242
+    "cases": 84,
+    "assertions": 245
   },
   "tests/effect_sequencing.test.js": {
     "cases": 46,

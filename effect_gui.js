@@ -87,12 +87,24 @@ export function legacyShaderBallParamNames(name) {
 }
 
 /**
+ * Whether a parameter schema is ShaderBall's, recognized by its per-stage
+ * selectors. The panel's stage grouping and the app's choice of persistence
+ * strategy both key off this predicate, so the two cannot disagree about which
+ * effect is loaded.
+ * @param {Array<Object>} params - Engine parameter definitions.
+ * @returns {boolean} True when every stage selector is registered.
+ */
+export function isShaderBallSchema(params) {
+  const names = new Set(params.map((parameter) => parameter.name));
+  return SHADERBALL_SIGNATURE.every((name) => names.has(name));
+}
+
+/**
  * @param {Array<Object>} params - Engine parameter definitions in stream order.
  * @returns {Map<string, string>|null} Parameter name to pipeline-stage title.
  */
 export function shaderBallStageAssignments(params) {
-  const names = new Set(params.map((parameter) => parameter.name));
-  if (!SHADERBALL_SIGNATURE.every((name) => names.has(name))) return null;
+  if (!isShaderBallSchema(params)) return null;
   const assignments = new Map();
   let stage = 'Function';
   for (const parameter of params) {
