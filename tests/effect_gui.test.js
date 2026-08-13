@@ -368,6 +368,21 @@ test('a numeric param becomes a slider bounded by the definition', () => {
   assert.equal(controller.isBoolean, false);
 });
 
+test('a narrow numeric range displays its nonzero slider steps', () => {
+  const gui = fakeGui();
+  const speed = {
+    name: 'Hue Noise Speed', value: 0.000016, min: -0.008, max: 0.008,
+    animated: true,
+  };
+  const state = { 'Hue Noise Speed': speed.value };
+  const controller = addParamControl(gui, state, speed);
+
+  assert.equal(controller.decimalsSet, 6);
+  assert.equal(controller.getValue(), 0.000016);
+  controller.setValue(0);
+  assert.equal(controller.getValue(), 0);
+});
+
 test('an integer param becomes a slider stepped to whole values', () => {
   const gui = fakeGui();
   const controller = addParamControl(gui, { Burst: 4 },

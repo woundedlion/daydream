@@ -163,7 +163,8 @@ export function addParamControl(
     // The engine truncates a fractional write, so offer only what it can hold.
     controller = add(state, p.name, p.min, p.max, 1).decimals(0);
   } else {
-    controller = add(state, p.name, p.min, p.max).decimals(3);
+    const decimals = Math.abs(p.max - p.min) <= 0.1 ? 6 : 3;
+    controller = add(state, p.name, p.min, p.max).decimals(decimals);
   }
   controller.isBoolean = (kind === 'boolean');
   controller.isEnum = (kind === 'enum');
