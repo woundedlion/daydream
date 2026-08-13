@@ -12,7 +12,9 @@
 // gated on a prerequisite the platform lacks runs nothing without having gone
 // away. That exemption is opt-in: the file's floors entry must carry
 // `"skippable": true`, so an unconditional skip retiring a file from gating
-// shows up as a floors diff instead of a silently green run. Re-measure every
+// shows up as a floors diff instead of a silently green run. A floor is a
+// minimum, so cases landing after the last re-measure are covered by none;
+// MAX_SURPLUS_CASES bounds how many may sit unratcheted. Re-measure every
 // floor in one run:
 //   node scripts/run-tests.mjs --update-floors "tests/*.test.js"
 import { spawnSync } from 'node:child_process';
@@ -29,6 +31,12 @@ import { join, relative } from 'node:path';
 
 const FLOORS_PATH = 'tests/assertion-floors.json';
 const UPDATE_FLAG = '--update-floors';
+// Cases allowed to sit above the committed floors across the whole run. A floor
+// left behind covers none of the cases that landed since, so those cases can be
+// deleted again without tripping anything; the bound keeps that gap from growing
+// without limit. scripts/require-tests.mjs holds the file count to exact
+// equality for the same reason.
+const MAX_SURPLUS_CASES = 64;
 const COUNTER = new URL('./count-assertions.mjs', import.meta.url).href;
 const CASE_REPORTER = new URL('./report-cases.mjs', import.meta.url).href;
 
@@ -297,9 +305,31 @@ if (belowCases.length + belowAssertions.length > 0) {
   );
   process.exit(1);
 }
+const surplusRows = gated
+  .map(([file, min]) => [file, cases.get(file) ?? 0, min.cases])
+  .filter(([, ran, min]) => ran > min)
+  .sort(([, ranA, minA], [, ranB, minB]) => ranB - minB - (ranA - minA));
+const surplus = surplusRows.reduce((sum, [, ran, min]) => sum + ran - min, 0);
+if (surplus > MAX_SURPLUS_CASES) {
+  console.error(
+    `run-tests: ${surplus} cases above their committed floors, past the bound ` +
+      `of ${MAX_SURPLUS_CASES}:\n` +
+      surplusRows
+        .map(([file, ran, min]) => `  ${file}: ${ran} ran, floor ${min}`)
+        .join('\n') +
+      '\nThose cases are unratcheted, so deleting them again trips nothing. ' +
+      `Ratchet the floors with \`node scripts/run-tests.mjs ${UPDATE_FLAG} ` +
+      '<patterns>`.',
+  );
+  process.exit(1);
+}
 console.log(
   `run-tests: ${total} tests passed, ${assertions} assertions across ` +
     `${counts.size} files, each above its committed floor.` +
+    (surplus > 0
+      ? `\nrun-tests: ${surplus} cases above their committed floors ` +
+        `(bound ${MAX_SURPLUS_CASES}) — ratchet them with ${UPDATE_FLAG}.`
+      : '') +
     (skipped.size > 0
       ? '\nrun-tests: exempted from their floors, wholly skipped:\n' +
         [...skipped]
