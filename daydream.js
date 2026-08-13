@@ -409,6 +409,7 @@ const effectGui = createEffectGui({
   guiContainer: () => document.getElementById('gui-container'),
   isMobile: () => daydream.isMobile,
   dragTarget: window,
+  focusedElement: () => document.activeElement,
   copyText: copyToClipboard,
   usesFullConfigSnapshot: () => appState.get('effect') === 'ShaderBall'
     && typeof host.engine.getFullConfigSnapshot === 'function'
