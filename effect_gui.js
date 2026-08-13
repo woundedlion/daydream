@@ -203,6 +203,9 @@ export function addParamControl(
  * @param {{addEventListener: Function, removeEventListener: Function}}
  *   deps.dragTarget - Where the drag-end listeners live (the window): a lil-gui
  *   drag continues outside the control's own DOM.
+ * @param {() => Object|null} [deps.focusedElement] - The document's focused
+ *   element. A control whose number input has focus is being typed into, so the
+ *   per-frame value stream must leave it alone.
  * @param {(text: string) => Promise<boolean>} deps.copyText - Copies text using
  *   the browser's available clipboard path.
  * @param {() => boolean} [deps.usesFullConfigSnapshot] - Whether the active
@@ -240,6 +243,7 @@ export function createEffectGui({
   guiContainer,
   isMobile,
   dragTarget,
+  focusedElement = () => null,
   copyText,
   usesFullConfigSnapshot = () => false,
   getFullConfigSnapshot = () => null,
@@ -427,13 +431,16 @@ export function createEffectGui({
       return;
     }
     skewLogged = false;
+    // One focus read for the whole pass: at most one element has focus.
+    const focused = focusedElement() ?? null;
     const n = names.length;
     for (let i = 0; i < n; i++) {
       const c = activeEffect.controllerByName.get(names[i]);
       if (!c) continue;
       if (c.isEnum) continue;
 
-      const isEditing = c.dragging;
+      const isEditing = c.dragging
+        || (focused !== null && c.domElement?.contains(focused) === true);
 
       const { update, value } = resolveParamSync(
         c.getValue(), values[i], c.isBoolean, isEditing);

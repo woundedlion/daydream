@@ -253,6 +253,7 @@ function makeHarness({
 } = {}) {
   const state = {
     params,
+    focused: null,
     generation,
     engineValues,
     segmentValues,
@@ -324,6 +325,7 @@ function makeHarness({
     guiContainer: () => state.container,
     isMobile: () => isMobile,
     dragTarget,
+    focusedElement: () => state.focused,
     copyText: state.copyText,
     usesFullConfigSnapshot: () => fullConfig,
     getFullConfigSnapshot: () => state.fullConfigSnapshot,
@@ -836,6 +838,29 @@ test('sync leaves a dragged control alone', () => {
 
   assert.equal(h.gui().ctrl('Speed').getValue(), 0.1, 'the drag owns the value');
   assert.equal(h.gui().ctrl('Glow').getValue(), true, 'other controls still track');
+});
+
+test('sync leaves a control whose input has focus alone', () => {
+  const h = makeHarness({ params: [SPEED, GLOW], engineValues: [0.9, 1] });
+  h.panel.build();
+  const input = fakeElement('input');
+  h.gui().ctrl('Speed').domElement.appendChild(input);
+  h.state.focused = input;
+
+  h.panel.sync();
+
+  assert.equal(h.gui().ctrl('Speed').getValue(), 0.1, 'the typed value stands');
+  assert.equal(h.gui().ctrl('Glow').getValue(), true, 'other controls still track');
+});
+
+test('sync tracks every control when the focus is outside the panel', () => {
+  const h = makeHarness({ params: [SPEED], engineValues: [0.9] });
+  h.panel.build();
+  h.state.focused = fakeElement('body');
+
+  h.panel.sync();
+
+  assert.equal(h.gui().ctrl('Speed').getValue(), 0.9);
 });
 
 test('sync adopts programmatic changes to an ordinary parameter', () => {
