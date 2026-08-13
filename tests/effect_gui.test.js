@@ -96,8 +96,11 @@ function fakeController(object, property, args) {
  * @returns {Object} The GUI double.
  */
 function fakeGui(hydrated = {}, stored = {}) {
+  const childrenElement = fakeElement('div');
+  childrenElement.classList.add('lil-children');
   const gui = {
     domElement: fakeElement('div'),
+    $children: childrenElement,
     controllers: [],
     folders: [],
     closed: false,
@@ -172,6 +175,7 @@ function fakeGui(hydrated = {}, stored = {}) {
       return this.controllers.find((c) => c.property === property);
     },
   };
+  gui.domElement.appendChild(childrenElement);
   gui.addDisplayFolder = (name) => {
     const folder = {
       name,
@@ -1025,6 +1029,7 @@ test('a schema generation change atomically rebuilds and remounts the panel', ()
   h.panel.mount();
   const oldGui = h.gui();
   const oldProjection = oldGui.ctrl('Projection');
+  oldGui.$children.scrollTop = 420;
 
   h.state.params = [{ ...projection, value: 1 }, bonne];
   h.state.engineValues = [1, 0.6];
@@ -1036,6 +1041,7 @@ test('a schema generation change atomically rebuilds and remounts the panel', ()
   assert.deepEqual(h.panel.active().paramNames, ['Projection', 'Bonne Parallel']);
   assert.equal(h.gui().ctrl('Projection').getValue(), 1);
   assert.equal(h.gui().ctrl('Bonne Parallel').getValue(), 0.6);
+  assert.equal(h.gui().$children.scrollTop, 420);
   assert.equal(oldProjection.getValue(), 0, 'the retired binding is never updated');
 
   h.panel.sync();
