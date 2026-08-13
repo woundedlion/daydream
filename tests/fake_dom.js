@@ -225,6 +225,7 @@ export function fakeElement(tag = 'div') {
       return found;
     },
     replaceChildren(...nodes) {
+      detach(nodes);
       reparent(this.children, null);
       reparent(nodes, this);
       this.children = nodes;
