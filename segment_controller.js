@@ -882,6 +882,9 @@ export class SegmentController {
       this.frameResolve = null;
       resolve();
     }
+    // tick() is unreachable while the host is paused and never ran at all for a
+    // create()-time fault, so the overlay is painted here rather than left to it.
+    this.updateStats();
   }
 
   /**
