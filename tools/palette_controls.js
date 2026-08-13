@@ -116,6 +116,23 @@ export function hitTestHueKeyMarker(x, y, points, radius) {
 }
 
 /**
+ * Fills a three-element array in place. Keeping the component writes out of
+ * oklchLinearRgb's body leaves that body pure matrix arithmetic, which the
+ * engine-parity test reads coefficient by coefficient.
+ * @param {number[]} out - Destination array.
+ * @param {number} r - First component.
+ * @param {number} g - Second component.
+ * @param {number} b - Third component.
+ * @returns {number[]} out
+ */
+function writeTriple(out, r, g, b) {
+  out[0] = r;
+  out[1] = g;
+  out[2] = b;
+  return out;
+}
+
+/**
  * Converts an OKLCH color to linear sRGB, unclamped so the caller can see which
  * side of the gamut a channel fell off.
  * @param {number} lightness - OKLCH L, nominally in [0, 1].
@@ -135,10 +152,10 @@ export function oklchLinearRgb(lightness, chroma, turns, out = [0, 0, 0]) {
   const l = lRoot * lRoot * lRoot;
   const m = mRoot * mRoot * mRoot;
   const s = sRoot * sRoot * sRoot;
-  out[0] = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
-  out[1] = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
-  out[2] = -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s;
-  return out;
+  return writeTriple(out,
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s);
 }
 
 /**
