@@ -686,54 +686,36 @@
         onChange();
       };
 
-      // The active mouse drag's cleanup, so a page discard mid-drag cannot
-      // leave the document listeners resident.
-      let endMouseDrag = null;
+      // Pointer capture keeps the drag bound to the plane it started on, so
+      // mouse and touch share one path, the move and end handlers stay on the
+      // element rather than on the document, and an interrupted gesture (an OS
+      // focus steal, a touch cancelled by the system) arrives as pointercancel
+      // instead of stranding a listener until the next press. The element
+      // carries touch-action: none, which is what stops the page scrolling
+      // under a touch drag.
+      let activePointerId = null;
 
-      const onMouseDown = (e) => {
-        e.preventDefault();
-        if (endMouseDrag) endMouseDrag();
-        handleInput(e.clientX, e.clientY);
-        const onMouseMove = (ev) => handleInput(ev.clientX, ev.clientY);
-        const onMouseUp = () => {
-          document.removeEventListener('mousemove', onMouseMove);
-          document.removeEventListener('mouseup', onMouseUp);
-          endMouseDrag = null;
-          planeElement.style.cursor = 'grab';
-        };
-        endMouseDrag = onMouseUp;
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('mouseup', onMouseUp);
-        planeElement.style.cursor = 'grabbing';
+      const endDrag = (e) => {
+        if (activePointerId === null || (e && e.pointerId !== activePointerId)) return;
+        if (planeElement.hasPointerCapture(activePointerId))
+          planeElement.releasePointerCapture(activePointerId);
+        activePointerId = null;
+        planeElement.style.cursor = 'grab';
       };
 
-      // The active touch drag's cleanup, so an interrupted gesture
-      // (touchcancel) or a page discard cannot leave the document listeners
-      // resident.
-      let endTouchDrag = null;
-
-      const onTouchStart = (e) => {
+      const onPointerDown = (e) => {
+        if (!e.isPrimary || e.button !== 0 || activePointerId !== null) return;
         e.preventDefault();
-        const touch = e.touches[0];
-        if (!touch) return;
-        if (endTouchDrag) endTouchDrag();
-        handleInput(touch.clientX, touch.clientY);
-        const onTouchMove = (ev) => {
-          ev.preventDefault();
-          const moveTouch = ev.touches[0];
-          if (!moveTouch) return;
-          handleInput(moveTouch.clientX, moveTouch.clientY);
-        };
-        const onTouchEnd = () => {
-          document.removeEventListener('touchmove', onTouchMove);
-          document.removeEventListener('touchend', onTouchEnd);
-          document.removeEventListener('touchcancel', onTouchEnd);
-          endTouchDrag = null;
-        };
-        endTouchDrag = onTouchEnd;
-        document.addEventListener('touchmove', onTouchMove, { passive: false });
-        document.addEventListener('touchend', onTouchEnd);
-        document.addEventListener('touchcancel', onTouchEnd);
+        activePointerId = e.pointerId;
+        planeElement.setPointerCapture(e.pointerId);
+        planeElement.style.cursor = 'grabbing';
+        handleInput(e.clientX, e.clientY);
+      };
+
+      const onPointerMove = (e) => {
+        if (e.pointerId !== activePointerId) return;
+        e.preventDefault();
+        handleInput(e.clientX, e.clientY);
       };
 
       // Keyboard equivalent of dragging the dot: a handle's arrows nudge its own
@@ -764,14 +746,13 @@
         onChange();
       };
 
-      planeElement.addEventListener('mousedown', onMouseDown);
-      planeElement.addEventListener('touchstart', onTouchStart, { passive: false });
+      planeElement.addEventListener('pointerdown', onPointerDown);
+      planeElement.addEventListener('pointermove', onPointerMove);
+      planeElement.addEventListener('pointerup', endDrag);
+      planeElement.addEventListener('pointercancel', endDrag);
       reElement.addEventListener('keydown', onAxisKeyDown('re'));
       imElement.addEventListener('keydown', onAxisKeyDown('im'));
-      onPageTeardown(() => {
-        if (endMouseDrag) endMouseDrag();
-        if (endTouchDrag) endTouchDrag();
-      });
+      onPageTeardown(() => endDrag(null));
       updateUI();
     };
 
