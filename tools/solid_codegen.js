@@ -1114,17 +1114,18 @@ export function createOpGate(validator, retries = 3) {
       }
       /**
        * Applies one candidate to the standing chain and classifies the result.
+       * @param {WasmModule} mod - The live validator instance.
        * @param {{op: string, params: Object<string, number>}} candidate - The op to probe.
        * @returns {string} 'ok', 'bad', 'exhausted' when the tooling arena filled, or 'trapped' when the instance died.
        * @details The recorded reason is read back before any further bridge
        * call can overwrite it, so the mesh is freed after the verdict.
        */
-      const attempt = (candidate) => {
+      const attempt = (mod, candidate) => {
         try {
           const out = applyOp(mesh, candidate);
           const classes = out.classifyFaces();
           const verdict = classes ? 'ok'
-            : (meshOpFailure(Mod, 'Face classification').flush ? 'exhausted' : 'bad');
+            : (meshOpFailure(mod, 'Face classification').flush ? 'exhausted' : 'bad');
           out.delete();
           return verdict;
         } catch (e) {
@@ -1132,7 +1133,7 @@ export function createOpGate(validator, retries = 3) {
           if (e instanceof WebAssembly.RuntimeError) return 'trapped';
           // applyOp raises a soft reject as a throw; of the reasons behind one,
           // only a full arena is cleared by flushing it.
-          return meshOpFailure(Mod, `Op "${candidate.op}"`).flush ? 'exhausted' : 'bad';
+          return meshOpFailure(mod, `Op "${candidate.op}"`).flush ? 'exhausted' : 'bad';
         }
       };
 
@@ -1142,13 +1143,13 @@ export function createOpGate(validator, retries = 3) {
         for (const [key, def] of Object.entries(OP_DEFS[op]?.params ?? {})) {
           candidate.params[key] = def.val;
         }
-        let verdict = attempt(candidate);
+        let verdict = attempt(Mod, candidate);
         if (verdict === 'exhausted') {
           // A full arena rejects every later candidate too, so reclaim it and
           // judge this one on an arena it does not share with its predecessors.
           try { mesh.delete(); Mod.MeshOps.clearToolingMemory(); mesh = build(Mod); }
           catch (e) { validator.noteDeath(e); return { bad, complete: false }; }
-          verdict = attempt(candidate);
+          verdict = attempt(Mod, candidate);
         }
         if (verdict === 'trapped') {
           bad.add(op);
