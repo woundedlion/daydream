@@ -1080,6 +1080,12 @@
     let hueKeyWheelCanvas, hueKeyWheelCtx;
     let hueKeyWheelRaster = null;
     let hueKeyWheelLightness = null;
+    // Marker positions of the last wheel actually painted. The wheel draws the
+    // canonical recipe, which clamps and rounds what the controls hold, and a
+    // recipe that failed to compile leaves the previous wheel on screen — so a
+    // grab must be tested against what the user can see, not against a state
+    // recomputed from the controls.
+    let hueKeyWheelDrawnPoints = [];
     let activeHueKey = null;
     let activeHuePointerId = null;
     let selectedHueKey = 0;
@@ -1226,6 +1232,7 @@
       const centerX = width * 0.5;
       const state = currentHueKeyState(recipe);
       const points = hueKeyPoints(state);
+      hueKeyWheelDrawnPoints = points;
       selectedHueKey = Math.min(selectedHueKey, points.length - 1);
       const degrees = state.offsets.map((offset) =>
         Math.round(wrapTurns(state.baseTurns + offset) * 360) % 360);
@@ -1282,11 +1289,9 @@
 
     function handleHueWheelPointerDown(event) {
       if (!event.isPrimary || event.button !== 0 || activeHuePointerId !== null) return;
-      const sourceRecipe = readPaletteRecipe();
-      const sourceState = currentHueKeyState(sourceRecipe);
       const position = wheelPointerPosition(event);
       activeHueKey = hitTestHueKeyMarker(position.x, position.y,
-        hueKeyPoints(sourceState), 16);
+        hueKeyWheelDrawnPoints, 16);
       if (activeHueKey === null) return;
       selectedHueKey = activeHueKey;
       activeHuePointerId = event.pointerId;
@@ -1298,10 +1303,9 @@
 
     function handleHueWheelPointerMove(event) {
       if (event.pointerId !== activeHuePointerId) {
-        const recipe = readPaletteRecipe();
         const position = wheelPointerPosition(event);
         const marker = hitTestHueKeyMarker(position.x, position.y,
-          hueKeyPoints(currentHueKeyState(recipe)), 16);
+          hueKeyWheelDrawnPoints, 16);
         hueKeyWheelCanvas.style.cursor = marker === null ? 'default' : 'grab';
         return;
       }
