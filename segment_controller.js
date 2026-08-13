@@ -624,8 +624,12 @@ export class SegmentController {
             this.armRenderWatchdog();
           }
         } else {
+          // The `never` binding makes an unhandled ControllerInboundMsg member a
+          // typecheck error rather than a runtime-only fault.
+          /** @type {never} */
+          const unhandled = msg;
           this.onWorkerFault(i, `worker seg ${i} sent unknown message type `
-            + `${String((/** @type {{type?: unknown}} */ (msg)).type)}`);
+            + `${String((/** @type {{type?: unknown}} */ (unhandled)).type)}`);
         }
       };
 

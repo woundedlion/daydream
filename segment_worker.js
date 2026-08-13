@@ -383,12 +383,17 @@ async function handleMessage(msg) {
       break;
     }
 
-    default:
+    default: {
       // Fail fast on protocol drift: a state-changing message dropped here would
       // leave the worker rendering stale under the current generation, invisible
       // to the fence. Throwing reaches onerror -> the controller faults.
+      // The `never` binding makes an unhandled WorkerInboundMsg member a
+      // typecheck error rather than a runtime-only throw.
+      /** @type {never} */
+      const unhandled = msg;
       throw new Error(`segment_worker: unknown message type ${
-        (/** @type {{type?: unknown}} */ (msg)).type}`);
+        (/** @type {{type?: unknown}} */ (unhandled)).type}`);
+    }
   }
 }
 
