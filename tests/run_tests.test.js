@@ -321,6 +321,29 @@ test('--update-floors writes the measured counts', () => {
 });
 
 /**
+ * Verifies a re-measurement on a Node major other than the one CI measures on
+ * is refused. node:test retallies cases across majors, so floors written there
+ * are not reproducible and red CI on files nobody touched.
+ */
+test('--update-floors refuses a Node major CI does not measure on', () => {
+  const pinNode = (version) => {
+    mkdirSync(join(root, '.github', 'workflows'), { recursive: true });
+    writeFileSync(join(root, '.github', 'workflows', 'js-unit-suite.yml'),
+      `jobs:\n  suite:\n    steps:\n      - with:\n          node-version: '${version}'\n`);
+  };
+  const major = Number(process.versions.node.split('.')[0]);
+
+  pinNode(`${major - 1}.0.0`);
+  assert.match(runExpectingFailure('--update-floors', PATTERN),
+    new RegExp(`must run on Node ${major - 1}\\.x`));
+  assert.deepEqual(readFloors()['tests/a.test.js'], { cases: 2, assertions: 6 },
+    'a refused re-measurement must leave the committed floors alone');
+
+  pinNode(`${major}.0.0`);
+  assert.match(run('--update-floors', PATTERN), /wrote 2 floors/);
+});
+
+/**
  * Verifies a file that ran cases and measured no assertions is refused rather
  * than ratcheted: a floor of zero assertions gates nothing, and it is also what
  * a file asserting through the counter's blind spot measures.
