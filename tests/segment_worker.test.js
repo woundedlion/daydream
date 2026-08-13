@@ -612,6 +612,28 @@ test('a full-frame-kept clip does not fault the pool', async () => {
 });
 
 /**
+ * A rejected clip leaves the engine on its previous one, so the reported
+ * disposition must stay on that clip too — otherwise every later frame claims a
+ * band render the worker never did.
+ */
+test('a rejected clip leaves the reported clip disposition alone', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  engineInstance.fullFrame = true;
+  await dispatch({ type: 'setEffect', name: 'MeshFeedback' });
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  assert.equal(posted.find((p) => p.msg.type === 'frame').msg.fullFrame, true,
+    'the kept full-canvas clip is in force');
+
+  engineInstance.clipOk = false;
+  await dispatch({ type: 'setEffect', name: 'Waves' });
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  assert.equal(posted.find((p) => p.msg.type === 'frame').msg.fullFrame, true,
+    'a rejected clip does not downgrade the report to a band render');
+});
+
+/**
  * The two clip successes describe different work: APPLIED shades the band,
  * FULL_FRAME_KEPT shades the whole canvas in every worker. Nothing else in a
  * 'frame' separates them, so the pool would otherwise read N full-canvas
