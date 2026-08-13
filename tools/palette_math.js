@@ -233,12 +233,9 @@ export function compilePaletteRecipe(recipe, inspect = true) {
     ? paletteOps.inspectV4(recipe)
     : paletteOps.compileAndBakeV4(recipe);
   /** @type {PaletteCompileResult} */
-  const copied = {
-    status: { ...result.status },
-    canonicalRecipe: result.canonicalRecipe
-      ? structuredClone(result.canonicalRecipe)
-      : undefined,
-  };
+  const copied = { status: { ...result.status } };
+  if (result.canonicalRecipe)
+    copied.canonicalRecipe = structuredClone(result.canonicalRecipe);
   if (result.lut) copied.lut = Uint8Array.from(result.lut);
   if (result.diagnostics) copied.diagnostics = Float32Array.from(result.diagnostics);
   if (result.fallback) copied.fallback = Uint8Array.from(result.fallback);

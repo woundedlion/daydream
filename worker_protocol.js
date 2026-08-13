@@ -81,8 +81,9 @@ export const PROTOCOL_VERSION = 9;
  *   w: number, h: number,
  *   effectName?: string, params?: SegParam[],
  *   fullConfigSnapshot?: FullConfigSnapshot, paused?: boolean,
- *   presetIndex?: number,
- *   poleLod?: number, paramRevision: number, wasmModule?: WebAssembly.Module,
+ *   presetIndex?: number|undefined,
+ *   poleLod?: number, paramRevision: number,
+ *   wasmModule?: WebAssembly.Module|undefined,
  * }} InitMsg
  */
 
@@ -92,7 +93,8 @@ export const PROTOCOL_VERSION = 9;
  * effect with defaults — so the segment matches instead of reverting to defaults.
  * @typedef {{ type: 'setEffect', name: string, params?: SegParam[],
  *   fullConfigSnapshot?: FullConfigSnapshot,
- *   paused?: boolean, presetIndex?: number, paramRevision: number }} SetEffectMsg
+ *   paused?: boolean, presetIndex?: number|undefined,
+ *   paramRevision: number }} SetEffectMsg
  */
 
 /** Resize the worker's canvas; the worker recomputes its segment rectangle from

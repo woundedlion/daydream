@@ -29,7 +29,7 @@ export { copyToClipboard };
  *
  * @param {string} text - Text to copy.
  * @param {Object} [opts] - Feedback options.
- * @param {FeedbackElement} [opts.element] - Element whose label flips on copy.
+ * @param {FeedbackElement|undefined} [opts.element] - Element whose label flips on copy.
  * @param {string} [opts.copiedText='Copied!'] - Label shown on success.
  * @param {string} [opts.failedText='Copy failed'] - Label shown on failure.
  * @param {string} [opts.revertText] - Label to restore (default: current text).
