@@ -85,8 +85,8 @@ test('generateRegistryCpp emits a Recipe mirror for a hankin-free chain too', ()
     + '    SEED_CUBE, CUBE_TRUNCATE33_STEPS,\n'
     + '    static_cast<uint8_t>(std::size(CUBE_TRUNCATE33_STEPS))};\n'
     + '\n'
-    + '    {"cube_truncate33",\n'
-    + '     IslamicStarPatterns::cube_truncate33, Category::Complex,\n'
+    + '    {"cube_truncate33", IslamicStarPatterns::cube_truncate33, '
+    + 'Category::Complex,\n'
     + '     &CUBE_TRUNCATE33_RECIPE},');
 });
 
@@ -192,9 +192,71 @@ test('generateRegistryCpp emits a step table and Recipe mirror for a hankin chai
     + '    SEED_DODECAHEDRON, DODECAHEDRON_HK62_AMBO_STEPS,\n'
     + '    static_cast<uint8_t>(std::size(DODECAHEDRON_HK62_AMBO_STEPS))};\n'
     + '\n'
-    + '    {"dodecahedron_hk62_ambo",\n'
-    + '     IslamicStarPatterns::dodecahedron_hk62_ambo, Category::Complex,\n'
-    + '     &DODECAHEDRON_HK62_AMBO_RECIPE},');
+    + '    {"dodecahedron_hk62_ambo", IslamicStarPatterns::dodecahedron_hk62_ambo,\n'
+    + '     Category::Complex, &DODECAHEDRON_HK62_AMBO_RECIPE},');
+});
+
+test('generateRegistryCpp wraps a long paste the way solids.h already carries it', () => {
+  const item = {
+    base: 'truncatedIcosahedron',
+    ops: [
+      'ambo',
+      { op: 'relax', params: { iter: 100 } },
+      { op: 'truncate', params: { t: 0.01 } },
+      { op: 'hankin', params: { angle: 59 } },
+    ],
+  };
+  assert.equal(generateRegistryCpp(item),
+    '/** Step table for truncatedIcosahedron_ambo_relax100_truncate01_hk59. */\n'
+    // A declarator past the limit moves below its type, taking the step list
+    // one indent level with it.
+    + 'inline constexpr OpStep\n'
+    + '    TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_STEPS[] = {\n'
+    + '        {Op::AMBO},\n'
+    + '        {Op::RELAX, 100.0f},\n'
+    + '        {Op::TRUNCATE, 0.01f},\n'
+    + '        {Op::HANKIN, 59.0f * IslamicStarPatterns::D2R}};\n'
+    // A doc comment past the limit becomes a filled block comment.
+    + '/**\n'
+    + ' * Recipe mirror of\n'
+    + ' * IslamicStarPatterns::truncatedIcosahedron_ambo_relax100_truncate01_hk59.\n'
+    + ' */\n'
+    + 'inline constexpr Recipe\n'
+    + '    TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_RECIPE = {\n'
+    + '        SEED_TRUNCATED_ICOSAHEDRON,\n'
+    + '        TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_STEPS,\n'
+    // The count expression breaks at the innermost call that fits its argument.
+    + '        static_cast<uint8_t>(std::size(\n'
+    + '            TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_STEPS))};\n'
+    + '\n'
+    + '    {"truncatedIcosahedron_ambo_relax100_truncate01_hk59",\n'
+    + '     IslamicStarPatterns::truncatedIcosahedron_ambo_relax100_truncate01_hk59,\n'
+    + '     Category::Complex,\n'
+    + '     &TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_RECIPE},');
+});
+
+test('no paste line exceeds the column limit solids.h is formatted at', () => {
+  const chains = [
+    ['ambo'],
+    [{ op: 'hankin', params: { angle: 62 } }, 'ambo'],
+    ['ambo', { op: 'relax', params: { iter: 100 } },
+      { op: 'truncate', params: { t: 0.01 } },
+      { op: 'hankin', params: { angle: 59 } }],
+    [{ op: 'bevel', params: { t: 0.5 } }, { op: 'relax', params: { iter: 100 } },
+      { op: 'hankin', params: { angle: 77 } }],
+  ];
+  for (const base of SIMPLE_SEEDS) {
+    for (const ops of chains) {
+      for (const line of generateRegistryCpp({ base, ops }).split('\n')) {
+        if (line.length <= 80) continue;
+        // clang-format cannot break a line that offers no break: an identifier
+        // long enough to overflow on its own overflows there too.
+        const atom = line.replace(/^\s*(\* )?/, '');
+        assert.ok(!atom.includes(' '),
+          `"${line}" is ${line.length} columns for base "${base}"`);
+      }
+    }
+  }
 });
 
 test('generateRegistryCpp flattens a star-pattern base onto its own seed', () => {
