@@ -26,13 +26,15 @@ if ! command -v npm >/dev/null 2>&1; then
 	exit 0
 fi
 
-# Linked worktrees deliberately carry no node_modules of their own, so the suite
-# is unrunnable there; warn rather than block a push the main tree can gate.
+# A linked worktree carries no node_modules of its own, and a push from one is
+# exactly the case this hook exists for: js-tests.yml fires on pull_request only,
+# so nothing else runs lint, typecheck, the import-map check or the unit suite
+# before master is public. A missing install blocks the push.
 # npm writes .package-lock.json on install, so it marks a populated tree where an
 # empty-but-present directory would pass a bare -d test.
 if [ ! -f node_modules/.package-lock.json ]; then
-	echo "pre-push: node_modules is missing; the JS unit suite did not run. Run \`npm ci\` to enable it." >&2
-	exit 0
+	echo "pre-push: node_modules is missing, so lint, typecheck, the import-map check and the unit suite cannot run. Run \`npm ci\` here — a linked worktree needs its own install." >&2
+	exit 1
 fi
 
 npm run lint || exit 1
