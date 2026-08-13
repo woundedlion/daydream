@@ -40,7 +40,7 @@
     "assertions": 9
   },
   "tests/effect_gui.test.js": {
-    "cases": 80,
+    "cases": 83,
     "assertions": 242
   },
   "tests/effect_sequencing.test.js": {
@@ -117,7 +117,7 @@
     "assertions": 59
   },
   "tests/palette_controls.test.js": {
-    "cases": 35,
+    "cases": 36,
     "assertions": 128
   },
   "tests/palette_math.test.js": {
@@ -210,7 +210,7 @@
     "assertions": 58
   },
   "tests/solids_registry_codegen.test.js": {
-    "cases": 26,
+    "cases": 28,
     "assertions": 204
   },
   "tests/state.test.js": {
