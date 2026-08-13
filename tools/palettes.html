@@ -1141,17 +1141,24 @@
       const centerX = width * 0.5;
       const centerY = height * 0.5;
       const maximumChroma = Math.max(0.001, maxSrgbGamutChroma(lightness));
+      const chromaPerPixel = maximumChroma / radius;
+      const turnsPerRadian = 1 / (Math.PI * 2);
+      // 65k samples: the colour conversion fills this one array rather than
+      // returning a fresh triple per pixel.
+      const rgb = [0, 0, 0];
       for (let y = 0; y < height; y++) {
+        const dy = y + 0.5 - centerY;
         for (let x = 0; x < width; x++) {
           const dx = x + 0.5 - centerX;
-          const dy = y + 0.5 - centerY;
           const distance = Math.hypot(dx, dy);
           const offset = (y * width + x) * 4;
-          const chroma = distance / radius * maximumChroma;
-          const rgb = oklchLinearRgb(lightness, chroma,
-            wrapTurns(Math.atan2(dy, dx) / (Math.PI * 2)));
-          const inGamut = distance <= radius && rgb.every((channel) =>
-            channel >= -0.0001 && channel <= 1.0001);
+          const chroma = distance * chromaPerPixel;
+          oklchLinearRgb(lightness, chroma,
+            wrapTurns(Math.atan2(dy, dx) * turnsPerRadian), rgb);
+          const inGamut = distance <= radius
+            && rgb[0] >= -0.0001 && rgb[0] <= 1.0001
+            && rgb[1] >= -0.0001 && rgb[1] <= 1.0001
+            && rgb[2] >= -0.0001 && rgb[2] <= 1.0001;
           if (inGamut) {
             for (let channel = 0; channel < 3; channel++) {
               image.data[offset + channel] = Math.round(
@@ -1231,7 +1238,10 @@
 
     function drawHueKeyWheel(recipe) {
       if (!hueKeyWheelCanvas || !hueKeyWheelCtx) return;
-      const lightness = recipe.lightness.center;
+      // Quantized: rebuilding the wheel costs a 360x12 gamut bisection plus a
+      // 65k-sample raster, and a lightness drag would otherwise pay it on every
+      // slider tick for a step the wheel cannot show.
+      const lightness = Math.round(recipe.lightness.center * 64) / 64;
       if (!hueKeyWheelRaster || hueKeyWheelLightness !== lightness) {
         hueKeyWheelRaster = wheelRaster(lightness);
         hueKeyWheelLightness = lightness;

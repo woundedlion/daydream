@@ -121,9 +121,11 @@ export function hitTestHueKeyMarker(x, y, points, radius) {
  * @param {number} lightness - OKLCH L, nominally in [0, 1].
  * @param {number} chroma - OKLCH C.
  * @param {number} turns - OKLCH hue, in turns.
+ * @param {number[]} [out] - Filled in place and returned, so a per-pixel caller
+ *   can carry one array across the whole raster instead of allocating per sample.
  * @returns {number[]} Linear [R, G, B]; a channel outside [0, 1] is out of gamut.
  */
-export function oklchLinearRgb(lightness, chroma, turns) {
+export function oklchLinearRgb(lightness, chroma, turns, out = [0, 0, 0]) {
   const angle = turns * Math.PI * 2;
   const a = chroma * Math.cos(angle);
   const b = chroma * Math.sin(angle);
@@ -133,11 +135,10 @@ export function oklchLinearRgb(lightness, chroma, turns) {
   const l = lRoot * lRoot * lRoot;
   const m = mRoot * mRoot * mRoot;
   const s = sRoot * sRoot * sRoot;
-  return [
-    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
-  ];
+  out[0] = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+  out[1] = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+  out[2] = -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s;
+  return out;
 }
 
 /**
@@ -152,14 +153,17 @@ export function maxSrgbGamutChroma(lightness) {
   const searchIterations = 12;
   const chromaLimit = 0.5;
   let maximum = 0;
+  const rgb = [0, 0, 0];
 
   for (let hue = 0; hue < hueSamples; hue++) {
     let low = 0;
     let high = chromaLimit;
     for (let iteration = 0; iteration < searchIterations; iteration++) {
       const chroma = (low + high) * 0.5;
-      const rgb = oklchLinearRgb(lightness, chroma, hue / hueSamples);
-      if (rgb.every((channel) => channel >= 0 && channel <= 1)) low = chroma;
+      oklchLinearRgb(lightness, chroma, hue / hueSamples, rgb);
+      const inGamut = rgb[0] >= 0 && rgb[0] <= 1 && rgb[1] >= 0 && rgb[1] <= 1
+        && rgb[2] >= 0 && rgb[2] <= 1;
+      if (inGamut) low = chroma;
       else high = chroma;
     }
     maximum = Math.max(maximum, low);
