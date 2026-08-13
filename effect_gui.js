@@ -46,7 +46,7 @@ export const SHADERBALL_STAGE_ORDER = [
   'Signal Weight',
   'Value Transfer',
   'Coverage',
-  'Palette',
+  'Colorize',
 ];
 const SHADERBALL_STAGE_BOUNDARIES = new Map([
   ['Function', 'Function'],
@@ -60,7 +60,7 @@ const SHADERBALL_STAGE_BOUNDARIES = new Map([
   ['Signal Weight', 'Signal Weight'],
   ['Value Transfer', 'Value Transfer'],
   ['Coverage', 'Coverage'],
-  ['Palette', 'Palette'],
+  ['Palette', 'Colorize'],
 ]);
 const SHADERBALL_SIGNATURE = [
   'Function', 'Projection', 'Lens', 'Planar Warp 1', 'Planar Warp 2',
@@ -74,7 +74,7 @@ const SHADERBALL_SIGNATURE = [
 export function legacyShaderBallParamNames(name) {
   if (name === 'Camera Wander') return ['Outer Wander'];
   if (name === 'Palette') return ['Colorizer'];
-  if (name === 'Hue Noise Amount') return ['Hue Shift'];
+  if (name === 'Hue Shift Amount') return ['Hue Noise Amount', 'Hue Shift'];
   for (const [prefix, legacy] of [
     ['Planar Warp 1', 'Outer'],
     ['Planar Warp 2', 'Inner'],
@@ -120,6 +120,7 @@ export function shaderBallStageAssignments(params) {
 
 function shaderBallControlLabel(stage, name) {
   if (SHADERBALL_STAGE_BOUNDARIES.has(name)) {
+    if (stage === 'Colorize') return 'Palette';
     return stage === 'Camera' ? 'Wander' : 'Mode';
   }
   if (name.startsWith(`${stage} `)) return name.slice(stage.length + 1);
