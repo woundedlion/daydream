@@ -1,11 +1,11 @@
 //
-// daydream.js is the app's composition root: it builds a WebGL Daydream and
-// mounts the GUI at module scope, so it cannot be imported here. Everything with
-// behaviour of its own lives in an injectable factory and is driven for real in
-// tests/app_lifecycle.test.js — the Pole LOD late-bind, the keydown guard, the
-// module-load handlers, the teardown order. What is left is the wiring itself:
-// which closures this file hands those factories. Only a source read can see
-// that, so these cases read it, and each one names the failure it prevents.
+// daydream.js is the app's composition root. Its assembly is executed in
+// tests/daydream_start.test.js, which drives start(deps) against fakes, and the
+// factories it composes are driven in tests/app_lifecycle.test.js — the Pole LOD
+// late-bind, the keydown guard, the module-load handlers, the teardown order.
+// What is left here is which closure the root hands each factory: a value only a
+// source read can see, so these cases read it, and each names the failure it
+// prevents.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -67,7 +67,7 @@ test('the teardown is retained and reachable from the module-load handlers', () 
 });
 
 test('the page-failure surface is the shared one, and it is torn down', () => {
-  assert.match(SOURCE, /reportPageFailures\('simulator', window\)/,
+  assert.match(SOURCE, /reportPageFailures\('simulator', win\)/,
     'a synchronous throw from an animation frame, a lil-gui onChange, or a DOM '
     + 'listener is console-only without the error listener the shared surface '
     + 'installs alongside the rejection one');
@@ -163,7 +163,7 @@ test('the segmented POV deep-link keys keep the names shared links carry', () =>
   const consequence = 'a deep link carries view.Segmented POV.<prop>, built from '
     + "the root namespace, the folder's display name and the bound property: "
     + 'changing any of the three silently invalidates every link already shared';
-  assert.match(SOURCE, /new GUI\([^)]*,\s*'view'\)/, consequence);
+  assert.match(SOURCE, /createGui\([^)]*,\s*'view'\)/, consequence);
   assert.match(SOURCE, /addFolder\('Segmented POV'\)/, consequence);
   for (const prop of ['segmented', 'segments']) {
     assert.match(SOURCE, new RegExp(`segFolder\\.add\\(segState, '${prop}'`),
@@ -186,7 +186,7 @@ test('the segment-count slider carries the device cap as its own maximum', () =>
   assert.match(SOURCE.slice(at, SOURCE.indexOf('\n', at)), /'segments', 2, segMax, 2\)/,
     'the cap must bound the control itself: the deep-link hydrator clamps against '
     + "the max passed to add(), and the pool's memory cost is what it bounds");
-  assert.match(SOURCE, /const segMax = maxSegmentCount\(navigator, daydream\.isMobile\)/,
+  assert.match(SOURCE, /const segMax = maxSegmentCount\(nav, daydream\.isMobile\)/,
     'the cap must read the device hints, not a constant');
   assert.match(SOURCE, /segments: Math\.min\(segments\.count, segMax\)/,
     'the initial value must sit inside the range, or a capped device opens the '
