@@ -29,7 +29,7 @@
   },
   "tests/daydream_boot.test.js": {
     "cases": 12,
-    "assertions": 38
+    "assertions": 40
   },
   "tests/driver.test.js": {
     "cases": 66,

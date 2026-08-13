@@ -113,6 +113,11 @@ test('a recording start or stop is announced, not only styled', () => {
     + 'session started or ended');
   assert.match(body, /Recording started\./);
   assert.match(body, /Recording stopped\./);
+  assert.match(body, /!wasRecording && !isRecording/,
+    'a start that never began a session has already reported why through '
+    + 'onError, and the generic stop message carries the same owner tag, so '
+    + 'writing it here replaces the only explanation the user was given with '
+    + 'one that is also untrue');
 });
 
 test('a recorder fault reports its reason, not just an un-tinted canvas', () => {
@@ -127,6 +132,9 @@ test('a recorder fault reports its reason, not just an un-tinted canvas', () => 
     + 'unless the reason is announced');
   assert.match(body, /showRecording\(false\)/,
     'the session is already gone: the button must stop offering to stop it');
+  assert.match(body, /failed to start/,
+    'the hook also fires for a start that never produced a session, where '
+    + '"Recording stopped" names something that never happened');
 });
 
 test('the discard path frees an engine built after disposal', () => {

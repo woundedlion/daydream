@@ -297,12 +297,14 @@ const moduleLoad = createModuleLoadHandlers({
         .find(key => REC_FORMATS[key] === extension) ?? 'Auto';
       recFormatCtrl.setValue(label);
     };
-    // An encoder fault ends the session on its own; drop the recording UI so the
-    // button doesn't keep offering to stop a session that is already gone, and
-    // report the reason through the same notice the record toggle writes.
+    // A fault ends the session on its own; drop the recording UI so the button
+    // doesn't keep offering to stop a session that is already gone, and report
+    // the reason through the same notice the record toggle writes.
     host.recorder.onError = (err) => {
       const detail = (err && err.message) ? err.message : String(err);
-      applyNotice.show(`Recording stopped: ${detail}`, RECORD_NOTICE);
+      applyNotice.show(recordingShown
+        ? `Recording stopped: ${detail}`
+        : `Recording failed to start: ${detail}`, RECORD_NOTICE);
       showRecording(false);
     };
     daydream.recorder = host.recorder;
@@ -555,6 +557,11 @@ document.getElementById('canvas-container')?.appendChild(durationEl);
 // on a second boundary rather than on every display frame.
 let durationText = null;
 
+// Whether the UI is currently showing a session. A failure hook runs after the
+// recorder has already cleaned up, so its own state cannot tell a failed start
+// from a stopped session; this can.
+let recordingShown = false;
+
 /**
  * Reflects the session state in the canvas styling, duration readout, and record
  * button label.
@@ -563,6 +570,7 @@ let durationText = null;
  */
 const showRecording = (isRecording) => {
   durationText = null;
+  recordingShown = isRecording;
   const canvasEl = document.getElementById('canvas-container');
   if (isRecording) {
     canvasEl?.classList.add('recording');
@@ -580,7 +588,11 @@ const recordState = { record: () => {
     console.warn('Recording is unavailable until the rendering engine finishes loading.');
     return;
   }
+  const wasRecording = recordingShown;
   const isRecording = host.recorder.toggle(appState.get('effect'));
+  // A start that never began a session has already reported why through onError;
+  // there was no session to stop, and the same owner tag would overwrite it.
+  if (!wasRecording && !isRecording) return;
   // The canvas tint, the duration readout, and the button label are all visual;
   // the notice region is what carries the state change to assistive tech.
   const axisWarning = isRecording && daydream.labelAxes
