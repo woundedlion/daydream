@@ -89,7 +89,7 @@ function fakeDriver() {
  * @returns {Object} The pieces a case asserts on.
  */
 function startApp({ loadModule = () => new Promise(() => {}) } = {}) {
-  const ids = ['gui-container', 'effect-gui-container', 'effect-sidebar', 'apply-notice-dismiss',
+  const ids = ['gui-container', 'effect-sidebar', 'apply-notice-dismiss',
     'canvas-container', 'loading-overlay', 'apply-notice', 'segment-stats'];
   const elements = new Map(ids.map((id) => [id, fakeElement('div')]));
   const doc = installDocument({
