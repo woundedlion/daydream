@@ -40,6 +40,13 @@ const engine = new M.HolosphereEngine();
 const resolutionOk = (r) => r === M.ResolutionSetResult.RESIZED
   || r === M.ResolutionSetResult.ALREADY_ACTIVE;
 
+// The module exports no heap view, so the pixel buffer stands in for one: it
+// aliases the heap, so its ArrayBuffer is the heap's.
+const heapBytes = () => engine.getPixels().buffer.byteLength;
+// Read before any case runs. Resolution changes allocate inside this heap; only
+// MeshOps' tooling block grows it.
+const INITIAL_HEAP_BYTES = heapBytes();
+
 test('HolosphereEngine exposes the method surface the FakeEngines mock', () => {
   for (const name of ENGINE_METHODS) {
     assert.equal(typeof engine[name], 'function',
@@ -730,9 +737,13 @@ test('the preset methods answer the way the segmented path assumes', () => {
 // buffer; this is the only place the real growth happens with a view
 // outstanding. MeshOps' 16 MB tooling block is allocated lazily on first use and
 // cannot fit the heap the module starts with, so that first call grows it, which
-// detaches every live view. Must run ahead of every other MeshOps test in this
-// file, which would allocate the block first and leave nothing to grow.
+// detaches every live view.
 test('heap growth detaches a held pixel view and the re-fetch is live and identical', () => {
+  // The growth is a one-time event, so a MeshOps case that ran first would leave
+  // this one nothing to observe. Asserted rather than left to declaration order.
+  assert.equal(heapBytes(), INITIAL_HEAP_BYTES,
+    'the heap has already grown, so the tooling allocation below will not: this ' +
+    'case must run ahead of every other MeshOps case in this file');
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
     'setEffect must succeed for a registered effect');
