@@ -33,6 +33,21 @@ export default [
     languageOptions: { globals: globals.node },
   },
   {
+    // scripts/count-assertions.mjs wraps node:assert's function properties; the
+    // callable default export is a binding inside the builtin and cannot be
+    // wrapped, so `assert(x)` asserts uncounted and sits below its file's
+    // committed floor, deletable without tripping the ratchet.
+    files: ['tests/**/*.js'],
+    rules: {
+      'no-restricted-syntax': ['error', {
+        selector: 'CallExpression[callee.type="Identifier"][callee.name="assert"]',
+        message:
+          'Call node:assert through a property (assert.ok(x)): a bare assert(x) ' +
+          'is not counted by scripts/count-assertions.mjs.',
+      }],
+    },
+  },
+  {
     files: ['segment_worker.js'],
     languageOptions: { globals: globals.worker },
   },
