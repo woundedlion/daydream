@@ -1527,6 +1527,89 @@ test('destroy drains the drag listeners of a panel torn down mid-drag', () => {
   assert.equal(h.panel.active(), null);
 });
 
+test('a slider drag defers persistence to the pointer release', () => {
+  const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
+  const h = makeHarness({
+    params: [speed],
+    onEngineParam: (_name, value) => { speed.value = value; },
+  });
+  h.panel.build();
+  const controller = h.gui().ctrl('Speed');
+  h.gui().storedWrites.length = 0;
+  h.acceptedSnapshots.length = 0;
+
+  controller.domElement.dispatch('pointerdown');
+  controller.setValue(0.2);
+  controller.setValue(0.3);
+
+  assert.deepEqual(h.gui().storedWrites, [], 'no per-pointermove persistence');
+  assert.deepEqual(h.acceptedSnapshots, []);
+
+  h.dragTarget.dispatch('pointerup');
+
+  assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', 0.3]]);
+  assert.deepEqual(h.acceptedSnapshots, [[{ name: 'Speed', value: 0.3 }]]);
+});
+
+test('a ShaderBall drag writes one full-config snapshot, at the release', () => {
+  const snapshot = (hue) => ({
+    schemaVersion: 2,
+    accepted: [hue],
+    requested: [hue],
+    pendingFieldIds: [],
+    hasRuntime: false,
+    runtime: [],
+  });
+  const h = makeHarness({
+    params: shaderBallParams(),
+    fullConfig: true,
+    fullConfigSnapshot: snapshot(0),
+    onEngineParam: (name, value, state) => {
+      if (name === 'Hue Shift') state.fullConfigSnapshot = snapshot(value);
+    },
+  });
+  h.panel.build();
+  const controller = h.gui().ctrl('Hue Shift');
+  h.gui().storedWrites.length = 0;
+
+  controller.domElement.dispatch('pointerdown');
+  controller.setValue(0.25);
+  controller.setValue(0.5);
+
+  assert.deepEqual(h.gui().storedWrites, [], 'no snapshot per pointermove');
+
+  h.dragTarget.dispatch('pointerup');
+
+  assert.deepEqual(h.gui().storedWrites, [
+    [FULL_CONFIG_STORAGE_KEY, JSON.stringify(snapshot(0.5))],
+  ], 'the release deep-links the state the last move would have');
+});
+
+test('a release that changed no value persists nothing', () => {
+  const h = makeHarness({ params: [SPEED] });
+  h.panel.build();
+  h.gui().storedWrites.length = 0;
+
+  h.gui().ctrl('Speed').domElement.dispatch('pointerdown');
+  h.dragTarget.dispatch('pointerup');
+
+  assert.deepEqual(h.gui().storedWrites, []);
+});
+
+test('a toggle persists without waiting for a pointer release', () => {
+  const glow = { name: 'Glow', value: false, animated: true };
+  const h = makeHarness({
+    params: [glow],
+    onEngineParam: (_name, value) => { glow.value = value > 0.5; },
+  });
+  h.panel.build();
+  h.gui().storedWrites.length = 0;
+
+  h.gui().ctrl('Glow').setValue(true);
+
+  assert.deepEqual(h.gui().storedWrites, [['__accepted.Glow', 1]]);
+});
+
 test('a readonly control is never drag-tracked', () => {
   const h = makeHarness({ params: [TELEMETRY] });
   h.panel.build();

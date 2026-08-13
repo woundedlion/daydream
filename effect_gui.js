@@ -618,7 +618,7 @@ export function createEffectGui({
    * Flag a controller as dragging until the pointer is released, so sync()'s
    * value stream doesn't fight the drag. The drag-end listeners live on the drag
    * target, so they join the effect record's set for a GUI destroyed mid-drag to
-   * drain.
+   * drain. Releasing the pointer also runs the persistence the drag deferred.
    * @param {Object} fx - The effect record owning the controller.
    * @param {Object} controller - The controller to track.
    * @returns {void}
@@ -631,6 +631,9 @@ export function createEffectGui({
         dragTarget.removeEventListener('pointerup', end);
         dragTarget.removeEventListener('pointercancel', end);
         fx.activeDragEnds.delete(end);
+        if (!fx.persistDeferred) return;
+        fx.persistDeferred = false;
+        persistEffectState(fx.gui);
       };
       fx.activeDragEnds.add(end);
       dragTarget.addEventListener('pointerup', end);
@@ -709,7 +712,12 @@ export function createEffectGui({
       controller.onChange(v => {
         const value = engineParamValue(v);
         setEngineParam(p.name, value);
-        persistEffectState(fx.gui);
+        // A drag emits one onChange per pointermove and persistence reads the
+        // whole effect (a definitions marshal, or ShaderBall's full-config
+        // snapshot and its JSON), so it waits for the pointer release, which
+        // sees the same state the last move would have.
+        if (controller.dragging) fx.persistDeferred = true;
+        else persistEffectState(fx.gui);
         setWorkerParam(p.name, value);
         adoptEnginePause(pause, p);
       });
@@ -735,6 +743,7 @@ export function createEffectGui({
       gui: createGui(),
       activeDragEnds: new Set(),
       animationPauseApplied: false,
+      persistDeferred: false,
     };
 
     try {
