@@ -161,3 +161,14 @@ test('the pre-push hook runs this provenance gate', () => {
   assert.match(hook, new RegExp(`${CLEAN_ENV}=`),
     `the hook must set ${CLEAN_ENV}, or the working-tree check never runs before a push`);
 });
+
+test('the deploy gate requires the engine CI that built the module', () => {
+  const workflow = readFileSync(resolve(REPO, '.github/workflows/deploy.yml'), 'utf8');
+  const step = workflow.match(/- name: Require the engine's own CI green[\s\S]*?\n\n/)?.[0];
+  assert.ok(step, 'deploy.yml must still gate on the engine CI at the pinned SHA');
+  assert.match(step, /commits\/\$PIN\/check-runs/,
+    'the check must be read at the pinned SHA, not at engine HEAD');
+  assert.match(step, /"CI green"/,
+    'the aggregate check is the one that covers the engine WASM job');
+  assert.match(step, /exit 1/, 'an unreadable or non-green check must fail the gate');
+});

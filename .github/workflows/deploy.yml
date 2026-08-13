@@ -21,6 +21,10 @@
 # gate fails hard rather than deploying an unverifiable artifact (a silent
 # fallback to engine HEAD would make the gate inert).
 #
+# The engine suite run here is the native one, and no job rebuilds the module,
+# so the gate also requires the engine's aggregate `CI green` check — which
+# covers its WASM job — to have concluded success at that same pinned SHA.
+#
 # The glue is deliberately NOT in the atomicity set: it is byte-identical across
 # most engine builds, so git has nothing to commit for it and its last-touch
 # commit legitimately trails the binary's. Its hash entry is the binding.
@@ -109,6 +113,29 @@ jobs:
           fi
           echo "Pinning engine checkout to $sha (from holosphere_wasm.sha)"
           echo "ref=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Require the engine's own CI green at the pinned SHA
+        # The suite this job runs is the engine's NATIVE one, which never touches
+        # the committed module, and nothing here rebuilds it. The job that does
+        # build WASM is the engine's own, covered by its aggregate `CI green`
+        # check — so the gate requires that check to have concluded success at
+        # the exact SHA the module records its source as.
+        env:
+          GH_TOKEN: ${{ secrets.POV_TOKEN || github.token }}
+          PIN: ${{ steps.engine.outputs.ref }}
+        run: |
+          if ! gh api --paginate "repos/woundedlion/pov/commits/$PIN/check-runs" \
+              --jq '.check_runs | sort_by(.started_at) | .[] | [.name, .status, .conclusion] | @tsv' \
+              > /tmp/engine-checks.tsv; then
+            echo "::error::could not read the engine's check runs at $PIN, so the gate cannot confirm the engine's WASM build passed at the pinned source. A private engine repo needs POV_TOKEN with read access."
+            exit 1
+          fi
+          cat /tmp/engine-checks.tsv
+          conclusion="$(awk -F'\t' '$1 == "CI green" { c = $3 } END { print c }' /tmp/engine-checks.tsv)"
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::the engine's aggregate CI check at $PIN is '${conclusion:-absent}' — that check covers the WASM job, so the committed module's source is unverified. Re-run the Holosphere WASM install from a SHA whose CI is green and commit the refreshed module."
+            exit 1
+          fi
 
       - name: Checkout engine (woundedlion/pov) at the pinned SHA
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
