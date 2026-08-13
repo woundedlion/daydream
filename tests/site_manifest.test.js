@@ -133,7 +133,13 @@ test('the derived page roster names every served page', () => {
       'CSP and stylesheet cases never see them');
 });
 
-test('the site manifest covers every asset the served pages reference', () => {
+/**
+ * Reference walk from the served pages over the tracked tree.
+ * @returns {{seen: Set<string>, unpublished: string[], dangling: string[],
+ *   absent: string[], escaping: string[]}} Every path reached, and the
+ *   references that name nothing servable.
+ */
+const walkFromPages = () => {
   const entries = manifestEntries();
   const covered = (path) =>
     entries.some((entry) => entry === path || path.startsWith(`${entry}/`));
@@ -142,7 +148,7 @@ test('the site manifest covers every asset the served pages reference', () => {
   const seen = new Set();
   const queue = [...PAGES];
   // The walk visits every reachable file, so it accumulates its findings and
-  // asserts once per class rather than once per node.
+  // its caller asserts once per class rather than once per node.
   const unpublished = [];
   const dangling = [];
   const absent = [];
@@ -164,8 +170,14 @@ test('the site manifest covers every asset the served pages reference', () => {
       if (!existsSync(resolve(REPO, target))) absent.push(`${path} -> ${target}`);
       else if (!covered(target)) unpublished.push(`${path} -> ${target}`);
       if (/\.(js|html|css)$/.test(target)) queue.push(target);
+      else seen.add(target);
     }
   }
+  return { seen, unpublished, dangling, absent, escaping };
+};
+
+test('the site manifest covers every asset the served pages reference', () => {
+  const { seen, unpublished, dangling, absent, escaping } = walkFromPages();
   assert.deepEqual(escaping.slice(0, 5), [],
     `${escaping.length} references normalize outside the repo`);
   assert.deepEqual(absent.slice(0, 5), [],
@@ -178,6 +190,28 @@ test('the site manifest covers every asset the served pages reference', () => {
       'would 404 on Pages');
   // A walk that stops at the entry pages proves nothing about the graph.
   assert.ok(seen.size > PAGES.length, 'the reference walk reached no modules');
+});
+
+// Entries no served page references. The manifest exists to keep tests/,
+// scripts/ and dev tooling off Pages, so this list stays short: an entry earns a
+// place here only by being published for its own sake.
+const UNREFERENCED = ['README.md', 'docs/screenshots'];
+
+test('the site manifest publishes nothing the served pages do not reach', () => {
+  const entries = manifestEntries();
+  const stale = UNREFERENCED.filter((entry) => !entries.includes(entry));
+  assert.deepEqual(stale, [],
+    `the unreferenced allowlist names paths ${MANIFEST} no longer publishes`);
+
+  const { seen } = walkFromPages();
+  const reached = (entry) =>
+    seen.has(entry) || [...seen].some((path) => path.startsWith(`${entry}/`));
+  const unreached = entries.filter(
+    (entry) => !UNREFERENCED.includes(entry) && !reached(entry));
+  assert.deepEqual(unreached.slice(0, 5), [],
+    `${unreached.length} ${MANIFEST} entries are neither a served page, ` +
+      'reachable from one, nor declared unreferenced — the manifest is the only ' +
+      'thing keeping dev tooling off Pages');
 });
 
 test('the deploy workflow stages the site from the committed manifest', () => {
