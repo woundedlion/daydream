@@ -232,6 +232,34 @@ test('an inactive pool hides the overlay and hands the stat bars back', () => {
   assert.equal(mobile.style.display, '');
 });
 
+// The overlay does not create its containers, so the page can replace one under
+// it. A cached detached node takes writes nobody sees, and the hand-back would
+// restore the bar that left while the live one stays hidden.
+test('a replaced overlay element is re-resolved instead of written detached', () => {
+  const createElement = (tag) => fakeElement(tag);
+  const byId = {
+    'segment-stats': createElement('div'),
+    'global-stats-desktop': createElement('div'),
+    'stats-bar': createElement('div'),
+  };
+  const doc = { getElementById: (id) => byId[id] ?? null, createElement };
+  const view = new SegmentStatsView(doc);
+
+  view.update(readyState(2));
+  const retired = byId['global-stats-desktop'];
+  assert.equal(retired.style.display, 'none');
+
+  retired.remove();
+  const replacement = createElement('div');
+  byId['global-stats-desktop'] = replacement;
+
+  view.update(readyState(2));
+  assert.equal(replacement.style.display, 'none', 'the live bar is the one hidden');
+
+  view.update(readyState(2, { active: false }));
+  assert.equal(replacement.style.display, '', 'the live bar is the one handed back');
+});
+
 // The bars belong to the page, so an inline display the page set on one is a
 // value the overlay is borrowing, not the stylesheet's to overwrite.
 test('a stat bar is handed back at the inline display it was hidden with', () => {
