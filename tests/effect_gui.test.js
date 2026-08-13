@@ -101,7 +101,9 @@ function fakeGui(hydrated = {}, stored = {}) {
     destroyThrows: null,
     stored,
     storedWrites: [],
+    storedReads: [],
     readStoredNumber(property, legacyProperties = []) {
+      this.storedReads.push(property);
       if (this.stored[property] !== undefined) return this.stored[property];
       const legacy = legacyProperties.find((name) => this.stored[name] !== undefined);
       if (!legacy) return undefined;
@@ -528,6 +530,32 @@ test('a bool parameter stores its accepted value as a float', () => {
   assert.deepEqual(h.acceptedSnapshots.at(-1), [{ name: 'Glow', value: 1 }]);
   const nonNumeric = h.gui().storedWrites.filter(([, v]) => typeof v !== 'number');
   assert.deepEqual(nonNumeric, []);
+});
+
+test('restore reaches a parameter a write revealed, probing each name once', () => {
+  const stage = {
+    name: 'Function', value: 0, requestedValue: 0, acceptedValue: 0,
+    options: ['Waves', 'Grid'],
+  };
+  const grid = { name: 'Grid Scale', value: 1, min: 0, max: 8 };
+  const h = makeHarness({
+    params: [stage, { name: 'Hue Shift', value: 0, min: 0, max: 1 }],
+    acceptedStored: { '__accepted.Function': 1, '__accepted.Grid Scale': 4 },
+    onEngineParam: (name, value, state) => {
+      if (name !== 'Function') return;
+      stage.value = value;
+      stage.requestedValue = value;
+      stage.acceptedValue = value;
+      if (value === 1 && !state.params.includes(grid)) state.params.push(grid);
+    },
+  });
+
+  h.panel.build();
+
+  assert.deepEqual(h.writes.slice(0, 2),
+    ['engine:Function=1', 'engine:Grid Scale=4']);
+  const reads = h.gui().storedReads;
+  assert.deepEqual(reads, [...new Set(reads)], 'no name is probed twice');
 });
 
 test('ShaderBall restores one versioned snapshot before building session controls', () => {

@@ -311,14 +311,25 @@ export function createEffectGui({
     rememberWorkerAcceptedParams(acceptedParams);
   }
 
+  /**
+   * Replay the stored accepted values into the engine. The definition list is
+   * re-read after every write because a write can change it — a ShaderBall
+   * selector swaps in the controls of the stage it selects — so parameters that
+   * did not exist a write ago still get their stored value. Nothing in the loop
+   * writes the stored values it reads, so one probe per name settles it and the
+   * rescan costs a set lookup rather than a URL read.
+   * @param {Object} gui - The effect GUI holding the stored values.
+   * @returns {void}
+   */
   function restoreAcceptedParams(gui) {
     if (typeof gui?.readStoredNumber !== 'function') return;
-    const restored = new Set();
+    const probed = new Set();
     for (;;) {
       let parameter;
       let value;
       for (const candidate of getParameterDefinitions()) {
-        if (candidate.readonly || restored.has(candidate.name)) continue;
+        if (candidate.readonly || probed.has(candidate.name)) continue;
+        probed.add(candidate.name);
         const stored = gui.readStoredNumber(
           acceptedStorageKey(candidate.name),
           legacyShaderBallParamNames(candidate.name).map(acceptedStorageKey));
@@ -328,7 +339,6 @@ export function createEffectGui({
         break;
       }
       if (!parameter) return;
-      restored.add(parameter.name);
       setEngineParam(parameter.name, value);
     }
   }
