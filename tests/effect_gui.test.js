@@ -5,7 +5,6 @@ import {
   createEffectGui,
   addParamControl,
   EXPORT_COPIED,
-  EXPORT_FAILED,
   FULL_CONFIG_STORAGE_KEY,
   FLASH_MS,
   SHADERBALL_STAGE_ORDER,
@@ -57,11 +56,15 @@ function shaderBallParams() {
  * @returns {Object} The controller double.
  */
 function fakeController(object, property, args) {
+  const domElement = fakeElement('div');
+  const button = fakeElement('button');
+  domElement.appendChild(button);
   return {
     object,
     property,
     args,
-    domElement: fakeElement('div'),
+    domElement,
+    $button: button,
     label: property,
     decimalsSet: null,
     disabled: false,
@@ -96,10 +99,14 @@ function fakeController(object, property, args) {
  * @returns {Object} The GUI double.
  */
 function fakeGui(hydrated = {}, stored = {}) {
+  const ownerDocument = { createElement: (tag) => fakeElement(tag) };
   const childrenElement = fakeElement('div');
+  childrenElement.ownerDocument = ownerDocument;
   childrenElement.classList.add('lil-children');
+  const domElement = fakeElement('div');
+  domElement.ownerDocument = ownerDocument;
   const gui = {
-    domElement: fakeElement('div'),
+    domElement,
     $children: childrenElement,
     controllers: [],
     folders: [],
@@ -136,6 +143,7 @@ function fakeGui(hydrated = {}, stored = {}) {
       const controller = fakeController(object, property, args);
       controller.replayOnChange = replayOnChange;
       this.controllers.push(controller);
+      this.$children.appendChild(controller.domElement);
       return controller;
     },
     addMigrated(object, property, legacyNames, ...args) {
@@ -1316,8 +1324,25 @@ test('preset effects expose zero-indexed selection and navigation', () => {
   assert.deepEqual(h.gui().ctrl('presetIndex').args, [{ 0: 0, 1: 1, 2: 2 }]);
   assert.equal(h.gui().ctrl('presetIndex').disabled, false);
   assert.equal(h.gui().ctrl('presetIndex').session, true);
-  assert.equal(h.gui().ctrl('previousPreset').label, 'Previous Preset');
-  assert.equal(h.gui().ctrl('nextPreset').label, 'Next Preset');
+  assert.equal(h.gui().ctrl('reset').label, '\u21ba');
+  assert.equal(h.gui().ctrl('export').label, '\u29c9');
+  assert.equal(h.gui().ctrl('previousPreset').label, '\u25c0');
+  assert.equal(h.gui().ctrl('nextPreset').label, '\u25b6');
+  for (const [property, label] of [
+    ['reset', 'Reset'],
+    ['export', 'Export'],
+    ['previousPreset', 'Previous Preset'],
+    ['nextPreset', 'Next Preset'],
+  ]) {
+    const button = h.gui().ctrl(property).$button;
+    assert.equal(button.getAttribute('aria-label'), label);
+    assert.equal(button.getAttribute('title'), label);
+  }
+  const actionRow = h.gui().$children.children[0];
+  assert.ok(actionRow.classList.contains('effect-action-row'));
+  assert.deepEqual(actionRow.children,
+    ['reset', 'export', 'previousPreset', 'nextPreset']
+      .map((property) => h.gui().ctrl(property).domElement));
   assert.ok(h.gui().ctrl('previousPreset').domElement.classList
     .contains('preset-nav-previous'));
   assert.ok(h.gui().ctrl('nextPreset').domElement.classList
@@ -1421,7 +1446,8 @@ test('Export copies the live values as a C++ brace-init list', async () => {
   await Promise.resolve();
 
   assert.deepEqual(h.state.copyText.copied, ['{ 0.25f, 0.5f }']);
-  assert.equal(h.gui().ctrl('export').label, EXPORT_COPIED);
+  assert.equal(h.gui().ctrl('export').label, '\u2713');
+  assert.equal(h.gui().ctrl('export').$button.getAttribute('title'), EXPORT_COPIED);
 });
 
 test('ShaderBall Export copies the versioned full-config snapshot', async () => {
@@ -1443,7 +1469,7 @@ test('ShaderBall Export copies the versioned full-config snapshot', async () => 
   await Promise.resolve();
 
   assert.deepEqual(h.state.copyText.copied, [JSON.stringify(snapshot, null, 2)]);
-  assert.equal(h.gui().ctrl('export').label, EXPORT_COPIED);
+  assert.equal(h.gui().ctrl('export').label, '\u2713');
 });
 
 test('Export copies displayed values while a segmented snapshot is pending', async () => {
@@ -1460,7 +1486,7 @@ test('Export copies displayed values while a segmented snapshot is pending', asy
   await Promise.resolve();
 
   assert.deepEqual(h.state.copyText.copied, ['{ 0.75f, 1.0f }']);
-  assert.equal(h.gui().ctrl('export').label, EXPORT_COPIED);
+  assert.equal(h.gui().ctrl('export').label, '\u2713');
 });
 
 test('Export does not fall back to controls from a stale schema', () => {
@@ -1476,7 +1502,7 @@ test('Export does not fall back to controls from a stale schema', () => {
   h.gui().ctrl('export').object.export();
 
   assert.deepEqual(h.state.copyText.copied, []);
-  assert.equal(h.gui().ctrl('export').label, EXPORT_FAILED);
+  assert.equal(h.gui().ctrl('export').label, '\u2717');
   assert.match(h.warnings[0], /no parameter values matching/);
 });
 
@@ -1499,7 +1525,7 @@ test('Export without a copy operation reports the failure', () => {
 
   h.gui().ctrl('export').object.export();
 
-  assert.equal(h.gui().ctrl('export').label, EXPORT_FAILED);
+  assert.equal(h.gui().ctrl('export').label, '\u2717');
   assert.deepEqual(h.warnings, ['Export: clipboard copy unavailable']);
 });
 
@@ -1510,7 +1536,7 @@ test('Export refuses a value stream that has skewed from the panel', () => {
   h.gui().ctrl('export').object.export();
 
   assert.deepEqual(h.state.copyText.copied, []);
-  assert.equal(h.gui().ctrl('export').label, EXPORT_FAILED);
+  assert.equal(h.gui().ctrl('export').label, '\u2717');
   assert.match(h.warnings[0], /param\/value length skew \(2 vs 1\)/);
 });
 
@@ -1526,7 +1552,7 @@ test('a rejected clipboard copy reports the failure', async () => {
   await Promise.resolve();
   await Promise.resolve();
 
-  assert.equal(h.gui().ctrl('export').label, EXPORT_FAILED);
+  assert.equal(h.gui().ctrl('export').label, '\u2717');
   assert.match(h.warnings[0], /clipboard copy failed/);
 });
 
@@ -1541,7 +1567,7 @@ test('a copy operation that exhausts its fallbacks reports the failure', async (
   h.gui().ctrl('export').object.export();
   await Promise.resolve();
 
-  assert.equal(h.gui().ctrl('export').label, EXPORT_FAILED);
+  assert.equal(h.gui().ctrl('export').label, '\u2717');
   assert.match(h.warnings[0], /clipboard copy failed/);
 });
 
@@ -1555,7 +1581,8 @@ test('an Export that lands after an effect switch does not flash the old panel',
   await Promise.resolve();
 
   assert.deepEqual(h.state.copyText.copied, ['{ 0.25f }']);
-  assert.equal(stale.ctrl('export').label, 'Export', 'the replaced panel is left alone');
+  assert.equal(stale.ctrl('export').label, '\u29c9',
+    'the replaced panel is left alone');
 });
 
 test('the Export flash reverts to the default label', () => {
@@ -1564,10 +1591,11 @@ test('the Export flash reverts to the default label', () => {
   h.panel.build();
 
   h.gui().ctrl('export').object.export();
-  assert.equal(h.gui().ctrl('export').label, EXPORT_FAILED);
+  assert.equal(h.gui().ctrl('export').label, '\u2717');
 
   mock.timers.tick(FLASH_MS);
-  assert.equal(h.gui().ctrl('export').label, 'Export');
+  assert.equal(h.gui().ctrl('export').label, '\u29c9');
+  assert.equal(h.gui().ctrl('export').$button.getAttribute('title'), 'Export');
 });
 
 test('destroy cancels a pending Export flash', () => {
@@ -1580,7 +1608,7 @@ test('destroy cancels a pending Export flash', () => {
   h.panel.destroy();
   mock.timers.tick(FLASH_MS);
 
-  assert.equal(stale.ctrl('export').label, EXPORT_FAILED,
+  assert.equal(stale.ctrl('export').label, '\u2717',
     'the flash timer fired into no destroyed controller');
 });
 

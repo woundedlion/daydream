@@ -631,17 +631,32 @@
     min-height: 50vh;
   }
 
-  .gui-container .effect-gui .preset-nav-previous,
-  .gui-container .effect-gui .preset-nav-next {
-    display: inline-flex;
-    vertical-align: top;
-    width: 50%;
-  }
+}
 
-  .gui-container .effect-gui .preset-nav-previous > .lil-widget,
-  .gui-container .effect-gui .preset-nav-next > .lil-widget {
-    width: 100%;
-  }
+.gui-container .effect-gui .effect-action-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-column: 1 / -1;
+  gap: var(--spacing);
+  width: 100%;
+}
+
+.gui-container .effect-gui .effect-action {
+  min-width: 0;
+}
+
+.gui-container .effect-gui .effect-action > .lil-widget,
+.gui-container .effect-gui .effect-action button {
+  width: 100%;
+}
+
+.gui-container .effect-gui .effect-action button {
+  min-width: 0;
+  padding-inline: 0;
+  font-family: var(--nav-font);
+  font-size: 16px;
+  line-height: 1;
 }
 
 /* --- Desktop Styles --- */
@@ -711,14 +726,6 @@
 
   .gui-container .lil-gui .lil-controller.lil-function > .lil-widget {
     grid-column: 1 / -1;
-  }
-
-  .gui-container .lil-gui .preset-nav-previous > .lil-widget {
-    grid-column: 1;
-  }
-
-  .gui-container .lil-gui .preset-nav-next > .lil-widget {
-    grid-column: 2;
   }
 
   /* 1px gap between adjacent panels */
