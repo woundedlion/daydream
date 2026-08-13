@@ -610,17 +610,29 @@ export function defaultPaletteRecipe() {
  * @param {string} controls.chromaCurve - PaletteV4.curve member name.
  * @param {{minimum: number, maximum: number}} controls.lightness - Lightness endpoints.
  * @param {{minimum: number, maximum: number}} controls.chroma - Chroma endpoints.
+ * @param {string} controls.easing - PaletteV4.easing member name.
+ * @param {number} controls.spreadTurns - Angular spread between a harmony's anchors, in turns.
+ * @param {number} controls.sweepTurns - Total travel of a SWEEP, in turns.
+ * @param {number} controls.headroom - Fraction of the local gamut the chroma may reach.
+ * @param {number} controls.hueTorsion - Hue drift per unit lightness, in radians.
+ * @param {number} controls.falloffStart - Where a FALLOFF domain begins to fade.
  * @returns {PaletteRecipe} The recipe.
  */
 export function paletteRecipeFromControls(template, controls) {
   const recipe = structuredClone(template);
   recipe.input = { ...controls.window };
   recipe.domain = PaletteV4.domain[controls.domain];
+  recipe.easing = PaletteV4.easing[controls.easing];
   recipe.colorPath = PaletteV4.colorPath[controls.colorPath];
   recipe.hue.mode = PaletteV4.hueMode[controls.hueMode];
   recipe.hue.harmony = PaletteV4.harmony[controls.harmony];
   recipe.hue.direction = PaletteV4.direction[controls.direction];
   recipe.hue.baseTurns = controls.baseTurns;
+  recipe.hue.spreadTurns = controls.spreadTurns;
+  recipe.hue.sweepTurns = controls.sweepTurns;
+  recipe.chroma.headroom = controls.headroom;
+  recipe.hueTorsion = controls.hueTorsion;
+  recipe.falloffStart = controls.falloffStart;
   if (recipe.hue.mode === PaletteV4.hueMode.CUSTOM) {
     recipe.hue.customTurns = customHueTurns(
       recipe.hue.baseTurns, controls.customHueOffsets, recipe.hue.customTurns);
@@ -634,8 +646,24 @@ export function paletteRecipeFromControls(template, controls) {
   }
   // A fully saturated center leaves no room to pull back into gamut.
   if (recipe.chroma.center === 1) recipe.chroma.headroom = 1;
+  // The engine canonicalizes both: a falloff start outside a FALLOFF domain, and
+  // a loop closed by a fractional sweep, which it rejects rather than rounds.
+  if (recipe.domain !== PaletteV4.domain.FALLOFF) recipe.falloffStart = 0.9;
+  if (recipe.domain === PaletteV4.domain.LOOP &&
+      recipe.hue.mode === PaletteV4.hueMode.SWEEP) {
+    recipe.hue.sweepTurns = Math.round(recipe.hue.sweepTurns);
+  }
   return recipe;
 }
+
+// The harmonies whose anchors are placed by spreadTurns; the rest are fixed
+// fractions of the wheel.
+const SPREAD_HARMONIES = new Set([
+  PaletteV4.harmony.ANALOGOUS,
+  PaletteV4.harmony.ACCENTED_ANALOGOUS,
+  PaletteV4.harmony.SPLIT_COMPLEMENTARY,
+  PaletteV4.harmony.TETRADIC,
+]);
 
 /**
  * Which control groups can still change the palette a recipe describes, so the
@@ -658,8 +686,15 @@ export function paletteRecipeAvailability(recipe) {
     baseHue: hasColor,
     hueMode: hasColor,
     harmony: hasColor && recipe.hue.mode === PaletteV4.hueMode.HARMONY,
+    hueSpread: hasColor && recipe.hue.mode === PaletteV4.hueMode.HARMONY &&
+      SPREAD_HARMONIES.has(recipe.hue.harmony),
+    hueSweep: hasColor && recipe.hue.mode === PaletteV4.hueMode.SWEEP,
+    hueTorsion: hasColor,
     colorPath: hasColor && !monochromatic,
     hueDirection: hasColor && !monochromatic && !customHue,
+    chromaHeadroom: hasColor && recipe.chroma.basis !== PaletteV4.chromaBasis.ABSOLUTE &&
+      recipe.chroma.center !== 1,
+    falloffStart: recipe.domain === PaletteV4.domain.FALLOFF,
     chromaEndpoints: !customChroma,
     chromaMaximum: variedChroma && !customChroma,
     lightnessEndpoints: !customLightness,

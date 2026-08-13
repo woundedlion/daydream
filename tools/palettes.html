@@ -818,6 +818,31 @@
                   <option value="SQUARE">Square</option>
                 </select>
               </div>
+              <div id="gen_spread_field" class="recipe-field">
+                <label for="gen_spread">Spread</label>
+                <div class="recipe-slider">
+                  <input type="range" id="gen_spread" min="0" max="90" step="0.1" value="25.2"
+                    aria-label="Harmony Spread (degrees)" title="Harmony Spread (degrees)">
+                  <span id="gen_spread_value" class="slider-label">25.2&deg;</span>
+                </div>
+              </div>
+              <div id="gen_sweep_field" class="recipe-field">
+                <label for="gen_sweep">Sweep</label>
+                <div class="recipe-slider">
+                  <input type="range" id="gen_sweep" min="-16" max="16" step="0.5" value="1"
+                    aria-label="Sweep Travel (turns)" title="Sweep Travel (turns)">
+                  <span id="gen_sweep_value" class="slider-label">1.0</span>
+                </div>
+              </div>
+              <div id="gen_torsion_field" class="recipe-field">
+                <label for="gen_torsion">Torsion</label>
+                <div class="recipe-slider">
+                  <input type="range" id="gen_torsion" min="-12.5" max="12.5" step="0.1" value="0"
+                    aria-label="Hue Torsion (radians per unit lightness)"
+                    title="Hue Torsion (radians per unit lightness)">
+                  <span id="gen_torsion_value" class="slider-label">0.0</span>
+                </div>
+              </div>
             </div>
             <div class="hue-key-visualizer" aria-labelledby="key_wheel_heading">
               <h4 id="key_wheel_heading" class="visually-hidden">OKLCH Hue Keys</h4>
@@ -859,6 +884,14 @@
             <div class="recipe-slider">
               <input type="range" id="gen_chroma_maximum" min="0" max="1" step="0.01" value="0.62">
               <span id="gen_chroma_maximum_value" class="slider-label">0.62</span>
+            </div>
+          </div>
+          <div id="gen_headroom_field" class="recipe-field">
+            <label for="gen_headroom">Headroom</label>
+            <div class="recipe-slider">
+              <input type="range" id="gen_headroom" min="0" max="1" step="0.01" value="0.94"
+                aria-label="Gamut Headroom" title="Gamut Headroom">
+              <span id="gen_headroom_value" class="slider-label">0.94</span>
             </div>
           </div>
         </section>
@@ -904,6 +937,23 @@
               <option value="VIGNETTE">Vignette</option>
               <option value="FALLOFF">Falloff</option>
               <option value="LOOP">Loop</option>
+            </select>
+          </div>
+          <div id="gen_falloff_field" class="recipe-field">
+            <label for="gen_falloff">Falloff</label>
+            <div class="recipe-slider">
+              <input type="range" id="gen_falloff" min="0.67" max="0.99" step="0.01" value="0.9"
+                aria-label="Falloff Start" title="Falloff Start">
+              <span id="gen_falloff_value" class="slider-label">0.90</span>
+            </div>
+          </div>
+          <div class="recipe-field">
+            <label for="gen_easing">Easing</label>
+            <select id="gen_easing" aria-label="Segment Easing" title="Segment Easing"
+              class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+              <option value="LINEAR">Linear</option>
+              <option value="COSINE" selected>Cosine</option>
+              <option value="SMOOTHSTEP">Smoothstep</option>
             </select>
           </div>
           <div id="gen_path_field" class="recipe-field">
@@ -1497,10 +1547,37 @@
       scheduleUpdate();
     }
 
+    // Recipe fields read straight off a slider: its element, how many decimals
+    // the mirror label shows, and the unit it is labelled in.
+    const recipeSliderDefinitions = [
+      { id: 'gen_spread', digits: 1, suffix: '°' },
+      { id: 'gen_sweep', digits: 1, suffix: '' },
+      { id: 'gen_torsion', digits: 1, suffix: '' },
+      { id: 'gen_headroom', digits: 2, suffix: '' },
+      { id: 'gen_falloff', digits: 2, suffix: '' },
+    ];
+
+    function recipeSliderValue(id) {
+      return Number(document.getElementById(id).value);
+    }
+
+    function syncRecipeSliderLabels() {
+      for (const { id, digits, suffix } of recipeSliderDefinitions) {
+        document.getElementById(`${id}_value`).textContent =
+          `${recipeSliderValue(id).toFixed(digits)}${suffix}`;
+      }
+    }
+
     function readPaletteRecipe() {
       const selected = (id) => document.getElementById(id).value;
       return paletteRecipeFromControls(recipeTemplate, {
         window: recipeWindow(),
+        easing: selected('gen_easing'),
+        spreadTurns: recipeSliderValue('gen_spread') / 360,
+        sweepTurns: recipeSliderValue('gen_sweep'),
+        headroom: recipeSliderValue('gen_headroom'),
+        hueTorsion: recipeSliderValue('gen_torsion'),
+        falloffStart: recipeSliderValue('gen_falloff'),
         domain: selected('gen_shape'),
         colorPath: selected('gen_path'),
         hueMode: selected('gen_hue_mode'),
@@ -1522,8 +1599,13 @@
         ['gen_seed_field', 'gen_seed_slider', availability.baseHue],
         ['gen_hue_mode_field', 'gen_hue_mode', availability.hueMode],
         ['gen_harmony_field', 'gen_harmony', availability.harmony],
+        ['gen_spread_field', 'gen_spread', availability.hueSpread],
+        ['gen_sweep_field', 'gen_sweep', availability.hueSweep],
+        ['gen_torsion_field', 'gen_torsion', availability.hueTorsion],
         ['gen_path_field', 'gen_path', availability.colorPath],
         ['gen_direction_field', 'gen_direction', availability.hueDirection],
+        ['gen_falloff_field', 'gen_falloff', availability.falloffStart],
+        ['gen_headroom_field', 'gen_headroom', availability.chromaHeadroom],
         ['gen_chroma_minimum_field', 'gen_chroma_minimum', availability.chromaEndpoints],
         ['gen_chroma_maximum_field', 'gen_chroma_maximum', availability.chromaMaximum],
         ['gen_lightness_minimum_field', 'gen_lightness_minimum', availability.lightnessEndpoints],
@@ -1555,6 +1637,14 @@
         Object.keys(PaletteV4.curve).find((key) => PaletteV4.curve[key] === recipe.lightness.curve);
       document.getElementById('gen_chroma_curve').value =
         Object.keys(PaletteV4.curve).find((key) => PaletteV4.curve[key] === recipe.chroma.curve);
+      document.getElementById('gen_easing').value =
+        Object.keys(PaletteV4.easing).find((key) => PaletteV4.easing[key] === recipe.easing);
+      document.getElementById('gen_spread').value = recipe.hue.spreadTurns * 360;
+      document.getElementById('gen_sweep').value = recipe.hue.sweepTurns;
+      document.getElementById('gen_torsion').value = recipe.hueTorsion;
+      document.getElementById('gen_headroom').value = recipe.chroma.headroom;
+      document.getElementById('gen_falloff').value = recipe.falloffStart;
+      syncRecipeSliderLabels();
       const hueState = customHueKeyState(recipe);
       customHueOffsets = hueState.offsets;
       previousHueMode = recipe.hue.mode;
@@ -2227,6 +2317,7 @@
 
       const dropdowns = [
         'gen_hue_mode', 'gen_harmony', 'gen_shape', 'gen_path', 'gen_direction',
+        'gen_easing',
       ];
       dropdowns.forEach(id => {
         const el = document.getElementById(id);
@@ -2266,6 +2357,14 @@
         });
       }
       syncRecipeWindowControls();
+
+      for (const { id } of recipeSliderDefinitions) {
+        document.getElementById(id).addEventListener('input', () => {
+          syncRecipeSliderLabels();
+          scheduleUpdate();
+        });
+      }
+      syncRecipeSliderLabels();
 
       document.querySelectorAll('[data-recipe-preset]').forEach((button) => {
         button.addEventListener('click', () => loadRecipePreset(button.dataset.recipePreset));
