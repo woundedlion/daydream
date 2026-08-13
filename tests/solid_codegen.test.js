@@ -1053,6 +1053,11 @@ test('savedChainShapeError rejects every unrestorable stored shape', () => {
     [['cube', [{ op: 'relax', params: { iter: NaN } }]], /carries no numeric "iter"/],
     [['cube', [{ op: 'truncate', params: { t: 0.75 } }]], /carries out-of-range "t"/],
     [['cube', [{ op: 'hankin', params: { angle: -1 } }]], /carries out-of-range "angle"/],
+    // A fractional angle names one solid in the funcName suffix (which rounds)
+    // and emits another in the recipe call (which does not).
+    [['cube', [{ op: 'hankin', params: { angle: 58.4 } }]], /carries off-grid "angle"/],
+    [['cube', [{ op: 'truncate', params: { t: 0.335 } }]], /carries off-grid "t"/],
+    [['cube', [{ op: 'relax', params: { iter: 100.5 } }]], /carries off-grid "iter"/],
     [['cube', null], /op chain is not a list/],
     [['cube', { 0: { op: 'dual' } }], /op chain is not a list/],
     [[null, []], /names no base solid/],

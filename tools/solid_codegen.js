@@ -188,7 +188,10 @@ function opParams(o) {
  * stale-format localStorage entry. An op name off the table leaves OP_DEFS[op]
  * undefined and the op-row builder throws reading its params; a declared param
  * that is missing, non-numeric, or outside its current range reaches the WASM
- * bridge as invalid state. Both are caught here, before any state is mutated.
+ * bridge as invalid state; and a value off the param's step grid — which no
+ * control can produce — splits the generated funcName from the recipe it names,
+ * since the name suffix rounds where the emitted call does not. All are caught
+ * here, before any state is mutated.
  * The tool's live chain holds {op,
  * params} objects, so a bare-string op — which applyOp accepts — is not a
  * restorable entry.
@@ -208,6 +211,9 @@ export function savedChainShapeError(base, ops) {
       }
       if (value < def.min || value > def.max) {
         return `${at} ("${o.op}") carries out-of-range "${key}"`;
+      }
+      if (Math.abs(value - snapToStep(value, def)) > Math.abs(def.step) * 1e-6) {
+        return `${at} ("${o.op}") carries off-grid "${key}"`;
       }
     }
   }
