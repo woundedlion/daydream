@@ -37,6 +37,7 @@ const RESERVED_CONTROL_NAMES = new Set([
 export const SHADERBALL_STAGE_ORDER = [
   'Camera',
   'Lens',
+  'Surface Noise',
   'Projection Frame',
   'Projection',
   'Planar Warp 1',
@@ -45,24 +46,25 @@ export const SHADERBALL_STAGE_ORDER = [
   'Signal Weight',
   'Value Transfer',
   'Coverage',
-  'Color',
+  'Palette',
 ];
 const SHADERBALL_STAGE_BOUNDARIES = new Map([
   ['Function', 'Function'],
   ['Projection', 'Projection'],
   ['Projection Frame', 'Projection Frame'],
   ['Camera Wander', 'Camera'],
+  ['Surface Noise', 'Surface Noise'],
   ['Lens', 'Lens'],
   ['Planar Warp 1', 'Planar Warp 1'],
   ['Planar Warp 2', 'Planar Warp 2'],
   ['Signal Weight', 'Signal Weight'],
   ['Value Transfer', 'Value Transfer'],
   ['Coverage', 'Coverage'],
-  ['Colorizer', 'Color'],
+  ['Palette', 'Palette'],
 ]);
 const SHADERBALL_SIGNATURE = [
   'Function', 'Projection', 'Lens', 'Planar Warp 1', 'Planar Warp 2',
-  'Signal Weight', 'Value Transfer', 'Coverage', 'Colorizer',
+  'Signal Weight', 'Value Transfer', 'Coverage', 'Palette',
 ];
 
 /**
@@ -71,6 +73,8 @@ const SHADERBALL_SIGNATURE = [
  */
 export function legacyShaderBallParamNames(name) {
   if (name === 'Camera Wander') return ['Outer Wander'];
+  if (name === 'Palette') return ['Colorizer'];
+  if (name === 'Hue Noise Amount') return ['Hue Shift'];
   for (const [prefix, legacy] of [
     ['Planar Warp 1', 'Outer'],
     ['Planar Warp 2', 'Inner'],
@@ -121,9 +125,6 @@ function shaderBallControlLabel(stage, name) {
   if (name.startsWith(`${stage} `)) return name.slice(stage.length + 1);
   if (stage === 'Projection Frame' && name.startsWith('Projection ')) {
     return name.slice('Projection '.length);
-  }
-  if (stage === 'Color' && name.startsWith('Colorizer ')) {
-    return name.slice('Colorizer '.length);
   }
   return name;
 }
