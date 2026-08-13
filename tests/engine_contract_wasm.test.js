@@ -393,7 +393,12 @@ test('parameter definitions separate rendered and requested state', () => {
   assert.equal(typeof before.requestedValue, 'number');
   assert.equal(typeof before.acceptedValue, 'number');
 
-  const requested = before.value === 4 ? 5 : 4;
+  // Admission needs a compiled program for the resulting topology; Glitch is
+  // the lens the default topology has one for, so this write is accepted
+  // rather than held pending behind a warning.
+  const requested = before.options?.indexOf('Glitch');
+  assert.ok(requested > 0 && requested !== before.value,
+    'Glitch must be a compiled lens alternative to the default');
   assert.equal(engine.setParameter('Lens', requested), M.ParamSetResult.APPLIED);
   const after = engine.getParameterDefinitions().find((d) => d.name === 'Lens');
 
@@ -442,8 +447,8 @@ test('ShaderBall reports an invalid selector without changing its neighbors', ()
 
   assert.equal(engine.setParameter('Planar Warp 1', 0), M.ParamSetResult.APPLIED);
   const repaired = engine.getParameterDefinitions().find((d) => d.name === 'Projection');
-  assert.equal(repaired?.warning, undefined,
-    'making the existing tuple compatible admits the pending Projection');
+  assert.match(repaired?.warning ?? '', /no compiled pipeline/,
+    'a seam-safe tuple still needs a compiled program to admit the Projection');
 });
 
 test('ShaderBall exposes rejected Curl Flow separately from the accepted warp', () => {
