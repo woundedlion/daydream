@@ -132,6 +132,12 @@ class DeepLinkGUI {
    */
   get domElement() { return this.gui.domElement; }
   /**
+   * Appends custom content alongside this GUI's controllers.
+   * @param {HTMLElement} element - Content to append.
+   * @returns {void}
+   */
+  appendElement(element) { this.gui.$children.appendChild(element); }
+  /**
    * Builds a control's URL param key by joining the root's namespace (when it has
    * one) and its enclosing folder names with the property, e.g.
    * "fx.Effects.Speed", so nested controls and separate GUI roots get distinct keys.

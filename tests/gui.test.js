@@ -71,7 +71,13 @@ class StubGUI {
   /**
    * Creates the root stub with a placeholder DOM element.
    */
-  constructor() { this.domElement = {}; this.destroyed = false; }
+  constructor() {
+    this.domElement = {};
+    this.$children = { appended: [], appendChild: (child) => {
+      this.$children.appended.push(child);
+    } };
+    this.destroyed = false;
+  }
   /**
    * Creates a controller bound to a target property.
    * @param {Object} object - The object whose property the controller edits.
@@ -112,6 +118,16 @@ class DeepLinkGUI extends BaseGUI {
     liveRoots.push(this);
   }
 }
+
+test('DeepLinkGUI appends custom content to the wrapped controller container', () => {
+  installWindow('');
+  const gui = new DeepLinkGUI({ autoPlace: false });
+  const element = {};
+
+  gui.appendElement(element);
+
+  assert.deepEqual(gui.gui.$children.appended, [element]);
+});
 
 /**
  * Installs a minimal global window so gui.js can read location.search and call

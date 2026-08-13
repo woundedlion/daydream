@@ -133,6 +133,7 @@ function fakeGui(hydrated = {}, stored = {}) {
       this.storedWrites.push([property, value]);
     },
     close() { this.closed = true; },
+    appendElement(element) { this.$children.appendChild(element); },
     destroy() {
       this.destroyed += 1;
       if (this.destroyThrows) throw this.destroyThrows;

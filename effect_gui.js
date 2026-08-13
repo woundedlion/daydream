@@ -554,7 +554,7 @@ export function createEffectGui({
   function addEffectActions(fx, params) {
     const actionRow = fx.gui.domElement.ownerDocument.createElement('div');
     actionRow.classList.add('effect-action-row');
-    fx.gui.$children.appendChild(actionRow);
+    fx.gui.appendElement(actionRow);
     const presentAction = (controller, icon, label) => {
       controller.name(icon);
       const button = controller.$button ?? controller.domElement;
