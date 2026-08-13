@@ -159,6 +159,10 @@ export class Daydream {
     this.DOT_SIZE = Daydream.DEFAULT_DOT_SIZE;
     // Shared RGB16 color buffer effects draw into; allocated by precomputeMatrices().
     this.pixels = null;
+    // Composed instance matrices per grid, keyed `WxHxH_OFFSET`. Entries come
+    // from the resolution-preset table, so the map holds a couple of grids.
+    /** @type {Map<string, Float32Array>} */
+    this.matrixCache = new Map();
 
     this.canvas = document.querySelector("#canvas");
 
@@ -838,25 +842,45 @@ export class Daydream {
    * sphere and orient the dot to face outward from the center. Also allocates
    * the shared instanceColor buffer (exposed as this.pixels) that effects write
    * pixel colors into.
+   *
+   * The matrices are a function of the grid alone, so they are composed once per
+   * grid and replayed afterwards: this runs synchronously inside the resolution
+   * handler over W*H instances, and toggling back to a preset would otherwise
+   * redo every spherical conversion, lookAt and compose to reach the same
+   * matrices.
    */
   precomputeMatrices() {
-    const vector = new THREE.Vector3();
+    const count = this.W * this.H;
     const dummy = new THREE.Object3D();
-    const sph = new THREE.Spherical(); // reused scratch out-param
+    const key = `${this.W}x${this.H}x${this.H_OFFSET}`;
+    const cached = this.matrixCache.get(key);
 
-    for (let i = 0; i < this.W * this.H; i++) {
-      const x = i % this.W;
-      const y = Math.floor(i / this.W);
+    if (cached) {
+      for (let i = 0; i < count; i++) {
+        dummy.matrix.fromArray(cached, i * 16);
+        this.dotMesh.setMatrixAt(i, dummy.matrix);
+      }
+    } else {
+      const composed = new Float32Array(count * 16);
+      const vector = new THREE.Vector3();
+      const sph = new THREE.Spherical(); // reused scratch out-param
 
-      vector.setFromSpherical(pixelToSpherical(x, y, this, sph));
-      vector.multiplyScalar(Daydream.SPHERE_RADIUS);
+      for (let i = 0; i < count; i++) {
+        const x = i % this.W;
+        const y = Math.floor(i / this.W);
 
-      dummy.position.set(0, 0, 0);
-      dummy.lookAt(vector);
-      dummy.position.copy(vector);
-      dummy.updateMatrix();
+        vector.setFromSpherical(pixelToSpherical(x, y, this, sph));
+        vector.multiplyScalar(Daydream.SPHERE_RADIUS);
 
-      this.dotMesh.setMatrixAt(i, dummy.matrix);
+        dummy.position.set(0, 0, 0);
+        dummy.lookAt(vector);
+        dummy.position.copy(vector);
+        dummy.updateMatrix();
+
+        dummy.matrix.toArray(composed, i * 16);
+        this.dotMesh.setMatrixAt(i, dummy.matrix);
+      }
+      this.matrixCache.set(key, composed);
     }
 
     const needed = this.dotMesh.count * 3;
@@ -939,6 +963,7 @@ export class Daydream {
       this.dotMesh = null;
     }
     this.pixels = null;
+    this.matrixCache.clear();
     this.dotMaterial?.dispose();
     this.dotMaterial = null;
 
