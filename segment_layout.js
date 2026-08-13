@@ -28,7 +28,7 @@ export function isValidSegmentCount(total) {
  * Compute the canvas sub-rectangle a segment renders.
  *
  * Layout: NUM_ARMS = 2 vertical halves — arm A is the left half, arm B the
- * floor(w/2)-shifted right half — with segments [0, total/2) on arm A and the
+ * w/2-shifted right half — with segments [0, total/2) on arm A and the
  * rest on arm B. Each arm splits into total/2 equal Y-bands. Within an arm the
  * first floor(bands/2) segments tile the northern bands top-down and the
  * remainder tile the southern bands from the S pole inward, so four bands per
@@ -37,7 +37,7 @@ export function isValidSegmentCount(total) {
  * Two conventions are shared with the firmware's physical segment→canvas map
  * (hardware/pov_segment_map.h::segment_map), so a per-segment overlay in the
  * simulator names the same board the hardware ID straps select: the arm
- * partition, arm B included as the floor(w/2)-shifted half, and each segment's
+ * partition, arm B included as the w/2-shifted half, and each segment's
  * row band. Both are pinned by tests/segment_crosscheck.test.js against
  * pov_segment_map.json — the mapping emitted from that header by the engine build
  * and installed here — so a convention change on either side trips a test. The
@@ -45,7 +45,7 @@ export function isValidSegmentCount(total) {
  * no direction, so only the row set matters here.
  *
  * The column split is a worker partition, not a firmware correspondence: arm A
- * holds [0, floor(w/2)) on every frame, keeping the `total` rectangles disjoint
+ * holds [0, w/2) on every frame, keeping the `total` rectangles disjoint
  * so they composite into one canvas. The firmware's segment_clip() instead
  * trades the two column halves between the arms every half-revolution, and each
  * arm sweeps the full width over a rotation.
@@ -57,7 +57,8 @@ export function isValidSegmentCount(total) {
  * @param {number} id - segment index in [0, total)
  * @param {number} total - total segment count (positive even number; the GUI
  *   exposes 2..8 in steps of 2, capped further on a low-memory device)
- * @param {number} w - canvas width in pixels
+ * @param {number} w - canvas width in pixels; must be even, so the two arms
+ *   tile it exactly (an odd width would leave column w-1 in no segment)
  * @param {number} h - canvas height in pixels
  * @returns {SegRange}
  */
@@ -74,9 +75,10 @@ export function computeSegmentRange(id, total, w, h) {
     throw new Error(
       `segment_layout: canvas dimensions must be positive integers (got ${w}x${h})`);
   }
-  if (w < NUM_ARMS) {
+  if (w % NUM_ARMS !== 0) {
     throw new Error(
-      `segment_layout: canvas width must be >= ${NUM_ARMS} arms (got ${w})`);
+      `segment_layout: canvas width must be a multiple of ${NUM_ARMS} arms so `
+      + `every column belongs to a segment (got ${w})`);
   }
   const ySegsPerArm = Math.floor(total / NUM_ARMS);
   if (h < ySegsPerArm) {
@@ -87,9 +89,8 @@ export function computeSegmentRange(id, total, w, h) {
   const armId = Math.floor(id / ySegsPerArm);
   const armSeg = id % ySegsPerArm;
 
-  // Symmetric floor(w/2) split per arm, matching the firmware's w/2 arm-B column
-  // offset; odd w drops its trailing column rather than widening arm B.
-  const armW = Math.floor(w / NUM_ARMS);
+  // Symmetric w/2 split per arm, matching the firmware's w/2 arm-B column offset.
+  const armW = w / NUM_ARMS;
   const x0 = armId * armW;
   const x1 = x0 + armW;
 
