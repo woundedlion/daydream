@@ -1250,7 +1250,7 @@
 
     function renderSavedList() {
       const list = document.getElementById('savedList');
-      list.innerHTML = '';
+      list.replaceChildren();
 
       // Two cards with the same funcName export definitions that overwrite each
       // other, so flag every member of a colliding set, not just the newest. A
@@ -1509,8 +1509,7 @@
 
     function renderOps() {
       const list = document.getElementById('opsList');
-      // Clean up overrides if any
-      list.innerHTML = '';
+      list.replaceChildren();
 
       // Container-level Drag Events
       list.ondragover = (e) => {

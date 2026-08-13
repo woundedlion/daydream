@@ -124,7 +124,7 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
       edgeLines = discard(edgeLines);
       vertPoints = discard(vertPoints);
       normalLines = discard(normalLines);
-      if (labelsContainer) labelsContainer.innerHTML = '';
+      if (labelsContainer) labelsContainer.replaceChildren();
 
       // Faces
       /** @type {number[]} */
