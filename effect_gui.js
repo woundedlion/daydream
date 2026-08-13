@@ -30,6 +30,10 @@ export const FLASH_MS = 1500;
 // Transient Export button labels.
 export const EXPORT_COPIED = '\u2713 Copied!';
 export const EXPORT_FAILED = '\u2717 Copy failed';
+const EXPORT_ICON = '\u29c9';
+const RESET_ICON = '\u21ba';
+const PREVIOUS_ICON = '\u25c0';
+const NEXT_ICON = '\u25b6';
 export const FULL_CONFIG_STORAGE_KEY = '__fullConfig';
 const RESERVED_CONTROL_NAMES = new Set([
   'reset', 'export', 'presetIndex', 'previousPreset', 'nextPreset', 'pause'
@@ -548,6 +552,23 @@ export function createEffectGui({
    * @returns {void}
    */
   function addEffectActions(fx, params) {
+    const actionRow = fx.gui.domElement.ownerDocument.createElement('div');
+    actionRow.classList.add('effect-action-row');
+    fx.gui.$children.appendChild(actionRow);
+    const presentAction = (controller, icon, label) => {
+      controller.name(icon);
+      const button = controller.$button ?? controller.domElement;
+      button.setAttribute('aria-label', label);
+      button.setAttribute('title', label);
+    };
+    const addAction = (actions, property, icon, label, className) => {
+      const controller = fx.gui.add(actions, property);
+      controller.domElement.classList.add('effect-action', className);
+      presentAction(controller, icon, label);
+      actionRow.appendChild(controller.domElement);
+      return controller;
+    };
+
     /**
      * Flash a transient status label on the Export button, restoring the default
      * label after the flash window. Supersedes any flash still pending for this
@@ -557,8 +578,9 @@ export function createEffectGui({
      */
     const flashExport = (label) => {
       clearTimeout(fx.exportFlashTimer);
-      exportCtrl.name(label);
-      fx.exportFlashTimer = setTimeout(() => exportCtrl.name('Export'), FLASH_MS);
+      presentAction(exportCtrl, label === EXPORT_COPIED ? '\u2713' : '\u2717', label);
+      fx.exportFlashTimer = setTimeout(
+        () => presentAction(exportCtrl, EXPORT_ICON, 'Export'), FLASH_MS);
     };
 
     const effectActions = {
@@ -574,8 +596,9 @@ export function createEffectGui({
        */
       export() { exportParams(fx, params, flashExport); }
     };
-    fx.gui.add(effectActions, 'reset').name('Reset');
-    const exportCtrl = fx.gui.add(effectActions, 'export').name('Export');
+    addAction(effectActions, 'reset', RESET_ICON, 'Reset', 'effect-action-reset');
+    const exportCtrl = addAction(
+      effectActions, 'export', EXPORT_ICON, 'Export', 'effect-action-export');
     const presetCount = getPresetCount();
     if (presetCount > 0) {
       effectActions.presetIndex = getPresetIndex();
@@ -605,11 +628,10 @@ export function createEffectGui({
       };
       effectActions.previousPreset = () => move(-1);
       effectActions.nextPreset = () => move(1);
-      const previous = fx.gui.add(effectActions, 'previousPreset')
-        .name('Previous Preset');
-      const next = fx.gui.add(effectActions, 'nextPreset').name('Next Preset');
-      previous.domElement.classList.add('preset-nav-previous');
-      next.domElement.classList.add('preset-nav-next');
+      addAction(effectActions, 'previousPreset', PREVIOUS_ICON, 'Previous Preset',
+        'preset-nav-previous');
+      addAction(effectActions, 'nextPreset', NEXT_ICON, 'Next Preset',
+        'preset-nav-next');
     }
   }
 
