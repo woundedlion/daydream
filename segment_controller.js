@@ -122,20 +122,21 @@ export class ModuleWarmer {
   /**
    * Prime the module graph's HTTP cache and compile its binary; see warmModules,
    * which runs this on the page's warmer.
-   * @param {{fetch?: typeof globalThis.fetch, baseUrl?: string|URL, minIntervalMs?: number}} [dependencies]
+   * @param {{fetch?: typeof globalThis.fetch, baseUrl?: string|URL, minIntervalMs?: number, now?: () => number}} [dependencies]
    * @returns {Promise<void>}
    */
   warm({
     fetch: fetchResource = globalThis.fetch,
     baseUrl = import.meta.url,
     minIntervalMs = WARM_INTERVAL_MS,
+    now: clock = Date.now,
   } = {}) {
     if (typeof fetchResource !== 'function') return Promise.resolve();
     let probe;
     try { probe = new URL('./holosphere_wasm.js', baseUrl); }
     catch { return Promise.resolve(); }
     if (probe.protocol !== 'http:' && probe.protocol !== 'https:') return Promise.resolve();
-    const now = Date.now();
+    const now = clock();
     if (probe.href === this.lastWarmKey && now - this.lastWarmAt < minIntervalMs) {
       return this.lastWarm;
     }
@@ -231,7 +232,7 @@ function unrefTimer(timer) {
  * worker. A binary the engine refuses is reported and drops the held module, so
  * the workers compile their own rather than instantiating an artifact this warm
  * has evidence is stale.
- * @param {{fetch?: typeof globalThis.fetch, baseUrl?: string|URL, minIntervalMs?: number}} [dependencies]
+ * @param {{fetch?: typeof globalThis.fetch, baseUrl?: string|URL, minIntervalMs?: number, now?: () => number}} [dependencies]
  * @returns {Promise<void>}
  */
 export function warmModules(dependencies) {
