@@ -229,6 +229,19 @@ test('a dataset write is reachable by an [attr] selector', () => {
   assert.equal(bare.matches('[data-index]'), false);
 });
 
+test('a selector the fake does not implement throws instead of matching nothing', () => {
+  const el = fakeElement('span');
+  el.className = 'op-row';
+  el.dataset.index = 0;
+
+  assert.throws(() => el.matches('.op-row.selected'), /unsupported selector/,
+    'a compound class selector would otherwise never match');
+  assert.throws(() => el.matches('[data-index="0"]'), /unsupported selector/,
+    'an attribute-value selector would otherwise never match');
+  assert.equal(el.matches('.op-row'), true);
+  assert.equal(el.matches('[data-index]'), true);
+});
+
 test('replaceChildren moves a node out of the parent it came from', () => {
   const from = fakeElement('div');
   const to = fakeElement('div');
