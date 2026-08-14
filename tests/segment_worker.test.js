@@ -2,6 +2,7 @@
 // Run: node --test --experimental-test-module-mocks "tests/*.test.js"
 import { test, mock, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -982,4 +983,51 @@ test('the worker module graph carries no specifier an import map would resolve',
     'segment_worker.js',
     'worker_protocol.js',
   ]);
+});
+
+/**
+ * The type expression of every `@typedef` in a module source, stripped of JSDoc
+ * line prefixes and whitespace so re-wrapping and prose edits leave it alone.
+ * Tag-anchored to the start of a JSDoc line, so a `@typedef` quoted mid-sentence
+ * is prose rather than a shape.
+ * @param {string} source - Module source text.
+ * @returns {string[]} `Name={shape}` entries, sorted by name.
+ */
+function typedefShapes(source) {
+  const shapes = [];
+  for (const m of source.matchAll(/^[ \t]*\*[ \t]*@typedef\s+\{/gm)) {
+    const open = m.index + m[0].length - 1;
+    let depth = 0;
+    let end = open;
+    for (; end < source.length; end++) {
+      if (source[end] === '{') depth++;
+      else if (source[end] === '}' && --depth === 0) break;
+    }
+    const body = source.slice(open, end + 1)
+      .replace(/^[ \t]*\*[ \t]?/gm, '')
+      .replace(/\s+/g, '');
+    const name = source.slice(end + 1).match(/^\s*(\w+)/)?.[1] ?? '?';
+    shapes.push(`${name}=${body}`);
+  }
+  return shapes.sort();
+}
+
+// The typedefs are erased at runtime, so a field added on one side of the
+// postMessage boundary and read on the other fails silently; PROTOCOL_VERSION is
+// what makes a reshaped message fault instead, and only this pin ties the two
+// together.
+const PROTOCOL_SHAPE_PIN = {
+  version: 9,
+  sha256: '6f6580a80eadb4a0611fc694948bb737188c9552623807a08dd19f78a947094e',
+};
+
+test('a reshaped protocol message forces a PROTOCOL_VERSION bump', () => {
+  const shapes = typedefShapes(readFileSync(join(REPO, 'worker_protocol.js'), 'utf8'));
+  assert.ok(shapes.length >= 12, 'every protocol message is a @typedef in that file');
+  const digest = createHash('sha256').update(shapes.join('\n')).digest('hex');
+  assert.equal(digest, PROTOCOL_SHAPE_PIN.sha256,
+    'a protocol message shape changed: bump PROTOCOL_VERSION so a stale cached '
+    + 'worker or glue faults, then re-pin the digest here');
+  assert.equal(PROTOCOL_VERSION, PROTOCOL_SHAPE_PIN.version,
+    'PROTOCOL_SHAPE_PIN.version tracks PROTOCOL_VERSION; re-pin both together');
 });
