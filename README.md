@@ -110,7 +110,7 @@ Building the WASM target in Holosphere installs `holosphere_wasm.js`, `holospher
     - [10.5 The Effect Sidebar](#105-the-effect-sidebar-sidebarjs)
     - [10.6 GUI Auto-Generation](#106-gui-auto-generation)
     - [10.7 Segmented POV Workers](#107-segmented-pov-workers-segment_workerjs)
-    - [10.8 Vendor Importmap](#108-vendor-importmap-local-first--cdn-fallback)
+    - [10.8 Vendor Importmap](#108-vendor-importmap-cdn-by-default--local-opt-in)
     - [10.9 Video Recording](#109-video-recording-recorderjs)
     - [10.10 Resolution Presets](#1010-resolution-presets)
     - [10.11 Geometry Tools](#1011-geometry-tools-daydreamtools)
@@ -445,7 +445,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 ├── favicon.svg                 Sphere-mark favicon for the simulator pages
 ├── site_manifest.txt           Repo-relative path list deploy.yml publishes to Pages
 ├── LICENSE                     PolyForm Noncommercial 1.0.0 (engine); effects reserved
-├── vendor-importmap.js         Local-first / CDN-fallback importmap helper
+├── vendor-importmap.js         CDN-by-default importmap helper, local opt-in
 ├── holosphere_wasm.js          Installed from Holosphere's WASM build
 ├── holosphere_wasm.wasm        Installed from Holosphere's WASM build
 ├── holosphere_wasm.sha         Engine commit + tree state the module was built from
@@ -534,7 +534,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 └── package-lock.json           Committed dependency pin (the optional trees above are gitignored)
 ```
 
-When the local `three.js/` and `node_modules/lil-gui/` directories are absent (e.g. on the GitHub Pages deploy, and by default), [`vendor-importmap.js`](https://github.com/woundedlion/daydream/blob/master/vendor-importmap.js) resolves libraries from jsdelivr; `npm run importmap:local` switches it to the vendored copies for offline dev. See [§10.8](#108-vendor-importmap-local-first--cdn-fallback).
+[`vendor-importmap.js`](https://github.com/woundedlion/daydream/blob/master/vendor-importmap.js) resolves libraries from jsdelivr, which is the committed default the Pages deploy and a fresh checkout serve; `npm run importmap:local` switches it to the vendored copies for offline dev. See [§10.8](#108-vendor-importmap-cdn-by-default--local-opt-in).
 
 ---
 
@@ -2540,7 +2540,7 @@ Key properties:
 - **Protocol version handshake** — `worker_protocol.js` exports a `PROTOCOL_VERSION` that both ends stamp and check. Each worker posts a `booted` ping carrying it *before* instantiating WASM, and the controller's `init` message carries it back; either side faults on a mismatch — a stale cached worker or glue file against a newer peer — instead of drifting on reshaped message fields.
 - **Watchdogs, bounded boot retry, and a latched fault** — a worker that hangs or fails to load without throwing fires no `onerror`, so three deadlines bound the pipeline: the `booted` ping (module fetch + evaluate), pool readiness (WASM instantiate), and render liveness. The render deadline is re-armed on every distinct segment frame, so a slow effect keeps extending it while a true stall still faults. A message-less `error` event before the pool is ready is a transient module-fetch failure and rebuilds the pool a bounded number of times with a short backoff; anything else latches. Latching terminates every worker and halts the pool with no auto-restart, replacing the per-segment stats table with a fault banner naming the segment and the reason — it stays down until a user-driven resolution or segmented-mode change rebuilds the pool.
 
-### 10.8 Vendor Importmap (Local-First / CDN Fallback)
+### 10.8 Vendor Importmap (CDN by Default / Local Opt-In)
 
 `vendor-importmap.js` is loaded as a regular (non-module) `<script>` by `index.html` and by the three tool pages that import bare specifiers. `palettes.html` imports none — every module it loads is page-relative — so it carries no importmap script at all. At parse time the helper:
 
@@ -2747,7 +2747,7 @@ git clone --depth 1 https://github.com/mrdoob/three.js.git
 
 After populating them, run `npm run importmap:local` to point [`vendor-importmap.js`](https://github.com/woundedlion/daydream/blob/master/vendor-importmap.js) at the local copies (don't commit the result); `npm run importmap` reverts to all-CDN (§10.8).
 
-**Live demo.** The `master` branch of daydream is published to <https://woundedlion.github.io/daydream/> via GitHub Pages. The CDN-fallback path is what powers it.
+**Live demo.** The `master` branch of daydream is published to <https://woundedlion.github.io/daydream/> via GitHub Pages. It serves the committed all-CDN import map.
 
 ---
 
