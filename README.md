@@ -291,6 +291,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   │   ├── plot_cull.h             Plot edge samplers + screen row/column span and clip-cull kernel
 │   │   ├── plot_raster.h           Plot::rasterize: adaptive sub-stepping polyline walk
 │   │   ├── filter.h                Composable render pipeline + all Filter::World/Screen/Pixel
+│   │   ├── filter_feedback.h       Filter::Pixel::Feedback: full-screen feedback loop + warp cache
 │   │   ├── sdf.h                   SDF shape primitives, CSG operations, distance queries
 │   │   ├── sdf_common.h            SDF interval/bounds substrate + DistanceResult + span-emission helpers
 │   │   ├── sdf_rings.h             SDF ring leaves (Ring, DistortedRing, FlatDistortedRing)
@@ -335,7 +336,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── pov_sync_content.h      Layer 3: index-beacon codec and the per-board content tracker
 │   ├── pov_sync_emitter.h      Master-side symbol generation with late-burst self-censoring
 │   ├── pov_handoff.h           Pure effect-handoff state machine for POVSegmented (host-testable)
-│   ├── pov_submit_gate.h       Pure LED-submit accept/drop decision for the POVSegmented ISR (host-testable)
+│   ├── pov_submit_gate.h       Pure LED-submit accept/drop and sync-pulse width decisions for the POVSegmented ISR (host-testable)
 │   ├── pov_segmented.h         Multi-Teensy segmented POV driver (Phantasm)
 │   └── phantasm/               KiCad 10 project for the per-segment carrier board
 │       ├── README.md               Project entry point and validation matrix
@@ -396,7 +397,11 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── screenshot_resolution.test.mjs Node unit test for that descent (fallback, empty list, prefix names)
 │   ├── png_probe.mjs           Dependency-free PNG chunk/CRC/inflate validator behind the gallery gate
 │   ├── png_probe.test.mjs      Node unit test for the PNG validator (corrupt/empty fixtures)
-│   └── check_screenshots.mjs   Asserts docs/screenshots/ matches the effect roster and decodes (CI)
+│   ├── check_screenshots.mjs   Asserts docs/screenshots/ matches the effect roster and decodes (CI)
+│   ├── run_tests.mjs           `npm test`: runs the .test.mjs suite and gates each file against its floors
+│   ├── count_assertions.mjs    NODE_OPTIONS shim counting each test file's node:assert calls
+│   ├── report_cases.mjs        node:test reporter tallying per-file case and skip counts
+│   └── assertion_floors.json   Committed per-file {cases, assertions} minimums behind that gate
 ├── tools/                      Firmware gates, device profiling, and asset bakes
 │   ├── build_pins.py           Shared external-tool version pins for CI and `just`
 │   ├── check_test_files.sh     Exact-count pin for every glob-discovered test-file set (CI)
@@ -456,6 +461,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 ├── README.md                   Installed from Holosphere (this file)
 ├── docs/screenshots/           Installed from Holosphere
 │
+├── main.js                     index.html's entry module: starts the simulator, once
 ├── bootstrap.js                Dynamic-import boot of daydream.js + failure overlay
 ├── daydream.js                 App entry: WASM loader, state wiring, GUI/sidebar
 ├── app_lifecycle.js            Composition-root frame adapter, display-alias heal, Test All
@@ -1037,7 +1043,7 @@ Convenience structs that construct an SDF shape and rasterize in a single `draw(
 
 #### Near-Pole Azimuthal LOD
 
-A row at colatitude φ has horizontal pixel pitch `sin(φ)` times the vertical, so `1/sin(φ)` columns share one physical LED footprint and need only one shade between them. The scan walk offers those columns as a block of `pole_lod_aggressiveness / sin(φ)` (`constants.h`, clamped to `POLE_LOD_MAX_RUN = 32`), and the sink settles the whole block from one probe wherever the probe can vouch for it. Only full canvas-aligned blocks are offered — partial blocks at clip or span edges go per column — so a column shades identically whichever segment renders it.
+A row at colatitude φ has horizontal pixel pitch `sin(φ)` times the vertical, so `1/sin(φ)` columns share one physical LED footprint and need only one shade between them. The scan walk offers those columns as a block of `pole_lod_aggressiveness / sin(φ)` (`constants.h`, clamped to `POLE_LOD_MAX_RUN = 32`), and the sink settles the whole block from one probe wherever the probe can vouch for it. Only full canvas-aligned blocks are offered, so an offer never straddles two blocks and a settled column always takes its shade from its own block's anchor. A block truncated by a clip or span edge goes per column instead, so the columns beside a segment seam shade at full resolution rather than from the anchor the neighbouring segment would have used.
 
 `pole_lod_aggressiveness` is a hardware-calibrated knob, not a derived constant: the true masking width depends on the LED's angular size and the per-column exposure. 1.0 tracks the footprint exactly; smaller values stay inside it; 0 makes every offer one column and the walk bit-identical to an undecimated one. It defaults to 0 (`HS_POLE_LOD_DEFAULT`). Firmware compiles it in as a `constexpr` with no setter — at the default, the decimation branches fold away entirely — while host and WASM builds keep it mutable so it can be tuned live (§10.2 `setPoleLod`).
 
@@ -1056,7 +1062,7 @@ All `Plot` primitives accept a `Fragments` array (an arena-backed `ArenaVector<F
 
 #### Sampling Policy
 
-`rasterize` takes a `RasterSamplingPolicy` template parameter setting the adaptive sample density. `DEFAULT` targets `SCREEN_STEP_PX` (0.9 px) and compiles the alternative away; `BALANCED` always trades samples for speed; `SELECTABLE` defers the choice to `RasterOptions::balanced_sampling`, so one instantiation serves both and the policy is picked per draw call. Only the single-pass rasterizer reads it — the cached-replay path always samples at the default density.
+`rasterize` takes its compile-time behavior as one `RasterConfig` NTTP (`rasterize<W, H, RasterConfig{.single_pass = true}>`), whose `sampling_policy` field sets the adaptive sample density. `DEFAULT` targets `SCREEN_STEP_PX` (0.9 px) and compiles the alternative away; `BALANCED` always trades samples for speed; `SELECTABLE` defers the choice to `RasterOptions::balanced_sampling`, so one instantiation serves both and the policy is picked per draw call. Only the single-pass rasterizer reads it — the cached-replay path always samples at the default density.
 
 Balanced sampling stretches each adaptive step by `BALANCED_SCREEN_STEP_PX / SCREEN_STEP_PX` (1.25×), clamped to one base step (2π/W) and left exact below the pole floor (`MIN_POLE_SCALE * BALANCED_POLE_GUARD_SCALE` base steps), where spacing is already at its minimum. Two consequences:
 
@@ -1471,7 +1477,7 @@ The mesh system is split across twelve files:
 - **`triangular_bitset.h`** — Upper-triangular pair bitset backing the edge deduplication in the wireframe path
 - **`solid_generators.h`** — Hardcoded Platonic vertex/face tables, the `SolidBuilder` operator chain, and the named Archimedean / Catalan / Islamic Star Pattern generators
 - **`solids.h`** — The four solid registries, the authored `Recipe` mirrors of the generators, and the name/index lookups over them
-- **`relax_bakes_generated.h`** — Baked relaxed-mesh vertices behind `MeshOps::relax_baked`, generated by `tools/relax_bakes.py`
+- **`relax_bakes_generated.h`** — Baked relaxed-mesh vertices behind `MeshOps::relax_baked`, generated by `tools/relax_bakes.py`; never hand-edited, regenerate with `<build>/relax_bake_gen | python tools/relax_bakes.py emit --stdin`
 
 `PolyMesh` stores vertices and face connectivity via `ArenaVector` arrays. `MeshState` (in `spatial.h`) is the flat compiled format consumed by the renderer. `HalfEdgeMesh` provides a half-edge traversal structure built from either a `PolyMesh` or `MeshState`.
 
@@ -2299,7 +2305,7 @@ Colorize ──────────> Palette + selected hue-shift source
 ```
 
 
-Schema validity still enforces the cross-stage constraints that have a geometric reason. Noise Contour (Sphere) cannot follow a planar warp. Polar Chart must be the only planar warp, requires Grid or Primitive Lattice, and requires `Pattern Freq × Polar Harmonic` to be a whole number. Seam-sensitive projected noise and warp stages cannot cross the cut topology of Bonne, Peirce, or Airocean. Unsafe coordinate bounds and excess noise resources are rejected as well. These incompatible combinations remain pending and report an actionable warning. Manifest availability is separate: the simulator routes valid unmatched combinations dynamically, while Teensy requires one of the 11 compiled descriptors.
+Schema validity still enforces the cross-stage constraints that have a geometric reason. Noise Contour (Sphere) cannot follow a planar warp. Polar Chart must be the only planar warp, except that Planar Warp 1 Polar Chart may be followed by Wave Shear. It requires Grid or Primitive Lattice, and when it is the only planar warp its seam must land on a whole number of source periods: `Pattern Freq × Polar Harmonic` for Grid, `2π × Lattice Cell Scale × Polar Harmonic` for Primitive Lattice, which is periodic in its cell scale and ignores Pattern Freq. Seam-sensitive projected noise and warp stages cannot cross the cut topology of Bonne, Peirce, or Airocean. Unsafe coordinate bounds and excess noise resources are rejected as well. These incompatible combinations remain pending and report an actionable warning. Manifest availability is separate: the simulator routes valid unmatched combinations dynamically, while Teensy requires one of the 11 compiled descriptors.
 
 Projection seams use topology supplied by the projection kernel rather than guessing from planar coordinates. **Edge Fade** gives both sides of a paired cut the same authored fade, so the seam closes flush without a subducted edge. Glued and periodic edges remain continuous and do not fade. **Pole Fade** is projection weight; selecting either projection-weight coverage policy carries that attenuation into alpha as well as any separately selected signal weighting.
 
@@ -2352,10 +2358,11 @@ Main thread                                Web Workers (segment mode only)
 index.html → vendor-importmap.js           segment_worker.js × N
               ↓ (resolves three/lil-gui    each owns its own WASM module
               ↓  to local or CDN)
-            bootstrap.js (entry)           engine.setClip(x0,x1,y0,y1)
-              ├─ failure overlay +         engine.drawFrame()  → pixel slice
-              │  refreshModuleCache()      postMessage(Transfer pixels)
-              └─ import('./daydream.js')
+            main.js (entry)                engine.setClip(x0,x1,y0,y1)
+              └─ bootstrap.js              engine.drawFrame()  → pixel slice
+                   ├─ failure overlay +    postMessage(Transfer pixels)
+                   │  refreshModuleCache()
+                   └─ import('./daydream.js')
                    ├─ createHolosphereModule()
                    ├─ Daydream (driver.js)
                    │    ├─ Three.WebGLRenderer
@@ -2368,7 +2375,7 @@ index.html → vendor-importmap.js           segment_worker.js × N
                    └─ VideoRecorder (MediaRecorder)
 ```
 
-`index.html` loads exactly one module, `bootstrap.js`, which dynamically imports `daydream.js` inside a `try`/`catch` — the only handler for a module-graph load failure. On failure it renders the error into the page's `loading-overlay` (as `role="alert"`, with a focused **Reload** button) and falls back to the shared fatal-error banner when no overlay exists. The Reload handler first runs `refreshModuleCache()`, which re-fetches every same-origin `.js` and `.wasm` the page has already loaded with `cache: 'reload'`. That is the remedy for the deploy-skew hazard: a plain browser reload only revalidates the top-level document, so modules cached from an earlier deploy stay stale and keep failing to link against freshly fetched importers — and the WASM binary is bound to its glue by content hash, so a stale binary against fresh glue is the canonical form of the skew.
+`index.html` loads exactly one module, `main.js`, whose whole body is a call to `bootstrap.js`'s exported `bootstrap()`. Keeping the side effect in the entry module rather than in `bootstrap.js` itself is what lets `daydream.js` import the failure overlay without standing up a second simulator. `bootstrap()` dynamically imports `daydream.js` inside a `try`/`catch` — the only handler for a module-graph load failure. On failure it renders the error into the page's `loading-overlay` (as `role="alert"`, with a focused **Reload** button) and falls back to the shared fatal-error banner when no overlay exists. The Reload handler first runs `refreshModuleCache()`, which re-fetches every same-origin `.js` and `.wasm` the page has already loaded with `cache: 'reload'`. That is the remedy for the deploy-skew hazard: a plain browser reload only revalidates the top-level document, so modules cached from an earlier deploy stay stale and keep failing to link against freshly fetched importers — and the WASM binary is bound to its glue by content hash, so a stale binary against fresh glue is the canonical form of the skew.
 
 A normal page load creates one WASM instance on the main thread. The dot mesh has one instance per LED pixel; the per-frame work is `instanceColor.needsUpdate = true` after the WASM buffer view is refreshed. When the user enables Segmented POV (§10.7), `daydream.js` spawns N Web Workers, each holding its own WASM module so the four-Teensy Phantasm layout can be exercised in software.
 
