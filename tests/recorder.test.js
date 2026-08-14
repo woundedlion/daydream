@@ -1067,12 +1067,18 @@ const installSavePath = () => {
   URL.revokeObjectURL = (url) => { spy.revoked.push(url); };
 
   const body = fakeElement('body');
-  const createOther = savedDocument?.createElement;
+  const createOther = savedDocument?.createElement?.bind(savedDocument);
   spy.body = body;
   globalThis.document = /** @type {any} */ ({
     body,
     createElement: (tag) => {
-      if (tag !== 'a') return createOther(tag);
+      if (tag !== 'a') {
+        if (!createOther) {
+          throw new Error(
+            `installSavePath: no document underneath to create <${tag}>`);
+        }
+        return createOther(tag);
+      }
       const anchor = fakeElement('a');
       // The anchor is detached right after the click, so record the attachment
       // state at click time rather than reading it afterwards.
