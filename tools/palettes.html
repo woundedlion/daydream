@@ -2027,6 +2027,9 @@
 
     function handleDragCancel(event) {
       if (!isDragging || event.pointerId !== activePointerId || !colorStripCanvas) return;
+      if (colorStripCanvas.hasPointerCapture(event.pointerId)) {
+        colorStripCanvas.releasePointerCapture(event.pointerId);
+      }
       activePointerId = null;
       isDragging = false;
       isSelectionActive = false;
