@@ -15,6 +15,7 @@ const {
   pctSuffix,
   generateFuncAndRecipe,
   generateRecipeCpp,
+  D2R_F32,
   computeInternalAngle,
   snapToStep,
   isConvexFace,
@@ -109,7 +110,7 @@ test('applyOp forwards each op its engine arguments', () => {
     [{ op: 'bevel', params: { t: 0.25 } }, { op: 'bevel', args: [0.25] }],
     [{ op: 'snub', params: { t: 0.5, twist: 0.28 } }, { op: 'snub', args: [0.5, 0.28] }],
     [{ op: 'relax', params: { iter: 100 } }, { op: 'relax', args: [100] }],
-    [{ op: 'hankin', params: { angle: 54 } }, { op: 'hankin', args: [54 * (Math.PI / 180)] }],
+    [{ op: 'hankin', params: { angle: 54 } }, { op: 'hankin', args: [Math.fround(54 * D2R_F32)] }],
     ['dual', { op: 'dual', args: [] }],
     ['kis', { op: 'kis', args: [] }],
   ];
@@ -119,7 +120,7 @@ test('applyOp forwards each op its engine arguments', () => {
     assert.deepEqual(calls, [expected], `applyOp dispatched ${expected.op} wrongly`);
   }
   // The degree->radian conversion is a real change of value, not an identity.
-  assert.notEqual(54 * (Math.PI / 180), 54);
+  assert.notEqual(Math.fround(54 * D2R_F32), 54);
 });
 
 /** Verifies applyOp rejects an op the mesh wrapper binds no method for. */
@@ -445,8 +446,21 @@ test('a seeded hankin angle agrees across the control, the funcName and the reci
   // pasted `<literal>f * D2R` computes.
   const calls = [];
   applyOp(stubMesh(calls), { op: 'hankin', params: { angle } });
-  assert.deepEqual(calls, [{ op: 'hankin', args: [angle * (Math.PI / 180)] }]);
-  assert.equal(calls[0].args[0], Number(literal[1]) * (Math.PI / 180));
+  assert.deepEqual(calls, [{ op: 'hankin', args: [Math.fround(angle * D2R_F32)] }]);
+  assert.equal(calls[0].args[0], Math.fround(Number(literal[1]) * D2R_F32));
+});
+
+/**
+ * The paste computes `<deg>f * D2R` in float32; a double PI/180 lands one ulp
+ * away at 54 and 73 degrees, both of which solids.h ships.
+ */
+test('the preview converts a hankin angle in the float precision the paste uses', () => {
+  for (const angle of [54, 73]) {
+    const calls = [];
+    applyOp(stubMesh(calls), { op: 'hankin', params: { angle } });
+    assert.equal(calls[0].args[0], Math.fround(angle * D2R_F32));
+    assert.notEqual(calls[0].args[0], Math.fround(angle * (Math.PI / 180)));
+  }
 });
 
 test('isConvexFace accepts a convex face', () => {
