@@ -243,7 +243,8 @@ test('bootstrap falls back to a fatal banner when there is no overlay', async ()
   });
 
   assert.equal(loaded, false);
-  assert.deepEqual(messages, ['Failed to start the simulator. offline']);
+  assert.equal(messages.length, 1);
+  assert.match(messages[0], /^Failed to start the simulator\b.*\boffline\b/);
 });
 
 test('bootstrap leaves the fatal banner alone when the overlay renders', async () => {

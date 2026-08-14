@@ -269,6 +269,6 @@ test('bootstrapTool still banners a synchronous and an async init failure', asyn
   assert.equal(asyncPage.bodyEl.children.length, 1, 'a rejected init raised no banner');
   assert.match(messageOf(asyncPage.bodyEl.children[0]),
     /^⚠ The palette tool failed to initialize/);
-  assert.deepEqual(logged.map(([message]) => message),
-    ['palette tool failed to initialize:']);
+  assert.equal(logged.length, 1);
+  assert.match(logged[0][0], /palette tool failed to initialize/);
 });

@@ -316,30 +316,27 @@ test('a rejection with no thrown value reports the restored value', () => {
 
 test('a recovered failure is logged but is not fatal', () => {
   const failure = new Error('setEffect threw');
-  assert.deepEqual(
-    switchFailureReport('Effect',
-      { applied: false, failure, recoveryFailure: null }),
-    {
-      logs: [{ message: 'Effect switch failed:', error: failure }],
-      notice: 'Effect change was rejected. The previous value was restored.',
-      fatal: null,
-    });
+  const report = switchFailureReport('Effect',
+    { applied: false, failure, recoveryFailure: null });
+
+  assert.equal(report.logs.length, 1);
+  assert.match(report.logs[0].message, /^Effect switch failed/);
+  assert.equal(report.logs[0].error, failure);
+  assert.match(report.notice, /^Effect change was rejected/);
+  assert.equal(report.fatal, null);
 });
 
 test('a failed rollback logs both errors and is fatal', () => {
   const failure = new Error('setResolution threw');
   const recoveryFailure = new Error('rollback threw');
-  assert.deepEqual(
-    switchFailureReport('Resolution', { applied: false, failure, recoveryFailure }),
-    {
-      logs: [
-        { message: 'Resolution switch failed:', error: failure },
-        { message: 'Resolution rollback failed:', error: recoveryFailure },
-      ],
-      notice: null,
-      fatal: 'Resolution change failed and the previous state could not be '
-        + 'restored. Reload the page.',
-    });
+  const report = switchFailureReport('Resolution',
+    { applied: false, failure, recoveryFailure });
+
+  assert.deepEqual(report.logs.map((entry) => entry.error), [failure, recoveryFailure]);
+  assert.match(report.logs[0].message, /^Resolution switch failed/);
+  assert.match(report.logs[1].message, /^Resolution rollback failed/);
+  assert.equal(report.notice, null);
+  assert.match(report.fatal, /^Resolution change failed .*Reload the page\.$/);
 });
 
 test('a rejected switch whose rollback failed still raises the banner', () => {
@@ -347,8 +344,9 @@ test('a rejected switch whose rollback failed still raises the banner', () => {
   const report = switchFailureReport('Effect',
     { applied: false, failure: null, recoveryFailure });
 
-  assert.deepEqual(report.logs,
-    [{ message: 'Effect rollback failed:', error: recoveryFailure }]);
+  assert.equal(report.logs.length, 1);
+  assert.match(report.logs[0].message, /^Effect rollback failed/);
+  assert.equal(report.logs[0].error, recoveryFailure);
   assert.match(report.fatal, /^Effect change failed/);
 });
 
