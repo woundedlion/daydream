@@ -78,11 +78,11 @@ export class EngineHost {
   }
 
   /**
-   * Release the recorder, render adapter, engine handle, and cached view,
-   * leaving the host inert. Idempotent, and the one release path for both a page
-   * discard and a startup the discard raced. A recording in progress is ended
-   * but not flushed: its onstop download is async and cannot complete under a
-   * synchronous page discard.
+   * Release the recorder, render adapter, engine handle, cached view, and module
+   * reference, leaving the host inert. Idempotent, and the one release path for
+   * both a page discard and a startup the discard raced. A recording in progress
+   * is ended but not flushed: its onstop download is async and cannot complete
+   * under a synchronous page discard.
    * @returns {void}
    */
   dispose() {
@@ -94,5 +94,8 @@ export class EngineHost {
     this.engine?.delete();
     this.engine = null;
     this.pixelView = null;
+    // The module owns the Emscripten heap, so a held reference keeps the whole
+    // WebAssembly.Memory alive behind a host that can no longer render.
+    this.module = null;
   }
 }
