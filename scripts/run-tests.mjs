@@ -238,6 +238,22 @@ if (updating) {
   } catch {
     /* no floors yet: there is nothing to keep */
   }
+  // The write replaces the file with what this run measured, so a narrower
+  // pattern than the suite would delete every floor outside it.
+  const dropped = Object.keys(committed)
+    .filter((file) => !(file in measured))
+    .sort();
+  if (dropped.length > 0) {
+    console.error(
+      'run-tests: these committed floors were not measured by this run, so ' +
+        'writing would delete them:\n' +
+        dropped.map((file) => `  ${file}`).join('\n') +
+        '\nRe-measure every floor in one run — `node scripts/run-tests.mjs ' +
+        `${UPDATE_FLAG} "tests/*.test.js"` +
+        '` — or delete the entries by hand if their files are gone.',
+    );
+    process.exit(1);
+  }
   for (const file of skipped)
     if (file in measured && sound(committed[file]))
       measured[file] = committed[file];
