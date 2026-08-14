@@ -156,32 +156,25 @@ test('Enter on the list selects the focused option and eats the native click', (
   assert.equal(event.defaultPrevented, true, 'a native click would double-select');
 });
 
-test('an arrow key on the list moves focus and the roving tab stop with it', () => {
+test('the list claims the keys it navigates with and passes the rest through', () => {
   const { sidebar, selected } = makeSidebar();
   sidebar.setEffects(['A', 'B', 'C'], {});
   document.activeElement = sidebar.buttons.get('A');
 
-  const event = sidebar.listEl.dispatch('keydown', { key: 'ArrowRight' });
+  const navigated = sidebar.listEl.dispatch('keydown', { key: 'ArrowRight' });
 
   assert.equal(document.activeElement, sidebar.buttons.get('B'));
   assert.equal(sidebar.tabbableBtn, sidebar.buttons.get('B'));
   assert.equal(sidebar.buttons.get('B').tabIndex, 0);
   assert.equal(sidebar.buttons.get('A').tabIndex, -1);
   assert.deepEqual(selected, [], 'navigating is not selecting');
-  assert.equal(event.defaultPrevented, true);
-});
+  assert.equal(navigated.defaultPrevented, true);
 
-test('a key the list does not own passes through untouched', () => {
-  const { sidebar, selected } = makeSidebar();
-  sidebar.setEffects(['A', 'B'], {});
-  const a = sidebar.buttons.get('A');
-  document.activeElement = a;
+  const ignored = sidebar.listEl.dispatch('keydown', { key: 'x' });
 
-  const event = sidebar.listEl.dispatch('keydown', { key: 'x' });
-
-  assert.equal(event.defaultPrevented, false, 'typing still reaches the page');
+  assert.equal(ignored.defaultPrevented, false, 'typing still reaches the page');
+  assert.equal(document.activeElement, sidebar.buttons.get('B'), 'focus did not move');
   assert.deepEqual(selected, []);
-  assert.equal(document.activeElement, a);
 });
 
 test('setActive toggles active/aria-selected on only the old and new buttons', () => {

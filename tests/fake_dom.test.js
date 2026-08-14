@@ -81,39 +81,24 @@ test('every listener sees the dispatching node as target and its own node as cur
   assert.deepEqual(seen, [[leaf, leaf], [leaf, mid], [leaf, root]]);
 });
 
-test('every listener sees the dispatched type, whatever the caller supplied', () => {
+test('the dispatched event carries the type and a default a handler can cancel', () => {
   const { leaf, mid } = chain();
   const seen = [];
-  const record = (node) => node.addEventListener('keydown', (e) => seen.push(e.type));
-  record(mid);
-  record(leaf);
+  mid.addEventListener('keydown', (e) => seen.push([e.type, e.defaultPrevented]));
+  leaf.addEventListener('keydown', (e) => {
+    seen.push([e.type, e.defaultPrevented]);
+    e.preventDefault();
+  });
 
-  leaf.dispatch('keydown', { type: 'click', key: 'Enter' });
+  // The caller names a type of its own; the dispatched one is what listeners see.
+  const cancelled = leaf.dispatch('keydown', { type: 'click', key: 'Enter' });
 
-  assert.deepEqual(seen, ['keydown', 'keydown']);
-});
-
-test('preventDefault marks the event and the dispatch answers with it', () => {
-  const { leaf, mid } = chain();
-  const seen = [];
-  mid.addEventListener('keydown', (e) => seen.push(e.defaultPrevented));
-  leaf.addEventListener('keydown', (e) => { seen.push(e.defaultPrevented); e.preventDefault(); });
-
-  const event = leaf.dispatch('keydown', { key: 'Enter' });
-
-  assert.deepEqual(seen, [false, true], 'the flag is unset until a handler sets it');
-  assert.equal(event.defaultPrevented, true);
-  assert.equal(event.key, 'Enter', 'the caller-supplied fields ride along');
-});
-
-test('an event nobody cancels reports its default intact', () => {
-  const { leaf, log, listen } = chain();
-  listen('leaf', 'leaf');
-
-  const event = leaf.dispatch('click');
-
-  assert.deepEqual(log, ['leaf']);
-  assert.equal(event.defaultPrevented, false);
+  assert.deepEqual(seen, [['keydown', false], ['keydown', true]],
+    'the flag is unset until a handler sets it');
+  assert.equal(cancelled.defaultPrevented, true);
+  assert.equal(cancelled.key, 'Enter', 'the caller-supplied fields ride along');
+  assert.equal(leaf.dispatch('click').defaultPrevented, false,
+    'an event nobody cancels reports its default intact');
 });
 
 test('a caller-named target overrides the dispatching node', () => {
