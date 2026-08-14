@@ -335,8 +335,11 @@ class FakeWorker {
     FakeWorker.instances.push(this);
   }
   /**
-   * Records a posted message instead of dispatching it to a real worker, and
-   * detaches every transferred buffer the way structured-clone transfer does.
+   * Structured-clones the payload the way the browser does — an unclonable
+   * field throws DataCloneError, and the transfer list detaches the sender's
+   * buffers — then records the message the controller sent. `posted` holds the
+   * sender's object rather than the clone so identity across workers stays
+   * observable.
    * @param {Object} msg - Protocol message the controller sent.
    * @param {Transferable[]} [transfer] - Transfer list the controller supplied.
    * @returns {void}
@@ -346,9 +349,9 @@ class FakeWorker {
       throw new DOMException('message rejected', 'DataCloneError');
     if (msg.type === FakeWorker.failPostType && this.index === FakeWorker.failPostAt)
       throw new DOMException('message rejected', 'DataCloneError');
+    structuredClone(msg, { transfer });
     this.posted.push(msg);
     this.transfers.push(transfer ?? null);
-    for (const buffer of transfer ?? []) buffer.transfer();
   }
   /**
    * Marks this fake worker as terminated.
