@@ -28,8 +28,8 @@
     "assertions": 29
   },
   "tests/daydream_boot.test.js": {
-    "cases": 13,
-    "assertions": 42
+    "cases": 14,
+    "assertions": 51
   },
   "tests/daydream_start.test.js": {
     "cases": 7,

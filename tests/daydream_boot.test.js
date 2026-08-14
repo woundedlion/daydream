@@ -144,6 +144,24 @@ test('a recording start or stop is announced, not only styled', () => {
     + 'one that is also untrue');
 });
 
+test('a refused recording container is announced, not silently substituted', () => {
+  const at = SOURCE.indexOf('host.recorder.onFormatFallback =');
+  assert.ok(at >= 0, 'the format-fallback hook must stay wired');
+  const body = sliceTo(at, '\n      };');
+  assert.doesNotMatch(body, /setValue/,
+    'rewriting the Rec Format dropdown fires its onChange, which overwrites '
+    + "the user's chosen container for the rest of the session");
+  assert.match(body, /formatFallback =/,
+    'the hook fires inside toggle(), whose caller raises the record notice '
+    + 'under the same owner tag: a notice written here would be replaced');
+  const record = sliceTo(SOURCE.indexOf('const recordState = {'), '\n  }};');
+  assert.match(record, /formatFallback = ''/,
+    'a stale detail would be appended to a later session that encoded fine');
+  assert.match(record, /\$\{formatFallback\}/,
+    'without this the fallback reaches the user as nothing at all: on Firefox '
+    + 'an MP4 request records WebM with no report');
+});
+
 test('a recorder fault reports its reason, not just an un-tinted canvas', () => {
   const at = SOURCE.indexOf('host.recorder.onError =');
   assert.ok(at >= 0, 'the recorder fault hook must stay wired');

@@ -312,10 +312,14 @@ export function start({
       host.recorder = new VideoRecorder(daydream.canvas);
       host.recorder.frameInterval = daydream.frameInterval;
       recordingSettings.replay();
+      // Held for the notice the record toggle raises once toggle() returns.
+      // Re-seating the dropdown instead would fire its onChange and replace the
+      // user's chosen container for the rest of the session.
       host.recorder.onFormatFallback = (extension) => {
         const label = Object.keys(REC_FORMATS)
           .find(key => REC_FORMATS[key] === extension) ?? 'Auto';
-        recFormatCtrl.setValue(label);
+        formatFallback = ` ${recSettings.recFormat} is unsupported in this`
+          + ` browser; recording as ${label}.`;
       };
       // A fault ends the session on its own; drop the recording UI so the button
       // doesn't keep offering to stop a session that is already gone, and report
@@ -633,6 +637,11 @@ export function start({
   // from a stopped session; this can.
   let recordingShown = false;
 
+  // Why the encoded container is not the one the Rec Format dropdown names,
+  // when the browser refused it. Written by the recorder's fallback hook during
+  // start(), consumed by the record notice raised right after.
+  let formatFallback = '';
+
   /**
    * Reflects the session state in the canvas styling, duration readout, and record
    * button label.
@@ -660,6 +669,7 @@ export function start({
       return;
     }
     const wasRecording = recordingShown;
+    formatFallback = '';
     const isRecording = host.recorder.toggle(appState.get('effect'));
     // A start that never began a session has already reported why through onError;
     // there was no session to stop, and the same owner tag would overwrite it.
@@ -670,7 +680,8 @@ export function start({
       ? ' Axis labels are page overlays, not canvas pixels; the recording will not carry them.'
       : '';
     applyNotice.show(
-      `${isRecording ? 'Recording started.' : 'Recording stopped.'}${axisWarning}`,
+      `${isRecording ? 'Recording started.' : 'Recording stopped.'}`
+      + `${formatFallback}${axisWarning}`,
       RECORD_NOTICE);
     showRecording(isRecording);
   }};
@@ -679,8 +690,7 @@ export function start({
   recFolder.close();
   recFolder.addSession(recSettings, 'recQuality', 1, 20, 1).name('Rec Quality (Mbps)');
   recFolder.addSession(recSettings, 'recResolution', Object.keys(REC_RESOLUTIONS)).name('Rec Resolution');
-  const recFormatCtrl =
-    recFolder.addSession(recSettings, 'recFormat', Object.keys(REC_FORMATS)).name('Rec Format');
+  recFolder.addSession(recSettings, 'recFormat', Object.keys(REC_FORMATS)).name('Rec Format');
   const recordCtrl = recFolder.add(recordState, 'record').name('\u25cf Record');
   recordCtrl.disable();
   const onKeyDown = createGlobalKeydownHandler({ dispatch: (e) => daydream.keydown(e) });
