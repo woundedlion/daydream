@@ -727,6 +727,11 @@
     grid-column: 1 / -1;
   }
 
+  .gui-container .lil-gui .effect-action-row
+    .lil-controller.lil-function > .lil-widget {
+    grid-column: auto;
+  }
+
   /* 1px gap between adjacent panels */
   .gui-container > .lil-gui + .lil-gui {
     margin-left: 1px;
