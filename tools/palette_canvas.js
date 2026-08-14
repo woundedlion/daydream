@@ -25,6 +25,41 @@ import { waveGraphBand } from './palette_math.js';
  */
 
 /**
+ * Sizes a canvas' backing store to its display box in device pixels and scales
+ * the context so drawing stays in CSS pixels.
+ * @param {HTMLCanvasElement} canvas - Canvas to size to its display box.
+ * @param {CanvasRenderingContext2D} ctx - Its 2D context.
+ * @returns {{width: number, height: number}} The canvas' size in CSS pixels.
+ */
+function fitCanvasToDisplay(canvas, ctx) {
+  const pixelRatio = Math.max(1, globalThis.devicePixelRatio || 1);
+  let width;
+  let height;
+
+  if (canvas.clientWidth && canvas.clientHeight) {
+    width = Math.max(1, Math.round(canvas.clientWidth));
+    height = Math.max(1, Math.round(canvas.clientHeight));
+    const renderWidth = Math.round(width * pixelRatio);
+    const renderHeight = Math.round(height * pixelRatio);
+    if (canvas.width !== renderWidth || canvas.height !== renderHeight) {
+      canvas.width = renderWidth;
+      canvas.height = renderHeight;
+    }
+  } else {
+    // An unlaid-out canvas has no display size to fit to. Its backing store is
+    // already in device pixels, so sizing it from itself would multiply by the
+    // ratio again on every call.
+    width = Math.max(1, Math.round(canvas.width / pixelRatio));
+    height = Math.max(1, Math.round(canvas.height / pixelRatio));
+  }
+
+  // Setting canvas.width resets the context state, so the transform is applied
+  // after any resize.
+  ctx.setTransform?.(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  return { width, height };
+}
+
+/**
  * Builds the color-strip painter, which owns the offscreen gradient cache.
  *
  * Caching the rendered gradient avoids rebuilding ImageData while a drag only
@@ -48,8 +83,8 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
   /**
    * Repaints the offscreen gradient when the palette or the canvas size changed.
    * @param {StripPalette} palette - Palette sampled per column.
-   * @param {number} width - Canvas width.
-   * @param {number} height - Canvas height.
+   * @param {number} width - Cache width, in device pixels.
+   * @param {number} height - Cache height, in device pixels.
    * @param {{start: number, end: number}} view - Phase window shown by the strip.
    * @returns {HTMLCanvasElement} The cache canvas, current as of this call.
    */
@@ -114,13 +149,15 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
      */
     draw(palette, selectionRange = null, view = { start: 0, end: 1 }) {
       if (!ctx) return;
-      const width = canvas.width;
-      const height = canvas.height;
+      const { width, height } = fitCanvasToDisplay(canvas, ctx);
 
-      const gradient = refreshCache(palette, width, height, view);
+      // One palette sample per device pixel: the gradient is baked at the
+      // backing store's size, then blitted over the CSS-pixel box the fitted
+      // transform scales by, so a column lands on a pixel.
+      const gradient = refreshCache(palette, canvas.width, canvas.height, view);
 
       // Blit the cached gradient, clearing the previous selection overlay.
-      ctx.drawImage(gradient, 0, 0);
+      ctx.drawImage(gradient, 0, 0, width, height);
 
       if (selectionRange) {
         // Ensure startX is the smaller value
@@ -141,39 +178,6 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
 }
 // Red, Green, Blue.
 const WAVE_COLORS = ['#EF4444', '#22C55E', '#3B82F6'];
-
-/**
- * @param {HTMLCanvasElement} canvas - Canvas to size to its display box.
- * @param {CanvasRenderingContext2D} ctx - Its 2D context.
- * @returns {{width: number, height: number}} The canvas' size in CSS pixels.
- */
-function fitCanvasToDisplay(canvas, ctx) {
-  const pixelRatio = Math.max(1, globalThis.devicePixelRatio || 1);
-  let width;
-  let height;
-
-  if (canvas.clientWidth && canvas.clientHeight) {
-    width = Math.max(1, Math.round(canvas.clientWidth));
-    height = Math.max(1, Math.round(canvas.clientHeight));
-    const renderWidth = Math.round(width * pixelRatio);
-    const renderHeight = Math.round(height * pixelRatio);
-    if (canvas.width !== renderWidth || canvas.height !== renderHeight) {
-      canvas.width = renderWidth;
-      canvas.height = renderHeight;
-    }
-  } else {
-    // An unlaid-out canvas has no display size to fit to. Its backing store is
-    // already in device pixels, so sizing it from itself would multiply by the
-    // ratio again on every call.
-    width = Math.max(1, Math.round(canvas.width / pixelRatio));
-    height = Math.max(1, Math.round(canvas.height / pixelRatio));
-  }
-
-  // Setting canvas.width resets the context state, so the transform is applied
-  // after any resize.
-  ctx.setTransform?.(pixelRatio, 0, 0, pixelRatio, 0, 0);
-  return { width, height };
-}
 
 /**
  * Draws the R, G, and B wave functions on the graph canvas.
