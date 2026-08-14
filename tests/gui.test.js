@@ -50,11 +50,17 @@ class StubController {
    */
   getValue() { return this.object[this.prop]; }
   /**
-   * Writes the bound value and fires the registered onChange handler.
+   * Writes the bound value and fires the registered onChange handler. Writing
+   * the value already bound is a no-op, as in lil-gui.
    * @param {*} v - The new value to assign to the bound property.
    * @returns {StubController} This controller, for chaining.
    */
-  setValue(v) { this.object[this.prop] = v; if (this.on) this.on(v); return this; }
+  setValue(v) {
+    if (this.getValue() === v) return this;
+    this.object[this.prop] = v;
+    if (this.on) this.on(v);
+    return this;
+  }
   /**
    * No-op display refresh that preserves the chaining surface.
    * @returns {StubController} This controller, for chaining.
