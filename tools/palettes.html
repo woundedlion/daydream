@@ -2273,7 +2273,9 @@
       // Safety check for critical elements
       if (!colorStripCanvas || !waveGraphCanvas || !hueKeyWheelCanvas ||
           !colorStripCtx || !waveGraphCtx || !hueKeyWheelCtx) {
-        console.error("Fatal Error: Canvas elements not found. Stopping init.");
+        showFatalError('The palette tool could not acquire its canvases — a '
+          + 'canvas element is missing or the browser refused a 2D context. '
+          + 'The controls below are inert.');
         return;
       }
 
