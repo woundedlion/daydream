@@ -1023,6 +1023,29 @@ test('sync marshals the definitions once for an effect with an enum control', ()
   assert.equal(h.gui().ctrl('Mode').getValue(), 1, 'the requested enum is adopted');
 });
 
+test('sync leaves a selector the user has open alone', () => {
+  const mode = {
+    name: 'Mode', value: 0, requestedValue: 0, options: ['Off', 'On'],
+    animated: true,
+  };
+  const h = makeHarness({ params: [mode, SPEED], engineValues: [0, 0.4] });
+  h.panel.build();
+  const selector = h.gui().ctrl('Mode');
+  const displays = selector.displayUpdates;
+  h.state.focused = selector.$button;
+  h.state.params = [{ ...mode, requestedValue: 1 }, SPEED];
+
+  h.panel.sync();
+
+  assert.equal(selector.getValue(), 0, 'the open dropdown keeps its selection');
+  assert.equal(selector.displayUpdates, displays, 'and is not re-rendered');
+
+  h.state.focused = null;
+  h.panel.sync();
+
+  assert.equal(selector.getValue(), 1, 'the requested value lands once focus leaves');
+});
+
 test('sync rebuilds before reading the main engine value stream', () => {
   const h = makeHarness({ params: [SPEED], engineValues: [0.9], generation: 3 });
   h.panel.build();
