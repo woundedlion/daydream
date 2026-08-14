@@ -51,6 +51,31 @@ test('navTargetIndex returns -1 for non-navigation keys and empty lists', () => 
   assert.equal(navTargetIndex(0, 0, 'ArrowDown'), -1);  // empty list
 });
 
+// The mobile list is an 8-row column-flow grid, so the option to the right of
+// index i sits 8 later; without the stride both horizontal arrows would walk
+// down the column they are already in.
+test('navTargetIndex steps a whole column for Left/Right under a stride', () => {
+  assert.equal(navTargetIndex(0, 20, 'ArrowRight', 8), 8);
+  assert.equal(navTargetIndex(8, 20, 'ArrowLeft', 8), 0);
+  // Vertical movement stays one option per press whatever the stride is.
+  assert.equal(navTargetIndex(0, 20, 'ArrowDown', 8), 1);
+  assert.equal(navTargetIndex(1, 20, 'ArrowUp', 8), 0);
+});
+
+test('navTargetIndex wraps Left/Right within the row, not into the next one', () => {
+  // Right past the last column returns to the first column of the same row.
+  assert.equal(navTargetIndex(16, 20, 'ArrowRight', 8), 0);
+  assert.equal(navTargetIndex(19, 20, 'ArrowRight', 8), 3);
+  // Left before the first column lands on the row's last populated option; the
+  // short trailing column leaves row 3 ending at 19 and row 4 at 12.
+  assert.equal(navTargetIndex(3, 20, 'ArrowLeft', 8), 19);
+  assert.equal(navTargetIndex(4, 20, 'ArrowLeft', 8), 12);
+  // An off-list focus still enters at an end, and a degenerate stride is 1.
+  assert.equal(navTargetIndex(-1, 20, 'ArrowRight', 8), 0);
+  assert.equal(navTargetIndex(-1, 20, 'ArrowLeft', 8), 19);
+  assert.equal(navTargetIndex(1, 3, 'ArrowRight', 0), 2);
+});
+
 test('navTargetIndex jumps to the first/last option for Home/End', () => {
   assert.equal(navTargetIndex(2, 5, 'Home'), 0);
   assert.equal(navTargetIndex(2, 5, 'End'), 4);

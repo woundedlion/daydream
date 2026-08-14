@@ -7,6 +7,21 @@ import { sortItems, navTargetIndex, scrollArrowState } from "./sidebar_logic.js"
 import { formatKB } from "./tools/kb_format.js";
 
 /**
+ * Options per column in the option list: the row count of a column-flow grid
+ * (the mobile layout), else 1 for the desktop single column. Read from the
+ * resolved style so the stylesheet stays the only place the layout is stated.
+ * @param {HTMLElement} listEl - The option list element.
+ * @returns {number} Index distance between an option and its horizontal neighbour.
+ */
+function columnStride(listEl) {
+  const style = listEl?.ownerDocument?.defaultView?.getComputedStyle?.(listEl);
+  if (!style || !String(style.gridAutoFlow ?? '').includes('column')) return 1;
+  const rows = String(style.gridTemplateRows ?? '').trim();
+  if (!rows || rows === 'none') return 1;
+  return rows.split(/\s+/).length;
+}
+
+/**
  * Self-contained sidebar managing the effect list, sort controls, and keyboard navigation.
  * Owns its container element and maintains persistent button references across a
  * SORT: sortBy() reorders the existing button DOM nodes rather than destroying and
@@ -334,7 +349,8 @@ export class EffectSidebar {
   /**
    * Keyboard navigation handler: arrow keys move focus between options (wrapping
    * at the ends and updating the roving tabindex), and Enter/Space selects the
-   * focused effect.
+   * focused effect. Up/Down step one option; Left/Right step one column, which is
+   * also one option wherever the list is a single column.
    * @param {KeyboardEvent} e - The keydown event from the list element.
    */
   onKeyDown(e) {
@@ -344,7 +360,7 @@ export class EffectSidebar {
     const focused = this.doc.activeElement;
     const idx = btns.indexOf(focused);
 
-    const target = navTargetIndex(idx, btns.length, e.key);
+    const target = navTargetIndex(idx, btns.length, e.key, columnStride(this.listEl));
     if (target !== -1) {
       e.preventDefault();
       this.setRovingTabbable(btns[target]);

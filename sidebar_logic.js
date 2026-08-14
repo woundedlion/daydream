@@ -33,25 +33,36 @@ export function sortItems(items, key, dir) {
 
 /**
  * Compute the focus target index for an arrow/Home/End keypress, wrapping at the
- * ends. Down/Right advance (wrapping past the last option to the first); Up/Left
- * retreat (wrapping before the first to the last); Home jumps to the first option
- * and End to the last. Returns -1 for any key that does not move focus, and -1
- * for an empty list.
+ * ends. Down/Up step one option; Right/Left step one `stride` — the number of
+ * options laid out along the vertical axis, so a horizontal arrow crosses to the
+ * neighbouring column of a column-flow grid and stays on the same row. Down and
+ * Right wrap past the end (Right into the first column of its row), Up and Left
+ * wrap before the start; Home jumps to the first option and End to the last.
+ * Returns -1 for any key that does not move focus, and -1 for an empty list.
  * @param {number} idx - Current focused index (-1 if focus is not on an option).
  * @param {number} len - Number of options.
  * @param {string} key - KeyboardEvent.key value.
+ * @param {number} [stride] - Options per column; 1 for a single-column list.
  * @returns {number} The target index, or -1 if the key does not navigate.
  */
-export function navTargetIndex(idx, len, key) {
+export function navTargetIndex(idx, len, key, stride = 1) {
   if (len <= 0) return -1;
-  if (key === 'ArrowDown' || key === 'ArrowRight') {
-    return idx < len - 1 ? idx + 1 : 0;
-  }
-  if (key === 'ArrowUp' || key === 'ArrowLeft') {
-    return idx > 0 ? idx - 1 : len - 1;
-  }
+  if (key === 'ArrowDown') return idx < len - 1 ? idx + 1 : 0;
+  if (key === 'ArrowUp') return idx > 0 ? idx - 1 : len - 1;
   if (key === 'Home') return 0;
   if (key === 'End') return len - 1;
+  const step = Math.max(1, Math.trunc(stride) || 1);
+  if (key === 'ArrowRight') {
+    if (idx < 0) return 0;
+    return idx + step < len ? idx + step : idx % step;
+  }
+  if (key === 'ArrowLeft') {
+    if (idx < 0) return len - 1;
+    if (idx >= step) return idx - step;
+    let last = idx;
+    while (last + step < len) last += step;
+    return last;
+  }
   return -1;
 }
 
