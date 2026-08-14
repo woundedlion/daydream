@@ -289,6 +289,9 @@ test('a failed instantiate of a supplied module reports instead of hanging', asy
   const failed = posted.find((p) => p.msg.type === 'engineRejected');
   assert.ok(failed, 'engineRejected posted');
   assert.match(failed.msg.reason, /shared module instantiate failed/);
+  assert.equal(failed.msg.sharedModule, true,
+    'unmarked, the controller cannot tell this rejection from an effect the '
+    + 'engine refused, and keeps handing the same module to every rebuild');
 });
 
 /**

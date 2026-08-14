@@ -992,6 +992,62 @@ test('an engineRejected worker message faults the pool with the reason and segId
   assert.match(c.faultInfo.message, /9000x9000 exceeds the worker arena/);
 });
 
+// Instantiating the controller's compilation is the only use a worker makes of
+// it, so a refusal is evidence about the module rather than about the pool.
+// Holding it hands the same refused artifact to every rebuild the fault overlay
+// asks the user for, and none of them can come back.
+test('a shared module a worker refuses is dropped before the next spawn', async () => {
+  const warmer = new ModuleWarmer();
+  await warmer.warm({
+    baseUrl: 'http://localhost:8000/shared/segment_controller.js',
+    minIntervalMs: 0,
+    fetch: (url) => Promise.resolve({
+      arrayBuffer: () => Promise.resolve(
+        url.href.endsWith('.wasm') ? EMPTY_WASM.buffer : new ArrayBuffer(0)),
+    }),
+  });
+  const c = makeController({ moduleWarmer: warmer });
+  c.create(2);
+  const initOf = (worker) => worker.posted.find((m) => m.type === 'init');
+  assert.ok(initOf(c.workers[0]).wasmModule instanceof WebAssembly.Module,
+    'the spawn hands out the warmed compilation');
+
+  c.workers[1].onmessage({
+    data: {
+      type: 'engineRejected', sharedModule: true,
+      reason: 'shared module instantiate failed: LinkError',
+    },
+  });
+
+  assert.equal(warmer.module, null, 'the refused compilation is not held');
+  c.create(2);
+  assert.equal(initOf(c.workers[0]).wasmModule, undefined,
+    'the rebuild compiles per worker rather than repeating the refusal');
+  c.destroy();
+});
+
+test('a rejection unrelated to the shared module keeps the compilation', async () => {
+  const warmer = new ModuleWarmer();
+  await warmer.warm({
+    baseUrl: 'http://localhost:8000/kept/segment_controller.js',
+    minIntervalMs: 0,
+    fetch: (url) => Promise.resolve({
+      arrayBuffer: () => Promise.resolve(
+        url.href.endsWith('.wasm') ? EMPTY_WASM.buffer : new ArrayBuffer(0)),
+    }),
+  });
+  const c = makeController({ moduleWarmer: warmer });
+  c.create(2);
+
+  c.workers[1].onmessage({
+    data: { type: 'engineRejected', reason: 'setEffect(TestEffect) rejected' },
+  });
+
+  assert.ok(warmer.module instanceof WebAssembly.Module,
+    'an effect the worker refused says nothing about the binary it instantiated');
+  c.destroy();
+});
+
 test('an unknown worker message faults instead of being silently dropped', () => {
   const c = makeController();
   c.create(2);

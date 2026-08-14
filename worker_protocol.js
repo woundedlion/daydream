@@ -145,7 +145,13 @@ export const PROTOCOL_VERSION = 9;
  * setResolution/setEffect; no usable geometry. Lets the controller fault
  * immediately instead of rendering stale-geometry frames or waiting out the
  * init watchdog. Carries no segId, for the same reason as 'ready'.
- * @typedef {{ type: 'engineRejected', reason: string }} EngineRejectedMsg */
+ *
+ * `sharedModule` marks the rejection as the controller's own compilation
+ * failing to instantiate, so the controller drops it and the next pool compiles
+ * per worker instead of being handed the same refused module forever. Optional
+ * in both directions, so it is not a version-breaking field.
+ * @typedef {{ type: 'engineRejected', reason: string,
+ *   sharedModule?: boolean }} EngineRejectedMsg */
 
 /** Worker module body started executing — its static imports (incl. the WASM
  * glue ./holosphere_wasm.js) all resolved. Sent before the WASM instantiate so
