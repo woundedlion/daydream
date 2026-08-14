@@ -2416,6 +2416,7 @@
         colorStripCanvas.removeEventListener('pointermove', handleDragMove);
         colorStripCanvas.removeEventListener('pointerup', handleDragEnd);
         colorStripCanvas.removeEventListener('pointercancel', handleDragCancel);
+        colorStripCanvas.removeEventListener('keydown', handleStripKeyDown);
         hueKeyWheelCanvas.removeEventListener('pointerdown', handleHueWheelPointerDown);
         hueKeyWheelCanvas.removeEventListener('pointermove', handleHueWheelPointerMove);
         hueKeyWheelCanvas.removeEventListener('pointerup', handleHueWheelPointerEnd);
