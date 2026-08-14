@@ -7,6 +7,8 @@
   --focus-ring: #8af;
   --ui-font: 'Segoe UI', Arial, sans-serif;
   --nav-font: Arial, sans-serif;
+  /* Arial carries none of the glyph-button characters (U+21BA, U+29C9, U+25C0/25B6). */
+  --symbol-font: 'Segoe UI Symbol', 'Apple Symbols', 'Noto Sans Symbols 2', var(--nav-font);
 }
 
 * {
@@ -653,7 +655,7 @@
 .gui-container .effect-gui .effect-action button {
   min-width: 0;
   padding-inline: 0;
-  font-family: var(--nav-font);
+  font-family: var(--symbol-font);
   font-size: 16px;
   line-height: 1;
 }
