@@ -6,136 +6,10 @@
 // tests/app_lifecycle.test.js; this is the assembly.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
-import { start } from '../daydream.js';
+import { fakeElement, restoreDocumentAfterEach } from './fake_dom.js';
+import { startApp, segmentCountControl } from './fake_app.js';
 
 restoreDocumentAfterEach();
-
-/** A lil-gui controller as the root uses one: named, bound, and re-settable. */
-function fakeController(property) {
-  const controller = {
-    property,
-    value: undefined,
-    calls: [],
-    name(text) { controller.label = text; return controller; },
-    onChange(fn) { controller.changed = fn; return controller; },
-    setValue(v) { controller.value = v; controller.changed?.(v); return controller; },
-    // lil-gui destroys the receiver and returns a replacement, which is why the
-    // root re-binds the resolution controller after narrowing its options.
-    options() { return fakeController(property); },
-    enable() { controller.enabled = true; return controller; },
-    disable() { controller.enabled = false; return controller; },
-    listen() { return controller; },
-  };
-  return controller;
-}
-
-function fakeGui(namespace) {
-  const gui = {
-    namespace,
-    domElement: fakeElement('div'),
-    controllers: [],
-    folders: [],
-    destroyed: false,
-    add(_target, property) {
-      const c = fakeController(property);
-      gui.controllers.push(c);
-      return c;
-    },
-    addSession(_target, property) {
-      const c = fakeController(property);
-      gui.controllers.push(c);
-      return c;
-    },
-    addFolder(title) {
-      const folder = fakeGui(title);
-      gui.folders.push(folder);
-      return folder;
-    },
-    close() { return gui; },
-    open() { return gui; },
-    destroy() { gui.destroyed = true; },
-    collectUrlKeys() { return []; },
-  };
-  return gui;
-}
-
-function fakeDriver() {
-  return {
-    isMobile: false,
-    canvas: fakeElement('canvas'),
-    frameInterval: 62.5,
-    labelAxes: false,
-    cullBackSphere: false,
-    showPip: false,
-    columnFillOverlap: 1,
-    recorder: null,
-    renderer: { setAnimationLoop(frame) { this.frame = frame; } },
-    keys: [],
-    invalidate() { this.invalidated = true; },
-    keydown(e) { this.keys.push(e); },
-    render() {},
-    dispose() { this.disposed = true; },
-  };
-}
-
-/**
- * Builds the app against fakes.
- * @param {{loadModule?: () => Promise<Object>}} [options] - Seam overrides.
- * @returns {Object} The pieces a case asserts on.
- */
-function startApp({ loadModule = () => new Promise(() => {}) } = {}) {
-  const ids = ['gui-container', 'effect-sidebar', 'apply-notice-dismiss',
-    'apply-notice-body', 'apply-notice-text', 'canvas-container',
-    'loading-overlay', 'apply-notice', 'segment-stats'];
-  const elements = new Map(ids.map((id) => [id, fakeElement('div')]));
-  const docListeners = [];
-  const doc = installDocument({
-    getElementById: (id) => elements.get(id) ?? null,
-    createElement: (tag) => fakeElement(tag),
-    addEventListener: (type, handler) => docListeners.push([type, handler]),
-    removeEventListener: (type, handler) => {
-      const at = docListeners.findIndex(([t, h]) => t === type && h === handler);
-      if (at >= 0) docListeners.splice(at, 1);
-    },
-    body: fakeElement('body'),
-  });
-  for (const element of elements.values()) element.ownerDocument = doc;
-  const listeners = [];
-  const win = {
-    addEventListener: (type, handler) => listeners.push([type, handler]),
-    removeEventListener: (type, handler) => {
-      const at = listeners.findIndex(([t, h]) => t === type && h === handler);
-      if (at >= 0) listeners.splice(at, 1);
-    },
-    location: { pathname: '/', search: '', hash: '' },
-    history: { replaceState() {} },
-  };
-  // Browser globals the sidebar and URL sync reach for directly.
-  globalThis.window = win;
-  globalThis.ResizeObserver = class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  };
-  globalThis.requestAnimationFrame = (fn) => setTimeout(fn, 0);
-  globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
-  const driver = fakeDriver();
-  const guis = [];
-  const teardown = start({
-    doc,
-    win,
-    nav: { hardwareConcurrency: 8 },
-    createDriver: () => driver,
-    createGui: (_options, namespace) => {
-      const gui = fakeGui(namespace);
-      guis.push(gui);
-      return gui;
-    },
-    loadModule,
-  });
-  return { teardown, driver, guis, listeners, docListeners, elements, win };
-}
 
 test('start assembles the app and hands back its teardown', () => {
   const { teardown, guis, listeners } = startApp();
@@ -184,9 +58,7 @@ test('the global GUI carries the controls a deep link names', () => {
 });
 
 test('the segment-count control is bounded by the device cap', () => {
-  const { guis } = startApp();
-  const segments = guis[0].folders.find((f) => f.namespace === 'Segmented POV');
-  const count = segments.controllers.find((c) => c.property === 'segments');
+  const count = segmentCountControl(startApp());
 
   assert.match(count.label, /^Segments/,
     'the label carries the marker for the count no hardware produces');

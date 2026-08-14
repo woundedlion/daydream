@@ -4,11 +4,16 @@
 // factories it composes are driven in tests/app_lifecycle.test.js — the Pole LOD
 // late-bind, the keydown guard, the module-load handlers, the teardown order.
 // What is left here is which closure the root hands each factory: a value only a
-// source read can see, so these cases read it, and each names the failure it
-// prevents.
+// source read can see, so those cases read it, and each names the failure it
+// prevents. The segmented-POV block below is driven instead, since the assembly
+// it produces carries the names and bounds a source read was standing in for.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { restoreDocumentAfterEach } from './fake_dom.js';
+import { startApp, segmentCountControl } from './fake_app.js';
+
+restoreDocumentAfterEach();
 
 const SOURCE = readFileSync(new URL('../daydream.js', import.meta.url), 'utf8');
 
@@ -194,32 +199,41 @@ test('the segmented POV deep-link keys keep the names shared links carry', () =>
   const consequence = 'a deep link carries view.Segmented POV.<prop>, built from '
     + "the root namespace, the folder's display name and the bound property: "
     + 'changing any of the three silently invalidates every link already shared';
-  assert.match(SOURCE, /createGui\([^)]*,\s*'view'\)/, consequence);
-  assert.match(SOURCE, /addFolder\('Segmented POV'\)/, consequence);
+  const { guis } = startApp();
+
+  assert.equal(guis[0].namespace, 'view', consequence);
+  const segFolder = guis[0].folders.find((folder) => folder.namespace === 'Segmented POV');
+  assert.ok(segFolder, consequence);
   for (const prop of ['segmented', 'segments']) {
-    assert.match(SOURCE, new RegExp(`segFolder\\.add\\(segState, '${prop}'`),
+    const control = segFolder.controllers.find((c) => c.property === prop);
+    assert.ok(control, `${consequence}; '${prop}' must stay bound`);
+    assert.equal(control.session, undefined,
       `${consequence}; '${prop}' must also stay deep-linked (add, not addSession)`);
   }
 });
 
 test('the segment-count control marks the count no hardware produces', () => {
-  const at = SOURCE.indexOf("segFolder.add(segState, 'segments'");
-  assert.ok(at >= 0, 'the segment-count control must stay in the segmented folder');
-  assert.match(SOURCE.slice(at, SOURCE.indexOf('\n', at)), /\.name\(segLabel\)/,
-    'the label must stay bound to segLabel, which carries the marker');
-  assert.match(SOURCE, /segMax >= 6 \? 'Segments \(6[^']*'/,
+  const roomy = segmentCountControl(startApp({ nav: { hardwareConcurrency: 8 } }));
+  assert.match(roomy.label, /^Segments \(6\b/,
     'the slider offers 6 segments, which the power-of-two firmware layout never '
     + 'runs; without the marker the per-segment overlay names boards that cannot exist');
+
+  const tight = segmentCountControl(startApp({ nav: { deviceMemory: 2 } }));
+  assert.match(tight.label, /^Segments \(max 2\b/,
+    'a device held below the marked count reports the cap it is held to instead');
+  assert.notEqual(tight.label, roomy.label, 'the marker follows the cap');
 });
 
 test('the segment-count slider carries the device cap as its own maximum', () => {
-  const at = SOURCE.indexOf("segFolder.add(segState, 'segments'");
-  assert.match(SOURCE.slice(at, SOURCE.indexOf('\n', at)), /'segments', 2, segMax, 2\)/,
+  const roomy = segmentCountControl(startApp({ nav: { hardwareConcurrency: 8 } }));
+  assert.deepEqual(roomy.args, [2, 8, 2],
     'the cap must bound the control itself: the deep-link hydrator clamps against '
     + "the max passed to add(), and the pool's memory cost is what it bounds");
-  assert.match(SOURCE, /const segMax = maxSegmentCount\(nav, daydream\.isMobile\)/,
+
+  const tight = segmentCountControl(startApp({ nav: { deviceMemory: 2 } }));
+  assert.deepEqual(tight.args, [2, 2, 2],
     'the cap must read the device hints, not a constant');
-  assert.match(SOURCE, /segments: Math\.min\(segments\.count, segMax\)/,
+  assert.ok(tight.object.segments <= 2,
     'the initial value must sit inside the range, or a capped device opens the '
     + 'GUI showing a count the slider cannot represent');
 });
