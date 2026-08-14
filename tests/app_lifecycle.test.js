@@ -827,23 +827,30 @@ test('stopping cancels the interval, and starting arms exactly one', () => {
 function makeApplyNotice() {
   const body = fakeElement('div');
   const text = fakeElement('span');
+  const dismiss = fakeElement('button');
+  body.append(text, dismiss); // index.html nests both inside the body
   body.hidden = true; // index.html renders apply-notice-body hidden
   const timer = { fn: null, ms: null, handle: 0, cancelled: [] };
+  const doc = {
+    activeElement: null,
+    getElementById: (id) => ({
+      'apply-notice-body': body,
+      'apply-notice-text': text,
+      'apply-notice-dismiss': dismiss,
+    }[id] ?? null),
+  };
   const notice = createApplyNotice({
-    doc: {
-      getElementById: (id) => ({
-        'apply-notice-body': body,
-        'apply-notice-text': text,
-      }[id] ?? null),
-    },
+    doc,
     timeoutMs: 8000,
     schedule: (fn, ms) => { timer.fn = fn; timer.ms = ms; return ++timer.handle; },
     cancel: (handle) => { timer.cancelled.push(handle); timer.fn = null; },
   });
   return {
     notice,
+    doc,
     body,
     text,
+    dismiss,
     timer,
     expire: () => timer.fn(),
   };
@@ -955,6 +962,29 @@ test('the notice self-clears so a stale rejection cannot outlive its action', ()
   h.expire();
 
   assert.equal(h.text.textContent, '');
+  assert.equal(h.body.hidden, true);
+  assert.equal(h.notice.owner(), null);
+});
+
+test('the self-clear waits out keyboard focus inside the notice', () => {
+  const h = makeApplyNotice();
+
+  h.notice.show('Effect change was rejected.', 'switch');
+  h.doc.activeElement = h.dismiss;
+  h.expire();
+
+  assert.equal(h.body.hidden, false,
+    'hiding the body drops focus from the dismiss button the user is standing on');
+  assert.equal(h.notice.owner(), 'switch');
+  assert.equal(h.timer.ms, 8000, 'the dwell is served again');
+
+  // The button is still the user's own way out, deferred dwell or not.
+  h.notice.clear();
+  assert.equal(h.body.hidden, true);
+
+  h.notice.show('Effect change was rejected.', 'switch');
+  h.doc.activeElement = null;
+  h.expire();
   assert.equal(h.body.hidden, true);
   assert.equal(h.notice.owner(), null);
 });
