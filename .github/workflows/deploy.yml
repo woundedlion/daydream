@@ -65,7 +65,7 @@ jobs:
     # Checks out and runs a second repository's build; never holds the Pages token.
     permissions:
       contents: read
-    runs-on: ubuntu-24.04   # pinned image: deterministic apt clang version
+    runs-on: ubuntu-24.04   # pinned image: fixes the apt.llvm.org release channel (noble)
     # The engine suite has a real hang mode (a Canvas constructor that spin-waits
     # for a buffer that never frees), which GitHub's 6-hour default would burn a
     # runner on. Generous enough for a cold build plus the full-tier roster.
@@ -236,14 +236,41 @@ jobs:
           fi
           echo "Recorded emsdk $recorded matches the pinned engine."
 
+      - name: Resolve the Clang the pinned engine builds with
+        id: clang
+        # The engine's tools/build_pins.py is the single source for the compiler
+        # its own native jobs install, and it enforces that spelling across its
+        # own files only — it cannot see this repository. Reading the pin out of
+        # the pinned engine checkout is what keeps this gate on the same compiler
+        # as the CI whose green it requires; a version spelled here would drift
+        # unpoliced, which is how it came to run three majors behind.
+        run: |
+          if ! major="$(python3 engine/tools/build_pins.py clang)" ||
+             ! printf '%s' "$major" | grep -Eq '^[0-9]+$'; then
+            echo "::error::the pinned engine ($(cat holosphere_wasm.sha)) does not report a clang pin from tools/build_pins.py, so the gate cannot build its suite on the compiler its own CI used."
+            exit 1
+          fi
+          echo "major=$major" >> "$GITHUB_OUTPUT"
+          echo "Building the engine suite with clang-$major, the engine's own pin."
+
       - name: Install Clang + Ninja
-        # Pin the compiler version (clang-18 = Ubuntu 24.04 default) to match CI
-        # so the deploy gate runs the engine suite on the same known compiler.
-        run: sudo apt-get update && sudo apt-get install -y clang-18 ninja-build
+        # The engine pins a Clang newer than the Ubuntu 24.04 default, so the
+        # toolchain comes from apt.llvm.org — the same source and release channel
+        # its CI uses (Holosphere .github/workflows/ci.yml).
+        env:
+          MAJOR: ${{ steps.clang.outputs.major }}
+        run: |
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | sudo gpg --dearmor -o /usr/share/keyrings/llvm.gpg
+          echo "deb [signed-by=/usr/share/keyrings/llvm.gpg] http://apt.llvm.org/noble/ llvm-toolchain-noble-$MAJOR main" \
+            | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update
+          sudo apt-get install -y "clang-$MAJOR" ninja-build
 
       - run: >
           cmake --preset tests -DHS_INSTALL_GIT_HOOKS=OFF
-          -DCMAKE_C_COMPILER=clang-18 -DCMAKE_CXX_COMPILER=clang++-18
+          -DCMAKE_C_COMPILER=clang-${{ steps.clang.outputs.major }}
+          -DCMAKE_CXX_COMPILER=clang++-${{ steps.clang.outputs.major }}
         working-directory: engine
       - run: cmake --build --preset tests
         working-directory: engine
