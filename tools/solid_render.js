@@ -21,6 +21,12 @@ import {
   geodesicTriangleVertices,
 } from './solid_codegen.js';
 
+/**
+ * Vertex count at which the index overlay stops being built: one DOM node per
+ * vertex, reprojected every frame the camera moves.
+ */
+export const MAX_INDEX_LABELS = 1000;
+
 /** @typedef {{x: number, y: number, z: number}} Point */
 
 /**
@@ -296,11 +302,12 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
         scene.add(normalLines);
       }
 
-      // Indices (limit to < 1000). Build into a DocumentFragment and insert in a
-      // single appendChild so up to ~1000 labels cost one DOM mutation instead
-      // of one per vertex.
+      // Indices. Build into a DocumentFragment and insert in a single
+      // appendChild so the whole label set costs one DOM mutation instead of
+      // one per vertex.
       let labelsBuilt = false;
-      if (view.showIndices && labelsContainer && meshData.vertices.length < 1000) {
+      if (view.showIndices && labelsContainer
+          && meshData.vertices.length < MAX_INDEX_LABELS) {
         const frag = doc.createDocumentFragment();
         meshData.vertices.forEach((v, i) => {
           const el = doc.createElement('div');

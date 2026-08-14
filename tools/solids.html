@@ -634,7 +634,7 @@
     // Scene construction from the JS-side mesh copy, and the stats line it
     // reports; the three.js namespace, the scene and the materials below are
     // passed in, so the renderer is unit tested against a stand-in namespace.
-    import { createMeshRenderer, meshStatsLine } from './solid_render.js';
+    import { createMeshRenderer, meshStatsLine, MAX_INDEX_LABELS } from './solid_render.js';
     import { createFrameScheduler, onPageTeardown } from './page_lifecycle.js';
 
     let camera, scene, renderer, controls;
@@ -1890,8 +1890,13 @@
       const { edgeCount, labelsBuilt } = meshRenderer.render(
         meshData, state, currentFaceClasses);
       // Flag the freshly-created labels for re-projection so updateLabels
-      // positions them on the next frame.
+      // positions them on the next frame. The toggle stays engaged when the
+      // mesh is past the label cap, so say why nothing appeared.
       if (labelsBuilt) labelsNeedReproject = true;
+      else if (state.showIndices && meshData.vertices.length >= MAX_INDEX_LABELS) {
+        showGateMsg(`Vertex indices are off past ${MAX_INDEX_LABELS} vertices; `
+          + `this mesh has ${meshData.vertices.length}.`);
+      }
 
       // Update Stats
       renderBaseSolid();
