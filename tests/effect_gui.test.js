@@ -1512,6 +1512,7 @@ test('effects without presets do not show preset navigation', () => {
 });
 
 test('Export copies the live values as a C++ brace-init list', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
   const h = makeHarness({ params: [SPEED, GLOW], engineValues: [0.25, 0.5] });
   h.panel.build();
 
@@ -1524,6 +1525,7 @@ test('Export copies the live values as a C++ brace-init list', async () => {
 });
 
 test('ShaderBall Export copies the versioned full-config snapshot', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
   const snapshot = {
     schemaVersion: 2,
     accepted: [0, 4294967295],
@@ -1546,6 +1548,7 @@ test('ShaderBall Export copies the versioned full-config snapshot', async () => 
 });
 
 test('Export copies displayed values while a segmented snapshot is pending', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
   const h = makeHarness({
     params: [SPEED, GLOW],
     segmentValues: null,
@@ -1563,6 +1566,7 @@ test('Export copies displayed values while a segmented snapshot is pending', asy
 });
 
 test('Export does not fall back to controls from a stale schema', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
   const h = makeHarness({
     params: [SPEED],
     segmentValues: null,
@@ -1580,6 +1584,7 @@ test('Export does not fall back to controls from a stale schema', () => {
 });
 
 test('Export omits engine-written readonly params from the preset', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
   const h = makeHarness({
     params: [SPEED, TELEMETRY],
     engineValues: [0.25, 1234],
@@ -1593,6 +1598,7 @@ test('Export omits engine-written readonly params from the preset', async () => 
 });
 
 test('Export without a copy operation reports the failure', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
   const h = makeHarness({ params: [SPEED], engineValues: [0.25], copyText: null });
   h.panel.build();
 
@@ -1603,6 +1609,7 @@ test('Export without a copy operation reports the failure', () => {
 });
 
 test('Export refuses a value stream that has skewed from the panel', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
   const h = makeHarness({ params: [SPEED, GLOW], engineValues: [0.25] });
   h.panel.build();
 
@@ -1614,6 +1621,7 @@ test('Export refuses a value stream that has skewed from the panel', () => {
 });
 
 test('a rejected clipboard copy reports the failure', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
   const h = makeHarness({
     params: [SPEED],
     engineValues: [0.25],
@@ -1630,6 +1638,7 @@ test('a rejected clipboard copy reports the failure', async () => {
 });
 
 test('a copy operation that exhausts its fallbacks reports the failure', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
   const h = makeHarness({
     params: [SPEED],
     engineValues: [0.25],
