@@ -63,6 +63,7 @@ export class EffectSidebar {
     this.listEl.setAttribute('aria-label', this.listLabel());
     this.listEl.className = 'effect-list';
     this.tabbableBtn = null; // option currently holding tabindex=0
+    this.scrolledBtn = null; // option setActive last scrolled into view
     this.scrollArrowsRaf = 0;
     this.onKeyDownBound = (e) => this.onKeyDown(e);
     this.onScrollBound = () => this.scheduleScrollArrows();
@@ -181,7 +182,7 @@ export class EffectSidebar {
   /**
    * Mark `name` as the active effect, toggling the .active class and
    * aria-selected on only the previous and new buttons, moving the roving
-   * tabindex, and scrolling the new option into view.
+   * tabindex, and scrolling a newly-active option into view.
    * @param {string} name - Name of the effect to mark active.
    */
   setActive(name) {
@@ -200,7 +201,13 @@ export class EffectSidebar {
     newBtn.classList.add('active');
     newBtn.setAttribute('aria-selected', 'true');
     this.setRovingTabbable(newBtn);
-    newBtn.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
+    // Re-applying the live effect (Reset) selects the same node again; scrolling
+    // it would yank a mobile strip the user has scrolled elsewhere. A rebuilt
+    // roster hands over a fresh node, which is still scrolled into view.
+    if (newBtn !== this.scrolledBtn) {
+      this.scrolledBtn = newBtn;
+      newBtn.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
+    }
   }
 
   /**
