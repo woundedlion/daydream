@@ -264,6 +264,36 @@ test('a selector the fake does not implement throws instead of matching nothing'
   assert.equal(el.matches('[data-index]'), true);
 });
 
+test('a removal with no listener behind it throws unless the fixture opts out', () => {
+  const strict = fakeElement('div');
+  const handler = () => {};
+  assert.throws(() => strict.removeEventListener('click', handler), /no click listener/,
+    'a removal that never had an add to pair with would otherwise pass silently');
+
+  const lenient = fakeElement('div', { allowRedundantRemoval: true });
+  lenient.addEventListener('click', handler);
+  lenient.removeEventListener('click', handler);
+  assert.doesNotThrow(() => lenient.removeEventListener('click', handler),
+    'an idempotent disposal cannot be driven twice');
+  assert.deepEqual(lenient.listeners, [], 'the second removal put the listener back');
+});
+
+test('style keeps only the values a browser would keep', () => {
+  const el = fakeElement('div');
+
+  assert.throws(() => { el.style['font-size'] = '10px'; }, /keyed camelCase/,
+    'a dashed name declares nothing, so no read would ever find it');
+
+  el.style.display = 'grid';
+  el.style.display = 'blink';
+  assert.equal(el.style.display, 'grid', 'a value no browser parses read back as set');
+  el.style.display = '';
+  assert.equal(el.style.display, '', 'clearing the declaration was dropped');
+
+  el.style.opacity = 0;
+  assert.equal(el.style.opacity, '0', 'the platform stores a DOMString');
+});
+
 test('replaceChildren moves a node out of the parent it came from', () => {
   const from = fakeElement('div');
   const to = fakeElement('div');
