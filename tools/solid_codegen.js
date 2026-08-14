@@ -67,6 +67,15 @@ import { formatFloatCpp } from './cpp_format.js';
  */
 
 /**
+ * Mirror of solid_generators.h `static constexpr float D2R = PI_F / 180.0f`
+ * with PI_F = float(PI). The preview and the emitted C++ both convert a hankin
+ * angle through it, so the preview must round the product to float32 the way
+ * the engine's float multiply does — at 54 and 73 degrees a double PI/180
+ * lands one ulp away.
+ */
+export const D2R_F32 = Math.fround(Math.fround(Math.PI) / 180);
+
+/**
  * Per-op parameter table for the Conway/SolidBuilder operators, shared by the
  * live preview (applyOp) and the C++ generator (generateFuncAndRecipe) so the
  * two cannot drift. Each params entry names a parameter both paths consume, in
@@ -330,7 +339,7 @@ function dispatchOp(mesh, o, opName) {
   if (opName === 'expand') return mesh.expand(params.t);
   if (opName === 'bevel') return mesh.bevel(params.t);
   if (opName === 'snub') return mesh.snub(params.t, params.twist);
-  if (opName === 'hankin') return mesh.hankin(params.angle * (Math.PI / 180));
+  if (opName === 'hankin') return mesh.hankin(Math.fround(params.angle * D2R_F32));
   if (opName === 'relax') return mesh.relax(params.iter);
   if (mesh[opName]) return mesh[opName]();
   throw new Error(`unknown op "${opName}" — not bound by the WASM MeshOps module`);

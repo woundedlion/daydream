@@ -15,6 +15,7 @@
 
 import {
   CATALAN_BASES,
+  D2R_F32,
   DEFINED_SEED_CONSTANTS,
   OP_DEFS,
   KNOWN_OPS,
@@ -32,11 +33,6 @@ const CPP_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
  * 256-step table would emit a count of 0.
  */
 export const MAX_RECIPE_STEPS = 255;
-
-// Mirrors solids.h `static constexpr float D2R = PI_F / 180.0f` with
-// PI_F = float(PI), so a degree literal's product can be compared in float32
-// against the radian angle the engine reports.
-const D2R_F32 = Math.fround(Math.fround(Math.PI) / 180);
 
 /**
  * solids.h names a recipe's tables after the generator, camelCase segments
