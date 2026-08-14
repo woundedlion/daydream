@@ -49,7 +49,11 @@ export class GlobalStatsView {
     const perfText = `${duration.toFixed(3)} ms`;
     const perfColor = duration > SLOW_FRAME_MS ? 'red' : 'grey';
     for (const el of cells.perf) {
-      if (el) { el.textContent = perfText; el.style.color = perfColor; }
+      if (!el) continue;
+      el.textContent = perfText;
+      // Written only on a crossing: an unchanged colour still costs a style
+      // invalidation per cell per frame.
+      if (el.style.color !== perfColor) el.style.color = perfColor;
     }
 
     if (!metrics) return;
@@ -61,7 +65,9 @@ export class GlobalStatsView {
      * @param {string} text
      */
     const updateRow = (row, text) => {
-      for (const el of row) if (el) el.textContent = text;
+      // Arena figures hold still across many frames, and a textContent write
+      // dirties layout whether or not the string changed.
+      for (const el of row) if (el && el.textContent !== text) el.textContent = text;
     };
     /**
      * @param {Array<HTMLElement|null>} row
