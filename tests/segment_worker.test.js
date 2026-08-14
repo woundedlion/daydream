@@ -211,6 +211,23 @@ async function dispatch(msg) {
   await fakeSelf.onmessage({ data: msg });
 }
 
+/**
+ * Yield turns until `probe` answers with something truthy. For work whose
+ * settle point the host schedules rather than the microtask queue, where a
+ * fixed number of turns is a guess.
+ * @param {() => any} probe - Re-evaluated once per turn.
+ * @param {number} [turns] - Turns to yield before giving up.
+ * @returns {Promise<any>} The first truthy answer.
+ */
+async function until(probe, turns = 1000) {
+  for (let i = 0; i < turns; i++) {
+    const found = probe();
+    if (found) return found;
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+  }
+  throw new Error('condition never held');
+}
+
 beforeEach(() => {
   posted.length = 0;
   engineInstance = null;
@@ -294,9 +311,9 @@ test('a failed instantiate of a supplied module reports instead of hanging', asy
 
   posted.length = 0;
   moduleOptions.instantiateWasm({}, () => assert.fail('instantiation cannot succeed'));
-  await new Promise((resolve) => { setTimeout(resolve, 0); });
-  const failed = posted.find((p) => p.msg.type === 'engineRejected');
-  assert.ok(failed, 'engineRejected posted');
+  const failed = await until(() => posted.find((p) => p.msg.type === 'engineRejected'));
+  assert.equal(posted.filter((p) => p.msg.type === 'engineRejected').length, 1,
+    'one rejection, not one per import the module leaves unsatisfied');
   assert.match(failed.msg.reason, /shared module instantiate failed/);
   assert.equal(failed.msg.sharedModule, true,
     'unmarked, the controller cannot tell this rejection from an effect the '
