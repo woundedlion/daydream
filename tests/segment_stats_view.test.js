@@ -354,8 +354,8 @@ test('each fault code names its own source in the headline', () => {
 
     const box = stats.firstElementChild;
     assert.equal(box.getAttribute('role'), 'alert');
-    assert.equal(box.tabIndex, -1);
-    assert.equal(box.focusCount, 1);
+    assert.equal(box.tabIndex, undefined);
+    assert.equal(box.focusCount, 0, 'the live region announces without taking focus');
     assert.equal(box.childNodes[0],
       `⚠ Segment ${who} faulted — segmented render halted.`);
     assert.equal(box.childNodes[2].textContent, faultInfo ? 'boom' : 'see console');
@@ -392,7 +392,7 @@ test('the fault overlay is painted once and torn down on recovery', () => {
   const box = stats.firstElementChild;
   view.update(faulted);
   assert.equal(stats.firstElementChild, box, 'a standing fault is not repainted');
-  assert.equal(box.focusCount, 1, 'focus is not stolen every frame');
+  assert.equal(box.focusCount, 0, 'focus is never stolen');
 
   view.update(readyState(2));
   const table = stats.firstElementChild;
