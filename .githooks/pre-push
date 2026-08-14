@@ -44,15 +44,18 @@ npm run typecheck || exit 1
 # Generate to a temp file: regenerating in place would clobber a deliberate
 # local-vendoring block in the working tree.
 tmp=$(mktemp ./vendor-importmap.XXXXXX) || exit 1
+# An interrupt during the steps below would otherwise leave the scratch copy
+# untracked in the working tree.
+trap 'rm -f "$tmp"' EXIT
+trap 'exit 130' INT TERM
 if ! npm run importmap -- --out "$tmp"; then
-	rm -f "$tmp"
 	exit 1
 fi
 if ! git show :vendor-importmap.js | git -c core.autocrlf=false diff --no-index --ignore-cr-at-eol --exit-code -- - "$tmp"; then
-	rm -f "$tmp"
 	echo "pre-push: vendor-importmap.js was stale; regenerate it with \`npm run importmap\`, then commit it and push again." >&2
 	exit 1
 fi
+# Out of the tree before the suite runs, which walks it.
 rm -f "$tmp"
 
 npm test

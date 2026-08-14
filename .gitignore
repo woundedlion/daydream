@@ -30,5 +30,8 @@ node_modules/
 .DS_Store
 Thumbs.db
 
+# Scratch copy the pre-push hook regenerates the import map into.
+/vendor-importmap.??????
+
 # Logs
 *.log
