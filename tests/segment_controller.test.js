@@ -2209,19 +2209,12 @@ test('an init-phase fault still reaches the fault overlay (faulted checked befor
   assert.equal(c.renderInFlight, false, 'no doomed render dispatched');
 });
 
-const makeElement = (tag) => {
-  const element = fakeElement(tag);
-  element.focusCount = 0;
-  element.focus = () => { element.focusCount++; };
-  return element;
-};
-
 test('the fault overlay is an alert that never takes focus', () => {
-  const stats = makeElement();
+  const stats = fakeElement();
   const c = makeController();
   c.statsView.doc = {
     getElementById: (id) => id === 'segment-stats' ? stats : null,
-    createElement: makeElement,
+    createElement: (tag) => fakeElement(tag),
   };
   c.active = true;
   c.faulted = true;
@@ -2232,21 +2225,21 @@ test('the fault overlay is an alert that never takes focus', () => {
   const alert = stats.firstElementChild;
   assert.equal(alert.getAttribute('role'), 'alert');
   assert.equal(alert.tabIndex, undefined);
-  assert.equal(alert.focusCount, 0);
+  assert.equal(alert.focusCalls, 0);
 
   c.updateStats();
   assert.equal(stats.firstElementChild, alert);
-  assert.equal(alert.focusCount, 0);
+  assert.equal(alert.focusCalls, 0);
 });
 
 test('a fault latched outside tick() paints the overlay without waiting for one', () => {
   // tick() is unreachable while the host is paused, so the fault path must paint
   // the banner itself.
-  const stats = makeElement();
+  const stats = fakeElement();
   const c = makeController();
   c.statsView.doc = {
     getElementById: (id) => id === 'segment-stats' ? stats : null,
-    createElement: makeElement,
+    createElement: (tag) => fakeElement(tag),
   };
   c.active = true;
   c.create(2);
@@ -2259,11 +2252,11 @@ test('a fault latched outside tick() paints the overlay without waiting for one'
 });
 
 test('a spawning pool reports the spawn and does not own the display', () => {
-  const stats = makeElement();
+  const stats = fakeElement();
   const c = makeController();
   c.statsView.doc = {
     getElementById: (id) => id === 'segment-stats' ? stats : null,
-    createElement: makeElement,
+    createElement: (tag) => fakeElement(tag),
   };
   c.active = true;
   c.count = 4;
@@ -2289,14 +2282,14 @@ test('turning segmented mode off hands the global stat bars back', () => {
   // The overlay hides page-owned elements while it stands in for them, so the
   // hand-back rides on the flag rather than on a host remembering to repaint.
   const byId = {
-    'segment-stats': makeElement(),
-    'global-stats-desktop': makeElement(),
-    'stats-bar': makeElement(),
+    'segment-stats': fakeElement(),
+    'global-stats-desktop': fakeElement(),
+    'stats-bar': fakeElement(),
   };
   const c = makeController();
   c.statsView.doc = {
     getElementById: (id) => byId[id] ?? null,
-    createElement: makeElement,
+    createElement: (tag) => fakeElement(tag),
   };
 
   c.active = true;

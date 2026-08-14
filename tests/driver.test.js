@@ -5,14 +5,15 @@
 // ordering invariant — instanceColor.array must be nulled before
 // InstancedMesh.dispose(), because that array may alias WASM memory. The
 // context-loss handlers run against the shared fake DOM.
-import { test, mock } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import {
   Daydream, dotDetailFor, fitDistance, initialAspect, MOBILE_BREAKPOINT_PX,
 } from '../driver.js';
-import { fakeElement } from './fake_dom.js';
+import { captureConsole } from './fake_console.js';
+import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
 
 // ---------------------------------------------------------------------------
@@ -775,21 +776,6 @@ function contextLossCtx(recorder = null) {
   };
 }
 
-/**
- * Runs `body` with console.error/warn captured, so the handlers' diagnostics are
- * asserted instead of printed into the suite output.
- * @param {Function} body - Code to run under the capture.
- * @returns {Array<string>} One joined message per call.
- */
-function captureConsole(body) {
-  const messages = [];
-  const record = (...args) => messages.push(args.map(String).join(' '));
-  const err = mock.method(console, 'error', record);
-  const warn = mock.method(console, 'warn', record);
-  try { body(); } finally { err.mock.restore(); warn.mock.restore(); }
-  return messages;
-}
-
 test('setupContextLossHandling starts unlost behind a hidden overlay', () => {
   const ctx = contextLossCtx();
   Daydream.prototype.setupContextLossHandling.call(ctx);
@@ -819,7 +805,7 @@ test('a lost context claims the restore, shows the reason, and aborts the record
   ctx.contextLostOverlay.focus = (options) => focusCalls.push(options);
 
   let prevented = false;
-  const messages = captureConsole(() => ctx.handlers.webglcontextlost({
+  const { messages } = captureConsole(() => ctx.handlers.webglcontextlost({
     preventDefault: () => { prevented = true; },
     statusMessage: 'GPU process reset',
   }));
@@ -838,7 +824,7 @@ test('a lost context with no recorder or reason still reports the loss', () => {
   const ctx = contextLossCtx();
   Daydream.prototype.setupContextLossHandling.call(ctx);
 
-  const messages = captureConsole(
+  const { messages } = captureConsole(
     () => ctx.handlers.webglcontextlost({ preventDefault: () => {} }));
 
   assert.equal(ctx.contextLost, true);

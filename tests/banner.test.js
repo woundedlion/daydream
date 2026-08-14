@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { showFatalError, bootstrapTool, reportPageFailures } from '../tools/banner.js';
+import { captureConsole, installConsoleCapture } from './fake_console.js';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
 
 restoreDocumentAfterEach();
@@ -127,41 +128,6 @@ function fakeTarget() {
   return target;
 }
 
-/**
- * Runs `fn` with console.error captured.
- * @param {Function} fn - The body to run.
- * @returns {Array<Array<*>>} The captured console.error argument lists.
- */
-function withCapturedConsole(fn) {
-  const original = console.error;
-  const logged = [];
-  console.error = (...args) => logged.push(args);
-  try {
-    fn();
-  } finally {
-    console.error = original;
-  }
-  return logged;
-}
-
-/**
- * Runs `fn` with console.error captured until it settles, for the paths that
- * report from a microtask rather than from the call that started them.
- * @param {Function} fn - The body to run.
- * @returns {Promise<Array<Array<*>>>} The captured console.error argument lists.
- */
-async function withCapturedConsoleAsync(fn) {
-  const original = console.error;
-  const logged = [];
-  console.error = (...args) => logged.push(args);
-  try {
-    await fn();
-  } finally {
-    console.error = original;
-  }
-  return logged;
-}
-
 test('reportPageFailures listens for both uncaught errors and unhandled rejections', () => {
   const target = fakeTarget();
   reportPageFailures('solids tool', target);
@@ -184,7 +150,7 @@ test('reportPageFailures returns the pairs its caller needs to deregister', () =
   for (const [type, handler] of installed) target.removeEventListener(type, handler);
   assert.deepEqual(target.types(), [], 'a returned handler was not the one installed');
 
-  withCapturedConsole(() => {
+  captureConsole(() => {
     target.dispatch('error', { error: new Error('after discard') });
   });
   assert.equal(bodyEl.children.length, 0, 'a removed listener still raised a banner');
@@ -195,7 +161,7 @@ test('a post-boot uncaught error raises the banner, not just a console line', ()
   const target = fakeTarget();
   reportPageFailures('solids tool', target);
 
-  const logged = withCapturedConsole(() => {
+  const { calls: logged } = captureConsole(() => {
     target.dispatch('error', { error: new Error('renderOps blew up') });
   });
 
@@ -211,7 +177,7 @@ test('a post-boot unhandled rejection raises the banner and is not double-report
   reportPageFailures('palette tool', target);
 
   let prevented = 0;
-  const logged = withCapturedConsole(() => {
+  const { calls: logged } = captureConsole(() => {
     target.dispatch('unhandledrejection', {
       reason: new Error('bakeLut rejected'),
       preventDefault: () => { prevented++; },
@@ -228,7 +194,7 @@ test('a failed subresource does not raise the page-failure banner', () => {
   const target = fakeTarget();
   reportPageFailures('palette tool', target);
 
-  withCapturedConsole(() => {
+  captureConsole(() => {
     target.dispatch('error', { target: { tagName: 'IMG' }, error: null });
   });
   assert.equal(bodyEl.children.length, 0, 'a subresource error opened a banner');
@@ -241,7 +207,7 @@ test('bootstrapTool installs the post-boot surface alongside the load handler', 
   assert.deepEqual(target.types().sort(), ['error', 'load', 'unhandledrejection']);
 
   // The boot path still reports through the same banner.
-  withCapturedConsole(() => {
+  captureConsole(() => {
     target.dispatch('load');
     assert.equal(bodyEl.children.length, 0, 'a clean init opened a banner');
     target.dispatch('error', { error: new Error('after boot') });
@@ -253,18 +219,22 @@ test('bootstrapTool still banners a synchronous and an async init failure', asyn
   const target = fakeTarget();
   const { bodyEl } = fakeDocument();
   bootstrapTool(() => { throw new Error('sync boom'); }, 'solids tool', target);
-  withCapturedConsole(() => target.dispatch('load'));
+  captureConsole(() => target.dispatch('load'));
   assert.match(messageOf(bodyEl.children[0]), /failed to initialize/);
 
   // Every tool page's initializer is async: its failure arrives as a rejection
   // the load handler has already returned from.
   const asyncTarget = fakeTarget();
   const asyncPage = fakeDocument();
-  const logged = await withCapturedConsoleAsync(async () => {
+  const captured = installConsoleCapture('error', 'warn');
+  try {
     bootstrapTool(async () => { throw new Error('async boom'); }, 'palette tool', asyncTarget);
     asyncTarget.dispatch('load');
     await Promise.resolve();
-  });
+  } finally {
+    captured.restore();
+  }
+  const logged = captured.calls;
 
   assert.equal(asyncPage.bodyEl.children.length, 1, 'a rejected init raised no banner');
   assert.match(messageOf(asyncPage.bodyEl.children[0]),
