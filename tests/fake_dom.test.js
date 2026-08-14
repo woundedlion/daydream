@@ -275,6 +275,27 @@ test('appended text lands in childNodes and never in children', () => {
   assert.equal(box.firstElementChild, null);
 });
 
+test('insertBefore places a node ahead of a child and moves it out of its old parent', () => {
+  const from = fakeElement('div');
+  const box = fakeElement('div');
+  const first = fakeElement('span');
+  const last = fakeElement('span');
+  const moved = fakeElement('em');
+  box.append(first, last);
+  from.append(moved);
+
+  box.insertBefore(moved, last);
+  assert.deepEqual(box.childNodes, [first, moved, last]);
+  assert.deepEqual(from.childNodes, [], 'the old parent still lists the node');
+  assert.equal(moved.parentNode, box);
+
+  box.insertBefore(moved, null);
+  assert.deepEqual(box.childNodes, [first, last, moved], 'a null reference appends');
+
+  assert.throws(() => box.insertBefore(fakeElement('b'), fakeElement('b')),
+    /not a child/, 'a reference outside the parent was accepted');
+});
+
 test('appendChild refuses a string the way the platform does', () => {
   const box = fakeElement('div');
   assert.throws(() => box.appendChild('text'), TypeError);
