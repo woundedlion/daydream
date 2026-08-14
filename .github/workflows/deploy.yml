@@ -1,7 +1,7 @@
 # Deploy the daydream simulator to GitHub Pages (Pages source: GitHub Actions),
-# GATED on the Holosphere engine's native unit suite and the simulator's JS unit
-# suite. The `deploy` job `needs: [gate, js-tests]`, so the live site only updates
-# when both suites pass.
+# GATED on the Holosphere engine's native unit suite, the simulator's JS unit
+# suite, and a headless load of every page the manifest publishes. The `deploy`
+# job `needs` all three, so the live site only updates when each passes.
 #
 # The committed app files are published as-is (three.js / lil-gui load from the
 # CDN via vendor-importmap.js, so they don't need vendoring here). The engine's
@@ -244,9 +244,15 @@ jobs:
     secrets:
       POV_TOKEN: ${{ secrets.POV_TOKEN }}
 
+  browser-smoke:
+    name: Headless page smoke (deploy gate)
+    permissions:
+      contents: read
+    uses: ./.github/workflows/browser-smoke.yml
+
   deploy:
     name: Deploy to Pages
-    needs: [gate, js-tests]       # ← only deploys if both suites pass
+    needs: [gate, js-tests, browser-smoke]   # ← only deploys if all three pass
     permissions:
       contents: read
       pages: write
