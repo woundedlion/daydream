@@ -884,6 +884,33 @@ export function createEffectGui({
   }
 
   /**
+   * The focusable widget a lil-gui controller built: a dropdown's select, an
+   * input, or a button, whichever its control kind owns.
+   * @param {Object|undefined} controller - A controller from an effect record.
+   * @returns {Object|null} The element that takes focus, or null.
+   */
+  function focusWidget(controller) {
+    return controller?.$select ?? controller?.$input
+      ?? controller?.$button ?? null;
+  }
+
+  /**
+   * Which parameter's controller holds keyboard focus. Discarding the focused
+   * control drops focus to <body>, so a rebuild that renames nothing can still
+   * cost a full document re-traverse to get back to the panel.
+   * @param {Object} fx - The effect record about to be replaced.
+   * @returns {string|null} The parameter name, or null when focus is elsewhere.
+   */
+  function focusedParamName(fx) {
+    const focused = focusedElement() ?? null;
+    if (focused === null) return null;
+    for (const [name, controller] of fx.controllerByName ?? []) {
+      if (controller.domElement?.contains(focused) === true) return name;
+    }
+    return null;
+  }
+
+  /**
    * Replace a stale parameter schema without reloading the effect. Definitions
    * always come from the main engine; segmented workers only supply live values.
    * @returns {boolean} True when a replacement record was installed.
@@ -895,6 +922,7 @@ export function createEffectGui({
     const generation = paramGeneration();
     const wasMounted = Boolean(previous.gui?.domElement?.parentNode);
     const scrollTop = scrollElement(previous.gui)?.scrollTop ?? 0;
+    const refocusName = focusedParamName(previous);
     const preservedPause = engineAnimationsPaused()
       ?? Boolean(previous.animationState?.pause);
     let next;
@@ -927,6 +955,10 @@ export function createEffectGui({
       mountEffect(next);
       const scroller = scrollElement(next.gui);
       if (scroller) scroller.scrollTop = scrollTop;
+      // After the mount: a detached element cannot hold focus.
+      if (refocusName !== null) {
+        focusWidget(next.controllerByName.get(refocusName))?.focus?.();
+      }
     }
     return true;
   }
