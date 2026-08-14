@@ -222,8 +222,8 @@
     "assertions": 204
   },
   "tests/state.test.js": {
-    "cases": 56,
-    "assertions": 1146
+    "cases": 57,
+    "assertions": 1149
   },
   "tests/switch_coordinator.test.js": {
     "cases": 17,

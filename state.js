@@ -284,6 +284,7 @@ export class URLSync {
     this.state = state;
     this.trackedKeys = new Set(trackedKeys);
     this.timer = null;
+    this.armedDelayMs = 0; // delay this.timer was armed with; 0 when unarmed
     this.disposed = false;
     this.adhoc = new Map(); // GUI-set params (key -> string), merged on flush
     this.pendingReset = null; // reset()'s excluded keys, applied by the next flush
@@ -364,13 +365,24 @@ export class URLSync {
   /**
    * Debounces a URL write, collapsing bursts into one flush after
    * URL_FLUSH_DEBOUNCE_MS. A no-op once disposed.
+   * @details A shorter delay never displaces an armed longer one: the retry
+   *   ladder arms at URL_FLUSH_RETRY_MS to pace the browser's write budget, and
+   *   letting a concurrent debounce pull it forward would spend the ladder
+   *   inside the rate-limit window it is waiting out. Nothing is lost by
+   *   waiting — the armed flush re-reads tracked state and merges the buffer at
+   *   fire time.
    * @param {number} [delayMs] - Delay before the flush fires.
    * @returns {void}
    */
   schedule(delayMs = URL_FLUSH_DEBOUNCE_MS) {
     if (this.disposed) return;
+    if (this.timer !== null && delayMs < this.armedDelayMs) return;
     clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.flush(), delayMs);
+    this.armedDelayMs = delayMs;
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      this.flush();
+    }, delayMs);
   }
 
   /**
