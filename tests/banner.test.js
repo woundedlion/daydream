@@ -144,6 +144,24 @@ function withCapturedConsole(fn) {
   return logged;
 }
 
+/**
+ * Runs `fn` with console.error captured until it settles, for the paths that
+ * report from a microtask rather than from the call that started them.
+ * @param {Function} fn - The body to run.
+ * @returns {Promise<Array<Array<*>>>} The captured console.error argument lists.
+ */
+async function withCapturedConsoleAsync(fn) {
+  const original = console.error;
+  const logged = [];
+  console.error = (...args) => logged.push(args);
+  try {
+    await fn();
+  } finally {
+    console.error = original;
+  }
+  return logged;
+}
+
 test('reportPageFailures listens for both uncaught errors and unhandled rejections', () => {
   const target = fakeTarget();
   reportPageFailures('solids tool', target);
@@ -231,10 +249,26 @@ test('bootstrapTool installs the post-boot surface alongside the load handler', 
   assert.match(messageOf(bodyEl.children[0]), /Möbius tool hit an error — after boot/);
 });
 
-test('bootstrapTool still banners a synchronous and an async init failure', () => {
+test('bootstrapTool still banners a synchronous and an async init failure', async () => {
   const target = fakeTarget();
   const { bodyEl } = fakeDocument();
   bootstrapTool(() => { throw new Error('sync boom'); }, 'solids tool', target);
   withCapturedConsole(() => target.dispatch('load'));
   assert.match(messageOf(bodyEl.children[0]), /failed to initialize/);
+
+  // Every tool page's initializer is async: its failure arrives as a rejection
+  // the load handler has already returned from.
+  const asyncTarget = fakeTarget();
+  const asyncPage = fakeDocument();
+  const logged = await withCapturedConsoleAsync(async () => {
+    bootstrapTool(async () => { throw new Error('async boom'); }, 'palette tool', asyncTarget);
+    asyncTarget.dispatch('load');
+    await Promise.resolve();
+  });
+
+  assert.equal(asyncPage.bodyEl.children.length, 1, 'a rejected init raised no banner');
+  assert.match(messageOf(asyncPage.bodyEl.children[0]),
+    /^⚠ The palette tool failed to initialize/);
+  assert.deepEqual(logged.map(([message]) => message),
+    ['palette tool failed to initialize:']);
 });
