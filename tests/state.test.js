@@ -321,6 +321,41 @@ test('URLSync bounds its retries of a refused history write', () => {
   }
 });
 
+/**
+ * The bounded ladder is sized to outlast a 30-second rate-limit window. Letting
+ * a concurrent write re-arm it at the debounce would spend all twenty attempts
+ * inside that window and drop the buffer while the refusal was still standing.
+ */
+test('URLSync will not let a concurrent write shorten an armed retry', () => {
+  const delays = [];
+  const realSetTimeout = globalThis.setTimeout;
+  const warn = console.warn;
+  console.warn = () => {};
+  globalThis.setTimeout = (fn, ms) => { delays.push(ms); return 0; };
+  globalThis.window = {
+    location: { search: '', pathname: '/sim', hash: '' },
+    history: { replaceState: () => { throw new Error('rate limit'); } },
+  };
+  try {
+    const state = new AppState({ effect: 'Voronoi' });
+    const sync = new URLSync(state, ['effect']);
+
+    sync.flush();
+    assert.deepEqual(delays, [URL_FLUSH_RETRY_MS], 'the refusal armed the retry');
+
+    sync.setParam('scale', 3);
+    assert.deepEqual(delays, [URL_FLUSH_RETRY_MS],
+      'an ad-hoc write did not re-arm at the debounce');
+
+    state.set('effect', 'Hankin');
+    assert.deepEqual(delays, [URL_FLUSH_RETRY_MS],
+      'a tracked-key change did not re-arm at the debounce either');
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+    console.warn = warn;
+  }
+});
+
 test('URLSync reads initial tracked keys from the URL into state', () => {
   installWindow('?effect=Voronoi&res=high&untracked=1');
   const s = new AppState({ effect: 'Moire', res: 'low' });
