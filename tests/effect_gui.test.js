@@ -137,6 +137,12 @@ function fakeGui(hydrated = {}, stored = {}) {
     destroy() {
       this.destroyed += 1;
       if (this.destroyThrows) throw this.destroyThrows;
+      for (const controller of this.controllers) {
+        if (controller.domElement.parentNode !== this.$children) {
+          throw new Error(`controller ${controller.property} has the wrong parent`);
+        }
+        this.$children.removeChild(controller.domElement);
+      }
     },
     add(object, property, ...args) {
       const replayOnChange = Object.hasOwn(hydrated, property);
@@ -161,6 +167,7 @@ function fakeGui(hydrated = {}, stored = {}) {
       const controller = fakeController(object, property, args);
       controller.unhydrated = true;
       this.controllers.push(controller);
+      this.$children.appendChild(controller.domElement);
       return controller;
     },
     /**
@@ -1052,6 +1059,7 @@ test('a schema generation change atomically rebuilds and remounts the panel', ()
   assert.equal(h.gui().ctrl('Bonne Parallel').getValue(), 0.6);
   assert.equal(h.gui().$children.scrollTop, 420);
   assert.equal(oldProjection.getValue(), 0, 'the retired binding is never updated');
+  assert.deepEqual(h.warnings, []);
 
   h.panel.sync();
   assert.equal(h.gui().ctrl('Bonne Parallel').getValue(), 0.6);
@@ -1341,6 +1349,10 @@ test('preset effects expose zero-indexed selection and navigation', () => {
   }
   const actionRow = h.gui().$children.children[0];
   assert.ok(actionRow.classList.contains('effect-action-row'));
+  assert.equal(actionRow.style.display, 'grid');
+  assert.equal(actionRow.style.gridAutoFlow, 'row');
+  assert.equal(actionRow.style.gridTemplateColumns,
+    'repeat(4, minmax(0, 1fr))');
   assert.deepEqual(actionRow.children,
     ['reset', 'export', 'previousPreset', 'nextPreset']
       .map((property) => h.gui().ctrl(property).domElement));
@@ -1437,6 +1449,8 @@ test('effects without presets do not show preset navigation', () => {
   assert.equal(h.gui().ctrl('previousPreset'), undefined);
   assert.equal(h.gui().ctrl('nextPreset'), undefined);
   assert.equal(h.gui().ctrl('presetIndex'), undefined);
+  assert.equal(h.gui().$children.children[0].style.gridTemplateColumns,
+    'repeat(2, minmax(0, 1fr))');
 });
 
 test('Export copies the live values as a C++ brace-init list', async () => {
@@ -1799,6 +1813,7 @@ test('destroy detaches the panel DOM and tears the GUI down', () => {
   assert.equal(gui.domElement.parentNode, null);
   assert.equal(gui.destroyed, 1);
   assert.equal(h.panel.active(), null);
+  assert.deepEqual(h.warnings, []);
 });
 
 test('a lil-gui teardown fault still clears the panel', () => {

@@ -555,6 +555,8 @@ export function createEffectGui({
     const actionRow = fx.gui.domElement.ownerDocument.createElement('div');
     actionRow.classList.add('effect-action-row');
     fx.gui.appendElement(actionRow);
+    fx.actionRow = actionRow;
+    fx.actionControllers = [];
     const presentAction = (controller, icon, label) => {
       controller.name(icon);
       const button = controller.$button ?? controller.domElement;
@@ -566,6 +568,7 @@ export function createEffectGui({
       controller.domElement.classList.add('effect-action', className);
       presentAction(controller, icon, label);
       actionRow.appendChild(controller.domElement);
+      fx.actionControllers.push(controller);
       return controller;
     };
 
@@ -633,6 +636,10 @@ export function createEffectGui({
       addAction(effectActions, 'nextPreset', NEXT_ICON, 'Next Preset',
         'preset-nav-next');
     }
+    actionRow.style.display = 'grid';
+    actionRow.style.gridAutoFlow = 'row';
+    actionRow.style.gridTemplateColumns =
+      `repeat(${fx.actionControllers.length}, minmax(0, 1fr))`;
   }
 
   /**
@@ -853,6 +860,12 @@ export function createEffectGui({
     }
     const dom = fx.gui.domElement;
     if (dom?.parentNode) dom.parentNode.removeChild(dom);
+    for (const controller of fx.actionControllers ?? []) {
+      fx.gui.appendElement(controller.domElement);
+    }
+    fx.actionControllers = [];
+    fx.actionRow?.remove();
+    fx.actionRow = null;
     try {
       fx.gui.destroy();
     } catch (e) {
