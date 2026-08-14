@@ -615,11 +615,11 @@ export function generateFuncAndRecipe(item, baseNamespace = '') {
 }
 
 /**
- * Renders one stored mesh count for the leading comment. The counts come from
+ * Renders one stored mesh count for the doc comment. The counts come from
  * user-writable localStorage and land in text a human pastes into a C++ header,
  * so anything that is not a non-negative integer becomes 0 rather than reaching
- * the output; a count carrying a newline would otherwise splice arbitrary code
- * above the generated function.
+ * the output; a count carrying a newline or a comment terminator would
+ * otherwise splice arbitrary code around the generated function.
  * @param {*} value - The persisted count.
  * @returns {number} The count as a non-negative integer, or 0.
  */
@@ -628,21 +628,97 @@ function commentCount(value) {
   return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
+// solid_generators.h is clang-formatted at 80 columns, and the paste goes in
+// verbatim.
+const COLUMN_LIMIT = 80;
+
 /**
- * Emits the full FLASHMEM C++ function for a solid, prefixed with a comment
- * recording its vertex/face/index counts. Output is pasted verbatim into the
- * engine, so the exact text and formatting are byte-for-byte significant.
+ * A doxygen block filled at the column limit, the way the blocks already in
+ * solid_generators.h are: a continuation carries the same ` * ` prefix at the
+ * same indent.
+ * @param {string[]} tags - One line of words per doxygen tag.
+ * @returns {string} The block comment.
+ */
+function doxygenCpp(tags) {
+  const lines = [];
+  for (const text of tags) {
+    let line = ' *';
+    for (const word of text.split(' ')) {
+      if (line.length + 1 + word.length > COLUMN_LIMIT) {
+        lines.push(line);
+        line = ' *';
+      }
+      line += ` ${word}`;
+    }
+    lines.push(line);
+  }
+  return ['/**', ...lines, ' */'].join('\n');
+}
+
+/**
+ * The function's signature, wrapped the way clang-format wraps the ones
+ * already in solid_generators.h: both parameters on the declarator's line
+ * where they fit, else the second aligned under the first; each shape tried
+ * first with the return type leading the line and then with it on its own,
+ * and last both parameters indented one level below a bare declarator.
+ * @param {string} funcName - The generated function's name.
+ * @returns {string} The signature through its opening brace.
+ */
+function signatureCpp(funcName) {
+  const tail = 'Arena &b) {';
+  for (const [lead, head] of [
+    ['', `FLASHMEM static PolyMesh ${funcName}`],
+    ['FLASHMEM static PolyMesh\n', funcName],
+  ]) {
+    const open = `${head}(Arena &a,`;
+    if (`${open} ${tail}`.length <= COLUMN_LIMIT) return `${lead}${open} ${tail}`;
+    const align = ' '.repeat(head.length + 1);
+    if (open.length <= COLUMN_LIMIT && align.length + tail.length <= COLUMN_LIMIT) {
+      return `${lead}${open}\n${align}${tail}`;
+    }
+  }
+  return `FLASHMEM static PolyMesh\n${funcName}(\n    Arena &a, ${tail}`;
+}
+
+// A builder call to break the chain before. A float literal's '.' is followed
+// by a digit and a namespace qualifier carries no '.', so only a call matches.
+const CHAIN_CALL = /\.(?=[A-Za-z_]\w*\()/;
+
+/**
+ * The return statement, wrapped the way clang-format wraps the recipes already
+ * in solid_generators.h: one line where it fits, else one builder call per
+ * line at the continuation indent.
+ * @param {string} recipe - The SolidBuilder call chain.
+ * @returns {string} The statement, ending in ';'.
+ */
+function returnRecipeCpp(recipe) {
+  if (`  return ${recipe};`.length <= COLUMN_LIMIT) return `  return ${recipe};`;
+  const [seed, ...calls] = recipe.split(CHAIN_CALL);
+  return [`  return ${seed}`, ...calls.map((call) => `      .${call}`)].join('\n') + ';';
+}
+
+/**
+ * Emits the full FLASHMEM C++ function for a solid, led by the doxygen block
+ * every solid_generators.h generator carries, whose brief records the solid's
+ * vertex/face/index counts. Output is pasted verbatim into the engine and must
+ * clear its clang-format gate, so the exact text and wrapping are
+ * byte-for-byte significant.
  * @param {SolidSpec} item - The solid spec (see generateFuncAndRecipe), optionally with vCount, fCount, and iCount counts.
  * @param {string} baseNamespace - Namespace qualifying the seed call (e.g. "Archimedean"); required, since the emitted function is pasted where the seed is not visible unqualified.
- * @returns {string} The complete C++ function source including its leading count comment.
+ * @returns {string} The complete C++ function source including its doc comment.
  * @throws {Error} When the namespace is not a valid C++ identifier, or generateFuncAndRecipe rejects the spec.
  */
 export function generateRecipeCpp(item, baseNamespace) {
   requireNamespace('generateRecipeCpp', baseNamespace);
   const { funcName, recipe } = generateFuncAndRecipe(item, baseNamespace);
-  const comment = `// V=${commentCount(item.vCount)}, F=${commentCount(item.fCount)}, `
-    + `I=${commentCount(item.iCount)}`;
-  return `${comment}\nFLASHMEM static PolyMesh ${funcName}(Arena &a, Arena &b) {\n  return ${recipe};\n}`;
+  const doc = doxygenCpp([
+    `@brief Builds the ${funcName} star pattern (V=${commentCount(item.vCount)}, `
+      + `F=${commentCount(item.fCount)}, I=${commentCount(item.iCount)}).`,
+    '@param a Output arena for the result and even pipeline stages.',
+    '@param b Scratch arena for odd pipeline stages.',
+    '@return The resulting star-pattern mesh.',
+  ]);
+  return `${doc}\n${signatureCpp(funcName)}\n${returnRecipeCpp(recipe)}\n}`;
 }
 
 /**

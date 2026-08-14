@@ -16,6 +16,7 @@ const {
   generateFuncAndRecipe,
   generateRecipeCpp,
   D2R_F32,
+  SIMPLE_SEEDS,
   computeInternalAngle,
   snapToStep,
   isConvexFace,
@@ -268,23 +269,91 @@ test('generateRecipeCpp wraps the recipe in a FLASHMEM function with V/F/I comme
   };
   const cpp = generateRecipeCpp(item, 'Archimedean');
   const expected =
-    '// V=8, F=12, I=4\n' +
+    '/**\n' +
+    ' * @brief Builds the tetrahedron_kis star pattern (V=8, F=12, I=4).\n' +
+    ' * @param a Output arena for the result and even pipeline stages.\n' +
+    ' * @param b Scratch arena for odd pipeline stages.\n' +
+    ' * @return The resulting star-pattern mesh.\n' +
+    ' */\n' +
     'FLASHMEM static PolyMesh tetrahedron_kis(Arena &a, Arena &b) {\n' +
     '  return SolidBuilder(Archimedean::tetrahedron(a, b), a, b).kis().build();\n' +
     '}';
   assert.equal(cpp, expected);
 });
 
+/**
+ * The paste goes into solid_generators.h verbatim, which is clang-formatted at
+ * 80 columns, so a line the emitter did not wrap lands as a gate violation.
+ */
+test('generateRecipeCpp wraps a long function the way solid_generators.h carries it', () => {
+  const cpp = generateRecipeCpp({
+    base: 'truncatedIcosahedron',
+    ops: [{ op: 'hankin', params: { angle: 58 } }, { op: 'chamfer', params: { t: 0.63 } }],
+    vCount: 1200,
+    fCount: 602,
+    iCount: 3600,
+  }, 'Archimedean');
+  assert.equal(cpp,
+    '/**\n'
+    + ' * @brief Builds the truncatedIcosahedron_hk58_chamfer63 star pattern (V=1200,\n'
+    + ' * F=602, I=3600).\n'
+    + ' * @param a Output arena for the result and even pipeline stages.\n'
+    + ' * @param b Scratch arena for odd pipeline stages.\n'
+    + ' * @return The resulting star-pattern mesh.\n'
+    + ' */\n'
+    + 'FLASHMEM static PolyMesh truncatedIcosahedron_hk58_chamfer63(Arena &a,\n'
+    + '                                                             Arena &b) {\n'
+    + '  return SolidBuilder(Archimedean::truncatedIcosahedron(a, b), a, b)\n'
+    + '      .hankin(58.0f * D2R)\n'
+    + '      .chamfer(0.63f)\n'
+    + '      .build();\n'
+    + '}');
+});
+
+/**
+ * A name too long to leave room for the first parameter moves the return type
+ * to its own line instead, the shape solid_generators.h already carries.
+ */
+test('generateRecipeCpp breaks after the return type when the name fills the line', () => {
+  const cpp = generateRecipeCpp({
+    base: 'truncatedIcosidodecahedron',
+    ops: [{ op: 'truncate', params: { t: 0.5 } }, 'ambo', 'dual'],
+  }, 'Archimedean');
+  assert.match(cpp, /\nFLASHMEM static PolyMesh\ntruncatedIcosidodecahedron_truncate50_ambo_dual\(Arena &a, Arena &b\) \{\n/);
+});
+
+/** Verifies no emitted line exceeds the column limit solid_generators.h is formatted at. */
+test('generateRecipeCpp never emits a line past the column limit', () => {
+  const chains = [
+    ['dual'],
+    ['kis', 'ambo', 'gyro', 'meta', 'needle', 'zip', 'dual'],
+    [{ op: 'snub', params: { t: 0.5, twist: 0.28 } }, { op: 'relax', params: { iter: 100 } },
+      { op: 'bevel', params: { t: 0.25 } }],
+  ];
+  for (const base of SIMPLE_SEEDS) {
+    for (const ops of chains) {
+      for (const line of generateRecipeCpp({ base, ops, vCount: 12345 }, 'Archimedean').split('\n')) {
+        // clang-format cannot break a line that offers no break: an identifier
+        // long enough to overflow on its own overflows there too.
+        const atom = line.replace(/^\s*(\* )?/, '');
+        assert.ok(line.length <= 80 || !atom.includes(' '),
+          `"${line}" is ${line.length} columns for base "${base}"`);
+      }
+    }
+  }
+});
+
 /** Verifies generateRecipeCpp falls back to zero vertex/face/internal counts when the item omits them. */
 test('generateRecipeCpp defaults missing V/F/I counts to 0', () => {
   const cpp = generateRecipeCpp({ base: 'cube', ops: ['dual'] }, 'Archimedean');
-  assert.ok(cpp.startsWith('// V=0, F=0, I=0\n'));
+  assert.ok(cpp.includes('star pattern (V=0, F=0, I=0).'));
 });
 
 /**
  * The counts ride in from localStorage, which a user can hand-edit, and the
- * output is pasted into solids.h; a count carrying a newline must not be able
- * to splice C++ above the generated function.
+ * output is pasted into solid_generators.h; a count carrying a newline or a
+ * comment terminator must not be able to splice C++ around the generated
+ * function.
  */
 test('generateRecipeCpp emits counts no non-negative integer can escape', () => {
   const spliced = generateRecipeCpp({
@@ -294,16 +363,16 @@ test('generateRecipeCpp emits counts no non-negative integer can escape', () => 
     fCount: 12,
     iCount: 4,
   }, 'Archimedean');
-  assert.equal(spliced.split('\n').length, 4);
+  assert.equal(spliced.split('\n').length, 9);
   assert.ok(!spliced.includes('evil'));
-  assert.equal(spliced.split('\n')[0], '// V=0, F=12, I=4');
+  assert.ok(spliced.includes('star pattern (V=0, F=12, I=4).'));
 
   for (const [count, shown] of [
     [-3, 0], [1.9, 1], ['24', 24], [NaN, 0], [Infinity, 0], [null, 0], [{}, 0],
     ['*/ evil() /*', 0],
   ]) {
     const cpp = generateRecipeCpp({ base: 'cube', ops: ['dual'], vCount: count }, 'Archimedean');
-    assert.equal(cpp.split('\n')[0], `// V=${shown}, F=0, I=0`,
+    assert.ok(cpp.includes(`star pattern (V=${shown}, F=0, I=0).`),
       `count ${String(count)} rendered wrong`);
   }
 });
