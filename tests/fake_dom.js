@@ -62,10 +62,10 @@ function reparent(nodes, parent) {
 function detach(nodes) {
   for (const node of nodes) {
     const parent = node && typeof node === 'object' ? node.parentNode : null;
-    if (!parent || !Array.isArray(parent.children)) continue;
-    const at = parent.children.indexOf(node);
+    if (!parent || !Array.isArray(parent.childNodes)) continue;
+    const at = parent.childNodes.indexOf(node);
     if (at < 0) continue;
-    parent.children.splice(at, 1);
+    parent.childNodes.splice(at, 1);
     blurRemoved(node);
   }
 }
@@ -186,6 +186,12 @@ function fakeDataset(element) {
  * that was never added throws rather than no-opping as the DOM does, so a
  * fixture that omits the add cannot hide a removal that never happens.
  *
+ * childNodes lists every inserted node; children is the elements-only view, as
+ * in the DOM, so a string append lands in one and not the other. append()
+ * accepts strings as text nodes; appendChild() takes a node and throws on
+ * anything else, so a test cannot encode a text node where the platform demands
+ * an element.
+ *
  * dispatch() propagates over the parentNode chain the way the DOM does, so a
  * listener's attachment point is observable: capture listeners run root-first,
  * then every listener on the dispatching node in registration order, then the
@@ -205,7 +211,7 @@ export function fakeElement(tag = 'div') {
     id: '',
     style: {},
     attributes: {},
-    children: [],
+    childNodes: [],
     parentNode: null,
     focusCalls: 0,
     scrollIntoViewCalls: 0,
@@ -216,8 +222,13 @@ export function fakeElement(tag = 'div') {
       if (this.parentNode) return Boolean(this.parentNode.isConnected);
       return !detached.has(this);
     },
+    // Elements-only view of childNodes, as in the DOM: appended strings are
+    // text nodes and appear in neither this nor firstElementChild.
+    get children() {
+      return this.childNodes.filter((node) => node && typeof node === 'object');
+    },
     get firstElementChild() {
-      return this.children.find((node) => node && typeof node === 'object') || null;
+      return this.children[0] || null;
     },
     classList: {
       add: (...names) => { for (const name of names) classes.add(name); },
@@ -231,16 +242,20 @@ export function fakeElement(tag = 'div') {
     },
     setAttribute(name, value) { this.attributes[name] = String(value); },
     getAttribute(name) { return name in this.attributes ? this.attributes[name] : null; },
-    append(...nodes) { detach(nodes); reparent(nodes, this); this.children.push(...nodes); },
+    append(...nodes) { detach(nodes); reparent(nodes, this); this.childNodes.push(...nodes); },
     appendChild(node) {
+      if (!node || typeof node !== 'object') {
+        throw new TypeError(
+          `appendChild: parameter 1 is not of type 'Node' (${typeof node})`);
+      }
       detach([node]);
       reparent([node], this);
-      this.children.push(node);
+      this.childNodes.push(node);
       return node;
     },
     removeChild(node) {
-      const at = this.children.indexOf(node);
-      if (at >= 0) this.children.splice(at, 1);
+      const at = this.childNodes.indexOf(node);
+      if (at >= 0) this.childNodes.splice(at, 1);
       reparent([node], null);
       return node;
     },
@@ -260,7 +275,7 @@ export function fakeElement(tag = 'div') {
       const found = [];
       const walk = (node) => {
         for (const child of node.children || []) {
-          if (!child || typeof child !== 'object' || !child.classList) continue;
+          if (!child.classList) continue;
           if (matches(child, selector)) found.push(child);
           walk(child);
         }
@@ -270,15 +285,14 @@ export function fakeElement(tag = 'div') {
     },
     replaceChildren(...nodes) {
       detach(nodes);
-      reparent(this.children, null);
+      reparent(this.childNodes, null);
       reparent(nodes, this);
-      this.children = nodes;
+      this.childNodes = nodes;
     },
     contains(node) {
       if (node === this) return true;
       return this.children.some(
-        (child) => child && typeof child === 'object'
-          && typeof child.contains === 'function' && child.contains(node));
+        (child) => typeof child.contains === 'function' && child.contains(node));
     },
     addEventListener(type, handler, options) {
       this.listeners.push({ type, handler, options, capture: captureFlag(options) });
