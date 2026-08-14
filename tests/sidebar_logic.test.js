@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sortItems, navTargetIndex, scrollArrowState, resolveActiveEffect } from '../sidebar_logic.js';
+import {
+  balancedColumnRows,
+  sortItems,
+  navTargetIndex,
+  scrollArrowState,
+  resolveActiveEffect,
+} from '../sidebar_logic.js';
 
 const items = () => [
   { name: 'Voronoi', size: 3000 },
@@ -29,6 +35,14 @@ test('sortItems does not mutate its input', () => {
   assert.deepEqual(original.map(i => i.name), snapshot);
 });
 
+test('balancedColumnRows keeps the column count and fills columns evenly', () => {
+  assert.equal(balancedColumnRows(20), 7);
+  assert.equal(balancedColumnRows(17), 6);
+  assert.equal(balancedColumnRows(16), 8);
+  assert.equal(balancedColumnRows(8), 8);
+  assert.equal(balancedColumnRows(0), 1);
+});
+
 test('navTargetIndex advances and wraps for Down/Right', () => {
   assert.equal(navTargetIndex(0, 3, 'ArrowDown'), 1);
   assert.equal(navTargetIndex(2, 3, 'ArrowDown'), 0);   // wrap past the end
@@ -51,28 +65,28 @@ test('navTargetIndex returns -1 for non-navigation keys and empty lists', () => 
   assert.equal(navTargetIndex(0, 0, 'ArrowDown'), -1);  // empty list
 });
 
-// The mobile list is an 8-row column-flow grid, so the option to the right of
-// index i sits 8 later; without the stride both horizontal arrows would walk
+// The balanced 20-item mobile list is a 7-row column-flow grid, so the option
+// to the right of index i sits 7 later; without the stride both arrows would walk
 // down the column they are already in.
 test('navTargetIndex steps a whole column for Left/Right under a stride', () => {
-  assert.equal(navTargetIndex(0, 20, 'ArrowRight', 8), 8);
-  assert.equal(navTargetIndex(8, 20, 'ArrowLeft', 8), 0);
+  assert.equal(navTargetIndex(0, 20, 'ArrowRight', 7), 7);
+  assert.equal(navTargetIndex(7, 20, 'ArrowLeft', 7), 0);
   // Vertical movement stays one option per press whatever the stride is.
-  assert.equal(navTargetIndex(0, 20, 'ArrowDown', 8), 1);
-  assert.equal(navTargetIndex(1, 20, 'ArrowUp', 8), 0);
+  assert.equal(navTargetIndex(0, 20, 'ArrowDown', 7), 1);
+  assert.equal(navTargetIndex(1, 20, 'ArrowUp', 7), 0);
 });
 
 test('navTargetIndex wraps Left/Right within the row, not into the next one', () => {
   // Right past the last column returns to the first column of the same row.
-  assert.equal(navTargetIndex(16, 20, 'ArrowRight', 8), 0);
-  assert.equal(navTargetIndex(19, 20, 'ArrowRight', 8), 3);
+  assert.equal(navTargetIndex(14, 20, 'ArrowRight', 7), 0);
+  assert.equal(navTargetIndex(19, 20, 'ArrowRight', 7), 5);
   // Left before the first column lands on the row's last populated option; the
-  // short trailing column leaves row 3 ending at 19 and row 4 at 12.
-  assert.equal(navTargetIndex(3, 20, 'ArrowLeft', 8), 19);
-  assert.equal(navTargetIndex(4, 20, 'ArrowLeft', 8), 12);
+  // short trailing column leaves row 5 ending at 19 and row 6 at 13.
+  assert.equal(navTargetIndex(5, 20, 'ArrowLeft', 7), 19);
+  assert.equal(navTargetIndex(6, 20, 'ArrowLeft', 7), 13);
   // An off-list focus still enters at an end, and a degenerate stride is 1.
-  assert.equal(navTargetIndex(-1, 20, 'ArrowRight', 8), 0);
-  assert.equal(navTargetIndex(-1, 20, 'ArrowLeft', 8), 19);
+  assert.equal(navTargetIndex(-1, 20, 'ArrowRight', 7), 0);
+  assert.equal(navTargetIndex(-1, 20, 'ArrowLeft', 7), 19);
   assert.equal(navTargetIndex(1, 3, 'ArrowRight', 0), 2);
 });
 

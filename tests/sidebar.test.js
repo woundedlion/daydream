@@ -80,6 +80,13 @@ test('setEffects builds one button per name and sizes only when > 0', () => {
   // No active effect yet: roving tab stop falls to the first option.
   assert.equal(sidebar.tabbableBtn, sidebar.listEl.children[0]);
   assert.equal(sidebar.tabbableBtn.tabIndex, 0);
+  assert.equal(sidebar.listEl.style.gridTemplateRows, 'repeat(2, auto)');
+});
+
+test('setEffects balances a full roster across its existing columns', () => {
+  const { sidebar } = makeSidebar();
+  sidebar.setEffects(Array.from({ length: 20 }, (_, i) => `E${i}`), {});
+  assert.equal(sidebar.listEl.style.gridTemplateRows, 'repeat(7, auto)');
 });
 
 test('setEffects rebuilds cleanly without leaking the old roster', () => {

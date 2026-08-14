@@ -32,6 +32,20 @@ export function sortItems(items, key, dir) {
 }
 
 /**
+ * Balance a column-flow list without exceeding its usual row cap.
+ * @param {number} itemCount - Number of options in the list.
+ * @param {number} [maxRows] - Maximum options in one column.
+ * @returns {number} Number of rows for the balanced grid.
+ */
+export function balancedColumnRows(itemCount, maxRows = 8) {
+  const count = Math.max(0, Math.trunc(itemCount) || 0);
+  const rowCap = Math.max(1, Math.trunc(maxRows) || 1);
+  if (count === 0) return 1;
+  const columnCount = Math.ceil(count / rowCap);
+  return Math.ceil(count / columnCount);
+}
+
+/**
  * Compute the focus target index for an arrow/Home/End keypress, wrapping at the
  * ends. Down/Up step one option; Right/Left step one `stride` — the number of
  * options laid out along the vertical axis, so a horizontal arrow crosses to the

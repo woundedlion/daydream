@@ -3,13 +3,17 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-import { sortItems, navTargetIndex, scrollArrowState } from "./sidebar_logic.js";
+import {
+  balancedColumnRows,
+  sortItems,
+  navTargetIndex,
+  scrollArrowState,
+} from "./sidebar_logic.js";
 import { formatKB } from "./tools/kb_format.js";
 
 /**
  * Options per column in the option list: the row count of a column-flow grid
- * (the mobile layout), else 1 for the desktop single column. Read from the
- * resolved style so the stylesheet stays the only place the layout is stated.
+ * (the mobile layout), else 1 for the desktop single column.
  * @param {HTMLElement} listEl - The option list element.
  * @returns {number} Index distance between an option and its horizontal neighbour.
  */
@@ -134,6 +138,8 @@ export class EffectSidebar {
     this.buttons.clear();
     this.listEl.innerHTML = '';
     this.items = [];
+    this.listEl.style.gridTemplateRows =
+      `repeat(${balancedColumnRows(names.length)}, auto)`;
 
     names.forEach(name => {
       const size = effectSizes ? (effectSizes[name] || 0) : 0;
