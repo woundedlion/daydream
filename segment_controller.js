@@ -1165,6 +1165,14 @@ export class SegmentController {
         resolve();
       };
 
+      // An empty pool has nothing to answer the dispatch and arms a watchdog that
+      // only fires on `pending > 0`, so settle here rather than never.
+      if (this.workers.length === 0) {
+        this.frameResolve();
+        this.frameResolve = null;
+        return;
+      }
+
       // Dispatched per worker rather than broadcast: each carries back its own
       // retired pixel buffer. `results` holds the live generation and is the only
       // buffer composite() reads, so a `scratch` slot here is two generations old
