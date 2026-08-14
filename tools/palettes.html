@@ -1718,7 +1718,7 @@
     /**
      * The accessible name for one procedural slider.
      * @param {{param: string, group: string}} def - A sliderDefinitions entry; its param is `<group>_<channel>`.
-     * @returns {string} The group and channel name, e.g. "Base red".
+     * @returns {string} The group and channel name, e.g. "Offset red".
      */
     function sliderAriaLabel(def) {
       return `${GROUP_NAMES[def.group]} ${CHANNEL_NAMES[def.param.split('_')[1]]}`;
