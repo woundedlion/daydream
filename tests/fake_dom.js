@@ -325,15 +325,18 @@ export function fakeElement(tag = 'div') {
 
       let stopped = false;
       let stoppedHere = false;
-      // stopPropagation/stopImmediatePropagation belong to the event, so they
-      // overwrite anything the caller supplied rather than the reverse.
+      // The type and the propagation/default controls belong to the event, so
+      // they overwrite anything the caller supplied rather than the reverse.
       const dispatched = {
         target: this,
         bubbles: true,
         ...event,
+        type,
         currentTarget: null,
+        defaultPrevented: false,
         stopPropagation() { stopped = true; },
         stopImmediatePropagation() { stopped = true; stoppedHere = true; },
+        preventDefault() { dispatched.defaultPrevented = true; },
       };
 
       /**
@@ -360,16 +363,17 @@ export function fakeElement(tag = 'div') {
       };
 
       for (const node of [...ancestors].reverse()) {
-        if (stopped) return;
+        if (stopped) break;
         fire(node, true);
       }
-      if (stopped) return;
-      fire(this, null);
-      if (!dispatched.bubbles) return;
-      for (const node of ancestors) {
-        if (stopped) return;
-        fire(node, false);
+      if (!stopped) fire(this, null);
+      if (dispatched.bubbles) {
+        for (const node of ancestors) {
+          if (stopped) break;
+          fire(node, false);
+        }
       }
+      return dispatched;
     },
     focus() {
       this.focusCalls++;
