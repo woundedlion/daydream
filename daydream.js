@@ -482,13 +482,12 @@ export function start({
     focusedElement: () => doc.activeElement,
     copyText: copyToClipboard,
     usesFullConfigSnapshot,
-    getFullConfigSnapshot: () => host.engine.getFullConfigSnapshot?.() ?? null,
-    restoreFullConfigSnapshot: (snapshot) => {
-      const result = host.engine.restoreFullConfigSnapshot?.(snapshot);
-      return result === host.module.FullConfigRestoreResult?.APPLIED;
-    },
-    getConfigImportNotice: () => host.engine.getConfigImportNotice?.() ?? '',
-    clearConfigImportNotice: () => host.engine.clearConfigImportNotice?.(),
+    getFullConfigSnapshot: () => host.engine.getFullConfigSnapshot(),
+    restoreFullConfigSnapshot: (snapshot) =>
+      host.engine.restoreFullConfigSnapshot(snapshot)
+        === host.module.FullConfigRestoreResult.APPLIED,
+    getConfigImportNotice: () => host.engine.getConfigImportNotice(),
+    clearConfigImportNotice: () => host.engine.clearConfigImportNotice(),
     showConfigImportNotice: (message) => applyNotice.show(message, CONFIG_NOTICE),
   });
 

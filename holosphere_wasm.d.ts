@@ -160,12 +160,12 @@ export interface HolosphereEngine {
    */
   getParamGeneration(): number;
   /** Complete ShaderBall state, independent of the visible parameter schema. */
-  getFullConfigSnapshot?(): FullConfigSnapshot | null;
+  getFullConfigSnapshot(): FullConfigSnapshot | null;
   /** Atomically restore accepted, requested, pending, and optional runtime state. */
-  restoreFullConfigSnapshot?(snapshot: FullConfigSnapshot): EnumValue;
-  getFullConfigFieldDefinitions?(): FullConfigFieldDefinition[];
-  getConfigImportNotice?(): string;
-  clearConfigImportNotice?(): void;
+  restoreFullConfigSnapshot(snapshot: FullConfigSnapshot): EnumValue;
+  getFullConfigFieldDefinitions(): FullConfigFieldDefinition[];
+  getConfigImportNotice(): string;
+  clearConfigImportNotice(): void;
   /**
    * True when the effect strobes each POV column to black after it is shown
    * (discrete columns with dark gaps), false when columns persist and smear
@@ -195,7 +195,7 @@ export interface HolosphereModule {
     READONLY: EnumValue;
     NON_FINITE: EnumValue;
   };
-  FullConfigRestoreResult?: {
+  FullConfigRestoreResult: {
     APPLIED: EnumValue;
     NOT_SHADERBALL: EnumValue;
     UNSUPPORTED_VERSION: EnumValue;
