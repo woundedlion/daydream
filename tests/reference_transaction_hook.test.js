@@ -80,7 +80,7 @@ describe(
       const run = spawnSync(SH, [HOOK, stage], {
         cwd,
         env,
-        input: `${lines.join('\n')}\n`,
+        input: stage === 'prepared' ? `${lines.join('\n')}\n` : undefined,
         encoding: 'utf8',
       });
       if (run.error) throw run.error;
