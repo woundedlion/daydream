@@ -408,15 +408,21 @@ export function createEffectGui({
    * definitions snapshot rather than the per-frame value stream — an effect
    * with no enum control skips it and keeps sync() off that marshal.
    * @param {Object} fx - The active effect record.
+   * @param {Object|null} focused - The document's focused element, or null. An
+   *   animated selector streams a new requested value every frame, so an open
+   *   dropdown has to be left alone like any other controller under edit.
    * @returns {void}
    */
-  function adoptRequestedEnums(fx) {
+  function adoptRequestedEnums(fx, focused) {
     if (!fx.hasEnumControls) return;
     for (const parameter of getParameterDefinitions()) {
       const controller = fx.controllerByName.get(parameter.name);
       if (!controller?.isEnum) continue;
-      const value = selectorControlValue(parameter);
-      if (controller.getValue() === value) continue;
+      const isEditing = focused !== null
+        && controller.domElement?.contains(focused) === true;
+      const { update, value } = resolveParamSync(
+        controller.getValue(), selectorControlValue(parameter), false, isEditing);
+      if (!update) continue;
       controller.object[controller.property] = value;
       controller.updateDisplay();
     }
@@ -442,7 +448,9 @@ export function createEffectGui({
     adoptPauseDisplay(activeEffect, engineAnimationsPaused());
     adoptPresetDisplay(activeEffect, presetCount, presetIndex);
     if (!activeEffect.hasParams) return;
-    adoptRequestedEnums(activeEffect);
+    // One focus read for the whole pass: at most one element has focus.
+    const focused = focusedElement() ?? null;
+    adoptRequestedEnums(activeEffect, focused);
 
     const values = liveParamValues();
     if (!values || values.length === 0) return;
@@ -460,8 +468,6 @@ export function createEffectGui({
       return;
     }
     skewLogged = false;
-    // One focus read for the whole pass: at most one element has focus.
-    const focused = focusedElement() ?? null;
     const n = names.length;
     for (let i = 0; i < n; i++) {
       const c = activeEffect.controllerByName.get(names[i]);
