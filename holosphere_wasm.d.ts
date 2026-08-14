@@ -152,7 +152,13 @@ export interface HolosphereEngine {
   getArenaMetrics(): ArenaMetrics;
   /** The bound effect's parameter descriptors, in declaration order; empty with no effect set. */
   getParameterDefinitions(): ParameterDefinition[];
-  /** Current values of the bound effect's parameters, in definition order. */
+  /**
+   * Current values of the bound effect's parameters, in definition order, as a
+   * zero-copy view over the module's memory, on the same lifetime contract as
+   * getPixels(): consume it before the next call into the module, since heap
+   * growth detaches it. The backing store is pre-reserved and never
+   * reallocates here, so this call detaches no other outstanding view.
+   */
   getParamValues(): ArrayLike<number> & Iterable<number>;
   /**
    * Identity token joining a getParameterDefinitions() snapshot to a later
