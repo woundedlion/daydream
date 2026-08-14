@@ -419,17 +419,6 @@ test('lissajous golden points (absolute pin)', () => {
 });
 
 /**
- * Stereographic projection in the convention the mobius.html fragment shader
- * uses: pole at +y, real axis x, imaginary axis z.
- * @param {number[]} p - Unit sphere point as [x, y, z].
- * @returns {{re:number, im:number}} The projected complex-plane coordinate.
- */
-function stereo([x, y, z]) {
-  const denom = 1 - y;
-  return { re: x / denom, im: z / denom };
-}
-
-/**
  * Inverse stereographic projection back onto the unit sphere.
  * @param {{re:number, im:number}} w - Complex-plane coordinate.
  * @returns {{x:number, y:number, z:number}} The corresponding sphere point.
@@ -442,14 +431,17 @@ function invStereo(w) {
 /**
  * Maps a sphere point through the tool's own complex arithmetic: project, apply
  * f(z) = (Az + B) / (Cz + D), unproject. This is the reference the engine's
- * fused mobius_transform must reproduce.
+ * fused mobius_transform must reproduce, so it runs the projection and the
+ * division the shader itself runs — stereo and projectDiv, which carry the
+ * engine's point-at-infinity conventions — rather than the general-purpose cdiv,
+ * whose absolute divisor guard the engine deliberately lacks.
  * @param {number[]} p - Unit sphere point as [x, y, z].
  * @param {{A:{re:number,im:number}, B:{re:number,im:number}, C:{re:number,im:number}, D:{re:number,im:number}}} coeffs - The Mobius coefficients.
  * @returns {{x:number, y:number, z:number}} The transformed sphere point.
  */
-function mobiusSphereJs(p, { A, B, C, D }) {
-  const w = stereo(p);
-  return invStereo(MB.cdiv(MB.cadd(MB.cmult(A, w), B), MB.cadd(MB.cmult(C, w), D)));
+function mobiusSphereJs([x, y, z], { A, B, C, D }) {
+  const w = MB.stereo({ x, y, z });
+  return invStereo(MB.projectDiv(MB.cadd(MB.cmult(A, w), B), MB.cadd(MB.cmult(C, w), D)));
 }
 
 /**

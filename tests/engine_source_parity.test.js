@@ -142,6 +142,136 @@ test('glslProjectionFunctions constants match core/math/3dmath.h', { skip: SKIP 
   }
 });
 
+// The core/math/3dmath.h spellings an engine Complex body uses, paired with the
+// JS the mobius_transforms port writes them as. Comments are stripped first so a
+// `//` cannot swallow a later substitution.
+const ENGINE_CPP_TO_JS = [
+  [/\/\/[^\n]*/g, ''],
+  [/\bconst float\b/g, 'const'],
+  [/\bfloat\b/g, 'const'],
+  [/\bstd::(max|min|abs)\(/g, 'Math.$1('],
+  [/\bsqrtf\(/g, 'Math.sqrt('],
+  [/(\d)f\b/g, '$1'],
+];
+
+/**
+ * Rewrites every `Complex(re, im)` construction in a C++ fragment as the
+ * {re, im} object literal the JS port returns. The arguments can nest parens, so
+ * the split is on the top-level comma rather than by regex.
+ * @param {string} text - The fragment.
+ * @returns {string} The fragment with each construction rewritten.
+ */
+function complexToObject(text) {
+  let source = text;
+  let at = 0;
+  while ((at = source.indexOf('Complex(', at)) !== -1) {
+    const open = at + 'Complex'.length;
+    let depth = 0, comma = -1, close = -1;
+    for (let i = open; i < source.length; i++) {
+      if (source[i] === '(') depth += 1;
+      else if (source[i] === ')' && (depth -= 1) === 0) { close = i; break; }
+      else if (source[i] === ',' && depth === 1) comma = i;
+    }
+    assert.ok(comma > open && close > comma,
+      `unreadable Complex(...) at "${source.slice(at, at + 60)}"`);
+    source = `${source.slice(0, at)}({ re: (${source.slice(open + 1, comma)}), `
+      + `im: (${source.slice(comma + 1, close)}) })${source.slice(close + 1)}`;
+    at = 0;
+  }
+  return source;
+}
+
+/**
+ * Transpiles one `inline Complex NAME(...)` engine body into a JS function, so
+ * the comparison runs the header's own arithmetic rather than a second
+ * transcription of it. Both sides then evaluate in doubles, which makes the
+ * agreement exact rather than approximate.
+ * @param {string} src - core/math/3dmath.h text.
+ * @param {string} name - The function's C++ name.
+ * @param {string[]} params - JS parameter names, in signature order.
+ * @param {Object<string, number>} constants - Engine constants the body names.
+ * @returns {(...args: any[]) => {re: number, im: number}} The transpiled function.
+ */
+function transpileEngineComplex(src, name, params, constants) {
+  let body = functionBody(src, name);
+  for (const [pattern, replacement] of ENGINE_CPP_TO_JS) {
+    body = body.replace(pattern, /** @type {string} */ (replacement));
+  }
+  body = complexToObject(body);
+  assert.doesNotMatch(body, /std::|sqrtf|\bfloat\b|\bComplex\b/,
+    `${name} still holds C++ this reader cannot translate: ${body}`);
+  const preamble = Object.entries(constants).map(([k, v]) => `const ${k} = ${v};`).join('\n');
+  return /** @type {any} */ (Function(...params, `${preamble}\n${body}`));
+}
+
+// Sphere points the projection is compared over: the equator, a generic point,
+// both poles, and the pole cap sampled off-axis so the azimuth branch runs.
+const STEREO_POINTS = (() => {
+  const points = [
+    { x: 1, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, { x: -1, y: 0, z: 0 },
+    { x: 0.48, y: 0.6, z: 0.64 }, { x: -0.36, y: 0.48, z: -0.8 },
+    { x: 0, y: 1, z: 0 }, { x: 0, y: -1, z: 0 },
+  ];
+  for (const y of [1 - MB.STEREO_POLE_EPS / 2, 1 - MB.STEREO_POLE_EPS * 1.5, 1 - 1e-4]) {
+    const r = Math.sqrt(1 - y * y);
+    for (const [ux, uz] of [[1, 0], [0, 1], [-Math.SQRT1_2, Math.SQRT1_2]]) {
+      points.push({ x: r * ux, y, z: r * uz });
+    }
+  }
+  return points;
+})();
+
+// Numerator/divisor pairs spanning project_div's branches: ordinary quotients, a
+// numerator that saturates on the relative test, a divisor small enough that the
+// general cdiv would zero it out, the 0/0 indeterminate form, and magnitudes
+// whose square leaves the representable range.
+const PROJECT_DIV_PAIRS = [
+  [{ re: 4, im: 2 }, { re: 2, im: 0 }],
+  [{ re: 1, im: -3 }, { re: -0.5, im: 0.25 }],
+  [{ re: 1e5, im: 0 }, { re: 1, im: 0 }],
+  [{ re: 1e5, im: 1e5 }, { re: 1, im: 0 }],
+  [{ re: 1e-6, im: 0 }, { re: 4e-4, im: 0 }],
+  [{ re: 0, im: 0 }, { re: 0, im: 0 }],
+  [{ re: 1, im: 1 }, { re: 0, im: 0 }],
+  [{ re: 3e200, im: -1e200 }, { re: 1, im: 0 }],
+  [{ re: 1e-200, im: 1e-200 }, { re: 1e-260, im: 0 }],
+];
+
+/**
+ * Pins mobius_transforms.js's stereo and projectDiv to the bodies of stereo and
+ * project_div in core/math/3dmath.h. The constants above are pinned separately,
+ * but these two functions are what mobius.html's shader actually runs, and the
+ * WASM bridge reaches only the engine's fused mobius_transform — which never
+ * calls either in isolation, so no export can separate them. Comparing the
+ * header's own body, transpiled, catches a reordered guard or a changed
+ * fallback that matching constants would hide.
+ */
+test('stereo and projectDiv match core/math/3dmath.h', { skip: SKIP }, () => {
+  const src = header(MARKER);
+  const inf = engineConstant(src, 'STEREO_INF');
+  const constants = {
+    STEREO_INF: inf,
+    STEREO_POLE_EPS: engineConstant(src, 'STEREO_POLE_EPS', { STEREO_INF: inf }),
+    STEREO_AZIMUTH_EPS: engineConstant(src, 'STEREO_AZIMUTH_EPS'),
+  };
+  const engineStereo = transpileEngineComplex(src, 'stereo', ['v'], constants);
+  const engineProjectDiv = transpileEngineComplex(src, 'project_div', ['num', 'den'], constants);
+
+  for (const v of STEREO_POINTS) {
+    const want = engineStereo(v);
+    const got = MB.stereo(v);
+    assert.equal(got.re, want.re, `stereo(${JSON.stringify(v)}).re drifted from the engine`);
+    assert.equal(got.im, want.im, `stereo(${JSON.stringify(v)}).im drifted from the engine`);
+  }
+  for (const [num, den] of PROJECT_DIV_PAIRS) {
+    const pair = `${JSON.stringify(num)} / ${JSON.stringify(den)}`;
+    const want = engineProjectDiv(num, den);
+    const got = MB.projectDiv(num, den);
+    assert.equal(got.re, want.re, `projectDiv ${pair} .re drifted from the engine`);
+    assert.equal(got.im, want.im, `projectDiv ${pair} .im drifted from the engine`);
+  }
+});
+
 // The two sRGB transfer functions, as color.js names them and as core/color/color.h
 // does. Both ports are a single guarded expression whose coefficients appear in
 // the same order, so the ordered literals are the comparison — an operator or
