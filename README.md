@@ -442,6 +442,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 <!-- docs-check: tree daydream exhaustive -->
 ```
 ├── index.html                  Main simulator page
+├── favicon.svg                 Sphere-mark favicon for the simulator pages
 ├── site_manifest.txt           Repo-relative path list deploy.yml publishes to Pages
 ├── LICENSE                     PolyForm Noncommercial 1.0.0 (engine); effects reserved
 ├── vendor-importmap.js         Local-first / CDN-fallback importmap helper
@@ -513,6 +514,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   └── tools.css               Shared design tokens and control styling for the tool pages
 │
 ├── scripts/
+│   ├── browser-smoke.mjs       Headless-Chrome smoke for every manifest-served page
 │   ├── count-assertions.mjs    NODE_OPTIONS shim counting each test file's node:assert calls
 │   ├── generate-importmap.mjs  Bakes the local-vs-CDN decision into vendor-importmap.js
 │   ├── report-cases.mjs        node:test reporter tallying per-file case and skip counts

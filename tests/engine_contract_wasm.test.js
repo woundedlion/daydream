@@ -471,33 +471,33 @@ test('ShaderBall accepts valid Curl Flow through the dynamic backend', () => {
 test('ShaderBall keeps planar warps when dodecahedral Grid becomes Primitive Lattice', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
-  assert.equal(engine.selectPreset(7), true);
+  assert.equal(engine.selectPreset(11), true);
 
   const before = engine.getParameterDefinitions();
   const functionDef = before.find((d) => d.name === 'Function');
   const outerDef = before.find((d) => d.name === 'Planar Warp 1');
   const innerDef = before.find((d) => d.name === 'Planar Warp 2');
   const primitiveLattice = functionDef?.options?.indexOf('Primitive Lattice');
-  const mirrorTile = outerDef?.options?.indexOf('Mirror Tile');
-  const noInnerWarp = innerDef?.options?.indexOf('None');
-  assert.equal(outerDef?.requestedValue, mirrorTile);
-  assert.equal(innerDef?.requestedValue, noInnerWarp);
+  const vectorNoise = outerDef?.options?.indexOf('Projected Vector Noise');
+  const mirrorTile = innerDef?.options?.indexOf('Mirror Tile');
+  assert.equal(outerDef?.requestedValue, vectorNoise);
+  assert.equal(innerDef?.requestedValue, mirrorTile);
 
   assert.equal(engine.setParameter('Function', primitiveLattice), M.ParamSetResult.APPLIED);
   const requested = engine.getParameterDefinitions();
-  assert.equal(requested.find((d) => d.name === 'Planar Warp 1')?.requestedValue, mirrorTile,
+  assert.equal(requested.find((d) => d.name === 'Planar Warp 1')?.requestedValue, vectorNoise,
     'the Function edit must not rewrite requested Planar Warp 1');
-  assert.equal(requested.find((d) => d.name === 'Planar Warp 2')?.requestedValue, noInnerWarp,
+  assert.equal(requested.find((d) => d.name === 'Planar Warp 2')?.requestedValue, mirrorTile,
     'the Function edit must not rewrite requested Planar Warp 2');
   assert.equal(requested.find((d) => d.name === 'Function')?.warning, undefined);
 
   engine.drawFrame();
   const rendered = engine.getParameterDefinitions();
   assert.equal(rendered.find((d) => d.name === 'Function')?.value, primitiveLattice);
-  assert.equal(rendered.find((d) => d.name === 'Planar Warp 1')?.value, mirrorTile,
-    'rendered Planar Warp 1 must remain Mirror Tile');
-  assert.equal(rendered.find((d) => d.name === 'Planar Warp 2')?.value, noInnerWarp,
-    'rendered Planar Warp 2 must remain None');
+  assert.equal(rendered.find((d) => d.name === 'Planar Warp 1')?.value, vectorNoise,
+    'rendered Planar Warp 1 must remain Projected Vector Noise');
+  assert.equal(rendered.find((d) => d.name === 'Planar Warp 2')?.value, mirrorTile,
+    'rendered Planar Warp 2 must remain Mirror Tile');
 });
 
 test('strobeColumns and getEffectSizes return the shapes daydream consumes', () => {
