@@ -260,6 +260,27 @@ test('replaceChildren moves a node out of the parent it came from', () => {
   assert.equal(dropped.parentNode, null);
 });
 
+test('appended text lands in childNodes and never in children', () => {
+  const box = fakeElement('div');
+  const span = fakeElement('span');
+  box.append('lead ', span, ' tail');
+
+  assert.deepEqual(box.childNodes, ['lead ', span, ' tail']);
+  assert.deepEqual(box.children, [span]);
+  assert.equal(box.firstElementChild, span, 'a leading text node is not the first element');
+
+  box.removeChild(span);
+  assert.deepEqual(box.childNodes, ['lead ', ' tail']);
+  assert.deepEqual(box.children, []);
+  assert.equal(box.firstElementChild, null);
+});
+
+test('appendChild refuses a string the way the platform does', () => {
+  const box = fakeElement('div');
+  assert.throws(() => box.appendChild('text'), TypeError);
+  assert.deepEqual(box.childNodes, [], 'the rejected node was still inserted');
+});
+
 // A liveness check reads isConnected off the node it cached, which is usually a
 // descendant of the container the page swapped, not the node the swap named.
 test('every detaching mutator disconnects the subtree it evicts', () => {

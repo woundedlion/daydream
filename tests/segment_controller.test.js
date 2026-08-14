@@ -2258,7 +2258,7 @@ test('a spawning pool reports the spawn and does not own the display', () => {
   c.updateStats();
   const status = stats.firstElementChild;
   assert.equal(status.getAttribute('role'), 'status');
-  assert.match(status.children.join(''), /4 workers/);
+  assert.match(status.childNodes.join(''), /4 workers/);
 
   c.updateStats();
   assert.equal(stats.firstElementChild, status, 'the status row is not rebuilt every frame');

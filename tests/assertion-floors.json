@@ -69,8 +69,8 @@
     "assertions": 9
   },
   "tests/fake_dom.test.js": {
-    "cases": 15,
-    "assertions": 29
+    "cases": 22,
+    "assertions": 58
   },
   "tests/fake_three.test.js": {
     "cases": 6,
@@ -174,8 +174,8 @@
     "assertions": 147
   },
   "tests/segment_stats_view.test.js": {
-    "cases": 12,
-    "assertions": 98
+    "cases": 16,
+    "assertions": 113
   },
   "tests/segment_worker.test.js": {
     "cases": 45,

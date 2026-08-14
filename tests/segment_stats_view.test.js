@@ -331,11 +331,12 @@ test('a spawning pool reports the worker count instead of a table', () => {
 
   const box = stats.firstElementChild;
   assert.equal(box.getAttribute('role'), 'status');
-  assert.deepEqual(box.children, ['Spawning 4 workers…']);
+  assert.deepEqual(box.childNodes, ['Spawning 4 workers…']);
+  assert.deepEqual(box.children, [], 'the count is a text node, not an element');
 
   view.update(readyState(8, { ready: false }));
   assert.equal(stats.firstElementChild, box);
-  assert.deepEqual(box.children, ['Spawning 8 workers…']);
+  assert.deepEqual(box.childNodes, ['Spawning 8 workers…']);
 });
 
 test('each fault code names its own source in the headline', () => {
@@ -355,10 +356,10 @@ test('each fault code names its own source in the headline', () => {
     assert.equal(box.getAttribute('role'), 'alert');
     assert.equal(box.tabIndex, -1);
     assert.equal(box.focusCount, 1);
-    assert.equal(box.children[0],
+    assert.equal(box.childNodes[0],
       `⚠ Segment ${who} faulted — segmented render halted.`);
-    assert.equal(box.children[2].textContent, faultInfo ? 'boom' : 'see console');
-    assert.equal(box.children[4].textContent,
+    assert.equal(box.childNodes[2].textContent, faultInfo ? 'boom' : 'see console');
+    assert.equal(box.childNodes[4].textContent,
       'Change resolution or toggle segmented mode to restart.');
   }
 });
@@ -370,14 +371,16 @@ test('the fault message is a text node, never markup', () => {
     readyState(2, { faulted: true, faultInfo: { segId: 1, message: hostile } }));
 
   const box = stats.firstElementChild;
-  const msg = box.children[2];
+  const msg = box.childNodes[2];
   assert.equal(msg.tagName, 'SPAN');
   assert.equal(msg.textContent, hostile, 'the message is carried verbatim as text');
-  assert.deepEqual(msg.children, [], 'nothing was parsed out of the message');
+  assert.deepEqual(msg.childNodes, [], 'nothing was parsed out of the message');
   // The headline is appended as a string, so it too becomes a text node.
-  assert.equal(typeof box.children[0], 'string');
-  assert.deepEqual(box.children.map((c) => typeof c === 'string' ? 'text' : c.tagName),
+  assert.equal(typeof box.childNodes[0], 'string');
+  assert.deepEqual(box.childNodes.map((c) => typeof c === 'string' ? 'text' : c.tagName),
     ['text', 'BR', 'SPAN', 'BR', 'SPAN']);
+  assert.deepEqual(box.children.map((c) => c.tagName), ['BR', 'SPAN', 'BR', 'SPAN'],
+    'the elements-only view drops the text nodes');
 });
 
 test('the fault overlay is painted once and torn down on recovery', () => {
