@@ -5,6 +5,8 @@
 
 import { refreshPixelView as computePixelView } from "./pixel_view.js";
 
+/** @typedef {import('./holosphere_wasm.js').HolosphereEngine} HolosphereEngine */
+
 /**
  * Owns the main-thread WASM engine and its reassignable display state. The pixel
  * view goes stale on heap growth and on a resolution change, so consumers read it
@@ -19,8 +21,11 @@ export class EngineHost {
    */
   constructor(onViewRefreshed = () => {}) {
     this.module = null;
+    /** @type {HolosphereEngine|null} */
     this.engine = null;
+    /** @type {Object|null} */
     this.adapter = null;
+    /** @type {{dispose: () => void}|null} */
     this.recorder = null;
     this.pixelView = null;
     this.onViewRefreshed = onViewRefreshed;
@@ -60,10 +65,11 @@ export class EngineHost {
    *   the engine last left there, not what the previous view's holder did to it.
    */
   refresh() {
-    if (!this.engine) return false;
+    const engine = this.engine;
+    if (!engine) return false;
     const { view, refreshed } = computePixelView(
-      this.pixelView, () => this.engine.getPixels(),
-      this.engine.getBufferLength?.());
+      this.pixelView, () => engine.getPixels(),
+      engine.getBufferLength?.());
     if (refreshed) {
       this.pixelView = view;
       this.onViewRefreshed(view);

@@ -34,10 +34,14 @@
   // tools/ is rostered whole except for the modules that import three, which
   // ships no typings: under noResolve a bare specifier resolves to nothing this
   // program contains, so `@types/three` could not be reached even if installed.
-  // tsconfig_roster.test.js holds tools/ to that one exemption.
+  // tsconfig_roster.test.js holds tools/ to that one exemption. The same puts
+  // geometry.js and everything else reached through driver.js out of range, and
+  // bootstrap.js with them: its dynamic import of daydream.js is an edge the
+  // closure follows.
   "files": [
     "holosphere_wasm.d.ts",
     "app_lifecycle.d.ts",
+    "engine_host.js",
     "frame_constants.js",
     "global_stats_view.js",
     "param_sync.js",
