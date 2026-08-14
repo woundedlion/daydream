@@ -89,6 +89,12 @@ test('holosphere_wasm.d.ts declares the pinned engine method roster', () => {
     assert.equal(typeof engine[name], 'function',
       `holosphere_wasm.d.ts declares ${name}, which the module does not export`);
   }
+  // embind puts exactly the bound methods on the instance prototype, so this
+  // pins the other direction: a binding the declarations never grew.
+  for (const name of Object.keys(Object.getPrototypeOf(engine))) {
+    assert.ok(declared.has(name),
+      `the module exports ${name}, which holosphere_wasm.d.ts does not declare`);
+  }
 });
 
 test('holosphere_wasm.d.ts declares the engine statics the app calls', () => {
