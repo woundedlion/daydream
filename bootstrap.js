@@ -130,7 +130,3 @@ export async function bootstrap({
     return false;
   }
 }
-
-if (globalThis.document) {
-  void bootstrap();
-}

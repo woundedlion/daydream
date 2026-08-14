@@ -9,7 +9,7 @@
   },
   "tests/bootstrap.test.js": {
     "cases": 18,
-    "assertions": 66
+    "assertions": 67
   },
   "tests/clipboard.test.js": {
     "cases": 7,
