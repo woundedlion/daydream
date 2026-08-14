@@ -165,8 +165,9 @@ export function compositeSegment(canvas, compact, canvasW, rect) {
 /**
  * Stamp the segment-boundary overlay into a composited canvas: a full-width
  * cyan row at each y in `ys` and a full-height cyan column at each x in `xs`.
- * Coordinates at or past the canvas edge are skipped, so a seam list cached
- * from a larger layout cannot write out of bounds.
+ * Coordinates outside the canvas are skipped, so a seam list cached from a
+ * larger layout cannot write out of bounds — a negative column would otherwise
+ * wrap onto the end of the preceding row.
  * @param {Uint16Array} canvas - Full canvas buffer (canvasW*canvasH*3).
  * @param {number} canvasW - Canvas width in pixels.
  * @param {number} canvasH - Canvas height in pixels.
@@ -183,13 +184,13 @@ export function stampBoundaries(canvas, canvasW, canvasH, xs, ys) {
   };
 
   for (const y of ys) {
-    if (y >= canvasH) continue;
+    if (y < 0 || y >= canvasH) continue;
     const rowStart = y * canvasW * 3;
     for (let x = 0; x < canvasW; x++) plotCyan(rowStart + x * 3);
   }
 
   for (const x of xs) {
-    if (x >= canvasW) continue;
+    if (x < 0 || x >= canvasW) continue;
     for (let y = 0; y < canvasH; y++) plotCyan((y * canvasW + x) * 3);
   }
 }
