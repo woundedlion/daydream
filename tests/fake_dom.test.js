@@ -81,6 +81,41 @@ test('every listener sees the dispatching node as target and its own node as cur
   assert.deepEqual(seen, [[leaf, leaf], [leaf, mid], [leaf, root]]);
 });
 
+test('every listener sees the dispatched type, whatever the caller supplied', () => {
+  const { leaf, mid } = chain();
+  const seen = [];
+  const record = (node) => node.addEventListener('keydown', (e) => seen.push(e.type));
+  record(mid);
+  record(leaf);
+
+  leaf.dispatch('keydown', { type: 'click', key: 'Enter' });
+
+  assert.deepEqual(seen, ['keydown', 'keydown']);
+});
+
+test('preventDefault marks the event and the dispatch answers with it', () => {
+  const { leaf, mid } = chain();
+  const seen = [];
+  mid.addEventListener('keydown', (e) => seen.push(e.defaultPrevented));
+  leaf.addEventListener('keydown', (e) => { seen.push(e.defaultPrevented); e.preventDefault(); });
+
+  const event = leaf.dispatch('keydown', { key: 'Enter' });
+
+  assert.deepEqual(seen, [false, true], 'the flag is unset until a handler sets it');
+  assert.equal(event.defaultPrevented, true);
+  assert.equal(event.key, 'Enter', 'the caller-supplied fields ride along');
+});
+
+test('an event nobody cancels reports its default intact', () => {
+  const { leaf, log, listen } = chain();
+  listen('leaf', 'leaf');
+
+  const event = leaf.dispatch('click');
+
+  assert.deepEqual(log, ['leaf']);
+  assert.equal(event.defaultPrevented, false);
+});
+
 test('a caller-named target overrides the dispatching node', () => {
   const { mid, log, listen } = chain();
   const detached = fakeElement('span');

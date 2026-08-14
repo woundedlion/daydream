@@ -142,6 +142,48 @@ test('sortBy leaves focus on the sort control that drove it', () => {
   }
 });
 
+// sidebar_dom.test.js drives onKeyDown against a hand-built receiver. These go
+// through the listener the constructor registered, so the wiring between the
+// keydown event, the list's own query, and the roving tab stop is covered too.
+test('Enter on the list selects the focused option and eats the native click', () => {
+  const { sidebar, selected } = makeSidebar();
+  sidebar.setEffects(['A', 'B'], {});
+  document.activeElement = sidebar.buttons.get('B');
+
+  const event = sidebar.listEl.dispatch('keydown', { key: 'Enter' });
+
+  assert.deepEqual(selected, ['B']);
+  assert.equal(event.defaultPrevented, true, 'a native click would double-select');
+});
+
+test('an arrow key on the list moves focus and the roving tab stop with it', () => {
+  const { sidebar, selected } = makeSidebar();
+  sidebar.setEffects(['A', 'B', 'C'], {});
+  document.activeElement = sidebar.buttons.get('A');
+
+  const event = sidebar.listEl.dispatch('keydown', { key: 'ArrowRight' });
+
+  assert.equal(document.activeElement, sidebar.buttons.get('B'));
+  assert.equal(sidebar.tabbableBtn, sidebar.buttons.get('B'));
+  assert.equal(sidebar.buttons.get('B').tabIndex, 0);
+  assert.equal(sidebar.buttons.get('A').tabIndex, -1);
+  assert.deepEqual(selected, [], 'navigating is not selecting');
+  assert.equal(event.defaultPrevented, true);
+});
+
+test('a key the list does not own passes through untouched', () => {
+  const { sidebar, selected } = makeSidebar();
+  sidebar.setEffects(['A', 'B'], {});
+  const a = sidebar.buttons.get('A');
+  document.activeElement = a;
+
+  const event = sidebar.listEl.dispatch('keydown', { key: 'x' });
+
+  assert.equal(event.defaultPrevented, false, 'typing still reaches the page');
+  assert.deepEqual(selected, []);
+  assert.equal(document.activeElement, a);
+});
+
 test('setActive toggles active/aria-selected on only the old and new buttons', () => {
   const { sidebar } = makeSidebar();
   sidebar.setEffects(['A', 'B'], {});
