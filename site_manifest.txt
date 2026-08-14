@@ -9,6 +9,7 @@
 
 # Simulator page and its module graph.
 index.html
+favicon.svg
 styles/index.css
 vendor-importmap.js
 bootstrap.js

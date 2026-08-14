@@ -270,6 +270,7 @@ test('bootstrap leaves the fatal banner alone when the overlay renders', async (
 
 test('index loads bootstrap instead of the application module directly', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /<link href="\.\/favicon\.svg" rel="icon"/);
   assert.match(html, /<script type="module" src="bootstrap\.js"><\/script>/);
   assert.doesNotMatch(html, /<script type="module" src="daydream\.js"><\/script>/);
 });
