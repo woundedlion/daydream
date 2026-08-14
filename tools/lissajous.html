@@ -136,7 +136,7 @@
       isRationalLocked: false // whether the rational-ratio constraint is locked
     };
 
-    let scene, camera, renderer, controls, line;
+    let scene, line;
 
     // The curve's appearance never varies, so one material serves every rebuild.
     const lineMaterial = new THREE.LineBasicMaterial({
@@ -160,9 +160,6 @@
         cameraPosition: [1.5, 1.5, 3],
       });
       scene = result.scene;
-      camera = result.camera;
-      renderer = result.renderer;
-      controls = result.controls;
 
       // The scaffold's dispose() stops the render loop and detaches the resize
       // listener; cancelling the pending frame keeps a queued rebuild from

@@ -372,7 +372,7 @@
     // flow speed is independent of the display refresh rate.
     let lastAnimTime = 0;
 
-    let scene, camera, renderer, controls, sphereMesh, wireMesh;
+    let scene, sphereMesh, wireMesh;
 
     const vertexShader = `
         varying vec3 vPosition;
@@ -776,9 +776,6 @@
         },
       });
       scene = result.scene;
-      camera = result.camera;
-      renderer = result.renderer;
-      controls = result.controls;
 
       // Each struct uniform keeps its own stable value object; updateMobiusUniforms
       // mutates these in place so Three.js re-uploads without per-tick allocation.
