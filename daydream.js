@@ -451,8 +451,6 @@ export function start({
     engineParamValues: () => host.engine.getParamValues(),
     setEngineParam,
     setWorkerParam: (name, value) => segments.setParameter(name, value),
-    rememberWorkerAcceptedParams: (params) => segments.rememberAcceptedParams(params),
-    resetWorkerAcceptedParams: () => segments.resetAcceptedParams(),
     setAnimationsPaused: (paused) => {
       host.engine.setAnimationsPaused(paused);
       segments.setAnimationsPaused(paused);

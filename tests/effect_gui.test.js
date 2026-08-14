@@ -299,7 +299,6 @@ function makeHarness({
   };
   const writes = [];
   const warnings = [];
-  const acceptedSnapshots = [];
   const restoredFullConfigs = [];
   const configNotices = [];
   let configNoticeClears = 0;
@@ -328,8 +327,6 @@ function makeHarness({
       onEngineParam(name, value, state);
     },
     setWorkerParam: (name, value) => writes.push(`worker:${name}=${value}`),
-    rememberWorkerAcceptedParams: (params) => acceptedSnapshots.push(params),
-    resetWorkerAcceptedParams: () => acceptedSnapshots.push('reset'),
     setAnimationsPaused: (paused) => {
       writes.push(`paused:${paused}`);
       engine.paused = paused;
@@ -372,7 +369,6 @@ function makeHarness({
   });
 
   return { panel, state, writes, warnings, guis, dragTarget, container, engine,
-           acceptedSnapshots,
            restoredFullConfigs, configNotices,
            configNoticeClears: () => configNoticeClears,
            paramDefinitionReads: () => paramDefinitionReads,
@@ -565,9 +561,6 @@ test('build restores the last accepted value before replaying an invalid request
   assert.equal(h.gui().ctrl('Planar Warp 1').getValue(), 3);
   assert.equal(h.gui().stored['__accepted.Planar Warp 1'], 0);
   assert.equal(h.gui().stored['__accepted.Outer Warp'], undefined);
-  assert.deepEqual(h.acceptedSnapshots.at(-1), [
-    { name: 'Planar Warp 1', value: 0 },
-  ]);
 });
 
 // The engine reports a bool param's values as JS booleans, but the companion
@@ -590,7 +583,6 @@ test('a bool parameter stores its accepted value as a float', () => {
   h.gui().ctrl('Glow').setValue(true);
 
   assert.equal(h.gui().stored['__accepted.Glow'], 1);
-  assert.deepEqual(h.acceptedSnapshots.at(-1), [{ name: 'Glow', value: 1 }]);
   const nonNumeric = h.gui().storedWrites.filter(([, v]) => typeof v !== 'number');
   assert.deepEqual(nonNumeric, []);
 });
@@ -1772,19 +1764,16 @@ test('a slider drag defers persistence to the pointer release', () => {
   h.panel.build();
   const controller = h.gui().ctrl('Speed');
   h.gui().storedWrites.length = 0;
-  h.acceptedSnapshots.length = 0;
 
   controller.domElement.dispatch('pointerdown');
   controller.setValue(0.2);
   controller.setValue(0.3);
 
   assert.deepEqual(h.gui().storedWrites, [], 'no per-pointermove persistence');
-  assert.deepEqual(h.acceptedSnapshots, []);
 
   h.dragTarget.dispatch('pointerup');
 
   assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', 0.3]]);
-  assert.deepEqual(h.acceptedSnapshots, [[{ name: 'Speed', value: 0.3 }]]);
 });
 
 test('a ShaderBall drag writes one full-config snapshot, at the release', () => {
