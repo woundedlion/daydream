@@ -105,6 +105,18 @@ function engineConstant(source, name, scope = {}) {
   return Function(...names, `return ${expr};`)(...names.map((k) => scope[k]));
 }
 
+// Gated with the rest so a local run without an engine tree stays wholly
+// skipped; the workflow it reads is the one that checks the engine out, so the
+// case always runs where the flag has to be set.
+test('the unit-suite workflow runs this suite against a required engine',
+  { skip: SKIP }, () => {
+    const workflow = readFileSync(
+      fileURLToPath(new URL('.github/workflows/js-unit-suite.yml', REPO)), 'utf8');
+    assert.match(workflow, new RegExp(`${REQUIRED_ENV}:`),
+      `the workflow must set ${REQUIRED_ENV}, or a job that lost its engine ` +
+        'checkout retires every parity case as a skip and still reports green');
+  });
+
 /**
  * Pins the stereographic-projection constants mobius_transforms.js mirrors to
  * their definitions in core/math/3dmath.h. STEREO_POLE_EPS is derived from
