@@ -260,6 +260,36 @@ test('a replaced overlay element is re-resolved instead of written detached', ()
   assert.equal(replacement.style.display, '', 'the live bar is the one handed back');
 });
 
+// The page swaps its overlay by rebuilding the container the bar sits in, which
+// never names the cached node itself.
+test('an overlay element retired with its container is re-resolved', () => {
+  const createElement = (tag) => fakeElement(tag);
+  const container = createElement('div');
+  const byId = {
+    'segment-stats': createElement('div'),
+    'global-stats-desktop': createElement('div'),
+    'stats-bar': createElement('div'),
+  };
+  container.append(byId['global-stats-desktop']);
+  const doc = { getElementById: (id) => byId[id] ?? null, createElement };
+  const view = new SegmentStatsView(doc);
+
+  view.update(readyState(2));
+  const retired = byId['global-stats-desktop'];
+  assert.equal(retired.style.display, 'none');
+
+  const replacement = createElement('div');
+  container.replaceChildren(replacement);
+  byId['global-stats-desktop'] = replacement;
+
+  view.update(readyState(2));
+  assert.equal(replacement.style.display, 'none', 'the live bar is the one hidden');
+
+  view.update(readyState(2, { active: false }));
+  assert.equal(replacement.style.display, '', 'the live bar is the one handed back');
+  assert.equal(retired.style.display, 'none', 'the retired bar took the hand-back');
+});
+
 // The bars belong to the page, so an inline display the page set on one is a
 // value the overlay is borrowing, not the stylesheet's to overwrite.
 test('a stat bar is handed back at the inline display it was hidden with', () => {

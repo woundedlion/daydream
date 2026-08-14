@@ -5,6 +5,10 @@
 // hand-rolling another one-off fake.
 import { afterEach } from 'node:test';
 
+// Nodes that have left a parent. A parentless node is connected unless it is in
+// here, which is what lets isConnected derive from the parent chain.
+const detached = new WeakSet();
+
 /**
  * Links appended element nodes back to their parent. Strings (text nodes) carry
  * no parent and are skipped.
@@ -13,7 +17,11 @@ import { afterEach } from 'node:test';
  * @returns {void}
  */
 function reparent(nodes, parent) {
-  for (const node of nodes) if (node && typeof node === 'object') node.parentNode = parent;
+  for (const node of nodes) {
+    if (!node || typeof node !== 'object') continue;
+    node.parentNode = parent;
+    if (parent) detached.delete(node); else detached.add(node);
+  }
 }
 
 /**
@@ -166,11 +174,15 @@ export function fakeElement(tag = 'div') {
     attributes: {},
     children: [],
     parentNode: null,
-    // The fake stands in for a node the page already carries, so it starts
-    // connected; remove() clears it, which is what a liveness check reads.
-    isConnected: true,
     focusCalls: 0,
     scrollIntoViewCalls: 0,
+    // Derived from the parent chain, as in the DOM: a fresh element stands in
+    // for a node the page already carries, and a node whose ancestor left its
+    // parent is disconnected along with it.
+    get isConnected() {
+      if (this.parentNode) return Boolean(this.parentNode.isConnected);
+      return !detached.has(this);
+    },
     get firstElementChild() {
       return this.children.find((node) => node && typeof node === 'object') || null;
     },
@@ -201,8 +213,7 @@ export function fakeElement(tag = 'div') {
     },
     remove() {
       detach([this]);
-      this.parentNode = null;
-      this.isConnected = false;
+      reparent([this], null);
     },
     matches(selector) { return matches(this, selector); },
     closest(selector) {
