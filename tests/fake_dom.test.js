@@ -257,3 +257,37 @@ test('replaceChildren moves a node out of the parent it came from', () => {
   assert.equal(moved.parentNode, to);
   assert.equal(dropped.parentNode, null);
 });
+
+// A liveness check reads isConnected off the node it cached, which is usually a
+// descendant of the container the page swapped, not the node the swap named.
+test('every detaching mutator disconnects the subtree it evicts', () => {
+  const root = fakeElement('div');
+  const branch = fakeElement('div');
+  const leaf = fakeElement('span');
+  root.appendChild(branch);
+  branch.appendChild(leaf);
+  assert.equal(leaf.isConnected, true);
+
+  root.removeChild(branch);
+  assert.equal(branch.isConnected, false, 'removeChild left the node connected');
+  assert.equal(leaf.isConnected, false, 'a removed subtree stayed connected below its root');
+
+  root.appendChild(branch);
+  assert.equal(leaf.isConnected, true, 're-appending did not reconnect the subtree');
+
+  root.replaceChildren(fakeElement('span'));
+  assert.equal(branch.isConnected, false, 'replaceChildren left the evicted node connected');
+  assert.equal(leaf.isConnected, false);
+});
+
+test('a node moved between parents stays connected; remove() disconnects it', () => {
+  const from = fakeElement('div');
+  const to = fakeElement('div');
+  const moved = fakeElement('span');
+  from.append(moved);
+  to.append(moved);
+  assert.equal(moved.isConnected, true, 'a move through append read as a detach');
+
+  moved.remove();
+  assert.equal(moved.isConnected, false);
+});
