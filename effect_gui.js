@@ -201,11 +201,6 @@ export function addParamControl(
  *   parameter to the main engine.
  * @param {(name: string, value: number) => void} deps.setWorkerParam - Writes one
  *   parameter to the worker pool.
- * @param {(params: Array<{name: string, value: number}>) => void}
- *   [deps.rememberWorkerAcceptedParams] - Retains accepted values needed when a
- *   worker rebuilds while the GUI holds a rejected request.
- * @param {() => void} [deps.resetWorkerAcceptedParams] - Clears accepted values
- *   belonging to the previous effect.
  * @param {(paused: boolean) => void} deps.setAnimationsPaused - Freezes/resumes
  *   animation-driven params on every engine.
  * @param {() => number} deps.getPresetCount - Number of presets on the live effect.
@@ -250,8 +245,6 @@ export function createEffectGui({
   engineParamValues,
   setEngineParam,
   setWorkerParam,
-  rememberWorkerAcceptedParams = () => {},
-  resetWorkerAcceptedParams = () => {},
   setAnimationsPaused,
   getPresetCount,
   getPresetIndex,
@@ -316,18 +309,15 @@ export function createEffectGui({
   }
 
   function persistAcceptedParams(gui) {
-    const acceptedParams = [];
     for (const parameter of getParameterDefinitions()) {
       if (parameter.readonly) continue;
       const accepted = parameter.acceptedValue
         ?? parameter.requestedValue ?? parameter.value;
       // The float form, not the raw value: restoreAcceptedParams() reads the
       // companion key back through the URL number grammar, which rejects a bool.
-      const value = engineParamValue(accepted);
-      acceptedParams.push({ name: parameter.name, value });
-      gui?.writeStoredValue?.(acceptedStorageKey(parameter.name), value);
+      gui?.writeStoredValue?.(
+        acceptedStorageKey(parameter.name), engineParamValue(accepted));
     }
-    rememberWorkerAcceptedParams(acceptedParams);
   }
 
   /**
@@ -1006,7 +996,6 @@ export function createEffectGui({
      * @returns {void}
      */
     build() {
-      resetWorkerAcceptedParams();
       activeEffect = createEffectRecord({ restoreAccepted: true });
       persistEffectState(activeEffect.gui);
       skewLogged = false;

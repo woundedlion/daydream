@@ -354,8 +354,6 @@ export class SegmentController {
     /** @type {number[] | null} */
     this.paramValues = null;  // segment 0's latest param values, for GUI sync
     this.paramRevision = 0;
-    /** @type {Map<string, number>} */
-    this.acceptedParams = new Map();
     /** @type {number | null} */
     this.presetCount = null;
     /** @type {number | null} */
@@ -958,11 +956,8 @@ export class SegmentController {
     const engine = this.getWasmEngine();
     if (!engine) return [];
     const defs = engine.getParameterDefinitions();
-    /** @type {Map<string, import('./worker_protocol.js').SegParam>} */
-    const params = new Map();
-    for (const [name, acceptedValue] of this.acceptedParams) {
-      params.set(name, { name, acceptedValue });
-    }
+    /** @type {import('./worker_protocol.js').SegParam[]} */
+    const params = [];
     for (let i = 0; i < defs.length; i++) {
       const p = defs[i];
       const requestedValue = /** @type {number|boolean|undefined} */ (p.requestedValue);
@@ -972,12 +967,9 @@ export class SegmentController {
       const accepted = acceptedValue ?? requested;
       const acceptedV = (typeof accepted === 'boolean')
         ? (accepted ? 1.0 : 0.0) : accepted;
-      const entry = params.get(p.name) ?? { name: p.name };
-      entry.value = v;
-      entry.acceptedValue = acceptedV;
-      params.set(p.name, entry);
+      params.push({ name: p.name, value: v, acceptedValue: acceptedV });
     }
-    return [...params.values()];
+    return params;
   }
 
   /**
@@ -994,16 +986,6 @@ export class SegmentController {
       if (snapshot) return { fullConfigSnapshot: snapshot };
     }
     return { params: this.snapshotParams() };
-  }
-
-  /** @param {{name: string, value: number}[]} params */
-  rememberAcceptedParams(params) {
-    for (const parameter of params)
-      this.acceptedParams.set(parameter.name, parameter.value);
-  }
-
-  resetAcceptedParams() {
-    this.acceptedParams.clear();
   }
 
   /**

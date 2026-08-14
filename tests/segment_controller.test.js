@@ -2318,6 +2318,21 @@ test('snapshotParams() carries accepted and requested state independently', () =
   ]);
 });
 
+// A request the engine refused leaves the GUI holding it while the engine
+// renders what it settled on. The worker replays the accepted value first and
+// the request after, so a pool rebuilt under a standing rejection matches the
+// main engine instead of falling back to the effect's own default.
+test('a refused request ships the value the engine settled on', () => {
+  const c = makeController();
+  c.getWasmEngine = () => fakeEngine([
+    { name: 'Lens', value: 0, requestedValue: 3, acceptedValue: 0 },
+  ]);
+
+  assert.deepEqual(c.snapshotEffectState(),
+    { params: [{ name: 'Lens', value: 3, acceptedValue: 0 }] },
+    'the definitions are the whole source of the accepted value');
+});
+
 test('snapshotParams() is empty when no engine is bound', () => {
   const c = makeController();
   assert.deepEqual(c.snapshotParams(), []);
