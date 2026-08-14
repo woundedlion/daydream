@@ -162,8 +162,8 @@
     "assertions": 126
   },
   "tests/segment_controller.test.js": {
-    "cases": 101,
-    "assertions": 552
+    "cases": 113,
+    "assertions": 595
   },
   "tests/segment_crosscheck.test.js": {
     "cases": 4,

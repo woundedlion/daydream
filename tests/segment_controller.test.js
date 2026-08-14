@@ -72,7 +72,7 @@ const consoleMocks = Object.keys(EXPECTED_CONSOLE_MESSAGES)
     if (!expected) originalConsole[method](...args);
   }));
 
-test('warmModules revalidates the worker, glue, and binary cache entries', async () => {
+test('warmModules revalidates the whole worker module graph', async () => {
   const calls = [];
   const response = { arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) };
   await warmModules({
@@ -87,8 +87,10 @@ test('warmModules revalidates the worker, glue, and binary cache entries', async
   assert.deepEqual(calls.map(([url]) => url), [
     'http://localhost:8000/segment_worker.js',
     'http://localhost:8000/holosphere_wasm.js',
+    'http://localhost:8000/segment_layout.js',
+    'http://localhost:8000/worker_protocol.js',
     'http://localhost:8000/holosphere_wasm.wasm',
-  ]);
+  ], 'every static import of the worker, or a stale one survives the warm');
   // 'reload' would re-download all 1.8 MB per call; 'no-cache' still refetches a
   // rebuilt binary because the artifacts are served unversioned.
   for (const [, options] of calls)
@@ -103,13 +105,13 @@ test('warmModules skips a re-warm inside the dedupe window', async () => {
     fetch: () => { calls++; return Promise.resolve(response); },
   };
   await warmModules({ ...deps, minIntervalMs: 0 });
-  assert.equal(calls, 3, 'a forced warm fetches the whole module graph');
+  assert.equal(calls, 5, 'a forced warm fetches the whole module graph');
 
   await warmModules({ ...deps, minIntervalMs: WARM_INTERVAL_MS });
-  assert.equal(calls, 3, 'a slider-drag re-warm reuses the previous warm');
+  assert.equal(calls, 5, 'a slider-drag re-warm reuses the previous warm');
 
   await warmModules({ ...deps, minIntervalMs: 0 });
-  assert.equal(calls, 6, 'a warm past the window fetches again');
+  assert.equal(calls, 10, 'a warm past the window fetches again');
 });
 
 test('the dedupe window covers one base URL, not every caller in it', async () => {
@@ -133,6 +135,8 @@ test('the dedupe window covers one base URL, not every caller in it', async () =
   assert.deepEqual(seen, [
     'http://localhost:8000/second/segment_worker.js',
     'http://localhost:8000/second/holosphere_wasm.js',
+    'http://localhost:8000/second/segment_layout.js',
+    'http://localhost:8000/second/worker_protocol.js',
     'http://localhost:8000/second/holosphere_wasm.wasm',
   ], 'a second base URL inside the window warms its own module graph');
 
@@ -159,7 +163,7 @@ test('a warm whose fetch throws synchronously does not claim the window', async 
       return Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) });
     },
   });
-  assert.equal(calls, 3,
+  assert.equal(calls, 5,
     'the throw warmed nothing, so the next call must not be handed a settled promise');
 });
 
