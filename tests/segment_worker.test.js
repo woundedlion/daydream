@@ -57,6 +57,7 @@ class FakeEngine {
     this.presetCount = 3;
     this.presetIndex = 0;
     this.metricsThrows = false;
+    this.paramResult = ParamSetResult.APPLIED;
     this.calls = [];
     // Reused view, like the real engine's getParamValues() into WASM memory, so
     // the worker's Array.from() copy-out is load-bearing (a passthrough would
@@ -85,7 +86,7 @@ class FakeEngine {
   }
   setParameter(name, value) {
     this.params.push([name, value]);
-    return ParamSetResult.APPLIED;
+    return this.paramResult;
   }
   getFullConfigSnapshot() { return null; }
   restoreFullConfigSnapshot(snapshot) {
@@ -864,6 +865,43 @@ test('setParameter handler forwards name/value and advances the frame revision',
   posted.length = 0;
   await dispatch({ type: 'render' });
   assert.equal(posted.find((p) => p.msg.type === 'frame').msg.paramRevision, 12);
+});
+
+// The controller has no reply channel for a rejected setParameter, and only
+// segment 0 mirrors its values back, so this log is the whole diagnostic.
+test('a rejected setParameter is logged once per outcome', async () => {
+  await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  engineInstance.paramResult = ParamSetResult.UNKNOWN_PARAM;
+
+  const original = console.error;
+  const logged = [];
+  console.error = (...args) => logged.push(args.join(' '));
+  try {
+    await dispatch({ type: 'setParameter', name: 'Ghost', value: 0.5 });
+    await dispatch({ type: 'setParameter', name: 'Ghost', value: 0.6 });
+    await dispatch({ type: 'setParameter', name: 'Phantom', value: 0.7 });
+  } finally {
+    console.error = original;
+  }
+
+  assert.equal(logged.length, 2, 'the repeat of an already-reported outcome stays quiet');
+  assert.match(logged[0], /segment 1 setParameter\(Ghost\) rejected: UNKNOWN_PARAM/);
+  assert.match(logged[1], /setParameter\(Phantom\) rejected: UNKNOWN_PARAM/);
+});
+
+test('an applied setParameter logs nothing', async () => {
+  await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+
+  const original = console.error;
+  const logged = [];
+  console.error = (...args) => logged.push(args.join(' '));
+  try {
+    await dispatch({ type: 'setParameter', name: 'Speed', value: 0.5 });
+  } finally {
+    console.error = original;
+  }
+
+  assert.deepEqual(logged, [], 'the ordinary tuning path is silent');
 });
 
 test('setAnimationsPaused handler forwards the flag (both directions) to the engine', async () => {
