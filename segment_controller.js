@@ -1376,10 +1376,25 @@ export class SegmentController {
 
   /**
    * Repaint the per-segment stats overlay from this controller's published state.
+   * @details The overlay is handed a snapshot naming exactly what it reads, not
+   * the controller, so the fields it depends on are the listed ones rather than
+   * whatever the class happens to expose.
    * @returns {void}
    */
   updateStats() {
-    this.statsView.update(this);
+    this.statsView.update({
+      active: this.active,
+      ready: this.ready,
+      faulted: this.faulted,
+      faultInfo: this.faultInfo,
+      count: this.count,
+      results: this.results,
+      timings: this.timings,
+      arenas: this.arenas,
+      fullFrames: this.fullFrames,
+      frameSeen: this.frameSeen,
+      wallTime: this.wallTime,
+    });
   }
 
   /**
