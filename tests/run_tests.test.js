@@ -395,11 +395,19 @@ test('no test pattern fails', () => {
   assert.match(runExpectingFailure(), /test file patterns/);
 });
 
-/** Verifies a failing case still fails the run when every floor is met. */
+/**
+ * Verifies a failing case still fails the run when every floor is met. The
+ * injected file is floored too, so the child's exit status is the only reason
+ * left for the run to fail: every gate of its own reports under a `run-tests:`
+ * heading, and none is expected here.
+ */
 test('a failing test fails the run', () => {
   writeFileSync(
     join(root, 'tests', 'c.test.js'),
     "import { test } from 'node:test';\ntest('boom', () => { throw new Error('boom'); });\n",
   );
-  runExpectingFailure(PATTERN);
+  writeFloors({ 'tests/c.test.js': { cases: 1, assertions: 0 } });
+  const err = runExpectingFailure(PATTERN);
+  assert.doesNotMatch(err, /^run-tests:/m,
+    'the run failed on a gate of its own rather than on the failing case');
 });
