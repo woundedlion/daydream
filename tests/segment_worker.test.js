@@ -22,7 +22,14 @@ import {
 const posted = [];
 /** @type {{ postMessage: Function, onmessage: ?Function, onmessageerror: ?Function }} */
 const fakeSelf = {
-  postMessage(msg, transfer) { posted.push({ msg, transfer }); },
+  // Structured-clone the payload the way the browser does: an unclonable field
+  // throws DataCloneError, and the transfer list detaches this side's buffers,
+  // so a worker that reads a posted buffer again sees an empty one. `received`
+  // is the controller's view of the message; `msg` stays the worker's own
+  // object, so identity against what the worker built is still observable.
+  postMessage(msg, transfer) {
+    posted.push({ msg, transfer, received: structuredClone(msg, { transfer }) });
+  },
   onmessage: null,
   onmessageerror: null,
 };
@@ -384,7 +391,8 @@ test('render extracts only this segment quadrant from the canvas buffer', async 
   posted.length = 0;
   await dispatch({ type: 'render' });
 
-  const frame = posted.find((p) => p.msg.type === 'frame').msg;
+  // Pixels ride the transfer list, so the delivered copy is the controller's.
+  const frame = posted.find((p) => p.msg.type === 'frame').received;
   // Quadrant is the bottom-right 4x2 block: x in [4,8), y in [2,4).
   assert.deepEqual([frame.x0, frame.x1, frame.y0, frame.y1], [4, 8, 2, 4]);
 
@@ -420,18 +428,20 @@ test('render refills a recycled buffer and allocates on a size mismatch', async 
   const reused = posted.find((p) => p.msg.type === 'frame');
   assert.equal(reused.msg.pixels, recycle, 'the returned buffer was refilled, not replaced');
   assert.deepEqual(reused.transfer, [recycle.buffer], 'and transferred straight back');
-  assert.equal(recycle.indexOf(STALE), -1, 'every element is overwritten by the extraction');
+  assert.equal(reused.received.pixels.indexOf(STALE), -1,
+    'every element is overwritten by the extraction');
+  assert.equal(recycle.byteLength, 0, 'the worker keeps no attached view of what it sent');
 
   posted.length = 0;
   const wrongSize = new Uint16Array(4);
   await dispatch({ type: 'render', recycle: wrongSize });
-  const fresh = posted.find((p) => p.msg.type === 'frame').msg;
-  assert.notEqual(fresh.pixels, wrongSize, 'a size mismatch falls back to allocation');
-  assert.equal(fresh.pixels.length, 4 * 2 * 3);
+  const fresh = posted.find((p) => p.msg.type === 'frame');
+  assert.notEqual(fresh.msg.pixels, wrongSize, 'a size mismatch falls back to allocation');
+  assert.equal(fresh.received.pixels.length, 4 * 2 * 3);
 
   posted.length = 0;
   await dispatch({ type: 'render' });
-  const none = posted.find((p) => p.msg.type === 'frame').msg;
+  const none = posted.find((p) => p.msg.type === 'frame').received;
   assert.equal(none.pixels.length, 4 * 2 * 3, 'a render with no recycle still allocates');
 });
 
