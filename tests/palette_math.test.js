@@ -403,6 +403,9 @@ test('GenerativePalette uses the canonical recipe and exposes diagnostics', () =
       hFinal: diagnostics[773],
       fallbackMapped: true,
     });
+    // Without the guard NaN indexes the buffers out of range, and the absent
+    // fallback byte reads as a gamut map.
+    assert.deepEqual(palette.diagnosticAt(Number.NaN), palette.diagnosticAt(1));
   });
 });
 

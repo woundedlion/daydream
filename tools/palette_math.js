@@ -378,7 +378,7 @@ export class GenerativePalette {
    * The compiler's own account of the nearest LUT entry to a phase, for the
    * inspector: where the color sat in OKLCH, how much chroma the gamut allowed
    * there, and whether it had to be mapped back into gamut.
-   * @param {number} t - Phase in [0, 1]; the nearest of the 256 entries answers.
+   * @param {number} t - Phase in [0, 1]; the nearest of the 256 entries answers, and NaN reads the last.
    * @returns {{t:number, rgb:number[], L:number, C:number, q:number, Cmax:number, hPath:number, hFinal:number, fallbackMapped:boolean}}
    *   The entry's phase and 8-bit sRGB triple, the OKLCH lightness and chroma it
    *   resolved to, the chroma control `q` as a fraction of the boundary, the
@@ -387,7 +387,7 @@ export class GenerativePalette {
    *   out of gamut and was mapped back in.
    */
   diagnosticAt(t) {
-    const index = Math.max(0, Math.min(255, Math.round(t * 255)));
+    const index = Math.max(0, Math.min(255, Number.isNaN(t) ? 255 : Math.round(t * 255)));
     const offset = index * 6;
     return {
       t: index / 255,
