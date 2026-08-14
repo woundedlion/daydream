@@ -245,6 +245,35 @@ test('a compile failure drops the module the previous warm left', async () => {
   c.destroy();
 });
 
+// A failed re-fetch is the same evidence as a failed compile: the warm went back
+// to the origin and came home with nothing, so a module held from an earlier
+// deploy can no longer be claimed to match the one being served.
+test('a failed binary re-fetch drops the module the previous warm left', async () => {
+  const warmer = new ModuleWarmer();
+  const serve = (binaryResponse) => ({
+    baseUrl: 'http://localhost:8000/redeployed/segment_controller.js',
+    minIntervalMs: 0,
+    fetch: (url) => (url.href.endsWith('.wasm')
+      ? binaryResponse()
+      : Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) })),
+  });
+
+  await warmer.warm(serve(() => Promise.resolve({
+    arrayBuffer: () => Promise.resolve(EMPTY_WASM.buffer),
+  })));
+  assert.ok(warmer.module instanceof WebAssembly.Module, 'the good binary compiled');
+
+  await warmer.warm(serve(() => Promise.reject(new TypeError('Failed to fetch'))));
+  assert.equal(warmer.module, null,
+    'the unfetchable binary drops the module rather than leaving the stale one');
+
+  const c = makeController({ moduleWarmer: warmer });
+  c.create(2);
+  assert.equal(FakeWorker.instances[0].posted.find((m) => m.type === 'init').wasmModule,
+    undefined, 'each worker compiles its own instead of being handed a stale module');
+  c.destroy();
+});
+
 test('a device cap moves with the memory hint and the mobile layout', () => {
   assert.equal(maxSegmentCount({}, false), 8,
     'no hint (Firefox/Safari) on a desktop layout keeps the full range');
