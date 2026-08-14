@@ -425,8 +425,10 @@ test('dispose detaches instanceColor before disposing the mesh', () => {
 
   const detach = log.indexOf('detach');
   const disposed = log.indexOf('mesh.dispose(detached)');
-  assert.ok(detach >= 0 && disposed > detach);
-  assert.ok(log.indexOf('geometry.dispose') < detach);
+  assert.ok(detach >= 0, 'instanceColor was never detached');
+  assert.ok(disposed > detach, 'the mesh was disposed before instanceColor came off it');
+  assert.ok(log.indexOf('geometry.dispose') < detach,
+    'the geometry outlived the detach it was supposed to precede');
 });
 
 test('dispose releases the observer, listeners, and GPU resources', () => {
@@ -1142,8 +1144,8 @@ test('updateCullUniforms culls nothing until back-face culling is on', () => {
   ctx.cullBackSphere = true;
   Daydream.prototype.updateCullUniforms.call(ctx);
   const threshold = ctx.cullUniforms.uCullThreshold.value;
-  assert.ok(threshold > -1 && threshold < 0,
-    'culling kept the far hemisphere, or ate the visible one');
+  assert.ok(threshold > -1, 'culling kept the far hemisphere');
+  assert.ok(threshold < 0, 'culling ate the visible hemisphere');
 });
 
 test('updateCullUniforms gap-fills columns only for a persisting effect', () => {
@@ -1224,7 +1226,9 @@ test('refreshLabels keeps the visible set the same at any orbit distance', () =>
   Daydream.prototype.refreshLabels.call(far);
 
   assert.deepEqual(labelTexts(far), labelTexts(near));
-  assert.ok(labelTexts(near).length > 0 && labelTexts(near).length < 6);
+  const visible = labelTexts(near);
+  assert.ok(visible.length > 0, 'no axis label was placed at all');
+  assert.ok(visible.length < 6, 'every axis end was labelled, so nothing was culled');
 });
 
 test('refreshLabels hands the pool the unscaled axis direction', () => {
