@@ -136,6 +136,8 @@ export interface HolosphereEngine {
   nextPreset(): boolean;
   previousPreset(): boolean;
   setPoleLod(value: number): void;
+  /** Clamped value of the last setPoleLod() on this engine, else the build default. */
+  getPoleLod(): number;
   /** Restrict rendering to [x0,x1) x [y0,y1); reset by a setEffect rebuild. */
   setClip(x0: number, x1: number, y0: number, y1: number): EnumValue;
   drawFrame(): void;
