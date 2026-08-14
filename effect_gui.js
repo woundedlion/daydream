@@ -854,6 +854,9 @@ export function createEffectGui({
     }
     const dom = fx.gui.domElement;
     if (dom?.parentNode) dom.parentNode.removeChild(dom);
+    // Controller.destroy() removes each domElement from the GUI's own children
+    // container; one left parented to the action row throws NotFoundError and
+    // aborts destroy(), leaving the remaining controllers' listeners attached.
     for (const controller of fx.actionControllers ?? []) {
       fx.gui.appendElement(controller.domElement);
     }
