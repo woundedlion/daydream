@@ -48,6 +48,19 @@ function balanced(src, open) {
 }
 
 /**
+ * Slices from `at` to the first `sentinel` after it, asserting the sentinel is
+ * present so a drifted terminator fails instead of widening the window.
+ * @param {number} at - Start index.
+ * @param {string} sentinel - Terminator text, excluded from the slice.
+ * @returns {string} The block text.
+ */
+function sliceTo(at, sentinel) {
+  const end = SOURCE.indexOf(sentinel, at);
+  assert.ok(end > at, `daydream.js: no ${JSON.stringify(sentinel)} after index ${at}`);
+  return SOURCE.slice(at, end);
+}
+
+/**
  * The dependency block wiring the WASM module promise, including the startup
  * handler that builds the engine.
  * @returns {string} The argument source.
@@ -117,7 +130,7 @@ test('a segmented-POV spawn failure is announced, not only logged', () => {
 test('a recording start or stop is announced, not only styled', () => {
   const at = SOURCE.indexOf('const recordState = {');
   assert.ok(at >= 0, 'the record toggle must stay a named binding');
-  const body = SOURCE.slice(at, SOURCE.indexOf('\n}};', at));
+  const body = sliceTo(at, '\n  }};');
   assert.match(body, /RECORD_NOTICE/,
     'the canvas tint, the duration readout, and the button label are all '
     + 'visual: without a notice a screen-reader user gets no report that the '
@@ -134,7 +147,7 @@ test('a recording start or stop is announced, not only styled', () => {
 test('a recorder fault reports its reason, not just an un-tinted canvas', () => {
   const at = SOURCE.indexOf('host.recorder.onError =');
   assert.ok(at >= 0, 'the recorder fault hook must stay wired');
-  const body = SOURCE.slice(at, SOURCE.indexOf('\n    };', at));
+  const body = sliceTo(at, '\n      };');
   assert.match(body, /\(err\)/,
     'the hook is handed the reason; dropping the parameter throws it away');
   assert.match(body, /applyNotice\.show\([^;]*RECORD_NOTICE\)/,
