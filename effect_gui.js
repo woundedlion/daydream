@@ -632,8 +632,6 @@ export function createEffectGui({
       addAction(effectActions, 'nextPreset', NEXT_ICON, 'Next Preset',
         'preset-nav-next');
     }
-    actionRow.style.display = 'grid';
-    actionRow.style.gridAutoFlow = 'row';
     actionRow.style.gridTemplateColumns =
       `repeat(${fx.actionControllers.length}, minmax(0, 1fr))`;
   }

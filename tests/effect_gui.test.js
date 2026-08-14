@@ -1406,8 +1406,9 @@ test('preset effects expose zero-indexed selection and navigation', () => {
   }
   const actionRow = h.gui().$children.children[0];
   assert.ok(actionRow.classList.contains('effect-action-row'));
-  assert.equal(actionRow.style.display, 'grid');
-  assert.equal(actionRow.style.gridAutoFlow, 'row');
+  // display/grid-auto-flow belong to the stylesheet; only the count is dynamic.
+  assert.equal(actionRow.style.display, undefined);
+  assert.equal(actionRow.style.gridAutoFlow, undefined);
   assert.equal(actionRow.style.gridTemplateColumns,
     'repeat(4, minmax(0, 1fr))');
   assert.deepEqual(actionRow.children,
