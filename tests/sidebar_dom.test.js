@@ -58,7 +58,7 @@ test('onKeyDown: Enter selects nothing when focus is not on an option', () => {
 // Drives onKeyDown against a multi-button fake so the DOM focus wiring (which
 // button is focused, roving-tabbable, and whether the native default is
 // suppressed) is exercised, not just the index math in sidebar_logic.test.js.
-function driveNav(key, startIdx = 0, count = 3) {
+function driveNav(key, startIdx = 0, count = 3, gridStyle = null) {
   const focusLog = [];
   const rovingLog = [];
   const state = { prevented: 0 };
@@ -66,9 +66,15 @@ function driveNav(key, startIdx = 0, count = 3) {
     dataset: { effect: `E${i}` },
     focus() { focusLog.push(i); },
   }));
+  const listEl = {
+    querySelectorAll: () => btns,
+    ownerDocument: gridStyle
+      ? { defaultView: { getComputedStyle: () => gridStyle } }
+      : undefined,
+  };
   const self = {
     doc: { activeElement: btns[startIdx] },
-    listEl: { querySelectorAll: () => btns },
+    listEl,
     tabbableBtn: btns[startIdx],
     setRovingTabbable(b) { rovingLog.push(btns.indexOf(b)); },
     onSelect() {},
@@ -90,6 +96,33 @@ test('onKeyDown: ArrowUp wraps focus to the last button', () => {
   assert.deepEqual(r.focusLog, [2]);
   assert.deepEqual(r.rovingLog, [2]);
   assert.equal(r.prevented, 1);
+});
+
+// The mobile list is a column-flow grid; the stride comes from the resolved
+// grid-template-rows so the stylesheet alone states the layout.
+const MOBILE_GRID = {
+  gridAutoFlow: 'column',
+  gridTemplateRows: '20px 20px 20px 20px 20px 20px 20px 20px',
+};
+
+test('onKeyDown: horizontal arrows cross columns in the mobile grid', () => {
+  const right = driveNav('ArrowRight', 0, 20, MOBILE_GRID);
+  assert.deepEqual(right.focusLog, [8], 'Right lands in the next column, same row');
+  assert.equal(right.prevented, 1);
+
+  const left = driveNav('ArrowLeft', 8, 20, MOBILE_GRID);
+  assert.deepEqual(left.focusLog, [0]);
+
+  // Vertical arrows still walk the column one option at a time.
+  const down = driveNav('ArrowDown', 0, 20, MOBILE_GRID);
+  assert.deepEqual(down.focusLog, [1]);
+});
+
+test('onKeyDown: a list that is not a column grid strides by one option', () => {
+  const desktop = { gridAutoFlow: 'row', gridTemplateRows: 'none' };
+  assert.deepEqual(driveNav('ArrowRight', 0, 20, desktop).focusLog, [1]);
+  // No view to resolve styles from (a detached list): one option per press.
+  assert.deepEqual(driveNav('ArrowRight', 0, 20).focusLog, [1]);
 });
 
 test('onKeyDown: Home focuses the first button, End the last', () => {
