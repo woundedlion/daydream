@@ -136,10 +136,17 @@ export class ModuleWarmer {
     try {
       const workerJs = drain('./segment_worker.js');
       const glueJs = drain('./holosphere_wasm.js');
+      // The worker's remaining static imports. worker_protocol.js carries
+      // PROTOCOL_VERSION, so a stale copy makes the handshake agree with itself
+      // across exactly the deploy skew it exists to catch.
+      const layoutJs = drain('./segment_layout.js');
+      const protocolJs = drain('./worker_protocol.js');
       const binary = drain('./holosphere_wasm.wasm');
       warm = Promise.allSettled([
         workerJs,
         glueJs,
+        layoutJs,
+        protocolJs,
         binary,
         // A rejected fetch is the cold-cache case and goes unreported; only a
         // binary the engine refuses gets a diagnostic. Either way the held
