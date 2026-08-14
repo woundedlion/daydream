@@ -84,6 +84,37 @@ test('update reddens the perf cells only past the slow-frame threshold', () => {
   assert.equal(byId['perf-stats-mobile'].style.color, 'red');
 });
 
+test('a steady frame rewrites neither the arena rows nor the perf colour', () => {
+  const { doc, byId } = makeDoc();
+  const view = new GlobalStatsView(doc);
+  view.update(1, metrics());
+
+  const writes = [];
+  for (const [row, ids] of Object.entries(STATS_CELL_IDS)) {
+    for (const id of ids) {
+      const el = byId[id];
+      let text = el.textContent;
+      Object.defineProperty(el, 'textContent', {
+        configurable: true,
+        get: () => text,
+        set(value) { text = value; writes.push(`${row}:text`); },
+      });
+      let color = el.style.color;
+      Object.defineProperty(el.style, 'color', {
+        configurable: true,
+        get: () => color,
+        set(value) { color = value; writes.push(`${row}:color`); },
+      });
+    }
+  }
+
+  view.update(1, metrics());
+
+  assert.deepEqual(writes, ['perf:text', 'perf:text'],
+    'only the duration moves every frame; the rest costs a layout invalidation '
+    + 'per cell per tick unless it is written on a crossing');
+});
+
 test('update lands each arena in its own row as usage|high-water|capacity KiB', () => {
   const { doc, byId } = makeDoc();
   new GlobalStatsView(doc).update(1, metrics());
