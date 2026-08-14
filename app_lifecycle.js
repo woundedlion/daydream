@@ -543,6 +543,10 @@ export function createSegmentedFallback({
   };
 }
 
+// Consecutive clean frames that re-arm the render-loop guard's report, about a
+// second of rendering at display rate.
+export const FRAME_GUARD_REARM_FRAMES = 60;
+
 /**
  * Wrap the render loop's per-frame body so a throw cannot freeze the page.
  *
@@ -551,9 +555,12 @@ export function createSegmentedFallback({
  * last frame still on screen. Catching keeps the loop armed and keeps calling
  * the body: a failure is often per-frame state the next frame clears, and an
  * effect or resolution switch runs from an event handler, outside the loop, so
- * the user can still drive the app back to something that renders. Only the
- * first failure is logged and banner-reported — a body that throws every frame
- * would otherwise report 60 times a second.
+ * the user can still drive the app back to something that renders. A failure is
+ * logged and banner-reported once, then not again until FRAME_GUARD_REARM_FRAMES
+ * consecutive frames have rendered cleanly — a body throwing every frame (or
+ * every other one) would otherwise report at display rate, while a latch that
+ * never re-armed would swallow a later, unrelated failure for the page's
+ * lifetime.
  *
  * @param {Object} deps - Injected collaborators.
  * @param {() => void} deps.frame - The per-frame body.
@@ -563,10 +570,16 @@ export function createSegmentedFallback({
  */
 export function createFrameLoopGuard({ frame, report, logError = console.error }) {
   let reported = false;
+  let clean = 0;
   return () => {
     try {
       frame();
+      if (reported && ++clean >= FRAME_GUARD_REARM_FRAMES) {
+        reported = false;
+        clean = 0;
+      }
     } catch (e) {
+      clean = 0;
       if (reported) return;
       reported = true;
       logError('Render loop frame failed:', e);

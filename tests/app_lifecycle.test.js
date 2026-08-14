@@ -9,6 +9,7 @@ import {
   createAppTeardown,
   createApplyNotice,
   createFrameLoopGuard,
+  FRAME_GUARD_REARM_FRAMES,
   createGlobalKeydownHandler,
   createModuleLoadHandlers,
   createPoleLodBinding,
@@ -452,6 +453,31 @@ test('a frame that throws every tick reports once', () => {
   assert.equal(reported.length, 1, 'the banner must not be rewritten 60 times a second');
   assert.equal(logged.length, 1);
   assert.equal(logged[0][0], 'Render loop frame failed:');
+});
+
+test('a loop that recovers reports its next failure again', () => {
+  let boom = true;
+  const { guarded, reported, logged } = makeFrameGuard(() => {
+    if (boom) throw new Error('view detached');
+  });
+
+  guarded();
+  boom = false;
+  for (let i = 0; i < FRAME_GUARD_REARM_FRAMES - 1; i++) guarded();
+  boom = true;
+  guarded();
+  assert.equal(reported.length, 1,
+    'a clean run short of the re-arm keeps the latch, so an intermittent throw '
+    + 'cannot report at display rate');
+
+  boom = false;
+  for (let i = 0; i < FRAME_GUARD_REARM_FRAMES; i++) guarded();
+  boom = true;
+  guarded();
+
+  assert.equal(reported.length, 2,
+    'a failure after the loop recovered must not be swallowed for the page lifetime');
+  assert.equal(logged.length, 2);
 });
 
 test('a frame guard stringifies a thrown value carrying no message', () => {
