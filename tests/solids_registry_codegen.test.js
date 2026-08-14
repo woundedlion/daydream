@@ -85,9 +85,30 @@ test('generateRegistryCpp emits a Recipe mirror for a hankin-free chain too', ()
     + '    SEED_CUBE, CUBE_TRUNCATE33_STEPS,\n'
     + '    static_cast<uint8_t>(std::size(CUBE_TRUNCATE33_STEPS))};\n'
     + '\n'
+    + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
+    + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
+    + '// fail; the README registry table counts the entry too.\n'
     + '    {"cube_truncate33", IslamicStarPatterns::cube_truncate33, '
     + 'Category::Complex,\n'
     + '     &CUBE_TRUNCATE33_RECIPE},');
+});
+
+/**
+ * Adding the entry grows islamic_registry, which fails its size static_assert
+ * and the NUM_ENTRIES sum until ISLAMIC_COUNT is raised to match; nothing else
+ * in the paste names the counter.
+ */
+test('every paste tells the user to raise ISLAMIC_COUNT', () => {
+  const chains = [
+    [{ base: 'cube', ops: ['ambo'] }],
+    [{ base: 'icosahedron', ops: [{ op: 'hankin', params: { angle: 62 } }] }],
+    [{ base: 'icosahedron_kis', ops: ['dual'] },
+      { seed: 'icosahedron', ops: [chainStep('kis')] }],
+  ];
+  for (const [item, baseRecipe] of chains) {
+    assert.match(generateRegistryCpp(item, baseRecipe), /raise ISLAMIC_COUNT by one/,
+      `${item.base} pastes without the ISLAMIC_COUNT bump`);
+  }
 });
 
 test('generateRegistryCpp never emits a Category::Simple entry', () => {
@@ -192,6 +213,9 @@ test('generateRegistryCpp emits a step table and Recipe mirror for a hankin chai
     + '    SEED_DODECAHEDRON, DODECAHEDRON_HK62_AMBO_STEPS,\n'
     + '    static_cast<uint8_t>(std::size(DODECAHEDRON_HK62_AMBO_STEPS))};\n'
     + '\n'
+    + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
+    + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
+    + '// fail; the README registry table counts the entry too.\n'
     + '    {"dodecahedron_hk62_ambo", IslamicStarPatterns::dodecahedron_hk62_ambo,\n'
     + '     Category::Complex, &DODECAHEDRON_HK62_AMBO_RECIPE},');
 });
@@ -229,6 +253,9 @@ test('generateRegistryCpp wraps a long paste the way solids.h already carries it
     + '        static_cast<uint8_t>(std::size(\n'
     + '            TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_STEPS))};\n'
     + '\n'
+    + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
+    + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
+    + '// fail; the README registry table counts the entry too.\n'
     + '    {"truncatedIcosahedron_ambo_relax100_truncate01_hk59",\n'
     + '     IslamicStarPatterns::truncatedIcosahedron_ambo_relax100_truncate01_hk59,\n'
     + '     Category::Complex,\n'
@@ -273,6 +300,9 @@ test('generateRegistryCpp flattens a star-pattern base onto its own seed', () =>
     + '    SEED_ICOSAHEDRON, ICOSAHEDRON_KIS_GYRO_HK54_STEPS,\n'
     + '    static_cast<uint8_t>(std::size(ICOSAHEDRON_KIS_GYRO_HK54_STEPS))};\n'
     + '\n'
+    + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
+    + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
+    + '// fail; the README registry table counts the entry too.\n'
     + '    {"icosahedron_kis_gyro_hk54",\n'
     + '     IslamicStarPatterns::icosahedron_kis_gyro_hk54, Category::Complex,\n'
     + '     &ICOSAHEDRON_KIS_GYRO_HK54_RECIPE},');

@@ -359,6 +359,9 @@ export function generateRegistryCpp(item, baseRecipe = null) {
     + `${docCommentCpp(`Recipe mirror of IslamicStarPatterns::${funcName}.`)}\n`
     + `${recipe.prefix}`
     + `${recipeBodyCpp(`SEED_${upperSnake(seedName)}`, stepsName, recipe.indent)}\n\n`
+    + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
+    + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
+    + '// fail; the README registry table counts the entry too.\n'
     + fillCpp([
       `{"${funcName}",`,
       `IslamicStarPatterns::${funcName},`,
