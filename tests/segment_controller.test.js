@@ -1677,14 +1677,16 @@ test('composite() faults on a rect that is not that segment\'s band of the layou
 });
 
 test('composite() faults when the layout admits no band for a segment', () => {
-  driver.W = 4; driver.H = 4;
-  driver.pixels = new Uint16Array(4 * 4 * 3);
+  // A count create() accepts, over a display buffer that later shrank under it:
+  // 2x2 leaves no y-band per arm for an 8-segment split.
+  driver.W = 2; driver.H = 2;
+  driver.pixels = new Uint16Array(2 * 2 * 3);
 
   const c = makeController();
-  c.count = 3; // no arm split exists for an odd segment count
+  c.count = 8;
   c.showBoundaries = false;
-  const quad = new Uint16Array(2 * 2 * 3).fill(123);
-  c.results = [{ pixels: quad, x0: 0, x1: 2, y0: 0, y1: 2 }];
+  const cell = new Uint16Array(1 * 1 * 3).fill(123);
+  c.results = [{ pixels: cell, x0: 0, x1: 1, y0: 0, y1: 1 }];
 
   const blitted = c.composite();
   assert.equal(blitted, 0, 'an underivable layout blits nothing');

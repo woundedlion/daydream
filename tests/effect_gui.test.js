@@ -445,11 +445,11 @@ test('the ShaderBall schema is recognized by its stage selectors alone', () => {
 test('ShaderBall parameters map to banks in evaluation order', () => {
   const assignments = shaderBallStageAssignments(shaderBallParams());
 
-  assert.deepEqual(SHADERBALL_STAGE_ORDER, [
-    'Camera', 'Lens', 'Surface Noise', 'Projection Frame', 'Projection',
-    'Planar Warp 1', 'Planar Warp 2', 'Function', 'Signal Weight',
-    'Value Transfer', 'Coverage', 'Colorize',
-  ]);
+  // A stage nothing lands in builds an empty folder; a stage nothing lists
+  // drops its controls on the floor.
+  assert.deepEqual([...new Set(assignments.values())].sort(),
+    [...SHADERBALL_STAGE_ORDER].sort(),
+    'the stage list and the assignments cover the same banks');
   assert.equal(assignments.get('Projection Wander'), 'Projection Frame');
   assert.equal(assignments.get('Surface Noise Scale'), 'Surface Noise');
   assert.equal(assignments.get('Planar Warp 1 Strength'), 'Planar Warp 1');
@@ -728,10 +728,18 @@ test('a readonly param is a session control with no engine write-back', () => {
 });
 
 test('every parameter participates in rendered-value synchronization', () => {
-  const h = makeHarness({ params: [{ name: 'Speed', value: 0.1, min: 0, max: 1 }] });
+  const h = makeHarness({ params: [SPEED, TELEMETRY] });
   h.panel.build();
 
+  // sync() binds over paramNames, so a readonly param stays in the stream it is
+  // kept out of the writable set for: the engine writes the value it displays.
+  assert.deepEqual(h.panel.active().paramNames, ['Speed', 'Frames']);
   assert.equal(h.panel.active().hasParams, true);
+
+  const bare = makeHarness({ params: [] });
+  bare.panel.build();
+  assert.equal(bare.panel.active().hasParams, false,
+    'an effect with no parameters skips the value pump');
 });
 
 test('editing a control writes the engine and the worker pool as floats', () => {

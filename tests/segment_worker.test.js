@@ -781,7 +781,8 @@ test('init seeds the worker engine with the carried pole LOD', async () => {
 
 test('init without a pole LOD leaves the engine default in place', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
-  assert.equal(engineInstance.poleLod, null, 'setPoleLod was never called');
+  assert.deepEqual(engineInstance.calls.filter(([method]) => method === 'setPoleLod'), [],
+    'the engine keeps the decimation default it was built with');
 });
 
 test('setPoleLod handler forwards the value to the engine', async () => {
