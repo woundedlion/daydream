@@ -409,6 +409,21 @@ test('cases above the committed floors are reported and bounded', () => {
   assert.match(err, /tests\/a\.test\.js: 80 ran, floor 2/);
 });
 
+/**
+ * Verifies the assertion surplus carries a bound of its own. Assertions are
+ * counted as they run, so a case looping over a table inflates one file's tally
+ * without adding a call site; without this bound a stale floor could sit
+ * arbitrarily far below what the file measures.
+ */
+test('assertions above the committed floors are reported and bounded', () => {
+  writeFileSync(join(root, 'tests', 'a.test.js'), passing(2, 20));
+  assert.match(run(PATTERN), /34 assertions above their committed floors \(bound 450\)/);
+  writeFileSync(join(root, 'tests', 'a.test.js'), passing(2, 300));
+  const err = runExpectingFailure(PATTERN);
+  assert.match(err, /594 assertions above their committed floors, past the bound of 450/);
+  assert.match(err, /tests\/a\.test\.js: 600 ran, floor 6/);
+});
+
 /** Verifies a pattern-less invocation is refused instead of walking the tree. */
 test('no test pattern fails', () => {
   assert.match(runExpectingFailure(), /test file patterns/);
