@@ -147,9 +147,23 @@ export class Daydream {
    * Build the renderer, cameras, controls, scene, dot mesh, and axis lines, and
    * wire up resize/camera-change observers. Leaves the sim paused-capable and
    * ready for render() to be driven from an animation loop.
+   * @param {Object} [dependencies] - Page seams, the same set start() threads
+   *   through the rest of the app; a driver reads no globals of its own.
+   * @param {Document} [dependencies.doc] - Document the canvas and overlays live in.
+   * @param {Window|typeof globalThis} [dependencies.win] - Window the pixel
+   *   ratio and the reload are read off.
+   * @param {Navigator} [dependencies.nav] - Navigator carrying the webdriver flag.
    */
-  constructor() {
+  constructor({
+    doc = globalThis.document,
+    win = globalThis,
+    nav = globalThis.navigator,
+  } = {}) {
     THREE.ColorManagement.enabled = true;
+
+    this.doc = doc;
+    this.win = win;
+    this.nav = nav;
 
     // Pixel grid, virtual-row padding, and dot radius. H_OFFSET is mirrored from
     // the class default so `this` satisfies pixelToSpherical's dims contract.
@@ -164,7 +178,7 @@ export class Daydream {
     /** @type {Map<string, Float32Array>} */
     this.matrixCache = new Map();
 
-    this.canvas = document.querySelector("#canvas");
+    this.canvas = this.doc.querySelector("#canvas");
 
     this.canvasParent = this.canvas?.parentElement;
     if (!this.canvasParent) {
@@ -181,7 +195,7 @@ export class Daydream {
 
     // Cap at CSS resolution: the sphere is coarse LED dots, so rendering above
     // 1x device-pixel-ratio only costs fill rate without adding visible detail.
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
+    this.renderer.setPixelRatio(Math.min(this.win.devicePixelRatio, 1));
 
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
@@ -231,11 +245,11 @@ export class Daydream {
     this.heldCaptures = 0;
 
     this.clock = new THREE.Timer();
-    this.clock.connect(document);
+    this.clock.connect(this.doc);
     this.frameInterval = 1 / Daydream.FPS; // seconds per simulation frame
     this.timeAccumulator = 0;
 
-    this.labelPool = new LabelPool(this.scene, Daydream.SPHERE_RADIUS, document);
+    this.labelPool = new LabelPool(this.scene, Daydream.SPHERE_RADIUS, this.doc);
 
     this.setupDots();
 
@@ -304,23 +318,23 @@ export class Daydream {
   setupContextLossHandling() {
     this.contextLost = false;
 
-    const overlay = document.createElement("div");
+    const overlay = this.doc.createElement("div");
     overlay.className = "loading-overlay error context-lost-overlay";
     overlay.setAttribute("role", "alert");
     overlay.tabIndex = -1;
     overlay.style.display = "none";
     // Same element vocabulary as the bootstrap load-failure overlay, which
     // shares these classes.
-    const title = document.createElement("span");
+    const title = this.doc.createElement("span");
     title.className = "load-error-title";
     title.textContent = "GPU context lost";
-    this.contextLostDetail = document.createElement("span");
+    this.contextLostDetail = this.doc.createElement("span");
     this.contextLostDetail.className = "load-error-detail";
-    const reload = document.createElement("button");
+    const reload = this.doc.createElement("button");
     reload.type = "button";
     reload.className = "context-lost-reload";
     reload.textContent = "Reload";
-    reload.addEventListener("click", () => location.reload());
+    reload.addEventListener("click", () => this.win.location.reload());
     overlay.append(title, this.contextLostDetail, reload);
     this.canvasParent.appendChild(overlay);
     this.contextLostOverlay = overlay;
@@ -489,7 +503,7 @@ export class Daydream {
     }
 
     // Re-apply on resize so moving to a different-DPR monitor refreshes the ratio.
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
+    this.renderer.setPixelRatio(Math.min(this.win.devicePixelRatio, 1));
     this.renderer.setSize(width, height);
     this.labelRenderer.setSize(width, height);
 
@@ -718,7 +732,7 @@ export class Daydream {
    *   off), so on a large grid the toggle roughly halves the per-frame draw cost.
    */
   renderPip() {
-    if (!this.showPip || this.isMobile || navigator.webdriver ||
+    if (!this.showPip || this.isMobile || this.nav.webdriver ||
         this.recorder?.isRecording) return;
 
     this.renderer.setViewport(

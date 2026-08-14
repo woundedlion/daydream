@@ -12,10 +12,8 @@ import * as THREE from 'three';
 import {
   Daydream, dotDetailFor, fitDistance, initialAspect, MOBILE_BREAKPOINT_PX,
 } from '../driver.js';
-import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
+import { fakeElement } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
-
-restoreDocumentAfterEach();
 
 // ---------------------------------------------------------------------------
 // dotDetailFor
@@ -90,22 +88,6 @@ test('initialAspect falls back to square while a dimension is still 0', () => {
 // ---------------------------------------------------------------------------
 
 /**
- * Runs `body` with a global window reporting `dpr`, restoring whatever was there
- * (usually nothing, under node) afterwards.
- * @param {number} dpr - devicePixelRatio the renderer should read.
- * @param {Function} body - Code to run under the stubbed window.
- * @returns {*} Whatever `body` returned.
- */
-function withDevicePixelRatio(dpr, body) {
-  const had = 'window' in globalThis;
-  const saved = globalThis.window;
-  globalThis.window = { devicePixelRatio: dpr };
-  try { return body(); } finally {
-    if (had) globalThis.window = saved; else delete globalThis.window;
-  }
-}
-
-/**
  * Minimal `this` for setCanvasSize: real perspective cameras (so aspect and the
  * projection matrix behave), an orbit stand-in at the class's distance limits,
  * and viewports seeded to a sentinel so an untouched one is visible.
@@ -121,6 +103,7 @@ function sizeCtx(width, height) {
   const sentinel = () => ({ x: -1, y: -1, width: -1, height: -1 });
   return {
     sized,
+    win: { devicePixelRatio: 1 },
     canvasParent: { clientWidth: width, clientHeight: height },
     mainViewport: sentinel(),
     pipViewport: sentinel(),
@@ -154,7 +137,8 @@ function sizeCtx(width, height) {
 function resize(ctx, width, height, dpr = 1) {
   ctx.canvasParent.clientWidth = width;
   ctx.canvasParent.clientHeight = height;
-  withDevicePixelRatio(dpr, () => Daydream.prototype.setCanvasSize.call(ctx));
+  ctx.win.devicePixelRatio = dpr;
+  Daydream.prototype.setCanvasSize.call(ctx);
 }
 
 /** Orbit radius the context's camera currently sits at.
@@ -682,6 +666,7 @@ function pipCtx(log) {
     showPip: true,
     isMobile: false,
     recorder: null,
+    nav: { webdriver: false },
     pipViewport: { x: 70, y: 0, width: 30, height: 30 },
     camera: {
       position: new THREE.Vector3(0, 40, 90),
@@ -697,19 +682,6 @@ function pipCtx(log) {
       render: () => log.push('render'),
     },
   };
-}
-
-/**
- * Runs `body` with navigator.webdriver set, as a headless automation driver
- * leaves it, restoring the real navigator afterwards.
- * @param {Function} body - Code to run under the stubbed navigator.
- * @returns {void}
- */
-function withWebdriver(body) {
-  const saved = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
-  Object.defineProperty(globalThis, 'navigator',
-    { value: { webdriver: true }, configurable: true });
-  try { body(); } finally { Object.defineProperty(globalThis, 'navigator', saved); }
 }
 
 test('renderPip draws the corner view into its own scissored viewport', () => {
@@ -754,7 +726,8 @@ test('renderPip stays suppressed on mobile and while recording', () => {
 test('renderPip stays suppressed under headless automation', () => {
   const log = [];
   const ctx = pipCtx(log);
-  withWebdriver(() => Daydream.prototype.renderPip.call(ctx));
+  ctx.nav.webdriver = true;
+  Daydream.prototype.renderPip.call(ctx);
 
   assert.deepEqual(log, []);
 });
@@ -777,17 +750,19 @@ test('a live recording suppresses the PiP even with the toggle on', () => {
 // ---------------------------------------------------------------------------
 
 /**
- * Minimal `this` for setupContextLossHandling, with a fake document installed so
- * the overlay can be built. Registered listeners land in `handlers`.
+ * Minimal `this` for setupContextLossHandling: a document the overlay is built
+ * in and a window the reload runs against. Registered listeners land in
+ * `handlers`.
  * @param {Object} [recorder] - Recorder stand-in, or null/omitted for no session.
  * @returns {Object} Context object for prototype.call.
  */
 function contextLossCtx(recorder = null) {
-  installDocument({ createElement: (tag) => fakeElement(tag) });
   const handlers = {};
   return {
     handlers,
     recorder,
+    doc: { createElement: (tag) => fakeElement(tag) },
+    win: { location: { reload: () => {} } },
     canvasParent: fakeElement(),
     canvas: { addEventListener: (type, fn) => { handlers[type] = fn; } },
   };

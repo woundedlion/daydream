@@ -140,7 +140,7 @@ export function start({
   doc = globalThis.document,
   win = globalThis,
   nav = globalThis.navigator,
-  createDriver = () => new Daydream(),
+  createDriver = () => new Daydream({ doc, win, nav }),
   createGui = (options, namespace) => new GUI(options, namespace),
   loadModule = createHolosphereModule,
 } = {}) {
