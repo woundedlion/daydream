@@ -51,6 +51,7 @@ afterEach(() => {
 function makeSidebar() {
   installDom();
   const container = fakeElement('div');
+  container.ownerDocument = globalThis.document;
   const selected = [];
   const sidebar = new EffectSidebar(container, (name) => selected.push(name));
   return { sidebar, container, selected };

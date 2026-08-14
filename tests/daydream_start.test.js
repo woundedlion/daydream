@@ -99,6 +99,7 @@ function startApp({ loadModule = () => new Promise(() => {}) } = {}) {
     removeEventListener() {},
     body: fakeElement('body'),
   });
+  for (const element of elements.values()) element.ownerDocument = doc;
   const listeners = [];
   const win = {
     addEventListener: (type, handler) => listeners.push([type, handler]),
