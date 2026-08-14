@@ -507,6 +507,27 @@ test('generativePaletteCpp assigns the fields core/color/color.h declares', { sk
 });
 
 /**
+ * Pins palette_math.js's fastSin to the engine kernel it mirrors: the fold in
+ * sinf_0_2pi then the Bhaskara coefficients in bhaskara_sinf, whose literals
+ * appear in that order in the JS port. ProceduralPalette evaluates its cosine
+ * through it, so a retuned kernel would leave the browser preview predicting
+ * colors the device no longer produces; the WASM bridge sees that only at the
+ * SHA the committed binary was built from.
+ */
+test('fastSin matches core/math/3dmath.h', { skip: SKIP }, () => {
+  const cpp = header(MARKER);
+  const js = readFileSync(fileURLToPath(new URL('tools/palette_math.js', REPO)), 'utf8');
+  assert.equal(typeof P.ProceduralPalette, 'function', 'palette_math.js must export ProceduralPalette');
+  const want = [
+    ...numbersIn(functionBody(cpp, 'sinf_0_2pi')),
+    ...numbersIn(functionBody(cpp, 'bhaskara_sinf')),
+  ];
+  assert.equal(want.length, 5, 'read the wrong literal count — the reader is out of date');
+  assert.deepEqual(numbersIn(functionBody(js, 'fastSin')), want,
+    'fastSin drifted from the engine sine kernel');
+});
+
+/**
  * The engine's named-palette roster, read from its X-macro list.
  * @param {string} source - core/color/palettes.h text.
  * @returns {{name:string, a:number[], b:number[], c:number[], d:number[]}[]} One
