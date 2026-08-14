@@ -208,6 +208,34 @@ jobs:
           fi
           exit $status
 
+      - name: Verify the recorded build toolchain matches the pinned engine
+        # holosphere_wasm.toolchain records the emsdk that built the committed
+        # module. The JS suite only checks its shape, and nothing else here read
+        # it, so a module built by a local unpinned emsdk recorded self-consistent
+        # provenance and deployed — the exact case the marker was written to
+        # prevent. The pinned engine checkout carries the emsdk its own WASM job
+        # builds with (tools/build_pins.py, the engine's single source for it),
+        # so require the two to agree.
+        #
+        # Only emsdk is compared: the clang line records emsdk's own bundled
+        # compiler, not the apt clang the native suite below builds with.
+        run: |
+          if [ ! -f holosphere_wasm.toolchain ]; then
+            echo "::error::holosphere_wasm.toolchain not found — the deployed module records no build toolchain. The Holosphere WASM install writes it next to the module; commit it with the .wasm."
+            exit 1
+          fi
+          if ! pinned="$(python3 engine/tools/build_pins.py emsdk)" || [ -z "$pinned" ]; then
+            echo "::error::the pinned engine ($(cat holosphere_wasm.sha)) does not report an emsdk pin from tools/build_pins.py, so the recorded toolchain cannot be checked against it."
+            exit 1
+          fi
+          recorded="$(awk '$1 == "emsdk" { print $2 }' holosphere_wasm.toolchain)"
+          if [ "$recorded" != "$pinned" ]; then
+            echo "::error::holosphere_wasm.toolchain records emsdk '${recorded:-none}', but the pinned engine builds WASM with $pinned — rebuild the module with the pinned emsdk and commit the refreshed provenance set."
+            cat holosphere_wasm.toolchain
+            exit 1
+          fi
+          echo "Recorded emsdk $recorded matches the pinned engine."
+
       - name: Install Clang + Ninja
         # Pin the compiler version (clang-18 = Ubuntu 24.04 default) to match CI
         # so the deploy gate runs the engine suite on the same known compiler.
