@@ -1,7 +1,7 @@
 # The simulator's JS unit suite: install, lint, typecheck, import-map freshness,
-# unit tests. Called by js-tests.yml (pull requests) and by deploy.yml's gate
-# (push to master), so both paths run one definition rather than two copies
-# that drift apart.
+# unit tests, and the assertion-floor shrink ratchet. Called by js-tests.yml
+# (pull requests) and by deploy.yml's gate (push to master), so both paths run
+# one definition rather than two copies that drift apart.
 #
 # tests/engine_source_parity.test.js reads the engine headers the browser tools
 # hand-transcribe, so the job checks the engine out to engine/ and declares it
@@ -124,3 +124,109 @@ jobs:
           # that rebuilt or rewrote the artifacts the WASM suites then loaded.
           DAYDREAM_WASM_CLEAN_REQUIRED: '1'
         run: npm test
+
+  assertion-floors:
+    name: Assertion floors (no silent shrink)
+    # scripts/run-tests.mjs compares each file's measured counts against
+    # tests/assertion-floors.json, so a commit that deletes cases and re-runs
+    # --update-floors clears that gate with the coverage bar lowered. Compare the
+    # committed floors against the commit this run builds on and fail on any
+    # reduction the commit does not approve. --update-floors writes only what its
+    # patterns measured, so a narrow pattern drops entries wholesale; a missing
+    # entry counts as a reduction here.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      # Escape hatch for a deliberate reduction: one key per line — `<file>` for
+      # a dropped entry, `<file>.cases`, `<file>.assertions` or
+      # `<file>.skippable` for a lowered one — added in the same commit as the
+      # reduction it approves, so the weakening is visible in that commit's diff.
+      # Empty in steady state.
+      ASSERTION_FLOOR_ALLOW_LOWER: ""
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          # The check reads the floors out of the commit the run builds on, which
+          # on a push is github.event.before — arbitrarily far back in a
+          # multi-commit push, so fetch the whole history rather than guess.
+          fetch-depth: 0
+
+      - name: Assert no committed floor shrank
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
+          SRC: tests/assertion-floors.json
+        run: |
+          # On a push, compare against the commit the branch had BEFORE it: a
+          # push lands several commits at once, and HEAD^1 is then the push's own
+          # penultimate commit, so a reduction made in any earlier commit of the
+          # same push is present on both sides and invisible. PUSH_BEFORE is
+          # empty on a pull_request run (where HEAD^1 is the base branch and the
+          # comparison spans the whole PR), all-zeros on a freshly created ref,
+          # and unreachable after a force-push; each of those fails to peel and
+          # falls back to HEAD^1.
+          PREV=
+          if [ -n "$PUSH_BEFORE" ]; then
+            PREV=$(git rev-parse --verify --quiet "$PUSH_BEFORE^{commit}") || PREV=
+          fi
+          if [ -z "$PREV" ] && ! PREV=$(git rev-parse --verify --quiet HEAD^1); then
+            echo "::warning::HEAD has no reachable parent — the floor shrink check was skipped"
+            exit 0
+          fi
+          if ! PREV_FLOORS=$(git show "$PREV:$SRC" 2>/dev/null); then
+            echo "::warning::$SRC absent in $PREV — the floor shrink check was skipped"
+            exit 0
+          fi
+          NOW_FLOORS=$(cat "$SRC")
+          export PREV PREV_FLOORS NOW_FLOORS
+          # The runner's own Node, deliberately unpinned: this parses two JSON
+          # documents and compares integers, so it does not depend on the version
+          # the floors were measured on. Reading both through the environment
+          # keeps the script free of imports, which the runner may load as either
+          # module kind.
+          node - <<'JS'
+          const src = process.env.SRC;
+          const prev = JSON.parse(process.env.PREV_FLOORS);
+          const now = JSON.parse(process.env.NOW_FLOORS);
+          const allow = new Set(
+            (process.env.ASSERTION_FLOOR_ALLOW_LOWER || '')
+              .split('\n')
+              .map((line) => line.trim())
+              .filter(Boolean),
+          );
+
+          const lowered = new Map();
+          for (const [file, was] of Object.entries(prev)) {
+            const min = now[file];
+            if (min === undefined) {
+              lowered.set(file, `${was.cases} cases, ${was.assertions} assertions -> entry gone`);
+              continue;
+            }
+            for (const what of ['cases', 'assertions'])
+              if (min[what] < was[what])
+                lowered.set(`${file}.${what}`, `${was[what]} -> ${min[what]}`);
+            // A skippable file is exempt from its floors entirely, so declaring
+            // one is a reduction to zero however the counts read.
+            if (min.skippable === true && was.skippable !== true)
+              lowered.set(`${file}.skippable`, 'now exempt from its floors');
+          }
+
+          const unapproved = [...lowered.keys()].filter((key) => !allow.has(key)).sort();
+          for (const key of unapproved)
+            console.log(
+              `::error file=${src}::${key} shrank (${lowered.get(key)}) — restore the ` +
+                `cases it covers, or approve the reduction by listing ${key} in ` +
+                'ASSERTION_FLOOR_ALLOW_LOWER in .github/workflows/js-unit-suite.yml ' +
+                'in this commit',
+            );
+          if (unapproved.length > 0) process.exit(1);
+
+          for (const key of [...allow].filter((key) => !lowered.has(key)).sort())
+            console.log(
+              `::warning::ASSERTION_FLOOR_ALLOW_LOWER is stale — "${key}" approves no ` +
+                'reduction in this commit',
+            );
+          console.log(
+            `assertion floors: ${Object.keys(now).length} entries, ${lowered.size} ` +
+              `approved reduction(s) against ${process.env.PREV}.`,
+          );
+          JS
