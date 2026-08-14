@@ -53,12 +53,12 @@ function captureFlag(options) {
  * @returns {boolean} True when the node matches.
  */
 function matchesOne(node, selector) {
-  if (selector.startsWith('.')) return node.classList.contains(selector.slice(1));
-  if (selector.startsWith('[') && selector.endsWith(']')) {
-    return node.getAttribute(selector.slice(1, -1)) !== null;
+  if (!/^(?:\.[\w-]+|\[[\w-]+\]|[a-z][\w-]*)$/i.test(selector)) {
+    throw new Error(`unsupported selector: ${selector}`);
   }
-  if (/^[a-z][\w-]*$/i.test(selector)) return node.tagName === selector.toUpperCase();
-  throw new Error(`unsupported selector: ${selector}`);
+  if (selector.startsWith('.')) return node.classList.contains(selector.slice(1));
+  if (selector.startsWith('[')) return node.getAttribute(selector.slice(1, -1)) !== null;
+  return node.tagName === selector.toUpperCase();
 }
 
 /**
