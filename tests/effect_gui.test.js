@@ -49,7 +49,10 @@ function shaderBallParams() {
 
 /**
  * lil-gui controller double: records the add() arguments, the label, the
- * onChange handler, and every display refresh.
+ * onChange handler, and every display refresh. Like lil-gui, it exposes exactly
+ * one focusable widget for the control kind add() implies — $select for a
+ * choices object, $button for a function, $input otherwise — so focus lands
+ * where the browser would put it.
  * @param {Object} object - The value object the controller is bound to.
  * @param {string} property - The bound property name.
  * @param {Array<any>} args - Extra arguments add() was called with.
@@ -57,14 +60,17 @@ function shaderBallParams() {
  */
 function fakeController(object, property, args) {
   const domElement = fakeElement('div');
-  const button = fakeElement('button');
-  domElement.appendChild(button);
+  const kind = args[0] !== null && typeof args[0] === 'object' ? 'select'
+    : typeof object[property] === 'function' ? 'button'
+    : 'input';
+  const widget = fakeElement(kind);
+  domElement.appendChild(widget);
   return {
     object,
     property,
     args,
     domElement,
-    $button: button,
+    [`$${kind}`]: widget,
     label: property,
     decimalsSet: null,
     disabled: false,
@@ -1032,7 +1038,7 @@ test('sync leaves a selector the user has open alone', () => {
   h.panel.build();
   const selector = h.gui().ctrl('Mode');
   const displays = selector.displayUpdates;
-  h.state.focused = selector.$button;
+  h.state.focused = selector.$select;
   h.state.params = [{ ...mode, requestedValue: 1 }, SPEED];
 
   h.panel.sync();
@@ -1086,6 +1092,42 @@ test('a schema generation change atomically rebuilds and remounts the panel', ()
 
   h.panel.sync();
   assert.equal(h.gui().ctrl('Bonne Parallel').getValue(), 0.6);
+});
+
+test('a schema rebuild hands keyboard focus back to the same control', () => {
+  const projection = {
+    name: 'Projection', value: 0, options: ['Stereographic', 'Bonne'], animated: true,
+  };
+  const bonne = { name: 'Bonne Parallel', value: 0.4, min: 0.01, max: 1.5, animated: true };
+  const h = makeHarness({ params: [projection], engineValues: [0], generation: 7 });
+  h.panel.build();
+  h.panel.mount();
+  h.state.focused = h.gui().ctrl('Projection').$select;
+
+  h.state.params = [{ ...projection, value: 1 }, bonne];
+  h.state.engineValues = [1, 0.6];
+  h.state.generation = 8;
+  h.panel.sync();
+
+  assert.equal(h.gui().ctrl('Projection').$select.focusCalls, 1);
+  assert.equal(h.gui().ctrl('Bonne Parallel').$input.focusCalls, 0);
+});
+
+test('a schema rebuild moves focus nowhere when the panel never held it', () => {
+  const projection = {
+    name: 'Projection', value: 0, options: ['Stereographic', 'Bonne'], animated: true,
+  };
+  const h = makeHarness({ params: [projection], engineValues: [0], generation: 7 });
+  h.panel.build();
+  h.panel.mount();
+  h.state.focused = fakeElement('input');
+
+  h.state.params = [{ ...projection, value: 1 }];
+  h.state.engineValues = [1];
+  h.state.generation = 8;
+  h.panel.sync();
+
+  assert.equal(h.gui().ctrl('Projection').$select.focusCalls, 0);
 });
 
 test('Lens Glitch to None survives a rebuild before the renderer advances', () => {
