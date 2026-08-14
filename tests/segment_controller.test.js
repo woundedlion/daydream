@@ -2201,7 +2201,7 @@ const makeElement = (tag) => {
   return element;
 };
 
-test('the fault overlay is an alert focused once for recovery', () => {
+test('the fault overlay is an alert that never takes focus', () => {
   const stats = makeElement();
   const c = makeController();
   c.statsView.doc = {
@@ -2216,12 +2216,12 @@ test('the fault overlay is an alert focused once for recovery', () => {
 
   const alert = stats.firstElementChild;
   assert.equal(alert.getAttribute('role'), 'alert');
-  assert.equal(alert.tabIndex, -1);
-  assert.equal(alert.focusCount, 1);
+  assert.equal(alert.tabIndex, undefined);
+  assert.equal(alert.focusCount, 0);
 
   c.updateStats();
   assert.equal(stats.firstElementChild, alert);
-  assert.equal(alert.focusCount, 1);
+  assert.equal(alert.focusCount, 0);
 });
 
 test('a fault latched outside tick() paints the overlay without waiting for one', () => {
