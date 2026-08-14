@@ -529,7 +529,9 @@ function renderCtx(colors, log) {
     paused: true,
     stepFrames: 0,
     timeAccumulator: 0,
-    frameInterval: 1 / 30,
+    // render() drives the real advanceFrameClock, so the cadence has to be the
+    // one the constructor installs.
+    frameInterval: 1 / Daydream.FPS,
     needsRender: true,
     labelAxes: false,
     recorder: null,
