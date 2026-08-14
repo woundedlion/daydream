@@ -109,6 +109,17 @@ export class ModuleWarmer {
   }
 
   /**
+   * Drop the held compilation. A module a worker refused to instantiate would
+   * otherwise be handed to every pool this page builds, leaving each documented
+   * recovery path (resolution change, mode toggle) rebuilding onto the same
+   * refusal; without it the next spawn compiles per worker instead.
+   * @returns {void}
+   */
+  discard() {
+    this.module = null;
+  }
+
+  /**
    * Prime the module graph's HTTP cache and compile its binary; see warmModules,
    * which runs this on the page's warmer.
    * @param {{fetch?: typeof globalThis.fetch, baseUrl?: string|URL, minIntervalMs?: number}} [dependencies]
@@ -623,6 +634,7 @@ export class SegmentController {
           if (!booted[i]) { booted[i] = true; bootedCount++; }
           if (bootedCount === numSegments) this.clearBootWatchdog();
         } else if (msg.type === 'engineRejected') {
+          if (msg.sharedModule) this.moduleWarmer.discard();
           this.onWorkerFault(i, `worker seg ${i} engine rejected: ${msg.reason}`);
         } else if (msg.type === 'frame') {
           // A halted pool zeroed `pending`; ignore late frames so it can't go negative.

@@ -159,7 +159,8 @@ async function handleMessage(msg) {
             // The glue's instantiate has no rejection path, so without this the
             // await below never settles and the pool waits out its init watchdog.
             (error) => post({ type: 'engineRejected',
-                              reason: `shared module instantiate failed: ${error}` }));
+                              reason: `shared module instantiate failed: ${error}`,
+                              sharedModule: true }));
           return {};
         };
       }

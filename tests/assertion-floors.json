@@ -162,8 +162,8 @@
     "assertions": 126
   },
   "tests/segment_controller.test.js": {
-    "cases": 113,
-    "assertions": 595
+    "cases": 115,
+    "assertions": 599
   },
   "tests/segment_crosscheck.test.js": {
     "cases": 4,
@@ -178,8 +178,8 @@
     "assertions": 98
   },
   "tests/segment_worker.test.js": {
-    "cases": 39,
-    "assertions": 138
+    "cases": 45,
+    "assertions": 150
   },
   "tests/shared.test.js": {
     "cases": 15,
