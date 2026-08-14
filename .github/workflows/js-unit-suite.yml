@@ -1,7 +1,8 @@
-# The simulator's JS unit suite: install, lint, typecheck, import-map freshness,
-# unit tests, and the assertion-floor shrink ratchet. Called by js-tests.yml
-# (pull requests) and by deploy.yml's gate (push to master), so both paths run
-# one definition rather than two copies that drift apart.
+# The simulator's JS unit suite: install, lint JS and shell, typecheck,
+# import-map freshness, unit tests, and the assertion-floor shrink ratchet.
+# Called by js-tests.yml (pull requests) and by deploy.yml's gate (push to
+# master), so both paths run one definition rather than two copies that
+# drift apart.
 #
 # tests/engine_source_parity.test.js reads the engine headers the browser tools
 # hand-transcribe, so the job checks the engine out to engine/ and declares it
@@ -76,6 +77,36 @@ jobs:
           echo "eslint clean: $count files linted."
 
       - run: npm run typecheck
+
+      # Only here to carry the pip install below; the runner's system Python is
+      # externally managed.
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+
+      # shellcheck-py is the PyPI distribution of the same binary; shellcheck's
+      # checks move between releases, so an unpinned one gates the tree on a
+      # different set than this job. Held at the engine repository's pin
+      # (Holosphere tools/build_pins.py) so both trees are gated on one rule set.
+      - name: Install shellcheck
+        run: pip install "shellcheck-py==0.11.0.1"
+
+      # .githooks/pre-push is this repository's only presubmit and
+      # .githooks/reference-transaction enforces fast-forward-only refs, so a
+      # shellcheck-class defect there passes a gate silently rather than failing
+      # it. The file list is enumerated from the index, so an empty one is a
+      # broken gate, like the lint step above. SC1091 and SC2034 are excluded to
+      # match the engine repository's shell gate.
+      - name: Lint shell
+        run: |
+          mapfile -t FILES < <(git ls-files -- '*.sh' '.githooks/*')
+          if [ "${#FILES[@]}" -eq 0 ]; then
+            echo "::error::no files selected — the shell path list is broken"
+            exit 1
+          fi
+          shellcheck --exclude=SC1091,SC2034 "${FILES[@]}"
+          echo "shellcheck clean: ${#FILES[@]} files linted."
+
       - name: Verify committed import map
         run: |
           npm run importmap
