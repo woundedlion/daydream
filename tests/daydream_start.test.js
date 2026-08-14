@@ -86,13 +86,18 @@ function fakeDriver() {
  */
 function startApp({ loadModule = () => new Promise(() => {}) } = {}) {
   const ids = ['gui-container', 'effect-sidebar', 'apply-notice-dismiss',
-    'canvas-container', 'loading-overlay', 'apply-notice', 'segment-stats'];
+    'apply-notice-body', 'apply-notice-text', 'canvas-container',
+    'loading-overlay', 'apply-notice', 'segment-stats'];
   const elements = new Map(ids.map((id) => [id, fakeElement('div')]));
+  const docListeners = [];
   const doc = installDocument({
     getElementById: (id) => elements.get(id) ?? null,
     createElement: (tag) => fakeElement(tag),
-    addEventListener() {},
-    removeEventListener() {},
+    addEventListener: (type, handler) => docListeners.push([type, handler]),
+    removeEventListener: (type, handler) => {
+      const at = docListeners.findIndex(([t, h]) => t === type && h === handler);
+      if (at >= 0) docListeners.splice(at, 1);
+    },
     body: fakeElement('body'),
   });
   for (const element of elements.values()) element.ownerDocument = doc;
@@ -129,7 +134,7 @@ function startApp({ loadModule = () => new Promise(() => {}) } = {}) {
     },
     loadModule,
   });
-  return { teardown, driver, guis, listeners, elements, win };
+  return { teardown, driver, guis, listeners, docListeners, elements, win };
 }
 
 test('start assembles the app and hands back its teardown', () => {
@@ -141,6 +146,25 @@ test('start assembles the app and hands back its teardown', () => {
     "the global GUI root must keep the 'view' namespace its deep links are built from");
   assert.deepEqual(listeners.map(([type]) => type),
     ['keydown', 'error', 'unhandledrejection', 'pagehide']);
+});
+
+test('a dismiss button that mounts after startup still clears the notice', () => {
+  const { docListeners, elements } = startApp();
+  const clicks = docListeners.filter(([type]) => type === 'click');
+  assert.equal(clicks.length, 1,
+    'the dismiss click is delegated to the document, not bound to one element');
+
+  // Markup injected after construction: a different element under the same id.
+  const dismiss = fakeElement('button');
+  elements.set('apply-notice-dismiss', dismiss);
+  const body = elements.get('apply-notice-body');
+  body.hidden = false;
+  elements.get('apply-notice-text').textContent = 'Effect change was rejected.';
+
+  clicks[0][1]({ target: dismiss });
+
+  assert.equal(body.hidden, true);
+  assert.equal(elements.get('apply-notice-text').textContent, '');
 });
 
 test('the global GUI carries the controls a deep link names', () => {

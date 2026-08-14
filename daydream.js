@@ -219,9 +219,13 @@ export function start({
     }
   }
 
-  const applyNoticeDismiss = doc.getElementById('apply-notice-dismiss');
-  const onApplyNoticeDismiss = () => applyNotice.clear();
-  applyNoticeDismiss?.addEventListener('click', onApplyNoticeDismiss);
+  // Delegated, and the button is resolved at click time: the notice sink resolves
+  // its own elements the same way, so markup that arrives after construction is
+  // dismissible rather than carrying an inert button.
+  const onApplyNoticeDismiss = (e) => {
+    if (e.target === doc.getElementById('apply-notice-dismiss')) applyNotice.clear();
+  };
+  doc.addEventListener('click', onApplyNoticeDismiss);
 
   /**
    * Name a ParamSetResult enum value for logging.
@@ -722,9 +726,7 @@ export function start({
     listeners: [
       ["keydown", onKeyDown],
       ...pageFailureListeners,
-      ...(applyNoticeDismiss
-        ? [["click", onApplyNoticeDismiss, applyNoticeDismiss]]
-        : []),
+      ["click", onApplyNoticeDismiss, doc],
     ],
     switches,
     stopTimers: () => { testAllTicker.stop(); applyNotice.clear(); },
