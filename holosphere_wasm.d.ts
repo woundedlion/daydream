@@ -174,6 +174,8 @@ export interface HolosphereEngine {
   strobeColumns(): boolean;
   /** Effect name to hint size at the active resolution; empty at an unsupported one. */
   getEffectSizes(): Record<string, number>;
+  /** Embind destructor: releases the C++ instance the handle points at. */
+  delete(): void;
 }
 
 export interface HolosphereModule {
