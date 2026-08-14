@@ -420,8 +420,11 @@ export function start({
    *   versioned snapshot API rather than through per-parameter values.
    */
   function usesFullConfigSnapshot() {
+    // The restore result is judged against the module's enum, so a build that
+    // exports the methods without it cannot report a restore either way.
     if (typeof host.engine?.getFullConfigSnapshot !== 'function'
-        || typeof host.engine.restoreFullConfigSnapshot !== 'function') {
+        || typeof host.engine.restoreFullConfigSnapshot !== 'function'
+        || !host.module?.FullConfigRestoreResult) {
       return false;
     }
     // An engine without a generation counter reports undefined for every load,
