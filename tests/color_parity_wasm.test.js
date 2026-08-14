@@ -33,9 +33,9 @@ test('WASM parity module is present with the exports this suite pins', () => {
 });
 
 // Largest divergence observed over the inputs below is 8.0e-7, on the OKLCh
-// wheel; the Mobius presets reach 6.1e-7, and their coefficients also carry
-// mobiusCodeString's 6-digit rounding, the golden literals themselves being
-// written to 6 decimals, a 5e-7 floor.
+// wheel; the Mobius presets reach 6.1e-7, where the WASM side additionally
+// reads its coefficients at float precision — mobiusCodeString emits the
+// shortest literal that reads back as the same float32, not the double.
 const FLOAT_EPS = 5e-6;
 const near = (a, b, eps = FLOAT_EPS) => Math.abs(a - b) <= eps;
 
@@ -447,8 +447,9 @@ function mobiusSphereJs([x, y, z], { A, B, C, D }) {
 /**
  * Splits mobiusCodeString's C++ initializer back into its eight floats, so the
  * WASM call is fed in exactly the order the generated MobiusParams literal uses.
- * The values are the tool's 6-digit rounding of the coefficients, which is the
- * only difference between the two sides of the comparison.
+ * Each literal reads back as the same float32 as the coefficient it came from,
+ * so float precision is the only difference between the two sides of the
+ * comparison.
  * @param {{A:{re:number,im:number}, B:{re:number,im:number}, C:{re:number,im:number}, D:{re:number,im:number}}} coeffs - The Mobius coefficients.
  * @returns {number[]} The eight floats, in emission order.
  */

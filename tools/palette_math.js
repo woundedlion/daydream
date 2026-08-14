@@ -23,6 +23,9 @@ import { formatFloatCpp } from './cpp_format.js';
  * @typedef {object} PaletteCompileStatus
  * @property {number} code - 0 on success, otherwise the compiler's error code.
  * @property {number} field - Which recipe field the error names.
+ * @property {number} wrappedFields - Bitmask over PaletteRecipeField of the fields the compiler wrapped into range.
+ * @property {number} clampedFields - The fields it clamped, in the same bit positions.
+ * @property {number} canonicalizedFields - The fields it rewrote into canonical form, in the same bit positions.
  */
 
 /**
