@@ -152,7 +152,6 @@ export class SegmentStatsView {
       // and must never be parsed as markup.
       const box = this.doc.createElement('div');
       box.setAttribute('role', 'alert');
-      box.tabIndex = -1;
       box.style.cssText = 'color:var(--error-text);padding:6px;font-size:0.85em';
       // segId < 0 is a pool-wide fault, not one worker; FAULT_RENDER is a render
       // timeout, other negatives are pool init/module load.
@@ -173,7 +172,6 @@ export class SegmentStatsView {
       box.appendChild(hint);
       el.replaceChildren(box);
       this.statsTable = null; // force a rebuild on recovery
-      box.focus({ preventScroll: true });
       return;
     }
 
