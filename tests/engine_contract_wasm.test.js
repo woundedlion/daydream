@@ -393,12 +393,12 @@ test('parameter definitions separate rendered and requested state', () => {
   assert.equal(typeof before.requestedValue, 'number');
   assert.equal(typeof before.acceptedValue, 'number');
 
-  // Admission needs a compiled program for the resulting topology; Glitch is
-  // the lens the default topology has one for, so this write is accepted
-  // rather than held pending behind a warning.
-  const requested = before.options?.indexOf('Glitch');
+  // Admission needs a compiled program for the resulting topology; the
+  // tetrahedral kaleidoscope is a lens the default topology has one for, so
+  // this write is accepted rather than held pending behind a warning.
+  const requested = before.options?.indexOf('Kaleidoscope (Tetrahedral)');
   assert.ok(requested > 0 && requested !== before.value,
-    'Glitch must be a compiled lens alternative to the default');
+    'the tetrahedral kaleidoscope must be a compiled lens alternative to the default');
   assert.equal(engine.setParameter('Lens', requested), M.ParamSetResult.APPLIED);
   const after = engine.getParameterDefinitions().find((d) => d.name === 'Lens');
 
@@ -471,7 +471,7 @@ test('ShaderBall accepts valid Curl Flow through the dynamic backend', () => {
 test('ShaderBall keeps planar warps when dodecahedral Grid becomes Primitive Lattice', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
-  assert.equal(engine.selectPreset(18), true);
+  assert.equal(engine.selectPreset(7), true);
 
   const before = engine.getParameterDefinitions();
   const functionDef = before.find((d) => d.name === 'Function');
