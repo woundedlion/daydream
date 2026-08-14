@@ -980,6 +980,9 @@ export class Daydream {
       this.dotMesh = null;
     }
     this.pixels = null;
+    // Injected sink the engine host disposes on the same teardown; holding it
+    // here would leave the render path a disposed recorder to capture through.
+    this.recorder = null;
     this.matrixCache.clear();
     this.dotMaterial?.dispose();
     this.dotMaterial = null;
