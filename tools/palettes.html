@@ -191,6 +191,7 @@
     }
 
     .key-wheel-canvas-wrap {
+      position: relative;
       display: grid;
       place-items: center;
     }
@@ -205,7 +206,8 @@
       touch-action: none;
     }
 
-    #hueKeyWheelCanvas:focus-visible {
+    /* Visible keyboard-focus ring for the wheel's per-key slider handles. */
+    .key-wheel-canvas-wrap:focus-within #hueKeyWheelCanvas {
       outline: 2px solid var(--blue-500);
       outline-offset: 2px;
     }
@@ -846,14 +848,16 @@
             </div>
             <div class="hue-key-visualizer" aria-labelledby="key_wheel_heading">
               <h4 id="key_wheel_heading" class="visually-hidden">OKLCH Hue Keys</h4>
-              <div class="key-wheel-canvas-wrap">
-                <canvas id="hueKeyWheelCanvas" width="256" height="256" tabindex="0"
-                  role="group" aria-roledescription="interactive gamut wheel"
-                  aria-keyshortcuts="A B C D ArrowLeft ArrowRight"
-                  aria-describedby="key_wheel_help"
+              <div id="hueKeyWheelGroup" class="key-wheel-canvas-wrap" role="group"
+                aria-roledescription="interactive gamut wheel"
+                aria-describedby="key_wheel_help"
+                aria-label="OKLCH hue keys">
+                <canvas id="hueKeyWheelCanvas" width="256" height="256"
+                  role="img"
                   aria-label="OKLCH gamut wheel with hue key positions"></canvas>
               </div>
-              <p id="key_wheel_help" class="visually-hidden">Drag keys independently.</p>
+              <p id="key_wheel_help" class="visually-hidden">Drag keys on the wheel, or
+                tab to a key handle and nudge it with the arrow keys.</p>
             </div>
           </div>
         </section>
@@ -1140,6 +1144,10 @@
     let activeHuePointerId = null;
     let selectedHueKey = 0;
     const hueKeyNames = ['A', 'B', 'C', 'D'];
+    // Off-screen role="slider" proxies, one per hue key. The wheel is a canvas,
+    // so a key's live position is announced through its own handle's
+    // aria-valuenow/aria-valuetext, which a screen reader re-reads on change.
+    let hueKeyHandles = [];
 
     const enumIndex = (group, value) => PaletteV4[group][value];
     const fullViewport = Object.freeze({ start: 0, end: 1 });
@@ -1328,12 +1336,59 @@
         hueKeyWheelCtx.stroke();
       });
       labels.forEach(drawHueKeyLabel);
+      syncHueKeyHandles(degrees);
+    }
 
-      const keyDescriptions = degrees.map((degreesValue, index) =>
-        `Key ${hueKeyNames[index]} ${degreesValue} degrees`).join(', ');
-      hueKeyWheelCanvas.setAttribute('aria-label',
-        `OKLCH gamut wheel. ${keyDescriptions}. ` +
-        `Key ${hueKeyNames[selectedHueKey]} selected.`);
+    /**
+     * Build one off-screen slider handle per hue key and attach them to the
+     * wheel's group. Focusing a handle selects its key, so focus and the
+     * highlighted marker stay the same thing; the draw hides the handles the
+     * current key count does not reach.
+     * @param {HTMLElement} group - The wheel's role="group" wrapper.
+     * @returns {void}
+     */
+    function mountHueKeyHandles(group) {
+      hueKeyHandles = hueKeyNames.map((name, index) => {
+        const handle = document.createElement('span');
+        handle.className = 'visually-hidden';
+        handle.tabIndex = 0;
+        handle.hidden = true;
+        handle.setAttribute('role', 'slider');
+        handle.setAttribute('aria-label', `Hue key ${name}`);
+        handle.setAttribute('aria-valuemin', '0');
+        handle.setAttribute('aria-valuemax', '360');
+        handle.setAttribute('aria-keyshortcuts',
+          'ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight');
+        handle.addEventListener('focus', () => {
+          selectedHueKey = index;
+          scheduleUpdate();
+        });
+        handle.addEventListener('keydown', (event) => handleHueKeyNudge(event, index));
+        group.appendChild(handle);
+        return handle;
+      });
+    }
+
+    /**
+     * Republish each key's hue on its slider handle, and take the handles a
+     * shorter key set no longer has out of the tab order and the accessibility
+     * tree. Focus is handed to the last surviving handle before its own is
+     * hidden, so a resample never drops focus to the document body.
+     * @param {number[]} degrees - Every drawn key's hue, in whole degrees.
+     * @returns {void}
+     */
+    function syncHueKeyHandles(degrees) {
+      hueKeyHandles.forEach((handle, index) => {
+        if (index < degrees.length) {
+          handle.hidden = false;
+          handle.setAttribute('aria-valuenow', String(degrees[index]));
+          handle.setAttribute('aria-valuetext', `${degrees[index]} degrees`);
+          return;
+        }
+        if (handle === document.activeElement && degrees.length > 0)
+          hueKeyHandles[degrees.length - 1].focus();
+        handle.hidden = true;
+      });
     }
 
     function wheelPointerPosition(event) {
@@ -1400,18 +1455,17 @@
       scheduleUpdate();
     }
 
-    function handleHueWheelKeyDown(event) {
-      const keyIndex = { a: 0, b: 1, c: 2, d: 3 }[event.key.toLowerCase()];
-      if (keyIndex !== undefined) {
-        if (keyIndex >= currentHueKeyState(readPaletteRecipe()).offsets.length) return;
-        selectedHueKey = keyIndex;
-        scheduleUpdate();
-        event.preventDefault();
-        return;
-      }
+    /**
+     * Nudge one hue key from its own slider handle.
+     * @param {KeyboardEvent} event - The handle's keydown.
+     * @param {number} keyIndex - Which key the handle stands for.
+     * @returns {void}
+     */
+    function handleHueKeyNudge(event, keyIndex) {
       const direction = event.key === 'ArrowLeft' || event.key === 'ArrowDown' ? -1
         : event.key === 'ArrowRight' || event.key === 'ArrowUp' ? 1 : 0;
       if (direction === 0) return;
+      selectedHueKey = keyIndex;
 
       const recipe = readPaletteRecipe();
       if (recipe.hue.mode !== PaletteV4.hueMode.CUSTOM
@@ -2389,7 +2443,7 @@
       hueKeyWheelCanvas.addEventListener('pointermove', handleHueWheelPointerMove);
       hueKeyWheelCanvas.addEventListener('pointerup', handleHueWheelPointerEnd);
       hueKeyWheelCanvas.addEventListener('pointercancel', handleHueWheelPointerEnd);
-      hueKeyWheelCanvas.addEventListener('keydown', handleHueWheelKeyDown);
+      mountHueKeyHandles(document.getElementById('hueKeyWheelGroup'));
 
       // 3. Add drag-and-drop listeners
       colorStripCanvas.addEventListener('pointerdown', handleDragStart);
@@ -2432,7 +2486,8 @@
         hueKeyWheelCanvas.removeEventListener('pointermove', handleHueWheelPointerMove);
         hueKeyWheelCanvas.removeEventListener('pointerup', handleHueWheelPointerEnd);
         hueKeyWheelCanvas.removeEventListener('pointercancel', handleHueWheelPointerEnd);
-        hueKeyWheelCanvas.removeEventListener('keydown', handleHueWheelKeyDown);
+        for (const handle of hueKeyHandles) handle.remove();
+        hueKeyHandles = [];
       });
     }
 
