@@ -719,10 +719,6 @@
   }
 
   /* Function/button controllers: span both columns */
-  .gui-container .lil-gui .lil-controller.lil-function > .lil-name {
-    display: none;
-  }
-
   .gui-container .lil-gui .lil-controller.lil-function > .lil-widget {
     grid-column: 1 / -1;
   }
