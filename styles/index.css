@@ -4,6 +4,8 @@
   --muted-text: #888;
   --error-text: #e66;
   --accent: #48f;
+  /* Accent applied to text; lighter than --accent for contrast on the dark theme. */
+  --accent-text: #8af;
   --focus-ring: #8af;
   --ui-font: 'Segoe UI', Arial, sans-serif;
   --nav-font: Arial, sans-serif;
@@ -412,7 +414,7 @@
 }
 
 .effect-button.active .effect-size {
-  color: var(--focus-ring);
+  color: var(--accent-text);
 }
 
 .sort-controls {
@@ -444,7 +446,7 @@
 }
 
 .sort-btn.active {
-  color: var(--focus-ring);
+  color: var(--accent-text);
   border-color: rgba(60, 120, 240, 0.3);
 }
 
@@ -804,7 +806,7 @@ div.label {
 
 .segment-stats .seg-label {
   text-align: left;
-  color: var(--focus-ring);
+  color: var(--accent-text);
 }
 
 .segment-stats .seg-time {
