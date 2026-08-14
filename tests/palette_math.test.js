@@ -7,6 +7,7 @@ const {
   proceduralPaletteCpp, proceduralParamsForViewport,
   generativePaletteCpp, setPaletteOps,
   NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
+  paletteCompileError, COMPILE_CODE_NAMES, RECIPE_FIELD_NAMES,
 } = await import('../tools/palette_math.js');
 const { defaultPaletteRecipe, PaletteV4 } = await import('../tools/palette_controls.js');
 
@@ -353,8 +354,24 @@ test('GenerativePalette reports compiler failures', () => {
   const ops = mockPaletteOps({ inspectV4: () => ({ status: { code: 2, field: 7 } }) });
   withPaletteOps(ops, () => {
     assert.throws(() => new GenerativePalette(defaultPaletteRecipe()),
-      /Palette recipe error 2 at field 7/);
+      /Palette recipe error NON_FINITE \(2\) at field BASE_TURNS \(7\)/);
   });
+});
+
+/**
+ * Verifies a failed compile is reported by the engine's own enumerator names.
+ * Every code and field a caller can be handed is named; an ordinal off either
+ * roster still reports the number rather than reading as a named reason.
+ */
+test('paletteCompileError names the engine enumerators', () => {
+  assert.equal(paletteCompileError({ code: 5, field: 9 }),
+    'Palette recipe error NON_INTEGER_LOOP_SWEEP (5) at field SWEEP_TURNS (9)');
+  assert.equal(paletteCompileError({ code: 3, field: 0 }),
+    'Palette recipe error INVALID_ENUM (3) at field NONE (0)');
+  assert.equal(paletteCompileError({ code: 99, field: 200 }),
+    'Palette recipe error unnamed 99 at field unnamed 200');
+  for (const name of COMPILE_CODE_NAMES) assert.match(name, /^[A-Z][A-Z0-9_]*$/);
+  for (const name of RECIPE_FIELD_NAMES) assert.match(name, /^[A-Z][A-Z0-9_]*$/);
 });
 
 test('GenerativePalette uses the canonical recipe and exposes diagnostics', () => {

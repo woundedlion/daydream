@@ -384,6 +384,56 @@ test('the V4 enum rosters match core/color/color.h', { skip: SKIP }, () => {
 const COLOR_H = 'core/color/color.h';
 
 /**
+ * The enumerators of an `enum class` whose members carry explicit values, keyed
+ * by the value each one is pinned to.
+ * @param {string} source - core/color/color.h text.
+ * @param {string} name - The enum's C++ name.
+ * @returns {Map<number, string>} Value -> enumerator name.
+ */
+function engineValuedEnumerators(source, name) {
+  const m = source.match(new RegExp(`enum class ${name}\\s*:\\s*uint8_t\\s*\\{([^}]*)\\}`));
+  assert.ok(m, `enum class ${name} not found in ${COLOR_H} — the reader is out of date`);
+  const roster = new Map();
+  let next = 0;
+  for (const member of m[1].split(',').map((s) => s.trim()).filter(Boolean)) {
+    const parsed = member.match(/^([A-Z][A-Z0-9_]*)(?:\s*=\s*(\d+))?$/);
+    assert.ok(parsed, `${name}::${member} is not an enumerator this reader can value`);
+    next = parsed[2] === undefined ? next : Number(parsed[2]);
+    roster.set(next, parsed[1]);
+    next += 1;
+  }
+  return roster;
+}
+
+// The two status enums a failed compile is reported through, as palette_math.js
+// names its rosters and as core/color/color.h declares them.
+const STATUS_ENUMS = [
+  ['COMPILE_CODE_NAMES', 'PaletteCompileCode'],
+  ['RECIPE_FIELD_NAMES', 'PaletteRecipeField'],
+];
+
+/**
+ * Pins the compiler-status rosters palette_math.js reports a failed palette
+ * compile through. The bridge hands back bare ordinals, so these names are the
+ * only thing that turns a refusal into a reason a user can act on; an enumerator
+ * inserted or renumbered in the engine would otherwise re-label every message
+ * silently and point the blame at the wrong recipe field.
+ */
+test('the compile-status rosters match core/color/color.h', { skip: SKIP }, () => {
+  const cpp = header(COLOR_H);
+  for (const [roster, cppName] of STATUS_ENUMS) {
+    const want = engineValuedEnumerators(cpp, cppName);
+    assert.ok(want.size > 0, `${cppName} yielded no enumerators — the reader is out of date`);
+    const got = P[roster];
+    assert.equal(got.length, Math.max(...want.keys()) + 1,
+      `${roster} does not span ${cppName}'s ordinals`);
+    for (const [value, name] of want) {
+      assert.equal(got[value], name, `${roster}[${value}] drifted from ${cppName}::${name}`);
+    }
+  }
+});
+
+/**
  * The non-static data members of a plain struct, in declaration order.
  * @param {string} source - core/color/color.h text.
  * @param {string} name - The struct's C++ name.
