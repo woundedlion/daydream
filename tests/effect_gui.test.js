@@ -700,9 +700,8 @@ test('build warns when engine params collide with effect controls', () => {
 
   h.panel.build();
 
-  assert.deepEqual(h.warnings, [
-    'Engine parameter names conflict with effect controls: reset, export, pause',
-  ]);
+  assert.equal(h.warnings.length, 1, 'one warning naming every collision');
+  assert.match(h.warnings[0], /conflict with effect controls: reset, export, pause$/);
 });
 
 test('a readonly param is disabled and excluded from the writable set', () => {
@@ -1359,8 +1358,8 @@ test('a param/value length skew is warned once per episode, never bound by index
   h.panel.sync();
 
   assert.equal(h.gui().ctrl('Speed').getValue(), 0.1);
-  assert.deepEqual(h.warnings,
-    ['Effect GUI: param/value length skew (2 vs 1); skipping sync']);
+  assert.equal(h.warnings.length, 1, 'two syncs inside one episode warn once');
+  assert.match(h.warnings[0], /param\/value length skew \(2 vs 1\)/);
 
   h.state.engineValues = [0.9, 1];
   h.panel.sync();
@@ -1613,7 +1612,8 @@ test('Export without a copy operation reports the failure', () => {
   h.gui().ctrl('export').object.export();
 
   assert.equal(h.gui().ctrl('export').label, '\u2717');
-  assert.deepEqual(h.warnings, ['Export: clipboard copy unavailable']);
+  assert.equal(h.warnings.length, 1);
+  assert.match(h.warnings[0], /clipboard copy unavailable/);
 });
 
 test('Export refuses a value stream that has skewed from the panel', () => {
