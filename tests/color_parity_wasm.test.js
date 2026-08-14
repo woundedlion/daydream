@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import createHolosphereModule from '../holosphere_wasm.js';
 import * as C from '../tools/color.js';
 import * as P from '../tools/palette_math.js';
-import { defaultPaletteRecipe, PaletteV4 } from '../tools/palette_controls.js';
+import { defaultPaletteRecipe, oklchLinearRgb, PaletteV4 } from '../tools/palette_controls.js';
 import * as L from '../tools/lissajous_math.js';
 import * as MB from '../tools/mobius_transforms.js';
 
@@ -32,9 +32,10 @@ test('WASM parity module is present with the exports this suite pins', () => {
   }
 });
 
-// Largest divergence observed over the inputs below is 6.1e-7, on the Mobius
-// presets, whose coefficients also carry mobiusCodeString's 6-digit rounding;
-// the golden literals are themselves written to 6 decimals, a 5e-7 floor.
+// Largest divergence observed over the inputs below is 8.0e-7, on the OKLCh
+// wheel; the Mobius presets reach 6.1e-7, and their coefficients also carry
+// mobiusCodeString's 6-digit rounding, the golden literals themselves being
+// written to 6 decimals, a 5e-7 floor.
 const FLOAT_EPS = 5e-6;
 const near = (a, b, eps = FLOAT_EPS) => Math.abs(a - b) <= eps;
 
@@ -66,6 +67,32 @@ test('OKLab golden values (absolute pin)', () => {
   const inv = M.oklab_to_linear_rgb(0.7, 0.1, -0.05);
   assert.ok(near(inv.r, 0.57893) && near(inv.g, 0.228833) && near(inv.b, 0.50137),
     `oklab_to_linear_rgb(0.7,0.1,-0.05): (${inv.r},${inv.g},${inv.b})`);
+});
+
+/**
+ * Verifies palette_controls.js's OKLCh→linear-sRGB port matches the engine's
+ * inverse OKLab transform. The port folds the polar-to-Cartesian step into the
+ * same body as the matrix, so it is compared against the engine fed the same
+ * (a, b); it draws the palettes page's hue wheel and every gamut bisection, so
+ * a drift there moves the colors the tool tells you to paste into the engine.
+ * The sweep covers the wheel at three lightnesses and out to a chroma no sRGB
+ * hue reaches, where the arithmetic is furthest from the neutral axis.
+ */
+test('OKLCh transform parity (oklab_to_linear_rgb)', () => {
+  for (const lightness of [0.15, 0.5, 0.85]) {
+    for (const chroma of [0, 0.08, 0.2]) {
+      for (let step = 0; step < 8; step++) {
+        const turns = step / 8;
+        const angle = turns * Math.PI * 2;
+        const w = M.oklab_to_linear_rgb(
+          lightness, chroma * Math.cos(angle), chroma * Math.sin(angle));
+        const [r, g, b] = oklchLinearRgb(lightness, chroma, turns);
+        assert.ok(near(w.r, r) && near(w.g, g) && near(w.b, b),
+          `oklch(${lightness},${chroma},${turns}): `
+          + `wasm(${w.r},${w.g},${w.b}) js(${r},${g},${b})`);
+      }
+    }
+  }
 });
 
 /**
