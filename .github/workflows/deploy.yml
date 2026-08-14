@@ -15,11 +15,13 @@
 # byte-identical to the hash recorded at build time (holosphere_wasm.wasm.sha256),
 # binding the deployed artifact to that recorded hash. That manifest carries an
 # entry for the .js Emscripten glue as well, so the glue is bound to the binary
-# by content. Finally it asserts .wasm and .sha share a last-touch commit, so
-# the engine source-pin cannot advance independently of the binary. If any file
-# is missing, a hash does not match, or the source pin was committed alone, the
-# gate fails hard rather than deploying an unverifiable artifact (a silent
-# fallback to engine HEAD would make the gate inert).
+# by content. Finally it asserts .wasm and .sha share a last-touch commit — or,
+# where they do not, that the binary is byte-identical to the one the pin was
+# committed over — so the engine source-pin cannot advance over a binary it did
+# not build. If any file is missing, a hash does not match, or the source pin
+# moved over a changed binary, the gate fails hard rather than deploying an
+# unverifiable artifact (a silent fallback to engine HEAD would make the gate
+# inert).
 #
 # The engine suite run here is the native one, and no job rebuilds the module,
 # so the gate also requires the engine's aggregate `CI green` check — which
@@ -87,13 +89,27 @@ jobs:
         # every build. The sha256 check above binds the manifest to .wasm and .js
         # by content; the shared .wasm/.sha last-touch commit prevents a source pin
         # from advancing independently of the binary.
+        #
+        # An engine advance that changes no compiled output leaves git nothing to
+        # commit for .wasm, so the pin moves alone. Content is the binding in that
+        # case, exactly as it is for the glue: the binary as of the pin's commit
+        # must be the one at HEAD.
         run: |
           wasm_c="$(git log -1 --format=%H -- holosphere_wasm.wasm)"
           sha_c="$(git log -1 --format=%H -- holosphere_wasm.sha)"
           echo "last-touch commits: .wasm=$wasm_c .sha=$sha_c"
-          if [ -z "$wasm_c" ] || [ "$wasm_c" != "$sha_c" ]; then
-            echo "::error::WASM and engine source-pin were not committed atomically — holosphere_wasm.sha is decoupled from holosphere_wasm.wasm. Re-run the Holosphere WASM install and commit them together."
+          if [ -z "$wasm_c" ] || [ -z "$sha_c" ]; then
+            echo "::error::holosphere_wasm.wasm or holosphere_wasm.sha is untracked — the deployed artifact carries no engine provenance. Re-run the Holosphere WASM install and commit them together."
             exit 1
+          fi
+          if [ "$wasm_c" != "$sha_c" ]; then
+            pinned_blob="$(git rev-parse "$sha_c:holosphere_wasm.wasm")"
+            head_blob="$(git rev-parse "HEAD:holosphere_wasm.wasm")"
+            if [ "$pinned_blob" != "$head_blob" ]; then
+              echo "::error::WASM and engine source-pin were not committed atomically — holosphere_wasm.sha is decoupled from holosphere_wasm.wasm. Re-run the Holosphere WASM install and commit them together."
+              exit 1
+            fi
+            echo "holosphere_wasm.sha moved alone at $sha_c, over the binary that is still at HEAD"
           fi
 
       - name: Resolve engine SHA the committed WASM was built from

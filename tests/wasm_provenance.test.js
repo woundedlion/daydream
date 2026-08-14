@@ -92,10 +92,18 @@ test('the WASM binary and its engine source pin were committed together', () => 
   assertFullHistory();
   const lastTouch = (path) => git(['log', '-1', '--format=%H', '--', path], 'utf8').trim();
   const wasmCommit = lastTouch(BINARY);
+  const pinCommit = lastTouch(PIN);
   assert.notEqual(wasmCommit, '', `${BINARY} is not tracked`);
-  assert.equal(lastTouch(PIN), wasmCommit,
-    `${PIN} was committed apart from ${BINARY}, so the engine source pin can ` +
-      'name source the binary was not built from');
+  assert.notEqual(pinCommit, '', `${PIN} is not tracked`);
+  if (pinCommit === wasmCommit) return;
+
+  // An engine advance that changes no compiled output leaves git nothing to
+  // commit for the binary, so the pin moves alone. Content is the binding then,
+  // exactly as it is for the glue.
+  const blob = (commit) => git(['rev-parse', `${commit}:${BINARY}`], 'utf8').trim();
+  assert.equal(blob(pinCommit), blob('HEAD'),
+    `${PIN} moved apart from ${BINARY} over a changed binary, so the engine ` +
+      'source pin can name source the binary was not built from');
 });
 
 test('the toolchain record names a real emsdk and clang', () => {
@@ -171,4 +179,14 @@ test('the deploy gate requires the engine CI that built the module', () => {
   assert.match(step, /"CI green"/,
     'the aggregate check is the one that covers the engine WASM job');
   assert.match(step, /exit 1/, 'an unreadable or non-green check must fail the gate');
+});
+
+test('the deploy gate binds a lone pin move to the binary by content', () => {
+  const workflow = readFileSync(resolve(REPO, '.github/workflows/deploy.yml'), 'utf8');
+  const step = workflow.match(/- name: Verify the installed WASM and source pin[\s\S]*?\n\n/)?.[0];
+  assert.ok(step, 'deploy.yml must still check the WASM/pin last-touch commits');
+  assert.match(step, /rev-parse "\$sha_c:holosphere_wasm\.wasm"/,
+    'without the content comparison, an engine advance that changes no compiled ' +
+      'output can never be deployed: git has nothing to commit for the binary');
+  assert.match(step, /exit 1/, 'a pin that moved over a changed binary must fail the gate');
 });
