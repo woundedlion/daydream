@@ -66,11 +66,11 @@ test('findBestRationalRatio: irrational (PI) clamped to maxDenominator returns t
   assert.equal(N, 1);
 });
 
-/** Verifies the result is in simplest form (0.5 yields 1/2, not 2/4). */
-test('findBestRationalRatio: simplest form preferred (0.5 → 1/2 not 2/4)', () => {
-  const { M, N } = findBestRationalRatio(0.5);
-  assert.equal(M, 1);
-  assert.equal(N, 2);
+/** Verifies the result is in simplest form (0.75 yields 3/4, not 6/8). */
+test('findBestRationalRatio: simplest form preferred (0.75 → 3/4 not 6/8)', () => {
+  const { M, N } = findBestRationalRatio(0.75);
+  assert.equal(M, 3);
+  assert.equal(N, 4);
 });
 
 /**
