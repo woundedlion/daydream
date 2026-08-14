@@ -15,5 +15,10 @@ pov_segment_map.json       text eol=lf
 # every path miss on the runner.
 site_manifest.txt          text eol=lf
 
+# The deploy gate byte-compares these against the engine checkout's copies on
+# the same runner, so their bytes must match the engine's pinned files exactly.
+README.md                  text eol=lf
+docs/screenshots/**        binary
+
 # Git hooks are sourced by /bin/sh; CRLF would break the shebang on checkout.
 .githooks/**               text eol=lf
