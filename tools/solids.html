@@ -899,7 +899,10 @@
         if (btn) addOp(btn.dataset.op);
       });
 
-      generateThumbnails().catch(e => console.error('Thumbnail generation failed:', e));
+      generateThumbnails().catch(e => {
+        if (engineTrapped(e)) return;
+        console.error('Thumbnail generation failed:', e);
+      });
 
       renderSavedList();
       updateToggles();
