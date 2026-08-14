@@ -141,18 +141,19 @@ export class ModuleWarmer {
         workerJs,
         glueJs,
         binary,
-        // A rejected fetch skips this entirely and allSettled swallows it, which
-        // is the cold-cache case; only a binary the engine refuses is reported.
+        // A rejected fetch is the cold-cache case and goes unreported; only a
+        // binary the engine refuses gets a diagnostic. Either way the held
+        // module is dropped rather than kept: this warm went back to the origin,
+        // so nothing left says a module compiled from an earlier one still
+        // describes the deployed artifact.
         binary.then((bytes) => WebAssembly.compile(bytes).then(
           (compiled) => { this.module = compiled; },
           (error) => {
             console.warn('[Segmented] shared WASM compile failed; each worker '
               + 'will compile its own', error);
-            // Dropped rather than kept: this warm re-fetched the binary, so a
-            // module held from an earlier one describes an artifact the engine
-            // has just refused.
             this.module = null;
-          })),
+          }),
+        () => { this.module = null; }),
       ]).then(() => {});
     } catch {
       // A fetch that throws synchronously warmed nothing, so the window stays
