@@ -69,8 +69,8 @@
     "assertions": 9
   },
   "tests/fake_dom.test.js": {
-    "cases": 22,
-    "assertions": 58
+    "cases": 23,
+    "assertions": 63
   },
   "tests/fake_three.test.js": {
     "cases": 6,
@@ -107,6 +107,10 @@
   "tests/label_pool.test.js": {
     "cases": 5,
     "assertions": 21
+  },
+  "tests/lil_gui_contract.test.js": {
+    "cases": 4,
+    "assertions": 24
   },
   "tests/lissajous_math.test.js": {
     "cases": 21,

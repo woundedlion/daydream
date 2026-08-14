@@ -190,7 +190,8 @@ function fakeDataset(element) {
  * in the DOM, so a string append lands in one and not the other. append()
  * accepts strings as text nodes; appendChild() takes a node and throws on
  * anything else, so a test cannot encode a text node where the platform demands
- * an element.
+ * an element. insertBefore() places a node ahead of a child and appends on a
+ * null reference; a reference that is not a child throws rather than appending.
  *
  * dispatch() propagates over the parentNode chain the way the DOM does, so a
  * listener's attachment point is observable: capture listeners run root-first,
@@ -251,6 +252,15 @@ export function fakeElement(tag = 'div') {
       detach([node]);
       reparent([node], this);
       this.childNodes.push(node);
+      return node;
+    },
+    insertBefore(node, reference) {
+      if (reference === null || reference === undefined) return this.appendChild(node);
+      const at = this.childNodes.indexOf(reference);
+      if (at < 0) throw new Error('insertBefore: the reference node is not a child');
+      detach([node]);
+      reparent([node], this);
+      this.childNodes.splice(this.childNodes.indexOf(reference), 0, node);
       return node;
     },
     removeChild(node) {
