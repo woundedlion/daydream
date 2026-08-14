@@ -73,8 +73,8 @@ function interfaceBody(name) {
 
 test('holosphere_wasm.d.ts declares the pinned engine method roster', () => {
   const body = interfaceBody('HolosphereEngine');
-  // The `\??` accepts the optional members the full-config surface is declared
-  // as; without it they parse as nothing and are pinned by neither loop below.
+  // `\??` also admits an optionally-declared member, which would otherwise
+  // parse as nothing and be pinned by neither loop below.
   const declared = new Set(
     [...body.matchAll(/^\s*([A-Za-z_]\w*)\??\s*\(/gm)].map((m) => m[1]));
   // getAnimationsPaused is read through an optional call, so it is absent from
