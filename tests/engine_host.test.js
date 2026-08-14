@@ -177,6 +177,7 @@ test('dispose() releases the recorder before the engine and leaves the host iner
   const order = [];
   const host = new EngineHost();
   host.adapter = { drawFrame() {} };
+  host.module = { HEAPU16: new Uint16Array(4) };
   host.recorder = { dispose() { order.push('recorder'); } };
   host.engine = {
     getPixels: () => new Uint16Array(4),
@@ -191,6 +192,8 @@ test('dispose() releases the recorder before the engine and leaves the host iner
   assert.equal(host.adapter, null);
   assert.equal(host.engine, null);
   assert.equal(host.view(), null);
+  assert.equal(host.module, null,
+    'a held module keeps the whole Emscripten heap alive behind an inert host');
 });
 
 test('dispose() runs on a host that never reached a module load', () => {
