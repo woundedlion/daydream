@@ -30,6 +30,14 @@ test('AppState.get returns defaults and set updates', () => {
   assert.equal(s.get('a'), 2);
 });
 
+test('AppState reads no key it was never given', () => {
+  const s = new AppState({ a: 1 });
+  assert.equal(s.get('toString'), undefined,
+    'an inherited member must not answer as state');
+  s.set('toString', 'x');
+  assert.equal(s.get('toString'), 'x');
+});
+
 test('AppState.set notifies with (key, new, old) and skips no-op writes', () => {
   const s = new AppState({ a: 1 });
   const events = [];
@@ -370,6 +378,15 @@ test('URLSync validator rejects an invalid URL value and keeps the default', () 
   new URLSync(s, ['effect', 'res'], { res: (v) => v === 'high' || v === 'low' });
   assert.equal(s.get('effect'), 'Voronoi');
   assert.equal(s.get('res'), 'low');
+});
+
+test('URLSync validates against its own validators, not inherited members', () => {
+  installWindow('?propertyIsEnumerable=high');
+  const s = new AppState({ propertyIsEnumerable: 'low' });
+  // Object.prototype.propertyIsEnumerable called on the validator map answers
+  // false for every raw value, so an inherited hit would reject the whole key.
+  new URLSync(s, ['propertyIsEnumerable'], {});
+  assert.equal(s.get('propertyIsEnumerable'), 'high');
 });
 
 test('URLSync coerces a URL value to a numeric default key', () => {

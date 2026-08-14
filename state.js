@@ -146,7 +146,9 @@ export class AppState {
    * @param {Object} defaults - Initial key/value pairs seeding the state.
    */
   constructor(defaults = {}) {
-    this.state = { ...defaults };
+    // Null prototype: keys are arbitrary strings, and an inherited one
+    // ("constructor", "toString") would read back as state the app never set.
+    this.state = { __proto__: null, ...defaults };
     this.listeners = [];
     this.batchDepth = 0;
     // key -> notifications dispatched since the outermost batch began. A queued
@@ -295,7 +297,9 @@ export class URLSync {
     for (const key of trackedKeys) {
       if (!params.has(key)) continue;
       const raw = params.get(key);
-      const validate = validators[key];
+      // Own keys only: Object.prototype carries a callable under every inherited
+      // name, and one of those would pass every raw value it was handed.
+      const validate = Object.hasOwn(validators, key) ? validators[key] : null;
       if (validate && !validate(raw)) continue;
       // Coerce to the seeded default's type so a numeric tracked key isn't left a
       // raw string; a non-finite parse keeps the default rather than seeding NaN.
