@@ -493,8 +493,9 @@ export function createApplyNotice({
  * @param {() => void} deps.spawn - Builds the pool at the requested size.
  * @param {() => boolean} deps.isActive - Whether segmented mode is still on.
  * @returns {{respawn: () => Promise<boolean>, strand: () => void}} The guarded
- *   spawn, resolving to whether it landed, and the stranding bump. A warm-up
- *   failure rejects, leaving the caller to run its fallback.
+ *   spawn, resolving to whether it landed, and the stranding bump. A rejecting
+ *   warm-up or a throwing spawn propagates, leaving the caller to run its
+ *   fallback; the app's own warmModules is best-effort and never rejects.
  */
 export function createSegmentSpawnGuard({ warmModules, spawn, isActive }) {
   let epoch = 0;
