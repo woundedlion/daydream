@@ -1009,6 +1009,8 @@ test('a cancelled save picker tells the host the session ended', async () => {
   const abort = new Error('user cancelled');
   abort.name = 'AbortError';
   globalThis.showSaveFilePicker = async () => { throw abort; };
+  const prevError = console.error;
+  console.error = () => {};
   try {
     const rec = new VideoRecorder(recordableCanvas());
     rec.download = () => {};
@@ -1022,12 +1024,15 @@ test('a cancelled save picker tells the host the session ended', async () => {
     await hostNotified();
 
     assert.equal(notified.length, 1, 'the host is told the session ended');
-    assert.equal(notified[0], abort, 'the cancellation itself is passed through');
+    assert.notEqual(notified[0], abort, 'the raw AbortError never reaches the host');
+    assert.match(notified[0].message, /Save dialog was cancelled/,
+      'the host is given the cancellation in the words the UI shows');
     assert.equal(rec.isRecording, false, 'the cancelled session is stopped');
 
     recorder.onstop();
     assert.equal(rec.mediaRecorder, null, 'the stop path still finalizes the session');
   } finally {
+    console.error = prevError;
     restore();
   }
 });
