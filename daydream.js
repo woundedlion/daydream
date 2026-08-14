@@ -9,6 +9,7 @@ import { Daydream } from "./driver.js";
 import { GUI, resetGUI } from "./gui.js";
 import { EffectSidebar } from "./sidebar.js";
 import {
+  ApplyResult,
   applyInitialState,
   createApplyPipeline,
   createSwitchCoordinator,
@@ -466,7 +467,13 @@ export function start({
       return true;
     },
     engineAnimationsPaused: () => host.engine.getAnimationsPaused?.(),
-    applyEffect: () => apply.applyEffect(),
+    applyEffect: () => {
+      const rejected = apply.applyEffect() !== ApplyResult.APPLIED;
+      const notice = rejected
+        ? 'Effect reset was rejected. The panel still shows the current values.'
+        : null;
+      applyNotice.show(notice, SWITCH_NOTICE);
+    },
     guiContainer: () => doc.getElementById('gui-container'),
     isMobile: () => daydream.isMobile,
     dragTarget: win,
