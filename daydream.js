@@ -557,6 +557,10 @@ export function start({
     spawn: () => segments.create(segCount),
     isActive: () => segments.active,
   });
+  // Declared ahead of the fallback, and assigned before its handler is wired: a
+  // deep-linked `segmented` replays that handler synchronously at registration,
+  // and a throw there reaches the fallback's showToggle.
+  let segEnabledCtrl;
   const segmentedFailed = createSegmentedFallback({
     segments,
     strand: () => segSpawn.strand(),
@@ -564,7 +568,8 @@ export function start({
     // No-ops when the toggle is already false.
     showToggle: (on) => segEnabledCtrl.setValue(on),
   });
-  const segEnabledCtrl = segFolder.add(segState, 'segmented').name('Enabled').onChange(async v => {
+  segEnabledCtrl = segFolder.add(segState, 'segmented').name('Enabled');
+  segEnabledCtrl.onChange(async v => {
     try {
       segments.active = v;
       if (v) {
