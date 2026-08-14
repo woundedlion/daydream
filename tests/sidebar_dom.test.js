@@ -1,17 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EffectSidebar } from '../sidebar.js';
-import { installDocument, restoreDocumentAfterEach } from './fake_dom.js';
-
-restoreDocumentAfterEach();
 
 // Drives EffectSidebar.onKeyDown against a minimal fake button/list so no real
 // DOM is needed; the handler only touches the DOM through these hooks.
-// `activeFor` picks what document.activeElement is, defaulting to the option.
+// `activeFor` picks what the owner document's activeElement is, defaulting to
+// the option.
 function driveKey(key, activeFor = (btn) => btn) {
   const state = { selected: 0, selectedName: null, prevented: 0 };
   const focused = { dataset: { effect: 'Voronoi' }, focus() {} };
   const self = {
+    doc: { activeElement: activeFor(focused) },
     listEl: { querySelectorAll: () => [focused] },
     tabbableBtn: focused,
     setRovingTabbable() {},
@@ -20,7 +19,6 @@ function driveKey(key, activeFor = (btn) => btn) {
       state.selectedName = name;
     },
   };
-  installDocument({ activeElement: activeFor(focused) });
   const e = {
     key,
     preventDefault() {
@@ -69,12 +67,12 @@ function driveNav(key, startIdx = 0, count = 3) {
     focus() { focusLog.push(i); },
   }));
   const self = {
+    doc: { activeElement: btns[startIdx] },
     listEl: { querySelectorAll: () => btns },
     tabbableBtn: btns[startIdx],
     setRovingTabbable(b) { rovingLog.push(btns.indexOf(b)); },
     onSelect() {},
   };
-  installDocument({ activeElement: btns[startIdx] });
   const e = { key, preventDefault() { state.prevented++; } };
   EffectSidebar.prototype.onKeyDown.call(self, e);
   return { focusLog, rovingLog, prevented: state.prevented };

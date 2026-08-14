@@ -23,17 +23,18 @@ export class EffectSidebar {
    */
   constructor(container, onSelect) {
     this.container = container;
+    this.doc = container.ownerDocument;
     this.onSelect = onSelect;
     this.buttons = new Map();      // name -> button element
     this.items = [];               // [{name, size}]
     this.activeName = null;
     this.sort = { key: 'name', dir: 'asc' };
 
-    this.heading = document.createElement('h2');
+    this.heading = this.doc.createElement('h2');
     this.heading.textContent = 'Effects';
     this.heading.className = 'effect-sidebar-heading';
 
-    this.sortRow = document.createElement('div');
+    this.sortRow = this.doc.createElement('div');
     this.sortRow.className = 'sort-controls';
 
     this.nameBtn = this.createSortBtn('name', 'Name');
@@ -42,7 +43,7 @@ export class EffectSidebar {
     this.sortRow.appendChild(this.sizeBtn);
 
     // Roving tabindex: exactly one option carries tabindex=0 (see setRovingTabbable).
-    this.listEl = document.createElement('div');
+    this.listEl = this.doc.createElement('div');
     this.listEl.setAttribute('role', 'listbox');
     this.listEl.setAttribute('aria-label', this.listLabel());
     this.listEl.className = 'effect-list';
@@ -53,12 +54,12 @@ export class EffectSidebar {
     this.listEl.addEventListener('keydown', this.onKeyDownBound);
 
     // Decorative scroll-arrow glyphs — hidden from assistive tech.
-    this.arrowLeft = document.createElement('div');
+    this.arrowLeft = this.doc.createElement('div');
     this.arrowLeft.className = 'scroll-arrow scroll-arrow-left';
     this.arrowLeft.textContent = '\u2039';
     this.arrowLeft.setAttribute('aria-hidden', 'true');
 
-    this.arrowRight = document.createElement('div');
+    this.arrowRight = this.doc.createElement('div');
     this.arrowRight.className = 'scroll-arrow scroll-arrow-right';
     this.arrowRight.textContent = '\u203A';
     this.arrowRight.setAttribute('aria-hidden', 'true');
@@ -110,7 +111,7 @@ export class EffectSidebar {
     // Discarding the focused option drops focus to <body>, where the list's
     // keydown handler no longer sees it and Space reaches the global one
     // instead. Name it now; the rebuilt button carrying that name takes it back.
-    const focused = document.activeElement;
+    const focused = this.doc.activeElement;
     const refocusName = focused && this.listEl.contains(focused)
       ? (focused.dataset?.effect ?? '') : null;
 
@@ -122,20 +123,20 @@ export class EffectSidebar {
       const size = effectSizes ? (effectSizes[name] || 0) : 0;
       this.items.push({ name, size });
 
-      const btn = document.createElement('button');
+      const btn = this.doc.createElement('button');
       btn.className = 'effect-button';
       btn.setAttribute('role', 'option');
       btn.setAttribute('aria-selected', 'false');
       btn.tabIndex = -1; // roving tabindex
       btn.dataset.effect = name;
 
-      const nameSpan = document.createElement('span');
+      const nameSpan = this.doc.createElement('span');
       nameSpan.className = 'effect-name';
       nameSpan.textContent = name;
       btn.appendChild(nameSpan);
 
       if (size > 0) {
-        const sizeSpan = document.createElement('span');
+        const sizeSpan = this.doc.createElement('span');
         sizeSpan.className = 'effect-size';
         sizeSpan.textContent = `${formatKB(size)} KB`;
         btn.appendChild(sizeSpan);
@@ -240,14 +241,14 @@ export class EffectSidebar {
    * @returns {HTMLElement} The created sort-control button.
    */
   createSortBtn(key, label) {
-    const btn = document.createElement('button');
+    const btn = this.doc.createElement('button');
     btn.dataset.sortLabel = label.toLowerCase();
 
-    const labelSpan = document.createElement('span');
+    const labelSpan = this.doc.createElement('span');
     labelSpan.textContent = label;
     btn.appendChild(labelSpan);
 
-    const glyphSpan = document.createElement('span');
+    const glyphSpan = this.doc.createElement('span');
     glyphSpan.className = 'sort-glyph';
     glyphSpan.setAttribute('aria-hidden', 'true');
     btn.appendChild(glyphSpan);
@@ -334,7 +335,7 @@ export class EffectSidebar {
     const btns = Array.from(this.listEl.querySelectorAll('.effect-button'));
     if (!btns.length) return;
 
-    const focused = document.activeElement;
+    const focused = this.doc.activeElement;
     const idx = btns.indexOf(focused);
 
     const target = navTargetIndex(idx, btns.length, e.key);
