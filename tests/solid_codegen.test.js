@@ -29,6 +29,7 @@ const {
   createCommitQueue,
   createChainValidator,
   createOpGate,
+  opTopologyKey,
   meshOpFailure,
   requireMeshResult,
   MESH_OP_RESULT_NAMES,
@@ -1249,6 +1250,49 @@ test('createOpGate skips a pass whose base and op names repeat', async () => {
   assert.equal(probes.length, swept);
   assert.notEqual(await gate.refresh('cube', [{ op: 'kis', params: {} }], CANDIDATES), null);
   assert.ok(probes.length > swept);
+});
+
+/**
+ * Verifies the pass-skipping signature separates the two lowerings truncate and
+ * bevel have. Both slide t up to 0.5, where truncate short-circuits to ambo, so
+ * the census on either side of that edge differs by roughly a doubling and a
+ * verdict carried across it would enable ops the engine then refuses.
+ */
+test('createOpGate re-sweeps when a param crosses the ambo lowering', async () => {
+  for (const op of ['truncate', 'bevel']) {
+    const probes = [];
+    const { Mod } = fakeModule((name) => probes.push(name));
+    const gate = createOpGate(createChainValidator(async () => Mod));
+
+    assert.notEqual(await gate.refresh('cube', [{ op, params: { t: 0.5 } }], CANDIDATES), null,
+      `${op} at 0.5 must sweep`);
+    const swept = probes.length;
+    assert.notEqual(await gate.refresh('cube', [{ op, params: { t: 0.49 } }], CANDIDATES), null,
+      `${op} leaving 0.5 must re-sweep`);
+    assert.ok(probes.length > swept, `${op} kept a verdict from the other lowering`);
+
+    const again = probes.length;
+    assert.equal(await gate.refresh('cube', [{ op, params: { t: 0.48 } }], CANDIDATES), null,
+      `${op} moving within one lowering must stay skipped`);
+    assert.equal(probes.length, again);
+  }
+});
+
+/** Verifies opTopologyKey names the parameter only where the engine lowers on it. */
+test('opTopologyKey separates only the params that pick a lowering', () => {
+  assert.equal(opTopologyKey({ op: 'truncate', params: { t: 0.5 } }), 'truncate:ambo');
+  assert.equal(opTopologyKey({ op: 'bevel', params: { t: 0.5 } }), 'bevel:ambo');
+  assert.equal(opTopologyKey({ op: 'truncate', params: { t: 0.49 } }), 'truncate');
+  assert.equal(opTopologyKey({ op: 'bevel', params: { t: 0.25 } }), 'bevel');
+  // Every other op's params leave the topology alone, so they stay out of the key.
+  assert.equal(opTopologyKey({ op: 'chamfer', params: { t: 0.5 } }), 'chamfer');
+  assert.equal(opTopologyKey({ op: 'expand', params: { t: 0.5 } }), 'expand');
+  assert.equal(opTopologyKey({ op: 'snub', params: { t: 0.5, twist: 0 } }), 'snub');
+  assert.equal(opTopologyKey({ op: 'hankin', params: { angle: 54 } }), 'hankin');
+  assert.equal(opTopologyKey({ op: 'relax', params: { iter: 100 } }), 'relax');
+  assert.equal(opTopologyKey('dual'), 'dual');
+  // A bare parameterized op carries no t, so it cannot be the aliased lowering.
+  assert.equal(opTopologyKey('truncate'), 'truncate');
 });
 
 /** Verifies a pass the chain outran reports nothing rather than gating on stale probes. */

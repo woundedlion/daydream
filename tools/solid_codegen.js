@@ -1081,6 +1081,25 @@ export function createChainValidator(createModule) {
   return { acquire, noteDeath, withValidator, chainIsValid };
 }
 
+// truncate short-circuits to ambo at exactly t == 0.5 (core/mesh/conway.h), and
+// bevel forwards its own t to that truncate, so for these two the resulting
+// element census turns on the parameter as well as the op name. 0.5 is each
+// one's slider max, so the aliased census is one drag away.
+const AMBO_ALIASING_OPS = new Set(['truncate', 'bevel']);
+const AMBO_ALIAS_T = 0.5;
+
+/**
+ * What a chain entry contributes to the resulting mesh's topology.
+ * @param {ChainOp} o - The op as the chain holds it.
+ * @returns {string} The op name, plus a marker where its params pick a different
+ *   lowering.
+ */
+export function opTopologyKey(o) {
+  const opName = typeof o === 'string' ? o : o?.op;
+  if (!AMBO_ALIASING_OPS.has(opName)) return String(opName);
+  return opParams(o).t === AMBO_ALIAS_T ? `${opName}:ambo` : String(opName);
+}
+
 /**
  * Builds the add-op availability gate: which of the offered ops would trap if
  * appended to the current chain.
@@ -1090,11 +1109,12 @@ export function createChainValidator(createModule) {
  * from a JS mirror of its ceilings. A trap kills only the validator, which is
  * respawned mid-sweep and the chain rebuilt on it.
  *
- * Gating depends only on the mesh's topology, which op params never change, so
- * a pass whose base and op names repeat the last complete one is skipped.
+ * Gating depends only on the mesh's topology, so a pass whose base and chain
+ * topology repeat the last complete one is skipped; opTopologyKey names what a
+ * chain entry contributes to that.
  * @param {ChainValidator} validator - A createChainValidator handle.
  * @param {number} [retries=3] - Incomplete passes tolerated before probing stops. A validator that never spawns would otherwise be retried on every recompute.
- * @returns {{refresh: (base: string, ops: Array<{op: string}>, candidates: string[]) => Promise<?OpGateVerdict>}} The gate.
+ * @returns {{refresh: (base: string, ops: ChainOp[], candidates: string[]) => Promise<?OpGateVerdict>}} The gate.
  */
 export function createOpGate(validator, retries = 3) {
   let generation = 0;
@@ -1198,13 +1218,13 @@ export function createOpGate(validator, retries = 3) {
   /**
    * Re-derives which candidates are blocked on the current chain.
    * @param {string} base - Registry name of the seed solid.
-   * @param {Array<{op: string}>} ops - The current chain.
+   * @param {ChainOp[]} ops - The current chain.
    * @param {string[]} candidates - Op names to probe.
    * @returns {Promise<?OpGateVerdict>} The verdict, or null when the pass was
    *   skipped or the chain changed under it.
    */
   async function refresh(base, ops, candidates) {
-    const signature = `${base}|${ops.map((o) => o.op).join(',')}`;
+    const signature = `${base}|${ops.map(opTopologyKey).join(',')}`;
     if (abandoned || signature === lastSignature) return null;
 
     const started = ++generation;
