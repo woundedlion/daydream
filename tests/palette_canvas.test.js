@@ -25,7 +25,7 @@ function fakeContext() {
     lineTo: (...a) => ops.push(['lineTo', ...a]),
     stroke: function stroke() { ops.push(['stroke', this.strokeStyle, this.lineWidth]); },
     setLineDash: (a) => ops.push(['setLineDash', a.join(',')]),
-    drawImage: (image, x, y) => ops.push(['drawImage', image, x, y]),
+    drawImage: (...a) => ops.push(['drawImage', ...a]),
     createImageData: (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }),
     putImageData: function putImageData(image) { this.painted = image; },
     fillText: (...a) => ops.push(['fillText', ...a]),
@@ -145,6 +145,51 @@ test('changing the visible phase window rebuilds the strip cache', () => {
   painter.draw(palette);
   painter.draw(palette, null, { start: 0.25, end: 0.75 });
   assert.equal(palette.getCalls, 16);
+});
+
+test('the strip fits its backing buffer to the displayed size and pixel density', () => {
+  const canvas = { width: 1024, height: 100, clientWidth: 400, clientHeight: 96 };
+  const ctx = fakeContext();
+  ctx.setTransform = (...args) => ctx.ops.push(['setTransform', ...args]);
+  const { doc, created } = fakeDoc();
+  const palette = fakePalette();
+  const painter = createColorStripPainter({ canvas, ctx, doc });
+  const originalPixelRatio = globalThis.devicePixelRatio;
+  globalThis.devicePixelRatio = 2;
+
+  try {
+    painter.draw(palette);
+  } finally {
+    if (originalPixelRatio === undefined) delete globalThis.devicePixelRatio;
+    else globalThis.devicePixelRatio = originalPixelRatio;
+  }
+
+  assert.deepEqual([canvas.width, canvas.height], [800, 192]);
+  assert.deepEqual(ctx.ops[0], ['setTransform', 2, 0, 0, 2, 0, 0]);
+  assert.deepEqual([created[0].width, created[0].height], [800, 192],
+    'the gradient must be baked at the backing store size, not the CSS size');
+  assert.equal(palette.getCalls, 800, 'the strip samples one color per device pixel');
+  assert.deepEqual(ctx.ops[1], ['drawImage', created[0], 0, 0, 400, 96],
+    'the gradient must be blitted over the CSS-pixel box the transform scales by');
+});
+
+test('repeated strip draws leave an unlaid-out canvas its own size', () => {
+  const { painter, canvas, ctx, palette } = stripSetup(2048, 512);
+  ctx.setTransform = (...args) => ctx.ops.push(['setTransform', ...args]);
+  const originalPixelRatio = globalThis.devicePixelRatio;
+  globalThis.devicePixelRatio = 2;
+
+  try {
+    for (let i = 0; i < 5; i++) painter.draw(palette);
+  } finally {
+    if (originalPixelRatio === undefined) delete globalThis.devicePixelRatio;
+    else globalThis.devicePixelRatio = originalPixelRatio;
+  }
+
+  assert.deepEqual([canvas.width, canvas.height], [2048, 512],
+    'the backing store must not compound the pixel ratio on every draw');
+  assert.deepEqual(ctx.ops[1].slice(4), [1024, 256],
+    'the drawn area is the backing store read back in CSS pixels');
 });
 
 test('a selection overlay is drawn only when one is passed, in either drag direction', () => {
