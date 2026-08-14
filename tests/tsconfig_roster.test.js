@@ -42,6 +42,12 @@ function readTsconfig() {
   return JSON.parse(stripped);
 }
 
+// Relative module specifiers, covering `import`, `export … from`, a bare
+// side-effect `import`, and the parenthesized form both `import()` and a JSDoc
+// `@typedef {import('./x.js').T}` use — the latter names a module whose types
+// the roster has to carry just as a static import does.
+const SPECIFIER = /\b(?:from|import)\s*\(?\s*["'](\.{1,2}\/[^"']+)["']/g;
+
 /**
  * The relative-module specifiers one file imports, resolved against the
  * importing file's directory.
@@ -52,10 +58,7 @@ function importsOf(file) {
   const importer = new URL(file, ROOT);
   const source = readFileSync(importer, 'utf8');
   const found = [];
-  for (const [, spec] of source.matchAll(/\bfrom\s*["'](\.{1,2}\/[^"']+)["']/g)) {
-    found.push(new URL(spec, importer).href.slice(ROOT.href.length));
-  }
-  for (const [, spec] of source.matchAll(/\bimport\s*["'](\.{1,2}\/[^"']+)["']/g)) {
+  for (const [, spec] of source.matchAll(SPECIFIER)) {
     found.push(new URL(spec, importer).href.slice(ROOT.href.length));
   }
   return found;
