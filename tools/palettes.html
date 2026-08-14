@@ -1159,13 +1159,15 @@
      * Switch the controls into CUSTOM hue mode, authoring the three keys the
      * handoff starts from.
      * @param {Object} sourceRecipe - The recipe the keys are resampled from.
-     * @returns {boolean} False when the resample dropped the key a drag had
-     *   grabbed — a four-key harmony resamples to three, and clamping the grab
-     *   onto a neighbour would silently move a different key.
+     * @returns {boolean} False when the resample dropped the key the user was
+     *   acting on — a four-key harmony resamples to three, and clamping the
+     *   grab or the selection onto a neighbour would silently move a different
+     *   key.
      */
     function activateCustomHue(sourceRecipe) {
       const state = customHueKeyState(sourceRecipe);
       customHueOffsets = state.offsets;
+      const selectionKept = selectedHueKey < customHueOffsets.length;
       selectedHueKey = Math.min(selectedHueKey, customHueOffsets.length - 1);
       const grabKept = activeHueKey === null
         || activeHueKey < customHueOffsets.length;
@@ -1174,7 +1176,7 @@
       document.getElementById('gen_hue_mode').value = 'CUSTOM';
       previousHueMode = PaletteV4.hueMode.CUSTOM;
       syncRecipeControlAvailability();
-      return grabKept;
+      return grabKept && selectionKept;
     }
 
     function currentHueKeyState(recipe) {
@@ -1412,7 +1414,14 @@
       if (direction === 0) return;
 
       const recipe = readPaletteRecipe();
-      if (recipe.hue.mode !== PaletteV4.hueMode.CUSTOM) activateCustomHue(recipe);
+      if (recipe.hue.mode !== PaletteV4.hueMode.CUSTOM
+          && !activateCustomHue(recipe)) {
+        // The resample dropped the selected key; redraw on the clamped
+        // selection rather than nudging the neighbour it landed on.
+        scheduleUpdate();
+        event.preventDefault();
+        return;
+      }
       const delta = direction * (event.shiftKey ? 10 : 1) / 360;
       const base = customBaseTurns();
       const current = base + customHueOffsets[selectedHueKey];
