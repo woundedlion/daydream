@@ -612,6 +612,32 @@ test('URLSync.applyPendingReset hides the params a scheduled reset will clear', 
   assert.equal(after.get('speed'), '2', 'the flush ends the window');
 });
 
+/**
+ * setParam() only buffers; the write reaches the URL on the next flush. A reader
+ * inside that window — the deep-link GUI rebuilding a panel — has to see the
+ * buffered value, not the query-string one it is about to replace.
+ */
+test('URLSync.overlayPending applies the writes buffered for the next flush', () => {
+  installWindow('?speed=2&drop=1', '/sim');
+  const sync = new URLSync(new AppState({ resolution: 'high' }), ['resolution']);
+
+  const before = new URLSearchParams('speed=2&drop=1');
+  sync.overlayPending(before);
+  assert.equal(before.get('speed'), '2', 'nothing is overlaid with no write buffered');
+
+  sync.setParam('speed', 3);
+  sync.setParam('drop', null);
+  const during = new URLSearchParams('speed=2&drop=1');
+  sync.overlayPending(during);
+  assert.equal(during.get('speed'), '3', 'the buffered write wins over the URL value');
+  assert.equal(during.has('drop'), false, 'a deletion marker drops the key');
+
+  sync.flush();
+  const after = new URLSearchParams('speed=2&drop=1');
+  sync.overlayPending(after);
+  assert.equal(after.get('speed'), '2', 'the flush empties the buffer');
+});
+
 test('URLSync.setParam(k, null) drops the key from the URL on flush', () => {
   const calls = installWindow('?keep=1', '/sim');
   const s = new AppState({});
