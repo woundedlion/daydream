@@ -52,7 +52,7 @@ jobs:
           echo "Running on Node $pin (pinned in js-unit-suite.yml)"
           echo "version=$pin" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ steps.node.outputs.version }}
           cache: npm
