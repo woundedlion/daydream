@@ -55,6 +55,9 @@ let segRange = null;
 // worker actually shaded rather than the rectangle it sliced out.
 let clipFullFrame = false;
 let arenaMetricsWarned = false;
+// Last `name:outcome` reported by reportParamRejected, so a held slider pushing
+// the same rejection every frame logs once.
+let paramRejectedKey = '';
 
 /**
  * Restore a complete ShaderBall snapshot after the effect has been rebuilt.
@@ -111,6 +114,27 @@ function applyClip() {
   }
   clipFullFrame = result === wasmModule.ClipSetResult.FULL_FRAME_KEPT;
   return true;
+}
+
+/**
+ * Report a live setParameter the engine did not apply. The controller has no
+ * reply channel for one, and only segment 0 mirrors its values back on a frame,
+ * so on any other segment this is the sole trace that the worker is rendering a
+ * configuration the main engine never had.
+ * @param {string} name - Parameter the controller pushed.
+ * @param {unknown} result - The ParamSetResult the engine answered.
+ * @returns {void}
+ */
+function reportParamRejected(name, result) {
+  if (!wasmModule) return;
+  const outcome = Object.entries(wasmModule.ParamSetResult)
+    .find(([, value]) => value === result)?.[0]
+    ?? `value ${String(/** @type {{value?: unknown}} */ (result)?.value ?? result)}`;
+  const key = `${name}:${outcome}`;
+  if (key === paramRejectedKey) return;
+  paramRejectedKey = key;
+  console.error(
+    `segment_worker: segment ${segId} setParameter(${name}) rejected: ${outcome}`);
 }
 
 /**
@@ -263,8 +287,11 @@ async function handleMessage(msg) {
     }
 
     case 'setParameter': {
-      if (engine) {
-        engine.setParameter(msg.name, msg.value);
+      if (engine && wasmModule) {
+        const result = engine.setParameter(msg.name, msg.value);
+        if (result !== wasmModule.ParamSetResult.APPLIED) {
+          reportParamRejected(msg.name, result);
+        }
         paramRevision = msg.paramRevision;
       }
       break;
