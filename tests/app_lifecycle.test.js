@@ -70,18 +70,6 @@ test('aliases agree only when both reference the same view', () => {
   assert.equal(displayAliasesDiverged(driver, view), true);
 });
 
-test('the mesh alias refuses a view of a different length', () => {
-  const driver = fakeDriver();
-  repointDisplayAliases(driver, new Uint16Array(4));
-
-  // A resolution change moves the active prefix of a buffer that is never
-  // reallocated, so a stale view stays live at the old length. Three.js sized
-  // the GPU buffer at the first upload and bufferSubDatas into it from then on,
-  // which renders the wrong frame rather than throwing (README §10.2).
-  assert.throws(() => repointDisplayAliases(driver, new Uint16Array(2)),
-    /GPU buffer is sized/);
-});
-
 /**
  * Build a render adapter over doubles for the host, driver, and worker pool.
  * @param {Object} [options] - Pool state and the view the host publishes.

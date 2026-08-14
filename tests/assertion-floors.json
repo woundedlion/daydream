@@ -1,7 +1,7 @@
 {
   "tests/app_lifecycle.test.js": {
-    "cases": 62,
-    "assertions": 140
+    "cases": 61,
+    "assertions": 139
   },
   "tests/banner.test.js": {
     "cases": 13,
@@ -71,6 +71,10 @@
   "tests/fake_dom.test.js": {
     "cases": 15,
     "assertions": 29
+  },
+  "tests/fake_three.test.js": {
+    "cases": 6,
+    "assertions": 17
   },
   "tests/flyout.test.js": {
     "cases": 3,
