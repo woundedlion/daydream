@@ -1,5 +1,6 @@
 import { test, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import { installConsoleCapture } from './fake_console.js';
 import {
   AppState,
   URLSync,
@@ -219,13 +220,11 @@ test('URLSync.reset leaves a bare path when nothing survives', () => {
  * all inside a switch rollback, where it would be read as unrecoverable state.
  */
 test('a refused history write does not propagate out of the URL layer', () => {
-  const warnings = [];
   globalThis.window = {
     location: { search: '', pathname: '/sim', hash: '' },
     history: { replaceState() { throw new Error('rate limit'); } },
   };
-  const warn = console.warn;
-  console.warn = (...args) => { warnings.push(args); };
+  const captured = installConsoleCapture('warn');
   try {
     assert.doesNotThrow(() => replaceUrl('/sim?effect=Voronoi'));
     assert.doesNotThrow(() => writeUrl(new URLSearchParams('effect=Voronoi')));
@@ -234,9 +233,9 @@ test('a refused history write does not propagate out of the URL layer', () => {
     assert.doesNotThrow(() => { sync.reset(); sync.flush(); });
     assert.doesNotThrow(() => sync.flush());
   } finally {
-    console.warn = warn;
+    captured.restore();
   }
-  assert.equal(warnings.length, 4, 'every refused write is reported once');
+  assert.equal(captured.calls.length, 4, 'every refused write is reported once');
 });
 
 /**
@@ -249,8 +248,7 @@ test('URLSync holds its ad-hoc buffer through a refused history write', () => {
   let refuse = true;
   const delays = [];
   const realSetTimeout = globalThis.setTimeout;
-  const warn = console.warn;
-  console.warn = () => {};
+  const captured = installConsoleCapture('warn');
   globalThis.setTimeout = (fn, ms) => { delays.push(ms); return 0; };
   globalThis.window = {
     location: { search: '', pathname: '/sim', hash: '' },
@@ -279,7 +277,7 @@ test('URLSync holds its ad-hoc buffer through a refused history write', () => {
       'a landed ad-hoc write is not replayed from the buffer');
   } finally {
     globalThis.setTimeout = realSetTimeout;
-    console.warn = warn;
+    captured.restore();
   }
 });
 
@@ -293,10 +291,8 @@ test('URLSync bounds its retries of a refused history write', () => {
   const written = [];
   let refuse = true;
   const delays = [];
-  const warnings = [];
   const realSetTimeout = globalThis.setTimeout;
-  const warn = console.warn;
-  console.warn = (...args) => { warnings.push(String(args[0])); };
+  const captured = installConsoleCapture('warn');
   globalThis.setTimeout = (fn, ms) => { delays.push(ms); return 0; };
   globalThis.window = {
     location: { search: '', pathname: '/sim', hash: '' },
@@ -316,7 +312,7 @@ test('URLSync bounds its retries of a refused history write', () => {
 
     assert.equal(delays.length, URL_FLUSH_MAX_RETRIES - 1,
       'the retry kept re-arming past the bound');
-    assert.equal(warnings.filter((m) => m.startsWith('URLSync:')).length, 1,
+    assert.equal(captured.messages.filter((m) => m.startsWith('URLSync:')).length, 1,
       'the exhaustion is reported once, not once per refused write');
 
     refuse = false;
@@ -325,7 +321,7 @@ test('URLSync bounds its retries of a refused history write', () => {
       'a tracked key is re-read from state, but the abandoned ad-hoc param is gone');
   } finally {
     globalThis.setTimeout = realSetTimeout;
-    console.warn = warn;
+    captured.restore();
   }
 });
 

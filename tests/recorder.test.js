@@ -1,5 +1,6 @@
 import { mock, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { installConsoleCapture } from './fake_console.js';
 import { fakeElement } from './fake_dom.js';
 import { selectMimeType, VideoRecorder } from '../recorder.js';
 
@@ -292,9 +293,7 @@ test('toggle starts then stops, reporting the true state each time', () => {
  */
 test('abort stops a live session and tells the host', () => {
   const restore = installRecorderEnv();
-  const errs = [];
-  const prevErr = console.error;
-  console.error = (...a) => errs.push(a.join(' '));
+  const captured = installConsoleCapture('error');
   try {
     const rec = new VideoRecorder(recordableCanvas());
     rec.download = () => {};
@@ -313,7 +312,7 @@ test('abort stops a live session and tells the host', () => {
     rec.abort('context lost');
     assert.equal(notified.length, 1, 'an idle recorder has nothing to abort');
   } finally {
-    console.error = prevErr;
+    captured.restore();
     restore();
   }
 });
@@ -321,9 +320,7 @@ test('abort stops a live session and tells the host', () => {
 /** Verifies start() refuses (no phantom session) when the browser is unsupported. */
 test('start refuses and stays idle when recording is unsupported', () => {
   const restore = installRecorderEnv();
-  const errs = [];
-  const prevErr = console.error;
-  console.error = (...a) => errs.push(a.join(' '));
+  const captured = installConsoleCapture('error');
   try {
     delete globalThis.MediaRecorder;
     const rec = new VideoRecorder(recordableCanvas());
@@ -332,11 +329,11 @@ test('start refuses and stays idle when recording is unsupported', () => {
     rec.start('e');
     assert.equal(rec.mediaRecorder, null);
     assert.equal(rec.isRecording, false);
-    assert.equal(errs.length, 1);
+    assert.equal(captured.messages.length, 1);
     assert.equal(notified.length, 1, 'the host is told the session never started');
     assert.match(notified[0].message, /not supported/);
   } finally {
-    console.error = prevErr;
+    captured.restore();
     restore();
   }
 });
@@ -362,9 +359,7 @@ test('an unsupported explicit format reports the browser-selected container', ()
 
 test('a MediaRecorder start failure releases the entire capture session', () => {
   const restore = installRecorderEnv();
-  const errors = [];
-  const previousError = console.error;
-  console.error = (...args) => errors.push(args);
+  const captured = installConsoleCapture('error');
   try {
     const failure = new Error('codec start rejected');
     failure.name = 'NotSupportedError';
@@ -390,7 +385,7 @@ test('a MediaRecorder start failure releases the entire capture session', () => 
     assert.equal(rec.offCtx, null);
     assert.equal(rec.isRecording, false);
     assert.equal(sinkOpened, false);
-    assert.ok(errors.some((args) => args.includes(failure)));
+    assert.ok(captured.calls.some((args) => args.includes(failure)));
     assert.deepEqual(notified, [failure], 'the host is told the session never started');
 
     FakeMediaRecorder.startError = null;
@@ -400,7 +395,7 @@ test('a MediaRecorder start failure releases the entire capture session', () => 
     assert.equal(rec.isRecording, true);
     rec.dispose();
   } finally {
-    console.error = previousError;
+    captured.restore();
     restore();
   }
 });
@@ -456,9 +451,7 @@ test('a chunk emitted synchronously by start reaches the installed sink', () => 
  */
 test('an encoder error finalizes the session, reports it, and clears the recorder', () => {
   const restore = installRecorderEnv();
-  const errs = [];
-  const prevErr = console.error;
-  console.error = (...a) => errs.push(a);
+  const captured = installConsoleCapture('error');
   try {
     const rec = new VideoRecorder(recordableCanvas());
     const downloads = [];
@@ -484,7 +477,8 @@ test('an encoder error finalizes the session, reports it, and clears the recorde
     assert.equal(rec.offscreen, null);
     assert.equal(rec.isRecording, false);
     assert.deepEqual(notified, [failure], 'the host is told the session ended');
-    assert.ok(errs.some((args) => args.includes(failure)), 'the failure is reported');
+    assert.ok(captured.calls.some((args) => args.includes(failure)),
+      'the failure is reported');
 
     // The UA may still deliver a stop event after the error; it must not finalize twice.
     recorder.onstop();
@@ -495,7 +489,7 @@ test('an encoder error finalizes the session, reports it, and clears the recorde
     assert.notEqual(rec.mediaRecorder, recorder, 'the next start is a fresh session');
     rec.dispose();
   } finally {
-    console.error = prevErr;
+    captured.restore();
     restore();
   }
 });
@@ -526,8 +520,7 @@ test('an encoder error event without an Error cause is normalized', () => {
  */
 test('a stale session error does not clobber the session that replaced it', () => {
   const restore = installRecorderEnv();
-  const prevErr = console.error;
-  console.error = () => {};
+  const captured = installConsoleCapture('error');
   try {
     const rec = new VideoRecorder(recordableCanvas());
     const downloads = [];
@@ -553,7 +546,7 @@ test('a stale session error does not clobber the session that replaced it', () =
     assert.equal(rec.isRecording, true);
     assert.equal(rec.stream.track.stopped, false);
   } finally {
-    console.error = prevErr;
+    captured.restore();
     restore();
   }
 });
@@ -692,11 +685,7 @@ test('a mid-stream streaming write failure closes the writable, skips download, 
     close: async () => { closed = true; },
   };
   globalThis.showSaveFilePicker = async () => ({ createWritable: async () => writable });
-  const errs = [];
-  const prevErr = console.error;
-  const prevWarn = console.warn;
-  console.error = (...a) => errs.push(a.join(' '));
-  console.warn = () => {};
+  const captured = installConsoleCapture('error', 'warn');
   try {
     const rec = new VideoRecorder(recordableCanvas());
     const sinkFinished = trackSinkFinish(rec);
@@ -716,10 +705,10 @@ test('a mid-stream streaming write failure closes the writable, skips download, 
     assert.deepEqual(writes, [{ size: 10 }], 'only the pre-failure chunk reached disk');
     assert.equal(closed, true, 'the writable is closed to flush the on-disk prefix');
     assert.equal(downloaded, false, 'no blob download of the post-failure tail');
-    assert.ok(errs.some((e) => /truncated/.test(e)), 'the truncation is reported to the user');
+    assert.ok(captured.messages.some((e) => /truncated/.test(e)),
+      'the truncation is reported to the user');
   } finally {
-    console.error = prevErr;
-    console.warn = prevWarn;
+    captured.restore();
     restore();
   }
 });
@@ -740,9 +729,7 @@ test('an unanswered save dialog stops the session at the backlog bound', async (
   globalThis.showSaveFilePicker = () => new Promise((resolve) => {
     answerPicker = () => resolve({ createWritable: async () => writable });
   });
-  const errs = [];
-  const prevErr = console.error;
-  console.error = (...a) => errs.push(a.join(' '));
+  const captured = installConsoleCapture('error');
   try {
     const rec = new VideoRecorder(recordableCanvas());
     const sinkFinished = trackSinkFinish(rec);
@@ -761,7 +748,8 @@ test('an unanswered save dialog stops the session at the backlog bound', async (
     recorder.ondataavailable({ data: { size: 2_000_000 } });
     assert.equal(rec.isRecording, false, 'the session stops when the backlog passes the bound');
     assert.equal(notified.length, 1, 'the host is told the session ended');
-    assert.match(errs.join(' '), /Save dialog/, 'the stop is reported, not silent');
+    assert.match(captured.messages.join(' '), /Save dialog/,
+      'the stop is reported, not silent');
 
     recorder.ondataavailable({ data: { size: 3_000_000 } });
     recorder.onstop();
@@ -776,7 +764,7 @@ test('an unanswered save dialog stops the session at the backlog bound', async (
     assert.equal(downloaded, false, 'no in-memory blob download of the dropped tail');
     assert.deepEqual(sessionChunks, [], 'the dropped chunks are not retained in RAM');
   } finally {
-    console.error = prevErr;
+    captured.restore();
     restore();
   }
 });
@@ -789,9 +777,7 @@ test('a streaming session that produces no data never opens the chosen file', as
   globalThis.showSaveFilePicker = async () => ({
     createWritable: async () => { createWritableCalls++; return writable; },
   });
-  const warns = [];
-  const prevWarn = console.warn;
-  console.warn = (...a) => warns.push(a.join(' '));
+  const captured = installConsoleCapture('warn');
   try {
     const rec = new VideoRecorder(recordableCanvas());
     const sinkFinished = trackSinkFinish(rec);
@@ -809,9 +795,10 @@ test('a streaming session that produces no data never opens the chosen file', as
     assert.equal(createWritableCalls, 0, 'the file is never opened/truncated when no data streams');
     assert.equal(closed, false, 'no empty writable is closed over the chosen file');
     assert.equal(downloaded, false, 'nothing to download');
-    assert.ok(warns.some((w) => /no data/.test(w)), 'the empty session is reported');
+    assert.ok(captured.messages.some((w) => /no data/.test(w)),
+      'the empty session is reported');
   } finally {
-    console.warn = prevWarn;
+    captured.restore();
     restore();
   }
 });
@@ -977,8 +964,7 @@ test('a cancelled save picker discards buffered chunks without downloading', asy
   const abort = new Error('user cancelled');
   abort.name = 'AbortError';
   globalThis.showSaveFilePicker = async () => { throw abort; };
-  const prevWarn = console.warn;
-  console.warn = () => {};
+  const captured = installConsoleCapture('warn');
   try {
     const rec = new VideoRecorder(recordableCanvas());
     const sinkFinished = trackSinkFinish(rec);
@@ -998,7 +984,7 @@ test('a cancelled save picker discards buffered chunks without downloading', asy
 
     assert.equal(downloads.length, 0, 'no download after the picker was cancelled');
   } finally {
-    console.warn = prevWarn;
+    captured.restore();
     restore();
   }
 });
@@ -1235,8 +1221,7 @@ test('download saves the supplied recorder, chunks, and effect name', () => {
  */
 const startAborted = (offscreen) => {
   const restore = installRecorderEnv();
-  const previousError = console.error;
-  console.error = () => {};
+  const captured = installConsoleCapture('error');
   try {
     globalThis.document = /** @type {any} */ ({ createElement: () => offscreen });
     const rec = new VideoRecorder(/** @type {any} */ (recordableCanvas()));
@@ -1247,7 +1232,7 @@ const startAborted = (offscreen) => {
     rec.start('aborted');
     return { rec, notified, recorders };
   } finally {
-    console.error = previousError;
+    captured.restore();
     restore();
   }
 };
