@@ -857,6 +857,21 @@ test('create posts init stamped with the protocol version', () => {
   }
 });
 
+test('create spawns module workers from the segment worker URL', () => {
+  const c = makeController();
+  c.create(2);
+
+  assert.equal(FakeWorker.instances.length, 2);
+  for (const w of FakeWorker.instances) {
+    assert.ok(String(w.url).endsWith('/segment_worker.js'),
+      `spawned from ${w.url}`);
+    // segment_worker.js uses static ESM imports: a classic worker fails to load
+    // it, and reports only a message-less error event.
+    assert.deepEqual(w.opts, { type: 'module' },
+      'the worker is spawned as a module');
+  }
+});
+
 test('create() is the sole writer of count, so it matches the pool it describes', () => {
   const c = readyController(4);
   assert.equal(c.count, 4);
