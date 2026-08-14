@@ -98,19 +98,19 @@ test('onKeyDown: ArrowUp wraps focus to the last button', () => {
   assert.equal(r.prevented, 1);
 });
 
-// The mobile list is a column-flow grid; the stride comes from the resolved
-// grid-template-rows so the stylesheet alone states the layout.
+// The mobile list is a column-flow grid; the stride comes from its resolved
+// grid-template-rows so navigation follows the active roster layout.
 const MOBILE_GRID = {
   gridAutoFlow: 'column',
-  gridTemplateRows: '20px 20px 20px 20px 20px 20px 20px 20px',
+  gridTemplateRows: '20px 20px 20px 20px 20px 20px 20px',
 };
 
 test('onKeyDown: horizontal arrows cross columns in the mobile grid', () => {
   const right = driveNav('ArrowRight', 0, 20, MOBILE_GRID);
-  assert.deepEqual(right.focusLog, [8], 'Right lands in the next column, same row');
+  assert.deepEqual(right.focusLog, [7], 'Right lands in the next column, same row');
   assert.equal(right.prevented, 1);
 
-  const left = driveNav('ArrowLeft', 8, 20, MOBILE_GRID);
+  const left = driveNav('ArrowLeft', 7, 20, MOBILE_GRID);
   assert.deepEqual(left.focusLog, [0]);
 
   // Vertical arrows still walk the column one option at a time.
