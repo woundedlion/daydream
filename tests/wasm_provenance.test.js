@@ -181,6 +181,18 @@ test('the deploy gate requires the engine CI that built the module', () => {
   assert.match(step, /exit 1/, 'an unreadable or non-green check must fail the gate');
 });
 
+test('the deploy gate checks the recorded toolchain against the engine pin', () => {
+  const workflow = readFileSync(resolve(REPO, '.github/workflows/deploy.yml'), 'utf8');
+  const step = workflow.match(/- name: Verify the recorded build toolchain[\s\S]*?\n\n/)?.[0];
+  assert.ok(step, `deploy.yml must still compare ${TOOLCHAIN} against the pinned engine`);
+  assert.match(step, /build_pins\.py emsdk/,
+    'the engine\'s own pin is what the recorded emsdk has to agree with; the ' +
+      'shape check above passes for any version a local unpinned emsdk writes');
+  assert.match(step, /engine\/tools\/build_pins\.py/,
+    'the pin must be read from the pinned engine checkout, not from engine HEAD');
+  assert.match(step, /exit 1/, 'a mismatched or unreadable pin must fail the gate');
+});
+
 test('the deploy gate binds a lone pin move to the binary by content', () => {
   const workflow = readFileSync(resolve(REPO, '.github/workflows/deploy.yml'), 'utf8');
   const step = workflow.match(/- name: Verify the installed WASM and source pin[\s\S]*?\n\n/)?.[0];
