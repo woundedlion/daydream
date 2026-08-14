@@ -547,6 +547,42 @@ test('generateFuncAndRecipe rejects non-finite or out-of-range op params', () =>
     /must be a positive integer/);
 });
 
+/**
+ * Verifies the emit path applies the same OP_DEFS bands the restore path does.
+ * A stale or hand-edited stored card is refused by savedChainShapeError, but its
+ * "copy C++" button reaches generateFuncAndRecipe directly, and a param past its
+ * band pastes a literal the engine's always-on operator asserts halt on.
+ */
+test('generateFuncAndRecipe rejects every param savedChainShapeError calls out of range', () => {
+  const cases = [
+    [{ op: 'chamfer', params: { t: 1 } }, 'chamfer param "t"'],
+    [{ op: 'truncate', params: { t: 0.75 } }, 'truncate param "t"'],
+    [{ op: 'expand', params: { t: 1 } }, 'expand param "t"'],
+    [{ op: 'bevel', params: { t: 0.9 } }, 'bevel param "t"'],
+    [{ op: 'hankin', params: { angle: 120 } }, 'hankin param "angle"'],
+    [{ op: 'snub', params: { t: 0.5, twist: 2 } }, 'snub param "twist"'],
+    [{ op: 'relax', params: { iter: 600 } }, 'relax param "iter"'],
+  ];
+  for (const [op, named] of cases) {
+    assert.match(savedChainShapeError('cube', [op]) ?? '', /carries out-of-range/,
+      `savedChainShapeError must refuse ${JSON.stringify(op)}`);
+    assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: [op] }),
+      new RegExp(`${named} must be within`),
+      `generateFuncAndRecipe must refuse ${JSON.stringify(op)}`);
+  }
+
+  // Every op's slider extremes stay emittable, so the band check refuses nothing
+  // the tool itself can author.
+  for (const [name, { params }] of Object.entries(OP_DEFS)) {
+    for (const edge of ['min', 'max']) {
+      const op = { op: name, params: {} };
+      for (const [key, def] of Object.entries(params)) op.params[key] = def[edge];
+      assert.doesNotThrow(() => generateFuncAndRecipe({ base: 'cube', ops: [op] }),
+        `${name} at its ${edge} must stay emittable`);
+    }
+  }
+});
+
 /** Verifies a negative fractional param is rejected rather than emitting a `-`-tainted, non-identifier funcName. */
 test('pctSuffix and generateFuncAndRecipe reject negative fractional params', () => {
   assert.throws(() => pctSuffix(-0.5), /negative/);
