@@ -176,17 +176,24 @@ test('blitToOffscreen ignores a zero-sized source canvas', () => {
 /** A fake video track with the manual-frame API the recorder drives. */
 const makeFakeTrack = () => ({ requestFrame() {}, stop() { this.stopped = true; }, stopped: false });
 
-/** A fake capture stream exposing the one video track. */
-const makeFakeStream = () => {
+/**
+ * A fake capture stream exposing the one video track, tagged with the frame rate
+ * it was opened at. Only rate 0 is manual-frame mode, so a stream opened at any
+ * other rate carries a track without requestFrame, as a browser would.
+ * @param {number} [fps] - Frame rate captureStream was called with.
+ * @returns {Object} The stream.
+ */
+const makeFakeStream = (fps = 0) => {
   const track = makeFakeTrack();
-  return { track, getVideoTracks: () => [track], getTracks: () => [track] };
+  if (fps !== 0) delete track.requestFrame;
+  return { track, captureRate: fps, getVideoTracks: () => [track], getTracks: () => [track] };
 };
 
 /** A fake canvas that can be recorded (has captureStream) and blitted into. */
 const recordableCanvas = (w = 64, h = 32) => ({
   width: w, height: h,
   getContext: () => ({ clearRect() {}, drawImage() {} }),
-  captureStream: () => makeFakeStream(),
+  captureStream: (fps) => makeFakeStream(fps),
 });
 
 /**
@@ -207,7 +214,13 @@ class FakeMediaRecorder {
     this.onerror = null;
     FakeMediaRecorder.instances.push(this);
   }
-  start() {
+  start(timesliceMs) {
+    // Without a timeslice the encoder buffers the whole recording until stop(),
+    // so a start that omits it is a fault rather than a session.
+    if (!Number.isFinite(timesliceMs) || timesliceMs <= 0) {
+      throw new Error(`start(): expected a positive timeslice, got ${timesliceMs}`);
+    }
+    this.timesliceMs = timesliceMs;
     if (FakeMediaRecorder.startError) throw FakeMediaRecorder.startError;
     this.state = 'recording';
     if (FakeMediaRecorder.startData) {
@@ -257,6 +270,11 @@ test('toggle starts then stops, reporting the true state each time', () => {
     assert.equal(rec.isRecording, true);
     const stream = rec.stream;
     const recorder = rec.mediaRecorder;
+    assert.equal(stream.captureRate, 0,
+      'the session must capture in manual-frame mode, not off the wall clock');
+    assert.equal(typeof rec.track.requestFrame, 'function');
+    assert.equal(recorder.timesliceMs, 1000,
+      'chunks must be delivered on a timeslice, not buffered until stop');
     assert.equal(rec.toggle('e'), false);
     assert.equal(rec.isRecording, false);
     recorder.onstop();
