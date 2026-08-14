@@ -139,6 +139,7 @@ export class EffectSidebar {
       this.items.push({ name, size });
 
       const btn = this.doc.createElement('button');
+      btn.type = 'button';
       btn.className = 'effect-button';
       btn.setAttribute('role', 'option');
       btn.setAttribute('aria-selected', 'false');
@@ -263,6 +264,7 @@ export class EffectSidebar {
    */
   createSortBtn(key, label) {
     const btn = this.doc.createElement('button');
+    btn.type = 'button';
     btn.dataset.sortLabel = label.toLowerCase();
 
     const labelSpan = this.doc.createElement('span');
