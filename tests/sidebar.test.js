@@ -113,8 +113,9 @@ test('applySortOrder reorders the existing button nodes in place', () => {
   assert.equal(sidebar.buttons.get('Bravo'), bravo, 'the roster keeps the same node');
   assert.equal(sidebar.listEl.children[1], bravo, 'the list holds that same node');
   assert.equal(sidebar.buttons.size, 3);
-  // Focus survives because the focused node itself is what moved.
+  // Moving the node blurred it; the sort handed focus back.
   assert.equal(document.activeElement, bravo);
+  assert.equal(bravo.focusCalls, 2, 'one restore per sort');
   assert.ok(sidebar.listEl.children.includes(document.activeElement),
     'the focused node is still in the list');
   // The roving tab stop is that node, so Tab still lands on the active effect.
@@ -124,6 +125,21 @@ test('applySortOrder reorders the existing button nodes in place', () => {
   assert.equal(bravo.onclick, bravoClick);
   bravo.onclick();
   assert.deepEqual(selected, ['Bravo']);
+});
+
+// Clicking a sort control sorts from outside the list. Focus belongs to the
+// control the user is on, not to whichever option the reorder happened to move.
+test('sortBy leaves focus on the sort control that drove it', () => {
+  const { sidebar } = makeSidebar();
+  sidebar.setEffects(['Charlie', 'alpha'], {});
+  document.activeElement = sidebar.nameBtn;
+
+  sidebar.nameBtn.onclick();
+
+  assert.equal(document.activeElement, sidebar.nameBtn);
+  for (const btn of sidebar.buttons.values()) {
+    assert.equal(btn.focusCalls, 0, 'a sort must not pull focus into the list');
+  }
 });
 
 test('setActive toggles active/aria-selected on only the old and new buttons', () => {

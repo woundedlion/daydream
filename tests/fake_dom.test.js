@@ -6,7 +6,9 @@
 // assertions about the module under test rather than about the harness.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fakeElement } from './fake_dom.js';
+import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
+
+restoreDocumentAfterEach();
 
 /**
  * Builds a root > mid > leaf chain whose every listener appends to one log.
@@ -278,6 +280,33 @@ test('every detaching mutator disconnects the subtree it evicts', () => {
   root.replaceChildren(fakeElement('span'));
   assert.equal(branch.isConnected, false, 'replaceChildren left the evicted node connected');
   assert.equal(leaf.isConnected, false);
+});
+
+// A list that reorders itself by re-appending its rows moves the focused row
+// through a removal, so the focus a real browser drops there must drop here too.
+test('focus tracks the document, and unparenting the focused node blurs it', () => {
+  const doc = installDocument({ activeElement: null });
+  const list = fakeElement('div');
+  const row = fakeElement('button');
+  const label = fakeElement('span');
+  list.appendChild(row);
+  row.appendChild(label);
+
+  row.focus();
+  assert.equal(doc.activeElement, row);
+
+  list.appendChild(row); // a move, not an insert
+  assert.equal(doc.activeElement, null, 'the re-append kept focus on the moved node');
+  assert.deepEqual(list.children, [row], 'the move still listed the node once');
+
+  row.focus();
+  list.removeChild(row);
+  assert.equal(doc.activeElement, null);
+
+  list.appendChild(row);
+  label.focus();
+  list.replaceChildren();
+  assert.equal(doc.activeElement, null, 'a focused descendant kept focus through the eviction');
 });
 
 test('a node moved between parents stays connected; remove() disconnects it', () => {

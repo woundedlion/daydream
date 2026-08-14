@@ -194,9 +194,15 @@ export class EffectSidebar {
    * @param {string} dir - Sort direction, either 'asc' or 'desc'.
    */
   sortBy(key, dir) {
+    // Moving a node is a remove plus an insert, which drops focus to <body>
+    // even though the option itself survives. Hold the focused option and hand
+    // it back afterwards; a sort driven from a sort control leaves focus there.
+    const focused = this.doc.activeElement;
+    const refocus = focused && this.listEl.contains(focused) ? focused : null;
     this.sort = { key, dir };
     this.applySortOrder();
     this.updateSortBtnUI();
+    refocus?.focus();
   }
 
   // ---- Internal ----
@@ -290,7 +296,7 @@ export class EffectSidebar {
   /**
    * Reorder the existing button DOM nodes to match the current sort key and
    * direction. Re-appending moves nodes in place rather than recreating them,
-   * preserving focus and event handlers.
+   * so their click handlers survive; focus does not, and sortBy hands it back.
    */
   applySortOrder() {
     const sorted = sortItems(this.items, this.sort.key, this.sort.dir);

@@ -10,6 +10,29 @@ import { afterEach } from 'node:test';
 const detached = new WeakSet();
 
 /**
+ * The installed document stand-in, when there is one. It carries the
+ * activeElement the modules read focus from.
+ * @returns {Object|null} The document, or null when none is installed.
+ */
+function activeDocument() {
+  const doc = globalThis.document;
+  return doc && typeof doc === 'object' ? doc : null;
+}
+
+/**
+ * Hands focus to the body when a node leaving its parent holds it, as the DOM
+ * does: removal blurs, and a re-insert does not give the focus back.
+ * @param {any} node - Node leaving its parent.
+ * @returns {void}
+ */
+function blurRemoved(node) {
+  const doc = activeDocument();
+  const focused = doc && doc.activeElement;
+  if (!focused || !node || typeof node.contains !== 'function') return;
+  if (node.contains(focused)) doc.activeElement = doc.body || null;
+}
+
+/**
  * Links appended element nodes back to their parent. Strings (text nodes) carry
  * no parent and are skipped.
  * @param {Array<any>} nodes - Nodes just inserted.
@@ -20,7 +43,12 @@ function reparent(nodes, parent) {
   for (const node of nodes) {
     if (!node || typeof node !== 'object') continue;
     node.parentNode = parent;
-    if (parent) detached.delete(node); else detached.add(node);
+    if (parent) {
+      detached.delete(node);
+    } else {
+      detached.add(node);
+      blurRemoved(node);
+    }
   }
 }
 
@@ -36,7 +64,9 @@ function detach(nodes) {
     const parent = node && typeof node === 'object' ? node.parentNode : null;
     if (!parent || !Array.isArray(parent.children)) continue;
     const at = parent.children.indexOf(node);
-    if (at >= 0) parent.children.splice(at, 1);
+    if (at < 0) continue;
+    parent.children.splice(at, 1);
+    blurRemoved(node);
   }
 }
 
@@ -149,7 +179,10 @@ function fakeDataset(element) {
  * as it fires, a listener an earlier handler removed does not fire, and removal
  * pairs on the capture flag, as in the DOM, so a capture-mismatched removal
  * leaves the listener on the list. focus() and
- * scrollIntoView() record their call counts the same way. Removing a listener
+ * scrollIntoView() record their call counts the same way; focus() also points
+ * the installed document's activeElement at the node, and unparenting a node
+ * that holds focus drops it to the body, so a reorder built out of re-appends
+ * loses focus the way it does in the DOM. Removing a listener
  * that was never added throws rather than no-opping as the DOM does, so a
  * fixture that omits the add cannot hide a removal that never happens.
  *
@@ -314,7 +347,11 @@ export function fakeElement(tag = 'div') {
         fire(node, false);
       }
     },
-    focus() { this.focusCalls++; },
+    focus() {
+      this.focusCalls++;
+      const doc = activeDocument();
+      if (doc) doc.activeElement = this;
+    },
     select() {},
     scrollIntoView() { this.scrollIntoViewCalls++; },
   };
