@@ -166,6 +166,39 @@ function fakeDataset(element) {
   });
 }
 
+// The value each of these properties accepts, the empty string (which clears a
+// declaration) included. A property with no entry takes anything.
+const STYLE_VALUES = {
+  display: /^(?:|none|block|inline|inline-block|flex|inline-flex|grid|inline-grid|contents)$/,
+  gridAutoFlow: /^(?:|row|column|dense|row dense|column dense)$/,
+  opacity: /^(?:|0|1|0?\.\d+|\d{1,3}%)$/,
+  position: /^(?:|static|relative|absolute|fixed|sticky)$/,
+};
+
+/**
+ * CSSStyleDeclaration stand-in. Writes are stringified, as the platform does,
+ * and a value the property does not accept is dropped so the previous one
+ * stands — again as the platform does, so invalid CSS cannot read back as the
+ * text that was written. A dashed property name reaches nothing in a browser,
+ * where the declaration is keyed camelCase, so it throws rather than storing a
+ * declaration no read will ever find.
+ * @returns {Object} The style view.
+ */
+function fakeStyle() {
+  return new Proxy({}, {
+    set: (declared, key, value) => {
+      const name = String(key);
+      if (name.includes('-')) {
+        throw new Error(`style is keyed camelCase, so "${name}" declares nothing`);
+      }
+      const text = String(value);
+      const accepts = STYLE_VALUES[name];
+      if (!accepts || accepts.test(text)) declared[name] = text;
+      return true;
+    },
+  });
+}
+
 /**
  * Element stand-in carrying the attribute, class, child, and listener surface
  * the daydream modules read and write. Non-empty innerHTML assignments throw so
@@ -184,7 +217,12 @@ function fakeDataset(element) {
  * that holds focus drops it to the body, so a reorder built out of re-appends
  * loses focus the way it does in the DOM. Removing a listener
  * that was never added throws rather than no-opping as the DOM does, so a
- * fixture that omits the add cannot hide a removal that never happens.
+ * fixture that omits the add cannot hide a removal that never happens; pass
+ * {allowRedundantRemoval: true} where the second removal is the thing under
+ * test, as it is for an idempotent disposal.
+ *
+ * style drops a value its property does not take and refuses a dashed property
+ * name, so neither reads back as written.
  *
  * childNodes lists every inserted node; children is the elements-only view, as
  * in the DOM, so a string append lands in one and not the other. append()
@@ -202,15 +240,19 @@ function fakeDataset(element) {
  * the event's own and overwrite any the caller passed. Events bubble unless the
  * caller passes {bubbles: false}.
  * @param {string} [tag] - Tag name.
+ * @param {Object} [options] - Fake-element options.
+ * @param {boolean} [options.allowRedundantRemoval] - Let removeEventListener
+ *   no-op on a listener that is not registered.
  * @returns {Object} Fake element.
  */
-export function fakeElement(tag = 'div') {
+export function fakeElement(tag = 'div', options = {}) {
+  const allowRedundantRemoval = Boolean(options && options.allowRedundantRemoval);
   const classes = new Set();
   const element = {
     listeners: [],
     tagName: String(tag).toUpperCase(),
     id: '',
-    style: {},
+    style: fakeStyle(),
     attributes: {},
     childNodes: [],
     parentNode: null,
@@ -312,6 +354,7 @@ export function fakeElement(tag = 'div') {
       const at = this.listeners.findIndex(
         (l) => l.type === type && l.handler === handler && l.capture === capture);
       if (at < 0) {
+        if (allowRedundantRemoval) return;
         throw new Error(
           `removeEventListener: no ${type} listener registered with capture=${capture}`);
       }
