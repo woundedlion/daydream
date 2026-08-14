@@ -251,6 +251,81 @@ test('the V4 enum rosters match core/color/color.h', { skip: SKIP }, () => {
   }
 });
 
+const COLOR_H = 'core/color/color.h';
+
+/**
+ * The non-static data members of a plain struct, in declaration order.
+ * @param {string} source - core/color/color.h text.
+ * @param {string} name - The struct's C++ name.
+ * @returns {{type: string, field: string}[]} Each member's declared type and name.
+ */
+function engineStructFields(source, name) {
+  const m = source.match(new RegExp(`struct ${name} \\{([\\s\\S]*?)\\n\\};`));
+  assert.ok(m, `struct ${name} not found in ${COLOR_H} — the reader is out of date`);
+  const fields = [];
+  for (const decl of m[1].split(';')) {
+    const text = decl.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '').trim();
+    if (!text || text.startsWith('static')) continue;
+    const member = text.match(/^(std::array<[^>]+>|[\w:]+)\s+(\w+)\s*(?:=[\s\S]+|\{\s*\})?$/);
+    assert.ok(member, `unreadable member "${text}" in struct ${name} — the reader is out of date`);
+    fields.push({ type: member[1], field: member[2] });
+  }
+  return fields;
+}
+
+/**
+ * Every leaf field below a struct, keyed by the dotted path a C++ assignment
+ * reaches it through.
+ * @param {string} source - core/color/color.h text.
+ * @param {string} name - The root struct's C++ name.
+ * @returns {Map<string, string>} Path -> the leaf's declared C++ type.
+ */
+function engineLeafFields(source, name) {
+  const leaves = new Map();
+  for (const { type, field } of engineStructFields(source, name)) {
+    if (new RegExp(`struct ${type} \\{`).test(source)) {
+      for (const [path, leafType] of engineLeafFields(source, type)) {
+        leaves.set(`${field}.${path}`, leafType);
+      }
+    } else {
+      leaves.set(field, type);
+    }
+  }
+  return leaves;
+}
+
+/**
+ * Pins the C++ field paths generativePaletteCpp writes to the members
+ * PaletteRecipe and its nested control structs actually declare. That paste is
+ * the palettes page's headline deliverable and nothing else checks it: the WASM
+ * bridge takes the JS-side recipe, so an engine field renamed, moved between
+ * structs or added would leave every emitted paste non-compiling with the whole
+ * suite green. The declared type is checked too, so an enum field emitted under
+ * the wrong enum name — which does compile, as the wrong constant — fails here.
+ */
+test('generativePaletteCpp assigns the fields core/color/color.h declares', { skip: SKIP }, () => {
+  const cpp = header(COLOR_H);
+  const js = readFileSync(fileURLToPath(new URL('tools/palette_math.js', REPO)), 'utf8');
+  const want = engineLeafFields(cpp, 'PaletteRecipe');
+  assert.ok(want.size >= 20, `read only ${want.size} recipe fields — the reader is out of date`);
+
+  const emitted = new Map([...functionBody(js, 'generativePaletteCpp')
+    .matchAll(/^recipe\.([\w.]+) = (.+);$/gm)].map(([, path, value]) => [path, value]));
+  assert.deepEqual([...emitted.keys()].sort(), [...want.keys()].sort(),
+    'the emitted paste no longer assigns exactly the PaletteRecipe fields the engine declares');
+
+  for (const [path, type] of want) {
+    const value = /** @type {string} */ (emitted.get(path));
+    if (new RegExp(`enum class ${type}\\s*:`).test(cpp)) {
+      assert.ok(value.startsWith(`${type}::`),
+        `recipe.${path} is a ${type} but the paste assigns "${value}"`);
+    } else if (type.startsWith('std::array<')) {
+      assert.match(value, /^\$\{cppFloatArray\(/,
+        `recipe.${path} is a ${type} but the paste does not brace-initialize it`);
+    }
+  }
+});
+
 /**
  * The engine's named-palette roster, read from its X-macro list.
  * @param {string} source - core/color/palettes.h text.
