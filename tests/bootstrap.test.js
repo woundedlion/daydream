@@ -5,29 +5,21 @@ import { bootstrap, refreshModuleCache, showBootstrapFailure } from '../bootstra
 import { fakeElement } from './fake_dom.js';
 
 function fakeDocument() {
-  const listeners = new WeakMap();
-  const createElement = (tagName) => {
-    const element = fakeElement(tagName);
-    element.addEventListener = function (type, callback) {
-      const handlers = listeners.get(this) || {};
-      handlers[type] = callback;
-      listeners.set(this, handlers);
-    };
-    return element;
-  };
-
-  const overlay = createElement('div');
-  const spinner = createElement('div');
+  const overlay = fakeElement('div');
+  const spinner = fakeElement('div');
   spinner.className = 'spinner';
   overlay.append(spinner);
   const doc = {
-    createElement,
+    createElement: (tagName) => fakeElement(tagName),
     getElementById: (id) => id === 'loading-overlay' ? overlay : null,
   };
   return {
     doc,
     overlay,
-    click: (element) => listeners.get(element)?.click?.(),
+    // The click handler returns the refresh-then-reload chain, so the caller is
+    // handed it to await rather than dispatching and losing it.
+    click: (element) =>
+      element.listeners.find(({ type }) => type === 'click')?.handler(),
   };
 }
 
