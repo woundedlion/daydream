@@ -14,8 +14,8 @@
 // `"skippable": true`, so an unconditional skip retiring a file from gating
 // shows up as a floors diff instead of a silently green run. A floor is a
 // minimum, so cases landing after the last re-measure are covered by none;
-// MAX_SURPLUS_CASES bounds how many may sit unratcheted. Re-measure every
-// floor in one run:
+// MAX_SURPLUS_CASES and MAX_SURPLUS_ASSERTIONS bound how many may sit
+// unratcheted. Re-measure every floor in one run:
 //   node scripts/run-tests.mjs --update-floors "tests/*.test.js"
 import { spawnSync } from 'node:child_process';
 import {
@@ -38,6 +38,12 @@ const UPDATE_FLAG = '--update-floors';
 // without limit. scripts/require-tests.mjs holds the file count to exact
 // equality for the same reason.
 const MAX_SURPLUS_CASES = 64;
+// The same allowance in assertions. Assertion counts are runtime invocations,
+// so a loop inflates one file's tally without adding a call site; the bound is
+// what keeps that from covering for floors nobody re-measured. Derived from
+// MAX_SURPLUS_CASES at the suite's ~7 assertions per case, so both bounds
+// forgive the same amount of unratcheted work.
+const MAX_SURPLUS_ASSERTIONS = 450;
 
 // The one spelling of the Node version the committed floors are measured
 // against, read rather than copied so a bump cannot leave this behind.
@@ -351,30 +357,57 @@ if (belowCases.length + belowAssertions.length > 0) {
   );
   process.exit(1);
 }
-const surplusRows = gated
-  .map(([file, min]) => [file, cases.get(file) ?? 0, min.cases])
-  .filter(([, ran, min]) => ran > min)
-  .sort(([, ranA, minA], [, ranB, minB]) => ranB - minB - (ranA - minA));
-const surplus = surplusRows.reduce((sum, [, ran, min]) => sum + ran - min, 0);
-if (surplus > MAX_SURPLUS_CASES) {
+/**
+ * What one counter runs above its committed floors.
+ * @param {Map<string, number>} ran - Counts this run measured, keyed as the
+ *   floors file is.
+ * @param {string} key - Floors-entry field to compare against.
+ * @returns {{rows: Array<[string, number, number]>, total: number}} Files over
+ *   their floor, widest gap first, and the summed surplus.
+ */
+const aboveFloor = (ran, key) => {
+  const rows = gated
+    .map(([file, min]) => [file, ran.get(file) ?? 0, min[key]])
+    .filter(([, count, min]) => count > min)
+    .sort(([, countA, minA], [, countB, minB]) => countB - minB - (countA - minA));
+  return { rows, total: rows.reduce((sum, [, count, min]) => sum + count - min, 0) };
+};
+const surplusCases = aboveFloor(cases, 'cases');
+const surplusAssertions = aboveFloor(counts, 'assertions');
+const overBound = [
+  ['cases', surplusCases, MAX_SURPLUS_CASES],
+  ['assertions', surplusAssertions, MAX_SURPLUS_ASSERTIONS],
+].filter(([, { total }, bound]) => total > bound);
+if (overBound.length > 0) {
   console.error(
-    `run-tests: ${surplus} cases above their committed floors, past the bound ` +
-      `of ${MAX_SURPLUS_CASES}:\n` +
-      surplusRows
-        .map(([file, ran, min]) => `  ${file}: ${ran} ran, floor ${min}`)
-        .join('\n') +
-      '\nThose cases are unratcheted, so deleting them again trips nothing. ' +
+    overBound
+      .map(
+        ([what, { rows, total }, bound]) =>
+          `run-tests: ${total} ${what} above their committed floors, past the ` +
+          `bound of ${bound}:\n` +
+          rows
+            .map(([file, count, min]) => `  ${file}: ${count} ran, floor ${min}`)
+            .join('\n'),
+      )
+      .join('\n') +
+      '\nThose are unratcheted, so deleting them again trips nothing. ' +
       `Ratchet the floors with \`node scripts/run-tests.mjs ${UPDATE_FLAG} ` +
       '<patterns>`.',
   );
   process.exit(1);
 }
+const surplus = surplusCases.total;
 console.log(
   `run-tests: ${total} tests passed, ${assertions} assertions across ` +
     `${counts.size} files, each above its committed floor.` +
     (surplus > 0
       ? `\nrun-tests: ${surplus} cases above their committed floors ` +
         `(bound ${MAX_SURPLUS_CASES}) — ratchet them with ${UPDATE_FLAG}.`
+      : '') +
+    (surplusAssertions.total > 0
+      ? `\nrun-tests: ${surplusAssertions.total} assertions above their ` +
+        `committed floors (bound ${MAX_SURPLUS_ASSERTIONS}) — ratchet them ` +
+        `with ${UPDATE_FLAG}.`
       : '') +
     (skipped.size > 0
       ? '\nrun-tests: exempted from their floors, wholly skipped:\n' +
