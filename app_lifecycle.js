@@ -453,7 +453,18 @@ export function createApplyNotice({
     // tech sees, which is not reliably announced.
     body.hidden = notice === null;
     text.textContent = notice ?? '';
-    if (notice !== null) handle = schedule(() => write(null, owner), timeoutMs);
+    if (notice !== null) handle = schedule(() => expire(owner), timeoutMs);
+  };
+
+  // Hiding the body takes the dismiss button inside it out of the tree and drops
+  // keyboard focus to <body>, so the dwell is served again while the user stands
+  // on it. Only the self-clear waits; an explicit clear() is the user's own act.
+  const expire = (owner) => {
+    if (elements?.body.contains?.(doc.activeElement)) {
+      handle = schedule(() => expire(owner), timeoutMs);
+      return;
+    }
+    write(null, owner);
   };
 
   return {
