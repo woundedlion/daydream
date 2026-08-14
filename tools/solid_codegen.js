@@ -179,6 +179,24 @@ function opParams(o) {
 }
 
 /**
+ * The first declared param of an op that carries a finite value outside its
+ * OP_DEFS band. Non-finite values are left to the caller's own finiteness check.
+ * @param {string} opName - An op name OP_DEFS declares.
+ * @param {Object<string, number>} params - The op's params.
+ * @returns {?{key: string, def: OpParamDef, value: number}} The offending param,
+ *   or null when every declared param is in band.
+ */
+function outOfRangeParam(opName, params) {
+  for (const [key, def] of Object.entries(OP_DEFS[opName].params)) {
+    const value = params[key];
+    if (Number.isFinite(value) && (value < def.min || value > def.max)) {
+      return { key, def, value };
+    }
+  }
+  return null;
+}
+
+/**
  * Shape-checks a persisted base+chain against the op table, without the engine.
  * @param {*} base - The persisted seed-solid name.
  * @param {*} ops - The persisted op chain.
@@ -204,13 +222,12 @@ export function savedChainShapeError(base, ops) {
     const at = `op ${i + 1}`;
     if (!o || typeof o !== 'object' || Array.isArray(o)) return `${at} is not an op entry`;
     if (!KNOWN_OPS.has(o.op)) return `${at} names an unknown operator "${o.op}"`;
+    const banded = outOfRangeParam(o.op, o.params ?? {});
+    if (banded) return `${at} ("${o.op}") carries out-of-range "${banded.key}"`;
     for (const [key, def] of Object.entries(OP_DEFS[o.op].params)) {
       const value = o.params?.[key];
       if (!Number.isFinite(value)) {
         return `${at} ("${o.op}") carries no numeric "${key}"`;
-      }
-      if (value < def.min || value > def.max) {
-        return `${at} ("${o.op}") carries out-of-range "${key}"`;
       }
       if (Math.abs(value - snapToStep(value, def)) > Math.abs(def.step) * 1e-6) {
         return `${at} ("${o.op}") carries off-grid "${key}"`;
@@ -568,6 +585,16 @@ export function generateFuncAndRecipe(item, baseNamespace = '') {
       // Parameterless ops: dual, kis, ambo, gyro, meta, needle, zip.
       chain += `.${opName}()`;
       nameParts.push(`_${opName}`);
+    }
+
+    // Runs after the per-op emit so the finiteness, count and negative-suffix
+    // checks each still name their own defect. A value the sliders cannot reach
+    // — a stale or hand-edited store — would otherwise be pasted straight past
+    // the engine's always-on operator asserts.
+    const banded = outOfRangeParam(opName, params);
+    if (banded) {
+      throw new Error(`generateFuncAndRecipe: ${opName} param "${banded.key}" must be `
+        + `within ${banded.def.min} to ${banded.def.max}, got ${banded.value}`);
     }
   });
 
