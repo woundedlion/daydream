@@ -217,6 +217,79 @@ export function proceduralParamsForViewport(parameters, viewport) {
 // --- Generative Palette V4 --------------------------------------------------
 
 /**
+ * The C++ enumerator each PaletteCompileCode value carries, indexed by value.
+ * engine_source_parity.test.js pins it to the `enum class` in core/color/color.h.
+ * @type {readonly string[]}
+ */
+export const COMPILE_CODE_NAMES = Object.freeze([
+  'OK',
+  'INVALID_SCHEMA',
+  'NON_FINITE',
+  'INVALID_ENUM',
+  'HUE_LIMIT',
+  'NON_INTEGER_LOOP_SWEEP',
+  'INVALID_FALLOFF_START',
+  'INCOMPATIBLE_OPTIONS',
+]);
+
+/**
+ * The C++ enumerator each PaletteRecipeField value carries, indexed by value.
+ * engine_source_parity.test.js pins it, values included, to the `enum class` in
+ * core/color/color.h.
+ * @type {readonly string[]}
+ */
+export const RECIPE_FIELD_NAMES = Object.freeze([
+  'NONE',
+  'PALETTE_DOMAIN',
+  'EASING',
+  'COLOR_PATH',
+  'HUE_MODE',
+  'HARMONY',
+  'HUE_DIRECTION',
+  'BASE_TURNS',
+  'SPREAD_TURNS',
+  'SWEEP_TURNS',
+  'CUSTOM_TURNS_0',
+  'CUSTOM_TURNS_1',
+  'CUSTOM_TURNS_2',
+  'CUSTOM_TURNS_3',
+  'LIGHTNESS_CURVE',
+  'LIGHTNESS_CENTER',
+  'LIGHTNESS_RANGE',
+  'LIGHTNESS_CUSTOM_0',
+  'LIGHTNESS_CUSTOM_1',
+  'LIGHTNESS_CUSTOM_2',
+  'LIGHTNESS_CUSTOM_3',
+  'CHROMA_CURVE',
+  'CHROMA_BASIS',
+  'CHROMA_CENTER',
+  'CHROMA_RANGE',
+  'CHROMA_CUSTOM_0',
+  'CHROMA_CUSTOM_1',
+  'CHROMA_CUSTOM_2',
+  'CHROMA_CUSTOM_3',
+  'CHROMA_HEADROOM',
+  'HUE_TORSION',
+  'FALLOFF_START',
+  'SCHEMA_VERSION',
+  'INPUT_OFFSET',
+  'INPUT_SPAN',
+]);
+
+/**
+ * Describes a failed compile the way core/color/color.h names it.
+ * @param {{code: number, field: number}} status - The compiler's status.
+ * @returns {string} The reason and the field it points at, each with its ordinal;
+ *   a value neither roster covers reads as an unnamed ordinal.
+ */
+export function paletteCompileError(status) {
+  const named = (/** @type {readonly string[]} */ roster, /** @type {number} */ value) =>
+    (roster[value] ? `${roster[value]} (${value})` : `unnamed ${value}`);
+  return `Palette recipe error ${named(COMPILE_CODE_NAMES, status.code)} `
+    + `at field ${named(RECIPE_FIELD_NAMES, status.field)}`;
+}
+
+/**
  * Compiles a recipe with the engine and copies its aliased module buffers. The
  * bridge returns views onto WASM memory, which the next call reuses, so the
  * results are copied out before they can be overwritten.
@@ -255,10 +328,7 @@ export class GenerativePalette {
    */
   constructor(recipe) {
     const result = compilePaletteRecipe(recipe, true);
-    if (result.status.code !== 0) {
-      throw new Error(
-        `Palette recipe error ${result.status.code} at field ${result.status.field}`);
-    }
+    if (result.status.code !== 0) throw new Error(paletteCompileError(result.status));
     this.canonicalRecipe = result.canonicalRecipe;
     // A successful inspect bake always carries all three buffers.
     this.lut = /** @type {Uint8Array} */ (result.lut);
