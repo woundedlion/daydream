@@ -364,6 +364,7 @@ function disposeCtx(mesh, log) {
     scene: { remove: (obj) => log.push(`scene.remove:${obj?.name ?? 'dotMesh'}`) },
     dotMesh: mesh,
     pixels: mesh.instanceColor.array,
+    recorder: { captureFrame: () => log.push('recorder.captureFrame') },
     matrixCache: new Map(),
     dotMaterial: { dispose: () => log.push('material.dispose') },
     xAxis: axis('xAxis'),
@@ -441,6 +442,8 @@ test('dispose releases the observer, listeners, and GPU resources', () => {
   }
   assert.deepEqual(ctx.canvas.listeners, [],
     'a listener outlived the canvas it was bound to');
+  assert.equal(ctx.recorder, null,
+    'the driver kept the recorder the engine host disposes on the same teardown');
   assert.ok(log.indexOf('renderer.stopLoop') < log.indexOf('renderer.dispose'));
   assert.ok(log.indexOf('renderer.dispose') < log.indexOf('renderer.loseContext'),
     'the drawing context was released before the renderer freed its objects');
