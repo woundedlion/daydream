@@ -97,39 +97,51 @@ test('warmModules revalidates the whole worker module graph', async () => {
     assert.deepEqual(options, { cache: 'no-cache' });
 });
 
-test('warmModules skips a re-warm inside the dedupe window', async () => {
+// The window is a wall-clock span, so these drive a warmer of their own with an
+// injected clock: on the page's shared warmer the reading would be whatever the
+// suite's own scheduling left behind.
+test('a re-warm inside the dedupe window is skipped', async () => {
   let calls = 0;
+  let now = 0;
   const response = { arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) };
   const deps = {
     baseUrl: 'http://localhost:8000/segment_controller.js',
+    minIntervalMs: WARM_INTERVAL_MS,
     fetch: () => { calls++; return Promise.resolve(response); },
+    now: () => now,
   };
-  await warmModules({ ...deps, minIntervalMs: 0 });
-  assert.equal(calls, 5, 'a forced warm fetches the whole module graph');
+  const warmer = new ModuleWarmer();
+  await warmer.warm(deps);
+  assert.equal(calls, 5, 'a first warm fetches the whole module graph');
 
-  await warmModules({ ...deps, minIntervalMs: WARM_INTERVAL_MS });
+  now += WARM_INTERVAL_MS - 1;
+  await warmer.warm(deps);
   assert.equal(calls, 5, 'a slider-drag re-warm reuses the previous warm');
 
-  await warmModules({ ...deps, minIntervalMs: 0 });
-  assert.equal(calls, 10, 'a warm past the window fetches again');
+  now += 1;
+  await warmer.warm(deps);
+  assert.equal(calls, 10, 'a warm on the window boundary fetches again');
 });
 
 test('the dedupe window covers one base URL, not every caller in it', async () => {
   const seen = [];
   const response = { arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) };
   const deps = {
+    minIntervalMs: WARM_INTERVAL_MS,
     fetch: (url) => { seen.push(url.href); return Promise.resolve(response); },
+    now: () => 0,
   };
-  await warmModules({
-    ...deps, minIntervalMs: 0,
+  const warmer = new ModuleWarmer();
+  await warmer.warm({
+    ...deps,
     baseUrl: 'http://localhost:8000/first/segment_controller.js',
   });
   seen.length = 0;
 
   // Another base URL is another module graph: serving it the first warm's
   // promise would report a warm of files it never fetched.
-  await warmModules({
-    ...deps, minIntervalMs: WARM_INTERVAL_MS,
+  await warmer.warm({
+    ...deps,
     baseUrl: 'http://localhost:8000/second/segment_controller.js',
   });
   assert.deepEqual(seen, [
@@ -141,8 +153,8 @@ test('the dedupe window covers one base URL, not every caller in it', async () =
   ], 'a second base URL inside the window warms its own module graph');
 
   seen.length = 0;
-  await warmModules({
-    ...deps, minIntervalMs: WARM_INTERVAL_MS,
+  await warmer.warm({
+    ...deps,
     baseUrl: 'http://localhost:8000/second/segment_controller.js',
   });
   assert.deepEqual(seen, [], 'a repeat of that base URL still dedupes');
@@ -150,14 +162,15 @@ test('the dedupe window covers one base URL, not every caller in it', async () =
 
 test('a warm whose fetch throws synchronously does not claim the window', async () => {
   const baseUrl = 'http://localhost:8000/offline/segment_controller.js';
-  await warmModules({
-    baseUrl, minIntervalMs: 0,
+  const warmer = new ModuleWarmer();
+  await warmer.warm({
+    baseUrl, minIntervalMs: WARM_INTERVAL_MS, now: () => 0,
     fetch: () => { throw new TypeError('network down'); },
   });
 
   let calls = 0;
-  await warmModules({
-    baseUrl, minIntervalMs: WARM_INTERVAL_MS,
+  await warmer.warm({
+    baseUrl, minIntervalMs: WARM_INTERVAL_MS, now: () => 0,
     fetch: () => {
       calls++;
       return Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) });
