@@ -430,6 +430,20 @@ export class URLSync {
   }
 
   /**
+   * Overlay onto a params object the ad-hoc writes still buffered for the next
+   * flush, so a reader running inside the debounce window sees the values the
+   * app has already accepted rather than the query string they will replace.
+   * @param {URLSearchParams} params - Params to update in place.
+   * @returns {void}
+   */
+  overlayPending(params) {
+    for (const [key, val] of this.adhoc) {
+      if (val === null) params.delete(key);
+      else params.set(key, val);
+    }
+  }
+
+  /**
    * Read-modify-write the URL once: re-read current params, overlay tracked
    * state keys and surviving ad-hoc writes, then replaceState. Running at fire
    * time (not schedule time) is what lets concurrent updates merge.
@@ -451,10 +465,7 @@ export class URLSync {
     for (const key of this.trackedKeys) {
       overlayUrlParam(params, key, this.state.get(key));
     }
-    for (const [key, val] of this.adhoc) {
-      if (val === null) params.delete(key);
-      else params.set(key, val);
-    }
+    this.overlayPending(params);
     if (!writeUrl(params)) {
       this.retries += 1;
       if (this.retries < URL_FLUSH_MAX_RETRIES) {
