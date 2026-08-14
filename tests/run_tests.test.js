@@ -321,6 +321,25 @@ test('--update-floors writes the measured counts', () => {
 });
 
 /**
+ * Verifies a re-measurement narrower than the committed floors is refused. The
+ * write replaces the file with what the run measured, so a single-file pattern
+ * would delete every other entry.
+ */
+test('--update-floors refuses a pattern that does not cover every floor', () => {
+  writeFloors({
+    'tests/a.test.js': { cases: 2, assertions: 6 },
+    'tests/b.test.js': { cases: 1, assertions: 2 },
+  });
+  const err = runExpectingFailure('--update-floors', 'tests/a.test.js');
+  assert.match(err, /would delete them[^]*\n {2}tests\/b\.test\.js/);
+  assert.doesNotMatch(err, /\n {2}tests\/a\.test\.js/);
+  assert.deepEqual(readFloors(), {
+    'tests/a.test.js': { cases: 2, assertions: 6 },
+    'tests/b.test.js': { cases: 1, assertions: 2 },
+  });
+});
+
+/**
  * Verifies a re-measurement on a Node major other than the one CI measures on
  * is refused. node:test retallies cases across majors, so floors written there
  * are not reproducible and red CI on files nobody touched.
