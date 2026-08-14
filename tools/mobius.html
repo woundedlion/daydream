@@ -545,7 +545,10 @@
     const stopAnimation = () => {
       isAnimating = false;
       activePreset = null;
-      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.preset-btn').forEach(b => {
+        b.classList.remove('active');
+        b.setAttribute('aria-pressed', 'false');
+      });
       // Clear the mobile dropdown back to its placeholder. <select> fires
       // 'change' only on a value change, so without this the just-stopped
       // preset stays selected and can't be re-tapped on mobile (where the
@@ -558,7 +561,9 @@
       stopAnimation(); // Stop any existing animation
       activePreset = preset;
       document.querySelectorAll('.preset-btn').forEach(b => {
-        b.classList.toggle('active', b.dataset.id === preset.id);
+        const selected = b.dataset.id === preset.id;
+        b.classList.toggle('active', selected);
+        b.setAttribute('aria-pressed', selected ? 'true' : 'false');
       });
       const presetSelect = document.getElementById('presetSelect');
       if (presetSelect) presetSelect.value = preset.id;
@@ -828,7 +833,9 @@
       const presetSelect = document.getElementById('presetSelect');
       presets.forEach(preset => {
         const btn = document.createElement('button');
+        btn.type = 'button';
         btn.className = 'preset-btn';
+        btn.setAttribute('aria-pressed', 'false');
         btn.dataset.id = preset.id;
         const name = document.createElement('div');
         name.className = 'font-semibold';
