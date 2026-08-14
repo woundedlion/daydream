@@ -7,13 +7,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
+import { start } from '../daydream.js';
 
 restoreDocumentAfterEach();
-
-// bootstrap.js starts the app on import when a document already exists, and
-// daydream.js pulls it in for the failure overlay — so the module graph is
-// loaded once, before any test installs one.
-const { start } = await import('../daydream.js');
 
 /** A lil-gui controller as the root uses one: named, bound, and re-settable. */
 function fakeController(property) {

@@ -12,6 +12,7 @@ index.html
 favicon.svg
 styles/index.css
 vendor-importmap.js
+main.js
 bootstrap.js
 app_lifecycle.js
 daydream.js

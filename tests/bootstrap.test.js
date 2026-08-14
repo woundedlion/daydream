@@ -260,11 +260,16 @@ test('bootstrap leaves the fatal banner alone when the overlay renders', async (
   assert.equal(childWithClass(overlay, 'load-error-detail').textContent, 'boom');
 });
 
-test('index loads bootstrap instead of the application module directly', () => {
+// Booting is the entry module's job alone. As an import-time side effect here it
+// would stand up a second simulator — WebGL context, URLSync, engine — for any
+// module that reached bootstrap.js for its overlay, daydream.js included.
+test('index boots through the entry module and bootstrap.js stays importable', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /<link href="\.\/favicon\.svg" rel="icon"/);
-  assert.match(html, /<script type="module" src="bootstrap\.js"><\/script>/);
+  assert.match(html, /<script type="module" src="main\.js"><\/script>/);
   assert.doesNotMatch(html, /<script type="module" src="daydream\.js"><\/script>/);
+  const source = readFileSync(new URL('../bootstrap.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /^\s*(?:void\s+)?bootstrap\s*\(/m);
 });
 
 test('index identifies new-window tool links and associates stats headers', () => {
