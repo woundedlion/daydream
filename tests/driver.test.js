@@ -13,7 +13,7 @@ import {
   Daydream, dotDetailFor, fitDistance, initialAspect, MOBILE_BREAKPOINT_PX,
 } from '../driver.js';
 import { captureConsole } from './fake_console.js';
-import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
+import { fakeElement } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
 
 // ---------------------------------------------------------------------------
