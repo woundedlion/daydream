@@ -135,6 +135,29 @@ function shaderBallControlLabel(stage, name) {
 }
 
 /**
+ * The `gui` method a parameter's control is added through: a session control
+ * owns no deep-link key, a migrated one accepts its former keys too, and an
+ * unhydrated one owns its key but is never seeded from the URL.
+ * @param {Object} gui - The effect GUI to add to.
+ * @param {Object} p - The parameter definition.
+ * @param {boolean} hydrate - Whether a matching deep link may seed it.
+ * @param {Array<string>} legacyNames - Former deep-link property names.
+ * @param {boolean} persist - Whether the control owns a deep-link key.
+ * @returns {(object: Object, property: string, ...rest: Array<*>) => Object}
+ */
+function paramAddMethod(gui, p, hydrate, legacyNames, persist) {
+  if (p.readonly || !persist) return (...args) => gui.addSession(...args);
+  if (hydrate && legacyNames.length > 0 && typeof gui.addMigrated === 'function') {
+    return (object, property, ...rest) =>
+      gui.addMigrated(object, property, legacyNames, ...rest);
+  }
+  if (!hydrate && typeof gui.addUnhydrated === 'function') {
+    return (...args) => gui.addUnhydrated(...args);
+  }
+  return (...args) => gui.add(...args);
+}
+
+/**
  * Add the lil-gui control one engine parameter definition calls for. A readonly
  * (engine-written telemetry) param becomes a session control: the engine refuses
  * to set it, so seeding it from a URL and writing it back is meaningless.
@@ -149,15 +172,7 @@ function shaderBallControlLabel(stage, name) {
 export function addParamControl(
   gui, state, p, hydrate = true, legacyNames = [], persist = true) {
   const kind = paramControlKind(p);
-  const add = p.readonly || !persist
-    ? (...args) => gui.addSession(...args)
-    : hydrate && legacyNames.length > 0
-        && typeof gui.addMigrated === 'function'
-      ? (object, property, ...args) =>
-          gui.addMigrated(object, property, legacyNames, ...args)
-    : !hydrate && typeof gui.addUnhydrated === 'function'
-      ? (...args) => gui.addUnhydrated(...args)
-    : (...args) => gui.add(...args);
+  const add = paramAddMethod(gui, p, hydrate, legacyNames, persist);
   let controller;
   if (kind === 'boolean') {
     controller = add(state, p.name);
