@@ -472,7 +472,7 @@ export class VideoRecorder {
           // the next click starts a second recording instead of stopping this one.
           if (this.mediaRecorder === recorder) {
             this.stop();
-            this.onError?.(err);
+            this.reportFailure('the Save dialog was cancelled, so nothing was saved.');
           }
         } else {
           console.warn('VideoRecorder: streaming save unavailable, buffering in memory', err);
