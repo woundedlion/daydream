@@ -351,8 +351,8 @@ export class URLSync {
    * debounced flush, and clear the app-wide writer slot if it still points here.
    * Without this, a pagehide discard can leave the debounce timer firing
    * history.replaceState into a dead page. Symmetric with disposeApp().
-   * Latches: schedule() and setParam() become no-ops afterwards, so a holder of
-   * a direct reference cannot re-arm the debounce into a discarded page.
+   * Latches: schedule(), setParam(), and reset() become no-ops afterwards, so a
+   * holder of a direct reference cannot re-arm the debounce into a discarded page.
    * @returns {void}
    */
   dispose() {
@@ -416,6 +416,7 @@ export class URLSync {
    * Clears every URL param except the excluded keys, on the same debounced flush
    * every other write takes. Tracked-key state and surviving ad-hoc writes are
    * re-asserted by that flush, so a value set inside the window is not lost.
+   * A no-op once disposed.
    * @details Debounced rather than immediate because an effect switch calls this
    *   on every change: writing here would let a burst of switches spend the
    *   browser's replaceState budget on its own.
@@ -423,6 +424,7 @@ export class URLSync {
    * @returns {void}
    */
   reset(excludedKeys = []) {
+    if (this.disposed) return;
     const excl = new Set(excludedKeys);
     for (const k of [...this.adhoc.keys()]) {
       if (!excl.has(k)) this.adhoc.delete(k);
