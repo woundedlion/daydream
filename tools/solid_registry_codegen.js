@@ -230,10 +230,11 @@ function definitionHeadCpp(type, declarator) {
 }
 
 /**
- * The Recipe initializer body: the seed constant and the step-table name share
- * a line where they fit, and the element-count expression breaks at the
- * innermost call that keeps its argument inside the column limit — the same
- * shapes solids.h already carries.
+ * The Recipe initializer body: all three elements share one line where they
+ * fit, else the seed constant and the step-table name share a line where they
+ * fit, and the element-count expression breaks at the innermost call that keeps
+ * its argument inside the column limit — the same shapes solids.h already
+ * carries.
  * @param {string} constName - The SEED_* constant the recipe seeds on.
  * @param {string} stepsName - The step table's name.
  * @param {number} indent - Column the body's lines start at.
@@ -241,9 +242,12 @@ function definitionHeadCpp(type, declarator) {
  */
 function recipeBodyCpp(constName, stepsName, indent) {
   const names = `${constName}, ${stepsName},`;
+  const size = `static_cast<uint8_t>(std::size(${stepsName}))};`;
+  if (indent + names.length + 1 + size.length <= COLUMN_LIMIT) {
+    return `${names} ${size}`;
+  }
   const lines = indent + names.length <= COLUMN_LIMIT
     ? [names] : [`${constName},`, `${stepsName},`];
-  const size = `static_cast<uint8_t>(std::size(${stepsName}))};`;
   if (indent + size.length <= COLUMN_LIMIT) {
     lines.push(size);
   } else {
