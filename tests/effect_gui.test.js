@@ -5,6 +5,7 @@ import {
   createEffectGui,
   addParamControl,
   EXPORT_COPIED,
+  EXPORT_FAILED,
   FULL_CONFIG_STORAGE_KEY,
   FLASH_MS,
   SHADERBALL_STAGE_ORDER,
@@ -245,6 +246,15 @@ function fakeCopyText(outcome = true) {
   };
   copyText.copied = copied;
   return copyText;
+}
+
+/**
+ * The live region the action row announces an Export outcome through.
+ * @param {Object} h - A built harness.
+ * @returns {Object} The status element.
+ */
+function exportStatus(h) {
+  return h.gui().$children.children[0].querySelector('.visually-hidden');
 }
 
 /**
@@ -1486,7 +1496,10 @@ test('preset effects expose zero-indexed selection and navigation', () => {
   assert.equal(actionRow.style.gridAutoFlow, '');
   assert.equal(actionRow.style.gridTemplateColumns,
     'repeat(4, minmax(0, 1fr))');
-  assert.deepEqual(actionRow.children,
+  // The live region is out of flow, so it takes no column of its own.
+  const [status, ...buttons] = actionRow.children;
+  assert.equal(status.getAttribute('role'), 'status');
+  assert.deepEqual(buttons,
     ['reset', 'export', 'previousPreset', 'nextPreset']
       .map((property) => h.gui().ctrl(property).domElement));
   assert.ok(h.gui().ctrl('previousPreset').domElement.classList
@@ -1597,6 +1610,25 @@ test('Export copies the live values as a C++ brace-init list', async () => {
   assert.deepEqual(h.state.copyText.copied, ['{ 0.25f, 0.5f }']);
   assert.equal(h.gui().ctrl('export').label, '\u2713');
   assert.equal(h.gui().ctrl('export').$button.getAttribute('title'), EXPORT_COPIED);
+  assert.equal(exportStatus(h).textContent, EXPORT_COPIED);
+});
+
+test('the Export outcome is announced in a polite live region', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  const h = makeHarness({ params: [SPEED], engineValues: [0.25], copyText: null });
+  h.panel.build();
+  const status = exportStatus(h);
+
+  assert.equal(status.getAttribute('role'), 'status');
+  assert.equal(status.getAttribute('aria-live'), 'polite');
+  assert.equal(status.textContent, '');
+
+  h.gui().ctrl('export').object.export();
+  assert.equal(status.textContent, EXPORT_FAILED);
+
+  mock.timers.tick(FLASH_MS);
+  assert.equal(status.textContent, '',
+    'a live region re-announces a repeat only after the text changes');
 });
 
 test('ShaderBall Export copies the versioned full-config snapshot', async () => {
