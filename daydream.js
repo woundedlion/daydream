@@ -211,7 +211,8 @@ export function start({
   function setEngineParam(name, value) {
     const result = host.engine.setParameter(name, value);
     if (result !== host.module.ParamSetResult.APPLIED) {
-      const message = `Parameter "${name}" was rejected: ${paramSetResultName(result)}.`;
+      const message = `Parameter "${name}" was rejected: `
+        + `${enumConstantName(host.module.ParamSetResult, result)}.`;
       console.warn(message);
       applyNotice.show(message, PARAM_NOTICE);
     } else {
@@ -228,13 +229,13 @@ export function start({
   doc.addEventListener('click', onApplyNoticeDismiss);
 
   /**
-   * Name a ParamSetResult enum value for logging.
-   * @param {Object} result - A Module.ParamSetResult value.
+   * Name an enum value for logging.
+   * @param {Object} values - A Module enum object, constant name to value.
+   * @param {Object} result - One of that enum's values.
    * @returns {string} The enum constant's name, e.g. "READONLY".
    */
-  function paramSetResultName(result) {
-    const names = Object.keys(host.module.ParamSetResult);
-    return names.find((n) => host.module.ParamSetResult[n] === result)
+  function enumConstantName(values, result) {
+    return Object.keys(values).find((name) => values[name] === result)
       ?? 'unrecognized result';
   }
 
@@ -487,9 +488,9 @@ export function start({
     copyText: copyToClipboard,
     usesFullConfigSnapshot,
     getFullConfigSnapshot: () => host.engine.getFullConfigSnapshot(),
-    restoreFullConfigSnapshot: (snapshot) =>
-      host.engine.restoreFullConfigSnapshot(snapshot)
-        === host.module.FullConfigRestoreResult.APPLIED,
+    restoreFullConfigSnapshot: (snapshot) => enumConstantName(
+      host.module.FullConfigRestoreResult,
+      host.engine.restoreFullConfigSnapshot(snapshot)),
     getConfigImportNotice: () => host.engine.getConfigImportNotice(),
     clearConfigImportNotice: () => host.engine.clearConfigImportNotice(),
     showConfigImportNotice: (message) => applyNotice.show(message, CONFIG_NOTICE),
