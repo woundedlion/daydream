@@ -349,6 +349,7 @@
     import * as THREE from 'three';
     import { initScene, bootstrapTool, wireCopyBlock } from './shared.js';
     import { onPageTeardown } from './page_lifecycle.js';
+    import { createPointerDrag } from './pointer_drag.js';
     import {
       elliptic, hyperbolic, loxodromic, parabolic,
       inversion, tumble, cayley, snapComplex,
@@ -691,37 +692,22 @@
         onChange();
       };
 
-      // Pointer capture keeps the drag bound to the plane it started on, so
-      // mouse and touch share one path, the move and end handlers stay on the
-      // element rather than on the document, and an interrupted gesture (an OS
-      // focus steal, a touch cancelled by the system) arrives as pointercancel
-      // instead of stranding a listener until the next press. The element
-      // carries touch-action: none, which is what stops the page scrolling
-      // under a touch drag.
-      let activePointerId = null;
-
-      const endDrag = (e) => {
-        if (activePointerId === null || (e && e.pointerId !== activePointerId)) return;
-        if (planeElement.hasPointerCapture(activePointerId))
-          planeElement.releasePointerCapture(activePointerId);
-        activePointerId = null;
-        planeElement.style.cursor = 'grab';
-      };
-
-      const onPointerDown = (e) => {
-        if (!e.isPrimary || e.button !== 0 || activePointerId !== null) return;
-        e.preventDefault();
-        activePointerId = e.pointerId;
-        planeElement.setPointerCapture(e.pointerId);
-        planeElement.style.cursor = 'grabbing';
-        handleInput(e.clientX, e.clientY);
-      };
-
-      const onPointerMove = (e) => {
-        if (e.pointerId !== activePointerId) return;
-        e.preventDefault();
-        handleInput(e.clientX, e.clientY);
-      };
+      // The plane carries touch-action: none, which is what stops the page
+      // scrolling under a touch drag.
+      const planeDrag = createPointerDrag({
+        element: planeElement,
+        onStart: (e) => {
+          planeElement.style.cursor = 'grabbing';
+          handleInput(e.clientX, e.clientY);
+        },
+        onMove: (e) => {
+          e.preventDefault();
+          handleInput(e.clientX, e.clientY);
+        },
+        onEnd: () => {
+          planeElement.style.cursor = 'grab';
+        },
+      });
 
       // Keyboard equivalent of dragging the dot: a handle's arrows nudge its own
       // part, decreasing on Left/Down and increasing on Right/Up (Shift for a
@@ -751,13 +737,9 @@
         onChange();
       };
 
-      planeElement.addEventListener('pointerdown', onPointerDown);
-      planeElement.addEventListener('pointermove', onPointerMove);
-      planeElement.addEventListener('pointerup', endDrag);
-      planeElement.addEventListener('pointercancel', endDrag);
       reElement.addEventListener('keydown', onAxisKeyDown('re'));
       imElement.addEventListener('keydown', onAxisKeyDown('im'));
-      onPageTeardown(() => endDrag(null));
+      onPageTeardown(() => planeDrag.stop());
       updateUI();
     };
 

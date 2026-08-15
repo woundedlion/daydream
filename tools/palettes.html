@@ -1080,6 +1080,7 @@
     import { createColorStripPainter, drawWaveGraph } from './palette_canvas.js';
     import { wireFlyout } from './flyout.js';
     import { createFrameScheduler, onPageTeardown } from './page_lifecycle.js';
+    import { createPointerDrag } from './pointer_drag.js';
 
     // --- Palette Class and Data Structure ---
 
@@ -1141,7 +1142,7 @@
     // recomputed from the controls.
     let hueKeyWheelDrawnPoints = [];
     let activeHueKey = null;
-    let activeHuePointerId = null;
+    let hueKeyDrag = null;
     let selectedHueKey = 0;
     const hueKeyNames = ['A', 'B', 'C', 'D'];
     // Off-screen role="slider" proxies, one per hue key. The wheel is a canvas,
@@ -1415,42 +1416,34 @@
     }
 
     function handleHueWheelPointerDown(event) {
-      if (!event.isPrimary || event.button !== 0 || activeHuePointerId !== null) return;
       const position = wheelPointerPosition(event);
       activeHueKey = hitTestHueKeyMarker(position.x, position.y,
         hueKeyWheelDrawnPoints, 16);
-      if (activeHueKey === null) return;
+      if (activeHueKey === null) return false;
       selectedHueKey = activeHueKey;
-      activeHuePointerId = event.pointerId;
-      hueKeyWheelCanvas.setPointerCapture(event.pointerId);
       hueKeyWheelCanvas.style.cursor = 'grabbing';
       scheduleUpdate();
-      event.preventDefault();
     }
 
     function handleHueWheelPointerMove(event) {
-      if (event.pointerId !== activeHuePointerId) {
-        const position = wheelPointerPosition(event);
-        const marker = hitTestHueKeyMarker(position.x, position.y,
-          hueKeyWheelDrawnPoints, 16);
-        hueKeyWheelCanvas.style.cursor = marker === null ? 'default' : 'grab';
-        return;
-      }
       const recipe = readPaletteRecipe();
       if (recipe.hue.mode !== PaletteV4.hueMode.CUSTOM
           && !activateCustomHue(recipe)) {
-        handleHueWheelPointerEnd(event);
+        hueKeyDrag.stop();
         return;
       }
       updateHueKeyFromPointer(event);
     }
 
-    function handleHueWheelPointerEnd(event) {
-      if (event.pointerId !== activeHuePointerId) return;
-      if (hueKeyWheelCanvas.hasPointerCapture(event.pointerId))
-        hueKeyWheelCanvas.releasePointerCapture(event.pointerId);
+    function handleHueWheelPointerHover(event) {
+      const position = wheelPointerPosition(event);
+      const marker = hitTestHueKeyMarker(position.x, position.y,
+        hueKeyWheelDrawnPoints, 16);
+      hueKeyWheelCanvas.style.cursor = marker === null ? 'default' : 'grab';
+    }
+
+    function handleHueWheelPointerEnd() {
       activeHueKey = null;
-      activeHuePointerId = null;
       hueKeyWheelCanvas.style.cursor = 'default';
       scheduleUpdate();
     }
@@ -1742,8 +1735,7 @@
     }
 
     // Drag-to-zoom state
-    let isDragging = false;
-    let activePointerId = null;
+    let stripDrag = null;
     let isSelectionActive = false; // Tracks if drag is active AND within Y-bounds
     let dragStartPosition = 0.0;
     let dragEndPosition = 0.0;
@@ -1938,16 +1930,12 @@
          * Handles the start of a drag or click on the color strip.
          */
     function handleDragStart(event) {
-      if (!event.isPrimary || event.button !== 0 || activePointerId !== null || !colorStripCanvas) return;
+      if (!colorStripCanvas) return false;
 
-      activePointerId = event.pointerId;
-      isDragging = true;
       isSelectionActive = true; // Selection is active on start
       dragStartPosition = getNormalizedX(event);
       dragEndPosition = dragStartPosition;
       colorStripCanvas.style.cursor = 'crosshair';
-      colorStripCanvas.setPointerCapture(event.pointerId);
-      event.preventDefault();
 
       drawColorStrip();
     }
@@ -1957,8 +1945,6 @@
          * Cancels selection if the pointer moves above or below the canvas.
          */
     function handleDragMove(event) {
-      if (!isDragging || event.pointerId !== activePointerId) return;
-
       dragEndPosition = getNormalizedX(event);
 
       // Check if the pointer is outside the canvas's Y-bounds to deactivate selection
@@ -1984,17 +1970,12 @@
          * Handles the end of a drag (zoom) or a simple click (set phase).
          */
     function handleDragEnd(event) {
-      if (!isDragging || event.pointerId !== activePointerId || !colorStripCanvas) return;
+      if (!colorStripCanvas) return;
 
       handleDragMove(event);
 
       const wasSelectionActive = isSelectionActive; // Store state before reset
 
-      if (colorStripCanvas.hasPointerCapture(event.pointerId)) {
-        colorStripCanvas.releasePointerCapture(event.pointerId);
-      }
-      activePointerId = null;
-      isDragging = false;
       isSelectionActive = false; // Reset selection state
       colorStripCanvas.style.cursor = 'pointer';
 
@@ -2025,13 +2006,8 @@
       }
     }
 
-    function handleDragCancel(event) {
-      if (!isDragging || event.pointerId !== activePointerId || !colorStripCanvas) return;
-      if (colorStripCanvas.hasPointerCapture(event.pointerId)) {
-        colorStripCanvas.releasePointerCapture(event.pointerId);
-      }
-      activePointerId = null;
-      isDragging = false;
+    function handleDragCancel() {
+      if (!colorStripCanvas) return;
       isSelectionActive = false;
       colorStripCanvas.style.cursor = 'pointer';
       drawColorStrip();
@@ -2442,17 +2418,23 @@
 
       window.addEventListener('resize', scheduleUpdate);
 
-      hueKeyWheelCanvas.addEventListener('pointerdown', handleHueWheelPointerDown);
-      hueKeyWheelCanvas.addEventListener('pointermove', handleHueWheelPointerMove);
-      hueKeyWheelCanvas.addEventListener('pointerup', handleHueWheelPointerEnd);
-      hueKeyWheelCanvas.addEventListener('pointercancel', handleHueWheelPointerEnd);
+      hueKeyDrag = createPointerDrag({
+        element: hueKeyWheelCanvas,
+        onStart: handleHueWheelPointerDown,
+        onMove: handleHueWheelPointerMove,
+        onHover: handleHueWheelPointerHover,
+        onEnd: handleHueWheelPointerEnd,
+      });
       mountHueKeyHandles(document.getElementById('hueKeyWheelGroup'));
 
       // 3. Add drag-and-drop listeners
-      colorStripCanvas.addEventListener('pointerdown', handleDragStart);
-      colorStripCanvas.addEventListener('pointermove', handleDragMove);
-      colorStripCanvas.addEventListener('pointerup', handleDragEnd);
-      colorStripCanvas.addEventListener('pointercancel', handleDragCancel);
+      stripDrag = createPointerDrag({
+        element: colorStripCanvas,
+        onStart: handleDragStart,
+        onMove: handleDragMove,
+        onEnd: handleDragEnd,
+        onCancel: handleDragCancel,
+      });
       colorStripCanvas.addEventListener('keydown', handleStripKeyDown); // keyboard parity (a11y)
       updateStripView();
 
@@ -2480,15 +2462,9 @@
         window.removeEventListener('resize', scheduleUpdate);
         copyRequestId += 1;
         if (copyFeedbackTimer !== null) clearTimeout(copyFeedbackTimer);
-        colorStripCanvas.removeEventListener('pointerdown', handleDragStart);
-        colorStripCanvas.removeEventListener('pointermove', handleDragMove);
-        colorStripCanvas.removeEventListener('pointerup', handleDragEnd);
-        colorStripCanvas.removeEventListener('pointercancel', handleDragCancel);
+        stripDrag.remove();
         colorStripCanvas.removeEventListener('keydown', handleStripKeyDown);
-        hueKeyWheelCanvas.removeEventListener('pointerdown', handleHueWheelPointerDown);
-        hueKeyWheelCanvas.removeEventListener('pointermove', handleHueWheelPointerMove);
-        hueKeyWheelCanvas.removeEventListener('pointerup', handleHueWheelPointerEnd);
-        hueKeyWheelCanvas.removeEventListener('pointercancel', handleHueWheelPointerEnd);
+        hueKeyDrag.remove();
         for (const handle of hueKeyHandles) handle.remove();
         hueKeyHandles = [];
       });
