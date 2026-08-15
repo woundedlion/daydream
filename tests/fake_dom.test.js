@@ -346,6 +346,18 @@ test('insertBefore places a node ahead of a child and moves it out of its old pa
     /not a child/, 'a reference outside the parent was accepted');
 });
 
+test('removeChild refuses a node that is not a child', () => {
+  const box = fakeElement('div');
+  const other = fakeElement('div');
+  const child = fakeElement('span');
+  other.appendChild(child);
+
+  assert.throws(() => box.removeChild(child), /not a child/,
+    'a removal aimed at the wrong parent was accepted');
+  assert.deepEqual(other.childNodes, [child], 'the real parent dropped the node');
+  assert.equal(child.parentNode, other, 'the node lost its parent link');
+});
+
 test('appendChild refuses a string the way the platform does', () => {
   const box = fakeElement('div');
   assert.throws(() => box.appendChild('text'), TypeError);

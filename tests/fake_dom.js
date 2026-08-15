@@ -230,6 +230,8 @@ function fakeStyle() {
  * anything else, so a test cannot encode a text node where the platform demands
  * an element. insertBefore() places a node ahead of a child and appends on a
  * null reference; a reference that is not a child throws rather than appending.
+ * removeChild() throws on a node that is not a child, so a removal aimed at the
+ * wrong parent cannot leave the node listed by its real one.
  *
  * dispatch() propagates over the parentNode chain the way the DOM does, so a
  * listener's attachment point is observable: capture listeners run root-first,
@@ -307,7 +309,8 @@ export function fakeElement(tag = 'div', options = {}) {
     },
     removeChild(node) {
       const at = this.childNodes.indexOf(node);
-      if (at >= 0) this.childNodes.splice(at, 1);
+      if (at < 0) throw new Error('removeChild: the node is not a child');
+      this.childNodes.splice(at, 1);
       reparent([node], null);
       return node;
     },
