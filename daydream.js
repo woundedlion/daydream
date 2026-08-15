@@ -533,6 +533,7 @@ export function start({
     logError: (message, error) => console.error(message, error),
     showNotice: (message) => applyNotice.show(message, SWITCH_NOTICE),
     showFatal: showFatalError,
+    usesFullConfigSnapshot,
   });
 
   testAllController = guiInstance.addSession({ testAll: false }, 'testAll').name('Test All')
