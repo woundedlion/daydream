@@ -466,7 +466,7 @@
 
       <div class="flex items-center justify-between">
         <label class="text-xs uppercase font-semibold text-slate-400">Add Operation</label>
-        <button id="clearOpsBtn"
+        <button type="button" id="clearOpsBtn"
           class="text-[0.65rem] text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">Clear
           All</button>
       </div>
@@ -477,38 +477,38 @@
            click listener (wired in init) dispatches to addOp, so no handler is
            pinned to window. -->
       <div id="addOpGrid" class="grid grid-cols-3 gap-1 pt-1">
-        <button data-op="kis" class="btn btn-secondary text-[0.65rem]">Kis</button>
-        <button data-op="ambo" class="btn btn-secondary text-[0.65rem]">Ambo</button>
-        <button data-op="gyro" class="btn btn-secondary text-[0.65rem]">Gyro</button>
-        <button data-op="snub" class="btn btn-secondary text-[0.65rem]">Snub</button>
-        <button data-op="dual" class="btn btn-secondary text-[0.65rem]">Dual</button>
-        <button data-op="truncate" class="btn btn-secondary text-[0.65rem]">Truncate</button>
-        <button data-op="chamfer" class="btn btn-secondary text-[0.65rem]">Chamfer</button>
-        <button data-op="expand" class="btn btn-secondary text-[0.65rem]">Expand</button>
-        <button data-op="hankin" class="btn btn-secondary text-[0.65rem]">Hankin</button>
-        <button data-op="relax" class="btn btn-secondary text-[0.65rem]">Relax</button>
-        <button data-op="meta" class="btn btn-secondary text-[0.65rem] relative group">
+        <button type="button" data-op="kis" class="btn btn-secondary text-[0.65rem]">Kis</button>
+        <button type="button" data-op="ambo" class="btn btn-secondary text-[0.65rem]">Ambo</button>
+        <button type="button" data-op="gyro" class="btn btn-secondary text-[0.65rem]">Gyro</button>
+        <button type="button" data-op="snub" class="btn btn-secondary text-[0.65rem]">Snub</button>
+        <button type="button" data-op="dual" class="btn btn-secondary text-[0.65rem]">Dual</button>
+        <button type="button" data-op="truncate" class="btn btn-secondary text-[0.65rem]">Truncate</button>
+        <button type="button" data-op="chamfer" class="btn btn-secondary text-[0.65rem]">Chamfer</button>
+        <button type="button" data-op="expand" class="btn btn-secondary text-[0.65rem]">Expand</button>
+        <button type="button" data-op="hankin" class="btn btn-secondary text-[0.65rem]">Hankin</button>
+        <button type="button" data-op="relax" class="btn btn-secondary text-[0.65rem]">Relax</button>
+        <button type="button" data-op="meta" class="btn btn-secondary text-[0.65rem] relative group">
           Meta
           <span
             class="absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
             Kis(Ambo(x))
           </span>
         </button>
-        <button data-op="needle" class="btn btn-secondary text-[0.65rem] relative group">
+        <button type="button" data-op="needle" class="btn btn-secondary text-[0.65rem] relative group">
           Needle
           <span
             class="absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
             Kis(Dual(x))
           </span>
         </button>
-        <button data-op="zip" class="btn btn-secondary text-[0.65rem] relative group">
+        <button type="button" data-op="zip" class="btn btn-secondary text-[0.65rem] relative group">
           Zip
           <span
             class="absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
             Dual(Kis(x))
           </span>
         </button>
-        <button data-op="bevel" class="btn btn-secondary text-[0.65rem] relative group">
+        <button type="button" data-op="bevel" class="btn btn-secondary text-[0.65rem] relative group">
           Bevel
           <span
             class="absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
@@ -551,9 +551,9 @@
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-bold text-white">Saved Solids</h2>
       <div class="flex gap-3">
-        <button id="exportSavedBtn"
+        <button type="button" id="exportSavedBtn"
           class="text-xs text-indigo-300 hover:text-white uppercase font-bold tracking-wider">Export JSON</button>
-        <button id="clearSavedBtn"
+        <button type="button" id="clearSavedBtn"
           class="text-xs text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">Clear All</button>
       </div>
     </div>
