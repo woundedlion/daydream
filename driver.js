@@ -953,6 +953,9 @@ export class Daydream {
    * leaked GPU material/geometry/context.
    */
   dispose() {
+    // Stop the rAF callback first so it never fires into the nulled dotMesh /
+    // disposed renderer on a real page discard.
+    this.renderer?.setAnimationLoop(null);
     this.resizeObserver?.disconnect();
     this.clock?.dispose();
 
@@ -996,9 +999,6 @@ export class Daydream {
 
     this.controls?.dispose();
     this.labelRenderer?.domElement?.remove();
-    // Stop the rAF callback before disposal so it never fires into the nulled
-    // dotMesh / disposed renderer on a real page discard.
-    this.renderer?.setAnimationLoop(null);
     this.renderer?.dispose();
     // dispose() frees the GPU objects but keeps the drawing context, which the
     // browser caps at ~16 per page; only a context loss hands it back.
