@@ -208,21 +208,26 @@ function fillCpp(tokens, first, rest) {
  * one level further.
  * @param {string} type - The declared type.
  * @param {string} declarator - The declared name plus any array suffix.
+ * @param {boolean} [breakAfterBrace] - True when the initializer always breaks
+ *   after its open brace, which moves the brace-alone form's elements one
+ *   indent level in rather than aligning them past the brace.
  * @returns {{prefix: string, indent: number}} The text up to and including the
  *   first initializer element's indentation, and the column that element
  *   starts at.
  */
-function definitionHeadCpp(type, declarator) {
+function definitionHeadCpp(type, declarator, breakAfterBrace = false) {
   const assign = `inline constexpr ${type} ${declarator} =`;
   const pad = ' '.repeat(INDENT);
+  const deeper = ' '.repeat(2 * INDENT);
   // ' {' is what the one-line form adds past the assignment.
   if (assign.length + 2 <= COLUMN_LIMIT) {
     return { prefix: `${assign} {\n${pad}`, indent: INDENT };
   }
   if (assign.length <= COLUMN_LIMIT) {
-    return { prefix: `${assign}\n${pad}{`, indent: INDENT + 1 };
+    return breakAfterBrace
+      ? { prefix: `${assign}\n${pad}{\n${deeper}`, indent: 2 * INDENT }
+      : { prefix: `${assign}\n${pad}{`, indent: INDENT + 1 };
   }
-  const deeper = ' '.repeat(2 * INDENT);
   return {
     prefix: `inline constexpr ${type}\n${pad}${declarator} = {\n${deeper}`,
     indent: 2 * INDENT,
@@ -355,11 +360,14 @@ export function generateRegistryCpp(item, baseRecipe = null) {
       + `steps; a Recipe carries at most ${MAX_RECIPE_STEPS}, above which its `
       + 'uint8_t count wraps and the pasted Recipe would replay a different chain');
   }
-  const table = definitionHeadCpp('OpStep', `${stepsName}[]`);
+  // The step table's trailing comma holds clang-format to one step per line;
+  // without it a table short enough to fit gets packed onto fewer lines and the
+  // paste no longer matches the formatted header.
+  const table = definitionHeadCpp('OpStep', `${stepsName}[]`, true);
   const recipe = definitionHeadCpp('Recipe', recipeName);
   return seedConstant
     + `${docCommentCpp(`Step table for ${funcName}.`)}\n`
-    + `${table.prefix}${stepList.join(`,\n${' '.repeat(table.indent)}`)}};\n`
+    + `${table.prefix}${stepList.join(`,\n${' '.repeat(table.indent)}`)},\n};\n`
     + `${docCommentCpp(`Recipe mirror of IslamicStarPatterns::${funcName}.`)}\n`
     + `${recipe.prefix}`
     + `${recipeBodyCpp(`SEED_${upperSnake(seedName)}`, stepsName, recipe.indent)}\n\n`
