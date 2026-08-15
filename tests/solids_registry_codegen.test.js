@@ -79,7 +79,8 @@ test('generateRegistryCpp emits a Recipe mirror for a hankin-free chain too', ()
     + '\n'
     + '/** Step table for cube_truncate33. */\n'
     + 'inline constexpr OpStep CUBE_TRUNCATE33_STEPS[] = {\n'
-    + '    {Op::TRUNCATE, 0.33f}};\n'
+    + '    {Op::TRUNCATE, 0.33f},\n'
+    + '};\n'
     + '/** Recipe mirror of IslamicStarPatterns::cube_truncate33. */\n'
     + 'inline constexpr Recipe CUBE_TRUNCATE33_RECIPE = {\n'
     + '    SEED_CUBE, CUBE_TRUNCATE33_STEPS,\n'
@@ -217,7 +218,8 @@ test('generateRegistryCpp emits a step table and Recipe mirror for a hankin chai
     '/** Step table for dodecahedron_hk62_ambo. */\n'
     + 'inline constexpr OpStep DODECAHEDRON_HK62_AMBO_STEPS[] = {\n'
     + '    {Op::HANKIN, 62.0f * IslamicStarPatterns::D2R},\n'
-    + '    {Op::AMBO}};\n'
+    + '    {Op::AMBO},\n'
+    + '};\n'
     + '/** Recipe mirror of IslamicStarPatterns::dodecahedron_hk62_ambo. */\n'
     + 'inline constexpr Recipe DODECAHEDRON_HK62_AMBO_RECIPE = {\n'
     + '    SEED_DODECAHEDRON, DODECAHEDRON_HK62_AMBO_STEPS,\n'
@@ -249,7 +251,8 @@ test('generateRegistryCpp wraps a long paste the way solids.h already carries it
     + '        {Op::AMBO},\n'
     + '        {Op::RELAX, 100.0f},\n'
     + '        {Op::TRUNCATE, 0.01f},\n'
-    + '        {Op::HANKIN, 59.0f * IslamicStarPatterns::D2R}};\n'
+    + '        {Op::HANKIN, 59.0f * IslamicStarPatterns::D2R},\n'
+    + '};\n'
     // A doc comment past the limit becomes a filled block comment.
     + '/**\n'
     + ' * Recipe mirror of\n'
@@ -296,6 +299,51 @@ test('no paste line exceeds the column limit solids.h is formatted at', () => {
   }
 });
 
+/** A step chain per step-table head shape: brace on the declarator line, brace
+ * alone on the continuation line, declarator moved below its type. */
+const HEAD_SHAPE_CHAINS = [
+  ['ambo'],
+  ['kis', 'gyro'],
+  [{ op: 'hankin', params: { angle: 62 } }, 'ambo'],
+  [{ op: 'truncate', params: { t: 0.33 } }, { op: 'truncate', params: { t: 0.33 } },
+    { op: 'truncate', params: { t: 0.33 } }],
+  ['ambo', { op: 'relax', params: { iter: 100 } },
+    { op: 'truncate', params: { t: 0.01 } },
+    { op: 'hankin', params: { angle: 59 } }],
+];
+
+/**
+ * clang-format packs a braced-init list that fits on fewer lines, so a step
+ * table emitted without a trailing comma comes back reflowed and the paste
+ * fails the format gate solids.h is under. The trailing comma is what holds one
+ * step per line, and it moves the closing brace to column 0.
+ */
+test('every step table emits one step per line, last step comma-terminated', () => {
+  for (const base of SIMPLE_SEEDS) {
+    for (const ops of HEAD_SHAPE_CHAINS) {
+      const code = generateRegistryCpp({ base, ops });
+      const start = code.indexOf('inline constexpr OpStep');
+      const close = code.indexOf('\n};\n', start);
+      assert.ok(close > start,
+        `the table for "${base}" must close with '};' in column 0`);
+      const steps = code.slice(start, close).split('\n')
+        .filter(line => line.trimStart().startsWith('{Op::'));
+      assert.equal(steps.length, ops.length,
+        `the table for "${base}" must carry one step per line`);
+      for (const line of steps) {
+        assert.ok(line.endsWith(','), `"${line}" must end in a comma`);
+      }
+    }
+  }
+});
+
+test('a step table head that fills the column limit breaks before its brace', () => {
+  const truncate33 = { op: 'truncate', params: { t: 0.33 } };
+  assert.match(
+    generateRegistryCpp({ base: 'dodecahedron', ops: [truncate33, truncate33, truncate33] }),
+    /inline constexpr OpStep DODECAHEDRON_TRUNCATE33_TRUNCATE33_TRUNCATE33_STEPS\[\] =\n {4}\{\n {8}\{Op::TRUNCATE, 0\.33f\},\n {8}\{Op::TRUNCATE, 0\.33f\},\n {8}\{Op::TRUNCATE, 0\.33f\},\n\};\n/);
+});
+
 test('generateRegistryCpp flattens a star-pattern base onto its own seed', () => {
   const item = { base: 'icosahedron_kis_gyro', ops: [{ op: 'hankin', params: { angle: 54 } }] };
   const baseRecipe = { seed: 'icosahedron', ops: [chainStep('kis'), chainStep('gyro')] };
@@ -304,7 +352,8 @@ test('generateRegistryCpp flattens a star-pattern base onto its own seed', () =>
     + 'inline constexpr OpStep ICOSAHEDRON_KIS_GYRO_HK54_STEPS[] = {\n'
     + '    {Op::KIS},\n'
     + '    {Op::GYRO},\n'
-    + '    {Op::HANKIN, 54.0f * IslamicStarPatterns::D2R}};\n'
+    + '    {Op::HANKIN, 54.0f * IslamicStarPatterns::D2R},\n'
+    + '};\n'
     + '/** Recipe mirror of IslamicStarPatterns::icosahedron_kis_gyro_hk54. */\n'
     + 'inline constexpr Recipe ICOSAHEDRON_KIS_GYRO_HK54_RECIPE = {\n'
     + '    SEED_ICOSAHEDRON, ICOSAHEDRON_KIS_GYRO_HK54_STEPS,\n'
@@ -332,7 +381,7 @@ test('generateRegistryCpp never names a star pattern as the Recipe seed', () => 
   assert.match(code, /\n {4}SEED_DODECAHEDRON, /);
   assert.doesNotMatch(code, /SEED_DODECAHEDRON_HK62/);
   // The base's own chain leads the step table, then the tool's ops.
-  assert.match(code, /\{Op::HANKIN, 62\.0f \* IslamicStarPatterns::D2R\},\n {4}\{Op::AMBO\},\n {4}\{Op::HANKIN, 62\.0f \* IslamicStarPatterns::D2R\},\n {4}\{Op::DUAL\}\}/);
+  assert.match(code, /\{Op::HANKIN, 62\.0f \* IslamicStarPatterns::D2R\},\n {4}\{Op::AMBO\},\n {4}\{Op::HANKIN, 62\.0f \* IslamicStarPatterns::D2R\},\n {4}\{Op::DUAL\},\n\};/);
 });
 
 test('generateRegistryCpp emits base chain params that read back as the same float32', () => {

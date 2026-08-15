@@ -226,8 +226,8 @@
     "assertions": 58
   },
   "tests/solids_registry_codegen.test.js": {
-    "cases": 29,
-    "assertions": 210
+    "cases": 31,
+    "assertions": 607
   },
   "tests/state.test.js": {
     "cases": 59,
