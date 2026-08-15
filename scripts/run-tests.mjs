@@ -114,10 +114,11 @@ const countsDir = join(scratch, 'assertions');
 let status;
 let tallied = false;
 const counts = new Map();
-// Cases each file ran, and the files that ran nothing but a skip. Both keyed
-// as `counts` is.
+// Cases each file ran, the files that ran nothing but a skip, and the files
+// that reported a todo. All keyed as `counts` is.
 const cases = new Map();
 const skipped = new Set();
+const todo = new Set();
 try {
   mkdirSync(countsDir);
   const run = spawnSync(
@@ -166,6 +167,7 @@ try {
       const key = keyOf(file);
       cases.set(key, tally.ran);
       if (tally.skipped > 0 && tally.ran === 0) skipped.add(key);
+      if (tally.todo > 0) todo.add(key);
     }
   }
 } finally {
@@ -185,6 +187,20 @@ if (counts.size === 0) {
 if (!tallied) {
   console.error(
     'run-tests: no case counts were reported — refusing to report a green run.',
+  );
+  process.exit(1);
+}
+// A todo runs its body and is reported as a pass however it ends, so it clears
+// both floors while asserting nothing that can fail. There is no opt-in for it,
+// as there is for a skip: a case that cannot pass belongs in neither floor.
+if (todo.size > 0) {
+  console.error(
+    'run-tests: these reported a todo, which passes whatever it does:\n' +
+      [...todo]
+        .sort()
+        .map((file) => `  ${file}`)
+        .join('\n') +
+      '\nFix the case or delete it; a todo is not a floor either counter can gate.',
   );
   process.exit(1);
 }
