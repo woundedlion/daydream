@@ -360,7 +360,7 @@ function makeHarness({
     getFullConfigSnapshot: () => state.fullConfigSnapshot,
     restoreFullConfigSnapshot: (snapshot) => {
       restoredFullConfigs.push(snapshot);
-      return restoreFullConfigAccepted;
+      return restoreFullConfigAccepted ? 'APPLIED' : 'INVALID_VALUE';
     },
     getConfigImportNotice: () => configImportNotice,
     clearConfigImportNotice: () => { configNoticeClears += 1; },

@@ -240,8 +240,9 @@ export function addParamControl(
  * @param {() => boolean} [deps.usesFullConfigSnapshot] - Whether the active
  *   effect persists through the exhaustive versioned snapshot API.
  * @param {() => Object|null} [deps.getFullConfigSnapshot] - Captures that state.
- * @param {(snapshot: Object) => boolean} [deps.restoreFullConfigSnapshot] -
- *   Atomically restores a captured state.
+ * @param {(snapshot: Object) => string} [deps.restoreFullConfigSnapshot] -
+ *   Atomically restores a captured state, returning the engine's
+ *   FullConfigRestoreResult constant name ("APPLIED" on success).
  * @param {() => string} [deps.getConfigImportNotice] - Reads a migration notice.
  * @param {() => void} [deps.clearConfigImportNotice] - Consumes that notice.
  * @param {(message: string|null) => void} [deps.showConfigImportNotice] - Shows
@@ -274,7 +275,7 @@ export function createEffectGui({
   copyText,
   usesFullConfigSnapshot = () => false,
   getFullConfigSnapshot = () => null,
-  restoreFullConfigSnapshot = () => false,
+  restoreFullConfigSnapshot = () => 'NO_ENGINE',
   getConfigImportNotice = () => '',
   clearConfigImportNotice = () => {},
   showConfigImportNotice = () => {},
@@ -314,8 +315,9 @@ export function createEffectGui({
       logWarn('ShaderBall: ignoring invalid full-config snapshot', error);
       return;
     }
-    if (!restoreFullConfigSnapshot(snapshot)) {
-      logWarn('ShaderBall: full-config snapshot was rejected');
+    const outcome = restoreFullConfigSnapshot(snapshot);
+    if (outcome !== 'APPLIED') {
+      logWarn(`ShaderBall: full-config snapshot was rejected: ${outcome}`);
       return;
     }
     const notice = getConfigImportNotice();
