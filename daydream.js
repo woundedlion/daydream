@@ -30,6 +30,7 @@ import {
   createSegmentSpawnGuard,
   createSegmentedFallback,
   createTestAllTicker,
+  loadWithDeadline,
   repointDisplayAliases,
 } from "./app_lifecycle.js";
 import { AppState, URLSync, replaceUrl } from "./state.js";
@@ -750,7 +751,10 @@ export function start({
   // flight would then build an engine into a half-built app — no teardown to
   // release it, no pagehide listener. Only synchronous construction sits between
   // this and the import, so the binary's fetch still starts in the same task.
-  loadModule().then(moduleLoad.onModuleReady).catch(moduleLoad.onModuleFailed);
+  // Deadlined: a stalled fetch reports through the same failure UI (overlay,
+  // detail, Reload) rather than leaving the loading overlay spinning.
+  loadWithDeadline(loadModule)
+    .then(moduleLoad.onModuleReady).catch(moduleLoad.onModuleFailed);
 
   return appTeardown;
 }
