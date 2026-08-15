@@ -164,12 +164,16 @@ test('the working-tree WASM artifacts are the committed ones', {
   }
 });
 
-test('the pre-push hook runs this provenance gate', () => {
+test('the pre-push hook and the unit-suite workflow arm the working-tree check', () => {
   const hook = readFileSync(resolve(REPO, '.githooks/pre-push'), 'utf8');
   assert.match(hook, /tests\/wasm_provenance\.test\.js/,
     'the provenance gate must run from .githooks/pre-push, not only from npm test');
   assert.match(hook, new RegExp(`${CLEAN_ENV}=`),
     `the hook must set ${CLEAN_ENV}, or the working-tree check never runs before a push`);
+  assert.match(readFileSync(resolve(REPO, UNIT_SUITE), 'utf8'),
+    new RegExp(`${CLEAN_ENV}:`),
+    `the workflow must set ${CLEAN_ENV} too, or the check the hook can be ` +
+      'skipped past is armed nowhere the push is measured against');
 });
 
 // Every case of tests/engine_source_parity.test.js skips without an engine
