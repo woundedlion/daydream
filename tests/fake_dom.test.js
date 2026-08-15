@@ -284,6 +284,8 @@ test('style keeps only the values a browser would keep', () => {
   assert.throws(() => { el.style['font-size'] = '10px'; }, /keyed camelCase/,
     'a dashed name declares nothing, so no read would ever find it');
 
+  assert.equal(el.style.position, '', 'an undeclared property is the empty string');
+
   el.style.display = 'grid';
   el.style.display = 'blink';
   assert.equal(el.style.display, 'grid', 'a value no browser parses read back as set');
