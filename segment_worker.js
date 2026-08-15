@@ -213,8 +213,10 @@ async function handleMessage(msg) {
           break;
         }
       }
+      // synchronizePreset, not selectPreset: this mirrors the engine-driven
+      // index, and selectPreset would engage the pause msg.paused carries.
       if (typeof msg.presetIndex === 'number') {
-        engine.selectPreset(msg.presetIndex);
+        engine.synchronizePreset(msg.presetIndex);
       }
       if (!restoreFullConfig(msg.fullConfigSnapshot)) break;
       // Tuned params must follow setEffect, which rebuilds with defaults.
@@ -245,8 +247,9 @@ async function handleMessage(msg) {
                  reason: `setEffect(${msg.name}) rejected` });
           break;
         }
+        // Mirrors the engine-driven index without the pause, as in 'init'.
         if (typeof msg.presetIndex === 'number') {
-          engine.selectPreset(msg.presetIndex);
+          engine.synchronizePreset(msg.presetIndex);
         }
         if (!restoreFullConfig(msg.fullConfigSnapshot)) break;
         // Tuned params must follow setEffect, which rebuilds with defaults.

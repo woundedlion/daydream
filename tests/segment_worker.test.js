@@ -109,7 +109,14 @@ class FakeEngine {
     this.presetIndex = index;
     return true;
   }
-  synchronizePreset(index) { return this.selectPreset(index); }
+  // Logged under its own name so a caller that must not engage the pause is
+  // distinguishable from one that may.
+  synchronizePreset(index) {
+    this.calls.push(['synchronizePreset', index]);
+    if (index < 0 || index >= this.presetCount) return false;
+    this.presetIndex = index;
+    return true;
+  }
   nextPreset() {
     return this.selectPreset((this.presetIndex + 1) % this.presetCount);
   }
@@ -752,6 +759,8 @@ test('init restores ShaderBall full config atomically instead of replaying param
   assert.deepEqual(engineInstance.params, []);
 });
 
+// synchronizePreset, not selectPreset: the carried index mirrors the main
+// engine, and the pause the init message carries is applied on its own.
 test('init selects the carried preset before applying tuned params', async () => {
   await dispatch({
     type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma',
@@ -759,7 +768,7 @@ test('init selects the carried preset before applying tuned params', async () =>
   });
   assert.equal(engineInstance.presetIndex, 2);
   assert.deepEqual(engineInstance.calls.slice(1, 3),
-    [['setEffect', 'Plasma'], ['selectPreset', 2]]);
+    [['setEffect', 'Plasma'], ['synchronizePreset', 2]]);
   assert.deepEqual(engineInstance.params, [['Speed', 0.5]]);
 });
 
