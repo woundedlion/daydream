@@ -246,9 +246,10 @@ test('the late-bound engine controls are re-applied once the engine exists', () 
 });
 
 test('narrowing the resolution options rebinds the controller and its handler', () => {
-  const consequence = "lil-gui's options() destroys the receiver and returns a "
-    + 'replacement that carries the name but no onChange; syncResolutionOptions '
-    + 'runs on every boot, so a discarded return value leaves the live dropdown '
+  const consequence = "lil-gui's base Controller.options() destroys the receiver "
+    + 'and returns a replacement that carries the name but no onChange (only an '
+    + 'OptionController updates itself in place); syncResolutionOptions runs on '
+    + 'every boot, so a discarded return value would leave the live dropdown '
     + 'writing to nothing and setValue() updating a detached <select>';
   assert.match(SOURCE, /let resolutionController/, consequence);
   assert.match(SOURCE, /resolutionController = resolutionController\.options\([^)]*\)\s*\.onChange\(setResolution\)/,

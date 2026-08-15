@@ -10,6 +10,11 @@ import { fakeElement, installDocument } from './fake_dom.js';
 // loaded here, at import time, before any test installs one.
 const { start } = await import('../daydream.js');
 
+// The third add() argument that makes lil-gui build an OptionController: a list
+// of choices, or an object mapping labels to them.
+const isOptionList = (arg) =>
+  Array.isArray(arg) || (arg !== null && typeof arg === 'object');
+
 /**
  * A lil-gui controller as the root uses one: named, bound, and re-settable.
  * @param {Object} owner - The GUI the controller belongs to.
@@ -28,13 +33,22 @@ function fakeController(owner, object, property, args = []) {
     name(text) { controller.label = text; return controller; },
     onChange(fn) { controller.changed = fn; return controller; },
     setValue(v) { controller.value = v; controller.changed?.(v); return controller; },
-    // lil-gui destroys the receiver and returns a replacement, which is why the
-    // root re-binds the resolution controller after narrowing its options.
+    // Two implementations, told apart the way lil-gui does: a controller add()
+    // built from an options list is an OptionController, whose options() updates
+    // its <select> in place and hands back the same controller; any other
+    // controller is destroyed and a replacement carrying the copied name is
+    // appended to the end of the panel. Pinned by tests/lil_gui_contract.test.js.
     options(choices) {
+      if (isOptionList(controller.args[0])) {
+        controller.args = [choices];
+        return controller;
+      }
       controller.destroyed = true;
       const replacement = fakeController(owner, object, property, [choices]);
+      replacement.label = controller.label;
       const at = owner.controllers.indexOf(controller);
-      if (at >= 0) owner.controllers[at] = replacement;
+      if (at >= 0) owner.controllers.splice(at, 1);
+      owner.controllers.push(replacement);
       return replacement;
     },
     enable() { controller.enabled = true; return controller; },
