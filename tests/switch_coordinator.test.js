@@ -9,8 +9,9 @@ import { AppState } from '../state.js';
 import { ApplyResult, createSwitchCoordinator } from '../effect_sequencing.js';
 
 // An effect GUI record in the shape snapshotEffectControlState() reads: one
-// writable "Speed" control plus the pause toggle.
-function makeEffectRecord(name, speed, paused) {
+// writable "Speed" control plus the pause toggle. Every per-parameter write goes
+// into the shared `writes` log, which is what a replay is visible as.
+function makeEffectRecord(name, speed, paused, writes = []) {
   const state = { Speed: speed, paused };
   return {
     name,
@@ -20,7 +21,7 @@ function makeEffectRecord(name, speed, paused) {
     writableParamNames: ['Speed'],
     controllerByName: new Map([['Speed', {
       getValue: () => state.Speed,
-      setValue: (v) => { state.Speed = v; },
+      setValue: (v) => { writes.push([name, 'Speed', v]); state.Speed = v; },
     }]]),
   };
 }
@@ -31,26 +32,32 @@ function makeEffectRecord(name, speed, paused) {
  * @param {Set<string>} [options.rejectEffects] - Effects applyEffect() rejects.
  * @param {Set<string>} [options.rejectResolutions] - Resolutions applyResolution() rejects.
  * @param {Error} [options.throwOnEffect] - Thrown by applyEffect() for any effect.
+ * @param {Set<string>} [options.fullConfigEffects] - Effects the panel persists
+ *   and restores whole through the full-config snapshot API (ShaderBall).
  */
 function makeApp({
   rejectEffects = new Set(),
   rejectResolutions = new Set(),
   throwOnEffect = null,
+  fullConfigEffects = new Set(),
 } = {}) {
   const appState = new AppState({ effect: 'Alpha', resolution: 'Lo' });
   const app = {
     appState,
     // What the engine/GUI layer actually holds, as distinct from appState.
     applied: { effect: 'Alpha', resolution: 'Lo' },
-    activeEffect: makeEffectRecord('Alpha', 0.5, false),
     url: '/?effect=Alpha',
     control: { resolution: 'Lo' },
+    // What the panel carried across its last rebuild, by effect name.
+    persisted: new Map(),
+    paramWrites: [],
     calls: [],
     errors: [],
     notices: [],
     fatals: [],
     urlSyncs: [],
   };
+  app.activeEffect = makeEffectRecord('Alpha', 0.5, false, app.paramWrites);
 
   const applyEffect = (preserveParams = false) => {
     const effect = appState.get('effect');
@@ -61,8 +68,13 @@ function makeApp({
     if (throwOnEffect && !app.switches.isRestoring()) throw throwOnEffect;
     if (rejectEffects.has(effect)) return ApplyResult.REJECTED;
     app.applied.effect = effect;
-    // A successful apply rebuilds the GUI: fresh record, engine-default values.
-    app.activeEffect = makeEffectRecord(effect, 0, false);
+    // A successful apply rebuilds the GUI: the outgoing panel persists its state
+    // on destroy, and the new one comes up at engine defaults — except for a
+    // full-config effect, which the rebuild restores whole.
+    app.persisted.set(app.activeEffect.name, app.activeEffect.state.Speed);
+    const restored = fullConfigEffects.has(effect)
+      ? app.persisted.get(effect) ?? 0 : 0;
+    app.activeEffect = makeEffectRecord(effect, restored, false, app.paramWrites);
     return ApplyResult.APPLIED;
   };
 
@@ -89,6 +101,10 @@ function makeApp({
     logError: (message, error) => app.errors.push({ message, error }),
     showNotice: (message) => app.notices.push(message),
     showFatal: (message) => app.fatals.push(message),
+    // Reads the effect the engine has loaded, not the one appState was just
+    // written to: the snapshot is taken before the apply, so it must describe
+    // the outgoing effect.
+    usesFullConfigSnapshot: () => fullConfigEffects.has(app.applied.effect),
   });
   return app;
 }
@@ -123,6 +139,34 @@ test('a rejected effect switch restores state, URL, and control values', () => {
   assert.deepEqual(app.notices,
     ['Effect change was rejected. The previous value was restored.']);
   assert.deepEqual(app.fatals, []);
+});
+
+test('a rejected switch off a full-config effect restores it without a replay', () => {
+  const app = makeApp({
+    rejectEffects: new Set(['Beta']),
+    fullConfigEffects: new Set(['Alpha']),
+  });
+  app.activeEffect.state.Speed = 0.9;
+
+  app.appState.set('effect', 'Beta');
+
+  assert.equal(app.applied.effect, 'Alpha');
+  assert.equal(app.activeEffect.state.Speed, 0.9,
+    'the rollback rebuild restored the whole config');
+  assert.deepEqual(app.paramWrites, [],
+    'a per-parameter replay on top of the atomic restore drives the effect '
+    + 'through combinations the bridge refuses, splitting requestedValue from '
+    + 'acceptedValue');
+});
+
+test('a rejected switch off a per-parameter effect still replays its values', () => {
+  const app = makeApp({ rejectEffects: new Set(['Beta']) });
+  app.activeEffect.state.Speed = 0.9;
+
+  app.appState.set('effect', 'Beta');
+
+  assert.deepEqual(app.paramWrites, [['Alpha', 'Speed', 0.9]],
+    'the rebuild comes up at engine defaults, so the snapshot is the only way back');
 });
 
 test('a rejected effect switch re-applies with preserveParams and stays muted', () => {

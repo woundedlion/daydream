@@ -70,6 +70,16 @@ test('effect state snapshot copies writable controls and pause state', () => {
   });
 });
 
+test('a full-config effect snapshots no parameters to replay', () => {
+  const effect = makeEffectControls({ Speed: 0.75, Glow: true }, true);
+
+  const snapshot = snapshotEffectControlState(effect, () => true);
+
+  assert.deepEqual(snapshot, { paramValues: [], animationsPaused: true },
+    'the panel rebuild restores the effect whole, so a per-parameter replay on '
+    + 'top of it would only drive it through combinations the bridge refuses');
+});
+
 test('effect state restoration updates controls, engine, workers, and URL together', () => {
   const snapshot = snapshotEffectControlState(
     makeEffectControls({ Speed: 0.75, Glow: true }, true));

@@ -53,15 +53,28 @@ export function runSwitchTransaction(apply, rollback) {
 
 /**
  * Copy the writable values and animation state from an applied effect GUI.
+ *
+ * An effect that persists through the full-config snapshot API is carried across
+ * the rollback's panel rebuild whole, by the panel itself. Replaying its
+ * parameters one at a time on top of that restore would drive the effect through
+ * the intermediate combinations the bridge refuses — a ShaderBall left with
+ * requestedValue and acceptedValue split — so the param list is left empty and
+ * only the pause state is carried here.
+ *
  * @param {Object|null|undefined} effect - Active effect control state.
+ * @param {() => boolean} [usesFullConfigSnapshot] - Whether the live effect
+ *   persists through the exhaustive versioned snapshot API.
  * @returns {{paramValues: Array<[string, any]>, animationsPaused: boolean}|null}
  */
-export function snapshotEffectControlState(effect) {
+export function snapshotEffectControlState(effect,
+                                           usesFullConfigSnapshot = () => false) {
   if (!effect?.controllerByName) return null;
   const paramValues = [];
-  for (const name of effect.writableParamNames || []) {
-    const controller = effect.controllerByName.get(name);
-    if (controller) paramValues.push([name, controller.getValue()]);
+  if (!usesFullConfigSnapshot()) {
+    for (const name of effect.writableParamNames || []) {
+      const controller = effect.controllerByName.get(name);
+      if (controller) paramValues.push([name, controller.getValue()]);
+    }
   }
   return {
     paramValues,
@@ -163,6 +176,9 @@ export function switchFailureReport(label, result) {
  * @param {(message: string, error: any) => void} deps.logError - Console sink.
  * @param {(message: string|null) => void} deps.showNotice - Recoverable error sink.
  * @param {(message: string) => void} deps.showFatal - Fatal-banner sink.
+ * @param {() => boolean} [deps.usesFullConfigSnapshot] - Whether the live effect
+ *   persists through the exhaustive versioned snapshot API, which the panel
+ *   rebuild restores whole; its parameters are then not replayed one at a time.
  * @returns {{isRestoring: () => boolean, mute: (write: () => void) => void,
  *   dispose: () => void}} The mute-window query, a muted-write helper for state
  *   the caller applies itself, and an idempotent unsubscribe.
@@ -179,6 +195,7 @@ export function createSwitchCoordinator({
   logError,
   showNotice,
   showFatal,
+  usesFullConfigSnapshot = () => false,
 }) {
   let restoring = false;
 
@@ -223,7 +240,8 @@ export function createSwitchCoordinator({
     if (restoring) return;
     if (key === 'effect') {
       const previousUrl = currentUrl();
-      const previousEffectState = snapshotEffectControlState(getActiveEffect());
+      const previousEffectState =
+        snapshotEffectControlState(getActiveEffect(), usesFullConfigSnapshot);
       report('Effect', runSwitchTransaction(
         () => applyEffect(),
         () => restoreEffect(old, previousUrl, previousEffectState),
@@ -231,7 +249,8 @@ export function createSwitchCoordinator({
     } else if (key === 'resolution') {
       const previousEffect = appState.get('effect');
       const previousUrl = currentUrl();
-      const previousEffectState = snapshotEffectControlState(getActiveEffect());
+      const previousEffectState =
+        snapshotEffectControlState(getActiveEffect(), usesFullConfigSnapshot);
       const result = runSwitchTransaction(
         () => applyResolution(),
         () => restoreResolution(old, previousEffect, previousUrl, previousEffectState),
