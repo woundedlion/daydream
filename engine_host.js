@@ -82,16 +82,20 @@ export class EngineHost {
    * callback, and module reference, leaving the host inert. Idempotent, and the
    * one release path for both a page discard and a startup the discard raced. A recording in progress
    * is ended but not flushed: its onstop download is async and cannot complete
-   * under a synchronous page discard.
+   * under a synchronous page discard. A collaborator that throws is reported and
+   * the remaining references are dropped anyway: the host runs inside a teardown
+   * that will not revisit it, so a stranded release is a leak with no retry.
    * @returns {void}
    */
   dispose() {
-    this.recorder?.dispose();
+    try { this.recorder?.dispose(); }
+    catch (error) { console.error('EngineHost: releasing the recorder failed:', error); }
     this.recorder = null;
     // Before the delete: the frame loop reaches the engine only through the
     // adapter, so a frame that outlives the teardown must find nothing to call.
     this.adapter = null;
-    this.engine?.delete();
+    try { this.engine?.delete(); }
+    catch (error) { console.error('EngineHost: deleting the engine failed:', error); }
     this.engine = null;
     this.pixelView = null;
     // The callback closes over the Three.js driver and its display aliases, so

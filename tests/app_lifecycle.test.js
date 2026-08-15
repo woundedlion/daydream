@@ -182,10 +182,26 @@ test('a segmented frame is capturable only once a composite has landed', () => {
 /**
  * Build the teardown over doubles that record their order into one log.
  * @param {Object} [options] - Host state the teardown must tolerate.
- * @returns {Object} The teardown plus its doubles and the ordered log.
+ * @param {boolean} [options.recorder] - Whether the host holds a recorder.
+ * @param {boolean} [options.engine] - Whether the host holds an engine.
+ * @param {Set<string>} [options.failing] - Log names whose double throws instead
+ *   of recording, standing in for a collaborator already in a bad state.
+ * @returns {Object} The teardown plus its doubles, the ordered log, and the
+ *   errors its logError sink saw.
  */
-function makeTeardown({ recorder = true, engine = true } = {}) {
+function makeTeardown({
+  recorder = true,
+  engine = true,
+  failing = new Set(),
+} = {}) {
+  const errors = [];
   const log = [];
+  // Records a step, or throws in its place when the case asked that collaborator
+  // to fail.
+  const note = (entry) => {
+    if (failing.has(entry)) throw new Error(`${entry} failed`);
+    log.push(entry);
+  };
   const pageTarget = fakeElement('window');
   const noticeTarget = fakeElement('button');
   const onKeyDown = () => {};
@@ -207,30 +223,32 @@ function makeTeardown({ recorder = true, engine = true } = {}) {
   host.engine = engine
     ? { delete() { log.push(`engine.delete adapter=${host.adapter}`); } }
     : null;
-  host.recorder = recorder ? { dispose() { log.push('recorder.dispose'); } } : null;
+  host.recorder = recorder ? { dispose() { note('recorder.dispose'); } } : null;
   const segments = {
     active: true,
-    destroy() { log.push(`segments.destroy active=${segments.active} epoch=${epoch}`); },
+    destroy() { note(`segments.destroy active=${segments.active} epoch=${epoch}`); },
   };
   let epoch = 0;
   const teardown = createAppTeardown({
     pageTarget,
     listeners,
-    switches: { dispose() { log.push('switches.dispose'); } },
-    stopTimers: () => log.push('stopTimers'),
-    effectGui: { destroy() { log.push('effectGui.destroy'); } },
-    globalGui: { destroy() { log.push('globalGui.destroy'); } },
+    switches: { dispose() { note('switches.dispose'); } },
+    stopTimers: () => note('stopTimers'),
+    effectGui: { destroy() { note('effectGui.destroy'); } },
+    globalGui: { destroy() { note('globalGui.destroy'); } },
     host,
-    urlSync: { dispose() { log.push('urlSync.dispose'); } },
-    sidebar: { dispose() { log.push('sidebar.dispose'); } },
+    urlSync: { dispose() { note('urlSync.dispose'); } },
+    sidebar: { dispose() { note('sidebar.dispose'); } },
     driver: fakeDriver(log),
     segments,
-    strandSegmentWork: () => { epoch += 1; log.push('strandSegmentWork'); },
-    removeOverlay: () => log.push('removeOverlay'),
+    strandSegmentWork: () => { epoch += 1; note('strandSegmentWork'); },
+    removeOverlay: () => note('removeOverlay'),
+    logError: (message, error) => errors.push({ message, error }),
   });
   return {
     teardown,
     log,
+    errors,
     pageTarget,
     noticeTarget,
     host,
@@ -314,6 +332,57 @@ test('the registered pagehide handler is the one that disposes', () => {
   t.pageTarget.dispatch('pagehide', { persisted: false });
 
   assert.equal(t.teardown.disposed(), true);
+});
+
+test('a step that throws does not strand the releases behind it', () => {
+  const t = makeTeardown({ failing: new Set(['globalGui.destroy']) });
+
+  t.teardown.dispose();
+
+  assert.deepEqual(t.log, [
+    'switches.dispose',
+    'stopTimers',
+    'effectGui.destroy',
+    'recorder.dispose',
+    'engine.delete adapter=null',
+    'urlSync.dispose',
+    'sidebar.dispose',
+    'driver.dispose',
+    'strandSegmentWork',
+    'segments.destroy active=false epoch=1',
+    'removeOverlay',
+  ], 'dispose runs once, so a stranded release leaks the URL debounce, the '
+    + 'WebGL context, and the worker pool with no retry left');
+  assert.equal(t.errors.length, 1, 'the failure is still reported');
+  assert.match(t.errors[0].message, /global GUI/);
+});
+
+test('every dispose step is independent of the ones before it', () => {
+  const failing = new Set([
+    'switches.dispose', 'stopTimers', 'effectGui.destroy', 'globalGui.destroy',
+    'urlSync.dispose', 'sidebar.dispose', 'strandSegmentWork', 'removeOverlay',
+  ]);
+  const t = makeTeardown({ failing });
+
+  assert.doesNotThrow(() => t.teardown.dispose());
+
+  assert.equal(t.errors.length, failing.size, 'each failure is named');
+  assert.equal(t.teardown.disposed(), true);
+  assert.equal(t.host.engine, null, 'the engine handle is still released');
+  assert.equal(t.segments.active, false);
+  assert.deepEqual(t.pageTarget.listeners, [], 'the page listeners still come off');
+});
+
+test('a listener removal that throws still leaves the others removed', () => {
+  const t = makeTeardown();
+  const target = t.noticeTarget;
+  target.removeEventListener = () => { throw new Error('detached'); };
+
+  t.teardown.dispose();
+
+  assert.deepEqual(t.pageTarget.listeners, []);
+  assert.equal(t.errors.length, 1);
+  assert.match(t.errors[0].message, /click listener/);
 });
 
 test('dispose tolerates a page torn down before the engine or recorder existed', () => {
