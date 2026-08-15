@@ -22,6 +22,8 @@ const GLUE = 'holosphere_wasm.js';
 const TOOLCHAIN = 'holosphere_wasm.toolchain';
 const INSTALLED = [BINARY, GLUE, MANIFEST, PIN, TOOLCHAIN];
 const CLEAN_ENV = 'DAYDREAM_WASM_CLEAN_REQUIRED';
+const ENGINE_ENV = 'HOLOSPHERE_ENGINE_REQUIRED';
+const UNIT_SUITE = '.github/workflows/js-unit-suite.yml';
 
 /**
  * Runs git in the repo.
@@ -168,6 +170,16 @@ test('the pre-push hook runs this provenance gate', () => {
     'the provenance gate must run from .githooks/pre-push, not only from npm test');
   assert.match(hook, new RegExp(`${CLEAN_ENV}=`),
     `the hook must set ${CLEAN_ENV}, or the working-tree check never runs before a push`);
+});
+
+// Every case of tests/engine_source_parity.test.js skips without an engine
+// checkout, and its floors declare the file skippable, so no assertion inside it
+// survives losing the workflow's checkout step. This file never skips.
+test('the unit-suite workflow declares the engine required', () => {
+  const workflow = readFileSync(resolve(REPO, UNIT_SUITE), 'utf8');
+  assert.match(workflow, new RegExp(`${ENGINE_ENV}:`),
+    `the workflow must set ${ENGINE_ENV}, or a job that lost its engine ` +
+      'checkout retires every source-parity case as a skip and still reports green');
 });
 
 test('the deploy gate requires the engine CI that built the module', () => {

@@ -60,8 +60,8 @@
     "assertions": 42
   },
   "tests/engine_source_parity.test.js": {
-    "cases": 13,
-    "assertions": 507,
+    "cases": 12,
+    "assertions": 506,
     "skippable": true
   },
   "tests/export_params.test.js": {
@@ -246,7 +246,7 @@
     "assertions": 34
   },
   "tests/wasm_provenance.test.js": {
-    "cases": 9,
-    "assertions": 27
+    "cases": 10,
+    "assertions": 28
   }
 }
