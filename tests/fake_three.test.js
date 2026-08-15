@@ -12,6 +12,7 @@ import {
   fakeColorAttribute,
   Mesh,
   MeshBasicMaterial,
+  Object3D,
   Scene,
   SphereGeometry,
 } from './fake_three.js';
@@ -98,4 +99,12 @@ test('only the dispose paths append to the shared teardown log', () => {
   assert.deepEqual(log.slice(before),
     ['scene.clear', 'geometry.dispose', 'material.dispose']);
   assert.deepEqual(scene.children, [], 'clear() empties the scene as well as logging');
+});
+
+test('a fresh object sits at the origin, as THREE.Vector3 constructs', () => {
+  const object = new Object3D();
+  assert.deepEqual({ ...object.position }, { x: 0, y: 0, z: 0 });
+
+  object.position.set(1, 2, 3);
+  assert.deepEqual({ ...object.position }, { x: 1, y: 2, z: 3 });
 });
