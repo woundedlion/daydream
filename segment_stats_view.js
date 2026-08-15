@@ -245,8 +245,17 @@ export class SegmentStatsView {
    */
   buildStatsTable(numSegs, el) {
     const table = this.doc.createElement('table');
+    const caption = this.doc.createElement('caption');
+    caption.className = 'visually-hidden';
+    caption.textContent = 'Per-segment compute time and arena high-water marks';
+    table.appendChild(caption);
     /** @param {string} text - Header label. */
-    const th = (text) => { const e = this.doc.createElement('th'); e.textContent = text; return e; };
+    const th = (text) => {
+      const e = this.doc.createElement('th');
+      e.setAttribute('scope', 'col');
+      e.textContent = text;
+      return e;
+    };
     /**
      * @param {string} [text] - Cell text; left untouched when omitted.
      * @param {string} [className] - Class to set when non-empty.

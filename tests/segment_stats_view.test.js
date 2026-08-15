@@ -77,17 +77,20 @@ function readyState(n, over = {}) {
 
 /**
  * Resolves table cells by header text rather than by index, so an assertion
- * pins the column a value is rendered into.
+ * pins the column a value is rendered into. Rows are filtered out of the table's
+ * children, which the caption also sits in.
  * @param {Object} stats - The stats container element.
- * @returns {{table: Object, head: string[], cell: (row: number, column: string) => Object}} Table accessors.
+ * @returns {{table: Object, rows: Object[], head: string[], cell: (row: number, column: string) => Object}} Table accessors.
  */
 function grid(stats) {
   const table = stats.firstElementChild;
-  const head = table.children[0].children.map((c) => c.textContent);
+  const rows = table.children.filter((c) => c.tagName === 'TR');
+  const head = rows[0].children.map((c) => c.textContent);
   return {
     table,
+    rows,
     head,
-    cell: (row, column) => table.children[row].children[head.indexOf(column)],
+    cell: (row, column) => rows[row].children[head.indexOf(column)],
   };
 }
 
@@ -176,7 +179,20 @@ test('the table is mutated in place and rebuilt only on a segment-count change',
   view.update(readyState(3));
   const rebuilt = stats.firstElementChild;
   assert.notEqual(rebuilt, first, 'a segment-count change rebuilds the table');
-  assert.equal(rebuilt.children.length, 3 + 3); // header + 3 segments + max + round-trip
+  assert.equal(grid(stats).rows.length, 3 + 3); // header + 3 segments + max + round-trip
+});
+
+test('the generated table names itself and scopes its column headers', () => {
+  const { doc, stats } = makeDoc();
+  new SegmentStatsView(doc).update(readyState(2));
+
+  const caption = stats.firstElementChild.children[0];
+  assert.equal(caption.tagName, 'CAPTION');
+  assert.equal(caption.className, 'visually-hidden');
+  assert.match(caption.textContent, /\S/);
+  for (const header of grid(stats).rows[0].children) {
+    assert.equal(header.getAttribute('scope'), 'col');
+  }
 });
 
 // The overlay repaints on every composited frame, so the steady-state path has
