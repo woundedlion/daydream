@@ -286,7 +286,7 @@ export class URLSync {
     this.state = state;
     this.trackedKeys = new Set(trackedKeys);
     this.timer = null;
-    this.armedDelayMs = 0; // delay this.timer was armed with; 0 when unarmed
+    this.armedDelayMs = 0; // delay this.timer was armed with; read only while armed
     this.disposed = false;
     this.adhoc = new Map(); // GUI-set params (key -> string), merged on flush
     this.pendingReset = null; // reset()'s excluded keys, applied by the next flush
