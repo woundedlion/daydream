@@ -185,6 +185,10 @@
     "cases": 50,
     "assertions": 164
   },
+  "tests/serve_manifest.test.js": {
+    "cases": 5,
+    "assertions": 21
+  },
   "tests/shared.test.js": {
     "cases": 15,
     "assertions": 60

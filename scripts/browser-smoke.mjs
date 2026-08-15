@@ -13,16 +13,12 @@
  * --enable-unsafe-swiftshader) because a runner has no GPU and every page but
  * palettes.html renders through WebGL.
  */
-import { createReadStream, existsSync, statSync } from 'node:fs';
-import { createServer } from 'node:http';
-import { dirname, extname, resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
 
 import puppeteer from 'puppeteer-core';
 
 import { manifestEntries, servedPages } from '../tests/site_pages.js';
-
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+import { serveManifest } from './serve-manifest.mjs';
 
 const BROWSER_CANDIDATES = [
   '/usr/bin/google-chrome',
@@ -43,23 +39,6 @@ const BROWSER_ARGS = [
 const VIEWPORT = { width: 1280, height: 900 };
 const LOAD_TIMEOUT_MS = 90_000;
 const READY_TIMEOUT_MS = 90_000;
-
-// A .wasm served as anything else drops Emscripten to the ArrayBuffer path, and
-// a module served as text/plain is refused outright.
-const MIME = {
-  '.css': 'text/css; charset=utf-8',
-  '.html': 'text/html; charset=utf-8',
-  '.ico': 'image/x-icon',
-  '.jpg': 'image/jpeg',
-  '.js': 'text/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.md': 'text/markdown; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-  '.txt': 'text/plain; charset=utf-8',
-  '.wasm': 'application/wasm',
-};
 
 // Paths the served set answers with a 404 by design: Chrome's implicit icon
 // fetch on a page that declares none, and the gitignored offline font drop the
@@ -129,48 +108,6 @@ function installDrawProbe() {
   probe(window.WebGL2RenderingContext, glDraws);
   probe(window.CanvasRenderingContext2D,
     ['drawImage', 'fill', 'fillRect', 'putImageData', 'stroke']);
-}
-
-/**
- * Serves the manifest set out of the repository, so the smoke sees the layout
- * deploy.yml stages rather than the whole tree.
- * @param {string[]} entries - site_manifest.txt's entries; a directory entry serves recursively.
- * @returns {Promise<{origin: string, close: () => Promise<void>}>} The listening origin and its shutdown.
- */
-async function serveManifest(entries) {
-  const served = (path) =>
-    entries.some((entry) => path === entry || path.startsWith(`${entry}/`));
-
-  const server = createServer((req, res) => {
-    const requested = decodeURIComponent(
-      new URL(req.url ?? '/', 'http://localhost').pathname).replace(/^\/+/, '');
-    const path = requested === '' ? 'index.html' : requested;
-    const target = resolve(ROOT, path);
-    const ok = served(path) && target.startsWith(`${ROOT}${sep}`) &&
-      existsSync(target) && statSync(target).isFile();
-    if (!ok) {
-      res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
-      res.end('not in site_manifest.txt\n');
-      return;
-    }
-    res.writeHead(200, {
-      'content-type': MIME[extname(target)] ?? 'application/octet-stream',
-    });
-    createReadStream(target).pipe(res);
-  });
-
-  await new Promise((done, fail) => {
-    server.once('error', fail);
-    server.listen(0, '127.0.0.1', done);
-  });
-  const address = server.address();
-  if (address === null || typeof address === 'string') {
-    throw new Error('the manifest server did not bind a port');
-  }
-  return {
-    origin: `http://127.0.0.1:${address.port}`,
-    close: () => new Promise((done) => server.close(() => done(undefined))),
-  };
 }
 
 /**

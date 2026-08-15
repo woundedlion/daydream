@@ -525,7 +525,8 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── generate-importmap.mjs  Bakes the local-vs-CDN decision into vendor-importmap.js
 │   ├── report-cases.mjs        node:test reporter tallying per-file case and skip counts
 │   ├── require-tests.mjs       `pretest` guard: fails below the committed test-file floor
-│   └── run-tests.mjs           `test` script: runs the suite, gates the total it reports
+│   ├── run-tests.mjs           `test` script: runs the suite, gates the total it reports
+│   └── serve-manifest.mjs      Static server publishing exactly the manifest set, for the smoke
 │
 ├── tests/                      Node unit tests (`npm test`)
 ├── tsconfig.json               checkJs settings for the worker-protocol module set
