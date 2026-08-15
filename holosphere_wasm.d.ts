@@ -171,7 +171,8 @@ export interface HolosphereEngine {
   getFullConfigSnapshot(): FullConfigSnapshot | null;
   /** Atomically restore accepted, requested, pending, and optional runtime state. */
   restoreFullConfigSnapshot(snapshot: FullConfigSnapshot): EnumValue;
-  getFullConfigFieldDefinitions(): FullConfigFieldDefinition[];
+  /** Stable field ids and names in ConfigFieldId order; null with no ShaderBall loaded. */
+  getFullConfigFieldDefinitions(): FullConfigFieldDefinition[] | null;
   getConfigImportNotice(): string;
   clearConfigImportNotice(): void;
   /**
