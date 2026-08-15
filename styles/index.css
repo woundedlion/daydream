@@ -570,9 +570,9 @@
     display: none;
   }
 
+  /* Row count is written inline by EffectSidebar.setEffects. */
   .effect-list {
     display: grid;
-    grid-template-rows: repeat(8, auto);
     grid-auto-flow: column;
     grid-auto-columns: minmax(110px, max-content);
     gap: 2px;
