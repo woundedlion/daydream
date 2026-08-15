@@ -1214,16 +1214,31 @@ export class SegmentController {
    * Composite segment results into the display buffer (segment-rectangle model).
    * @returns {number} How many segment rectangles were actually blitted this
    *   call. 0 means either every result was null/empty (a fully-fenced frame),
-   *   so the display buffer still holds only driver.render()'s fill(0), or the
-   *   pre-pass rejected a segment (out-of-bounds/empty/inverted rect, a
+   *   so the display buffer still holds only driver.render()'s fill(0), or a
+   *   check latched a fault: the destination view's length against the driver
+   *   grid, or the per-segment pre-pass (out-of-bounds/empty/inverted rect, a
    *   pixel-length mismatch, or a rect that is not that segment's band of the
-   *   current layout) and latched a fault. The caller uses this to avoid
+   *   current layout). The caller uses this to avoid
    *   marking a black buffer as a real composited frame.
    */
   composite() {
     const refreshed = this.refreshPixelView() === true;
     const dst = this.getMemoryView();
     if (!dst) return 0;
+
+    const w = this.driver.W;
+    const h = this.driver.H;
+
+    // Checked before anything writes to dst: the segment pre-pass below measures
+    // every rect against w/h, so a display buffer that is not w*h*3 long would
+    // throw a raw RangeError out of the blit instead of latching a fault.
+    if (dst.length !== w * h * 3) {
+      this.onWorkerFault(FAULT_RENDER,
+        `SegmentController.composite: display buffer length ${dst.length} != ` +
+        `expected ${w * h * 3} for the ${w}x${h} grid — the driver geometry ran ` +
+        `ahead of the engine's active resolution`);
+      return 0;
+    }
 
     // No clear: driver.render() already zero-filled this buffer; we blit over it.
     // That elision holds only while dst is the buffer render() cleared, and a
@@ -1245,9 +1260,6 @@ export class SegmentController {
       }
       this.repointDisplayAliases(dst);
     }
-
-    const w = this.driver.W;
-    const h = this.driver.H;
 
     // Iterate the configured segment count (the same source updateStats reads),
     // not results.length, so the two can't drift after a teardown reset.

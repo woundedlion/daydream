@@ -1581,6 +1581,27 @@ test('composite() blits each quadrant to its display-buffer offset', () => {
   assert.equal(driver.pixels[idx(1, 1, 4)], 0);
 });
 
+test('composite() faults when the display buffer is not the driver grid', () => {
+  // The driver moved to 4x2 while the display buffer is still the 2x2 one the
+  // engine's active resolution allocated: every rect below is measured against
+  // the driver grid, so the blit would run off the end of the view.
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(2 * 2 * 3);
+
+  const c = makeController();
+  c.showBoundaries = false;
+  const band = new Uint16Array(4 * 2 * 3).fill(222);
+  c.results = [{ pixels: band, x0: 0, x1: 4, y0: 0, y1: 2 }];
+
+  const blitted = c.composite();
+  assert.equal(blitted, 0, 'a mis-sized display buffer blits nothing');
+  assert.equal(c.faulted, true,
+    'a short destination view latches a fault instead of throwing a RangeError');
+  assert.match(c.faultInfo.message, /display buffer length 12 != expected 24/);
+  assert.ok(driver.pixels.every((v) => v === 0),
+    'nothing is written to a display buffer that disagrees with the grid');
+});
+
 test('composite() faults on a rectangle that overflows the current display buffer', () => {
   driver.W = 4; driver.H = 2;
   driver.pixels = new Uint16Array(4 * 2 * 3);
