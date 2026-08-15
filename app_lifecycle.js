@@ -143,6 +143,8 @@ export function createRenderAdapter({
  * @param {() => void} deps.strandSegmentWork - Bumps the segmented epoch so an
  *   in-flight spawn continuation cannot land in a discarded page.
  * @param {() => void} deps.removeOverlay - Removes the app's canvas overlays.
+ * @param {(message: string, error?: any) => void} [deps.logError] - Console sink
+ *   for a step that threw.
  * @returns {{dispose: () => void, onPageHide: (e: {persisted?: boolean}) => void,
  *   disposed: () => boolean}}
  */
@@ -160,8 +162,28 @@ export function createAppTeardown({
   segments,
   strandSegmentWork,
   removeOverlay,
+  logError = (...args) => console.error(...args),
 }) {
   let appDisposed = false;
+
+  /**
+   * Run one release step. dispose() latches before the first step and runs once,
+   * so a step that throws would otherwise strand every later release — the URL
+   * debounce still armed on a dead page, the WebGL context (the browser caps
+   * them near 16) still held, the worker pool still spawning — with no retry
+   * left. Each step is independent of the others' success, so a failure is
+   * reported and the rest still run.
+   * @param {string} what - Names the step in the log line.
+   * @param {() => void} step - The release to attempt.
+   * @returns {void}
+   */
+  function release(what, step) {
+    try {
+      step();
+    } catch (error) {
+      logError(`Teardown: ${what} failed:`, error);
+    }
+  }
 
   /**
    * Release the listeners, timers, and worker pool the app owns so a page
@@ -173,23 +195,25 @@ export function createAppTeardown({
     if (appDisposed) return;
     appDisposed = true;
     for (const [type, handler, target = pageTarget] of listeners) {
-      target.removeEventListener(type, handler);
+      release(`removing the ${type} listener`,
+        () => target.removeEventListener(type, handler));
     }
-    pageTarget.removeEventListener("pagehide", onPageHide);
-    switches.dispose();
-    stopTimers();
-    effectGui.destroy();
-    globalGui.destroy();
-    host.dispose();
-    urlSync.dispose();
-    sidebar.dispose();
-    driver.dispose();
+    release('removing the pagehide listener',
+      () => pageTarget.removeEventListener("pagehide", onPageHide));
+    release('the switch coordinator', () => switches.dispose());
+    release('the app timers', stopTimers);
+    release('the effect panel', () => effectGui.destroy());
+    release('the global GUI', () => globalGui.destroy());
+    release('the engine host', () => host.dispose());
+    release('the URL writer', () => urlSync.dispose());
+    release('the sidebar', () => sidebar.dispose());
+    release('the driver', () => driver.dispose());
     // Strand any in-flight warmModules() continuation: its post-await guard reads
     // both, so without this it spawns a worker pool into the discarded page.
-    segments.active = false;
-    strandSegmentWork();
-    segments.destroy();
-    removeOverlay();
+    release('clearing the segmented-mode flag', () => { segments.active = false; });
+    release('stranding the segment spawn', strandSegmentWork);
+    release('the segment pool', () => segments.destroy());
+    release('the canvas overlays', removeOverlay);
   }
 
   /**
