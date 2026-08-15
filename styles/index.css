@@ -186,6 +186,8 @@
 .global-stats th { font-weight: normal; padding: 0 4px; }
 .global-stats td { padding: 0 4px; white-space: nowrap; }
 .global-stats--desktop td { padding: 0 8px; }
+.global-stats .perf-time { color: var(--muted-text); }
+.global-stats .perf-time.slow { color: var(--error-text); }
 .global-stats th:not(:last-child),
 .global-stats td:not(:last-child) { border-right: 1px solid #444; }
 
