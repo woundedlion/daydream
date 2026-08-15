@@ -954,6 +954,46 @@ test('selectPreset forwards the index and publishes preset state', async () => {
   assert.equal(frame.paramRevision, 13);
 });
 
+// A refused index leaves this segment on another preset than its peers, which
+// nothing else reports: the controller has no reply channel for one.
+test('a preset index the engine refuses is logged', async () => {
+  await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4,
+    effectName: 'Plasma' });
+
+  const original = console.error;
+  const logged = [];
+  console.error = (...args) => logged.push(args.join(' '));
+  try {
+    await dispatch({ type: 'selectPreset', index: 9, paramRevision: 14 });
+  } finally {
+    console.error = original;
+  }
+
+  assert.equal(engineInstance.presetIndex, 0, 'a refused index moves nothing');
+  assert.equal(logged.length, 1);
+  assert.match(logged[0],
+    /segment 1 selectPreset\(9\) rejected: 3 presets, still on 0/);
+});
+
+// The controller carries the fresh-effect index 0 for every effect, and an
+// effect with no presets refuses it; that answer moves nothing and is routine.
+test('the index a presetless effect refuses is not logged', async () => {
+  await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4 });
+  engineInstance.presetCount = 0;
+
+  const original = console.error;
+  const logged = [];
+  console.error = (...args) => logged.push(args.join(' '));
+  try {
+    await dispatch({ type: 'setEffect', name: 'Plasma', presetIndex: 0,
+      paramRevision: 15 });
+  } finally {
+    console.error = original;
+  }
+
+  assert.deepEqual(logged, [], 'the ordinary effect-switch path is silent');
+});
+
 // ---------------------------------------------------------------------------
 // Module graph
 // ---------------------------------------------------------------------------
