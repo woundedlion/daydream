@@ -138,6 +138,26 @@ function reportParamRejected(name, result) {
 }
 
 /**
+ * Select a preset, reporting an index the engine refused. A refusal leaves this
+ * segment rendering a different preset from its peers, and the controller has no
+ * reply channel for one. An index the engine is already on moves nothing and is
+ * not reported: the controller carries the fresh-effect index 0 for every
+ * effect, and an effect with no presets refuses it.
+ * @param {number} index - Preset the controller broadcast.
+ * @param {'selectPreset'|'synchronizePreset'} [method] - Engine call to apply it
+ * with. Mirroring an engine-driven index uses synchronizePreset, which does not
+ * engage the pause selectPreset carries.
+ * @returns {void}
+ */
+function applyPreset(index, method = 'selectPreset') {
+  if (!engine || engine[method](index)) return;
+  if (engine.getPresetIndex() === index) return;
+  console.error(
+    `segment_worker: segment ${segId} ${method}(${index}) rejected: ` +
+    `${engine.getPresetCount()} presets, still on ${engine.getPresetIndex()}`);
+}
+
+/**
  * Process one protocol message. Only ever invoked through the serialized
  * queue in self.onmessage below, so 'init''s long await of the WASM
  * fetch+instantiate cannot interleave with later messages: a setResolution/
@@ -216,7 +236,7 @@ async function handleMessage(msg) {
       // synchronizePreset, not selectPreset: this mirrors the engine-driven
       // index, and selectPreset would engage the pause msg.paused carries.
       if (typeof msg.presetIndex === 'number') {
-        engine.synchronizePreset(msg.presetIndex);
+        applyPreset(msg.presetIndex, 'synchronizePreset');
       }
       if (!restoreFullConfig(msg.fullConfigSnapshot)) break;
       // Tuned params must follow setEffect, which rebuilds with defaults.
@@ -249,7 +269,7 @@ async function handleMessage(msg) {
         }
         // Mirrors the engine-driven index without the pause, as in 'init'.
         if (typeof msg.presetIndex === 'number') {
-          engine.synchronizePreset(msg.presetIndex);
+          applyPreset(msg.presetIndex, 'synchronizePreset');
         }
         if (!restoreFullConfig(msg.fullConfigSnapshot)) break;
         // Tuned params must follow setEffect, which rebuilds with defaults.
@@ -309,7 +329,7 @@ async function handleMessage(msg) {
 
     case 'selectPreset': {
       if (engine) {
-        engine.selectPreset(msg.index);
+        applyPreset(msg.index);
         paramRevision = msg.paramRevision;
       }
       break;

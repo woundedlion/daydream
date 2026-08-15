@@ -182,8 +182,8 @@
     "assertions": 113
   },
   "tests/segment_worker.test.js": {
-    "cases": 48,
-    "assertions": 160
+    "cases": 50,
+    "assertions": 164
   },
   "tests/shared.test.js": {
     "cases": 15,
