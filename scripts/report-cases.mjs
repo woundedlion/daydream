@@ -9,21 +9,26 @@
 //             so they are not counted.
 //   skipped - results carrying a skip, suites included: a skipped suite is the
 //             only result its subtree reports, since its cases never enqueue.
+//   todo    - results carrying a todo. Node runs a todo body and reports its
+//             failure as a pass, so a todo counts in `ran` and accrues its
+//             assertions: neither floor can see one, and the gate refuses any
+//             file reporting one.
 // A file that skipped at least once and ran nothing is wholly skipped: gated on
 // a prerequisite this platform lacks, and so exempt from its floors. A file
 // that reported nothing at all is absent, and is exempt from nothing.
 
 /**
  * @param {AsyncIterable<{type: string, data: Object}>} source - Runner events.
- * @yields {string} JSON object of `{ ran, skipped }` per absolute file path.
+ * @yields {string} JSON object of `{ ran, skipped, todo }` per absolute file path.
  */
 export default async function* reportCases(source) {
   const files = new Map();
   for await (const event of source) {
     if (event.type !== 'test:pass' && event.type !== 'test:fail') continue;
-    const { file, skip, details } = event.data;
+    const { file, skip, todo, details } = event.data;
     if (!file) continue;
-    const tally = files.get(file) ?? { ran: 0, skipped: 0 };
+    const tally = files.get(file) ?? { ran: 0, skipped: 0, todo: 0 };
+    if (todo !== undefined) tally.todo += 1;
     if (skip !== undefined) tally.skipped += 1;
     else if (details?.type !== 'suite') tally.ran += 1;
     files.set(file, tally);

@@ -158,8 +158,8 @@
     "assertions": 19
   },
   "tests/run_tests.test.js": {
-    "cases": 25,
-    "assertions": 44
+    "cases": 26,
+    "assertions": 47
   },
   "tests/segment_composite_wasm.test.js": {
     "cases": 5,

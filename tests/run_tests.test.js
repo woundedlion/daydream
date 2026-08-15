@@ -245,6 +245,32 @@ test('a partly skipped file still fails its floors', () => {
   );
 });
 
+/**
+ * Verifies a todo is refused outright. Node runs the body and reports a failing
+ * one as a pass, so the case clears both floors while asserting nothing that can
+ * fail — the hole the opt-in `skippable` declaration closes for a skip. The
+ * re-measure path is checked too, or a red file could be ratcheted in.
+ */
+test('a file reporting a todo is refused', () => {
+  writeFileSync(
+    join(root, 'tests', 'a.test.js'),
+    [
+      "import { test } from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      "test('case 0', { todo: true }, () => { assert.ok(false); });",
+      "test('case 1', () => { assert.ok(true); assert.ok(true); assert.ok(true); });",
+    ].join('\n'),
+  );
+  const err = runExpectingFailure(PATTERN);
+  assert.match(err, /reported a todo[^]*\n {2}tests\/a\.test\.js/);
+  assert.doesNotMatch(err, /ran below the committed floor/,
+    'the todo cleared both floors, which is what makes it an escape hatch');
+  assert.match(
+    runExpectingFailure('--update-floors', PATTERN),
+    /reported a todo[^]*\n {2}tests\/a\.test\.js/,
+  );
+});
+
 /** Verifies re-measuring does not retire a skipped file's floors to zero. */
 test('--update-floors keeps a wholly skipped floor', () => {
   writeFileSync(join(root, 'tests', 'a.test.js'), skipping(2, 3));
