@@ -351,7 +351,8 @@ export function start({
       } catch (err) {
         console.error('Initial resolution/effect could not be applied:', err);
         const title = 'No supported resolution and effect could be applied.';
-        if (!showBootstrapFailure(err, { document: doc, title })) {
+        if (!showBootstrapFailure(err,
+            { document: doc, location: win.location, title })) {
           const detailText = (err && err.message) ? err.message : String(err);
           showFatalError(`${title} ${detailText}`);
         }
@@ -369,8 +370,11 @@ export function start({
         testAllController.setValue(false);
         testAllController.disable();
       }
-      if (!showBootstrapFailure(err,
-          { document: doc, title: 'Failed to load the rendering engine.' })) {
+      if (!showBootstrapFailure(err, {
+        document: doc,
+        location: win.location,
+        title: 'Failed to load the rendering engine.',
+      })) {
         const detailText = (err && err.message) ? err.message : String(err);
         showFatalError(`Failed to initialize the rendering engine. ${detailText}`);
       }
