@@ -2312,7 +2312,7 @@ test('turning segmented mode off hands the global stat bars back', () => {
  * Minimal stand-in for the WASM engine exposing just getParameterDefinitions().
  * @param {Array<{name: string, value: number|boolean,
  *   requestedValue?: number|boolean,
- *   acceptedValue?: number|boolean}>} defs - Param defs.
+ *   acceptedValue?: number|boolean, readonly?: boolean}>} defs - Param defs.
  * @returns {{ getParameterDefinitions: () => Array }} Fake engine.
  */
 function fakeEngine(defs, presetCount = 0, presetIndex = 0) {
@@ -2357,6 +2357,21 @@ test('a refused request ships the value the engine settled on', () => {
   assert.deepEqual(c.snapshotEffectState(),
     { params: [{ name: 'Lens', value: 3, acceptedValue: 0 }] },
     'the definitions are the whole source of the accepted value');
+});
+
+// A readonly param is engine-written telemetry: replaying it would cost every
+// worker two setParameter calls the engine answers READONLY.
+test('snapshotParams() leaves readonly telemetry out of the rebuild state', () => {
+  const c = makeController();
+  c.getWasmEngine = () => fakeEngine([
+    { name: 'Speed', value: 0.5 },
+    { name: 'Frames', value: 120, readonly: true },
+    { name: 'Glow', value: true },
+  ]);
+  assert.deepEqual(c.snapshotParams(), [
+    { name: 'Speed', value: 0.5, acceptedValue: 0.5 },
+    { name: 'Glow', value: 1.0, acceptedValue: 1.0 },
+  ]);
 });
 
 test('snapshotParams() is empty when no engine is bound', () => {
