@@ -596,10 +596,18 @@ export function createEffectGui({
    * @returns {void}
    */
   function addEffectActions(fx, params) {
-    const actionRow = fx.gui.domElement.ownerDocument.createElement('div');
+    const ownerDocument = fx.gui.domElement.ownerDocument;
+    const actionRow = ownerDocument.createElement('div');
     actionRow.classList.add('effect-action-row');
     fx.gui.appendElement(actionRow);
     fx.actionRow = actionRow;
+    // The Export outcome is otherwise a glyph swap, which no screen reader
+    // announces. Out of flow, so it claims no action-row grid cell.
+    const exportStatus = ownerDocument.createElement('span');
+    exportStatus.className = 'visually-hidden';
+    exportStatus.setAttribute('role', 'status');
+    exportStatus.setAttribute('aria-live', 'polite');
+    actionRow.appendChild(exportStatus);
     fx.actionControllers = [];
     const presentAction = (controller, icon, label) => {
       controller.name(icon);
@@ -617,17 +625,22 @@ export function createEffectGui({
     };
 
     /**
-     * Flash a transient status label on the Export button, restoring the default
-     * label after the flash window. Supersedes any flash still pending for this
-     * GUI.
+     * Flash a transient status label on the Export button and announce it in the
+     * action row's live region, restoring the default label after the flash
+     * window. Supersedes any flash still pending for this GUI.
      * @param {string} label - The transient button label to show.
      * @returns {void}
      */
     const flashExport = (label) => {
       clearTimeout(fx.exportFlashTimer);
       presentAction(exportCtrl, label === EXPORT_COPIED ? '\u2713' : '\u2717', label);
-      fx.exportFlashTimer = setTimeout(
-        () => presentAction(exportCtrl, EXPORT_ICON, 'Export'), FLASH_MS);
+      // Emptied on revert: a live region re-announces a repeated message only
+      // after its text has changed.
+      exportStatus.textContent = label;
+      fx.exportFlashTimer = setTimeout(() => {
+        presentAction(exportCtrl, EXPORT_ICON, 'Export');
+        exportStatus.textContent = '';
+      }, FLASH_MS);
     };
 
     const effectActions = {
