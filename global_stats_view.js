@@ -47,13 +47,13 @@ export class GlobalStatsView {
     const cells = this.resolveCells();
 
     const perfText = `${duration.toFixed(3)} ms`;
-    const perfColor = duration > SLOW_FRAME_MS ? 'red' : 'grey';
+    const perfClass = duration > SLOW_FRAME_MS ? 'perf-time slow' : 'perf-time';
     for (const el of cells.perf) {
       if (!el) continue;
       el.textContent = perfText;
-      // Written only on a crossing: an unchanged colour still costs a style
-      // invalidation per cell per frame.
-      if (el.style.color !== perfColor) el.style.color = perfColor;
+      // Written only on a crossing: an unchanged class attribute still costs a
+      // style invalidation per cell per frame.
+      if (el.className !== perfClass) el.className = perfClass;
     }
 
     if (!metrics) return;

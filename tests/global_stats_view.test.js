@@ -76,15 +76,15 @@ test('update reddens the perf cells only past the slow-frame threshold', () => {
   const view = new GlobalStatsView(doc);
 
   view.update(SLOW_FRAME_MS, null);
-  assert.equal(byId['perf-stats'].style.color, 'grey');
-  assert.equal(byId['perf-stats-mobile'].style.color, 'grey');
+  assert.equal(byId['perf-stats'].className, 'perf-time');
+  assert.equal(byId['perf-stats-mobile'].className, 'perf-time');
 
   view.update(SLOW_FRAME_MS + 0.001, null);
-  assert.equal(byId['perf-stats'].style.color, 'red');
-  assert.equal(byId['perf-stats-mobile'].style.color, 'red');
+  assert.equal(byId['perf-stats'].className, 'perf-time slow');
+  assert.equal(byId['perf-stats-mobile'].className, 'perf-time slow');
 });
 
-test('a steady frame rewrites neither the arena rows nor the perf colour', () => {
+test('a steady frame rewrites neither the arena rows nor the perf class', () => {
   const { doc, byId } = makeDoc();
   const view = new GlobalStatsView(doc);
   view.update(1, metrics());
@@ -99,11 +99,11 @@ test('a steady frame rewrites neither the arena rows nor the perf colour', () =>
         get: () => text,
         set(value) { text = value; writes.push(`${row}:text`); },
       });
-      let color = el.style.color;
-      Object.defineProperty(el.style, 'color', {
+      let className = el.className;
+      Object.defineProperty(el, 'className', {
         configurable: true,
-        get: () => color,
-        set(value) { color = value; writes.push(`${row}:color`); },
+        get: () => className,
+        set(value) { className = value; writes.push(`${row}:class`); },
       });
     }
   }
