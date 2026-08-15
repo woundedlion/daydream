@@ -61,6 +61,7 @@ tools/page_lifecycle.js
 tools/palette_canvas.js
 tools/palette_controls.js
 tools/palette_math.js
+tools/pointer_drag.js
 tools/shared.js
 tools/slider.js
 tools/solid_codegen.js

@@ -144,6 +144,10 @@
     "cases": 10,
     "assertions": 25
   },
+  "tests/pointer_drag.test.js": {
+    "cases": 16,
+    "assertions": 51
+  },
   "tests/recorder.test.js": {
     "cases": 40,
     "assertions": 213
