@@ -92,6 +92,49 @@ test('a controller carries the surface the GUI layer chains off it', async () =>
   assert.deepEqual(calls, [['second', 4]], 'the later registration replaced the earlier');
 });
 
+// options() has two implementations. daydream.js narrows the resolution dropdown
+// through it on every boot, so which one it lands on decides whether the live
+// control keeps its handler or is silently detached.
+test('options() on a dropdown updates it in place and returns the same controller',
+  async () => {
+    const gui = await realGUI();
+    const params = { resolution: 'Lo' };
+    const dropdown = gui.add(params, 'resolution', ['Lo', 'Hi']).name('Resolution');
+    const changes = [];
+    dropdown.onChange((v) => changes.push(v));
+
+    const narrowed = dropdown.options(['Hi']);
+
+    assert.equal(narrowed, dropdown,
+      'OptionController overrides options() to mutate its own <select>');
+    assert.equal(gui.controllers.length, 1, 'no replacement is appended');
+    assert.deepEqual(narrowed.$select.children.map((o) => o.textContent), ['Hi'],
+      'the offered rows are the narrowed list');
+    assert.equal(narrowed._name, 'Resolution', 'the name survives');
+
+    narrowed.setValue('Hi');
+    assert.deepEqual(changes, ['Hi'],
+      'the handler registered before the narrowing still fires');
+  });
+
+test('options() on a non-dropdown destroys the receiver and appends a replacement',
+  async () => {
+    const gui = await realGUI();
+    const params = { count: 1, other: 2 };
+    const plain = gui.add(params, 'count').name('Count');
+    gui.add(params, 'other');
+
+    const replacement = plain.options([1, 2, 3]);
+
+    assert.notEqual(replacement, plain,
+      'the base Controller.options() cannot convert a controller in place');
+    assert.equal(replacement.constructor.name, 'OptionController');
+    assert.equal(replacement._name, 'Count', 'the name is copied over');
+    assert.equal(gui.controllers.at(-1), replacement,
+      'the replacement lands at the end of the panel, not in the old slot');
+    assert.equal(gui.controllers.includes(plain), false, 'the receiver is destroyed');
+  });
+
 test('addColor and addFolder hand back the shapes the GUI layer wraps', async () => {
   const gui = await realGUI();
   const color = gui.addColor({ tint: '#ff00ff' }, 'tint');

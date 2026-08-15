@@ -255,8 +255,11 @@ export function start({
     if (unlabeled.length > 0) {
       console.warn(`Engine resolutions with no preset (not offered): ${unlabeled.join(', ')}`);
     }
-    // options() destroys the receiver and returns a replacement carrying only the
-    // copied name, so the binding and its handler have to be re-established.
+    // The dropdown is an OptionController, whose options() updates the <select>
+    // in place and hands back the same controller; the base Controller.options()
+    // instead destroys the receiver and returns a replacement carrying only the
+    // copied name. Taking the return value and re-attaching the handler is the
+    // form that holds under both (tests/lil_gui_contract.test.js).
     resolutionController = resolutionController.options(labels).onChange(setResolution);
 
     const current = appState.get('resolution');
@@ -403,7 +406,8 @@ export function start({
   // Not deep-linked here: urlSync owns the `resolution` param, so a second writer
   // under the 'view' namespace would give the URL two authorities for one setting.
   const setResolution = (v) => appState.set('resolution', v);
-  // Reassigned by syncResolutionOptions: lil-gui's options() replaces the controller.
+  // Reassigned by syncResolutionOptions, which narrows the offered rows through
+  // lil-gui's options().
   let resolutionController = guiInstance
     .addSession({ resolution: appState.get('resolution') }, 'resolution', Object.keys(resolutionPresets))
     .name('Resolution')
