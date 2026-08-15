@@ -35,6 +35,7 @@ const REQUIRED_ENV = 'HOLOSPHERE_ENGINE_REQUIRED';
 // a working checkout sits beside this repo under either its directory name.
 const CANDIDATES = ['engine', '../Holosphere', '../pov'];
 const MARKER = 'core/math/3dmath.h';
+const STEREO_SOURCE = 'core/math/stereographic.h';
 
 /**
  * Locates a Holosphere checkout to read headers from.
@@ -109,17 +110,18 @@ function engineConstant(source, name, scope = {}) {
 
 /**
  * Pins the stereographic-projection constants mobius_transforms.js mirrors to
- * their definitions in core/math/3dmath.h. STEREO_POLE_EPS is derived from
+ * their definitions in core/math/stereographic.h. STEREO_POLE_EPS is derived from
  * STEREO_INF on both sides, so the engine's expression is evaluated rather than
  * its value read, and a change to either the sentinel or the derivation fails.
  */
-test('projection constants match core/math/3dmath.h', { skip: SKIP }, () => {
-  const src = header(MARKER);
-  const inf = engineConstant(src, 'STEREO_INF');
+test('projection constants match core/math/stereographic.h', { skip: SKIP }, () => {
+  const src = header(STEREO_SOURCE);
+  const inf = engineConstant(src, 'STEREO_INF', {}, STEREO_SOURCE);
   assert.equal(MB.STEREO_INF, inf, 'STEREO_INF drifted from the engine sentinel');
-  assert.equal(MB.STEREO_POLE_EPS, engineConstant(src, 'STEREO_POLE_EPS', { STEREO_INF: inf }),
+  assert.equal(MB.STEREO_POLE_EPS,
+    engineConstant(src, 'STEREO_POLE_EPS', { STEREO_INF: inf }, STEREO_SOURCE),
     'STEREO_POLE_EPS drifted from the engine pole cap');
-  assert.equal(MB.STEREO_AZIMUTH_EPS, engineConstant(src, 'STEREO_AZIMUTH_EPS'),
+  assert.equal(MB.STEREO_AZIMUTH_EPS, engineConstant(src, 'STEREO_AZIMUTH_EPS', {}, STEREO_SOURCE),
     'STEREO_AZIMUTH_EPS drifted from the engine azimuth floor');
 });
 
@@ -128,14 +130,14 @@ test('projection constants match core/math/3dmath.h', { skip: SKIP }, () => {
  * definitions. The shader is the preview's only renderer, so a constant that
  * tracked the JS module but not the header would still lie about the pole cap.
  */
-test('glslProjectionFunctions constants match core/math/3dmath.h', { skip: SKIP }, () => {
-  const src = header(MARKER);
-  const inf = engineConstant(src, 'STEREO_INF');
+test('glslProjectionFunctions constants match core/math/stereographic.h', { skip: SKIP }, () => {
+  const src = header(STEREO_SOURCE);
+  const inf = engineConstant(src, 'STEREO_INF', {}, STEREO_SOURCE);
   const glsl = MB.glslProjectionFunctions;
   for (const [name, value] of [
     ['STEREO_INF', inf],
-    ['STEREO_POLE_EPS', engineConstant(src, 'STEREO_POLE_EPS', { STEREO_INF: inf })],
-    ['STEREO_AZIMUTH_EPS', engineConstant(src, 'STEREO_AZIMUTH_EPS')],
+    ['STEREO_POLE_EPS', engineConstant(src, 'STEREO_POLE_EPS', { STEREO_INF: inf }, STEREO_SOURCE)],
+    ['STEREO_AZIMUTH_EPS', engineConstant(src, 'STEREO_AZIMUTH_EPS', {}, STEREO_SOURCE)],
   ]) {
     const m = glsl.match(new RegExp(`const float ${name}\\s*=\\s*([^;]+);`));
     assert.ok(m, `glslProjectionFunctions does not declare ${name}`);
@@ -144,7 +146,7 @@ test('glslProjectionFunctions constants match core/math/3dmath.h', { skip: SKIP 
   }
 });
 
-// The core/math/3dmath.h spellings an engine Complex body uses, paired with the
+// The core/math/stereographic.h spellings an engine Complex body uses, paired with the
 // JS the mobius_transforms port writes them as. Comments are stripped first so a
 // `//` cannot swallow a later substitution.
 const ENGINE_CPP_TO_JS = [
@@ -241,20 +243,20 @@ const PROJECT_DIV_PAIRS = [
 
 /**
  * Pins mobius_transforms.js's stereo and projectDiv to the bodies of stereo and
- * project_div in core/math/3dmath.h. The constants above are pinned separately,
+ * project_div in core/math/stereographic.h. The constants above are pinned separately,
  * but these two functions are what mobius.html's shader actually runs, and the
  * WASM bridge reaches only the engine's fused mobius_transform — which never
  * calls either in isolation, so no export can separate them. Comparing the
  * header's own body, transpiled, catches a reordered guard or a changed
  * fallback that matching constants would hide.
  */
-test('stereo and projectDiv match core/math/3dmath.h', { skip: SKIP }, () => {
-  const src = header(MARKER);
-  const inf = engineConstant(src, 'STEREO_INF');
+test('stereo and projectDiv match core/math/stereographic.h', { skip: SKIP }, () => {
+  const src = header(STEREO_SOURCE);
+  const inf = engineConstant(src, 'STEREO_INF', {}, STEREO_SOURCE);
   const constants = {
     STEREO_INF: inf,
-    STEREO_POLE_EPS: engineConstant(src, 'STEREO_POLE_EPS', { STEREO_INF: inf }),
-    STEREO_AZIMUTH_EPS: engineConstant(src, 'STEREO_AZIMUTH_EPS'),
+    STEREO_POLE_EPS: engineConstant(src, 'STEREO_POLE_EPS', { STEREO_INF: inf }, STEREO_SOURCE),
+    STEREO_AZIMUTH_EPS: engineConstant(src, 'STEREO_AZIMUTH_EPS', {}, STEREO_SOURCE),
   };
   const engineStereo = transpileEngineComplex(src, 'stereo', ['v'], constants);
   const engineProjectDiv = transpileEngineComplex(src, 'project_div', ['num', 'den'], constants);
