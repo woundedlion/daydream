@@ -260,8 +260,12 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
       // Edges
       const edges = uniqueEdges(meshData.faces, meshData.vertices.length);
 
-      /** @type {any[]} */
-      const lineGeoPoints = [];
+      /** @type {number[]} */
+      const linePositions = [];
+      // Two scratch vectors carry the whole cage: a geodesic edge walks 12
+      // segments and would otherwise allocate 24 vectors per edge per render.
+      const arcStart = new THREE.Vector3();
+      const arcEnd = new THREE.Vector3();
       for (const [ai, bi] of edges) {
         const va = meshData.vertices[ai];
         const vb = meshData.vertices[bi];
@@ -271,16 +275,17 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
           for (let j = 0; j < steps; j++) {
             const t1 = j / steps;
             const t2 = (j + 1) / steps;
-            const p1 = new THREE.Vector3().copy(va).lerp(vb, t1).normalize().multiplyScalar(1.002);
-            const p2 = new THREE.Vector3().copy(va).lerp(vb, t2).normalize().multiplyScalar(1.002);
-            lineGeoPoints.push(p1, p2);
+            arcStart.copy(va).lerp(vb, t1).normalize().multiplyScalar(1.002);
+            arcEnd.copy(va).lerp(vb, t2).normalize().multiplyScalar(1.002);
+            linePositions.push(arcStart.x, arcStart.y, arcStart.z, arcEnd.x, arcEnd.y, arcEnd.z);
           }
         } else {
-          lineGeoPoints.push(va, vb);
+          linePositions.push(va.x, va.y, va.z, vb.x, vb.y, vb.z);
         }
       }
 
-      const lineGeo = new THREE.BufferGeometry().setFromPoints(lineGeoPoints);
+      const lineGeo = new THREE.BufferGeometry();
+      lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
       edgeLines = new THREE.LineSegments(lineGeo, materials.edge);
       scene.add(edgeLines);
 
