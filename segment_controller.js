@@ -951,6 +951,7 @@ export class SegmentController {
    * Snapshot the main engine's accepted and requested parameter values,
    * flattened for structured-clone transport (bools encoded as 1/0). Workers
    * restore the accepted render state first, then replay pending requests.
+   * Readonly params carry no writable state and are left out.
    * @returns {import('./worker_protocol.js').SegParam[]}
    */
   snapshotParams() {
@@ -961,6 +962,9 @@ export class SegmentController {
     const params = [];
     for (let i = 0; i < defs.length; i++) {
       const p = defs[i];
+      // Engine-written telemetry: setParameter answers READONLY, so shipping it
+      // costs every worker two refused writes per rebuild.
+      if (p.readonly) continue;
       const requestedValue = /** @type {number|boolean|undefined} */ (p.requestedValue);
       const requested = requestedValue ?? p.value;
       const v = (typeof requested === 'boolean') ? (requested ? 1.0 : 0.0) : requested;
