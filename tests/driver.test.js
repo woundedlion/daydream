@@ -447,7 +447,8 @@ test('dispose releases the observer, listeners, and GPU resources', () => {
     'a listener outlived the canvas it was bound to');
   assert.equal(ctx.recorder, null,
     'the driver kept the recorder the engine host disposes on the same teardown');
-  assert.ok(log.indexOf('renderer.stopLoop') < log.indexOf('renderer.dispose'));
+  assert.equal(log[0], 'renderer.stopLoop',
+    'the rAF callback outlived a teardown step it could fire into');
   assert.ok(log.indexOf('renderer.dispose') < log.indexOf('renderer.loseContext'),
     'the drawing context was released before the renderer freed its objects');
 });
