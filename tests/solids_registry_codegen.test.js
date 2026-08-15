@@ -93,6 +93,16 @@ test('generateRegistryCpp emits a Recipe mirror for a hankin-free chain too', ()
     + '     &CUBE_TRUNCATE33_RECIPE},');
 });
 
+// A short seed and step-table name leave all three Recipe elements inside the
+// 80-column limit, which is the shape clang-format packs them into.
+test('generateRegistryCpp packs a short Recipe body onto one continuation line', () => {
+  const code = generateRegistryCpp({ base: 'cube', ops: ['kis'] });
+  assert.match(code, /\n {4}SEED_CUBE, CUBE_KIS_STEPS, static_cast<uint8_t>\(std::size\(CUBE_KIS_STEPS\)\)};\n/);
+  for (const line of code.split('\n')) {
+    assert.ok(line.length <= 80, `"${line}" is ${line.length} columns`);
+  }
+});
+
 /**
  * Adding the entry grows islamic_registry, which fails its size static_assert
  * and the NUM_ENTRIES sum until ISLAMIC_COUNT is raised to match; nothing else
