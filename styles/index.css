@@ -818,3 +818,27 @@ div.label {
 .segment-stats .seg-time.slow {
   color: var(--error-text);
 }
+
+/* The fault and spawning notices that stand in for the table. */
+.segment-stats .seg-status {
+  padding: 6px;
+  font-size: 0.85em;
+  color: var(--muted-text);
+}
+
+.segment-stats .seg-status.seg-fault {
+  color: var(--error-text);
+}
+
+.segment-stats .seg-detail {
+  color: var(--muted-text);
+}
+
+.segment-stats .seg-range {
+  color: var(--muted-text);
+  font-size: 0.8em;
+}
+
+.segment-stats .seg-total {
+  border-top: 1px solid var(--panel-border);
+}
