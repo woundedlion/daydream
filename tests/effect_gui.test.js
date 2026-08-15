@@ -517,7 +517,24 @@ test('an invalid param carries an actionable warning indicator and tooltip', () 
 
   assert.equal(controller.domElement.classList.contains('param-warning'), true);
   assert.equal(controller.domElement.getAttribute('title'), warning);
-  assert.equal(controller.domElement.getAttribute('aria-invalid'), 'true');
+  // The wrapper is a plain div, so the state and the description belong on the
+  // widget that carries the control's role.
+  assert.equal(controller.domElement.getAttribute('aria-invalid'), null);
+  assert.equal(controller.$select.getAttribute('aria-invalid'), 'true');
+
+  const note = controller.domElement.querySelector('.visually-hidden');
+  assert.equal(note.textContent, warning);
+  assert.equal(controller.$select.getAttribute('aria-describedby'), note.id);
+  assert.equal(note.id, 'param-warning-projection');
+});
+
+test('a param without a warning carries no invalid state or description', () => {
+  const gui = fakeGui();
+  const controller = addParamControl(gui, { Speed: 0.1 }, SPEED);
+
+  assert.equal(controller.$input.getAttribute('aria-invalid'), null);
+  assert.equal(controller.$input.getAttribute('aria-describedby'), null);
+  assert.equal(controller.domElement.querySelector('.visually-hidden'), null);
 });
 
 test('a boolean carrying option labels stays a toggle', () => {
