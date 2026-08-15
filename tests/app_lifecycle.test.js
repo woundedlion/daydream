@@ -12,6 +12,8 @@ import {
   FRAME_GUARD_REARM_FRAMES,
   createGlobalKeydownHandler,
   createModuleLoadHandlers,
+  loadWithDeadline,
+  MODULE_LOAD_DEADLINE_MS,
   createPoleLodBinding,
   createRecordingSettings,
   createSegmentSpawnGuard,
@@ -407,6 +409,72 @@ test('both handlers tolerate a module evaluation that never built the teardown',
   const failed = makeLoadHandlers({ teardown: 'missing' });
   failed.handlers.onModuleFailed(new Error('fetch blocked'));
   assert.deepEqual(failed.log, ['reportFailure fetch blocked']);
+});
+
+/**
+ * A timer source a case fires by hand.
+ * @returns {Object} The stand-in, plus the pending timers and the clears seen.
+ */
+function fakeTimers() {
+  const pending = new Map();
+  let next = 1;
+  return {
+    pending,
+    cleared: [],
+    setTimeout(fn, ms) {
+      const id = next++;
+      pending.set(id, { fn, ms });
+      return id;
+    },
+    clearTimeout(id) {
+      this.cleared.push(id);
+      pending.delete(id);
+    },
+    /** Runs the one pending timer. @returns {void} */
+    fire() {
+      const [id, { fn }] = [...pending][0];
+      pending.delete(id);
+      fn();
+    },
+  };
+}
+
+test('a load that beats the deadline resolves and cancels the timer', async () => {
+  const timers = fakeTimers();
+
+  const module = await loadWithDeadline(
+    () => Promise.resolve({ name: 'wasm' }), { ms: 10, timers });
+
+  assert.deepEqual(module, { name: 'wasm' });
+  assert.equal(timers.cleared.length, 1, 'a live timer would fire into a loaded page');
+  assert.equal(timers.pending.size, 0);
+});
+
+test('a load failure still rejects with its own error', async () => {
+  const timers = fakeTimers();
+
+  await assert.rejects(
+    loadWithDeadline(() => Promise.reject(new Error('fetch blocked')),
+      { ms: 10, timers }),
+    /fetch blocked/);
+  assert.equal(timers.pending.size, 0, 'the deadline is cancelled either way');
+});
+
+test('a stalled load rejects at the deadline instead of spinning', async () => {
+  const timers = fakeTimers();
+  // The stall this bounds: a fetch that neither resolves nor errors.
+  const rejected = loadWithDeadline(() => new Promise(() => {}), { ms: 10, timers });
+
+  assert.equal([...timers.pending.values()][0].ms, 10);
+  timers.fire();
+
+  await assert.rejects(rejected, /did not load within/,
+    'without this the loading overlay spins for the page lifetime');
+});
+
+test('the deadline is generous enough for a cold load of the binary', () => {
+  assert.ok(MODULE_LOAD_DEADLINE_MS >= 60000,
+    'a slow-but-working first fetch of the multi-megabyte binary must not trip it');
 });
 
 // The render loop guard: Three.js re-arms the frame request only after the

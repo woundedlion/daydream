@@ -601,6 +601,48 @@ export function createFrameLoopGuard({ frame, report, logError = console.error }
   };
 }
 
+// Deadline for the main-thread WASM module load: fetch of the multi-megabyte
+// binary plus glue, instantiate, and the module's own runtime init. Sized well
+// above the segmented pool's INIT_WATCHDOG_MS, which bounds the same binary in a
+// worker but only after its boot ping has already proved the connection; nothing
+// precedes this one, so it has to cover a cold, throttled first fetch. A stalled
+// fetch fires no error of its own, so without this the loading overlay spins for
+// the page's lifetime.
+export const MODULE_LOAD_DEADLINE_MS = 90000;
+
+/**
+ * Race a module load against a deadline, so a fetch that stalls rather than
+ * failing still reaches the load-failure path.
+ *
+ * The timer is cleared once the race settles, so a load that beats the deadline
+ * leaves nothing pending; the deadline promise then never rejects. A load that
+ * loses the race stays attached to the race, so its own later rejection is
+ * handled rather than escaping as an unhandled one.
+ *
+ * @param {() => Promise<Object>} load - Starts the module load.
+ * @param {Object} [deps] - Injected collaborators.
+ * @param {number} [deps.ms] - The deadline, in milliseconds.
+ * @param {{setTimeout: Function, clearTimeout: Function}} [deps.timers] - Timer
+ *   source; the page (or, under test, whatever stands in for it).
+ * @returns {Promise<Object>} The loaded module, or a rejection carrying the
+ *   deadline that expired.
+ */
+export function loadWithDeadline(load, {
+  ms = MODULE_LOAD_DEADLINE_MS,
+  timers = globalThis,
+} = {}) {
+  let timer = null;
+  const deadline = new Promise((_, reject) => {
+    timer = timers.setTimeout(() => reject(new Error(
+      `The rendering engine did not load within ${Math.round(ms / 1000)} seconds.`)), ms);
+    // No-op in browsers; keeps an unfired deadline from holding the unit-test
+    // process open.
+    timer?.unref?.();
+  });
+  return Promise.race([load(), deadline])
+    .finally(() => timers.clearTimeout(timer));
+}
+
 /**
  * Build the handlers for the main WASM module promise, guarded against a page
  * discard that settles first.
