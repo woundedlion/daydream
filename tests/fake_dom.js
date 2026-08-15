@@ -9,6 +9,10 @@ import { afterEach } from 'node:test';
 // here, which is what lets isConnected derive from the parent chain.
 const detached = new WeakSet();
 
+// The ownerDocument every fake element carries, as every element in a browser
+// does: enough of a document for a module that builds a node of its own.
+const ownerDocument = { createElement: (tag) => fakeElement(tag) };
+
 /**
  * The installed document stand-in, when there is one. It carries the
  * activeElement the modules read focus from.
@@ -257,6 +261,7 @@ export function fakeElement(tag = 'div', options = {}) {
   const element = {
     listeners: [],
     tagName: String(tag).toUpperCase(),
+    ownerDocument,
     id: '',
     style: fakeStyle(),
     attributes: {},

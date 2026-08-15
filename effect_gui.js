@@ -135,6 +135,27 @@ function shaderBallControlLabel(stage, name) {
 }
 
 /**
+ * The focusable widget a lil-gui controller built: a dropdown's select, an
+ * input, or a button, whichever its control kind owns.
+ * @param {Object|undefined} controller - A controller from an effect record.
+ * @returns {Object|null} The element that takes focus, or null.
+ */
+function focusWidget(controller) {
+  return controller?.$select ?? controller?.$input
+    ?? controller?.$button ?? null;
+}
+
+/**
+ * The id one parameter's warning text is published under, for the control's
+ * aria-describedby to name.
+ * @param {string} name - Engine parameter name.
+ * @returns {string} The element id.
+ */
+function paramWarningId(name) {
+  return `param-warning-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+}
+
+/**
  * The `gui` method a parameter's control is added through: a session control
  * owns no deep-link key, a migrated one accepts its former keys too, and an
  * unhydrated one owns its key but is never seeded from the URL.
@@ -190,9 +211,19 @@ export function addParamControl(
   controller.isEnum = (kind === 'enum');
   controller.isContinuous = (kind === 'number' || kind === 'integer');
   if (p.warning) {
+    // Assistive technology reads aria-invalid and aria-describedby off the
+    // widget, not off the wrapper the control is drawn in, and reaches the
+    // warning text only through a node — a title attribute is mouse-only.
+    const widget = focusWidget(controller) ?? controller.domElement;
+    const note = controller.domElement.ownerDocument.createElement('span');
+    note.id = paramWarningId(p.name);
+    note.className = 'visually-hidden';
+    note.textContent = p.warning;
+    controller.domElement.appendChild(note);
     controller.domElement.classList.add('param-warning');
     controller.domElement.setAttribute('title', p.warning);
-    controller.domElement.setAttribute('aria-invalid', 'true');
+    widget.setAttribute('aria-invalid', 'true');
+    widget.setAttribute('aria-describedby', note.id);
   }
   return controller;
 }
@@ -895,17 +926,6 @@ export function createEffectGui({
 
   function scrollElement(gui) {
     return gui?.domElement?.querySelector?.('.lil-children') ?? null;
-  }
-
-  /**
-   * The focusable widget a lil-gui controller built: a dropdown's select, an
-   * input, or a button, whichever its control kind owns.
-   * @param {Object|undefined} controller - A controller from an effect record.
-   * @returns {Object|null} The element that takes focus, or null.
-   */
-  function focusWidget(controller) {
-    return controller?.$select ?? controller?.$input
-      ?? controller?.$button ?? null;
   }
 
   /**
