@@ -43,6 +43,9 @@ export class EffectSidebar {
   constructor(container, onSelect) {
     this.container = container;
     this.doc = container.ownerDocument;
+    // Observer and frame timers come from the container's own window; a
+    // detached document has no defaultView, leaving only the ambient one.
+    this.win = this.doc?.defaultView ?? globalThis;
     this.onSelect = onSelect;
     this.buttons = new Map();      // name -> button element
     this.items = [];               // [{name, size}]
@@ -85,7 +88,7 @@ export class EffectSidebar {
     this.arrowRight.setAttribute('aria-hidden', 'true');
 
     this.listEl.addEventListener('scroll', this.onScrollBound, { passive: true });
-    this.resizeObs = new ResizeObserver(this.onScrollBound);
+    this.resizeObs = new this.win.ResizeObserver(this.onScrollBound);
     this.resizeObs.observe(this.listEl);
 
     this.container.appendChild(this.heading);
@@ -103,7 +106,7 @@ export class EffectSidebar {
    * discarding the sidebar so no observer keeps firing into a dead DOM subtree.
    */
   dispose() {
-    cancelAnimationFrame(this.scrollArrowsRaf);
+    this.win.cancelAnimationFrame(this.scrollArrowsRaf);
     this.resizeObs?.disconnect();
     this.resizeObs = null;
     this.listEl.removeEventListener('keydown', this.onKeyDownBound);
@@ -394,8 +397,8 @@ export class EffectSidebar {
    * Scroll and resize bursts then force layout once per frame instead of per event.
    */
   scheduleScrollArrows() {
-    cancelAnimationFrame(this.scrollArrowsRaf);
-    this.scrollArrowsRaf = requestAnimationFrame(() => {
+    this.win.cancelAnimationFrame(this.scrollArrowsRaf);
+    this.scrollArrowsRaf = this.win.requestAnimationFrame(() => {
       this.scrollArrowsRaf = 0;
       this.updateScrollArrows();
     });
