@@ -9,6 +9,8 @@
 export const log = [];
 
 class Vector3 {
+  /** @param {number} [x] @param {number} [y] @param {number} [z] */
+  constructor(x = 0, y = 0, z = 0) { this.set(x, y, z); }
   /** @param {number} x @param {number} y @param {number} z @returns {Vector3} */
   set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; }
 }
