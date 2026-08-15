@@ -11,7 +11,9 @@
 //
 // The engine is a separate repository. The JS unit suite checks it out and sets
 // HOLOSPHERE_ENGINE_REQUIRED, under which a missing tree fails instead of
-// skipping; only a local run without a checkout skips.
+// skipping; only a local run without a checkout skips. That every case here can
+// skip is why the workflow's own declaration of the flag is pinned from
+// tests/wasm_provenance.test.js, which never skips.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
@@ -104,18 +106,6 @@ function engineConstant(source, name, scope = {}) {
   const names = Object.keys(scope);
   return Function(...names, `return ${expr};`)(...names.map((k) => scope[k]));
 }
-
-// Gated with the rest so a local run without an engine tree stays wholly
-// skipped; the workflow it reads is the one that checks the engine out, so the
-// case always runs where the flag has to be set.
-test('the unit-suite workflow runs this suite against a required engine',
-  { skip: SKIP }, () => {
-    const workflow = readFileSync(
-      fileURLToPath(new URL('.github/workflows/js-unit-suite.yml', REPO)), 'utf8');
-    assert.match(workflow, new RegExp(`${REQUIRED_ENV}:`),
-      `the workflow must set ${REQUIRED_ENV}, or a job that lost its engine ` +
-        'checkout retires every parity case as a skip and still reports green');
-  });
 
 /**
  * Pins the stereographic-projection constants mobius_transforms.js mirrors to
