@@ -257,6 +257,9 @@ function fakeCopyText(outcome = true) {
  *   export getAnimationsPaused.
  * @param {Function} [options.onEngineParam] - Optional engine-side reaction to
  *   a parameter write, used to model a dynamic descriptor rebind.
+ * @param {boolean} [options.rebuildOnApply] - Makes the injected applyEffect run
+ *   the app's real destroy/build/mount sequence instead of only recording the
+ *   call, which is what the Reset button drives.
  * @returns {Object} The panel plus the doubles and sinks a test asserts on.
  */
 function makeHarness({
@@ -273,6 +276,7 @@ function makeHarness({
   pausesOnWrite = (p) => Boolean(p.animated),
   pauseAccessor = true,
   onEngineParam = () => {},
+  rebuildOnApply = false,
   onSynchronizePreset = () => {},
   presetCount = 0,
   presetIndex = 0,
@@ -350,7 +354,13 @@ function makeHarness({
       return true;
     },
     engineAnimationsPaused: () => (pauseAccessor ? engine.paused : undefined),
-    applyEffect: () => writes.push('applyEffect'),
+    applyEffect: () => {
+      writes.push('applyEffect');
+      if (!rebuildOnApply) return;
+      panel.destroy();
+      panel.build();
+      panel.mount();
+    },
     guiContainer: () => state.container,
     isMobile: () => isMobile,
     dragTarget,
@@ -903,6 +913,47 @@ test('the Reset button re-applies the effect', () => {
   h.gui().ctrl('reset').object.reset();
 
   assert.deepEqual(h.writes, ['applyEffect']);
+});
+
+test('Reset hands keyboard focus back to the rebuilt Reset button', () => {
+  const h = makeHarness({ params: [SPEED], rebuildOnApply: true });
+  h.panel.build();
+  h.panel.mount();
+  const stale = h.gui();
+  stale.$children.scrollTop = 220;
+  h.state.focused = stale.ctrl('reset').$button;
+
+  stale.ctrl('reset').object.reset();
+
+  assert.notEqual(h.gui(), stale, 'the panel was rebuilt');
+  assert.equal(h.gui().ctrl('reset').$button.focusCalls, 1);
+  assert.equal(h.gui().$children.scrollTop, 220);
+});
+
+test('Reset hands keyboard focus back to the parameter that held it', () => {
+  const h = makeHarness({ params: [SPEED, GLOW], rebuildOnApply: true });
+  h.panel.build();
+  h.panel.mount();
+  const stale = h.gui();
+  h.state.focused = stale.ctrl('Glow').$input;
+
+  stale.ctrl('reset').object.reset();
+
+  assert.equal(h.gui().ctrl('Glow').$input.focusCalls, 1);
+  assert.equal(h.gui().ctrl('reset').$button.focusCalls, 0);
+});
+
+test('Reset moves focus nowhere when the panel never held it', () => {
+  const h = makeHarness({ params: [SPEED], rebuildOnApply: true });
+  h.panel.build();
+  h.panel.mount();
+  const stale = h.gui();
+  h.state.focused = fakeElement('input');
+
+  stale.ctrl('reset').object.reset();
+
+  assert.equal(h.gui().ctrl('reset').$button.focusCalls, 0);
+  assert.equal(h.gui().ctrl('Speed').$input.focusCalls, 0);
 });
 
 // sync() is the per-frame poll that mirrors engine-written values back into the

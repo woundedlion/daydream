@@ -601,10 +601,16 @@ export function createEffectGui({
 
     const effectActions = {
       /**
-       * Rebuild the effect GUI from the engine's current state, discarding edits.
+       * Rebuild the effect GUI from the engine's current state, discarding
+       * edits. The rebuild discards the panel this button lives in, so the
+       * keyboard focus and scroll offset are carried across it.
        * @returns {void}
        */
-      reset() { applyEffect(); },
+      reset() {
+        const captured = capturePanelFocus(fx);
+        applyEffect();
+        restorePanelFocus(activeEffect, captured);
+      },
       /**
        * Copy the current parameter values to the clipboard as a C++ brace-init
        * list of float literals, then flash the outcome on the Export button.
@@ -903,19 +909,69 @@ export function createEffectGui({
   }
 
   /**
-   * Which parameter's controller holds keyboard focus. Discarding the focused
-   * control drops focus to <body>, so a rebuild that renames nothing can still
-   * cost a full document re-traverse to get back to the panel.
-   * @param {Object} fx - The effect record about to be replaced.
-   * @returns {string|null} The parameter name, or null when focus is elsewhere.
+   * Every controller a rebuilt panel can hand keyboard focus back to, keyed by
+   * the property it binds: the parameters, the pause toggle, the preset
+   * selector, then the action row's buttons.
+   * @param {Object|null} fx - An effect record, or null.
+   * @returns {Array<[string, Object]>} Property/controller pairs.
    */
-  function focusedParamName(fx) {
+  function panelControllers(fx) {
+    if (!fx) return [];
+    const pairs = [...(fx.controllerByName ?? [])];
+    if (fx.pauseController) pairs.push(['pause', fx.pauseController]);
+    if (fx.preset?.controller) pairs.push(['presetIndex', fx.preset.controller]);
+    for (const controller of fx.actionControllers ?? []) {
+      pairs.push([controller.property, controller]);
+    }
+    return pairs;
+  }
+
+  /**
+   * Which control holds keyboard focus. Discarding the focused control drops
+   * focus to <body>, so a rebuild that renames nothing can still cost a full
+   * document re-traverse to get back to the panel.
+   * @param {Object|null} fx - The effect record about to be replaced.
+   * @returns {string|null} The bound property, or null when focus is elsewhere.
+   */
+  function focusedControlProperty(fx) {
     const focused = focusedElement() ?? null;
     if (focused === null) return null;
-    for (const [name, controller] of fx.controllerByName ?? []) {
-      if (controller.domElement?.contains(focused) === true) return name;
+    for (const [property, controller] of panelControllers(fx)) {
+      if (controller.domElement?.contains(focused) === true) return property;
     }
     return null;
+  }
+
+  /**
+   * Capture the panel's scroll offset and focused control ahead of a rebuild.
+   * @param {Object|null} fx - The effect record about to be replaced.
+   * @returns {{scrollTop: number, property: string|null}} The captured state.
+   */
+  function capturePanelFocus(fx) {
+    return {
+      scrollTop: scrollElement(fx?.gui)?.scrollTop ?? 0,
+      property: focusedControlProperty(fx),
+    };
+  }
+
+  /**
+   * Re-seat a captured scroll offset and keyboard focus on the record that
+   * replaced the captured one. A detached element cannot hold focus, so the
+   * replacement must already be mounted.
+   * @param {Object|null} fx - The record now published.
+   * @param {{scrollTop: number, property: string|null}} captured - The state
+   *   capturePanelFocus() returned.
+   * @returns {void}
+   */
+  function restorePanelFocus(fx, captured) {
+    const scroller = scrollElement(fx?.gui);
+    if (scroller) scroller.scrollTop = captured.scrollTop;
+    if (captured.property === null) return;
+    for (const [property, controller] of panelControllers(fx)) {
+      if (property !== captured.property) continue;
+      focusWidget(controller)?.focus?.();
+      return;
+    }
   }
 
   /**
@@ -929,8 +985,7 @@ export function createEffectGui({
 
     const generation = paramGeneration();
     const wasMounted = Boolean(previous.gui?.domElement?.parentNode);
-    const scrollTop = scrollElement(previous.gui)?.scrollTop ?? 0;
-    const refocusName = focusedParamName(previous);
+    const captured = capturePanelFocus(previous);
     const preservedPause = engineAnimationsPaused()
       ?? Boolean(previous.animationState?.pause);
     let next;
@@ -961,12 +1016,7 @@ export function createEffectGui({
     skewLogged = false;
     if (wasMounted) {
       mountEffect(next);
-      const scroller = scrollElement(next.gui);
-      if (scroller) scroller.scrollTop = scrollTop;
-      // After the mount: a detached element cannot hold focus.
-      if (refocusName !== null) {
-        focusWidget(next.controllerByName.get(refocusName))?.focus?.();
-      }
+      restorePanelFocus(next, captured);
     }
     return true;
   }
