@@ -176,8 +176,19 @@ const walkFromPages = () => {
   return { seen, unpublished, dangling, absent, escaping };
 };
 
+/** @type {ReturnType<typeof walkFromPages>|undefined} */
+let walked;
+
+/**
+ * The reference walk, run once: it re-reads the tracked tree and spawns a
+ * `git check-ignore` per dangling reference, and nothing between the cases
+ * below changes what it would find.
+ * @returns {ReturnType<typeof walkFromPages>} The shared, read-only result.
+ */
+const pageWalk = () => (walked ??= walkFromPages());
+
 test('the site manifest covers every asset the served pages reference', () => {
-  const { seen, unpublished, dangling, absent, escaping } = walkFromPages();
+  const { seen, unpublished, dangling, absent, escaping } = pageWalk();
   assert.deepEqual(escaping.slice(0, 5), [],
     `${escaping.length} references normalize outside the repo`);
   assert.deepEqual(absent.slice(0, 5), [],
@@ -203,7 +214,7 @@ test('the site manifest publishes nothing the served pages do not reach', () => 
   assert.deepEqual(stale, [],
     `the unreferenced allowlist names paths ${MANIFEST} no longer publishes`);
 
-  const { seen } = walkFromPages();
+  const { seen } = pageWalk();
   const reached = (entry) =>
     seen.has(entry) || [...seen].some((path) => path.startsWith(`${entry}/`));
   const unreached = entries.filter(
