@@ -181,11 +181,15 @@ const STYLE_VALUES = {
  * stands — again as the platform does, so invalid CSS cannot read back as the
  * text that was written. A dashed property name reaches nothing in a browser,
  * where the declaration is keyed camelCase, so it throws rather than storing a
- * declaration no read will ever find.
+ * declaration no read will ever find. An undeclared property reads back as the
+ * empty string, as CSSStyleDeclaration yields, so a module branching on `=== ''`
+ * takes the same path here as in a browser.
  * @returns {Object} The style view.
  */
 function fakeStyle() {
   return new Proxy({}, {
+    get: (declared, key) => (
+      typeof key === 'symbol' || key in declared ? declared[key] : ''),
     set: (declared, key, value) => {
       const name = String(key);
       if (name.includes('-')) {
