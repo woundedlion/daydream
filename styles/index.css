@@ -1,8 +1,13 @@
 :root {
   --page-bg: #000;
+  /* Raised surfaces over the page: notices, dialog buttons. */
+  --panel-bg: #222;
+  --panel-text: #eee;
   --panel-border: #333;
+  --bright-text: #fff;
   --muted-text: #888;
   --error-text: #e66;
+  --record-indicator: #e22;
   --accent: #48f;
   /* Accent applied to text; lighter than --accent for contrast on the dark theme. */
   --accent-text: #8af;
@@ -59,7 +64,7 @@
 }
 
 .nav-label {
-  color: white;
+  color: var(--bright-text);
   font-family: var(--nav-font);
   font-size: 14px;
   font-weight: bold;
@@ -70,7 +75,7 @@
 .tab {
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.1);
-  color: white;
+  color: var(--bright-text);
   text-decoration: none;
   font-family: var(--nav-font);
   font-size: 14px;
@@ -130,7 +135,7 @@
   left: 12px;
   width: 14px;
   height: 14px;
-  background: #e22;
+  background: var(--record-indicator);
   border-radius: 50%;
   box-shadow: 0 0 8px 2px rgba(238, 34, 34, 0.6);
   animation: rec-pulse 1s ease-in-out infinite;
@@ -148,7 +153,7 @@
   position: absolute;
   top: 12px;
   left: 32px;
-  color: #e22;
+  color: var(--record-indicator);
   font-family: var(--ui-font);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
@@ -277,8 +282,8 @@
   padding: 8px 12px;
   border: 1px solid var(--error-text);
   border-radius: 6px;
-  background: #222;
-  color: #eee;
+  background: var(--panel-bg);
+  color: var(--panel-text);
   font-family: var(--ui-font);
   font-size: 13px;
   pointer-events: auto;
@@ -293,7 +298,7 @@
   padding: 0 2px;
   border: none;
   background: none;
-  color: #eee;
+  color: var(--panel-text);
   font-family: var(--ui-font);
   font-size: 15px;
   line-height: 1;
@@ -304,8 +309,8 @@
 .context-lost-reload {
   margin-top: 4px;
   padding: 6px 16px;
-  background: #222;
-  color: #eee;
+  background: var(--panel-bg);
+  color: var(--panel-text);
   border: 1px solid #555;
   border-radius: 6px;
   font-family: var(--ui-font);
@@ -464,7 +469,7 @@
 
 .effect-button.active {
   background: linear-gradient(90deg, rgba(50, 100, 200, 0.2), rgba(50, 100, 200, 0.1));
-  color: #fff;
+  color: var(--bright-text);
   border-color: rgba(60, 120, 240, 0.4);
   font-weight: 600;
   box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
@@ -757,7 +762,7 @@ div.labelLayer {
 div.label {
   pointer-events: none;
   background-color: transparent;
-  color: white;
+  color: var(--bright-text);
   font-family: Arial;
   font-size: 10px;
 }
