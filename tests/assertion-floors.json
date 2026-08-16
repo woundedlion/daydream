@@ -44,16 +44,16 @@
     "assertions": 10
   },
   "tests/effect_gui.test.js": {
-    "cases": 97,
-    "assertions": 346
+    "cases": 99,
+    "assertions": 357
   },
   "tests/effect_sequencing.test.js": {
-    "cases": 47,
-    "assertions": 106
+    "cases": 48,
+    "assertions": 108
   },
   "tests/engine_contract_wasm.test.js": {
     "cases": 36,
-    "assertions": 413
+    "assertions": 415
   },
   "tests/engine_host.test.js": {
     "cases": 18,
@@ -109,8 +109,8 @@
     "assertions": 21
   },
   "tests/legacy_shader_import.test.js": {
-    "cases": 4,
-    "assertions": 68
+    "cases": 5,
+    "assertions": 73
   },
   "tests/lil_gui_contract.test.js": {
     "cases": 6,
@@ -174,8 +174,8 @@
     "assertions": 126
   },
   "tests/segment_controller.test.js": {
-    "cases": 119,
-    "assertions": 610
+    "cases": 120,
+    "assertions": 612
   },
   "tests/segment_crosscheck.test.js": {
     "cases": 4,
@@ -197,9 +197,17 @@
     "cases": 5,
     "assertions": 21
   },
+  "tests/sha256.test.js": {
+    "cases": 6,
+    "assertions": 149
+  },
+  "tests/shader_document.test.js": {
+    "cases": 17,
+    "assertions": 243
+  },
   "tests/shader_workbench.test.js": {
-    "cases": 3,
-    "assertions": 16
+    "cases": 5,
+    "assertions": 28
   },
   "tests/shared.test.js": {
     "cases": 15,
@@ -255,11 +263,11 @@
   },
   "tests/tool_pages.test.js": {
     "cases": 10,
-    "assertions": 193
+    "assertions": 195
   },
   "tests/tsconfig_roster.test.js": {
     "cases": 7,
-    "assertions": 108
+    "assertions": 111
   },
   "tests/vendor-importmap.test.js": {
     "cases": 7,
