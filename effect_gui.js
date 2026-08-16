@@ -60,6 +60,14 @@ export const CURL_LATTICE_STAGE_ORDER = [
   'Function',
   'Colorize',
 ];
+export const FACET_GRID_STAGE_ORDER = [
+  'Camera',
+  'Projection Frame',
+  'Projection',
+  'Planar Warp 2',
+  'Function',
+  'Colorize',
+];
 const SHADERBALL_STAGE_BOUNDARIES = new Map([
   ['Function', 'Function'],
   ['Projection', 'Projection'],
@@ -97,6 +105,34 @@ const CURL_LATTICE_STAGE_BY_PARAMETER = new Map([
   ['Phase Oscillation Depth', 'Colorize'],
   ['Phase Oscillation Speed', 'Colorize'],
   ['Brightness Depth', 'Colorize'],
+  ['Value Opacity Low', 'Colorize'],
+  ['Value Opacity High', 'Colorize'],
+  ['Hue Shift Amount', 'Colorize'],
+  ['Hue Noise Scale', 'Colorize'],
+  ['Hue Noise Speed', 'Colorize'],
+]);
+const FACET_GRID_STAGE_BY_PARAMETER = new Map([
+  ['Camera Wander', 'Camera'],
+  ['Projection Spin Speed', 'Projection Frame'],
+  ['Projection Wander', 'Projection Frame'],
+  ['Pole Fade', 'Projection'],
+  ['Planar Warp 2 Speed', 'Planar Warp 2'],
+  ['Planar Warp 2 Rotation', 'Planar Warp 2'],
+  ['Planar Warp 2 Cell X', 'Planar Warp 2'],
+  ['Planar Warp 2 Cell Y', 'Planar Warp 2'],
+  ['Planar Warp 2 Offset X', 'Planar Warp 2'],
+  ['Planar Warp 2 Offset Y', 'Planar Warp 2'],
+  ['Pattern Freq', 'Function'],
+  ['Speed', 'Function'],
+  ['Source Angle Speed', 'Function'],
+  ['Complexity', 'Function'],
+  ['Pattern Mix', 'Function'],
+  ['Drift', 'Function'],
+  ['Palette Chroma', 'Colorize'],
+  ['Mapping Frequency', 'Colorize'],
+  ['Mapping Phase', 'Colorize'],
+  ['Phase Oscillation Depth', 'Colorize'],
+  ['Phase Oscillation Speed', 'Colorize'],
   ['Value Opacity Low', 'Colorize'],
   ['Value Opacity High', 'Colorize'],
   ['Hue Shift Amount', 'Colorize'],
@@ -166,6 +202,19 @@ export function curlLatticeStageAssignments(params) {
   }
   return new Map(params.map((parameter) =>
     [parameter.name, CURL_LATTICE_STAGE_BY_PARAMETER.get(parameter.name)]));
+}
+
+/**
+ * @param {Array<Object>} params - Engine parameter definitions in stream order.
+ * @returns {Map<string, string>|null} Parameter name to fixed pipeline stage.
+ */
+export function facetGridStageAssignments(params) {
+  const names = new Set(params.map((parameter) => parameter.name));
+  if ([...FACET_GRID_STAGE_BY_PARAMETER.keys()].some((name) => !names.has(name))) {
+    return null;
+  }
+  return new Map(params.map((parameter) =>
+    [parameter.name, FACET_GRID_STAGE_BY_PARAMETER.get(parameter.name)]));
 }
 
 function shaderBallControlLabel(stage, name) {
@@ -860,10 +909,13 @@ export function createEffectGui({
     fx.hasEnumControls = false;
     const shaderBallAssignments = shaderBallStageAssignments(params);
     const curlLatticeAssignments = curlLatticeStageAssignments(params);
-    const stageAssignments = shaderBallAssignments ?? curlLatticeAssignments;
+    const facetGridAssignments = facetGridStageAssignments(params);
+    const stageAssignments = shaderBallAssignments ?? curlLatticeAssignments
+      ?? facetGridAssignments;
     const stageOrder = shaderBallAssignments
       ? SHADERBALL_STAGE_ORDER
-      : curlLatticeAssignments ? CURL_LATTICE_STAGE_ORDER : [];
+      : curlLatticeAssignments ? CURL_LATTICE_STAGE_ORDER
+      : facetGridAssignments ? FACET_GRID_STAGE_ORDER : [];
     const stageFolders = new Map();
     if (stageAssignments) {
       for (const stage of stageOrder) {
