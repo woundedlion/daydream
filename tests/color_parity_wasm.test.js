@@ -211,7 +211,7 @@ test('PaletteOps publishes every effect-owned GenerativePalette recipe', () => {
       'DisplacementField / RingShower',
       'Dynamo',
       'GSReactionDiffusion',
-      'MobiusGrid',
+      'MobiusRings',
       'Raymarch',
       'ShaderBall Liquid',
       'ShaderBall Flyby',
@@ -222,7 +222,7 @@ test('PaletteOps publishes every effect-owned GenerativePalette recipe', () => {
       'DisplacementField / RingShower',
       'Dynamo',
       'GSReactionDiffusion',
-      'MobiusGrid',
+      'MobiusRings',
     ]);
     for (const preset of presets) {
       assert.equal(preset.recipe.schemaVersion, 4);
