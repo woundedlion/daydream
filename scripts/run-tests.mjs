@@ -1,7 +1,9 @@
 // Run `node --test` over the patterns given on the command line, then gate what
 // it reports against tests/assertion-floors.json, which commits two floors per
 // test file: the cases it runs (measured by scripts/report-cases.mjs) and the
-// assertions those cases make (measured by scripts/count-assertions.mjs).
+// assertions those cases make (measured by scripts/count-assertions.mjs), and
+// against the source roster, which every module has to be loaded from somewhere
+// in the suite to clear (measured by scripts/record-module-loads.mjs).
 // Neither floor sees what the other does: a file gutted to a comment still
 // scores the one pass node reports for a file with no cases, and a case gutted
 // to an empty body still scores a pass while asserting nothing.
@@ -29,9 +31,20 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const FLOORS_PATH = 'tests/assertion-floors.json';
+// Source modules the suite is allowed to leave unloaded, each against the
+// reason it cannot be covered. An absent file exempts nothing, so losing it
+// tightens the gate rather than turning it off.
+const EXEMPT_PATH = 'tests/uncovered-modules.json';
 const UPDATE_FLAG = '--update-floors';
+// Never walked for source modules: dependency and git metadata, the linked
+// worktrees, the vendored third-party drops, and the engine checkout. Mirrors
+// scripts/require-tests.mjs, which sweeps the same tree for test files.
+const SKIP_DIRS = new Set([
+  'node_modules', '.git', '.worktrees', 'vendor', 'three.js', 'engine',
+]);
 // Cases allowed to sit above the committed floors across the whole run. A floor
 // left behind covers none of the cases that landed since, so those cases can be
 // deleted again without tripping anything; the bound keeps that gap from growing
@@ -50,6 +63,7 @@ const MAX_SURPLUS_ASSERTIONS = 450;
 const NODE_PIN_PATH = '.github/workflows/js-unit-suite.yml';
 const COUNTER = new URL('./count-assertions.mjs', import.meta.url).href;
 const CASE_REPORTER = new URL('./report-cases.mjs', import.meta.url).href;
+const LOAD_RECORDER = new URL('./record-module-loads.mjs', import.meta.url).href;
 
 const argv = process.argv.slice(2);
 const updating = argv.includes(UPDATE_FLAG);
@@ -123,6 +137,17 @@ const suffixes = args
  */
 const keyOf = (file) => relative(process.cwd(), file).replaceAll('\\', '/');
 
+// Directories the patterns draw test files from. Their contents are the suite,
+// not the source the suite has to cover.
+const testDirs = new Set(
+  args
+    .filter((a) => !a.startsWith('-'))
+    .map((p) => p.split('/'))
+    .map((parts) => parts.slice(0, parts.findIndex((s) => s.includes('*'))))
+    .filter((parts) => parts.length > 0)
+    .map((parts) => parts.join('/')),
+);
+
 // The default reporter depends on whether stdout is a TTY, so pin both: spec
 // for the operator, the case tallies into a scratch file. A third reporter
 // overruns node's listener budget on the runner's event stream and draws a
@@ -131,6 +156,7 @@ const keyOf = (file) => relative(process.cwd(), file).replaceAll('\\', '/');
 const scratch = mkdtempSync(join(tmpdir(), 'daydream-run-tests-'));
 const casesPath = join(scratch, 'cases.json');
 const countsDir = join(scratch, 'assertions');
+const loadsDir = join(scratch, 'loads');
 let status;
 let tallied = false;
 const counts = new Map();
@@ -139,8 +165,11 @@ const counts = new Map();
 const cases = new Map();
 const skipped = new Set();
 const todo = new Set();
+// Repo-relative paths of every module a test process loaded.
+const loaded = new Set();
 try {
   mkdirSync(countsDir);
+  mkdirSync(loadsDir);
   const run = spawnSync(
     process.execPath,
     [
@@ -153,12 +182,15 @@ try {
     ],
     {
       stdio: 'inherit',
-      // NODE_OPTIONS rather than an execArgv flag: the counter has to load in
-      // the processes the runner spawns per test file, not in the runner.
+      // NODE_OPTIONS rather than an execArgv flag: the counter and the load
+      // recorder have to load in the processes the runner spawns per test file,
+      // not in the runner.
       env: {
         ...process.env,
-        NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import ${COUNTER}`,
+        NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import ${COUNTER}` +
+          ` --import ${LOAD_RECORDER}`,
         DAYDREAM_ASSERTION_COUNTS: countsDir,
+        DAYDREAM_MODULE_LOADS: loadsDir,
       },
     },
   );
@@ -174,6 +206,12 @@ try {
     // the files the run's own patterns describe.
     if (key.startsWith('..') || !suffixes.some((s) => key.endsWith(s))) continue;
     counts.set(key, (counts.get(key) ?? 0) + count);
+  }
+  for (const entry of readdirSync(loadsDir)) {
+    for (const url of JSON.parse(readFileSync(join(loadsDir, entry), 'utf8'))) {
+      const key = keyOf(fileURLToPath(url.split(/[?#]/)[0]));
+      if (!key.startsWith('..')) loaded.add(key);
+    }
   }
   let tallies = '';
   try {
@@ -312,6 +350,84 @@ if (updating) {
   process.exit(0);
 }
 
+// Ratchet: the file-count floor in package.json holds the number of test files,
+// which says nothing about what they reach. A module nothing imports can land
+// with a test file beside it and be covered by neither. The roster is every
+// source module outside the suite's own directories, and clearing it takes a
+// load: the recorder reports what the module loader resolved, so a mention in a
+// comment or a string counts for nothing.
+const roster = [];
+const walkSource = (dir) => {
+  for (const entry of readdirSync(dir === '' ? '.' : dir, { withFileTypes: true })) {
+    const path = dir === '' ? entry.name : `${dir}/${entry.name}`;
+    if (entry.isDirectory()) {
+      if (!SKIP_DIRS.has(entry.name) && !testDirs.has(path)) walkSource(path);
+    } else if (/\.m?js$/.test(entry.name)) roster.push(path);
+  }
+};
+walkSource('');
+roster.sort();
+
+let exempt = {};
+if (existsSync(EXEMPT_PATH)) {
+  try {
+    exempt = JSON.parse(readFileSync(EXEMPT_PATH, 'utf8'));
+  } catch (e) {
+    console.error(`run-tests: ${EXEMPT_PATH} is unreadable (${e.code ?? e.message}).`);
+    process.exit(1);
+  }
+}
+const unreasoned = Object.entries(exempt)
+  .filter(([, reason]) => typeof reason !== 'string' || reason.trim() === '')
+  .map(([file]) => file)
+  .sort();
+if (unreasoned.length > 0) {
+  console.error(
+    `run-tests: every ${EXEMPT_PATH} entry must name why the module cannot be ` +
+      'covered:\n' +
+      unreasoned.map((file) => `  ${file}`).join('\n'),
+  );
+  process.exit(1);
+}
+/**
+ * One reported block of modules the roster gate refused.
+ * @param {string} heading - What the modules have in common.
+ * @param {string[]} files - The modules, already sorted.
+ * @param {string} remedy - What to do about them.
+ * @returns {string} The block, without a trailing newline.
+ */
+const refused = (heading, files, remedy) =>
+  `run-tests: ${heading}:\n${files.map((f) => `  ${f}`).join('\n')}\n${remedy}`;
+const uncovered = roster.filter((file) => !loaded.has(file) && !(file in exempt));
+const stale = Object.keys(exempt).filter((file) => !roster.includes(file)).sort();
+const redundant = Object.keys(exempt).filter((file) => loaded.has(file)).sort();
+const blocks = [];
+if (uncovered.length > 0) {
+  blocks.push(refused(
+    'no test loaded these source modules',
+    uncovered,
+    `Write a test that imports each, or record why it cannot be one in ${EXEMPT_PATH}.`,
+  ));
+}
+if (stale.length > 0) {
+  blocks.push(refused(
+    `these ${EXEMPT_PATH} entries name no source module`,
+    stale,
+    'Delete them; an exemption for a file that has gone away covers nothing.',
+  ));
+}
+if (redundant.length > 0) {
+  blocks.push(refused(
+    `these ${EXEMPT_PATH} entries are covered after all`,
+    redundant,
+    'Delete them, or the exemption outlives the reason it was written for.',
+  ));
+}
+if (blocks.length > 0) {
+  console.error(blocks.join('\n'));
+  process.exit(1);
+}
+
 let floors;
 try {
   floors = JSON.parse(readFileSync(FLOORS_PATH, 'utf8'));
@@ -435,7 +551,10 @@ if (overBound.length > 0) {
 const surplus = surplusCases.total;
 console.log(
   `run-tests: ${total} tests passed, ${assertions} assertions across ` +
-    `${counts.size} files, each above its committed floor.` +
+    `${counts.size} files, each above its committed floor.\n` +
+    `run-tests: ${roster.length - Object.keys(exempt).length} of ` +
+    `${roster.length} source modules were loaded by a test, the rest exempt ` +
+    `in ${EXEMPT_PATH}.` +
     (surplus > 0
       ? `\nrun-tests: ${surplus} cases above their committed floors ` +
         `(bound ${MAX_SURPLUS_CASES}) — ratchet them with ${UPDATE_FLAG}.`

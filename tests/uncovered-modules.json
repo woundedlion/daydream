@@ -1,0 +1,11 @@
+{
+  "eslint.config.mjs": "The lint rules themselves. eslint loads this, and the `lint` step in .github/workflows/js-unit-suite.yml is the gate on it.",
+  "main.js": "index.html's entry module, whose body is `void bootstrap()`. Importing it starts the simulator, which is why bootstrap.js stays separately importable and tests/bootstrap.test.js covers it there.",
+  "vendor-importmap.js": "An IIFE the page loads by script tag, not a module. tests/vendor-importmap.test.js evaluates its source in a node:vm sandbox, which is not a module load.",
+  "scripts/browser-smoke.mjs": "Drives headless Chrome over every manifest-served page. It is its own CI job (.github/workflows/browser-smoke.yml), and there is no part of it a unit test could reach without a browser.",
+  "scripts/generate-importmap.mjs": "tests/generate_importmap.test.js and tests/vendor-importmap.test.js run it for real, but against a copy inside a throwaway fixture repo, so the module the loader resolves is the copy rather than this path.",
+  "scripts/run-tests.mjs": "tests/run_tests.test.js drives it as a subprocess against a fixture repo, with NODE_TEST_CONTEXT scrubbed so the runner it starts will run files at all. That marker is what tells scripts/record-module-loads.mjs it is inside a test.",
+  "scripts/count-assertions.mjs": "Loaded through NODE_OPTIONS --import, which runs before scripts/record-module-loads.mjs registers its hooks. A run where it fails to load is refused by scripts/run-tests.mjs rather than reported green.",
+  "scripts/record-module-loads.mjs": "The recorder this gate is measured by, loaded through NODE_OPTIONS --import before its own hooks exist. A run where it fails to load leaves every module unloaded, which fails this gate.",
+  "scripts/report-cases.mjs": "A node:test reporter, so the runner loads it rather than any test process. A run where it reports nothing is refused by scripts/run-tests.mjs rather than reported green."
+}
