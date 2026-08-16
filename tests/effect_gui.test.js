@@ -676,7 +676,8 @@ test('promoted Shader controls use their accepted structural modes as folders', 
 
 test('fixed Shader controls retain stage folders without dynamic metadata', () => {
   const params = [
-    'Camera Wander', 'Pole Fade', 'Planar Warp 1 Strength', 'Pattern Freq',
+    'Camera Wander', 'Pole Fade', 'Planar Warp 1 Speed', 'Warp Strength',
+    'Planar Warp 2 Speed', 'Mirror Rotation', 'Pattern Freq',
     'Edge Width', 'Palette Chroma', 'Mapping Frequency',
   ].map((name) => ({ name, value: 0, min: 0, max: 1, animated: true }));
   const h = makeHarness({
@@ -689,8 +690,10 @@ test('fixed Shader controls retain stage folders without dynamic metadata', () =
   h.panel.build();
 
   assert.deepEqual(h.gui().folders.map((folder) => folder.name),
-    ['Camera', 'Projection', 'Planar Warp 1', 'Function', 'Coverage', 'Colorize']);
-  assert.equal(h.gui().ctrl('Planar Warp 1 Strength').label, 'Strength');
+    ['Camera', 'Projection', 'Planar Warp 1', 'Planar Warp 2', 'Function',
+      'Coverage', 'Colorize']);
+  assert.equal(h.gui().ctrl('Warp Strength').folder, 'Planar Warp 1');
+  assert.equal(h.gui().ctrl('Mirror Rotation').folder, 'Planar Warp 2');
   assert.equal(h.gui().ctrl('Edge Width').folder, 'Coverage');
 });
 
