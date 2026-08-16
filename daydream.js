@@ -51,7 +51,7 @@ import { importLegacyShaderSelection, LEGACY_SHADER_ALIAS } from "./legacy_shade
 
 // Dwell time per effect while "Test All" cycles the favorites list.
 const TEST_ALL_INTERVAL_MS = 1000;
-const EXPECTED_SEGMENT_CONTROLLER_API_VERSION = 1;
+const EXPECTED_SEGMENT_CONTROLLER_API_VERSION = 2;
 
 if (SEGMENT_CONTROLLER_API_VERSION !== EXPECTED_SEGMENT_CONTROLLER_API_VERSION) {
   throw new Error('Cached segment_controller.js is incompatible; reload the simulator.');

@@ -357,6 +357,8 @@ export function createApplyPipeline({
     // broadcast below: sending the rejected name would diverge them from main.
     if (getEngine() && !selectEngineEffect()) return ApplyResult.REJECTED;
 
+    if (getEngine() && segments.active) segments.refreshPresetState();
+
     effectGui.destroy();
     if (!preserveParams) clearEffectParamUrl();
     if (getEngine()) effectGui.build();

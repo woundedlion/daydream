@@ -31,7 +31,7 @@ import { displayAliasesDiverged } from "./app_lifecycle.js";
 import { FAULT_POOL, FAULT_RENDER, SegmentStatsView } from "./segment_stats_view.js";
 import { PROTOCOL_VERSION } from "./worker_protocol.js";
 
-export const SEGMENT_CONTROLLER_API_VERSION = 1;
+export const SEGMENT_CONTROLLER_API_VERSION = 2;
 
 // Deadline for all workers to report 'ready'. A non-throwing WASM load failure
 // fires no onerror and never sends 'ready', so this bound latches a fault instead
@@ -534,6 +534,16 @@ export class SegmentController {
   }
 
   /**
+   * Refresh preset metadata from the main engine.
+   * @returns {void}
+   */
+  refreshPresetState() {
+    const mainEngine = this.getWasmEngine();
+    this.presetCount = mainEngine?.getPresetCount?.() ?? null;
+    this.presetIndex = mainEngine?.getPresetIndex?.() ?? null;
+  }
+
+  /**
    * (Re)build the worker pool at the current resolution: destroy any existing
    * pool, then spawn `numSegments` fresh workers, each loading its own WASM
    * module and initialized with this engine's tuned params and paused state.
@@ -570,9 +580,7 @@ export class SegmentController {
     this.fullFrames = new Array(numSegments).fill(false);
     this.frameSeen = new Array(numSegments).fill(false);
     this.paramValues = null;
-    const mainEngine = this.getWasmEngine();
-    this.presetCount = mainEngine?.getPresetCount?.() ?? null;
-    this.presetIndex = mainEngine?.getPresetIndex?.() ?? null;
+    this.refreshPresetState();
     this.ready = false;
 
     const res = this.resolutionPresets[this.appState.get('resolution')];
@@ -1007,9 +1015,7 @@ export class SegmentController {
     // rebuilt GUI would bind the new effect's sliders to stale values by index.
     this.paramValues = null;
     this.paramRevision++;
-    const mainEngine = this.getWasmEngine();
-    this.presetCount = mainEngine?.getPresetCount?.() ?? null;
-    this.presetIndex = mainEngine?.getPresetIndex?.() ?? null;
+    this.refreshPresetState();
     // A faulted pool is broken until re-created; rebuild (active) re-reads the
     // effect and params from appState rather than broadcasting to dead workers.
     // Bounded by MAX_FAULTED_REBUILDS: effect switches can arrive on a timer, and

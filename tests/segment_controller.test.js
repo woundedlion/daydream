@@ -36,7 +36,7 @@ const {
 const { PROTOCOL_VERSION } = await import('../worker_protocol.js');
 
 test('segment controller publishes its composition-root API version', () => {
-  assert.equal(SEGMENT_CONTROLLER_API_VERSION, 1);
+  assert.equal(SEGMENT_CONTROLLER_API_VERSION, 2);
 });
 
 const EXPECTED_CONSOLE_MESSAGES = {
@@ -734,6 +734,21 @@ test('a segment-0 frame publishes rendered param values for the GUI', async () =
 
   deliverFrame(c, 1);
   await done;
+});
+
+test('refreshPresetState replaces outgoing preset metadata from the main engine', () => {
+  const c = makeController();
+  c.presetCount = 10;
+  c.presetIndex = 9;
+  c.getWasmEngine = () => ({
+    getPresetCount: () => 8,
+    getPresetIndex: () => 0,
+  });
+
+  c.refreshPresetState();
+
+  assert.equal(c.getPresetCount(), 8);
+  assert.equal(c.getPresetIndex(), 0);
 });
 
 test('a frame from a non-zero segment never publishes param values', async () => {
