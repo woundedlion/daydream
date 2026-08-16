@@ -68,6 +68,73 @@ export const FACET_GRID_STAGE_ORDER = [
   'Function',
   'Colorize',
 ];
+const CURL_LATTICE_STAGE_TITLES = new Map([
+  ['Camera', 'Camera'],
+  ['Surface Noise', 'Curl'],
+  ['Projection Frame', 'Spin + Wander'],
+  ['Projection', 'Folded Sinusoidal'],
+  ['Function', 'Primitive Lattice'],
+  ['Colorize', 'Generated Triadic'],
+]);
+const FACET_GRID_STAGE_TITLES = new Map([
+  ['Camera', 'Camera'],
+  ['Projection Frame', 'Spin + Wander'],
+  ['Projection', 'Stereographic'],
+  ['Planar Warp 2', 'Mirror Tile'],
+  ['Function', 'Grid'],
+  ['Colorize', 'Generated Analogous'],
+]);
+const FIXED_SHADER_MODE_FIELDS = new Map([
+  ['Function', ['slots.function', [
+    'Twin Wave', 'Rings', 'Spiral', 'Grid', 'Noise Contour (Projected)',
+    'Primitive Lattice', 'Noise Contour (Sphere)',
+  ]]],
+  ['Projection', ['slots.projection', [
+    'Folded Sinusoidal', 'Stereographic', 'Gnomonic', 'Bonne',
+    'Peirce Quincuncial', 'Dymaxion / Airocean', 'Equirectangular',
+  ]]],
+  ['Projection Frame', ['slots.projection_frame', [
+    'Identity', 'Spin + Wander',
+  ]]],
+  ['Surface Noise', ['slots.surface_noise', ['None', 'Direct', 'Curl']]],
+  ['Lens', ['slots.surface_lens', [
+    'None',
+    'Glitch',
+    'Twist',
+    'Kaleidoscope (Azimuthal 6-fold)',
+    'Mobius',
+    'Tangent Noise',
+    'Kaleidoscope (Tetrahedral)',
+    'Kaleidoscope (Octahedral / Cubic)',
+    'Kaleidoscope (Dodecahedral / Icosahedral)',
+    'Kaleidoscope (Triangular Prism)',
+    'Kaleidoscope (Square Prism)',
+    'Kaleidoscope (Pentagonal Prism)',
+    'Kaleidoscope (Hexagonal Prism)',
+    'Kaleidoscope (Octagonal Prism)',
+  ]]],
+  ['Planar Warp 1', ['slots.warp_program.outer.kind', [
+    'None', 'Stereo Noise', 'Affine Transform', 'Wave Shear', 'Vortex',
+    'Projected Vector Noise', 'Projected Curl Flow', 'Mirror Tile',
+    'Polar Chart',
+  ]]],
+  ['Planar Warp 2', ['slots.warp_program.inner.kind', [
+    'None', 'Stereo Noise', 'Affine Transform', 'Wave Shear', 'Vortex',
+    'Projected Vector Noise', 'Projected Curl Flow', 'Mirror Tile',
+    'Polar Chart',
+  ]]],
+  ['Signal Weight', ['slots.signal_weight', ['None', 'Projection']]],
+  ['Value Transfer', ['slots.value_transfer', [
+    'Linear', 'Ridge', 'Iso Contour', 'Smooth Bands',
+  ]]],
+  ['Coverage', ['slots.coverage', [
+    'Opaque', 'Projection Weight Squared', 'Value Cutout', 'Edge Fade',
+    'Projection Weight',
+  ]]],
+  ['Colorize', ['slots.palette', [
+    'Generated Triadic', 'Generated Complementary', 'Generated Analogous',
+  ]]],
+]);
 const SHADERBALL_STAGE_BOUNDARIES = new Map([
   ['Function', 'Function'],
   ['Projection', 'Projection'],
@@ -249,6 +316,26 @@ export function fixedShaderStageAssignments(params) {
   return new Map(params.map((parameter) => [parameter.name, stageFor(parameter.name)]));
 }
 
+/**
+ * @param {Object|null} snapshot - Versioned Shader configuration snapshot.
+ * @param {Array<Object>|null} fields - Snapshot field definitions.
+ * @returns {Map<string, string>|null} Fixed stage position to selected mode.
+ */
+export function fixedShaderStageTitles(snapshot, fields) {
+  if (!snapshot || !Array.isArray(snapshot.accepted) || !Array.isArray(fields)) {
+    return null;
+  }
+  const fieldIds = new Map(fields.map((field) => [field.name, field.id]));
+  const titles = new Map([['Camera', 'Camera']]);
+  for (const [stage, [fieldName, options]] of FIXED_SHADER_MODE_FIELDS) {
+    const id = fieldIds.get(fieldName);
+    const mode = id === undefined ? undefined : options[snapshot.accepted[id]];
+    if (mode === undefined) return null;
+    titles.set(stage, mode);
+  }
+  return titles;
+}
+
 function shaderBallControlLabel(stage, name) {
   if (SHADERBALL_STAGE_BOUNDARIES.has(name)) {
     if (stage === 'Colorize') return 'Palette';
@@ -401,6 +488,8 @@ export function addParamControl(
  * @param {() => boolean} [deps.usesFullConfigSnapshot] - Whether the active
  *   effect persists through the exhaustive versioned snapshot API.
  * @param {() => Object|null} [deps.getFullConfigSnapshot] - Captures that state.
+ * @param {() => Array<Object>|null} [deps.getFullConfigFieldDefinitions] -
+ *   Names the fields in a full configuration snapshot.
  * @param {(snapshot: Object) => string} [deps.restoreFullConfigSnapshot] -
  *   Atomically restores a captured state, returning the engine's
  *   FullConfigRestoreResult constant name ("APPLIED" on success).
@@ -437,6 +526,7 @@ export function createEffectGui({
   copyText,
   usesFullConfigSnapshot = () => false,
   getFullConfigSnapshot = () => null,
+  getFullConfigFieldDefinitions = () => null,
   restoreFullConfigSnapshot = () => 'NO_ENGINE',
   getConfigImportNotice = () => '',
   clearConfigImportNotice = () => {},
@@ -949,22 +1039,34 @@ export function createEffectGui({
     const shaderBallAssignments = shaderBallStageAssignments(params);
     const curlLatticeAssignments = curlLatticeStageAssignments(params);
     const facetGridAssignments = facetGridStageAssignments(params);
-    const fixedShaderAssignments = fixedShaderStageAssignments(params);
-    const stageAssignments = shaderBallAssignments ?? curlLatticeAssignments
-      ?? facetGridAssignments ?? fixedShaderAssignments;
+    const fixedShaderCandidate = fixedShaderStageAssignments(params);
+    const fullConfigSnapshot = fixedShaderCandidate
+      ? getFullConfigSnapshot() : null;
+    const fixedShaderTitles = fixedShaderCandidate ? fixedShaderStageTitles(
+      fullConfigSnapshot, getFullConfigFieldDefinitions()) : null;
+    const fixedShaderAssignments = fixedShaderTitles
+      ? fixedShaderCandidate : null;
+    const stageAssignments = shaderBallAssignments ?? fixedShaderAssignments
+      ?? curlLatticeAssignments ?? facetGridAssignments;
+    const stageTitles = fixedShaderAssignments
+      ? fixedShaderTitles
+      : curlLatticeAssignments ? CURL_LATTICE_STAGE_TITLES
+      : facetGridAssignments ? FACET_GRID_STAGE_TITLES
+      : null;
     const stageOrder = shaderBallAssignments
       ? SHADERBALL_STAGE_ORDER
+      : fixedShaderAssignments ? SHADERBALL_STAGE_ORDER.filter((stage) =>
+        new Set(fixedShaderAssignments.values()).has(stage))
       : curlLatticeAssignments ? CURL_LATTICE_STAGE_ORDER
       : facetGridAssignments ? FACET_GRID_STAGE_ORDER
-      : fixedShaderAssignments ? SHADERBALL_STAGE_ORDER.filter((stage) =>
-        new Set(fixedShaderAssignments.values()).has(stage)) : [];
+      : [];
     const stageFolders = new Map();
     if (stageAssignments) {
       for (const stage of stageOrder) {
         const addFolder = typeof fx.gui.addDisplayFolder === 'function'
           ? fx.gui.addDisplayFolder.bind(fx.gui)
           : fx.gui.addFolder.bind(fx.gui);
-        stageFolders.set(stage, addFolder(stage));
+        stageFolders.set(stage, addFolder(stageTitles?.get(stage) ?? stage));
       }
     }
 
