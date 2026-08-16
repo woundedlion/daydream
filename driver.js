@@ -436,11 +436,12 @@ export class Daydream {
   }
 
   /**
-   * Keyboard handler: space toggles pause; right-arrow single-steps one frame
-   * while paused.
-   * @param {KeyboardEvent} e - The keydown event whose key drives pause/step.
+   * Keyboard handler: space toggles pause; right-arrow single-steps while
+   * paused; left/right select presets while running.
+   * @param {KeyboardEvent} e - The keydown event driving playback or presets.
+   * @param {(delta: number) => boolean} [movePreset] - Selects an adjacent preset.
    */
-  keydown(e) {
+  keydown(e, movePreset = () => false) {
     if (e.key === ' ') {
       this.paused = !this.paused;
       if (!this.paused) this.stepFrames = 0;
@@ -448,6 +449,10 @@ export class Daydream {
     } else if (this.paused && e.key === "ArrowRight") {
       this.stepFrames++;
       e.preventDefault();
+    } else if (!this.paused && !e.altKey && !e.ctrlKey && !e.metaKey
+               && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+      const delta = e.key === "ArrowLeft" ? -1 : 1;
+      if (movePreset(delta)) e.preventDefault();
     }
   }
 
