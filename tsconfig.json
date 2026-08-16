@@ -66,6 +66,7 @@
     "tools/palette_controls.js",
     "tools/palette_math.js",
     "tools/pointer_drag.js",
+    "tools/shader_workbench_nav.js",
     "tools/slider.js",
     "tools/solid_codegen.js",
     "tools/solid_op_rows.js",
