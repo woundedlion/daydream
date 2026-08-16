@@ -679,6 +679,19 @@
   display: none;
 }
 
+.gui-container .effect-gui .preset-nav-previous button {
+  border-radius: var(--widget-border-radius) 0 0 var(--widget-border-radius);
+}
+
+.gui-container .effect-gui .preset-nav-selector .lil-display {
+  width: 100%;
+  border-radius: 0;
+}
+
+.gui-container .effect-gui .preset-nav-next button {
+  border-radius: 0 var(--widget-border-radius) var(--widget-border-radius) 0;
+}
+
 /* --- Desktop Styles --- */
 @media only screen and (width > 900px) {
   .gui-container {
