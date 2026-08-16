@@ -534,6 +534,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── palette_canvas.js       Gradient-strip and RGB-wave canvas painters for palettes.html
 │   ├── palette_controls.js     DOM-free zoom history and locked-slider delta capping for palettes.html
 │   ├── palette_math.js         ProceduralPalette / GenerativePalette mirror + the PaletteOps bridge
+│   ├── solid_build.js          Mesh construction and validation for solids.html
 │   ├── solid_codegen.js        Op dispatch, codegen, and op-chain sequencing for solids.html
 │   ├── solid_op_rows.js        DOM construction for one op-chain row of solids.html
 │   ├── solid_registry_codegen.js  Registry-paste emitter: the solids.h Entry, OpStep table, Recipe, and (when solids.h declares none) the seed's SEED_* constant
@@ -545,6 +546,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── browser-smoke.mjs       Headless-Chrome smoke for every manifest-served page
 │   ├── count-assertions.mjs    NODE_OPTIONS shim counting each test file's node:assert calls
 │   ├── generate-importmap.mjs  Bakes the local-vs-CDN decision into vendor-importmap.js
+│   ├── record-module-loads.mjs NODE_OPTIONS shim recording loaded test modules
 │   ├── report-cases.mjs        node:test reporter tallying per-file case and skip counts
 │   ├── require-tests.mjs       `pretest` guard: fails below the committed test-file floor
 │   ├── serve-manifest.mjs      Local static server constrained to the published site manifest
@@ -2456,19 +2458,9 @@ Volumetric raymarcher that renders twisted tori at the 26 vertices of a disdyaki
 
 </td></tr></table>
 
-<table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=Shader" target="_blank"><img src="docs/screenshots/Shader.png" alt="Shader" width="280"></a></td>
-<td valign="top">
-
-#### Shader
-
-Simulator-only pullback-shader authoring workbench with the complete structural vocabulary and configurable stage folders. It opens in a new tab through Daydream's dedicated [Shader workbench page](https://github.com/woundedlion/daydream/blob/master/tools/shader.html) rather than a normal simulator effect card, and its popped-out navigation omits simulator-only controls. Twenty-three retained legacy presets migrate to stable fixed-pipeline product effects; legacy preset 4 is retired, and unmatched custom configurations route here for editing. The firmware rosters contain only the promoted effects.
-
-**Parameters**: the active controls are schema-driven by the selected slots. See the vocabulary and dependency map below.
-
-</td></tr></table>
-
 ### Shader Authoring Workbench
+
+The standalone [Shader workbench](https://github.com/woundedlion/daydream/blob/master/tools/shader.html) provides the complete structural vocabulary and configurable stage folders in a dedicated browser tab. Twenty-three retained legacy presets migrate to stable fixed-pipeline product effects; legacy preset 4 is retired, and unmatched custom configurations route to the workbench for editing. The firmware rosters contain only the promoted effects.
 
 The [fixed-pipeline migration specification](https://github.com/woundedlion/pov/blob/master/docs/specs/shader_workbench_fixed_pipeline_effects_spec.md) defines the architecture. `ShaderWorkbench` is registered as `Shader`, with `ShaderBall` retained as a legacy alias. It owns structural editing and dynamic dispatch in WASM and native oracle tests only. `HS_ENABLE_SHADER_WORKBENCH` is rejected for Arduino builds, and release ELF inspection gates the dynamic backend, topology registry, and workbench symbols out of firmware.
 
