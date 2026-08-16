@@ -307,7 +307,7 @@ export function fixedShaderStageAssignments(params) {
     if (name.startsWith('Planar Warp 2 ')) return 'Planar Warp 2';
     if (name.startsWith('Mobius ')) return 'Lens';
     if (/^(Iso |Band )/.test(name)) return 'Value Transfer';
-    if (/^(Edge Fade|Cutout )/.test(name)) return 'Coverage';
+    if (/^(Edge(?: Fade)?|Cutout )/.test(name)) return 'Coverage';
     if (/^(Pattern|Speed$|Source |Complexity|Drift|Lattice )/.test(name)) {
       return 'Function';
     }
@@ -1044,21 +1044,22 @@ export function createEffectGui({
       ? getFullConfigSnapshot() : null;
     const fixedShaderTitles = fixedShaderCandidate ? fixedShaderStageTitles(
       fullConfigSnapshot, getFullConfigFieldDefinitions()) : null;
-    const fixedShaderAssignments = fixedShaderTitles
-      ? fixedShaderCandidate : null;
+    const fixedShaderAssignments = fixedShaderTitles ? fixedShaderCandidate : null;
+    const fallbackFixedAssignments = fixedShaderTitles ? null : fixedShaderCandidate;
     const stageAssignments = shaderBallAssignments ?? fixedShaderAssignments
-      ?? curlLatticeAssignments ?? facetGridAssignments;
-    const stageTitles = fixedShaderAssignments
-      ? fixedShaderTitles
+      ?? curlLatticeAssignments ?? facetGridAssignments ?? fallbackFixedAssignments;
+    const stageTitles = fixedShaderAssignments ? fixedShaderTitles
       : curlLatticeAssignments ? CURL_LATTICE_STAGE_TITLES
       : facetGridAssignments ? FACET_GRID_STAGE_TITLES
-      : null;
+      : fixedShaderTitles;
     const stageOrder = shaderBallAssignments
       ? SHADERBALL_STAGE_ORDER
       : fixedShaderAssignments ? SHADERBALL_STAGE_ORDER.filter((stage) =>
         new Set(fixedShaderAssignments.values()).has(stage))
       : curlLatticeAssignments ? CURL_LATTICE_STAGE_ORDER
       : facetGridAssignments ? FACET_GRID_STAGE_ORDER
+      : fallbackFixedAssignments ? SHADERBALL_STAGE_ORDER.filter((stage) =>
+        new Set(fallbackFixedAssignments.values()).has(stage))
       : [];
     const stageFolders = new Map();
     if (stageAssignments) {
