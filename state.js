@@ -290,6 +290,8 @@ export class URLSync {
     this.disposed = false;
     this.adhoc = new Map(); // GUI-set params (key -> string), merged on flush
     this.pendingReset = null; // reset()'s excluded keys, applied by the next flush
+    this.suspendDepth = 0;
+    this.suspendedDirty = false;
     this.retries = 0; // consecutive refused writes, cleared by one that lands
 
     const params = new URLSearchParams(window.location.search);
@@ -366,6 +368,19 @@ export class URLSync {
     if (activeURLSync === this) activeURLSync = null;
   }
 
+  /** Defers tracked URL writes until resume() completes a state transaction. */
+  suspend() { this.suspendDepth += 1; }
+
+  /** Releases one suspension and schedules the accumulated URL write. */
+  resume() {
+    if (this.suspendDepth === 0) return;
+    this.suspendDepth -= 1;
+    if (this.suspendDepth === 0 && this.suspendedDirty) {
+      this.suspendedDirty = false;
+      this.schedule();
+    }
+  }
+
   /**
    * Debounces a URL write, collapsing bursts into one flush after
    * URL_FLUSH_DEBOUNCE_MS. A no-op once disposed.
@@ -380,6 +395,10 @@ export class URLSync {
    */
   schedule(delayMs = URL_FLUSH_DEBOUNCE_MS) {
     if (this.disposed) return;
+    if (this.suspendDepth > 0) {
+      this.suspendedDirty = true;
+      return;
+    }
     if (this.timer !== null && delayMs < this.armedDelayMs) return;
     clearTimeout(this.timer);
     this.armedDelayMs = delayMs;

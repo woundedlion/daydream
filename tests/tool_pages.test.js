@@ -81,6 +81,8 @@ const SCRIPT_SRC = {
   'tools/lissajous.html': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
   'tools/mobius.html': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
   'tools/palettes.html': ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'"],
+  'tools/shader.html':
+    ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", 'https://cdn.jsdelivr.net'],
   'tools/solids.html':
     ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", 'https://cdn.jsdelivr.net'],
   'index.html':

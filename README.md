@@ -100,7 +100,7 @@ Building the WASM target in Holosphere installs `holosphere_wasm.js`, `holospher
    - [The `EffectConfig` Flags](#the-effectconfig-flags)
 9. [Effects Reference](#9-effects-reference)
    - [Core Effects (Modern Engine)](#core-effects-modern-engine)
-   - [ShaderBall Inverse Pipeline](#shaderball-inverse-pipeline)
+   - [Shader Authoring Workbench](#shader-authoring-workbench)
    - [Legacy Effects](#legacy-effects-effects_legacyh)
 10. [The Web Simulator (Daydream)](#10-the-web-simulator-daydream)
     - [10.1 Process and Threading Model](#101-process-and-threading-model)
@@ -234,7 +234,9 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   │   ├── effects.h               Effect roster (includes each effect + HS_EFFECT_LIST)
 │   │   ├── effects_legacy.h        Pre-engine effects (TheMatrix, Spirals, etc.)
 │   │   ├── effect_registry.h       Self-registering factory: REGISTER_EFFECT macro
+│   │   ├── effect_transition.h     Fenced one-endpoint effect transition controller
 │   │   ├── effect_params.h         ParamDef descriptors + the fixed-capacity ParamList registry
+│   │   ├── fixed_pipeline.h        Shared fixed-pipeline preset transition helpers
 │   │   ├── concepts.h              FunctionRef/Fn callable wrappers, PipelineRef type erasure, Tweenable concept
 │   │   ├── inplace_function.h      Fixed-capacity in-place callable storage behind Fn
 │   │   ├── memory.h / memory.cpp   Arena allocator, ScratchScope, Persist<T>
@@ -262,7 +264,8 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   │   ├── mesh.h                  PolyMesh, HalfEdgeMesh, MeshOps (compile, clone, etc.)
 │   │   ├── mesh_class_types.h      Congruence-class id space + the record structs the rasterizer reads
 │   │   ├── mesh_classes.h          Congruence-class clustering + canonical distance-LUT bake
-│   │   ├── spatial.h               KDTree k-nearest-neighbor search, arena-backed MeshState
+│   │   ├── mesh_state.h            Arena-backed MeshState, the flat mesh format the renderer reads
+│   │   ├── spatial.h               KDTree k-nearest-neighbor search
 │   │   ├── conway.h                Conway operators (dual, kis, ambo, truncate, etc.)
 │   │   ├── conway_graph.h          Constexpr solid-to-solid operator edge graph + walk helpers
 │   │   ├── recipe.h                Recipe lowering to primitive Conway steps + replay
@@ -286,6 +289,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── render/                 Canvas, rasterizers, and the filter pipeline
 │   │   ├── canvas.h                Effect base class + Canvas RAII write-buffer guard
 │   │   ├── clip.h                  ClipRegion segment clip rectangle + cylindrical render band
+│   │   ├── pullback.h              Typed inverse-render pipeline, carriers, stages, and policies
 │   │   ├── scan.h                  Rasterization primitives (Ring, Circle, Star, Mesh, etc.)
 │   │   ├── plot.h                  Line/curve rasterizer with geodesic/planar strategies
 │   │   ├── plot_cull.h             Plot edge samplers + screen row/column span and clip-cull kernel
@@ -316,8 +320,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │       ├── FastNoiseLite.h         Single-header noise library
 │       └── FastNoiseLite_config.h  FastNoiseLite build configuration
 │
-├── effects/                    24 headers: one per effect (23) plus the shared
-│                                ReactionDiffusionBase.h:
+├── effects/                    27 headers covering 37 effects plus shared bases:
 │                                BZReactionDiffusion.h, HopfFibration.h, IslamicStars.h,
 │                                Raymarch.h, … — see §9 Effects Reference
 │
@@ -380,6 +383,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── mindsplatter_whitebox.h  White-box MindSplatter accessor shared by its tests and the replay tools
 │   ├── mindsplatter_replay_metrics.h  Difference metrics + clip geometry shared by the replay generator and comparator
 │   └── mindsplatter_replay_corpus.h  Generated golden replay corpus (emitted by tools/mindsplatter_replay_gen.cpp)
+├── patterns/                   Shader workbench source documents
 ├── scripts/                    Build + CI tooling
 │   ├── generate_luts.py        sRGB ↔ linear LUT generator of record (emits core/color/color_luts.h)
 │   ├── generate_reaction_graph.py K-NN lattice generator of record (emits core/engine/reaction_graph.cpp)
@@ -387,6 +391,9 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── effect_roster.mjs       Shared HS_EFFECT_LIST / REGISTER_EFFECT parser for the roster tools
 │   ├── effect_roster.test.mjs  Node unit test for both roster parsers
 │   ├── check_effect_roster.mjs Cross-checks HS_EFFECT_LIST against the REGISTER_EFFECT calls (CI)
+│   ├── shader_workbench.mjs    Fixed-pipeline document validation and canonical identity
+│   ├── shader_workbench_cli.mjs Command-line validator for shader workbench documents
+│   ├── shader_workbench.test.mjs Node contract tests for the shader workbench
 │   ├── wasm_smoke.mjs          Runtime WASM smoke: drives every effect at both resolutions (CI)
 │   ├── wasm_smoke_predicates.mjs Module-free smoke decisions: dark band, stack creep budget, param zip
 │   ├── wasm_smoke_predicates.test.mjs Node unit test for those three decisions
@@ -417,6 +424,10 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── profile_islamic_big.sh  Focused profiling loop for IslamicStars' largest mesh
 │   ├── profile_capture.py      Serial capture of the profiling image's readout
 │   ├── parse_profile.py        Capture-log parser behind the per-window/per-preset reports
+│   ├── pullback_profile_build.py  Profile-image Git-SHA build hook for pullback telemetry
+│   ├── generate_pullback_manifest_header.py  Pullback manifest validator and native-test header generator
+│   ├── pullback_capture.py / pullback_capture_native.cpp  Canonical producer + native/WASM backend
+│   ├── pullback_crosscheck.py  Isolated base/candidate pullback capture runner and comparator
 │   ├── device_lock.sh          Host-global per-board lock every device path takes
 │   ├── pov_segment_map_export.cpp  Generator for the committed segment-map golden
 │   ├── relax_bakes.py / relax_bake_harness.cpp  Relaxed-mesh bake generator of record
@@ -427,7 +438,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── docs_check.py           Markdown fence/link/anchor/path validator (CI)
 │   ├── docs_images.py          Stages README images into the Doxygen output and resolves every `<img>` (CI)
 │   ├── license_check.py        Checks every tracked C/C++ source against the terms LICENSE grants it (CI)
-│   └── *_tests/                Host unit tests for the gate, build + git hooks, profile parser, bakes, docs and license checks
+│   └── *_tests/                Host unit tests for the gate, build + git hooks, profile parser, bakes, build pins, docs and license checks
 ├── docs/                       Design specs, perf ledgers, and the docs/screenshots/ gallery
 ├── Doxyfile                    Doxygen config for the published API reference
 ├── package.json                npm entry points for the scripts/*.mjs tools (ESM; Node ≥ 22, CI pinned via tools/build_pins.py)
@@ -469,6 +480,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 ├── app_lifecycle.d.ts          Hand-written declarations for app_lifecycle.js — what the typecheck sees
 ├── engine_host.js              Owns the main-thread WASM engine + its reassignable display state
 ├── effect_gui.js               Effect panel lifecycle: build, mount, value sync, Export, teardown
+├── legacy_shader_import.js     Versioned ShaderBall URL/save-state migration importer
 ├── effect_sequencing.js        DOM-free effect/resolution apply-order and preset rules
 ├── param_sync.js               DOM-free param-stream rules: slider adopt/coerce and skew guards
 ├── pixel_view.js               DOM-free zero-copy pixel-view detach/re-fetch contract
@@ -495,6 +507,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── lissajous.html          Spherical Lissajous curve designer
 │   ├── mobius.html             Möbius transformation visualizer
 │   ├── palettes.html           Procedural palette tuner
+│   ├── shader.html             Pullback Shader authoring workbench
 │   ├── solids.html             Conway operator playground (uses MeshOps bridge)
 │   ├── shared.js               Three.js scene boilerplate for the 3D tool pages
 │   ├── banner.js               Dependency-free page + fatal-error banners (no Three.js)
@@ -509,6 +522,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── lissajous_math.js       Pure Lissajous curve math from lissajous.html
 │   ├── mobius_transforms.js    Pure Möbius coefficient presets from mobius.html
 │   ├── page_lifecycle.js       Animation-frame recompute coalescer + bfcache-aware teardown hook
+│   ├── pointer_drag.js         Pointer-drag lifecycle shared by standalone tools
 │   ├── palette_canvas.js       Gradient-strip and RGB-wave canvas painters for palettes.html
 │   ├── palette_controls.js     DOM-free zoom history and locked-slider delta capping for palettes.html
 │   ├── palette_math.js         ProceduralPalette / GenerativePalette mirror + the PaletteOps bridge
@@ -525,8 +539,8 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── generate-importmap.mjs  Bakes the local-vs-CDN decision into vendor-importmap.js
 │   ├── report-cases.mjs        node:test reporter tallying per-file case and skip counts
 │   ├── require-tests.mjs       `pretest` guard: fails below the committed test-file floor
-│   ├── run-tests.mjs           `test` script: runs the suite, gates the total it reports
-│   └── serve-manifest.mjs      Static server publishing exactly the manifest set, for the smoke
+│   ├── serve-manifest.mjs      Local static server constrained to the published site manifest
+│   └── run-tests.mjs           `test` script: runs the suite, gates the total it reports
 │
 ├── tests/                      Node unit tests (`npm test`)
 ├── tsconfig.json               checkJs settings for the worker-protocol module set
@@ -1383,7 +1397,7 @@ The clip reads the 256 × 128 flash master by default. An effect that clips per 
 #### Palette Modifiers
 
 Modifiers compose around any palette source at compile time via
-`StaticPalette<Source, Coords<...>, Colors<...>, Wrap>`. There are two axes: a
+`StaticPalette<Source, Coords<...>, Colors<...>, Wrap, Shade>`. There are two axes: a
 **coordinate** chain that remaps the lookup parameter `t` *before* the source is
 sampled, and a **color** chain that reshapes the resulting sample *after*, with
 the original coordinate in hand. Both chains are inlined by fold expression with
@@ -1398,6 +1412,19 @@ wave, `InsetModifier`'s clamp) clears an unbounded predecessor; `ReverseModifier
 and `MirrorModifier` are bounded on `[0,1]` but pass an out-of-range coordinate
 straight through — chaining one after a cycling modifier needs a `WrapModifier`
 between them and `Wrap=false`.
+
+`Shade` (a `ShadeCoord`, default `MATCH_WRAP`) selects which coordinate the
+color chain receives:
+
+| `ShadeCoord` | Coordinate handed to `shade()` |
+|---|---|
+| `MATCH_WRAP` | The lookup coordinate when `Wrap` is on, the raw input when it is off |
+| `LOOKUP` | The coordinate the source was sampled at, whatever `Wrap` is |
+| `RAW_INPUT` | The raw pre-modifier input, whatever `Wrap` is |
+
+It is a separate knob rather than a second meaning of `Wrap` because the
+coordinate chain can force `Wrap` through the `static_assert`s above: a shade
+that must read the un-wrapped input still composes behind a cycling modifier.
 
 Coordinate modifiers (`modify(float) -> float`):
 
@@ -1463,6 +1490,75 @@ StaticPalette<ProceduralPalette, Coords<NoiseWarpModifier>,
 | `PaletteFacade<SP>` | Exposes a compile-time `StaticPalette` composition through the polymorphic `Palette` API, for preset tables and baking |
 | `BakedPalette` | Precomputes any palette source (a `Palette` or a `StaticPalette`) into a fast 16-bit LUT for O(1) lookup. Arena-allocated. |
 
+#### Recipe-Compiled Palettes
+
+`GenerativePalette` is not configured field by field — it is *compiled* from a
+`PaletteRecipe`, a flat POD of authoring controls that canonicalizes into the
+control keys the palette evaluates. The recipe is the persisted form, so it
+carries a `schema_version` pinned to `PaletteRecipe::SCHEMA_VERSION`; a stored
+recipe from another schema is rejected rather than silently misread.
+
+| Field | Description |
+|---|---|
+| `input` | `PaletteInputWindow{offset, span}` — the sub-window of the source domain the recipe maps across |
+| `domain` | `PaletteDomain`: `STRAIGHT`, `MIRROR` (ping-pong), `VIGNETTE` (fades in and out at both ends), `FALLOFF` (holds, then fades out), `LOOP` (seamless, whole-turn hue winding) |
+| `easing` | `SegmentEase` between control keys: `LINEAR`, `COSINE`, `SMOOTHSTEP` |
+| `color_path` | `ColorPath::OKLCH_ARC` (polar, shortest-arc hue) or `OKLAB_CARTESIAN` (rectangular, straight through the neutral axis) |
+| `hue` | `HueControls`: `mode` (`HARMONY`, `SWEEP`, `CUSTOM`), `harmony` (`PaletteHarmony`), `direction` (`HueDirection`), `base_turns`, `spread_turns`, `sweep_turns`, `custom_turns[PALETTE_MAX_KEYS]` |
+| `lightness` | `AxisControls`: `curve` (`AxisCurve`: `CONSTANT`, `ASCENDING`, `DESCENDING`, `BELL`, `CUP`, `CUSTOM`), `center`, `range`, `custom[]` |
+| `chroma` | `ChromaControls`: the same curve/center/range/custom, plus `basis` (`ChromaBasis::LOCAL_GAMUT` or `ABSOLUTE`; `PATH_MINIMUM` holds its ordinal but is unimplemented and fails compilation) and `headroom` |
+| `hue_torsion` | Shifts each key's hue by `hue_torsion * (L - 0.5)`, so the light and dark ends drift apart |
+| `falloff_start` | Where the `FALLOFF` domain's fade reaches zero; must lie in `(2/3, 1)` under that domain, and is canonicalized back to its default under any other |
+
+Compilation both validates and normalizes.
+`GenerativePalette::try_compile(input, output, canonical, status)` returns false
+on rejection and leaves `output` untouched; the constructor takes the same path
+and fail-fast traps instead. `PaletteCompileStatus` carries the verdict:
+
+| Member | Description |
+|---|---|
+| `code` | `PaletteCompileCode`: `OK`, `INVALID_SCHEMA`, `NON_FINITE`, `INVALID_ENUM`, `HUE_LIMIT`, `NON_INTEGER_LOOP_SWEEP`, `INVALID_FALLOFF_START`, `INCOMPATIBLE_OPTIONS` |
+| `field` | The `PaletteRecipeField` naming the offending control, so an authoring tool can point at it |
+| `adjustments` | `PaletteAdjustments`: three `PaletteRecipeField` bitmasks — `wrapped_fields`, `clamped_fields`, `canonicalized_fields` — recording every silent normalization the compile applied |
+
+A successful compile also hands back the `canonical` recipe: the normalized form
+the palette was actually built from, which is what an authoring tool should
+persist rather than the raw input.
+
+The `PaletteRecipes` namespace collects the stock builders — `hue_turns()`,
+`harmony()`, `balanced_analogous()`, `profile()`, `random_profile()`,
+`from_oklch_keys()`, `from_colors()`, `isolight_spectral_loop()` and
+`tonal_monochrome()` — and `core/color/effect_palette_recipes.h` holds the
+per-effect recipes the roster renders.
+
+#### Palette Cycling
+
+`PaletteCycler` (`core/color/palette_cycler.h`) drives a display LUT through a
+sequence of palettes over time: it dwells on an entry for `dwell_frames`, then
+fades into the next over `fade_frames` (a zero dwell chains fades back to back).
+Effects call `step()` once per frame and shade from `palette()`, a
+`BakedPalette` — outside a fade the display is a bit-exact bake of the current
+entry.
+
+The fade mechanism is chosen per adjacent pair at `init()`. Two morph-compatible
+`GenerativePalette`s fade by **key-space morph**, interpolating control keys for
+perceptually coherent hue travel; every other pair — composed, prebaked, or
+morph-incompatible — falls back to a **baked-LUT crossfade**. An `Entry`
+accordingly accepts a `GenerativePalette`, any `Palette`, or a `BakedPalette`,
+so a mixed sequence of up to `MAX_ENTRIES` cycles correctly. Entries are
+caller-owned and must outlive the cycler; `Entry`'s rvalue overloads are deleted
+so a temporary cannot bind.
+
+`init_generated()` replaces the fixed entry array with a `NextPaletteFn`
+provider that fills palette *n* on demand, for an endless non-repeating cycle;
+successive palettes must stay morph-compatible and every retarget is fail-fast
+checked. Arena cost is declared up front — `display_arena_bytes()`,
+`crossfade_arena_bytes()`, `morph_arena_bytes()`, and the
+`required_arena_bytes()` / `generated_arena_bytes()` worst cases — so an effect
+sizes its arena without probing. `advance_without_display()` keeps the timeline
+and the provider moving without rebuilding the LUT; a later `step()` rebuilds it
+at the current phase.
+
 ### 7.7 The Mesh System (`core/mesh/`)
 
 The mesh system is split across twelve files:
@@ -1474,13 +1570,14 @@ The mesh system is split across twelve files:
 - **`hankin.h`** — Hankin pattern compilation and dynamic update
 - **`mesh_classes.h`** — Congruence-class clustering plus one canonical distance-LUT bake per class, allocated by descending face count under an 18 KB per-mesh budget
 - **`mesh_class_types.h`** — The class id space and the three record types the rasterizer binds per frame, split out so the clustering and bake machinery stays out of every rasterizer translation unit
-- **`spatial.h`** — `MeshState` (flat-array renderer format) and `KDTree`
+- **`mesh_state.h`** — `MeshState`, the flat-array renderer format, split out so the mesh, Conway, Hankin and solids translation units need not compile `KDTree`
+- **`spatial.h`** — `KDTree` k-nearest-neighbor search
 - **`triangular_bitset.h`** — Upper-triangular pair bitset backing the edge deduplication in the wireframe path
 - **`solid_generators.h`** — Hardcoded Platonic vertex/face tables, the `SolidBuilder` operator chain, and the named Archimedean / Catalan / Islamic Star Pattern generators
 - **`solids.h`** — The four solid registries, the authored `Recipe` mirrors of the generators, and the name/index lookups over them
 - **`relax_bakes_generated.h`** — Baked relaxed-mesh vertices behind `MeshOps::relax_baked`, generated by `tools/relax_bakes.py`; never hand-edited, regenerate with `<build>/relax_bake_gen | python tools/relax_bakes.py emit --stdin`
 
-`PolyMesh` stores vertices and face connectivity via `ArenaVector` arrays. `MeshState` (in `spatial.h`) is the flat compiled format consumed by the renderer. `HalfEdgeMesh` provides a half-edge traversal structure built from either a `PolyMesh` or `MeshState`.
+`PolyMesh` stores vertices and face connectivity via `ArenaVector` arrays. `MeshState` (in `mesh_state.h`) is the flat compiled format consumed by the renderer. `HalfEdgeMesh` provides a half-edge traversal structure built from either a `PolyMesh` or `MeshState`.
 
 #### Core MeshOps (`mesh.h`)
 
@@ -1937,7 +2034,7 @@ An effect passes construction-time flags to its base as `Effect(W, H, {.strobe =
 
 All screenshots below were captured from the [live WebAssembly simulator](https://woundedlion.github.io/daydream/) — the Phantasm 288×144 preset for most, and the Holosphere 96×20 preset for RingShower, Dynamo and Thrusters.
 
-The effect registry and tests carry the full 23-effect roster. The simulator sidebar exposes the curated subset for its active resolution (§10.5), omitting three effects at 288×144 and five at 96×20. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) is a 21-effect subset of the full roster, excluding the two Holosphere-96×20-only effects, Dynamo and Thrusters. Full-cycle Teensy measurements for the firmware playlist are indexed in the [on-device effect profiles](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md).
+The effect registry and tests carry the full 25-effect roster. The simulator sidebar exposes the curated subset for its active resolution (§10.5), omitting three effects at 288×144 and five at 96×20. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) remains the prior 21-effect subset, excluding the CurlLattice and FacetGrid workbench effects and the two Holosphere-96×20-only effects, Dynamo and Thrusters. Full-cycle Teensy measurements for the firmware playlist are indexed in the [on-device effect profiles](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md).
 
 ### Core Effects (Modern Engine)
 
@@ -2076,6 +2173,43 @@ A single head traces spherical Lissajous curves, cycling through a dozen configu
 </td></tr></table>
 
 <table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=CurlLattice" target="_blank"><img src="docs/screenshots/CurlLattice.png" alt="CurlLattice" width="280"></a></td>
+<td valign="top">
+
+#### CurlLattice
+
+A folded-sinusoidal sphere projection displaced by curl noise and shaded with a generated triadic palette. Its two presets share one fixed pipeline and vary only the surface-noise scale.
+
+**Parameters**: Lattice Cell Scale, Lattice Shape, Lattice Softness, Lattice
+Radius, Pole Fade, Central Meridian, Projection Spin Speed, Projection Wander,
+Camera Wander, Surface Noise Scale, Surface Noise Strength, Surface Noise
+Speed, Palette Chroma, Mapping Frequency, Mapping Phase, Phase Oscillation
+Depth, Phase Oscillation Speed, Brightness Depth, Value Opacity Low, Value
+Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+
+</td></tr></table>
+
+<table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=FacetGrid" target="_blank"><img src="docs/screenshots/FacetGrid.png" alt="FacetGrid" width="280"></a></td>
+<td valign="top">
+
+#### FacetGrid
+
+A generated analogous-palette grid folded through a dodecahedral kaleidoscope,
+then projected stereographically and repeated by an inner mirror tile. Its
+three presets share one fixed pipeline and vary only continuous parameters.
+
+**Parameters**: Pattern Freq, Speed, Source Angle Speed, Complexity, Pattern
+Mix, Drift, Pole Fade, Projection Spin Speed, Projection Wander, Camera Wander,
+Planar Warp 2 Speed, Planar Warp 2 Rotation, Planar Warp 2 Cell X, Planar Warp 2
+Cell Y, Planar Warp 2 Offset X, Planar Warp 2 Offset Y, Palette Chroma, Mapping
+Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed,
+Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue
+Noise Speed
+
+</td></tr></table>
+
+<table border="0"><tr>
 <td width="300"><a href="https://woundedlion.github.io/daydream/?effect=RingSpin" target="_blank"><img src="docs/screenshots/RingSpin.png" alt="RingSpin" width="280"></a></td>
 <td valign="top">
 
@@ -2184,31 +2318,31 @@ Volumetric raymarcher that renders twisted tori at the 26 vertices of a disdyaki
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=ShaderBall" target="_blank"><img src="docs/screenshots/ShaderBall.png" alt="ShaderBall" width="280"></a></td>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=Shader" target="_blank"><img src="docs/screenshots/Shader.png" alt="Shader" width="280"></a></td>
 <td valign="top">
 
-#### ShaderBall
+#### Shader
 
-Typed pullback sphere shader (extends `Effect` directly) with 11 compiled inverse programs covering all 12 authored presets and a simulator-only dynamic backend for experimentation. Every compiled program fixes six policy stages at compile time: outer camera, fused surface/projection, planar warp, source, material, and color. The roster includes authored stereographic, Bonne, Peirce quincuncial, folded-sinusoidal, and folded-gnomonic looks; topology-aware seam metadata; three generated palette harmonies; sphere-space hue noise; and continuous preset choreography. The simulator uses a compiled wrapper whenever one matches and otherwise routes any structurally valid combination to the dynamic renderer. Teensy remains closed to the compiled roster. Preset changes use parameter morphs within a topology and a through-clear transition between topologies. The [current dual-board shipping profile](https://github.com/woundedlion/pov/blob/master/docs/profiles/shipping/profile_shaderball_teensy_2026-08-14.md) covers the complete bank with zero spills and a 55.69 ms worst frame.
+Simulator-only pullback-shader authoring workbench with the complete structural vocabulary and configurable stage folders. It opens as the dedicated `tools/shader.html` route rather than a normal simulator effect card. Its 19 legacy presets migrate to stable fixed-pipeline product effects, while unmatched custom configurations route here for editing. The firmware rosters contain only the promoted effects.
 
 **Parameters**: the active controls are schema-driven by the selected slots. See the vocabulary and dependency map below.
 
 </td></tr></table>
 
-### ShaderBall Inverse Pipeline
+### Shader Authoring Workbench
 
 Full design record: the [ShaderBall spec](https://github.com/woundedlion/pov/blob/master/docs/specs/shaderball_spec.md) fixes the authored vocabulary, presets, and choreography; the [inverse-sampling pipeline spec](https://github.com/woundedlion/pov/blob/master/docs/specs/inverse_sampling_pipeline_spec.md) specifies the shipping renderer summarized below. The [noise unification brief](https://github.com/woundedlion/pov/blob/master/docs/shaderball_noise_unification.md) and the [red-preset optimization plan](https://github.com/woundedlion/pov/blob/master/docs/shaderball_optimization_plan.md) carry the supporting design and performance record.
 
-The shipping renderer is a closed set of typed programs, not a free-form node graph or a runtime switch renderer. A `TopologyKey` records every discrete choice that changes code, canonicalizing inactive layout, noise, and warp fields. The 11-entry program manifest maps an exact key and continuous precondition to a semantic `InversePipelineId` and a non-null `&InversePipeline<...>::shade` wrapper. Teensy has no fallback. The simulator first consults the same manifest, then resolves a valid unmatched configuration to a separate non-null dynamic shade function.
+The shipping renderer is a closed set of typed programs, not a free-form node graph or a runtime switch renderer. A `TopologyKey` records every discrete choice that changes code, canonicalizing inactive layout, noise, and warp fields. The 13-entry program manifest maps an exact key and continuous precondition to a semantic `InversePipelineId` and a non-null `&InversePipeline<...>::shade` wrapper. Teensy has no fallback. The simulator first consults the same manifest, then resolves a valid unmatched configuration to a separate non-null dynamic shade function.
 
 Frame preparation resolves the backend once, snapshots the selected slots, live parameters, clocks, transforms, prepared lookup data, and borrowed palette/noise resources into an immutable `FrameState`, then validates every resource that backend may dereference. The resulting `PreparedEndpoint` owns the frame snapshot, pipeline ID (`NONE` for dynamic), alpha, and shade pointer. The shared `Scan::Shader` loop calls that pointer unconditionally for every visible sample. Through-clear transitions prepare and consume one endpoint at a time, so compiled and dynamic endpoints can transition without keeping two large frame snapshots live on the stack.
 
-The shader is a *pullback*: it starts at a visible sphere point and walks backward to discover the source coordinate to sample. `InversePipeline` accepts exactly six empty policy types and validates their order, exact input/output carriers, return types, terminal placement, and approximation metadata at compile time. The coordinator and inline-only stages disappear into the address-taken flash wrapper; each selected policy calls its mathematical leaf directly rather than reading the slot tag it represents.
+The shader is a *pullback*: it starts at a visible sphere point and walks backward to discover the source coordinate to sample. The reusable `Pullback::Pipeline` in `core/render/pullback.h` accepts exactly six empty policy types and validates their binding, order, exact input/output carriers, return types, terminal placement, provider shape, and approximation metadata at compile time. ShaderBall supplies only its immutable frame binding, narrow state providers, topology matchers, and the closed 14-program manifest. The coordinator and inline-only stages disappear into the address-taken flash wrapper; both compiled and simulator-dynamic paths call the same public core operator kernels.
 
 ```
 selection — once per frame
 
-  Candidate Config ──> canonical TopologyKey ──> 11-entry program manifest
+  Candidate Config ──> canonical TopologyKey ──> 13-entry program manifest
                        ├─ match ────> compiled shade + semantic ID
                        └─ no match ─> dynamic shade + NONE (simulator only)
                                       └──> PreparedEndpoint
@@ -2230,13 +2364,13 @@ shading — once per visible sample, through the shared Scan::Shader loop
   Canvas
 ```
 
-The fused surface/projection stage owns lens selection, optional direct surface noise, projection-frame rotation, projection, and all seam/topology metadata. The planar-warp stage runs its two authored warps in pullback order and carries the original projection metadata plus both net deformation and accumulated path length. The material stage combines signal weighting, value transfer, and coverage while carrying that total warp displacement into Colorize. The terminal Colorize stage samples the selected generated harmony, optionally rotates its hue with sphere-space noise or total warp displacement, and returns straight-alpha `Color4`; the scan sink performs the final premultiplication.
+The core catalog owns the reusable surface, lens, projection, planar-warp, source, material, and generated-color policies. The fused surface/projection stage applies surface displacement, lensing, projection-frame rotation, projection, and all seam/topology metadata. The planar-warp stage runs its two authored warps in pullback order and carries the original projection metadata plus net delta and accumulated path length. The material stage combines signal weighting, value transfer, and coverage while carrying total surface/warp path length into Colorize. The terminal Colorize stage samples the selected generated harmony, optionally rotates its hue with sphere-space noise or total path length, and returns straight-alpha `Color4`; the scan sink performs the final premultiplication.
 
 Two stages carry approved approximations. Fast square Peirce projection and the hue-rotation LUT each name a host reference oracle, exact non-floating fields, error domains, limits, and a final-framebuffer metric as part of the stage contract. The dynamic orchestration is compiled for the simulator and native oracle tests, where every authored preset is compared against it. Teensy preprocessing excludes it.
 
 #### Compiled program roster
 
-Semantic program identities are independent of preset numbering. Presets 8–9 share one topology and therefore one compiled wrapper, differing only in a continuous surface-noise scale the key does not record; all other rows are one authored topology each.
+Semantic program identities are independent of preset numbering. Presets 7–8 share one topology and therefore one compiled wrapper, differing only in a continuous surface-noise scale the key does not record; all other rows are one authored topology each.
 
 | Preset(s) | Compiled program | Selected stages |
 |---|---|---|
@@ -2244,13 +2378,24 @@ Semantic program identities are independent of preset numbering. Presets 8–9 s
 | 1 | `KALEIDOSCOPE_TWIN_WAVE_INNER_MIRROR` | Stereographic kaleidoscope lens, inner mirror, twin wave, squared-weight generated color |
 | 2 | `GNOMONIC_KALEIDOSCOPE_GRID_MIRROR` | Folded gnomonic, kaleidoscope lens, outer mirror, edge-faded generated color |
 | 3 | `GNOMONIC_GLITCH_GRID_MIRROR` | Folded gnomonic, glitch lens, outer mirror, edge-faded generated color |
-| 4 | `BONNE_KALEIDOSCOPE_LATTICE_MIRROR` | North Bonne, kaleidoscope lens, outer mirror, edge-faded lattice |
-| 5 | `PEIRCE_DODECAHEDRAL_GRID` | Square Peirce, dodecahedral lens, edge-faded grid |
-| 6 | `GNOMONIC_DODECAHEDRAL_GRID_WAVE_MIRROR` | Folded gnomonic, dodecahedral lens, outer wave shear then inner mirror, squared-weight generated color |
-| 7 | `GNOMONIC_AFFINE_LATTICE_CONTOUR` | Folded gnomonic, outer affine frame, iso-contour value transfer, projection-weight lattice |
-| 8–9 | `SINUSOIDAL_CURL_LATTICE` | Folded sinusoidal curl surface noise, projection-weight lattice |
-| 10 | `STEREOGRAPHIC_PRISM_POLAR_WAVE_LATTICE` | Stereographic, triangular-prism kaleidoscope lens, outer polar chart then inner wave shear, squared-weight lattice |
-| 11 | `GNOMONIC_DODECAHEDRAL_GRID_VECTOR_MIRROR` | Folded gnomonic, dodecahedral lens, outer projected vector noise then inner mirror, squared-weight generated color |
+| 4 | `PEIRCE_DODECAHEDRAL_GRID` | Square Peirce, dodecahedral lens, edge-faded grid |
+| 5 | `GNOMONIC_DODECAHEDRAL_GRID_WAVE_MIRROR` | Folded gnomonic, dodecahedral lens, outer wave shear then inner mirror, squared-weight generated color |
+| 6 | `GNOMONIC_AFFINE_LATTICE_CONTOUR` | Folded gnomonic, outer affine frame, iso-contour value transfer, projection-weight lattice |
+| 7–8 | `SINUSOIDAL_CURL_LATTICE` | Folded sinusoidal curl surface noise, projection-weight lattice |
+| 9 | `STEREOGRAPHIC_PRISM_POLAR_WAVE_LATTICE` | Stereographic, triangular-prism kaleidoscope lens, outer polar chart then inner wave shear, squared-weight lattice |
+| 10 | `GNOMONIC_DODECAHEDRAL_GRID_VECTOR_MIRROR` | Folded gnomonic, dodecahedral lens, outer projected vector noise then inner mirror, squared-weight generated color |
+| 11, 13–14 | `STEREOGRAPHIC_DODECAHEDRAL_GRID_INNER_MIRROR` | Stereographic, dodecahedral lens, inner mirror, squared-weight grid |
+
+`CurlLattice` promotes presets 7–8 into one registered fixed-pipeline effect.
+It declares the folded-sinusoidal curl pipeline directly;
+its two presets change only surface-noise scale and do not select a program.
+All continuous controls used by that pipeline remain available on the promoted
+effect; structural selectors stay fixed.
+
+`FacetGrid` promotes presets 11 and 13–14 into a second registered
+fixed-pipeline effect and adds one authored look. All four share the exact
+stereographic dodecahedral-grid pipeline and remain presets of one effect; no
+family metadata or structural selectors are needed.
 
 #### Authoring vocabulary
 
@@ -2306,7 +2451,7 @@ Colorize ──────────> Palette + selected hue-shift source
 ```
 
 
-Schema validity still enforces the cross-stage constraints that have a geometric reason. Noise Contour (Sphere) cannot follow a planar warp. Polar Chart must be the only planar warp, except that Planar Warp 1 Polar Chart may be followed by Wave Shear. It requires Grid or Primitive Lattice, and when it is the only planar warp its seam must land on a whole number of source periods: `Pattern Freq × Polar Harmonic` for Grid, `2π × Lattice Cell Scale × Polar Harmonic` for Primitive Lattice, which is periodic in its cell scale and ignores Pattern Freq. Seam-sensitive projected noise and warp stages cannot cross the cut topology of Bonne, Peirce, or Airocean. Unsafe coordinate bounds and excess noise resources are rejected as well. These incompatible combinations remain pending and report an actionable warning. Manifest availability is separate: the simulator routes valid unmatched combinations dynamically, while Teensy requires one of the 11 compiled descriptors.
+Schema validity still enforces the cross-stage constraints that have a geometric reason. Noise Contour (Sphere) cannot follow a planar warp. Polar Chart must be the only planar warp, except that Planar Warp 1 Polar Chart may be followed by Wave Shear. It requires Grid or Primitive Lattice, and when it is the only planar warp its seam must land on a whole number of source periods: `Pattern Freq × Polar Harmonic` for Grid, `2π × Lattice Cell Scale × Polar Harmonic` for Primitive Lattice, which is periodic in its cell scale and ignores Pattern Freq. Seam-sensitive projected noise and warp stages cannot cross the cut topology of Bonne, Peirce, or Airocean. Unsafe coordinate bounds and excess noise resources are rejected as well. These incompatible combinations remain pending and report an actionable warning. Manifest availability is separate: the simulator routes valid unmatched combinations dynamically, while Teensy requires one of the 13 compiled descriptors.
 
 Projection seams use topology supplied by the projection kernel rather than guessing from planar coordinates. **Edge Fade** gives both sides of a paired cut the same authored fade, so the seam closes flush without a subducted edge. Glued and periodic edges remain continuous and do not fade. **Pole Fade** is projection weight; selecting either projection-weight coverage policy carries that attenuation into alpha as well as any separately selected signal weighting.
 
@@ -2521,7 +2666,7 @@ params.forEach(p => {
 });
 ```
 
-`getParamValues()` is polled each frame to sync the GUI with parameter values that the animation system has changed autonomously. The sync skips any control the user is currently interacting with to avoid fighting the slider. A per-effect **Reset** rebuilds the GUI from defaults, and **Export** copies the current `{ name, value }` set as a C++-formatted initializer suitable for `Presets<…>` arrays. If a segmented-render parameter snapshot is temporarily unavailable after an edit, Export uses the values displayed by the current parameter schema. An effect that reports presets also gets a **Preset** dropdown listing every index — picking one applies that preset and engages the animation pause, as `selectPreset()` does — flanked by **Previous Preset** / **Next Preset** buttons that step the same selection with wraparound. Each per-frame sync first mirrors the live preset into the engine that owns the definitions, skipping the rest of the update when that mirror fails.
+`getParamValues()` is polled each frame to sync the GUI with parameter values that the animation system has changed autonomously. The sync skips any control the user is currently interacting with to avoid fighting the slider. A per-effect **Reset** rebuilds the GUI from defaults, and **Export** copies the current `{ name, value }` set as a C++-formatted initializer suitable for `Presets<…>` arrays. If a segmented-render parameter snapshot is temporarily unavailable after an edit, Export uses the values displayed by the current parameter schema. An effect that reports presets also gets a disabled **Preset** readout of the live index plus **Previous Preset** / **Next Preset** buttons that step it, and each per-frame sync first mirrors the live preset into the engine that owns the definitions, skipping the rest of the update when that mirror fails.
 
 ### 10.7 Segmented POV Workers (`segment_worker.js`)
 
@@ -2596,16 +2741,17 @@ Switching presets does a full WASM reset: `setResolution(w, h)` updates the acti
 
 ### 10.11 Geometry Tools (`daydream/tools/`)
 
-Four standalone HTML pages. Three render with their own Three.js scene; `palettes.html` renders with 2D canvas contexts. Two are backed by the engine's WASM build so their math stays identical to the C++ engine — `solids.html` via the `MeshOps` class and `palettes.html` via `PaletteOps` — and both hard-require it: a failed module load raises a fatal banner instead of falling back. `lissajous.html` and `mobius.html` implement their geometry math directly in JavaScript:
+Five standalone HTML pages. Four render with Three.js; `palettes.html` renders with 2D canvas contexts. Three are backed by the engine's WASM build so their math stays identical to the C++ engine — `shader.html` through the authoring-only `Shader` effect, `solids.html` via the `MeshOps` class, and `palettes.html` via `PaletteOps` — and all three hard-require it: a failed module load raises a fatal banner instead of falling back. `lissajous.html` and `mobius.html` implement their geometry math directly in JavaScript:
 
 | Tool | What it does |
 |---|---|
 | `lissajous.html` | Designs spherical Lissajous curves with live frequency / phase sliders; outputs a C++ `LissajousParams` initializer for the engine's Lissajous effects (`ChaoticStrings`, `Comets`). |
 | `mobius.html` | Visualizes Möbius transformations on the sphere via the engine's stereographic projection; lets you sweep the four complex coefficients, see the warp on a latitude-longitude grid, and copy a C++ `MobiusParams` initializer. |
 | `palettes.html` | Tunes `ProceduralPalette` cosine coefficients and versioned `GenerativePalette` recipes, exports complete canonical C++ recipes, and renders engine-returned LUTs and diagnostics on 2D canvas contexts. |
+| `shader.html` | Authors pullback shaders against the complete stage vocabulary with the live sphere preview and configurable stage folders. It is the destination for unmatched legacy ShaderBall documents and is deliberately absent from the normal effect-card roster. |
 | `solids.html` | Conway operator playground — chain `truncate`, `kis`, `ambo`, `dual`, etc. on Platonic / Archimedean / Catalan / Islamic-pattern seeds and visualize the result. Backed by the WASM `MeshOps` bridge with dedicated tooling arenas (16 MB, separate from the engine's 298 KiB arena). |
 
-The three Three.js pages reuse `vendor-importmap.js`, so they resolve from the CDN by default or from the local `three.js/` after `npm run importmap:local`. `palettes.html` imports only page-relative modules, so it carries no importmap script and its CSP `script-src` is `'self'` with no CDN origin.
+The four Three.js pages reuse `vendor-importmap.js`, so they resolve from the CDN by default or from the local `three.js/` after `npm run importmap:local`. `palettes.html` imports only page-relative modules, so it carries no importmap script and its CSP `script-src` is `'self'` with no CDN origin.
 
 ---
 

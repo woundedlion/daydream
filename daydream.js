@@ -45,6 +45,7 @@ import { EngineHost } from "./engine_host.js";
 import { reportPageFailures, showFatalError } from "./tools/banner.js";
 import { showBootstrapFailure } from "./bootstrap.js";
 import { copyToClipboard } from "./tools/copy_text.js";
+import { importLegacyShaderSelection, LEGACY_SHADER_ALIAS } from "./legacy_shader_import.js";
 
 // UI layer degrades gracefully (log + keep last good state); lower layers trap.
 
@@ -60,11 +61,22 @@ const HiResFavorites = [
   "BZReactionDiffusion",
   "ChaoticStrings",
   "Comets",
+  "SignalWeave",
+  "KaleidoWave",
+  "KaleidoGrid",
+  "GlitchGrid",
+  "QuincunxFacets",
+  "FacetWave",
+  "ContourLattice",
   "CurlLattice",
+  "PrismLattice",
+  "VectorFacets",
   "FacetGrid",
+  "HexWave",
+  "EquatorGrid",
+  "StereoGlitch",
   "DreamBalls",
   "MeshFeedback",
-  "ShaderBall",
   "GnomonicStars",
   "GSReactionDiffusion",
   "HankinSolids",
@@ -85,14 +97,25 @@ const LoResFavorites = [
   "BZReactionDiffusion",
   "ChaoticStrings",
   "Comets",
+  "SignalWeave",
+  "KaleidoWave",
+  "KaleidoGrid",
+  "GlitchGrid",
+  "QuincunxFacets",
+  "FacetWave",
+  "ContourLattice",
   "CurlLattice",
+  "PrismLattice",
+  "VectorFacets",
   "FacetGrid",
+  "HexWave",
+  "EquatorGrid",
+  "StereoGlitch",
   "Dynamo",
   "GnomonicStars",
   "GSReactionDiffusion",
   "HankinSolids",
   "IslamicStars",
-  "ShaderBall",
   "MobiusGrid",
   "PetalFlow",
   "Raymarch",
@@ -130,6 +153,22 @@ function favoritesFor(resolution) {
 }
 
 /**
+ * Builds the dedicated authoring route while preserving the incoming query.
+ * @param {Location|URL|string} location - Current simulator location.
+ * @returns {string} Same-origin workbench URL.
+ */
+export function shaderWorkbenchUrl(location) {
+  const source = typeof location === 'string' || location instanceof URL
+    ? location : location.href;
+  const current = new URL(source);
+  const url = new URL('tools/shader.html', current);
+  url.search = current.search;
+  url.hash = current.hash;
+  url.searchParams.set('effect', 'Shader');
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+/**
  * Builds the simulator: driver, engine host, state, GUI, sidebar, apply
  * pipeline, recording, and the page listeners, then kicks off the WASM load.
  * @param {Object} [dependencies] - Seams the page owns; each defaults to the real one.
@@ -149,6 +188,14 @@ export function start({
   createGui = (options, namespace) => new GUI(options, namespace),
   loadModule = createHolosphereModule,
 } = {}) {
+  const shaderWorkbench = doc.documentElement?.dataset.daydreamMode === 'shader-workbench';
+  const requestedEffect = new URLSearchParams(win.location?.search ?? '').get('effect');
+  const requestedSelection = importLegacyShaderSelection(requestedEffect);
+  if (!shaderWorkbench && requestedSelection.effect === 'Shader') {
+    win.location.replace(shaderWorkbenchUrl(win.location));
+    return { dispose() {} };
+  }
+
   ///////////////////////////////////////////////////////////////////////////////
   // Instances
   ///////////////////////////////////////////////////////////////////////////////
@@ -162,16 +209,26 @@ export function start({
 
   // Seed plain defaults; URLSync is the single URL reader and hydrates these from
   // the query string through the same validators below.
-  const knownEffects = new Set(
-    Object.values(resolutionPresets).flatMap((preset) => preset.favorites));
+  const knownEffects = new Set(shaderWorkbench
+    ? ['Shader']
+    : Object.values(resolutionPresets).flatMap((preset) => preset.favorites));
+  knownEffects.add(LEGACY_SHADER_ALIAS);
   const appState = new AppState({
-    effect: 'IslamicStars',
+    effect: shaderWorkbench ? 'Shader' : 'IslamicStars',
     resolution: "Phantasm (288x144)",
   });
   const urlSync = new URLSync(appState, ['effect', 'resolution'], {
     resolution: (v) => Object.hasOwn(resolutionPresets, v),
     effect: (v) => knownEffects.has(v),
   });
+  const legacySelection = importLegacyShaderSelection(appState.get('effect'));
+  let legacyUrlPending = legacySelection.migrated;
+  if (legacyUrlPending) {
+    urlSync.suspend();
+    appState.set('effect', legacySelection.effect);
+  }
+  const availableEffects = (resolution) => shaderWorkbench
+    ? ['Shader'] : favoritesFor(resolution);
 
   const segments = new SegmentController({
     resolutionPresets,
@@ -286,7 +343,7 @@ export function start({
 
   const testAllTicker = createTestAllTicker({
     intervalMs: TEST_ALL_INTERVAL_MS,
-    availableEffects: () => favoritesFor(appState.get('resolution')),
+    availableEffects: () => availableEffects(appState.get('resolution')),
     getEffect: () => appState.get('effect'),
     setEffect: (name) => appState.set('effect', name),
     engineReady: () => Boolean(host.engine),
@@ -312,12 +369,23 @@ export function start({
       // before first paint: it sets the hydrated resolution and validates the hydrated
       // effect against this resolution's allow-list.
 
-      host.adapter = createRenderAdapter({
+      const renderAdapter = createRenderAdapter({
         host,
         driver: daydream,
         segments,
         syncEffectGui: () => effectGui.sync(),
       });
+      host.adapter = {
+        ...renderAdapter,
+        drawFrame() {
+          renderAdapter.drawFrame();
+          if (legacyUrlPending && renderAdapter.captureReady()) {
+            legacyUrlPending = false;
+            urlSync.resume();
+            applyNotice.show(legacySelection.notice, CONFIG_NOTICE);
+          }
+        },
+      };
 
       console.log("Wasm Engine Loaded");
 
@@ -418,7 +486,7 @@ export function start({
     .onChange(setResolution);
 
   const sidebarContainer = doc.getElementById('effect-sidebar');
-  if (!sidebarContainer) {
+  if (!sidebarContainer && !shaderWorkbench) {
     console.warn('daydream: #effect-sidebar not found; the effect list is not shown.');
   }
   // Off-document fallback: the sidebar is a collaborator of the apply pipeline and
@@ -515,7 +583,7 @@ export function start({
     getModule: () => host.module,
     invalidateEngineView: () => host.invalidateView(),
     presets: resolutionPresets,
-    availableEffects: favoritesFor,
+    availableEffects,
     effectGui,
     clearEffectParamUrl,
     segments,

@@ -16,6 +16,7 @@ main.js
 bootstrap.js
 app_lifecycle.js
 daydream.js
+legacy_shader_import.js
 driver.js
 effect_gui.js
 effect_sequencing.js
@@ -44,6 +45,7 @@ holosphere_wasm.wasm
 tools/lissajous.html
 tools/mobius.html
 tools/palettes.html
+tools/shader.html
 tools/solids.html
 tools/tools.css
 tools/tailwind.css

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<!--
+ Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
+ Licensed under the Polyform Noncommercial License 1.0.0
+-->
+<html lang="en" data-daydream-mode="shader-workbench">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'">
+  <title>Shader Workbench — Holosphere</title>
+  <link href="../favicon.svg" rel="icon" type="image/svg+xml">
+  <link rel="stylesheet" href="../vendor/fonts/fonts.css"
+    onerror="this.onerror=null;this.href='https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono&display=swap'">
+  <link href="../styles/index.css" rel="stylesheet">
+  <link href="tools.css" rel="stylesheet">
+  <link href="tailwind.css" rel="stylesheet">
+  <script src="../vendor-importmap.js"></script>
+</head>
+
+<body>
+  <h1 class="visually-hidden">Holosphere Shader authoring workbench</h1>
+  <div id="layout-container" class="layout-container">
+    <nav class="nav-tabs" aria-label="Shader workbench navigation">
+      <strong class="nav-label">Shader Workbench</strong>
+      <a href="../index.html" class="tab">Simulator</a>
+      <a href="palettes.html" target="_blank" rel="noopener" class="tab">Palettes <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
+      <div id="global-stats-desktop">
+        <table class="global-stats global-stats--desktop">
+          <caption class="visually-hidden">Engine memory and compute</caption>
+          <thead>
+            <tr class="stats-head"><th scope="col">Scratch A KB</th><th scope="col">Scratch B KB</th><th scope="col">Persistent KB</th><th scope="col">Stack KB</th><th scope="col">Compute</th></tr>
+          </thead>
+          <tbody>
+            <tr><td id="stat-scratch-a"></td><td id="stat-scratch-b"></td><td id="stat-persistent"></td><td id="stat-stack"></td><td id="perf-stats" class="perf-time"></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </nav>
+    <main class="main-area">
+      <div id="stats-bar" class="stats-bar">
+        <table class="global-stats global-stats--mobile">
+          <caption class="visually-hidden">Engine memory and compute</caption>
+          <thead>
+            <tr class="stats-head"><th scope="col">Scratch A</th><th scope="col">Scratch B</th><th scope="col">Persistent</th><th scope="col">Stack</th><th scope="col">Compute</th></tr>
+          </thead>
+          <tbody>
+            <tr><td id="stat-scratch-a-m"></td><td id="stat-scratch-b-m"></td><td id="stat-persistent-m"></td><td id="stat-stack-m"></td><td id="perf-stats-mobile" class="perf-time"></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="canvas-container" class="canvas-container">
+        <div id="loading-overlay" class="loading-overlay" role="status"><div class="spinner"></div><span>Loading Shader workbench…</span></div>
+        <div id="segment-stats" class="segment-stats" style="display:none;"></div>
+        <div id="apply-notice" class="apply-notice" role="alert">
+          <div id="apply-notice-body" class="apply-notice-body" hidden><span id="apply-notice-text"></span><button id="apply-notice-dismiss" class="apply-notice-dismiss" type="button" aria-label="Dismiss message">&times;</button></div>
+        </div>
+        <canvas id="canvas" tabindex="0" role="application" aria-label="Real-time preview of the authored Shader document"></canvas>
+      </div>
+    </main>
+    <div id="gui-container" class="gui-container"></div>
+  </div>
+  <script type="module" src="../main.js"></script>
+</body>
+
+</html>

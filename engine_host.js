@@ -20,6 +20,7 @@ export class EngineHost {
    *   display aliases (kept out of this module so it stays DOM/Three-free).
    */
   constructor(onViewRefreshed = () => {}) {
+    /** @type {Object|null} */
     this.module = null;
     /** @type {HolosphereEngine|null} */
     this.engine = null;

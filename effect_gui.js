@@ -217,6 +217,38 @@ export function facetGridStageAssignments(params) {
     [parameter.name, FACET_GRID_STAGE_BY_PARAMETER.get(parameter.name)]));
 }
 
+/**
+ * @param {Array<Object>} params - Fixed Shader parameter definitions.
+ * @returns {Map<string, string>|null} Parameter name to fixed pipeline stage.
+ */
+export function fixedShaderStageAssignments(params) {
+  const names = new Set(params.map((parameter) => parameter.name));
+  if (!names.has('Camera Wander') || !names.has('Palette Chroma')
+      || !names.has('Mapping Frequency') || isShaderBallSchema(params)) {
+    return null;
+  }
+  const stageFor = (name) => {
+    if (name === 'Camera Wander') return 'Camera';
+    if (name.startsWith('Surface Noise ')) return 'Surface Noise';
+    if (name === 'Projection Spin Speed' || name === 'Projection Wander') {
+      return 'Projection Frame';
+    }
+    if (/^(Pole Fade|Central Meridian|Projection |Peirce |Bonne |Gnomonic )/.test(name)) {
+      return 'Projection';
+    }
+    if (name.startsWith('Planar Warp 1 ')) return 'Planar Warp 1';
+    if (name.startsWith('Planar Warp 2 ')) return 'Planar Warp 2';
+    if (name.startsWith('Mobius ')) return 'Lens';
+    if (/^(Iso |Band )/.test(name)) return 'Value Transfer';
+    if (/^(Edge Fade|Cutout )/.test(name)) return 'Coverage';
+    if (/^(Pattern|Speed$|Source |Complexity|Drift|Lattice )/.test(name)) {
+      return 'Function';
+    }
+    return 'Colorize';
+  };
+  return new Map(params.map((parameter) => [parameter.name, stageFor(parameter.name)]));
+}
+
 function shaderBallControlLabel(stage, name) {
   if (SHADERBALL_STAGE_BOUNDARIES.has(name)) {
     if (stage === 'Colorize') return 'Palette';
@@ -917,12 +949,15 @@ export function createEffectGui({
     const shaderBallAssignments = shaderBallStageAssignments(params);
     const curlLatticeAssignments = curlLatticeStageAssignments(params);
     const facetGridAssignments = facetGridStageAssignments(params);
+    const fixedShaderAssignments = fixedShaderStageAssignments(params);
     const stageAssignments = shaderBallAssignments ?? curlLatticeAssignments
-      ?? facetGridAssignments;
+      ?? facetGridAssignments ?? fixedShaderAssignments;
     const stageOrder = shaderBallAssignments
       ? SHADERBALL_STAGE_ORDER
       : curlLatticeAssignments ? CURL_LATTICE_STAGE_ORDER
-      : facetGridAssignments ? FACET_GRID_STAGE_ORDER : [];
+      : facetGridAssignments ? FACET_GRID_STAGE_ORDER
+      : fixedShaderAssignments ? SHADERBALL_STAGE_ORDER.filter((stage) =>
+        new Set(fixedShaderAssignments.values()).has(stage)) : [];
     const stageFolders = new Map();
     if (stageAssignments) {
       for (const stage of stageOrder) {
