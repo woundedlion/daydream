@@ -92,9 +92,25 @@ export function engineParameterName(parameterId) {
 /** @param {string} parameterId */
 function engineParameterNames(parameterId) {
   const primary = engineParameterName(parameterId);
+  const fixedAliases = /** @type {Record<string, string[]>} */ ({
+    'edge-width': ['Edge Width'],
+    'iso-level': ['Iso Level'],
+    'iso-width': ['Iso Width'],
+    'mirror-speed': ['Planar Warp 2 Speed'],
+    'mirror-rotation': ['Planar Warp 2 Rotation', 'Mirror Rotation'],
+    'mirror-cell-x': ['Planar Warp 2 Cell X', 'Mirror Cell X'],
+    'mirror-cell-y': ['Planar Warp 2 Cell Y', 'Mirror Cell Y'],
+    'mirror-offset-x': ['Planar Warp 2 Offset X', 'Mirror Offset X'],
+    'mirror-offset-y': ['Planar Warp 2 Offset Y', 'Mirror Offset Y'],
+  });
+  if (fixedAliases[parameterId]) return [primary, ...fixedAliases[parameterId]];
   const warp = parameterId.match(/^(outer|inner)-(.+)$/u);
   if (!warp) return [primary];
   const suffix = titleWords(warp[2]);
+  if (['Rotation Rate', 'Translation X', 'Translation Y', 'Scale X', 'Scale Y', 'Shear']
+      .includes(suffix)) return [primary, `Affine ${suffix}`];
+  if (['Radial Scale', 'Radial Phase', 'Angular Phase'].includes(suffix))
+    return [primary, `Polar ${suffix}`];
   if (['Rotation', 'Cell X', 'Cell Y', 'Offset X', 'Offset Y'].includes(suffix))
     return [primary, `Mirror ${suffix}`];
   if (['Strength', 'Frequency', 'Field Angle', 'Scale', 'Vector Angle'].includes(suffix))
@@ -136,6 +152,16 @@ function applyDocumentValues(engine, compiled, presetId) {
     if (!name || !writeEngineValue(engine, definitions, name, value)) return false;
   }
   return true;
+}
+
+/** Applies one authored preset to a matching concrete fixed-pipeline effect. */
+export function applyFixedShaderDocument(engine, compiled, presetId,
+                                         referencePresetIds) {
+  const referenceId = referencePresetIds.includes(presetId)
+    ? presetId : referencePresetIds[0];
+  return typeof referenceId === 'string'
+    && engine.selectPresetById?.(referenceId) === true
+    && applyDocumentValues(engine, compiled, presetId);
 }
 
 /** Applies a linear six-role document to the dynamic Shader evaluator. */
@@ -257,10 +283,8 @@ export function createShaderDocumentController({
     if (!engine || !active) return false;
     let applied;
     if (active.fixed) {
-      const referenceId = active.referencePresetIds.includes(presetId)
-        ? presetId : active.referencePresetIds[0];
-      applied = engine.selectPresetById?.(referenceId) === true
-        && applyDocumentValues(engine, active.compiled, presetId);
+      applied = applyFixedShaderDocument(
+        engine, active.compiled, presetId, active.referencePresetIds);
     } else applied = applyDynamicShaderDocument(engine, active.compiled, presetId);
     if (!applied) return false;
     syncEffectGui();
