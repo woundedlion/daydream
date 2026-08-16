@@ -2415,13 +2415,13 @@ test('snapshotParams() is empty when no engine is bound', () => {
   assert.deepEqual(c.snapshotParams(), []);
 });
 
-test('ShaderBall rebuild state uses the exhaustive full-config snapshot', () => {
+test('Shader rebuild state uses the exhaustive full-config snapshot', () => {
   const snapshot = {
     schemaVersion: 2,
     accepted: [1, 2, 3], requested: [1, 9, 3], pendingFieldIds: [1],
     hasRuntime: true, runtime: [0.25],
   };
-  const c = makeController({ effect: 'ShaderBall' });
+  const c = makeController({ effect: 'Shader' });
   c.getWasmEngine = () => ({
     getFullConfigSnapshot: () => snapshot,
     getParameterDefinitions: () => {
@@ -2431,8 +2431,21 @@ test('ShaderBall rebuild state uses the exhaustive full-config snapshot', () => 
   assert.deepEqual(c.snapshotEffectState(), { fullConfigSnapshot: snapshot });
 });
 
-test('ShaderBall falls back to params until the snapshot API is installed', () => {
-  const c = makeController({ effect: 'ShaderBall' });
+test('an effect outside the Shader workbench rebuilds from its params', () => {
+  const c = makeController({ effect: 'signal-weave' });
+  c.getWasmEngine = () => ({
+    ...fakeEngine([{ name: 'Speed', value: 0.5 }]),
+    getFullConfigSnapshot: () => {
+      throw new Error('the full-config path is Shader-only');
+    },
+  });
+  assert.deepEqual(c.snapshotEffectState(), {
+    params: [{ name: 'Speed', value: 0.5, acceptedValue: 0.5 }],
+  });
+});
+
+test('Shader falls back to params until the snapshot API is installed', () => {
+  const c = makeController({ effect: 'Shader' });
   c.getWasmEngine = () => fakeEngine([{ name: 'Speed', value: 0.5 }]);
   assert.deepEqual(c.snapshotEffectState(), {
     params: [{ name: 'Speed', value: 0.5, acceptedValue: 0.5 }],

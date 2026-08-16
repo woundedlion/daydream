@@ -986,14 +986,14 @@ export class SegmentController {
   }
 
   /**
-   * Capture the rebuild state for the active effect. ShaderBall owns a complete
+   * Capture the rebuild state for the active effect. Shader owns a complete
    * versioned snapshot; all other effects retain the parameter-list protocol.
    * @returns {{params?: import('./worker_protocol.js').SegParam[],
    *   fullConfigSnapshot?: import('./worker_protocol.js').FullConfigSnapshot}}
    */
   snapshotEffectState() {
     const engine = this.getWasmEngine();
-    if (this.appState.get('effect') === 'ShaderBall'
+    if (this.appState.get('effect') === 'Shader'
         && typeof engine?.getFullConfigSnapshot === 'function') {
       const snapshot = engine.getFullConfigSnapshot();
       if (snapshot) return { fullConfigSnapshot: snapshot };
