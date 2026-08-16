@@ -52,6 +52,14 @@ export const SHADERBALL_STAGE_ORDER = [
   'Coverage',
   'Colorize',
 ];
+export const CURL_LATTICE_STAGE_ORDER = [
+  'Camera',
+  'Surface Noise',
+  'Projection Frame',
+  'Projection',
+  'Function',
+  'Colorize',
+];
 const SHADERBALL_STAGE_BOUNDARIES = new Map([
   ['Function', 'Function'],
   ['Projection', 'Projection'],
@@ -70,6 +78,31 @@ const SHADERBALL_SIGNATURE = [
   'Function', 'Projection', 'Lens', 'Planar Warp 1', 'Planar Warp 2',
   'Signal Weight', 'Value Transfer', 'Coverage', 'Palette',
 ];
+const CURL_LATTICE_STAGE_BY_PARAMETER = new Map([
+  ['Camera Wander', 'Camera'],
+  ['Surface Noise Scale', 'Surface Noise'],
+  ['Surface Noise Strength', 'Surface Noise'],
+  ['Surface Noise Speed', 'Surface Noise'],
+  ['Projection Spin Speed', 'Projection Frame'],
+  ['Projection Wander', 'Projection Frame'],
+  ['Pole Fade', 'Projection'],
+  ['Central Meridian', 'Projection'],
+  ['Lattice Cell Scale', 'Function'],
+  ['Lattice Shape', 'Function'],
+  ['Lattice Softness', 'Function'],
+  ['Lattice Radius', 'Function'],
+  ['Palette Chroma', 'Colorize'],
+  ['Mapping Frequency', 'Colorize'],
+  ['Mapping Phase', 'Colorize'],
+  ['Phase Oscillation Depth', 'Colorize'],
+  ['Phase Oscillation Speed', 'Colorize'],
+  ['Brightness Depth', 'Colorize'],
+  ['Value Opacity Low', 'Colorize'],
+  ['Value Opacity High', 'Colorize'],
+  ['Hue Shift Amount', 'Colorize'],
+  ['Hue Noise Scale', 'Colorize'],
+  ['Hue Noise Speed', 'Colorize'],
+]);
 
 /**
  * @param {string} name - Canonical engine parameter name.
@@ -122,6 +155,19 @@ export function shaderBallStageAssignments(params) {
   return assignments;
 }
 
+/**
+ * @param {Array<Object>} params - Engine parameter definitions in stream order.
+ * @returns {Map<string, string>|null} Parameter name to fixed pipeline stage.
+ */
+export function curlLatticeStageAssignments(params) {
+  const names = new Set(params.map((parameter) => parameter.name));
+  if ([...CURL_LATTICE_STAGE_BY_PARAMETER.keys()].some((name) => !names.has(name))) {
+    return null;
+  }
+  return new Map(params.map((parameter) =>
+    [parameter.name, CURL_LATTICE_STAGE_BY_PARAMETER.get(parameter.name)]));
+}
+
 function shaderBallControlLabel(stage, name) {
   if (SHADERBALL_STAGE_BOUNDARIES.has(name)) {
     if (stage === 'Colorize') return 'Palette';
@@ -130,6 +176,9 @@ function shaderBallControlLabel(stage, name) {
   if (name.startsWith(`${stage} `)) return name.slice(stage.length + 1);
   if (stage === 'Projection Frame' && name.startsWith('Projection ')) {
     return name.slice('Projection '.length);
+  }
+  if (stage === 'Function' && name.startsWith('Lattice ')) {
+    return name.slice('Lattice '.length);
   }
   return name;
 }
@@ -809,10 +858,15 @@ export function createEffectGui({
     fx.controllerByName = new Map();
     fx.hasParams = params.length > 0;
     fx.hasEnumControls = false;
-    const stageAssignments = shaderBallStageAssignments(params);
+    const shaderBallAssignments = shaderBallStageAssignments(params);
+    const curlLatticeAssignments = curlLatticeStageAssignments(params);
+    const stageAssignments = shaderBallAssignments ?? curlLatticeAssignments;
+    const stageOrder = shaderBallAssignments
+      ? SHADERBALL_STAGE_ORDER
+      : curlLatticeAssignments ? CURL_LATTICE_STAGE_ORDER : [];
     const stageFolders = new Map();
     if (stageAssignments) {
-      for (const stage of SHADERBALL_STAGE_ORDER) {
+      for (const stage of stageOrder) {
         const addFolder = typeof fx.gui.addDisplayFolder === 'function'
           ? fx.gui.addDisplayFolder.bind(fx.gui)
           : fx.gui.addFolder.bind(fx.gui);

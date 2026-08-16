@@ -8,7 +8,9 @@ import {
   EXPORT_FAILED,
   FULL_CONFIG_STORAGE_KEY,
   FLASH_MS,
+  CURL_LATTICE_STAGE_ORDER,
   SHADERBALL_STAGE_ORDER,
+  curlLatticeStageAssignments,
   isShaderBallSchema,
   legacyShaderBallParamNames,
   shaderBallStageAssignments,
@@ -46,6 +48,34 @@ function shaderBallParams() {
     { name: 'Hue Shift Mode', ...ENUM },
     { name: 'Hue Shift Amount', value: 0, min: 0, max: 1, animated: true },
   ];
+}
+
+function curlLatticeParams() {
+  return [
+    'Lattice Cell Scale',
+    'Lattice Shape',
+    'Lattice Softness',
+    'Lattice Radius',
+    'Pole Fade',
+    'Central Meridian',
+    'Projection Spin Speed',
+    'Projection Wander',
+    'Camera Wander',
+    'Surface Noise Scale',
+    'Surface Noise Strength',
+    'Surface Noise Speed',
+    'Palette Chroma',
+    'Mapping Frequency',
+    'Mapping Phase',
+    'Phase Oscillation Depth',
+    'Phase Oscillation Speed',
+    'Brightness Depth',
+    'Value Opacity Low',
+    'Value Opacity High',
+    'Hue Shift Amount',
+    'Hue Noise Scale',
+    'Hue Noise Speed',
+  ].map((name) => ({ name, value: 0.5, min: 0, max: 1, animated: true }));
 }
 
 /**
@@ -499,6 +529,32 @@ test('ShaderBall builds one URL-transparent bank for every pipeline stage', () =
   assert.equal(h.gui().ctrl('Palette').folder, 'Colorize');
   assert.equal(h.gui().ctrl('Palette').label, 'Palette');
   assert.equal(h.gui().ctrl('Hue Shift Mode').folder, 'Colorize');
+});
+
+test('CurlLattice controls retain the fixed pipeline stage folders', () => {
+  const params = curlLatticeParams();
+  const assignments = curlLatticeStageAssignments(params);
+  const h = makeHarness({
+    params,
+    engineValues: params.map((parameter) => parameter.value),
+  });
+
+  h.panel.build();
+
+  assert.deepEqual([...new Set(assignments.values())].sort(),
+    [...CURL_LATTICE_STAGE_ORDER].sort());
+  assert.deepEqual(h.gui().folders.map((folder) => folder.name),
+    CURL_LATTICE_STAGE_ORDER);
+  assert.equal(h.gui().ctrl('Camera Wander').folder, 'Camera');
+  assert.equal(h.gui().ctrl('Camera Wander').label, 'Wander');
+  assert.equal(h.gui().ctrl('Surface Noise Strength').folder, 'Surface Noise');
+  assert.equal(h.gui().ctrl('Surface Noise Strength').label, 'Strength');
+  assert.equal(h.gui().ctrl('Projection Spin Speed').folder, 'Projection Frame');
+  assert.equal(h.gui().ctrl('Projection Spin Speed').label, 'Spin Speed');
+  assert.equal(h.gui().ctrl('Central Meridian').folder, 'Projection');
+  assert.equal(h.gui().ctrl('Lattice Cell Scale').folder, 'Function');
+  assert.equal(h.gui().ctrl('Lattice Cell Scale').label, 'Cell Scale');
+  assert.equal(h.gui().ctrl('Hue Noise Speed').folder, 'Colorize');
 });
 
 test('renamed ShaderBall controls accept every legacy deep-link name', () => {
