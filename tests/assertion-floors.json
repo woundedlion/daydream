@@ -36,16 +36,16 @@
     "assertions": 20
   },
   "tests/driver.test.js": {
-    "cases": 67,
-    "assertions": 542
+    "cases": 69,
+    "assertions": 546
   },
   "tests/driver_clock.test.js": {
     "cases": 4,
     "assertions": 10
   },
   "tests/effect_gui.test.js": {
-    "cases": 96,
-    "assertions": 339
+    "cases": 97,
+    "assertions": 346
   },
   "tests/effect_sequencing.test.js": {
     "cases": 47,
@@ -263,6 +263,6 @@
   },
   "tests/wasm_provenance.test.js": {
     "cases": 10,
-    "assertions": 30
+    "assertions": 29
   }
 }
