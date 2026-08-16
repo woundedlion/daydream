@@ -294,6 +294,11 @@ export function fixedShaderStageAssignments(params) {
       || !names.has('Mapping Frequency') || isShaderBallSchema(params)) {
     return null;
   }
+  const hasGenericWarp = [...names].some((name) => name.startsWith('Warp '));
+  const mirrorStage = hasGenericWarp || names.has('Planar Warp 2 Speed')
+    ? 'Planar Warp 2' : 'Planar Warp 1';
+  const warpStage = [...names].some((name) => name.startsWith('Polar '))
+    ? 'Planar Warp 2' : 'Planar Warp 1';
   const stageFor = (name) => {
     if (name === 'Camera Wander') return 'Camera';
     if (name.startsWith('Surface Noise ')) return 'Surface Noise';
@@ -305,6 +310,11 @@ export function fixedShaderStageAssignments(params) {
     }
     if (name.startsWith('Planar Warp 1 ')) return 'Planar Warp 1';
     if (name.startsWith('Planar Warp 2 ')) return 'Planar Warp 2';
+    if (name.startsWith('Mirror ')) return mirrorStage;
+    if (name.startsWith('Warp ')) return warpStage;
+    if (name.startsWith('Affine ') || name.startsWith('Polar ')) {
+      return 'Planar Warp 1';
+    }
     if (name.startsWith('Mobius ')) return 'Lens';
     if (/^(Iso |Band )/.test(name)) return 'Value Transfer';
     if (/^(Edge(?: Fade)?|Cutout )/.test(name)) return 'Coverage';
