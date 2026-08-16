@@ -28,6 +28,25 @@ const REFRESHED_EXTENSIONS = ['.js', '.wasm'];
 const RESOURCE_TIMING_ENTRIES = 1000;
 
 /**
+ * Read a re-fetched response to the end of its body.
+ * @param {Response} response Re-fetch response.
+ * @returns {Promise<void>} Resolves once the body has been read.
+ * @details fetch settles on the headers; a response whose body is never read is
+ *   aborted when it is collected, leaving the stale cache entry in place.
+ */
+async function drainBody(response) {
+  const reader = response?.body?.getReader?.();
+  if (!reader) {
+    await response?.arrayBuffer?.();
+    return;
+  }
+  for (;;) {
+    const { done } = await reader.read();
+    if (done) return;
+  }
+}
+
+/**
  * Re-fetch every same-origin module the page has already loaded, bypassing the
  * HTTP cache and replacing each cache entry with the server's current copy.
  * A plain reload only revalidates the top-level document, so a module held in
@@ -35,7 +54,8 @@ const RESOURCE_TIMING_ENTRIES = 1000;
  * its freshly fetched importers.
  * @param {{performance?: Performance, fetch?: typeof globalThis.fetch,
  *   origin?: string}} [dependencies]
- * @returns {Promise<void>} Resolves once every re-fetch has settled.
+ * @returns {Promise<void>} Resolves once every re-fetch has been read to the end
+ *   of its body and the cache entry it replaces is written.
  */
 export async function refreshModuleCache({
   performance: timeline = globalThis.performance,
@@ -49,8 +69,8 @@ export async function refreshModuleCache({
     const path = name.split(/[?#]/)[0];
     if (REFRESHED_EXTENSIONS.some((ext) => path.endsWith(ext))) modules.add(name);
   }
-  await Promise.allSettled(
-    Array.from(modules, (url) => fetchResource(url, { cache: 'reload' })));
+  await Promise.allSettled(Array.from(modules, async (url) =>
+    drainBody(await fetchResource(url, { cache: 'reload' }))));
 }
 
 /**
