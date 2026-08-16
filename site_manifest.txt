@@ -47,6 +47,7 @@ tools/mobius.html
 tools/palettes.html
 tools/shader.html
 tools/shader.css
+tools/shader_documents.js
 tools/shader_workbench_nav.js
 tools/solids.html
 tools/tools.css

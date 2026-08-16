@@ -130,7 +130,9 @@ export interface HolosphereEngine {
   getAnimationsPaused(): boolean;
   getPresetCount(): number;
   getPresetIndex(): number;
+  getPresetIds(): string[];
   selectPreset(index: number): boolean;
+  selectPresetById(id: string): boolean;
   /** Adopts an index a segment worker already advanced to, without engaging the animation pause. */
   synchronizePreset(index: number): boolean;
   nextPreset(): boolean;
