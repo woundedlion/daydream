@@ -154,7 +154,13 @@ function applyDocumentValues(engine, compiled, presetId) {
   return true;
 }
 
-/** Applies one authored preset to a matching concrete fixed-pipeline effect. */
+/**
+ * Applies one authored preset to a matching concrete fixed-pipeline effect.
+ * @param {*} engine
+ * @param {CompiledDocument} compiled
+ * @param {string} presetId
+ * @param {string[]} referencePresetIds
+ */
 export function applyFixedShaderDocument(engine, compiled, presetId,
                                          referencePresetIds) {
   const referenceId = referencePresetIds.includes(presetId)
