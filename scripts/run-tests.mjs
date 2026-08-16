@@ -65,11 +65,10 @@ if (!args.some((a) => !a.startsWith('-'))) {
 }
 
 // node:test retallies cases across majors, so floors measured on one major are
-// not reproducible on another: a re-measurement here reds CI on files nobody
-// touched. Only the write is gated — a plain run on another major is the
-// developer's own business — and only inside a checkout of this repository,
-// since this script's own fixture repos carry floors with no pin behind them.
-if (updating && existsSync(NODE_PIN_PATH)) {
+// not reproducible on another. Plain runs re-exec under the exact CI pin;
+// re-measurements must start there so the process writing the floors is explicit.
+// Fixture repos carry no workflow pin and continue under their invoking Node.
+if (existsSync(NODE_PIN_PATH)) {
   const pin = readFileSync(NODE_PIN_PATH, 'utf8').match(/node-version: *'([\d.]+)'/)?.[1];
   if (!pin) {
     console.error(
@@ -80,12 +79,33 @@ if (updating && existsSync(NODE_PIN_PATH)) {
   }
   const [pinMajor] = pin.split('.');
   const [runningMajor] = process.versions.node.split('.');
-  if (runningMajor !== pinMajor) {
+  if (updating && runningMajor !== pinMajor) {
     console.error(
       `run-tests: ${UPDATE_FLAG} must run on Node ${pinMajor}.x — CI measures the ` +
         `floors on ${pin}, and this is v${process.versions.node}.`,
     );
     process.exit(1);
+  }
+  if (runningMajor !== pinMajor) {
+    console.error(
+      `run-tests: Node v${process.versions.node} cannot reproduce the CI floors; ` +
+        `re-running with Node ${pin}.`,
+    );
+    const npxArgs = ['--yes', `node@${pin}`, process.argv[1], ...argv];
+    const command = process.platform === 'win32'
+      ? (process.env.ComSpec ?? 'cmd.exe')
+      : 'npx';
+    const commandArgs = process.platform === 'win32'
+      ? ['/d', '/s', '/c', 'npx.cmd', ...npxArgs]
+      : npxArgs;
+    const rerun = spawnSync(command, commandArgs, { stdio: 'inherit' });
+    if (rerun.error) {
+      console.error(
+        `run-tests: could not start Node ${pin} through npx (${rerun.error.message}).`,
+      );
+      process.exit(1);
+    }
+    process.exit(rerun.status ?? 1);
   }
 }
 
