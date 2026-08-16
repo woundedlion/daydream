@@ -14,6 +14,7 @@ import {
   curlLatticeStageAssignments,
   facetGridStageAssignments,
   fixedShaderStageAssignments,
+  fixedShaderStageTitles,
   isShaderBallSchema,
   legacyShaderBallParamNames,
   shaderBallStageAssignments,
@@ -110,6 +111,27 @@ function facetGridParams() {
     'Hue Noise Scale',
     'Hue Noise Speed',
   ].map((name) => ({ name, value: 0.5, min: 0, max: 1, animated: true }));
+}
+
+function fixedShaderConfig(overrides = {}) {
+  const values = new Map([
+    ['slots.function', 5],
+    ['slots.projection', 2],
+    ['slots.projection_frame', 1],
+    ['slots.surface_noise', 0],
+    ['slots.surface_lens', 0],
+    ['slots.warp_program.outer.kind', 2],
+    ['slots.warp_program.inner.kind', 0],
+    ['slots.signal_weight', 1],
+    ['slots.value_transfer', 0],
+    ['slots.coverage', 3],
+    ['slots.palette', 0],
+  ]);
+  for (const [name, value] of Object.entries(overrides)) values.set(name, value);
+  return {
+    fields: [...values.keys()].map((name, id) => ({ name, id })),
+    snapshot: { accepted: [...values.values()] },
+  };
 }
 
 /**
@@ -358,6 +380,7 @@ function makeHarness({
   presetSyncAccepted = true,
   fullConfig = false,
   fullConfigSnapshot = null,
+  fullConfigFieldDefinitions = null,
   restoreFullConfigAccepted = true,
   configImportNotice = '',
 } = {}) {
@@ -374,6 +397,7 @@ function makeHarness({
     presetIndex,
     hostPresetIndex: presetIndex,
     fullConfigSnapshot,
+    fullConfigFieldDefinitions,
   };
   const writes = [];
   const warnings = [];
@@ -442,6 +466,7 @@ function makeHarness({
     copyText: state.copyText,
     usesFullConfigSnapshot: () => fullConfig,
     getFullConfigSnapshot: () => state.fullConfigSnapshot,
+    getFullConfigFieldDefinitions: () => state.fullConfigFieldDefinitions,
     restoreFullConfigSnapshot: (snapshot) => {
       restoredFullConfigs.push(snapshot);
       return restoreFullConfigAccepted ? 'APPLIED' : 'INVALID_VALUE';
@@ -565,7 +590,7 @@ test('ShaderBall builds one URL-transparent bank for every pipeline stage', () =
   assert.equal(h.gui().ctrl('Hue Shift Mode').folder, 'Colorize');
 });
 
-test('CurlLattice controls retain the fixed pipeline stage folders', () => {
+test('CurlLattice controls use the fixed pipeline modes as folders', () => {
   const params = curlLatticeParams();
   const assignments = curlLatticeStageAssignments(params);
   const h = makeHarness({
@@ -578,20 +603,21 @@ test('CurlLattice controls retain the fixed pipeline stage folders', () => {
   assert.deepEqual([...new Set(assignments.values())].sort(),
     [...CURL_LATTICE_STAGE_ORDER].sort());
   assert.deepEqual(h.gui().folders.map((folder) => folder.name),
-    CURL_LATTICE_STAGE_ORDER);
+    ['Camera', 'Curl', 'Spin + Wander', 'Folded Sinusoidal',
+      'Primitive Lattice', 'Generated Triadic']);
   assert.equal(h.gui().ctrl('Camera Wander').folder, 'Camera');
   assert.equal(h.gui().ctrl('Camera Wander').label, 'Wander');
-  assert.equal(h.gui().ctrl('Surface Noise Strength').folder, 'Surface Noise');
+  assert.equal(h.gui().ctrl('Surface Noise Strength').folder, 'Curl');
   assert.equal(h.gui().ctrl('Surface Noise Strength').label, 'Strength');
-  assert.equal(h.gui().ctrl('Projection Spin Speed').folder, 'Projection Frame');
+  assert.equal(h.gui().ctrl('Projection Spin Speed').folder, 'Spin + Wander');
   assert.equal(h.gui().ctrl('Projection Spin Speed').label, 'Spin Speed');
-  assert.equal(h.gui().ctrl('Central Meridian').folder, 'Projection');
-  assert.equal(h.gui().ctrl('Lattice Cell Scale').folder, 'Function');
+  assert.equal(h.gui().ctrl('Central Meridian').folder, 'Folded Sinusoidal');
+  assert.equal(h.gui().ctrl('Lattice Cell Scale').folder, 'Primitive Lattice');
   assert.equal(h.gui().ctrl('Lattice Cell Scale').label, 'Cell Scale');
-  assert.equal(h.gui().ctrl('Hue Noise Speed').folder, 'Colorize');
+  assert.equal(h.gui().ctrl('Hue Noise Speed').folder, 'Generated Triadic');
 });
 
-test('FacetGrid controls retain the fixed pipeline stage folders', () => {
+test('FacetGrid controls use the fixed pipeline modes as folders', () => {
   const params = facetGridParams();
   const assignments = facetGridStageAssignments(params);
   const h = makeHarness({
@@ -604,30 +630,75 @@ test('FacetGrid controls retain the fixed pipeline stage folders', () => {
   assert.deepEqual([...new Set(assignments.values())].sort(),
     [...FACET_GRID_STAGE_ORDER].sort());
   assert.deepEqual(h.gui().folders.map((folder) => folder.name),
-    FACET_GRID_STAGE_ORDER);
+    ['Camera', 'Spin + Wander', 'Stereographic', 'Mirror Tile', 'Grid',
+      'Generated Analogous']);
   assert.equal(h.gui().ctrl('Camera Wander').folder, 'Camera');
-  assert.equal(h.gui().ctrl('Projection Spin Speed').folder, 'Projection Frame');
-  assert.equal(h.gui().ctrl('Pole Fade').folder, 'Projection');
-  assert.equal(h.gui().ctrl('Planar Warp 2 Cell Y').folder, 'Planar Warp 2');
+  assert.equal(h.gui().ctrl('Projection Spin Speed').folder, 'Spin + Wander');
+  assert.equal(h.gui().ctrl('Pole Fade').folder, 'Stereographic');
+  assert.equal(h.gui().ctrl('Planar Warp 2 Cell Y').folder, 'Mirror Tile');
   assert.equal(h.gui().ctrl('Planar Warp 2 Cell Y').label, 'Cell Y');
-  assert.equal(h.gui().ctrl('Pattern Mix').folder, 'Function');
-  assert.equal(h.gui().ctrl('Hue Noise Speed').folder, 'Colorize');
+  assert.equal(h.gui().ctrl('Pattern Mix').folder, 'Grid');
+  assert.equal(h.gui().ctrl('Hue Noise Speed').folder, 'Generated Analogous');
 });
 
-test('promoted Shader controls derive folders from their fixed stage names', () => {
+test('promoted Shader controls use their accepted structural modes as folders', () => {
   const params = [
     'Camera Wander', 'Projection Spin Speed', 'Pole Fade',
-    'Planar Warp 1 Strength', 'Pattern Freq', 'Edge Fade Width',
+    'Planar Warp 1 Translation X', 'Pattern Freq', 'Edge Fade Width',
     'Palette Chroma', 'Mapping Frequency',
   ].map((name) => ({ name }));
   const assignments = fixedShaderStageAssignments(params);
+  const { snapshot, fields } = fixedShaderConfig();
+  const titles = fixedShaderStageTitles(snapshot, fields);
+  const h = makeHarness({
+    params,
+    engineValues: params.map(() => 0),
+    fullConfigSnapshot: snapshot,
+    fullConfigFieldDefinitions: fields,
+  });
+
+  h.panel.build();
+
   assert.equal(assignments.get('Camera Wander'), 'Camera');
   assert.equal(assignments.get('Projection Spin Speed'), 'Projection Frame');
   assert.equal(assignments.get('Pole Fade'), 'Projection');
-  assert.equal(assignments.get('Planar Warp 1 Strength'), 'Planar Warp 1');
+  assert.equal(assignments.get('Planar Warp 1 Translation X'), 'Planar Warp 1');
   assert.equal(assignments.get('Pattern Freq'), 'Function');
   assert.equal(assignments.get('Edge Fade Width'), 'Coverage');
   assert.equal(assignments.get('Palette Chroma'), 'Colorize');
+  assert.equal(titles.get('Planar Warp 1'), 'Affine Transform');
+  assert.deepEqual(h.gui().folders.map((folder) => folder.name),
+    ['Camera', 'Spin + Wander', 'Gnomonic', 'Affine Transform',
+      'Primitive Lattice', 'Edge Fade', 'Generated Triadic']);
+  assert.equal(h.gui().ctrl('Planar Warp 1 Translation X').label,
+    'Translation X');
+});
+
+test('a promoted Shader snapshot outranks a matching dedicated-effect schema', () => {
+  const params = [...facetGridParams(), {
+    name: 'Central Meridian', value: 0.5, min: 0, max: 1, animated: true,
+  }];
+  const { snapshot, fields } = fixedShaderConfig({
+    'slots.function': 3,
+    'slots.projection': 6,
+    'slots.warp_program.outer.kind': 0,
+    'slots.warp_program.inner.kind': 7,
+    'slots.coverage': 1,
+    'slots.palette': 2,
+  });
+  const h = makeHarness({
+    params,
+    engineValues: params.map(() => 0),
+    fullConfigSnapshot: snapshot,
+    fullConfigFieldDefinitions: fields,
+  });
+
+  h.panel.build();
+
+  assert.equal(h.gui().ctrl('Central Meridian').folder, 'Equirectangular');
+  assert.equal(h.gui().ctrl('Planar Warp 2 Cell Y').folder, 'Mirror Tile');
+  assert.equal(h.gui().ctrl('Pattern Mix').folder, 'Grid');
+  assert.equal(h.gui().ctrl('Hue Noise Speed').folder, 'Generated Analogous');
 });
 
 test('renamed ShaderBall controls accept every legacy deep-link name', () => {

@@ -568,6 +568,8 @@ export function start({
     copyText: copyToClipboard,
     usesFullConfigSnapshot,
     getFullConfigSnapshot: () => host.engine.getFullConfigSnapshot(),
+    getFullConfigFieldDefinitions: () =>
+      host.engine.getFullConfigFieldDefinitions(),
     restoreFullConfigSnapshot: (snapshot) => enumConstantName(
       host.module.FullConfigRestoreResult,
       host.engine.restoreFullConfigSnapshot(snapshot)),
