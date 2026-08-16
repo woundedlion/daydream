@@ -124,23 +124,46 @@ function optionIndex(definition, label) {
   return definition.options?.findIndex((option) => option.toLowerCase() === wanted) ?? -1;
 }
 
-/** @param {*} engine @param {ParameterDefinition[]} definitions @param {string} name @param {*} value */
-function writeEngineValue(engine, definitions, name, value) {
+/** @param {*} module @param {*} result */
+function paramSetResultName(module, result) {
+  return Object.keys(module.ParamSetResult)
+    .find((name) => module.ParamSetResult[name] === result) ?? 'unrecognized result';
+}
+
+/**
+ * Writes one engine parameter.
+ * @param {*} engine
+ * @param {*} module - The loaded WASM module, for its ParamSetResult enum.
+ *   setParameter answers one of its values; every value is a truthy object, so
+ *   the outcome only reads as applied against APPLIED itself.
+ * @param {ParameterDefinition[]} definitions
+ * @param {string} name
+ * @param {*} value
+ * @returns {string|null} Refusal reason, or null once written.
+ */
+function writeEngineValue(engine, module, definitions, name, value) {
   const definition = definitions.find((candidate) => candidate.name === name);
-  if (!definition || definition.readonly) return false;
+  if (!definition) return `the engine has no parameter "${name}"`;
+  if (definition.readonly) return `"${name}" is read-only`;
   let stored = value;
   if (definition.options) {
     if (typeof value !== 'number') {
       const label = name === 'Palette Mapping' ? titleWords(String(value)) : value;
       stored = optionIndex(definition, label);
-      if (stored < 0) return false;
+      if (stored < 0) return `"${name}" has no option "${label}"`;
     }
   }
-  return engine.setParameter(name, stored) !== false;
+  const result = engine.setParameter(name, stored);
+  if (result === module.ParamSetResult.APPLIED) return null;
+  return `"${name}" was refused: ${paramSetResultName(module, result)}`;
 }
 
-/** @param {*} engine @param {CompiledDocument} compiled @param {string} presetId */
-function applyDocumentValues(engine, compiled, presetId) {
+/**
+ * @param {*} engine @param {*} module @param {CompiledDocument} compiled
+ * @param {string} presetId
+ * @returns {string|null} Refusal reason, or null once every value is written.
+ */
+function applyDocumentValues(engine, module, compiled, presetId) {
   const preset = compiled.document.preset_bank.presets
     .find((/** @type {*} */ candidate) => candidate.preset_id === presetId)
     ?? compiled.document.preset_bank.presets[0];
@@ -149,30 +172,39 @@ function applyDocumentValues(engine, compiled, presetId) {
     const name = engineParameterNames(parameterId)
       .find((candidate) => definitions.some(
         (/** @type {ParameterDefinition} */ definition) => definition.name === candidate));
-    if (!name || !writeEngineValue(engine, definitions, name, value)) return false;
+    if (!name) return `no engine parameter matches "${parameterId}"`;
+    const refusal = writeEngineValue(engine, module, definitions, name, value);
+    if (refusal) return refusal;
   }
-  return true;
+  return null;
 }
 
 /**
  * Applies one authored preset to a matching concrete fixed-pipeline effect.
  * @param {*} engine
+ * @param {*} module
  * @param {CompiledDocument} compiled
  * @param {string} presetId
  * @param {string[]} referencePresetIds
+ * @returns {string|null} Refusal reason, or null once applied.
  */
-export function applyFixedShaderDocument(engine, compiled, presetId,
+export function applyFixedShaderDocument(engine, module, compiled, presetId,
                                          referencePresetIds) {
   const referenceId = referencePresetIds.includes(presetId)
     ? presetId : referencePresetIds[0];
-  return typeof referenceId === 'string'
-    && engine.selectPresetById?.(referenceId) === true
-    && applyDocumentValues(engine, compiled, presetId);
+  if (typeof referenceId !== 'string') return 'the effect has no reference preset';
+  if (engine.selectPresetById?.(referenceId) !== true)
+    return `the engine refused reference preset "${referenceId}"`;
+  return applyDocumentValues(engine, module, compiled, presetId);
 }
 
-/** Applies a linear six-role document to the dynamic Shader evaluator. */
-/** @param {*} engine @param {CompiledDocument} compiled @param {string} presetId */
-export function applyDynamicShaderDocument(engine, compiled, presetId) {
+/**
+ * Applies a linear six-role document to the dynamic Shader evaluator.
+ * @param {*} engine @param {*} module @param {CompiledDocument} compiled
+ * @param {string} presetId
+ * @returns {string|null} Refusal reason, or null once applied.
+ */
+export function applyDynamicShaderDocument(engine, module, compiled, presetId) {
   const nodes = new Map(compiled.document.descriptor.graph.nodes
     .map((/** @type {*} */ node) => [node.role, node]));
   const surface = nodes.get('surface_project')?.policy ?? {};
@@ -200,9 +232,10 @@ export function applyDynamicShaderDocument(engine, compiled, presetId) {
     const label = options?.[policy];
     if (!label) continue;
     const definitions = engine.getParameterDefinitions();
-    if (!writeEngineValue(engine, definitions, name, label)) return false;
+    const refusal = writeEngineValue(engine, module, definitions, name, label);
+    if (refusal) return refusal;
   }
-  return applyDocumentValues(engine, compiled, presetId);
+  return applyDocumentValues(engine, module, compiled, presetId);
 }
 
 /** @param {CompiledDocument} compiled */
@@ -224,7 +257,8 @@ function defaultDownload(doc, filename, source) {
 
 /** Owns document import, validation, preview selection, and export UI. */
 /**
- * @param {{doc: Document, getEngine: () => *, selectEffect: (effect: string) => boolean,
+ * @param {{doc: Document, getEngine: () => *, getModule: () => *,
+ * selectEffect: (effect: string) => boolean,
  * syncEffectGui: () => void, invalidate: () => void,
  * fetchText?: (url: string) => Promise<string>, importCompiler?: () => Promise<*>,
  * download?: (filename: string, source: string) => void}} dependencies
@@ -232,6 +266,7 @@ function defaultDownload(doc, filename, source) {
 export function createShaderDocumentController({
   doc,
   getEngine,
+  getModule,
   selectEffect,
   syncEffectGui,
   invalidate,
@@ -286,13 +321,19 @@ export function createShaderDocumentController({
   /** @param {string} presetId */
   const applyPreset = (presetId) => {
     const engine = getEngine();
-    if (!engine || !active) return false;
-    let applied;
-    if (active.fixed) {
-      applied = applyFixedShaderDocument(
-        engine, active.compiled, presetId, active.referencePresetIds);
-    } else applied = applyDynamicShaderDocument(engine, active.compiled, presetId);
-    if (!applied) return false;
+    const module = getModule();
+    if (!engine || !module || !active) {
+      show('The preview engine is not ready.', true);
+      return false;
+    }
+    const refusal = active.fixed
+      ? applyFixedShaderDocument(
+        engine, module, active.compiled, presetId, active.referencePresetIds)
+      : applyDynamicShaderDocument(engine, module, active.compiled, presetId);
+    if (refusal) {
+      show(`Preset "${presetId}" could not be applied: ${refusal}`, true);
+      return false;
+    }
     syncEffectGui();
     invalidate();
     active.presetId = presetId;
@@ -326,11 +367,11 @@ export function createShaderDocumentController({
     populatePresets(compiled);
     saveButton.disabled = false;
     const presetId = compiled.document.preset_bank.presets[0]?.preset_id;
-    if (!presetId || !applyPreset(presetId)) {
-      show('The document is valid, but its preview could not be applied.', true);
+    if (!presetId) {
+      show('The document is valid, but it carries no preset to preview.', true);
       return false;
     }
-    return true;
+    return applyPreset(presetId);
   };
 
   const save = () => {
@@ -413,8 +454,7 @@ export function createShaderDocumentController({
     await loadSource(option.dataset.source ?? '', option.dataset.filename);
   });
   presetSelect.addEventListener('change', () => {
-    if (!applyPreset(presetSelect.value))
-      show(`Preset "${presetSelect.value}" could not be applied.`, true);
+    applyPreset(presetSelect.value);
   });
   openButton.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', async () => {

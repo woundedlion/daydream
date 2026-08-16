@@ -621,6 +621,7 @@ export function start({
   const shaderDocuments = shaderWorkbench ? createShaderDocumentController({
     doc,
     getEngine: () => host.engine,
+    getModule: () => host.module,
     selectEffect: (effect) => {
       appState.set('effect', effect);
       return appState.get('effect') === effect;
