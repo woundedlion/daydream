@@ -7,6 +7,10 @@ import {
   findWorkbenchFolder,
   revealWorkbenchFolder,
 } from '../tools/shader_workbench_nav.js';
+import {
+  applyDynamicShaderDocument,
+  engineParameterName,
+} from '../tools/shader_documents.js';
 
 const INDEX = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const WORKBENCH = readFileSync(new URL('../tools/shader.html', import.meta.url), 'utf8');
@@ -17,12 +21,67 @@ test('simulator exposes Shader as a standalone tool', () => {
   assert.match(WORKBENCH, /data-daydream-mode="shader-workbench"/);
   assert.match(WORKBENCH, /src="\.\.\/main\.js"/);
   assert.match(WORKBENCH, /id="shader-workbench-nav"/);
+  assert.match(WORKBENCH, /id="shader-document-select"/);
+  assert.match(WORKBENCH, /id="shader-preset-select"/);
+  assert.match(WORKBENCH, /id="shader-document-open"/);
+  assert.match(WORKBENCH, /id="shader-document-save"/);
   assert.match(WORKBENCH, /src="shader_workbench_nav\.js"/);
   assert.doesNotMatch(WORKBENCH, />Simulator<\/a>/);
   assert.doesNotMatch(WORKBENCH, /id="effect-sidebar"/);
   assert.match(WORKBENCH_CSS, /\.lil-controller\.lil-option option\s*\{/);
   assert.match(WORKBENCH_CSS, /color-scheme:\s*dark/);
   assert.match(WORKBENCH_CSS, /background-color:\s*var\(--background-color\)/);
+});
+
+test('document parameter IDs map to dynamic stage controls', () => {
+  assert.equal(engineParameterName('pattern-freq'), 'Pattern Freq');
+  assert.equal(engineParameterName('outer-cell-x'), 'Planar Warp 1 Cell X');
+  assert.equal(engineParameterName('inner-speed'), 'Planar Warp 2 Speed');
+  assert.equal(engineParameterName('edge-width'), 'Edge Fade Width');
+  assert.equal(engineParameterName('source-angle-speed'), 'Source Angle Speed');
+});
+
+test('dynamic document preview snaps structure before applying preset values', () => {
+  const definitions = [
+    { name: 'Function', options: ['Grid'] },
+    { name: 'Projection', options: ['Stereographic'] },
+    { name: 'Surface Noise', options: ['None'] },
+    { name: 'Lens', options: ['None'] },
+    { name: 'Planar Warp 1', options: ['None'] },
+    { name: 'Planar Warp 2', options: ['None'] },
+    { name: 'Signal Weight', options: ['Projection'] },
+    { name: 'Value Transfer', options: ['Linear'] },
+    { name: 'Coverage', options: ['Opaque'] },
+    { name: 'Palette', options: ['Generated Triadic'] },
+    { name: 'Hue Shift Mode', options: ['Noise'] },
+    { name: 'Brightness Envelope', options: ['None'] },
+    { name: 'Pattern Freq' },
+  ];
+  const writes = [];
+  const engine = {
+    getParameterDefinitions: () => definitions,
+    setParameter: (name, value) => { writes.push([name, value]); return true; },
+  };
+  const compiled = { document: {
+    descriptor: { graph: { nodes: [
+      { role: 'surface_project', policy: {
+        pre_lens_surface: 'identity', lens: 'identity', projection: 'stereographic',
+      } },
+      { role: 'planar_warp', policy: { sequence: ['identity', 'identity'] } },
+      { role: 'source', policy: { source: 'grid' } },
+      { role: 'material', policy: {
+        weight: 'projection', transfer: 'linear', coverage: 'opaque',
+      } },
+      { role: 'color', policy: {
+        color: 'generated-palette', hue_mode: 'noise', brightness_envelope: 'none',
+      } },
+    ] } },
+    preset_bank: { presets: [{ preset_id: 'study', values: { 'pattern-freq': 3.5 } }] },
+  } };
+
+  assert.equal(applyDynamicShaderDocument(engine, compiled, 'study'), true);
+  assert.deepEqual(writes.at(-1), ['Pattern Freq', 3.5]);
+  assert.equal(writes.find(([name]) => name === 'Function')?.[1], 0);
 });
 
 test('stage navigation opens and reveals the selected GUI folder', () => {

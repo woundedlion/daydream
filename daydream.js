@@ -46,12 +46,20 @@ import { reportPageFailures, showFatalError } from "./tools/banner.js";
 import { showBootstrapFailure } from "./bootstrap.js";
 import { copyToClipboard } from "./tools/copy_text.js";
 import { importLegacyShaderSelection, LEGACY_SHADER_ALIAS } from "./legacy_shader_import.js";
+import { createShaderDocumentController } from "./tools/shader_documents.js";
 
 // UI layer degrades gracefully (log + keep last good state); lower layers trap.
 
 // Dwell time per effect while "Test All" cycles the favorites list.
 const TEST_ALL_INTERVAL_MS = 1000;
 const EXPECTED_SEGMENT_CONTROLLER_API_VERSION = 2;
+
+export const SHADER_DOCUMENT_EFFECTS = Object.freeze([
+  'signal-weave', 'kaleido-wave', 'alien-ocean', 'glitch-grid',
+  'facet-wave', 'contour-lattice', 'curl-lattice', 'prism-lattice',
+  'vector-facets', 'facet-grid', 'hex-wave', 'equator-grid',
+  'cosmic-eyeball', 'mobius-grid',
+]);
 
 if (SEGMENT_CONTROLLER_API_VERSION !== EXPECTED_SEGMENT_CONTROLLER_API_VERSION) {
   throw new Error('Cached segment_controller.js is incompatible; reload the simulator.');
@@ -209,7 +217,7 @@ export function start({
   // Seed plain defaults; URLSync is the single URL reader and hydrates these from
   // the query string through the same validators below.
   const knownEffects = new Set(shaderWorkbench
-    ? ['Shader']
+    ? ['Shader', ...SHADER_DOCUMENT_EFFECTS]
     : Object.values(resolutionPresets).flatMap((preset) => preset.favorites));
   knownEffects.add(LEGACY_SHADER_ALIAS);
   const appState = new AppState({
@@ -227,7 +235,7 @@ export function start({
     appState.set('effect', legacySelection.effect);
   }
   const availableEffects = (resolution) => shaderWorkbench
-    ? ['Shader'] : favoritesFor(resolution);
+    ? ['Shader', ...SHADER_DOCUMENT_EFFECTS] : favoritesFor(resolution);
 
   const segments = new SegmentController({
     resolutionPresets,
@@ -423,6 +431,7 @@ export function start({
           () => apply.applyResolution(true),
           () => loadingOverlay?.remove(),
         );
+        void shaderDocuments?.init();
       } catch (err) {
         console.error('Initial resolution/effect could not be applied:', err);
         const title = 'No supported resolution and effect could be applied.';
@@ -608,6 +617,17 @@ export function start({
     showFatal: showFatalError,
     usesFullConfigSnapshot,
   });
+
+  const shaderDocuments = shaderWorkbench ? createShaderDocumentController({
+    doc,
+    getEngine: () => host.engine,
+    selectEffect: (effect) => {
+      appState.set('effect', effect);
+      return appState.get('effect') === effect;
+    },
+    syncEffectGui: () => effectGui.sync(),
+    invalidate: () => daydream.invalidate(),
+  }) : null;
 
   testAllController = guiInstance.addSession({ testAll: false }, 'testAll').name('Test All')
     .onChange((v) => {

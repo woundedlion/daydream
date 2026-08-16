@@ -41,6 +41,23 @@
     </nav>
     <main class="main-area">
       <aside id="shader-workbench-nav" class="shader-workbench-nav" aria-label="Shader stages">
+        <section class="shader-document-controls" aria-labelledby="shader-document-heading">
+          <h2 id="shader-document-heading">Shader document</h2>
+          <label for="shader-document-select">Source</label>
+          <select id="shader-document-select">
+            <option value="">Scratch shader</option>
+          </select>
+          <label for="shader-preset-select">Preset</label>
+          <select id="shader-preset-select" disabled>
+            <option value="">No document loaded</option>
+          </select>
+          <div class="shader-document-actions">
+            <button id="shader-document-open" type="button">Open…</button>
+            <button id="shader-document-save" type="button" disabled>Save</button>
+          </div>
+          <input id="shader-document-file" type="file" accept=".json,.shader.json,application/json" hidden>
+          <output id="shader-document-status" role="status">Loading source documents…</output>
+        </section>
         <h2>Shader stages</h2>
         <button type="button" data-workbench-folder="Controls">Presets</button>
         <button type="button" data-workbench-folder="Camera">Camera</button>
