@@ -1,5 +1,5 @@
 const MIGRATION_URL = '../shader/patterns/shaderball_migration.json';
-const COMPILER_URL = '../shader/shader_workbench.mjs';
+const COMPILER_URL = new URL('../shader/shader_workbench.mjs', import.meta.url).href;
 
 /** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[]}} ParameterDefinition */
 /** @typedef {{document: *, descriptor_digest?: string, diagnostics?: *, status?: string}} CompiledDocument */

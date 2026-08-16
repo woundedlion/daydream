@@ -74,6 +74,10 @@ tools/solid_op_rows.js
 tools/solid_registry_codegen.js
 tools/solid_render.js
 
+# Shader workbench: the document compiler and the pattern documents the source
+# catalog fetches by name at runtime.
+shader
+
 # Documentation the deploy gate pins to the engine checkout.
 README.md
 docs/screenshots
