@@ -648,7 +648,7 @@
   display: grid;
   grid-auto-flow: row;
   grid-column: 1 / -1;
-  gap: var(--spacing);
+  gap: 0;
   width: 100%;
 }
 
@@ -659,6 +659,12 @@
 .gui-container .effect-gui .effect-action > .lil-widget,
 .gui-container .effect-gui .effect-action button {
   width: 100%;
+}
+
+.gui-container .effect-gui .effect-action-reset > .lil-widget,
+.gui-container .effect-gui .effect-action-export > .lil-widget {
+  width: calc(100% - var(--spacing));
+  margin-right: var(--spacing);
 }
 
 .gui-container .effect-gui .effect-action button {
