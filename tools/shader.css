@@ -43,6 +43,13 @@
   cursor: wait;
 }
 
+#gui-container .lil-controller.lil-option select,
+#gui-container .lil-controller.lil-option option {
+  color-scheme: dark;
+  color: var(--text-color);
+  background-color: var(--background-color);
+}
+
 @media (max-width: 768px) {
   .shader-workbench-nav {
     width: 100%;
