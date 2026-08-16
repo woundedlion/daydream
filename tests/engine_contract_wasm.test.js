@@ -477,7 +477,22 @@ test('ShaderBall accepts valid Curl Flow through the dynamic backend', () => {
 test('ShaderBall keeps planar warps when dodecahedral Grid becomes Primitive Lattice', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
-  assert.equal(engine.selectPreset(11), true);
+  let vectorMirrorPreset = -1;
+  for (let index = 0; index < engine.getPresetCount(); index++) {
+    assert.equal(engine.selectPreset(index), true);
+    const definitions = engine.getParameterDefinitions();
+    const selectedOption = (name) => {
+      const definition = definitions.find((entry) => entry.name === name);
+      return definition?.options?.[definition.requestedValue];
+    };
+    if (selectedOption('Planar Warp 1') === 'Projected Vector Noise' &&
+        selectedOption('Planar Warp 2') === 'Mirror Tile') {
+      vectorMirrorPreset = index;
+      break;
+    }
+  }
+  assert.notEqual(vectorMirrorPreset, -1,
+    'ShaderBall must retain the vector-noise/mirror preset used by this contract');
 
   const before = engine.getParameterDefinitions();
   const functionDef = before.find((d) => d.name === 'Function');
