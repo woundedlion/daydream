@@ -225,9 +225,13 @@
     "cases": 17,
     "assertions": 59
   },
+  "tests/solid_build.test.js": {
+    "cases": 17,
+    "assertions": 87
+  },
   "tests/solid_codegen.test.js": {
-    "cases": 101,
-    "assertions": 1379
+    "cases": 99,
+    "assertions": 1373
   },
   "tests/solid_op_rows.test.js": {
     "cases": 13,
