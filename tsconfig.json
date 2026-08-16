@@ -69,6 +69,7 @@
     "tools/shader_workbench_nav.js",
     "tools/shader_documents.js",
     "tools/slider.js",
+    "tools/solid_build.js",
     "tools/solid_codegen.js",
     "tools/solid_op_rows.js",
     "tools/solid_registry_codegen.js",

@@ -611,9 +611,6 @@
       savedChainShapeError,
       PLATONIC_SOLIDS,
       CATALAN_BASES,
-      applyOp,
-      meshOpFailure,
-      requireMeshResult,
       formatSolidName,
       generateFuncAndRecipe,
       generateRecipeCpp,
@@ -629,6 +626,11 @@
       createChainValidator,
       createOpGate,
     } from './solid_codegen.js';
+    // The MeshOps call sequences — base solid, op chain, classify, readback and
+    // the arena flush that follows each — with the module, the vertex
+    // constructor and the error line injected, so they are exercised against a
+    // stand-in module rather than only in a browser.
+    import { buildBaseMesh, buildChainMesh } from './solid_build.js';
     import { generateRegistryCpp, MAX_RECIPE_STEPS } from './solid_registry_codegen.js';
     import { buildOpRow, formatParamValue, syncSweepWarning } from './solid_op_rows.js';
     // Scene construction from the JS-side mesh copy, and the stats line it
@@ -911,40 +913,6 @@
       renderBaseSolid();
     }
 
-    // Reads a live wrapper out to plain JS. Null when the readback itself was
-    // rejected — a wrapper the caller held across a clearToolingMemory() aliases
-    // reclaimed arena storage, so the bridge refuses it (STALE_WRAPPER).
-    function wasmMeshToJs(wasmMesh) {
-      const vArray = requireMesh(wasmMesh.getVertices(), 'Mesh vertex readback');
-      if (!vArray) return null;
-
-      for (let i = 0; i < vArray.length; i++) {
-        if (Number.isNaN(vArray[i])) {
-          showMeshError(`Mesh vertex readback failed: component ${i} is NaN`);
-          return null;
-        }
-      }
-
-      const vertices = [];
-      for (let i = 0; i < vArray.length; i += 3) {
-        vertices.push(new THREE.Vector3(vArray[i], vArray[i + 1], vArray[i + 2]));
-      }
-
-      // { indices: Uint16Array, counts: Uint8Array }
-      const flat = requireMesh(wasmMesh.getFaces(), 'Mesh face readback');
-      if (!flat) return null;
-      const faces = [];
-      let k = 0;
-      for (let i = 0; i < flat.counts.length; i++) {
-        const n = flat.counts[i];
-        const face = new Array(n);
-        for (let c = 0; c < n; c++) face[c] = flat.indices[k++];
-        faces.push(face);
-      }
-
-      return { vertices, faces };
-    }
-
     async function generateThumbnails() {
       const footer = document.getElementById('footer');
 
@@ -994,12 +962,7 @@
           offScene.add(light);
           offScene.add(ambient);
 
-          const wasmMesh = requireMesh(MeshOpsWasm.fromSolidName(key),
-            `Thumbnail for "${key}"`);
-          if (!wasmMesh) continue;
-          const meshData = wasmMeshToJs(wasmMesh);
-          wasmMesh.delete();
-          MeshOpsWasm.clearToolingMemory();
+          const meshData = buildBaseMesh(key, `Thumbnail for "${key}"`, buildContext());
           if (!meshData) continue;
 
           // Triangulate
@@ -1789,93 +1752,31 @@
       if (statsEl) statsEl.textContent = message;
     }
 
-    // Binds the shared null-result handler to this page's live module and error
-    // line; both are read per call, since an engine halt nulls the module.
-    function requireMesh(result, what) {
-      return requireMeshResult(result, what,
-        { Mod: WasmModule, meshOps: MeshOpsWasm, onError: showMeshError });
+    // The live wiring one build runs against, assembled per call: an engine halt
+    // nulls the module handles, so a context must not outlive a build.
+    function buildContext() {
+      return {
+        Mod: WasmModule,
+        meshOps: MeshOpsWasm,
+        vector: (x, y, z) => new THREE.Vector3(x, y, z),
+        onError: showMeshError,
+        onTrap: engineTrapped,
+      };
     }
 
     function update() {
       if (!WasmModule || !MeshOpsWasm) return;
 
-      // MeshOps error-handling contract. Every failure the bridge foresees —
-      // unknown solid name, tooling arena exhaustion, 16-bit connectivity or
-      // face-degree overflow, a non-finite or out-of-domain argument — is a null
-      // with the reason in getLastResult(); requireMesh() reports those. An
-      // engine invariant trap is not recoverable: the module is built with
-      // exceptions disabled, so it aborts and reaches the catches below as a
-      // WebAssembly.RuntimeError over a torn-down module, which engineTrapped()
-      // turns into a fatal banner. What is left for the catches is Embind
-      // marshalling errors.
+      const built = buildChainMesh(state.base, state.ops, buildContext());
+      if (!built) return;
 
-      // 1. Generate Mesh directly from WASM
-      let currentWasmMesh = null;
-      try {
-        // Use the string name directly
-        currentWasmMesh = requireMesh(MeshOpsWasm.fromSolidName(state.base),
-          `Base solid "${state.base}"`);
-        if (!currentWasmMesh) return;
-      } catch (e) {
-        console.error("Error creating base solid:", e);
-        engineTrapped(e);
-        return;
-      }
-
-      // Apply Ops
-      try {
-        state.ops.forEach(o => {
-          const nextMesh = applyOp(currentWasmMesh, o);
-          currentWasmMesh.delete();
-          currentWasmMesh = nextMesh;
-        });
-      } catch (e) {
-        console.error("WASM Op Error:", e);
-        if (engineTrapped(e)) return;
-        // A mid-chain op failed: the partial mesh is meaningless, so surface the
-        // error and skip the render rather than displaying a half-applied solid
-        // with wrong stats. currentWasmMesh still points at the last valid op
-        // result (the failing op threw before the swap), so it is safe to free.
-        if (currentWasmMesh) currentWasmMesh.delete();
-        MeshOpsWasm.clearToolingMemory();
-        showMeshError(`Op error: ${e?.message || e}`);
-        return;
-      }
-
-      // Per-face topology class ids for the Colorize Faces toggle. Runs
-      // engine-side (it reuses the tooling scratch arenas, which are free
-      // between ops); the returned Int32Array is a fresh JS copy, so it stays
-      // valid after the wrapper is deleted and the arenas are flushed below.
-      // Computed on every recompute (it is cheap next to the op chain) and
-      // cached so toggling Colorize redraws from currentMesh without replaying
-      // the whole WASM chain.
-      currentFaceClasses = null;
-      // Colorize-only data: a null leaves the render intact, and the arena
-      // remedy is the flush already run below, once the mesh is read out. The
-      // reason is reported after renderMesh, which rewrites the line it shares.
-      let classifyFailure = null;
-      try {
-        currentFaceClasses = currentWasmMesh.classifyFaces();
-        if (!currentFaceClasses) {
-          classifyFailure = meshOpFailure(WasmModule, 'Face classification').message;
-        }
-      } catch (e) {
-        console.error("WASM classifyFaces error:", e);
-        if (engineTrapped(e)) return;
-      }
-
-      const meshData = wasmMeshToJs(currentWasmMesh);
-      currentWasmMesh.delete(); // Cleanup final result
-      MeshOpsWasm.clearToolingMemory(); // Flush the 16 MB tooling arenas (8 MB + 4 MB + 4 MB)
-      // A rejected readback leaves no geometry to draw; requireMesh already
-      // reported it, so skip the render rather than clearing the last good mesh.
-      if (!meshData) return;
-
-      // Store for stats/helpers
-      currentMesh = meshData;
+      // Cached alongside the mesh so toggling Colorize redraws from currentMesh
+      // without replaying the whole WASM chain.
+      currentMesh = built.meshData;
+      currentFaceClasses = built.faceClasses;
 
       renderMesh();
-      if (classifyFailure) showMeshError(classifyFailure);
+      if (built.classifyFailure) showMeshError(built.classifyFailure);
 
       // The mesh changed, so which ops would now overflow changed too.
       refreshOpGating();

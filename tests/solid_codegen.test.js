@@ -999,15 +999,6 @@ test('requireMeshResult flushes only for the reason that calls for it', () => {
   assert.equal(shown.length, 1);
 });
 
-/** Verifies solids.html routes its own failures through the shared handler. */
-test('solids.html binds requireMeshResult to its live module', () => {
-  assert.match(SOLIDS_HTML, /\brequireMeshResult\b[\s\S]*?from '\.\/solid_codegen\.js'/,
-    'solids.html must import the shared handler');
-  assert.match(SOLIDS_HTML,
-    /requireMeshResult\(result, what,\s*\{ Mod: WasmModule, meshOps: MeshOpsWasm, onError: showMeshError \}\)/,
-    'the page must pass its live module, MeshOps binding and error line');
-});
-
 test('solids validator resolves the module factory after async initialization', async () => {
   const match = SOLIDS_HTML.match(/\bcreateChainValidator\((.+)\);/);
   assert.ok(match);
@@ -1204,16 +1195,6 @@ test('solids.html shape-checks a restore before it commits', () => {
     'the shape check must run before the commit that mutates state');
   assert.match(restore, /showGateMsg\(`cannot restore/,
     'a refused restore must say so rather than fail silently');
-});
-
-/** Verifies a NaN vertex readback is refused outright rather than passed on as an empty mesh. */
-test('wasmMeshToJs refuses a NaN vertex readback', () => {
-  const fn = SOLIDS_HTML.match(/function wasmMeshToJs\(wasmMesh\) \{[\s\S]*?\n {4}\}/)?.[0];
-  assert.ok(fn, 'wasmMeshToJs must stay a named function in solids.html');
-  const guard = fn.match(/if \(Number\.isNaN\([\s\S]*?\n {8}\}/)?.[0];
-  assert.ok(guard, 'the readback must still reject NaN vertices');
-  assert.match(guard, /showMeshError\(/, 'a NaN readback must reach the error line, not only the console');
-  assert.match(guard, /return null;/, 'a NaN readback must not yield a mesh that save and export accept');
 });
 
 /** Verifies a transient spawn failure is retried rather than disabling validation for good. */
