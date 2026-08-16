@@ -1,14 +1,15 @@
 //
 // scripts/run-tests.mjs is the `test` script: it runs the suite and gates each
 // file against two committed floors, the cases it runs and the assertions those
-// cases make. Driven as a subprocess with cwd set to a temp fixture holding its
-// own package.json, floors and test files, so the counts under test are the
-// fixture's and not this suite's.
+// cases make, and every source module outside the suite's own directory against
+// having been loaded by one. Driven as a subprocess with cwd set to a temp
+// fixture holding its own package.json, floors, source and test files, so the
+// counts and the roster under test are the fixture's and not this suite's.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fixtureRepo, expectFailure } from './fixture_repo.js';
 
@@ -16,6 +17,8 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = resolve(HERE, '../scripts/run-tests.mjs');
 const PATTERN = 'tests/*.test.js';
 const FLOORS = 'tests/assertion-floors.json';
+const EXEMPT = 'tests/uncovered-modules.json';
+const MODULE = 'lib.mjs';
 /** Fixture test files: cases declared per file, assertions run per case. */
 const FILES = {
   'a.test.js': { cases: 2, asserts: 3 },
@@ -448,6 +451,143 @@ test('assertions above the committed floors are reported and bounded', () => {
   const err = runExpectingFailure(PATTERN);
   assert.match(err, /594 assertions above their committed floors, past the bound of 450/);
   assert.match(err, /tests\/a\.test\.js: 600 ran, floor 6/);
+});
+
+/**
+ * Writes a source module into the fixture root, outside the test directory.
+ * @param {string} [name] - File name, relative to the fixture root.
+ */
+const writeModule = (name = MODULE) => {
+  mkdirSync(dirname(join(root, name)), { recursive: true });
+  writeFileSync(join(root, name), 'export const value = 1;\n');
+};
+
+/** Writes the fixture's committed exemptions. */
+const writeExempt = (entries) =>
+  writeFileSync(join(root, EXEMPT), JSON.stringify(entries, null, 2));
+
+/**
+ * Fixture test file source with a.test.js's two cases and six assertions, whose
+ * first case runs `body` — the one place a module reference can reach the
+ * loader.
+ * @param {string} body - Statements the first case runs.
+ * @param {string[]} [prelude] - Lines above the cases.
+ * @returns {string} Module source.
+ */
+const reaching = (body, prelude = []) =>
+  [
+    "import { test } from 'node:test';",
+    "import assert from 'node:assert/strict';",
+    ...prelude,
+    `test('case 0', async () => { ${body} assert.ok(true); assert.ok(true); });`,
+    "test('case 1', () => { assert.ok(true); assert.ok(true); assert.ok(true); });",
+  ].join('\n');
+
+/** Verifies a source module the suite never loads fails the run. */
+test('a source module no test loads fails', () => {
+  writeModule();
+  const err = runExpectingFailure(PATTERN);
+  assert.match(err, /no test loaded these source modules:\n {2}lib\.mjs/);
+  assert.match(err, new RegExp(EXEMPT.replace('.', '\\.')));
+});
+
+/**
+ * Verifies naming the module is not loading it. A source-text scan reads a
+ * comment and a string literal as a reference, which is coverage the module
+ * does not have; the gate records what the loader resolved.
+ */
+test('a module named only in a comment or a string is not covered', () => {
+  writeModule();
+  writeFileSync(
+    join(root, 'tests', 'a.test.js'),
+    reaching("assert.ok(path);", [`// covers ../${MODULE}`, `const path = '../${MODULE}';`]),
+  );
+  assert.match(
+    runExpectingFailure(PATTERN),
+    /no test loaded these source modules:\n {2}lib\.mjs/,
+  );
+});
+
+/** Verifies a module a test imports clears the roster. */
+test('a source module a test imports passes', () => {
+  writeModule();
+  writeFileSync(
+    join(root, 'tests', 'a.test.js'),
+    reaching('assert.equal(value, 1);', [`import { value } from '../${MODULE}';`]),
+  );
+  assert.match(run(PATTERN), /1 of 1 source modules were loaded by a test/);
+});
+
+/** Verifies a module reached only at run time counts, as the loader saw it. */
+test('a source module a test imports dynamically passes', () => {
+  writeModule();
+  writeFileSync(
+    join(root, 'tests', 'a.test.js'),
+    reaching(`assert.equal((await import('../${MODULE}')).value, 1);`),
+  );
+  assert.match(run(PATTERN), /1 of 1 source modules were loaded by a test/);
+});
+
+/** Verifies modules inside the test directory are the suite, not the roster. */
+test('a helper inside the test directory is not rostered', () => {
+  writeModule('tests/helper.js');
+  assert.match(run(PATTERN), /0 of 0 source modules/);
+});
+
+/** Verifies the vendored and metadata directories are not walked for modules. */
+test('modules under the skipped directories are not rostered', () => {
+  for (const dir of ['node_modules', 'vendor', 'three.js', 'engine', '.worktrees'])
+    writeModule(`${dir}/nested/stray.mjs`);
+  assert.match(run(PATTERN), /0 of 0 source modules/);
+});
+
+/** Verifies a committed exemption covers a module nothing loads. */
+test('a committed exemption covers an unloadable module', () => {
+  writeModule();
+  writeExempt({ [MODULE]: 'the fixture never imports it' });
+  assert.match(run(PATTERN), /0 of 1 source modules were loaded by a test/);
+});
+
+/** Verifies an exemption has to say why, so it cannot be a bare opt-out. */
+test('an exemption with no reason fails', () => {
+  writeModule();
+  writeExempt({ [MODULE]: '  ' });
+  assert.match(runExpectingFailure(PATTERN), /must name why[^]*\n {2}lib\.mjs/);
+  writeExempt({ [MODULE]: true });
+  assert.match(runExpectingFailure(PATTERN), /must name why[^]*\n {2}lib\.mjs/);
+});
+
+/** Verifies an exemption outliving its module is refused rather than ignored. */
+test('an exemption naming no source module fails', () => {
+  writeExempt({ [MODULE]: 'the module was deleted' });
+  assert.match(
+    runExpectingFailure(PATTERN),
+    /entries name no source module:\n {2}lib\.mjs/,
+  );
+});
+
+/**
+ * Verifies an exemption is given up once the module is covered: left in place
+ * it would go on exempting the module after the test that reaches it is gone.
+ */
+test('an exemption for a module a test loads fails', () => {
+  writeModule();
+  writeFileSync(
+    join(root, 'tests', 'a.test.js'),
+    reaching('assert.equal(value, 1);', [`import { value } from '../${MODULE}';`]),
+  );
+  writeExempt({ [MODULE]: 'the fixture never imports it' });
+  assert.match(
+    runExpectingFailure(PATTERN),
+    /entries are covered after all:\n {2}lib\.mjs/,
+  );
+});
+
+/** Verifies an unreadable exemption file fails rather than exempting nothing. */
+test('a malformed exemption file fails', () => {
+  writeModule();
+  writeFileSync(join(root, EXEMPT), '{');
+  assert.match(runExpectingFailure(PATTERN), /uncovered-modules\.json is unreadable/);
 });
 
 /** Verifies a pattern-less invocation is refused instead of walking the tree. */
