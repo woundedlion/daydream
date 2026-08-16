@@ -8,9 +8,9 @@ export const LEGACY_SHADER_ALIAS = 'ShaderBall';
 export const LEGACY_SHADER_PRESETS = Object.freeze([
   ['SignalWeave', 'signal-weave'],
   ['KaleidoWave', 'twin-wave'],
-  ['KaleidoGrid', 'folded-grid'],
+  ['AlienOcean', 'folded-grid'],
   ['GlitchGrid', 'folded-glitch'],
-  ['QuincunxFacets', 'peirce-facets'],
+  ['Shader', 'peirce-facets'],
   ['FacetWave', 'wave-mirror'],
   ['ContourLattice', 'affine-contour'],
   ['CurlLattice', 'open-curl'],
@@ -24,15 +24,15 @@ export const LEGACY_SHADER_PRESETS = Object.freeze([
   ['EquatorGrid', 'double-map'],
   ['EquatorGrid', 'open-grid'],
   ['EquatorGrid', 'fine-grid'],
-  ['StereoGlitch', 'mirrored-grid'],
+  ['CosmicEyeball', 'mirrored-grid'],
 ]);
 
 const PIPELINE_EFFECTS = Object.freeze({
   GLITCH_NOISE_GRID_WAVE_SHEAR: 'SignalWeave',
   KALEIDOSCOPE_TWIN_WAVE_INNER_MIRROR: 'KaleidoWave',
-  GNOMONIC_KALEIDOSCOPE_GRID_MIRROR: 'KaleidoGrid',
+  GNOMONIC_KALEIDOSCOPE_GRID_MIRROR: 'AlienOcean',
   GNOMONIC_GLITCH_GRID_MIRROR: 'GlitchGrid',
-  PEIRCE_DODECAHEDRAL_GRID: 'QuincunxFacets',
+  PEIRCE_DODECAHEDRAL_GRID: 'Shader',
   GNOMONIC_DODECAHEDRAL_GRID_WAVE_MIRROR: 'FacetWave',
   GNOMONIC_AFFINE_LATTICE_CONTOUR: 'ContourLattice',
   SINUSOIDAL_CURL_LATTICE: 'CurlLattice',
@@ -41,7 +41,7 @@ const PIPELINE_EFFECTS = Object.freeze({
   STEREOGRAPHIC_DODECAHEDRAL_GRID_INNER_MIRROR: 'FacetGrid',
   STEREOGRAPHIC_HEXAGONAL_PRISM_TWIN_WAVE_INNER_MIRROR: 'HexWave',
   EQUIRECTANGULAR_DODECAHEDRAL_GRID_INNER_MIRROR: 'EquatorGrid',
-  STEREOGRAPHIC_GLITCH_GRID_MIRROR: 'StereoGlitch',
+  STEREOGRAPHIC_GLITCH_GRID_MIRROR: 'CosmicEyeball',
 });
 
 /**
