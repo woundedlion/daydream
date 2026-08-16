@@ -10,6 +10,7 @@ import {
 
 const INDEX = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const WORKBENCH = readFileSync(new URL('../tools/shader.html', import.meta.url), 'utf8');
+const WORKBENCH_CSS = readFileSync(new URL('../tools/shader.css', import.meta.url), 'utf8');
 
 test('simulator exposes Shader as a standalone tool', () => {
   assert.match(INDEX, /href="tools\/shader\.html"[^>]*>Shader/);
@@ -17,7 +18,11 @@ test('simulator exposes Shader as a standalone tool', () => {
   assert.match(WORKBENCH, /src="\.\.\/main\.js"/);
   assert.match(WORKBENCH, /id="shader-workbench-nav"/);
   assert.match(WORKBENCH, /src="shader_workbench_nav\.js"/);
+  assert.doesNotMatch(WORKBENCH, />Simulator<\/a>/);
   assert.doesNotMatch(WORKBENCH, /id="effect-sidebar"/);
+  assert.match(WORKBENCH_CSS, /\.lil-controller\.lil-option option\s*\{/);
+  assert.match(WORKBENCH_CSS, /color-scheme:\s*dark/);
+  assert.match(WORKBENCH_CSS, /background-color:\s*var\(--background-color\)/);
 });
 
 test('stage navigation opens and reveals the selected GUI folder', () => {
