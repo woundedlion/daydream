@@ -1607,15 +1607,18 @@ test('preset effects expose zero-indexed selection and navigation', () => {
   assert.equal(actionRow.style.display, '');
   assert.equal(actionRow.style.gridAutoFlow, '');
   assert.equal(actionRow.style.gridTemplateColumns,
-    'repeat(4, minmax(0, 1fr))');
+    'repeat(5, minmax(0, 1fr))');
   // The live region is out of flow, so it takes no column of its own.
-  const [status, ...buttons] = actionRow.children;
+  const [status, ...controls] = actionRow.children;
   assert.equal(status.getAttribute('role'), 'status');
-  assert.deepEqual(buttons,
-    ['reset', 'export', 'previousPreset', 'nextPreset']
+  assert.deepEqual(controls,
+    ['reset', 'export', 'previousPreset', 'presetIndex', 'nextPreset']
       .map((property) => h.gui().ctrl(property).domElement));
   assert.ok(h.gui().ctrl('previousPreset').domElement.classList
     .contains('preset-nav-previous'));
+  assert.ok(h.gui().ctrl('presetIndex').domElement.classList
+    .contains('preset-nav-selector'));
+  assert.equal(h.gui().ctrl('presetIndex').$select.getAttribute('aria-label'), 'Preset');
   assert.ok(h.gui().ctrl('nextPreset').domElement.classList
     .contains('preset-nav-next'));
 
@@ -1625,6 +1628,16 @@ test('preset effects expose zero-indexed selection and navigation', () => {
   assert.deepEqual(h.writes, ['preset:2', 'preset:0']);
   assert.equal(h.gui().ctrl('presetIndex').getValue(), 0);
   assert.equal(h.gui().ctrl('pause'), undefined);
+});
+
+test('preset navigation is available to global keyboard shortcuts', () => {
+  const h = makeHarness({ presetCount: 3, presetIndex: 1 });
+  h.panel.build();
+
+  assert.equal(h.panel.movePreset(-1), true);
+  assert.equal(h.panel.movePreset(1), true);
+  assert.deepEqual(h.writes, ['preset:0', 'preset:1']);
+  assert.equal(h.gui().ctrl('presetIndex').getValue(), 1);
 });
 
 test('the preset dropdown selects its zero-indexed value', () => {
@@ -1704,6 +1717,7 @@ test('a rejected preset selection does not change the pause state', () => {
 test('effects without presets do not show preset navigation', () => {
   const h = makeHarness();
   h.panel.build();
+  assert.equal(h.panel.movePreset(1), false);
   assert.equal(h.gui().ctrl('previousPreset'), undefined);
   assert.equal(h.gui().ctrl('nextPreset'), undefined);
   assert.equal(h.gui().ctrl('presetIndex'), undefined);

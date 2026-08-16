@@ -709,7 +709,9 @@ export function start({
   recFolder.addSession(recSettings, 'recFormat', Object.keys(REC_FORMATS)).name('Rec Format');
   const recordCtrl = recFolder.add(recordState, 'record').name('\u25cf Record');
   recordCtrl.disable();
-  const onKeyDown = createGlobalKeydownHandler({ dispatch: (e) => daydream.keydown(e) });
+  const onKeyDown = createGlobalKeydownHandler({
+    dispatch: (e) => daydream.keydown(e, (delta) => effectGui.movePreset(delta)),
+  });
   win.addEventListener("keydown", onKeyDown);
 
   // Covers a synchronous throw as well as a rejection: a sidebar rAF, a lil-gui

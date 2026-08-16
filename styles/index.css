@@ -669,6 +669,10 @@
   line-height: 1;
 }
 
+.gui-container .effect-gui .preset-nav-selector > .lil-name {
+  display: none;
+}
+
 /* --- Desktop Styles --- */
 @media only screen and (width > 900px) {
   .gui-container {

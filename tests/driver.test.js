@@ -1236,7 +1236,7 @@ test('refreshLabels acquires nothing while the axes are hidden', () => {
 });
 
 // ---------------------------------------------------------------------------
-// keydown (pause / single-step)
+// keydown (pause / single-step / presets)
 // ---------------------------------------------------------------------------
 
 /** Keydown event stand-in recording whether the default was prevented.
@@ -1261,20 +1261,39 @@ test('space pauses and resumes, dropping any queued step on resume', () => {
   assert.equal(ctx.stepFrames, 0, 'a queued step survived the resume');
 });
 
-test('right-arrow queues single frames only while paused', () => {
+test('left and right arrows select presets while running', () => {
   const ctx = { paused: false, stepFrames: 0 };
+  const moves = [];
+  const movePreset = (delta) => {
+    moves.push(delta);
+    return true;
+  };
 
-  const running = keyEvent('ArrowRight');
-  Daydream.prototype.keydown.call(ctx, running);
+  const previous = keyEvent('ArrowLeft');
+  Daydream.prototype.keydown.call(ctx, previous, movePreset);
+  const next = keyEvent('ArrowRight');
+  Daydream.prototype.keydown.call(ctx, next, movePreset);
+
+  assert.deepEqual(moves, [-1, 1]);
   assert.equal(ctx.stepFrames, 0);
-  assert.equal(running.prevented, false, 'the arrow key was stolen from the orbit');
+  assert.equal(previous.prevented, true);
+  assert.equal(next.prevented, true);
+});
 
-  ctx.paused = true;
+test('right-arrow queues single frames only while paused', () => {
+  const ctx = { paused: true, stepFrames: 0 };
+  const moves = [];
+  const movePreset = (delta) => {
+    moves.push(delta);
+    return true;
+  };
+
   const stepped = keyEvent('ArrowRight');
-  Daydream.prototype.keydown.call(ctx, stepped);
-  Daydream.prototype.keydown.call(ctx, keyEvent('ArrowRight'));
+  Daydream.prototype.keydown.call(ctx, stepped, movePreset);
+  Daydream.prototype.keydown.call(ctx, keyEvent('ArrowRight'), movePreset);
   assert.equal(ctx.stepFrames, 2, 'held steps did not queue');
   assert.equal(stepped.prevented, true);
+  assert.deepEqual(moves, []);
 });
 
 test('keydown ignores keys it does not own', () => {
@@ -1285,6 +1304,15 @@ test('keydown ignores keys it does not own', () => {
   assert.equal(ctx.paused, true);
   assert.equal(ctx.stepFrames, 0);
   assert.equal(other.prevented, false);
+});
+
+test('an unavailable preset leaves the running arrow key unclaimed', () => {
+  const ctx = { paused: false, stepFrames: 0 };
+  const arrow = keyEvent('ArrowLeft');
+
+  Daydream.prototype.keydown.call(ctx, arrow, () => false);
+
+  assert.equal(arrow.prevented, false);
 });
 
 // ---------------------------------------------------------------------------

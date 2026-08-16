@@ -378,8 +378,9 @@ export function addParamControl(
  *   or clears the migration notice.
  * @param {(message: string, error?: any) => void} [deps.logWarn] - Console sink.
  * @returns {{active: () => Object|null, liveParamValues: () => ArrayLike<number>|null,
- *   build: () => void, applyAnimationPause: () => void, mount: () => void,
- *   sync: () => void, destroy: () => void}}
+ *   movePreset: (delta: number) => boolean, build: () => void,
+ *   applyAnimationPause: () => void, mount: () => void, sync: () => void,
+ *   destroy: () => void}}
  */
 export function createEffectGui({
   createGui,
@@ -778,22 +779,28 @@ export function createEffectGui({
         const count = getPresetCount();
         if (count <= 0 || !selectPreset(index)) {
           adoptPresetDisplay(fx, count, getPresetIndex());
-          return;
+          return false;
         }
         persistEffectState(fx.gui);
         adoptPresetDisplay(fx, count, index);
         adoptPauseDisplay(fx, engineAnimationsPaused() ?? true);
+        return true;
       };
       preset.onChange(choose);
       const move = (delta) => {
         const count = getPresetCount();
-        if (count <= 0) return;
-        choose((getPresetIndex() + delta + count) % count);
+        if (count <= 0) return false;
+        return choose((getPresetIndex() + delta + count) % count);
       };
+      fx.movePreset = move;
       effectActions.previousPreset = () => move(-1);
       effectActions.nextPreset = () => move(1);
       addAction(effectActions, 'previousPreset', PREVIOUS_ICON, 'Previous Preset',
         'preset-nav-previous');
+      preset.domElement.classList.add('effect-action', 'preset-nav-selector');
+      preset.$select?.setAttribute('aria-label', 'Preset');
+      actionRow.appendChild(preset.domElement);
+      fx.actionControllers.push(preset);
       addAction(effectActions, 'nextPreset', NEXT_ICON, 'Next Preset',
         'preset-nav-next');
     }
@@ -1185,6 +1192,15 @@ export function createEffectGui({
 
     liveParamValues,
     sync,
+
+    /**
+     * Select a preset relative to the active one.
+     * @param {number} delta - Signed preset offset.
+     * @returns {boolean} Whether the preset was selected.
+     */
+    movePreset(delta) {
+      return activeEffect?.movePreset?.(delta) ?? false;
+    },
 
     /**
      * Commit the hydrated pause state after every renderer has rebuilt its
