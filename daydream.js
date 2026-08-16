@@ -59,7 +59,7 @@ if (SEGMENT_CONTROLLER_API_VERSION !== EXPECTED_SEGMENT_CONTROLLER_API_VERSION) 
 
 const HiResFavorites = [
   "BZReactionDiffusion",
-  "ChaoticStrings",
+  "Fishbowl",
   "Comets",
   "SignalWeave",
   "KaleidoWave",
@@ -94,7 +94,7 @@ const HiResFavorites = [
 
 const LoResFavorites = [
   "BZReactionDiffusion",
-  "ChaoticStrings",
+  "Fishbowl",
   "Comets",
   "SignalWeave",
   "KaleidoWave",
