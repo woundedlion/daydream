@@ -16,6 +16,7 @@
     onerror="this.onerror=null;this.href='https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono&display=swap'">
   <link href="../styles/index.css" rel="stylesheet">
   <link href="tools.css" rel="stylesheet">
+  <link href="shader.css" rel="stylesheet">
   <link href="tailwind.css" rel="stylesheet">
   <script src="../vendor-importmap.js"></script>
 </head>
@@ -24,7 +25,7 @@
   <h1 class="visually-hidden">Holosphere Shader authoring workbench</h1>
   <div id="layout-container" class="layout-container">
     <nav class="nav-tabs" aria-label="Shader workbench navigation">
-      <strong class="nav-label">Shader Workbench</strong>
+      <a href="shader.html" class="tab" aria-current="page">Shader Workbench</a>
       <a href="../index.html" class="tab">Simulator</a>
       <a href="palettes.html" target="_blank" rel="noopener" class="tab">Palettes <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
       <div id="global-stats-desktop">
@@ -40,6 +41,22 @@
       </div>
     </nav>
     <main class="main-area">
+      <aside id="shader-workbench-nav" class="shader-workbench-nav" aria-label="Shader stages">
+        <h2>Shader stages</h2>
+        <button type="button" data-workbench-folder="Controls">Presets</button>
+        <button type="button" data-workbench-folder="Camera">Camera</button>
+        <button type="button" data-workbench-folder="Lens">Lens</button>
+        <button type="button" data-workbench-folder="Surface Noise">Surface Noise</button>
+        <button type="button" data-workbench-folder="Projection Frame">Projection Frame</button>
+        <button type="button" data-workbench-folder="Projection">Projection</button>
+        <button type="button" data-workbench-folder="Planar Warp 1">Planar Warp 1</button>
+        <button type="button" data-workbench-folder="Planar Warp 2">Planar Warp 2</button>
+        <button type="button" data-workbench-folder="Function">Function</button>
+        <button type="button" data-workbench-folder="Signal Weight">Signal Weight</button>
+        <button type="button" data-workbench-folder="Value Transfer">Value Transfer</button>
+        <button type="button" data-workbench-folder="Coverage">Coverage</button>
+        <button type="button" data-workbench-folder="Colorize">Colorize</button>
+      </aside>
       <div id="stats-bar" class="stats-bar">
         <table class="global-stats global-stats--mobile">
           <caption class="visually-hidden">Engine memory and compute</caption>
@@ -62,6 +79,7 @@
     </main>
     <div id="gui-container" class="gui-container"></div>
   </div>
+  <script type="module" src="shader_workbench_nav.js"></script>
   <script type="module" src="../main.js"></script>
 </body>
 

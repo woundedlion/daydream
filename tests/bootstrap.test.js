@@ -277,11 +277,15 @@ test('index identifies new-window tool links and associates stats headers', () =
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const toolLinks = [...html.matchAll(/<a href="tools\/[^"]+"[^>]+>.*?<\/a>/g)];
   assert.equal(toolLinks.length, 5);
-  for (const [link] of toolLinks) {
+  const newWindowLinks = toolLinks.filter(([link]) => !link.includes('tools/shader.html'));
+  assert.equal(newWindowLinks.length, 4);
+  for (const [link] of newWindowLinks) {
     assert.match(link, /target="_blank"/);
     assert.match(link, /rel="noopener"/);
     assert.match(link, /opens in a new window/);
   }
+  const shaderLink = toolLinks.find(([link]) => link.includes('tools/shader.html'))?.[0];
+  assert.doesNotMatch(shaderLink, /target=/);
   const headers = [...html.matchAll(/<th\b[^>]*>/g)].map(([tag]) => tag);
   assert.ok(headers.length > 0);
   for (const header of headers) assert.match(header, /\bscope="col"/);

@@ -46,6 +46,8 @@ tools/lissajous.html
 tools/mobius.html
 tools/palettes.html
 tools/shader.html
+tools/shader.css
+tools/shader_workbench_nav.js
 tools/solids.html
 tools/tools.css
 tools/tailwind.css

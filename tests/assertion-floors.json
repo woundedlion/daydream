@@ -9,7 +9,7 @@
   },
   "tests/bootstrap.test.js": {
     "cases": 18,
-    "assertions": 72
+    "assertions": 71
   },
   "tests/clipboard.test.js": {
     "cases": 7,
@@ -198,8 +198,8 @@
     "assertions": 21
   },
   "tests/shader_workbench.test.js": {
-    "cases": 2,
-    "assertions": 5
+    "cases": 3,
+    "assertions": 12
   },
   "tests/shared.test.js": {
     "cases": 15,
@@ -251,11 +251,11 @@
   },
   "tests/tool_pages.test.js": {
     "cases": 10,
-    "assertions": 192
+    "assertions": 193
   },
   "tests/tsconfig_roster.test.js": {
     "cases": 7,
-    "assertions": 105
+    "assertions": 108
   },
   "tests/vendor-importmap.test.js": {
     "cases": 7,
