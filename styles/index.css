@@ -648,7 +648,7 @@
   display: grid;
   grid-auto-flow: row;
   grid-column: 1 / -1;
-  gap: 0;
+  gap: var(--spacing);
   width: 100%;
 }
 
@@ -659,12 +659,6 @@
 .gui-container .effect-gui .effect-action > .lil-widget,
 .gui-container .effect-gui .effect-action button {
   width: 100%;
-}
-
-.gui-container .effect-gui .effect-action-reset > .lil-widget,
-.gui-container .effect-gui .effect-action-export > .lil-widget {
-  width: calc(100% - var(--spacing));
-  margin-right: var(--spacing);
 }
 
 .gui-container .effect-gui .effect-action button {
@@ -679,17 +673,8 @@
   display: none;
 }
 
-.gui-container .effect-gui .preset-nav-previous button {
-  border-radius: var(--widget-border-radius) 0 0 var(--widget-border-radius);
-}
-
 .gui-container .effect-gui .preset-nav-selector .lil-display {
   width: 100%;
-  border-radius: 0;
-}
-
-.gui-container .effect-gui .preset-nav-next button {
-  border-radius: 0 var(--widget-border-radius) var(--widget-border-radius) 0;
 }
 
 /* --- Desktop Styles --- */
