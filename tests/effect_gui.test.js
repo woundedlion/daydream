@@ -9,8 +9,10 @@ import {
   FULL_CONFIG_STORAGE_KEY,
   FLASH_MS,
   CURL_LATTICE_STAGE_ORDER,
+  FACET_GRID_STAGE_ORDER,
   SHADERBALL_STAGE_ORDER,
   curlLatticeStageAssignments,
+  facetGridStageAssignments,
   isShaderBallSchema,
   legacyShaderBallParamNames,
   shaderBallStageAssignments,
@@ -70,6 +72,37 @@ function curlLatticeParams() {
     'Phase Oscillation Depth',
     'Phase Oscillation Speed',
     'Brightness Depth',
+    'Value Opacity Low',
+    'Value Opacity High',
+    'Hue Shift Amount',
+    'Hue Noise Scale',
+    'Hue Noise Speed',
+  ].map((name) => ({ name, value: 0.5, min: 0, max: 1, animated: true }));
+}
+
+function facetGridParams() {
+  return [
+    'Pattern Freq',
+    'Speed',
+    'Source Angle Speed',
+    'Complexity',
+    'Pattern Mix',
+    'Drift',
+    'Pole Fade',
+    'Projection Spin Speed',
+    'Projection Wander',
+    'Camera Wander',
+    'Planar Warp 2 Speed',
+    'Planar Warp 2 Rotation',
+    'Planar Warp 2 Cell X',
+    'Planar Warp 2 Cell Y',
+    'Planar Warp 2 Offset X',
+    'Planar Warp 2 Offset Y',
+    'Palette Chroma',
+    'Mapping Frequency',
+    'Mapping Phase',
+    'Phase Oscillation Depth',
+    'Phase Oscillation Speed',
     'Value Opacity Low',
     'Value Opacity High',
     'Hue Shift Amount',
@@ -554,6 +587,29 @@ test('CurlLattice controls retain the fixed pipeline stage folders', () => {
   assert.equal(h.gui().ctrl('Central Meridian').folder, 'Projection');
   assert.equal(h.gui().ctrl('Lattice Cell Scale').folder, 'Function');
   assert.equal(h.gui().ctrl('Lattice Cell Scale').label, 'Cell Scale');
+  assert.equal(h.gui().ctrl('Hue Noise Speed').folder, 'Colorize');
+});
+
+test('FacetGrid controls retain the fixed pipeline stage folders', () => {
+  const params = facetGridParams();
+  const assignments = facetGridStageAssignments(params);
+  const h = makeHarness({
+    params,
+    engineValues: params.map((parameter) => parameter.value),
+  });
+
+  h.panel.build();
+
+  assert.deepEqual([...new Set(assignments.values())].sort(),
+    [...FACET_GRID_STAGE_ORDER].sort());
+  assert.deepEqual(h.gui().folders.map((folder) => folder.name),
+    FACET_GRID_STAGE_ORDER);
+  assert.equal(h.gui().ctrl('Camera Wander').folder, 'Camera');
+  assert.equal(h.gui().ctrl('Projection Spin Speed').folder, 'Projection Frame');
+  assert.equal(h.gui().ctrl('Pole Fade').folder, 'Projection');
+  assert.equal(h.gui().ctrl('Planar Warp 2 Cell Y').folder, 'Planar Warp 2');
+  assert.equal(h.gui().ctrl('Planar Warp 2 Cell Y').label, 'Cell Y');
+  assert.equal(h.gui().ctrl('Pattern Mix').folder, 'Function');
   assert.equal(h.gui().ctrl('Hue Noise Speed').folder, 'Colorize');
 });
 
