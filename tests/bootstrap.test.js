@@ -195,6 +195,80 @@ test('refreshModuleCache re-fetches same-origin scripts past the cache', async (
   for (const [, options] of calls) assert.deepEqual(options, { cache: 'reload' });
 });
 
+// A response whose body is never read is aborted when it is collected, so the
+// cache entry the sweep exists to replace survives the reload.
+function fakeBody(chunks, gate = Promise.resolve()) {
+  const body = { pending: chunks, drained: false };
+  body.response = {
+    body: {
+      getReader: () => ({
+        read: async () => {
+          await gate;
+          if (body.pending === 0) {
+            body.drained = true;
+            return { done: true, value: undefined };
+          }
+          body.pending -= 1;
+          return { done: false, value: new Uint8Array(1) };
+        },
+      }),
+    },
+  };
+  return body;
+}
+
+test('refreshModuleCache reads every re-fetched body to completion', async () => {
+  const bodies = new Map([
+    ['http://localhost:8000/daydream.js', fakeBody(1)],
+    ['http://localhost:8000/holosphere_wasm.wasm', fakeBody(4)],
+  ]);
+
+  await refreshModuleCache({
+    origin: 'http://localhost:8000',
+    performance: fakeTimeline(...bodies.keys()),
+    fetch: (url) => Promise.resolve(bodies.get(url).response),
+  });
+
+  for (const [url, body] of bodies) {
+    assert.equal(body.drained, true, `${url} settled on its headers, uncached`);
+  }
+});
+
+test('refreshModuleCache reads a response that carries no body stream', async () => {
+  let reads = 0;
+  await assert.doesNotReject(() => refreshModuleCache({
+    origin: 'http://localhost:8000',
+    performance: fakeTimeline('http://localhost:8000/daydream.js'),
+    fetch: async () => ({ body: null, arrayBuffer: async () => { reads += 1; } }),
+  }));
+  assert.equal(reads, 1);
+});
+
+test('the reload waits for the re-fetched binary to finish streaming', async () => {
+  const { doc, overlay, click } = fakeDocument();
+  const order = [];
+  let release;
+  const body = fakeBody(1, new Promise((resolve) => { release = resolve; }));
+  showBootstrapFailure(new Error('failed'), {
+    document: doc,
+    location: { reload() { order.push('reload'); } },
+    refresh: () => refreshModuleCache({
+      origin: 'http://localhost:8000',
+      performance: fakeTimeline('http://localhost:8000/holosphere_wasm.wasm'),
+      fetch: async () => body.response,
+    }),
+  });
+
+  const clicked = click(childWithClass(overlay, 'context-lost-reload'));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(order, [], 'the reload fired while the binary was still streaming');
+
+  release();
+  await clicked;
+  assert.equal(body.drained, true);
+  assert.deepEqual(order, ['reload']);
+});
+
 test('refreshModuleCache skips cross-origin and non-module resources', async () => {
   const calls = [];
   await refreshModuleCache({
@@ -222,6 +296,13 @@ test('refreshModuleCache survives a rejected re-fetch and a missing timeline', a
     origin: 'http://localhost:8000',
     performance: undefined,
     fetch: () => assert.fail('no resource timeline: nothing to re-fetch'),
+  }));
+  await assert.doesNotReject(() => refreshModuleCache({
+    origin: 'http://localhost:8000',
+    performance: fakeTimeline('http://localhost:8000/daydream.js'),
+    fetch: async () => ({
+      body: { getReader: () => ({ read: () => Promise.reject(new TypeError('aborted')) }) },
+    }),
   }));
 });
 
