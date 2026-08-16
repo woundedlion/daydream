@@ -615,6 +615,23 @@ test('CurlLattice controls use the fixed pipeline modes as folders', () => {
   assert.equal(h.gui().ctrl('Lattice Cell Scale').folder, 'Primitive Lattice');
   assert.equal(h.gui().ctrl('Lattice Cell Scale').label, 'Cell Scale');
   assert.equal(h.gui().ctrl('Hue Noise Speed').folder, 'Generated Triadic');
+  assert.deepEqual(h.warnings, [], 'every parameter reached a stage');
+});
+
+test('a parameter no stage table maps is reported, not quietly rooted', () => {
+  const params = [...curlLatticeParams(),
+    { name: 'Ridge Sharpness', value: 0.5, min: 0, max: 1, animated: true }];
+  const h = makeHarness({
+    params,
+    engineValues: params.map((parameter) => parameter.value),
+  });
+
+  h.panel.build();
+
+  assert.equal(h.gui().ctrl('Ridge Sharpness').folder, undefined);
+  assert.equal(h.gui().ctrl('Ridge Sharpness').label, 'Ridge Sharpness');
+  assert.equal(h.warnings.length, 1, 'one warning naming every unmapped param');
+  assert.match(h.warnings[0], /no pipeline stage claims Ridge Sharpness/);
 });
 
 test('FacetGrid controls use the fixed pipeline modes as folders', () => {
@@ -695,6 +712,8 @@ test('fixed Shader controls retain stage folders without dynamic metadata', () =
   assert.equal(h.gui().ctrl('Warp Strength').folder, 'Planar Warp 1');
   assert.equal(h.gui().ctrl('Mirror Rotation').folder, 'Planar Warp 2');
   assert.equal(h.gui().ctrl('Edge Width').folder, 'Coverage');
+  assert.deepEqual(h.warnings, [],
+    'the Shader stage rules file every name they are given');
 });
 
 test('a promoted Shader snapshot outranks a matching dedicated-effect schema', () => {

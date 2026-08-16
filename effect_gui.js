@@ -1111,12 +1111,14 @@ export function createEffectGui({
       }
     }
 
+    const unstagedParams = [];
     params.forEach(p => {
       state[p.name] = paramControlKind(p) === 'enum'
         ? selectorControlValue(p)
         : p.value;
 
       const stage = stageAssignments?.get(p.name);
+      if (stageAssignments && !stage) unstagedParams.push(p.name);
       const controlGui = stage ? stageFolders.get(stage) : fx.gui;
       const controller = addParamControl(
         controlGui, state, p, !previousParamNames?.has(p.name),
@@ -1147,6 +1149,9 @@ export function createEffectGui({
         fx.warningsDirty = true;
       });
     });
+    if (unstagedParams.length > 0) {
+      logWarn(`Effect GUI: no pipeline stage claims ${unstagedParams.join(', ')}; shown outside every stage folder`);
+    }
   }
 
   /**
