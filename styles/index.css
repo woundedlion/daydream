@@ -492,7 +492,7 @@
   .nav-tabs {
     padding: 6px;
     gap: 4px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: center;
   }
 
@@ -501,14 +501,16 @@
   }
 
   .nav-label {
-    font-size: 12px;
-    padding: 4px 0;
-    margin-right: 2px;
+    display: none;
   }
 
   .tab {
-    padding: 5px 8px;
-    font-size: 12px;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 5px 2px;
+    font-size: 11px;
+    text-align: center;
+    white-space: nowrap;
   }
 
   /* Show stats bar below effect selectors */
@@ -554,7 +556,7 @@
   .main-area {
     flex-direction: column;
     height: auto;
-    min-height: 50vh;
+    min-height: 0;
   }
 
   .effect-sidebar {
@@ -639,7 +641,8 @@
   }
 
   .canvas-container {
-    min-height: 50vh;
+    flex: 1 1 0;
+    min-height: 0;
   }
 
 }
