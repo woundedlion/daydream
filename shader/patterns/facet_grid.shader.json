@@ -322,7 +322,7 @@
         "classification": "preset",
         "storage": "binary32",
         "unit": "ratio",
-        "domain": { "minimum": 0.015625, "maximum": 2 },
+        "domain": { "minimum": 0.015625, "maximum": 8 },
         "interpolation": { "kind": "LINEAR" },
         "default": 1.47215629
       },
