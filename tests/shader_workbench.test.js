@@ -11,6 +11,7 @@ import {
   applyDynamicShaderDocument,
   engineParameterName,
 } from '../tools/shader_documents.js';
+import { ParamSetResult } from './fake_engine.js';
 
 const INDEX = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const WORKBENCH = readFileSync(new URL('../tools/shader.html', import.meta.url), 'utf8');
@@ -41,47 +42,82 @@ test('document parameter IDs map to dynamic stage controls', () => {
   assert.equal(engineParameterName('source-angle-speed'), 'Source Angle Speed');
 });
 
-test('dynamic document preview snaps structure before applying preset values', () => {
-  const definitions = [
-    { name: 'Function', options: ['Grid'] },
-    { name: 'Projection', options: ['Stereographic'] },
-    { name: 'Surface Noise', options: ['None'] },
-    { name: 'Lens', options: ['None'] },
-    { name: 'Planar Warp 1', options: ['None'] },
-    { name: 'Planar Warp 2', options: ['None'] },
-    { name: 'Signal Weight', options: ['Projection'] },
-    { name: 'Value Transfer', options: ['Linear'] },
-    { name: 'Coverage', options: ['Opaque'] },
-    { name: 'Palette', options: ['Generated Triadic'] },
-    { name: 'Hue Shift Mode', options: ['Noise'] },
-    { name: 'Brightness Envelope', options: ['None'] },
-    { name: 'Pattern Freq' },
-  ];
-  const writes = [];
-  const engine = {
-    getParameterDefinitions: () => definitions,
-    setParameter: (name, value) => { writes.push([name, value]); return true; },
-  };
-  const compiled = { document: {
-    descriptor: { graph: { nodes: [
-      { role: 'surface_project', policy: {
-        pre_lens_surface: 'identity', lens: 'identity', projection: 'stereographic',
-      } },
-      { role: 'planar_warp', policy: { sequence: ['identity', 'identity'] } },
-      { role: 'source', policy: { source: 'grid' } },
-      { role: 'material', policy: {
-        weight: 'projection', transfer: 'linear', coverage: 'opaque',
-      } },
-      { role: 'color', policy: {
-        color: 'generated-palette', hue_mode: 'noise', brightness_envelope: 'none',
-      } },
-    ] } },
-    preset_bank: { presets: [{ preset_id: 'study', values: { 'pattern-freq': 3.5 } }] },
-  } };
+const MODULE = { ParamSetResult };
 
-  assert.equal(applyDynamicShaderDocument(engine, compiled, 'study'), true);
-  assert.deepEqual(writes.at(-1), ['Pattern Freq', 3.5]);
-  assert.equal(writes.find(([name]) => name === 'Function')?.[1], 0);
+const dynamicDefinitions = () => [
+  { name: 'Function', options: ['Grid'] },
+  { name: 'Projection', options: ['Stereographic'] },
+  { name: 'Surface Noise', options: ['None'] },
+  { name: 'Lens', options: ['None'] },
+  { name: 'Planar Warp 1', options: ['None'] },
+  { name: 'Planar Warp 2', options: ['None'] },
+  { name: 'Signal Weight', options: ['Projection'] },
+  { name: 'Value Transfer', options: ['Linear'] },
+  { name: 'Coverage', options: ['Opaque'] },
+  { name: 'Palette', options: ['Generated Triadic'] },
+  { name: 'Hue Shift Mode', options: ['Noise'] },
+  { name: 'Brightness Envelope', options: ['None'] },
+  { name: 'Pattern Freq' },
+];
+
+const dynamicDocument = () => ({ document: {
+  descriptor: { graph: { nodes: [
+    { role: 'surface_project', policy: {
+      pre_lens_surface: 'identity', lens: 'identity', projection: 'stereographic',
+    } },
+    { role: 'planar_warp', policy: { sequence: ['identity', 'identity'] } },
+    { role: 'source', policy: { source: 'grid' } },
+    { role: 'material', policy: {
+      weight: 'projection', transfer: 'linear', coverage: 'opaque',
+    } },
+    { role: 'color', policy: {
+      color: 'generated-palette', hue_mode: 'noise', brightness_envelope: 'none',
+    } },
+  ] } },
+  preset_bank: { presets: [{ preset_id: 'study', values: { 'pattern-freq': 3.5 } }] },
+} });
+
+/** @param {(name: string) => Object} answer */
+function dynamicEngine(answer) {
+  const definitions = dynamicDefinitions();
+  const writes = [];
+  return {
+    writes,
+    getParameterDefinitions: () => definitions,
+    setParameter: (name, value) => { writes.push([name, value]); return answer(name); },
+  };
+}
+
+test('dynamic document preview snaps structure before applying preset values', () => {
+  const engine = dynamicEngine(() => ParamSetResult.APPLIED);
+
+  assert.equal(
+    applyDynamicShaderDocument(engine, MODULE, dynamicDocument(), 'study'), null);
+  assert.deepEqual(engine.writes.at(-1), ['Pattern Freq', 3.5]);
+  assert.equal(engine.writes.find(([name]) => name === 'Function')?.[1], 0);
+});
+
+// Every ParamSetResult value is a truthy object, so a refused write only reads as
+// refused against APPLIED; a preview that missed one would bake into a Save.
+test('a refused parameter write reports the parameter and the engine outcome', () => {
+  const engine = dynamicEngine((name) =>
+    (name === 'Pattern Freq' ? ParamSetResult.READONLY : ParamSetResult.APPLIED));
+
+  const refusal = applyDynamicShaderDocument(
+    engine, MODULE, dynamicDocument(), 'study');
+  assert.equal(typeof refusal, 'string');
+  assert.match(refusal, /Pattern Freq/);
+  assert.match(refusal, /READONLY/);
+});
+
+test('a refused structural write stops before the preset values', () => {
+  const engine = dynamicEngine((name) =>
+    (name === 'Lens' ? ParamSetResult.UNKNOWN_PARAM : ParamSetResult.APPLIED));
+
+  const refusal = applyDynamicShaderDocument(
+    engine, MODULE, dynamicDocument(), 'study');
+  assert.match(refusal, /"Lens" was refused: UNKNOWN_PARAM/);
+  assert.deepEqual(engine.writes.at(-1), ['Lens', 0]);
 });
 
 test('stage navigation opens and reveals the selected GUI folder', () => {
