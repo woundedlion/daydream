@@ -674,6 +674,26 @@ test('promoted Shader controls use their accepted structural modes as folders', 
     'Translation X');
 });
 
+test('fixed Shader controls retain stage folders without dynamic metadata', () => {
+  const params = [
+    'Camera Wander', 'Pole Fade', 'Planar Warp 1 Strength', 'Pattern Freq',
+    'Edge Width', 'Palette Chroma', 'Mapping Frequency',
+  ].map((name) => ({ name, value: 0, min: 0, max: 1, animated: true }));
+  const h = makeHarness({
+    params,
+    engineValues: params.map(() => 0),
+    fullConfigSnapshot: null,
+    fullConfigFieldDefinitions: null,
+  });
+
+  h.panel.build();
+
+  assert.deepEqual(h.gui().folders.map((folder) => folder.name),
+    ['Camera', 'Projection', 'Planar Warp 1', 'Function', 'Coverage', 'Colorize']);
+  assert.equal(h.gui().ctrl('Planar Warp 1 Strength').label, 'Strength');
+  assert.equal(h.gui().ctrl('Edge Width').folder, 'Coverage');
+});
+
 test('a promoted Shader snapshot outranks a matching dedicated-effect schema', () => {
   const params = [...facetGridParams(), {
     name: 'Central Meridian', value: 0.5, min: 0, max: 1, animated: true,
