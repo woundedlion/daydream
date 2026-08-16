@@ -45,6 +45,9 @@ const JS_REF = [
   /\bimport\s*['"](\.{1,2}\/[^'"]+)['"]/g,
   /\bimport\s*\(\s*['"](\.{1,2}\/[^'"]+)['"]\s*\)/g,
   /\bnew\s+(?:URL|Worker)\s*\(\s*['"](\.{1,2}\/[^'"]+)['"]/g,
+  // A module may hold a specifier or an asset URL in a constant and pass it to
+  // import() or fetch() elsewhere, which none of the forms above see.
+  /['"](\.{1,2}\/[^'"]*\.(?:mjs|js|json|wasm))['"]/g,
 ];
 // The Emscripten glue locates its binary by plain file name, not by specifier.
 const WASM_REF = /['"]([\w.-]+\.wasm)['"]/g;
@@ -169,7 +172,7 @@ const walkFromPages = () => {
       }
       if (!existsSync(resolve(REPO, target))) absent.push(`${path} -> ${target}`);
       else if (!covered(target)) unpublished.push(`${path} -> ${target}`);
-      if (/\.(js|html|css)$/.test(target)) queue.push(target);
+      if (/\.(m?js|html|css)$/.test(target)) queue.push(target);
       else seen.add(target);
     }
   }
