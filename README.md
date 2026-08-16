@@ -17,7 +17,7 @@ The project spans **two repositories** that ship as one product:
 | Repo | Role | What lives here |
 |---|---|---|
 | [**Holosphere**](https://github.com/woundedlion/pov) | C++ engine + firmware | All rendering code, effects, hardware drivers (`pov_single.h`, `pov_segmented.h`), the Emscripten/WASM target, unit tests, and this README. |
-| [**daydream**](https://github.com/woundedlion/daydream) | Web simulator | Three.js renderer, the compiled `holosphere_wasm.{js,wasm}` artifacts (output of Holosphere's WASM build), GUI/sidebar, recorder, segmented-POV Web Workers, and standalone geometry tools. |
+| [**daydream**](https://github.com/woundedlion/daydream) | Web simulator | Three.js renderer, the compiled `holosphere_wasm.{js,wasm}` artifacts (output of Holosphere's WASM build), GUI/sidebar, recorder, segmented-POV Web Workers, and standalone design tools. |
 
 Building the WASM target in Holosphere installs `holosphere_wasm.js`, `holosphere_wasm.wasm`, `hardware/pov_segment_map.json`, this README, and `docs/screenshots/` into the sibling `daydream/` checkout — so both repos always serve the same README. The live demo is daydream served from GitHub Pages.
 
@@ -113,7 +113,7 @@ Building the WASM target in Holosphere installs `holosphere_wasm.js`, `holospher
     - [10.8 Vendor Importmap](#108-vendor-importmap-cdn-by-default--local-opt-in)
     - [10.9 Video Recording](#109-video-recording-recorderjs)
     - [10.10 Resolution Presets](#1010-resolution-presets)
-    - [10.11 Geometry Tools](#1011-geometry-tools-daydreamtools)
+    - [10.11 Standalone Design Tools](#1011-standalone-design-tools-daydreamtools)
 11. [Building](#11-building)
     - [Firmware (Arduino / Teensy 4.x)](#firmware-arduino--teensy-4x--holosphere-repo)
     - [WASM Build](#wasm-build--holosphere-repo-installs-into-daydream)
@@ -320,9 +320,10 @@ Both trees are gated against their repository's tracked file list: every row mus
 │       ├── FastNoiseLite.h         Single-header noise library
 │       └── FastNoiseLite_config.h  FastNoiseLite build configuration
 │
-├── effects/                    27 headers covering 37 effects plus shared bases:
+├── effects/                    28 headers covering 36 effects plus shared bases:
 │                                BZReactionDiffusion.h, HopfFibration.h, IslamicStars.h,
-│                                Raymarch.h, … — see §9 Effects Reference
+│                                Raymarch.h, …; 5 fixed/ headers hold the shared runtime
+│                                and multi-effect product declarations — see §9
 │
 ├── hardware/                   Hardware drivers
 │   ├── dma_led.h               Non-blocking DMA LED controller for HD107S (Teensy 4.x)
@@ -394,6 +395,8 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── shader_workbench.mjs    Fixed-pipeline document validation and canonical identity
 │   ├── shader_workbench_cli.mjs Command-line validator for shader workbench documents
 │   ├── shader_workbench.test.mjs Node contract tests for the shader workbench
+│   ├── generate_promoted_shader_documents.mjs Generates canonical promoted-effect documents
+│   ├── sha256.mjs              Shared SHA-256 implementation for shader documents
 │   ├── wasm_smoke.mjs          Runtime WASM smoke: drives every effect at both resolutions (CI)
 │   ├── wasm_smoke_predicates.mjs Module-free smoke decisions: dark band, stack creep budget, param zip
 │   ├── wasm_smoke_predicates.test.mjs Node unit test for those three decisions
@@ -471,6 +474,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 ├── pov_segment_map.json        Firmware segment→canvas golden, installed from Holosphere — read by the segment cross-check
 ├── README.md                   Installed from Holosphere (this file)
 ├── docs/screenshots/           Installed from Holosphere
+├── shader/                     Installed shader documents, migration manifest, and validator
 │
 ├── main.js                     index.html's entry module: starts the simulator, once
 ├── bootstrap.js                Dynamic-import boot of daydream.js + failure overlay
@@ -503,11 +507,14 @@ Both trees are gated against their repository's tracked file list: every row mus
 ├── worker_protocol.js          JSDoc @typedef contract plus the runtime protocol version
 ├── styles/                     CSS for the main page and tools
 │
-├── tools/                      Standalone geometry tools (own HTML pages)
+├── tools/                      Standalone design tools (own HTML pages)
 │   ├── lissajous.html          Spherical Lissajous curve designer
 │   ├── mobius.html             Möbius transformation visualizer
 │   ├── palettes.html           Procedural palette tuner
 │   ├── shader.html             Pullback Shader authoring workbench
+│   ├── shader.css              Shader workbench layout and control styling
+│   ├── shader_documents.js     Document loading, validation, matching, and engine application
+│   ├── shader_workbench_nav.js Workbench stage-folder navigation
 │   ├── solids.html             Conway operator playground (uses MeshOps bridge)
 │   ├── shared.js               Three.js scene boilerplate for the 3D tool pages
 │   ├── banner.js               Dependency-free page + fatal-error banners (no Three.js)
@@ -530,7 +537,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── solid_op_rows.js        DOM construction for one op-chain row of solids.html
 │   ├── solid_registry_codegen.js  Registry-paste emitter: the solids.h Entry, OpStep table, Recipe, and (when solids.h declares none) the seed's SEED_* constant
 │   ├── solid_render.js         Scene construction for solids.html: faces, vertices, edges, normals, index labels
-│   ├── tailwind.css            Prebuilt utility classes the four tool pages use, served same-origin
+│   ├── tailwind.css            Prebuilt utility classes the five tool pages use, served same-origin
 │   └── tools.css               Shared design tokens and control styling for the tool pages
 │
 ├── scripts/
@@ -2034,7 +2041,7 @@ An effect passes construction-time flags to its base as `Effect(W, H, {.strobe =
 
 All screenshots below were captured from the [live WebAssembly simulator](https://woundedlion.github.io/daydream/) — the Phantasm 288×144 preset for most, and the Holosphere 96×20 preset for RingShower, Dynamo and Thrusters.
 
-The effect registry and tests carry the full 25-effect roster. The simulator sidebar exposes the curated subset for its active resolution (§10.5), omitting three effects at 288×144 and five at 96×20. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) remains the prior 21-effect subset, excluding the CurlLattice and FacetGrid workbench effects and the two Holosphere-96×20-only effects, Dynamo and Thrusters. Full-cycle Teensy measurements for the firmware playlist are indexed in the [on-device effect profiles](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md).
+The compile-time roster and tests carry 36 firmware-capable effects. Native and WASM builds add the simulator-only `Shader` workbench as a 37th registry entry. The simulator sidebar exposes 32 effects at 288×144 and 31 at 96×20 (§10.5); `Shader` stays out of both card lists because it opens through the standalone tool. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) contains 33 effects, including all fourteen promoted fixed-pipeline effects and excluding the three Holosphere-96×20-only effects: Dynamo, MobiusRings, and Thrusters. Full-cycle Teensy measurements for that playlist are indexed in the [on-device effect profiles](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md).
 
 ### Core Effects (Modern Engine)
 
@@ -2113,18 +2120,6 @@ Visualizes the real spherical harmonics Yˡₘ(θ, φ) as a colored scalar field
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=MobiusGrid" target="_blank"><img src="docs/screenshots/MobiusGrid.png" alt="MobiusGrid" width="280"></a></td>
-<td valign="top">
-
-#### MobiusGrid
-
-A stereographic twin-wave field folded through an inner mirror tile and a live Möbius lens. The lens follows the original grid's 160-frame circular warp cycle while a complementary full-chroma palette tracks displacement through the fold.
-
-**Parameters**: Pattern Freq, Speed, Drift, Projection Spin Speed, Projection Wander, Mobius A/B/C/D Real/Imag, Planar Warp 1/2, Palette Mapping, Chroma, Hue Shift Amount, Outer Wander
-
-</td></tr></table>
-
-<table border="0"><tr>
 <td width="300"><a href="https://woundedlion.github.io/daydream/?effect=MobiusRings" target="_blank"><img src="docs/screenshots/MobiusRings.png" alt="MobiusRings" width="280"></a></td>
 <td valign="top">
 
@@ -2185,6 +2180,78 @@ A single head traces spherical Lissajous curves, cycling through a dozen configu
 </td></tr></table>
 
 <table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=SignalWeave" target="_blank"><img src="docs/screenshots/SignalWeave.png" alt="SignalWeave" width="280"></a></td>
+<td valign="top">
+
+#### SignalWeave
+
+Glitch-folded stereographic grids pulled through an animated wave shear. Four presets morph the grid frequency, complexity, shear strength, and speed inside one fixed pipeline.
+
+**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Pole Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 1 Speed, Warp Strength, Warp Frequency, Warp Field Angle, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+
+</td></tr></table>
+
+<table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=KaleidoWave" target="_blank"><img src="docs/screenshots/KaleidoWave.png" alt="KaleidoWave" width="280"></a></td>
+<td valign="top">
+
+#### KaleidoWave
+
+A drifting twin-wave field reflected through a spherical kaleidoscope, projected stereographically, and repeated by an inner mirror tile.
+
+**Parameters**: Pattern Freq, Speed, Drift, Source Angle Speed, Pole Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 2 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+
+</td></tr></table>
+
+<table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=AlienOcean" target="_blank"><img src="docs/screenshots/AlienOcean.png" alt="AlienOcean" width="280"></a></td>
+<td valign="top">
+
+#### AlienOcean
+
+A broad folded gnomonic grid with slow mirrored drift through a spherical kaleidoscope. Edge-fade coverage and a generated triadic palette give the field its soft, liquid boundary.
+
+**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Pole Fade, Camera Wander, Planar Warp 1 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Edge Width, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+
+</td></tr></table>
+
+<table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=GlitchGrid" target="_blank"><img src="docs/screenshots/GlitchGrid.png" alt="GlitchGrid" width="280"></a></td>
+<td valign="top">
+
+#### GlitchGrid
+
+A mirrored grid folded by the glitch lens and a folded gnomonic projection. Its high-contrast edge-fade material keeps the discontinuous facets legible while the mirror frame drifts.
+
+**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Pole Fade, Camera Wander, Planar Warp 1 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Edge Width, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+
+</td></tr></table>
+
+<table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=FacetWave" target="_blank"><img src="docs/screenshots/FacetWave.png" alt="FacetWave" width="280"></a></td>
+<td valign="top">
+
+#### FacetWave
+
+A wave-sheared grid moving across a folded gnomonic dodecahedral kaleidoscope, then repeated through an inner mirror tile.
+
+**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Pole Fade, Camera Wander, Planar Warp 1 Speed, Warp Strength, Warp Frequency, Warp Field Angle, Planar Warp 2 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+
+</td></tr></table>
+
+<table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=ContourLattice" target="_blank"><img src="docs/screenshots/ContourLattice.png" alt="ContourLattice" width="280"></a></td>
+<td valign="top">
+
+#### ContourLattice
+
+An affine primitive lattice rendered as soft iso contours through a folded gnomonic projection. The affine frame rotates and scales the lattice without changing its fixed stage graph.
+
+**Parameters**: Lattice Cell Scale, Lattice Shape, Lattice Softness, Lattice Radius, Pole Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 1 Speed, Affine Rotation Rate, Affine Translation X, Affine Translation Y, Affine Scale X, Affine Scale Y, Affine Shear, Iso Level, Iso Width, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+
+</td></tr></table>
+
+<table border="0"><tr>
 <td width="300"><a href="https://woundedlion.github.io/daydream/?effect=CurlLattice" target="_blank"><img src="docs/screenshots/CurlLattice.png" alt="CurlLattice" width="280"></a></td>
 <td valign="top">
 
@@ -2192,12 +2259,31 @@ A single head traces spherical Lissajous curves, cycling through a dozen configu
 
 A folded-sinusoidal sphere projection displaced by curl noise and shaded with a generated triadic palette. Its two presets share one fixed pipeline and vary only the surface-noise scale.
 
-**Parameters**: Lattice Cell Scale, Lattice Shape, Lattice Softness, Lattice
-Radius, Pole Fade, Central Meridian, Projection Spin Speed, Projection Wander,
-Camera Wander, Surface Noise Scale, Surface Noise Strength, Surface Noise
-Speed, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation
-Depth, Phase Oscillation Speed, Brightness Depth, Value Opacity Low, Value
-Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+**Parameters**: Lattice Cell Scale, Lattice Shape, Lattice Softness, Lattice Radius, Pole Fade, Central Meridian, Projection Spin Speed, Projection Wander, Camera Wander, Surface Noise Scale, Surface Noise Strength, Surface Noise Speed, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Brightness Depth, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+
+</td></tr></table>
+
+<table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=PrismLattice" target="_blank"><img src="docs/screenshots/PrismLattice.png" alt="PrismLattice" width="280"></a></td>
+<td valign="top">
+
+#### PrismLattice
+
+A polar primitive lattice folded through a triangular-prism kaleidoscope, projected stereographically, and pulled through a second wave-shear stage.
+
+**Parameters**: Lattice Cell Scale, Lattice Shape, Lattice Softness, Lattice Radius, Pole Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 1 Speed, Polar Radial Scale, Polar Radial Phase, Polar Angular Phase, Planar Warp 2 Speed, Warp Strength, Warp Frequency, Warp Field Angle, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+
+</td></tr></table>
+
+<table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=VectorFacets" target="_blank"><img src="docs/screenshots/VectorFacets.png" alt="VectorFacets" width="280"></a></td>
+<td valign="top">
+
+#### VectorFacets
+
+A vector-noise grid refracted across folded gnomonic dodecahedral facets and repeated through an inner mirror tile. A cup-shaped palette envelope emphasizes the warped cell interiors.
+
+**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Pole Fade, Camera Wander, Planar Warp 1 Speed, Warp Strength, Warp Scale, Warp Vector Angle, Planar Warp 2 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Brightness Depth, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
 
 </td></tr></table>
 
@@ -2207,17 +2293,57 @@ Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
 
 #### FacetGrid
 
-A generated analogous-palette grid folded through a dodecahedral kaleidoscope,
-then projected stereographically and repeated by an inner mirror tile. Its
-four presets share one fixed pipeline and vary only continuous parameters.
+A generated analogous-palette grid folded through a dodecahedral kaleidoscope, then projected stereographically and repeated by an inner mirror tile. Its four presets share one fixed pipeline and vary only continuous parameters.
 
-**Parameters**: Pattern Freq, Speed, Source Angle Speed, Complexity, Pattern
-Mix, Drift, Pole Fade, Projection Spin Speed, Projection Wander, Camera Wander,
-Planar Warp 2 Speed, Planar Warp 2 Rotation, Planar Warp 2 Cell X, Planar Warp 2
-Cell Y, Planar Warp 2 Offset X, Planar Warp 2 Offset Y, Palette Chroma, Mapping
-Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed,
-Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue
-Noise Speed
+**Parameters**: Pattern Freq, Speed, Source Angle Speed, Complexity, Pattern Mix, Drift, Pole Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 2 Speed, Planar Warp 2 Rotation, Planar Warp 2 Cell X, Planar Warp 2 Cell Y, Planar Warp 2 Offset X, Planar Warp 2 Offset Y, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+
+</td></tr></table>
+
+<table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=HexWave" target="_blank"><img src="docs/screenshots/HexWave.png" alt="HexWave" width="280"></a></td>
+<td valign="top">
+
+#### HexWave
+
+A mirrored twin-wave field folded through a hexagonal-prism kaleidoscope and projected stereographically, with an analogous generated palette.
+
+**Parameters**: Pattern Freq, Speed, Drift, Source Angle Speed, Pole Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 2 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+
+</td></tr></table>
+
+<table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=EquatorGrid" target="_blank"><img src="docs/screenshots/EquatorGrid.png" alt="EquatorGrid" width="280"></a></td>
+<td valign="top">
+
+#### EquatorGrid
+
+Dodecahedrally folded grids mapped continuously around an equirectangular equator and repeated through an inner mirror tile. Three presets morph density, coupling, and color mapping without changing structure.
+
+**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Pole Fade, Projection Spin Speed, Projection Wander, Camera Wander, Central Meridian, Planar Warp 2 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+
+</td></tr></table>
+
+<table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=CosmicEyeball" target="_blank"><img src="docs/screenshots/CosmicEyeball.png" alt="CosmicEyeball" width="280"></a></td>
+<td valign="top">
+
+#### CosmicEyeball
+
+A high-contrast mirrored stereographic grid folded by the glitch lens. Hue follows total mirror displacement, producing the concentric color structure around the moving field.
+
+**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Pole Fade, Camera Wander, Planar Warp 1 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Edge Width, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount
+
+</td></tr></table>
+
+<table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=MobiusGrid" target="_blank"><img src="docs/screenshots/MobiusGrid.png" alt="MobiusGrid" width="280"></a></td>
+<td valign="top">
+
+#### MobiusGrid
+
+A stereographic twin-wave field folded through an inner mirror tile and a live Möbius lens. The lens follows a continuous 160-frame circular warp cycle while a complementary palette tracks displacement through the fold. Its two presets share the same fixed graph.
+
+**Parameters**: Pattern Freq, Speed, Drift, Source Angle Speed, Pole Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 2 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Mobius A Re, Mobius A Im, Mobius B Re, Mobius B Im, Mobius C Re, Mobius C Im, Mobius D Re, Mobius D Im, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Brightness Depth, Value Opacity Low, Value Opacity High, Hue Shift Amount
 
 </td></tr></table>
 
@@ -2335,7 +2461,7 @@ Volumetric raymarcher that renders twisted tori at the 26 vertices of a disdyaki
 
 #### Shader
 
-Simulator-only pullback-shader authoring workbench with the complete structural vocabulary and configurable stage folders. It opens as the dedicated `tools/shader.html` route rather than a normal simulator effect card. Twenty-three retained legacy presets migrate to stable fixed-pipeline product effects; legacy preset 4 is retired, and unmatched custom configurations route here for editing. The firmware rosters contain only the promoted effects.
+Simulator-only pullback-shader authoring workbench with the complete structural vocabulary and configurable stage folders. It opens in a new tab through Daydream's dedicated [Shader workbench page](https://github.com/woundedlion/daydream/blob/master/tools/shader.html) rather than a normal simulator effect card, and its popped-out navigation omits simulator-only controls. Twenty-three retained legacy presets migrate to stable fixed-pipeline product effects; legacy preset 4 is retired, and unmatched custom configurations route here for editing. The firmware rosters contain only the promoted effects.
 
 **Parameters**: the active controls are schema-driven by the selected slots. See the vocabulary and dependency map below.
 
@@ -2343,7 +2469,7 @@ Simulator-only pullback-shader authoring workbench with the complete structural 
 
 ### Shader Authoring Workbench
 
-The fixed-pipeline migration specification defines the architecture. `ShaderWorkbench` is registered as `Shader`, with `ShaderBall` retained as a legacy alias. It owns structural editing and dynamic dispatch in WASM and native oracle tests only. `HS_ENABLE_SHADER_WORKBENCH` is rejected for Arduino builds, and release ELF inspection gates the dynamic backend, topology registry, and workbench symbols out of firmware.
+The [fixed-pipeline migration specification](https://github.com/woundedlion/pov/blob/master/docs/specs/shader_workbench_fixed_pipeline_effects_spec.md) defines the architecture. `ShaderWorkbench` is registered as `Shader`, with `ShaderBall` retained as a legacy alias. It owns structural editing and dynamic dispatch in WASM and native oracle tests only. `HS_ENABLE_SHADER_WORKBENCH` is rejected for Arduino builds, and release ELF inspection gates the dynamic backend, topology registry, and workbench symbols out of firmware.
 
 Shipping looks are ordinary concrete `Effect` types. Each names one compile-time `Pullback::Pipeline`, a compact parameter and prepared-frame type, immutable stable preset IDs, and only the resources its graph uses. Its raster loop calls `Derived::shade(view, frame)` directly; there is no per-pixel function-pointer dispatch, topology lookup, family object, or universal Shader parameter block. The shared `FixedLook::Runtime` contains only lifecycle work that is genuinely common: clocks, preset interpolation, parameter registration, palette/LUT ownership, narrow frame preparation, and the typed scan loop. Generated palette evaluation remains in the shared `GenerativePalette` color stage rather than being copied into each effect.
 
@@ -2401,6 +2527,8 @@ Two stages carry approved approximations. Fast square Peirce projection and the 
 
 These fourteen effects form the product-only `shader-collection` group; family metadata is not part of runtime identity. The group keeps the former Shader slot at 120 seconds total instead of multiplying it into fourteen independent 120-second entries. Host tests compare every shared-runtime preset bit-for-bit against Shader's dynamic evaluator; Curl Lattice and Facet Grid have dedicated white-box equivalence suites.
 
+The [2026-08-16 device captures](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md) report zero spilled frames for all fourteen effects, with peaks from 23.30 ms for GlitchGrid to 48.67 ms for CurlLattice. The fixed effects let the compiler inline the exact typed pipeline and discard every unused stage. The shared runtime and `GenerativePalette` color stage keep common lifecycle and palette machinery from being duplicated without introducing type erasure in the per-pixel call. No paired capture currently isolates specialization from the other structural differences, so the archive does not claim a dispatch-only speedup.
+
 #### Authoring vocabulary
 
 The parameter schema exposes the broader Shader workbench vocabulary below. A menu entry describes a structurally possible field value, not a promise that its Cartesian combination is compiled for Teensy. The simulator renders valid unmatched combinations dynamically; sliders are active only when the selected schema uses them.
@@ -2455,7 +2583,7 @@ Colorize ──────────> Palette + selected hue-shift source
 ```
 
 
-Schema validity still enforces the cross-stage constraints that have a geometric reason. Noise Contour (Sphere) cannot follow a planar warp. Polar Chart must be the only planar warp, except that Planar Warp 1 Polar Chart may be followed by Wave Shear. It requires Grid or Primitive Lattice, and when it is the only planar warp its seam must land on a whole number of source periods: `Pattern Freq × Polar Harmonic` for Grid, `2π × Lattice Cell Scale × Polar Harmonic` for Primitive Lattice, which is periodic in its cell scale and ignores Pattern Freq. Seam-sensitive projected noise and warp stages cannot cross the cut topology of Bonne, Peirce, or Airocean. Unsafe coordinate bounds and excess noise resources are rejected as well. These incompatible combinations remain pending and report an actionable warning. Manifest availability is separate: the simulator routes valid unmatched combinations dynamically, while Teensy requires one of the 13 compiled descriptors.
+Schema validity still enforces the cross-stage constraints that have a geometric reason. Noise Contour (Sphere) cannot follow a planar warp. Polar Chart must be the only planar warp, except that Planar Warp 1 Polar Chart may be followed by Wave Shear. It requires Grid or Primitive Lattice, and when it is the only planar warp its seam must land on a whole number of source periods: `Pattern Freq × Polar Harmonic` for Grid, `2π × Lattice Cell Scale × Polar Harmonic` for Primitive Lattice, which is periodic in its cell scale and ignores Pattern Freq. Seam-sensitive projected noise and warp stages cannot cross the cut topology of Bonne, Peirce, or Airocean. Unsafe coordinate bounds and excess noise resources are rejected as well. These incompatible combinations remain pending and report an actionable warning. Manifest availability is separate: the simulator routes valid unmatched combinations dynamically, while firmware exposes the fourteen promoted fixed descriptors rather than the workbench dispatcher.
 
 Projection seams use topology supplied by the projection kernel rather than guessing from planar coordinates. **Edge Fade** gives both sides of a paired cut the same authored fade, so the seam closes flush without a subducted edge. Glued and periodic edges remain continuous and do not fade. **Pole Fade** is projection weight; selecting either projection-weight coverage policy carries that attenuation into alpha as well as any separately selected signal weighting.
 
@@ -2498,7 +2626,7 @@ The [`daydream`](https://github.com/woundedlion/daydream) repo is a static web a
 1. Drive the WASM engine one frame at a time at a fixed cadence.
 2. Map each `(x, y, color)` pixel to a position on a 3D sphere and render it as an instanced dot mesh.
 3. Provide a UI for switching effects, tuning parameters, sweeping resolutions, recording video, and exercising the segmented-POV multi-board mode.
-4. Host four standalone geometry tools for interactive design work, one of which (`solids.html`) drives the engine's own `MeshOps` through WASM.
+4. Host five standalone design tools for interactive authoring, three of which drive engine facilities through WASM.
 
 ### 10.1 Process and Threading Model
 
@@ -2701,7 +2829,7 @@ Key properties:
 
 ### 10.8 Vendor Importmap (CDN by Default / Local Opt-In)
 
-`vendor-importmap.js` is loaded as a regular (non-module) `<script>` by `index.html` and by the three tool pages that import bare specifiers. `palettes.html` imports none — every module it loads is page-relative — so it carries no importmap script at all. At parse time the helper:
+`vendor-importmap.js` is loaded as a regular (non-module) `<script>` by `index.html` and by the four tool pages that import bare specifiers. `palettes.html` imports none — every module it loads is page-relative — so it carries no importmap script at all. At parse time the helper:
 
 1. Locates itself via `document.currentScript.src`, so it works whether called as `./vendor-importmap.js` (root) or `../vendor-importmap.js` (a tool page).
 2. Reads a build-time-baked `VENDOR` decision (per library, `'cdn'` or `'local'`).
@@ -2716,7 +2844,7 @@ import map, so the exact package-version pin is the primary defense; the
 available SRI entries are additional partial coverage. Import-map `integrity`
 is Chromium-only — Firefox and Safari ignore the key entirely, so SRI is no
 coverage at all there. A `Content-Security-Policy` meta tag, carried by
-`index.html` and each of the four tool pages, bounds this on every browser
+`index.html` and each of the five tool pages, bounds this on every browser
 by origin: script loads are restricted to `'self'` plus the CDN origins that
 page actually uses. It is an origin boundary, not an XSS one — every page
 carries `'unsafe-inline'`, required by the four tool pages' inline module
@@ -2745,7 +2873,7 @@ Codec priority is MP4/H.264 → WebM/VP9 → WebM/VP8. Capture always goes throu
 
 Switching presets does a full WASM reset: `setResolution(w, h)` updates the active width/height and drops the current effect — the pixel buffer is pre-sized to `MAX_W × MAX_H` and deliberately never resized (a realloc could move its backing store under `ALLOW_MEMORY_GROWTH` and detach every outstanding `getPixels()` view), so `getPixels()` returns a view over just the active prefix. `setEffect(name)` then rebuilds the effect at the new template instantiation. The sidebar swaps to the matching favorites list (§10.5).
 
-### 10.11 Geometry Tools (`daydream/tools/`)
+### 10.11 Standalone Design Tools (`daydream/tools/`)
 
 Five standalone HTML pages. Four render with Three.js; `palettes.html` renders with 2D canvas contexts. Three are backed by the engine's WASM build so their math stays identical to the C++ engine — `shader.html` through the authoring-only `Shader` effect, `solids.html` via the `MeshOps` class, and `palettes.html` via `PaletteOps` — and all three hard-require it: a failed module load raises a fatal banner instead of falling back. `lissajous.html` and `mobius.html` implement their geometry math directly in JavaScript:
 
@@ -2921,4 +3049,4 @@ This project is split-licensed: the rendering engine and the visual effects carr
 
 **Per-file notices are a C++ convention only.** The `Required Notice` banner at the top of engine and effect sources is a courtesy for files that travel alone; it is not what grants or withholds rights. Build tooling, generator and gate scripts, and test files — Python, shell, and JavaScript in either repo — deliberately carry no banner, and `tools/license_check.py` gates the C/C++ ones only. Scope is decided by the terms above and by the file's location in the tree, banner or not.
 
-**Third-party.** The engine vendors [FastNoiseLite](https://github.com/Auburn/FastNoiseLite) 1.1.1 as `core/vendor/FastNoiseLite.h` under the MIT License (Auburn / Jordan Peck), patched in tree as recorded in `core/vendor/FastNoiseLite_config.h` (first-party). `core/math/projections.h` carries map projections derived from [PROJ](https://proj.org) under the MIT License (Frank Warmerdam, Gerald I. Evenden, Kristian Evers, Toby C Wilkinson and the PROJ contributors); it sits outside `core/vendor/` because the engine's own projections are developed alongside them in the same header, and `LICENSE` names it as an exception. The simulator vendors one file: `daydream/tools/tailwind.css`, a prebuilt [Tailwind CSS](https://tailwindcss.com) 3.4.17 utility sheet (MIT, Tailwind Labs) served same-origin to the four tool pages, carrying its upstream MIT banner; its preflight reset derives from [modern-normalize](https://github.com/sindresorhus/modern-normalize) (MIT, Sindre Sorhus), itself derived from normalize.css (MIT, Nicolas Gallagher and Jonathan Neal). Everything else the simulator uses loads at runtime: [three.js](https://github.com/mrdoob/three.js) (MIT, three.js authors) and [lil-gui](https://github.com/georgealways/lil-gui) (MIT, George Michael Brower) come from the jsdelivr CDN at the versions pinned in `daydream/package.json` (currently three 0.183.1, lil-gui 0.21.0). The optional self-hosted fonts under `daydream/vendor/fonts/` (Inter and JetBrains Mono, both SIL OFL 1.1) are gitignored and distributed by neither repo.
+**Third-party.** The engine vendors [FastNoiseLite](https://github.com/Auburn/FastNoiseLite) 1.1.1 as `core/vendor/FastNoiseLite.h` under the MIT License (Auburn / Jordan Peck), patched in tree as recorded in `core/vendor/FastNoiseLite_config.h` (first-party). `core/math/projections.h` carries map projections derived from [PROJ](https://proj.org) under the MIT License (Frank Warmerdam, Gerald I. Evenden, Kristian Evers, Toby C Wilkinson and the PROJ contributors); it sits outside `core/vendor/` because the engine's own projections are developed alongside them in the same header, and `LICENSE` names it as an exception. The simulator vendors one file: `daydream/tools/tailwind.css`, a prebuilt [Tailwind CSS](https://tailwindcss.com) 3.4.17 utility sheet (MIT, Tailwind Labs) served same-origin to the five tool pages, carrying its upstream MIT banner; its preflight reset derives from [modern-normalize](https://github.com/sindresorhus/modern-normalize) (MIT, Sindre Sorhus), itself derived from normalize.css (MIT, Nicolas Gallagher and Jonathan Neal). Everything else the simulator uses loads at runtime: [three.js](https://github.com/mrdoob/three.js) (MIT, three.js authors) and [lil-gui](https://github.com/georgealways/lil-gui) (MIT, George Michael Brower) come from the jsdelivr CDN at the versions pinned in `daydream/package.json` (currently three 0.183.1, lil-gui 0.21.0). The optional self-hosted fonts under `daydream/vendor/fonts/` (Inter and JetBrains Mono, both SIL OFL 1.1) are gitignored and distributed by neither repo.
