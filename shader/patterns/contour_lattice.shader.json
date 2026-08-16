@@ -1,0 +1,678 @@
+{
+  "schema_version": 1,
+  "catalog_version": 1,
+  "document_id": "contour-lattice-v1",
+  "effect_id": "contour-lattice",
+  "descriptor": {
+    "graph": {
+      "nodes": [
+        {
+          "label": "camera",
+          "role": "outer_camera",
+          "operator": "pullback.outer_camera.v1",
+          "policy": {
+            "base_orientation": "negative-z-to-negative-y"
+          }
+        },
+        {
+          "label": "surface",
+          "role": "surface_project",
+          "operator": "pullback.surface_project.v1",
+          "policy": {
+            "pre_lens_surface": "identity",
+            "lens": "identity",
+            "post_lens_surface": "identity",
+            "projection": "gnomonic-folded"
+          }
+        },
+        {
+          "label": "warp",
+          "role": "planar_warp",
+          "operator": "pullback.planar_warp.v1",
+          "policy": {
+            "sequence": [
+              "affine-frame",
+              "identity"
+            ]
+          }
+        },
+        {
+          "label": "source",
+          "role": "source",
+          "operator": "pullback.source.v1",
+          "policy": {
+            "source": "primitive-lattice"
+          }
+        },
+        {
+          "label": "material",
+          "role": "material",
+          "operator": "pullback.material.v1",
+          "policy": {
+            "weight": "projection",
+            "transfer": "iso-contour",
+            "coverage": "projection"
+          }
+        },
+        {
+          "label": "color",
+          "role": "color",
+          "operator": "pullback.color.v1",
+          "policy": {
+            "color": "generated-palette",
+            "hue_mode": "noise",
+            "brightness_envelope": "none"
+          },
+          "resources": [
+            "triadic-palette",
+            "hue-noise"
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "from": "camera",
+          "to": "surface"
+        },
+        {
+          "from": "surface",
+          "to": "warp"
+        },
+        {
+          "from": "warp",
+          "to": "source"
+        },
+        {
+          "from": "source",
+          "to": "material"
+        },
+        {
+          "from": "material",
+          "to": "color"
+        }
+      ]
+    },
+    "parameters": [
+      {
+        "id": "lattice-cell-scale",
+        "binding": "lattice.cell.scale",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0.015625,
+          "maximum": 8
+        },
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
+        },
+        "default": 1
+      },
+      {
+        "id": "lattice-shape",
+        "binding": "lattice.shape",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "lattice-softness",
+        "binding": "lattice.softness",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0.0009765625,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
+        },
+        "default": 0.05
+      },
+      {
+        "id": "lattice-radius",
+        "binding": "lattice.radius",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0.015625,
+          "maximum": 0.49
+        },
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
+        },
+        "default": 0.25
+      },
+      {
+        "id": "pole-fade",
+        "binding": "pole.fade",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 1,
+          "maximum": 20
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 1
+      },
+      {
+        "id": "camera-wander",
+        "binding": "camera.wander",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "outer-speed",
+        "binding": "outer.speed",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "turn-per-frame",
+        "domain": {
+          "minimum": -0.02,
+          "maximum": 0.02
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "outer-rotation-rate",
+        "binding": "outer.rotation.rate",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "radian",
+        "domain": {
+          "minimum": -6.2831854820251465,
+          "maximum": 6.2831854820251465
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "outer-translation-x",
+        "binding": "outer.translation.x",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -4,
+          "maximum": 4
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "outer-translation-y",
+        "binding": "outer.translation.y",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -4,
+          "maximum": 4
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "outer-scale-x",
+        "binding": "outer.scale.x",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0.015625,
+          "maximum": 64
+        },
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
+        },
+        "default": 1
+      },
+      {
+        "id": "outer-scale-y",
+        "binding": "outer.scale.y",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0.015625,
+          "maximum": 64
+        },
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
+        },
+        "default": 1
+      },
+      {
+        "id": "outer-shear",
+        "binding": "outer.shear",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -4,
+          "maximum": 4
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "iso-level",
+        "binding": "iso.level",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0.5
+      },
+      {
+        "id": "iso-width",
+        "binding": "iso.width",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0.0009765625,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0.05
+      },
+      {
+        "id": "palette-chroma",
+        "binding": "palette.chroma",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0.62
+      },
+      {
+        "id": "palette-mapping",
+        "binding": "color.palette-mapping",
+        "classification": "preset",
+        "storage": "enum8",
+        "unit": "mapping",
+        "domain": {
+          "values": [
+            "cup",
+            "bell",
+            "linear",
+            "reverse"
+          ]
+        },
+        "interpolation": {
+          "kind": "MIXED_ENUM"
+        },
+        "default": "linear"
+      },
+      {
+        "id": "mapping-frequency",
+        "binding": "mapping.frequency",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0.01,
+          "maximum": 32
+        },
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
+        },
+        "default": 1
+      },
+      {
+        "id": "mapping-phase",
+        "binding": "mapping.phase",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -1,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "phase-oscillation-depth",
+        "binding": "phase.oscillation.depth",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "phase-oscillation-speed",
+        "binding": "phase.oscillation.speed",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "turn-per-frame",
+        "domain": {
+          "minimum": -0.02,
+          "maximum": 0.02
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "value-opacity-low",
+        "binding": "value.opacity.low",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 1
+      },
+      {
+        "id": "value-opacity-high",
+        "binding": "value.opacity.high",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 1
+      },
+      {
+        "id": "hue-shift-amount",
+        "binding": "hue.shift.amount",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -4,
+          "maximum": 4
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "projection-spin-speed",
+        "binding": "projection.spin.speed",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "turn-per-frame",
+        "domain": {
+          "minimum": 0,
+          "maximum": 0.05
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "projection-wander",
+        "binding": "projection.wander",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "hue-noise-scale",
+        "binding": "hue.noise.scale",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0.015625,
+          "maximum": 8
+        },
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
+        },
+        "default": 1
+      },
+      {
+        "id": "hue-noise-speed",
+        "binding": "hue.noise.speed",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "turn-per-frame",
+        "domain": {
+          "minimum": -0.001,
+          "maximum": 0.001
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      }
+    ],
+    "path_policies": [
+      {
+        "id": "parallel",
+        "kind": "PARALLEL"
+      }
+    ],
+    "clocks": [
+      {
+        "id": "palette-cycle",
+        "kind": "generated-palette-cycle",
+        "settings": {
+          "fade": 600
+        }
+      },
+      {
+        "id": "transition-progress",
+        "kind": "completed-frame",
+        "settings": {
+          "pause": "parameter-animation"
+        }
+      }
+    ],
+    "preparation": [
+      {
+        "id": "spatial-frames",
+        "kind": "prepare-orientation-conjugates"
+      },
+      {
+        "id": "hue-luts",
+        "kind": "prepare-hue-luts"
+      },
+      {
+        "id": "warp-carriers",
+        "kind": "prepare-fixed-warps"
+      }
+    ],
+    "resources": [
+      {
+        "id": "triadic-palette",
+        "kind": "generated-triadic-palette",
+        "settings": {
+          "hue_step": 159
+        }
+      },
+      {
+        "id": "hue-noise",
+        "kind": "simplex-sphere-scalar",
+        "settings": {
+          "seed": 6047
+        }
+      }
+    ],
+    "serialization": {
+      "schema_version": 1,
+      "fields": [
+        "lattice-cell-scale",
+        "lattice-shape",
+        "lattice-softness",
+        "lattice-radius",
+        "pole-fade",
+        "camera-wander",
+        "outer-speed",
+        "outer-rotation-rate",
+        "outer-translation-x",
+        "outer-translation-y",
+        "outer-scale-x",
+        "outer-scale-y",
+        "outer-shear",
+        "iso-level",
+        "iso-width",
+        "palette-chroma",
+        "palette-mapping",
+        "mapping-frequency",
+        "mapping-phase",
+        "phase-oscillation-depth",
+        "phase-oscillation-speed",
+        "value-opacity-low",
+        "value-opacity-high",
+        "hue-shift-amount",
+        "projection-spin-speed",
+        "projection-wander",
+        "hue-noise-scale",
+        "hue-noise-speed"
+      ]
+    },
+    "approximation": [
+      {
+        "id": "hue-luts",
+        "kind": "registered-oracle",
+        "settings": {
+          "oracle": "hue-luts-v1"
+        }
+      }
+    ],
+    "handoff": {
+      "policy": "reset"
+    }
+  },
+  "preset_bank": {
+    "schema_version": 1,
+    "presets": [
+      {
+        "preset_id": "affine-contour",
+        "display_name": "Affine Contour",
+        "values": {
+          "lattice-cell-scale": 1.22925,
+          "lattice-shape": 1,
+          "lattice-softness": 0.1608203,
+          "lattice-radius": 0.332981884,
+          "pole-fade": 1,
+          "camera-wander": 1,
+          "outer-speed": 0.015625,
+          "outer-rotation-rate": 0,
+          "outer-translation-x": 4,
+          "outer-translation-y": 4,
+          "outer-scale-x": 1,
+          "outer-scale-y": 1,
+          "outer-shear": 0,
+          "iso-level": 0.138,
+          "iso-width": 0.227034181,
+          "palette-chroma": 0.62,
+          "palette-mapping": "linear",
+          "mapping-frequency": 1,
+          "mapping-phase": 0,
+          "phase-oscillation-depth": 0,
+          "phase-oscillation-speed": 0,
+          "value-opacity-low": 1,
+          "value-opacity-high": 1,
+          "hue-shift-amount": 0.398,
+          "projection-spin-speed": 0.0208791979,
+          "projection-wander": 0.00309175253,
+          "hue-noise-scale": 0.8300313,
+          "hue-noise-speed": 0.000212000014
+        }
+      }
+    ],
+    "edges": [],
+    "absent_edge_fallback": {
+      "manual": "SNAP",
+      "automatic": "REJECT",
+      "synchronized": "SNAP",
+      "restore": "SNAP",
+      "authoring": "SNAP"
+    },
+    "choreography": {
+      "generated_order": [
+        "affine-contour"
+      ],
+      "dwell": {
+        "affine-contour": 600
+      }
+    }
+  },
+  "effect_metadata": {
+    "display_name": "Contour Lattice",
+    "description": "An affine primitive lattice rendered as soft contours."
+  }
+}

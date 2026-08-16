@@ -684,7 +684,7 @@ JS:  wasmEngine.getPixels()
 
 ### End-to-End Flow
 
-A typical effect frame follows a four-stage pipeline. Not every effect uses every stage — some skip generation entirely, others skip transformations, and a few full-screen shader effects (e.g. ShaderBall, Raymarch) extend `Effect` directly and bypass the filter pipeline altogether — but the available primitives compose along this flow:
+A typical effect frame follows a four-stage pipeline. Not every effect uses every stage — some skip generation entirely, others skip transformations, and full-screen shader effects such as the fixed pullback roster and Raymarch extend `Effect` directly and bypass the filter pipeline altogether — but the available primitives compose along this flow:
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
@@ -1177,7 +1177,7 @@ Two traversal helpers linearize multi-level orientation history into a single ca
 | Function | Input | Description |
 |---|---|---|
 | `tween(orientation, callback)` | `Orientation<CAP>` | Iterates over the sub-frame quaternion history of a single orientation, calling `callback(quaternion, t)` for each step with `t ∈ (0, 1]`. Sub-frame 0 is the pose carried over from the previous frame's end and is skipped unless it is the only snapshot (which reads `t = 1`, age-neutral). Used by `World::Orient` to distribute motion blur. |
-| `deep_tween(trail, callback)` | `OrientationTrail` (any `Tweenable`) | Flattens a trail of orientations into a single continuous traversal, calling `callback(quaternion, t)` with a global `t` spanning all frames and sub-frames. Used by the orientation-trail effects (Comets, ChaoticStrings, RingSpin) for rendering trails with full sub-frame accuracy. A bare `Orientation` has no per-frame structure to flatten and is rejected by the `Tweenable` concept — use `tween` for that. |
+| `deep_tween(trail, callback)` | `OrientationTrail` (any `Tweenable`) | Flattens a trail of orientations into a single continuous traversal, calling `callback(quaternion, t)` with a global `t` spanning all frames and sub-frames. Used by the orientation-trail effects (Comets, Fishbowl, RingSpin) for rendering trails with full sub-frame accuracy. A bare `Orientation` has no per-frame structure to flatten and is rejected by the `Tweenable` concept — use `tween` for that. |
 
 #### Animations and Mutable State
 
@@ -1379,7 +1379,7 @@ Pixel (linear 16-bit) → linear RGB float → OKLab (L, a, b) → OKLCH (L, C, 
 | `oklab_to_oklch()` | Convert OKLab (rectangular) to OKLCH (polar: Lightness, Chroma, Hue) |
 | `lerp_oklch()` | Interpolate two OKLCH values with shortest-arc hue (avoids the red→green→blue detour) |
 | `gamut_clip_preserve_chroma()` | Maps an out-of-gamut OKLab color back into the sRGB cube by reducing chroma while holding hue and lightness (walk-then-bisect on the chroma scale). The hue-preserving alternative to a per-channel RGB clip. Gated behind an in-gamut test (`oklab_to_linear_rgb_gamut`), so in-gamut colors — the vast majority — pay only the test and skip the search. |
-| `hue_rotate()` | Perceptual hue rotation — rotates the (a,b) chroma plane in OKLab, preserving lightness and chroma. Forward nonlinearity uses `fast_cbrt` (hot per-pixel path); inverse is exact. Out-of-gamut results are chroma-reduced rather than per-channel clipped, which holds hue and stabilizes the feedback loop against saturated-color drift. Used by the feedback `hue_fade` transform and ShaderBall's sphere-space hue noise. |
+| `hue_rotate()` | Perceptual hue rotation — rotates the (a,b) chroma plane in OKLab, preserving lightness and chroma. Forward nonlinearity uses `fast_cbrt` (hot per-pixel path); inverse is exact. Out-of-gamut results are chroma-reduced rather than per-channel clipped, which holds hue and stabilizes the feedback loop against saturated-color drift. Used by the feedback `hue_fade` transform and the pullback color stage's sphere-space hue noise. |
 
 #### The Gamut Boundary Grid
 
@@ -1392,7 +1392,7 @@ The clip reads the 256 × 128 flash master by default. An effect that clips per 
 | `init_gamut_lut(arena, angle_steps, l_steps)` | Downsamples the flash master into `arena` and points the clip at the copy. Both step counts must divide the master's 256 × 128 and stay at or above `GAMUT_LUT_MIN_ANGLE_STEPS` × `GAMUT_LUT_MIN_L_STEPS` (128 × 64), the coarsest grid the walk resolves — both trapped. Costs `gamut_lut_bytes(angle_steps, l_steps)`. Call from the effect's `init()`, after any `configure_arenas()`. |
 | `release_gamut_lut()` | Drops the copy and points the clip back at the flash master. Registered as an `ArenaResetHook`, so `configure_arenas()` and the mesh carousel's compaction both run it before handing the storage out again. |
 
-`ShaderBall` and `MeshFeedback` arm a copy; every other effect clips against the flash master.
+The Shader workbench and `MeshFeedback` arm a copy; every other effect clips against the flash master.
 
 #### Palette Modifiers
 
@@ -2022,7 +2022,7 @@ register_readonly_param("Particles", &params.active_count, 0.0f, 1024.0f);  // e
 
 The enum overload takes an array of option labels that must outlive the effect (string literals). `register_animated_param` marks the param as written by the animation system, so the GUI renders it as an auto-pausing slider that engages "Pause Animation" when touched; `register_readonly_param` marks it engine-written, so the GUI shows the live value but disables editing. The readonly flag can also be applied to an already-registered param via `mark_readonly(name)`, and `mark_global(name)` marks an already-registered param a global control rather than part of the effect's look, clearing the `preset` flag so preset exports skip it.
 
-The parameter list (`ParamList`) is accessible via `getParameters()`, and `updateParameter(name, float)` sets values at runtime. Its default storage is a fixed `std::array<ParamDef, 32>`; an effect needing more calls `use_parameter_storage()` to swap in an arena-allocated array, as ShaderBall does at 80 (both are fixed-capacity — the no-realloc memory-view invariant the WASM bridge depends on). Each `ParamDef` holds a plain `void *` target tagged by a `TargetType`: `FLOAT`, `BOOL`, or one of six integer widths (`INT_I8`/`INT_U8`/`INT_I16`/`INT_U16`/`INT_I32`/`INT_U32`). Every write arrives as a float and is converted on store, with automatic bool threshold at 0.5. The animation system can also write to these parameters, allowing effects to animate their own exposed controls.
+The parameter list (`ParamList`) is accessible via `getParameters()`, and `updateParameter(name, float)` sets values at runtime. Its default storage is a fixed `std::array<ParamDef, 32>`; an effect needing more calls `use_parameter_storage()` to swap in an arena-allocated array, as the Shader workbench does at 80 (both are fixed-capacity — the no-realloc memory-view invariant the WASM bridge depends on). Each `ParamDef` holds a plain `void *` target tagged by a `TargetType`: `FLOAT`, `BOOL`, or one of six integer widths (`INT_I8`/`INT_U8`/`INT_I16`/`INT_U16`/`INT_I32`/`INT_U32`). Every write arrives as a float and is converted on store, with automatic bool threshold at 0.5. The animation system can also write to these parameters, allowing effects to animate their own exposed controls.
 
 ### The `EffectConfig` Flags
 
@@ -2118,6 +2118,18 @@ Visualizes the real spherical harmonics Yˡₘ(θ, φ) as a colored scalar field
 
 #### MobiusGrid
 
+A stereographic twin-wave field folded through an inner mirror tile and a live Möbius lens. The lens follows the original grid's 160-frame circular warp cycle while a complementary full-chroma palette tracks displacement through the fold.
+
+**Parameters**: Pattern Freq, Speed, Drift, Projection Spin Speed, Projection Wander, Mobius A/B/C/D Real/Imag, Planar Warp 1/2, Palette Mapping, Chroma, Hue Shift Amount, Outer Wander
+
+</td></tr></table>
+
+<table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=MobiusRings" target="_blank"><img src="docs/screenshots/MobiusRings.png" alt="MobiusRings" width="280"></a></td>
+<td valign="top">
+
+#### MobiusRings
+
 A latitude-longitude grid that undergoes live Möbius transformation animation via `MobiusWarpCircularTransformer`.
 
 **Parameters**: Rings, Lines, Alpha
@@ -2183,7 +2195,7 @@ A folded-sinusoidal sphere projection displaced by curl noise and shaded with a 
 **Parameters**: Lattice Cell Scale, Lattice Shape, Lattice Softness, Lattice
 Radius, Pole Fade, Central Meridian, Projection Spin Speed, Projection Wander,
 Camera Wander, Surface Noise Scale, Surface Noise Strength, Surface Noise
-Speed, Palette Chroma, Mapping Frequency, Mapping Phase, Phase Oscillation
+Speed, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation
 Depth, Phase Oscillation Speed, Brightness Depth, Value Opacity Low, Value
 Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
 
@@ -2197,7 +2209,7 @@ Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
 
 A generated analogous-palette grid folded through a dodecahedral kaleidoscope,
 then projected stereographically and repeated by an inner mirror tile. Its
-three presets share one fixed pipeline and vary only continuous parameters.
+four presets share one fixed pipeline and vary only continuous parameters.
 
 **Parameters**: Pattern Freq, Speed, Source Angle Speed, Complexity, Pattern
 Mix, Drift, Pole Fade, Projection Spin Speed, Projection Wander, Camera Wander,
@@ -2234,10 +2246,10 @@ Rings bloom at random orientations and grow their radius from zero, fading in ov
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=ChaoticStrings" target="_blank"><img src="docs/screenshots/ChaoticStrings.png" alt="ChaoticStrings" width="280"></a></td>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=Fishbowl" target="_blank"><img src="docs/screenshots/Fishbowl.png" alt="Fishbowl" width="280"></a></td>
 <td valign="top">
 
-#### ChaoticStrings
+#### Fishbowl
 
 A head traces a fixed 12:5 spherical Lissajous figure whose long trail is continuously warped by a noise transformer, over a slowly cycling gradient palette.
 
@@ -2323,7 +2335,7 @@ Volumetric raymarcher that renders twisted tori at the 26 vertices of a disdyaki
 
 #### Shader
 
-Simulator-only pullback-shader authoring workbench with the complete structural vocabulary and configurable stage folders. It opens as the dedicated `tools/shader.html` route rather than a normal simulator effect card. Its 19 legacy presets migrate to stable fixed-pipeline product effects, while unmatched custom configurations route here for editing. The firmware rosters contain only the promoted effects.
+Simulator-only pullback-shader authoring workbench with the complete structural vocabulary and configurable stage folders. It opens as the dedicated `tools/shader.html` route rather than a normal simulator effect card. Twenty-three retained legacy presets migrate to stable fixed-pipeline product effects; legacy preset 4 is retired, and unmatched custom configurations route here for editing. The firmware rosters contain only the promoted effects.
 
 **Parameters**: the active controls are schema-driven by the selected slots. See the vocabulary and dependency map below.
 
@@ -2331,18 +2343,18 @@ Simulator-only pullback-shader authoring workbench with the complete structural 
 
 ### Shader Authoring Workbench
 
-Full design record: the [ShaderBall spec](https://github.com/woundedlion/pov/blob/master/docs/specs/shaderball_spec.md) fixes the authored vocabulary, presets, and choreography; the [inverse-sampling pipeline spec](https://github.com/woundedlion/pov/blob/master/docs/specs/inverse_sampling_pipeline_spec.md) specifies the shipping renderer summarized below. The [noise unification brief](https://github.com/woundedlion/pov/blob/master/docs/shaderball_noise_unification.md) and the [red-preset optimization plan](https://github.com/woundedlion/pov/blob/master/docs/shaderball_optimization_plan.md) carry the supporting design and performance record.
+The fixed-pipeline migration specification defines the architecture. `ShaderWorkbench` is registered as `Shader`, with `ShaderBall` retained as a legacy alias. It owns structural editing and dynamic dispatch in WASM and native oracle tests only. `HS_ENABLE_SHADER_WORKBENCH` is rejected for Arduino builds, and release ELF inspection gates the dynamic backend, topology registry, and workbench symbols out of firmware.
 
-The shipping renderer is a closed set of typed programs, not a free-form node graph or a runtime switch renderer. A `TopologyKey` records every discrete choice that changes code, canonicalizing inactive layout, noise, and warp fields. The 13-entry program manifest maps an exact key and continuous precondition to a semantic `InversePipelineId` and a non-null `&InversePipeline<...>::shade` wrapper. Teensy has no fallback. The simulator first consults the same manifest, then resolves a valid unmatched configuration to a separate non-null dynamic shade function.
+Shipping looks are ordinary concrete `Effect` types. Each names one compile-time `Pullback::Pipeline`, a compact parameter and prepared-frame type, immutable stable preset IDs, and only the resources its graph uses. Its raster loop calls `Derived::shade(view, frame)` directly; there is no per-pixel function-pointer dispatch, topology lookup, family object, or universal Shader parameter block. The shared `FixedLook::Runtime` contains only lifecycle work that is genuinely common: clocks, preset interpolation, parameter registration, palette/LUT ownership, narrow frame preparation, and the typed scan loop. Generated palette evaluation remains in the shared `GenerativePalette` color stage rather than being copied into each effect.
 
-Frame preparation resolves the backend once, snapshots the selected slots, live parameters, clocks, transforms, prepared lookup data, and borrowed palette/noise resources into an immutable `FrameState`, then validates every resource that backend may dereference. The resulting `PreparedEndpoint` owns the frame snapshot, pipeline ID (`NONE` for dynamic), alpha, and shade pointer. The shared `Scan::Shader` loop calls that pointer unconditionally for every visible sample. Through-clear transitions prepare and consume one endpoint at a time, so compiled and dynamic endpoints can transition without keeping two large frame snapshots live on the stack.
+Each editable source document lives under `patterns/*.shader.json`. The browser validates and canonicalizes a document before changing the live engine, matches its exact descriptor digest to a fixed effect, and selects presets by immutable ID. Open/save preserves exhaustive graph, parameter, resource, transition, and choreography data. Unknown or invalid semantics leave the current preview untouched. The migration manifest maps all 23 retained Shader preset positions to stable effect/preset identities; preset 4 is intentionally retired.
 
-The shader is a *pullback*: it starts at a visible sphere point and walks backward to discover the source coordinate to sample. The reusable `Pullback::Pipeline` in `core/render/pullback.h` accepts exactly six empty policy types and validates their binding, order, exact input/output carriers, return types, terminal placement, provider shape, and approximation metadata at compile time. ShaderBall supplies only its immutable frame binding, narrow state providers, topology matchers, and the closed 14-program manifest. The coordinator and inline-only stages disappear into the address-taken flash wrapper; both compiled and simulator-dynamic paths call the same public core operator kernels.
+The shader is a *pullback*: it starts at a visible sphere point and walks backward through outer camera, surface/projection, planar warp, source, material, and color stages. Both Shader preview and concrete effects call the same public kernels in `core/render/pullback.h`. Palette mapping is continuous preset state: a transition carries both mapping endpoints and interpolates their coordinates before the single palette sample, so changing Cup/Bell/Linear/Reverse does not require another pipeline or effect.
 
 ```
 selection — once per frame
 
-  Candidate Config ──> canonical TopologyKey ──> 13-entry program manifest
+  Candidate Config ──> canonical TopologyKey ──> 15-entry program manifest
                        ├─ match ────> compiled shade + semantic ID
                        └─ no match ─> dynamic shade + NONE (simulator only)
                                       └──> PreparedEndpoint
@@ -2368,38 +2380,30 @@ The core catalog owns the reusable surface, lens, projection, planar-warp, sourc
 
 Two stages carry approved approximations. Fast square Peirce projection and the hue-rotation LUT each name a host reference oracle, exact non-floating fields, error domains, limits, and a final-framebuffer metric as part of the stage contract. The dynamic orchestration is compiled for the simulator and native oracle tests, where every authored preset is compared against it. Teensy preprocessing excludes it.
 
-#### Compiled program roster
+#### Fixed-pipeline roster
 
-Semantic program identities are independent of preset numbering. Presets 7–8 share one topology and therefore one compiled wrapper, differing only in a continuous surface-noise scale the key does not record; all other rows are one authored topology each.
+| Effect ID | Concrete effect | Presets | Legacy source |
+|---|---|---:|---|
+| `signal-weave` | `SignalWeave` | 4 | 0, 21–23 |
+| `kaleido-wave` | `KaleidoWave` | 1 | 1 |
+| `alien-ocean` | `AlienOcean` | 1 | 2 |
+| `glitch-grid` | `GlitchGrid` | 1 | 3 |
+| `facet-wave` | `FacetWave` | 1 | 5 |
+| `contour-lattice` | `ContourLattice` | 1 | 6 |
+| `curl-lattice` | `CurlLattice` | 2 | 7–8 |
+| `prism-lattice` | `PrismLattice` | 1 | 9 |
+| `vector-facets` | `VectorFacets` | 1 | 10 |
+| `facet-grid` | `FacetGrid` | 4 | 11, 13–14, plus `stretched-grid` |
+| `hex-wave` | `HexWave` | 1 | 12 |
+| `equator-grid` | `EquatorGrid` | 3 | 15–17 |
+| `cosmic-eyeball` | `CosmicEyeball` | 1 | 18 |
+| `mobius-grid` | `MobiusGrid` | 2 | 19–20 |
 
-| Preset(s) | Compiled program | Selected stages |
-|---|---|---|
-| 0 | `GLITCH_NOISE_GRID_WAVE_SHEAR` | Stereographic glitch lens, outer wave shear, grid, squared-weight generated color |
-| 1 | `KALEIDOSCOPE_TWIN_WAVE_INNER_MIRROR` | Stereographic kaleidoscope lens, inner mirror, twin wave, squared-weight generated color |
-| 2 | `GNOMONIC_KALEIDOSCOPE_GRID_MIRROR` | Folded gnomonic, kaleidoscope lens, outer mirror, edge-faded generated color |
-| 3 | `GNOMONIC_GLITCH_GRID_MIRROR` | Folded gnomonic, glitch lens, outer mirror, edge-faded generated color |
-| 4 | `PEIRCE_DODECAHEDRAL_GRID` | Square Peirce, dodecahedral lens, edge-faded grid |
-| 5 | `GNOMONIC_DODECAHEDRAL_GRID_WAVE_MIRROR` | Folded gnomonic, dodecahedral lens, outer wave shear then inner mirror, squared-weight generated color |
-| 6 | `GNOMONIC_AFFINE_LATTICE_CONTOUR` | Folded gnomonic, outer affine frame, iso-contour value transfer, projection-weight lattice |
-| 7–8 | `SINUSOIDAL_CURL_LATTICE` | Folded sinusoidal curl surface noise, projection-weight lattice |
-| 9 | `STEREOGRAPHIC_PRISM_POLAR_WAVE_LATTICE` | Stereographic, triangular-prism kaleidoscope lens, outer polar chart then inner wave shear, squared-weight lattice |
-| 10 | `GNOMONIC_DODECAHEDRAL_GRID_VECTOR_MIRROR` | Folded gnomonic, dodecahedral lens, outer projected vector noise then inner mirror, squared-weight generated color |
-| 11, 13–14 | `STEREOGRAPHIC_DODECAHEDRAL_GRID_INNER_MIRROR` | Stereographic, dodecahedral lens, inner mirror, squared-weight grid |
-
-`CurlLattice` promotes presets 7–8 into one registered fixed-pipeline effect.
-It declares the folded-sinusoidal curl pipeline directly;
-its two presets change only surface-noise scale and do not select a program.
-All continuous controls used by that pipeline remain available on the promoted
-effect; structural selectors stay fixed.
-
-`FacetGrid` promotes presets 11 and 13–14 into a second registered
-fixed-pipeline effect and adds one authored look. All four share the exact
-stereographic dodecahedral-grid pipeline and remain presets of one effect; no
-family metadata or structural selectors are needed.
+These fourteen effects form the product-only `shader-collection` group; family metadata is not part of runtime identity. The group keeps the former Shader slot at 120 seconds total instead of multiplying it into fourteen independent 120-second entries. Host tests compare every shared-runtime preset bit-for-bit against Shader's dynamic evaluator; Curl Lattice and Facet Grid have dedicated white-box equivalence suites.
 
 #### Authoring vocabulary
 
-The parameter schema exposes the broader ShaderBall vocabulary below. A menu entry describes a structurally possible field value, not a promise that its Cartesian combination is compiled for Teensy. The simulator renders valid unmatched combinations dynamically; sliders are active only when the selected schema uses them.
+The parameter schema exposes the broader Shader workbench vocabulary below. A menu entry describes a structurally possible field value, not a promise that its Cartesian combination is compiled for Teensy. The simulator renders valid unmatched combinations dynamically; sliders are active only when the selected schema uses them.
 
 The two planar warps run in their displayed pullback order: **Planar Warp 1** then **Planar Warp 2**, followed by the source function.
 
@@ -2415,7 +2419,7 @@ The two planar warps run in their displayed pullback order: **Planar Warp 1** th
 | **Coverage** | Opaque, Projection Weight Squared, Value Cutout, Edge Fade, Projection Weight | Computes alpha independently from color value. Linear projection weight is softer and broader than the squared form. |
 | **Colorize** | Palette: Generated Triadic, Generated Complementary, Generated Analogous. Brightness Envelope: Cup, Bell, Ascending, Descending. Hue Shift Mode: None, Noise, Total Warp Displacement | Converts shaped value and coverage into straight-alpha color. Envelope Frequency repeats the selected palette-coordinate profile 1-32 times without changing Value Transfer or coverage. Hue Shift Amount controls either sphere-space noise rotation or rotation proportional to the accumulated displacement of both planar warps. |
 
-Planar-warp **Speed** advances the stage's wrapped phase in cycles per frame. Affine Frame derives Primitive Lattice's exact planar period as `1 / Lattice Cell Scale`; Translation X/Y are signed whole-cell windings per cycle and therefore scroll continuously in one direction before resetting invisibly at the source. Fractional translation writes snap to the nearest whole winding. A translating Affine Frame requires Primitive Lattice, no later planar warp, and a hue mode other than Total Warp Displacement; incompatible cross-stage edits are rejected with a warning. Rotation and Shear oscillate with quadrature phase, while Scale X/Y move logarithmically between reciprocal extrema. Speed adds no transform of its own. Mirror Tile translates its mirror lattice by one local X cell, producing a seamless repeating scroll while its Y offset remains manual. Polar Chart advances only Angular Phase by one turn; Radial Phase remains manual. Wave Shear advances its wave, Vortex orbits its center, and the two projected-noise modes move through their periodic noise field.
+Planar-warp **Speed** advances the stage's wrapped phase in cycles per frame. Affine Frame derives Primitive Lattice's exact planar period as `1 / Lattice Cell Scale`; Translation X/Y are signed whole-cell windings per cycle and therefore scroll continuously in one direction before resetting invisibly at the source. Fractional translation writes snap to the nearest whole winding. A translating Affine Frame requires Primitive Lattice, no later planar warp, and a hue mode other than Total Warp Displacement; incompatible cross-stage edits are rejected with a warning. Rotation is a signed angle in radians per phase cycle over `[-2π, 2π]`; its continuous angular rate is `Speed × Rotation`, and zero holds the frame still. Shear oscillates, and Scale X/Y move logarithmically between reciprocal extrema. Mirror Tile translates its mirror lattice by one local X cell, producing a seamless repeating scroll while its Y offset remains manual. Polar Chart advances only Angular Phase by one turn; Radial Phase remains manual. Wave Shear advances its wave, Vortex orbits its center, and the two projected-noise modes move through their periodic noise field.
 
 Polyhedral kaleidoscope lenses contract animation-speed and warp/noise-frequency slider ranges to the linear size of one symmetry chamber. Grid Pattern Freq and Lattice Cell Scale retain their full source-density ceilings under every lens, so small dodecahedral and prismatic chambers can still hold dense patterns. The stored units and shader math do not change: frequency remains measured in the stage's native domain and Speed remains cycles per frame. Switching to a smaller chamber clamps affected authoring values into its displayed range; switching back restores the wider range, not the discarded out-of-range value.
 
@@ -2532,7 +2536,7 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 | Method | Description |
 |---|---|
 | `setResolution(w, h)` → `ResolutionSetResult` | Switch active resolution (96×20 or 288×144). Returns `Module.ResolutionSetResult.RESIZED` when the switch took — tearing down the current effect, so `setEffect` and any clip must be re-applied — `ALREADY_ACTIVE` for a request matching the active resolution (a pure no-op; nothing is torn down), or `UNSUPPORTED` for a size the build cannot render (ignored, prior state kept). Compare against the enum values — never by truthiness |
-| `setEffect(name)` → `EffectSetResult` | Instantiate a new effect by string name; resets all arenas to defaults. Returns `Module.EffectSetResult.INSTALLED` on success, else the rejection reason (`UNKNOWN_EFFECT`, or `UNSUPPORTED_RESOLUTION` when the active resolution has no factory); a rejection keeps the prior effect alive. Compare against the enum values — never by truthiness |
+| `setEffect(name)` → `EffectSetResult` | Instantiate a new effect by C++ class name or stable effect ID; `ShaderBall` remains an alias for `Shader`. The call resets all arenas to defaults. Returns `Module.EffectSetResult.INSTALLED` on success, else the rejection reason (`UNKNOWN_EFFECT`, or `UNSUPPORTED_RESOLUTION` when the active resolution has no factory); a rejection keeps the prior effect alive. Compare against the enum values — never by truthiness |
 | `drawFrame()` | Advance one frame and copy pixels to the output buffer |
 | `getPixels()` | Return a zero-copy `Uint16Array` view into WASM linear memory, spanning the active resolution's prefix of the fixed backing buffer |
 | `getBufferLength()` → `int` | Length of the pixel buffer (`W × H × 3`) for sizing the view, and the staleness test for a cached one: a `setResolution` moves this length without detaching the outstanding view |
@@ -2541,12 +2545,14 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 | `getAnimationsPaused()` → `bool` | Whether those drivers are currently frozen. The engine is the owner of this state — an `APPLIED` `setParameter` on an animated param engages the pause by itself — so read it back rather than mirroring the rule in JS |
 | `getPresetCount()` → `uint32` | Number of presets the current effect exposes for manual navigation; `0` when no effect is set or the effect authored none, which is how a GUI decides whether to offer preset controls at all |
 | `getPresetIndex()` → `uint32` | Index of the selected preset; `0` when no effect is set, so tell that apart with `getPresetCount() != 0`. An effect whose choreography advances its own presets moves this with no JS call, so poll it rather than tracking the index last written |
+| `getPresetIds()` → `string[]` | Stable preset IDs in numeric navigation order. Fixed-pipeline identities come from the WASM-only factory metadata, so this API adds no virtual method or firmware vtable cost |
+| `selectPresetById(id)` → `bool` | Select a preset through its persisted identity and engage the animation pause like `selectPreset(index)`; `false` for an empty or unknown ID or an effect without stable preset metadata |
 | `selectPreset(index)` → `bool` | Select a preset for manual navigation: applies it **and engages the animation pause**, exactly as `setAnimationsPaused(true)` would, so the preset's values are not overwritten by the animation on the next frame. `false` when no effect is set, the index is out of range, or the effect refused the preset. The pause survives `setEffect`, so read it back via `getAnimationsPaused()`; parameter values move with the preset, so re-read `getParamValues()` |
 | `synchronizePreset(index)` → `bool` | Select a preset **without touching the pause state** — the call for following engine-driven advancement, which `selectPreset` would freeze. A request for the already-active index is a success no-op; `false` when no effect is set, the index is out of range, or the effect refused the preset |
 | `nextPreset()` / `previousPreset()` → `bool` | Step one preset forward/back with wraparound, pausing animations like `selectPreset`; `false` when no effect is set, the effect has no presets, or it refused the preset |
 | `setPoleLod(aggressiveness)` | Set near-pole azimuthal shading decimation (the GUI "Pole LOD" slider, `[0, 2]`); non-finite and negative inputs clamp to 0, and the value saturates at 8. The setting is a module-global, so it reaches only the engine instance it was called on — a segmented pool needs it re-sent to every worker (§10.7) |
 | `getPoleLod()` → `float` | Current decimation aggressiveness |
-| `getParameterDefinitions()` | Return the parameter list; each entry is `{name, value, requestedValue, acceptedValue, animated, readonly, preset}`, and float params additionally carry `{min, max}` (bool params omit `min`/`max` and return values as JS booleans). `value` is the displayed/rendered state and `requestedValue` is the writable target copied to another renderer. `acceptedValue` is the last value the effect admitted for rendering, which is the writable target for every effect except one that vets a whole configuration (ShaderBall): there a requested value the effect refused leaves `requestedValue` and `acceptedValue` apart, and the accepted one is what a segment worker or a URL restore must replay. An entry whose requested value cannot safely render also carries an actionable `warning` string; other valid edits continue to apply while that value stays requested. Whole-number targets — enum and integer params — additionally carry `step: 1`, absent on a float one, so the GUI knows which controls admit only whole values. `preset` is a bool, `false` only for a param the effect excluded from preset exports (`mark_global`), so an export tool skips those alongside the readonly ones. Enum params (registered with option labels) also carry `options`, an array of label strings indexed by the param's value, which the GUI renders as a dropdown; an enum registered with export literals carries `exportOptions` as well — the C++ enum literals indexed the same way, which the export formatter emits in place of a numeric literal. `exportOptions` is absent on an enum registered without them, and on every non-enum param |
+| `getParameterDefinitions()` | Return the parameter list; each entry is `{name, value, requestedValue, acceptedValue, animated, readonly, preset}`, and float params additionally carry `{min, max}` (bool params omit `min`/`max` and return values as JS booleans). `value` is the displayed/rendered state and `requestedValue` is the writable target copied to another renderer. `acceptedValue` is the last value the effect admitted for rendering, which is the writable target for every effect except the Shader workbench, which vets slots and params as one configuration: there a refused request leaves `requestedValue` and `acceptedValue` apart, and the accepted one is what a segment worker or URL restore must replay. An entry whose requested value cannot safely render also carries an actionable `warning` string; other valid edits continue to apply while that value stays requested. Whole-number targets — enum and integer params — additionally carry `step: 1`, absent on a float one, so the GUI knows which controls admit only whole values. `preset` is a bool, `false` only for a param the effect excluded from preset exports (`mark_global`), so an export tool skips those alongside the readonly ones. Enum params (registered with option labels) also carry `options`, an array of label strings indexed by the param's value, which the GUI renders as a dropdown; an enum registered with export literals carries `exportOptions` as well — the C++ enum literals indexed the same way, which the export formatter emits in place of a numeric literal. `exportOptions` is absent on an enum registered without them, and on every non-enum param |
 | `getParamValues()` | Return current parameter values (including animation-driven updates), as raw floats in definition order. A bool param streams as `0.0`/`1.0` here even though `getParameterDefinitions()` reports its `value` as a JS boolean, so a consumer reads the type off the definition and thresholds this stream at 0.5 rather than testing `typeof` on it |
 | `getParamGeneration()` → `int` | Generation identifying which loaded-effect or no-effect state the definition and value streams describe. Pin it beside a `getParameterDefinitions()` snapshot and re-read it with each `getParamValues()` call; a changed value means the snapshot is stale (parameter counts repeat across the roster, so a length check alone cannot detect the switch or teardown) |
 | `getArenaMetrics()` | Memory usage stats for the three engine arenas, plus the stack high-water mark (see below). Read once per frame by the HUD, so it omits the tooling arenas an engine instance never moves; `MeshOps.getArenaMetrics()` reports all six on demand |
@@ -2555,15 +2561,15 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 | `setClip(x0, x1, y0, y1)` → `ClipSetResult` | Restrict rendering to a sub-rectangle (used by segment workers). Returns `Module.ClipSetResult.APPLIED` when the band is installed, `FULL_FRAME_KEPT` when the bounds are accepted but ignored because the effect reports `needs_full_frame()` (§10.7) and keeps the full-canvas clip, else the rejection reason (`NO_EFFECT` or `INVALID_BOUNDS`). Compare against the enum values — never by truthiness. Both `APPLIED` and `FULL_FRAME_KEPT` are successes, and a segment pool needs them apart to tell an N-way parallel speedup from N workers each computing the same full frame. The two rejections want opposite responses: `INVALID_BOUNDS` is a caller bug worth faulting on, while `NO_EFFECT` is the ordinary state between a `setResolution()` (or an `init` carrying no effect name) and the `setEffect()` that follows. A clip is dropped by any `INSTALLED` `setEffect()` or `RESIZED` `setResolution()` (an `ALREADY_ACTIVE` same-resolution call keeps the clip) and must be re-applied |
 | `strobeColumns()` → `bool` | Whether the current effect renders as discrete strobed columns (dark inter-column gaps) rather than a continuous smeared band; `false` when no effect is set. Daydream reads it to decide whether to fill the inter-column gap |
 
-Five further methods carry ShaderBall's whole configuration across a reload or into a segment worker, which the per-parameter stream above cannot: ShaderBall vets slots and params as one configuration, so replaying the entries one at a time walks through combinations it refuses. None of the five traps when the loaded effect is something else — they report it instead — so a caller may wire them up unconditionally and hide the controls on the not-ShaderBall answer.
+Five further methods carry Shader's whole workbench configuration across a reload or into a segment worker, which the per-parameter stream above cannot. Replaying individual entries can walk through combinations the workbench refuses. None traps when the loaded effect is something else, so a caller may wire them unconditionally and hide the structural controls on the non-Shader answer.
 
 | Method | Description |
 |---|---|
-| `getFullConfigSnapshot()` | Return the current ShaderBall's whole state as `{schemaVersion, accepted, requested, pendingFieldIds, hasRuntime, runtime}`, or `null` when the loaded effect is not ShaderBall. `accepted` and `requested` are `CONFIG_FIELD_COUNT`-long arrays of field values encoded as `uint32`, in `ConfigFieldId` order; `pendingFieldIds` lists the indices of the fields carrying an unresolved edit; `runtime` is the animation clock state, meaningful only when `hasRuntime` |
+| `getFullConfigSnapshot()` | Return the current Shader workbench's whole state as `{schemaVersion, accepted, requested, pendingFieldIds, hasRuntime, runtime}`, or `null` for another effect. `accepted` and `requested` are `CONFIG_FIELD_COUNT`-long arrays of field values encoded as `uint32`, in `ConfigFieldId` order; `pendingFieldIds` lists the indices of the fields carrying an unresolved edit; `runtime` is the animation clock state, meaningful only when `hasRuntime` |
 | `restoreFullConfigSnapshot(snapshot)` → `FullConfigRestoreResult` | Install a current-schema snapshot atomically: `Module.FullConfigRestoreResult.APPLIED`, else `NOT_SHADERBALL`, `UNSUPPORTED_VERSION`, `INVALID_LENGTH` (a missing snapshot, or an array whose length is not the field count), `INVALID_VALUE` (a field or runtime value outside what its slot admits), `INVALID_ACCEPTED` (fields each in range but a combination the effect will not render), or `INVALID_PENDING` (a pending list that is absent, that is not a set of in-range field indices, or that does not name exactly the fields where `accepted` and `requested` differ — retry with `[]`). Compare against the enum values — never by truthiness. Every rejection leaves the effect exactly as it was, so a failed restore needs no rollback. Only schema 7, the current field layout, is accepted; older layouts are intentionally rejected. |
-| `getFullConfigFieldDefinitions()` | Return `[{id, name}]` for every field in the snapshot arrays — `id` is the index into `accepted`/`requested`/`pendingFieldIds`, `name` the stable dotted config path — or `null` when the loaded effect is not ShaderBall. Read it to label a field rather than hardcoding an index, which moves when the schema gains a field |
-| `getConfigImportNotice()` → `string` | Reserved compatibility accessor. It returns `""` for the current schema and when the loaded effect is not ShaderBall. |
-| `clearConfigImportNotice()` | Clear the reserved notice buffer. No-op when the loaded effect is not ShaderBall. |
+| `getFullConfigFieldDefinitions()` | Return `[{id, name}]` for every field in the snapshot arrays — `id` is the index into `accepted`/`requested`/`pendingFieldIds`, `name` the stable dotted config path — or `null` when the loaded effect is not Shader. Read it to label a field rather than hardcoding an index, which moves when the schema gains a field |
+| `getConfigImportNotice()` → `string` | Reserved compatibility accessor. It returns `""` for the current schema and when the loaded effect is not Shader. |
+| `clearConfigImportNotice()` | Clear the reserved notice buffer. No-op when the loaded effect is not Shader. |
 
 The bridge also exposes a `MeshOps` class — used by the `solids.html` geometry tool — with dedicated tooling arenas (an 8 MB persistent arena plus two 4 MB scratch arenas — 16 MB total, separate from the engine's 298 KiB arena) for interactive solid manipulation. `fromSolidName`, `getVertices`, `getFaces`, `classifyFaces` and the operator methods answer a rejected call with `null`; `MeshOps.getLastResult()` then names the reason as a `Module.MeshOpResult` value (`OK`, `UNKNOWN_NAME`, `CONNECTIVITY_OVERFLOW`, `FACE_DEGREE_OVERFLOW`, `ARENA_EXHAUSTED`, `NON_FINITE_ARG`, `ANGLE_OUT_OF_DOMAIN`, `STALE_WRAPPER`, or `ARENA_UNAVAILABLE`). Compare against the enum values — never by truthiness — and read it before the next such call, which overwrites it. The reasons demand opposite responses: an overflow means shrinking the op chain, `ARENA_EXHAUSTED` means calling `clearToolingMemory()`, `STALE_WRAPPER` — a wrapper used after a `clearToolingMemory()` reclaimed its storage — means rebuilding the mesh from its base solid, and `ARENA_UNAVAILABLE` — the 16 MB tooling block itself could not be allocated — means no MeshOps call can run at all, so the tool must stand down rather than retry. That last one is a reject rather than a trap for the same reason as the rest: an allocation failure in a long-lived tab must cost the page a null, not the module. A stale wrapper is rejected rather than trapped, so an interleaved wipe costs the page a null, not the module. A call that *succeeds* can still have moved what it was given: the fraction operators, `snub` and `relax` saturate a finite out-of-domain argument into the operator's domain and render from the saturated value, leaving `getLastResult()` at `OK`. `MeshOps.getLastAdjusted()` reports that, on the same read-it-before-the-next-call terms — a tool that only previews the mesh can ignore it, while one that exports the argument it passed must check it, or the exported value carries an out-of-domain bound into a firmware assert. Two class functions sit outside that contract as pure table reads — no arenas, no wrapper, no `clearToolingMemory()` pairing: `MeshOps.getRegistry()` lists every registered solid as `{name, category}` for the editor's solid picker, and `MeshOps.getRecipe(name)` returns one entry's authored op chain as `{seed, ops: [{op, param, twist}]}` in engine-native units, answering `null` for an unknown name or for a known entry that carries no recipe.
 
@@ -2745,7 +2751,7 @@ Five standalone HTML pages. Four render with Three.js; `palettes.html` renders w
 
 | Tool | What it does |
 |---|---|
-| `lissajous.html` | Designs spherical Lissajous curves with live frequency / phase sliders; outputs a C++ `LissajousParams` initializer for the engine's Lissajous effects (`ChaoticStrings`, `Comets`). |
+| `lissajous.html` | Designs spherical Lissajous curves with live frequency / phase sliders; outputs a C++ `LissajousParams` initializer for the engine's Lissajous effects (`Fishbowl`, `Comets`). |
 | `mobius.html` | Visualizes Möbius transformations on the sphere via the engine's stereographic projection; lets you sweep the four complex coefficients, see the warp on a latitude-longitude grid, and copy a C++ `MobiusParams` initializer. |
 | `palettes.html` | Tunes `ProceduralPalette` cosine coefficients and versioned `GenerativePalette` recipes, exports complete canonical C++ recipes, and renders engine-returned LUTs and diagnostics on 2D canvas contexts. |
 | `shader.html` | Authors pullback shaders against the complete stage vocabulary with the live sphere preview and configurable stage folders. It is the destination for unmatched legacy ShaderBall documents and is deliberately absent from the normal effect-card roster. |
