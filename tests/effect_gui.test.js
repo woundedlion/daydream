@@ -1430,6 +1430,92 @@ test('a schema rebuild moves focus nowhere when the panel never held it', () => 
   assert.equal(h.gui().ctrl('Projection').$select.focusCalls, 0);
 });
 
+test('a refused edit republishes the warning it raised, and its withdrawal', () => {
+  const projection = {
+    name: 'Projection', value: 0, requestedValue: 0,
+    options: ['Stereographic', 'Bonne'], animated: true,
+  };
+  const warning = 'Bonne needs a nonzero parallel.';
+  const h = makeHarness({
+    params: [projection],
+    engineValues: [0],
+    generation: 7,
+    // A refusal publishes its reason on the definition without loading an
+    // effect, so the schema generation stands still.
+    onEngineParam(name, value, state) {
+      if (name !== 'Projection') return;
+      state.params = [value === 1
+        ? { ...projection, requestedValue: 1, warning }
+        : { ...projection, requestedValue: value }];
+    },
+  });
+  h.panel.build();
+  h.panel.mount();
+
+  h.gui().ctrl('Projection').setValue(1);
+  h.panel.sync();
+
+  const controller = h.gui().ctrl('Projection');
+  assert.equal(h.panel.active().paramGeneration, 7, 'no effect was loaded');
+  assert.equal(controller.domElement.classList.contains('param-warning'), true);
+  assert.equal(controller.domElement.getAttribute('title'), warning);
+  assert.equal(controller.$select.getAttribute('aria-invalid'), 'true');
+  const note = controller.domElement.querySelector('.visually-hidden');
+  assert.equal(note.textContent, warning);
+  assert.equal(controller.$select.getAttribute('aria-describedby'), note.id);
+  assert.deepEqual(h.container.children, [h.gui().domElement]);
+
+  controller.setValue(0);
+  h.panel.sync();
+
+  const cleared = h.gui().ctrl('Projection');
+  assert.equal(cleared.domElement.classList.contains('param-warning'), false);
+  assert.equal(cleared.$select.getAttribute('aria-invalid'), null);
+});
+
+test('an edit that changes no warning costs one definitions read and no rebuild', () => {
+  const h = makeHarness({ params: [SPEED], engineValues: [0.5], generation: 3 });
+  h.panel.build();
+  h.gui().ctrl('Speed').setValue(0.5);
+  const before = h.paramDefinitionReads();
+
+  h.panel.sync();
+  h.panel.sync();
+
+  assert.equal(h.paramDefinitionReads(), before + 1,
+    'the warnings are re-read once per edit, not once per frame');
+  assert.equal(h.guis.length, 1, 'the panel is kept');
+});
+
+test('a warning raised mid-drag lands on the pointer release', () => {
+  const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
+  const warning = 'Speed is faster than the segment stream can follow.';
+  const h = makeHarness({
+    params: [speed],
+    engineValues: [0.1],
+    onEngineParam(_name, value, state) {
+      state.params = [value > 0.5 ? { ...speed, warning } : { ...speed }];
+    },
+  });
+  h.panel.build();
+  h.panel.mount();
+  const controller = h.gui().ctrl('Speed');
+
+  controller.domElement.dispatch('pointerdown');
+  controller.setValue(0.9);
+  h.panel.sync();
+
+  assert.equal(h.guis.length, 1, 'the controller under the pointer survives');
+  assert.equal(h.gui().ctrl('Speed').domElement.classList.contains('param-warning'),
+    false);
+
+  h.dragTarget.dispatch('pointerup');
+  h.panel.sync();
+
+  assert.equal(h.guis.length, 2);
+  assert.equal(h.gui().ctrl('Speed').domElement.getAttribute('title'), warning);
+});
+
 test('Lens Glitch to None survives a rebuild before the renderer advances', () => {
   const lens = {
     name: 'Lens', value: 1, requestedValue: 1, acceptedValue: 1,

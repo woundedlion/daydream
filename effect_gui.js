@@ -383,6 +383,15 @@ function paramWarningId(name) {
 }
 
 /**
+ * The warning text the engine publishes for each parameter that carries one.
+ * @param {Array<Object>} params - Engine parameter definitions.
+ * @returns {Map<string, string>} Parameter name to warning text.
+ */
+function paramWarningTexts(params) {
+  return new Map(params.filter((p) => p.warning).map((p) => [p.name, p.warning]));
+}
+
+/**
  * The `gui` method a parameter's control is added through: a session control
  * owns no deep-link key, a migrated one accepts its former keys too, and an
  * unhydrated one owns its key but is never seeded from the URL.
@@ -658,6 +667,25 @@ export function createEffectGui({
     return engineParamValues();
   }
 
+  /**
+   * Whether the engine's parameter warnings have moved off the ones the panel
+   * was built from. A refused write raises or clears a warning without loading
+   * an effect, so the schema generation cannot report it. Deferred while a drag
+   * is in flight: the rebuild would discard the controller under the pointer.
+   * @param {Object} fx - The active effect record.
+   * @returns {boolean} True when the panel must be rebuilt to show them.
+   */
+  function paramWarningsStale(fx) {
+    if (!fx.warningsDirty || fx.activeDragEnds.size > 0) return false;
+    fx.warningsDirty = false;
+    const current = paramWarningTexts(getParameterDefinitions());
+    if (current.size !== fx.paramWarnings.size) return true;
+    for (const [name, warning] of current) {
+      if (fx.paramWarnings.get(name) !== warning) return true;
+    }
+    return false;
+  }
+
   function adoptPauseDisplay(fx, paused) {
     if (paused === undefined || paused === fx.pause.animationState.pause) return;
     fx.pause.animationState.pause = paused;
@@ -710,7 +738,8 @@ export function createEffectGui({
     // it — but a refusal must not gate the rebuild, which is what clears the
     // stale schema a refusal comes from.
     const presetSynced = synchronizePreset(presetIndex);
-    if (paramGenerationStale(activeEffect.paramGeneration, paramGeneration())) {
+    if (paramGenerationStale(activeEffect.paramGeneration, paramGeneration())
+        || paramWarningsStale(activeEffect)) {
       if (!rebuildSchema()) return;
     }
     if (!presetSynced) return;
@@ -1046,6 +1075,7 @@ export function createEffectGui({
     fx.controllerByName = new Map();
     fx.hasParams = params.length > 0;
     fx.hasEnumControls = false;
+    fx.paramWarnings = paramWarningTexts(params);
     const shaderBallAssignments = shaderBallStageAssignments(params);
     const curlLatticeAssignments = curlLatticeStageAssignments(params);
     const facetGridAssignments = facetGridStageAssignments(params);
@@ -1114,6 +1144,7 @@ export function createEffectGui({
         else persistEffectState(fx.gui);
         setWorkerParam(p.name, value);
         adoptEnginePause(pause, p);
+        fx.warningsDirty = true;
       });
     });
   }
@@ -1138,6 +1169,7 @@ export function createEffectGui({
       activeDragEnds: new Set(),
       animationPauseApplied: false,
       persistDeferred: false,
+      warningsDirty: false,
     };
 
     try {
