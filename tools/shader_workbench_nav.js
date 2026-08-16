@@ -61,10 +61,8 @@ export function wireShaderWorkbenchNav(doc) {
       button.setAttribute('aria-current', 'true');
     });
   }
-  if (sync()) return null;
-  const observer = new MutationObserver(() => {
-    if (sync()) observer.disconnect();
-  });
+  sync();
+  const observer = new MutationObserver(sync);
   observer.observe(gui, { childList: true, subtree: true });
   return observer;
 }
