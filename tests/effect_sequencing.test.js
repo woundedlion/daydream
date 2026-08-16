@@ -428,6 +428,7 @@ function makeApp({
 
   const segments = {
     active: segmented,
+    refreshPresetState: () => log.push('segments.refreshPresetState'),
     setEffect: (name) => log.push(`segments.setEffect ${name}`),
     setResolution: (w, h) => log.push(`segments.setResolution ${w}x${h}`),
   };
@@ -512,6 +513,17 @@ test('a segmented pool is told which effect to render', () => {
   ]);
 });
 
+test('a segmented switch refreshes preset state before rebuilding the panel', () => {
+  const app = makeApp({ segmented: true });
+
+  app.pipeline.applyEffect();
+
+  assert.ok(app.log.indexOf('segments.refreshPresetState')
+    < app.log.indexOf('effectGui.build'));
+  assert.ok(app.log.indexOf('effectGui.build')
+    < app.log.indexOf('segments.setEffect Alpha'));
+});
+
 test('a preserved pause is committed after the segmented effect rebuild', () => {
   const app = makeApp({ segmented: true });
 
@@ -549,6 +561,7 @@ test('a resolution change resizes every renderer before re-applying the effect',
     'sidebar.setEffects Alpha,Gamma sizes={"Alpha":12}',
     'engine.setEffect Alpha',
     'driver.setStrobeColumns 7',
+    'segments.refreshPresetState',
     'effectGui.destroy',
     'clearEffectParamUrl',
     'effectGui.build',
