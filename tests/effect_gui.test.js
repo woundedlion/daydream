@@ -13,6 +13,7 @@ import {
   SHADERBALL_STAGE_ORDER,
   curlLatticeStageAssignments,
   facetGridStageAssignments,
+  fixedShaderStageAssignments,
   isShaderBallSchema,
   legacyShaderBallParamNames,
   shaderBallStageAssignments,
@@ -611,6 +612,22 @@ test('FacetGrid controls retain the fixed pipeline stage folders', () => {
   assert.equal(h.gui().ctrl('Planar Warp 2 Cell Y').label, 'Cell Y');
   assert.equal(h.gui().ctrl('Pattern Mix').folder, 'Function');
   assert.equal(h.gui().ctrl('Hue Noise Speed').folder, 'Colorize');
+});
+
+test('promoted Shader controls derive folders from their fixed stage names', () => {
+  const params = [
+    'Camera Wander', 'Projection Spin Speed', 'Pole Fade',
+    'Planar Warp 1 Strength', 'Pattern Freq', 'Edge Fade Width',
+    'Palette Chroma', 'Mapping Frequency',
+  ].map((name) => ({ name }));
+  const assignments = fixedShaderStageAssignments(params);
+  assert.equal(assignments.get('Camera Wander'), 'Camera');
+  assert.equal(assignments.get('Projection Spin Speed'), 'Projection Frame');
+  assert.equal(assignments.get('Pole Fade'), 'Projection');
+  assert.equal(assignments.get('Planar Warp 1 Strength'), 'Planar Warp 1');
+  assert.equal(assignments.get('Pattern Freq'), 'Function');
+  assert.equal(assignments.get('Edge Fade Width'), 'Coverage');
+  assert.equal(assignments.get('Palette Chroma'), 'Colorize');
 });
 
 test('renamed ShaderBall controls accept every legacy deep-link name', () => {

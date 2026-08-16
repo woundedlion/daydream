@@ -276,7 +276,7 @@ test('index boots through the entry module and bootstrap.js stays importable', (
 test('index identifies new-window tool links and associates stats headers', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const toolLinks = [...html.matchAll(/<a href="tools\/[^"]+"[^>]+>.*?<\/a>/g)];
-  assert.equal(toolLinks.length, 4);
+  assert.equal(toolLinks.length, 5);
   for (const [link] of toolLinks) {
     assert.match(link, /target="_blank"/);
     assert.match(link, /rel="noopener"/);

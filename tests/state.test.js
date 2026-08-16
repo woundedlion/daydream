@@ -368,6 +368,27 @@ test('URLSync reads initial tracked keys from the URL into state', () => {
   assert.equal(s.get('res'), 'high');
 });
 
+test('URLSync defers a tracked identity rewrite until resume', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const calls = installWindow('?effect=ShaderBall', '/sim');
+    const state = new AppState({ effect: 'ShaderBall' });
+    const sync = new URLSync(state, ['effect']);
+    sync.suspend();
+    state.set('effect', 'Shader');
+    mock.timers.tick(1000);
+    assert.equal(calls.length, 0);
+    assert.equal(globalThis.window.location.search, '?effect=ShaderBall');
+
+    sync.resume();
+    mock.timers.tick(1000);
+    assert.equal(calls.length, 1);
+    assert.match(calls[0], /effect=Shader/u);
+  } finally {
+    mock.timers.reset();
+  }
+});
+
 test('URLSync validator rejects an invalid URL value and keeps the default', () => {
   installWindow('?effect=Voronoi&res=bogus');
   const s = new AppState({ effect: 'Moire', res: 'low' });
