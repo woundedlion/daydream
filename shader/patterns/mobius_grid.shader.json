@@ -1,0 +1,794 @@
+{
+  "schema_version": 1,
+  "catalog_version": 1,
+  "document_id": "mobius-grid-v1",
+  "effect_id": "mobius-grid",
+  "descriptor": {
+    "graph": {
+      "nodes": [
+        {
+          "label": "camera",
+          "role": "outer_camera",
+          "operator": "pullback.outer_camera.v1",
+          "policy": {
+            "base_orientation": "negative-z-to-negative-y"
+          }
+        },
+        {
+          "label": "surface",
+          "role": "surface_project",
+          "operator": "pullback.surface_project.v1",
+          "policy": {
+            "pre_lens_surface": "identity",
+            "lens": "mobius",
+            "post_lens_surface": "identity",
+            "projection": "stereographic"
+          }
+        },
+        {
+          "label": "warp",
+          "role": "planar_warp",
+          "operator": "pullback.planar_warp.v1",
+          "policy": {
+            "sequence": [
+              "identity",
+              "mirror-tile"
+            ]
+          }
+        },
+        {
+          "label": "source",
+          "role": "source",
+          "operator": "pullback.source.v1",
+          "policy": {
+            "source": "twin-wave"
+          }
+        },
+        {
+          "label": "material",
+          "role": "material",
+          "operator": "pullback.material.v1",
+          "policy": {
+            "weight": "projection",
+            "transfer": "linear",
+            "coverage": "projection-squared"
+          }
+        },
+        {
+          "label": "color",
+          "role": "color",
+          "operator": "pullback.color.v1",
+          "policy": {
+            "color": "generated-palette",
+            "hue_mode": "path-length",
+            "brightness_envelope": "cup"
+          },
+          "resources": [
+            "complementary-palette"
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "from": "camera",
+          "to": "surface"
+        },
+        {
+          "from": "surface",
+          "to": "warp"
+        },
+        {
+          "from": "warp",
+          "to": "source"
+        },
+        {
+          "from": "source",
+          "to": "material"
+        },
+        {
+          "from": "material",
+          "to": "color"
+        }
+      ]
+    },
+    "parameters": [
+      {
+        "id": "pattern-freq",
+        "binding": "pattern.freq",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0.1,
+          "maximum": 20
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 1
+      },
+      {
+        "id": "speed",
+        "binding": "speed",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "turn-per-frame",
+        "domain": {
+          "minimum": 0,
+          "maximum": 0.5
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "drift",
+        "binding": "drift",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1.25
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "source-angle-speed",
+        "binding": "source.angle.speed",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "turn-per-frame",
+        "domain": {
+          "minimum": 0,
+          "maximum": 0.05000000074505806
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "pole-fade",
+        "binding": "pole.fade",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 1,
+          "maximum": 20
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 1
+      },
+      {
+        "id": "camera-wander",
+        "binding": "camera.wander",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "inner-speed",
+        "binding": "inner.speed",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "turn-per-frame",
+        "domain": {
+          "minimum": -0.02,
+          "maximum": 0.02
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "inner-rotation",
+        "binding": "inner.rotation",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "radian",
+        "domain": {
+          "minimum": -6.2831854820251465,
+          "maximum": 6.2831854820251465
+        },
+        "interpolation": {
+          "kind": "SHORTEST_PERIODIC",
+          "period": 6.2831854820251465
+        },
+        "default": 0
+      },
+      {
+        "id": "inner-cell-x",
+        "binding": "inner.cell.x",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0.015625,
+          "maximum": 8
+        },
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
+        },
+        "default": 1
+      },
+      {
+        "id": "inner-cell-y",
+        "binding": "inner.cell.y",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0.015625,
+          "maximum": 8
+        },
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
+        },
+        "default": 1
+      },
+      {
+        "id": "inner-offset-x",
+        "binding": "inner.offset.x",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -8,
+          "maximum": 8
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "inner-offset-y",
+        "binding": "inner.offset.y",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -8,
+          "maximum": 8
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "palette-chroma",
+        "binding": "palette.chroma",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0.62
+      },
+      {
+        "id": "palette-mapping",
+        "binding": "color.palette-mapping",
+        "classification": "preset",
+        "storage": "enum8",
+        "unit": "mapping",
+        "domain": {
+          "values": [
+            "cup",
+            "bell",
+            "linear",
+            "reverse"
+          ]
+        },
+        "interpolation": {
+          "kind": "MIXED_ENUM"
+        },
+        "default": "linear"
+      },
+      {
+        "id": "mapping-frequency",
+        "binding": "mapping.frequency",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0.01,
+          "maximum": 32
+        },
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
+        },
+        "default": 1
+      },
+      {
+        "id": "mapping-phase",
+        "binding": "mapping.phase",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -1,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "phase-oscillation-depth",
+        "binding": "phase.oscillation.depth",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "phase-oscillation-speed",
+        "binding": "phase.oscillation.speed",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "turn-per-frame",
+        "domain": {
+          "minimum": -0.02,
+          "maximum": 0.02
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "value-opacity-low",
+        "binding": "value.opacity.low",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 1
+      },
+      {
+        "id": "value-opacity-high",
+        "binding": "value.opacity.high",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 1
+      },
+      {
+        "id": "hue-shift-amount",
+        "binding": "hue.shift.amount",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -4,
+          "maximum": 4
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "projection-spin-speed",
+        "binding": "projection.spin.speed",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "turn-per-frame",
+        "domain": {
+          "minimum": 0,
+          "maximum": 0.05
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "projection-wander",
+        "binding": "projection.wander",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "brightness-depth",
+        "binding": "brightness.depth",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 1
+      },
+      {
+        "id": "mobius-a-re",
+        "binding": "mobius.a.re",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -4,
+          "maximum": 4
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0.7071067811865476
+      },
+      {
+        "id": "mobius-a-im",
+        "binding": "mobius.a.im",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -4,
+          "maximum": 4
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "mobius-b-re",
+        "binding": "mobius.b.re",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -4,
+          "maximum": 4
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "mobius-b-im",
+        "binding": "mobius.b.im",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -4,
+          "maximum": 4
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "mobius-c-re",
+        "binding": "mobius.c.re",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -4,
+          "maximum": 4
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "mobius-c-im",
+        "binding": "mobius.c.im",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -4,
+          "maximum": 4
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "mobius-d-re",
+        "binding": "mobius.d.re",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -4,
+          "maximum": 4
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0.7071067811865476
+      },
+      {
+        "id": "mobius-d-im",
+        "binding": "mobius.d.im",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -4,
+          "maximum": 4
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      }
+    ],
+    "path_policies": [
+      {
+        "id": "parallel",
+        "kind": "PARALLEL"
+      }
+    ],
+    "clocks": [
+      {
+        "id": "palette-cycle",
+        "kind": "generated-palette-cycle",
+        "settings": {
+          "fade": 600
+        }
+      },
+      {
+        "id": "transition-progress",
+        "kind": "completed-frame",
+        "settings": {
+          "pause": "parameter-animation"
+        }
+      }
+    ],
+    "preparation": [
+      {
+        "id": "spatial-frames",
+        "kind": "prepare-orientation-conjugates"
+      },
+      {
+        "id": "hue-luts",
+        "kind": "prepare-hue-luts"
+      },
+      {
+        "id": "warp-carriers",
+        "kind": "prepare-fixed-warps"
+      }
+    ],
+    "resources": [
+      {
+        "id": "complementary-palette",
+        "kind": "generated-complementary-palette",
+        "settings": {
+          "hue_step": 159
+        }
+      }
+    ],
+    "serialization": {
+      "schema_version": 1,
+      "fields": [
+        "pattern-freq",
+        "speed",
+        "drift",
+        "source-angle-speed",
+        "pole-fade",
+        "camera-wander",
+        "inner-speed",
+        "inner-rotation",
+        "inner-cell-x",
+        "inner-cell-y",
+        "inner-offset-x",
+        "inner-offset-y",
+        "palette-chroma",
+        "palette-mapping",
+        "mapping-frequency",
+        "mapping-phase",
+        "phase-oscillation-depth",
+        "phase-oscillation-speed",
+        "value-opacity-low",
+        "value-opacity-high",
+        "hue-shift-amount",
+        "projection-spin-speed",
+        "projection-wander",
+        "brightness-depth",
+        "mobius-a-re",
+        "mobius-a-im",
+        "mobius-b-re",
+        "mobius-b-im",
+        "mobius-c-re",
+        "mobius-c-im",
+        "mobius-d-re",
+        "mobius-d-im"
+      ]
+    },
+    "approximation": [
+      {
+        "id": "hue-luts",
+        "kind": "registered-oracle",
+        "settings": {
+          "oracle": "hue-luts-v1"
+        }
+      }
+    ],
+    "handoff": {
+      "policy": "reset"
+    }
+  },
+  "preset_bank": {
+    "schema_version": 1,
+    "presets": [
+      {
+        "preset_id": "mobius-grid",
+        "display_name": "Mobius Grid",
+        "values": {
+          "pattern-freq": 10.158,
+          "speed": 0.245,
+          "drift": 0.8,
+          "source-angle-speed": 0.027,
+          "pole-fade": 2.102,
+          "camera-wander": 1,
+          "inner-speed": 0,
+          "inner-rotation": 0,
+          "inner-cell-x": 1,
+          "inner-cell-y": 1,
+          "inner-offset-x": 0,
+          "inner-offset-y": 0,
+          "palette-chroma": 0.398,
+          "palette-mapping": "linear",
+          "mapping-frequency": 1,
+          "mapping-phase": 0,
+          "phase-oscillation-depth": 0,
+          "phase-oscillation-speed": 0,
+          "value-opacity-low": 1,
+          "value-opacity-high": 1,
+          "hue-shift-amount": 0.312,
+          "projection-spin-speed": 0,
+          "projection-wander": 1,
+          "brightness-depth": 1,
+          "mobius-a-re": -1.072,
+          "mobius-a-im": 0.304,
+          "mobius-b-re": 0.416,
+          "mobius-b-im": 0,
+          "mobius-c-re": 0,
+          "mobius-c-im": 0,
+          "mobius-d-re": 0.70710677,
+          "mobius-d-im": 0
+        }
+      },
+      {
+        "preset_id": "mobius-grid-2",
+        "display_name": "Mobius Grid 2",
+        "values": {
+          "pattern-freq": 10.158,
+          "speed": 0.245,
+          "drift": 0.8,
+          "source-angle-speed": 0.027,
+          "pole-fade": 2.102,
+          "camera-wander": 1,
+          "inner-speed": 0.005875,
+          "inner-rotation": 0,
+          "inner-cell-x": 0.2791094,
+          "inner-cell-y": 6.810328,
+          "inner-offset-x": 0,
+          "inner-offset-y": 0,
+          "palette-chroma": 0.398,
+          "palette-mapping": "linear",
+          "mapping-frequency": 1,
+          "mapping-phase": 0,
+          "phase-oscillation-depth": 0,
+          "phase-oscillation-speed": 0,
+          "value-opacity-low": 1,
+          "value-opacity-high": 1,
+          "hue-shift-amount": 0.312,
+          "projection-spin-speed": 0,
+          "projection-wander": 1,
+          "brightness-depth": 1,
+          "mobius-a-re": -1.072,
+          "mobius-a-im": 0.304,
+          "mobius-b-re": 0.416,
+          "mobius-b-im": 0,
+          "mobius-c-re": 0,
+          "mobius-c-im": 0,
+          "mobius-d-re": 0.70710677,
+          "mobius-d-im": 0
+        }
+      }
+    ],
+    "edges": [
+      {
+        "from": "mobius-grid",
+        "to": "mobius-grid-2",
+        "path_policy": "parallel",
+        "easing": "EASE_IN_OUT_SIN",
+        "duration": 480
+      },
+      {
+        "from": "mobius-grid-2",
+        "to": "mobius-grid",
+        "path_policy": "parallel",
+        "easing": "EASE_IN_OUT_SIN",
+        "duration": 480
+      }
+    ],
+    "absent_edge_fallback": {
+      "manual": "SNAP",
+      "automatic": "REJECT",
+      "synchronized": "SNAP",
+      "restore": "SNAP",
+      "authoring": "SNAP"
+    },
+    "choreography": {
+      "generated_order": [
+        "mobius-grid",
+        "mobius-grid-2"
+      ],
+      "dwell": {
+        "mobius-grid": 600,
+        "mobius-grid-2": 600
+      }
+    }
+  },
+  "effect_metadata": {
+    "display_name": "Mobius Grid",
+    "description": "A continuously animated Mobius lens over a mirrored twin wave."
+  }
+}
