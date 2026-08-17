@@ -11,9 +11,11 @@ import {
 import {
   applyDynamicShaderDocument,
   applyFixedShaderDocument,
+  createShaderDocumentController,
   engineParameterName,
 } from '../tools/shader_documents.js';
 import { ParamSetResult, unpinnedEngineMethods } from './fake_engine.js';
+import { fakeElement } from './fake_dom.js';
 
 const INDEX = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const WORKBENCH = readFileSync(new URL('../tools/shader.html', import.meta.url), 'utf8');
@@ -301,6 +303,263 @@ test('the workbench nav never observes when the GUI is already built', () => {
     globalThis.MutationObserver = savedObserver;
     globalThis.window = savedWindow;
   }
+});
+
+const MIGRATION = JSON.stringify({
+  source_documents: { EquatorGrid: 'equator_grid.shader.json' },
+  product_group: { children: [{ effect_id: 'EquatorGrid', display_name: 'Equator Grid' }] },
+});
+
+/** @param {{digest?: string, status?: string, diagnostics?: *}} [shape] */
+const shaderDocument = ({ digest = 'digest-equator', status = 'VALID',
+                          diagnostics = undefined } = {}) => JSON.stringify({
+  status,
+  diagnostics,
+  descriptor_digest: digest,
+  document: {
+    effect_id: 'EquatorGrid',
+    effect_metadata: { display_name: 'Equator Grid' },
+    descriptor: { graph: { nodes: [] } },
+    preset_bank: { presets: [
+      { preset_id: 'noon', display_name: 'Noon', values: { 'pattern-freq': 2 } },
+      { preset_id: 'dusk', display_name: 'Dusk', values: { 'pattern-freq': 5 } },
+    ] },
+  },
+});
+
+/** @returns {Object} An engine whose parameter definitions follow its writes. */
+function workbenchEngine() {
+  // The warp slots default to identity for a graph that names no planar_warp
+  // node, so the dynamic path writes them whatever the document carries.
+  const definitions = [
+    { name: 'Planar Warp 1', value: 0, options: ['None'] },
+    { name: 'Planar Warp 2', value: 0, options: ['None'] },
+    { name: 'Pattern Freq', value: 1 },
+  ];
+  const writes = [];
+  const selected = [];
+  return {
+    definitions,
+    writes,
+    selected,
+    selectPresetById: (id) => { selected.push(id); return true; },
+    getParameterDefinitions: () => definitions,
+    setParameter: (name, value) => {
+      writes.push([name, value]);
+      const definition = definitions.find((candidate) => candidate.name === name);
+      if (definition) definition.value = value;
+      return ParamSetResult.APPLIED;
+    },
+  };
+}
+
+/**
+ * Builds the workbench document controller over the shader.html control set.
+ * @param {{files?: Object, engine?: *, selectEffect?: (effect: string) => boolean}} [seams]
+ * @returns {Object} The controller and everything it wrote to.
+ */
+function workbench({ files = { 'equator_grid.shader.json': shaderDocument() },
+                     engine = workbenchEngine(),
+                     selectEffect = () => true } = {}) {
+  const elements = new Map(['shader-document-select', 'shader-preset-select',
+    'shader-document-open', 'shader-document-save', 'shader-document-file',
+    'shader-document-status',
+  ].map((id) => [id, fakeElement(id.endsWith('select') ? 'select' : 'div')]));
+  const scratch = fakeElement('option');
+  scratch.value = '';
+  scratch.textContent = 'Scratch shader';
+  elements.get('shader-document-select').appendChild(scratch);
+  elements.get('shader-document-save').disabled = true;
+
+  const downloads = [];
+  const selections = [];
+  const ran = { gui: 0, invalidated: 0 };
+  const controller = createShaderDocumentController({
+    doc: {
+      getElementById: (id) => elements.get(id) ?? null,
+      createElement: (tag) => fakeElement(tag),
+    },
+    getEngine: () => engine,
+    getModule: () => MODULE,
+    selectEffect: (effect) => { selections.push(effect); return selectEffect(effect); },
+    syncEffectGui: () => { ran.gui += 1; },
+    invalidate: () => { ran.invalidated += 1; },
+    fetchText: async (url) => {
+      const name = String(url).split('/').pop();
+      if (name === 'shaderball_migration.json') return MIGRATION;
+      const source = files[name];
+      if (source === undefined) throw new Error(`404 ${name}`);
+      return source;
+    },
+    importCompiler: async () => ({ compileShaderDocument: (s) => JSON.parse(s) }),
+    download: (filename, source) => downloads.push([filename, source]),
+  });
+  return { controller, elements, downloads, selections, engine, ran };
+}
+
+/** @param {Object} element @returns {Function} The element's change handler. */
+const onChange = (element) =>
+  element.listeners.find((listener) => listener.type === 'change').handler;
+
+/** @param {Object} harness @returns {Promise<void>} */
+async function chooseCatalogSource({ elements, controller }) {
+  await controller.init();
+  const select = elements.get('shader-document-select');
+  select.value = 'EquatorGrid';
+  await onChange(select)();
+}
+
+test('a page missing the document controls builds no controller', () => {
+  assert.equal(createShaderDocumentController({
+    doc: { getElementById: () => null, createElement: () => fakeElement('div') },
+    getEngine: () => null,
+    getModule: () => null,
+    selectEffect: () => true,
+    syncEffectGui: () => {},
+    invalidate: () => {},
+  }), null);
+});
+
+test('the source catalog lists each document by its product display name', async () => {
+  const { controller, elements } = workbench();
+
+  assert.equal(await controller.init(), true);
+  const select = elements.get('shader-document-select');
+  assert.deepEqual(select.options.map((option) => option.value), ['', 'EquatorGrid']);
+  assert.deepEqual(select.options.map((option) => option.textContent),
+    ['Scratch shader', 'Equator Grid']);
+  const status = elements.get('shader-document-status');
+  assert.equal(status.dataset.status, 'ok');
+  assert.match(status.textContent, /Choose a source document/);
+});
+
+// init() reports through the status element and a return value the page drops,
+// so a catalog that never loaded is a line of prose on an otherwise live page:
+// the boolean is the only channel a caller can act on.
+test('a catalog document that fails to compile reports its diagnostic', async () => {
+  const { controller, elements } = workbench({ files: {
+    'equator_grid.shader.json': shaderDocument({
+      status: 'INVALID',
+      diagnostics: [{ code: 'E_ROLE', path: '/descriptor', message: 'unknown role' }],
+    }),
+  } });
+
+  assert.equal(await controller.init(), false);
+  const status = elements.get('shader-document-status');
+  assert.equal(status.dataset.status, 'error');
+  assert.match(status.textContent, /E_ROLE at \/descriptor: unknown role/);
+  assert.equal(elements.get('shader-document-select').options.length, 1);
+});
+
+test('a catalog that cannot be fetched is reported, not left half-listed', async () => {
+  const { controller, elements } = workbench({ files: {} });
+
+  assert.equal(await controller.init(), false);
+  assert.match(elements.get('shader-document-status').textContent,
+    /Source catalog failed to load: 404/);
+  assert.equal(elements.get('shader-document-select').options.length, 1);
+});
+
+test('choosing a catalog source stages its effect and previews its first preset', async () => {
+  const harness = workbench();
+
+  await chooseCatalogSource(harness);
+
+  assert.deepEqual(harness.selections, ['EquatorGrid']);
+  assert.deepEqual(harness.engine.selected, ['noon']);
+  assert.deepEqual(harness.engine.writes, [['Pattern Freq', 2]]);
+  const presets = harness.elements.get('shader-preset-select');
+  assert.deepEqual(presets.options.map((option) => option.value), ['noon', 'dusk']);
+  assert.equal(presets.disabled, false);
+  assert.equal(harness.elements.get('shader-document-save').disabled, false);
+  assert.match(harness.elements.get('shader-document-status').textContent,
+    /Equator Grid · Noon/);
+  assert.deepEqual(harness.ran, { gui: 1, invalidated: 1 });
+});
+
+// The digest is what tells an authored study from a shipped pattern: matching
+// one routes the preview onto the concrete effect, and anything else onto the
+// dynamic evaluator, which takes no reference preset.
+test('an imported study the catalog does not carry previews on the scratch Shader', async () => {
+  const harness = workbench();
+  await harness.controller.init();
+
+  assert.equal(await harness.controller.loadSource(
+    shaderDocument({ digest: 'digest-study' }), 'study.shader.json'), true);
+  assert.deepEqual(harness.selections, ['Shader']);
+  assert.deepEqual(harness.engine.selected, []);
+  assert.deepEqual(harness.engine.writes,
+    [['Planar Warp 1', 0], ['Planar Warp 2', 0], ['Pattern Freq', 2]],
+    'the dynamic path snaps the stage structure before the preset values');
+});
+
+test('choosing a preset previews it without reloading the document', async () => {
+  const harness = workbench();
+  await chooseCatalogSource(harness);
+  const presets = harness.elements.get('shader-preset-select');
+  presets.value = 'dusk';
+
+  onChange(presets)();
+
+  assert.deepEqual(harness.engine.selected, ['noon', 'dusk']);
+  assert.deepEqual(harness.engine.writes.at(-1), ['Pattern Freq', 5]);
+  assert.match(harness.elements.get('shader-document-status').textContent,
+    /Equator Grid · Dusk/);
+});
+
+test('a preview with no engine names the engine rather than the preset', async () => {
+  const harness = workbench({ engine: null });
+  await harness.controller.init();
+
+  assert.equal(harness.controller.applyPreset('noon'), false);
+  const status = harness.elements.get('shader-document-status');
+  assert.equal(status.dataset.status, 'error');
+  assert.equal(status.textContent, 'The preview engine is not ready.');
+});
+
+test('an effect the preview engine rejects leaves the export disabled', async () => {
+  const harness = workbench({ selectEffect: () => false });
+  await harness.controller.init();
+
+  assert.equal(await harness.controller.loadSource(shaderDocument()), false);
+  assert.match(harness.elements.get('shader-document-status').textContent,
+    /rejected effect "EquatorGrid"/);
+  assert.equal(harness.elements.get('shader-document-save').disabled, true);
+  assert.equal(harness.controller.save(), false);
+});
+
+test('saving exports the live engine values, not the ones the document arrived with', async () => {
+  const harness = workbench();
+  await chooseCatalogSource(harness);
+  harness.engine.definitions.find((d) => d.name === 'Pattern Freq').value = 9;
+
+  assert.equal(harness.controller.save(), true);
+  const [filename, source] = harness.downloads[0];
+  assert.equal(filename, 'equator_grid.shader.json');
+  const saved = JSON.parse(source);
+  assert.equal(saved.preset_bank.presets[0].values['pattern-freq'], 9);
+  assert.equal(saved.preset_bank.presets[1].values['pattern-freq'], 5,
+    'the presets the session never previewed must survive the round trip');
+  assert.match(harness.elements.get('shader-document-status').textContent,
+    /Saved equator_grid\.shader\.json/);
+});
+
+test('returning to the scratch source drops the loaded document', async () => {
+  const harness = workbench();
+  await chooseCatalogSource(harness);
+  const select = harness.elements.get('shader-document-select');
+  select.value = '';
+
+  await onChange(select)();
+
+  assert.deepEqual(harness.selections, ['EquatorGrid', 'Shader']);
+  const presets = harness.elements.get('shader-preset-select');
+  assert.equal(presets.options.length, 0);
+  assert.equal(presets.disabled, true);
+  assert.equal(harness.elements.get('shader-document-save').disabled, true);
+  assert.equal(harness.controller.save(), false);
+  assert.match(harness.elements.get('shader-document-status').textContent,
+    /Scratch Shader is active/);
 });
 
 test('legacy custom Shader URLs preserve their state on the workbench route', () => {

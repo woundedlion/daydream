@@ -470,6 +470,52 @@ export function fakeElement(tag = 'div', options = {}) {
     configurable: true,
     value: fakeDataset(element),
   });
+  // An <option>'s value falls back to its text, as in the DOM, and `selected`
+  // is the flag the owning <select>'s selection views read.
+  if (element.tagName === 'OPTION') {
+    element.selected = false;
+    let optionValue = null;
+    Object.defineProperty(element, 'value', {
+      enumerable: true,
+      configurable: true,
+      get() { return optionValue === null ? text : optionValue; },
+      set(value) { optionValue = String(value); },
+    });
+  }
+  // A <select>'s views over its <option> children, live as in the DOM. One with
+  // nothing explicitly selected shows its first option, so a freshly populated
+  // select already has a selection, and an empty one has none.
+  if (element.tagName === 'SELECT') {
+    element.disabled = false;
+    const options = () => element.children.filter((n) => n.tagName === 'OPTION');
+    const selection = () => {
+      const chosen = options().filter((option) => option.selected);
+      return chosen.length > 0 ? chosen : options().slice(0, 1);
+    };
+    Object.defineProperty(element, 'options', {
+      enumerable: true, configurable: true, get: options,
+    });
+    Object.defineProperty(element, 'selectedOptions', {
+      enumerable: true, configurable: true, get: selection,
+    });
+    Object.defineProperty(element, 'selectedIndex', {
+      enumerable: true,
+      configurable: true,
+      get() { return options().indexOf(selection()[0]); },
+      set(at) {
+        for (const [i, option] of options().entries()) option.selected = i === Number(at);
+      },
+    });
+    Object.defineProperty(element, 'value', {
+      enumerable: true,
+      configurable: true,
+      get() { return selection()[0]?.value ?? ''; },
+      set(value) {
+        element.selectedIndex =
+          options().findIndex((option) => option.value === String(value));
+      },
+    });
+  }
   return element;
 }
 
