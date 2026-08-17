@@ -210,7 +210,7 @@
     "assertions": 243
   },
   "tests/shader_workbench.test.js": {
-    "cases": 15,
+    "cases": 28,
     "assertions": 50
   },
   "tests/shared.test.js": {
