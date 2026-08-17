@@ -47,6 +47,7 @@
     "param_sync.js",
     "pixel_view.js",
     "sidebar_logic.js",
+    "state.js",
     "worker_protocol.js",
     "segment_controller.js",
     "segment_layout.js",
