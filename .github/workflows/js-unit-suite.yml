@@ -78,35 +78,6 @@ jobs:
 
       - run: npm run typecheck
 
-      # Only here to carry the pip install below; the runner's system Python is
-      # externally managed.
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: '3.12'
-
-      # shellcheck-py is the PyPI distribution of the same binary; shellcheck's
-      # checks move between releases, so an unpinned one gates the tree on a
-      # different set than this job. Held at the engine repository's pin
-      # (Holosphere tools/build_pins.py) so both trees are gated on one rule set.
-      - name: Install shellcheck
-        run: pip install "shellcheck-py==0.11.0.1"
-
-      # .githooks/pre-push is this repository's only presubmit and
-      # .githooks/reference-transaction enforces fast-forward-only refs, so a
-      # shellcheck-class defect there passes a gate silently rather than failing
-      # it. The file list is enumerated from the index, so an empty one is a
-      # broken gate, like the lint step above. SC1091 and SC2034 are excluded to
-      # match the engine repository's shell gate.
-      - name: Lint shell
-        run: |
-          mapfile -t FILES < <(git ls-files -- '*.sh' '.githooks/*')
-          if [ "${#FILES[@]}" -eq 0 ]; then
-            echo "::error::no files selected — the shell path list is broken"
-            exit 1
-          fi
-          shellcheck --exclude=SC1091,SC2034 "${FILES[@]}"
-          echo "shellcheck clean: ${#FILES[@]} files linted."
-
       - name: Verify committed import map
         run: |
           npm run importmap
@@ -147,6 +118,48 @@ jobs:
           # The suite runs code out of this tree; nothing below fetches, so the
           # token must not be left in engine/.git/config.
           persist-credentials: false
+
+      # Only here to carry the pip install below; the runner's system Python is
+      # externally managed.
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+
+      # shellcheck-py is the PyPI distribution of the same binary; shellcheck's
+      # checks move between releases, so an unpinned one gates the tree on a
+      # different set than the engine's shell gate. The engine's
+      # tools/build_pins.py is its single source for the pin, read out of the
+      # checkout above rather than copied, so both trees run one binary.
+      - name: Install shellcheck
+        run: |
+          if ! pin="$(python3 engine/tools/build_pins.py shellcheck)" || [ -z "$pin" ]; then
+            echo "::error::the engine checkout does not report a shellcheck pin from tools/build_pins.py, so this job has no version to gate the tree on."
+            exit 1
+          fi
+          pip install "shellcheck-py==$pin"
+          echo "shellcheck pinned to $pin (engine tools/build_pins.py)."
+
+      # .githooks/pre-push is this repository's only presubmit and
+      # .githooks/reference-transaction enforces fast-forward-only refs, so a
+      # shellcheck-class defect there passes a gate silently rather than failing
+      # it. The file list is enumerated from the index, so an empty one is a
+      # broken gate, like the JavaScript lint step above. The excluded codes are
+      # read out of the engine's own shell gate for the same reason as the pin.
+      - name: Lint shell
+        run: |
+          exclude="$(sed -n 's/.*shellcheck --exclude=\([A-Z0-9,]*\).*/\1/p' \
+            engine/.github/workflows/ci.yml | head -n1)"
+          if [ -z "$exclude" ]; then
+            echo "::error::the engine's .github/workflows/ci.yml no longer spells a shellcheck --exclude list, so this job has no exclusion set to match it with."
+            exit 1
+          fi
+          mapfile -t FILES < <(git ls-files -- '*.sh' '.githooks/*')
+          if [ "${#FILES[@]}" -eq 0 ]; then
+            echo "::error::no files selected — the shell path list is broken"
+            exit 1
+          fi
+          shellcheck "--exclude=$exclude" "${FILES[@]}"
+          echo "shellcheck clean: ${#FILES[@]} files linted, excluding $exclude."
 
       - name: Test
         env:
