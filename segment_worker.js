@@ -56,7 +56,8 @@ let segRange = null;
 let clipFullFrame = false;
 let arenaMetricsWarned = false;
 // Last `name:outcome` reported by reportParamRejected, so a held slider pushing
-// the same rejection every frame logs once.
+// the same rejection every frame logs once. Cleared on every effect install: the
+// same name:outcome pair under a different effect is a distinct event.
 let paramRejectedKey = '';
 
 /**
@@ -267,6 +268,7 @@ async function handleMessage(msg) {
                  reason: `setEffect(${msg.name}) rejected` });
           break;
         }
+        paramRejectedKey = '';
         // Mirrors the engine-driven index without the pause, as in 'init'.
         if (typeof msg.presetIndex === 'number') {
           applyPreset(msg.presetIndex, 'synchronizePreset');

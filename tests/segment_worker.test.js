@@ -917,6 +917,27 @@ test('a rejected setParameter is logged once per outcome', async () => {
   assert.match(logged[1], /setParameter\(Phantom\) rejected: UNKNOWN_PARAM/);
 });
 
+// The latch is module-scoped and the worker outlives every effect switch, so a
+// name:outcome silenced under one effect would stay silenced under the next.
+test('an effect switch clears the rejected-parameter latch', async () => {
+  await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  engineInstance.paramResult = ParamSetResult.UNKNOWN_PARAM;
+
+  const original = console.error;
+  const logged = [];
+  console.error = (...args) => logged.push(args.join(' '));
+  try {
+    await dispatch({ type: 'setParameter', name: 'Ghost', value: 0.5 });
+    await dispatch({ type: 'setEffect', name: 'Waves' });
+    await dispatch({ type: 'setParameter', name: 'Ghost', value: 0.5 });
+  } finally {
+    console.error = original;
+  }
+
+  assert.equal(logged.length, 2, 'the same rejection under a new effect logs again');
+  assert.match(logged[1], /setParameter\(Ghost\) rejected: UNKNOWN_PARAM/);
+});
+
 test('an applied setParameter logs nothing', async () => {
   await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
 
