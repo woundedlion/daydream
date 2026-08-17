@@ -621,6 +621,34 @@
     display: none; /* Chrome / Safari */
   }
 
+  /* A mouse cannot swipe the list and the scroll arrows are decorative
+     (pointer-events: none), so a pointing device gets a real scrollbar back.
+     This layout also covers any narrowed desktop window, not just touch. */
+  @media (pointer: fine) {
+    .effect-list {
+      scrollbar-width: thin;
+      scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+    }
+
+    .effect-list::-webkit-scrollbar {
+      display: block;
+      height: 8px;
+    }
+
+    .effect-list::-webkit-scrollbar-track {
+      background: var(--scrollbar-track);
+    }
+
+    .effect-list::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border-radius: 4px;
+    }
+
+    .effect-list::-webkit-scrollbar-thumb:hover {
+      background: var(--scrollbar-thumb-hover);
+    }
+  }
+
   /* Scroll arrow indicators */
   .scroll-arrow {
     position: absolute;
