@@ -195,6 +195,37 @@ test('refreshModuleCache re-fetches same-origin scripts past the cache', async (
   for (const [, options] of calls) assert.deepEqual(options, { cache: 'reload' });
 });
 
+// The whole module graph at once only queues past the browser's per-host
+// connection limit, leaving the binary the sweep exists for behind the queue.
+test('refreshModuleCache bounds how many re-fetches are in flight', async () => {
+  const urls = Array.from({ length: 30 }, (_, i) => `http://localhost:8000/m${i}.js`);
+  const release = [];
+  let inFlight = 0;
+  let peak = 0;
+
+  const sweep = refreshModuleCache({
+    origin: 'http://localhost:8000',
+    performance: fakeTimeline(...urls),
+    fetch: () => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      return new Promise((resolve) => release.push(() => {
+        inFlight -= 1;
+        resolve({ body: null, arrayBuffer: async () => {} });
+      }));
+    },
+  });
+
+  while (release.length > 0) {
+    release.splice(0).forEach((fn) => fn());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  await sweep;
+
+  assert.ok(peak > 1, 'the sweep runs re-fetches in parallel');
+  assert.ok(peak <= 6, `${peak} re-fetches were in flight at once`);
+});
+
 // A response whose body is never read is aborted when it is collected, so the
 // cache entry the sweep exists to replace survives the reload.
 function fakeBody(chunks, gate = Promise.resolve()) {
