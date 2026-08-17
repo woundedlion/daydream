@@ -66,6 +66,7 @@
     "tools/palette_canvas.js",
     "tools/palette_controls.js",
     "tools/palette_math.js",
+    "tools/palette_wheel.js",
     "tools/pointer_drag.js",
     "tools/shader_workbench_nav.js",
     "tools/shader_documents.js",
