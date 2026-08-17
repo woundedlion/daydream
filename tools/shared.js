@@ -25,7 +25,15 @@ export { formatFloatCpp } from './cpp_format.js';
 export { formatKB } from './kb_format.js';
 export { showFatalError, bootstrapTool, reportPageFailures } from './banner.js';
 
-/** @param {number} ratio @returns {number} */
+/**
+ * Caps a WebGL renderer's device-pixel ratio at CSS resolution: the tool scenes
+ * are fill-bound, so a HiDPI backing store costs fill rate without adding
+ * visible detail. driver.js caps the simulator the same way. The 2D painters in
+ * palette_canvas.js are not fill-bound and keep the display's full density.
+ *
+ * @param {number} ratio - The display's devicePixelRatio.
+ * @returns {number} The ratio to hand setPixelRatio, never above 1.
+ */
 export function capPixelRatio(ratio) {
   return Math.min(ratio, 1);
 }
