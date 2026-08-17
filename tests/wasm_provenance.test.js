@@ -20,6 +20,9 @@ const PIN = 'holosphere_wasm.sha';
 const BINARY = 'holosphere_wasm.wasm';
 const GLUE = 'holosphere_wasm.js';
 const TOOLCHAIN = 'holosphere_wasm.toolchain';
+// Sorted, as the record's keys are compared.
+const VERSION_KEYS = ['clang', 'emsdk'];
+const TOOLCHAIN_KEYS = ['build_type', 'clang', 'dev_bindings', 'emsdk'];
 const INSTALLED = [BINARY, GLUE, MANIFEST, PIN, TOOLCHAIN];
 const CLEAN_ENV = 'DAYDREAM_WASM_CLEAN_REQUIRED';
 const ENGINE_ENV = 'HOLOSPHERE_ENGINE_REQUIRED';
@@ -109,19 +112,35 @@ test('the WASM binary and its engine source pin were committed together', () => 
       'source pin can name source the binary was not built from');
 });
 
-test('the toolchain record names a real emsdk and clang', () => {
+test('the toolchain record names a real emsdk and clang, built for release', () => {
   const records = new Map();
   for (const line of committed(TOOLCHAIN).toString('utf8').split('\n')) {
     const m = line.match(/^(\S+) +(\S.*?)\s*$/);
     if (m) records.set(m[1], m[2]);
   }
-  assert.deepEqual([...records.keys()].sort(), ['clang', 'emsdk'],
-    `${TOOLCHAIN} must record exactly an emsdk and a clang version`);
-  for (const [tool, version] of records) {
-    assert.match(version, /^\d+\.\d+/,
-      `${TOOLCHAIN} records ${tool} as '${version}'; a CMake probe that found ` +
-        'nothing writes a placeholder here and the record then means nothing');
+  // The install writes all four fields in one CMake pass. Engines before the
+  // configuration fields existed wrote the two version lines alone, which is
+  // still a whole record; any other key set is a partial or hand-edited one.
+  const keys = [...records.keys()].sort().join(' ');
+  const configured = keys === TOOLCHAIN_KEYS.join(' ');
+  assert.ok(configured || keys === VERSION_KEYS.join(' '),
+    `${TOOLCHAIN} records '${keys}'; it must record ${TOOLCHAIN_KEYS.join(', ')} ` +
+      `(or ${VERSION_KEYS.join(' and ')} alone, from an engine predating the ` +
+      'configuration fields)');
+  for (const tool of VERSION_KEYS) {
+    assert.match(records.get(tool), /^\d+\.\d+/,
+      `${TOOLCHAIN} records ${tool} as '${records.get(tool)}'; a CMake probe that ` +
+        'found nothing writes a placeholder here and the record then means nothing');
   }
+  if (!configured) return;
+  // -O0 with assertions and a 64 KB stack, or the extra dev exports, is a
+  // different module from the shipped one under the same emsdk and clang.
+  assert.equal(records.get('build_type'), 'Release',
+    `${TOOLCHAIN} records build_type '${records.get('build_type')}'; the ` +
+      'committed module must be the release build');
+  assert.equal(records.get('dev_bindings'), 'OFF',
+    `${TOOLCHAIN} records dev_bindings '${records.get('dev_bindings')}'; the ` +
+      'committed module must not carry the dev-only exports');
 });
 
 test('the toolchain record only ever moved with the binary it describes', () => {
@@ -216,6 +235,9 @@ test('the deploy gate checks the recorded toolchain against the engine pin', () 
       'shape check above passes for any version a local unpinned emsdk writes');
   assert.match(step, /engine\/tools\/build_pins\.py/,
     'the pin must be read from the pinned engine checkout, not from engine HEAD');
+  assert.match(step, /build_type.*Release|Release.*build_type/,
+    'the recorded configuration is gated here too; the emsdk comparison alone ' +
+      'passes for a debug or dev-bindings module built with the pinned emsdk');
   assert.match(step, /exit 1/, 'a mismatched or unreadable pin must fail the gate');
 });
 

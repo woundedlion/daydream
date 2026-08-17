@@ -219,6 +219,13 @@ jobs:
         #
         # Only emsdk is compared: the clang line records emsdk's own bundled
         # compiler, not the apt clang the native suite below builds with.
+        #
+        # The record also carries the CONFIGURATION, which the emsdk line does
+        # not distinguish: the same source and the same emsdk produce a
+        # different module under wasm-debug (-O0, assertions, 64 KB stack) or
+        # with -DHS_WASM_DEV_BINDINGS=ON. A deployed module must be neither.
+        # Engines predating those fields wrote the two version lines alone; the
+        # next WASM install closes that window for good.
         run: |
           if [ ! -f holosphere_wasm.toolchain ]; then
             echo "::error::holosphere_wasm.toolchain not found — the deployed module records no build toolchain. The Holosphere WASM install writes it next to the module; commit it with the .wasm."
@@ -235,6 +242,18 @@ jobs:
             exit 1
           fi
           echo "Recorded emsdk $recorded matches the pinned engine."
+          field() { awk -v k="$1" '$1 == k { print $2 }' holosphere_wasm.toolchain; }
+          build_type="$(field build_type)"
+          dev_bindings="$(field dev_bindings)"
+          if [ -z "$build_type" ] && [ -z "$dev_bindings" ]; then
+            echo "::warning::holosphere_wasm.toolchain records no build configuration, so the deployed module's build type and dev bindings are unverified. It was written by an engine predating those fields; the next Holosphere WASM install records them."
+          elif [ "$build_type" != "Release" ] || [ "$dev_bindings" != "OFF" ]; then
+            echo "::error::holosphere_wasm.toolchain records build_type '${build_type:-none}' / dev_bindings '${dev_bindings:-none}' — a deployed module must be the Release build with dev bindings off. Rebuild with the wasm-release preset and commit the refreshed provenance set."
+            cat holosphere_wasm.toolchain
+            exit 1
+          else
+            echo "Recorded build configuration: Release, dev bindings off."
+          fi
 
       - name: Resolve the Clang the pinned engine builds with
         id: clang
