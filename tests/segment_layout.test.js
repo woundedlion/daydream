@@ -9,7 +9,7 @@ test('a full segment set tiles the canvas exactly once', () => {
     { w: 288, h: 144, total: 4 },
     { w: 288, h: 144, total: 8 },
     { w: 96, h: 20, total: 2 },
-    { w: 96, h: 21, total: 4 },   // odd height: last band takes the remainder
+    { w: 96, h: 21, total: 4 },   // odd height: the remainder spreads across bands
     { w: 100, h: 30, total: 6 },
   ];
 
@@ -55,14 +55,25 @@ test('an odd canvas width fails fast instead of leaving a column uncovered', () 
   assert.throws(() => computeSegmentRange(0, 2, 1, 144), /multiple of 2 arms/);
 });
 
-test('the last band absorbs an uneven height remainder', () => {
-  // total=4 → 2 bands per arm; h=21 → segH=10, last band reaches 21.
+test('an uneven height remainder spreads one row per band', () => {
+  // total=4 → 2 bands per arm; h=21 → segH=10 and one spare row, taken by the
+  // northern band, so neither band exceeds the other by more than a row.
   const top = computeSegmentRange(0, 4, 96, 21);
   const bottom = computeSegmentRange(1, 4, 96, 21);
-  assert.equal(top.y0, 0);
-  assert.equal(top.y1, 10);
-  assert.equal(bottom.y0, 10);
-  assert.equal(bottom.y1, 21); // remainder absorbed, not 20
+  assert.deepEqual([top.y0, top.y1], [0, 11]);
+  assert.deepEqual([bottom.y0, bottom.y1], [11, 21]);
+});
+
+// The slowest worker bounds the frame, so a remainder piled onto one band inflates
+// every parallel render by its excess.
+test('no band exceeds another by more than one row', () => {
+  for (const { total, h } of [{ total: 6, h: 20 }, { total: 8, h: 15 },
+                              { total: 4, h: 21 }, { total: 6, h: 100 }]) {
+    const heights = [];
+    for (let id = 0; id < total; id++) heights.push(computeSegmentRange(id, total, 96, h).h);
+    assert.ok(Math.max(...heights) - Math.min(...heights) <= 1,
+      `band heights ${heights} for ${total} segments over h=${h}`);
+  }
 });
 
 // Four bands per arm is where the firmware's northern/southern split becomes
@@ -79,13 +90,14 @@ test('four bands per arm tile north top-down then south from the pole inward', (
   }
 });
 
-test('the bottom band absorbs an uneven height remainder at four bands per arm', () => {
-  // total=8 → 4 bands per arm; h=15 → segH=3, and the bottom band [9,15) belongs
-  // to within-arm slot 2, not slot 3.
+test('an uneven height remainder spreads across four bands per arm', () => {
+  // total=8 → 4 bands per arm; h=15 → segH=3 and three spare rows, so the three
+  // northmost bands run 4 rows and the S-pole band 3. The bottom band belongs to
+  // within-arm slot 2, not slot 3.
   const slot2 = computeSegmentRange(2, 8, 96, 15);
   const slot3 = computeSegmentRange(3, 8, 96, 15);
-  assert.deepEqual([slot2.y0, slot2.y1], [9, 15]);
-  assert.deepEqual([slot3.y0, slot3.y1], [6, 9]);
+  assert.deepEqual([slot2.y0, slot2.y1], [12, 15]);
+  assert.deepEqual([slot3.y0, slot3.y1], [8, 12]);
 });
 
 test('an odd or too-small segment count fails fast', () => {
