@@ -1,7 +1,10 @@
+// @ts-check
 /*
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
+
+/** @typedef {(key: string, value: *, old: *) => void} StateListener */
 
 // Significant digits kept by roundUrlNumber. A lil-gui slider's implicit step is
 // a thousandth of its range, so 5 digits resolve every step of a param at any
@@ -148,7 +151,9 @@ export class AppState {
   constructor(defaults = {}) {
     // Null prototype: keys are arbitrary strings, and an inherited one
     // ("constructor", "toString") would read back as state the app never set.
+    /** @type {Record<string, *>} */
     this.state = { __proto__: null, ...defaults };
+    /** @type {{fn: StateListener}[]} */
     this.listeners = [];
     this.batchDepth = 0;
     // key -> notifications dispatched since the outermost batch began. A queued
@@ -213,8 +218,8 @@ export class AppState {
 
   /**
    * Subscribes to state changes.
-   * @param {Function} callback - Invoked as (key, newValue, oldValue) on each change.
-   * @returns {Function} An unsubscribe function that removes this registration
+   * @param {StateListener} callback - Invoked as (key, newValue, oldValue) on each change.
+   * @returns {() => void} An unsubscribe function that removes this registration
    *   only; the same callback registered twice needs both disposers, and calling
    *   one twice is a no-op.
    */
@@ -251,6 +256,7 @@ export class AppState {
 }
 
 // Single app-wide URL writer; gui.js routes its param writes through this.
+/** @type {URLSync|null} */
 let activeURLSync = null;
 /**
  * Returns the app-wide active URLSync instance, or null if none is constructed.
@@ -285,20 +291,25 @@ export class URLSync {
     if (activeURLSync) activeURLSync.dispose();
     this.state = state;
     this.trackedKeys = new Set(trackedKeys);
+    /** @type {ReturnType<typeof setTimeout>|null} */
     this.timer = null;
     this.armedDelayMs = 0; // delay this.timer was armed with; read only while armed
     this.disposed = false;
-    this.adhoc = new Map(); // GUI-set params (key -> string), merged on flush
-    this.pendingReset = null; // reset()'s excluded keys, applied by the next flush
+    /** @type {Map<string, string|null>} GUI-set params, merged on flush. */
+    this.adhoc = new Map();
+    /** @type {Set<string>|null} reset()'s excluded keys, applied by the next flush. */
+    this.pendingReset = null;
     this.suspendDepth = 0;
     this.suspendedDirty = false;
     this.retries = 0; // consecutive refused writes, cleared by one that lands
 
     const params = new URLSearchParams(window.location.search);
+    /** @type {Record<string, *>} */
     const patch = {};
     for (const key of trackedKeys) {
-      if (!params.has(key)) continue;
+      // null only for an absent key; a present one with no value reads as ''.
       const raw = params.get(key);
+      if (raw === null) continue;
       // Own keys only: Object.prototype carries a callable under every inherited
       // name, and one of those would pass every raw value it was handed.
       const validate = Object.hasOwn(validators, key) ? validators[key] : null;
@@ -340,6 +351,7 @@ export class URLSync {
       }
     }
 
+    /** @type {(() => void)|null} */
     this.unsubscribe = state.subscribe((key) => {
       if (!this.trackedKeys.has(key)) return;
       this.schedule();
@@ -363,7 +375,7 @@ export class URLSync {
       this.unsubscribe();
       this.unsubscribe = null;
     }
-    clearTimeout(this.timer);
+    if (this.timer !== null) clearTimeout(this.timer);
     this.timer = null;
     if (activeURLSync === this) activeURLSync = null;
   }
@@ -399,8 +411,10 @@ export class URLSync {
       this.suspendedDirty = true;
       return;
     }
-    if (this.timer !== null && delayMs < this.armedDelayMs) return;
-    clearTimeout(this.timer);
+    if (this.timer !== null) {
+      if (delayMs < this.armedDelayMs) return;
+      clearTimeout(this.timer);
+    }
     this.armedDelayMs = delayMs;
     this.timer = setTimeout(() => {
       this.timer = null;
