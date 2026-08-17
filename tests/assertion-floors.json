@@ -140,6 +140,10 @@
     "cases": 22,
     "assertions": 1491
   },
+  "tests/palette_wheel.test.js": {
+    "cases": 20,
+    "assertions": 319
+  },
   "tests/param_sync.test.js": {
     "cases": 32,
     "assertions": 56
