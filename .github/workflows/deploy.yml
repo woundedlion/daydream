@@ -276,11 +276,24 @@ jobs:
         # The engine pins a Clang newer than the Ubuntu 24.04 default, so the
         # toolchain comes from apt.llvm.org — the same source and release channel
         # its CI uses (Holosphere .github/workflows/ci.yml).
+        #
+        # The signing key is checksum-pinned, as it is there: it is served by the
+        # same host as the packages it authenticates, so a fresh fetch trusted on
+        # sight lets that host vouch for itself. The digest comes out of the
+        # pinned engine checkout for the same reason the clang major does — a
+        # value spelled here would drift unpoliced by the engine's own gate. The
+        # deb transport stays plain HTTP; signed-by is what authenticates the
+        # archive, per release file.
         env:
           MAJOR: ${{ steps.clang.outputs.major }}
         run: |
-          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key \
-            | sudo gpg --dearmor -o /usr/share/keyrings/llvm.gpg
+          if ! key_sha="$(python3 engine/tools/build_pins.py llvm-key-sha256)" || [ -z "$key_sha" ]; then
+            echo "::error::the pinned engine ($(cat holosphere_wasm.sha)) does not report an llvm-key-sha256 pin from tools/build_pins.py, so the apt.llvm.org signing key cannot be verified before it is trusted."
+            exit 1
+          fi
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key -o /tmp/llvm-snapshot.gpg.key
+          echo "$key_sha  /tmp/llvm-snapshot.gpg.key" | sha256sum --check --strict
+          sudo gpg --dearmor -o /usr/share/keyrings/llvm.gpg /tmp/llvm-snapshot.gpg.key
           echo "deb [signed-by=/usr/share/keyrings/llvm.gpg] http://apt.llvm.org/noble/ llvm-toolchain-noble-$MAJOR main" \
             | sudo tee /etc/apt/sources.list.d/llvm.list
           sudo apt-get update
