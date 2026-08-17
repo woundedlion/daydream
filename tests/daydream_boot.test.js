@@ -11,18 +11,52 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { restoreDocumentAfterEach } from './fake_dom.js';
+import { captureConsole } from './fake_console.js';
 import { startApp, segmentCountControl } from './fake_app.js';
 
 restoreDocumentAfterEach();
 
-const SOURCE = readFileSync(new URL('../daydream.js', import.meta.url), 'utf8');
+/**
+ * Blanks a source's comments to spaces, leaving every other offset where it
+ * was. Prose cannot then satisfy a pattern, so a case that names wiring fails
+ * when only a comment describes it.
+ * @param {string} src - Source text.
+ * @returns {string} The source with its comment bodies spaced out.
+ */
+function withoutComments(src) {
+  const out = [...src];
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (c === "'" || c === '"' || c === '`') {
+      for (i++; i < src.length && src[i] !== c; i++) if (src[i] === '\\') i++;
+      continue;
+    }
+    if (c !== '/') continue;
+    let end;
+    if (src[i + 1] === '/') {
+      const eol = src.indexOf('\n', i);
+      end = eol < 0 ? src.length : eol;
+    } else if (src[i + 1] === '*') {
+      const close = src.indexOf('*/', i + 2);
+      end = close < 0 ? src.length : close + 2;
+    } else {
+      continue;
+    }
+    for (let j = i; j < end; j++) if (out[j] !== '\n') out[j] = ' ';
+    i = end - 1;
+  }
+  return out.join('');
+}
+
+const SOURCE = withoutComments(
+  readFileSync(new URL('../daydream.js', import.meta.url), 'utf8'));
 
 const WASM_INIT = 'createModuleLoadHandlers(';
 
 /**
  * Extracts the text between a call's parentheses, skipping parens that sit
- * inside strings, template literals, or comments.
- * @param {string} src - Source text.
+ * inside strings or template literals.
+ * @param {string} src - Comment-blanked source text.
  * @param {number} open - Index of the opening '('.
  * @returns {string} The argument-list text.
  */
@@ -30,18 +64,6 @@ function balanced(src, open) {
   let depth = 0;
   for (let i = open; i < src.length; i++) {
     const c = src[i];
-    if (c === '/' && src[i + 1] === '/') {
-      const eol = src.indexOf('\n', i);
-      if (eol < 0) break;
-      i = eol;
-      continue;
-    }
-    if (c === '/' && src[i + 1] === '*') {
-      const end = src.indexOf('*/', i + 2);
-      if (end < 0) break;
-      i = end + 1;
-      continue;
-    }
     if (c === "'" || c === '"' || c === '`') {
       for (i++; i < src.length && src[i] !== c; i++) if (src[i] === '\\') i++;
       continue;
@@ -85,13 +107,25 @@ test('the teardown is retained and reachable from the module-load handlers', () 
 });
 
 test('the page-failure surface is the shared one, and it is torn down', () => {
-  assert.match(SOURCE, /reportPageFailures\('simulator', win\)/,
+  const { teardown, listeners, win } = startApp();
+  const failureListeners = () => listeners.filter(
+    ([type]) => type === 'error' || type === 'unhandledrejection');
+
+  assert.deepEqual(failureListeners().map(([type]) => type),
+    ['error', 'unhandledrejection'],
     'a synchronous throw from an animation frame, a lil-gui onChange, or a DOM '
     + 'listener is console-only without the error listener the shared surface '
     + 'installs alongside the rejection one');
-  const at = SOURCE.indexOf('appTeardown = createAppTeardown(');
-  const args = balanced(SOURCE, SOURCE.indexOf('(', at));
-  assert.match(args, /\.\.\.pageFailureListeners/,
+
+  const [, onError] = failureListeners()[0];
+  const { messages } = captureConsole(
+    () => onError({ target: win, error: new Error('boom') }));
+  assert.match(messages.join('\n'), /simulator error:.*boom/,
+    'the surface must be raised under the page label, or a report from the '
+    + 'simulator is indistinguishable from one from a tool page');
+
+  teardown.dispose();
+  assert.deepEqual(failureListeners(), [],
     'a listener that outlives the page discard reports into a dead app');
 });
 
