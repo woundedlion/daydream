@@ -8,7 +8,7 @@
 // The device evaluates its native palette at 16-bit precision, so the browser
 // preview can differ most in dark tones.
 
-import { srgbToLinearFloat, linearToSrgbFloat } from './color.js';
+import { srgbToLinearFloat, linearToSrgbFloat, linearRgbToHex } from './color.js';
 import { formatFloatCpp } from './cpp_format.js';
 
 /** @typedef {import('./palette_controls.js').PaletteRecipe} PaletteRecipe */
@@ -193,6 +193,40 @@ export function proceduralPaletteParams({ a, b, c, d }) {
     C_R: c[0], C_G: c[1], C_B: c[2],
     D_R: d[0], D_G: d[1], D_B: d[2],
   };
+}
+
+/**
+ * Title-cases an UPPER_SNAKE palette name for display.
+ * @param {string} name - A NAMED_PROCEDURAL_PALETTES name, e.g. 'DARK_RAINBOW'.
+ * @returns {string} The display name, e.g. 'Dark Rainbow'.
+ */
+export function prettyPaletteName(name) {
+  return name.split('_')
+    .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+// A stop per device pixel across the gallery's 3rem swatch at 2x. CSS
+// interpolates between stops in gamma-encoded sRGB, so a palette with a high
+// coefficient frequency aliases visibly at a coarser sampling.
+const GRADIENT_STOPS = 96;
+
+/**
+ * A left-to-right CSS gradient previewing a named palette, sampled through the
+ * same ProceduralPalette math the strip uses so the swatch matches the palette
+ * it loads.
+ * @param {{a:number[], b:number[], c:number[], d:number[]}} entry - A NAMED_PROCEDURAL_PALETTES entry.
+ * @param {number} [stopCount] - How many colors the gradient carries.
+ * @returns {string} A `linear-gradient(...)` value for the swatch background.
+ */
+export function paletteGradientCss(entry, stopCount = GRADIENT_STOPS) {
+  const preview = new ProceduralPalette(entry.a, entry.b, entry.c, entry.d);
+  const stops = [];
+  for (let i = 0; i < stopCount; i++) {
+    const [r, g, b] = preview.get(stopCount === 1 ? 0 : i / (stopCount - 1));
+    stops.push(linearRgbToHex(r, g, b));
+  }
+  return `linear-gradient(to right, ${stops.join(', ')})`;
 }
 
 /**
@@ -404,6 +438,23 @@ export class GenerativePalette {
       fallbackMapped: this.fallback[index] !== 0,
     };
   }
+}
+
+// Where the last of the LUT's 256 sRGB triples starts.
+const LAST_LUT_ENTRY = 255 * 3;
+
+/**
+ * Whether a compiled palette's LUT closes on itself exactly, which only a LOOP
+ * domain asks for.
+ * @param {GenerativePalette} palette - A compiled generative palette.
+ * @returns {boolean} True when the domain is LOOP and its first and last LUT
+ *   entries are byte-identical, so the palette repeats with no seam.
+ */
+export function paletteLoopClosure(palette) {
+  return ENUM_NAMES.domain[palette.canonicalRecipe?.domain ?? -1] === 'LOOP'
+    && palette.lut[0] === palette.lut[LAST_LUT_ENTRY]
+    && palette.lut[1] === palette.lut[LAST_LUT_ENTRY + 1]
+    && palette.lut[2] === palette.lut[LAST_LUT_ENTRY + 2];
 }
 
 /**

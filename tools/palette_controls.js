@@ -297,6 +297,75 @@ export function createPaletteViewport() {
 }
 
 /**
+ * The phase window the generative tab samples, with its controls' own limits
+ * applied: a span narrower than a hundredth of the palette is not editable, and
+ * the offset cannot push the window past the end.
+ * @param {number} offset - Where the window starts, in palette phase.
+ * @param {number} span - How much of the palette it covers.
+ * @returns {{offset: number, span: number}} The window the controls hold.
+ */
+export function clampRecipeWindow(offset, span) {
+  const clampedSpan = Math.max(0.01, Math.min(1, span));
+  return {
+    offset: Math.max(0, Math.min(1 - clampedSpan, offset)),
+    span: clampedSpan,
+  };
+}
+
+/**
+ * Narrows a recipe's phase window to the span between two strip positions, in
+ * either drag direction. The generative palette bakes its own window, so its
+ * zoom composes here rather than in a viewport.
+ * @param {{offset: number, span: number}} window - The window now shown.
+ * @param {number} firstPosition - One end of the drag, as a 0..1 strip position.
+ * @param {number} secondPosition - The other end.
+ * @returns {{offset: number, span: number}} The window to show next.
+ */
+export function zoomRecipeWindow(window, firstPosition, secondPosition) {
+  const low = Math.min(clampUnit(firstPosition), clampUnit(secondPosition));
+  const high = Math.max(clampUnit(firstPosition), clampUnit(secondPosition));
+  return clampRecipeWindow(
+    window.offset + low * window.span, (high - low) * window.span);
+}
+
+/** Shortest drag the strip reads as a zoom rather than as a click. */
+export const STRIP_DRAG_THRESHOLD = 0.01;
+
+/**
+ * What a completed strip drag asks for.
+ * @param {number} startPosition - Where the drag began, as a 0..1 strip position.
+ * @param {number} endPosition - Where it ended; the two may arrive in either order.
+ * @param {number} [threshold] - Shortest drag that counts as a zoom.
+ * @returns {{intent: string, start: number, end: number}} Either a 'copy' of the
+ *   color at `start`, or a 'zoom' onto [start, end].
+ */
+export function stripDragIntent(startPosition, endPosition,
+  threshold = STRIP_DRAG_THRESHOLD) {
+  const start = Math.min(startPosition, endPosition);
+  const end = Math.max(startPosition, endPosition);
+  return { intent: end - start < threshold ? 'copy' : 'zoom', start, end };
+}
+
+/**
+ * How the strip presents the phase window it is showing.
+ * @param {{start: number, end: number}} range - The visible phase window.
+ * @returns {{zoomed: boolean, heading: string, ariaLabel: string}} Whether the
+ *   window is narrower than the whole palette, and the heading and accessible
+ *   name that say so.
+ */
+export function paletteStripView({ start, end }) {
+  const zoomed = start !== 0 || end !== 1;
+  return {
+    zoomed,
+    heading: zoomed
+      ? `sRGB Palette (t ∈ [${start.toFixed(3)}, ${end.toFixed(3)}])`
+      : 'sRGB Palette (t ∈ [0, 1])',
+    ariaLabel: `Palette strip, t ${start.toFixed(3)} to ${end.toFixed(3)}. `
+      + 'Press Enter to copy the center color. Drag to zoom.',
+  };
+}
+
+/**
  * The endpoints a lightness or chroma axis spans, for controls that edit its
  * ends rather than its center and width.
  * @param {{center:number, range:number}} axis - The recipe's axis values.
@@ -321,6 +390,54 @@ export function axisFromEndpoints(minimum, maximum) {
   return {
     center: (low + high) * 0.5,
     range: high - low,
+  };
+}
+
+/**
+ * The two OKLCH axes the generative tab edits by their endpoints: the id prefix
+ * their sliders share, the curve select that governs them, and how each is
+ * named in the labels and accessible names built from it.
+ * @type {Object<string, {prefix: string, curve: string, label: string, shortLabel: string}>}
+ */
+export const PALETTE_AXIS_CONTROLS = Object.freeze({
+  lightness: Object.freeze({
+    prefix: 'gen_lightness', curve: 'gen_brightness',
+    label: 'Lightness', shortLabel: 'Lightness',
+  }),
+  chroma: Object.freeze({
+    prefix: 'gen_chroma', curve: 'gen_chroma_curve',
+    label: 'Relative Chroma', shortLabel: 'Chroma',
+  }),
+});
+
+/**
+ * How an axis' endpoint sliders present themselves under the curve selected for
+ * it. A CONSTANT curve has one value rather than two ends, so its minimum reads
+ * as the axis itself and spans the whole unit interval; every other curve pins
+ * each end against the other so the pair cannot cross.
+ * @param {object} axis - The axis' current control readings.
+ * @param {string} axis.curve - PaletteV4.curve member name the curve select holds.
+ * @param {string|number} axis.minimum - The minimum slider's value.
+ * @param {string|number} axis.maximum - The maximum slider's value.
+ * @param {string} axis.label - The axis' full name, for accessible names.
+ * @param {string} axis.shortLabel - Its name as the visible label shows it.
+ * @returns {Object<string, string|boolean>} The bounds, labels, accessible names
+ *   and readouts to apply to the pair.
+ */
+export function axisControlState({ curve, minimum, maximum, label, shortLabel }) {
+  const constant = curve === 'CONSTANT';
+  return {
+    constant,
+    minimumLabel: shortLabel,
+    maximumLabel: 'Maximum',
+    minimumName: constant ? label : `Minimum ${label}`,
+    maximumName: `Maximum ${label}`,
+    minimumMin: '0',
+    minimumMax: constant ? '1' : String(maximum),
+    maximumMin: constant ? '0' : String(minimum),
+    maximumMax: '1',
+    minimumText: Number(minimum).toFixed(2),
+    maximumText: Number(maximum).toFixed(2),
   };
 }
 
@@ -671,6 +788,144 @@ export function paletteRecipeFromControls(template, controls) {
     recipe.hue.sweepTurns = Math.round(recipe.hue.sweepTurns);
   }
   return recipe;
+}
+
+/**
+ * The generative tab's control elements, by the reading each one carries. The
+ * page hands the values over; the ids live here so a reading and the control it
+ * comes off cannot drift apart.
+ * @type {Object<string, string>}
+ */
+export const PALETTE_CONTROL_IDS = Object.freeze({
+  offset: 'gen_phase',
+  span: 'gen_width',
+  easing: 'gen_easing',
+  spreadDegrees: 'gen_spread',
+  sweepTurns: 'gen_sweep',
+  headroom: 'gen_headroom',
+  hueTorsion: 'gen_torsion',
+  falloffStart: 'gen_falloff',
+  domain: 'gen_shape',
+  colorPath: 'gen_path',
+  hueMode: 'gen_hue_mode',
+  harmony: 'gen_harmony',
+  direction: 'gen_direction',
+  baseHueDegrees: 'gen_seed_slider',
+  lightnessCurve: 'gen_brightness',
+  chromaCurve: 'gen_chroma_curve',
+  lightnessMinimum: 'gen_lightness_minimum',
+  lightnessMaximum: 'gen_lightness_maximum',
+  chromaMinimum: 'gen_chroma_minimum',
+  chromaMaximum: 'gen_chroma_maximum',
+});
+
+/**
+ * Assembles the readings paletteRecipeFromControls consumes, converting the
+ * units the controls are labelled in (degrees) to the recipe's own (turns).
+ * @param {(id: string) => (string|undefined)} readControl - Reads one control's value by element id.
+ * @param {number[]} customHueOffsets - The wheel's per-key hue offsets, which no control holds.
+ * @returns {Object} The readings.
+ * @throws {RangeError} When a control the recipe needs is not on the page, which
+ *   would otherwise marshal as a NaN or an undefined enum the engine rejects.
+ */
+export function paletteControlReadings(readControl, customHueOffsets) {
+  /**
+   * @param {string} name - A PALETTE_CONTROL_IDS key.
+   * @returns {string} The control's value.
+   */
+  const read = (name) => {
+    const id = PALETTE_CONTROL_IDS[name];
+    const value = readControl(id);
+    if (value === undefined || value === null)
+      throw new RangeError(`Palette control ${id} is missing`);
+    return value;
+  };
+  /**
+   * @param {string} name - A PALETTE_CONTROL_IDS key.
+   * @returns {number} The control's value as a number.
+   */
+  const number = (name) => Number(read(name));
+
+  return {
+    window: { offset: number('offset'), span: number('span') },
+    easing: read('easing'),
+    spreadTurns: number('spreadDegrees') / 360,
+    sweepTurns: number('sweepTurns'),
+    headroom: number('headroom'),
+    hueTorsion: number('hueTorsion'),
+    falloffStart: number('falloffStart'),
+    domain: read('domain'),
+    colorPath: read('colorPath'),
+    hueMode: read('hueMode'),
+    harmony: read('harmony'),
+    direction: read('direction'),
+    baseTurns: number('baseHueDegrees') / 360,
+    customHueOffsets,
+    lightnessCurve: read('lightnessCurve'),
+    chromaCurve: read('chromaCurve'),
+    lightness: {
+      minimum: number('lightnessMinimum'),
+      maximum: number('lightnessMaximum'),
+    },
+    chroma: {
+      minimum: number('chromaMinimum'),
+      maximum: number('chromaMaximum'),
+    },
+  };
+}
+
+/**
+ * The PaletteV4 member name an ordinal stands for — the value the matching
+ * <option> carries.
+ * @param {string} group - A PaletteV4 enum name.
+ * @param {number} value - The ordinal a recipe carries.
+ * @returns {string} The member's name.
+ * @throws {RangeError} When the group has no member with that ordinal, which
+ *   would otherwise leave the select on whatever it already showed.
+ */
+export function paletteEnumName(group, value) {
+  const members = PaletteV4[group];
+  if (!members) throw new RangeError(`Unknown palette enum: ${group}`);
+  const name = Object.keys(members).find((key) => members[key] === value);
+  if (name === undefined)
+    throw new RangeError(`Unknown ${group} value: ${value}`);
+  return name;
+}
+
+/**
+ * The inverse of paletteRecipeFromControls: the readings that reproduce a
+ * recipe, for loading a preset into the tab's controls.
+ *
+ * The hue keys come back as the base-plus-offsets form the wheel edits, taken
+ * from the recipe's own hue mode — so loading a harmony leaves the wheel on the
+ * keys that harmony draws, ready for a handoff into CUSTOM.
+ * @param {PaletteRecipe} recipe - The recipe to load.
+ * @returns {Object} The readings, in paletteRecipeFromControls' own shape.
+ * @throws {RangeError} When a field holds an ordinal PaletteV4 has no member for.
+ */
+export function paletteControlsFromRecipe(recipe) {
+  const hueState = customHueKeyState(recipe);
+  return {
+    window: { ...recipe.input },
+    easing: paletteEnumName('easing', recipe.easing),
+    spreadTurns: recipe.hue.spreadTurns,
+    sweepTurns: recipe.hue.sweepTurns,
+    headroom: recipe.chroma.headroom,
+    hueTorsion: recipe.hueTorsion,
+    falloffStart: recipe.falloffStart,
+    domain: paletteEnumName('domain', recipe.domain),
+    colorPath: paletteEnumName('colorPath', recipe.colorPath),
+    hueMode: paletteEnumName('hueMode', recipe.hue.mode),
+    harmony: paletteEnumName('harmony', recipe.hue.harmony),
+    direction: paletteEnumName('direction', recipe.hue.direction),
+    baseTurns: recipe.hue.mode === PaletteV4.hueMode.CUSTOM
+      ? hueState.baseTurns : recipe.hue.baseTurns,
+    customHueOffsets: hueState.offsets,
+    lightnessCurve: paletteEnumName('curve', recipe.lightness.curve),
+    chromaCurve: paletteEnumName('curve', recipe.chroma.curve),
+    lightness: axisEndpoints(recipe.lightness),
+    chroma: axisEndpoints(recipe.chroma),
+  };
 }
 
 // The harmonies whose anchors are placed by spreadTurns; the rest are fixed
