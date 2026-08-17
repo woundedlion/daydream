@@ -935,6 +935,9 @@ test('a keyboard-focused canvas rings and orbits until it loses focus', () => {
  */
 function matricesCtx(w, h) {
   const matrices = [];
+  // Backed like the real attribute, whose array is what setMatrixAt writes into
+  // and what the cache replay copies over wholesale.
+  const instanceMatrix = { array: new Float32Array(w * h * 16), needsUpdate: false };
   return {
     W: w,
     H: h,
@@ -945,8 +948,11 @@ function matricesCtx(w, h) {
     dotMesh: {
       count: w * h,
       instanceColor: null,
-      instanceMatrix: { needsUpdate: false },
-      setMatrixAt: (i, m) => { matrices[i] = m.clone(); },
+      instanceMatrix,
+      setMatrixAt: (i, m) => {
+        matrices[i] = m.clone();
+        m.toArray(instanceMatrix.array, i * 16);
+      },
     },
   };
 }
@@ -1125,13 +1131,12 @@ test('precomputeMatrices reuses a grid it has already composed', () => {
   Daydream.prototype.precomputeMatrices.call(again);
 
   assert.equal(first.matrixCache.size, 1, 'one entry per grid');
-  // Compared at the precision the instanceMatrix attribute carries, which is
-  // what the cache stores and the GPU reads.
-  const carried = (m) => Float32Array.from(m.elements);
-  for (let i = 0; i < 8 * 5; i++) {
-    assert.deepEqual(carried(again.matrices[i]), carried(first.matrices[i]),
-      `instance ${i} replayed a different matrix`);
-  }
+  // The attribute array is what the cache stores and the GPU reads, so the
+  // replay is exact or it is not a replay.
+  assert.deepEqual(again.dotMesh.instanceMatrix.array,
+    first.dotMesh.instanceMatrix.array, 'the replayed grid is not bit-identical');
+  assert.equal(again.matrices.length, 0,
+    'the replay composed matrices the cache already holds in the target layout');
 
   const wider = matricesCtx(9, 5);
   wider.matrixCache = first.matrixCache;

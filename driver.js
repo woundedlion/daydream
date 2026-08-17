@@ -872,16 +872,16 @@ export class Daydream {
    */
   precomputeMatrices() {
     const count = this.W * this.H;
-    const dummy = new THREE.Object3D();
     const key = `${this.W}x${this.H}x${this.H_OFFSET}`;
     const cached = this.matrixCache.get(key);
 
     if (cached) {
-      for (let i = 0; i < count; i++) {
-        dummy.matrix.fromArray(cached, i * 16);
-        this.dotMesh.setMatrixAt(i, dummy.matrix);
-      }
+      // The cache holds the instanceMatrix layout itself, so the replay is one
+      // typed-array copy; round-tripping each matrix through an Object3D would
+      // read and write the same 16 floats an element at a time.
+      this.dotMesh.instanceMatrix.array.set(cached);
     } else {
+      const dummy = new THREE.Object3D();
       const composed = new Float32Array(count * 16);
       const vector = new THREE.Vector3();
       const sph = new THREE.Spherical(); // reused scratch out-param
