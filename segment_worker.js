@@ -139,6 +139,40 @@ function reportParamRejected(name, result) {
 }
 
 /**
+ * Push one parameter, reporting a refusal.
+ * @param {string} name - Parameter to write.
+ * @param {number} value - Value to write.
+ * @returns {void}
+ */
+function applyParam(name, value) {
+  if (!engine || !wasmModule) return;
+  const result = engine.setParameter(name, value);
+  if (result !== wasmModule.ParamSetResult.APPLIED) {
+    reportParamRejected(name, result);
+  }
+}
+
+/**
+ * Replay a rebuild's parameter list: accepted render state first, then pending
+ * requests. setEffect rebuilds with defaults, so this must follow it. Every
+ * ParamSetResult is checked as a live setParameter's is — the engine answers the
+ * same structural refusals here, and one dropped leaves this segment rendering a
+ * configuration the main engine never had.
+ * @param {import('./worker_protocol.js').SegParam[]|undefined} params - The
+ * controller's parameter snapshot.
+ * @returns {void}
+ */
+function replayParams(params) {
+  if (!params) return;
+  for (const p of params) {
+    if (typeof p.acceptedValue === 'number') applyParam(p.name, p.acceptedValue);
+  }
+  for (const p of params) {
+    if (typeof p.value === 'number') applyParam(p.name, p.value);
+  }
+}
+
+/**
  * Select a preset, reporting an index the engine refused. A refusal leaves this
  * segment rendering a different preset from its peers, and the controller has no
  * reply channel for one. An index the engine is already on moves nothing and is
@@ -240,16 +274,7 @@ async function handleMessage(msg) {
         applyPreset(msg.presetIndex, 'synchronizePreset');
       }
       if (!restoreFullConfig(msg.fullConfigSnapshot)) break;
-      // Tuned params must follow setEffect, which rebuilds with defaults.
-      if (msg.params) {
-        for (const p of msg.params) {
-          if (typeof p.acceptedValue === 'number')
-            engine.setParameter(p.name, p.acceptedValue);
-        }
-        for (const p of msg.params) {
-          if (typeof p.value === 'number') engine.setParameter(p.name, p.value);
-        }
-      }
+      replayParams(msg.params);
       if (typeof msg.paused === 'boolean') engine.setAnimationsPaused(msg.paused);
       if (typeof msg.poleLod === 'number') engine.setPoleLod(msg.poleLod);
       // A rejected clip leaves no usable render geometry: report nothing ready.
@@ -274,16 +299,7 @@ async function handleMessage(msg) {
           applyPreset(msg.presetIndex, 'synchronizePreset');
         }
         if (!restoreFullConfig(msg.fullConfigSnapshot)) break;
-        // Tuned params must follow setEffect, which rebuilds with defaults.
-        if (msg.params) {
-          for (const p of msg.params) {
-            if (typeof p.acceptedValue === 'number')
-              engine.setParameter(p.name, p.acceptedValue);
-          }
-          for (const p of msg.params) {
-            if (typeof p.value === 'number') engine.setParameter(p.name, p.value);
-          }
-        }
+        replayParams(msg.params);
         if (typeof msg.paused === 'boolean') {
           engine.setAnimationsPaused(msg.paused);
         }
@@ -313,10 +329,7 @@ async function handleMessage(msg) {
 
     case 'setParameter': {
       if (engine && wasmModule) {
-        const result = engine.setParameter(msg.name, msg.value);
-        if (result !== wasmModule.ParamSetResult.APPLIED) {
-          reportParamRejected(msg.name, result);
-        }
+        applyParam(msg.name, msg.value);
         paramRevision = msg.paramRevision;
       }
       break;
