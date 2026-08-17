@@ -47,12 +47,16 @@ const ABSENT_PATHS = [/^\/favicon\.ico$/, /^\/vendor\//];
 
 /**
  * Readiness a page must reach beyond a painted frame, evaluated in the page.
- * The simulator paints its empty scene before the engine is up, so a frame alone
- * would pass over a WASM module that never loaded; it removes the loading
- * overlay once the engine has booted and the first effect applied.
+ * The app paints its empty scene before the engine is up, so a frame alone would
+ * pass over a WASM module that never loaded; it removes the loading overlay once
+ * the engine has booted and the first effect applied. Every page that declares
+ * `#loading-overlay` runs that startup, so each must clear it.
  */
+const enginePainted = () => !document.getElementById('loading-overlay');
+
 const PAGE_READY = {
-  'index.html': () => !document.getElementById('loading-overlay'),
+  'index.html': enginePainted,
+  'tools/shader.html': enginePainted,
 };
 
 /**
