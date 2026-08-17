@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import {
   Daydream, dotDetailFor, fitDistance, initialAspect, MOBILE_BREAKPOINT_PX,
 } from '../driver.js';
+import { repointDisplayAliases } from '../app_lifecycle.js';
 import { captureConsole } from './fake_console.js';
 import { fakeElement } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
@@ -969,6 +970,45 @@ test('precomputeMatrices places one dot per pixel on the sphere surface', () => 
   }
 });
 
+/**
+ * Reference world position of a pixel's dot, written out independently of
+ * geometry.js: polar angle y/(H-1) from +Y, azimuth from +X toward +Z, on the
+ * sphere the camera frames.
+ * @param {number} x - Pixel column index in [0, w).
+ * @param {number} y - Pixel row index in [0, h).
+ * @param {number} w - Grid width in pixels.
+ * @param {number} h - Grid height in pixels.
+ * @returns {THREE.Vector3} Where that pixel's dot belongs in the scene.
+ */
+function dotPosition(x, y, w, h) {
+  const phi = (y * Math.PI) / (h - 1);
+  const theta = (x * 2 * Math.PI) / w;
+  return new THREE.Vector3(
+    Math.sin(phi) * Math.cos(theta),
+    Math.cos(phi),
+    Math.sin(phi) * Math.sin(theta),
+  ).multiplyScalar(Daydream.SPHERE_RADIUS);
+}
+
+/**
+ * Every instance carries the engine's own pixel, in the engine's frame. A
+ * mirrored azimuth or a transposed index keeps the dots on the sphere, facing
+ * outward, one per row and column, and draws exactly as many of them, so only
+ * the position itself separates the two.
+ */
+test('precomputeMatrices puts each instance on the pixel its index names', () => {
+  const ctx = matricesCtx(8, 5);
+  Daydream.prototype.precomputeMatrices.call(ctx);
+
+  for (let i = 0; i < 8 * 5; i++) {
+    const x = i % 8;
+    const y = Math.floor(i / 8);
+    const want = dotPosition(x, y, 8, 5);
+    assert.ok(dotAt(ctx, i).distanceTo(want) < 1e-4,
+      `instance ${i} is pixel (${x},${y}) at ${want.toArray()}, drawn at ${dotAt(ctx, i).toArray()}`);
+  }
+});
+
 test('precomputeMatrices faces every dot outward', () => {
   const ctx = matricesCtx(8, 5);
   Daydream.prototype.precomputeMatrices.call(ctx);
@@ -1008,6 +1048,48 @@ test('precomputeMatrices allocates a zeroed color buffer the driver aliases', ()
   assert.equal(attribute.array.length, 8 * 5 * 3);
   assert.ok(attribute.array.every((v) => v === 0));
   assert.equal(ctx.pixels, attribute.array, 'driver.pixels does not alias the buffer');
+});
+
+/**
+ * The engine writes 16-bit linear channels straight into this buffer, so the
+ * attribute is what scales them to the shader's [0,1]. Dropping the normalized
+ * flag uploads the same bytes as raw 0..65535 — every lit dot saturates, with
+ * no change to the instance count or the draw call.
+ */
+test('the color buffer uploads as normalized Uint16, so full scale reads as 1', () => {
+  const ctx = matricesCtx(8, 5);
+  Daydream.prototype.precomputeMatrices.call(ctx);
+  const attribute = ctx.dotMesh.instanceColor;
+
+  assert.equal(attribute.array.constructor.name, 'Uint16Array',
+    'the attribute must alias the engine buffer, which is 16-bit linear');
+  assert.equal(attribute.normalized, true,
+    'without the flag the shader reads 0..65535 instead of 0..1');
+
+  const lit = 5;
+  attribute.array.set([65535, 0, 32768], lit * 3);
+  assert.equal(attribute.getX(lit), 1, 'full scale is white, not 65535');
+  assert.equal(attribute.getY(lit), 0);
+  assert.ok(Math.abs(attribute.getZ(lit) - 32768 / 65535) < 1e-9);
+});
+
+/**
+ * The engine's buffer replaces the JS-owned one on every heap growth and
+ * resolution change. The flag lives on the attribute, not on the array, so the
+ * re-pointed view must read back on the same scale.
+ */
+test('a re-pointed engine view keeps the normalized read-back', () => {
+  const ctx = matricesCtx(8, 5);
+  Daydream.prototype.precomputeMatrices.call(ctx);
+  const view = new Uint16Array(8 * 5 * 3);
+  view.set([65535, 32768, 0], 2 * 3);
+
+  repointDisplayAliases(ctx, view);
+
+  assert.equal(ctx.pixels, view);
+  assert.equal(ctx.dotMesh.instanceColor.array, view);
+  assert.equal(ctx.dotMesh.instanceColor.getX(2), 1);
+  assert.ok(Math.abs(ctx.dotMesh.instanceColor.getY(2) - 32768 / 65535) < 1e-9);
 });
 
 test('precomputeMatrices keeps an existing color buffer rather than reallocating', () => {
