@@ -3,14 +3,17 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const PALETTES_HTML = readFileSync(new URL('../tools/palettes.html', import.meta.url), 'utf8');
-const PALETTE_CONTROLS_SRC =
-  readFileSync(new URL('../tools/palette_controls.js', import.meta.url), 'utf8');
 
 const {
   paletteTabFromSearch, paletteTabUrl, tablistKeyTarget,
   createPaletteViewport, axisEndpoints, axisFromEndpoints,
+  axisControlState, PALETTE_AXIS_CONTROLS,
+  clampRecipeWindow, zoomRecipeWindow, stripDragIntent, paletteStripView,
+  STRIP_DRAG_THRESHOLD,
   lockedGroupMove,
   PaletteV4, defaultPaletteRecipe, paletteRecipeFromControls,
+  PALETTE_CONTROL_IDS, paletteControlReadings, paletteControlsFromRecipe,
+  paletteEnumName,
   PALETTE_RECIPE_PRESETS,
   paletteRecipeAvailability, wrapTurns, signedTurnDelta, equivalentTurnNear,
   hitTestHueKeyMarker, oklchLinearRgb, maxSrgbGamutChroma,
@@ -437,23 +440,16 @@ test('every recipe field a control carries is marshalled', () => {
 });
 
 /**
- * The marshal is the whole contract between the tab and the exported recipe, so
- * a reading it consumes that the page never assembles leaves that recipe field
- * pinned to the template — a control the tool offers no way to reach.
+ * The readings name their controls by element id, so an id the page does not
+ * carry reads as a missing control rather than as a NaN or an undefined enum the
+ * engine bridge rejects several steps later.
  */
-test('the generative tab assembles every reading the marshal consumes', () => {
-  const marshal = PALETTE_CONTROLS_SRC.match(
-    /export function paletteRecipeFromControls[\s\S]*?\n\}/)?.[0];
-  assert.ok(marshal, 'paletteRecipeFromControls must stay an exported function declaration');
-  const reader = PALETTES_HTML.match(/function readPaletteRecipe\(\) \{[\s\S]*?\n {4}\}/)?.[0];
-  assert.ok(reader, 'readPaletteRecipe must stay a named function in palettes.html');
-
-  const consumed = new Set([...marshal.matchAll(/controls\.(\w+)/g)].map((m) => m[1]));
-  assert.ok(consumed.size >= 12, 'the marshal must still read its readings by name');
-  for (const key of consumed) {
-    // Shorthand counts: the reading may be a local of the same name.
-    assert.match(reader, new RegExp(`\\b${key}\\s*[,:]`),
-      `the tab must read ${key} off a control`);
+test('the generative tab carries every control the readings name', () => {
+  const ids = Object.values(PALETTE_CONTROL_IDS);
+  assert.ok(ids.length >= 20, 'the roster must still name the tab\'s controls');
+  for (const id of ids) {
+    assert.match(PALETTES_HTML, new RegExp(`<(?:input|select)[^>]*\\bid="${id}"`),
+      `palettes.html must carry a ${id} control`);
   }
 });
 
@@ -545,4 +541,236 @@ test('marshalling never writes through to the template', () => {
 
   assert.deepEqual(template, defaultPaletteRecipe());
   assert.equal(recipe.schemaVersion, template.schemaVersion);
+});
+
+/**
+ * Compares two recipes field by field, with a tolerance on the numbers: an
+ * endpoint pair that round-trips through a center and a range does not come back
+ * bit-identical.
+ * @param {any} actual - What came back.
+ * @param {any} expected - What went in.
+ * @param {string} [path] - Field path, for the failure message.
+ * @returns {void}
+ */
+function assertRecipeClose(actual, expected, path = 'recipe') {
+  if (typeof expected === 'number') {
+    assert.ok(Math.abs(actual - expected) < 1e-9,
+      `${path}: ${actual} is not ${expected}`);
+    return;
+  }
+  if (Array.isArray(expected)) {
+    assert.equal(actual.length, expected.length, `${path}: length`);
+    expected.forEach((value, index) =>
+      assertRecipeClose(actual[index], value, `${path}[${index}]`));
+    return;
+  }
+  if (expected && typeof expected === 'object') {
+    assert.deepEqual(Object.keys(actual).sort(), Object.keys(expected).sort(),
+      `${path}: fields`);
+    for (const key of Object.keys(expected))
+      assertRecipeClose(actual[key], expected[key], `${path}.${key}`);
+    return;
+  }
+  assert.equal(actual, expected, path);
+}
+
+/**
+ * The control values a recipe loads as, as strings, the way the page's elements
+ * hold them.
+ * @param {Object} recipe - The recipe to load.
+ * @returns {{values: Object<string, string>, customHueOffsets: number[]}} The
+ *   control map, keyed by element id, and the key offsets the wheel holds.
+ */
+function controlsFor(recipe) {
+  const controls = paletteControlsFromRecipe(recipe);
+  const id = PALETTE_CONTROL_IDS;
+  return {
+    customHueOffsets: controls.customHueOffsets,
+    values: {
+      [id.offset]: String(controls.window.offset),
+      [id.span]: String(controls.window.span),
+      [id.easing]: controls.easing,
+      [id.spreadDegrees]: String(controls.spreadTurns * 360),
+      [id.sweepTurns]: String(controls.sweepTurns),
+      [id.headroom]: String(controls.headroom),
+      [id.hueTorsion]: String(controls.hueTorsion),
+      [id.falloffStart]: String(controls.falloffStart),
+      [id.domain]: controls.domain,
+      [id.colorPath]: controls.colorPath,
+      [id.hueMode]: controls.hueMode,
+      [id.harmony]: controls.harmony,
+      [id.direction]: controls.direction,
+      [id.baseHueDegrees]: String(controls.baseTurns * 360),
+      [id.lightnessCurve]: controls.lightnessCurve,
+      [id.chromaCurve]: controls.chromaCurve,
+      [id.lightnessMinimum]: String(controls.lightness.minimum),
+      [id.lightnessMaximum]: String(controls.lightness.maximum),
+      [id.chromaMinimum]: String(controls.chroma.minimum),
+      [id.chromaMaximum]: String(controls.chroma.maximum),
+    },
+  };
+}
+
+test('every preset survives the trip out to the controls and back', () => {
+  for (const [name, preset] of Object.entries(PALETTE_RECIPE_PRESETS)) {
+    const recipe = preset();
+    const { values, customHueOffsets } = controlsFor(recipe);
+    const readings = paletteControlReadings((id) => values[id], customHueOffsets);
+
+    assertRecipeClose(paletteRecipeFromControls(recipe, readings), recipe, name);
+  }
+});
+
+test('an authored custom-hue recipe keeps its keys through the controls', () => {
+  const recipe = defaultPaletteRecipe();
+  recipe.hue.mode = PaletteV4.hueMode.CUSTOM;
+  recipe.hue.customTurns = [0.98, 1.02, 0.73, 0.4];
+  const { values, customHueOffsets } = controlsFor(recipe);
+  const back = paletteRecipeFromControls(recipe,
+    paletteControlReadings((id) => values[id], customHueOffsets));
+
+  assertRecipeClose(back.hue.customTurns, recipe.hue.customTurns, 'customTurns');
+  assert.ok(Math.abs(back.hue.baseTurns - 0.98) < 1e-9,
+    'the base hue follows the first key the wheel edits');
+});
+
+test('the readings convert the units the controls are labelled in', () => {
+  const { values, customHueOffsets } = controlsFor(defaultPaletteRecipe());
+  values[PALETTE_CONTROL_IDS.baseHueDegrees] = '90';
+  values[PALETTE_CONTROL_IDS.spreadDegrees] = '36';
+  const readings = paletteControlReadings((id) => values[id], customHueOffsets);
+
+  assert.equal(readings.baseTurns, 0.25, 'degrees read as turns');
+  assert.equal(readings.spreadTurns, 0.1);
+  assert.deepEqual(readings.window, { offset: 0, span: 1 });
+  assert.equal(readings.customHueOffsets, customHueOffsets,
+    'the wheel keys are page state, not a control reading');
+});
+
+test('a control the page does not carry is refused rather than read as NaN', () => {
+  const { values, customHueOffsets } = controlsFor(defaultPaletteRecipe());
+  delete values[PALETTE_CONTROL_IDS.headroom];
+
+  assert.throws(() => paletteControlReadings((id) => values[id], customHueOffsets),
+    /Palette control gen_headroom is missing/);
+});
+
+test('every control on the roster is read, and no control is read twice', () => {
+  const ids = Object.values(PALETTE_CONTROL_IDS);
+  assert.equal(new Set(ids).size, ids.length, 'two readings cannot share a control');
+
+  const { values, customHueOffsets } = controlsFor(defaultPaletteRecipe());
+  const asked = [];
+  paletteControlReadings((id) => {
+    asked.push(id);
+    return values[id];
+  }, customHueOffsets);
+  assert.deepEqual([...asked].sort(), [...ids].sort(),
+    'a rostered control the readings never ask for is decorative');
+});
+
+test('enum ordinals name the option that carries them', () => {
+  assert.equal(paletteEnumName('domain', PaletteV4.domain.LOOP), 'LOOP');
+  assert.equal(paletteEnumName('curve', PaletteV4.curve.CUSTOM), 'CUSTOM');
+  assert.equal(paletteEnumName('harmony', PaletteV4.harmony.MONOCHROMATIC),
+    'MONOCHROMATIC');
+});
+
+test('an ordinal or a group the page has no option for is refused', () => {
+  assert.throws(() => paletteEnumName('domain', 99), /Unknown domain value: 99/);
+  assert.throws(() => paletteEnumName('cadence', 0), /Unknown palette enum: cadence/);
+
+  const recipe = defaultPaletteRecipe();
+  recipe.domain = 42;
+  assert.throws(() => paletteControlsFromRecipe(recipe), /Unknown domain value: 42/);
+});
+
+test('the recipe window is clamped to a span its controls can express', () => {
+  assert.deepEqual(clampRecipeWindow(0.2, 0.5), { offset: 0.2, span: 0.5 });
+  assert.deepEqual(clampRecipeWindow(0.9, 0.5), { offset: 0.5, span: 0.5 },
+    'the window cannot start past the end of the palette');
+  assert.deepEqual(clampRecipeWindow(-1, 2), { offset: 0, span: 1 });
+  assert.deepEqual(clampRecipeWindow(0.5, 0), { offset: 0.5, span: 0.01 },
+    'an empty span is widened to the narrowest the slider offers');
+});
+
+test('zooming the recipe window composes onto the window already shown', () => {
+  const first = zoomRecipeWindow({ offset: 0, span: 1 }, 0.4, 0.6);
+  assert.equal(first.offset, 0.4);
+  assert.ok(Math.abs(first.span - 0.2) < 1e-12);
+
+  const nested = zoomRecipeWindow({ offset: 0.4, span: 0.2 }, 0.5, 1);
+  assert.ok(Math.abs(nested.offset - 0.5) < 1e-12);
+  assert.ok(Math.abs(nested.span - 0.1) < 1e-12);
+});
+
+test('a recipe zoom reads the same in either drag direction and stays in range', () => {
+  assert.deepEqual(zoomRecipeWindow({ offset: 0, span: 1 }, 0.6, 0.4),
+    zoomRecipeWindow({ offset: 0, span: 1 }, 0.4, 0.6));
+  assert.deepEqual(zoomRecipeWindow({ offset: 0, span: 1 }, -0.5, 1.5),
+    { offset: 0, span: 1 }, 'a drag off either end still names the whole palette');
+  assert.equal(zoomRecipeWindow({ offset: 0, span: 0.02 }, 0.5, 0.5).span, 0.01,
+    'a zoom onto nothing keeps the narrowest window the controls hold');
+});
+
+test('a short strip drag copies a color and a long one zooms', () => {
+  assert.deepEqual(stripDragIntent(0.5, 0.5 + STRIP_DRAG_THRESHOLD / 2),
+    { intent: 'copy', start: 0.5, end: 0.5 + STRIP_DRAG_THRESHOLD / 2 });
+  assert.equal(stripDragIntent(0.2, 0.8).intent, 'zoom');
+  assert.deepEqual(stripDragIntent(0.8, 0.2),
+    { intent: 'zoom', start: 0.2, end: 0.8 },
+    'a right-to-left drag names the same window');
+  assert.equal(stripDragIntent(0.2, 0.21, 0.05).intent, 'copy',
+    'the threshold is the caller’s to set');
+});
+
+test('the strip says which window it is showing only once it is zoomed', () => {
+  const full = paletteStripView({ start: 0, end: 1 });
+  assert.equal(full.zoomed, false);
+  assert.equal(full.heading, 'sRGB Palette (t ∈ [0, 1])');
+  assert.match(full.ariaLabel, /^Palette strip, t 0\.000 to 1\.000\./);
+
+  const zoomed = paletteStripView({ start: 0.25, end: 0.5 });
+  assert.equal(zoomed.zoomed, true);
+  assert.equal(zoomed.heading, 'sRGB Palette (t ∈ [0.250, 0.500])');
+  assert.match(zoomed.ariaLabel, /t 0\.250 to 0\.500\. Press Enter/);
+});
+
+test('a constant axis is edited as one value spanning the whole range', () => {
+  const state = axisControlState({
+    curve: 'CONSTANT', minimum: '0.62', maximum: '0.62',
+    label: 'Relative Chroma', shortLabel: 'Chroma',
+  });
+
+  assert.equal(state.constant, true);
+  assert.equal(state.minimumLabel, 'Chroma');
+  assert.equal(state.minimumName, 'Relative Chroma',
+    'a single value is named for the axis, not for an end of it');
+  assert.equal(state.maximumName, 'Maximum Relative Chroma');
+  assert.deepEqual(
+    [state.minimumMin, state.minimumMax, state.maximumMin, state.maximumMax],
+    ['0', '1', '0', '1']);
+});
+
+test('a varying axis pins each endpoint against the other so they cannot cross', () => {
+  const state = axisControlState({
+    curve: 'ASCENDING', minimum: '0.2', maximum: '0.8',
+    label: 'Lightness', shortLabel: 'Lightness',
+  });
+
+  assert.equal(state.constant, false);
+  assert.equal(state.minimumName, 'Minimum Lightness');
+  assert.deepEqual(
+    [state.minimumMin, state.minimumMax, state.maximumMin, state.maximumMax],
+    ['0', '0.8', '0.2', '1']);
+  assert.deepEqual([state.minimumText, state.maximumText], ['0.20', '0.80']);
+});
+
+test('both axes the tab edits by their endpoints are on the roster', () => {
+  assert.deepEqual(Object.keys(PALETTE_AXIS_CONTROLS), ['lightness', 'chroma']);
+  for (const axis of Object.values(PALETTE_AXIS_CONTROLS)) {
+    for (const id of [axis.curve, `${axis.prefix}_minimum`, `${axis.prefix}_maximum`])
+      assert.match(PALETTES_HTML, new RegExp(`\\bid="${id}"`),
+        `palettes.html must carry a ${id} control`);
+  }
 });
