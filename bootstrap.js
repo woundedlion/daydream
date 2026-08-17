@@ -22,6 +22,12 @@ function errorDetail(error) {
 // glue is the canonical skew a Reload has to clear.
 const REFRESHED_EXTENSIONS = ['.js', '.wasm'];
 
+// Re-fetches in flight at once. Past the browser's per-host connection limit
+// the extra requests only queue, and the multi-megabyte binary — the one
+// re-fetch a Reload exists for — waits behind whatever small modules opened
+// their sockets first.
+const REFRESH_CONCURRENCY = 6;
+
 // Resource-timing entries kept, over the 250-entry default. The buffer drops
 // every load past its size, and the dropped ones are the earliest — the modules
 // a Reload most needs to re-fetch.
@@ -69,8 +75,18 @@ export async function refreshModuleCache({
     const path = name.split(/[?#]/)[0];
     if (REFRESHED_EXTENSIONS.some((ext) => path.endsWith(ext))) modules.add(name);
   }
-  await Promise.allSettled(Array.from(modules, async (url) =>
-    drainBody(await fetchResource(url, { cache: 'reload' }))));
+  // Load order, so the queue drains the way the page pulled the graph in.
+  const queue = Array.from(modules);
+  const lanes = Array.from(
+    { length: Math.min(REFRESH_CONCURRENCY, queue.length) },
+    async () => {
+      for (let url = queue.shift(); url !== undefined; url = queue.shift()) {
+        // A failed re-fetch leaves its stale entry; the rest of the sweep runs.
+        try { await drainBody(await fetchResource(url, { cache: 'reload' })); }
+        catch { /* reported by the reload that follows, not recoverable here */ }
+      }
+    });
+  await Promise.all(lanes);
 }
 
 /**
