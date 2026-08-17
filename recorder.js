@@ -388,7 +388,8 @@ export class VideoRecorder {
    * source resize: the captured track's frame size must stay fixed for the whole
    * session, so a resized source scales into this fixed buffer (captureFrame)
    * rather than changing the track size.
-   * @returns {HTMLCanvasElement} The offscreen canvas pinned to its start-time size.
+   * @returns {HTMLCanvasElement|null} The offscreen canvas pinned to its
+   *   start-time size, or null when no 2D context could be acquired for it.
    */
   ensureOffscreen() {
     if (!this.offscreen) {
@@ -579,8 +580,8 @@ export class VideoRecorder {
   /**
    * Determines the output file extension from the recorder's MIME type, so the
    * filename matches the real container the browser chose.
-   * @param {MediaRecorder} [recorder] - Recorder whose mimeType is inspected;
-   *   defaults to the active recorder.
+   * @param {MediaRecorder|null} [recorder] - Recorder whose mimeType is
+   *   inspected; defaults to the active recorder, which is null when idle.
    * @returns {string} The container extension (e.g. 'mp4', 'webm', 'mkv'),
    *   falling back to 'webm' for an empty/unknown type.
    */
