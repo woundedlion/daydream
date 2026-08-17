@@ -27,6 +27,7 @@ const STRUCTURAL_OPTIONS = Object.freeze({
     mobius: 'Mobius',
     'dodecahedral-kaleidoscope': 'Kaleidoscope (Dodecahedral / Icosahedral)',
     'triangular-prism-kaleidoscope': 'Kaleidoscope (Triangular Prism)',
+    'pentagonal-prism-kaleidoscope': 'Kaleidoscope (Pentagonal Prism)',
     'hexagonal-prism-kaleidoscope': 'Kaleidoscope (Hexagonal Prism)',
   }),
   'Planar Warp 1': Object.freeze({

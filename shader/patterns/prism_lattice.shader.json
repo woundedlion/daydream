@@ -20,7 +20,7 @@
           "operator": "pullback.surface_project.v1",
           "policy": {
             "pre_lens_surface": "identity",
-            "lens": "triangular-prism-kaleidoscope",
+            "lens": "pentagonal-prism-kaleidoscope",
             "post_lens_surface": "identity",
             "projection": "stereographic"
           }
@@ -659,6 +659,6 @@
   },
   "effect_metadata": {
     "display_name": "Prism Lattice",
-    "description": "A polar lattice folded through a triangular prism."
+    "description": "A polar lattice folded through a pentagonal prism."
   }
 }
