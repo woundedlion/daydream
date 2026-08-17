@@ -305,7 +305,7 @@ export class Daydream {
     // Round dots until an effect binds and sets its mode (see updateCullUniforms).
     this.strobeColumns = true;
 
-    this.statsView = new GlobalStatsView();
+    this.statsView = new GlobalStatsView(this.doc);
 
     this.precomputeMatrices();
   }

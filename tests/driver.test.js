@@ -1403,15 +1403,50 @@ test('an unavailable preset leaves the running arrow key unclaimed', () => {
 });
 
 // ---------------------------------------------------------------------------
-// context-factory parity
+// source-read checks
 // ---------------------------------------------------------------------------
 
 // The constructor needs a WebGL context, so every case above drives a prototype
-// method over a hand-built `this`. Read the class's field roster out of the
-// source so a context cannot keep standing in for state the driver dropped or
-// renamed — the mirror of the method-surface check fake_engine.js runs.
+// method over a hand-built `this`. What the constructor itself does, and the
+// class's field roster, are read out of the source instead.
 const DRIVER_SOURCE = readFileSync(new URL('../driver.js', import.meta.url), 'utf8');
 
+/**
+ * The constructor reaches WebGL on its first statement, so its wiring is read
+ * rather than run. A collaborator that defaults its document to the global is
+ * the one construction that can silently bind the wrong page: nothing throws,
+ * and the driver's stated contract — it reads no globals of its own — is gone.
+ */
+test('the driver hands its own document to every collaborator that defaults to the global', () => {
+  // Every class the driver could build whose constructor takes an optional doc,
+  // derived from its own module rather than listed here.
+  const modules = [...DRIVER_SOURCE.matchAll(/^import \{([^}]*)\} from "(\.\/[^"]+)"/gmu)]
+    .flatMap(([, names, path]) => {
+      const source = readFileSync(new URL(`../${path.slice(2)}`, import.meta.url), 'utf8');
+      return names.split(',').map((n) => n.trim())
+        .filter((name) => new RegExp(`class ${name}\\b[\\s\\S]*?constructor\\([^)]*doc = globalThis\\.document`)
+          .test(source));
+    });
+  // Classes the driver module declares itself carry the same hazard.
+  const local = [...DRIVER_SOURCE.matchAll(
+    /export class (\w+)[\s\S]{0,400}?constructor\([^)]*doc = globalThis\.document/gu)]
+    .map(([, name]) => name);
+  const collaborators = [...modules, ...local];
+  assert.deepEqual(collaborators.sort(), ['GlobalStatsView', 'LabelPool'],
+    'a doc-defaulting collaborator moved; the pin below must still cover it');
+
+  for (const name of collaborators) {
+    const calls = [...DRIVER_SOURCE.matchAll(new RegExp(`new ${name}\\(([^)]*)\\)`, 'gu'))];
+    assert.ok(calls.length > 0, `driver.js no longer builds a ${name}`);
+    for (const [call, args] of calls) {
+      assert.match(args, /\bthis\.doc\b/u,
+        `${call} takes the global document, not the one start() threaded in`);
+    }
+  }
+});
+
+// A context cannot keep standing in for state the driver dropped or renamed —
+// the mirror of the method-surface check fake_engine.js runs.
 /** Fields the Daydream class assigns, read from its class body.
  * @returns {Set<string>} Field names.
  */
