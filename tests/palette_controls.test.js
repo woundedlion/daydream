@@ -13,7 +13,7 @@ const {
   lockedGroupMove,
   PaletteV4, defaultPaletteRecipe, paletteRecipeFromControls,
   PALETTE_CONTROL_IDS, paletteControlReadings, paletteControlsFromRecipe,
-  paletteEnumName,
+  paletteEnumName, paletteEnumOrdinal,
   PALETTE_RECIPE_PRESETS,
   paletteRecipeAvailability, wrapTurns, signedTurnDelta, equivalentTurnNear,
   hitTestHueKeyMarker, oklchLinearRgb, maxSrgbGamutChroma,
@@ -683,6 +683,54 @@ test('an ordinal or a group the page has no option for is refused', () => {
   const recipe = defaultPaletteRecipe();
   recipe.domain = 42;
   assert.throws(() => paletteControlsFromRecipe(recipe), /Unknown domain value: 42/);
+});
+
+test('a control value no enum member carries is refused, not marshalled', () => {
+  assert.equal(paletteEnumOrdinal('domain', 'LOOP'), PaletteV4.domain.LOOP);
+  assert.throws(() => paletteEnumOrdinal('domain', 'RENAMED'),
+    /Unknown domain member: RENAMED/);
+  assert.throws(() => paletteEnumOrdinal('cadence', 'LOOP'),
+    /Unknown palette enum: cadence/);
+  // Object.prototype carries a value under every inherited name.
+  assert.throws(() => paletteEnumOrdinal('domain', 'constructor'),
+    /Unknown domain member: constructor/);
+
+  assert.throws(() => paletteRecipeFromControls(defaultPaletteRecipe(),
+    { ...CONTROL_READINGS, harmony: 'TRIADIQUE' }),
+  /Unknown harmony member: TRIADIQUE/);
+  assert.throws(() => paletteRecipeFromControls(defaultPaletteRecipe(),
+    { ...CONTROL_READINGS, chromaCurve: 'S_CURVE' }),
+  /Unknown curve member: S_CURVE/);
+});
+
+// The marshal reads these option values straight through, so a renamed member
+// or a typo in the markup only shows up as a refused recipe at export time.
+const ENUM_SELECT_GROUPS = {
+  gen_shape: 'domain',
+  gen_path: 'colorPath',
+  gen_hue_mode: 'hueMode',
+  gen_harmony: 'harmony',
+  gen_direction: 'direction',
+  gen_easing: 'easing',
+  gen_brightness: 'curve',
+  gen_chroma_curve: 'curve',
+};
+
+test('every generative <select> option names a PaletteV4 member', () => {
+  let options = 0;
+  for (const [id, group] of Object.entries(ENUM_SELECT_GROUPS)) {
+    const block = PALETTES_HTML.match(
+      new RegExp(`<select[^>]*\\bid="${id}"[\\s\\S]*?</select>`))?.[0];
+    assert.ok(block, `palettes.html must carry a ${id} select`);
+    const values = [...block.matchAll(/<option value="([^"]*)"/g)].map((m) => m[1]);
+    assert.ok(values.length > 0, `${id} carries no options`);
+    for (const value of values) {
+      assert.equal(typeof paletteEnumOrdinal(group, value), 'number',
+        `${id} option "${value}" is not a PaletteV4.${group} member`);
+    }
+    options += values.length;
+  }
+  assert.ok(options >= 30, 'the enum selects must still cover the tab');
 });
 
 test('the recipe window is clamped to a span its controls can express', () => {
