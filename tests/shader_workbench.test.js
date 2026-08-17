@@ -10,9 +10,10 @@ import {
 } from '../tools/shader_workbench_nav.js';
 import {
   applyDynamicShaderDocument,
+  applyFixedShaderDocument,
   engineParameterName,
 } from '../tools/shader_documents.js';
-import { ParamSetResult } from './fake_engine.js';
+import { ParamSetResult, unpinnedEngineMethods } from './fake_engine.js';
 
 const INDEX = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const WORKBENCH = readFileSync(new URL('../tools/shader.html', import.meta.url), 'utf8');
@@ -119,6 +120,87 @@ test('a refused structural write stops before the preset values', () => {
     engine, MODULE, dynamicDocument(), 'study');
   assert.match(refusal, /"Lens" was refused: UNKNOWN_PARAM/);
   assert.deepEqual(engine.writes.at(-1), ['Lens', 0]);
+});
+
+const fixedDocument = () => ({ document: {
+  preset_bank: { presets: [
+    { preset_id: 'noon', values: { 'pattern-freq': 2 } },
+    { preset_id: 'dusk', values: { 'pattern-freq': 5 } },
+  ] },
+} });
+
+/** @param {(id: string) => boolean} answer */
+function fixedEngine(answer) {
+  const selected = [];
+  const writes = [];
+  return {
+    selected,
+    writes,
+    selectPresetById: (id) => { selected.push(id); return answer(id); },
+    getParameterDefinitions: () => [{ name: 'Pattern Freq' }],
+    setParameter: (name, value) => {
+      writes.push([name, value]);
+      return ParamSetResult.APPLIED;
+    },
+  };
+}
+
+test('the shader-document engine fakes mock nothing outside the engine surface', () => {
+  assert.deepEqual(unpinnedEngineMethods(fixedEngine(() => true)), []);
+  assert.deepEqual(unpinnedEngineMethods(dynamicEngine(() => ParamSetResult.APPLIED)), []);
+});
+
+test('a fixed-pipeline preset is staged on the engine preset it names', () => {
+  const engine = fixedEngine(() => true);
+
+  assert.equal(applyFixedShaderDocument(
+    engine, MODULE, fixedDocument(), 'dusk', ['noon', 'dusk']), null);
+  assert.deepEqual(engine.selected, ['dusk']);
+  assert.deepEqual(engine.writes, [['Pattern Freq', 5]]);
+});
+
+// The document's presets and the effect's reference presets are separate banks:
+// an authored preset the effect never had still has to land on some reference
+// state, or the values are written over whatever the last preview left behind.
+test('a preset the effect does not carry falls back to its first reference', () => {
+  const engine = fixedEngine(() => true);
+
+  assert.equal(applyFixedShaderDocument(
+    engine, MODULE, fixedDocument(), 'study', ['noon']), null);
+  assert.deepEqual(engine.selected, ['noon']);
+  assert.deepEqual(engine.writes, [['Pattern Freq', 2]]);
+});
+
+test('an effect with no reference preset is refused before any engine write', () => {
+  const engine = fixedEngine(() => true);
+
+  assert.equal(
+    applyFixedShaderDocument(engine, MODULE, fixedDocument(), 'noon', []),
+    'the effect has no reference preset');
+  assert.deepEqual(engine.selected, []);
+  assert.deepEqual(engine.writes, []);
+});
+
+test('a refused reference preset names the preset the engine rejected', () => {
+  const engine = fixedEngine(() => false);
+
+  assert.equal(
+    applyFixedShaderDocument(engine, MODULE, fixedDocument(), 'noon', ['noon']),
+    'the engine refused reference preset "noon"');
+  assert.deepEqual(engine.writes, []);
+});
+
+// selectPresetById is reached through an optional call, so an engine build
+// without it answers undefined rather than throwing; only the !== true test
+// keeps that from reading as a staged preset.
+test('an engine without selectPresetById is refused, not written through', () => {
+  const engine = fixedEngine(() => true);
+  delete engine.selectPresetById;
+
+  assert.match(
+    String(applyFixedShaderDocument(engine, MODULE, fixedDocument(), 'noon', ['noon'])),
+    /refused reference preset "noon"/);
+  assert.deepEqual(engine.writes, []);
 });
 
 test('stage navigation opens and reveals the selected GUI folder', () => {
