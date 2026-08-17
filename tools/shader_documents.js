@@ -252,7 +252,8 @@ function defaultDownload(doc, filename, source) {
   anchor.href = url;
   anchor.download = filename;
   anchor.click();
-  URL.revokeObjectURL(url);
+  // The click starts the download asynchronously; the URL has to outlive it.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /** Owns document import, validation, preview selection, and export UI. */
