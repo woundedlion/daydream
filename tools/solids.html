@@ -1081,6 +1081,11 @@
     // --- SAVED ITEMS ---
     const SAVED_SOLIDS_KEY = 'daydream.savedSolids.v1';
     const SAVED_THUMB_SIZE = 256;
+    // Every card carries a 256x256 PNG data URL, so an uncapped list grows into
+    // the browser's localStorage quota; past it persistSavedSolids can only
+    // report that the list is session-only. Refuse the save while the store
+    // still round-trips instead.
+    const SAVED_SOLIDS_MAX = 40;
 
     function loadSavedSolids() {
       try {
@@ -1099,7 +1104,7 @@
         localStorage.setItem(SAVED_SOLIDS_KEY, JSON.stringify(savedSolids));
       } catch (error) {
         console.warn('Could not persist saved solids:', error);
-        showGateMsg('saved for this session only: browser storage is unavailable');
+        showGateMsg('saved for this session only: browser storage refused the write');
       }
     }
 
@@ -1143,6 +1148,12 @@
       // would be named after the seed and call itself.
       if (state.ops.length === 0) {
         showGateMsg('rejected: add at least one op — a bare seed has no recipe to export');
+        return;
+      }
+
+      if (savedSolids.length >= SAVED_SOLIDS_MAX) {
+        showGateMsg(`rejected: the saved list is full at ${SAVED_SOLIDS_MAX} — `
+          + 'export it, then delete a card to make room');
         return;
       }
 
