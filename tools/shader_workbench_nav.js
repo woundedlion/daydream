@@ -1,3 +1,5 @@
+import { onPageTeardown } from './page_lifecycle.js';
+
 const TITLE_SELECTOR = '#gui-container .lil-gui > .lil-title';
 
 /**
@@ -10,6 +12,17 @@ export function findWorkbenchFolder(root, name) {
   const titles = /** @type {HTMLElement[]} */ (
     [...root.querySelectorAll(TITLE_SELECTOR)]
   );
+  return folderFromTitles(titles, name);
+}
+
+/**
+ * Picks a folder out of an already-collected title list, so a caller resolving
+ * several names pays one DOM sweep rather than one per name.
+ * @param {HTMLElement[]} titles - Every GUI folder title, in document order.
+ * @param {string} name - Exact folder title.
+ * @returns {HTMLElement|null} Matching folder element.
+ */
+function folderFromTitles(titles, name) {
   const title = titles
     .filter((candidate) => candidate.textContent?.trim() === name)
     .at(-1);
@@ -35,8 +48,13 @@ export function revealWorkbenchFolder(root, name) {
 
 /**
  * Connects the stage navigator to the live Shader GUI.
+ *
+ * The observer watches the GUI mount and disconnects the moment every stage
+ * folder has appeared: the GUI is built once, so past that point each structural
+ * change would cost a sweep for a result that can no longer change.
  * @param {Document} doc - Workbench document.
- * @returns {MutationObserver|null} Observer used while the GUI mounts.
+ * @returns {MutationObserver|null} Observer watching the mount, or null when the
+ *   nav is absent or every folder was already there.
  */
 export function wireShaderWorkbenchNav(doc) {
   const nav = doc.getElementById('shader-workbench-nav');
@@ -45,10 +63,13 @@ export function wireShaderWorkbenchNav(doc) {
   const buttons = /** @type {HTMLButtonElement[]} */ (
     [...nav.querySelectorAll('[data-workbench-folder]')]
   );
+  // One sweep per call, shared across the buttons; a per-button lookup would
+  // re-walk the whole GUI subtree once per stage on every mutation.
   const sync = () => {
+    const titles = /** @type {HTMLElement[]} */ ([...doc.querySelectorAll(TITLE_SELECTOR)]);
     for (const button of buttons) {
       const name = button.dataset.workbenchFolder;
-      button.disabled = !name || !findWorkbenchFolder(doc, name);
+      button.disabled = !name || !folderFromTitles(titles, name);
     }
     return buttons.every((button) => !button.disabled);
   };
@@ -61,9 +82,12 @@ export function wireShaderWorkbenchNav(doc) {
       button.setAttribute('aria-current', 'true');
     });
   }
-  sync();
-  const observer = new MutationObserver(sync);
+  if (sync()) return null;
+  const observer = new MutationObserver(() => {
+    if (sync()) observer.disconnect();
+  });
   observer.observe(gui, { childList: true, subtree: true });
+  onPageTeardown(() => observer.disconnect());
   return observer;
 }
 
