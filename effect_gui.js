@@ -903,9 +903,11 @@ export function createEffectGui({
     const flashExport = (label) => {
       clearTimeout(fx.exportFlashTimer);
       presentAction(exportCtrl, label === EXPORT_COPIED ? '\u2713' : '\u2717', label);
-      // Emptied on revert: a live region re-announces a repeated message only
-      // after its text has changed.
-      exportStatus.textContent = label;
+      // A live region re-announces a repeated message only after its text has
+      // changed. The revert empties it; a repeat inside the flash window instead
+      // alternates an inaudible zero-width marker.
+      exportStatus.textContent = exportStatus.textContent === label
+        ? `${label}\u200B` : label;
       fx.exportFlashTimer = setTimeout(() => {
         presentAction(exportCtrl, EXPORT_ICON, 'Export');
         exportStatus.textContent = '';
