@@ -44,10 +44,17 @@ const findSh = () => {
   return null;
 };
 const SH = findSh();
+const REQUIRED_ENV = 'DAYDREAM_HOOK_SH_REQUIRED';
+const MISSING = 'no POSIX sh available';
+// Every case here skips without a shell, and the floors declare the file
+// skippable, so a runner that lost its sh would retire all of them and still
+// report green. The unit-suite workflow declares the flag, under which the
+// missing shell fails instead.
+const SKIP = SH || process.env[REQUIRED_ENV] ? false : MISSING;
 
 describe(
   'reference-transaction hook',
-  { skip: SH ? false : 'no POSIX sh available' },
+  { skip: SKIP },
   () => {
     let root;
     let repo;
@@ -77,6 +84,7 @@ describe(
      * @returns {{status: number, stderr: string}} Hook exit status and stderr.
      */
     const runHook = (lines, stage = 'prepared', cwd = repo) => {
+      assert.ok(SH, MISSING);
       const run = spawnSync(SH, [HOOK, stage], {
         cwd,
         env,

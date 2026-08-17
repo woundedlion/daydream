@@ -167,6 +167,10 @@ jobs:
           # A runner's checkout is pristine, so this only ever fires on a job
           # that rebuilt or rewrote the artifacts the WASM suites then loaded.
           DAYDREAM_WASM_CLEAN_REQUIRED: '1'
+          # tests/reference_transaction_hook.test.js drives the hook through a
+          # POSIX shell and skips every case without one; the runner has one, so
+          # a job that stops finding it fails rather than retiring the file.
+          DAYDREAM_HOOK_SH_REQUIRED: '1'
         run: npm test
 
   assertion-floors:

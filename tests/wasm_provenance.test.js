@@ -23,6 +23,7 @@ const TOOLCHAIN = 'holosphere_wasm.toolchain';
 const INSTALLED = [BINARY, GLUE, MANIFEST, PIN, TOOLCHAIN];
 const CLEAN_ENV = 'DAYDREAM_WASM_CLEAN_REQUIRED';
 const ENGINE_ENV = 'HOLOSPHERE_ENGINE_REQUIRED';
+const HOOK_SH_ENV = 'DAYDREAM_HOOK_SH_REQUIRED';
 const UNIT_SUITE = '.github/workflows/js-unit-suite.yml';
 
 /**
@@ -184,6 +185,15 @@ test('the unit-suite workflow declares the engine required', () => {
   assert.match(workflow, new RegExp(`${ENGINE_ENV}:`),
     `the workflow must set ${ENGINE_ENV}, or a job that lost its engine ` +
       'checkout retires every source-parity case as a skip and still reports green');
+});
+
+// tests/reference_transaction_hook.test.js is the other skippable file: every
+// case needs a POSIX shell to drive the hook with.
+test('the unit-suite workflow declares a shell required for the hook suite', () => {
+  const workflow = readFileSync(resolve(REPO, UNIT_SUITE), 'utf8');
+  assert.match(workflow, new RegExp(`${HOOK_SH_ENV}:`),
+    `the workflow must set ${HOOK_SH_ENV}, or a job that stops finding sh ` +
+      'retires every reference-transaction case as a skip and still reports green');
 });
 
 test('the deploy gate requires the engine CI that built the module', () => {
