@@ -54,9 +54,10 @@ const PIPELINE_EFFECTS = Object.freeze({
  *   open and whether it was migrated, always. A migration also carries a
  *   `notice` to show, and one of: `presetId` for a preset that maps to a
  *   concrete effect, `customParameters` for a recognized custom pipeline,
- *   `snapshot` for a document handed to Shader whole (null when the save was
- *   unusable, alongside a `diagnostic` code). `handoff` carries the legacy
- *   runtime state whenever the save had any.
+ *   `snapshot` for a document handed to Shader whole. A null `snapshot` carries
+ *   nothing across: with a `diagnostic` code the save was unusable, without one
+ *   no save was supplied at all. `handoff` carries the legacy runtime state
+ *   whenever the save had any.
  */
 export function importLegacyShaderSelection(effect, snapshot = null) {
   if (effect !== LEGACY_SHADER_ALIAS) return { effect, migrated: false };
@@ -93,8 +94,12 @@ export function importLegacyShaderSelection(effect, snapshot = null) {
       notice: `Migrated a custom ShaderBall configuration to ${PIPELINE_EFFECTS[pipeline]}.`,
     };
   }
+  // A bare ShaderBall identity carries no document, so the notice must not claim
+  // state was brought across: both production call sites reach here that way.
   return {
     effect: 'Shader', migrated: true, snapshot,
-    notice: 'Opened the legacy ShaderBall document in Shader with its pending and runtime state.',
+    notice: snapshot === null
+      ? 'ShaderBall is now Shader; opened with defaults.'
+      : 'Opened the legacy ShaderBall document in Shader with its pending and runtime state.',
   };
 }
