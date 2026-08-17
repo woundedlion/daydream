@@ -301,6 +301,7 @@ export class URLSync {
     this.pendingReset = null;
     this.suspendDepth = 0;
     this.suspendedDirty = false;
+    this.suspendedDelayMs = 0; // delay of a flush suspend() disarmed, re-armed by resume()
     this.retries = 0; // consecutive refused writes, cleared by one that lands
 
     const params = new URLSearchParams(window.location.search);
@@ -380,8 +381,23 @@ export class URLSync {
     if (activeURLSync === this) activeURLSync = null;
   }
 
-  /** Defers tracked URL writes until resume() completes a state transaction. */
-  suspend() { this.suspendDepth += 1; }
+  /**
+   * Defers tracked URL writes until resume() completes a state transaction.
+   * @details Disarms a flush already armed — the constructor's canonicalization
+   *   arms one before any caller can suspend, and left running it would write the
+   *   URL from inside the transaction the suspension exists to bracket. Its delay
+   *   is carried so resume() cannot pull a retry-ladder wait forward into the
+   *   rate-limit window it is pacing out.
+   * @returns {void}
+   */
+  suspend() {
+    this.suspendDepth += 1;
+    if (this.timer === null) return;
+    clearTimeout(this.timer);
+    this.timer = null;
+    this.suspendedDirty = true;
+    this.suspendedDelayMs = Math.max(this.suspendedDelayMs, this.armedDelayMs);
+  }
 
   /** Releases one suspension and schedules the accumulated URL write. */
   resume() {
@@ -389,7 +405,9 @@ export class URLSync {
     this.suspendDepth -= 1;
     if (this.suspendDepth === 0 && this.suspendedDirty) {
       this.suspendedDirty = false;
-      this.schedule();
+      const delayMs = Math.max(this.suspendedDelayMs, URL_FLUSH_DEBOUNCE_MS);
+      this.suspendedDelayMs = 0;
+      this.schedule(delayMs);
     }
   }
 
