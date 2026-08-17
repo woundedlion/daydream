@@ -383,10 +383,13 @@ export function createApplyPipeline({
    *   param URL entries through the re-apply (only if the effect is still
    *   offered; an off-list effect is corrected to the list's first entry,
    *   dropping its effect-specific URL entries regardless).
-   * @returns {string} ApplyResult.REJECTED when the resolution was not applied —
-   *   an unknown preset name, or an engine rejection — so the caller must revert
-   *   appState and UI/URL don't advertise an unapplied value, else
-   *   ApplyResult.APPLIED.
+   * @returns {string} ApplyResult.APPLIED, else ApplyResult.REJECTED. REJECTED is
+   *   not a no-op: only the two early rejections — an unknown preset name, and an
+   *   engine setResolution rejection — leave everything as it was. A refused
+   *   effect correction or a rejected applyEffect returns REJECTED after the
+   *   engine, worker pool, driver and sidebar have already moved to the new
+   *   resolution, so recovery is the caller's rollback re-apply, not a return
+   *   here; reverting appState alone leaves those mutations standing.
    */
   function applyResolution(preserveParams = false) {
     const resolution = appState.get('resolution');
