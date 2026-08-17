@@ -720,13 +720,32 @@ export function defaultPaletteRecipe() {
 }
 
 /**
+ * The ordinal a PaletteV4 member name stands for — the inverse of
+ * paletteEnumName, and the one gate every control reading passes through.
+ * @param {string} group - A PaletteV4 enum name.
+ * @param {string} name - The member name a <select> option carries.
+ * @returns {number} The member's ordinal.
+ * @throws {RangeError} When the group has no such member, which would otherwise
+ *   marshal as an `undefined` the engine bridge rejects far from its cause. Own
+ *   members only: an inherited name ("constructor", "toString") resolves under
+ *   plain property access and would pass every reading handed to it.
+ */
+export function paletteEnumOrdinal(group, name) {
+  const members = PaletteV4[group];
+  if (!members) throw new RangeError(`Unknown palette enum: ${group}`);
+  if (!Object.hasOwn(members, name))
+    throw new RangeError(`Unknown ${group} member: ${name}`);
+  return members[name];
+}
+
+/**
  * Marshals the generative tab's control readings into a V4 recipe.
  *
  * Every C++ recipe export and every preview repaint goes through this, and the
  * enum members it reads are the string values the page's <select> options carry
- * — so the mapping is where a renamed option turns into an `undefined` enum the
- * engine bridge rejects. It stays free of the DOM: the page reads the controls
- * and hands the values over.
+ * — so the mapping is where a renamed option is caught, as a RangeError naming
+ * the group and the value rather than an `undefined` enum. It stays free of the
+ * DOM: the page reads the controls and hands the values over.
  *
  * A CUSTOM-curve axis keeps the template's own custom points, so its endpoint
  * readings are ignored rather than overwriting them.
@@ -751,16 +770,17 @@ export function defaultPaletteRecipe() {
  * @param {number} controls.hueTorsion - Hue drift per unit lightness, in radians.
  * @param {number} controls.falloffStart - Where a FALLOFF domain begins to fade.
  * @returns {PaletteRecipe} The recipe.
+ * @throws {RangeError} When a reading names no PaletteV4 member of its group.
  */
 export function paletteRecipeFromControls(template, controls) {
   const recipe = structuredClone(template);
   recipe.input = { ...controls.window };
-  recipe.domain = PaletteV4.domain[controls.domain];
-  recipe.easing = PaletteV4.easing[controls.easing];
-  recipe.colorPath = PaletteV4.colorPath[controls.colorPath];
-  recipe.hue.mode = PaletteV4.hueMode[controls.hueMode];
-  recipe.hue.harmony = PaletteV4.harmony[controls.harmony];
-  recipe.hue.direction = PaletteV4.direction[controls.direction];
+  recipe.domain = paletteEnumOrdinal('domain', controls.domain);
+  recipe.easing = paletteEnumOrdinal('easing', controls.easing);
+  recipe.colorPath = paletteEnumOrdinal('colorPath', controls.colorPath);
+  recipe.hue.mode = paletteEnumOrdinal('hueMode', controls.hueMode);
+  recipe.hue.harmony = paletteEnumOrdinal('harmony', controls.harmony);
+  recipe.hue.direction = paletteEnumOrdinal('direction', controls.direction);
   recipe.hue.baseTurns = controls.baseTurns;
   recipe.hue.spreadTurns = controls.spreadTurns;
   recipe.hue.sweepTurns = controls.sweepTurns;
@@ -771,8 +791,8 @@ export function paletteRecipeFromControls(template, controls) {
     recipe.hue.customTurns = customHueTurns(
       recipe.hue.baseTurns, controls.customHueOffsets, recipe.hue.customTurns);
   }
-  recipe.lightness.curve = PaletteV4.curve[controls.lightnessCurve];
-  recipe.chroma.curve = PaletteV4.curve[controls.chromaCurve];
+  recipe.lightness.curve = paletteEnumOrdinal('curve', controls.lightnessCurve);
+  recipe.chroma.curve = paletteEnumOrdinal('curve', controls.chromaCurve);
   for (const axis of /** @type {Array<'lightness'|'chroma'>} */ (['lightness', 'chroma'])) {
     if (recipe[axis].curve === PaletteV4.curve.CUSTOM) continue;
     const { minimum, maximum } = controls[axis];

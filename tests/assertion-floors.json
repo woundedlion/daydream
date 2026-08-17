@@ -133,8 +133,8 @@
     "assertions": 68
   },
   "tests/palette_controls.test.js": {
-    "cases": 40,
-    "assertions": 179
+    "cases": 42,
+    "assertions": 238
   },
   "tests/palette_math.test.js": {
     "cases": 22,
