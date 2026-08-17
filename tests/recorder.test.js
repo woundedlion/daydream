@@ -769,6 +769,42 @@ test('an unanswered save dialog stops the session at the backlog bound', async (
   }
 });
 
+/**
+ * Firefox and Safari take the fallback sink, which holds the whole video in RAM
+ * until stop. Unbounded, a long capture OOMs the tab and the user loses every
+ * frame; bounded, the session ends, says why, and downloads the prefix.
+ */
+test('the in-memory fallback sink stops the session at its byte bound', () => {
+  const restore = installRecorderEnv();
+  const captured = installConsoleCapture('error');
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    let downloaded = null;
+    rec.download = (_recorder, chunks) => { downloaded = chunks.length; };
+    const notified = [];
+    rec.onError = (err) => notified.push(err);
+
+    rec.start('unbounded');
+    const recorder = rec.mediaRecorder;
+    for (let i = 0; i < 512; i++) recorder.ondataavailable({ data: { size: 1_000_000 } });
+    assert.equal(rec.isRecording, true, 'a buffer under the bound keeps recording');
+
+    recorder.ondataavailable({ data: { size: 1_000_000 } });
+    assert.equal(rec.isRecording, false, 'the session runs to an OOM instead of stopping');
+    assert.equal(notified.length, 1, 'the host is told the session ended');
+    assert.match(captured.messages.join(' '), /held in memory/,
+      'the stop is reported, not silent');
+
+    recorder.ondataavailable({ data: { size: 1_000_000 } });
+    recorder.onstop();
+    assert.equal(notified.length, 1, 'the bound is reported once, not per chunk');
+    assert.equal(downloaded, 512, 'the prefix captured under the bound is still saved');
+  } finally {
+    captured.restore();
+    restore();
+  }
+});
+
 test('a streaming session that produces no data never opens the chosen file', async () => {
   const restore = installRecorderEnv();
   let createWritableCalls = 0;

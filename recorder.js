@@ -30,6 +30,12 @@ const RECORDER_TIMESLICE_MS = 1000;
 // minutes is far past any real time-to-pick, so the bound is a runaway guard.
 const PICKER_GRACE_SECONDS = 120;
 
+// Bytes the in-memory fallback sink may accumulate before it ends the session.
+// Browsers without the File System Access API (Firefox, Safari) hold the whole
+// video here until stop, so the alternative to a bound is an OOM that loses the
+// recording outright rather than saving its prefix.
+const MEMORY_BUFFER_LIMIT_BYTES = 512_000_000;
+
 /**
  * Pick the best-supported MIME type for the requested output format. Codec
  * priority: MP4/H.264 > WebM/VP9 > WebM/VP8. Returns '' if nothing in the
@@ -425,7 +431,9 @@ export class VideoRecorder {
    * captured before the user picks a file are held in the write chain, bounded at
    * PICKER_GRACE_SECONDS of video at the latched bitrate — past that the session
    * stops and reports, and what was held still reaches the file if one is picked
-   * later. Otherwise it accumulates chunks for a single blob download at stop.
+   * later. Otherwise it accumulates chunks for a single blob download at stop,
+   * bounded at MEMORY_BUFFER_LIMIT_BYTES on the same terms: a stopped recording
+   * the user is told about, and can save, beats an OOM that loses all of it.
    * The save dialog is raised here (under start()'s user gesture) so its
    * transient activation is preserved.
    * @param {MediaRecorder} recorder - Session recorder, queried for its container type.
@@ -438,8 +446,27 @@ export class VideoRecorder {
    */
   openSink(recorder, effectName, chunks) {
     if (typeof globalThis.showSaveFilePicker !== 'function') {
+      let bufferedBytes = 0;
+      let full = false;
       return {
-        write: (data) => { chunks.push(data); },
+        write: (data) => {
+          if (full) return;
+          bufferedBytes += data.size;
+          if (bufferedBytes > MEMORY_BUFFER_LIMIT_BYTES) {
+            full = true;
+            // Guard against a superseding session, as the streaming sink does:
+            // only stop if this recorder is still the live one.
+            if (this.mediaRecorder === recorder) {
+              this.stop();
+              this.reportFailure(
+                'this browser has no streaming save, so the whole video is held in memory; '
+                + `recording stopped at ${Math.round(MEMORY_BUFFER_LIMIT_BYTES / 1_000_000)} MB. `
+                + 'What was captured up to that point is saved.');
+            }
+            return;
+          }
+          chunks.push(data);
+        },
         finish: () => { if (chunks.length) this.download(recorder, chunks, effectName); },
       };
     }
