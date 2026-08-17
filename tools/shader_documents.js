@@ -1,3 +1,8 @@
+/*
+ * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
+ * Licensed under the Polyform Noncommercial License 1.0.0
+ */
+
 const MIGRATION_URL = '../shader/patterns/shaderball_migration.json';
 const COMPILER_URL = new URL('../shader/shader_workbench.mjs', import.meta.url).href;
 
