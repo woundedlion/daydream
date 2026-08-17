@@ -1,7 +1,7 @@
 {
   "tests/app_lifecycle.test.js": {
-    "cases": 70,
-    "assertions": 168
+    "cases": 71,
+    "assertions": 171
   },
   "tests/banner.test.js": {
     "cases": 13,

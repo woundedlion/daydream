@@ -649,7 +649,8 @@ export const MODULE_LOAD_DEADLINE_MS = 90000;
  * @param {{setTimeout: Function, clearTimeout: Function}} [deps.timers] - Timer
  *   source; the page (or, under test, whatever stands in for it).
  * @returns {Promise<Object>} The loaded module, or a rejection carrying the
- *   deadline that expired.
+ *   deadline that expired or whatever load() raised — a synchronous throw
+ *   included, so every failure reaches the caller through the same catch.
  */
 export function loadWithDeadline(load, {
   ms = MODULE_LOAD_DEADLINE_MS,
@@ -663,7 +664,17 @@ export function loadWithDeadline(load, {
     // process open.
     timer?.unref?.();
   });
-  return Promise.race([load(), deadline])
+  // A synchronous throw from load() would escape before the race is built,
+  // leaving the deadline armed to reject unhandled long after the failure UI is
+  // up. Routed into the same rejection every other failure takes.
+  let started;
+  try {
+    started = load();
+  } catch (err) {
+    timers.clearTimeout(timer);
+    return Promise.reject(err);
+  }
+  return Promise.race([started, deadline])
     .finally(() => timers.clearTimeout(timer));
 }
 

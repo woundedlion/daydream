@@ -529,6 +529,19 @@ test('a load failure still rejects with its own error', async () => {
   assert.equal(timers.pending.size, 0, 'the deadline is cancelled either way');
 });
 
+test('a load that throws synchronously rejects and cancels the deadline', async () => {
+  const timers = fakeTimers();
+
+  const rejected = loadWithDeadline(() => { throw new Error('bad import'); },
+    { ms: 10, timers });
+
+  await assert.rejects(rejected, /bad import/,
+    'a sync throw escapes past the failure UI instead of reporting through it');
+  assert.equal(timers.pending.size, 0,
+    'the armed deadline would fire a second, unrelated fatal 90 s later');
+  assert.equal(timers.cleared.length, 1);
+});
+
 test('a stalled load rejects at the deadline instead of spinning', async () => {
   const timers = fakeTimers();
   // The stall this bounds: a fetch that neither resolves nor errors.
