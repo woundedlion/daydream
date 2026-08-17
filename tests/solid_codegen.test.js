@@ -1197,6 +1197,24 @@ test('solids.html shape-checks a restore before it commits', () => {
     'a refused restore must say so rather than fail silently');
 });
 
+/**
+ * Verifies the saved list is bounded before a card is built. Each card holds a
+ * PNG data URL, so an unbounded list reaches the localStorage quota, after
+ * which persistSavedSolids can only report that further saves are session-only.
+ */
+test('solids.html caps the saved list before it captures a thumbnail', () => {
+  const save = SOLIDS_HTML.match(/function saveSolid\(\) \{[\s\S]*?\n {4}\}/)?.[0];
+  assert.ok(save, 'saveSolid must stay a named function in solids.html');
+  assert.match(SOLIDS_HTML, /const SAVED_SOLIDS_MAX = \d+;/,
+    'the cap must be a named constant, not a literal inside the gate');
+  const capAt = save.indexOf('savedSolids.length >= SAVED_SOLIDS_MAX');
+  assert.ok(capAt > 0, 'saveSolid must refuse a save once the list is at the cap');
+  assert.ok(capAt < save.indexOf('captureSavedThumbnail('),
+    'the cap must gate ahead of the thumbnail capture it would otherwise discard');
+  assert.ok(capAt < save.indexOf('savedSolids.push('),
+    'the cap must gate ahead of the push it bounds');
+});
+
 /** Verifies a transient spawn failure is retried rather than disabling validation for good. */
 test('createChainValidator retries after a failed spawn', async () => {
   let spawns = 0;
