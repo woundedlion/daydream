@@ -341,10 +341,15 @@ export function createShaderDocumentController({
     return true;
   };
 
-  /** @param {string} source @param {string} [filename] */
-  const loadSource = async (source, filename = 'import.shader.json') => {
+  /**
+   * @param {string} source @param {string} [filename]
+   * @param {*} [precompiled] - The catalog's already-compiled document, when the
+   *   source is a catalog entry rather than an imported study.
+   */
+  const loadSource = async (source, filename = 'import.shader.json',
+                            precompiled = null) => {
     compiler ??= await importCompiler();
-    const compiled = compiler.compileShaderDocument(source);
+    const compiled = precompiled ?? compiler.compileShaderDocument(source);
     if (compiled.status !== 'VALID') {
       show(diagnosticText(compiled), true);
       return false;
@@ -417,18 +422,17 @@ export function createShaderDocumentController({
           effectId,
           filename,
           source,
+          compiled,
           descriptorDigest: compiled.descriptor_digest,
           presetIds: compiled.document.preset_bank.presets.map(
             (/** @type {*} */ preset) => preset.preset_id),
         }]));
-      for (const [effectId, filename, source] of entries) {
+      for (const [effectId] of entries) {
         const option = doc.createElement('option');
         option.value = effectId;
         option.textContent = migration.product_group.children
           .find((/** @type {*} */ child) => child.effect_id === effectId)?.display_name
           ?? effectId;
-        option.dataset.filename = filename;
-        option.dataset.source = source;
         sourceSelect.appendChild(option);
       }
       show('Choose a source document or open a local study.');
@@ -451,7 +455,12 @@ export function createShaderDocumentController({
       show('Scratch Shader is active.');
       return;
     }
-    await loadSource(option.dataset.source ?? '', option.dataset.filename);
+    const entry = catalog.get(option.value);
+    if (!entry) {
+      show(`The source catalog carries no document for "${option.value}".`, true);
+      return;
+    }
+    await loadSource(entry.source, entry.filename, entry.compiled);
   });
   presetSelect.addEventListener('change', () => {
     applyPreset(presetSelect.value);
