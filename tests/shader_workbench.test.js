@@ -6,6 +6,7 @@ import { shaderWorkbenchUrl, start } from '../daydream.js';
 import {
   findWorkbenchFolder,
   revealWorkbenchFolder,
+  wireShaderWorkbenchNav,
 } from '../tools/shader_workbench_nav.js';
 import {
   applyDynamicShaderDocument,
@@ -140,6 +141,84 @@ test('stage navigation opens and reveals the selected GUI folder', () => {
   assert.equal(clicked, true);
   assert.equal(scrolled, true);
   assert.equal(revealWorkbenchFolder(root, 'Missing'), false);
+});
+
+/**
+ * Nav-wiring double: a document whose folder titles the test grows, a nav of
+ * two stage buttons, and a MutationObserver stand-in the test fires by hand.
+ * @param {string[]} names - Folder titles present at wire time.
+ * @returns {Object} The doc, the buttons, the observer record and a sweep count.
+ */
+function navHarness(names) {
+  const titles = names.map((name) => ({ textContent: name, parentElement: { name } }));
+  const button = (name) => ({
+    dataset: { workbenchFolder: name },
+    disabled: false,
+    addEventListener() {},
+    setAttribute() {},
+    removeAttribute() {},
+  });
+  const buttons = [button('Projection'), button('Lens')];
+  const nav = { querySelectorAll: () => buttons };
+  const gui = {};
+  const record = { observed: 0, disconnected: 0, callback: null, sweeps: 0 };
+  const doc = {
+    getElementById: (id) => (id === 'shader-workbench-nav' ? nav
+      : id === 'gui-container' ? gui : null),
+    querySelectorAll: () => { record.sweeps++; return titles; },
+  };
+  return { doc, buttons, record, titles };
+}
+
+test('the workbench nav stops observing once every stage folder exists', () => {
+  const savedObserver = globalThis.MutationObserver;
+  const savedWindow = globalThis.window;
+  try {
+    const { doc, buttons, record, titles } = navHarness(['Projection']);
+    globalThis.window = { addEventListener() {} };
+    globalThis.MutationObserver = class {
+      /** @param {Function} cb - Mutation callback. */
+      constructor(cb) { record.callback = cb; }
+      observe() { record.observed++; }
+      disconnect() { record.disconnected++; }
+    };
+
+    const observer = wireShaderWorkbenchNav(doc);
+    assert.ok(observer, 'a missing folder must leave the observer watching the mount');
+    assert.equal(record.observed, 1);
+    assert.equal(buttons[1].disabled, true, 'the absent stage stays disabled');
+    assert.equal(record.sweeps, 1, 'one DOM sweep per sync, not one per button');
+
+    titles.push({ textContent: 'Lens', parentElement: {} });
+    record.callback();
+    assert.equal(buttons[1].disabled, false);
+    assert.equal(record.disconnected, 1,
+      'the observer sweeps the GUI for the page lifetime after the last folder lands');
+  } finally {
+    globalThis.MutationObserver = savedObserver;
+    globalThis.window = savedWindow;
+  }
+});
+
+test('the workbench nav never observes when the GUI is already built', () => {
+  const savedObserver = globalThis.MutationObserver;
+  const savedWindow = globalThis.window;
+  try {
+    const { doc, record } = navHarness(['Projection', 'Lens']);
+    globalThis.window = { addEventListener() {} };
+    globalThis.MutationObserver = class {
+      /** @param {Function} cb - Mutation callback. */
+      constructor(cb) { record.callback = cb; }
+      observe() { record.observed++; }
+      disconnect() { record.disconnected++; }
+    };
+
+    assert.equal(wireShaderWorkbenchNav(doc), null);
+    assert.equal(record.observed, 0);
+  } finally {
+    globalThis.MutationObserver = savedObserver;
+    globalThis.window = savedWindow;
+  }
 });
 
 test('legacy custom Shader URLs preserve their state on the workbench route', () => {
