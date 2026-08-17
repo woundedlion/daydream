@@ -48,7 +48,15 @@ const PIPELINE_EFFECTS = Object.freeze({
  * Classifies a supported ShaderBall save before current effect-name validation.
  * @param {string} effect - Persisted effect name.
  * @param {Object|null} snapshot - Versioned legacy snapshot, when available.
- * @returns {Object} Destination identity, preserved state, notice, and diagnostic.
+ * @returns {{effect: string, migrated: boolean, presetId?: string,
+ *   snapshot?: Object|null, customParameters?: Object|null,
+ *   handoff?: Object|null, notice?: string, diagnostic?: string}} The effect to
+ *   open and whether it was migrated, always. A migration also carries a
+ *   `notice` to show, and one of: `presetId` for a preset that maps to a
+ *   concrete effect, `customParameters` for a recognized custom pipeline,
+ *   `snapshot` for a document handed to Shader whole (null when the save was
+ *   unusable, alongside a `diagnostic` code). `handoff` carries the legacy
+ *   runtime state whenever the save had any.
  */
 export function importLegacyShaderSelection(effect, snapshot = null) {
   if (effect !== LEGACY_SHADER_ALIAS) return { effect, migrated: false };
