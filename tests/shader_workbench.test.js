@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { shaderWorkbenchUrl } from '../daydream.js';
+import { shaderWorkbenchUrl, start } from '../daydream.js';
 import {
   findWorkbenchFolder,
   revealWorkbenchFolder,
@@ -147,4 +147,26 @@ test('legacy custom Shader URLs preserve their state on the workbench route', ()
     shaderWorkbenchUrl('https://example.test/daydream/index.html?effect=ShaderBall&fx.Speed=2#preview'),
     '/daydream/tools/shader.html?effect=Shader&fx.Speed=2#preview',
   );
+});
+
+test('the workbench route carries the requested shader document', () => {
+  assert.equal(
+    shaderWorkbenchUrl('https://example.test/daydream/index.html?effect=signal-weave', 'signal-weave'),
+    '/daydream/tools/shader.html?effect=signal-weave',
+  );
+});
+
+// A document id is a workbench effect the simulator's favorites never list, so
+// without the route it fails validation and the page opens on its default.
+test('a shader-document deep link routes the simulator to the workbench', () => {
+  const replaced = [];
+  const win = {
+    location: { href: 'https://example.test/daydream/index.html?effect=alien-ocean',
+                search: '?effect=alien-ocean',
+                replace: (url) => replaced.push(url) },
+    addEventListener() {}, removeEventListener() {},
+  };
+  const doc = { documentElement: { dataset: {} } };
+  start({ doc, win });
+  assert.deepEqual(replaced, ['/daydream/tools/shader.html?effect=alien-ocean']);
 });

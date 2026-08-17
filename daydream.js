@@ -162,16 +162,17 @@ function favoritesFor(resolution) {
 /**
  * Builds the dedicated authoring route while preserving the incoming query.
  * @param {Location|URL|string} location - Current simulator location.
+ * @param {string} [effect] - Effect the workbench opens on.
  * @returns {string} Same-origin workbench URL.
  */
-export function shaderWorkbenchUrl(location) {
+export function shaderWorkbenchUrl(location, effect = 'Shader') {
   const source = typeof location === 'string' || location instanceof URL
     ? location : location.href;
   const current = new URL(source);
   const url = new URL('tools/shader.html', current);
   url.search = current.search;
   url.hash = current.hash;
-  url.searchParams.set('effect', 'Shader');
+  url.searchParams.set('effect', effect);
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
@@ -198,8 +199,12 @@ export function start({
   const shaderWorkbench = doc.documentElement?.dataset.daydreamMode === 'shader-workbench';
   const requestedEffect = new URLSearchParams(win.location?.search ?? '').get('effect');
   const requestedSelection = importLegacyShaderSelection(requestedEffect);
-  if (!shaderWorkbench && requestedSelection.effect === 'Shader') {
-    win.location.replace(shaderWorkbenchUrl(win.location));
+  // Shader-document ids name effects only the workbench offers, so the simulator
+  // routes them there instead of dropping them for its default effect.
+  const workbenchEffect = requestedSelection.effect === 'Shader' ? 'Shader'
+    : SHADER_DOCUMENT_EFFECTS.includes(requestedEffect) ? requestedEffect : null;
+  if (!shaderWorkbench && workbenchEffect) {
+    win.location.replace(shaderWorkbenchUrl(win.location, workbenchEffect));
     return { dispose() {} };
   }
 
