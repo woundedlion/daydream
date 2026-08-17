@@ -286,7 +286,8 @@ export function facetGridStageAssignments(params) {
 
 /**
  * @param {Array<Object>} params - Fixed Shader parameter definitions.
- * @returns {Map<string, string>|null} Parameter name to fixed pipeline stage.
+ * @returns {Map<string, string>|null} Parameter name to fixed pipeline stage; a
+ *   name no rule claims is absent, and the panel reports it as unstaged.
  */
 export function fixedShaderStageAssignments(params) {
   const names = new Set(params.map((parameter) => parameter.name));
@@ -321,9 +322,17 @@ export function fixedShaderStageAssignments(params) {
     if (/^(Pattern|Speed$|Source |Complexity|Drift|Lattice )/.test(name)) {
       return 'Function';
     }
-    return 'Colorize';
+    if (/^(Palette|Mapping |Phase Oscillation |Brightness |Value Opacity |Hue )/.test(name)) {
+      return 'Colorize';
+    }
+    return null;
   };
-  return new Map(params.map((parameter) => [parameter.name, stageFor(parameter.name)]));
+  const assignments = new Map();
+  for (const parameter of params) {
+    const stage = stageFor(parameter.name);
+    if (stage) assignments.set(parameter.name, stage);
+  }
+  return assignments;
 }
 
 /**
