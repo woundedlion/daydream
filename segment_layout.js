@@ -29,7 +29,8 @@ export function isValidSegmentCount(total) {
  *
  * Layout: NUM_ARMS = 2 vertical halves — arm A is the left half, arm B the
  * w/2-shifted right half — with segments [0, total/2) on arm A and the
- * rest on arm B. Each arm splits into total/2 equal Y-bands. Within an arm the
+ * rest on arm B. Each arm splits into total/2 Y-bands of equal height, to within
+ * the one row a height the band count does not divide spreads. Within an arm the
  * first floor(bands/2) segments tile the northern bands top-down and the
  * remainder tile the southern bands from the S pole inward, so four bands per
  * arm run 0, 1, 3, 2.
@@ -101,9 +102,13 @@ export function computeSegmentRange(id, total, w, h) {
     ? armSeg
     : ySegsPerArm - 1 - (armSeg - northBands);
 
+  // A height the band count does not divide spreads its remainder one row per
+  // band from the N pole down, so no band carries more than one extra row and
+  // the slowest worker bounds the frame as tightly as the layout allows.
   const segH = Math.floor(h / ySegsPerArm);
-  const y0 = bandId * segH;
-  const y1 = (bandId === ySegsPerArm - 1) ? h : y0 + segH;
+  const tallBands = h % ySegsPerArm;
+  const y0 = bandId * segH + Math.min(bandId, tallBands);
+  const y1 = y0 + segH + (bandId < tallBands ? 1 : 0);
 
   return { x0, x1, y0, y1, w: x1 - x0, h: y1 - y0 };
 }
