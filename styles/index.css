@@ -1,17 +1,42 @@
 :root {
-  --page-bg: #000;
+  /* Channels of the three tokens that also appear translucent. The rules that
+     need alpha read them as rgb(var(--x) / a), which stays exact. */
+  --page-bg-rgb: 0 0 0;
+  --bright-text-rgb: 255 255 255;
+  --record-indicator-rgb: 238 34 34;
+  --page-bg: rgb(var(--page-bg-rgb));
   /* Raised surfaces over the page: notices, dialog buttons. */
   --panel-bg: #222;
   --panel-text: #eee;
   --panel-border: #333;
-  --bright-text: #fff;
+  --button-border: #555;
+  --button-border-hover: #777;
+  --bright-text: rgb(var(--bright-text-rgb));
   --muted-text: #888;
   --error-text: #e66;
-  --record-indicator: #e22;
+  --warning-text: #facc15;
+  --record-indicator: rgb(var(--record-indicator-rgb));
   --accent: #48f;
   /* Accent applied to text; lighter than --accent for contrast on the dark theme. */
   --accent-text: #8af;
   --focus-ring: #8af;
+  /* Sidebar surface; also the opaque end of the scroll-arrow fades. */
+  --sidebar-bg: rgb(20 20 20 / 0.95);
+  --scrollbar-track: #111;
+  --scrollbar-thumb: #444;
+  --scrollbar-thumb-hover: #666;
+  --effect-hover-text: #ddd;
+  --sort-hover-text: #aaa;
+  /* Selected sidebar row and sort button: gradient fill, then border tint. */
+  --active-fill-rgb: 50 100 200;
+  --active-border-rgb: 60 120 240;
+  /* Engine stats table, in the desktop header and the mobile stats bar. */
+  --stats-text: #808080;
+  --stats-head-text: #999;
+  --stats-divider: #444;
+  /* Per-segment stats overlay: body text, then the timing readouts in it. */
+  --segment-stats-text: #aaa;
+  --segment-stats-value: #ccc;
   --ui-font: 'Segoe UI', Arial, sans-serif;
   --nav-font: Arial, sans-serif;
   /* Arial carries none of the glyph-button characters (U+21BA, U+29C9, U+25C0/25B6). */
@@ -74,18 +99,18 @@
 
 .tab {
   padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgb(var(--bright-text-rgb) / 0.1);
   color: var(--bright-text);
   text-decoration: none;
   font-family: var(--nav-font);
   font-size: 14px;
   border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgb(var(--bright-text-rgb) / 0.2);
   transition: background 0.2s;
 }
 
 .tab:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgb(var(--bright-text-rgb) / 0.3);
 }
 
 /* Layout */
@@ -137,7 +162,7 @@
   height: 14px;
   background: var(--record-indicator);
   border-radius: 50%;
-  box-shadow: 0 0 8px 2px rgba(238, 34, 34, 0.6);
+  box-shadow: 0 0 8px 2px rgb(var(--record-indicator-rgb) / 0.6);
   animation: rec-pulse 1s ease-in-out infinite;
   z-index: 200;
   pointer-events: none;
@@ -160,7 +185,7 @@
   line-height: 14px;
   z-index: 200;
   pointer-events: none;
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 0 4px rgb(var(--page-bg-rgb) / 0.8);
 }
 
 /* Stats bar — mobile-only readout below effect selectors */
@@ -168,7 +193,7 @@
   display: none;
   width: 100%;
   padding: 4px 8px;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgb(var(--page-bg-rgb) / 0.6);
   border-bottom: 1px solid var(--panel-border);
   text-align: center;
 }
@@ -178,7 +203,7 @@
    and the desktop table's offset from the tab strip differ. The column divider
    uses :not(:last-child) so the last cell in each row omits it. */
 .global-stats {
-  color: grey;
+  color: var(--stats-text);
   font-family: monospace;
   text-align: center;
   border-collapse: collapse;
@@ -187,14 +212,14 @@
 }
 .global-stats--desktop { font-size: 12px; margin-left: 10px; }
 .global-stats--mobile { font-size: 10px; }
-.global-stats .stats-head { color: #999; }
+.global-stats .stats-head { color: var(--stats-head-text); }
 .global-stats th { font-weight: normal; padding: 0 4px; }
 .global-stats td { padding: 0 4px; white-space: nowrap; }
 .global-stats--desktop td { padding: 0 8px; }
 .global-stats .perf-time { color: var(--muted-text); }
 .global-stats .perf-time.slow { color: var(--error-text); }
 .global-stats th:not(:last-child),
-.global-stats td:not(:last-child) { border-right: 1px solid #444; }
+.global-stats td:not(:last-child) { border-right: 1px solid var(--stats-divider); }
 
 /* Loading overlay */
 .loading-overlay {
@@ -223,7 +248,7 @@
 .spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid rgba(255, 255, 255, 0.1);
+  border: 3px solid rgb(var(--bright-text-rgb) / 0.1);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -311,7 +336,7 @@
   padding: 6px 16px;
   background: var(--panel-bg);
   color: var(--panel-text);
-  border: 1px solid #555;
+  border: 1px solid var(--button-border);
   border-radius: 6px;
   font-family: var(--ui-font);
   font-size: 13px;
@@ -320,7 +345,7 @@
 
 .context-lost-reload:hover {
   background: var(--panel-border);
-  border-color: #777;
+  border-color: var(--button-border-hover);
 }
 
 /* Scroll arrows — hidden on desktop, styled only in mobile media query */
@@ -340,7 +365,7 @@
   width: fit-content;
   min-width: 15rem;
   max-width: 25rem;
-  background: rgba(20, 20, 20, 0.95);
+  background: var(--sidebar-bg);
   border-right: 1px solid var(--panel-border);
   display: flex;
   flex-direction: column;
@@ -370,16 +395,16 @@
 }
 
 .effect-sidebar::-webkit-scrollbar-track {
-  background: #111;
+  background: var(--scrollbar-track);
 }
 
 .effect-sidebar::-webkit-scrollbar-thumb {
-  background: #444;
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 
 .effect-sidebar::-webkit-scrollbar-thumb:hover {
-  background: #666;
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* Effect Buttons */
@@ -433,8 +458,8 @@
 .sort-btn {
   flex: 1;
   padding: 3px 6px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgb(var(--bright-text-rgb) / 0.05);
+  border: 1px solid rgb(var(--bright-text-rgb) / 0.1);
   color: var(--muted-text);
   font-family: var(--ui-font);
   font-size: 10px;
@@ -448,13 +473,13 @@
 }
 
 .sort-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #aaa;
+  background: rgb(var(--bright-text-rgb) / 0.1);
+  color: var(--sort-hover-text);
 }
 
 .sort-btn.active {
   color: var(--accent-text);
-  border-color: rgba(60, 120, 240, 0.3);
+  border-color: rgb(var(--active-border-rgb) / 0.3);
 }
 
 .sort-glyph {
@@ -462,17 +487,18 @@
 }
 
 .effect-button:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #ddd;
-  border-color: rgba(255, 255, 255, 0.1);
+  background: rgb(var(--bright-text-rgb) / 0.05);
+  color: var(--effect-hover-text);
+  border-color: rgb(var(--bright-text-rgb) / 0.1);
 }
 
 .effect-button.active {
-  background: linear-gradient(90deg, rgba(50, 100, 200, 0.2), rgba(50, 100, 200, 0.1));
+  background: linear-gradient(90deg, rgb(var(--active-fill-rgb) / 0.2),
+    rgb(var(--active-fill-rgb) / 0.1));
   color: var(--bright-text);
-  border-color: rgba(60, 120, 240, 0.4);
+  border-color: rgb(var(--active-border-rgb) / 0.4);
   font-weight: 600;
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 15px rgb(var(--page-bg-rgb) / 0.3);
   border-left-color: var(--accent);
 }
 
@@ -541,7 +567,7 @@
     height: auto;
     flex-shrink: 0;
     z-index: 1000;
-    background: rgba(0, 0, 0, 0.8);
+    background: rgb(var(--page-bg-rgb) / 0.8);
     display: flex;
     flex-direction: column;
     overflow-y: visible;
@@ -604,7 +630,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: rgba(255, 255, 255, 0.7);
+    color: rgb(var(--bright-text-rgb) / 0.7);
     font-size: 18px;
     font-family: var(--nav-font);
     pointer-events: none;
@@ -620,12 +646,12 @@
 
   .scroll-arrow-left {
     left: 0;
-    background: linear-gradient(to right, rgba(20, 20, 20, 0.95), transparent);
+    background: linear-gradient(to right, var(--sidebar-bg), transparent);
   }
 
   .scroll-arrow-right {
     right: 0;
-    background: linear-gradient(to left, rgba(20, 20, 20, 0.95), transparent);
+    background: linear-gradient(to left, var(--sidebar-bg), transparent);
   }
 
   .effect-button {
@@ -758,7 +784,7 @@
 
 .gui-container .effect-gui .lil-controller.param-warning > .lil-name::after {
   content: "\26a0";
-  color: #facc15;
+  color: var(--warning-text);
   margin-left: 0.4em;
   text-shadow: 0 0 2px var(--page-bg);
 }
@@ -785,13 +811,13 @@ div.label {
   left: 8px;
   z-index: 150;
   pointer-events: none;
-  background: rgba(0, 0, 0, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgb(var(--page-bg-rgb) / 0.75);
+  border: 1px solid rgb(var(--bright-text-rgb) / 0.15);
   border-radius: 6px;
   padding: 6px 10px;
   font-family: 'Consolas', 'Courier New', monospace;
   font-size: 11px;
-  color: #aaa;
+  color: var(--segment-stats-text);
   line-height: 1.4;
   backdrop-filter: blur(4px);
 }
@@ -828,7 +854,7 @@ div.label {
 }
 
 .segment-stats .seg-time {
-  color: #ccc;
+  color: var(--segment-stats-value);
 }
 
 .segment-stats .seg-time.slow {
