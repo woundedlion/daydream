@@ -69,7 +69,7 @@ Building the WASM target in Holosphere installs `holosphere_wasm.js`, `holospher
      - [VectorTrail and QuantizedVectorTrail](#vectortrail-and-quantizedvectortrail)
      - [`tween` and `deep_tween`](#tween-and-deep_tween)
      - [Animations and Mutable State](#animations-and-mutable-state)
-   - [7.4 Geometry Transformers](#74-geometry-transformers-transformersh)
+   - [7.4 Geometry Transformers](#74-geometry-transformers-transformerh)
      - [Displacement Fields](#displacement-fields)
      - [Pool Lifecycle](#pool-lifecycle)
      - [Standalone Utilities](#standalone-utilities)
@@ -87,7 +87,7 @@ Building the WASM target in Holosphere installs `holosphere_wasm.js`, `holospher
      - [Conway Operators](#conway-operators-conwayh)
      - [Hankin Pattern System](#hankin-pattern-system-hankinh)
      - [Solids Library](#solids-library-solidsh-solid_generatorsh)
-   - [7.8 Generators](#78-generators-generatorsh)
+   - [7.8 Generators](#78-generators-memoryh)
    - [7.9 The Preset System](#79-the-preset-system-controlpresetsh)
    - [7.10 Hardware Drivers](#710-hardware-drivers-dma_ledh-pov_singleh-pov_segmentedh)
      - [DMA LED Controller](#dma-led-controller-dma_ledh)
@@ -262,32 +262,33 @@ Both trees are gated against their repository's tracked file list: every row mus
 <!-- docs-check: tree exhaustive -->
 ```
 ├── core/                       Rendering engine
-│   ├── engine/                 Machinery: platform layer, memory, callables, rosters, effect support
+│   ├── platform/               Target abstraction and build-time configuration
 │   │   ├── platform.h              Arduino vs. WASM vs. Desktop abstraction layer
-│   │   ├── platform/               Fragments platform.h pulls in (attributes, diagnostics,
-│   │   │                            rng, arduino_mocks)
-│   │   ├── build_features.h         Build-time feature and instrumentation switches
+│   │   ├── attributes.h            Placement and optimization attribute macros
+│   │   ├── diagnostics.h           HS_CHECK trap + hs::log
+│   │   ├── rng.h                   Deterministic random number generation
+│   │   ├── arduino_mocks.h         Host-side FastLED / Arduino mock surface
+│   │   ├── build_features.h        Build-time feature and instrumentation switches
+│   │   └── constants.h             MAX_W, MAX_H, star ratio, pole-LOD tuning
+│   ├── control/                An effect's control surface (registry, params +
+│   │                            apply_if_changed, presets, choreography, transition)
+│   ├── containers/             Reusable fixed-capacity containers
+│   │   ├── static_circular_buffer.h Fixed-capacity non-allocating circular buffer
+│   │   └── triangular_bitset.h     Upper-triangular unordered-pair bitset
+│   ├── engine/                 Machinery: memory, callables, rosters, effect support
 │   │   ├── profiling.h             Cycle counters + HS_PROFILE / scan-metric macros
-│   │   ├── constants.h             MAX_W, MAX_H, star ratio, pole-LOD tuning
 │   │   ├── engine.h                Engine API umbrella — included by every effect
 │   │   ├── effects.h               Effect roster (includes each effect + HS_EFFECT_LIST)
 │   │   ├── effects_legacy.h        Pre-engine effects (TheMatrix, Spirals, etc.)
-│   │   ├── control/                An effect's control surface (registry, params, presets,
-│   │   │                            choreography, transition)
 │   │   ├── concepts.h              FunctionRef/Fn callable wrappers, PipelineRef type erasure, Tweenable concept
 │   │   ├── inplace_function.h      Fixed-capacity in-place callable storage behind Fn
-│   │   ├── memory.h / memory.cpp   Arena allocator, ScratchScope, Persist<T>
+│   │   ├── memory.h / memory.cpp   Arena allocator, ScratchScope, Persist<T>, generate()
 │   │   ├── static_storage.cpp      Definitions of the framebuffer/timeline statics (DMAMEM placement)
-│   │   ├── static_circular_buffer.h Fixed-capacity non-allocating circular buffer
-│   │   ├── generators.h            Universal generate() wrapper for procedural geometry
-│   │   ├── util.h                  wrap(), fast_wrap(), shortest_distance, apply_if_changed
-│   │   ├── transformers.h          Ripple, Noise, Möbius warp geometry transformers
-│   │   ├── styles.h                Feedback::Style named presets + space/color transform functions
-│   │   └── reaction_graph.h / reaction_graph.cpp  Precomputed Fibonacci-lattice K-NN graph (90 KiB / 92,160-byte table)
+│   │   └── styles.h                Feedback::Style named presets + space/color transform functions
 │   ├── math/                   Vector/quaternion math and scalar curves
 │   │   ├── 3dmath.h                Vector, Quaternion, Spherical, Complex, Möbius math
 │   │   ├── rotate.h                Quaternion projection helpers
-│   │   ├── geometry.h              PhiLUT/TrigLUT, pixel ↔ vector mapping, pole_wrap, Orientation, Basis
+│   │   ├── geometry.h              wrap()/fast_wrap()/shortest_distance, PhiLUT/TrigLUT, pixel ↔ vector mapping, pole_wrap, Orientation, Basis
 │   │   ├── spherical_field.h       Latitude-ring field layout + bilinear sphere sampling
 │   │   ├── spherical_harmonics.h   Real spherical harmonics in Cartesian form on the unit sphere
 │   │   ├── noise_field.h           Shared scalar/vector noise-field sampling kernels
@@ -302,15 +303,16 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   │   ├── mesh_class_types.h      Congruence-class id space + the record structs the rasterizer reads
 │   │   ├── mesh_classes.h          Congruence-class clustering + canonical distance-LUT bake
 │   │   ├── mesh_state.h            Arena-backed MeshState, the flat mesh format the renderer reads
-│   │   ├── spatial.h               KDTree k-nearest-neighbor search
 │   │   ├── conway.h                Conway operators (dual, kis, ambo, truncate, etc.)
 │   │   ├── conway_graph.h          Constexpr solid-to-solid operator edge graph + walk helpers
 │   │   ├── recipe.h                Recipe lowering to primitive Conway steps + replay
 │   │   ├── hankin.h                Hankin pattern compilation and update system
 │   │   ├── solid_generators.h     Platonic vertex/face tables, SolidBuilder, and the named solid generators
 │   │   ├── solids.h                Solid registries, Recipe mirrors, and the name/index lookups
-│   │   ├── triangular_bitset.h     Upper-triangular pair bitset (wireframe edge dedup)
 │   │   └── relax_bakes_generated.h Baked relaxed-mesh vertices (from tools/relax_bakes.py)
+│   ├── spatial/                Spatial indexing and spherical graph structures
+│   │   ├── kd_tree.h               KDTree k-nearest-neighbor search
+│   │   └── reaction_graph.h / reaction_graph.cpp  Precomputed Fibonacci-lattice K-NN graph (90 KiB / 92,160-byte table)
 │   ├── color/                  Color math and palettes
 │   │   ├── color.h                 Pixel (16-bit linear), Color4, blend helpers, palettes
 │   │   ├── composition.h           Palette modifiers + StaticPalette composition (via color.h)
@@ -360,7 +362,8 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   │   ├── timeline.h              TimelineEvent inline storage + the Timeline scheduler
 │   │   ├── opleg.h                 Conway-chain morph legs: OpLeg
 │   │   ├── segue.h                 Mesh-to-mesh transition policies: the Segue library
-│   │   └── carousel.h              Double-buffered mesh slot pair: MeshCarousel
+│   │   ├── carousel.h              Double-buffered mesh slot pair: MeshCarousel
+│   │   └── transformer.h           Ripple, Noise, Möbius warp and displacement-field transformer pools
 │   └── vendor/                 Third-party code
 │       ├── FastNoiseLite.h         Single-header noise library
 │       └── FastNoiseLite_config.h  FastNoiseLite build configuration
@@ -432,7 +435,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 ├── patterns/                   Shader workbench source documents
 ├── scripts/                    Build + CI tooling
 │   ├── generate_luts.py        sRGB ↔ linear LUT generator of record (emits core/color/color_luts.h)
-│   ├── generate_reaction_graph.py K-NN lattice generator of record (emits core/engine/reaction_graph.cpp)
+│   ├── generate_reaction_graph.py K-NN lattice generator of record (emits core/spatial/reaction_graph.cpp)
 │   ├── generate_srgb_decode.cpp Split-decode generator of record (emits core/color/srgb_decode_lut.h)
 │   ├── effect_roster.mjs       Shared HS_EFFECT_LIST / REGISTER_EFFECT parser for the roster tools
 │   ├── effect_roster.test.mjs  Node unit test for both roster parsers
@@ -746,9 +749,9 @@ A typical effect frame follows a four-stage pipeline. Not every effect uses ever
 ┌─────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
 │  Generate   │     │  Transform   │     │  Rasterize   │     │   Filter     │
 │             │ ──▸ │              │ ──▸ │              │ ──▸ │   Pipeline   │
-│ geometry.h  │     │transformers.h│     │ sdf.h/scan.h │     │  filter.h    │
+│ geometry.h  │     │transformer.h │     │ sdf.h/scan.h │     │  filter.h    │
 │ solids.h    │     │              │     │ plot.h       │     │              │
-│ generators.h│     │              │     │              │     │              │
+│ memory.h    │     │              │     │              │     │              │
 └─────────────┘     └──────────────┘     └──────────────┘     └──────────────┘
 
   Solids::get()      MeshOps::transform    Scan::Mesh::draw     Pipeline<W,H,
@@ -1278,7 +1281,7 @@ void draw_frame() {
 }
 ```
 
-### 7.4 Geometry Transformers (`transformers.h`)
+### 7.4 Geometry Transformers (`transformer.h`)
 
 Transformers deform the sphere geometry before rendering. The `Transformer<ParamsT, AnimT, TransformFunc, CAPACITY>` class manages a pool of active transform instances, each with its own animated parameters:
 
@@ -1321,7 +1324,7 @@ Both classes derive from `TransformerPool`, which fixes the call order:
 
 #### Standalone Utilities
 
-`OrientTransformer<CAP>` (`transformers.h`) is a plain adapter struct, not a `Transformer<>` specialization: it holds a reference to an `Orientation<CAP>` and applies `orientation.orient()` to each vertex. It has no pool, no params and no lifecycle — effects construct one on the stack at the call site (a deduction guide takes `CAP` from the orientation) and hand it straight to `MeshOps::transform()`.
+`OrientTransformer<CAP>` (`transformer.h`) is a plain adapter struct, not a `Transformer<>` specialization: it holds a reference to an `Orientation<CAP>` and applies `orientation.orient()` to each vertex. It has no pool, no params and no lifecycle — effects construct one on the stack at the call site (a deduction guide takes `CAP` from the orientation) and hand it straight to `MeshOps::transform()`.
 
 ### 7.5 Memory Architecture (`memory.h`, `memory.cpp`)
 
@@ -1621,7 +1624,7 @@ at the current phase.
 
 ### 7.7 The Mesh System (`core/mesh/`)
 
-The mesh system is split across thirteen files:
+The mesh system is split across eleven files:
 
 - **`mesh.h`** — Core data structures (`PolyMesh`, `HalfEdgeMesh`) and fundamental `MeshOps` (compile, clone, classify)
 - **`conway.h`** — Conway mesh operators and vertex transformations
@@ -1631,8 +1634,6 @@ The mesh system is split across thirteen files:
 - **`mesh_classes.h`** — Congruence-class clustering plus one canonical distance-LUT bake per class, allocated by descending face count under an 18 KB per-mesh budget
 - **`mesh_class_types.h`** — The class id space and the three record types the rasterizer binds per frame, split out so the clustering and bake machinery stays out of every rasterizer translation unit
 - **`mesh_state.h`** — `MeshState`, the flat-array renderer format, split out so the mesh, Conway, Hankin and solids translation units need not compile `KDTree`
-- **`spatial.h`** — `KDTree` k-nearest-neighbor search
-- **`triangular_bitset.h`** — Upper-triangular pair bitset backing the edge deduplication in the wireframe path
 - **`solid_generators.h`** — Hardcoded Platonic vertex/face tables, the `SolidBuilder` operator chain, and the named Archimedean / Catalan / Islamic Star Pattern generators
 - **`solids.h`** — The four solid registries, the authored `Recipe` mirrors of the generators, and the name/index lookups over them
 - **`relax_bakes_generated.h`** — Baked relaxed-mesh vertices behind `MeshOps::relax_baked`, generated by `tools/relax_bakes.py`; never hand-edited, regenerate with `<build>/relax_bake_gen | python tools/relax_bakes.py emit --stdin`
@@ -1712,9 +1713,9 @@ SolidBuilder(dodecahedron(a, b), a, b)
     .hankin(54.0f * D2R).ambo().hankin(72.0f * D2R).build();
 ```
 
-### 7.8 Generators (`generators.h`)
+### 7.8 Generators (`memory.h`)
 
-`generators.h` provides a single universal generation wrapper that manages arena lifecycle for all procedural geometry creation:
+`memory.h` provides a single universal generation wrapper that manages arena lifecycle for all procedural geometry creation:
 
 ```cpp
 namespace hs {
@@ -3013,7 +3014,7 @@ cmake --build  --preset wasm-release-install    # build + install into ../daydre
 Use `wasm-debug` for an unoptimized build with assertions (`-sASSERTIONS=1`). Build outputs go to `build/<preset>/`. The `justfile` provides cross-platform shortcuts that forward to these presets: `just build` (release), `just build-debug`, and `just install` (smoke + install into `../daydream`). `just smoke` rebuilds and then drives the shipped module through [`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs) under Node — the same runtime gate CI's `wasm` job runs. The recipe graph is `install → smoke → build`, so the module and provenance markers written into daydream are exactly the ones the runtime gate exercised and a release build is never shipped un-exercised.
 
 The WASM target (`CMakeLists.txt`, `EMSCRIPTEN` branch) configures:
-- Source paths: `targets/wasm/wasm.cpp`, `core/engine/memory.cpp`, `core/engine/static_storage.cpp`, `core/engine/reaction_graph.cpp`
+- Source paths: `targets/wasm/wasm.cpp`, `core/engine/memory.cpp`, `core/engine/static_storage.cpp`, `core/spatial/reaction_graph.cpp`
 - Include paths: project root (for `effects/`, `hardware/`) and `core/` (for engine headers)
 - `-sALLOW_MEMORY_GROWTH=1` — WASM heap can grow for large meshes
 - `-sMODULARIZE=1 -sEXPORT_ES6=1` — ES6 module output
