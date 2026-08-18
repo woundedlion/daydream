@@ -296,7 +296,7 @@ export class Daydream {
     this.resizeObserver.observe(this.canvasParent);
 
     this.labelAxes = false;
-    this.cullBackSphere = false;
+    this.cullBackSphere = true;
     this.showPip = true;
     // Persist column gap-fill overlap (see updateCullUniforms): 1.0 = pills meet
     // exactly; higher closes any hairline seam at the cost of longer terminal caps.
