@@ -1,2 +1,4 @@
 emsdk 5.0.0
 clang 23.0.0
+build_type Release
+dev_bindings OFF

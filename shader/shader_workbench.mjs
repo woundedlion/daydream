@@ -1,3 +1,8 @@
+/*
+ * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
+ * Licensed under the Polyform Noncommercial License 1.0.0
+ */
+
 import { sha256Hex } from './sha256.mjs';
 
 export const SHADER_DOCUMENT_SCHEMA_VERSION = 1;
@@ -90,6 +95,11 @@ const codePointCompare = (left, right) => {
   return a.length - b.length;
 };
 
+// RFC 8259 insignificant whitespace. /\s/u would also skip NBSP, the Unicode
+// space separators, U+2028/U+2029 and U+FEFF, so this reader would accept
+// documents every conforming JSON parser rejects.
+const JSON_WHITESPACE = new Set([' ', '\t', '\n', '\r']);
+
 class JsonReader {
   constructor(source, limits) {
     this.source = source;
@@ -107,7 +117,7 @@ class JsonReader {
   }
 
   space() {
-    while (/\s/u.test(this.source[this.index] ?? '')) ++this.index;
+    while (JSON_WHITESPACE.has(this.source[this.index])) ++this.index;
   }
 
   value(depth, path) {

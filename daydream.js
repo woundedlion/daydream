@@ -57,7 +57,7 @@ const EXPECTED_SEGMENT_CONTROLLER_API_VERSION = 2;
 export const SHADER_DOCUMENT_EFFECTS = Object.freeze([
   'signal-weave', 'kaleido-wave', 'alien-ocean', 'glitch-grid',
   'facet-wave', 'contour-lattice', 'curl-lattice', 'prism-lattice',
-  'vector-facets', 'facet-grid', 'hex-wave', 'equator-grid',
+  'prism-spiral', 'vector-facets', 'facet-grid', 'hex-wave', 'equator-grid',
   'cosmic-eyeball', 'mobius-grid',
 ]);
 
@@ -77,6 +77,7 @@ const HiResFavorites = [
   "ContourLattice",
   "CurlLattice",
   "PrismLattice",
+  "PrismSpiral",
   "VectorFacets",
   "FacetGrid",
   "HexWave",
@@ -112,6 +113,7 @@ const LoResFavorites = [
   "ContourLattice",
   "CurlLattice",
   "PrismLattice",
+  "PrismSpiral",
   "VectorFacets",
   "FacetGrid",
   "HexWave",
