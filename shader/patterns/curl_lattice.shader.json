@@ -78,7 +78,7 @@
         "storage": "binary32",
         "unit": "ratio",
         "domain": { "minimum": 0.015625, "maximum": 8 },
-        "interpolation": { "kind": "LINEAR" },
+        "interpolation": { "kind": "LOG_POSITIVE" },
         "default": 0.710265636
       },
       {
@@ -98,7 +98,7 @@
         "storage": "binary32",
         "unit": "ratio",
         "domain": { "minimum": 0.0009765625, "maximum": 1 },
-        "interpolation": { "kind": "LINEAR" },
+        "interpolation": { "kind": "LOG_POSITIVE" },
         "default": 0.455532223
       },
       {
@@ -218,7 +218,7 @@
         "storage": "binary32",
         "unit": "cycles",
         "domain": { "minimum": 1, "maximum": 32 },
-        "interpolation": { "kind": "LINEAR" },
+        "interpolation": { "kind": "LOG_POSITIVE" },
         "default": 1
       },
       {
@@ -298,7 +298,7 @@
         "storage": "binary32",
         "unit": "ratio",
         "domain": { "minimum": 0.015625, "maximum": 8 },
-        "interpolation": { "kind": "LINEAR" },
+        "interpolation": { "kind": "LOG_POSITIVE" },
         "default": 2
       },
       {
@@ -385,7 +385,7 @@
       }
     ],
     "serialization": {
-      "schema_version": 3,
+      "schema_version": 4,
       "fields": [
         "lattice-cell-scale",
         "lattice-shape",

@@ -92,7 +92,7 @@
         "classification": "preset",
         "storage": "binary32",
         "unit": "radian-per-frame",
-        "domain": { "minimum": 0, "maximum": 0.03 },
+        "domain": { "minimum": 0, "maximum": 0.05 },
         "interpolation": { "kind": "LINEAR" },
         "default": 0.0269999988
       },
@@ -142,7 +142,7 @@
         "classification": "preset",
         "storage": "binary32",
         "unit": "radian-per-frame",
-        "domain": { "minimum": 0, "maximum": 0.04 },
+        "domain": { "minimum": 0, "maximum": 0.05 },
         "interpolation": { "kind": "LINEAR" },
         "default": 0
       },
@@ -172,7 +172,7 @@
         "classification": "preset",
         "storage": "binary32",
         "unit": "turn-per-frame",
-        "domain": { "minimum": -0.005, "maximum": 0.005 },
+        "domain": { "minimum": -0.02, "maximum": 0.02 },
         "interpolation": { "kind": "LINEAR" },
         "default": 0.00013
       },
@@ -193,7 +193,7 @@
         "storage": "binary32",
         "unit": "ratio",
         "domain": { "minimum": 0.015625, "maximum": 8 },
-        "interpolation": { "kind": "LINEAR" },
+        "interpolation": { "kind": "LOG_POSITIVE" },
         "default": 1
       },
       {
@@ -203,7 +203,7 @@
         "storage": "binary32",
         "unit": "ratio",
         "domain": { "minimum": 0.015625, "maximum": 8 },
-        "interpolation": { "kind": "LINEAR" },
+        "interpolation": { "kind": "LOG_POSITIVE" },
         "default": 0.997703135
       },
       {
@@ -253,7 +253,7 @@
         "storage": "binary32",
         "unit": "cycles",
         "domain": { "minimum": 1, "maximum": 32 },
-        "interpolation": { "kind": "LINEAR" },
+        "interpolation": { "kind": "LOG_POSITIVE" },
         "default": 1
       },
       {
@@ -323,7 +323,7 @@
         "storage": "binary32",
         "unit": "ratio",
         "domain": { "minimum": 0.015625, "maximum": 8 },
-        "interpolation": { "kind": "LINEAR" },
+        "interpolation": { "kind": "LOG_POSITIVE" },
         "default": 1.47215629
       },
       {
@@ -423,7 +423,7 @@
       }
     ],
     "serialization": {
-      "schema_version": 2,
+      "schema_version": 3,
       "fields": [
         "pattern-freq",
         "speed",

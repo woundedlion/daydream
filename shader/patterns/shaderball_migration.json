@@ -2,7 +2,9 @@
   "schema_version": 1,
   "legacy_alias": "ShaderBall",
   "authoring_effect": "Shader",
-  "retired_legacy_presets": [4],
+  "retired_legacy_presets": [
+    4
+  ],
   "source_documents": {
     "signal-weave": "signal_weave.shader.json",
     "kaleido-wave": "kaleido_wave.shader.json",
@@ -17,52 +19,229 @@
     "hex-wave": "hex_wave.shader.json",
     "equator-grid": "equator_grid.shader.json",
     "cosmic-eyeball": "cosmic_eyeball.shader.json",
-    "mobius-grid": "mobius_grid.shader.json"
+    "mobius-grid": "mobius_grid.shader.json",
+    "prism-spiral": "prism_spiral.shader.json"
   },
   "product_group": {
     "id": "shader-collection",
     "display_name": "Shader Collection",
     "total_device_seconds": 120,
     "children": [
-      { "effect_id": "signal-weave", "display_name": "Signal Weave", "seconds": 7 },
-      { "effect_id": "kaleido-wave", "display_name": "Kaleido Wave", "seconds": 7 },
-      { "effect_id": "alien-ocean", "display_name": "Alien Ocean", "seconds": 7 },
-      { "effect_id": "glitch-grid", "display_name": "Glitch Grid", "seconds": 6 },
-      { "effect_id": "facet-wave", "display_name": "Facet Wave", "seconds": 6 },
-      { "effect_id": "contour-lattice", "display_name": "Contour Lattice", "seconds": 6 },
-      { "effect_id": "curl-lattice", "display_name": "Curl Lattice", "seconds": 13 },
-      { "effect_id": "prism-lattice", "display_name": "Prism Lattice", "seconds": 6 },
-      { "effect_id": "vector-facets", "display_name": "Vector Facets", "seconds": 6 },
-      { "effect_id": "facet-grid", "display_name": "Facet Grid", "seconds": 19 },
-      { "effect_id": "hex-wave", "display_name": "Hex Wave", "seconds": 6 },
-      { "effect_id": "equator-grid", "display_name": "Equator Grid", "seconds": 19 },
-      { "effect_id": "cosmic-eyeball", "display_name": "Cosmic Eyeball", "seconds": 6 },
-      { "effect_id": "mobius-grid", "display_name": "Mobius Grid", "seconds": 6 }
+      {
+        "effect_id": "signal-weave",
+        "display_name": "Signal Weave",
+        "seconds": 7
+      },
+      {
+        "effect_id": "kaleido-wave",
+        "display_name": "Kaleido Wave",
+        "seconds": 7
+      },
+      {
+        "effect_id": "alien-ocean",
+        "display_name": "Alien Ocean",
+        "seconds": 7
+      },
+      {
+        "effect_id": "glitch-grid",
+        "display_name": "Glitch Grid",
+        "seconds": 6
+      },
+      {
+        "effect_id": "facet-wave",
+        "display_name": "Facet Wave",
+        "seconds": 6
+      },
+      {
+        "effect_id": "contour-lattice",
+        "display_name": "Contour Lattice",
+        "seconds": 6
+      },
+      {
+        "effect_id": "curl-lattice",
+        "display_name": "Curl Lattice",
+        "seconds": 13
+      },
+      {
+        "effect_id": "prism-lattice",
+        "display_name": "Prism Lattice",
+        "seconds": 6
+      },
+      {
+        "effect_id": "prism-spiral",
+        "display_name": "Prism Spiral",
+        "seconds": 6
+      },
+      {
+        "effect_id": "vector-facets",
+        "display_name": "Vector Facets",
+        "seconds": 6
+      },
+      {
+        "effect_id": "facet-grid",
+        "display_name": "Facet Grid",
+        "seconds": 19
+      },
+      {
+        "effect_id": "hex-wave",
+        "display_name": "Hex Wave",
+        "seconds": 6
+      },
+      {
+        "effect_id": "equator-grid",
+        "display_name": "Equator Grid",
+        "seconds": 13
+      },
+      {
+        "effect_id": "cosmic-eyeball",
+        "display_name": "Cosmic Eyeball",
+        "seconds": 6
+      },
+      {
+        "effect_id": "mobius-grid",
+        "display_name": "Mobius Grid",
+        "seconds": 6
+      }
     ]
   },
   "destinations": [
-    { "legacy_preset": 0, "effect_id": "signal-weave", "preset_id": "signal-weave", "pipeline": "GLITCH_NOISE_GRID_WAVE_SHEAR" },
-    { "legacy_preset": 1, "effect_id": "kaleido-wave", "preset_id": "twin-wave", "pipeline": "KALEIDOSCOPE_TWIN_WAVE_INNER_MIRROR" },
-    { "legacy_preset": 2, "effect_id": "alien-ocean", "preset_id": "folded-grid", "pipeline": "GNOMONIC_KALEIDOSCOPE_GRID_MIRROR" },
-    { "legacy_preset": 3, "effect_id": "glitch-grid", "preset_id": "folded-glitch", "pipeline": "GNOMONIC_GLITCH_GRID_MIRROR" },
-    { "legacy_preset": 5, "effect_id": "facet-wave", "preset_id": "wave-mirror", "pipeline": "GNOMONIC_DODECAHEDRAL_GRID_WAVE_MIRROR" },
-    { "legacy_preset": 6, "effect_id": "contour-lattice", "preset_id": "affine-contour", "pipeline": "GNOMONIC_AFFINE_LATTICE_CONTOUR" },
-    { "legacy_preset": 7, "effect_id": "curl-lattice", "preset_id": "open-curl", "pipeline": "SINUSOIDAL_CURL_LATTICE" },
-    { "legacy_preset": 8, "effect_id": "curl-lattice", "preset_id": "dense-curl", "pipeline": "SINUSOIDAL_CURL_LATTICE" },
-    { "legacy_preset": 9, "effect_id": "prism-lattice", "preset_id": "polar-wave", "pipeline": "STEREOGRAPHIC_PRISM_POLAR_WAVE_LATTICE" },
-    { "legacy_preset": 10, "effect_id": "vector-facets", "preset_id": "vector-mirror", "pipeline": "GNOMONIC_DODECAHEDRAL_GRID_VECTOR_MIRROR" },
-    { "legacy_preset": 11, "effect_id": "facet-grid", "preset_id": "coupled-grid", "pipeline": "STEREOGRAPHIC_DODECAHEDRAL_GRID_INNER_MIRROR" },
-    { "legacy_preset": 12, "effect_id": "hex-wave", "preset_id": "hex-twin-wave", "pipeline": "STEREOGRAPHIC_HEXAGONAL_PRISM_TWIN_WAVE_INNER_MIRROR" },
-    { "legacy_preset": 13, "effect_id": "facet-grid", "preset_id": "direct-grid", "pipeline": "STEREOGRAPHIC_DODECAHEDRAL_GRID_INNER_MIRROR" },
-    { "legacy_preset": 14, "effect_id": "facet-grid", "preset_id": "double-map", "pipeline": "STEREOGRAPHIC_DODECAHEDRAL_GRID_INNER_MIRROR" },
-    { "legacy_preset": 15, "effect_id": "equator-grid", "preset_id": "double-map", "pipeline": "EQUIRECTANGULAR_DODECAHEDRAL_GRID_INNER_MIRROR" },
-    { "legacy_preset": 16, "effect_id": "equator-grid", "preset_id": "open-grid", "pipeline": "EQUIRECTANGULAR_DODECAHEDRAL_GRID_INNER_MIRROR" },
-    { "legacy_preset": 17, "effect_id": "equator-grid", "preset_id": "fine-grid", "pipeline": "EQUIRECTANGULAR_DODECAHEDRAL_GRID_INNER_MIRROR" },
-    { "legacy_preset": 18, "effect_id": "cosmic-eyeball", "preset_id": "mirrored-grid", "pipeline": "STEREOGRAPHIC_GLITCH_GRID_MIRROR" },
-    { "legacy_preset": 19, "effect_id": "mobius-grid", "preset_id": "mobius-grid", "pipeline": "STEREOGRAPHIC_MOBIUS_TWIN_WAVE_INNER_MIRROR" },
-    { "legacy_preset": 20, "effect_id": "mobius-grid", "preset_id": "mobius-grid-2", "pipeline": "STEREOGRAPHIC_MOBIUS_TWIN_WAVE_INNER_MIRROR" },
-    { "legacy_preset": 21, "effect_id": "signal-weave", "preset_id": "signal-weave-2", "pipeline": "GLITCH_NOISE_GRID_WAVE_SHEAR" },
-    { "legacy_preset": 22, "effect_id": "signal-weave", "preset_id": "signal-weave-3", "pipeline": "GLITCH_NOISE_GRID_WAVE_SHEAR" },
-    { "legacy_preset": 23, "effect_id": "signal-weave", "preset_id": "signal-weave-4", "pipeline": "GLITCH_NOISE_GRID_WAVE_SHEAR" }
+    {
+      "legacy_preset": 0,
+      "effect_id": "signal-weave",
+      "preset_id": "signal-weave",
+      "pipeline": "GLITCH_NOISE_GRID_WAVE_SHEAR"
+    },
+    {
+      "legacy_preset": 1,
+      "effect_id": "kaleido-wave",
+      "preset_id": "twin-wave",
+      "pipeline": "KALEIDOSCOPE_TWIN_WAVE_INNER_MIRROR"
+    },
+    {
+      "legacy_preset": 2,
+      "effect_id": "alien-ocean",
+      "preset_id": "folded-grid",
+      "pipeline": "GNOMONIC_KALEIDOSCOPE_GRID_MIRROR"
+    },
+    {
+      "legacy_preset": 3,
+      "effect_id": "glitch-grid",
+      "preset_id": "folded-glitch",
+      "pipeline": "GNOMONIC_GLITCH_GRID_MIRROR"
+    },
+    {
+      "legacy_preset": 5,
+      "effect_id": "facet-wave",
+      "preset_id": "wave-mirror",
+      "pipeline": "GNOMONIC_DODECAHEDRAL_GRID_WAVE_MIRROR"
+    },
+    {
+      "legacy_preset": 6,
+      "effect_id": "contour-lattice",
+      "preset_id": "affine-contour",
+      "pipeline": "GNOMONIC_AFFINE_LATTICE_CONTOUR"
+    },
+    {
+      "legacy_preset": 7,
+      "effect_id": "curl-lattice",
+      "preset_id": "open-curl",
+      "pipeline": "SINUSOIDAL_CURL_LATTICE"
+    },
+    {
+      "legacy_preset": 8,
+      "effect_id": "curl-lattice",
+      "preset_id": "dense-curl",
+      "pipeline": "SINUSOIDAL_CURL_LATTICE"
+    },
+    {
+      "legacy_preset": 9,
+      "effect_id": "prism-lattice",
+      "preset_id": "polar-wave",
+      "pipeline": "STEREOGRAPHIC_PRISM_POLAR_WAVE_LATTICE"
+    },
+    {
+      "legacy_preset": 10,
+      "effect_id": "vector-facets",
+      "preset_id": "vector-mirror",
+      "pipeline": "GNOMONIC_DODECAHEDRAL_GRID_VECTOR_MIRROR"
+    },
+    {
+      "legacy_preset": 11,
+      "effect_id": "facet-grid",
+      "preset_id": "coupled-grid",
+      "pipeline": "STEREOGRAPHIC_DODECAHEDRAL_GRID_INNER_MIRROR"
+    },
+    {
+      "legacy_preset": 12,
+      "effect_id": "hex-wave",
+      "preset_id": "hex-twin-wave",
+      "pipeline": "STEREOGRAPHIC_HEXAGONAL_PRISM_TWIN_WAVE_INNER_MIRROR"
+    },
+    {
+      "legacy_preset": 13,
+      "effect_id": "facet-grid",
+      "preset_id": "direct-grid",
+      "pipeline": "STEREOGRAPHIC_DODECAHEDRAL_GRID_INNER_MIRROR"
+    },
+    {
+      "legacy_preset": 14,
+      "effect_id": "facet-grid",
+      "preset_id": "double-map",
+      "pipeline": "STEREOGRAPHIC_DODECAHEDRAL_GRID_INNER_MIRROR"
+    },
+    {
+      "legacy_preset": 15,
+      "effect_id": "equator-grid",
+      "preset_id": "double-map",
+      "pipeline": "EQUIRECTANGULAR_DODECAHEDRAL_GRID_INNER_MIRROR"
+    },
+    {
+      "legacy_preset": 16,
+      "effect_id": "equator-grid",
+      "preset_id": "open-grid",
+      "pipeline": "EQUIRECTANGULAR_DODECAHEDRAL_GRID_INNER_MIRROR"
+    },
+    {
+      "legacy_preset": 17,
+      "effect_id": "equator-grid",
+      "preset_id": "fine-grid",
+      "pipeline": "EQUIRECTANGULAR_DODECAHEDRAL_GRID_INNER_MIRROR"
+    },
+    {
+      "legacy_preset": 18,
+      "effect_id": "cosmic-eyeball",
+      "preset_id": "mirrored-grid",
+      "pipeline": "STEREOGRAPHIC_GLITCH_GRID_MIRROR"
+    },
+    {
+      "legacy_preset": 19,
+      "effect_id": "mobius-grid",
+      "preset_id": "mobius-grid",
+      "pipeline": "STEREOGRAPHIC_MOBIUS_TWIN_WAVE_INNER_MIRROR"
+    },
+    {
+      "legacy_preset": 20,
+      "effect_id": "mobius-grid",
+      "preset_id": "mobius-grid-2",
+      "pipeline": "STEREOGRAPHIC_MOBIUS_TWIN_WAVE_INNER_MIRROR"
+    },
+    {
+      "legacy_preset": 21,
+      "effect_id": "signal-weave",
+      "preset_id": "signal-weave-2",
+      "pipeline": "GLITCH_NOISE_GRID_WAVE_SHEAR"
+    },
+    {
+      "legacy_preset": 22,
+      "effect_id": "signal-weave",
+      "preset_id": "signal-weave-3",
+      "pipeline": "GLITCH_NOISE_GRID_WAVE_SHEAR"
+    },
+    {
+      "legacy_preset": 23,
+      "effect_id": "signal-weave",
+      "preset_id": "signal-weave-4",
+      "pipeline": "GLITCH_NOISE_GRID_WAVE_SHEAR"
+    }
   ]
 }
