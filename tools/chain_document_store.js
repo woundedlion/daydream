@@ -132,6 +132,8 @@ export async function createChainDocumentStore({
   const undoStack = [];
   /** @type {Object[]} */
   const redoStack = [];
+  /** @type {string|null} Coalesce key the newest undo entry was opened under. */
+  let coalesceKey = null;
 
   /** @returns {ChainEntry[]} */
   const chain = () => doc.descriptor.chain;
@@ -161,12 +163,16 @@ export async function createChainDocumentStore({
    * Validates a candidate and, when green, makes it current under one undo
    * entry. A refused candidate is discarded whole.
    * @param {*} candidate - The reconciled document to adopt.
+   * @param {string|null} [coalesce] - Control key consecutive commits share one
+   *   undo entry under, so a slider drag's stream of writes is undone whole.
+   *   Null for a structural edit, which also ends any open run.
    * @returns {EditResult} The outcome.
    */
-  const commit = (candidate) => {
+  const commit = (candidate, coalesce = null) => {
     const diagnostics = diagnosticsOf(candidate);
     if (diagnostics.length > 0) return { ok: false, diagnostics };
-    undoStack.push(doc);
+    if (coalesce === null || coalesce !== coalesceKey) undoStack.push(doc);
+    coalesceKey = coalesce;
     redoStack.length = 0;
     doc = candidate;
     pruneSession();
@@ -428,6 +434,32 @@ export async function createChainDocumentStore({
     return result;
   };
 
+  /**
+   * Writes one preset's value for one parameter through the same validator and
+   * the same history as a structural edit: a parameter-dock edit is a document
+   * edit, and the engine write is its side effect. Consecutive writes to the
+   * same control collapse into one undo entry, so undoing a drag restores the
+   * value the run started from; any other edit, undo or redo ends the run.
+   * @param {string} presetId - The preset the value belongs to.
+   * @param {string} parameterId - A declared `<label>.<field>` parameter id.
+   * @param {*} value - The value to store; an enum8 takes its option id.
+   * @returns {EditResult} The outcome; a refusal leaves the store untouched.
+   */
+  const setPresetValue = (presetId, parameterId, value) => {
+    const index = doc.preset_bank.presets.findIndex(
+      (/** @type {{preset_id: string}} */ preset) => preset.preset_id === presetId);
+    if (index < 0)
+      return refusal('UNKNOWN_PRESET', '$.preset_bank.presets',
+        `the preset bank carries no preset "${presetId}"`);
+    if (!doc.descriptor.parameters.some(
+      (/** @type {{id: string}} */ parameter) => parameter.id === parameterId))
+      return refusal('UNKNOWN_PARAMETER', '$.descriptor.parameters',
+        `the document declares no parameter "${parameterId}"`);
+    const candidate = structuredClone(doc);
+    candidate.preset_bank.presets[index].values[parameterId] = value;
+    return commit(candidate, `${presetId} ${parameterId}`);
+  };
+
   return {
     /** @returns {*} An isolated copy of the current (always-valid) document. */
     document: () => structuredClone(doc),
@@ -500,6 +532,7 @@ export async function createChainDocumentStore({
 
     replaceSpan,
     relabel,
+    setPresetValue,
 
     /** @returns {boolean} Whether a structural edit can be undone. */
     canUndo: () => undoStack.length > 0,
@@ -518,6 +551,7 @@ export async function createChainDocumentStore({
       if (previous === undefined) return false;
       redoStack.push(doc);
       doc = previous;
+      coalesceKey = null;
       pruneSession();
       return true;
     },
@@ -528,6 +562,7 @@ export async function createChainDocumentStore({
       if (next === undefined) return false;
       undoStack.push(doc);
       doc = next;
+      coalesceKey = null;
       pruneSession();
       return true;
     },

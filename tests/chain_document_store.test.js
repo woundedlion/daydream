@@ -309,6 +309,82 @@ test('bypass is pruned by removal and not restored by undo', async () => {
   assert.deepEqual(store.bypassedLabels(), []);
 });
 
+const presetValue = (store, presetId, parameterId) => store.document()
+  .preset_bank.presets.find((preset) => preset.preset_id === presetId)
+  .values[parameterId];
+
+test('a preset value write lands in the document and is validated', async () => {
+  const store = await makeStore();
+  const untouched = presetValue(store, 'hex-twin-wave-alt', 'sample.pattern-freq');
+  assert.equal(store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 7).ok, true);
+  assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'), 7);
+  assert.equal(presetValue(store, 'hex-twin-wave-alt', 'sample.pattern-freq'), untouched,
+    'the write names one preset, never the bank');
+  assert.equal(store.setPresetValue('hex-twin-wave', 'colorize.palette-mapping', 'bell').ok,
+    true);
+  assert.equal(presetValue(store, 'hex-twin-wave', 'colorize.palette-mapping'), 'bell');
+  assertGreen(store);
+});
+
+test('a write outside the parameter domain leaves the store untouched', async () => {
+  const store = await makeStore();
+  const before = store.document();
+
+  const wide = store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 500);
+  assert.equal(wide.ok, false);
+  assert.equal(wide.diagnostics[0].code, 'VALUE_OUT_OF_RANGE');
+  const option = store.setPresetValue('hex-twin-wave', 'colorize.palette-mapping', 'plaid');
+  assert.equal(option.diagnostics[0].code, 'INVALID_ENUM_VALUE');
+  assert.equal(store.setPresetValue('dawn', 'sample.pattern-freq', 2).diagnostics[0].code,
+    'UNKNOWN_PRESET');
+  assert.equal(store.setPresetValue('hex-twin-wave', 'sample.nope', 2).diagnostics[0].code,
+    'UNKNOWN_PARAMETER');
+  assert.deepEqual(store.document(), before);
+  assert.equal(store.canUndo(), false);
+});
+
+// A drag emits an onChange per pointermove: the run is one undo step, and undo
+// restores the value the control held before the drag started.
+test('consecutive writes to one control coalesce into one undo step', async () => {
+  const store = await makeStore();
+  const opening = presetValue(store, 'hex-twin-wave', 'sample.pattern-freq');
+  for (const value of [2, 3, 4, 5]) {
+    assert.equal(store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', value).ok, true);
+  }
+  assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'), 5);
+
+  assert.equal(store.undo(), true);
+  assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'), opening);
+  assert.equal(store.canUndo(), false);
+  assert.equal(store.redo(), true);
+  assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'), 5);
+});
+
+test('another control, a structural edit, an undo or a redo ends the run', async () => {
+  const store = await makeStore();
+  assert.equal(store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 2).ok, true);
+  assert.equal(store.setPresetValue('hex-twin-wave', 'camera.wander', 0.5).ok, true);
+  assert.equal(store.setPresetValue('hex-twin-wave-alt', 'camera.wander', 0.25).ok, true);
+  assert.equal(store.undo(), true);
+  assert.equal(store.undo(), true);
+  assert.equal(store.undo(), true);
+  assert.equal(store.canUndo(), false);
+
+  assert.equal(store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 3).ok, true);
+  assert.equal(store.replaceSpan(WARP, 0, [{ operator: 'warp.wave-shear.v2' }]).ok, true);
+  assert.equal(store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 4).ok, true);
+  assert.equal(store.undo(), true);
+  assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'), 3);
+  assert.equal(labels(store).includes('warp1'), true,
+    'the structural edit opened its own entry and survives the value undo');
+
+  assert.equal(store.redo(), true);
+  assert.equal(store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 6).ok, true);
+  assert.equal(store.undo(), true);
+  assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'), 4,
+    'a redo ends the run, so the write after it opens a new entry');
+});
+
 test('legality lists every operator with reasons for the illegal', async () => {
   const store = await makeStore();
   const gap = store.legalInsertions(WARP);
