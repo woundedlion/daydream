@@ -4,7 +4,6 @@ import { readFileSync } from 'node:fs';
 
 import { shaderWorkbenchUrl, start } from '../daydream.js';
 import {
-  applyDynamicShaderDocument,
   applyFixedShaderDocument,
   createShaderDocumentController,
   engineParameterName,
@@ -49,45 +48,50 @@ test('simulator exposes Shader as a standalone tool', () => {
 test('v2 document parameter IDs map to pre-spec promoted controls', () => {
   assert.equal(engineParameterName('sample.pattern-freq'), 'Pattern Freq');
   assert.equal(engineParameterName('sample.angle-speed'), 'Source Angle Speed');
-  assert.equal(engineParameterName('sample.edge-width'), 'Edge Fade Width');
   assert.equal(engineParameterName('warp1.cell-x'), 'Planar Warp 1 Cell X');
   assert.equal(engineParameterName('warp2.speed'), 'Planar Warp 2 Speed');
-  assert.equal(engineParameterName('project.pole-fade'), 'Pole Fade');
-  assert.equal(engineParameterName('project.camera-wander'), 'Camera Wander');
+  assert.equal(engineParameterName('camera.wander'), 'Camera Wander');
   assert.equal(engineParameterName('surface.scale'), 'Surface Noise Scale');
-  assert.equal(engineParameterName('lens.a-re'), 'Mobius A Re');
-  assert.equal(engineParameterName('transfer.iso-level'), 'Iso Contour Level');
+});
+
+/** @param {string} field The plain Title Case control name an alias-free label yields. */
+const plainName = (field) => field.split('-').map((part) => part.length === 0
+  ? part : part[0].toUpperCase() + part.slice(1)).join(' ');
+
+// A label outside the alias set maps to the plain Title Case of its field, so
+// a newly promoted document needs no table entry to land on its controls.
+test('labels outside the alias table need no entry', () => {
+  assert.equal(engineParameterName('project.pole-fade'), 'Pole Fade');
+  assert.equal(engineParameterName('lens.mobius-a-re'), 'Mobius A Re');
+  assert.equal(engineParameterName('transfer.iso-level'), 'Iso Level');
   assert.equal(engineParameterName('colorize.palette-mapping'), 'Palette Mapping');
-  assert.equal(engineParameterName('colorize.hue-shift-amount'), 'Hue Shift Amount');
+  assert.equal(engineParameterName('halo.glow-strength'), 'Glow Strength');
+  assert.equal(engineParameterName('no-dot-id'), 'No Dot Id');
+});
+
+// Convergence pin: across every shipped pattern document, the labels whose
+// mapping differs from the plain field spelling stay this frozen set. A new
+// label showing up here means an alias entry crept in for a post-spec effect.
+test('the alias table keys stay frozen to the pre-spec promoted labels', () => {
+  const migration = JSON.parse(readFileSync(
+    new URL('../shader/patterns/shaderball_migration.json', import.meta.url), 'utf8'));
+  const aliased = new Set();
+  for (const filename of Object.values(migration.source_documents)) {
+    const doc = JSON.parse(readFileSync(
+      new URL(`../shader/patterns/${filename}`, import.meta.url), 'utf8'));
+    for (const preset of doc.preset_bank.presets) {
+      for (const id of Object.keys(preset.values ?? {})) {
+        const dot = id.indexOf('.');
+        if (engineParameterName(id) !== plainName(id.slice(dot + 1)))
+          aliased.add(id.slice(0, dot));
+      }
+    }
+  }
+  assert.deepEqual([...aliased].sort(),
+    ['camera', 'sample', 'surface', 'warp1', 'warp2']);
 });
 
 const MODULE = { ParamSetResult };
-
-/** @param {(name: string) => Object} answer */
-function dynamicEngine(answer) {
-  const definitions = [{ name: 'Pattern Freq' }];
-  const writes = [];
-  return {
-    writes,
-    getParameterDefinitions: () => definitions,
-    setParameter: (name, value) => { writes.push([name, value]); return answer(name); },
-  };
-}
-
-// A chain document previews through tools/chain_apply.js over setShaderChain;
-// the legacy six-role body refuses it before touching the engine.
-test('a chain document is refused by the legacy six-role path', () => {
-  const engine = dynamicEngine(() => ParamSetResult.APPLIED);
-  const compiled = { document: {
-    descriptor: { chain: [{ label: 'camera', operator: 'sphere.rotate.v2' }] },
-    preset_bank: { presets: [{ preset_id: 'study', values: {} }] },
-  } };
-
-  const refusal = applyDynamicShaderDocument(engine, MODULE, compiled, 'study');
-  assert.equal(typeof refusal, 'string');
-  assert.match(refusal, /legacy six-role path/);
-  assert.deepEqual(engine.writes, []);
-});
 
 const fixedDocument = () => ({ document: {
   preset_bank: { presets: [
@@ -114,7 +118,6 @@ function fixedEngine(answer) {
 
 test('the shader-document engine fakes mock nothing outside the engine surface', () => {
   assert.deepEqual(unpinnedEngineMethods(fixedEngine(() => true)), []);
-  assert.deepEqual(unpinnedEngineMethods(dynamicEngine(() => ParamSetResult.APPLIED)), []);
 });
 
 // The writes also pin the topology skip: sample.weight-mode selects a baked

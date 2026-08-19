@@ -20,9 +20,8 @@ const CHAIN_EFFECT = 'ShaderChain';
 // effect bakes its variants in, so the fixed path skips them; palette-mapping
 // stays live as an ordinary dropdown.
 const TOPOLOGY_FIELDS = new Set([
-  'weight-mode', 'coverage-mode', 'envelope', 'basis', 'integrator', 'symmetry',
-  'mode', 'harmonic', 'hemisphere', 'palette-mode', 'hue-shift-mode',
-  'brightness-envelope',
+  'weight-mode', 'coverage-mode', 'basis', 'integrator', 'symmetry', 'mode',
+  'hemisphere', 'palette-mode', 'hue-shift-mode', 'brightness-envelope',
 ]);
 
 /** @param {string} parameterId */
@@ -31,67 +30,6 @@ const fieldSegment = (parameterId) =>
 
 /** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[]}} ParameterDefinition */
 /** @typedef {{document: *, descriptor_digest?: string, diagnostics?: *, status?: string}} CompiledDocument */
-
-const STRUCTURAL_OPTIONS = Object.freeze({
-  Function: Object.freeze({
-    'twin-wave': 'Twin Wave',
-    grid: 'Grid',
-    'primitive-lattice': 'Primitive Lattice',
-  }),
-  Projection: Object.freeze({
-    'folded-sinusoidal': 'Folded Sinusoidal',
-    stereographic: 'Stereographic',
-    'gnomonic-folded': 'Gnomonic',
-    equirectangular: 'Equirectangular',
-  }),
-  'Surface Noise': Object.freeze({
-    identity: 'None',
-    'curl-noise-simplex-euler': 'Curl',
-  }),
-  Lens: Object.freeze({
-    identity: 'None',
-    glitch: 'Glitch',
-    kaleidoscope: 'Kaleidoscope (Azimuthal 6-fold)',
-    mobius: 'Mobius',
-    'dodecahedral-kaleidoscope': 'Kaleidoscope (Dodecahedral / Icosahedral)',
-    'triangular-prism-kaleidoscope': 'Kaleidoscope (Triangular Prism)',
-    'pentagonal-prism-kaleidoscope': 'Kaleidoscope (Pentagonal Prism)',
-    'hexagonal-prism-kaleidoscope': 'Kaleidoscope (Hexagonal Prism)',
-  }),
-  'Planar Warp 1': Object.freeze({
-    identity: 'None',
-    'affine-frame': 'Affine Frame',
-    'wave-shear': 'Wave Shear',
-    'vector-noise-simplex': 'Projected Vector Noise',
-    'mirror-tile': 'Mirror Tile',
-    'polar-chart-linear': 'Polar Chart',
-  }),
-  'Planar Warp 2': Object.freeze({
-    identity: 'None',
-    'affine-frame': 'Affine Frame',
-    'wave-shear': 'Wave Shear',
-    'vector-noise-simplex': 'Projected Vector Noise',
-    'mirror-tile': 'Mirror Tile',
-    'polar-chart-linear': 'Polar Chart',
-  }),
-  'Signal Weight': Object.freeze({ projection: 'Projection' }),
-  'Value Transfer': Object.freeze({ linear: 'Linear', 'iso-contour': 'Iso Contour' }),
-  Coverage: Object.freeze({
-    opaque: 'Opaque',
-    projection: 'Projection Weight',
-    'projection-squared': 'Projection Weight Squared',
-    'edge-fade': 'Edge Fade',
-  }),
-  Palette: Object.freeze({
-    'generated-palette': 'Generated Triadic',
-    generated_palette: 'Generated Triadic',
-  }),
-  'Hue Shift Mode': Object.freeze({
-    noise: 'Noise',
-    'path-length': 'Total Warp Displacement',
-  }),
-  'Brightness Envelope': Object.freeze({ none: 'None', cup: 'Cup' }),
-});
 
 /** @param {string} value */
 function titleWords(value) {
@@ -114,25 +52,8 @@ export function engineParameterName(parameterId) {
   if (label === 'warp1') return `Planar Warp 1 ${titleWords(field)}`;
   if (label === 'warp2') return `Planar Warp 2 ${titleWords(field)}`;
   if (label === 'surface') return `Surface Noise ${titleWords(field)}`;
-  if (label === 'lens') return `Mobius ${titleWords(field)}`;
-  if (label === 'sample') {
-    const aliases = /** @type {Record<string, string>} */ ({
-      'angle-speed': 'Source Angle Speed',
-      'edge-width': 'Edge Fade Width',
-      'noise-scale': 'Source Noise Scale',
-      'noise-contrast': 'Source Noise Contrast',
-      'noise-speed': 'Source Noise Speed',
-    });
-    return aliases[field] ?? titleWords(field);
-  }
-  if (label === 'transfer' || label === 'cutout') {
-    const aliases = /** @type {Record<string, string>} */ ({
-      'iso-level': 'Iso Contour Level',
-      'iso-width': 'Iso Contour Width',
-      'edge-width': 'Edge Fade Width',
-    });
-    return aliases[field] ?? titleWords(field);
-  }
+  if (label === 'camera') return `Camera ${titleWords(field)}`;
+  if (label === 'sample' && field === 'angle-speed') return 'Source Angle Speed';
   return titleWords(field);
 }
 
@@ -154,12 +75,6 @@ function engineParameterNames(parameterId) {
     if (['Strength', 'Frequency', 'Field Angle', 'Scale', 'Vector Angle'].includes(suffix))
       return [primary, `Warp ${suffix}`];
     return [primary, suffix];
-  }
-  if (label === 'sample' && field === 'edge-width') return [primary, 'Edge Width'];
-  if (label === 'transfer' || label === 'cutout') {
-    if (field === 'iso-level') return [primary, 'Iso Level'];
-    if (field === 'iso-width') return [primary, 'Iso Width'];
-    if (field === 'edge-width') return [primary, 'Edge Width'];
   }
   return [primary];
 }
@@ -242,53 +157,6 @@ export function applyFixedShaderDocument(engine, module, compiled, presetId,
   if (typeof referenceId !== 'string') return 'the effect has no reference preset';
   if (engine.selectPresetById?.(referenceId) !== true)
     return `the engine refused reference preset "${referenceId}"`;
-  return applyDocumentValues(engine, module, compiled, presetId);
-}
-
-/**
- * Applies a legacy six-role document to ShaderBall's structural dropdowns. A
- * v2 chain document never previews here: its dynamic path is
- * tools/chain_apply.js over setShaderChain. This body only serves a
- * pre-expansion v1 compile, which the single-code-path compiler no longer
- * produces.
- * @param {*} engine @param {*} module @param {CompiledDocument} compiled
- * @param {string} presetId
- * @returns {string|null} Refusal reason, or null once applied.
- */
-export function applyDynamicShaderDocument(engine, module, compiled, presetId) {
-  if (compiled.document.descriptor?.chain !== undefined ||
-      compiled.document.descriptor?.graph === undefined)
-    return 'a chain document previews through the chain engine, not the legacy six-role path';
-  const nodes = new Map(compiled.document.descriptor.graph.nodes
-    .map((/** @type {*} */ node) => [node.role, node]));
-  const surface = nodes.get('surface_project')?.policy ?? {};
-  const warp = nodes.get('planar_warp')?.policy?.sequence ?? ['identity', 'identity'];
-  const material = nodes.get('material')?.policy ?? {};
-  const color = nodes.get('color')?.policy ?? {};
-  const source = nodes.get('source')?.policy ?? {};
-  const requested = {
-    Function: source.source,
-    Projection: surface.projection,
-    'Surface Noise': surface.pre_lens_surface,
-    Lens: surface.lens,
-    'Planar Warp 1': warp[0],
-    'Planar Warp 2': warp[1],
-    'Signal Weight': material.weight,
-    'Value Transfer': material.transfer,
-    Coverage: material.coverage,
-    Palette: color.color,
-    'Hue Shift Mode': color.hue_mode,
-    'Brightness Envelope': color.brightness_envelope,
-  };
-  for (const [name, policy] of Object.entries(requested)) {
-    const options = /** @type {Record<string, string>|undefined} */ (
-      /** @type {Record<string, *>} */ (STRUCTURAL_OPTIONS)[name]);
-    const label = options?.[policy];
-    if (!label) continue;
-    const definitions = engine.getParameterDefinitions();
-    const refusal = writeEngineValue(engine, module, definitions, name, label);
-    if (refusal) return refusal;
-  }
   return applyDocumentValues(engine, module, compiled, presetId);
 }
 
