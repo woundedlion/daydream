@@ -22,3 +22,9 @@ docs/screenshots/**        binary
 
 # Git hooks are sourced by /bin/sh; CRLF would break the shebang on checkout.
 .githooks/**               text eol=lf
+
+# The v2 pattern documents and the digest-migration table are pinned
+# byte-identical to the compiler's canonical export, which emits LF; the
+# catalog joins them so the engine-emitted replacement diffs cleanly.
+shader/engine_catalog.json text eol=lf
+shader/patterns/**         text eol=lf

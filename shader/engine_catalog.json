@@ -1,0 +1,2206 @@
+{
+  "provisional": true,
+  "catalog_version": 2,
+  "budgets": {
+    "max_chain_ops": 32,
+    "arena_bytes": 98304,
+    "max_params": 224,
+    "max_instance_id_length": 47,
+    "per_op_overhead_bytes": 64
+  },
+  "carriers": [
+    "sphere",
+    "plane",
+    "field",
+    "color"
+  ],
+  "operators": [
+    {
+      "id": "sphere.rotate.v2",
+      "name": "Rotate",
+      "input": "sphere",
+      "output": "sphere",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "wander",
+          "name": "Camera Wander",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "spin-speed",
+          "name": "Camera Spin Speed",
+          "min": 0,
+          "max": 0.05,
+          "default": 0,
+          "curve": "LERP"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "sphere.displace.curl.v2",
+      "name": "Curl Displace",
+      "input": "sphere",
+      "output": "sphere",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "scale",
+          "name": "Surface Noise Scale",
+          "min": 0.015625,
+          "max": 64,
+          "default": 1,
+          "curve": "LERP"
+        },
+        {
+          "id": "strength",
+          "name": "Surface Noise Strength",
+          "min": -0.5,
+          "max": 0.5,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "speed",
+          "name": "Surface Noise Speed",
+          "min": -0.015625,
+          "max": 0.015625,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "basis",
+          "topology": true,
+          "values": [
+            "simplex",
+            "fbm3",
+            "ridged3"
+          ],
+          "default": "simplex"
+        },
+        {
+          "id": "integrator",
+          "topology": true,
+          "values": [
+            "euler",
+            "midpoint",
+            "midpoint-2x"
+          ],
+          "default": "euler"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "sphere.displace.direct.v2",
+      "name": "Direct Displace",
+      "input": "sphere",
+      "output": "sphere",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "scale",
+          "name": "Surface Noise Scale",
+          "min": 0.015625,
+          "max": 64,
+          "default": 1,
+          "curve": "LERP"
+        },
+        {
+          "id": "strength",
+          "name": "Surface Noise Strength",
+          "min": 0,
+          "max": 0.5,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "speed",
+          "name": "Surface Noise Speed",
+          "min": -0.015625,
+          "max": 0.015625,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "direction",
+          "name": "Surface Noise Direction",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "basis",
+          "topology": true,
+          "values": [
+            "simplex",
+            "fbm3",
+            "ridged3"
+          ],
+          "default": "simplex"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "sphere.lens.glitch.v2",
+      "name": "Glitch Lens",
+      "input": "sphere",
+      "output": "sphere",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [],
+      "approximate": false
+    },
+    {
+      "id": "sphere.lens.twist.v2",
+      "name": "Twist Lens",
+      "input": "sphere",
+      "output": "sphere",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [],
+      "approximate": false
+    },
+    {
+      "id": "sphere.lens.mobius.v2",
+      "name": "Mobius Lens",
+      "input": "sphere",
+      "output": "sphere",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "a-re",
+          "name": "Mobius A Re",
+          "min": -4,
+          "max": 4,
+          "default": 0.7071067811865476,
+          "curve": "LERP"
+        },
+        {
+          "id": "a-im",
+          "name": "Mobius A Im",
+          "min": -4,
+          "max": 4,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "b-re",
+          "name": "Mobius B Re",
+          "min": -4,
+          "max": 4,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "b-im",
+          "name": "Mobius B Im",
+          "min": -4,
+          "max": 4,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "c-re",
+          "name": "Mobius C Re",
+          "min": -4,
+          "max": 4,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "c-im",
+          "name": "Mobius C Im",
+          "min": -4,
+          "max": 4,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "d-re",
+          "name": "Mobius D Re",
+          "min": -4,
+          "max": 4,
+          "default": 0.7071067811865476,
+          "curve": "LERP"
+        },
+        {
+          "id": "d-im",
+          "name": "Mobius D Im",
+          "min": -4,
+          "max": 4,
+          "default": 0,
+          "curve": "LERP"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "sphere.lens.kaleidoscope.v2",
+      "name": "Kaleidoscope Lens",
+      "input": "sphere",
+      "output": "sphere",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "symmetry",
+          "topology": true,
+          "values": [
+            "azimuthal",
+            "tetrahedral",
+            "octahedral",
+            "dodecahedral",
+            "triangular-prism",
+            "square-prism",
+            "pentagonal-prism",
+            "hexagonal-prism",
+            "octagonal-prism"
+          ],
+          "default": "azimuthal"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "project.stereographic.v2",
+      "name": "Stereographic",
+      "input": "sphere",
+      "output": "plane",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "pole-fade",
+          "name": "Pole Fade",
+          "min": 1,
+          "max": 20,
+          "default": 1,
+          "curve": "LERP"
+        },
+        {
+          "id": "projection-spin-speed",
+          "name": "Projection Spin Speed",
+          "min": 0,
+          "max": 0.05,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "projection-wander",
+          "name": "Projection Wander",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "camera-wander",
+          "name": "Camera Wander",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "central-meridian",
+          "name": "Central Meridian",
+          "min": 0,
+          "max": 6.2831854820251465,
+          "default": 0,
+          "curve": "SHORTEST_PERIODIC"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "project.folded-sinusoidal.v2",
+      "name": "Folded Sinusoidal",
+      "input": "sphere",
+      "output": "plane",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "pole-fade",
+          "name": "Pole Fade",
+          "min": 1,
+          "max": 20,
+          "default": 1,
+          "curve": "LERP"
+        },
+        {
+          "id": "projection-spin-speed",
+          "name": "Projection Spin Speed",
+          "min": 0,
+          "max": 0.05,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "projection-wander",
+          "name": "Projection Wander",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "camera-wander",
+          "name": "Camera Wander",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "central-meridian",
+          "name": "Central Meridian",
+          "min": 0,
+          "max": 6.2831854820251465,
+          "default": 0,
+          "curve": "SHORTEST_PERIODIC"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "project.equirectangular.v2",
+      "name": "Equirectangular",
+      "input": "sphere",
+      "output": "plane",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "pole-fade",
+          "name": "Pole Fade",
+          "min": 1,
+          "max": 20,
+          "default": 1,
+          "curve": "LERP"
+        },
+        {
+          "id": "projection-spin-speed",
+          "name": "Projection Spin Speed",
+          "min": 0,
+          "max": 0.05,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "projection-wander",
+          "name": "Projection Wander",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "camera-wander",
+          "name": "Camera Wander",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "central-meridian",
+          "name": "Central Meridian",
+          "min": 0,
+          "max": 6.2831854820251465,
+          "default": 0,
+          "curve": "SHORTEST_PERIODIC"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "project.gnomonic.v2",
+      "name": "Gnomonic",
+      "input": "sphere",
+      "output": "plane",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "pole-fade",
+          "name": "Pole Fade",
+          "min": 1,
+          "max": 20,
+          "default": 1,
+          "curve": "LERP"
+        },
+        {
+          "id": "projection-spin-speed",
+          "name": "Projection Spin Speed",
+          "min": 0,
+          "max": 0.05,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "projection-wander",
+          "name": "Projection Wander",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "camera-wander",
+          "name": "Camera Wander",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "central-meridian",
+          "name": "Central Meridian",
+          "min": 0,
+          "max": 6.2831854820251465,
+          "default": 0,
+          "curve": "SHORTEST_PERIODIC"
+        },
+        {
+          "id": "hemisphere",
+          "topology": true,
+          "values": [
+            "folded",
+            "front",
+            "back"
+          ],
+          "default": "folded"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "project.peirce.v2",
+      "name": "Peirce",
+      "input": "sphere",
+      "output": "plane",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "pole-fade",
+          "name": "Pole Fade",
+          "min": 1,
+          "max": 20,
+          "default": 1,
+          "curve": "LERP"
+        },
+        {
+          "id": "projection-spin-speed",
+          "name": "Projection Spin Speed",
+          "min": 0,
+          "max": 0.05,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "projection-wander",
+          "name": "Projection Wander",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "camera-wander",
+          "name": "Camera Wander",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "central-meridian",
+          "name": "Central Meridian",
+          "min": 0,
+          "max": 6.2831854820251465,
+          "default": 0,
+          "curve": "SHORTEST_PERIODIC"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "project.peirce-square-fast.v2",
+      "name": "Peirce Square Fast",
+      "input": "sphere",
+      "output": "plane",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "pole-fade",
+          "name": "Pole Fade",
+          "min": 1,
+          "max": 20,
+          "default": 1,
+          "curve": "LERP"
+        },
+        {
+          "id": "projection-spin-speed",
+          "name": "Projection Spin Speed",
+          "min": 0,
+          "max": 0.05,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "projection-wander",
+          "name": "Projection Wander",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "camera-wander",
+          "name": "Camera Wander",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "central-meridian",
+          "name": "Central Meridian",
+          "min": 0,
+          "max": 6.2831854820251465,
+          "default": 0,
+          "curve": "SHORTEST_PERIODIC"
+        }
+      ],
+      "approximate": true
+    },
+    {
+      "id": "project.bonne.v2",
+      "name": "Bonne",
+      "input": "sphere",
+      "output": "plane",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "pole-fade",
+          "name": "Pole Fade",
+          "min": 1,
+          "max": 20,
+          "default": 1,
+          "curve": "LERP"
+        },
+        {
+          "id": "projection-spin-speed",
+          "name": "Projection Spin Speed",
+          "min": 0,
+          "max": 0.05,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "projection-wander",
+          "name": "Projection Wander",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "camera-wander",
+          "name": "Camera Wander",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "central-meridian",
+          "name": "Central Meridian",
+          "min": 0,
+          "max": 6.2831854820251465,
+          "default": 0,
+          "curve": "SHORTEST_PERIODIC"
+        },
+        {
+          "id": "hemisphere",
+          "topology": true,
+          "values": [
+            "north",
+            "south"
+          ],
+          "default": "north"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "project.airocean.v2",
+      "name": "Airocean",
+      "input": "sphere",
+      "output": "plane",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "pole-fade",
+          "name": "Pole Fade",
+          "min": 1,
+          "max": 20,
+          "default": 1,
+          "curve": "LERP"
+        },
+        {
+          "id": "projection-spin-speed",
+          "name": "Projection Spin Speed",
+          "min": 0,
+          "max": 0.05,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "projection-wander",
+          "name": "Projection Wander",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "camera-wander",
+          "name": "Camera Wander",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "central-meridian",
+          "name": "Central Meridian",
+          "min": 0,
+          "max": 6.2831854820251465,
+          "default": 0,
+          "curve": "SHORTEST_PERIODIC"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "warp.affine.v2",
+      "name": "Affine Frame",
+      "input": "plane",
+      "output": "plane",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "speed",
+          "name": "Warp Speed",
+          "min": -0.02,
+          "max": 0.02,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "rotation-rate",
+          "name": "Affine Rotation Rate",
+          "min": -6.2831854820251465,
+          "max": 6.2831854820251465,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "translation-x",
+          "name": "Affine Translation X",
+          "min": -4,
+          "max": 4,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "translation-y",
+          "name": "Affine Translation Y",
+          "min": -4,
+          "max": 4,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "scale-x",
+          "name": "Affine Scale X",
+          "min": 0.015625,
+          "max": 64,
+          "default": 1,
+          "curve": "LOG_POSITIVE"
+        },
+        {
+          "id": "scale-y",
+          "name": "Affine Scale Y",
+          "min": 0.015625,
+          "max": 64,
+          "default": 1,
+          "curve": "LOG_POSITIVE"
+        },
+        {
+          "id": "shear",
+          "name": "Affine Shear",
+          "min": -4,
+          "max": 4,
+          "default": 0,
+          "curve": "LERP"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "warp.wave-shear.v2",
+      "name": "Wave Shear",
+      "input": "plane",
+      "output": "plane",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "speed",
+          "name": "Warp Speed",
+          "min": -0.02,
+          "max": 0.02,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "strength",
+          "name": "Warp Strength",
+          "min": -30,
+          "max": 30,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "frequency",
+          "name": "Warp Frequency",
+          "min": 0.01,
+          "max": 32,
+          "default": 1,
+          "curve": "LOG_POSITIVE"
+        },
+        {
+          "id": "field-angle",
+          "name": "Warp Field Angle",
+          "min": 0,
+          "max": 6.2831854820251465,
+          "default": 0,
+          "curve": "SHORTEST_PERIODIC"
+        },
+        {
+          "id": "edge-width",
+          "name": "Edge Fade Width",
+          "min": 0,
+          "max": 1,
+          "default": 0.1,
+          "curve": "LERP"
+        },
+        {
+          "id": "envelope",
+          "topology": true,
+          "values": [
+            "flat",
+            "projection-weight",
+            "edge-fade"
+          ],
+          "default": "flat"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "warp.vector-noise.v2",
+      "name": "Vector Noise",
+      "input": "plane",
+      "output": "plane",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "speed",
+          "name": "Warp Speed",
+          "min": -0.02,
+          "max": 0.02,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "strength",
+          "name": "Warp Strength",
+          "min": -30,
+          "max": 30,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "scale",
+          "name": "Warp Scale",
+          "min": 0.015625,
+          "max": 64,
+          "default": 1,
+          "curve": "LOG_POSITIVE"
+        },
+        {
+          "id": "vector-angle",
+          "name": "Warp Vector Angle",
+          "min": 0,
+          "max": 6.2831854820251465,
+          "default": 0,
+          "curve": "SHORTEST_PERIODIC"
+        },
+        {
+          "id": "edge-width",
+          "name": "Edge Fade Width",
+          "min": 0,
+          "max": 1,
+          "default": 0.1,
+          "curve": "LERP"
+        },
+        {
+          "id": "basis",
+          "topology": true,
+          "values": [
+            "simplex",
+            "fbm3",
+            "ridged3"
+          ],
+          "default": "simplex"
+        },
+        {
+          "id": "envelope",
+          "topology": true,
+          "values": [
+            "flat",
+            "projection-weight",
+            "edge-fade"
+          ],
+          "default": "flat"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "warp.mirror-tile.v2",
+      "name": "Mirror Tile",
+      "input": "plane",
+      "output": "plane",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "speed",
+          "name": "Warp Speed",
+          "min": -0.02,
+          "max": 0.02,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "rotation",
+          "name": "Mirror Rotation",
+          "min": 0,
+          "max": 6.2831854820251465,
+          "default": 0,
+          "curve": "SHORTEST_PERIODIC"
+        },
+        {
+          "id": "cell-x",
+          "name": "Mirror Cell X",
+          "min": 0.015625,
+          "max": 8,
+          "default": 1,
+          "curve": "LOG_POSITIVE"
+        },
+        {
+          "id": "cell-y",
+          "name": "Mirror Cell Y",
+          "min": 0.015625,
+          "max": 8,
+          "default": 1,
+          "curve": "LOG_POSITIVE"
+        },
+        {
+          "id": "offset-x",
+          "name": "Mirror Offset X",
+          "min": -8,
+          "max": 8,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "offset-y",
+          "name": "Mirror Offset Y",
+          "min": -8,
+          "max": 8,
+          "default": 0,
+          "curve": "LERP"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "warp.polar-chart.v2",
+      "name": "Polar Chart",
+      "input": "plane",
+      "output": "plane",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "speed",
+          "name": "Warp Speed",
+          "min": -0.02,
+          "max": 0.02,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "radial-scale",
+          "name": "Polar Radial Scale",
+          "min": 0.015625,
+          "max": 64,
+          "default": 1,
+          "curve": "LOG_POSITIVE"
+        },
+        {
+          "id": "radial-phase",
+          "name": "Polar Radial Phase",
+          "min": -6.2831854820251465,
+          "max": 6.2831854820251465,
+          "default": 0,
+          "curve": "SHORTEST_PERIODIC"
+        },
+        {
+          "id": "angular-phase",
+          "name": "Polar Angular Phase",
+          "min": -6.2831854820251465,
+          "max": 6.2831854820251465,
+          "default": 0,
+          "curve": "SHORTEST_PERIODIC"
+        },
+        {
+          "id": "mode",
+          "topology": true,
+          "values": [
+            "linear",
+            "logarithmic"
+          ],
+          "default": "linear"
+        },
+        {
+          "id": "harmonic",
+          "topology": true,
+          "values": [
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "h7",
+            "h8"
+          ],
+          "default": "h1"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "warp.curl-flow.v2",
+      "name": "Curl Flow",
+      "input": "plane",
+      "output": "plane",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "speed",
+          "name": "Warp Speed",
+          "min": -0.02,
+          "max": 0.02,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "strength",
+          "name": "Warp Strength",
+          "min": -30,
+          "max": 30,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "scale",
+          "name": "Warp Scale",
+          "min": 0.015625,
+          "max": 64,
+          "default": 1,
+          "curve": "LOG_POSITIVE"
+        },
+        {
+          "id": "edge-width",
+          "name": "Edge Fade Width",
+          "min": 0,
+          "max": 1,
+          "default": 0.1,
+          "curve": "LERP"
+        },
+        {
+          "id": "basis",
+          "topology": true,
+          "values": [
+            "simplex",
+            "fbm3",
+            "ridged3"
+          ],
+          "default": "simplex"
+        },
+        {
+          "id": "integrator",
+          "topology": true,
+          "values": [
+            "euler",
+            "midpoint",
+            "midpoint-2x"
+          ],
+          "default": "euler"
+        },
+        {
+          "id": "envelope",
+          "topology": true,
+          "values": [
+            "flat",
+            "projection-weight",
+            "edge-fade"
+          ],
+          "default": "flat"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "sample.grid.v2",
+      "name": "Grid",
+      "input": "plane",
+      "output": "field",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "pattern-freq",
+          "name": "Pattern Freq",
+          "min": 0.1,
+          "max": 20,
+          "default": 1,
+          "curve": "LERP"
+        },
+        {
+          "id": "speed",
+          "name": "Speed",
+          "min": 0,
+          "max": 0.5,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "complexity",
+          "name": "Complexity",
+          "min": 0,
+          "max": 3,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "pattern-mix",
+          "name": "Pattern Mix",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "drift",
+          "name": "Drift",
+          "min": 0,
+          "max": 1.25,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "angle-speed",
+          "name": "Source Angle Speed",
+          "min": 0,
+          "max": 0.05,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "edge-width",
+          "name": "Edge Fade Width",
+          "min": 0,
+          "max": 1,
+          "default": 0.1,
+          "curve": "LERP"
+        },
+        {
+          "id": "weight-mode",
+          "topology": true,
+          "values": [
+            "none",
+            "projection"
+          ],
+          "default": "projection"
+        },
+        {
+          "id": "coverage-mode",
+          "topology": true,
+          "values": [
+            "none",
+            "weight",
+            "weight-squared",
+            "edge-fade"
+          ],
+          "default": "none"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "sample.twin-wave.v2",
+      "name": "Twin Wave",
+      "input": "plane",
+      "output": "field",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "pattern-freq",
+          "name": "Pattern Freq",
+          "min": 0.1,
+          "max": 20,
+          "default": 1,
+          "curve": "LERP"
+        },
+        {
+          "id": "speed",
+          "name": "Speed",
+          "min": 0,
+          "max": 0.5,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "drift",
+          "name": "Drift",
+          "min": 0,
+          "max": 1.25,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "angle-speed",
+          "name": "Source Angle Speed",
+          "min": 0,
+          "max": 0.05,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "edge-width",
+          "name": "Edge Fade Width",
+          "min": 0,
+          "max": 1,
+          "default": 0.1,
+          "curve": "LERP"
+        },
+        {
+          "id": "weight-mode",
+          "topology": true,
+          "values": [
+            "none",
+            "projection"
+          ],
+          "default": "projection"
+        },
+        {
+          "id": "coverage-mode",
+          "topology": true,
+          "values": [
+            "none",
+            "weight",
+            "weight-squared",
+            "edge-fade"
+          ],
+          "default": "none"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "sample.rings.v2",
+      "name": "Rings",
+      "input": "plane",
+      "output": "field",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "pattern-freq",
+          "name": "Pattern Freq",
+          "min": 0.1,
+          "max": 20,
+          "default": 1,
+          "curve": "LERP"
+        },
+        {
+          "id": "speed",
+          "name": "Speed",
+          "min": 0,
+          "max": 0.5,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "edge-width",
+          "name": "Edge Fade Width",
+          "min": 0,
+          "max": 1,
+          "default": 0.1,
+          "curve": "LERP"
+        },
+        {
+          "id": "weight-mode",
+          "topology": true,
+          "values": [
+            "none",
+            "projection"
+          ],
+          "default": "projection"
+        },
+        {
+          "id": "coverage-mode",
+          "topology": true,
+          "values": [
+            "none",
+            "weight",
+            "weight-squared",
+            "edge-fade"
+          ],
+          "default": "none"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "sample.spiral.v2",
+      "name": "Spiral",
+      "input": "plane",
+      "output": "field",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "pattern-freq",
+          "name": "Pattern Freq",
+          "min": 0.1,
+          "max": 20,
+          "default": 1,
+          "curve": "LERP"
+        },
+        {
+          "id": "speed",
+          "name": "Speed",
+          "min": 0,
+          "max": 0.5,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "angle-speed",
+          "name": "Source Angle Speed",
+          "min": 0,
+          "max": 0.05,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "edge-width",
+          "name": "Edge Fade Width",
+          "min": 0,
+          "max": 1,
+          "default": 0.1,
+          "curve": "LERP"
+        },
+        {
+          "id": "weight-mode",
+          "topology": true,
+          "values": [
+            "none",
+            "projection"
+          ],
+          "default": "projection"
+        },
+        {
+          "id": "coverage-mode",
+          "topology": true,
+          "values": [
+            "none",
+            "weight",
+            "weight-squared",
+            "edge-fade"
+          ],
+          "default": "none"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "sample.lattice.v2",
+      "name": "Primitive Lattice",
+      "input": "plane",
+      "output": "field",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "lattice-cell-scale",
+          "name": "Lattice Cell Scale",
+          "min": 0.015625,
+          "max": 8,
+          "default": 1,
+          "curve": "LOG_POSITIVE"
+        },
+        {
+          "id": "lattice-shape",
+          "name": "Lattice Shape",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "lattice-softness",
+          "name": "Lattice Softness",
+          "min": 0.0009765625,
+          "max": 1,
+          "default": 0.05,
+          "curve": "LOG_POSITIVE"
+        },
+        {
+          "id": "lattice-radius",
+          "name": "Lattice Radius",
+          "min": 0.015625,
+          "max": 0.49,
+          "default": 0.25,
+          "curve": "LERP"
+        },
+        {
+          "id": "edge-width",
+          "name": "Edge Fade Width",
+          "min": 0,
+          "max": 1,
+          "default": 0.1,
+          "curve": "LERP"
+        },
+        {
+          "id": "weight-mode",
+          "topology": true,
+          "values": [
+            "none",
+            "projection"
+          ],
+          "default": "projection"
+        },
+        {
+          "id": "coverage-mode",
+          "topology": true,
+          "values": [
+            "none",
+            "weight",
+            "weight-squared",
+            "edge-fade"
+          ],
+          "default": "none"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "sample.projected-noise.v2",
+      "name": "Projected Noise",
+      "input": "plane",
+      "output": "field",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "noise-scale",
+          "name": "Source Noise Scale",
+          "min": 0.015625,
+          "max": 64,
+          "default": 1,
+          "curve": "LERP"
+        },
+        {
+          "id": "noise-contrast",
+          "name": "Source Noise Contrast",
+          "min": 0,
+          "max": 8,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "noise-speed",
+          "name": "Source Noise Speed",
+          "min": -0.015625,
+          "max": 0.015625,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "edge-width",
+          "name": "Edge Fade Width",
+          "min": 0,
+          "max": 1,
+          "default": 0.1,
+          "curve": "LERP"
+        },
+        {
+          "id": "weight-mode",
+          "topology": true,
+          "values": [
+            "none",
+            "projection"
+          ],
+          "default": "projection"
+        },
+        {
+          "id": "coverage-mode",
+          "topology": true,
+          "values": [
+            "none",
+            "weight",
+            "weight-squared",
+            "edge-fade"
+          ],
+          "default": "none"
+        },
+        {
+          "id": "basis",
+          "topology": true,
+          "values": [
+            "simplex",
+            "fbm3",
+            "ridged3"
+          ],
+          "default": "simplex"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "sample.spherical-noise.v2",
+      "name": "Spherical Noise",
+      "input": "plane",
+      "output": "field",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "noise-scale",
+          "name": "Source Noise Scale",
+          "min": 0.015625,
+          "max": 64,
+          "default": 1,
+          "curve": "LERP"
+        },
+        {
+          "id": "noise-contrast",
+          "name": "Source Noise Contrast",
+          "min": 0,
+          "max": 8,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "noise-speed",
+          "name": "Source Noise Speed",
+          "min": -0.015625,
+          "max": 0.015625,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "edge-width",
+          "name": "Edge Fade Width",
+          "min": 0,
+          "max": 1,
+          "default": 0.1,
+          "curve": "LERP"
+        },
+        {
+          "id": "weight-mode",
+          "topology": true,
+          "values": [
+            "none",
+            "projection"
+          ],
+          "default": "projection"
+        },
+        {
+          "id": "coverage-mode",
+          "topology": true,
+          "values": [
+            "none",
+            "weight",
+            "weight-squared",
+            "edge-fade"
+          ],
+          "default": "none"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "field.transfer.linear.v2",
+      "name": "Linear Transfer",
+      "input": "field",
+      "output": "field",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [],
+      "approximate": false
+    },
+    {
+      "id": "field.transfer.ridge.v2",
+      "name": "Ridge Transfer",
+      "input": "field",
+      "output": "field",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [],
+      "approximate": false
+    },
+    {
+      "id": "field.transfer.iso-contour.v2",
+      "name": "Iso Contour",
+      "input": "field",
+      "output": "field",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "iso-level",
+          "name": "Iso Contour Level",
+          "min": 0,
+          "max": 1,
+          "default": 0.5,
+          "curve": "LERP"
+        },
+        {
+          "id": "iso-width",
+          "name": "Iso Contour Width",
+          "min": 0.0009765625,
+          "max": 1,
+          "default": 0.05,
+          "curve": "LOG_POSITIVE"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "field.transfer.smooth-bands.v2",
+      "name": "Smooth Bands",
+      "input": "field",
+      "output": "field",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [],
+      "approximate": false
+    },
+    {
+      "id": "field.coverage.value-cutout.v2",
+      "name": "Value Cutout",
+      "input": "field",
+      "output": "field",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "edge-width",
+          "name": "Edge Fade Width",
+          "min": 0,
+          "max": 1,
+          "default": 0.1,
+          "curve": "LERP"
+        }
+      ],
+      "approximate": false
+    },
+    {
+      "id": "colorize.generated-palette.v2",
+      "name": "Generated Palette",
+      "input": "field",
+      "output": "color",
+      "blocks": {
+        "param": {
+          "size": 0,
+          "align": 1
+        },
+        "prepared": {
+          "size": 0,
+          "align": 1
+        },
+        "state": {
+          "size": 0,
+          "align": 1
+        }
+      },
+      "params": [
+        {
+          "id": "hue-shift-amount",
+          "name": "Hue Shift Amount",
+          "min": -4,
+          "max": 4,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "hue-noise-scale",
+          "name": "Hue Noise Scale",
+          "min": 0.015625,
+          "max": 8,
+          "default": 1,
+          "curve": "LOG_POSITIVE"
+        },
+        {
+          "id": "hue-noise-speed",
+          "name": "Hue Noise Speed",
+          "min": -0.001,
+          "max": 0.001,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "palette-chroma",
+          "name": "Palette Chroma",
+          "min": 0,
+          "max": 1,
+          "default": 0.62,
+          "curve": "LERP"
+        },
+        {
+          "id": "mapping-frequency",
+          "name": "Mapping Frequency",
+          "min": 0.01,
+          "max": 32,
+          "default": 1,
+          "curve": "LOG_POSITIVE"
+        },
+        {
+          "id": "mapping-phase",
+          "name": "Mapping Phase",
+          "min": -1,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "phase-oscillation-depth",
+          "name": "Phase Oscillation Depth",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "phase-oscillation-speed",
+          "name": "Phase Oscillation Speed",
+          "min": -0.02,
+          "max": 0.02,
+          "default": 0,
+          "curve": "LERP"
+        },
+        {
+          "id": "brightness-depth",
+          "name": "Brightness Depth",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "curve": "LERP"
+        },
+        {
+          "id": "value-opacity-low",
+          "name": "Value Opacity Low",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "curve": "LERP"
+        },
+        {
+          "id": "value-opacity-high",
+          "name": "Value Opacity High",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "curve": "LERP"
+        },
+        {
+          "id": "palette-mode",
+          "topology": true,
+          "values": [
+            "triadic",
+            "complementary",
+            "analogous"
+          ],
+          "default": "triadic"
+        },
+        {
+          "id": "palette-mapping",
+          "topology": true,
+          "values": [
+            "cup",
+            "bell",
+            "linear",
+            "reverse"
+          ],
+          "default": "linear"
+        },
+        {
+          "id": "hue-shift-mode",
+          "topology": true,
+          "values": [
+            "noise",
+            "path-length"
+          ],
+          "default": "noise"
+        },
+        {
+          "id": "brightness-envelope",
+          "topology": true,
+          "values": [
+            "none",
+            "cup"
+          ],
+          "default": "none"
+        }
+      ],
+      "approximate": false
+    }
+  ]
+}

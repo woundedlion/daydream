@@ -211,6 +211,12 @@ test('the site manifest covers every asset the served pages reference', () => {
 // place here only by being published for its own sake.
 const UNREFERENCED = ['README.md', 'docs/screenshots'];
 
+// The source catalog fetches the pattern documents by file name at runtime
+// (their URLs are built from shaderball_migration.json's listing), so the
+// static reference walk cannot reach them. They are listed file by file so the
+// v1 expansion fixtures under shader/patterns/v1/ stay off Pages.
+const runtimeFetched = (entry) => /^shader\/patterns\/[^/]+\.json$/.test(entry);
+
 test('the site manifest publishes nothing the served pages do not reach', () => {
   const entries = manifestEntries();
   const stale = UNREFERENCED.filter((entry) => !entries.includes(entry));
@@ -221,7 +227,7 @@ test('the site manifest publishes nothing the served pages do not reach', () => 
   const reached = (entry) =>
     seen.has(entry) || [...seen].some((path) => path.startsWith(`${entry}/`));
   const unreached = entries.filter(
-    (entry) => !UNREFERENCED.includes(entry) && !reached(entry));
+    (entry) => !UNREFERENCED.includes(entry) && !runtimeFetched(entry) && !reached(entry));
   assert.deepEqual(unreached.slice(0, 5), [],
     `${unreached.length} ${MANIFEST} entries are neither a served page, ` +
       'reachable from one, nor declared unreferenced — the manifest is the only ' +
