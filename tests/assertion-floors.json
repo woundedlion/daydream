@@ -27,6 +27,10 @@
     "cases": 18,
     "assertions": 121
   },
+  "tests/chain_library.test.js": {
+    "cases": 8,
+    "assertions": 44
+  },
   "tests/chain_strip.test.js": {
     "cases": 20,
     "assertions": 166
@@ -291,7 +295,7 @@
   },
   "tests/tsconfig_roster.test.js": {
     "cases": 7,
-    "assertions": 132
+    "assertions": 135
   },
   "tests/vendor-importmap.test.js": {
     "cases": 7,
