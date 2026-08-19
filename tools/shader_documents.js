@@ -5,7 +5,7 @@
 
 import { applyChainDocument } from './chain_apply.js';
 import { createParameterDock, deactivatedParamNames } from './chain_dock.js';
-import { createChainDocumentStore } from './chain_document_store.js';
+import { createChainDocumentStore, scratchChainDocument } from './chain_document_store.js';
 import { createChainLibrary } from './chain_library.js';
 import { createChainStrip } from './chain_strip.js';
 import { copyToClipboard } from './copy_text.js';
@@ -20,6 +20,9 @@ const CHAIN_EFFECT = 'ShaderChain';
 
 // Digest characters the toolbar shows; the button copies all of it.
 const DIGEST_ABBREVIATION = 12;
+
+// The download name the scratch document exports under until Save As renames it.
+const SCRATCH_FILENAME = 'scratch.shader.json';
 
 // Topology enum8 parameters select an operator's structural variant. A fixed
 // effect bakes its variants in, so the fixed path skips them; palette-mapping
@@ -436,7 +439,8 @@ export function createShaderDocumentController({
   };
 
   /**
-   * @param {string} source @param {string} [filename]
+   * @param {string|*} source - Document JSON, or the document itself.
+   * @param {string} [filename]
    * @param {*} [precompiled] - The catalog's already-compiled document, when the
    *   source is a catalog entry rather than an imported study.
    */
@@ -505,6 +509,15 @@ export function createShaderDocumentController({
     return true;
   };
 
+  /**
+   * Opens the default chain on catalog defaults through the ordinary load path,
+   * so an unnamed session authors against the same strip, library and dock a
+   * loaded document gets.
+   * @returns {Promise<boolean>} Whether the scratch document is on screen.
+   */
+  const loadScratch = () =>
+    loadSource(scratchChainDocument(operatorCatalog), SCRATCH_FILENAME);
+
   const init = async () => {
     try {
       compiler = await importCompiler();
@@ -537,26 +550,18 @@ export function createShaderDocumentController({
           ?? effectId;
         sourceSelect.appendChild(option);
       }
-      show('Choose a source document or open a local study.');
-      return true;
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       show(`Source catalog failed to load: ${detail}`, true);
       return false;
     }
+    return loadScratch();
   };
 
   sourceSelect.addEventListener('change', async () => {
     const option = sourceSelect.selectedOptions[0];
     if (!option?.value) {
-      teardownChainUi();
-      selectEffect('Shader');
-      active = null;
-      presetSelect.replaceChildren();
-      presetSelect.disabled = true;
-      saveButton.disabled = true;
-      show('Scratch Shader is active.');
-      showDigest();
+      await loadScratch();
       return;
     }
     const entry = catalog.get(option.value);

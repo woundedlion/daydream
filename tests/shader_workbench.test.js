@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { shaderWorkbenchUrl, start, WORKBENCH_EFFECTS } from '../daydream.js';
+import { scratchChainDocument } from '../tools/chain_document_store.js';
 import {
   applyFixedShaderDocument,
   createShaderDocumentController,
@@ -18,6 +19,11 @@ import {
 const INDEX = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const WORKBENCH = readFileSync(new URL('../tools/shader.html', import.meta.url), 'utf8');
 const WORKBENCH_CSS = readFileSync(new URL('../tools/shader.css', import.meta.url), 'utf8');
+const ENGINE_CATALOG = readFileSync(
+  new URL('../shader/engine_catalog.json', import.meta.url), 'utf8');
+// §4.5: the document the workbench opens on, built from the same catalog the
+// page fetches, so the fakes register exactly what the scratch chain would.
+const SCRATCH = scratchChainDocument(JSON.parse(ENGINE_CATALOG));
 
 restoreDocumentAfterEach();
 
@@ -229,11 +235,16 @@ const shaderDocument = ({ digest = 'digest-equator', status = 'VALID',
 
 /** @returns {Object} An engine whose parameter definitions follow its writes. */
 function workbenchEngine() {
-  // 'Pattern Freq' serves the fixed path's alias lookup; the raw parameter id
-  // is what a setShaderChain-programmed chain registers.
+  // 'Pattern Freq' serves the fixed path's alias lookup; the raw parameter ids
+  // are what a setShaderChain-programmed chain registers, and the scratch
+  // document is the chain the page opens on.
   const definitions = [
     { name: 'Pattern Freq', value: 1 },
     { name: 'sample.pattern-freq', value: 1 },
+    ...SCRATCH.descriptor.parameters.map((parameter) => parameter.storage === 'enum8'
+      ? { name: parameter.id, value: parameter.domain.values.indexOf(parameter.default),
+          options: [...parameter.domain.values] }
+      : { name: parameter.id, value: parameter.default }),
   ];
   const writes = [];
   const selected = [];
@@ -293,12 +304,18 @@ function workbench({ files = { 'equator_grid.shader.json': shaderDocument() },
     fetchText: async (url) => {
       const name = String(url).split('/').pop();
       if (name === 'shaderball_migration.json') return MIGRATION;
-      if (name === 'engine_catalog.json') return '{"catalog_version": 2}';
+      if (name === 'engine_catalog.json') return ENGINE_CATALOG;
       const source = files[name];
       if (source === undefined) throw new Error(`404 ${name}`);
       return source;
     },
-    importCompiler: async () => ({ compileShaderDocument: (s) => JSON.parse(s) }),
+    // The fixtures are compiler results already; a document object is the
+    // scratch build, which the fake passes through as its own compile.
+    importCompiler: async () => ({
+      compileShaderDocument: (s) => typeof s === 'string'
+        ? JSON.parse(s)
+        : { status: 'VALID', descriptor_digest: 'digest-scratch', document: s },
+    }),
     download: (filename, source) => downloads.push([filename, source]),
   });
   return { controller, elements, downloads, selections, engine, ran };
@@ -307,6 +324,10 @@ function workbench({ files = { 'equator_grid.shader.json': shaderDocument() },
 /** @param {Object} element @returns {Function} The element's change handler. */
 const onChange = (element) =>
   element.listeners.find((listener) => listener.type === 'change').handler;
+
+// §4.5: init() opens the scratch document, so every later assertion about the
+// engine reads past the writes that opening preview made.
+const SCRATCH_WRITES = SCRATCH.descriptor.parameters.length;
 
 /** @param {Object} harness @returns {Promise<void>} */
 async function chooseCatalogSource({ elements, controller }) {
@@ -337,7 +358,8 @@ test('the source catalog lists each document by its product display name', async
     ['Scratch shader', 'Equator Grid']);
   const status = elements.get('shader-document-status');
   assert.equal(status.dataset.status, 'ok');
-  assert.match(status.textContent, /Choose a source document/);
+  assert.match(status.textContent, /Scratch Chain · Catalog Defaults/,
+    'the page opens rendering the scratch chain');
 });
 
 // init() reports through the status element and a return value the page drops,
@@ -372,16 +394,16 @@ test('choosing a catalog source stages its effect and previews its first preset'
 
   await chooseCatalogSource(harness);
 
-  assert.deepEqual(harness.selections, ['EquatorGrid']);
+  assert.deepEqual(harness.selections, ['ShaderChain', 'EquatorGrid']);
   assert.deepEqual(harness.engine.selected, ['noon']);
-  assert.deepEqual(harness.engine.writes, [['Pattern Freq', 2]]);
+  assert.deepEqual(harness.engine.writes.slice(SCRATCH_WRITES), [['Pattern Freq', 2]]);
   const presets = harness.elements.get('shader-preset-select');
   assert.deepEqual(presets.options.map((option) => option.value), ['noon', 'dusk']);
   assert.equal(presets.disabled, false);
   assert.equal(harness.elements.get('shader-document-save').disabled, false);
   assert.match(harness.elements.get('shader-document-status').textContent,
     /Equator Grid · Noon/);
-  assert.deepEqual(harness.ran, { gui: 1, invalidated: 1 });
+  assert.deepEqual(harness.ran, { gui: 2, invalidated: 2 });
 });
 
 // The digest is what tells an authored study from a shipped pattern: matching
@@ -393,18 +415,19 @@ test('an imported study the catalog does not carry routes to the chain engine', 
 
   assert.equal(await harness.controller.loadSource(
     shaderDocument({ digest: 'digest-study' }), 'study.shader.json'), true);
-  assert.deepEqual(harness.selections, ['ShaderChain']);
+  assert.deepEqual(harness.selections, ['ShaderChain', 'ShaderChain']);
   assert.deepEqual(harness.engine.selected, [],
     'the dynamic path stages no fixed-effect reference preset');
-  assert.deepEqual(harness.engine.chained,
-    [[{ instance: 'sample', operator: 'sample.grid.v2' }]]);
-  assert.deepEqual(harness.engine.writes, [['sample.pattern-freq', 2]],
+  assert.deepEqual(harness.engine.chained.at(-1),
+    [{ instance: 'sample', operator: 'sample.grid.v2' }]);
+  assert.deepEqual(harness.engine.writes.slice(SCRATCH_WRITES),
+    [['sample.pattern-freq', 2]],
     'the preset lands by parameter id, not by alias name');
   const status = harness.elements.get('shader-document-status');
   assert.equal(status.dataset.status, 'ok');
   assert.match(status.textContent, /Equator Grid · Noon/);
   assert.equal(harness.elements.get('shader-document-save').disabled, false);
-  assert.deepEqual(harness.ran, { gui: 1, invalidated: 1 });
+  assert.deepEqual(harness.ran, { gui: 2, invalidated: 2 });
 });
 
 test('a setShaderChain refusal is surfaced with its code', async () => {
@@ -493,14 +516,16 @@ test('the workbench roster admits every effect the controller selects', async ()
   select.value = '';
   await onChange(select)();
 
-  assert.deepEqual(harness.selections, ['ShaderChain', 'Shader']);
+  assert.deepEqual(harness.selections, ['ShaderChain', 'ShaderChain', 'ShaderChain']);
   for (const effect of harness.selections) {
     assert.ok(WORKBENCH_EFFECTS.includes(effect),
       `the workbench page must know the effect "${effect}"`);
   }
 });
 
-test('returning to the scratch source drops the loaded document', async () => {
+// §4.5: the scratch source is a document like any other — returning to it
+// reopens the default chain on the interpreter, rendering from the first frame.
+test('returning to the scratch source reopens the default chain', async () => {
   const harness = workbench();
   await chooseCatalogSource(harness);
   const select = harness.elements.get('shader-document-select');
@@ -508,22 +533,20 @@ test('returning to the scratch source drops the loaded document', async () => {
 
   await onChange(select)();
 
-  assert.deepEqual(harness.selections, ['EquatorGrid', 'Shader']);
+  assert.deepEqual(harness.selections, ['ShaderChain', 'EquatorGrid', 'ShaderChain']);
   const presets = harness.elements.get('shader-preset-select');
-  assert.equal(presets.options.length, 0);
-  assert.equal(presets.disabled, true);
-  assert.equal(harness.elements.get('shader-document-save').disabled, true);
-  assert.equal(harness.controller.save(), false);
+  assert.deepEqual(presets.options.map((option) => option.textContent),
+    ['Catalog Defaults']);
+  assert.equal(presets.disabled, false);
+  assert.equal(harness.elements.get('shader-document-save').disabled, false);
   assert.match(harness.elements.get('shader-document-status').textContent,
-    /Scratch Shader is active/);
+    /Scratch Chain · Catalog Defaults/);
 });
 
 // ── The pipeline strip over the real store, compiler and engine catalog ────
 
 const HEX_WAVE = readFileSync(
   new URL('../shader/patterns/hex_wave.shader.json', import.meta.url), 'utf8');
-const ENGINE_CATALOG = readFileSync(
-  new URL('../shader/engine_catalog.json', import.meta.url), 'utf8');
 // No source documents: every load misses the fixed-effect digest catalog and
 // routes onto the chain engine, where the strip mounts.
 const EMPTY_MIGRATION = JSON.stringify({
@@ -532,11 +555,13 @@ const EMPTY_MIGRATION = JSON.stringify({
 
 /**
  * The document controller over the real compiler, the real chain store, and a
- * FakeChainEngine, with the workbench mounts present and hex_wave loaded on the
- * dynamic path.
+ * FakeChainEngine, with the workbench mounts present and hex_wave loaded over
+ * the scratch document the page opens on.
+ * @param {{source?: string|null, migration?: string}} [seams] - source null
+ *   leaves the scratch document loaded.
  * @returns {Promise<Object>} The controller and everything it wrote to.
  */
-async function editorWorkbench() {
+async function editorWorkbench({ source = HEX_WAVE, migration = EMPTY_MIGRATION } = {}) {
   const engine = new FakeChainEngine();
   const ids = ['shader-document-select', 'shader-preset-select',
     'shader-document-open', 'shader-document-save', 'shader-document-file',
@@ -571,15 +596,17 @@ async function editorWorkbench() {
     setParamFilter: (filter) => filters.push(filter),
     fetchText: async (url) => {
       const name = String(url).split('/').pop();
-      if (name === 'shaderball_migration.json') return EMPTY_MIGRATION;
+      if (name === 'shaderball_migration.json') return migration;
       if (name === 'engine_catalog.json') return ENGINE_CATALOG;
+      if (name === 'hex_wave.shader.json') return HEX_WAVE;
       throw new Error(`404 ${name}`);
     },
     importCompiler: () => import('../shader/shader_workbench.mjs'),
     download: (filename, source) => downloads.push([filename, source]),
   });
   assert.equal(await controller.init(), true);
-  assert.equal(await controller.loadSource(HEX_WAVE, 'study.shader.json'), true);
+  if (source !== null)
+    assert.equal(await controller.loadSource(source, 'study.shader.json'), true);
   return { controller, engine, elements, downloads, selections, filters, ran };
 }
 
@@ -588,11 +615,39 @@ const stripChips = (harness) =>
 const libraryEntries = (harness) =>
   harness.elements.get('chain-library').querySelectorAll('.chain-library-entry');
 
+// §4.5: the workbench opens on a valid, rendering document with the whole
+// authoring surface live — the scratch chain is edited exactly like a load.
+test('the scratch document opens as a live, editable chain', async () => {
+  const harness = await editorWorkbench({ source: null });
+
+  assert.deepEqual(harness.selections, ['ShaderChain']);
+  assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator),
+    ['sphere.rotate.v2', 'project.stereographic.v2', 'sample.grid.v2',
+      'colorize.generated-palette.v2']);
+  assert.deepEqual(stripChips(harness).map((chip) => chip.dataset.label),
+    ['rotate', 'project', 'sample', 'colorize']);
+  assert.deepEqual(
+    harness.elements.get('shader-preset-select').options.map((o) => o.value),
+    ['catalog-defaults']);
+  assert.ok(harness.engine.writes.some(([name]) => name === 'colorize.palette-chroma'),
+    'the opening preview carries the catalog defaults');
+
+  const mount = harness.elements.get('chain-strip');
+  mount.querySelectorAll('.chain-band')
+    .find((band) => band.dataset.carrier === 'plane')
+    .querySelector('.chain-band-add').dispatch('click');
+  mount.querySelectorAll('.chain-palette-entry')
+    .find((entry) => entry.dataset.operator === 'warp.affine.v2')
+    .dispatch('click');
+
+  assert.equal(harness.engine.chainCalls.at(-1).length, 5);
+});
+
 test('a dynamic document builds the strip, and edits re-apply through the engine', async () => {
   const harness = await editorWorkbench();
-  assert.deepEqual(harness.selections, ['ShaderChain']);
-  assert.equal(harness.engine.chainCalls.length, 1);
-  assert.equal(harness.engine.chainCalls[0].length, 7);
+  assert.deepEqual(harness.selections, ['ShaderChain', 'ShaderChain']);
+  assert.equal(harness.engine.chainCalls.length, 2);
+  assert.equal(harness.engine.chainCalls.at(-1).length, 7);
   assert.equal(stripChips(harness).length, 7);
   assert.equal(libraryEntries(harness).length, 34);
   assert.equal(harness.elements.get('parameter-dock').dataset.collapsed, 'false');
@@ -609,8 +664,8 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
     .find((entry) => entry.dataset.operator === 'warp.wave-shear.v2')
     .dispatch('click');
 
-  assert.equal(harness.engine.chainCalls.length, 2);
-  assert.equal(harness.engine.chainCalls[1].length, 8);
+  assert.equal(harness.engine.chainCalls.length, 3);
+  assert.equal(harness.engine.chainCalls.at(-1).length, 8);
   assert.ok(harness.engine.writes.some(([name]) => name === 'warp1.strength'),
     'the re-apply carries the backfilled catalog defaults');
 
