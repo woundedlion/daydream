@@ -11,11 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { createChainDocumentStore } from '../tools/chain_document_store.js';
-import {
-  createChainEditor,
-  deactivatedParamNames,
-  railGapFromPoint,
-} from '../tools/chain_editor.js';
+import { createChainEditor, railGapFromPoint } from '../tools/chain_editor.js';
 import { compileShaderDocument } from '../shader/shader_workbench.mjs';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
 
@@ -370,22 +366,6 @@ test('destroy detaches the pointer listeners and empties the rail', async () => 
   assert.equal(h.container.childNodes.length, 0);
   assert.deepEqual(h.container.listeners.filter(
     (listener) => listener.type.startsWith('pointer')), []);
-});
-
-test('deactivatedParamNames flags edge-width only while its gate is off edge-fade', () => {
-  const definitions = [
-    { name: 'sample.coverage-mode', value: 1,
-      options: ['none', 'weight', 'weight-squared', 'edge-fade'] },
-    { name: 'sample.edge-width', value: 0.1 },
-    { name: 'warp1.envelope', value: 2,
-      options: ['flat', 'projection-weight', 'edge-fade'] },
-    { name: 'warp1.edge-width', value: 0.1 },
-    { name: 'camera.wander', value: 0 },
-  ];
-  assert.deepEqual([...deactivatedParamNames(definitions)], ['sample.edge-width']);
-  assert.deepEqual([...deactivatedParamNames([
-    { name: 'sample.edge-width', value: 0.1 },
-  ])], [], 'no gate, no deactivation');
 });
 
 test('railGapFromPoint resolves gaps through elementFromPoint', () => {

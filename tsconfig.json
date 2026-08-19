@@ -56,6 +56,7 @@
     "tools/banner.js",
     "tools/chain_apply.js",
     "tools/chain_catalog_panel.js",
+    "tools/chain_dock.js",
     "tools/chain_document_store.js",
     "tools/chain_editor.js",
     "tools/chain_library.js",

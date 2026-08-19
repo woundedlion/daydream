@@ -1,7 +1,7 @@
 import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement } from './fake_dom.js';
-import { deactivatedParamNames } from '../tools/chain_editor.js';
+import { deactivatedParamNames } from '../tools/chain_dock.js';
 import {
   createEffectGui,
   addParamControl,
