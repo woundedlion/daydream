@@ -75,6 +75,91 @@ const parameterFromField = (label, field) => {
 };
 
 /**
+ * The default chain a scratch document opens on: the minimal legal chain over
+ * the shipped crossings, with the camera in front.
+ * @type {ReadonlyArray<ChainEntry>}
+ */
+export const DEFAULT_SCRATCH_CHAIN = Object.freeze([
+  { label: 'rotate', operator: 'sphere.rotate.v2' },
+  { label: 'project', operator: 'project.stereographic.v2' },
+  { label: 'sample', operator: 'sample.grid.v2' },
+  { label: 'colorize', operator: 'colorize.generated-palette.v2' },
+]);
+
+const SCRATCH_PRESET_ID = 'catalog-defaults';
+
+/**
+ * Builds the workbench's scratch document: the given chain over catalog
+ * operators carrying one preset of the catalog's own defaults, so the workbench
+ * opens on a valid, rendering document rather than an empty page. The parameter
+ * declarations come from the same catalog-field mapping a structural insert
+ * backfills with, so a scratch stage and an inserted one are indistinguishable.
+ * @param {*} catalog - The operator catalog the document validates against.
+ * @param {ReadonlyArray<ChainEntry>} [chain] - The chain to build over.
+ * @returns {*} A complete v2 document.
+ */
+export function scratchChainDocument(catalog, chain = DEFAULT_SCRATCH_CHAIN) {
+  /** @type {Map<string, CatalogOperator>} */
+  const operators = new Map((catalog?.operators ?? []).map(
+    (/** @type {CatalogOperator} */ op) => [op.id, op]));
+  /** @type {ParameterDeclaration[]} */
+  const parameters = [];
+  /** @type {Object<string, *>} */
+  const values = {};
+  for (const entry of chain) {
+    const operator = operators.get(entry.operator);
+    if (operator === undefined) {
+      throw new Error('scratch chain document: the catalog carries no operator '
+        + `"${entry.operator}"`);
+    }
+    for (const field of operator.params) {
+      const parameter = parameterFromField(entry.label, field);
+      parameters.push(parameter);
+      values[parameter.id] = parameter.default;
+    }
+  }
+  return {
+    schema_version: 2,
+    catalog_version: catalog.catalog_version,
+    document_id: 'scratch',
+    effect_id: 'scratch',
+    effect_metadata: {
+      display_name: 'Scratch Chain',
+      description: "The default chain on the catalog's own defaults.",
+    },
+    descriptor: {
+      chain: chain.map((entry) => ({ ...entry })),
+      parameters,
+      path_policies: [{ id: 'parallel', kind: 'PARALLEL' }],
+      serialization: {
+        schema_version: 1,
+        fields: parameters.map((parameter) => parameter.id),
+      },
+    },
+    preset_bank: {
+      schema_version: 1,
+      presets: [{
+        preset_id: SCRATCH_PRESET_ID,
+        display_name: 'Catalog Defaults',
+        values,
+      }],
+      edges: [],
+      absent_edge_fallback: {
+        manual: 'SNAP',
+        automatic: 'REJECT',
+        synchronized: 'SNAP',
+        restore: 'SNAP',
+        authoring: 'SNAP',
+      },
+      choreography: {
+        generated_order: [SCRATCH_PRESET_ID],
+        dwell: { [SCRATCH_PRESET_ID]: 600 },
+      },
+    },
+  };
+}
+
+/**
  * Creates the chain editor's document state machine: a validated chain
  * document, a selection, a session bypass set and an undo history, mutated
  * through one span-replacement primitive that reconciles the whole document

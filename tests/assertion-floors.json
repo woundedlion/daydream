@@ -20,8 +20,8 @@
     "assertions": 21
   },
   "tests/chain_document_store.test.js": {
-    "cases": 31,
-    "assertions": 320
+    "cases": 34,
+    "assertions": 331
   },
   "tests/chain_library.test.js": {
     "cases": 11,
@@ -230,8 +230,8 @@
     "assertions": 382
   },
   "tests/shader_workbench.test.js": {
-    "cases": 34,
-    "assertions": 180
+    "cases": 35,
+    "assertions": 187
   },
   "tests/shared.test.js": {
     "cases": 15,

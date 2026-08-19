@@ -11,7 +11,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { createChainDocumentStore } from '../tools/chain_document_store.js';
+import {
+  DEFAULT_SCRATCH_CHAIN,
+  createChainDocumentStore,
+  scratchChainDocument,
+} from '../tools/chain_document_store.js';
 import {
   compileShaderDocument,
   validateShaderDocument,
@@ -512,4 +516,45 @@ test('a malformed span or sequence is refused without side effects', async () =>
   assert.equal(store.replaceSpan(0, 0, [null]).diagnostics[0].code, 'INVALID_SEQUENCE');
   assert.equal(store.canUndo(), false);
   assertGreen(store);
+});
+
+
+// §4.5: the workbench opens on this document, so it has to be valid by
+// construction — the builder is the only thing between a cold page and a
+// rendering chain.
+test('the scratch document compiles clean against the catalog', async () => {
+  const compiled = compileShaderDocument(scratchChainDocument(CATALOG),
+    { catalog: CATALOG });
+  assert.equal(compiled.status, 'VALID');
+  assert.deepEqual(compiled.diagnostics, []);
+  assert.deepEqual(compiled.document.descriptor.chain, [
+    { label: 'rotate', operator: 'sphere.rotate.v2' },
+    { label: 'project', operator: 'project.stereographic.v2' },
+    { label: 'sample', operator: 'sample.grid.v2' },
+    { label: 'colorize', operator: 'colorize.generated-palette.v2' },
+  ]);
+  assert.equal(compiled.document.preset_bank.presets.length, 1);
+  const values = compiled.document.preset_bank.presets[0].values;
+  assert.equal(values['colorize.palette-chroma'], 0.62,
+    'the one preset carries the catalog defaults');
+  assert.deepEqual(Object.keys(values).sort(),
+    compiled.document.descriptor.parameters.map((parameter) => parameter.id).sort());
+});
+
+test('the store adopts the scratch document and edits it', async () => {
+  const store = await createChainDocumentStore({
+    document: scratchChainDocument(CATALOG), catalog: CATALOG,
+  });
+  assert.deepEqual(labels(store), ['rotate', 'project', 'sample', 'colorize']);
+
+  assert.equal(store.replaceSpan(1, 0, [{ operator: 'sphere.lens.mobius.v2' }]).ok, true);
+  assertGreen(store);
+  assert.deepEqual(labels(store),
+    ['rotate', 'sphere1', 'project', 'sample', 'colorize']);
+});
+
+test('the scratch builder refuses an operator the catalog lacks', () => {
+  assert.throws(() => scratchChainDocument(CATALOG,
+    [...DEFAULT_SCRATCH_CHAIN, { label: 'ghost', operator: 'warp.nope.v2' }]),
+  /carries no operator "warp\.nope\.v2"/);
 });
