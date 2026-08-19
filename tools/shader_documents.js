@@ -498,13 +498,13 @@ export function createShaderDocumentController({
     if (!active) return false;
     // Every edit is already a document edit, so the export is the document as
     // it stands — the store's once the editor is live, else the load-time
-    // compile — with nothing harvested back out of the engine.
+    // compile — canonicalized, with nothing harvested back out of the engine.
     const document = chainUi
       ? chainUi.store.document()
       : structuredClone(active.compiled.document);
     const filename = active.filename.endsWith('.shader.json')
       ? active.filename : `${document.effect_id}.shader.json`;
-    download(filename, `${JSON.stringify(document, null, 2)}\n`);
+    download(filename, compiler.exportShaderDocumentJson(document));
     show(`Saved ${filename}.`);
     return true;
   };
