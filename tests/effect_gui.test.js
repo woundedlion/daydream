@@ -1,6 +1,7 @@
 import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement } from './fake_dom.js';
+import { deactivatedParamNames } from '../tools/chain_editor.js';
 import {
   createEffectGui,
   addParamControl,
@@ -387,6 +388,7 @@ function makeHarness({
   const state = {
     params,
     focused: null,
+    paramFilter: null,
     generation,
     engineValues,
     segmentValues,
@@ -463,6 +465,7 @@ function makeHarness({
     isMobile: () => isMobile,
     dragTarget,
     focusedElement: () => state.focused,
+    paramFilter: () => state.paramFilter,
     copyText: state.copyText,
     usesFullConfigSnapshot: () => fullConfig,
     getFullConfigSnapshot: () => state.fullConfigSnapshot,
@@ -2348,4 +2351,86 @@ test('destroy on an unbuilt panel is a no-op', () => {
 
   assert.equal(h.panel.active(), null);
   assert.deepEqual(h.warnings, []);
+});
+
+// ── The chain editor's selected-instance filter ─────────────────────────────
+
+function chainParams() {
+  return [
+    { name: 'camera.wander', value: 0, min: 0, max: 1, animated: true },
+    { name: 'sample.pattern-freq', value: 1, min: 0.1, max: 20, animated: true },
+    { name: 'sample.coverage-mode', value: 1, requestedValue: 1,
+      options: ['none', 'weight', 'weight-squared', 'edge-fade'] },
+    { name: 'sample.edge-width', value: 0.1, min: 0, max: 1, animated: true },
+  ];
+}
+
+test('the instance filter builds controls only for the prefixed params', () => {
+  const params = chainParams();
+  const h = makeHarness({
+    params,
+    engineValues: params.map((parameter) => parameter.value),
+  });
+  h.state.paramFilter = { prefix: 'sample.', deactivated: deactivatedParamNames };
+
+  h.panel.build();
+  const fx = h.panel.active();
+
+  assert.equal(fx.controllerByName.has('camera.wander'), false,
+    'another instance\'s params get no control');
+  assert.deepEqual(fx.paramNames, params.map((parameter) => parameter.name),
+    'the value-stream order stays whole so the shown sliders bind correctly');
+  assert.equal(fx.controllerByName.get('sample.pattern-freq').label,
+    'pattern-freq', 'controls are labeled by their field segment');
+
+  // The topology gate sits on "weight", so edge-width renders dimmed — but
+  // present and enabled: deactivation changes what the engine reads, never
+  // what the document carries.
+  const edge = fx.controllerByName.get('sample.edge-width');
+  assert.equal(edge.domElement.classList.contains('param-deactivated'), true);
+  assert.equal(edge.domElement.getAttribute('title'),
+    'Deactivated by the current topology selection');
+  assert.equal(edge.disabled, false);
+  assert.equal(fx.controllerByName.get('sample.pattern-freq')
+    .domElement.classList.contains('param-deactivated'), false);
+});
+
+test('a filter change rebuilds the panel on the next sync', () => {
+  const params = chainParams();
+  const h = makeHarness({
+    params,
+    engineValues: params.map((parameter) => parameter.value),
+  });
+  h.panel.build();
+  assert.equal(h.panel.active().controllerByName.has('camera.wander'), true);
+
+  h.state.paramFilter = { prefix: 'sample.', deactivated: deactivatedParamNames };
+  h.panel.sync();
+  assert.equal(h.panel.active().controllerByName.has('camera.wander'), false);
+  assert.equal(h.panel.active().controllerByName.has('sample.pattern-freq'), true);
+
+  h.state.paramFilter = null;
+  h.panel.sync();
+  assert.equal(h.panel.active().controllerByName.has('camera.wander'), true,
+    'clearing the filter restores the unfiltered panel');
+});
+
+test('sync re-dims against the live topology values', () => {
+  const params = chainParams();
+  const h = makeHarness({
+    params,
+    engineValues: params.map((parameter) => parameter.value),
+  });
+  h.state.paramFilter = { prefix: 'sample.', deactivated: deactivatedParamNames };
+  h.panel.build();
+  const edge = h.panel.active().controllerByName.get('sample.edge-width');
+  assert.equal(edge.domElement.classList.contains('param-deactivated'), true);
+
+  // The coverage gate moves onto edge-fade without any schema rebuild.
+  params[2].value = 3;
+  params[2].requestedValue = 3;
+  h.panel.sync();
+
+  assert.equal(edge.domElement.classList.contains('param-deactivated'), false);
+  assert.equal(edge.domElement.getAttribute('title'), '');
 });

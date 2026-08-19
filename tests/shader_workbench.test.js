@@ -4,38 +4,43 @@ import { readFileSync } from 'node:fs';
 
 import { shaderWorkbenchUrl, start } from '../daydream.js';
 import {
-  findWorkbenchFolder,
-  revealWorkbenchFolder,
-  wireShaderWorkbenchNav,
-} from '../tools/shader_workbench_nav.js';
-import {
   applyDynamicShaderDocument,
   applyFixedShaderDocument,
   createShaderDocumentController,
   engineParameterName,
 } from '../tools/shader_documents.js';
-import { ParamSetResult, unpinnedEngineMethods } from './fake_engine.js';
-import { fakeElement } from './fake_dom.js';
+import {
+  FakeChainEngine, ParamSetResult, unpinnedEngineMethods,
+} from './fake_engine.js';
+import {
+  fakeElement, installDocument, restoreDocumentAfterEach,
+} from './fake_dom.js';
 
 const INDEX = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const WORKBENCH = readFileSync(new URL('../tools/shader.html', import.meta.url), 'utf8');
 const WORKBENCH_CSS = readFileSync(new URL('../tools/shader.css', import.meta.url), 'utf8');
 
+restoreDocumentAfterEach();
+
 test('simulator exposes Shader as a standalone tool', () => {
   assert.match(INDEX, /href="tools\/shader\.html"[^>]*>Shader/);
   assert.match(WORKBENCH, /data-daydream-mode="shader-workbench"/);
   assert.match(WORKBENCH, /src="\.\.\/main\.js"/);
-  assert.match(WORKBENCH, /id="shader-workbench-nav"/);
+  assert.match(WORKBENCH, /id="chain-editor"/);
+  assert.match(WORKBENCH, /id="chain-catalog"/);
   assert.match(WORKBENCH, /id="shader-document-select"/);
   assert.match(WORKBENCH, /id="shader-preset-select"/);
   assert.match(WORKBENCH, /id="shader-document-open"/);
   assert.match(WORKBENCH, /id="shader-document-save"/);
-  assert.match(WORKBENCH, /src="shader_workbench_nav\.js"/);
+  assert.doesNotMatch(WORKBENCH, /data-workbench-folder/,
+    'the folder banks are replaced by the chain rail');
+  assert.doesNotMatch(WORKBENCH, /shader_workbench_nav/);
   assert.doesNotMatch(WORKBENCH, />Simulator<\/a>/);
   assert.doesNotMatch(WORKBENCH, /id="effect-sidebar"/);
   assert.match(WORKBENCH_CSS, /\.lil-controller\.lil-option option\s*\{/);
   assert.match(WORKBENCH_CSS, /color-scheme:\s*dark/);
   assert.match(WORKBENCH_CSS, /background-color:\s*var\(--background-color\)/);
+  assert.match(WORKBENCH_CSS, /\.param-deactivated\s*\{/);
 });
 
 // The alias table serves effects promoted before the chain schema: a v2
@@ -165,106 +170,6 @@ test('an engine without selectPresetById is refused, not written through', () =>
     String(applyFixedShaderDocument(engine, MODULE, fixedDocument(), 'noon', ['noon'])),
     /refused reference preset "noon"/);
   assert.deepEqual(engine.writes, []);
-});
-
-test('stage navigation opens and reveals the selected GUI folder', () => {
-  let clicked = false;
-  let scrolled = false;
-  const title = {
-    textContent: 'Projection',
-    click: () => { clicked = true; },
-    getAttribute: () => 'false',
-  };
-  const folder = {
-    querySelector: () => title,
-    scrollIntoView: () => { scrolled = true; },
-  };
-  title.parentElement = folder;
-  const root = { querySelectorAll: () => [{ textContent: 'Camera' }, title] };
-
-  assert.equal(findWorkbenchFolder(root, 'Projection'), folder);
-  assert.equal(revealWorkbenchFolder(root, 'Projection'), true);
-  assert.equal(clicked, true);
-  assert.equal(scrolled, true);
-  assert.equal(revealWorkbenchFolder(root, 'Missing'), false);
-});
-
-/**
- * Nav-wiring double: a document whose folder titles the test grows, a nav of
- * two stage buttons, and a MutationObserver stand-in the test fires by hand.
- * @param {string[]} names - Folder titles present at wire time.
- * @returns {Object} The doc, the buttons, the observer record and a sweep count.
- */
-function navHarness(names) {
-  const titles = names.map((name) => ({ textContent: name, parentElement: { name } }));
-  const button = (name) => ({
-    dataset: { workbenchFolder: name },
-    disabled: false,
-    addEventListener() {},
-    setAttribute() {},
-    removeAttribute() {},
-  });
-  const buttons = [button('Projection'), button('Lens')];
-  const nav = { querySelectorAll: () => buttons };
-  const gui = {};
-  const record = { observed: 0, disconnected: 0, callback: null, sweeps: 0 };
-  const doc = {
-    getElementById: (id) => (id === 'shader-workbench-nav' ? nav
-      : id === 'gui-container' ? gui : null),
-    querySelectorAll: () => { record.sweeps++; return titles; },
-  };
-  return { doc, buttons, record, titles };
-}
-
-test('the workbench nav stops observing once every stage folder exists', () => {
-  const savedObserver = globalThis.MutationObserver;
-  const savedWindow = globalThis.window;
-  try {
-    const { doc, buttons, record, titles } = navHarness(['Projection']);
-    globalThis.window = { addEventListener() {} };
-    globalThis.MutationObserver = class {
-      /** @param {Function} cb - Mutation callback. */
-      constructor(cb) { record.callback = cb; }
-      observe() { record.observed++; }
-      disconnect() { record.disconnected++; }
-    };
-
-    const observer = wireShaderWorkbenchNav(doc);
-    assert.ok(observer, 'a missing folder must leave the observer watching the mount');
-    assert.equal(record.observed, 1);
-    assert.equal(buttons[1].disabled, true, 'the absent stage stays disabled');
-    assert.equal(record.sweeps, 1, 'one DOM sweep per sync, not one per button');
-
-    titles.push({ textContent: 'Lens', parentElement: {} });
-    record.callback();
-    assert.equal(buttons[1].disabled, false);
-    assert.equal(record.disconnected, 1,
-      'the observer sweeps the GUI for the page lifetime after the last folder lands');
-  } finally {
-    globalThis.MutationObserver = savedObserver;
-    globalThis.window = savedWindow;
-  }
-});
-
-test('the workbench nav never observes when the GUI is already built', () => {
-  const savedObserver = globalThis.MutationObserver;
-  const savedWindow = globalThis.window;
-  try {
-    const { doc, record } = navHarness(['Projection', 'Lens']);
-    globalThis.window = { addEventListener() {} };
-    globalThis.MutationObserver = class {
-      /** @param {Function} cb - Mutation callback. */
-      constructor(cb) { record.callback = cb; }
-      observe() { record.observed++; }
-      disconnect() { record.disconnected++; }
-    };
-
-    assert.equal(wireShaderWorkbenchNav(doc), null);
-    assert.equal(record.observed, 0);
-  } finally {
-    globalThis.MutationObserver = savedObserver;
-    globalThis.window = savedWindow;
-  }
 });
 
 const MIGRATION = JSON.stringify({
@@ -553,6 +458,147 @@ test('returning to the scratch source drops the loaded document', async () => {
   assert.equal(harness.controller.save(), false);
   assert.match(harness.elements.get('shader-document-status').textContent,
     /Scratch Shader is active/);
+});
+
+// ── The chain rail over the real store, compiler and engine catalog ─────────
+
+const HEX_WAVE = readFileSync(
+  new URL('../shader/patterns/hex_wave.shader.json', import.meta.url), 'utf8');
+const ENGINE_CATALOG = readFileSync(
+  new URL('../shader/engine_catalog.json', import.meta.url), 'utf8');
+// No source documents: every load misses the fixed-effect digest catalog and
+// routes onto the chain engine, where the editor mounts.
+const EMPTY_MIGRATION = JSON.stringify({
+  source_documents: {}, product_group: { children: [] },
+});
+
+/**
+ * The document controller over the real compiler, the real chain store, and a
+ * FakeChainEngine, with the chain-editor mounts present and hex_wave loaded on
+ * the dynamic path.
+ * @returns {Promise<Object>} The controller and everything it wrote to.
+ */
+async function editorWorkbench() {
+  const engine = new FakeChainEngine();
+  const ids = ['shader-document-select', 'shader-preset-select',
+    'shader-document-open', 'shader-document-save', 'shader-document-file',
+    'shader-document-status'];
+  const elements = new Map(ids.map((id) =>
+    [id, fakeElement(id.endsWith('select') ? 'select' : 'div')]));
+  for (const mount of ['chain-editor', 'chain-catalog']) {
+    const element = fakeElement('section');
+    element.setPointerCapture = () => {};
+    element.hasPointerCapture = () => true;
+    element.releasePointerCapture = () => {};
+    elements.set(mount, element);
+  }
+  const doc = installDocument({
+    body: fakeElement('body'),
+    activeElement: null,
+    getElementById: (id) => elements.get(id) ?? null,
+    createElement: (tag) => fakeElement(tag),
+  });
+  const downloads = [];
+  const selections = [];
+  const filters = [];
+  const ran = { gui: 0, invalidated: 0 };
+  const controller = createShaderDocumentController({
+    doc,
+    getEngine: () => engine,
+    getModule: () => MODULE,
+    selectEffect: (effect) => { selections.push(effect); return true; },
+    syncEffectGui: () => { ran.gui += 1; },
+    invalidate: () => { ran.invalidated += 1; },
+    setParamFilter: (filter) => filters.push(filter),
+    fetchText: async (url) => {
+      const name = String(url).split('/').pop();
+      if (name === 'shaderball_migration.json') return EMPTY_MIGRATION;
+      if (name === 'engine_catalog.json') return ENGINE_CATALOG;
+      throw new Error(`404 ${name}`);
+    },
+    importCompiler: () => import('../shader/shader_workbench.mjs'),
+    download: (filename, source) => downloads.push([filename, source]),
+  });
+  assert.equal(await controller.init(), true);
+  assert.equal(await controller.loadSource(HEX_WAVE, 'study.shader.json'), true);
+  return { controller, engine, elements, downloads, selections, filters, ran };
+}
+
+const railCards = (harness) =>
+  harness.elements.get('chain-editor').querySelectorAll('.chain-card');
+
+test('a dynamic document builds the rail, and edits re-apply through the engine', async () => {
+  const harness = await editorWorkbench();
+  assert.deepEqual(harness.selections, ['ShaderChain']);
+  assert.equal(harness.engine.chainCalls.length, 1);
+  assert.equal(harness.engine.chainCalls[0].length, 7);
+  assert.equal(railCards(harness).length, 7);
+  assert.equal(harness.elements.get('chain-catalog')
+    .querySelectorAll('.chain-catalog-entry').length, 34);
+
+  // Insert a wave shear through a plane-band gap's palette.
+  const mount = harness.elements.get('chain-editor');
+  mount.querySelectorAll('.chain-gap')
+    .find((gap) => gap.dataset.index === '4').dispatch('click');
+  mount.querySelectorAll('.chain-palette-entry')
+    .find((entry) => entry.dataset.operator === 'warp.wave-shear.v2')
+    .dispatch('click');
+
+  assert.equal(harness.engine.chainCalls.length, 2);
+  assert.equal(harness.engine.chainCalls[1].length, 8);
+  assert.ok(harness.engine.writes.some(([name]) => name === 'warp1.strength'),
+    'the re-apply carries the backfilled catalog defaults');
+
+  // Save exports the store's edited document, not the load-time compile.
+  assert.equal(harness.controller.save(), true);
+  const saved = JSON.parse(harness.downloads[0][1]);
+  assert.equal(saved.descriptor.chain.length, 8);
+  assert.ok(Object.keys(saved.preset_bank.presets[0].values)
+    .some((id) => id.startsWith('warp1.')));
+});
+
+test('selecting a card publishes the instance filter and the catalog drop context', async () => {
+  const harness = await editorWorkbench();
+  railCards(harness).find((card) => card.dataset.label === 'lens')
+    .dispatch('click');
+
+  assert.equal(harness.filters.at(-1)?.prefix, 'lens.');
+  assert.equal(typeof harness.filters.at(-1)?.deactivated, 'function');
+  assert.ok(harness.ran.gui > 0, 'the selection resyncs the parameter GUI');
+
+  // The catalog's click-insert context is the gap after lens — a sphere gap.
+  const catalogEntries = harness.elements.get('chain-catalog')
+    .querySelectorAll('.chain-catalog-entry');
+  const wave = catalogEntries.find(
+    (entry) => entry.dataset.operator === 'warp.wave-shear.v2');
+  assert.equal(wave.getAttribute('aria-disabled'), 'true');
+  assert.match(wave.querySelector('.chain-catalog-reason').textContent,
+    /plane carrier/);
+  assert.equal(catalogEntries.find(
+    (entry) => entry.dataset.operator === 'sphere.lens.mobius.v2')
+    .getAttribute('aria-disabled'), null);
+});
+
+test('a bypass reshapes the engine program while the saved document keeps the stage', async () => {
+  const harness = await editorWorkbench();
+  const writesBefore = harness.engine.writes.length;
+  railCards(harness).find((card) => card.dataset.label === 'lens')
+    .querySelector('.chain-card-bypass').dispatch('click');
+
+  const shape = harness.engine.chainCalls.at(-1);
+  assert.equal(shape.length, 6);
+  assert.ok(!shape.some((entry) => entry.instance === 'lens'));
+  assert.ok(harness.engine.writes.length > writesBefore,
+    'the re-apply rewrote the surviving instances');
+  assert.ok(!harness.engine.writes.slice(writesBefore)
+    .some(([name]) => name.startsWith('lens.')),
+  'a bypassed instance registers no parameters, so its values are skipped');
+
+  assert.equal(harness.controller.save(), true);
+  const saved = JSON.parse(harness.downloads.at(-1)[1]);
+  assert.equal(saved.descriptor.chain.length, 7);
+  assert.ok(saved.descriptor.chain.some((entry) => entry.label === 'lens'),
+    'bypass is session state, never serialized');
 });
 
 test('legacy custom Shader URLs preserve their state on the workbench route', () => {

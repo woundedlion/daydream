@@ -25,16 +25,30 @@ const paramSetResultName = (module, result) =>
  * after the chain lands; enum8 values (topology fields included) are written
  * as the option index that snapshot resolves them to.
  *
+ * A session bypass compiles a program shape that omits document entries; the
+ * omitted instances register no engine parameters, so their preset values are
+ * skipped rather than refused — the document still carries them, which is what
+ * keeps a bypass an A/B toggle instead of a document edit.
+ *
  * @param {{engine: *, module: *, compiled: CompiledDocument, presetId: string,
- *   syncEffectGui: () => void, invalidate: () => void}} apply
+ *   syncEffectGui: () => void, invalidate: () => void,
+ *   programShape?: Array<{instance: string, operator: string}>|null}} apply -
+ *   programShape overrides the chain sent to the engine (the document chain
+ *   minus the session-bypassed instances); omitted, the document chain is sent
+ *   whole.
  * @returns {string|null} Refusal reason, or null once applied.
  */
 export function applyChainDocument({
   engine, module, compiled, presetId, syncEffectGui, invalidate,
+  programShape = null,
 }) {
-  const chain = compiled.document.descriptor.chain.map(
-    (/** @type {{label: string, operator: string}} */ entry) =>
-      ({ instance: entry.label, operator: entry.operator }));
+  const documentChain = /** @type {Array<{label: string, operator: string}>} */ (
+    compiled.document.descriptor.chain);
+  const chain = programShape
+    ?? documentChain.map((entry) => ({ instance: entry.label, operator: entry.operator }));
+  const live = new Set(chain.map((entry) => entry.instance));
+  const bypassed = new Set(
+    documentChain.map((entry) => entry.label).filter((label) => !live.has(label)));
   const result = engine.setShaderChain(chain);
   if (result?.code !== 'APPLIED') {
     const code = result?.code ?? 'no result';
@@ -50,6 +64,8 @@ export function applyChainDocument({
     (/** @type {*} */ candidate) => candidate.preset_id === presetId)
     ?? presets[0];
   for (const [parameterId, value] of Object.entries(preset?.values ?? {})) {
+    const dot = parameterId.indexOf('.');
+    if (dot > 0 && bypassed.has(parameterId.slice(0, dot))) continue;
     const definition = definitions.find(
       (candidate) => candidate.name === parameterId);
     if (!definition) return `the chain registered no parameter "${parameterId}"`;

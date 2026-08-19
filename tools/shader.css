@@ -1,6 +1,6 @@
 .shader-workbench-nav {
-  width: 13rem;
-  flex: 0 0 13rem;
+  width: 16rem;
+  flex: 0 0 16rem;
   overflow-y: auto;
   padding: 0.75rem;
   border-right: 1px solid var(--panel-border);
@@ -60,30 +60,258 @@
   line-height: 1.35;
 }
 
-.shader-workbench-nav button {
+/* ── Chain rail ──────────────────────────────────────────────────────────── */
+
+.chain-editor {
+  margin: 0 0 0.875rem;
+  padding: 0 0 0.75rem;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.chain-actions {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.chain-actions button {
+  flex: 1;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--panel-text);
+  font-size: 0.6875rem;
+  cursor: pointer;
+}
+
+.chain-actions button:disabled {
+  color: var(--muted-text);
+  cursor: default;
+}
+
+.chain-band {
+  margin-bottom: 0.125rem;
+  padding: 0.125rem 0.25rem 0.25rem;
+  border-left: 2px solid var(--panel-border);
+}
+
+.chain-band-title {
+  color: var(--muted-text);
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chain-card {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.25rem;
+  background: var(--panel-bg);
+  font-size: 0.75rem;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.chain-card:hover,
+.chain-card:focus-visible {
+  border-color: var(--accent);
+  color: var(--bright-text);
+}
+
+.chain-card[aria-current="true"] {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--bright-text);
+}
+
+.chain-card--crossing {
+  margin: 0.125rem 0;
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.chain-card--bypassed .chain-card-name,
+.chain-card--bypassed .chain-card-label {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.chain-card[data-dragging="true"] {
+  opacity: 0.5;
+}
+
+.chain-card-label,
+.chain-card-pair {
+  color: var(--muted-text);
+  font-size: 0.6875rem;
+}
+
+.chain-card-pair {
+  margin-left: auto;
+}
+
+.chain-card-bypass {
+  margin-left: auto;
+  padding: 0.0625rem 0.25rem;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--muted-text);
+  font-size: 0.625rem;
+  cursor: pointer;
+}
+
+.chain-card-bypass:hover,
+.chain-card-bypass:focus-visible {
+  border-color: var(--accent);
+  color: var(--bright-text);
+}
+
+.chain-card-bypass[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.chain-gap {
+  display: block;
   width: 100%;
-  margin-bottom: 0.25rem;
-  padding: 0.5rem 0.625rem;
+  margin: 0.0625rem 0;
+  padding: 0;
+  border: 1px dashed transparent;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--muted-text);
+  font-size: 0.625rem;
+  line-height: 0.75rem;
+  cursor: pointer;
+}
+
+.chain-gap:hover,
+.chain-gap:focus-visible,
+.chain-gap[data-drop="legal"] {
+  border-color: var(--panel-border);
+  color: var(--panel-text);
+}
+
+.chain-gap[data-drop="active"] {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--accent);
+}
+
+.chain-palette {
+  margin: 0.25rem 0;
+  padding: 0.25rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.25rem;
+  background: var(--panel-bg);
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.chain-palette-entry {
+  padding: 0.25rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.6875rem;
+  cursor: pointer;
+}
+
+.chain-palette-entry:hover,
+.chain-palette-entry:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--bright-text);
+}
+
+.chain-palette-entry[aria-disabled="true"] {
+  color: var(--muted-text);
+  cursor: default;
+}
+
+.chain-palette-entry--remove {
+  color: var(--bright-text);
+  border-bottom: 1px solid var(--panel-border);
+  border-radius: 0.25rem 0.25rem 0 0;
+}
+
+.chain-palette-reason {
+  display: block;
+  color: var(--muted-text);
+  font-size: 0.625rem;
+  line-height: 1.3;
+}
+
+.chain-editor-status {
+  min-height: 1rem;
+  margin-top: 0.375rem;
+  color: var(--muted-text);
+  font-size: 0.6875rem;
+  overflow-wrap: anywhere;
+}
+
+/* ── Operator catalog panel ──────────────────────────────────────────────── */
+
+.chain-catalog {
+  display: block;
+}
+
+.chain-catalog-band {
+  margin-bottom: 0.5rem;
+}
+
+.chain-catalog-title {
+  margin: 0.25rem 0;
+  color: var(--muted-text);
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chain-catalog-entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem;
+  width: 100%;
+  margin-bottom: 0.125rem;
+  padding: 0.25rem 0.375rem;
   border: 1px solid transparent;
   border-radius: 0.25rem;
   background: transparent;
   color: var(--panel-text);
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   text-align: left;
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
 }
 
-.shader-workbench-nav button:hover,
-.shader-workbench-nav button:focus-visible,
-.shader-workbench-nav button[aria-current="true"] {
+.chain-catalog-entry:hover,
+.chain-catalog-entry:focus-visible {
   border-color: var(--accent);
   background: var(--panel-bg);
   color: var(--bright-text);
 }
 
-.shader-workbench-nav button:disabled {
+.chain-catalog-entry[aria-disabled="true"] {
   color: var(--muted-text);
-  cursor: wait;
+  cursor: default;
+}
+
+.chain-catalog-pair {
+  margin-left: auto;
+  color: var(--muted-text);
+  font-size: 0.625rem;
+}
+
+.chain-catalog-reason {
+  flex-basis: 100%;
+  color: var(--muted-text);
+  font-size: 0.625rem;
+  line-height: 1.3;
 }
 
 #gui-container .lil-controller.lil-option select,
@@ -93,47 +321,18 @@
   background-color: var(--background-color);
 }
 
+/* A field the current topology value deactivates stays present and editable;
+   only the engine stops reading it. */
+#gui-container .lil-controller.param-deactivated {
+  opacity: 0.45;
+}
+
 @media (max-width: 768px) {
   .shader-workbench-nav {
     width: 100%;
     flex-basis: auto;
-    display: flex;
-    gap: 0.25rem;
-    overflow-x: auto;
-    padding: 0.375rem;
+    max-height: 45vh;
     border-right: 0;
     border-bottom: 1px solid var(--panel-border);
-  }
-
-  .shader-workbench-nav h2 {
-    display: none;
-  }
-
-  .shader-document-controls {
-    display: grid;
-    grid-template-columns: minmax(9rem, 1fr) minmax(7rem, 1fr) auto;
-    gap: 0.25rem;
-    align-items: end;
-    min-width: 31rem;
-    margin: 0 0.375rem 0 0;
-    padding: 0 0.375rem 0 0;
-    border-right: 1px solid var(--panel-border);
-    border-bottom: 0;
-  }
-
-  .shader-document-controls label,
-  .shader-document-controls output {
-    display: none;
-  }
-
-  .shader-document-actions {
-    margin: 0;
-  }
-
-  .shader-workbench-nav button {
-    width: auto;
-    flex: 0 0 auto;
-    margin: 0;
-    white-space: nowrap;
   }
 }

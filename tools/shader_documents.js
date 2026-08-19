@@ -4,6 +4,9 @@
  */
 
 import { applyChainDocument } from './chain_apply.js';
+import { createChainDocumentStore } from './chain_document_store.js';
+import { createChainEditor, deactivatedParamNames } from './chain_editor.js';
+import { createChainCatalogPanel } from './chain_catalog_panel.js';
 
 const MIGRATION_URL = '../shader/patterns/shaderball_migration.json';
 const CATALOG_URL = '../shader/engine_catalog.json';
@@ -307,11 +310,12 @@ function defaultDownload(doc, filename, source) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Owns document import, validation, preview selection, and export UI. */
+/** Owns document import, validation, preview selection, editing, and export UI. */
 /**
  * @param {{doc: Document, getEngine: () => *, getModule: () => *,
  * selectEffect: (effect: string) => boolean,
  * syncEffectGui: () => void, invalidate: () => void,
+ * setParamFilter?: (filter: {prefix: string, deactivated?: Function}|null) => void,
  * fetchText?: (url: string) => Promise<string>, importCompiler?: () => Promise<*>,
  * download?: (filename: string, source: string) => void}} dependencies
  */
@@ -322,6 +326,7 @@ export function createShaderDocumentController({
   selectEffect,
   syncEffectGui,
   invalidate,
+  setParamFilter = () => {},
   fetchText = async (url) => {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
@@ -344,6 +349,11 @@ export function createShaderDocumentController({
     doc.getElementById('shader-document-status'));
   if (!sourceSelect || !presetSelect || !openButton || !saveButton
       || !fileInput || !status) return null;
+  // The chain rail and catalog panel mount here on the workbench page; a page
+  // without the mounts (or a compiler without the validator) previews documents
+  // but offers no structural editing.
+  const editorMount = doc.getElementById('chain-editor');
+  const catalogMount = doc.getElementById('chain-catalog');
 
   /** @type {*} */
   let compiler;
@@ -353,6 +363,8 @@ export function createShaderDocumentController({
   let catalog = new Map();
   /** @type {*|null} */
   let operatorCatalog = null;
+  /** @type {{store: *, editor: *, panel: *}|null} */
+  let chainUi = null;
 
   /** @param {string} message @param {boolean} [error] */
   const show = (message, error = false) => {
@@ -381,13 +393,18 @@ export function createShaderDocumentController({
       return false;
     }
     // applyChainDocument owns the GUI resync and repaint (its apply order is
-    // fixed); the fixed path runs them here.
+    // fixed); the fixed path runs them here. With the editor live, the store's
+    // document is the authority (the imported compile goes stale on the first
+    // structural edit) and its program shape carries the session bypasses.
+    const store = chainUi?.store ?? null;
     const refusal = active.fixed
       ? applyFixedShaderDocument(
         engine, module, active.compiled, presetId, active.referencePresetIds)
       : applyChainDocument({
-        engine, module, compiled: active.compiled, presetId,
-        syncEffectGui, invalidate,
+        engine, module,
+        compiled: store ? { document: store.document() } : active.compiled,
+        programShape: store ? store.programShape() : null,
+        presetId, syncEffectGui, invalidate,
       });
     if (refusal) {
       show(`Preset "${presetId}" could not be applied: ${refusal}`, true);
@@ -402,6 +419,65 @@ export function createShaderDocumentController({
       ?? active.compiled.document.document_id;
     show(`${title} · ${presetSelect.selectedOptions[0]?.textContent ?? presetId}`);
     return true;
+  };
+
+  const teardownChainUi = () => {
+    if (chainUi === null) return;
+    chainUi.editor.destroy();
+    chainUi.panel.destroy();
+    chainUi = null;
+    setParamFilter(null);
+  };
+
+  // The catalog panel's click-insert legality tracks the drop context: the gap
+  // after the selected card. No selection clears it, leaving every entry
+  // draggable and click-inserting at the first legal gap.
+  const refreshCatalogLegality = () => {
+    if (chainUi === null) return;
+    const selected = chainUi.store.selectedLabel();
+    if (selected === null) {
+      chainUi.panel.setLegality(null);
+      return;
+    }
+    const gap = chainUi.store.chain()
+      .findIndex((/** @type {*} */ entry) => entry.label === selected) + 1;
+    chainUi.panel.setLegality(chainUi.store.legalInsertions(gap));
+  };
+
+  /**
+   * Builds the chain rail and catalog panel over one document store, wiring
+   * every structural edit, undo and bypass toggle back through the one apply
+   * path and the selection into the parameter GUI's instance filter.
+   * @param {*} document - The compiled (valid) v2 document to edit.
+   */
+  const buildChainUi = async (document) => {
+    const store = /** @type {*} */ (await createChainDocumentStore({
+      document, catalog: operatorCatalog, importCompiler,
+    }));
+    const editor = /** @type {*} */ (createChainEditor({
+      doc,
+      container: editorMount,
+      store,
+      catalog: operatorCatalog,
+      onApply: () => {
+        applyPreset(active?.presetId ?? presetSelect.value);
+        refreshCatalogLegality();
+      },
+      onSelect: (/** @type {string|null} */ label) => {
+        setParamFilter(label === null
+          ? null : { prefix: `${label}.`, deactivated: deactivatedParamNames });
+        syncEffectGui();
+        refreshCatalogLegality();
+      },
+    }));
+    const panel = createChainCatalogPanel({
+      doc,
+      container: catalogMount,
+      catalog: operatorCatalog,
+      drag: editor.drag,
+      onPick: (/** @type {string} */ operatorId) => editor.insertOperator(operatorId),
+    });
+    chainUi = { store, editor, panel };
   };
 
   /**
@@ -425,6 +501,7 @@ export function createShaderDocumentController({
       candidate.descriptorDigest === compiled.descriptor_digest);
     const fixed = official !== undefined;
     const effect = fixed ? official.effectId : CHAIN_EFFECT;
+    teardownChainUi();
     if (!selectEffect(effect)) {
       show(`The preview engine rejected effect "${effect}".`, true);
       return false;
@@ -438,6 +515,17 @@ export function createShaderDocumentController({
     };
     populatePresets(compiled);
     saveButton.disabled = false;
+    if (!fixed && editorMount && catalogMount
+        && typeof compiler.validateShaderDocument === 'function') {
+      try {
+        await buildChainUi(compiled.document);
+        refreshCatalogLegality();
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        show(`The chain editor could not adopt the document: ${detail}`, true);
+        return false;
+      }
+    }
     const presetId = compiled.document.preset_bank.presets[0]?.preset_id;
     if (!presetId) {
       show('The document is valid, but it carries no preset to preview.', true);
@@ -448,7 +536,11 @@ export function createShaderDocumentController({
 
   const save = () => {
     if (!active) return false;
-    const document = structuredClone(active.compiled.document);
+    // With the editor live, the store's document carries every structural edit
+    // and reconciliation; the imported compile is only the load-time snapshot.
+    const document = chainUi
+      ? chainUi.store.document()
+      : structuredClone(active.compiled.document);
     const preset = document.preset_bank.presets
       .find((/** @type {*} */ candidate) => candidate.preset_id === active.presetId);
     if (preset) {
@@ -522,6 +614,7 @@ export function createShaderDocumentController({
   sourceSelect.addEventListener('change', async () => {
     const option = sourceSelect.selectedOptions[0];
     if (!option?.value) {
+      teardownChainUi();
       selectEffect('Shader');
       active = null;
       presetSelect.replaceChildren();
