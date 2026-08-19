@@ -54,6 +54,7 @@
     "segment_stats_view.js",
     "segment_worker.js",
     "tools/banner.js",
+    "tools/chain_document_store.js",
     "tools/clipboard.js",
     "tools/color.js",
     "tools/copy_text.js",
