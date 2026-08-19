@@ -206,12 +206,12 @@
     "assertions": 149
   },
   "tests/shader_document.test.js": {
-    "cases": 17,
-    "assertions": 243
+    "cases": 29,
+    "assertions": 377
   },
   "tests/shader_workbench.test.js": {
-    "cases": 28,
-    "assertions": 50
+    "cases": 26,
+    "assertions": 109
   },
   "tests/shared.test.js": {
     "cases": 15,

@@ -76,9 +76,30 @@ tools/solid_op_rows.js
 tools/solid_registry_codegen.js
 tools/solid_render.js
 
-# Shader workbench: the document compiler and the pattern documents the source
-# catalog fetches by name at runtime.
-shader
+# Shader workbench: the document compiler, the operator catalog, and the v2
+# pattern documents the source catalog fetches by name at runtime. Listed file
+# by file so the v1 expansion fixtures under shader/patterns/v1/ do not ship.
+shader/sha256.mjs
+shader/shader_workbench.mjs
+shader/engine_catalog.json
+shader/patterns/shaderball_migration.json
+shader/patterns/digest_migration.v1v2.json
+shader/patterns/alien_ocean.shader.json
+shader/patterns/contour_lattice.shader.json
+shader/patterns/cosmic_eyeball.shader.json
+shader/patterns/curl_lattice.shader.json
+shader/patterns/equator_grid.shader.json
+shader/patterns/example.shader.json
+shader/patterns/facet_grid.shader.json
+shader/patterns/facet_wave.shader.json
+shader/patterns/glitch_grid.shader.json
+shader/patterns/hex_wave.shader.json
+shader/patterns/kaleido_wave.shader.json
+shader/patterns/mobius_grid.shader.json
+shader/patterns/prism_lattice.shader.json
+shader/patterns/prism_spiral.shader.json
+shader/patterns/signal_weave.shader.json
+shader/patterns/vector_facets.shader.json
 
 # Documentation the deploy gate pins to the engine checkout.
 README.md

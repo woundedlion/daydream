@@ -1,0 +1,628 @@
+{
+  "schema_version": 1,
+  "catalog_version": 1,
+  "document_id": "kaleido-wave-v1",
+  "effect_id": "kaleido-wave",
+  "descriptor": {
+    "graph": {
+      "nodes": [
+        {
+          "label": "camera",
+          "role": "outer_camera",
+          "operator": "pullback.outer_camera.v1",
+          "policy": {
+            "base_orientation": "negative-z-to-negative-y"
+          }
+        },
+        {
+          "label": "surface",
+          "role": "surface_project",
+          "operator": "pullback.surface_project.v1",
+          "policy": {
+            "pre_lens_surface": "identity",
+            "lens": "kaleidoscope",
+            "post_lens_surface": "identity",
+            "projection": "stereographic"
+          }
+        },
+        {
+          "label": "warp",
+          "role": "planar_warp",
+          "operator": "pullback.planar_warp.v1",
+          "policy": {
+            "sequence": [
+              "identity",
+              "mirror-tile"
+            ]
+          }
+        },
+        {
+          "label": "source",
+          "role": "source",
+          "operator": "pullback.source.v1",
+          "policy": {
+            "source": "twin-wave"
+          }
+        },
+        {
+          "label": "material",
+          "role": "material",
+          "operator": "pullback.material.v1",
+          "policy": {
+            "weight": "projection",
+            "transfer": "linear",
+            "coverage": "projection-squared"
+          }
+        },
+        {
+          "label": "color",
+          "role": "color",
+          "operator": "pullback.color.v1",
+          "policy": {
+            "color": "generated-palette",
+            "hue_mode": "noise",
+            "brightness_envelope": "none"
+          },
+          "resources": [
+            "triadic-palette",
+            "hue-noise"
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "from": "camera",
+          "to": "surface"
+        },
+        {
+          "from": "surface",
+          "to": "warp"
+        },
+        {
+          "from": "warp",
+          "to": "source"
+        },
+        {
+          "from": "source",
+          "to": "material"
+        },
+        {
+          "from": "material",
+          "to": "color"
+        }
+      ]
+    },
+    "parameters": [
+      {
+        "id": "pattern-freq",
+        "binding": "pattern.freq",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0.1,
+          "maximum": 20
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 1
+      },
+      {
+        "id": "speed",
+        "binding": "speed",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "turn-per-frame",
+        "domain": {
+          "minimum": 0,
+          "maximum": 0.5
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "drift",
+        "binding": "drift",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1.25
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "source-angle-speed",
+        "binding": "source.angle.speed",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "turn-per-frame",
+        "domain": {
+          "minimum": 0,
+          "maximum": 0.05000000074505806
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "pole-fade",
+        "binding": "pole.fade",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 1,
+          "maximum": 20
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 1
+      },
+      {
+        "id": "camera-wander",
+        "binding": "camera.wander",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "inner-speed",
+        "binding": "inner.speed",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "turn-per-frame",
+        "domain": {
+          "minimum": -0.02,
+          "maximum": 0.02
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "inner-rotation",
+        "binding": "inner.rotation",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "radian",
+        "domain": {
+          "minimum": -6.2831854820251465,
+          "maximum": 6.2831854820251465
+        },
+        "interpolation": {
+          "kind": "SHORTEST_PERIODIC",
+          "period": 6.2831854820251465
+        },
+        "default": 0
+      },
+      {
+        "id": "inner-cell-x",
+        "binding": "inner.cell.x",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0.015625,
+          "maximum": 8
+        },
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
+        },
+        "default": 1
+      },
+      {
+        "id": "inner-cell-y",
+        "binding": "inner.cell.y",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0.015625,
+          "maximum": 8
+        },
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
+        },
+        "default": 1
+      },
+      {
+        "id": "inner-offset-x",
+        "binding": "inner.offset.x",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -8,
+          "maximum": 8
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "inner-offset-y",
+        "binding": "inner.offset.y",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -8,
+          "maximum": 8
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "palette-chroma",
+        "binding": "palette.chroma",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0.62
+      },
+      {
+        "id": "palette-mapping",
+        "binding": "color.palette-mapping",
+        "classification": "preset",
+        "storage": "enum8",
+        "unit": "mapping",
+        "domain": {
+          "values": [
+            "cup",
+            "bell",
+            "linear",
+            "reverse"
+          ]
+        },
+        "interpolation": {
+          "kind": "MIXED_ENUM"
+        },
+        "default": "linear"
+      },
+      {
+        "id": "mapping-frequency",
+        "binding": "mapping.frequency",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0.01,
+          "maximum": 32
+        },
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
+        },
+        "default": 1
+      },
+      {
+        "id": "mapping-phase",
+        "binding": "mapping.phase",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -1,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "phase-oscillation-depth",
+        "binding": "phase.oscillation.depth",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "phase-oscillation-speed",
+        "binding": "phase.oscillation.speed",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "turn-per-frame",
+        "domain": {
+          "minimum": -0.02,
+          "maximum": 0.02
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "value-opacity-low",
+        "binding": "value.opacity.low",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 1
+      },
+      {
+        "id": "value-opacity-high",
+        "binding": "value.opacity.high",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 1
+      },
+      {
+        "id": "hue-shift-amount",
+        "binding": "hue.shift.amount",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": -4,
+          "maximum": 4
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "projection-spin-speed",
+        "binding": "projection.spin.speed",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "turn-per-frame",
+        "domain": {
+          "minimum": 0,
+          "maximum": 0.05
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "projection-wander",
+        "binding": "projection.wander",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "hue-noise-scale",
+        "binding": "hue.noise.scale",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0.015625,
+          "maximum": 8
+        },
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
+        },
+        "default": 1
+      },
+      {
+        "id": "hue-noise-speed",
+        "binding": "hue.noise.speed",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "turn-per-frame",
+        "domain": {
+          "minimum": -0.001,
+          "maximum": 0.001
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      }
+    ],
+    "path_policies": [
+      {
+        "id": "parallel",
+        "kind": "PARALLEL"
+      }
+    ],
+    "clocks": [
+      {
+        "id": "palette-cycle",
+        "kind": "generated-palette-cycle",
+        "settings": {
+          "fade": 600
+        }
+      },
+      {
+        "id": "transition-progress",
+        "kind": "completed-frame",
+        "settings": {
+          "pause": "parameter-animation"
+        }
+      }
+    ],
+    "preparation": [
+      {
+        "id": "spatial-frames",
+        "kind": "prepare-orientation-conjugates"
+      },
+      {
+        "id": "hue-luts",
+        "kind": "prepare-hue-luts"
+      },
+      {
+        "id": "warp-carriers",
+        "kind": "prepare-fixed-warps"
+      }
+    ],
+    "resources": [
+      {
+        "id": "triadic-palette",
+        "kind": "generated-triadic-palette",
+        "settings": {
+          "hue_step": 159
+        }
+      },
+      {
+        "id": "hue-noise",
+        "kind": "simplex-sphere-scalar",
+        "settings": {
+          "seed": 6047
+        }
+      }
+    ],
+    "serialization": {
+      "schema_version": 1,
+      "fields": [
+        "pattern-freq",
+        "speed",
+        "drift",
+        "source-angle-speed",
+        "pole-fade",
+        "camera-wander",
+        "inner-speed",
+        "inner-rotation",
+        "inner-cell-x",
+        "inner-cell-y",
+        "inner-offset-x",
+        "inner-offset-y",
+        "palette-chroma",
+        "palette-mapping",
+        "mapping-frequency",
+        "mapping-phase",
+        "phase-oscillation-depth",
+        "phase-oscillation-speed",
+        "value-opacity-low",
+        "value-opacity-high",
+        "hue-shift-amount",
+        "projection-spin-speed",
+        "projection-wander",
+        "hue-noise-scale",
+        "hue-noise-speed"
+      ]
+    },
+    "approximation": [
+      {
+        "id": "hue-luts",
+        "kind": "registered-oracle",
+        "settings": {
+          "oracle": "hue-luts-v1"
+        }
+      }
+    ],
+    "handoff": {
+      "policy": "reset"
+    }
+  },
+  "preset_bank": {
+    "schema_version": 1,
+    "presets": [
+      {
+        "preset_id": "twin-wave",
+        "display_name": "Twin Wave",
+        "values": {
+          "pattern-freq": 4.9755,
+          "speed": 0.125,
+          "drift": 0.8,
+          "source-angle-speed": 0.05,
+          "pole-fade": 4.971,
+          "camera-wander": 1,
+          "inner-speed": 0,
+          "inner-rotation": 0,
+          "inner-cell-x": 1,
+          "inner-cell-y": 1,
+          "inner-offset-x": 0,
+          "inner-offset-y": 0,
+          "palette-chroma": 0.361,
+          "palette-mapping": "linear",
+          "mapping-frequency": 1,
+          "mapping-phase": 0,
+          "phase-oscillation-depth": 0,
+          "phase-oscillation-speed": 0,
+          "value-opacity-low": 1,
+          "value-opacity-high": 1,
+          "hue-shift-amount": 0.27,
+          "projection-spin-speed": 0,
+          "projection-wander": 1,
+          "hue-noise-scale": 2.2033439,
+          "hue-noise-speed": -0.00040800002
+        }
+      }
+    ],
+    "edges": [],
+    "absent_edge_fallback": {
+      "manual": "SNAP",
+      "automatic": "REJECT",
+      "synchronized": "SNAP",
+      "restore": "SNAP",
+      "authoring": "SNAP"
+    },
+    "choreography": {
+      "generated_order": [
+        "twin-wave"
+      ],
+      "dwell": {
+        "twin-wave": 600
+      }
+    }
+  },
+  "effect_metadata": {
+    "display_name": "Kaleido Wave",
+    "description": "A drifting twin wave reflected through a kaleidoscope."
+  }
+}

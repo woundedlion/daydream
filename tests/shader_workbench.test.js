@@ -38,52 +38,29 @@ test('simulator exposes Shader as a standalone tool', () => {
   assert.match(WORKBENCH_CSS, /background-color:\s*var\(--background-color\)/);
 });
 
-test('document parameter IDs map to dynamic stage controls', () => {
-  assert.equal(engineParameterName('pattern-freq'), 'Pattern Freq');
-  assert.equal(engineParameterName('outer-cell-x'), 'Planar Warp 1 Cell X');
-  assert.equal(engineParameterName('inner-speed'), 'Planar Warp 2 Speed');
-  assert.equal(engineParameterName('edge-width'), 'Edge Fade Width');
-  assert.equal(engineParameterName('source-angle-speed'), 'Source Angle Speed');
+// The alias table serves effects promoted before the chain schema: a v2
+// parameter id is <label>.<field>, and the label picks the family whose
+// registered control names the field maps onto.
+test('v2 document parameter IDs map to pre-spec promoted controls', () => {
+  assert.equal(engineParameterName('sample.pattern-freq'), 'Pattern Freq');
+  assert.equal(engineParameterName('sample.angle-speed'), 'Source Angle Speed');
+  assert.equal(engineParameterName('sample.edge-width'), 'Edge Fade Width');
+  assert.equal(engineParameterName('warp1.cell-x'), 'Planar Warp 1 Cell X');
+  assert.equal(engineParameterName('warp2.speed'), 'Planar Warp 2 Speed');
+  assert.equal(engineParameterName('project.pole-fade'), 'Pole Fade');
+  assert.equal(engineParameterName('project.camera-wander'), 'Camera Wander');
+  assert.equal(engineParameterName('surface.scale'), 'Surface Noise Scale');
+  assert.equal(engineParameterName('lens.a-re'), 'Mobius A Re');
+  assert.equal(engineParameterName('transfer.iso-level'), 'Iso Contour Level');
+  assert.equal(engineParameterName('colorize.palette-mapping'), 'Palette Mapping');
+  assert.equal(engineParameterName('colorize.hue-shift-amount'), 'Hue Shift Amount');
 });
 
 const MODULE = { ParamSetResult };
 
-const dynamicDefinitions = () => [
-  { name: 'Function', options: ['Grid'] },
-  { name: 'Projection', options: ['Stereographic'] },
-  { name: 'Surface Noise', options: ['None'] },
-  { name: 'Lens', options: ['None'] },
-  { name: 'Planar Warp 1', options: ['None'] },
-  { name: 'Planar Warp 2', options: ['None'] },
-  { name: 'Signal Weight', options: ['Projection'] },
-  { name: 'Value Transfer', options: ['Linear'] },
-  { name: 'Coverage', options: ['Opaque'] },
-  { name: 'Palette', options: ['Generated Triadic'] },
-  { name: 'Hue Shift Mode', options: ['Noise'] },
-  { name: 'Brightness Envelope', options: ['None'] },
-  { name: 'Pattern Freq' },
-];
-
-const dynamicDocument = () => ({ document: {
-  descriptor: { graph: { nodes: [
-    { role: 'surface_project', policy: {
-      pre_lens_surface: 'identity', lens: 'identity', projection: 'stereographic',
-    } },
-    { role: 'planar_warp', policy: { sequence: ['identity', 'identity'] } },
-    { role: 'source', policy: { source: 'grid' } },
-    { role: 'material', policy: {
-      weight: 'projection', transfer: 'linear', coverage: 'opaque',
-    } },
-    { role: 'color', policy: {
-      color: 'generated-palette', hue_mode: 'noise', brightness_envelope: 'none',
-    } },
-  ] } },
-  preset_bank: { presets: [{ preset_id: 'study', values: { 'pattern-freq': 3.5 } }] },
-} });
-
 /** @param {(name: string) => Object} answer */
 function dynamicEngine(answer) {
-  const definitions = dynamicDefinitions();
+  const definitions = [{ name: 'Pattern Freq' }];
   const writes = [];
   return {
     writes,
@@ -92,42 +69,26 @@ function dynamicEngine(answer) {
   };
 }
 
-test('dynamic document preview snaps structure before applying preset values', () => {
+// A chain document has no structural dropdowns to write; its dynamic preview
+// goes through setShaderChain, which lands with the D2 engine update, so until
+// then the dynamic path refuses before touching the engine.
+test('a chain document is refused pending the chain engine', () => {
   const engine = dynamicEngine(() => ParamSetResult.APPLIED);
+  const compiled = { document: {
+    descriptor: { chain: [{ label: 'camera', operator: 'sphere.rotate.v2' }] },
+    preset_bank: { presets: [{ preset_id: 'study', values: {} }] },
+  } };
 
-  assert.equal(
-    applyDynamicShaderDocument(engine, MODULE, dynamicDocument(), 'study'), null);
-  assert.deepEqual(engine.writes.at(-1), ['Pattern Freq', 3.5]);
-  assert.equal(engine.writes.find(([name]) => name === 'Function')?.[1], 0);
-});
-
-// Every ParamSetResult value is a truthy object, so a refused write only reads as
-// refused against APPLIED; a preview that missed one would bake into a Save.
-test('a refused parameter write reports the parameter and the engine outcome', () => {
-  const engine = dynamicEngine((name) =>
-    (name === 'Pattern Freq' ? ParamSetResult.READONLY : ParamSetResult.APPLIED));
-
-  const refusal = applyDynamicShaderDocument(
-    engine, MODULE, dynamicDocument(), 'study');
+  const refusal = applyDynamicShaderDocument(engine, MODULE, compiled, 'study');
   assert.equal(typeof refusal, 'string');
-  assert.match(refusal, /Pattern Freq/);
-  assert.match(refusal, /READONLY/);
-});
-
-test('a refused structural write stops before the preset values', () => {
-  const engine = dynamicEngine((name) =>
-    (name === 'Lens' ? ParamSetResult.UNKNOWN_PARAM : ParamSetResult.APPLIED));
-
-  const refusal = applyDynamicShaderDocument(
-    engine, MODULE, dynamicDocument(), 'study');
-  assert.match(refusal, /"Lens" was refused: UNKNOWN_PARAM/);
-  assert.deepEqual(engine.writes.at(-1), ['Lens', 0]);
+  assert.match(refusal, /chain engine/);
+  assert.deepEqual(engine.writes, []);
 });
 
 const fixedDocument = () => ({ document: {
   preset_bank: { presets: [
-    { preset_id: 'noon', values: { 'pattern-freq': 2 } },
-    { preset_id: 'dusk', values: { 'pattern-freq': 5 } },
+    { preset_id: 'noon', values: { 'sample.pattern-freq': 2, 'sample.weight-mode': 'projection' } },
+    { preset_id: 'dusk', values: { 'sample.pattern-freq': 5, 'sample.weight-mode': 'projection' } },
   ] },
 } });
 
@@ -152,6 +113,8 @@ test('the shader-document engine fakes mock nothing outside the engine surface',
   assert.deepEqual(unpinnedEngineMethods(dynamicEngine(() => ParamSetResult.APPLIED)), []);
 });
 
+// The writes also pin the topology skip: sample.weight-mode selects a baked
+// structural variant, so the fixed path never offers it to the engine.
 test('a fixed-pipeline preset is staged on the engine preset it names', () => {
   const engine = fixedEngine(() => true);
 
@@ -319,21 +282,17 @@ const shaderDocument = ({ digest = 'digest-equator', status = 'VALID',
   document: {
     effect_id: 'EquatorGrid',
     effect_metadata: { display_name: 'Equator Grid' },
-    descriptor: { graph: { nodes: [] } },
+    descriptor: { chain: [] },
     preset_bank: { presets: [
-      { preset_id: 'noon', display_name: 'Noon', values: { 'pattern-freq': 2 } },
-      { preset_id: 'dusk', display_name: 'Dusk', values: { 'pattern-freq': 5 } },
+      { preset_id: 'noon', display_name: 'Noon', values: { 'sample.pattern-freq': 2 } },
+      { preset_id: 'dusk', display_name: 'Dusk', values: { 'sample.pattern-freq': 5 } },
     ] },
   },
 });
 
 /** @returns {Object} An engine whose parameter definitions follow its writes. */
 function workbenchEngine() {
-  // The warp slots default to identity for a graph that names no planar_warp
-  // node, so the dynamic path writes them whatever the document carries.
   const definitions = [
-    { name: 'Planar Warp 1', value: 0, options: ['None'] },
-    { name: 'Planar Warp 2', value: 0, options: ['None'] },
     { name: 'Pattern Freq', value: 1 },
   ];
   const writes = [];
@@ -387,6 +346,7 @@ function workbench({ files = { 'equator_grid.shader.json': shaderDocument() },
     fetchText: async (url) => {
       const name = String(url).split('/').pop();
       if (name === 'shaderball_migration.json') return MIGRATION;
+      if (name === 'engine_catalog.json') return '{"catalog_version": 2}';
       const source = files[name];
       if (source === undefined) throw new Error(`404 ${name}`);
       return source;
@@ -478,19 +438,21 @@ test('choosing a catalog source stages its effect and previews its first preset'
 });
 
 // The digest is what tells an authored study from a shipped pattern: matching
-// one routes the preview onto the concrete effect, and anything else onto the
-// dynamic evaluator, which takes no reference preset.
-test('an imported study the catalog does not carry previews on the scratch Shader', async () => {
+// one routes the preview onto the concrete effect, and anything else needs the
+// chain engine, which lands with the D2 engine update.
+test('an imported study the catalog does not carry is parked on the D2 status', async () => {
   const harness = workbench();
   await harness.controller.init();
 
   assert.equal(await harness.controller.loadSource(
-    shaderDocument({ digest: 'digest-study' }), 'study.shader.json'), true);
-  assert.deepEqual(harness.selections, ['Shader']);
+    shaderDocument({ digest: 'digest-study' }), 'study.shader.json'), false);
+  assert.deepEqual(harness.selections, []);
   assert.deepEqual(harness.engine.selected, []);
-  assert.deepEqual(harness.engine.writes,
-    [['Planar Warp 1', 0], ['Planar Warp 2', 0], ['Pattern Freq', 2]],
-    'the dynamic path snaps the stage structure before the preset values');
+  assert.deepEqual(harness.engine.writes, []);
+  const status = harness.elements.get('shader-document-status');
+  assert.equal(status.dataset.status, 'error');
+  assert.match(status.textContent, /chain engine \(D2\)/);
+  assert.equal(harness.elements.get('shader-document-save').disabled, true);
 });
 
 test('choosing a preset previews it without reloading the document', async () => {
@@ -537,8 +499,8 @@ test('saving exports the live engine values, not the ones the document arrived w
   const [filename, source] = harness.downloads[0];
   assert.equal(filename, 'equator_grid.shader.json');
   const saved = JSON.parse(source);
-  assert.equal(saved.preset_bank.presets[0].values['pattern-freq'], 9);
-  assert.equal(saved.preset_bank.presets[1].values['pattern-freq'], 5,
+  assert.equal(saved.preset_bank.presets[0].values['sample.pattern-freq'], 9);
+  assert.equal(saved.preset_bank.presets[1].values['sample.pattern-freq'], 5,
     'the presets the session never previewed must survive the round trip');
   assert.match(harness.elements.get('shader-document-status').textContent,
     /Saved equator_grid\.shader\.json/);

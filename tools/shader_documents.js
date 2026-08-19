@@ -4,7 +4,21 @@
  */
 
 const MIGRATION_URL = '../shader/patterns/shaderball_migration.json';
+const CATALOG_URL = '../shader/engine_catalog.json';
 const COMPILER_URL = new URL('../shader/shader_workbench.mjs', import.meta.url).href;
+
+// Topology enum8 parameters select an operator's structural variant. A fixed
+// effect bakes its variants in, so the fixed path skips them; palette-mapping
+// stays live as an ordinary dropdown.
+const TOPOLOGY_FIELDS = new Set([
+  'weight-mode', 'coverage-mode', 'envelope', 'basis', 'integrator', 'symmetry',
+  'mode', 'harmonic', 'hemisphere', 'palette-mode', 'hue-shift-mode',
+  'brightness-envelope',
+]);
+
+/** @param {string} parameterId */
+const fieldSegment = (parameterId) =>
+  parameterId.slice(parameterId.indexOf('.') + 1);
 
 /** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[]}} ParameterDefinition */
 /** @typedef {{document: *, descriptor_digest?: string, diagnostics?: *, status?: string}} CompiledDocument */
@@ -76,52 +90,69 @@ function titleWords(value) {
     ? part : part[0].toUpperCase() + part.slice(1)).join(' ');
 }
 
-/** Maps a document parameter identity to its engine control. @param {string} parameterId */
+/**
+ * Maps a v2 document parameter identity (`<label>.<field>`) to the control
+ * name a pre-spec promoted effect registered. Newly promoted effects register
+ * label-derived names, so this alias table only serves the effects promoted
+ * before the chain schema and shrinks as they are re-registered.
+ * @param {string} parameterId
+ */
 export function engineParameterName(parameterId) {
-  const warp = parameterId.match(/^(outer|inner)-(.+)$/u);
-  if (warp) {
-    const slot = warp[1] === 'outer' ? 1 : 2;
-    return `Planar Warp ${slot} ${titleWords(warp[2])}`;
+  const dot = parameterId.indexOf('.');
+  if (dot < 0) return titleWords(parameterId);
+  const label = parameterId.slice(0, dot);
+  const field = parameterId.slice(dot + 1);
+  if (label === 'warp1') return `Planar Warp 1 ${titleWords(field)}`;
+  if (label === 'warp2') return `Planar Warp 2 ${titleWords(field)}`;
+  if (label === 'surface') return `Surface Noise ${titleWords(field)}`;
+  if (label === 'lens') return `Mobius ${titleWords(field)}`;
+  if (label === 'sample') {
+    const aliases = /** @type {Record<string, string>} */ ({
+      'angle-speed': 'Source Angle Speed',
+      'edge-width': 'Edge Fade Width',
+      'noise-scale': 'Source Noise Scale',
+      'noise-contrast': 'Source Noise Contrast',
+      'noise-speed': 'Source Noise Speed',
+    });
+    return aliases[field] ?? titleWords(field);
   }
-  const aliases = /** @type {Record<string, string>} */ ({
-    'edge-width': 'Edge Fade Width',
-    'iso-level': 'Iso Contour Level',
-    'iso-width': 'Iso Contour Width',
-    'source-angle-speed': 'Source Angle Speed',
-    'source-noise-scale': 'Source Noise Scale',
-    'source-noise-contrast': 'Source Noise Contrast',
-    'source-noise-speed': 'Source Noise Speed',
-  });
-  return aliases[parameterId] ?? titleWords(parameterId);
+  if (label === 'transfer' || label === 'cutout') {
+    const aliases = /** @type {Record<string, string>} */ ({
+      'iso-level': 'Iso Contour Level',
+      'iso-width': 'Iso Contour Width',
+      'edge-width': 'Edge Fade Width',
+    });
+    return aliases[field] ?? titleWords(field);
+  }
+  return titleWords(field);
 }
 
 /** @param {string} parameterId */
 function engineParameterNames(parameterId) {
   const primary = engineParameterName(parameterId);
-  const fixedAliases = /** @type {Record<string, string[]>} */ ({
-    'edge-width': ['Edge Width'],
-    'iso-level': ['Iso Level'],
-    'iso-width': ['Iso Width'],
-    'mirror-speed': ['Planar Warp 2 Speed'],
-    'mirror-rotation': ['Planar Warp 2 Rotation', 'Mirror Rotation'],
-    'mirror-cell-x': ['Planar Warp 2 Cell X', 'Mirror Cell X'],
-    'mirror-cell-y': ['Planar Warp 2 Cell Y', 'Mirror Cell Y'],
-    'mirror-offset-x': ['Planar Warp 2 Offset X', 'Mirror Offset X'],
-    'mirror-offset-y': ['Planar Warp 2 Offset Y', 'Mirror Offset Y'],
-  });
-  if (fixedAliases[parameterId]) return [primary, ...fixedAliases[parameterId]];
-  const warp = parameterId.match(/^(outer|inner)-(.+)$/u);
-  if (!warp) return [primary];
-  const suffix = titleWords(warp[2]);
-  if (['Rotation Rate', 'Translation X', 'Translation Y', 'Scale X', 'Scale Y', 'Shear']
-      .includes(suffix)) return [primary, `Affine ${suffix}`];
-  if (['Radial Scale', 'Radial Phase', 'Angular Phase'].includes(suffix))
-    return [primary, `Polar ${suffix}`];
-  if (['Rotation', 'Cell X', 'Cell Y', 'Offset X', 'Offset Y'].includes(suffix))
-    return [primary, `Mirror ${suffix}`];
-  if (['Strength', 'Frequency', 'Field Angle', 'Scale', 'Vector Angle'].includes(suffix))
-    return [primary, `Warp ${suffix}`];
-  return [primary, suffix];
+  const dot = parameterId.indexOf('.');
+  if (dot < 0) return [primary];
+  const label = parameterId.slice(0, dot);
+  const field = parameterId.slice(dot + 1);
+  if (label === 'warp1' || label === 'warp2') {
+    const suffix = titleWords(field);
+    if (['Rotation Rate', 'Translation X', 'Translation Y', 'Scale X', 'Scale Y', 'Shear']
+        .includes(suffix)) return [primary, `Affine ${suffix}`];
+    if (['Radial Scale', 'Radial Phase', 'Angular Phase'].includes(suffix))
+      return [primary, `Polar ${suffix}`];
+    if (['Rotation', 'Cell X', 'Cell Y', 'Offset X', 'Offset Y'].includes(suffix))
+      return [primary, `Mirror ${suffix}`];
+    if (['Strength', 'Frequency', 'Field Angle', 'Scale', 'Vector Angle'].includes(suffix))
+      return [primary, `Warp ${suffix}`];
+    return [primary, suffix];
+  }
+  if (label === 'sample' && field === 'edge-width') return [primary, 'Edge Width'];
+  if (label === 'transfer' || label === 'cutout') {
+    if (field === 'iso-level') return [primary, 'Iso Level'];
+    if (field === 'iso-width') return [primary, 'Iso Width'];
+    if (field === 'edge-width') return [primary, 'Edge Width'];
+  }
+  return [primary];
 }
 
 /** @param {ParameterDefinition} definition @param {*} label */
@@ -175,6 +206,7 @@ function applyDocumentValues(engine, module, compiled, presetId) {
     ?? compiled.document.preset_bank.presets[0];
   const definitions = engine.getParameterDefinitions();
   for (const [parameterId, value] of Object.entries(preset?.values ?? {})) {
+    if (TOPOLOGY_FIELDS.has(fieldSegment(parameterId))) continue;
     const name = engineParameterNames(parameterId)
       .find((candidate) => definitions.some(
         (/** @type {ParameterDefinition} */ definition) => definition.name === candidate));
@@ -205,12 +237,20 @@ export function applyFixedShaderDocument(engine, module, compiled, presetId,
 }
 
 /**
- * Applies a linear six-role document to the dynamic Shader evaluator.
+ * Applies a document to the dynamic evaluator. A v2 chain document has no
+ * structural dropdowns to write: its dynamic preview goes through
+ * setShaderChain, which lands with the D2 engine update, so until then every
+ * chain document is refused with that status. The legacy six-role body below
+ * only serves a pre-expansion v1 compile, which the single-code-path compiler
+ * no longer produces.
  * @param {*} engine @param {*} module @param {CompiledDocument} compiled
  * @param {string} presetId
  * @returns {string|null} Refusal reason, or null once applied.
  */
 export function applyDynamicShaderDocument(engine, module, compiled, presetId) {
+  if (compiled.document.descriptor?.chain !== undefined ||
+      compiled.document.descriptor?.graph === undefined)
+    return 'this document previews on the chain engine, which lands with the D2 engine update';
   const nodes = new Map(compiled.document.descriptor.graph.nodes
     .map((/** @type {*} */ node) => [node.role, node]));
   const surface = nodes.get('surface_project')?.policy ?? {};
@@ -306,6 +346,8 @@ export function createShaderDocumentController({
   let active = null;
   /** @type {Map<string, *>} */
   let catalog = new Map();
+  /** @type {*|null} */
+  let operatorCatalog = null;
 
   /** @param {string} message @param {boolean} [error] */
   const show = (message, error = false) => {
@@ -356,15 +398,23 @@ export function createShaderDocumentController({
   const loadSource = async (source, filename = 'import.shader.json',
                             precompiled = null) => {
     compiler ??= await importCompiler();
-    const compiled = precompiled ?? compiler.compileShaderDocument(source);
+    const compiled = precompiled
+      ?? compiler.compileShaderDocument(source, { catalog: operatorCatalog });
     if (compiled.status !== 'VALID') {
       show(diagnosticText(compiled), true);
       return false;
     }
     const official = [...catalog.values()].find((candidate) =>
       candidate.descriptorDigest === compiled.descriptor_digest);
-    const fixed = Boolean(official);
-    const effect = official?.effectId ?? 'Shader';
+    if (!official) {
+      active = null;
+      saveButton.disabled = true;
+      show('This chain matches no fixed-pipeline effect; its dynamic preview '
+        + 'requires the chain engine (D2).', true);
+      return false;
+    }
+    const fixed = true;
+    const effect = official.effectId;
     if (!selectEffect(effect)) {
       show(`The preview engine rejected effect "${effect}".`, true);
       return false;
@@ -374,7 +424,7 @@ export function createShaderDocumentController({
       filename,
       fixed,
       presetId: null,
-      referencePresetIds: official?.presetIds ?? [],
+      referencePresetIds: official.presetIds ?? [],
     };
     populatePresets(compiled);
     saveButton.disabled = false;
@@ -398,7 +448,7 @@ export function createShaderDocumentController({
         const definition = definitions.find(
           (/** @type {ParameterDefinition} */ candidate) => names.includes(candidate.name));
         if (!definition) continue;
-        if (definition.options && parameterId === 'palette-mapping') {
+        if (definition.options && fieldSegment(parameterId) === 'palette-mapping') {
           preset.values[parameterId] = definition.options[definition.value]?.toLowerCase();
         } else {
           preset.values[parameterId] = definition.value;
@@ -415,11 +465,13 @@ export function createShaderDocumentController({
   const init = async () => {
     try {
       compiler = await importCompiler();
+      operatorCatalog = JSON.parse(await fetchText(CATALOG_URL));
       const migration = JSON.parse(await fetchText(MIGRATION_URL));
       const entries = await Promise.all(Object.entries(migration.source_documents)
         .map(async ([effectId, filename]) => {
           const source = await fetchText(`../shader/patterns/${filename}`);
-          const compiled = compiler.compileShaderDocument(source);
+          const compiled = compiler.compileShaderDocument(source,
+            { catalog: operatorCatalog });
           if (compiled.status !== 'VALID')
             throw new Error(`${filename}: ${diagnosticText(compiled)}`);
           return [effectId, filename, source, compiled];

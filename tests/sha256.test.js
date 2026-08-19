@@ -82,16 +82,20 @@ test('a committed shader document keeps its recorded digests', () => {
     new URL('../shader/patterns/example.shader.json', import.meta.url),
     'utf8',
   );
-  const compiled = compileShaderDocument(source);
+  const catalog = JSON.parse(readFileSync(
+    new URL('../shader/engine_catalog.json', import.meta.url),
+    'utf8',
+  ));
+  const compiled = compileShaderDocument(source, { catalog });
 
   assert.equal(compiled.status, 'VALID');
   assert.equal(
     compiled.descriptor_digest,
-    '86a72dd4a59595c4245a5b6ec72ec53f11b809e9a40874075d426748ef4e0025',
+    'df639eb93c1c7437f204f0283faa8e1d2cf27fb64199c964e161d46a468d187c',
   );
   assert.equal(
     compiled.preset_bank_digest,
-    '36baa97c0a71358736e0335bb61cc320cfd29b8d4cc7e768a1ce41848a6421b0',
+    'a1ca741f5ff587a5f12ef5327e0ce809d446076b8795934e30d590730840e833',
   );
   assert.equal(sha256Hex(compiled.descriptor_json), compiled.descriptor_digest);
   assert.equal(

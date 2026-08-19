@@ -5,33 +5,50 @@
 // identity. The reader is a hand-written parser rather than JSON.parse because
 // it has to reject what JSON.parse accepts — a duplicate key, a byte-order
 // mark, an over-deep or over-long document — so those rejections are checked
-// one by one.
+// one by one. Schema v2 encodes the descriptor as an ordered operator chain
+// validated against the engine catalog; a schema_version 1 document expands
+// through expandV1Document first, the single code path both generations
+// share, and the committed v2 pattern documents are pinned byte-identical to
+// that expansion's canonical export.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 
 import {
   DEFAULT_LIMITS,
-  LINEAR_STAGE_ROLES,
-  OPERATOR_CATALOG,
   ShaderDocumentError,
   applyEasing,
   canonicalDescriptor,
   classifyExport,
   compileShaderDocument,
   evaluateTransition,
+  expandV1Document,
+  exportShaderDocumentJson,
   interpolateValue,
   parseShaderDocument,
   stableStringify,
+  v1DescriptorDigest,
   validateShaderDocument,
 } from '../shader/shader_workbench.mjs';
 import { sha256Hex } from '../shader/sha256.mjs';
 
 const PATTERNS = new URL('../shader/patterns/', import.meta.url);
+const FIXTURES = new URL('v1/', PATTERNS);
+const CATALOG = JSON.parse(
+  readFileSync(new URL('../shader/engine_catalog.json', import.meta.url), 'utf8'));
+const MIGRATION = JSON.parse(
+  readFileSync(new URL('digest_migration.v1v2.json', PATTERNS), 'utf8'));
 const EXAMPLE = readFileSync(new URL('example.shader.json', PATTERNS), 'utf8');
 
-/** @returns {Object} A fresh parse of the example document, safe to mutate. */
+/** @returns {Object} A fresh parse of the v2 example document, safe to mutate. */
 const example = () => JSON.parse(EXAMPLE);
+
+/** Compiles with the pinned catalog. @param {*} source @param {Object} [options] */
+const compile = (source, options = {}) =>
+  compileShaderDocument(source, { catalog: CATALOG, ...options });
+
+/** Validates with the pinned catalog. @param {Object} document */
+const validate = (document) => validateShaderDocument(document, { catalog: CATALOG });
 
 /**
  * Runs a call expected to raise a ShaderDocumentError and returns it.
@@ -67,8 +84,8 @@ test('the reader parses a committed document as JSON.parse does', () => {
     a: [1, -2.5, 100, true, false, null, ''],
   });
   assert.deepEqual(parseShaderDocument(' \n\t{ "a" : { } , "b" : [ ] } '), { a: {}, b: [] });
-  assert.deepEqual(parseShaderDocument('{"a":"\\u00e9\\n\\\\"}'), { a: '\u00e9\n\\' });
-  assert.deepEqual(Object.keys(parseShaderDocument('{"e\u0301":1}')), ['\u00e9']);
+  assert.deepEqual(parseShaderDocument('{"a":"\\u00e9\\n\\\\"}'), { a: 'é\n\\' });
+  assert.deepEqual(Object.keys(parseShaderDocument('{"é":1}')), ['é']);
 });
 
 /**
@@ -83,7 +100,7 @@ test('the reader rejects what JSON.parse would silently accept', () => {
 
 /** Verifies malformed JSON is refused with a phase, code and path. */
 test('the reader refuses malformed JSON', () => {
-  assert.deepEqual(parseFailure('\uFEFF{}'), ['BYTE_ORDER_MARK', '$']);
+  assert.deepEqual(parseFailure('﻿{}'), ['BYTE_ORDER_MARK', '$']);
   assert.deepEqual(parseFailure('{} {}'), ['TRAILING_INPUT', '$']);
   assert.deepEqual(parseFailure('nope'), ['INVALID_JSON', '$']);
   assert.deepEqual(parseFailure('{"a" 1}'), ['INVALID_JSON', '$']);
@@ -134,13 +151,14 @@ test('stableStringify orders keys by code point', () => {
   assert.equal(stableStringify({ b: 1, a: 2 }), '{"a":2,"b":1}');
   assert.equal(stableStringify({ a: 2, b: 1 }), '{"a":2,"b":1}');
   assert.equal(stableStringify([{ b: 1, a: 2 }]), '[{"a":2,"b":1}]');
-  assert.equal(stableStringify({ '\u00e9': 1, a: 2 }), '{"a":2,"\u00e9":1}');
-  assert.equal(stableStringify({ a: 'e\u0301' }), '{"a":"\u00e9"}');
+  assert.equal(stableStringify({ 'é': 1, a: 2 }), '{"a":2,"é":1}');
+  assert.equal(stableStringify({ a: 'é' }), '{"a":"é"}');
 });
 
 /**
  * Reverses every array whose order the canonical form is supposed to erase,
- * and every object's key order with it.
+ * and every object's key order with it. descriptor.chain is exempt: its order
+ * is the program, so the canonical form keeps it.
  * @param {*} value - Parsed document fragment.
  * @returns {*} The same data, ordered the other way round.
  */
@@ -158,14 +176,13 @@ const reordered = (value) => {
  * canonical JSON and the same digest, and a changed value does not.
  */
 test('the descriptor digest survives reordering and not a value change', () => {
-  const baseline = compileShaderDocument(EXAMPLE);
+  const baseline = compile(EXAMPLE);
+  assert.equal(baseline.status, 'VALID');
   const shuffled = reordered(example());
-  shuffled.descriptor.graph.nodes.reverse();
-  shuffled.descriptor.graph.edges.reverse();
   shuffled.descriptor.parameters.reverse();
   shuffled.preset_bank.presets.reverse();
   shuffled.preset_bank.edges.reverse();
-  const compiled = compileShaderDocument(shuffled);
+  const compiled = compile(shuffled);
 
   assert.equal(compiled.status, 'VALID');
   assert.equal(compiled.descriptor_json, baseline.descriptor_json);
@@ -175,27 +192,73 @@ test('the descriptor digest survives reordering and not a value change', () => {
 
   const changed = example();
   changed.descriptor.parameters[0].default = 2.0;
-  assert.notEqual(
-    compileShaderDocument(changed).descriptor_digest,
-    baseline.descriptor_digest,
-  );
+  assert.notEqual(compile(changed).descriptor_digest, baseline.descriptor_digest);
 });
 
-/** Verifies the canonical descriptor carries the graph in stage order. */
-test('the canonical descriptor orders the graph by stage role', () => {
-  const shuffled = example();
-  shuffled.descriptor.graph.nodes.reverse();
-  const descriptor = canonicalDescriptor(shuffled);
+/**
+ * A document with the same operator twice, telling apart the three moves the
+ * v1 canonical form collapsed: re-serializing is identity-preserving, while
+ * swapping the two stages or renaming an instance is a different descriptor.
+ */
+const twinWarpExample = () => {
+  const document = example();
+  const chain = document.descriptor.chain;
+  const at = chain.findIndex((entry) => entry.label === 'sample');
+  chain.splice(at, 0,
+    { label: 'warp1', operator: 'warp.mirror-tile.v2' },
+    { label: 'warp2', operator: 'warp.mirror-tile.v2' });
+  document.descriptor.parameters.push({
+    id: 'warp1.cell-x',
+    classification: 'preset',
+    storage: 'binary32',
+    unit: 'ratio',
+    domain: { minimum: 0.015625, maximum: 8 },
+    interpolation: { kind: 'LOG_POSITIVE' },
+    default: 2,
+  });
+  for (const preset of document.preset_bank.presets)
+    preset.values['warp1.cell-x'] = 2;
+  return document;
+};
 
-  assert.deepEqual(descriptor.graph.nodes.map((node) => node.role), LINEAR_STAGE_ROLES);
+test('a duplicate-operator chain digests by order and label, not by operator set', () => {
+  const baseline = compile(twinWarpExample());
+  assert.equal(baseline.status, 'VALID', JSON.stringify(baseline.diagnostics));
+
+  const shuffled = reordered(twinWarpExample());
+  shuffled.descriptor.parameters.reverse();
+  assert.equal(compile(shuffled).descriptor_digest, baseline.descriptor_digest,
+    'a reordered serialization of the same document must keep its digest');
+
+  const swapped = twinWarpExample();
+  const chain = swapped.descriptor.chain;
+  const first = chain.findIndex((entry) => entry.label === 'warp1');
+  [chain[first], chain[first + 1]] = [chain[first + 1], chain[first]];
+  const swappedCompiled = compile(swapped);
+  assert.equal(swappedCompiled.status, 'VALID');
+  assert.notEqual(swappedCompiled.descriptor_digest, baseline.descriptor_digest,
+    'swapping two stages of the same operator must change the digest');
+
+  const relabeled = twinWarpExample();
+  for (const entry of relabeled.descriptor.chain)
+    if (entry.label === 'warp2') entry.label = 'mirror';
+  const relabeledCompiled = compile(relabeled);
+  assert.equal(relabeledCompiled.status, 'VALID');
+  assert.notEqual(relabeledCompiled.descriptor_digest, baseline.descriptor_digest,
+    'labels are the identity parameters bind to, so a rename is a descriptor change');
+});
+
+/** Verifies the canonical descriptor keeps the chain order and its labels. */
+test('the canonical descriptor keeps chain order and labels', () => {
+  const document = example();
+  const descriptor = canonicalDescriptor(document);
+
+  assert.deepEqual(descriptor.chain, document.descriptor.chain);
+  assert.ok(descriptor.chain.every((entry) => 'label' in entry && 'operator' in entry));
   assert.deepEqual(
-    descriptor.graph.edges,
-    LINEAR_STAGE_ROLES.slice(0, -1).map((role, index) => ({
-      from: role, to: LINEAR_STAGE_ROLES[index + 1],
-    })),
+    descriptor.parameters.map((parameter) => parameter.id),
+    [...descriptor.parameters.map((parameter) => parameter.id)].sort(),
   );
-  assert.deepEqual(descriptor.parameters.map((p) => p.id), ['phase', 'scale']);
-  assert.ok(descriptor.graph.nodes.every((node) => !('label' in node)));
 });
 
 /** Verifies every committed pattern compiles and is keyed by its own digest. */
@@ -204,9 +267,7 @@ test('every committed shader pattern compiles to a distinct digest', () => {
   assert.ok(names.length > 1);
   const digests = new Map();
   for (const name of names) {
-    const compiled = compileShaderDocument(
-      readFileSync(new URL(name, PATTERNS), 'utf8'),
-    );
+    const compiled = compile(readFileSync(new URL(name, PATTERNS), 'utf8'));
     assert.deepEqual(compiled.diagnostics, [], name);
     assert.equal(compiled.status, 'VALID', name);
     assert.equal(compiled.descriptor_digest, sha256Hex(compiled.descriptor_json), name);
@@ -217,49 +278,191 @@ test('every committed shader pattern compiles to a distinct digest', () => {
   }
 });
 
-/** Verifies a rejected document compiles to a single diagnostic and no digest. */
+/** Verifies a rejected document compiles to diagnostics and no digest. */
 test('an invalid document compiles to a diagnostic rather than a digest', () => {
   const outOfRange = example();
-  outOfRange.descriptor.parameters[0].default = 100;
-  const compiled = compileShaderDocument(outOfRange);
+  outOfRange.preset_bank.presets[0].values['project.central-meridian'] = 100;
+  const compiled = compile(outOfRange);
 
   assert.equal(compiled.status, 'INVALID');
   assert.equal(compiled.descriptor_digest, undefined);
   assert.equal(compiled.diagnostics.length, 1);
   assert.equal(compiled.diagnostics[0].code, 'VALUE_OUT_OF_RANGE');
   assert.equal(compiled.diagnostics[0].phase, 'semantic');
-  assert.equal(compiled.diagnostics[0].path, '$.descriptor.parameters[0].default');
 });
 
-/** Verifies the validator rejects each shape a document must not take. */
+/** Verifies compiling without the catalog is refused, not silently weakened. */
+test('compiling without the operator catalog is refused', () => {
+  const compiled = compileShaderDocument(EXAMPLE);
+  assert.equal(compiled.status, 'INVALID');
+  assert.equal(compiled.diagnostics[0].code, 'CATALOG_REQUIRED');
+});
+
+/**
+ * The semantic codes of the chain validator, one construction each. The chain
+ * is validated against the catalog: carrier pairs order the four families, and
+ * every finding is collected rather than thrown.
+ * @param {Object[]} chain @param {Object[]} [parameters] @param {Object} [values]
+ */
+const chainDocument = (chain, parameters = [], values = {}) => ({
+  schema_version: 2,
+  catalog_version: 2,
+  document_id: 'chain-study',
+  descriptor: {
+    chain,
+    parameters,
+    path_policies: [{ id: 'parallel', kind: 'PARALLEL' }],
+    serialization: { schema_version: 1, fields: [] },
+  },
+  preset_bank: {
+    schema_version: 1,
+    presets: [{ preset_id: 'only', values }],
+    edges: [],
+    absent_edge_fallback: {
+      manual: 'SNAP', automatic: 'SNAP', synchronized: 'SNAP',
+      restore: 'SNAP', authoring: 'SNAP',
+    },
+    choreography: { generated_order: ['only'] },
+  },
+});
+
+const MINIMAL_CHAIN = [
+  { label: 'camera', operator: 'sphere.rotate.v2' },
+  { label: 'project', operator: 'project.stereographic.v2' },
+  { label: 'sample', operator: 'sample.grid.v2' },
+  { label: 'colorize', operator: 'colorize.generated-palette.v2' },
+];
+
+/** @param {Object} document @returns {string[]} The collected codes. */
+const codesOf = (document) => validate(document).map((diagnostic) => diagnostic.code);
+
+test('the chain validator reports each family and carrier violation', () => {
+  assert.deepEqual(codesOf(chainDocument(MINIMAL_CHAIN)), []);
+  assert.deepEqual(codesOf(chainDocument([])), ['EMPTY_CHAIN']);
+  assert.ok(codesOf(chainDocument(MINIMAL_CHAIN.slice(2))).includes('ENTRY_FAMILY'),
+    'a chain must enter on the sphere carrier');
+  assert.ok(codesOf(chainDocument(MINIMAL_CHAIN.slice(0, 3))).includes('EXIT_FAMILY'),
+    'a chain must exit on the color carrier');
+  const backward = [MINIMAL_CHAIN[1],
+    { label: 'late-camera', operator: 'sphere.rotate.v2' },
+    ...MINIMAL_CHAIN.slice(2)];
+  assert.ok(codesOf(chainDocument(backward)).includes('FAMILY_ORDER'),
+    'a sphere operator after the projection steps back across the crossing');
+  const gap = [MINIMAL_CHAIN[0], ...MINIMAL_CHAIN.slice(2)];
+  assert.ok(codesOf(chainDocument(gap)).includes('CARRIER_MISMATCH'),
+    'a sample fed a sphere carrier is a carrier mismatch, not an order violation');
+  assert.ok(codesOf(chainDocument([
+    { label: 'camera', operator: 'sphere.vortex.v3' }, ...MINIMAL_CHAIN.slice(1),
+  ])).includes('UNKNOWN_OPERATOR'));
+  assert.ok(codesOf(chainDocument([
+    { label: 'camera', operator: 'sphere.rotate.v2' },
+    { label: 'camera', operator: 'sphere.rotate.v2' }, ...MINIMAL_CHAIN.slice(1),
+  ])).includes('DUPLICATE_LABEL'));
+});
+
+test('a parameter must bind a chain label and a catalog field through one dot', () => {
+  const parameter = {
+    classification: 'preset', storage: 'binary32', unit: 'ratio',
+    domain: { minimum: 0, maximum: 1 }, interpolation: { kind: 'LINEAR' }, default: 0,
+  };
+  const withId = (parameterId) => codesOf(chainDocument(MINIMAL_CHAIN,
+    [{ ...parameter, id: parameterId }], { [parameterId]: 0 }));
+
+  assert.deepEqual(withId('sample.pattern-mix'), []);
+  assert.deepEqual(withId('drift'), ['UNBOUND_PARAMETER']);
+  assert.deepEqual(withId('ghost.drift'), ['UNBOUND_PARAMETER']);
+  assert.deepEqual(withId('sample.ghost-field'), ['UNBOUND_PARAMETER']);
+  assert.deepEqual(withId('sample.drift.rate'), ['UNBOUND_PARAMETER']);
+  assert.deepEqual(withId('sample.weight-mode'), ['ENUM_DOMAIN_MISMATCH'],
+    'a binary32 parameter cannot bind a topology enum field');
+});
+
+test('an enum8 parameter must carry its catalog values verbatim', () => {
+  const withValues = (values) => codesOf(chainDocument(MINIMAL_CHAIN, [{
+    id: 'sample.weight-mode', classification: 'preset', storage: 'enum8',
+    unit: 'mode', domain: { values }, interpolation: { kind: 'MIXED_ENUM' },
+    default: 'projection',
+  }], { 'sample.weight-mode': 'projection' }));
+
+  assert.deepEqual(withValues(['none', 'projection']), []);
+  assert.deepEqual(withValues(['projection', 'none']), ['ENUM_DOMAIN_MISMATCH']);
+  assert.deepEqual(withValues(['projection', 'shadow']), ['ENUM_DOMAIN_MISMATCH']);
+});
+
+test('the validator holds a chain to the engine-exported budgets', () => {
+  const cameras = Array.from({ length: 33 }, (unused, index) =>
+    ({ label: `camera-${index}`, operator: 'sphere.rotate.v2' }));
+  assert.ok(codesOf(chainDocument([...cameras, ...MINIMAL_CHAIN.slice(1)]))
+    .includes('BUDGET_EXCEEDED'), 'chain length is budgeted');
+  const longLabel = `camera-${'x'.repeat(48)}`;
+  assert.ok(codesOf(chainDocument([
+    { label: longLabel, operator: 'sphere.rotate.v2' }, ...MINIMAL_CHAIN.slice(1),
+  ])).includes('BUDGET_EXCEEDED'), 'instance-id length is budgeted');
+});
+
+/**
+ * Verifies the semantic phase collects and continues: a document broken three
+ * ways surfaces all three findings in one validation, which is what makes the
+ * import dialog's full diagnostic list possible.
+ */
+test('semantic validation surfaces the full diagnostic list', () => {
+  const document = chainDocument([
+    { label: 'camera', operator: 'sphere.vortex.v3' },
+    { label: 'camera', operator: 'sphere.rotate.v2' },
+    ...MINIMAL_CHAIN.slice(1),
+  ], [{
+    id: 'ghost.drift', classification: 'preset', storage: 'binary32',
+    unit: 'ratio', domain: { minimum: 0, maximum: 1 },
+    interpolation: { kind: 'LINEAR' }, default: 0,
+  }], {});
+  const codes = codesOf(document);
+
+  assert.ok(codes.includes('UNKNOWN_OPERATOR'), codes.join());
+  assert.ok(codes.includes('DUPLICATE_LABEL'), codes.join());
+  assert.ok(codes.includes('UNBOUND_PARAMETER'), codes.join());
+  assert.ok(codes.includes('MISSING_PRESET_VALUE'), codes.join());
+  assert.ok(codes.length >= 4);
+
+  const compiled = compile(document);
+  assert.equal(compiled.status, 'INVALID');
+  assert.equal(compiled.diagnostics.length, codes.length);
+});
+
 test('the validator rejects unsupported and incomplete documents', () => {
   const code = (mutate) => {
     const document = example();
     mutate(document);
-    return raised(() => validateShaderDocument(document)).code;
+    const semantic = (() => {
+      try {
+        return validate(document);
+      } catch (error) {
+        assert.ok(error instanceof ShaderDocumentError);
+        return [error.diagnostic()];
+      }
+    })();
+    assert.ok(semantic.length > 0, 'the mutation was expected to invalidate');
+    return semantic[0].code;
   };
 
-  assert.equal(code((d) => { d.schema_version = 2; }), 'UNSUPPORTED_DOCUMENT_SCHEMA');
-  assert.equal(code((d) => { d.catalog_version = 2; }), 'UNSUPPORTED_CATALOG_SCHEMA');
+  assert.equal(code((d) => { d.schema_version = 3; }), 'UNSUPPORTED_DOCUMENT_SCHEMA');
+  assert.equal(code((d) => { d.catalog_version = 1; }), 'UNSUPPORTED_CATALOG_SCHEMA');
   assert.equal(code((d) => { d.document_id = 'Example Study'; }), 'INVALID_ID');
   assert.equal(code((d) => { d.extensions = { vendor: {} }; }), 'UNKNOWN_EXTENSION');
   assert.equal(code((d) => { delete d.preset_bank; }), 'MISSING_FIELD');
   assert.equal(code((d) => { d.unexpected = 1; }), 'UNKNOWN_FIELD');
-  assert.equal(code((d) => { d.descriptor.graph.nodes.pop(); }), 'UNSUPPORTED_GRAPH');
-  assert.equal(code((d) => { d.descriptor.graph.nodes[0].role = 'source'; }),
-    'DUPLICATE_STAGE_ROLE');
-  assert.equal(code((d) => { d.descriptor.graph.edges.pop(); }), 'INVALID_LINEAR_GRAPH');
-  assert.equal(code((d) => { d.descriptor.parameters[1].id = 'scale'; }),
-    'DUPLICATE_PARAMETER');
+  assert.equal(code((d) => { d.descriptor.graph = { nodes: [], edges: [] }; }),
+    'UNKNOWN_FIELD');
+  assert.equal(code((d) => { d.descriptor.chain[0].label = 'two.segments'; }),
+    'INVALID_ID');
+  assert.equal(code((d) => {
+    d.descriptor.parameters[1].id = d.descriptor.parameters[0].id;
+  }), 'DUPLICATE_PARAMETER');
   assert.equal(code((d) => { d.descriptor.parameters[0].interpolation.kind = 'MIXED_ENUM'; }),
     'STORAGE_INTERPOLATION_MISMATCH');
-  assert.equal(code((d) => { delete d.descriptor.parameters[1].interpolation.period; }),
-    'INVALID_PERIOD');
-  assert.equal(code((d) => { d.descriptor.graph.nodes[0].resources = ['absent']; }),
-    'UNKNOWN_RESOURCE_BINDING');
   assert.equal(code((d) => { d.descriptor.path_policies = []; }), 'MISSING_PATH_POLICY');
-  assert.equal(code((d) => { delete d.preset_bank.presets[0].values.scale; }),
-    'MISSING_PRESET_VALUE');
+  assert.equal(code((d) => {
+    delete d.preset_bank.presets[0].values['sample.pattern-freq'];
+  }), 'MISSING_PRESET_VALUE');
   assert.equal(code((d) => { d.preset_bank.presets[1].preset_id = 'calm'; }),
     'DUPLICATE_PRESET');
   assert.equal(code((d) => { d.preset_bank.edges[0].to = 'calm'; }),
@@ -270,25 +473,149 @@ test('the validator rejects unsupported and incomplete documents', () => {
     'INVALID_GENERATED_ORDER');
 });
 
-/**
- * Verifies an operator the target catalog does not carry compiles to a digest
- * and a per-stage diagnostic rather than to a rejection.
- */
-test('an operator outside the catalog compiles but reports its stage', () => {
-  const catalog = { ...OPERATOR_CATALOG };
-  delete catalog['pullback.color.v1'];
-  const compiled = compileShaderDocument(EXAMPLE, { catalog });
+// --- v1 expansion -----------------------------------------------------------
 
-  assert.equal(compiled.status, 'VALID_BUT_UNSUPPORTED');
-  assert.equal(compiled.descriptor_digest, compileShaderDocument(EXAMPLE).descriptor_digest);
-  assert.equal(compiled.diagnostics.length, 1);
-  assert.equal(compiled.diagnostics[0].code, 'OPERATOR_UNAVAILABLE');
-  assert.equal(compiled.diagnostics[0].path, 'stage.color');
+const fixtureNames = readdirSync(FIXTURES).filter((f) => f.endsWith('.shader.json'));
+
+/** @param {string} name @returns {Object} A parsed v1 fixture. */
+const fixture = (name) =>
+  parseShaderDocument(readFileSync(new URL(name, FIXTURES), 'utf8'));
+
+/**
+ * Verifies expansion assigns the deterministic slot labels and consumes the
+ * v1 policy objects into operator selection plus topology enum8 parameters.
+ * equator_grid pins the interesting cases: a kaleidoscope lens variant, a
+ * mirror in the second warp slot (warp1 vanishes with its identity policy),
+ * and coverage folded into the sample stage.
+ */
+test('a v1 document expands to the deterministic chain of its slots', () => {
+  const { document, parameter_ids } =
+    expandV1Document(fixture('equator_grid.shader.json'), CATALOG);
+
+  assert.equal(document.schema_version, 2);
+  assert.equal(document.catalog_version, 2);
+  assert.deepEqual(document.descriptor.chain, [
+    { label: 'camera', operator: 'sphere.rotate.v2' },
+    { label: 'lens', operator: 'sphere.lens.kaleidoscope.v2' },
+    { label: 'project', operator: 'project.equirectangular.v2' },
+    { label: 'warp2', operator: 'warp.mirror-tile.v2' },
+    { label: 'sample', operator: 'sample.grid.v2' },
+    { label: 'transfer', operator: 'field.transfer.linear.v2' },
+    { label: 'colorize', operator: 'colorize.generated-palette.v2' },
+  ]);
+
+  const byId = new Map(document.descriptor.parameters.map((p) => [p.id, p]));
+  assert.equal(byId.get('lens.symmetry')?.default, 'dodecahedral');
+  assert.equal(byId.get('sample.weight-mode')?.default, 'projection');
+  assert.equal(byId.get('sample.coverage-mode')?.default, 'weight-squared');
+  assert.equal(byId.get('colorize.palette-mode')?.default, 'analogous');
+  assert.equal(byId.get('colorize.hue-shift-mode')?.default, 'noise');
+  assert.equal(byId.get('colorize.brightness-envelope')?.default, 'none');
+
+  assert.equal(parameter_ids['inner-cell-x'], 'warp2.cell-x');
+  assert.equal(parameter_ids['camera-wander'], 'project.camera-wander');
+  assert.equal(parameter_ids['source-angle-speed'], 'sample.angle-speed');
+  assert.equal(parameter_ids['palette-mapping'], 'colorize.palette-mapping');
+  for (const v1Id of fixture('equator_grid.shader.json').descriptor.parameters
+    .map((parameter) => parameter.id))
+    assert.ok(v1Id in parameter_ids, `rewrite map misses "${v1Id}"`);
+
+  for (const preset of document.preset_bank.presets) {
+    assert.equal(preset.values['lens.symmetry'], 'dodecahedral');
+    assert.equal(preset.values['sample.coverage-mode'], 'weight-squared');
+  }
+  assert.ok(document.descriptor.serialization.fields.includes('lens.symmetry'));
+  assert.ok(!('binding' in document.descriptor.parameters[0]));
+  assert.equal(document.descriptor.clocks, undefined,
+    'engine machinery records do not survive expansion');
+});
+
+test('expansion is deterministic and the compiler is one code path', () => {
+  const first = expandV1Document(fixture('prism_spiral.shader.json'), CATALOG);
+  const second = expandV1Document(fixture('prism_spiral.shader.json'), CATALOG);
+  assert.deepEqual(first.document, second.document);
+  assert.deepEqual(first.parameter_ids, second.parameter_ids);
+
+  const throughCompile = compile(fixture('prism_spiral.shader.json'));
+  assert.equal(throughCompile.status, 'VALID');
+  assert.equal(throughCompile.descriptor_digest,
+    compile(first.document).descriptor_digest,
+    'compiling a v1 source must be expansion followed by v2 compilation');
+});
+
+/**
+ * The re-export gate: the committed v2 pattern documents are by definition
+ * the expansion's output, byte for byte, so the two cannot drift apart.
+ */
+test('every committed v2 pattern is its v1 fixture expanded, byte-identical', () => {
+  assert.equal(fixtureNames.length, 16);
+  for (const name of fixtureNames) {
+    const expanded = expandV1Document(fixture(name), CATALOG).document;
+    assert.equal(
+      exportShaderDocumentJson(expanded),
+      readFileSync(new URL(name, PATTERNS), 'utf8'),
+      `${name} drifted from its expansion`,
+    );
+  }
+});
+
+/**
+ * The frozen migration table: every v1 descriptor digest maps to the digest
+ * of its expanded v2 document, with no extra or missing entries, so digest
+ * consumers can follow a v1 identity onto its v2 identity.
+ */
+test('the digest migration table covers exactly the v1 fixtures', () => {
+  const expected = new Map();
+  for (const name of fixtureNames) {
+    const v1 = fixture(name);
+    const compiled = compile(v1);
+    assert.equal(compiled.status, 'VALID', name);
+    expected.set(v1DescriptorDigest(v1), compiled.descriptor_digest);
+  }
+  assert.deepEqual(MIGRATION, Object.fromEntries(expected));
+  assert.equal(Object.keys(MIGRATION).length, fixtureNames.length);
+});
+
+/**
+ * v1 documents distinct only by an identity-policy spelling expand to the
+ * same chain: expansion canonicalizes them, and the registry migration merges
+ * their entries deliberately rather than reporting ambiguity.
+ */
+test('identity-spelling-distinct v1 documents collide by design', () => {
+  const spelled = fixture('example.shader.json');
+  const baseline = compile(fixture('example.shader.json')).descriptor_digest;
+  const surface = spelled.descriptor.graph.nodes.find((n) => n.role === 'surface_project');
+  surface.policy = { ...surface.policy, pre_lens_surface: 'identity', lens: 'identity' };
+  const warp = spelled.descriptor.graph.nodes.find((n) => n.role === 'planar_warp');
+  warp.policy = { sequence: ['identity', 'identity'] };
+  const color = spelled.descriptor.graph.nodes.find((n) => n.role === 'color');
+  color.policy = { ...color.policy, color: 'generated-palette' };
+
+  assert.notEqual(v1DescriptorDigest(spelled),
+    v1DescriptorDigest(fixture('example.shader.json')),
+    'the two spellings are distinct v1 descriptors');
+  assert.equal(compile(spelled).descriptor_digest, baseline);
+});
+
+/** Verifies a v1 document outside the expansion vocabulary is refused whole. */
+test('a v1 policy or parameter without a chain home refuses to expand', () => {
+  const alienPolicy = fixture('example.shader.json');
+  alienPolicy.descriptor.graph.nodes.find((n) => n.role === 'source')
+    .policy.source = 'perlin-clouds';
+  const policyCompiled = compile(alienPolicy);
+  assert.equal(policyCompiled.status, 'INVALID');
+  assert.equal(policyCompiled.diagnostics[0].code, 'V1_POLICY_UNSUPPORTED');
+
+  const alienParameter = fixture('example.shader.json');
+  alienParameter.descriptor.parameters[0].id = 'mystery-knob';
+  const parameterCompiled = compile(alienParameter);
+  assert.equal(parameterCompiled.status, 'INVALID');
+  assert.equal(parameterCompiled.diagnostics[0].code, 'V1_PARAMETER_UNMAPPED');
 });
 
 /** Verifies an export is classified against the registry by descriptor digest. */
 test('an export is classified by its descriptor digest', () => {
-  const compiled = compileShaderDocument(EXAMPLE);
+  const compiled = compile(EXAMPLE);
   const known = {
     effect_id: 'example',
     descriptor: compiled.descriptor,
@@ -335,40 +662,48 @@ test('easing is clamped to the unit interval', () => {
 /** Verifies an enum field crossfades as a pair rather than as a number. */
 test('an enum field interpolates as a from/to mix', () => {
   const lens = {
-    id: 'lens',
+    id: 'lens.symmetry',
     storage: 'enum8',
-    domain: { values: ['identity', 'glitch'] },
+    domain: { values: ['azimuthal', 'dodecahedral'] },
     interpolation: { kind: 'MIXED_ENUM' },
   };
 
-  assert.deepEqual(interpolateValue(lens, 'identity', 'glitch', 0.25),
-    { from: 'identity', to: 'glitch', mix: 0.25 });
-  assert.equal(interpolateValue(lens, 'glitch', 'glitch', 0.25), 'glitch');
-  assert.equal(interpolateValue(lens, 'identity', 'glitch', 0), 'identity');
-  assert.equal(interpolateValue(lens, 'identity', 'glitch', 1), 'glitch');
-  assert.equal(raised(() => interpolateValue(lens, 'identity', 'absent', 0.5)).code,
+  assert.deepEqual(interpolateValue(lens, 'azimuthal', 'dodecahedral', 0.25),
+    { from: 'azimuthal', to: 'dodecahedral', mix: 0.25 });
+  assert.equal(interpolateValue(lens, 'dodecahedral', 'dodecahedral', 0.25), 'dodecahedral');
+  assert.equal(interpolateValue(lens, 'azimuthal', 'dodecahedral', 0), 'azimuthal');
+  assert.equal(interpolateValue(lens, 'azimuthal', 'dodecahedral', 1), 'dodecahedral');
+  assert.equal(raised(() => interpolateValue(lens, 'azimuthal', 'absent', 0.5)).code,
     'INVALID_ENUM_VALUE');
 });
 
 /**
  * Verifies a transition lands exactly on its endpoints, eases in between, and
- * refuses an evaluation the edge does not define. A periodic field is checked
- * for staying inside its period rather than for a value: it wraps through the
- * seam between the two presets.
+ * refuses an evaluation the edge does not define. The periodic meridian is
+ * checked for staying inside its period rather than for a value: it wraps
+ * through the seam between the two presets.
  */
 test('a transition evaluates between its two presets', () => {
-  const { descriptor, preset_bank: bank } = compileShaderDocument(EXAMPLE);
+  const { descriptor, preset_bank: bank } = compile(EXAMPLE);
   const at = (evaluation) => evaluateTransition(descriptor, bank, 'calm', 'fast', evaluation);
+  const period = Math.fround(6.2831854820251465);
 
-  assert.deepEqual(at(0).values, { scale: 1, phase: Math.fround(0.9) });
-  assert.deepEqual(at(120).values, { scale: 4, phase: Math.fround(0.1) });
+  assert.equal(at(0).values['sample.pattern-freq'], 1);
+  assert.equal(at(0).values['project.central-meridian'], 6);
+  assert.equal(at(120).values['sample.pattern-freq'], 4);
+  assert.equal(at(120).values['project.central-meridian'], Math.fround(0.2));
   assert.equal(at(120).duration, 120);
 
   const middle = at(60);
   assert.equal(middle.raw_progress, 0.5);
   assert.equal(middle.eased_progress, 0.5);
-  assert.equal(middle.values.scale, 2);
-  assert.ok(middle.values.phase >= 0 && middle.values.phase < 1);
+  assert.equal(middle.values['sample.pattern-freq'], 2,
+    'the log-positive midpoint of 1 and 4 is their geometric mean');
+  const meridian = middle.values['project.central-meridian'];
+  assert.ok(meridian >= 0 && meridian < period);
+  assert.ok(meridian > 6 || meridian < 0.2, 'the shortest path crosses the seam');
+  assert.equal(middle.values['sample.weight-mode'], 'projection',
+    'an unchanged topology value rides the transition as itself');
 
   assert.equal(raised(() => at(121)).code, 'INVALID_EVALUATION');
   assert.equal(raised(() => at(0.5)).code, 'INVALID_EVALUATION');

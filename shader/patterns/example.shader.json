@@ -1,84 +1,170 @@
 {
-  "schema_version": 1,
-  "catalog_version": 1,
-  "document_id": "example-study",
-  "effect_id": null,
+  "catalog_version": 2,
   "descriptor": {
-    "graph": {
-      "nodes": [
-        { "label": "camera", "role": "outer_camera", "operator": "pullback.outer_camera.v1" },
-        { "label": "surface", "role": "surface_project", "operator": "pullback.surface_project.v1", "policy": { "lens": "identity", "projection": "equirectangular" } },
-        { "label": "warp", "role": "planar_warp", "operator": "pullback.planar_warp.v1", "policy": { "outer": "identity" } },
-        { "label": "pattern", "role": "source", "operator": "pullback.source.v1", "policy": { "source": "grid" } },
-        { "label": "transfer", "role": "material", "operator": "pullback.material.v1", "policy": { "weight": "projection", "transfer": "linear", "coverage": "opaque" } },
-        { "label": "palette", "role": "color", "operator": "pullback.color.v1", "policy": { "color": "generated_palette" } }
-      ],
-      "edges": [
-        { "from": "camera", "to": "surface" },
-        { "from": "surface", "to": "warp" },
-        { "from": "warp", "to": "pattern" },
-        { "from": "pattern", "to": "transfer" },
-        { "from": "transfer", "to": "palette" }
-      ]
-    },
-    "parameters": [
+    "chain": [
       {
-        "id": "scale",
-        "binding": "source.scale",
-        "classification": "preset",
-        "storage": "binary32",
-        "unit": "ratio",
-        "domain": { "minimum": 0.01, "maximum": 10.0 },
-        "interpolation": { "kind": "LOG_POSITIVE" },
-        "default": 1.0
+        "label": "camera",
+        "operator": "sphere.rotate.v2"
       },
       {
-        "id": "phase",
-        "binding": "source.phase",
+        "label": "project",
+        "operator": "project.equirectangular.v2"
+      },
+      {
+        "label": "sample",
+        "operator": "sample.grid.v2"
+      },
+      {
+        "label": "transfer",
+        "operator": "field.transfer.linear.v2"
+      },
+      {
+        "label": "colorize",
+        "operator": "colorize.generated-palette.v2"
+      }
+    ],
+    "parameters": [
+      {
         "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 6.2831854820251465,
+          "minimum": 0
+        },
+        "id": "project.central-meridian",
+        "interpolation": {
+          "kind": "SHORTEST_PERIODIC",
+          "period": 6.2831854820251465
+        },
         "storage": "binary32",
-        "unit": "turn",
-        "domain": { "minimum": 0.0, "maximum": 1.0 },
-        "interpolation": { "kind": "SHORTEST_PERIODIC", "period": 1.0 },
-        "default": 0.0
+        "unit": "radian"
+      },
+      {
+        "classification": "preset",
+        "default": "none",
+        "domain": {
+          "values": [
+            "none",
+            "weight",
+            "weight-squared",
+            "edge-fade"
+          ]
+        },
+        "id": "sample.coverage-mode",
+        "interpolation": {
+          "kind": "MIXED_ENUM"
+        },
+        "storage": "enum8",
+        "unit": "mode"
+      },
+      {
+        "classification": "preset",
+        "default": 1,
+        "domain": {
+          "maximum": 10,
+          "minimum": 0.009999999776482582
+        },
+        "id": "sample.pattern-freq",
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
+        "default": "projection",
+        "domain": {
+          "values": [
+            "none",
+            "projection"
+          ]
+        },
+        "id": "sample.weight-mode",
+        "interpolation": {
+          "kind": "MIXED_ENUM"
+        },
+        "storage": "enum8",
+        "unit": "mode"
       }
     ],
     "path_policies": [
-      { "id": "parallel", "kind": "PARALLEL" }
+      {
+        "id": "parallel",
+        "kind": "PARALLEL"
+      }
     ],
-    "clocks": [
-      { "id": "source-clock", "kind": "frame-clock", "settings": { "wrap": 1.0 } }
-    ],
-    "preparation": [
-      { "id": "frame", "kind": "prepare-frame" }
-    ],
-    "resources": [],
-    "serialization": { "schema_version": 1, "fields": ["scale", "phase"] },
-    "approximation": [],
-    "handoff": { "policy": "reset" }
-  },
-  "preset_bank": {
-    "schema_version": 1,
-    "presets": [
-      { "preset_id": "calm", "display_name": "Calm", "values": { "scale": 1.0, "phase": 0.9 } },
-      { "preset_id": "fast", "display_name": "Fast", "values": { "scale": 4.0, "phase": 0.1 } }
-    ],
-    "edges": [
-      { "from": "calm", "to": "fast", "path_policy": "parallel", "easing": "EASE_IN_OUT_SIN", "duration": 120 },
-      { "from": "fast", "to": "calm", "path_policy": "parallel", "easing": "EASE_IN_OUT_SIN", "duration": 120 }
-    ],
-    "absent_edge_fallback": {
-      "manual": "SNAP",
-      "automatic": "REJECT",
-      "synchronized": "REJECT",
-      "restore": "SNAP",
-      "authoring": "SNAP"
-    },
-    "choreography": {
-      "generated_order": ["calm", "fast"],
-      "dwell": { "calm": 600, "fast": 600 }
+    "serialization": {
+      "fields": [
+        "sample.pattern-freq",
+        "project.central-meridian",
+        "sample.weight-mode",
+        "sample.coverage-mode"
+      ],
+      "schema_version": 1
     }
   },
+  "document_id": "example-study",
+  "effect_id": null,
+  "preset_bank": {
+    "absent_edge_fallback": {
+      "authoring": "SNAP",
+      "automatic": "REJECT",
+      "manual": "SNAP",
+      "restore": "SNAP",
+      "synchronized": "REJECT"
+    },
+    "choreography": {
+      "dwell": {
+        "calm": 600,
+        "fast": 600
+      },
+      "generated_order": [
+        "calm",
+        "fast"
+      ]
+    },
+    "edges": [
+      {
+        "duration": 120,
+        "easing": "EASE_IN_OUT_SIN",
+        "from": "calm",
+        "path_policy": "parallel",
+        "to": "fast"
+      },
+      {
+        "duration": 120,
+        "easing": "EASE_IN_OUT_SIN",
+        "from": "fast",
+        "path_policy": "parallel",
+        "to": "calm"
+      }
+    ],
+    "presets": [
+      {
+        "display_name": "Calm",
+        "preset_id": "calm",
+        "values": {
+          "project.central-meridian": 6,
+          "sample.coverage-mode": "none",
+          "sample.pattern-freq": 1,
+          "sample.weight-mode": "projection"
+        }
+      },
+      {
+        "display_name": "Fast",
+        "preset_id": "fast",
+        "values": {
+          "project.central-meridian": 0.20000000298023224,
+          "sample.coverage-mode": "none",
+          "sample.pattern-freq": 4,
+          "sample.weight-mode": "projection"
+        }
+      }
+    ],
+    "schema_version": 1
+  },
+  "schema_version": 2,
   "study_metadata": {
     "notes": "Example authoring document"
   }
