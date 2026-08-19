@@ -69,10 +69,9 @@ function dynamicEngine(answer) {
   };
 }
 
-// A chain document has no structural dropdowns to write; its dynamic preview
-// goes through setShaderChain, which lands with the D2 engine update, so until
-// then the dynamic path refuses before touching the engine.
-test('a chain document is refused pending the chain engine', () => {
+// A chain document previews through tools/chain_apply.js over setShaderChain;
+// the legacy six-role body refuses it before touching the engine.
+test('a chain document is refused by the legacy six-role path', () => {
   const engine = dynamicEngine(() => ParamSetResult.APPLIED);
   const compiled = { document: {
     descriptor: { chain: [{ label: 'camera', operator: 'sphere.rotate.v2' }] },
@@ -81,7 +80,7 @@ test('a chain document is refused pending the chain engine', () => {
 
   const refusal = applyDynamicShaderDocument(engine, MODULE, compiled, 'study');
   assert.equal(typeof refusal, 'string');
-  assert.match(refusal, /chain engine/);
+  assert.match(refusal, /legacy six-role path/);
   assert.deepEqual(engine.writes, []);
 });
 
@@ -282,7 +281,7 @@ const shaderDocument = ({ digest = 'digest-equator', status = 'VALID',
   document: {
     effect_id: 'EquatorGrid',
     effect_metadata: { display_name: 'Equator Grid' },
-    descriptor: { chain: [] },
+    descriptor: { chain: [{ label: 'sample', operator: 'sample.grid.v2' }] },
     preset_bank: { presets: [
       { preset_id: 'noon', display_name: 'Noon', values: { 'sample.pattern-freq': 2 } },
       { preset_id: 'dusk', display_name: 'Dusk', values: { 'sample.pattern-freq': 5 } },
@@ -292,16 +291,26 @@ const shaderDocument = ({ digest = 'digest-equator', status = 'VALID',
 
 /** @returns {Object} An engine whose parameter definitions follow its writes. */
 function workbenchEngine() {
+  // 'Pattern Freq' serves the fixed path's alias lookup; the raw parameter id
+  // is what a setShaderChain-programmed chain registers.
   const definitions = [
     { name: 'Pattern Freq', value: 1 },
+    { name: 'sample.pattern-freq', value: 1 },
   ];
   const writes = [];
   const selected = [];
+  const chained = [];
   return {
     definitions,
     writes,
     selected,
+    chained,
     selectPresetById: (id) => { selected.push(id); return true; },
+    setShaderChain: (entries) => {
+      chained.push(entries);
+      return { code: 'APPLIED', entryIndex: -1 };
+    },
+    getParamGeneration: () => chained.length,
     getParameterDefinitions: () => definitions,
     setParameter: (name, value) => {
       writes.push([name, value]);
@@ -438,21 +447,43 @@ test('choosing a catalog source stages its effect and previews its first preset'
 });
 
 // The digest is what tells an authored study from a shipped pattern: matching
-// one routes the preview onto the concrete effect, and anything else needs the
-// chain engine, which lands with the D2 engine update.
-test('an imported study the catalog does not carry is parked on the D2 status', async () => {
+// one routes the preview onto the concrete fixed-pipeline effect, and anything
+// else onto the chain interpreter through setShaderChain.
+test('an imported study the catalog does not carry routes to the chain engine', async () => {
   const harness = workbench();
   await harness.controller.init();
 
   assert.equal(await harness.controller.loadSource(
+    shaderDocument({ digest: 'digest-study' }), 'study.shader.json'), true);
+  assert.deepEqual(harness.selections, ['ShaderChain']);
+  assert.deepEqual(harness.engine.selected, [],
+    'the dynamic path stages no fixed-effect reference preset');
+  assert.deepEqual(harness.engine.chained,
+    [[{ instance: 'sample', operator: 'sample.grid.v2' }]]);
+  assert.deepEqual(harness.engine.writes, [['sample.pattern-freq', 2]],
+    'the preset lands by parameter id, not by alias name');
+  const status = harness.elements.get('shader-document-status');
+  assert.equal(status.dataset.status, 'ok');
+  assert.match(status.textContent, /Equator Grid · Noon/);
+  assert.equal(harness.elements.get('shader-document-save').disabled, false);
+  assert.deepEqual(harness.ran, { gui: 1, invalidated: 1 });
+});
+
+test('a setShaderChain refusal is surfaced with its code', async () => {
+  const engine = workbenchEngine();
+  engine.setShaderChain = (entries) => {
+    engine.chained.push(entries);
+    return { code: 'ARENA_OVERFLOW', entryIndex: -1 };
+  };
+  const harness = workbench({ engine });
+  await harness.controller.init();
+
+  assert.equal(await harness.controller.loadSource(
     shaderDocument({ digest: 'digest-study' }), 'study.shader.json'), false);
-  assert.deepEqual(harness.selections, []);
-  assert.deepEqual(harness.engine.selected, []);
   assert.deepEqual(harness.engine.writes, []);
   const status = harness.elements.get('shader-document-status');
   assert.equal(status.dataset.status, 'error');
-  assert.match(status.textContent, /chain engine \(D2\)/);
-  assert.equal(harness.elements.get('shader-document-save').disabled, true);
+  assert.match(status.textContent, /ARENA_OVERFLOW/);
 });
 
 test('choosing a preset previews it without reloading the document', async () => {

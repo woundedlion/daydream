@@ -34,6 +34,20 @@
     "parameters": [
       {
         "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 1,
+          "minimum": 0
+        },
+        "id": "camera.wander",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
         "default": 1,
         "domain": {
           "maximum": 1,
@@ -232,7 +246,7 @@
           "maximum": 4,
           "minimum": -4
         },
-        "id": "lens.a-im",
+        "id": "lens.mobius-a-im",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -246,7 +260,7 @@
           "maximum": 4,
           "minimum": -4
         },
-        "id": "lens.a-re",
+        "id": "lens.mobius-a-re",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -260,7 +274,7 @@
           "maximum": 4,
           "minimum": -4
         },
-        "id": "lens.b-im",
+        "id": "lens.mobius-b-im",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -274,7 +288,7 @@
           "maximum": 4,
           "minimum": -4
         },
-        "id": "lens.b-re",
+        "id": "lens.mobius-b-re",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -288,7 +302,7 @@
           "maximum": 4,
           "minimum": -4
         },
-        "id": "lens.c-im",
+        "id": "lens.mobius-c-im",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -302,7 +316,7 @@
           "maximum": 4,
           "minimum": -4
         },
-        "id": "lens.c-re",
+        "id": "lens.mobius-c-re",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -316,7 +330,7 @@
           "maximum": 4,
           "minimum": -4
         },
-        "id": "lens.d-im",
+        "id": "lens.mobius-d-im",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -330,21 +344,7 @@
           "maximum": 4,
           "minimum": -4
         },
-        "id": "lens.d-re",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
-        "default": 0,
-        "domain": {
-          "maximum": 1,
-          "minimum": 0
-        },
-        "id": "project.camera-wander",
+        "id": "lens.mobius-d-re",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -582,7 +582,7 @@
         "sample.drift",
         "sample.angle-speed",
         "project.pole-fade",
-        "project.camera-wander",
+        "camera.wander",
         "warp2.speed",
         "warp2.rotation",
         "warp2.cell-x",
@@ -601,14 +601,14 @@
         "project.projection-spin-speed",
         "project.projection-wander",
         "colorize.brightness-depth",
-        "lens.a-re",
-        "lens.a-im",
-        "lens.b-re",
-        "lens.b-im",
-        "lens.c-re",
-        "lens.c-im",
-        "lens.d-re",
-        "lens.d-im",
+        "lens.mobius-a-re",
+        "lens.mobius-a-im",
+        "lens.mobius-b-re",
+        "lens.mobius-b-im",
+        "lens.mobius-c-re",
+        "lens.mobius-c-im",
+        "lens.mobius-d-re",
+        "lens.mobius-d-im",
         "sample.weight-mode",
         "sample.coverage-mode",
         "colorize.palette-mode",
@@ -663,6 +663,7 @@
         "display_name": "Mobius Grid",
         "preset_id": "mobius-grid",
         "values": {
+          "camera.wander": 1,
           "colorize.brightness-depth": 1,
           "colorize.brightness-envelope": "cup",
           "colorize.hue-shift-amount": 0.31200000643730164,
@@ -676,15 +677,14 @@
           "colorize.phase-oscillation-speed": 0,
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
-          "lens.a-im": 0.30399999022483826,
-          "lens.a-re": -1.0720000267028809,
-          "lens.b-im": 0,
-          "lens.b-re": 0.41600000858306885,
-          "lens.c-im": 0,
-          "lens.c-re": 0,
-          "lens.d-im": 0,
-          "lens.d-re": 0.7071067690849304,
-          "project.camera-wander": 1,
+          "lens.mobius-a-im": 0.30399999022483826,
+          "lens.mobius-a-re": -1.0720000267028809,
+          "lens.mobius-b-im": 0,
+          "lens.mobius-b-re": 0.41600000858306885,
+          "lens.mobius-c-im": 0,
+          "lens.mobius-c-re": 0,
+          "lens.mobius-d-im": 0,
+          "lens.mobius-d-re": 0.7071067690849304,
           "project.pole-fade": 2.1019999980926514,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 1,
@@ -706,6 +706,7 @@
         "display_name": "Mobius Grid 2",
         "preset_id": "mobius-grid-2",
         "values": {
+          "camera.wander": 1,
           "colorize.brightness-depth": 1,
           "colorize.brightness-envelope": "cup",
           "colorize.hue-shift-amount": 0.31200000643730164,
@@ -719,15 +720,14 @@
           "colorize.phase-oscillation-speed": 0,
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
-          "lens.a-im": 0.30399999022483826,
-          "lens.a-re": -1.0720000267028809,
-          "lens.b-im": 0,
-          "lens.b-re": 0.41600000858306885,
-          "lens.c-im": 0,
-          "lens.c-re": 0,
-          "lens.d-im": 0,
-          "lens.d-re": 0.7071067690849304,
-          "project.camera-wander": 1,
+          "lens.mobius-a-im": 0.30399999022483826,
+          "lens.mobius-a-re": -1.0720000267028809,
+          "lens.mobius-b-im": 0,
+          "lens.mobius-b-re": 0.41600000858306885,
+          "lens.mobius-c-im": 0,
+          "lens.mobius-c-re": 0,
+          "lens.mobius-d-im": 0,
+          "lens.mobius-d-re": 0.7071067690849304,
           "project.pole-fade": 2.1019999980926514,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 1,

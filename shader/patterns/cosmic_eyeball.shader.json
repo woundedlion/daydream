@@ -34,6 +34,20 @@
     "parameters": [
       {
         "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 1,
+          "minimum": 0
+        },
+        "id": "camera.wander",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
         "default": "none",
         "domain": {
           "values": [
@@ -205,20 +219,6 @@
           "minimum": 0
         },
         "id": "colorize.value-opacity-low",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
-        "default": 0,
-        "domain": {
-          "maximum": 1,
-          "minimum": 0
-        },
-        "id": "project.camera-wander",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -472,7 +472,7 @@
         "sample.drift",
         "sample.angle-speed",
         "project.pole-fade",
-        "project.camera-wander",
+        "camera.wander",
         "warp1.speed",
         "warp1.rotation",
         "warp1.cell-x",
@@ -526,6 +526,7 @@
         "display_name": "Mirrored Grid",
         "preset_id": "mirrored-grid",
         "values": {
+          "camera.wander": 1,
           "colorize.brightness-envelope": "none",
           "colorize.hue-shift-amount": 2.0480000972747803,
           "colorize.hue-shift-mode": "path-length",
@@ -538,7 +539,6 @@
           "colorize.phase-oscillation-speed": 0,
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
-          "project.camera-wander": 1,
           "project.pole-fade": 1.399999976158142,
           "sample.angle-speed": 0,
           "sample.complexity": 1.8539999723434448,

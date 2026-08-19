@@ -30,6 +30,20 @@
     "parameters": [
       {
         "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 1,
+          "minimum": 0
+        },
+        "id": "camera.wander",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
         "default": "none",
         "domain": {
           "values": [
@@ -229,20 +243,6 @@
           "minimum": 0
         },
         "id": "colorize.value-opacity-low",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
-        "default": 0,
-        "domain": {
-          "maximum": 1,
-          "minimum": 0
-        },
-        "id": "project.camera-wander",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -538,7 +538,7 @@
         "sample.lattice-softness",
         "sample.lattice-radius",
         "project.pole-fade",
-        "project.camera-wander",
+        "camera.wander",
         "warp1.speed",
         "warp1.rotation-rate",
         "warp1.translation-x",
@@ -599,6 +599,7 @@
         "display_name": "Affine Contour",
         "preset_id": "affine-contour",
         "values": {
+          "camera.wander": 1,
           "colorize.brightness-envelope": "none",
           "colorize.hue-noise-scale": 0.8300312757492065,
           "colorize.hue-noise-speed": 0.00021200001356191933,
@@ -613,7 +614,6 @@
           "colorize.phase-oscillation-speed": 0,
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
-          "project.camera-wander": 1,
           "project.hemisphere": "folded",
           "project.pole-fade": 1,
           "project.projection-spin-speed": 0.020879197865724564,

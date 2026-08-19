@@ -38,6 +38,20 @@
     "parameters": [
       {
         "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 1,
+          "minimum": 0
+        },
+        "id": "camera.wander",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
         "default": 1,
         "domain": {
           "maximum": 1,
@@ -279,20 +293,6 @@
         },
         "storage": "enum8",
         "unit": "mode"
-      },
-      {
-        "classification": "preset",
-        "default": 0,
-        "domain": {
-          "maximum": 1,
-          "minimum": 0
-        },
-        "id": "project.camera-wander",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
       },
       {
         "classification": "preset",
@@ -618,7 +618,7 @@
         "sample.drift",
         "sample.angle-speed",
         "project.pole-fade",
-        "project.camera-wander",
+        "camera.wander",
         "warp1.speed",
         "warp1.strength",
         "warp1.scale",
@@ -681,6 +681,7 @@
         "display_name": "Vector Mirror",
         "preset_id": "vector-mirror",
         "values": {
+          "camera.wander": 1,
           "colorize.brightness-depth": 0.6549999713897705,
           "colorize.brightness-envelope": "cup",
           "colorize.hue-noise-scale": 1,
@@ -697,7 +698,6 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "dodecahedral",
-          "project.camera-wander": 1,
           "project.hemisphere": "folded",
           "project.pole-fade": 2.311000108718872,
           "sample.angle-speed": 0.027000000700354576,

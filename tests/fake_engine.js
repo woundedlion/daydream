@@ -2,6 +2,7 @@
 // Single source of truth for the HolosphereEngine method surface the tests
 // stand in for: engine_contract_wasm.test.js pins the real WASM module against
 // this list, and every FakeEngine is checked to mock nothing outside it.
+import { readFileSync } from 'node:fs';
 
 /** Instance methods the tests' engine fakes stand in for. */
 export const ENGINE_METHODS = [
@@ -10,7 +11,7 @@ export const ENGINE_METHODS = [
   'synchronizePreset', 'nextPreset', 'previousPreset',
   'setPoleLod', 'setClip', 'drawFrame', 'getPixels', 'getArenaMetrics',
   'getParameterDefinitions', 'getParamValues', 'getBufferLength',
-  'getParamGeneration', 'getEffectSizes', 'strobeColumns',
+  'getParamGeneration', 'getEffectSizes', 'strobeColumns', 'setShaderChain',
 ];
 
 export const ENGINE_OPTIONAL_METHODS = [
@@ -81,6 +82,103 @@ export const FullConfigRestoreResult = Object.freeze({
   INVALID_ACCEPTED: Object.freeze({ value: 5 }),
   INVALID_PENDING: Object.freeze({ value: 6 }),
 });
+
+// The engine catalog exactly as the module's getShaderChainCatalog static
+// exports it: the committed pin carries the export plus a POSIX trailing
+// newline, which the export itself does not.
+const CHAIN_CATALOG_TEXT = readFileSync(
+  new URL('../shader/engine_catalog.json', import.meta.url), 'utf8',
+).replace(/\n$/, '');
+
+/**
+ * Stand-in for the chain-capable engine surface tools/chain_apply.js drives:
+ * setShaderChain with the module's payload-shape checks, parameter definitions
+ * rebuilt from the pinned catalog on every APPLIED (with the generation bump
+ * the real engine makes), and an injectable refusal. Every method it mocks is
+ * pinned in ENGINE_METHODS.
+ */
+export class FakeChainEngine {
+  /** The pinned operator catalog, byte-identical to the module export. */
+  static getShaderChainCatalog() {
+    return CHAIN_CATALOG_TEXT;
+  }
+
+  constructor() {
+    this.catalog = JSON.parse(CHAIN_CATALOG_TEXT);
+    this.effect = null;
+    this.generation = 1;
+    /** @type {Array<*>} Payloads handed to setShaderChain, in call order. */
+    this.chainCalls = [];
+    /** @type {Array<[string, number]>} Accepted setParameter writes. */
+    this.writes = [];
+    /** @type {?{code: string, entryIndex: number}} Injected next refusal. */
+    this.nextChainResult = null;
+    this.definitions = [];
+  }
+
+  setEffect(name) {
+    this.effect = name;
+    this.definitions = [];
+    this.generation += 1;
+    return EffectSetResult.INSTALLED;
+  }
+
+  setShaderChain(entries) {
+    this.chainCalls.push(entries);
+    const malformed = { code: 'MALFORMED_PAYLOAD', entryIndex: -1 };
+    if (!Array.isArray(entries)) return malformed;
+    for (const entry of entries) {
+      if (entry === null || typeof entry !== 'object'
+          || typeof entry.instance !== 'string'
+          || typeof entry.operator !== 'string') return malformed;
+    }
+    if (this.nextChainResult !== null) {
+      const injected = this.nextChainResult;
+      this.nextChainResult = null;
+      return injected;
+    }
+    const operators = new Map(this.catalog.operators.map((op) => [op.id, op]));
+    const definitions = [];
+    for (const [index, entry] of entries.entries()) {
+      const operator = operators.get(entry.operator);
+      if (!operator) return { code: 'UNKNOWN_OPERATOR', entryIndex: index };
+      for (const field of operator.params) {
+        const base = {
+          name: `${entry.instance}.${field.id}`,
+          animated: false, readonly: false, preset: true,
+        };
+        definitions.push(field.topology
+          ? { ...base, value: field.values.indexOf(field.default),
+              min: 0, max: field.values.length - 1, options: [...field.values] }
+          : { ...base, value: field.default, min: field.min, max: field.max });
+      }
+    }
+    this.definitions = definitions;
+    this.generation += 1;
+    return { code: 'APPLIED', entryIndex: -1 };
+  }
+
+  getParameterDefinitions() {
+    return this.definitions.map((definition) => ({
+      ...definition,
+      ...(definition.options ? { options: [...definition.options] } : {}),
+    }));
+  }
+
+  setParameter(name, value) {
+    const definition = this.definitions.find((d) => d.name === name);
+    if (!definition) return ParamSetResult.UNKNOWN_PARAM;
+    if (typeof value !== 'number' || !Number.isFinite(value))
+      return ParamSetResult.NON_FINITE;
+    definition.value = value;
+    this.writes.push([name, value]);
+    return ParamSetResult.APPLIED;
+  }
+
+  getParamGeneration() {
+    return this.generation;
+  }
+}
 
 /**
  * Method names an object exposes that ENGINE_METHODS does not pin — a fake

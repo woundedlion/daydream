@@ -513,7 +513,8 @@ test('a v1 document expands to the deterministic chain of its slots', () => {
   assert.equal(byId.get('colorize.brightness-envelope')?.default, 'none');
 
   assert.equal(parameter_ids['inner-cell-x'], 'warp2.cell-x');
-  assert.equal(parameter_ids['camera-wander'], 'project.camera-wander');
+  assert.equal(parameter_ids['camera-wander'], 'camera.wander',
+    'v1 camera-wander is the camera walk, not a projection field');
   assert.equal(parameter_ids['source-angle-speed'], 'sample.angle-speed');
   assert.equal(parameter_ids['palette-mapping'], 'colorize.palette-mapping');
   for (const v1Id of fixture('equator_grid.shader.json').descriptor.parameters
@@ -528,6 +529,33 @@ test('a v1 document expands to the deterministic chain of its slots', () => {
   assert.ok(!('binding' in document.descriptor.parameters[0]));
   assert.equal(document.descriptor.clocks, undefined,
     'engine machinery records do not survive expansion');
+});
+
+/**
+ * The two v1 identities that changed homes under the engine catalog: the
+ * mobius lens keeps its prefix in the engine field ids, and the one v1
+ * 'edge-width' splits by the material coverage policy — the sample stage's
+ * fade width under edge-fade, the cutout transition width (cutout-softness)
+ * under value-cutout.
+ */
+test('v1 mobius and edge-width parameters route onto the engine field ids', () => {
+  const mobius = expandV1Document(fixture('mobius_grid.shader.json'), CATALOG);
+  assert.equal(mobius.parameter_ids['mobius-a-re'], 'lens.mobius-a-re');
+  assert.equal(mobius.parameter_ids['mobius-d-im'], 'lens.mobius-d-im');
+
+  const fade = expandV1Document(fixture('alien_ocean.shader.json'), CATALOG);
+  assert.equal(fade.parameter_ids['edge-width'], 'sample.edge-width');
+
+  // No committed fixture uses value-cutout coverage, so the cutout routing is
+  // exercised on a mutated copy.
+  const cutout = fixture('alien_ocean.shader.json');
+  cutout.descriptor.graph.nodes.find((n) => n.role === 'material')
+    .policy.coverage = 'value-cutout';
+  const expanded = expandV1Document(cutout, CATALOG);
+  assert.equal(expanded.parameter_ids['edge-width'], 'cutout.cutout-softness');
+  assert.ok(expanded.document.descriptor.chain.some(
+    (entry) => entry.label === 'cutout'
+      && entry.operator === 'field.coverage.value-cutout.v2'));
 });
 
 test('expansion is deterministic and the compiler is one code path', () => {
