@@ -13,7 +13,9 @@
  * drop context, where an illegal entry shows disabled with the computed reason
  * instead of vanishing. The filter narrows by name or id and never hides that
  * state: a browsable vocabulary that quietly drops what does not currently fit
- * is the folder banks again.
+ * is the folder banks again. One tab per rendered domain rides along at every
+ * width; only the narrow-viewport stylesheet reads it, to show a single group
+ * at a time where four will not fit side by side.
  */
 
 import { createPointerDrag } from './pointer_drag.js';
@@ -54,6 +56,8 @@ const carrierTitle = (carrier) =>
 export function createChainLibrary({ doc, container, catalog, drag, announce, onPick }) {
   /** @type {Map<string, LegalityEntry>|null} Null = no drop context; all enabled. */
   let legality = null;
+  /** @type {string|null} The domain the narrow layout shows. */
+  let activeCarrier = null;
 
   /**
    * @param {string} tag - Element tag.
@@ -72,6 +76,9 @@ export function createChainLibrary({ doc, container, catalog, drag, announce, on
   const filter = el('input', 'chain-library-filter');
   filter.type = 'search';
   filter.id = FILTER_ID;
+  const tabs = el('div', 'chain-library-tabs');
+  tabs.setAttribute('role', 'group');
+  tabs.setAttribute('aria-label', 'Stage domains');
 
   /**
    * @param {CatalogOperator} op - A catalog operator.
@@ -111,6 +118,34 @@ export function createChainLibrary({ doc, container, catalog, drag, announce, on
   };
 
   /**
+   * Rebuilds the domain tabs and re-homes the active carrier onto a group the
+   * filter left standing. The tabs are in the DOM at every width; only the
+   * narrow-viewport rules read `data-active-carrier`, so the library needs no
+   * viewport query of its own.
+   * @param {string[]} rendered - Carriers whose groups this pass drew.
+   * @returns {void}
+   */
+  const renderTabs = (rendered) => {
+    if (activeCarrier === null || !rendered.includes(activeCarrier)) {
+      activeCarrier = rendered[0] ?? null;
+    }
+    if (activeCarrier === null) delete container.dataset.activeCarrier;
+    else container.dataset.activeCarrier = activeCarrier;
+    tabs.replaceChildren(...rendered.map((carrier) => {
+      const tab = el('button', 'chain-library-tab');
+      tab.type = 'button';
+      tab.dataset.carrier = carrier;
+      tab.textContent = carrierTitle(carrier);
+      tab.setAttribute('aria-pressed', String(carrier === activeCarrier));
+      tab.addEventListener('click', () => {
+        activeCarrier = carrier;
+        render();
+      });
+      return tab;
+    }));
+  };
+
+  /**
    * Rebuilds the groups from the catalog, the current legality and the filter.
    * The filter box itself survives, so narrowing never costs its focus or
    * caret.
@@ -122,9 +157,12 @@ export function createChainLibrary({ doc, container, catalog, drag, announce, on
     const matches = (op) => query === ''
       || op.name.toLowerCase().includes(query) || op.id.toLowerCase().includes(query);
     for (const stale of container.querySelectorAll('.chain-library-group')) stale.remove();
+    /** @type {string[]} */
+    const rendered = [];
     for (const carrier of catalog.carriers) {
       const ops = catalog.operators.filter((op) => op.input === carrier && matches(op));
       if (ops.length === 0) continue;
+      rendered.push(carrier);
       const group = el('div', 'chain-library-group');
       group.setAttribute('role', 'group');
       group.setAttribute('aria-label', `${carrierTitle(carrier)} stages`);
@@ -135,6 +173,7 @@ export function createChainLibrary({ doc, container, catalog, drag, announce, on
       for (const op of ops) group.appendChild(entryElement(op));
       container.appendChild(group);
     }
+    renderTabs(rendered);
   };
 
   filter.addEventListener('input', () => render());
@@ -159,7 +198,7 @@ export function createChainLibrary({ doc, container, catalog, drag, announce, on
     onCancel: () => drag.cancel(),
   });
 
-  container.replaceChildren(label, filter);
+  container.replaceChildren(label, filter, tabs);
   render();
 
   return {

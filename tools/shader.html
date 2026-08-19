@@ -27,6 +27,21 @@
     <nav class="nav-tabs" aria-label="Shader workbench navigation">
       <a href="shader.html" class="tab" aria-current="page">Shader Workbench</a>
       <a href="palettes.html" target="_blank" rel="noopener" class="tab">Palettes <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
+    </nav>
+    <div id="shader-toolbar" class="shader-toolbar">
+      <label for="shader-document-select">Source</label>
+      <select id="shader-document-select">
+        <option value="">Scratch shader</option>
+      </select>
+      <label for="shader-preset-select">Preset</label>
+      <select id="shader-preset-select" disabled>
+        <option value="">No document loaded</option>
+      </select>
+      <button id="shader-document-open" type="button">Open…</button>
+      <button id="shader-document-save" type="button" disabled>Save</button>
+      <button id="shader-document-digest" class="shader-document-digest" type="button" disabled aria-label="Copy the descriptor digest">—</button>
+      <input id="shader-document-file" type="file" accept=".json,.shader.json,application/json" hidden>
+      <output id="shader-document-status" class="shader-document-status" role="status" aria-live="polite">Loading source documents…</output>
       <div id="global-stats-desktop">
         <table class="global-stats global-stats--desktop">
           <caption class="visually-hidden">Engine memory and compute</caption>
@@ -38,30 +53,9 @@
           </tbody>
         </table>
       </div>
-    </nav>
+    </div>
+    <section id="chain-strip" class="chain-strip-region" aria-label="Shader chain"></section>
     <main class="main-area">
-      <aside class="shader-workbench-nav" aria-label="Shader chain authoring">
-        <section class="shader-document-controls" aria-labelledby="shader-document-heading">
-          <h2 id="shader-document-heading">Shader document</h2>
-          <label for="shader-document-select">Source</label>
-          <select id="shader-document-select">
-            <option value="">Scratch shader</option>
-          </select>
-          <label for="shader-preset-select">Preset</label>
-          <select id="shader-preset-select" disabled>
-            <option value="">No document loaded</option>
-          </select>
-          <div class="shader-document-actions">
-            <button id="shader-document-open" type="button">Open…</button>
-            <button id="shader-document-save" type="button" disabled>Save</button>
-          </div>
-          <input id="shader-document-file" type="file" accept=".json,.shader.json,application/json" hidden>
-          <output id="shader-document-status" role="status">Loading source documents…</output>
-        </section>
-        <section id="chain-editor" class="chain-editor" aria-label="Shader chain"></section>
-        <h2>Operator catalog</h2>
-        <section id="chain-catalog" class="chain-catalog" aria-label="Operator catalog"></section>
-      </aside>
       <div id="stats-bar" class="stats-bar">
         <table class="global-stats global-stats--mobile">
           <caption class="visually-hidden">Engine memory and compute</caption>
@@ -81,8 +75,12 @@
         </div>
         <canvas id="canvas" tabindex="0" role="application" aria-label="Real-time preview of the authored Shader document"></canvas>
       </div>
+      <aside id="parameter-dock" class="parameter-dock" aria-label="Stage parameters">
+        <button id="parameter-dock-toggle" class="parameter-dock-toggle" type="button" aria-expanded="true">Parameters</button>
+        <div id="gui-container" class="gui-container"></div>
+      </aside>
     </main>
-    <div id="gui-container" class="gui-container"></div>
+    <section id="chain-library" class="chain-library-region" aria-label="Stage library"></section>
   </div>
   <script type="module" src="../main.js"></script>
 </body>
