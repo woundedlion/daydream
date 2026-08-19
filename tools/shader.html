@@ -40,7 +40,7 @@
       </div>
     </nav>
     <main class="main-area">
-      <aside id="shader-workbench-nav" class="shader-workbench-nav" aria-label="Shader stages">
+      <aside class="shader-workbench-nav" aria-label="Shader chain authoring">
         <section class="shader-document-controls" aria-labelledby="shader-document-heading">
           <h2 id="shader-document-heading">Shader document</h2>
           <label for="shader-document-select">Source</label>
@@ -58,20 +58,9 @@
           <input id="shader-document-file" type="file" accept=".json,.shader.json,application/json" hidden>
           <output id="shader-document-status" role="status">Loading source documents…</output>
         </section>
-        <h2>Shader stages</h2>
-        <button type="button" data-workbench-folder="Controls">Presets</button>
-        <button type="button" data-workbench-folder="Camera">Camera</button>
-        <button type="button" data-workbench-folder="Lens">Lens</button>
-        <button type="button" data-workbench-folder="Surface Noise">Surface Noise</button>
-        <button type="button" data-workbench-folder="Projection Frame">Projection Frame</button>
-        <button type="button" data-workbench-folder="Projection">Projection</button>
-        <button type="button" data-workbench-folder="Planar Warp 1">Planar Warp 1</button>
-        <button type="button" data-workbench-folder="Planar Warp 2">Planar Warp 2</button>
-        <button type="button" data-workbench-folder="Function">Function</button>
-        <button type="button" data-workbench-folder="Signal Weight">Signal Weight</button>
-        <button type="button" data-workbench-folder="Value Transfer">Value Transfer</button>
-        <button type="button" data-workbench-folder="Coverage">Coverage</button>
-        <button type="button" data-workbench-folder="Colorize">Colorize</button>
+        <section id="chain-editor" class="chain-editor" aria-label="Shader chain"></section>
+        <h2>Operator catalog</h2>
+        <section id="chain-catalog" class="chain-catalog" aria-label="Operator catalog"></section>
       </aside>
       <div id="stats-bar" class="stats-bar">
         <table class="global-stats global-stats--mobile">
@@ -95,7 +84,6 @@
     </main>
     <div id="gui-container" class="gui-container"></div>
   </div>
-  <script type="module" src="shader_workbench_nav.js"></script>
   <script type="module" src="../main.js"></script>
 </body>
 

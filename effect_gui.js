@@ -511,6 +511,12 @@ export function addParamControl(
  * @param {() => Object|null} [deps.focusedElement] - The document's focused
  *   element. A control whose number input has focus is being typed into, so the
  *   per-frame value stream must leave it alone.
+ * @param {() => {prefix: string, deactivated?: Function}|null} [deps.paramFilter] -
+ *   The chain editor's selected-instance filter: when non-null, only parameters
+ *   whose name starts with `prefix` get controls (labeled by their field
+ *   segment), and `deactivated(definitions)` names the params the current
+ *   topology values deactivate, which render dimmed but stay editable. A
+ *   prefix change is detected in sync() and rebuilds the panel.
  * @param {(text: string) => Promise<boolean>} deps.copyText - Copies text using
  *   the browser's available clipboard path.
  * @param {() => boolean} [deps.usesFullConfigSnapshot] - Whether the active
@@ -551,6 +557,7 @@ export function createEffectGui({
   isMobile,
   dragTarget,
   focusedElement = () => null,
+  paramFilter = () => null,
   copyText,
   usesFullConfigSnapshot = () => false,
   getFullConfigSnapshot = () => null,
@@ -747,8 +754,14 @@ export function createEffectGui({
     // it — but a refusal must not gate the rebuild, which is what clears the
     // stale schema a refusal comes from.
     const presetSynced = synchronizePreset(presetIndex);
+    // The selected-instance filter is external state: a chain-editor selection
+    // changes which controls belong in the panel without moving the schema
+    // generation, so its prefix is compared against the one the panel was
+    // built with.
+    const filterStale =
+      (paramFilter()?.prefix ?? null) !== (activeEffect.paramFilterPrefix ?? null);
     if (paramGenerationStale(activeEffect.paramGeneration, paramGeneration())
-        || paramWarningsStale(activeEffect)) {
+        || paramWarningsStale(activeEffect) || filterStale) {
       if (!rebuildSchema()) return;
     }
     if (!presetSynced) return;
@@ -758,6 +771,9 @@ export function createEffectGui({
     // One focus read for the whole pass: at most one element has focus.
     const focused = focusedElement() ?? null;
     adoptRequestedEnums(activeEffect, focused);
+    if (activeEffect.paramFilterDeactivated) {
+      applyTopologyDimming(activeEffect, getParameterDefinitions());
+    }
 
     const values = liveParamValues();
     if (!values || values.length === 0) return;
@@ -821,7 +837,9 @@ export function createEffectGui({
       return;
     }
     let values = liveParamValues();
-    if ((!values || values.length === 0)
+    // The controller fallback needs one control per stream slot, which the
+    // selected-instance filter deliberately does not build.
+    if ((!values || values.length === 0) && !fx.paramFilterPrefix
         && !paramGenerationStale(fx.paramGeneration, paramGeneration())) {
       values = fx.paramNames.map((name) =>
         engineParamValue(fx.controllerByName.get(name).getValue()));
@@ -1081,12 +1099,15 @@ export function createEffectGui({
     // paramNames records the value-stream order; sync() binds by name, not
     // index, so a C++ param reorder can't mis-bind sliders.
     const state = {};
+    const filter = paramFilter();
     fx.paramNames = [];
     fx.writableParamNames = [];
     fx.controllerByName = new Map();
     fx.hasParams = params.length > 0;
     fx.hasEnumControls = false;
     fx.paramWarnings = paramWarningTexts(params);
+    fx.paramFilterPrefix = filter?.prefix ?? null;
+    fx.paramFilterDeactivated = filter?.deactivated ?? null;
     const shaderBallAssignments = shaderBallStageAssignments(params);
     const curlLatticeAssignments = curlLatticeStageAssignments(params);
     const facetGridAssignments = facetGridStageAssignments(params);
@@ -1124,6 +1145,13 @@ export function createEffectGui({
 
     const unstagedParams = [];
     params.forEach(p => {
+      // A filtered-out param still claims its paramNames slot: the value
+      // stream is positional, so hiding a control must not shift the binding
+      // of the ones that stay.
+      if (filter && !p.name.startsWith(filter.prefix)) {
+        fx.paramNames.push(p.name);
+        return;
+      }
       state[p.name] = paramControlKind(p) === 'enum'
         ? selectorControlValue(p)
         : p.value;
@@ -1135,6 +1163,7 @@ export function createEffectGui({
         controlGui, state, p, !previousParamNames?.has(p.name),
         legacyShaderBallParamNames(p.name), !usesFullConfigSnapshot());
       if (stage) controller.name(shaderBallControlLabel(stage, p.name));
+      if (filter) controller.name(p.name.slice(filter.prefix.length));
       fx.paramNames.push(p.name);
       fx.controllerByName.set(p.name, controller);
       if (controller.isEnum) fx.hasEnumControls = true;
@@ -1162,6 +1191,27 @@ export function createEffectGui({
     });
     if (unstagedParams.length > 0) {
       logWarn(`Effect GUI: no pipeline stage claims ${unstagedParams.join(', ')}; shown outside every stage folder`);
+    }
+    applyTopologyDimming(fx, params);
+  }
+
+  /**
+   * Dims the controls the current topology values deactivate: they stay in the
+   * document, every preset and the digest, so they stay present and editable —
+   * only the engine stops reading them. Re-run from sync() because a topology
+   * dropdown edit changes what is deactivated without a schema rebuild.
+   * @param {Object} fx - The effect record.
+   * @param {Array<Object>} params - The engine's parameter definitions.
+   * @returns {void}
+   */
+  function applyTopologyDimming(fx, params) {
+    if (!fx.paramFilterDeactivated || !fx.controllerByName) return;
+    const dimmed = fx.paramFilterDeactivated(params);
+    for (const [name, controller] of fx.controllerByName) {
+      const off = dimmed.has(name);
+      controller.domElement.classList.toggle('param-deactivated', off);
+      controller.domElement.setAttribute('title',
+        off ? 'Deactivated by the current topology selection' : '');
     }
   }
 

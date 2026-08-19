@@ -48,13 +48,14 @@ tools/palettes.html
 tools/shader.html
 tools/shader.css
 tools/shader_documents.js
-tools/shader_workbench_nav.js
 tools/solids.html
 tools/tools.css
 tools/tailwind.css
 tools/banner.js
 tools/chain_apply.js
+tools/chain_catalog_panel.js
 tools/chain_document_store.js
+tools/chain_editor.js
 tools/clipboard.js
 tools/copy_text.js
 tools/color.js

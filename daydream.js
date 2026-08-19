@@ -547,6 +547,10 @@ export function start({
     return fullConfigSchema;
   }
 
+  // The shader-document controller (created below, after the panel it filters)
+  // publishes the chain editor's selected-instance filter through this slot.
+  const paramFilterRef = { current: null };
+
   const effectGui = createEffectGui({
     createGui: () => createGui({ autoPlace: false }, 'fx'),
     getParameterDefinitions: () => host.engine.getParameterDefinitions(),
@@ -585,6 +589,7 @@ export function start({
     isMobile: () => daydream.isMobile,
     dragTarget: win,
     focusedElement: () => doc.activeElement,
+    paramFilter: () => paramFilterRef.current,
     copyText: copyToClipboard,
     usesFullConfigSnapshot,
     getFullConfigSnapshot: () => host.engine.getFullConfigSnapshot(),
@@ -639,6 +644,7 @@ export function start({
     },
     syncEffectGui: () => effectGui.sync(),
     invalidate: () => daydream.invalidate(),
+    setParamFilter: (filter) => { paramFilterRef.current = filter; },
   }) : null;
 
   testAllController = guiInstance.addSession({ testAll: false }, 'testAll').name('Test All')
