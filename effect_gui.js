@@ -511,12 +511,15 @@ export function addParamControl(
  * @param {() => Object|null} [deps.focusedElement] - The document's focused
  *   element. A control whose number input has focus is being typed into, so the
  *   per-frame value stream must leave it alone.
- * @param {() => {prefix: string, deactivated?: Function}|null} [deps.paramFilter] -
+ * @param {() => {prefix: string, deactivated?: Function,
+ *   onEdit?: (name: string, value: number) => void}|null} [deps.paramFilter] -
  *   The chain editor's selected-instance filter: when non-null, only parameters
  *   whose name starts with `prefix` get controls (labeled by their field
  *   segment), and `deactivated(definitions)` names the params the current
  *   topology values deactivate, which render dimmed but stay editable. A
- *   prefix change is detected in sync() and rebuilds the panel.
+ *   prefix change is detected in sync() and rebuilds the panel. `onEdit` takes
+ *   every control edit, so the chain editor can write it to the document the
+ *   engine write mirrors; an enum edit carries its option index.
  * @param {(text: string) => Promise<boolean>} deps.copyText - Copies text using
  *   the browser's available clipboard path.
  * @param {() => boolean} [deps.usesFullConfigSnapshot] - Whether the active
@@ -1178,6 +1181,7 @@ export function createEffectGui({
       controller.onChange(v => {
         const value = engineParamValue(v);
         setEngineParam(p.name, value);
+        filter?.onEdit?.(p.name, value);
         // A drag emits one onChange per pointermove and persistence reads the
         // whole effect (a definitions marshal, or ShaderBall's full-config
         // snapshot and its JSON), so it waits for the pointer release, which

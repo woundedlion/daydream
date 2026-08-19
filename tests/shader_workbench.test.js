@@ -459,16 +459,21 @@ test('an effect the preview engine rejects leaves the export disabled', async ()
   assert.equal(harness.controller.save(), false);
 });
 
-test('saving exports the live engine values, not the ones the document arrived with', async () => {
+// §4.4: every edit is a document edit, so Save serializes the document
+// rather than capturing state only the engine holds.
+test('saving exports the document, harvesting nothing from the engine', async () => {
   const harness = workbench();
   await chooseCatalogSource(harness);
   harness.engine.definitions.find((d) => d.name === 'Pattern Freq').value = 9;
+  harness.engine.getParameterDefinitions = () => {
+    throw new Error('Save must not read the engine');
+  };
 
   assert.equal(harness.controller.save(), true);
   const [filename, source] = harness.downloads[0];
   assert.equal(filename, 'equator_grid.shader.json');
   const saved = JSON.parse(source);
-  assert.equal(saved.preset_bank.presets[0].values['sample.pattern-freq'], 9);
+  assert.equal(saved.preset_bank.presets[0].values['sample.pattern-freq'], 2);
   assert.equal(saved.preset_bank.presets[1].values['sample.pattern-freq'], 5,
     'the presets the session never previewed must survive the round trip');
   assert.match(harness.elements.get('shader-document-status').textContent,
@@ -677,6 +682,75 @@ test('a bypass reshapes the engine program while the saved document keeps the st
   assert.equal(saved.descriptor.chain.length, 7);
   assert.ok(saved.descriptor.chain.some((entry) => entry.label === 'lens'),
     'bypass is session state, never serialized');
+});
+
+/**
+ * Selects a chip and hands back the parameter-dock write-through the selection
+ * published, as the effect GUI's controller onChange would call it.
+ * @param {Object} harness - An editorWorkbench() result.
+ * @param {string} label - The instance to select.
+ * @returns {Function} The filter's onEdit.
+ */
+function dockEditor(harness, label) {
+  stripChips(harness).find((chip) => chip.dataset.label === label).dispatch('click');
+  return harness.filters.at(-1).onEdit;
+}
+
+const savedValues = (harness) => {
+  assert.equal(harness.controller.save(), true);
+  return JSON.parse(harness.downloads.at(-1)[1]).preset_bank.presets[0].values;
+};
+
+// §4.4: a dock edit is a document edit. The engine already holds the value the
+// dock wrote, so Save reads the document and nothing else.
+test('a dock edit writes the active preset and survives Save without an engine read', async () => {
+  const harness = await editorWorkbench();
+
+  dockEditor(harness, 'sample')('sample.pattern-freq', 7);
+  dockEditor(harness, 'colorize')('colorize.palette-mapping', 1);
+  harness.engine.getParameterDefinitions = () => {
+    throw new Error('Save must not read the engine');
+  };
+
+  const values = savedValues(harness);
+  assert.equal(values['sample.pattern-freq'], 7);
+  assert.equal(values['colorize.palette-mapping'], 'bell',
+    'an enum control edits by option index; the document stores the option id');
+});
+
+test('a dock edit outside the parameter domain is announced, not stored', async () => {
+  const harness = await editorWorkbench();
+  const before = savedValues(harness)['sample.pattern-freq'];
+
+  dockEditor(harness, 'sample')('sample.pattern-freq', 500);
+
+  const status = harness.elements.get('shader-document-status');
+  assert.equal(status.dataset.status, 'error');
+  assert.match(status.textContent, /sample\.pattern-freq.*bounds/);
+  assert.equal(savedValues(harness)['sample.pattern-freq'], before);
+});
+
+// One history: the strip's Undo covers a dock edit, and a drag's stream of
+// writes is one step in it.
+test('a dock edit joins the structural history and coalesces per control', async () => {
+  const harness = await editorWorkbench();
+  const strip = harness.elements.get('chain-strip');
+  assert.equal(strip.querySelector('.chain-undo').disabled, true);
+  const opening = savedValues(harness)['sample.pattern-freq'];
+
+  const edit = dockEditor(harness, 'sample');
+  for (const value of [2, 3, 4]) edit('sample.pattern-freq', value);
+  assert.equal(savedValues(harness)['sample.pattern-freq'], 4);
+  assert.equal(strip.querySelector('.chain-undo').disabled, false,
+    'the write that opens the run enables the strip Undo');
+
+  strip.querySelector('.chain-undo').dispatch('click');
+
+  assert.equal(savedValues(harness)['sample.pattern-freq'], opening);
+  assert.equal(strip.querySelector('.chain-undo').disabled, true);
+  assert.ok(harness.engine.writes.some(
+    ([name, value]) => name === 'sample.pattern-freq' && value === opening),
+  'undoing a dock edit re-applies the restored value to the engine');
 });
 
 test('legacy custom Shader URLs preserve their state on the workbench route', () => {

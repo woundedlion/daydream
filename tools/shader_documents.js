@@ -188,7 +188,8 @@ function defaultDownload(doc, filename, source) {
  * @param {{doc: Document, getEngine: () => *, getModule: () => *,
  * selectEffect: (effect: string) => boolean,
  * syncEffectGui: () => void, invalidate: () => void,
- * setParamFilter?: (filter: {prefix: string, deactivated?: Function}|null) => void,
+ * setParamFilter?: (filter: {prefix: string, deactivated?: Function,
+ *   onEdit?: (name: string, value: *) => void}|null) => void,
  * fetchText?: (url: string) => Promise<string>, importCompiler?: () => Promise<*>,
  * download?: (filename: string, source: string) => void}} dependencies
  */
@@ -344,6 +345,51 @@ export function createShaderDocumentController({
   };
 
   /**
+   * The catalog schema behind a chain parameter id, which is `<label>.<field>`
+   * over the labelled instance's operator.
+   * @param {string} parameterId - A chain parameter id.
+   * @returns {*|null} The catalog field, or null when nothing declares it.
+   */
+  const catalogField = (parameterId) => {
+    if (chainUi === null) return null;
+    const dot = parameterId.indexOf('.');
+    if (dot < 0) return null;
+    const entry = chainUi.store.chain().find(
+      (/** @type {*} */ candidate) => candidate.label === parameterId.slice(0, dot));
+    return operatorCatalog.operators
+      .find((/** @type {*} */ op) => op.id === entry?.operator)?.params
+      .find((/** @type {*} */ field) => field.id === parameterId.slice(dot + 1)) ?? null;
+  };
+
+  /**
+   * Routes a parameter-dock edit into the active preset: the document is the
+   * source of truth and the engine write, which the dock has already made, is
+   * the side effect. The chain path registers each parameter id verbatim as its
+   * control name, so no alias translation stands between the two.
+   * @param {string} parameterId - The edited control's name.
+   * @param {*} value - The control's value; an enum carries an option index into
+   *   the operator's catalog values, which is the order the chain registers its
+   *   options in.
+   * @returns {void}
+   */
+  const writeDockEdit = (parameterId, value) => {
+    if (chainUi === null || active === null || active.presetId === null) return;
+    const values = catalogField(parameterId)?.values;
+    const stored = values && typeof value === 'number' ? values[value] : value;
+    const undoable = chainUi.store.canUndo();
+    const redoable = chainUi.store.canRedo();
+    const result = chainUi.store.setPresetValue(active.presetId, parameterId, stored);
+    if (!result.ok) {
+      announce(`"${parameterId}" was refused: ${result.diagnostics[0].message}`);
+      return;
+    }
+    // A drag calls this per pointermove; only the write that opens the undo
+    // run moves the strip's history buttons.
+    if (undoable !== chainUi.store.canUndo() || redoable !== chainUi.store.canRedo())
+      chainUi.strip.render();
+  };
+
+  /**
    * Builds the pipeline strip, the stage library and the parameter dock over one
    * document store, wiring every structural edit, undo and bypass toggle back
    * through the one apply path and the selection into the parameter GUI's
@@ -365,8 +411,11 @@ export function createShaderDocumentController({
         refreshLibraryLegality();
       },
       onSelect: (/** @type {string|null} */ label) => {
-        setParamFilter(label === null
-          ? null : { prefix: `${label}.`, deactivated: deactivatedParamNames });
+        setParamFilter(label === null ? null : {
+          prefix: `${label}.`,
+          deactivated: deactivatedParamNames,
+          onEdit: writeDockEdit,
+        });
         syncEffectGui();
         refreshLibraryLegality();
         if (label !== null) chainUi?.dock?.setCollapsed(false);
@@ -443,33 +492,12 @@ export function createShaderDocumentController({
 
   const save = () => {
     if (!active) return false;
-    // With the editor live, the store's document carries every structural edit
-    // and reconciliation; the imported compile is only the load-time snapshot.
+    // Every edit is already a document edit, so the export is the document as
+    // it stands — the store's once the editor is live, else the load-time
+    // compile — with nothing harvested back out of the engine.
     const document = chainUi
       ? chainUi.store.document()
       : structuredClone(active.compiled.document);
-    const preset = document.preset_bank.presets
-      .find((/** @type {*} */ candidate) => candidate.preset_id === active.presetId);
-    if (preset) {
-      const definitions = getEngine()?.getParameterDefinitions?.() ?? [];
-      for (const parameterId of Object.keys(preset.values)) {
-        // The chain path registers the parameter id itself; the alias names
-        // only serve the pre-spec promoted effects on the fixed path.
-        const names = active.fixed ? engineParameterNames(parameterId) : [parameterId];
-        const definition = definitions.find(
-          (/** @type {ParameterDefinition} */ candidate) => names.includes(candidate.name));
-        if (!definition) continue;
-        if (definition.options && typeof preset.values[parameterId] === 'string') {
-          // A document enum value is the option id; the fixed path's Palette
-          // Mapping labels are Title Case spellings of it, the chain path's
-          // options are the ids themselves.
-          const option = definition.options[definition.value];
-          preset.values[parameterId] = active.fixed ? option?.toLowerCase() : option;
-        } else {
-          preset.values[parameterId] = definition.value;
-        }
-      }
-    }
     const filename = active.filename.endsWith('.shader.json')
       ? active.filename : `${document.effect_id}.shader.json`;
     download(filename, `${JSON.stringify(document, null, 2)}\n`);
