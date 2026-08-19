@@ -25,21 +25,51 @@ test('simulator exposes Shader as a standalone tool', () => {
   assert.match(INDEX, /href="tools\/shader\.html"[^>]*>Shader/);
   assert.match(WORKBENCH, /data-daydream-mode="shader-workbench"/);
   assert.match(WORKBENCH, /src="\.\.\/main\.js"/);
-  assert.match(WORKBENCH, /id="chain-editor"/);
-  assert.match(WORKBENCH, /id="chain-catalog"/);
+  assert.match(WORKBENCH, /id="chain-strip"/);
+  assert.match(WORKBENCH, /id="chain-library"/);
+  assert.match(WORKBENCH, /id="parameter-dock"/);
+  assert.match(WORKBENCH, /id="parameter-dock-toggle"/);
   assert.match(WORKBENCH, /id="shader-document-select"/);
   assert.match(WORKBENCH, /id="shader-preset-select"/);
   assert.match(WORKBENCH, /id="shader-document-open"/);
   assert.match(WORKBENCH, /id="shader-document-save"/);
+  assert.match(WORKBENCH, /id="shader-document-digest"/);
   assert.doesNotMatch(WORKBENCH, /data-workbench-folder/,
-    'the folder banks are replaced by the chain rail');
+    'the folder banks are replaced by the pipeline strip');
   assert.doesNotMatch(WORKBENCH, /shader_workbench_nav/);
   assert.doesNotMatch(WORKBENCH, />Simulator<\/a>/);
   assert.doesNotMatch(WORKBENCH, /id="effect-sidebar"/);
+  assert.doesNotMatch(WORKBENCH, /id="chain-editor"|id="chain-catalog"/,
+    'the sidebar rail and its catalog panel are retired');
+  assert.doesNotMatch(WORKBENCH, /shader-workbench-nav/);
   assert.match(WORKBENCH_CSS, /\.lil-controller\.lil-option option\s*\{/);
   assert.match(WORKBENCH_CSS, /color-scheme:\s*dark/);
   assert.match(WORKBENCH_CSS, /background-color:\s*var\(--background-color\)/);
   assert.match(WORKBENCH_CSS, /\.param-deactivated\s*\{/);
+});
+
+// §4.1: three stacked regions plus one dock. The toolbar keeps the engine stats
+// row, the canvas keeps every pixel the four do not need, and the document
+// status output is the one live region the strip, library and dock announce
+// through.
+test('the workbench page lays out the toolbar, strip, canvas, library and dock', () => {
+  const region = (/** @type {RegExp} */ pattern) => WORKBENCH.search(pattern);
+  assert.ok(region(/id="shader-toolbar"/) < region(/id="chain-strip"/));
+  assert.ok(region(/id="chain-strip"/) < region(/<main class="main-area"/));
+  assert.ok(region(/<main class="main-area"/) < region(/id="chain-library"/));
+  assert.ok(region(/id="canvas-container"/) < region(/id="parameter-dock"/),
+    'the dock sits beside the canvas inside the main area');
+  assert.ok(region(/id="parameter-dock"/) < region(/id="gui-container"/),
+    'the effect GUI moves into the dock');
+  assert.ok(region(/id="shader-toolbar"/) < region(/id="global-stats-desktop"/)
+    && region(/id="global-stats-desktop"/) < region(/id="chain-strip"/),
+  'the engine memory and compute stats stay in the toolbar row');
+  assert.match(WORKBENCH,
+    /id="shader-document-status"[^>]*role="status"[^>]*aria-live="polite"/);
+  assert.match(WORKBENCH_CSS, /\.parameter-dock \.gui-container \{/,
+    'the dock has to undo the global rule that floats the GUI over the canvas');
+  assert.match(WORKBENCH_CSS, /\[data-carrier="color"\]/,
+    'each carrier domain carries its own hue');
 });
 
 // The alias table serves effects promoted before the chain schema: a v2
@@ -463,38 +493,39 @@ test('returning to the scratch source drops the loaded document', async () => {
     /Scratch Shader is active/);
 });
 
-// ── The chain rail over the real store, compiler and engine catalog ─────────
+// ── The pipeline strip over the real store, compiler and engine catalog ────
 
 const HEX_WAVE = readFileSync(
   new URL('../shader/patterns/hex_wave.shader.json', import.meta.url), 'utf8');
 const ENGINE_CATALOG = readFileSync(
   new URL('../shader/engine_catalog.json', import.meta.url), 'utf8');
 // No source documents: every load misses the fixed-effect digest catalog and
-// routes onto the chain engine, where the editor mounts.
+// routes onto the chain engine, where the strip mounts.
 const EMPTY_MIGRATION = JSON.stringify({
   source_documents: {}, product_group: { children: [] },
 });
 
 /**
  * The document controller over the real compiler, the real chain store, and a
- * FakeChainEngine, with the chain-editor mounts present and hex_wave loaded on
- * the dynamic path.
+ * FakeChainEngine, with the workbench mounts present and hex_wave loaded on the
+ * dynamic path.
  * @returns {Promise<Object>} The controller and everything it wrote to.
  */
 async function editorWorkbench() {
   const engine = new FakeChainEngine();
   const ids = ['shader-document-select', 'shader-preset-select',
     'shader-document-open', 'shader-document-save', 'shader-document-file',
-    'shader-document-status'];
+    'shader-document-status', 'shader-document-digest', 'parameter-dock-toggle'];
   const elements = new Map(ids.map((id) =>
     [id, fakeElement(id.endsWith('select') ? 'select' : 'div')]));
-  for (const mount of ['chain-editor', 'chain-catalog']) {
+  for (const mount of ['chain-strip', 'chain-library', 'parameter-dock']) {
     const element = fakeElement('section');
     element.setPointerCapture = () => {};
     element.hasPointerCapture = () => true;
     element.releasePointerCapture = () => {};
     elements.set(mount, element);
   }
+  elements.get('parameter-dock').appendChild(elements.get('parameter-dock-toggle'));
   const doc = installDocument({
     body: fakeElement('body'),
     activeElement: null,
@@ -527,22 +558,28 @@ async function editorWorkbench() {
   return { controller, engine, elements, downloads, selections, filters, ran };
 }
 
-const railCards = (harness) =>
-  harness.elements.get('chain-editor').querySelectorAll('.chain-card');
+const stripChips = (harness) =>
+  harness.elements.get('chain-strip').querySelectorAll('.chain-chip');
+const libraryEntries = (harness) =>
+  harness.elements.get('chain-library').querySelectorAll('.chain-library-entry');
 
-test('a dynamic document builds the rail, and edits re-apply through the engine', async () => {
+test('a dynamic document builds the strip, and edits re-apply through the engine', async () => {
   const harness = await editorWorkbench();
   assert.deepEqual(harness.selections, ['ShaderChain']);
   assert.equal(harness.engine.chainCalls.length, 1);
   assert.equal(harness.engine.chainCalls[0].length, 7);
-  assert.equal(railCards(harness).length, 7);
-  assert.equal(harness.elements.get('chain-catalog')
-    .querySelectorAll('.chain-catalog-entry').length, 34);
+  assert.equal(stripChips(harness).length, 7);
+  assert.equal(libraryEntries(harness).length, 34);
+  assert.equal(harness.elements.get('parameter-dock').dataset.collapsed, 'false');
+  assert.equal(harness.elements.get('shader-document-digest').textContent,
+    harness.elements.get('shader-document-digest').dataset.digest.slice(0, 12),
+    'the toolbar shows the digest abbreviated and carries the whole of it');
 
-  // Insert a wave shear through a plane-band gap's palette.
-  const mount = harness.elements.get('chain-editor');
-  mount.querySelectorAll('.chain-gap')
-    .find((gap) => gap.dataset.index === '4').dispatch('click');
+  // Insert a wave shear through the plane band's + palette.
+  const mount = harness.elements.get('chain-strip');
+  mount.querySelectorAll('.chain-band')
+    .find((band) => band.dataset.carrier === 'plane')
+    .querySelector('.chain-band-add').dispatch('click');
   mount.querySelectorAll('.chain-palette-entry')
     .find((entry) => entry.dataset.operator === 'warp.wave-shear.v2')
     .dispatch('click');
@@ -560,33 +597,51 @@ test('a dynamic document builds the rail, and edits re-apply through the engine'
     .some((id) => id.startsWith('warp1.')));
 });
 
-test('selecting a card publishes the instance filter and the catalog drop context', async () => {
+test('selecting a chip publishes the instance filter, the drop context and the dock', async () => {
   const harness = await editorWorkbench();
-  railCards(harness).find((card) => card.dataset.label === 'lens')
-    .dispatch('click');
+  const dock = harness.elements.get('parameter-dock');
+  harness.elements.get('parameter-dock-toggle').dispatch('click');
+  assert.equal(dock.dataset.collapsed, 'true');
+
+  stripChips(harness).find((chip) => chip.dataset.label === 'lens').dispatch('click');
 
   assert.equal(harness.filters.at(-1)?.prefix, 'lens.');
   assert.equal(typeof harness.filters.at(-1)?.deactivated, 'function');
   assert.ok(harness.ran.gui > 0, 'the selection resyncs the parameter GUI');
+  assert.equal(dock.dataset.collapsed, 'false',
+    'a selection reopens the dock on the instance it names');
 
-  // The catalog's click-insert context is the gap after lens — a sphere gap.
-  const catalogEntries = harness.elements.get('chain-catalog')
-    .querySelectorAll('.chain-catalog-entry');
-  const wave = catalogEntries.find(
+  // The library's click-insert context is the gap after lens — a sphere gap.
+  const wave = libraryEntries(harness).find(
     (entry) => entry.dataset.operator === 'warp.wave-shear.v2');
   assert.equal(wave.getAttribute('aria-disabled'), 'true');
-  assert.match(wave.querySelector('.chain-catalog-reason').textContent,
+  assert.match(wave.querySelector('.chain-library-reason').textContent,
     /plane carrier/);
-  assert.equal(catalogEntries.find(
+  assert.equal(libraryEntries(harness).find(
     (entry) => entry.dataset.operator === 'sphere.lens.mobius.v2')
     .getAttribute('aria-disabled'), null);
+});
+
+// §4.7: one live region for every refusal. The library's own refusal is the
+// cheapest to provoke — a disabled entry clicked at a drop context that rejects
+// it — and it has to land where the document status does.
+test('a library refusal is announced in the shared status region', async () => {
+  const harness = await editorWorkbench();
+  stripChips(harness).find((chip) => chip.dataset.label === 'lens').dispatch('click');
+  libraryEntries(harness)
+    .find((entry) => entry.dataset.operator === 'warp.wave-shear.v2')
+    .dispatch('click');
+
+  const status = harness.elements.get('shader-document-status');
+  assert.equal(status.dataset.status, 'error');
+  assert.match(status.textContent, /plane carrier/);
 });
 
 test('a bypass reshapes the engine program while the saved document keeps the stage', async () => {
   const harness = await editorWorkbench();
   const writesBefore = harness.engine.writes.length;
-  railCards(harness).find((card) => card.dataset.label === 'lens')
-    .querySelector('.chain-card-bypass').dispatch('click');
+  stripChips(harness).find((chip) => chip.dataset.label === 'lens')
+    .querySelector('.chain-chip-bypass').dispatch('click');
 
   const shape = harness.engine.chainCalls.at(-1);
   assert.equal(shape.length, 6);

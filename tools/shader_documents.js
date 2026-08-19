@@ -4,10 +4,11 @@
  */
 
 import { applyChainDocument } from './chain_apply.js';
-import { createChainCatalogPanel } from './chain_catalog_panel.js';
-import { deactivatedParamNames } from './chain_dock.js';
+import { createParameterDock, deactivatedParamNames } from './chain_dock.js';
 import { createChainDocumentStore } from './chain_document_store.js';
-import { createChainEditor } from './chain_editor.js';
+import { createChainLibrary } from './chain_library.js';
+import { createChainStrip } from './chain_strip.js';
+import { copyToClipboard } from './copy_text.js';
 
 const MIGRATION_URL = '../shader/patterns/shaderball_migration.json';
 const CATALOG_URL = '../shader/engine_catalog.json';
@@ -16,6 +17,9 @@ const COMPILER_URL = new URL('../shader/shader_workbench.mjs', import.meta.url).
 // The effect the dynamic path previews on: the engine's chain interpreter,
 // programmed through setShaderChain.
 const CHAIN_EFFECT = 'ShaderChain';
+
+// Digest characters the toolbar shows; the button copies all of it.
+const DIGEST_ABBREVIATION = 12;
 
 // Topology enum8 parameters select an operator's structural variant. A fixed
 // effect bakes its variants in, so the fixed path skips them; palette-mapping
@@ -216,13 +220,17 @@ export function createShaderDocumentController({
     doc.getElementById('shader-document-file'));
   const status = /** @type {HTMLOutputElement|null} */ (
     doc.getElementById('shader-document-status'));
+  const digestButton = /** @type {HTMLButtonElement|null} */ (
+    doc.getElementById('shader-document-digest'));
   if (!sourceSelect || !presetSelect || !openButton || !saveButton
       || !fileInput || !status) return null;
-  // The chain rail and catalog panel mount here on the workbench page; a page
-  // without the mounts (or a compiler without the validator) previews documents
-  // but offers no structural editing.
-  const editorMount = doc.getElementById('chain-editor');
-  const catalogMount = doc.getElementById('chain-catalog');
+  // The pipeline strip, the stage library and the parameter dock mount here on
+  // the workbench page; a page without the mounts (or a compiler without the
+  // validator) previews documents but offers no structural editing.
+  const stripMount = doc.getElementById('chain-strip');
+  const libraryMount = doc.getElementById('chain-library');
+  const dockMount = doc.getElementById('parameter-dock');
+  const dockToggle = doc.getElementById('parameter-dock-toggle');
 
   /** @type {*} */
   let compiler;
@@ -232,13 +240,33 @@ export function createShaderDocumentController({
   let catalog = new Map();
   /** @type {*|null} */
   let operatorCatalog = null;
-  /** @type {{store: *, editor: *, panel: *}|null} */
+  /** @type {{store: *, strip: *, library: *, dock: *}|null} */
   let chainUi = null;
 
   /** @param {string} message @param {boolean} [error] */
   const show = (message, error = false) => {
     status.textContent = message;
     status.dataset.status = error ? 'error' : 'ok';
+  };
+
+  // The one shared live region: the strip, the library and the dock all report
+  // through it, and an empty message clears it.
+  /** @param {string} message */
+  const announce = (message) => show(message, message !== '');
+
+  /**
+   * Repaints the toolbar digest from whichever document is authoritative: the
+   * store's once the editor is live, else the load-time compile.
+   * @returns {void}
+   */
+  const showDigest = () => {
+    if (!digestButton) return;
+    const digest = chainUi
+      ? chainUi.store.compile().descriptor_digest
+      : active?.compiled.descriptor_digest;
+    digestButton.dataset.digest = digest ?? '';
+    digestButton.textContent = digest ? digest.slice(0, DIGEST_ABBREVIATION) : '—';
+    digestButton.disabled = !digest;
   };
 
   /** @param {CompiledDocument} compiled */
@@ -287,66 +315,75 @@ export function createShaderDocumentController({
     const title = active.compiled.document.effect_metadata?.display_name
       ?? active.compiled.document.document_id;
     show(`${title} · ${presetSelect.selectedOptions[0]?.textContent ?? presetId}`);
+    showDigest();
     return true;
   };
 
   const teardownChainUi = () => {
     if (chainUi === null) return;
-    chainUi.editor.destroy();
-    chainUi.panel.destroy();
+    chainUi.strip.destroy();
+    chainUi.library.destroy();
+    chainUi.dock?.destroy();
     chainUi = null;
     setParamFilter(null);
   };
 
-  // The catalog panel's click-insert legality tracks the drop context: the gap
-  // after the selected card. No selection clears it, leaving every entry
-  // draggable and click-inserting at the first legal gap.
-  const refreshCatalogLegality = () => {
+  // The library's click-insert legality tracks the drop context: the gap after
+  // the selected chip. No selection clears it, leaving every entry draggable
+  // and click-inserting at the first legal gap.
+  const refreshLibraryLegality = () => {
     if (chainUi === null) return;
     const selected = chainUi.store.selectedLabel();
     if (selected === null) {
-      chainUi.panel.setLegality(null);
+      chainUi.library.setLegality(null);
       return;
     }
     const gap = chainUi.store.chain()
       .findIndex((/** @type {*} */ entry) => entry.label === selected) + 1;
-    chainUi.panel.setLegality(chainUi.store.legalInsertions(gap));
+    chainUi.library.setLegality(chainUi.store.legalInsertions(gap));
   };
 
   /**
-   * Builds the chain rail and catalog panel over one document store, wiring
-   * every structural edit, undo and bypass toggle back through the one apply
-   * path and the selection into the parameter GUI's instance filter.
+   * Builds the pipeline strip, the stage library and the parameter dock over one
+   * document store, wiring every structural edit, undo and bypass toggle back
+   * through the one apply path and the selection into the parameter GUI's
+   * instance filter.
    * @param {*} document - The compiled (valid) v2 document to edit.
    */
   const buildChainUi = async (document) => {
     const store = /** @type {*} */ (await createChainDocumentStore({
       document, catalog: operatorCatalog, importCompiler,
     }));
-    const editor = /** @type {*} */ (createChainEditor({
+    const strip = /** @type {*} */ (createChainStrip({
       doc,
-      container: editorMount,
+      container: stripMount,
       store,
       catalog: operatorCatalog,
+      announce,
       onApply: () => {
         applyPreset(active?.presetId ?? presetSelect.value);
-        refreshCatalogLegality();
+        refreshLibraryLegality();
       },
       onSelect: (/** @type {string|null} */ label) => {
         setParamFilter(label === null
           ? null : { prefix: `${label}.`, deactivated: deactivatedParamNames });
         syncEffectGui();
-        refreshCatalogLegality();
+        refreshLibraryLegality();
+        if (label !== null) chainUi?.dock?.setCollapsed(false);
       },
     }));
-    const panel = createChainCatalogPanel({
+    const library = createChainLibrary({
       doc,
-      container: catalogMount,
+      container: libraryMount,
       catalog: operatorCatalog,
-      drag: editor.drag,
-      onPick: (/** @type {string} */ operatorId) => editor.insertOperator(operatorId),
+      drag: strip.drag,
+      announce,
+      onPick: (/** @type {string} */ operatorId) => strip.insertOperator(operatorId),
     });
-    chainUi = { store, editor, panel };
+    const dock = dockMount && dockToggle
+      ? createParameterDock({ doc, container: dockMount, toggle: dockToggle })
+      : null;
+    chainUi = { store, strip, library, dock };
   };
 
   /**
@@ -384,11 +421,12 @@ export function createShaderDocumentController({
     };
     populatePresets(compiled);
     saveButton.disabled = false;
-    if (!fixed && editorMount && catalogMount
+    showDigest();
+    if (!fixed && stripMount && libraryMount
         && typeof compiler.validateShaderDocument === 'function') {
       try {
         await buildChainUi(compiled.document);
-        refreshCatalogLegality();
+        refreshLibraryLegality();
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         show(`The chain editor could not adopt the document: ${detail}`, true);
@@ -490,6 +528,7 @@ export function createShaderDocumentController({
       presetSelect.disabled = true;
       saveButton.disabled = true;
       show('Scratch Shader is active.');
+      showDigest();
       return;
     }
     const entry = catalog.get(option.value);
@@ -511,6 +550,12 @@ export function createShaderDocumentController({
     fileInput.value = '';
   });
   saveButton.addEventListener('click', save);
+  digestButton?.addEventListener('click', async () => {
+    const digest = digestButton.dataset.digest;
+    if (!digest) return;
+    if (await copyToClipboard(digest)) show(`Copied the descriptor digest ${digest}.`);
+    else announce('The descriptor digest could not be copied.');
+  });
 
   return { init, loadSource, save, applyPreset };
 }

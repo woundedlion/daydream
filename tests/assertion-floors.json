@@ -15,10 +15,6 @@
     "cases": 11,
     "assertions": 30
   },
-  "tests/chain_catalog_panel.test.js": {
-    "cases": 4,
-    "assertions": 18
-  },
   "tests/chain_dock.test.js": {
     "cases": 6,
     "assertions": 21
@@ -27,13 +23,9 @@
     "cases": 27,
     "assertions": 280
   },
-  "tests/chain_editor.test.js": {
-    "cases": 17,
-    "assertions": 119
-  },
   "tests/chain_library.test.js": {
-    "cases": 8,
-    "assertions": 44
+    "cases": 11,
+    "assertions": 61
   },
   "tests/chain_strip.test.js": {
     "cases": 20,
@@ -238,8 +230,8 @@
     "assertions": 382
   },
   "tests/shader_workbench.test.js": {
-    "cases": 28,
-    "assertions": 132
+    "cases": 30,
+    "assertions": 154
   },
   "tests/shared.test.js": {
     "cases": 15,
@@ -299,7 +291,7 @@
   },
   "tests/tsconfig_roster.test.js": {
     "cases": 7,
-    "assertions": 138
+    "assertions": 132
   },
   "tests/vendor-importmap.test.js": {
     "cases": 7,

@@ -51,6 +51,7 @@ const entries = (h) => h.container.querySelectorAll('.chain-library-entry');
 const entryFor = (h, operatorId) =>
   entries(h).find((entry) => entry.dataset.operator === operatorId);
 const filterOf = (h) => h.container.querySelector('.chain-library-filter');
+const tabs = (h) => h.container.querySelectorAll('.chain-library-tab');
 const narrow = (h, text) => {
   const filter = filterOf(h);
   filter.value = text;
@@ -162,6 +163,47 @@ test('a filtered-in entry keeps the disabled state its context gave it', () => {
     entry.querySelector('.chain-library-reason').id);
 });
 
+test('the library carries one domain tab per rendered group', () => {
+  const h = makeLibrary();
+  assert.deepEqual(tabs(h).map((tab) => tab.dataset.carrier),
+    ['sphere', 'plane', 'field']);
+  assert.deepEqual(tabs(h).map((tab) => tab.textContent), ['Sphere', 'Plane', 'Field']);
+  for (const tab of tabs(h)) assert.equal(tab.tagName, 'BUTTON');
+  assert.deepEqual(tabs(h).map((tab) => tab.getAttribute('aria-pressed')),
+    ['true', 'false', 'false']);
+  assert.equal(h.container.dataset.activeCarrier, 'sphere');
+});
+
+test('a tab moves the active carrier the narrow layout reads', () => {
+  const h = makeLibrary();
+  tabs(h).find((tab) => tab.dataset.carrier === 'field').dispatch('click');
+
+  assert.equal(h.container.dataset.activeCarrier, 'field');
+  assert.deepEqual(tabs(h).map((tab) => tab.getAttribute('aria-pressed')),
+    ['false', 'false', 'true']);
+  assert.equal(groups(h).length, 3,
+    'every group stays in the DOM; only the stylesheet hides the inactive ones');
+  assert.deepEqual(h.picks, [], 'a tab inserts nothing');
+});
+
+test('a filter that drops the active domain re-homes it onto a rendered one', () => {
+  const h = makeLibrary();
+  tabs(h).find((tab) => tab.dataset.carrier === 'field').dispatch('click');
+  narrow(h, 'sample.');
+
+  assert.deepEqual(tabs(h).map((tab) => tab.dataset.carrier), ['plane']);
+  assert.equal(h.container.dataset.activeCarrier, 'plane');
+  assert.equal(tabs(h)[0].getAttribute('aria-pressed'), 'true');
+
+  narrow(h, 'no such stage');
+  assert.deepEqual(tabs(h), []);
+  assert.equal(h.container.dataset.activeCarrier, undefined,
+    'an empty library names no domain');
+
+  narrow(h, '');
+  assert.equal(h.container.dataset.activeCarrier, 'sphere');
+});
+
 test('a pointer drag on an entry hands off to the strip drag controller', () => {
   const h = makeLibrary();
   const entry = () => entryFor(h, 'warp.wave-shear.v2');
@@ -176,10 +218,11 @@ test('a pointer drag on an entry hands off to the strip drag controller', () => 
   assert.deepEqual(h.dragCalls.slice(1), [['hoverFromPoint', 3, 4], ['drop']],
     'the library resolves nothing itself; the strip hit-tests the point');
 
-  // A group title and the filter box start nothing.
+  // A group title, a domain tab and the filter box start nothing.
   h.container.querySelector('.chain-library-title').dispatch('pointerdown',
     { isPrimary: true, button: 0, pointerId: 6 });
-  filterOf(h).dispatch('pointerdown', { isPrimary: true, button: 0, pointerId: 7 });
+  tabs(h)[0].dispatch('pointerdown', { isPrimary: true, button: 0, pointerId: 7 });
+  filterOf(h).dispatch('pointerdown', { isPrimary: true, button: 0, pointerId: 8 });
   assert.equal(h.dragCalls.length, 3);
 });
 

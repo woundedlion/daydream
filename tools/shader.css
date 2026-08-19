@@ -1,40 +1,29 @@
-.shader-workbench-nav {
-  width: 16rem;
-  flex: 0 0 16rem;
-  overflow-y: auto;
-  padding: 0.75rem;
-  border-right: 1px solid var(--panel-border);
-  background: rgba(20, 20, 20, 0.98);
+/* ── Workbench regions ───────────────────────────────────────────────────── */
+
+/* The toolbar, strip and library are sized by their content and .main-area is
+   the only growing row, so the canvas owns every pixel the four do not need. */
+.shader-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  padding: 0.375rem 0.625rem;
+  border-bottom: 1px solid var(--panel-border);
+  background: var(--sidebar-bg);
   color: var(--panel-text);
   font-family: var(--ui-font);
+  font-size: 0.75rem;
 }
 
-.shader-workbench-nav h2 {
-  margin-bottom: 0.625rem;
-  color: var(--muted-text);
-  font-size: 0.6875rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.shader-document-controls {
-  margin: 0 0 0.875rem;
-  padding: 0 0 0.75rem;
-  border-bottom: 1px solid var(--panel-border);
-}
-
-.shader-document-controls label,
-.shader-document-controls output {
-  display: block;
-  margin: 0.375rem 0 0.25rem;
+.shader-toolbar label {
   color: var(--muted-text);
   font-size: 0.6875rem;
 }
 
-.shader-document-controls select {
-  width: 100%;
-  min-width: 0;
-  padding: 0.375rem;
+.shader-toolbar select {
+  min-width: 8rem;
+  padding: 0.1875rem 0.375rem;
   border: 1px solid var(--panel-border);
   border-radius: 0.25rem;
   color-scheme: dark;
@@ -43,179 +32,278 @@
   font: inherit;
 }
 
-.shader-document-actions {
-  display: flex;
-  gap: 0.25rem;
-  margin-top: 0.5rem;
-}
-
-.shader-document-actions button {
+.shader-toolbar button {
   margin: 0;
-  text-align: center;
-}
-
-.shader-document-controls output {
-  min-height: 2.25rem;
-  overflow-wrap: anywhere;
-  line-height: 1.35;
-}
-
-/* ── Chain rail ──────────────────────────────────────────────────────────── */
-
-.chain-editor {
-  margin: 0 0 0.875rem;
-  padding: 0 0 0.75rem;
-  border-bottom: 1px solid var(--panel-border);
-}
-
-.chain-actions {
-  display: flex;
-  gap: 0.25rem;
-  margin-bottom: 0.5rem;
-}
-
-.chain-actions button {
-  flex: 1;
-  padding: 0.25rem 0.5rem;
-  border: 1px solid var(--panel-border);
+  padding: 0.1875rem 0.625rem;
+  border: 1px solid var(--button-border);
   border-radius: 0.25rem;
   background: transparent;
   color: var(--panel-text);
-  font-size: 0.6875rem;
+  font: inherit;
   cursor: pointer;
 }
 
-.chain-actions button:disabled {
+.shader-toolbar button:hover:not(:disabled),
+.shader-toolbar button:focus-visible {
+  border-color: var(--accent);
+  color: var(--bright-text);
+}
+
+.shader-toolbar button:disabled {
   color: var(--muted-text);
   cursor: default;
 }
 
+.shader-document-digest {
+  font-family: monospace;
+  letter-spacing: 0.04em;
+}
+
+.shader-document-status {
+  flex: 1 1 14rem;
+  min-width: 0;
+  color: var(--muted-text);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.shader-document-status[data-status="error"] {
+  color: var(--error-text);
+}
+
+#global-stats-desktop {
+  margin-left: auto;
+}
+
+/* One fixed hue per carrier domain, worn by both the strip band and the library
+   group: the colour is what says a stage from this group goes up there. */
+[data-carrier="sphere"] {
+  --carrier: #5aa9ff;
+  --carrier-fill: rgb(90 169 255 / 0.1);
+}
+
+[data-carrier="plane"] {
+  --carrier: #4fd1a5;
+  --carrier-fill: rgb(79 209 165 / 0.1);
+}
+
+[data-carrier="field"] {
+  --carrier: #b78bff;
+  --carrier-fill: rgb(183 139 255 / 0.1);
+}
+
+[data-carrier="color"] {
+  --carrier: #ffb057;
+  --carrier-fill: rgb(255 176 87 / 0.1);
+}
+
+/* ── Pipeline strip ──────────────────────────────────────────────────────── */
+
+.chain-strip-region {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  padding: 0.375rem 0.625rem;
+  border-bottom: 1px solid var(--panel-border);
+  background: var(--sidebar-bg);
+  color: var(--panel-text);
+  font-family: var(--ui-font);
+}
+
+.chain-strip-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.1875rem;
+  flex-shrink: 0;
+}
+
+.chain-strip-actions button {
+  margin: 0;
+  padding: 0.0625rem 0.5rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--panel-text);
+  font-family: inherit;
+  font-size: 0.625rem;
+  cursor: pointer;
+}
+
+.chain-strip-actions button:disabled {
+  color: var(--muted-text);
+  cursor: default;
+}
+
+.chain-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .chain-band {
-  margin-bottom: 0.125rem;
-  padding: 0.125rem 0.25rem 0.25rem;
-  border-left: 2px solid var(--panel-border);
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.1875rem;
+  flex: 1 1 auto;
+  min-width: 7rem;
+  padding: 0.25rem 0.375rem;
+  border: 1px solid var(--carrier);
+  border-radius: 0.375rem;
+  background: var(--carrier-fill);
+}
+
+.chain-band[data-drop="refused"] {
+  border-color: var(--error-text);
+  background: rgb(238 102 102 / 0.12);
 }
 
 .chain-band-title {
-  color: var(--muted-text);
+  color: var(--carrier);
   font-size: 0.625rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.chain-card {
-  position: relative;
+.chain-band-add {
+  margin: 0 0 0 auto;
+  padding: 0 0.375rem;
+  border: 1px solid var(--carrier);
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--carrier);
+  font: inherit;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.chain-band-add:disabled {
+  border-color: var(--panel-border);
+  color: var(--muted-text);
+  cursor: default;
+}
+
+.chain-chip {
   display: flex;
   align-items: baseline;
   gap: 0.25rem;
-  padding: 0.375rem 0.5rem;
-  border: 1px solid var(--panel-border);
+  flex: 0 0 auto;
+  padding: 0.1875rem 0.4375rem;
+  border: 1px solid var(--carrier, var(--panel-border));
   border-radius: 0.25rem;
   background: var(--panel-bg);
+  color: var(--panel-text);
   font-size: 0.75rem;
+  white-space: nowrap;
   cursor: pointer;
   touch-action: none;
 }
 
-.chain-card:hover,
-.chain-card:focus-visible {
-  border-color: var(--accent);
+.chain-chip:hover,
+.chain-chip:focus-visible {
+  border-color: var(--bright-text);
   color: var(--bright-text);
 }
 
-.chain-card[aria-current="true"] {
-  border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.06);
+.chain-chip[aria-current="true"] {
+  outline: 2px solid var(--carrier, var(--accent));
+  outline-offset: 1px;
+  background: rgb(255 255 255 / 0.06);
   color: var(--bright-text);
 }
 
-.chain-card--crossing {
-  margin: 0.125rem 0;
+.chain-chip--socket {
+  align-self: center;
   border-style: dashed;
-  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--muted-text);
+  background: rgb(255 255 255 / 0.03);
 }
 
-.chain-card--bypassed .chain-card-name,
-.chain-card--bypassed .chain-card-label {
+.chain-chip--bypassed .chain-chip-name,
+.chain-chip--bypassed .chain-chip-label {
   opacity: 0.45;
   text-decoration: line-through;
 }
 
-.chain-card[data-dragging="true"] {
+.chain-chip[data-dragging="true"] {
   opacity: 0.5;
 }
 
-.chain-card-label,
-.chain-card-pair {
+.chain-chip-label,
+.chain-chip-pair {
   color: var(--muted-text);
   font-size: 0.6875rem;
 }
 
-.chain-card-pair {
-  margin-left: auto;
-}
-
-.chain-card-bypass {
-  margin-left: auto;
-  padding: 0.0625rem 0.25rem;
+.chain-chip-remove,
+.chain-chip-bypass,
+.chain-chip-swap {
+  margin: 0;
+  padding: 0 0.25rem;
   border: 1px solid transparent;
   border-radius: 0.25rem;
   background: transparent;
   color: var(--muted-text);
+  font-family: inherit;
   font-size: 0.625rem;
   cursor: pointer;
 }
 
-.chain-card-bypass:hover,
-.chain-card-bypass:focus-visible {
+.chain-chip-remove:hover,
+.chain-chip-remove:focus-visible,
+.chain-chip-bypass:hover,
+.chain-chip-bypass:focus-visible,
+.chain-chip-swap:hover,
+.chain-chip-swap:focus-visible {
   border-color: var(--accent);
   color: var(--bright-text);
 }
 
-.chain-card-bypass[aria-pressed="true"] {
+.chain-chip-bypass[aria-pressed="true"] {
   border-color: var(--accent);
   color: var(--accent);
 }
 
 .chain-gap {
-  display: block;
-  width: 100%;
-  margin: 0.0625rem 0;
-  padding: 0;
+  flex: 0 0 0.375rem;
+  align-self: stretch;
   border: 1px dashed transparent;
   border-radius: 0.25rem;
-  background: transparent;
-  color: var(--muted-text);
-  font-size: 0.625rem;
-  line-height: 0.75rem;
-  cursor: pointer;
 }
 
-.chain-gap:hover,
-.chain-gap:focus-visible,
 .chain-gap[data-drop="legal"] {
-  border-color: var(--panel-border);
-  color: var(--panel-text);
+  border-color: var(--carrier);
 }
 
 .chain-gap[data-drop="active"] {
-  border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--accent);
+  border-style: solid;
+  border-color: var(--carrier);
+  background: var(--carrier);
 }
 
 .chain-palette {
-  margin: 0.25rem 0;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 2100;
+  min-width: 13rem;
+  max-height: 18rem;
+  overflow-y: auto;
+  margin-top: 0.25rem;
   padding: 0.25rem;
   border: 1px solid var(--accent);
   border-radius: 0.25rem;
   background: var(--panel-bg);
-  max-height: 16rem;
-  overflow-y: auto;
 }
 
 .chain-palette-entry {
-  padding: 0.25rem 0.375rem;
+  padding: 0.1875rem 0.375rem;
   border-radius: 0.25rem;
   font-size: 0.6875rem;
   cursor: pointer;
@@ -223,7 +311,7 @@
 
 .chain-palette-entry:hover,
 .chain-palette-entry:focus-visible {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgb(255 255 255 / 0.08);
   color: var(--bright-text);
 }
 
@@ -233,9 +321,13 @@
 }
 
 .chain-palette-entry--remove {
-  color: var(--bright-text);
   border-bottom: 1px solid var(--panel-border);
   border-radius: 0.25rem 0.25rem 0 0;
+  color: var(--bright-text);
+}
+
+.chain-palette-name {
+  white-space: nowrap;
 }
 
 .chain-palette-reason {
@@ -245,73 +337,190 @@
   line-height: 1.3;
 }
 
-.chain-editor-status {
-  min-height: 1rem;
-  margin-top: 0.375rem;
+/* ── Stage library ───────────────────────────────────────────────────────── */
+
+.chain-library-region {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.25rem 0.75rem;
+  flex-shrink: 0;
+  max-height: 24vh;
+  overflow-y: auto;
+  padding: 0.375rem 0.625rem;
+  border-top: 1px solid var(--panel-border);
+  background: var(--sidebar-bg);
+  color: var(--panel-text);
+  font-family: var(--ui-font);
+}
+
+.chain-library-filter-label {
+  align-self: center;
   color: var(--muted-text);
   font-size: 0.6875rem;
-  overflow-wrap: anywhere;
 }
 
-/* ── Operator catalog panel ──────────────────────────────────────────────── */
-
-.chain-catalog {
-  display: block;
+.chain-library-filter {
+  flex: 0 0 10rem;
+  padding: 0.1875rem 0.375rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.25rem;
+  color-scheme: dark;
+  color: var(--panel-text);
+  background: var(--panel-bg);
+  font-family: inherit;
+  font-size: 0.6875rem;
 }
 
-.chain-catalog-band {
-  margin-bottom: 0.5rem;
+/* A full-basis row whose buttons only show below the breakpoint: it costs no
+   height in the desktop layout and still breaks the groups onto their own line. */
+.chain-library-tabs {
+  display: flex;
+  gap: 0.25rem;
+  flex: 1 0 100%;
 }
 
-.chain-catalog-title {
-  margin: 0.25rem 0;
-  color: var(--muted-text);
+.chain-library-tab {
+  display: none;
+  margin: 0;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--carrier);
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--carrier);
+  font-family: inherit;
+  font-size: 0.6875rem;
+  cursor: pointer;
+}
+
+.chain-library-tab[aria-pressed="true"] {
+  background: var(--carrier-fill);
+  color: var(--bright-text);
+}
+
+.chain-library-group {
+  flex: 1 1 12rem;
+  min-width: 0;
+  padding-top: 0.125rem;
+  border-top: 2px solid var(--carrier);
+}
+
+.chain-library-title {
+  margin: 0.125rem 0;
+  color: var(--carrier);
   font-size: 0.625rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.chain-catalog-entry {
+.chain-library-entry {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.25rem;
   width: 100%;
-  margin-bottom: 0.125rem;
-  padding: 0.25rem 0.375rem;
+  margin: 0 0 0.0625rem;
+  padding: 0.125rem 0.375rem;
   border: 1px solid transparent;
   border-radius: 0.25rem;
   background: transparent;
   color: var(--panel-text);
+  font-family: inherit;
   font-size: 0.6875rem;
   text-align: left;
   cursor: grab;
   touch-action: none;
 }
 
-.chain-catalog-entry:hover,
-.chain-catalog-entry:focus-visible {
-  border-color: var(--accent);
+.chain-library-entry:hover,
+.chain-library-entry:focus-visible {
+  border-color: var(--carrier);
   background: var(--panel-bg);
   color: var(--bright-text);
 }
 
-.chain-catalog-entry[aria-disabled="true"] {
+.chain-library-entry[aria-disabled="true"] {
   color: var(--muted-text);
   cursor: default;
 }
 
-.chain-catalog-pair {
+.chain-library-name {
+  white-space: nowrap;
+}
+
+.chain-library-pair {
   margin-left: auto;
   color: var(--muted-text);
   font-size: 0.625rem;
 }
 
-.chain-catalog-reason {
+.chain-library-reason {
   flex-basis: 100%;
   color: var(--muted-text);
   font-size: 0.625rem;
   line-height: 1.3;
+}
+
+/* ── Parameter dock ──────────────────────────────────────────────────────── */
+
+.parameter-dock {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  width: 17rem;
+  max-width: 40vw;
+  border-left: 1px solid var(--panel-border);
+  background: var(--sidebar-bg);
+  font-family: var(--ui-font);
+}
+
+.parameter-dock[data-collapsed="true"] {
+  width: auto;
+  max-width: none;
+}
+
+.parameter-dock[data-collapsed="true"] .gui-container {
+  display: none;
+}
+
+.parameter-dock-toggle {
+  margin: 0;
+  padding: 0.25rem 0.625rem;
+  border: 0;
+  border-bottom: 1px solid var(--panel-border);
+  background: transparent;
+  color: var(--muted-text);
+  font-family: inherit;
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.parameter-dock-toggle:hover,
+.parameter-dock-toggle:focus-visible {
+  color: var(--bright-text);
+}
+
+/* The dock sits beside the canvas, never over it, so the global rule that
+   floats the GUI panels across the viewport is undone here. */
+.parameter-dock .gui-container {
+  position: static;
+  z-index: auto;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  width: 100%;
+  max-height: none;
+  overflow-y: auto;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.parameter-dock .gui-container > .lil-gui {
+  width: 100%;
+  margin: 0 0 1px;
 }
 
 #gui-container .lil-controller.lil-option select,
@@ -327,12 +536,63 @@
   opacity: 0.45;
 }
 
+/* ── Narrow viewports ────────────────────────────────────────────────────── */
+
 @media (max-width: 768px) {
-  .shader-workbench-nav {
-    width: 100%;
-    flex-basis: auto;
-    max-height: 45vh;
-    border-right: 0;
-    border-bottom: 1px solid var(--panel-border);
+  .chain-strip-region {
+    overflow-x: auto;
+  }
+
+  .chain-strip {
+    flex-wrap: nowrap;
+  }
+
+  .chain-band {
+    flex: 0 0 auto;
+  }
+
+  /* A popover inside a scroller would be clipped by it, so the palette flows. */
+  .chain-palette {
+    position: static;
+    max-height: 12rem;
+  }
+
+  .chain-library-region {
+    overflow-x: auto;
+  }
+
+  .chain-library-tab {
+    display: block;
+  }
+
+  .chain-library-group {
+    display: flex;
+    align-items: baseline;
+    gap: 0.25rem;
+    flex: 1 0 100%;
+    overflow-x: auto;
+  }
+
+  .chain-library-title,
+  .chain-library-entry {
+    flex: 0 0 auto;
+    width: auto;
+  }
+
+  .chain-library-region[data-active-carrier="sphere"] .chain-library-group:not([data-carrier="sphere"]),
+  .chain-library-region[data-active-carrier="plane"] .chain-library-group:not([data-carrier="plane"]),
+  .chain-library-region[data-active-carrier="field"] .chain-library-group:not([data-carrier="field"]),
+  .chain-library-region[data-active-carrier="color"] .chain-library-group:not([data-carrier="color"]) {
+    display: none;
+  }
+
+  .parameter-dock {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1500;
+    width: 15rem;
+    max-width: 70vw;
   }
 }
