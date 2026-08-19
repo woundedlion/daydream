@@ -754,7 +754,7 @@ export function createEffectGui({
     // it — but a refusal must not gate the rebuild, which is what clears the
     // stale schema a refusal comes from.
     const presetSynced = synchronizePreset(presetIndex);
-    // The selected-instance filter is external state: a chain-editor selection
+    // The selected-instance filter is external state: a pipeline-strip selection
     // changes which controls belong in the panel without moving the schema
     // generation, so its prefix is compared against the one the panel was
     // built with.
