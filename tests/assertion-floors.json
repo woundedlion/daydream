@@ -226,8 +226,8 @@
     "assertions": 382
   },
   "tests/shader_workbench.test.js": {
-    "cases": 27,
-    "assertions": 135
+    "cases": 28,
+    "assertions": 132
   },
   "tests/shared.test.js": {
     "cases": 15,
