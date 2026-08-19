@@ -194,7 +194,9 @@ function defaultDownload(doc, filename, source) {
  * setParamFilter?: (filter: {prefix: string, deactivated?: Function,
  *   onEdit?: (name: string, value: *) => void}|null) => void,
  * fetchText?: (url: string) => Promise<string>, importCompiler?: () => Promise<*>,
- * download?: (filename: string, source: string) => void}} dependencies
+ * download?: (filename: string, source: string) => void,
+ * initialEffect?: string|null}} dependencies - initialEffect is the effect the
+ *   page was opened on, which init() honors when it names a catalog source.
  */
 export function createShaderDocumentController({
   doc,
@@ -211,6 +213,7 @@ export function createShaderDocumentController({
   },
   importCompiler = () => import(COMPILER_URL),
   download = (filename, source) => defaultDownload(doc, filename, source),
+  initialEffect = null,
 }) {
   const sourceSelect = /** @type {HTMLSelectElement|null} */ (
     doc.getElementById('shader-document-select'));
@@ -635,7 +638,12 @@ export function createShaderDocumentController({
       show(`Source catalog failed to load: ${detail}`, true);
       return false;
     }
-    return loadScratch();
+    // A shared link naming a shipped document opens on that document; anything
+    // else, the legacy Shader route included, opens on the scratch chain.
+    const requested = catalog.get(initialEffect ?? '');
+    if (requested === undefined) return loadScratch();
+    sourceSelect.value = requested.effectId;
+    return loadSource(requested.source, requested.filename, requested.compiled);
   };
 
   sourceSelect.addEventListener('change', async () => {
