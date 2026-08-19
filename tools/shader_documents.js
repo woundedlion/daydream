@@ -226,6 +226,8 @@ export function createShaderDocumentController({
     doc.getElementById('shader-document-status'));
   const digestButton = /** @type {HTMLButtonElement|null} */ (
     doc.getElementById('shader-document-digest'));
+  const parityToggle = /** @type {HTMLButtonElement|null} */ (
+    doc.getElementById('shader-parity-toggle'));
   if (!sourceSelect || !presetSelect || !openButton || !saveButton
       || !fileInput || !status) return null;
   // The pipeline strip, the stage library and the parameter dock mount here on
@@ -259,15 +261,50 @@ export function createShaderDocumentController({
   const announce = (message) => show(message, message !== '');
 
   /**
-   * Repaints the toolbar digest from whichever document is authoritative: the
-   * store's once the editor is live, else the load-time compile.
+   * The descriptor digest of whichever document is authoritative: the store's
+   * once the editor is live, else the load-time compile.
+   * @returns {string|undefined} The digest.
+   */
+  const liveDigest = () => chainUi
+    ? chainUi.store.compile().descriptor_digest
+    : active?.compiled.descriptor_digest;
+
+  /**
+   * Whether the loaded chain still digests to the promoted effect it opened as.
+   * Bypass is a program-shape override that never touches the document, so it
+   * leaves this true; the first descriptor-changing edit does not.
+   * @returns {boolean} Whether the parity toggle is armed.
+   */
+  const parityArmed = () =>
+    active?.official != null && liveDigest() === active.loadedDigest;
+
+  /**
+   * Repaints the parity toggle and, once a descriptor edit has broken the
+   * match, returns the preview to the interpreter so the render is the document
+   * being edited.
+   * @returns {boolean} Whether the compiled build was dropped.
+   */
+  const syncParity = () => {
+    const armed = parityArmed();
+    const dropped = !armed && active?.compiledSide === true;
+    if (dropped && active) {
+      active.compiledSide = false;
+      selectEffect(CHAIN_EFFECT);
+    }
+    if (parityToggle) {
+      parityToggle.disabled = !armed;
+      parityToggle.setAttribute('aria-pressed', String(active?.compiledSide === true));
+    }
+    return dropped;
+  };
+
+  /**
+   * Repaints the toolbar digest.
    * @returns {void}
    */
   const showDigest = () => {
     if (!digestButton) return;
-    const digest = chainUi
-      ? chainUi.store.compile().descriptor_digest
-      : active?.compiled.descriptor_digest;
+    const digest = liveDigest();
     digestButton.dataset.digest = digest ?? '';
     digestButton.textContent = digest ? digest.slice(0, DIGEST_ABBREVIATION) : '—';
     digestButton.disabled = !digest;
@@ -298,9 +335,10 @@ export function createShaderDocumentController({
     // document is the authority (the imported compile goes stale on the first
     // structural edit) and its program shape carries the session bypasses.
     const store = chainUi?.store ?? null;
-    const refusal = active.fixed
+    const refusal = active.compiledSide
       ? applyFixedShaderDocument(
-        engine, module, active.compiled, presetId, active.referencePresetIds)
+        engine, module, store ? { document: store.document() } : active.compiled,
+        presetId, active.referencePresetIds)
       : applyChainDocument({
         engine, module,
         compiled: store ? { document: store.document() } : active.compiled,
@@ -311,14 +349,19 @@ export function createShaderDocumentController({
       show(`Preset "${presetId}" could not be applied: ${refusal}`, true);
       return false;
     }
-    if (active.fixed) {
+    if (active.compiledSide) {
       syncEffectGui();
       invalidate();
     }
     active.presetId = presetId;
     const title = active.compiled.document.effect_metadata?.display_name
       ?? active.compiled.document.document_id;
-    show(`${title} · ${presetSelect.selectedOptions[0]?.textContent ?? presetId}`);
+    const preset = presetSelect.selectedOptions[0]?.textContent ?? presetId;
+    // Which side is on screen is only a question while the toggle is armed, and
+    // it has to be legible: the strip stays editable either way.
+    const side = !parityArmed() ? ''
+      : active.compiledSide ? ` · compiled build` : ` · interpreter`;
+    show(`${title} · ${preset}${side}`);
     showDigest();
     return true;
   };
@@ -410,7 +453,12 @@ export function createShaderDocumentController({
       catalog: operatorCatalog,
       announce,
       onApply: () => {
+        const dropped = syncParity();
         applyPreset(active?.presetId ?? presetSelect.value);
+        if (dropped) {
+          show('The edit changed the descriptor: the preview is back on the '
+            + 'interpreter and the parity toggle is disarmed.');
+        }
         refreshLibraryLegality();
       },
       onSelect: (/** @type {string|null} */ label) => {
@@ -453,29 +501,29 @@ export function createShaderDocumentController({
       show(diagnosticText(compiled), true);
       return false;
     }
-    // The digest tells an authored study from a shipped pattern: a match
-    // routes the preview onto the concrete fixed-pipeline effect, anything
-    // else onto the chain interpreter.
+    // Every load previews through the interpreter, so a shipped pattern opens
+    // as editable as a scratch chain; a digest match only arms the toolbar's
+    // parity toggle to the promoted build.
     const official = [...catalog.values()].find((candidate) =>
-      candidate.descriptorDigest === compiled.descriptor_digest);
-    const fixed = official !== undefined;
-    const effect = fixed ? official.effectId : CHAIN_EFFECT;
+      candidate.descriptorDigest === compiled.descriptor_digest) ?? null;
     teardownChainUi();
-    if (!selectEffect(effect)) {
-      show(`The preview engine rejected effect "${effect}".`, true);
+    if (!selectEffect(CHAIN_EFFECT)) {
+      show(`The preview engine rejected effect "${CHAIN_EFFECT}".`, true);
       return false;
     }
     active = {
       compiled,
       filename,
-      fixed,
+      official,
+      loadedDigest: compiled.descriptor_digest,
+      compiledSide: false,
       presetId: null,
-      referencePresetIds: fixed ? official.presetIds ?? [] : [],
+      referencePresetIds: official?.presetIds ?? [],
     };
     populatePresets(compiled);
     saveButton.disabled = false;
     showDigest();
-    if (!fixed && stripMount && libraryMount
+    if (stripMount && libraryMount
         && typeof compiler.validateShaderDocument === 'function') {
       try {
         await buildChainUi(compiled.document);
@@ -486,6 +534,7 @@ export function createShaderDocumentController({
         return false;
       }
     }
+    syncParity();
     const presetId = compiled.document.preset_bank.presets[0]?.preset_id;
     if (!presetId) {
       show('The document is valid, but it carries no preset to preview.', true);
@@ -583,6 +632,20 @@ export function createShaderDocumentController({
     fileInput.value = '';
   });
   saveButton.addEventListener('click', save);
+  // A/B verification only: the toggle swaps which build renders the loaded
+  // document and touches neither the document nor the editing surface.
+  parityToggle?.addEventListener('click', () => {
+    if (active === null || !parityArmed()) return;
+    const compiledSide = !active.compiledSide;
+    const effect = compiledSide ? active.official.effectId : CHAIN_EFFECT;
+    if (!selectEffect(effect)) {
+      announce(`The preview engine rejected effect "${effect}".`);
+      return;
+    }
+    active.compiledSide = compiledSide;
+    syncParity();
+    applyPreset(active.presetId ?? presetSelect.value);
+  });
   digestButton?.addEventListener('click', async () => {
     const digest = digestButton.dataset.digest;
     if (!digest) return;
