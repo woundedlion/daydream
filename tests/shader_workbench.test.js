@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { shaderWorkbenchUrl, start, WORKBENCH_EFFECTS } from '../daydream.js';
+import { exportShaderDocumentJson } from '../shader/shader_workbench.mjs';
 import { scratchChainDocument } from '../tools/chain_document_store.js';
 import {
   applyFixedShaderDocument,
@@ -315,6 +316,10 @@ function workbench({ files = { 'equator_grid.shader.json': shaderDocument() },
       compileShaderDocument: (s) => typeof s === 'string'
         ? JSON.parse(s)
         : { status: 'VALID', descriptor_digest: 'digest-scratch', document: s },
+      // The fixtures are not whole documents, so the canonicalizer would refuse
+      // them; the real module's export is pinned in editorWorkbench.
+      exportShaderDocumentJson: (document) =>
+        `${JSON.stringify(document, null, 2)}\n`,
     }),
     download: (filename, source) => downloads.push([filename, source]),
   });
@@ -675,6 +680,16 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
   assert.equal(saved.descriptor.chain.length, 8);
   assert.ok(Object.keys(saved.preset_bank.presets[0].values)
     .some((id) => id.startsWith('warp1.')));
+});
+
+// §4.5: Save has one format, and it is the canonicalizer's.
+test('Save writes the canonical v2 serialization', async () => {
+  const harness = await editorWorkbench();
+
+  assert.equal(harness.controller.save(), true);
+  const [filename, source] = harness.downloads.at(-1);
+  assert.equal(filename, 'study.shader.json');
+  assert.equal(source, exportShaderDocumentJson(JSON.parse(HEX_WAVE)));
 });
 
 test('selecting a chip publishes the instance filter, the drop context and the dock', async () => {
