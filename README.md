@@ -2531,9 +2531,9 @@ The standalone [Shader workbench](https://github.com/woundedlion/daydream/blob/m
 
 Shipping composed effects are ordinary concrete `Effect` types. Each names one compile-time `Pullback::Pipeline`, a compact parameter and prepared-frame type, immutable stable preset IDs, and only the resources its graph uses. Its raster loop calls `Derived::shade(view, frame)` directly; there is no per-pixel function-pointer dispatch, topology lookup, family object, or universal Shader parameter block. The shared `Pullback::ComposedEffect` base contains only lifecycle work that is genuinely common: clocks, preset interpolation, parameter registration, palette/LUT ownership, narrow frame preparation, and the typed scan loop; its preset choreography and snapshot machinery come from the engine-level `ChoreographedEffect`. Generated palette evaluation remains in the shared `GenerativePalette` color stage rather than being copied into each effect.
 
-Each editable source document lives under `patterns/*.shader.json`. The browser validates and canonicalizes a document before changing the live engine, matches its exact descriptor digest to a composed effect, and selects presets by immutable ID. Open/save preserves exhaustive graph, parameter, resource, transition, and choreography data. Unknown or invalid semantics leave the current preview untouched. The migration manifest maps all 23 retained Shader preset positions to stable effect/preset identities; preset 4 is intentionally retired.
+Each editable source document lives under `patterns/*.shader.json`. The browser validates and canonicalizes a document before changing the live engine, matches its exact descriptor digest to a composed effect, and selects presets by immutable ID. Open/save preserves exhaustive chain, parameter, transition, and choreography data. Unknown or invalid semantics leave the current preview untouched. The migration manifest maps all 23 retained Shader preset positions to stable effect/preset identities; preset 4 is intentionally retired.
 
-The shader is a *pullback*: it starts at a visible sphere point and walks backward through outer camera, surface/projection, planar warp, source, material, and color stages. Both Shader preview and concrete effects call the same public kernels in `core/render/pullback.h`. Palette mapping is continuous preset state: a transition carries both mapping endpoints and interpolates their coordinates before the single palette sample, so changing Cup/Bell/Linear/Reverse does not require another pipeline or effect.
+The shader is a *pullback*: it starts at a visible sphere point and walks backward through a chain of stages over four ranked carrier families — Sphere, Plane, Field, Color. A chain is any stage sequence that is non-decreasing in family rank with agreeing adjacent carriers, entering at `SphereSample` and exiting at `Color4`; each family boundary is crossed at most once. Both Shader preview and concrete effects call the same public kernels in `core/render/pullback.h`. Palette mapping is continuous preset state: a transition carries both mapping endpoints and interpolates their coordinates before the single palette sample, so changing Cup/Bell/Linear/Reverse does not require another pipeline or effect.
 
 ```
 selection — once per frame
@@ -2545,22 +2545,22 @@ selection — once per frame
 
 shading — once per visible sample, through the shared Scan::Shader loop
 
-  Outer Camera
-       │ Vector
-  Surface + Projection
-       │ ProjectedLookup
-  Planar Warp
-       │ SourceInput
-  Source
-       │ MaterialInput
-  Material
-       │ MaterialSample
-  Colorize
+  Rotate · Displace · Lens        (SPHERE endomorphisms)
+       │ SphereSample
+  Project                         (SPHERE → PLANE crossing)
+       │ PlaneSample
+  Warp × N                        (PLANE endomorphisms)
+       │ PlaneSample
+  Sample                          (PLANE → FIELD crossing)
+       │ FieldSample
+  Transfer · Coverage             (FIELD endomorphisms)
+       │ FieldSample
+  Colorize                        (FIELD → COLOR crossing)
        │ straight-alpha Color4
   Canvas
 ```
 
-The core catalog owns the reusable surface, lens, projection, planar-warp, source, material, and generated-color policies. The fused surface/projection stage applies surface displacement, lensing, projection-frame rotation, projection, and all seam/topology metadata. The planar-warp stage runs its two authored warps in pullback order and carries the original projection metadata plus the accumulated path length. The material stage combines signal weighting, value transfer, and coverage while carrying total surface/warp path length into Colorize. The terminal Colorize stage samples the selected generated harmony, optionally rotates its hue with sphere-space noise or total path length, and returns straight-alpha `Color4`; the scan sink performs the final premultiplication.
+The core catalog owns the reusable surface, lens, projection, planar-warp, source, material, and generated-color policies. The `Project` crossing rotates into the projection frame, projects, and embeds the projection's provenance and the sample point into the plane carrier. Each `Warp` stage advances the working coordinate and path accumulator, leaving provenance and sample point immutable. The `Sample` crossing consumes the provenance: it weights the raw signed field, ramps it into [0, 1], and folds projected coverage and domain coverage into the field carrier; `Transfer` and `Coverage` stages then reshape value and coverage. The terminal Colorize crossing samples the selected generated harmony, optionally rotates its hue with sphere-space noise or total path length, and returns straight-alpha `Color4`; the scan sink performs the final premultiplication.
 
 Two stages carry approved approximations. Fast square Peirce projection and the hue-rotation LUT each name a host reference oracle, exact non-floating fields, error domains, limits, and a final-framebuffer metric as part of the stage contract. The dynamic orchestration is compiled for the simulator and native oracle tests, where every authored preset is compared against it. Teensy preprocessing excludes it.
 
