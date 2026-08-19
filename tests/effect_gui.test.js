@@ -2395,6 +2395,47 @@ test('the instance filter builds controls only for the prefixed params', () => {
     .domElement.classList.contains('param-deactivated'), false);
 });
 
+// §4.4: the dock's edit is the document edit, the engine write its side effect.
+test('a filtered control edit reaches the document write-through and the engine', () => {
+  const params = chainParams();
+  const h = makeHarness({
+    params,
+    engineValues: params.map((parameter) => parameter.value),
+  });
+  const edits = [];
+  h.state.paramFilter = {
+    prefix: 'sample.',
+    deactivated: deactivatedParamNames,
+    onEdit: (name, value) => edits.push([name, value]),
+  };
+  h.panel.build();
+  const fx = h.panel.active();
+
+  fx.controllerByName.get('sample.pattern-freq').setValue(4);
+  fx.controllerByName.get('sample.coverage-mode').setValue(3);
+
+  assert.deepEqual(edits, [['sample.pattern-freq', 4], ['sample.coverage-mode', 3]],
+    'an enum edit carries its option index');
+  assert.ok(h.writes.includes('engine:sample.pattern-freq=4'),
+    'the engine write stays where it was');
+});
+
+// A filter without the hook is the whole non-chain surface; an edit there must
+// not reach for a write-through that is not offered.
+test('a filter with no write-through still edits', () => {
+  const params = chainParams();
+  const h = makeHarness({
+    params,
+    engineValues: params.map((parameter) => parameter.value),
+  });
+  h.state.paramFilter = { prefix: 'sample.' };
+  h.panel.build();
+
+  h.panel.active().controllerByName.get('sample.pattern-freq').setValue(4);
+
+  assert.ok(h.writes.includes('engine:sample.pattern-freq=4'));
+});
+
 test('a filter change rebuilds the panel on the next sync', () => {
   const params = chainParams();
   const h = makeHarness({

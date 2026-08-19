@@ -64,8 +64,8 @@
     "assertions": 10
   },
   "tests/effect_gui.test.js": {
-    "cases": 106,
-    "assertions": 392
+    "cases": 108,
+    "assertions": 395
   },
   "tests/effect_sequencing.test.js": {
     "cases": 48,
@@ -230,8 +230,8 @@
     "assertions": 382
   },
   "tests/shader_workbench.test.js": {
-    "cases": 31,
-    "assertions": 157
+    "cases": 34,
+    "assertions": 180
   },
   "tests/shared.test.js": {
     "cases": 15,
