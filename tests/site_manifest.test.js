@@ -209,7 +209,9 @@ test('the site manifest covers every asset the served pages reference', () => {
 // Entries no served page references. The manifest exists to keep tests/,
 // scripts/ and dev tooling off Pages, so this list stays short: an entry earns a
 // place here only by being published for its own sake.
-const UNREFERENCED = ['README.md', 'docs/screenshots'];
+// tools/chain_document_store.js ships ahead of the chain-editor rail that will
+// import it from tools/shader.html; move it off this list when that lands.
+const UNREFERENCED = ['README.md', 'docs/screenshots', 'tools/chain_document_store.js'];
 
 // The source catalog fetches the pattern documents by file name at runtime
 // (their URLs are built from shaderball_migration.json's listing), so the
