@@ -40,6 +40,7 @@ test('simulator exposes Shader as a standalone tool', () => {
   assert.match(WORKBENCH, /id="shader-preset-select"/);
   assert.match(WORKBENCH, /id="shader-document-open"/);
   assert.match(WORKBENCH, /id="shader-document-save"/);
+  assert.match(WORKBENCH, /id="shader-parity-toggle"/);
   assert.match(WORKBENCH, /id="shader-document-digest"/);
   assert.doesNotMatch(WORKBENCH, /data-workbench-folder/,
     'the folder banks are replaced by the pipeline strip');
@@ -281,7 +282,7 @@ function workbench({ files = { 'equator_grid.shader.json': shaderDocument() },
                      selectEffect = () => true } = {}) {
   const elements = new Map(['shader-document-select', 'shader-preset-select',
     'shader-document-open', 'shader-document-save', 'shader-document-file',
-    'shader-document-status',
+    'shader-document-status', 'shader-parity-toggle',
   ].map((id) => [id, fakeElement(id.endsWith('select') ? 'select' : 'div')]));
   const scratch = fakeElement('option');
   scratch.value = '';
@@ -394,21 +395,64 @@ test('a catalog that cannot be fetched is reported, not left half-listed', async
   assert.equal(elements.get('shader-document-select').options.length, 1);
 });
 
-test('choosing a catalog source stages its effect and previews its first preset', async () => {
+// §4.6: no separate read-only mode. A shipped pattern previews through
+// the interpreter exactly as a scratch chain does; the digest match only arms
+// the parity toggle to the promoted build.
+test('choosing a catalog source previews it through the interpreter', async () => {
   const harness = workbench();
 
   await chooseCatalogSource(harness);
 
-  assert.deepEqual(harness.selections, ['ShaderChain', 'EquatorGrid']);
-  assert.deepEqual(harness.engine.selected, ['noon']);
-  assert.deepEqual(harness.engine.writes.slice(SCRATCH_WRITES), [['Pattern Freq', 2]]);
+  assert.deepEqual(harness.selections, ['ShaderChain', 'ShaderChain']);
+  assert.deepEqual(harness.engine.selected, [],
+    'no fixed-effect reference preset is staged for an interpreted load');
+  assert.deepEqual(harness.engine.chained.at(-1),
+    [{ instance: 'sample', operator: 'sample.grid.v2' }]);
+  assert.deepEqual(harness.engine.writes.slice(SCRATCH_WRITES),
+    [['sample.pattern-freq', 2]]);
   const presets = harness.elements.get('shader-preset-select');
   assert.deepEqual(presets.options.map((option) => option.value), ['noon', 'dusk']);
   assert.equal(presets.disabled, false);
   assert.equal(harness.elements.get('shader-document-save').disabled, false);
   assert.match(harness.elements.get('shader-document-status').textContent,
-    /Equator Grid · Noon/);
+    /Equator Grid · Noon · interpreter/);
+  assert.equal(harness.elements.get('shader-parity-toggle').disabled, false,
+    'the digest match arms the toggle');
   assert.deepEqual(harness.ran, { gui: 2, invalidated: 2 });
+});
+
+test('the parity toggle swaps the preview onto the compiled build and back', async () => {
+  const harness = workbench();
+  await chooseCatalogSource(harness);
+  const toggle = harness.elements.get('shader-parity-toggle');
+
+  toggle.dispatch('click');
+
+  assert.equal(harness.selections.at(-1), 'EquatorGrid');
+  assert.equal(toggle.getAttribute('aria-pressed'), 'true');
+  assert.deepEqual(harness.engine.selected, ['noon']);
+  assert.deepEqual(harness.engine.writes.at(-1), ['Pattern Freq', 2],
+    'the compiled build takes the preset through the promoted control names');
+  assert.match(harness.elements.get('shader-document-status').textContent,
+    /Equator Grid · Noon · compiled build/);
+
+  toggle.dispatch('click');
+
+  assert.equal(harness.selections.at(-1), 'ShaderChain');
+  assert.equal(toggle.getAttribute('aria-pressed'), 'false');
+  assert.deepEqual(harness.engine.writes.at(-1), ['sample.pattern-freq', 2]);
+});
+
+test('a document the migration table does not carry leaves the toggle disarmed', async () => {
+  const harness = workbench();
+  await harness.controller.init();
+
+  assert.equal(await harness.controller.loadSource(
+    shaderDocument({ digest: 'digest-study' }), 'study.shader.json'), true);
+
+  assert.equal(harness.elements.get('shader-parity-toggle').disabled, true);
+  assert.doesNotMatch(harness.elements.get('shader-document-status').textContent,
+    /interpreter|compiled/);
 });
 
 // The digest is what tells an authored study from a shipped pattern: matching
@@ -460,8 +504,8 @@ test('choosing a preset previews it without reloading the document', async () =>
 
   onChange(presets)();
 
-  assert.deepEqual(harness.engine.selected, ['noon', 'dusk']);
-  assert.deepEqual(harness.engine.writes.at(-1), ['Pattern Freq', 5]);
+  assert.deepEqual(harness.engine.selected, []);
+  assert.deepEqual(harness.engine.writes.at(-1), ['sample.pattern-freq', 5]);
   assert.match(harness.elements.get('shader-document-status').textContent,
     /Equator Grid · Dusk/);
 });
@@ -482,7 +526,7 @@ test('an effect the preview engine rejects leaves the export disabled', async ()
 
   assert.equal(await harness.controller.loadSource(shaderDocument()), false);
   assert.match(harness.elements.get('shader-document-status').textContent,
-    /rejected effect "EquatorGrid"/);
+    /rejected effect "ShaderChain"/);
   assert.equal(harness.elements.get('shader-document-save').disabled, true);
   assert.equal(harness.controller.save(), false);
 });
@@ -538,7 +582,7 @@ test('returning to the scratch source reopens the default chain', async () => {
 
   await onChange(select)();
 
-  assert.deepEqual(harness.selections, ['ShaderChain', 'EquatorGrid', 'ShaderChain']);
+  assert.deepEqual(harness.selections, ['ShaderChain', 'ShaderChain', 'ShaderChain']);
   const presets = harness.elements.get('shader-preset-select');
   assert.deepEqual(presets.options.map((option) => option.textContent),
     ['Catalog Defaults']);
@@ -557,6 +601,37 @@ const HEX_WAVE = readFileSync(
 const EMPTY_MIGRATION = JSON.stringify({
   source_documents: {}, product_group: { children: [] },
 });
+// hex_wave as a shipped pattern: loading it digests onto a promoted effect, so
+// the toolbar's parity toggle arms.
+const HEX_MIGRATION = JSON.stringify({
+  source_documents: { HexWave: 'hex_wave.shader.json' },
+  product_group: { children: [{ effect_id: 'HexWave', display_name: 'Hex Wave' }] },
+});
+
+/**
+ * The promoted build's engine surface: its own reference presets and the
+ * alias-named controls hex_wave's parameter ids map onto, which is what makes
+ * it a different engine surface from the chain interpreter's.
+ * @returns {Object} The engine.
+ */
+function compiledBuildEngine() {
+  const definitions = JSON.parse(HEX_WAVE).descriptor.parameters.map((parameter) => ({
+    name: engineParameterName(parameter.id),
+    ...(parameter.storage === 'enum8' ? { options: [...parameter.domain.values] } : {}),
+  }));
+  const selected = [];
+  const writes = [];
+  return {
+    selected,
+    writes,
+    selectPresetById: (id) => { selected.push(id); return true; },
+    getParameterDefinitions: () => definitions,
+    setParameter: (name, value) => {
+      writes.push([name, value]);
+      return ParamSetResult.APPLIED;
+    },
+  };
+}
 
 /**
  * The document controller over the real compiler, the real chain store, and a
@@ -568,9 +643,12 @@ const EMPTY_MIGRATION = JSON.stringify({
  */
 async function editorWorkbench({ source = HEX_WAVE, migration = EMPTY_MIGRATION } = {}) {
   const engine = new FakeChainEngine();
+  const compiledEngine = compiledBuildEngine();
+  let current = engine;
   const ids = ['shader-document-select', 'shader-preset-select',
     'shader-document-open', 'shader-document-save', 'shader-document-file',
-    'shader-document-status', 'shader-document-digest', 'parameter-dock-toggle'];
+    'shader-document-status', 'shader-document-digest', 'shader-parity-toggle',
+    'parameter-dock-toggle'];
   const elements = new Map(ids.map((id) =>
     [id, fakeElement(id.endsWith('select') ? 'select' : 'div')]));
   for (const mount of ['chain-strip', 'chain-library', 'parameter-dock']) {
@@ -593,9 +671,13 @@ async function editorWorkbench({ source = HEX_WAVE, migration = EMPTY_MIGRATION 
   const ran = { gui: 0, invalidated: 0 };
   const controller = createShaderDocumentController({
     doc,
-    getEngine: () => engine,
+    getEngine: () => current,
     getModule: () => MODULE,
-    selectEffect: (effect) => { selections.push(effect); return true; },
+    selectEffect: (effect) => {
+      selections.push(effect);
+      current = effect === 'ShaderChain' ? engine : compiledEngine;
+      return true;
+    },
     syncEffectGui: () => { ran.gui += 1; },
     invalidate: () => { ran.invalidated += 1; },
     setParamFilter: (filter) => filters.push(filter),
@@ -612,7 +694,25 @@ async function editorWorkbench({ source = HEX_WAVE, migration = EMPTY_MIGRATION 
   assert.equal(await controller.init(), true);
   if (source !== null)
     assert.equal(await controller.loadSource(source, 'study.shader.json'), true);
-  return { controller, engine, elements, downloads, selections, filters, ran };
+  return {
+    controller, engine, compiledEngine, elements, downloads, selections, filters, ran,
+  };
+}
+
+/**
+ * Commits an insertion of one operator through the plane band's + palette.
+ * @param {Object} harness - An editorWorkbench() result.
+ * @param {string} operatorId - The catalog operator to insert.
+ * @returns {void}
+ */
+function insertIntoPlaneBand(harness, operatorId) {
+  const mount = harness.elements.get('chain-strip');
+  mount.querySelectorAll('.chain-band')
+    .find((band) => band.dataset.carrier === 'plane')
+    .querySelector('.chain-band-add').dispatch('click');
+  mount.querySelectorAll('.chain-palette-entry')
+    .find((entry) => entry.dataset.operator === operatorId)
+    .dispatch('click');
 }
 
 const stripChips = (harness) =>
@@ -637,13 +737,7 @@ test('the scratch document opens as a live, editable chain', async () => {
   assert.ok(harness.engine.writes.some(([name]) => name === 'colorize.palette-chroma'),
     'the opening preview carries the catalog defaults');
 
-  const mount = harness.elements.get('chain-strip');
-  mount.querySelectorAll('.chain-band')
-    .find((band) => band.dataset.carrier === 'plane')
-    .querySelector('.chain-band-add').dispatch('click');
-  mount.querySelectorAll('.chain-palette-entry')
-    .find((entry) => entry.dataset.operator === 'warp.affine.v2')
-    .dispatch('click');
+  insertIntoPlaneBand(harness, 'warp.affine.v2');
 
   assert.equal(harness.engine.chainCalls.at(-1).length, 5);
 });
@@ -660,14 +754,7 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
     harness.elements.get('shader-document-digest').dataset.digest.slice(0, 12),
     'the toolbar shows the digest abbreviated and carries the whole of it');
 
-  // Insert a wave shear through the plane band's + palette.
-  const mount = harness.elements.get('chain-strip');
-  mount.querySelectorAll('.chain-band')
-    .find((band) => band.dataset.carrier === 'plane')
-    .querySelector('.chain-band-add').dispatch('click');
-  mount.querySelectorAll('.chain-palette-entry')
-    .find((entry) => entry.dataset.operator === 'warp.wave-shear.v2')
-    .dispatch('click');
+  insertIntoPlaneBand(harness, 'warp.wave-shear.v2');
 
   assert.equal(harness.engine.chainCalls.length, 3);
   assert.equal(harness.engine.chainCalls.at(-1).length, 8);
@@ -680,6 +767,51 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
   assert.equal(saved.descriptor.chain.length, 8);
   assert.ok(Object.keys(saved.preset_bank.presets[0].values)
     .some((id) => id.startsWith('warp1.')));
+});
+
+// §4.6/§4.8: a descriptor edit breaks the match with the promoted
+// build and disarms the toggle. A bypass is a program-shape override and a dock
+// edit writes a preset value, so neither touches the descriptor digest.
+test('the parity toggle disarms on a descriptor edit, not on a bypass', async () => {
+  const harness = await editorWorkbench({ migration: HEX_MIGRATION });
+  const toggle = harness.elements.get('shader-parity-toggle');
+  assert.equal(toggle.disabled, false, 'the loaded digest matches a promoted effect');
+  assert.deepEqual(harness.selections, ['ShaderChain', 'ShaderChain'],
+    'a shipped pattern still previews through the interpreter');
+
+  stripChips(harness).find((chip) => chip.dataset.label === 'lens')
+    .querySelector('.chain-chip-bypass').dispatch('click');
+  assert.equal(toggle.disabled, false);
+
+  dockEditor(harness, 'sample')('sample.pattern-freq', 7);
+  assert.equal(toggle.disabled, false);
+
+  insertIntoPlaneBand(harness, 'warp.wave-shear.v2');
+
+  assert.equal(toggle.disabled, true);
+});
+
+test('a descriptor edit under the compiled build returns the preview to the interpreter', async () => {
+  const harness = await editorWorkbench({ migration: HEX_MIGRATION });
+  const status = harness.elements.get('shader-document-status');
+  const toggle = harness.elements.get('shader-parity-toggle');
+
+  toggle.dispatch('click');
+
+  assert.equal(harness.selections.at(-1), 'HexWave');
+  assert.deepEqual(harness.compiledEngine.selected, ['hex-twin-wave']);
+  assert.ok(harness.compiledEngine.writes.some(([name]) => name === 'Camera Wander'),
+    'the compiled build takes the preset through its own control names');
+  assert.match(status.textContent, /compiled build/);
+
+  insertIntoPlaneBand(harness, 'warp.wave-shear.v2');
+
+  assert.equal(harness.selections.at(-1), 'ShaderChain');
+  assert.equal(toggle.disabled, true);
+  assert.equal(toggle.getAttribute('aria-pressed'), 'false');
+  assert.equal(harness.engine.chainCalls.at(-1).length, 8,
+    'the edited chain is what renders');
+  assert.match(status.textContent, /back on the interpreter/);
 });
 
 // §4.5: Save has one format, and it is the canonicalizer's.

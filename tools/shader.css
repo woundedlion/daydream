@@ -54,6 +54,13 @@
   cursor: default;
 }
 
+/* Armed only while the loaded descriptor still digests to a promoted effect;
+   pressed means the compiled build, not the interpreter, is on the canvas. */
+.shader-parity-toggle[aria-pressed="true"]:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--bright-text);
+}
+
 .shader-document-digest {
   font-family: monospace;
   letter-spacing: 0.04em;
