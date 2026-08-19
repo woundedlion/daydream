@@ -47,39 +47,6 @@ const carrierTitle = (carrier) =>
   carrier.length === 0 ? carrier : carrier[0].toUpperCase() + carrier.slice(1);
 
 /**
- * The parameter names the current topology selections deactivate: an
- * `edge-width` field is read by the engine only while its instance's
- * `coverage-mode` or `envelope` enum sits on `edge-fade`. Deactivation changes
- * what the engine reads, never what the document carries, so the GUI dims these
- * controls rather than dropping them.
- * @param {Array<{name: string, value?: *, requestedValue?: *, options?: string[]}>} definitions
- *   - Engine parameter definitions (enum values are option indices).
- * @returns {Set<string>} The deactivated parameter names.
- */
-export function deactivatedParamNames(definitions) {
-  /** @type {Map<string, string>} */
-  const gates = new Map();
-  for (const definition of definitions) {
-    if (!definition.options) continue;
-    const dot = definition.name.indexOf('.');
-    if (dot < 0) continue;
-    const field = definition.name.slice(dot + 1);
-    if (field !== 'coverage-mode' && field !== 'envelope') continue;
-    const index = definition.requestedValue ?? definition.value;
-    const option = typeof index === 'number' ? definition.options[index] : undefined;
-    if (option !== undefined) gates.set(definition.name.slice(0, dot), option);
-  }
-  const deactivated = new Set();
-  for (const definition of definitions) {
-    const dot = definition.name.indexOf('.');
-    if (dot < 0 || definition.name.slice(dot + 1) !== 'edge-width') continue;
-    const gate = gates.get(definition.name.slice(0, dot));
-    if (gate !== undefined && gate !== 'edge-fade') deactivated.add(definition.name);
-  }
-  return deactivated;
-}
-
-/**
  * The rail gap under a viewport point, for a drag captured outside the rail
  * (the catalog panel's) to hit-test drop targets with.
  * @param {*} doc - Document owning the rail.

@@ -4,9 +4,10 @@
  */
 
 import { applyChainDocument } from './chain_apply.js';
-import { createChainDocumentStore } from './chain_document_store.js';
-import { createChainEditor, deactivatedParamNames } from './chain_editor.js';
 import { createChainCatalogPanel } from './chain_catalog_panel.js';
+import { deactivatedParamNames } from './chain_dock.js';
+import { createChainDocumentStore } from './chain_document_store.js';
+import { createChainEditor } from './chain_editor.js';
 
 const MIGRATION_URL = '../shader/patterns/shaderball_migration.json';
 const CATALOG_URL = '../shader/engine_catalog.json';

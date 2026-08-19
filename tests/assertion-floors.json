@@ -19,13 +19,17 @@
     "cases": 4,
     "assertions": 18
   },
+  "tests/chain_dock.test.js": {
+    "cases": 6,
+    "assertions": 21
+  },
   "tests/chain_document_store.test.js": {
     "cases": 27,
     "assertions": 280
   },
   "tests/chain_editor.test.js": {
-    "cases": 18,
-    "assertions": 121
+    "cases": 17,
+    "assertions": 119
   },
   "tests/chain_library.test.js": {
     "cases": 8,
@@ -291,11 +295,11 @@
   },
   "tests/tool_pages.test.js": {
     "cases": 10,
-    "assertions": 206
+    "assertions": 208
   },
   "tests/tsconfig_roster.test.js": {
     "cases": 7,
-    "assertions": 135
+    "assertions": 138
   },
   "tests/vendor-importmap.test.js": {
     "cases": 7,
