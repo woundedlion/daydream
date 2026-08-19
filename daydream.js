@@ -61,6 +61,13 @@ export const SHADER_DOCUMENT_EFFECTS = Object.freeze([
   'cosmic-eyeball', 'mobius-grid',
 ]);
 
+// Every effect the workbench page may hold: the scratch shader, the chain
+// interpreter each dynamically previewed document is programmed onto
+// (tools/shader_documents.js), and the shipped documents.
+export const WORKBENCH_EFFECTS = Object.freeze([
+  'Shader', 'ShaderChain', ...SHADER_DOCUMENT_EFFECTS,
+]);
+
 if (SEGMENT_CONTROLLER_API_VERSION !== EXPECTED_SEGMENT_CONTROLLER_API_VERSION) {
   throw new Error('Cached segment_controller.js is incompatible; reload the simulator.');
 }
@@ -224,7 +231,7 @@ export function start({
   // Seed plain defaults; URLSync is the single URL reader and hydrates these from
   // the query string through the same validators below.
   const knownEffects = new Set(shaderWorkbench
-    ? ['Shader', ...SHADER_DOCUMENT_EFFECTS]
+    ? WORKBENCH_EFFECTS
     : Object.values(resolutionPresets).flatMap((preset) => preset.favorites));
   knownEffects.add(LEGACY_SHADER_ALIAS);
   const appState = new AppState({
@@ -242,7 +249,7 @@ export function start({
     appState.set('effect', legacySelection.effect);
   }
   const availableEffects = (resolution) => shaderWorkbench
-    ? ['Shader', ...SHADER_DOCUMENT_EFFECTS] : favoritesFor(resolution);
+    ? [...WORKBENCH_EFFECTS] : favoritesFor(resolution);
 
   const segments = new SegmentController({
     resolutionPresets,

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { shaderWorkbenchUrl, start } from '../daydream.js';
+import { shaderWorkbenchUrl, start, WORKBENCH_EFFECTS } from '../daydream.js';
 import {
   applyFixedShaderDocument,
   createShaderDocumentController,
@@ -473,6 +473,26 @@ test('saving exports the live engine values, not the ones the document arrived w
     'the presets the session never previewed must survive the round trip');
   assert.match(harness.elements.get('shader-document-status').textContent,
     /Saved equator_grid\.shader\.json/);
+});
+
+// The workbench roster is what the page's deep-link validator and its
+// resolution correction are both built from, so an effect the controller
+// selects but the roster omits survives the load and is dropped on the next
+// reload or resolution change.
+test('the workbench roster admits every effect the controller selects', async () => {
+  const harness = workbench();
+  await harness.controller.init();
+  await harness.controller.loadSource(
+    shaderDocument({ digest: 'digest-study' }), 'study.shader.json');
+  const select = harness.elements.get('shader-document-select');
+  select.value = '';
+  await onChange(select)();
+
+  assert.deepEqual(harness.selections, ['ShaderChain', 'Shader']);
+  for (const effect of harness.selections) {
+    assert.ok(WORKBENCH_EFFECTS.includes(effect),
+      `the workbench page must know the effect "${effect}"`);
+  }
 });
 
 test('returning to the scratch source drops the loaded document', async () => {
