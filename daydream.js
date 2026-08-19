@@ -652,6 +652,7 @@ export function start({
     syncEffectGui: () => effectGui.sync(),
     invalidate: () => daydream.invalidate(),
     setParamFilter: (filter) => { paramFilterRef.current = filter; },
+    initialEffect: requestedSelection.effect,
   }) : null;
 
   testAllController = guiInstance.addSession({ testAll: false }, 'testAll').name('Test All')

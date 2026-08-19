@@ -277,12 +277,14 @@ function workbenchEngine() {
 
 /**
  * Builds the workbench document controller over the shader.html control set.
- * @param {{files?: Object, engine?: *, selectEffect?: (effect: string) => boolean}} [seams]
+ * @param {{files?: Object, engine?: *, selectEffect?: (effect: string) => boolean,
+ *   initialEffect?: string|null}} [seams]
  * @returns {Object} The controller and everything it wrote to.
  */
 function workbench({ files = { 'equator_grid.shader.json': shaderDocument() },
                      engine = workbenchEngine(),
-                     selectEffect = () => true } = {}) {
+                     selectEffect = () => true,
+                     initialEffect = null } = {}) {
   const elements = new Map(['shader-document-select', 'shader-preset-select',
     'shader-document-open', 'shader-document-save', 'shader-document-file',
     'shader-document-status', 'shader-parity-toggle', 'shader-document-save-as',
@@ -326,6 +328,7 @@ function workbench({ files = { 'equator_grid.shader.json': shaderDocument() },
         `${JSON.stringify(document, null, 2)}\n`,
     }),
     download: (filename, source) => downloads.push([filename, source]),
+    initialEffect,
   });
   return { controller, elements, downloads, selections, engine, ran };
 }
@@ -396,6 +399,34 @@ test('a catalog that cannot be fetched is reported, not left half-listed', async
   assert.match(elements.get('shader-document-status').textContent,
     /Source catalog failed to load: 404/);
   assert.equal(elements.get('shader-document-select').options.length, 1);
+});
+
+// The simulator redirects a shader-document deep link here, so the id it
+// carries has to open that document rather than the scratch chain.
+test('a deep-linked document id opens that document', async () => {
+  const harness = workbench({ initialEffect: 'EquatorGrid' });
+
+  assert.equal(await harness.controller.init(), true);
+
+  assert.equal(harness.elements.get('shader-document-select').value, 'EquatorGrid');
+  assert.deepEqual(harness.engine.chained.at(-1),
+    [{ instance: 'sample', operator: 'sample.grid.v2' }]);
+  assert.match(harness.elements.get('shader-document-status').textContent,
+    /Equator Grid · Noon/);
+});
+
+// §4.5: the legacy Shader route names no document, and neither does a
+// stale id, so both open the scratch chain.
+test('a deep link naming no catalog document opens the scratch chain', async () => {
+  for (const initialEffect of ['Shader', 'retired-pattern', null]) {
+    const harness = workbench({ initialEffect });
+
+    assert.equal(await harness.controller.init(), true);
+
+    assert.equal(harness.elements.get('shader-document-select').value, '');
+    assert.match(harness.elements.get('shader-document-status').textContent,
+      /Scratch Chain · Catalog Defaults/);
+  }
 });
 
 // §4.6: no separate read-only mode. A shipped pattern previews through
