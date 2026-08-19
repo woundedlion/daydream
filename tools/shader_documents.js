@@ -220,6 +220,8 @@ export function createShaderDocumentController({
     doc.getElementById('shader-document-open'));
   const saveButton = /** @type {HTMLButtonElement|null} */ (
     doc.getElementById('shader-document-save'));
+  const saveAsButton = /** @type {HTMLButtonElement|null} */ (
+    doc.getElementById('shader-document-save-as'));
   const fileInput = /** @type {HTMLInputElement|null} */ (
     doc.getElementById('shader-document-file'));
   const status = /** @type {HTMLOutputElement|null} */ (
@@ -248,6 +250,8 @@ export function createShaderDocumentController({
   let operatorCatalog = null;
   /** @type {{store: *, strip: *, library: *, dock: *}|null} */
   let chainUi = null;
+  /** @type {number} Save As copies this session, which their ids count off. */
+  let copies = 0;
 
   /** @param {string} message @param {boolean} [error] */
   const show = (message, error = false) => {
@@ -357,10 +361,9 @@ export function createShaderDocumentController({
     const title = active.compiled.document.effect_metadata?.display_name
       ?? active.compiled.document.document_id;
     const preset = presetSelect.selectedOptions[0]?.textContent ?? presetId;
-    // Which side is on screen is only a question while the toggle is armed, and
-    // it has to be legible: the strip stays editable either way.
+    // Only an armed toggle leaves which build is rendering in question.
     const side = !parityArmed() ? ''
-      : active.compiledSide ? ` · compiled build` : ` · interpreter`;
+      : active.compiledSide ? ' · compiled build' : ' · interpreter';
     show(`${title} · ${preset}${side}`);
     showDigest();
     return true;
@@ -522,6 +525,7 @@ export function createShaderDocumentController({
     };
     populatePresets(compiled);
     saveButton.disabled = false;
+    if (saveAsButton) saveAsButton.disabled = false;
     showDigest();
     if (stripMount && libraryMount
         && typeof compiler.validateShaderDocument === 'function') {
@@ -543,19 +547,46 @@ export function createShaderDocumentController({
     return applyPreset(presetId);
   };
 
-  const save = () => {
-    if (!active) return false;
-    // Every edit is already a document edit, so the export is the document as
-    // it stands — the store's once the editor is live, else the load-time
-    // compile — canonicalized, with nothing harvested back out of the engine.
-    const document = chainUi
-      ? chainUi.store.document()
-      : structuredClone(active.compiled.document);
-    const filename = active.filename.endsWith('.shader.json')
-      ? active.filename : `${document.effect_id}.shader.json`;
+  /**
+   * The document as it stands: the store's once the editor is live, else the
+   * load-time compile. Every edit is already a document edit, so nothing is
+   * harvested back out of the engine.
+   * @returns {*} An isolated copy.
+   */
+  const currentDocument = () => chainUi
+    ? chainUi.store.document()
+    : structuredClone(active.compiled.document);
+
+  /**
+   * @param {*} document - The document to write.
+   * @param {string} filename - The download name.
+   * @returns {boolean} Always true; a valid-by-construction document has no
+   *   export failure state.
+   */
+  const exportDocument = (document, filename) => {
     download(filename, compiler.exportShaderDocumentJson(document));
     show(`Saved ${filename}.`);
     return true;
+  };
+
+  const save = () => {
+    if (!active) return false;
+    const document = currentDocument();
+    return exportDocument(document, active.filename.endsWith('.shader.json')
+      ? active.filename : `${document.effect_id}.shader.json`);
+  };
+
+  /**
+   * Writes a copy under a fresh document id. The loaded document keeps its own
+   * id and download name, so a following Save still re-exports the original.
+   * @returns {boolean} Whether a document was written.
+   */
+  const saveAs = () => {
+    if (!active) return false;
+    const document = currentDocument();
+    copies += 1;
+    document.document_id = `${document.document_id}-copy${copies}`;
+    return exportDocument(document, `${document.document_id}.shader.json`);
   };
 
   /**
@@ -632,6 +663,7 @@ export function createShaderDocumentController({
     fileInput.value = '';
   });
   saveButton.addEventListener('click', save);
+  saveAsButton?.addEventListener('click', saveAs);
   // A/B verification only: the toggle swaps which build renders the loaded
   // document and touches neither the document nor the editing surface.
   parityToggle?.addEventListener('click', () => {
@@ -653,5 +685,5 @@ export function createShaderDocumentController({
     else announce('The descriptor digest could not be copied.');
   });
 
-  return { init, loadSource, save, applyPreset };
+  return { init, loadSource, save, saveAs, applyPreset };
 }

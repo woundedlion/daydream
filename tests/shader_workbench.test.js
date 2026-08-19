@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { shaderWorkbenchUrl, start, WORKBENCH_EFFECTS } from '../daydream.js';
-import { exportShaderDocumentJson } from '../shader/shader_workbench.mjs';
+import {
+  exportShaderDocumentJson, validateShaderDocument,
+} from '../shader/shader_workbench.mjs';
 import { scratchChainDocument } from '../tools/chain_document_store.js';
 import {
   applyFixedShaderDocument,
@@ -40,6 +42,7 @@ test('simulator exposes Shader as a standalone tool', () => {
   assert.match(WORKBENCH, /id="shader-preset-select"/);
   assert.match(WORKBENCH, /id="shader-document-open"/);
   assert.match(WORKBENCH, /id="shader-document-save"/);
+  assert.match(WORKBENCH, /id="shader-document-save-as"/);
   assert.match(WORKBENCH, /id="shader-parity-toggle"/);
   assert.match(WORKBENCH, /id="shader-document-digest"/);
   assert.doesNotMatch(WORKBENCH, /data-workbench-folder/,
@@ -282,7 +285,7 @@ function workbench({ files = { 'equator_grid.shader.json': shaderDocument() },
                      selectEffect = () => true } = {}) {
   const elements = new Map(['shader-document-select', 'shader-preset-select',
     'shader-document-open', 'shader-document-save', 'shader-document-file',
-    'shader-document-status', 'shader-parity-toggle',
+    'shader-document-status', 'shader-parity-toggle', 'shader-document-save-as',
   ].map((id) => [id, fakeElement(id.endsWith('select') ? 'select' : 'div')]));
   const scratch = fakeElement('option');
   scratch.value = '';
@@ -443,22 +446,9 @@ test('the parity toggle swaps the preview onto the compiled build and back', asy
   assert.deepEqual(harness.engine.writes.at(-1), ['sample.pattern-freq', 2]);
 });
 
-test('a document the migration table does not carry leaves the toggle disarmed', async () => {
-  const harness = workbench();
-  await harness.controller.init();
-
-  assert.equal(await harness.controller.loadSource(
-    shaderDocument({ digest: 'digest-study' }), 'study.shader.json'), true);
-
-  assert.equal(harness.elements.get('shader-parity-toggle').disabled, true);
-  assert.doesNotMatch(harness.elements.get('shader-document-status').textContent,
-    /interpreter|compiled/);
-});
-
-// The digest is what tells an authored study from a shipped pattern: matching
-// one routes the preview onto the concrete fixed-pipeline effect, and anything
-// else onto the chain interpreter through setShaderChain.
-test('an imported study the catalog does not carry routes to the chain engine', async () => {
+// A study no shipped pattern digests to has no promoted build to compare
+// against, so it loads on the interpreter with the toggle disarmed.
+test('an imported study the catalog does not carry has no parity build', async () => {
   const harness = workbench();
   await harness.controller.init();
 
@@ -474,7 +464,8 @@ test('an imported study the catalog does not carry routes to the chain engine', 
     'the preset lands by parameter id, not by alias name');
   const status = harness.elements.get('shader-document-status');
   assert.equal(status.dataset.status, 'ok');
-  assert.match(status.textContent, /Equator Grid · Noon/);
+  assert.equal(status.textContent, 'Equator Grid · Noon');
+  assert.equal(harness.elements.get('shader-parity-toggle').disabled, true);
   assert.equal(harness.elements.get('shader-document-save').disabled, false);
   assert.deepEqual(harness.ran, { gui: 2, invalidated: 2 });
 });
@@ -648,7 +639,7 @@ async function editorWorkbench({ source = HEX_WAVE, migration = EMPTY_MIGRATION 
   const ids = ['shader-document-select', 'shader-preset-select',
     'shader-document-open', 'shader-document-save', 'shader-document-file',
     'shader-document-status', 'shader-document-digest', 'shader-parity-toggle',
-    'parameter-dock-toggle'];
+    'shader-document-save-as', 'parameter-dock-toggle'];
   const elements = new Map(ids.map((id) =>
     [id, fakeElement(id.endsWith('select') ? 'select' : 'div')]));
   for (const mount of ['chain-strip', 'chain-library', 'parameter-dock']) {
@@ -822,6 +813,40 @@ test('Save writes the canonical v2 serialization', async () => {
   const [filename, source] = harness.downloads.at(-1);
   assert.equal(filename, 'study.shader.json');
   assert.equal(source, exportShaderDocumentJson(JSON.parse(HEX_WAVE)));
+});
+
+// §4.6: Save As is a copy, not a rename - the loaded document and the
+// name plain Save re-exports over are both left alone.
+test('Save As writes a new document id and leaves the loaded one alone', async () => {
+  const harness = await editorWorkbench();
+
+  assert.equal(harness.controller.saveAs(), true);
+  const [copyName, copySource] = harness.downloads.at(-1);
+  const copy = JSON.parse(copySource);
+  assert.equal(copy.document_id, 'hex-wave-v1-copy1');
+  assert.equal(copyName, 'hex-wave-v1-copy1.shader.json');
+  assert.equal(copySource, exportShaderDocumentJson(copy),
+    'a copy is written in the same canonical serialization as Save');
+
+  assert.equal(harness.controller.save(), true);
+  const [savedName, savedSource] = harness.downloads.at(-1);
+  assert.equal(savedName, 'study.shader.json');
+  assert.equal(JSON.parse(savedSource).document_id, 'hex-wave-v1');
+
+  assert.equal(harness.controller.saveAs(), true);
+  assert.equal(JSON.parse(harness.downloads.at(-1)[1]).document_id,
+    'hex-wave-v1-copy2', 'each copy takes an id of its own');
+});
+
+test('a Save As copy carries the edits made since the load', async () => {
+  const harness = await editorWorkbench();
+  insertIntoPlaneBand(harness, 'warp.wave-shear.v2');
+
+  assert.equal(harness.controller.saveAs(), true);
+  const copy = JSON.parse(harness.downloads.at(-1)[1]);
+  assert.equal(copy.descriptor.chain.length, 8);
+  assert.deepEqual(
+    validateShaderDocument(copy, { catalog: JSON.parse(ENGINE_CATALOG) }), []);
 });
 
 test('selecting a chip publishes the instance filter, the drop context and the dock', async () => {
