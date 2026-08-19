@@ -3,9 +3,15 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import { applyChainDocument } from './chain_apply.js';
+
 const MIGRATION_URL = '../shader/patterns/shaderball_migration.json';
 const CATALOG_URL = '../shader/engine_catalog.json';
 const COMPILER_URL = new URL('../shader/shader_workbench.mjs', import.meta.url).href;
+
+// The effect the dynamic path previews on: the engine's chain interpreter,
+// programmed through setShaderChain.
+const CHAIN_EFFECT = 'ShaderChain';
 
 // Topology enum8 parameters select an operator's structural variant. A fixed
 // effect bakes its variants in, so the fixed path skips them; palette-mapping
@@ -237,12 +243,11 @@ export function applyFixedShaderDocument(engine, module, compiled, presetId,
 }
 
 /**
- * Applies a document to the dynamic evaluator. A v2 chain document has no
- * structural dropdowns to write: its dynamic preview goes through
- * setShaderChain, which lands with the D2 engine update, so until then every
- * chain document is refused with that status. The legacy six-role body below
- * only serves a pre-expansion v1 compile, which the single-code-path compiler
- * no longer produces.
+ * Applies a legacy six-role document to ShaderBall's structural dropdowns. A
+ * v2 chain document never previews here: its dynamic path is
+ * tools/chain_apply.js over setShaderChain. This body only serves a
+ * pre-expansion v1 compile, which the single-code-path compiler no longer
+ * produces.
  * @param {*} engine @param {*} module @param {CompiledDocument} compiled
  * @param {string} presetId
  * @returns {string|null} Refusal reason, or null once applied.
@@ -250,7 +255,7 @@ export function applyFixedShaderDocument(engine, module, compiled, presetId,
 export function applyDynamicShaderDocument(engine, module, compiled, presetId) {
   if (compiled.document.descriptor?.chain !== undefined ||
       compiled.document.descriptor?.graph === undefined)
-    return 'this document previews on the chain engine, which lands with the D2 engine update';
+    return 'a chain document previews through the chain engine, not the legacy six-role path';
   const nodes = new Map(compiled.document.descriptor.graph.nodes
     .map((/** @type {*} */ node) => [node.role, node]));
   const surface = nodes.get('surface_project')?.policy ?? {};
@@ -375,18 +380,27 @@ export function createShaderDocumentController({
       show('The preview engine is not ready.', true);
       return false;
     }
+    // applyChainDocument owns the GUI resync and repaint (its apply order is
+    // fixed); the fixed path runs them here.
     const refusal = active.fixed
       ? applyFixedShaderDocument(
         engine, module, active.compiled, presetId, active.referencePresetIds)
-      : applyDynamicShaderDocument(engine, module, active.compiled, presetId);
+      : applyChainDocument({
+        engine, module, compiled: active.compiled, presetId,
+        syncEffectGui, invalidate,
+      });
     if (refusal) {
       show(`Preset "${presetId}" could not be applied: ${refusal}`, true);
       return false;
     }
-    syncEffectGui();
-    invalidate();
+    if (active.fixed) {
+      syncEffectGui();
+      invalidate();
+    }
     active.presetId = presetId;
-    show(`${active.compiled.document.effect_metadata.display_name} · ${presetSelect.selectedOptions[0]?.textContent ?? presetId}`);
+    const title = active.compiled.document.effect_metadata?.display_name
+      ?? active.compiled.document.document_id;
+    show(`${title} · ${presetSelect.selectedOptions[0]?.textContent ?? presetId}`);
     return true;
   };
 
@@ -404,17 +418,13 @@ export function createShaderDocumentController({
       show(diagnosticText(compiled), true);
       return false;
     }
+    // The digest tells an authored study from a shipped pattern: a match
+    // routes the preview onto the concrete fixed-pipeline effect, anything
+    // else onto the chain interpreter.
     const official = [...catalog.values()].find((candidate) =>
       candidate.descriptorDigest === compiled.descriptor_digest);
-    if (!official) {
-      active = null;
-      saveButton.disabled = true;
-      show('This chain matches no fixed-pipeline effect; its dynamic preview '
-        + 'requires the chain engine (D2).', true);
-      return false;
-    }
-    const fixed = true;
-    const effect = official.effectId;
+    const fixed = official !== undefined;
+    const effect = fixed ? official.effectId : CHAIN_EFFECT;
     if (!selectEffect(effect)) {
       show(`The preview engine rejected effect "${effect}".`, true);
       return false;
@@ -424,7 +434,7 @@ export function createShaderDocumentController({
       filename,
       fixed,
       presetId: null,
-      referencePresetIds: official.presetIds ?? [],
+      referencePresetIds: fixed ? official.presetIds ?? [] : [],
     };
     populatePresets(compiled);
     saveButton.disabled = false;
@@ -444,12 +454,18 @@ export function createShaderDocumentController({
     if (preset) {
       const definitions = getEngine()?.getParameterDefinitions?.() ?? [];
       for (const parameterId of Object.keys(preset.values)) {
-        const names = engineParameterNames(parameterId);
+        // The chain path registers the parameter id itself; the alias names
+        // only serve the pre-spec promoted effects on the fixed path.
+        const names = active.fixed ? engineParameterNames(parameterId) : [parameterId];
         const definition = definitions.find(
           (/** @type {ParameterDefinition} */ candidate) => names.includes(candidate.name));
         if (!definition) continue;
-        if (definition.options && fieldSegment(parameterId) === 'palette-mapping') {
-          preset.values[parameterId] = definition.options[definition.value]?.toLowerCase();
+        if (definition.options && typeof preset.values[parameterId] === 'string') {
+          // A document enum value is the option id; the fixed path's Palette
+          // Mapping labels are Title Case spellings of it, the chain path's
+          // options are the ids themselves.
+          const option = definition.options[definition.value];
+          preset.values[parameterId] = active.fixed ? option?.toLowerCase() : option;
         } else {
           preset.values[parameterId] = definition.value;
         }

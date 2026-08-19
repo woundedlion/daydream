@@ -34,6 +34,20 @@
     "parameters": [
       {
         "classification": "preset",
+        "default": 1,
+        "domain": {
+          "maximum": 1,
+          "minimum": 0
+        },
+        "id": "camera.wander",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "blend"
+      },
+      {
+        "classification": "preset",
         "default": "none",
         "domain": {
           "values": [
@@ -261,20 +275,6 @@
         },
         "storage": "enum8",
         "unit": "mode"
-      },
-      {
-        "classification": "preset",
-        "default": 1,
-        "domain": {
-          "maximum": 1,
-          "minimum": 0
-        },
-        "id": "project.camera-wander",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "blend"
       },
       {
         "classification": "preset",
@@ -539,7 +539,7 @@
         "project.pole-fade",
         "project.projection-spin-speed",
         "project.projection-wander",
-        "project.camera-wander",
+        "camera.wander",
         "warp2.speed",
         "warp2.rotation",
         "warp2.cell-x",
@@ -630,6 +630,7 @@
         "display_name": "Coupled Grid",
         "preset_id": "coupled-grid",
         "values": {
+          "camera.wander": 1,
           "colorize.brightness-envelope": "none",
           "colorize.hue-noise-scale": 1.472156286239624,
           "colorize.hue-noise-speed": 0,
@@ -645,7 +646,6 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "dodecahedral",
-          "project.camera-wander": 1,
           "project.pole-fade": 3.431999921798706,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 1,
@@ -669,6 +669,7 @@
         "display_name": "Direct Grid",
         "preset_id": "direct-grid",
         "values": {
+          "camera.wander": 1,
           "colorize.brightness-envelope": "none",
           "colorize.hue-noise-scale": 1.472156286239624,
           "colorize.hue-noise-speed": 0,
@@ -684,7 +685,6 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "dodecahedral",
-          "project.camera-wander": 1,
           "project.pole-fade": 3.431999921798706,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 1,
@@ -708,6 +708,7 @@
         "display_name": "Double Map",
         "preset_id": "double-map",
         "values": {
+          "camera.wander": 1,
           "colorize.brightness-envelope": "none",
           "colorize.hue-noise-scale": 1.472156286239624,
           "colorize.hue-noise-speed": 0,
@@ -723,7 +724,6 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "dodecahedral",
-          "project.camera-wander": 1,
           "project.pole-fade": 3.431999921798706,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 0.16500000655651093,
@@ -747,6 +747,7 @@
         "display_name": "Stretched Grid",
         "preset_id": "stretched-grid",
         "values": {
+          "camera.wander": 1,
           "colorize.brightness-envelope": "none",
           "colorize.hue-noise-scale": 1.472156286239624,
           "colorize.hue-noise-speed": 0,
@@ -762,7 +763,6 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "dodecahedral",
-          "project.camera-wander": 1,
           "project.pole-fade": 3.431999921798706,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 0.16500000655651093,

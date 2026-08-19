@@ -53,6 +53,7 @@ tools/solids.html
 tools/tools.css
 tools/tailwind.css
 tools/banner.js
+tools/chain_apply.js
 tools/chain_document_store.js
 tools/clipboard.js
 tools/copy_text.js

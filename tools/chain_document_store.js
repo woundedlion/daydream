@@ -58,8 +58,10 @@ const parameterFromField = (label, field) => {
       default: field.default,
     };
   }
-  const kind = field.curve === 'LOG_POSITIVE' || field.curve === 'SHORTEST_PERIODIC'
-    ? field.curve : 'LINEAR';
+  // Catalog curves are lowercase kebab; document interpolation kinds keep
+  // their own uppercase vocabulary.
+  const kind = field.curve === 'log-positive' ? 'LOG_POSITIVE'
+    : field.curve === 'shortest-periodic' ? 'SHORTEST_PERIODIC' : 'LINEAR';
   return {
     id: `${label}.${field.id}`,
     classification: 'preset',

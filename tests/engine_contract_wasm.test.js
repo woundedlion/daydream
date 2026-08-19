@@ -109,6 +109,92 @@ test('holosphere_wasm.d.ts declares the engine statics the app calls', () => {
     + '`new () => HolosphereEngine` declares it out of existence');
   assert.equal(typeof M.HolosphereEngine.getSupportedResolutions, 'function',
     'the module must expose getSupportedResolutions on the constructor');
+  assert.match(decl, /getShaderChainCatalog\s*\(/,
+    'the catalog pin below reads this static; the declarations must carry it');
+  assert.equal(typeof M.HolosphereEngine.getShaderChainCatalog, 'function',
+    'the module must expose getShaderChainCatalog on the constructor');
+});
+
+// The catalog is the contract the document compiler, the chain editor's
+// budgets and the fake chain engine all validate against; this pin is what
+// keeps the committed copy the engine's own export rather than a hand edit.
+test('getShaderChainCatalog matches the committed shader/engine_catalog.json', () => {
+  const pinned = readFileSync(
+    new URL('../shader/engine_catalog.json', import.meta.url), 'utf8');
+  assert.equal(pinned, `${M.HolosphereEngine.getShaderChainCatalog()}\n`,
+    'shader/engine_catalog.json must be the module export plus its trailing '
+    + 'newline — re-pin the catalog from the installed module');
+});
+
+// The default ShaderChain program, spelled as the payload setShaderChain
+// takes. tools/chain_apply.js drives exactly this call shape.
+const DEFAULT_CHAIN = [
+  { instance: 'camera', operator: 'sphere.rotate.v2' },
+  { instance: 'project', operator: 'project.stereographic.v2' },
+  { instance: 'sample', operator: 'sample.grid.v2' },
+  { instance: 'colorize', operator: 'colorize.generated-palette.v2' },
+];
+
+test('setShaderChain applies a chain, registers label.field params and bumps the generation', () => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('ShaderChain'), M.EffectSetResult.INSTALLED,
+    'the chain interpreter effect must be registered in the WASM build');
+
+  const before = engine.getParamGeneration();
+  const applied = engine.setShaderChain(DEFAULT_CHAIN);
+  assert.equal(applied.code, 'APPLIED', 'the default chain must compile');
+  assert.equal(applied.entryIndex, -1, 'APPLIED blames no entry');
+  assert.notEqual(engine.getParamGeneration(), before,
+    'an APPLIED setShaderChain must bump the param generation, or a stale '
+    + 'definitions snapshot cannot be detected');
+
+  const defs = engine.getParameterDefinitions();
+  assert.ok(defs.length > 0, 'the applied chain must register parameters');
+  const misnamed = Array.from(defs, (d) => d.name)
+    .filter((name) => !/^[a-z][a-z0-9-]*\.[a-z0-9-]+$/.test(name));
+  assert.deepEqual(misnamed.slice(0, 5), [],
+    `${misnamed.length} chain params are not instance.field names`);
+  assert.ok(defs.some((d) => d.name === 'camera.wander'),
+    'the camera instance must register its wander field');
+  const coverage = defs.find((d) => d.name === 'sample.coverage-mode');
+  assert.ok(coverage, 'the sample instance must register its topology enum');
+  const catalog = JSON.parse(M.HolosphereEngine.getShaderChainCatalog());
+  const field = catalog.operators.find((op) => op.id === 'sample.grid.v2')
+    .params.find((p) => p.id === 'coverage-mode');
+  assert.deepEqual(Array.from(coverage.options), field.values,
+    'a topology enum must offer the catalog values as its options, in order');
+
+  assert.equal(engine.setParameter('sample.pattern-freq', 3),
+    M.ParamSetResult.APPLIED, 'a chain param must be writable by its id');
+  assert.equal(engine.setClip(0, W, 0, H), M.ClipSetResult.APPLIED);
+  engine.drawFrame();
+  assert.ok(engine.getPixels().some((v) => v !== 0),
+    'the applied chain must render a nonzero frame');
+});
+
+test('setShaderChain refuses transactionally and names the offending entry', () => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('ShaderChain'), M.EffectSetResult.INSTALLED);
+  assert.equal(engine.setShaderChain(DEFAULT_CHAIN).code, 'APPLIED');
+  const generation = engine.getParamGeneration();
+  const names = Array.from(engine.getParameterDefinitions(), (d) => d.name);
+
+  const unknown = engine.setShaderChain([
+    { instance: 'camera', operator: 'sphere.rotate.v2' },
+    { instance: 'project', operator: 'project.unknown.v9' },
+    { instance: 'sample', operator: 'sample.grid.v2' },
+    { instance: 'colorize', operator: 'colorize.generated-palette.v2' },
+  ]);
+  assert.equal(unknown.code, 'UNKNOWN_OPERATOR');
+  assert.equal(unknown.entryIndex, 1,
+    'the refusal must name the entry that failed the lookup');
+  assert.equal(engine.getParamGeneration(), generation,
+    'a refused chain must not bump the generation');
+  assert.deepEqual(Array.from(engine.getParameterDefinitions(), (d) => d.name),
+    names, 'a refused chain must leave the active program registered');
+
+  assert.equal(engine.setShaderChain('nonsense').code, 'MALFORMED_PAYLOAD',
+    'a non-array payload is refused at the boundary, never a trap');
 });
 
 test('the module ParamSetResult enum matches the fake_engine.js mirror', () => {

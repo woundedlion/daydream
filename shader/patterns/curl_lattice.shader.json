@@ -35,6 +35,20 @@
           "maximum": 1,
           "minimum": 0
         },
+        "id": "camera.wander",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "blend"
+      },
+      {
+        "classification": "preset",
+        "default": 1,
+        "domain": {
+          "maximum": 1,
+          "minimum": 0
+        },
         "id": "colorize.brightness-depth",
         "interpolation": {
           "kind": "LINEAR"
@@ -248,20 +262,6 @@
         },
         "storage": "binary32",
         "unit": "opacity"
-      },
-      {
-        "classification": "preset",
-        "default": 1,
-        "domain": {
-          "maximum": 1,
-          "minimum": 0
-        },
-        "id": "project.camera-wander",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "blend"
       },
       {
         "classification": "preset",
@@ -503,7 +503,7 @@
         "project.central-meridian",
         "project.projection-spin-speed",
         "project.projection-wander",
-        "project.camera-wander",
+        "camera.wander",
         "surface.scale",
         "surface.strength",
         "surface.speed",
@@ -575,6 +575,7 @@
         "display_name": "Dense Curl",
         "preset_id": "dense-curl",
         "values": {
+          "camera.wander": 1,
           "colorize.brightness-depth": 1,
           "colorize.brightness-envelope": "cup",
           "colorize.hue-noise-scale": 2,
@@ -590,7 +591,6 @@
           "colorize.phase-oscillation-speed": 0,
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
-          "project.camera-wander": 1,
           "project.central-meridian": 0,
           "project.pole-fade": 20,
           "project.projection-spin-speed": 0,
@@ -612,6 +612,7 @@
         "display_name": "Open Curl",
         "preset_id": "open-curl",
         "values": {
+          "camera.wander": 1,
           "colorize.brightness-depth": 1,
           "colorize.brightness-envelope": "cup",
           "colorize.hue-noise-scale": 2,
@@ -627,7 +628,6 @@
           "colorize.phase-oscillation-speed": 0,
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
-          "project.camera-wander": 1,
           "project.central-meridian": 0,
           "project.pole-fade": 20,
           "project.projection-spin-speed": 0,

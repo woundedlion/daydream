@@ -368,7 +368,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │       ├── FastNoiseLite.h         Single-header noise library
 │       └── FastNoiseLite_config.h  FastNoiseLite build configuration
 │
-├── effects/                    40 headers covering 37 effects plus shared bases:
+├── effects/                    41 headers covering 37 effects plus shared bases:
 │                                BZReactionDiffusion.h, HopfFibration.h, IslamicStars.h,
 │                                Raymarch.h, …; the shared composed-effect base is
 │                                core/render/pullback/composed_effect.h — see §9
@@ -440,10 +440,11 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── effect_roster.mjs       Shared HS_EFFECT_LIST / REGISTER_EFFECT parser for the roster tools
 │   ├── effect_roster.test.mjs  Node unit test for both roster parsers
 │   ├── check_effect_roster.mjs Cross-checks HS_EFFECT_LIST against the REGISTER_EFFECT calls (CI)
-│   ├── shader_workbench.mjs    Fixed-pipeline document validation and canonical identity
+│   ├── shader_workbench.mjs    Chain-document validation and canonical identity (daydream mirror)
 │   ├── shader_workbench_cli.mjs Command-line validator for shader workbench documents
 │   ├── shader_workbench.test.mjs Node contract tests for the shader workbench
 │   ├── generate_promoted_shader_documents.mjs Generates canonical promoted-effect documents
+│   ├── engine_catalog.json     Operator catalog behind chain validation (daydream mirror)
 │   ├── sha256.mjs              Shared SHA-256 implementation for shader documents
 │   ├── wasm_smoke.mjs          Runtime WASM smoke: drives every effect at both resolutions (CI)
 │   ├── wasm_smoke_predicates.mjs Module-free smoke decisions: dark band, stack creep budget, param zip
@@ -595,6 +596,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── browser-smoke.mjs       Headless-Chrome smoke for every manifest-served page
 │   ├── count-assertions.mjs    NODE_OPTIONS shim counting each test file's node:assert calls
 │   ├── generate-importmap.mjs  Bakes the local-vs-CDN decision into vendor-importmap.js
+│   ├── generate-shader-v2-documents.mjs  Regenerates the v2 pattern documents and digest-migration table from the v1 fixtures
 │   ├── record-module-loads.mjs NODE_OPTIONS shim recording loaded test modules
 │   ├── report-cases.mjs        node:test reporter tallying per-file case and skip counts
 │   ├── require-tests.mjs       `pretest` guard: fails below the committed test-file floor

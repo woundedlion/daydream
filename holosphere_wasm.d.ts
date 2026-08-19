@@ -185,6 +185,15 @@ export interface HolosphereEngine {
   strobeColumns(): boolean;
   /** Effect name to hint size at the active resolution; empty at an unsupported one. */
   getEffectSizes(): Record<string, number>;
+  /**
+   * Programs the ShaderChain effect with an ordered operator chain. APPLIED
+   * rebuilds the parameter definitions (named `instance.field`) and bumps the
+   * param generation before returning; any other code refuses transactionally,
+   * with entryIndex naming the offending entry (-1 = the whole chain).
+   */
+  setShaderChain(
+    entries: Array<{ instance: string; operator: string }>,
+  ): { code: string; entryIndex: number };
   /** Embind destructor: releases the C++ instance the handle points at. */
   delete(): void;
 }
@@ -194,6 +203,11 @@ export interface HolosphereModule {
     new (): HolosphereEngine;
     /** Buildable [w, h] rows; the app narrows its resolution presets to these. */
     getSupportedResolutions(): Array<[number, number]>;
+    /**
+     * The engine's operator catalog as one JSON string, byte-identical (plus
+     * the committed trailing newline) to the shader/engine_catalog.json pin.
+     */
+    getShaderChainCatalog(): string;
   };
   ClipSetResult: {
     APPLIED: EnumValue;

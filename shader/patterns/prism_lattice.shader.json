@@ -38,6 +38,20 @@
     "parameters": [
       {
         "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 1,
+          "minimum": 0
+        },
+        "id": "camera.wander",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
         "default": "none",
         "domain": {
           "values": [
@@ -265,20 +279,6 @@
         },
         "storage": "enum8",
         "unit": "mode"
-      },
-      {
-        "classification": "preset",
-        "default": 0,
-        "domain": {
-          "maximum": 1,
-          "minimum": 0
-        },
-        "id": "project.camera-wander",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
       },
       {
         "classification": "preset",
@@ -557,7 +557,7 @@
         "sample.lattice-softness",
         "sample.lattice-radius",
         "project.pole-fade",
-        "project.camera-wander",
+        "camera.wander",
         "warp1.speed",
         "warp1.radial-scale",
         "warp1.radial-phase",
@@ -618,6 +618,7 @@
         "display_name": "Polar Wave",
         "preset_id": "polar-wave",
         "values": {
+          "camera.wander": 1,
           "colorize.brightness-envelope": "none",
           "colorize.hue-noise-scale": 2,
           "colorize.hue-noise-speed": 0,
@@ -633,7 +634,6 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "pentagonal-prism",
-          "project.camera-wander": 1,
           "project.pole-fade": 2.2730000019073486,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 1,

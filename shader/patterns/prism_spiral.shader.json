@@ -34,6 +34,20 @@
     "parameters": [
       {
         "classification": "preset",
+        "default": 1,
+        "domain": {
+          "maximum": 1,
+          "minimum": 0
+        },
+        "id": "camera.wander",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
         "default": "none",
         "domain": {
           "values": [
@@ -233,20 +247,6 @@
         },
         "storage": "enum8",
         "unit": "mode"
-      },
-      {
-        "classification": "preset",
-        "default": 1,
-        "domain": {
-          "maximum": 1,
-          "minimum": 0
-        },
-        "id": "project.camera-wander",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
       },
       {
         "classification": "preset",
@@ -454,7 +454,7 @@
         "project.pole-fade",
         "project.projection-spin-speed",
         "project.projection-wander",
-        "project.camera-wander",
+        "camera.wander",
         "surface.scale",
         "surface.strength",
         "surface.speed",
@@ -524,6 +524,7 @@
         "display_name": "Prism Spiral",
         "preset_id": "prism-spiral",
         "values": {
+          "camera.wander": 1,
           "colorize.brightness-envelope": "none",
           "colorize.hue-shift-amount": -2.2160000801086426,
           "colorize.hue-shift-mode": "path-length",
@@ -537,7 +538,6 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "hexagonal-prism",
-          "project.camera-wander": 1,
           "project.pole-fade": 1.6269999742507935,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 1,
@@ -557,6 +557,7 @@
         "display_name": "Prism Spiral 2",
         "preset_id": "prism-spiral-2",
         "values": {
+          "camera.wander": 1,
           "colorize.brightness-envelope": "none",
           "colorize.hue-shift-amount": -2.2160000801086426,
           "colorize.hue-shift-mode": "path-length",
@@ -570,7 +571,6 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "hexagonal-prism",
-          "project.camera-wander": 1,
           "project.pole-fade": 1.6269999742507935,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 1,

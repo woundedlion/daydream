@@ -34,6 +34,20 @@
     "parameters": [
       {
         "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 1,
+          "minimum": 0
+        },
+        "id": "camera.wander",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
         "default": "none",
         "domain": {
           "values": [
@@ -233,20 +247,6 @@
           "minimum": 0
         },
         "id": "colorize.value-opacity-low",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
-        "default": 0,
-        "domain": {
-          "maximum": 1,
-          "minimum": 0
-        },
-        "id": "project.camera-wander",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -517,7 +517,7 @@
         "sample.drift",
         "sample.angle-speed",
         "project.pole-fade",
-        "project.camera-wander",
+        "camera.wander",
         "warp1.speed",
         "warp1.rotation",
         "warp1.cell-x",
@@ -574,6 +574,7 @@
         "display_name": "Folded Glitch",
         "preset_id": "folded-glitch",
         "values": {
+          "camera.wander": 1,
           "colorize.brightness-envelope": "none",
           "colorize.hue-noise-scale": 1,
           "colorize.hue-noise-speed": 0,
@@ -588,7 +589,6 @@
           "colorize.phase-oscillation-speed": 0,
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
-          "project.camera-wander": 1,
           "project.hemisphere": "folded",
           "project.pole-fade": 1.399999976158142,
           "sample.angle-speed": 0,

@@ -314,7 +314,8 @@ const validateChain = (chain, catalog, report) => {
       return;
     }
     known.set(entry.label, operator);
-    arenaBytes += budgets.per_op_overhead_bytes + blockBytes(operator.blocks);
+    arenaBytes += budgets.per_op_overhead_bytes + blockBytes(operator.blocks)
+      + (budgets.per_param_name_bytes ?? 0) * operator.params.length;
   });
   if (arenaBytes > budgets.arena_bytes)
     report('BUDGET_EXCEEDED', '$.descriptor.chain',
@@ -822,14 +823,12 @@ const V1_SAMPLE_FIELDS = {
   'lattice-shape': 'lattice-shape',
   'lattice-softness': 'lattice-softness',
   'lattice-radius': 'lattice-radius',
-  'edge-width': 'edge-width',
 };
 
 const V1_PROJECT_FIELDS = new Set([
   'pole-fade',
   'projection-spin-speed',
   'projection-wander',
-  'camera-wander',
   'central-meridian',
 ]);
 
@@ -966,13 +965,28 @@ const v1ParameterTarget = (parameterId, slotsByLabel) => {
     const tail = prefixed[2];
     if (prefixed[1] === 'outer') return bind('warp1', tail);
     if (prefixed[1] === 'inner') return bind('warp2', tail);
-    if (prefixed[1] === 'mobius') return bind('lens', tail);
+    // The engine schema keeps the mobius- prefix in its field ids
+    // (mobius-a-re .. mobius-d-im), so the whole v1 id is the field.
+    if (prefixed[1] === 'mobius') return bind('lens', parameterId);
     const mirror = ['warp2', 'warp1'].find((slotLabel) =>
       slot(slotLabel)?.operator === 'warp.mirror-tile.v2');
     if (!mirror)
       failV1('V1_PARAMETER_UNMAPPED', `parameter.${parameterId}`,
         `Parameter "${parameterId}" binds no mirror-tile warp slot.`);
     return `${mirror}.${tail}`;
+  }
+  // v1 camera-wander lived on the projection slot's parameter list, but the
+  // motion it drives is the camera walk: the engine carries it as
+  // sphere.rotate.v2's wander field.
+  if (parameterId === 'camera-wander') return bind('camera', 'wander');
+  // One v1 'edge-width' had two meanings, told apart by the material coverage
+  // policy: under edge-fade coverage it is the sample stage's projected-
+  // coverage fade width; under value-cutout (which expands to a cutout slot)
+  // it is the cutout transition width, named cutout-softness in the engine
+  // schema.
+  if (parameterId === 'edge-width') {
+    return slot('cutout')
+      ? bind('cutout', 'cutout-softness') : bind('sample', 'edge-width');
   }
   if (parameterId in V1_SURFACE_FIELDS)
     return bind('surface', V1_SURFACE_FIELDS[parameterId]);

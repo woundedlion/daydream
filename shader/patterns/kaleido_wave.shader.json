@@ -34,6 +34,20 @@
     "parameters": [
       {
         "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 1,
+          "minimum": 0
+        },
+        "id": "camera.wander",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
         "default": "none",
         "domain": {
           "values": [
@@ -261,20 +275,6 @@
         },
         "storage": "enum8",
         "unit": "mode"
-      },
-      {
-        "classification": "preset",
-        "default": 0,
-        "domain": {
-          "maximum": 1,
-          "minimum": 0
-        },
-        "id": "project.camera-wander",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
       },
       {
         "classification": "preset",
@@ -507,7 +507,7 @@
         "sample.drift",
         "sample.angle-speed",
         "project.pole-fade",
-        "project.camera-wander",
+        "camera.wander",
         "warp2.speed",
         "warp2.rotation",
         "warp2.cell-x",
@@ -565,6 +565,7 @@
         "display_name": "Twin Wave",
         "preset_id": "twin-wave",
         "values": {
+          "camera.wander": 1,
           "colorize.brightness-envelope": "none",
           "colorize.hue-noise-scale": 2.2033438682556152,
           "colorize.hue-noise-speed": -0.00040800002170726657,
@@ -580,7 +581,6 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "azimuthal",
-          "project.camera-wander": 1,
           "project.pole-fade": 4.9710001945495605,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 1,

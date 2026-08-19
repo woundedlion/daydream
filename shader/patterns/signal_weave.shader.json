@@ -34,6 +34,20 @@
     "parameters": [
       {
         "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 1,
+          "minimum": 0
+        },
+        "id": "camera.wander",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
         "default": "none",
         "domain": {
           "values": [
@@ -233,20 +247,6 @@
           "minimum": 0
         },
         "id": "colorize.value-opacity-low",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
-        "default": 0,
-        "domain": {
-          "maximum": 1,
-          "minimum": 0
-        },
-        "id": "project.camera-wander",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -486,7 +486,7 @@
         "sample.drift",
         "sample.angle-speed",
         "project.pole-fade",
-        "project.camera-wander",
+        "camera.wander",
         "warp1.speed",
         "warp1.strength",
         "warp1.frequency",
@@ -576,6 +576,7 @@
         "display_name": "Signal Weave",
         "preset_id": "signal-weave",
         "values": {
+          "camera.wander": 0.800000011920929,
           "colorize.brightness-envelope": "none",
           "colorize.hue-noise-scale": 0.6304218769073486,
           "colorize.hue-noise-speed": 0,
@@ -590,7 +591,6 @@
           "colorize.phase-oscillation-speed": 0,
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
-          "project.camera-wander": 0.800000011920929,
           "project.pole-fade": 1,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 0,
@@ -612,6 +612,7 @@
         "display_name": "Signal Weave 2",
         "preset_id": "signal-weave-2",
         "values": {
+          "camera.wander": 0.800000011920929,
           "colorize.brightness-envelope": "none",
           "colorize.hue-noise-scale": 0.6304218769073486,
           "colorize.hue-noise-speed": 0,
@@ -626,7 +627,6 @@
           "colorize.phase-oscillation-speed": 0,
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
-          "project.camera-wander": 0.800000011920929,
           "project.pole-fade": 1,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 0,
@@ -648,6 +648,7 @@
         "display_name": "Signal Weave 3",
         "preset_id": "signal-weave-3",
         "values": {
+          "camera.wander": 0.800000011920929,
           "colorize.brightness-envelope": "none",
           "colorize.hue-noise-scale": 0.6304218769073486,
           "colorize.hue-noise-speed": 0,
@@ -662,7 +663,6 @@
           "colorize.phase-oscillation-speed": 0,
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
-          "project.camera-wander": 0.800000011920929,
           "project.pole-fade": 1,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 0,
@@ -684,6 +684,7 @@
         "display_name": "Signal Weave 4",
         "preset_id": "signal-weave-4",
         "values": {
+          "camera.wander": 0.800000011920929,
           "colorize.brightness-envelope": "none",
           "colorize.hue-noise-scale": 0.6304218769073486,
           "colorize.hue-noise-speed": 0,
@@ -698,7 +699,6 @@
           "colorize.phase-oscillation-speed": 0,
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
-          "project.camera-wander": 0.800000011920929,
           "project.pole-fade": 1,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 0,

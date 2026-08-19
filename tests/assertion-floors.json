@@ -11,6 +11,10 @@
     "cases": 18,
     "assertions": 72
   },
+  "tests/chain_apply.test.js": {
+    "cases": 11,
+    "assertions": 30
+  },
   "tests/chain_document_store.test.js": {
     "cases": 27,
     "assertions": 279

@@ -34,6 +34,20 @@
     "parameters": [
       {
         "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 1,
+          "minimum": 0
+        },
+        "id": "camera.wander",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
         "default": "none",
         "domain": {
           "values": [
@@ -261,20 +275,6 @@
         },
         "storage": "enum8",
         "unit": "mode"
-      },
-      {
-        "classification": "preset",
-        "default": 0,
-        "domain": {
-          "maximum": 1,
-          "minimum": 0
-        },
-        "id": "project.camera-wander",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
       },
       {
         "classification": "preset",
@@ -552,7 +552,7 @@
         "sample.drift",
         "sample.angle-speed",
         "project.pole-fade",
-        "project.camera-wander",
+        "camera.wander",
         "warp2.speed",
         "warp2.rotation",
         "warp2.cell-x",
@@ -637,6 +637,7 @@
         "display_name": "Double Map",
         "preset_id": "double-map",
         "values": {
+          "camera.wander": 1,
           "colorize.brightness-envelope": "none",
           "colorize.hue-noise-scale": 1.472156286239624,
           "colorize.hue-noise-speed": 0,
@@ -652,7 +653,6 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "dodecahedral",
-          "project.camera-wander": 1,
           "project.central-meridian": 0,
           "project.pole-fade": 2.140000104904175,
           "project.projection-spin-speed": 0,
@@ -677,6 +677,7 @@
         "display_name": "Fine Grid",
         "preset_id": "fine-grid",
         "values": {
+          "camera.wander": 1,
           "colorize.brightness-envelope": "none",
           "colorize.hue-noise-scale": 1.472156286239624,
           "colorize.hue-noise-speed": 0,
@@ -692,7 +693,6 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "dodecahedral",
-          "project.camera-wander": 1,
           "project.central-meridian": 0,
           "project.pole-fade": 2.140000104904175,
           "project.projection-spin-speed": 0,
@@ -717,6 +717,7 @@
         "display_name": "Open Grid",
         "preset_id": "open-grid",
         "values": {
+          "camera.wander": 1,
           "colorize.brightness-envelope": "none",
           "colorize.hue-noise-scale": 1.472156286239624,
           "colorize.hue-noise-speed": 0,
@@ -732,7 +733,6 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "dodecahedral",
-          "project.camera-wander": 1,
           "project.central-meridian": 0,
           "project.pole-fade": 2.140000104904175,
           "project.projection-spin-speed": 0,
