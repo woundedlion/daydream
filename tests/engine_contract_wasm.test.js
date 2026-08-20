@@ -59,6 +59,15 @@ test('HolosphereEngine exposes the method surface the FakeEngines mock', () => {
 const DTS = readFileSync(new URL('../holosphere_wasm.d.ts', import.meta.url), 'utf8');
 
 /**
+ * Reads a file the engine's LF export is pinned against. A CRLF working-tree
+ * copy holds the same content, so line endings are normalized away and every
+ * other byte still has to match.
+ * @param {URL} url - File to read.
+ * @returns {string} The text, LF-terminated.
+ */
+const readPinned = (url) => readFileSync(url, 'utf8').replaceAll('\r\n', '\n');
+
+/**
  * Body of a named `export interface` declaration, comments stripped.
  * @param {string} name - Interface name.
  * @returns {string} The declaration body.
@@ -119,8 +128,8 @@ test('holosphere_wasm.d.ts declares the engine statics the app calls', () => {
 // budgets and the fake chain engine all validate against; this pin is what
 // keeps the committed copy the engine's own export rather than a hand edit.
 test('getShaderChainCatalog matches the committed shader/engine_catalog.json', () => {
-  const pinned = readFileSync(
-    new URL('../shader/engine_catalog.json', import.meta.url), 'utf8');
+  const pinned = readPinned(
+    new URL('../shader/engine_catalog.json', import.meta.url));
   assert.equal(pinned, `${M.HolosphereEngine.getShaderChainCatalog()}\n`,
     'shader/engine_catalog.json must be the module export plus its trailing '
     + 'newline — re-pin the catalog from the installed module');
