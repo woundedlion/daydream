@@ -8,7 +8,8 @@
  * layout nor pointer capture, so it can see neither where a palette lands on
  * screen nor that a captured press swallows the click behind it. Those need a
  * browser: palette placement is measured against the control that opened it, and
- * every gesture below is a genuine mouse down/move/up.
+ * every gesture below is a genuine mouse down/move/up — including the press on a
+ * chip's own slider, which the chip drag must leave alone.
  */
 import puppeteer from 'puppeteer-core';
 
@@ -33,6 +34,14 @@ const DRAG_STEPS = 16;
 // Travel that arms a drag: past the strip's slop, so the press stops reading as
 // a click and the drop targets take their live sizes.
 const DRAG_ARM_PX = 8;
+
+// Where along a slider's track the probe clicks, and the value that lands there.
+const SLIDER_FRACTION = 0.75;
+
+// Slack between the slider's own value and the one the exported document
+// carries: the two are the same number through a JSON round trip, so this only
+// absorbs the export's own binary32 rounding.
+const VALUE_TOLERANCE = 1e-4;
 
 /**
  * @param {import('puppeteer-core').Page} tab - The page under test.
@@ -104,6 +113,27 @@ async function paletteOffsetFrom(tab, selector) {
 }
 
 /**
+ * Clicks Save and reads back the document it exported, by capturing the blob
+ * the download is built from rather than waiting on a file.
+ * @param {import('puppeteer-core').Page} tab - The page under test.
+ * @returns {Promise<*>} The exported document.
+ */
+async function savedDocument(tab) {
+  await tab.evaluate(() => {
+    const create = URL.createObjectURL.bind(URL);
+    Object.assign(window, { exported: [] });
+    URL.createObjectURL = (blob) => {
+      window.exported.push(blob.text());
+      return create(blob);
+    };
+  });
+  await (await tab.waitForSelector('#shader-document-save')).click();
+  const source = await tab.evaluate(async () => (await Promise.all(window.exported)).at(-1));
+  if (typeof source !== 'string') throw new Error('Save exported no document');
+  return JSON.parse(source);
+}
+
+/**
  * Runs every gesture check against a loaded workbench.
  * @param {import('puppeteer-core').Page} tab - The page under test.
  * @returns {Promise<string[]>} One line per failure; empty when all pass.
@@ -170,6 +200,34 @@ async function probeStrip(tab) {
   const reordered = await bandChipNames(tab, 'sphere');
   check(reordered.join() === [...sphere].reverse().join(),
     `dragging a chip past another reorders the band (${reordered.join(', ')})`);
+
+  check(await tab.$('#parameter-dock') === null && await tab.$('.parameter-dock') === null,
+    'the parameter dock is gone: a stage is tuned on its own chip');
+
+  // The selected chip is the expanded one, and it carries the controls the
+  // document declares for that instance.
+  const chip = '.chain-chip[data-label="rotate"]';
+  await (await tab.waitForSelector(`${chip} .chain-chip-name`)).click();
+  const controls = await tab.$$eval(`${chip} .chain-param`,
+    (nodes) => nodes.map((node) => node.dataset.parameter ?? ''));
+  check(controls.join() === 'rotate.wander,rotate.spin-speed',
+    `clicking a chip expands it onto its own controls (${controls.join(', ') || 'none'})`);
+  check(await tab.$eval(`${chip} .chain-chip-disclosure`,
+    (node) => node.getAttribute('aria-expanded')) === 'true',
+  'the expanded chip reports itself expanded');
+
+  // A press on a slider must reach the slider: the chip's drag capture would
+  // otherwise swallow it and the stage could not be tuned at all.
+  const track = `${chip} .chain-param[data-parameter="rotate.wander"] .chain-param-control`;
+  const slider = await boxOf(tab, track);
+  await tab.mouse.click(slider.x + slider.width * SLIDER_FRACTION, centre(slider).y);
+  const shown = Number(await tab.$eval(track, (node) => node.value));
+  check(Math.abs(shown - SLIDER_FRACTION) < 0.05,
+    `clicking a chip's slider moves it (wander ${shown})`);
+
+  const stored = (await savedDocument(tab)).preset_bank.presets[0].values['rotate.wander'];
+  check(Math.abs(stored - shown) < VALUE_TOLERANCE,
+    `the control's value round-trips into the saved document (${stored})`);
 
   return failures;
 }
