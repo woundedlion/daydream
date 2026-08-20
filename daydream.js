@@ -592,7 +592,7 @@ export function start({
         : null;
       applyNotice.show(notice, SWITCH_NOTICE);
     },
-    guiContainer: () => doc.getElementById('gui-container'),
+    guiContainer: () => shaderWorkbench ? null : doc.getElementById('gui-container'),
     isMobile: () => daydream.isMobile,
     dragTarget: win,
     focusedElement: () => doc.activeElement,
@@ -651,6 +651,11 @@ export function start({
     },
     syncEffectGui: () => effectGui.sync(),
     invalidate: () => daydream.invalidate(),
+    getAnimationsPaused: () => host.engine.getAnimationsPaused?.() ?? null,
+    setAnimationsPaused: (paused) => {
+      host.engine.setAnimationsPaused(paused);
+      segments.setAnimationsPaused(paused);
+    },
     setParamFilter: (filter) => { paramFilterRef.current = filter; },
     initialEffect: requestedSelection.effect,
   }) : null;

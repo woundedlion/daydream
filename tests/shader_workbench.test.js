@@ -35,7 +35,7 @@ test('simulator exposes Shader as a standalone tool', () => {
   assert.match(WORKBENCH, /data-daydream-mode="shader-workbench"/);
   assert.match(WORKBENCH, /src="\.\.\/main\.js"/);
   assert.match(WORKBENCH, /id="chain-strip"/);
-  assert.match(WORKBENCH, /id="chain-library"/);
+  assert.doesNotMatch(WORKBENCH, /id="chain-library"/);
   assert.match(WORKBENCH, /id="gui-container"/);
   assert.match(WORKBENCH, /id="shader-document-select"/);
   assert.match(WORKBENCH, /id="shader-preset-select"/);
@@ -43,6 +43,7 @@ test('simulator exposes Shader as a standalone tool', () => {
   assert.match(WORKBENCH, /id="shader-document-save"/);
   assert.match(WORKBENCH, /id="shader-document-save-as"/);
   assert.match(WORKBENCH, /id="shader-parity-toggle"/);
+  assert.match(WORKBENCH, /id="shader-animation-toggle"/);
   assert.match(WORKBENCH, /id="shader-document-digest"/);
   assert.doesNotMatch(WORKBENCH, /data-workbench-folder/,
     'the folder banks are replaced by the pipeline strip');
@@ -65,11 +66,10 @@ test('simulator exposes Shader as a standalone tool', () => {
 // document status output is the one live region the strip and library announce
 // through. The global controls keep the floating panel every other page mounts,
 // inside the main area so it covers the canvas and nothing else.
-test('the workbench page lays out the toolbar, strip, canvas and library', () => {
+test('the workbench page lays out the toolbar, pipeline and canvas', () => {
   const region = (/** @type {RegExp} */ pattern) => WORKBENCH.search(pattern);
   assert.ok(region(/id="shader-toolbar"/) < region(/id="chain-strip"/));
   assert.ok(region(/id="chain-strip"/) < region(/<main class="main-area"/));
-  assert.ok(region(/<main class="main-area"/) < region(/id="chain-library"/));
   assert.ok(region(/id="canvas-container"/) < region(/<\/main>/),
     'the canvas is what the main area holds');
   assert.ok(region(/id="canvas-container"/) < region(/id="gui-container"/)
@@ -82,8 +82,8 @@ test('the workbench page lays out the toolbar, strip, canvas and library', () =>
   'the engine memory and compute stats stay in the toolbar row');
   assert.match(WORKBENCH,
     /id="shader-document-status"[^>]*role="status"[^>]*aria-live="polite"/);
-  assert.match(WORKBENCH_CSS, /\.chain-strip-region\[data-expanded="true"\] \{/,
-    'an expanded chip scrolls the strip rather than crushing the bands');
+  assert.match(WORKBENCH_CSS, /\.chain-strip-region\s*\{[\s\S]*overflow-x:\s*auto/,
+    'expanded chips scroll rather than crushing the bands');
   assert.match(WORKBENCH_CSS, /\[data-carrier="color"\]/,
     'each carrier domain carries its own hue');
 });
@@ -671,14 +671,21 @@ function compiledBuildEngine() {
 async function editorWorkbench({ source = HEX_WAVE, migration = EMPTY_MIGRATION } = {}) {
   const engine = new FakeChainEngine();
   const compiledEngine = compiledBuildEngine();
+  let animationsPaused = false;
+  const animationWrites = [];
+  const writeParameter = engine.setParameter.bind(engine);
+  engine.setParameter = (name, value) => {
+    animationsPaused = true;
+    return writeParameter(name, value);
+  };
   let current = engine;
   const ids = ['shader-document-select', 'shader-preset-select',
     'shader-document-open', 'shader-document-save', 'shader-document-file',
     'shader-document-status', 'shader-document-digest', 'shader-parity-toggle',
-    'shader-document-save-as'];
+    'shader-animation-toggle', 'shader-document-save-as'];
   const elements = new Map(ids.map((id) =>
     [id, fakeElement(id.endsWith('select') ? 'select' : 'div')]));
-  for (const mount of ['chain-strip', 'chain-library']) {
+  for (const mount of ['chain-strip']) {
     const element = fakeElement('section');
     element.setPointerCapture = () => {};
     element.hasPointerCapture = () => true;
@@ -706,6 +713,11 @@ async function editorWorkbench({ source = HEX_WAVE, migration = EMPTY_MIGRATION 
     },
     syncEffectGui: () => { ran.gui += 1; },
     invalidate: () => { ran.invalidated += 1; },
+    getAnimationsPaused: () => animationsPaused,
+    setAnimationsPaused: (paused) => {
+      animationsPaused = paused;
+      animationWrites.push(paused);
+    },
     setParamFilter: (filter) => filters.push(filter),
     fetchText: async (url) => {
       const name = String(url).split('/').pop();
@@ -722,6 +734,7 @@ async function editorWorkbench({ source = HEX_WAVE, migration = EMPTY_MIGRATION 
     assert.equal(await controller.loadSource(source, 'study.shader.json'), true);
   return {
     controller, engine, compiledEngine, elements, downloads, selections, filters, ran,
+    animationWrites, animationsPaused: () => animationsPaused,
   };
 }
 
@@ -744,8 +757,6 @@ function clickPlaneBandEntry(harness, operatorId) {
 
 const stripChips = (harness) =>
   harness.elements.get('chain-strip').querySelectorAll('.chain-chip');
-const libraryEntries = (harness) =>
-  harness.elements.get('chain-library').querySelectorAll('.chain-library-entry');
 
 // §4.5: the workbench opens on a valid, rendering document with the whole
 // authoring surface live — the scratch chain is edited exactly like a load.
@@ -775,7 +786,6 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
   assert.equal(harness.engine.chainCalls.length, 2);
   assert.equal(harness.engine.chainCalls.at(-1).length, 7);
   assert.equal(stripChips(harness).length, 7);
-  assert.equal(libraryEntries(harness).length, 34);
   assert.equal(harness.elements.get('shader-document-digest').textContent,
     harness.elements.get('shader-document-digest').dataset.digest.slice(0, 12),
     'the toolbar shows the digest abbreviated and carries the whole of it');
@@ -793,6 +803,26 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
   assert.equal(saved.descriptor.chain.length, 8);
   assert.ok(Object.keys(saved.preset_bank.presets[0].values)
     .some((id) => id.startsWith('warp1.')));
+});
+
+test('preset and stage writes preserve the animation state', async () => {
+  const harness = await editorWorkbench();
+  const toggle = harness.elements.get('shader-animation-toggle');
+  assert.equal(harness.animationsPaused(), false,
+    'preset writes do not leave the chain frozen');
+  assert.equal(toggle.disabled, false);
+  assert.equal(toggle.textContent, 'Pause animation');
+
+  stageEditor(harness, 'sample')('sample.pattern-freq', 7);
+  assert.equal(harness.animationsPaused(), false,
+    'an inline stage edit restores the running state after the engine write');
+
+  toggle.dispatch('click');
+  assert.equal(harness.animationsPaused(), true);
+  assert.equal(toggle.textContent, 'Resume animation');
+  stageEditor(harness, 'sample')('sample.pattern-freq', 8);
+  assert.equal(harness.animationsPaused(), true,
+    'an edit also preserves an intentional pause');
 });
 
 // §4.6/§4.8: a descriptor edit breaks the match with the promoted
@@ -884,50 +914,34 @@ test('a Save As copy carries the edits made since the load', async () => {
     validateShaderDocument(copy, { catalog: JSON.parse(ENGINE_CATALOG) }), []);
 });
 
-test('selecting a chip expands its controls without disabling the library', async () => {
+test('stage controls stay expanded and source function is directly selectable', async () => {
   const harness = await editorWorkbench();
-  assert.deepEqual(harness.filters.at(-1), { external: true },
-    'the panel renders none of the chain\'s parameters: the chips do');
-
-  stripChips(harness).find((chip) => chip.dataset.label === 'lens').dispatch('click');
-
   const lens = stripChips(harness).find((chip) => chip.dataset.label === 'lens');
-  assert.equal(lens.getAttribute('aria-current'), 'true');
   assert.deepEqual(lens.querySelectorAll('.chain-param')
-    .map((row) => row.dataset.parameter), ['lens.symmetry'],
-  'the selected chip carries its own stage\'s controls');
+    .map((row) => row.dataset.parameter), ['lens.symmetry']);
 
-  // §4.3: the selection sits in the sphere band, which no plane stage fits, but
-  // the plane band does — so the entry stays live and the click lands there.
-  const entryFor = (/** @type {string} */ id) =>
-    libraryEntries(harness).find((entry) => entry.dataset.operator === id);
-  assert.equal(entryFor('warp.wave-shear.v2').getAttribute('aria-disabled'), null);
-  assert.equal(entryFor('sphere.lens.mobius.v2').getAttribute('aria-disabled'), null);
+  const source = stripChips(harness).find((chip) => chip.dataset.label === 'sample');
+  const select = source.querySelector('.chain-chip-replace');
+  assert.equal(select.getAttribute('aria-label'), 'Source function');
+  assert.equal(select.options.every((option) => option.value.startsWith('sample.')), true);
+  select.value = 'sample.rings.v2';
+  select.dispatch('change');
 
-  const crossing = entryFor('project.stereographic.v2');
-  assert.equal(crossing.getAttribute('aria-disabled'), null,
-    'a crossing fills no gap, but the socket over its pair replaces it');
-  assert.match(crossing.querySelector('.chain-library-reason').textContent,
-    /swaps the sphere → plane socket/);
-
-  entryFor('warp.wave-shear.v2').dispatch('click');
-
-  assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator)
-    .filter((id) => id.startsWith('warp.')),
-  ['warp.wave-shear.v2', 'warp.mirror-tile.v2'],
-  'the click inserted at the first plane gap, ahead of the band\'s own stage');
+  assert.ok(harness.engine.chainCalls.at(-1)
+    .some((entry) => entry.operator === 'sample.rings.v2'));
 });
 
-// §4.7: one live region for every refusal. A gap's palette carries the whole
-// catalog, so the cheapest refusal to provoke is an entry whose carrier that gap
-// does not, and it has to land where the document status does.
-test('a palette refusal is announced in the shared status region', async () => {
+test('an add menu omits stages that are invalid at its gap', async () => {
   const harness = await editorWorkbench();
-  clickPlaneBandEntry(harness, 'sphere.rotate.v2');
-
-  const status = harness.elements.get('shader-document-status');
-  assert.equal(status.dataset.status, 'error');
-  assert.match(status.textContent, /consumes the sphere carrier/);
+  const plane = harness.elements.get('chain-strip').querySelectorAll('.chain-band')
+    .find((band) => band.dataset.carrier === 'plane');
+  plane.querySelector('.chain-band-add').dispatch('click');
+  const entries = harness.elements.get('chain-strip')
+    .querySelectorAll('.chain-palette-entry');
+  assert.equal(entries.some((entry) => entry.dataset.operator === 'sphere.rotate.v2'),
+    false);
+  assert.equal(entries.every((entry) => entry.getAttribute('aria-disabled') === null),
+    true);
 });
 
 test('a bypass reshapes the engine program while the saved document keeps the stage', async () => {
