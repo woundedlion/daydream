@@ -120,7 +120,9 @@ class JsonReader {
 
   object(depth, path) {
     ++this.index;
-    const result = {};
+    // Null-prototype: a "__proto__" key must land as an own key rather than run
+    // the prototype setter, which hides it from Object.keys and skews `in`.
+    const result = Object.create(null);
     const keys = new Set();
     this.space();
     if (this.source[this.index] === '}') {
@@ -635,7 +637,8 @@ export function validateShaderDocument(document, options = {}) {
 const canonicalValue = (value) => {
   if (Array.isArray(value)) return value.map(canonicalValue);
   if (value !== null && typeof value === 'object') {
-    const result = {};
+    // Null-prototype: an own "__proto__" key is copied, not applied.
+    const result = Object.create(null);
     for (const key of Object.keys(value).map((key) => key.normalize('NFC')).sort(codePointCompare))
       result[key] = canonicalValue(value[key]);
     return result;
@@ -1042,7 +1045,8 @@ export function expandV1Document(document, catalog) {
   const slotsByLabel = new Map(slots.map((slot) => [slot.label, slot]));
   const chain = slots.map((slot) => ({ label: slot.label, operator: slot.operator }));
 
-  const parameterIds = {};
+  // Null-prototype: rewriteId's `in` must answer for mapped ids only.
+  const parameterIds = Object.create(null);
   const parameters = array(descriptor.parameters, '$.descriptor.parameters').map((parameter) => {
     const target = v1ParameterTarget(id(parameter.id, '$.descriptor.parameters'), slotsByLabel);
     parameterIds[parameter.id] = target;
