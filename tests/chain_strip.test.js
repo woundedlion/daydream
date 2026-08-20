@@ -485,12 +485,43 @@ test('a band with no legal gap refuses the drag and announces why', async () => 
   h.strip.drag.hover({ kind: 'band', carrier: 'plane', x: 10 });
 
   assert.equal(bandFor(h, 'plane').dataset.drop, 'refused');
-  assert.equal(bandFor(h, 'sphere').dataset.drop, undefined);
+  assert.equal(bandFor(h, 'sphere').dataset.drop, 'legal',
+    'the band that does accept it stays marked as a target');
   assert.match(lastAnnounced(h), /carrier/);
   assert.equal(h.strip.drag.drop(), false);
   assert.deepEqual(h.applied, []);
   assert.equal(bandFor(h, 'plane').dataset.drop, undefined,
     'an unwound drag clears the refusing mark');
+});
+
+test('a running drag marks its bands and widens the strip gaps', async () => {
+  const h = await makeStrip();
+  const stripOf = (harness) => harness.container.querySelector('.chain-strip');
+  h.strip.drag.start({ kind: 'operator', operatorId: 'warp.wave-shear.v2' });
+  assert.equal(stripOf(h).dataset.dragging, 'true',
+    'the strip carries the drag so the stylesheet can give the gaps a hit area');
+  assert.deepEqual(h.container.querySelectorAll('.chain-band')
+    .map((band) => band.dataset.drop), [undefined, 'legal', undefined, undefined],
+  'a band holding a legal gap is a coarse drop target from the start');
+
+  h.strip.drag.hover({ kind: 'gap', index: 3 });
+  assert.equal(bandFor(h, 'plane').dataset.drop, 'active',
+    'the band the drop would commit in reads live, not merely legal');
+
+  h.strip.drag.cancel();
+  assert.equal(stripOf(h).dataset.dragging, undefined);
+  assert.deepEqual(h.container.querySelectorAll('.chain-band')
+    .map((band) => band.dataset.drop), [undefined, undefined, undefined, undefined]);
+});
+
+test('only a chip with somewhere to go advertises the reorder', async () => {
+  const h = await makeStrip();
+  assert.deepEqual(chips(h).filter((chip) => chip.dataset.movable === 'true')
+    .map((chip) => chip.dataset.label), ['camera', 'lens'],
+  'the sole chip in a band, and every crossing, can go nowhere');
+  assert.equal(chipByLabel(h, 'camera').getAttribute('title'),
+    'Drag, or Alt+Arrow, to reorder');
+  assert.equal(chipByLabel(h, 'warp2').getAttribute('title'), null);
 });
 
 test('hoverFromPoint resolves gaps, then bands, then nothing', async () => {

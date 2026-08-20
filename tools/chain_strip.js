@@ -539,12 +539,15 @@ export function createChainStrip({
    * @param {ChainEntry} entry - The chain entry.
    * @param {Object} view - Render-pass state.
    * @param {boolean} view.crossing - Whether the operator crosses carriers.
+   * @param {boolean} view.movable - Whether the chip has a gap to move to.
    * @param {string|null} view.selected - The selected label.
    * @param {Set<string>} view.bypassed - The bypassed labels.
    * @param {string|null} view.tabLabel - The roving-tabindex label.
    * @returns {*} The chip element.
    */
-  const chipElement = (index, entry, { crossing, selected, bypassed, tabLabel }) => {
+  const chipElement = (index, entry, {
+    crossing, movable, selected, bypassed, tabLabel,
+  }) => {
     const op = opOf(entry);
     const isSelected = selected === entry.label;
     const isBypassed = bypassed.has(entry.label);
@@ -560,6 +563,10 @@ export function createChainStrip({
     chip.setAttribute('aria-label', `${op.name} · ${entry.label}`
       + (crossing ? `, ${op.input} to ${op.output}` : '')
       + (isBypassed ? ', bypassed' : ''));
+    if (movable) {
+      chip.dataset.movable = 'true';
+      chip.setAttribute('title', 'Drag, or Alt+Arrow, to reorder');
+    }
 
     const name = el('span', 'chain-chip-name');
     name.textContent = op.name;
@@ -685,14 +692,15 @@ export function createChainStrip({
         element.appendChild(gapElement(gap));
         const chip = band.chips[at];
         if (chip !== undefined) {
-          element.appendChild(chipElement(chip, chain[chip], { crossing: false, ...view }));
+          element.appendChild(chipElement(chip, chain[chip],
+            { crossing: false, movable: band.chips.length > 1, ...view }));
         }
       }
       element.appendChild(bandAddButton(band));
       strip.appendChild(element);
       if (band.socket !== null) {
-        strip.appendChild(
-          chipElement(band.socket, chain[band.socket], { crossing: true, ...view }));
+        strip.appendChild(chipElement(band.socket, chain[band.socket],
+          { crossing: true, movable: false, ...view }));
       }
     }
 
@@ -723,6 +731,9 @@ export function createChainStrip({
     for (const gap of gapElements()) delete gap.dataset.drop;
     for (const band of container.querySelectorAll('.chain-band')) delete band.dataset.drop;
     for (const chip of container.querySelectorAll('.chain-chip')) delete chip.dataset.dragging;
+    for (const strip of container.querySelectorAll('.chain-strip')) {
+      delete strip.dataset.dragging;
+    }
   };
 
   /**
@@ -797,9 +808,12 @@ export function createChainStrip({
       else if (legal.has(index)) gap.dataset.drop = 'legal';
       else delete gap.dataset.drop;
     }
-    for (const band of container.querySelectorAll('.chain-band')) {
-      if (band.dataset.carrier === refused) band.dataset.drop = 'refused';
-      else delete band.dataset.drop;
+    for (const element of container.querySelectorAll('.chain-band')) {
+      const gaps = bandOf(element.dataset.carrier)?.gaps ?? [];
+      if (element.dataset.carrier === refused) element.dataset.drop = 'refused';
+      else if (active !== null && gaps.includes(active)) element.dataset.drop = 'active';
+      else if (gaps.some((gap) => legal.has(gap))) element.dataset.drop = 'legal';
+      else delete element.dataset.drop;
     }
   };
 
@@ -840,6 +854,9 @@ export function createChainStrip({
       }
       dragState = { source, legal, hovered: null };
       markDrop(null, null);
+      for (const strip of container.querySelectorAll('.chain-strip')) {
+        strip.dataset.dragging = 'true';
+      }
       if (source.kind === 'chip') {
         const chip = chipAt(source.index);
         if (chip) chip.dataset.dragging = 'true';
