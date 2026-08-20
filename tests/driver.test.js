@@ -664,6 +664,83 @@ test('a held tick honours captureReady before capturing', () => {
 });
 
 // ---------------------------------------------------------------------------
+// renderMainView
+// ---------------------------------------------------------------------------
+
+/** Minimal `this` for renderMainView: the main pass over a spying renderer.
+ * @param {Array<string>} log - Ordered event sink.
+ * @returns {Object} Context object for prototype.call.
+ */
+function mainCtx(log) {
+  return {
+    scene: { tag: 'scene' },
+    camera: { tag: 'camera' },
+    pipCamera: { tag: 'pipCamera' },
+    mainViewport: { x: 0, y: 0, width: 1200, height: 800 },
+    pipViewport: { x: 960, y: 0, width: 240, height: 240 },
+    renderer: {
+      setViewport: (...a) => log.push(`viewport:${a.join(',')}`),
+      setScissor: (...a) => log.push(`scissor:${a.join(',')}`),
+      render: (scene, camera) => log.push(`render:${scene.tag},${camera.tag}`),
+    },
+  };
+}
+
+test('renderMainView scissors the main pass to the main viewport', () => {
+  const log = [];
+  const ctx = mainCtx(log);
+  Daydream.prototype.renderMainView.call(ctx);
+
+  // The scissor is what confines the pass's own clear: without it the corner the
+  // PiP wrote last frame is never cleared.
+  assert.deepEqual(log, [
+    'viewport:0,0,1200,800',
+    'scissor:0,0,1200,800',
+    'render:scene,camera',
+  ]);
+});
+
+test('renderMainView paints the region setCanvasSize laid out, not the corner', () => {
+  const laid = sizeCtx(1200, 800);
+  resize(laid, 1200, 800);
+
+  const log = [];
+  const ctx = mainCtx(log);
+  ctx.mainViewport = laid.mainViewport;
+  ctx.pipViewport = laid.pipViewport;
+  Daydream.prototype.renderMainView.call(ctx);
+
+  const rect = (v) => `${v.x},${v.y},${v.width},${v.height}`;
+  assert.deepEqual(log, [
+    `viewport:${rect(laid.mainViewport)}`,
+    `scissor:${rect(laid.mainViewport)}`,
+    'render:scene,camera',
+  ]);
+  assert.notEqual(rect(laid.mainViewport), rect(laid.pipViewport),
+    'the two viewports coincide, so this proves nothing');
+});
+
+test('render drives the real main pass inside the scissor test', () => {
+  const log = [];
+  const ctx = Object.assign(renderCtx(new Uint16Array(4), log), mainCtx(log));
+  ctx.renderer.setScissorTest = (on) => log.push(`scissorTest:${on}`);
+  ctx.renderMainView = Daydream.prototype.renderMainView;
+  Daydream.prototype.render.call(ctx, null);
+
+  assert.deepEqual(log, [
+    'controls.update',
+    'updateCullUniforms',
+    'scissorTest:true',
+    'viewport:0,0,1200,800',
+    'scissor:0,0,1200,800',
+    'render:scene,camera',
+    'refreshLabels',
+    'renderPip',
+    'scissorTest:false',
+  ]);
+});
+
+// ---------------------------------------------------------------------------
 // renderPip
 // ---------------------------------------------------------------------------
 
