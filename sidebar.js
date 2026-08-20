@@ -48,7 +48,9 @@ export class EffectSidebar {
     this.win = this.doc?.defaultView ?? globalThis;
     this.onSelect = onSelect;
     this.buttons = new Map();      // name -> button element
+    this.orderedButtons = [];      // buttons in the order they are laid out
     this.items = [];               // [{name, size}]
+    this.gridStride = null;        // measured lazily; see onKeyDown
     this.activeName = null;
     this.sort = { key: 'name', dir: 'asc' };
 
@@ -74,6 +76,10 @@ export class EffectSidebar {
     this.scrollArrowsRaf = 0;
     this.onKeyDownBound = (e) => this.onKeyDown(e);
     this.onScrollBound = () => this.scheduleScrollArrows();
+    this.onResizeBound = () => {
+      this.gridStride = null;
+      this.scheduleScrollArrows();
+    };
     this.listEl.addEventListener('keydown', this.onKeyDownBound);
 
     // Decorative scroll-arrow glyphs — hidden from assistive tech.
@@ -88,7 +94,7 @@ export class EffectSidebar {
     this.arrowRight.setAttribute('aria-hidden', 'true');
 
     this.listEl.addEventListener('scroll', this.onScrollBound, { passive: true });
-    this.resizeObs = new this.win.ResizeObserver(this.onScrollBound);
+    this.resizeObs = new this.win.ResizeObserver(this.onResizeBound);
     this.resizeObs.observe(this.listEl);
 
     this.container.appendChild(this.heading);
@@ -113,6 +119,7 @@ export class EffectSidebar {
     this.listEl.removeEventListener('scroll', this.onScrollBound);
     for (const btn of this.buttons.values()) btn.onclick = null;
     this.buttons.clear();
+    this.orderedButtons = [];
     this.nameBtn.onclick = null;
     this.sizeBtn.onclick = null;
     this.listEl.innerHTML = '';
@@ -143,6 +150,7 @@ export class EffectSidebar {
     this.items = [];
     this.listEl.style.gridTemplateRows =
       `repeat(${balancedColumnRows(names.length)}, auto)`;
+    this.gridStride = null;
 
     names.forEach(name => {
       const size = effectSizes ? (effectSizes[name] || 0) : 0;
@@ -176,7 +184,7 @@ export class EffectSidebar {
     this.updateActiveClass();
     this.tabbableBtn = null;
     this.setRovingTabbable(
-      this.buttons.get(this.activeName) || this.listEl.querySelector('.effect-button')
+      this.buttons.get(this.activeName) || this.orderedButtons[0]
     );
     // Only when focus was already in the list: a rebuild driven from elsewhere
     // must not pull it out of whatever the user is on. An option that left the
@@ -334,9 +342,12 @@ export class EffectSidebar {
   applySortOrder() {
     const sorted = sortItems(this.items, this.sort.key, this.sort.dir);
 
+    this.orderedButtons = [];
     sorted.forEach(({ name }) => {
       const btn = this.buttons.get(name);
-      if (btn) this.listEl.appendChild(btn);
+      if (!btn) return;
+      this.listEl.appendChild(btn);
+      this.orderedButtons.push(btn);
     });
   }
 
@@ -372,13 +383,16 @@ export class EffectSidebar {
    * @param {KeyboardEvent} e - The keydown event from the list element.
    */
   onKeyDown(e) {
-    const btns = Array.from(this.listEl.querySelectorAll('.effect-button'));
+    const btns = this.orderedButtons;
     if (!btns.length) return;
 
     const focused = this.doc.activeElement;
     const idx = btns.indexOf(focused);
 
-    const target = navTargetIndex(idx, btns.length, e.key, columnStride(this.listEl));
+    // Measuring the stride forces a style recalc, so it is held until a resize
+    // or a new roster invalidates it.
+    this.gridStride ??= columnStride(this.listEl);
+    const target = navTargetIndex(idx, btns.length, e.key, this.gridStride);
     if (target !== -1) {
       e.preventDefault();
       this.setRovingTabbable(btns[target]);

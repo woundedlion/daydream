@@ -151,7 +151,8 @@ test('sortBy leaves focus on the sort control that drove it', () => {
 
 // sidebar_dom.test.js drives onKeyDown against a hand-built receiver. These go
 // through the listener the constructor registered, so the wiring between the
-// keydown event, the list's own query, and the roving tab stop is covered too.
+// keydown event, the recorded option order, and the roving tab stop is covered
+// too.
 test('Enter on the list selects the focused option and eats the native click', () => {
   const { sidebar, selected } = makeSidebar();
   sidebar.setEffects(['A', 'B'], {});
@@ -182,6 +183,37 @@ test('the list claims the keys it navigates with and passes the rest through', (
   assert.equal(ignored.defaultPrevented, false, 'typing still reaches the page');
   assert.equal(document.activeElement, sidebar.buttons.get('B'), 'focus did not move');
   assert.deepEqual(selected, []);
+});
+
+// Resolving the grid's rows forces a style recalc, which a per-keystroke
+// measurement would pay on every arrow press.
+test('the column stride is measured once per layout, not once per keystroke', () => {
+  const { sidebar } = makeSidebar();
+  sidebar.setEffects(['A', 'B', 'C', 'D'], {});
+  let measured = 0;
+  sidebar.listEl.ownerDocument = {
+    defaultView: {
+      getComputedStyle: () => {
+        measured += 1;
+        return { gridAutoFlow: 'column', gridTemplateRows: '20px 20px' };
+      },
+    },
+  };
+  document.activeElement = sidebar.buttons.get('A');
+
+  sidebar.listEl.dispatch('keydown', { key: 'ArrowRight' });
+  sidebar.listEl.dispatch('keydown', { key: 'ArrowLeft' });
+  sidebar.listEl.dispatch('keydown', { key: 'ArrowRight' });
+
+  assert.equal(measured, 1);
+  assert.equal(document.activeElement, sidebar.buttons.get('C'),
+    'the held stride still crosses columns');
+
+  observers[0].cb();
+  sidebar.listEl.dispatch('keydown', { key: 'ArrowLeft' });
+
+  assert.equal(measured, 2, 'a resize re-measures the layout');
+  assert.equal(document.activeElement, sidebar.buttons.get('A'));
 });
 
 test('setActive toggles active/aria-selected on only the old and new buttons', () => {
