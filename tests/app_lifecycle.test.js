@@ -519,6 +519,22 @@ test('a load that beats the deadline resolves and cancels the timer', async () =
   assert.equal(timers.pending.size, 0);
 });
 
+test('a timer handle that carries unref is unref-ed', async () => {
+  // The fake above answers with a number, as a browser does; Node answers with a
+  // Timeout object, and an armed deadline holding one keeps the process alive.
+  const handle = { unrefs: 0, unref() { this.unrefs += 1; } };
+  const cleared = [];
+  const timers = {
+    setTimeout: () => handle,
+    clearTimeout: (timer) => { cleared.push(timer); },
+  };
+
+  await loadWithDeadline(() => Promise.resolve({ name: 'wasm' }), { ms: 10, timers });
+
+  assert.equal(handle.unrefs, 1);
+  assert.deepEqual(cleared, [handle], 'the handle itself is what gets cleared');
+});
+
 test('a load failure still rejects with its own error', async () => {
   const timers = fakeTimers();
 
