@@ -19,10 +19,6 @@
     "cases": 11,
     "assertions": 30
   },
-  "tests/chain_dock.test.js": {
-    "cases": 6,
-    "assertions": 21
-  },
   "tests/chain_document_store.test.js": {
     "cases": 34,
     "assertions": 331
@@ -68,8 +64,8 @@
     "assertions": 10
   },
   "tests/effect_gui.test.js": {
-    "cases": 108,
-    "assertions": 395
+    "cases": 105,
+    "assertions": 385
   },
   "tests/effect_sequencing.test.js": {
     "cases": 48,
@@ -235,7 +231,7 @@
   },
   "tests/shader_workbench.test.js": {
     "cases": 43,
-    "assertions": 252
+    "assertions": 251
   },
   "tests/shared.test.js": {
     "cases": 15,
@@ -291,11 +287,11 @@
   },
   "tests/tool_pages.test.js": {
     "cases": 10,
-    "assertions": 208
+    "assertions": 206
   },
   "tests/tsconfig_roster.test.js": {
     "cases": 7,
-    "assertions": 132
+    "assertions": 129
   },
   "tests/vendor-importmap.test.js": {
     "cases": 7,

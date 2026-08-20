@@ -4,7 +4,6 @@
  */
 
 import { applyChainDocument } from './chain_apply.js';
-import { createParameterDock, deactivatedParamNames } from './chain_dock.js';
 import { createChainDocumentStore, scratchChainDocument } from './chain_document_store.js';
 import { createChainLibrary } from './chain_library.js';
 import { createChainStrip } from './chain_strip.js';
@@ -191,8 +190,7 @@ function defaultDownload(doc, filename, source) {
  * @param {{doc: Document, getEngine: () => *, getModule: () => *,
  * selectEffect: (effect: string) => boolean,
  * syncEffectGui: () => void, invalidate: () => void,
- * setParamFilter?: (filter: {prefix: string, deactivated?: Function,
- *   onEdit?: (name: string, value: *) => void}|null) => void,
+ * setParamFilter?: (filter: {external: true}|null) => void,
  * fetchText?: (url: string) => Promise<string>, importCompiler?: () => Promise<*>,
  * download?: (filename: string, source: string) => void,
  * initialEffect?: string|null}} dependencies - initialEffect is the effect the
@@ -235,13 +233,11 @@ export function createShaderDocumentController({
     doc.getElementById('shader-parity-toggle'));
   if (!sourceSelect || !presetSelect || !openButton || !saveButton
       || !fileInput || !status) return null;
-  // The pipeline strip, the stage library and the parameter dock mount here on
-  // the workbench page; a page without the mounts (or a compiler without the
-  // validator) previews documents but offers no structural editing.
+  // The pipeline strip and the stage library mount here on the workbench page;
+  // a page without the mounts (or a compiler without the validator) previews
+  // documents but offers no structural editing.
   const stripMount = doc.getElementById('chain-strip');
   const libraryMount = doc.getElementById('chain-library');
-  const dockMount = doc.getElementById('parameter-dock');
-  const dockToggle = doc.getElementById('parameter-dock-toggle');
 
   /** @type {*} */
   let compiler;
@@ -251,7 +247,7 @@ export function createShaderDocumentController({
   let catalog = new Map();
   /** @type {*|null} */
   let operatorCatalog = null;
-  /** @type {{store: *, strip: *, library: *, dock: *}|null} */
+  /** @type {{store: *, strip: *, library: *}|null} */
   let chainUi = null;
   /** @type {number} Save As copies this session, which their ids count off. */
   let copies = 0;
@@ -262,8 +258,8 @@ export function createShaderDocumentController({
     status.dataset.status = error ? 'error' : 'ok';
   };
 
-  // The one shared live region: the strip, the library and the dock all report
-  // through it, and an empty message clears it.
+  // The one shared live region: the strip and the library both report through
+  // it, and an empty message clears it.
   /** @param {string} message */
   const announce = (message) => show(message, message !== '');
 
@@ -376,7 +372,6 @@ export function createShaderDocumentController({
     if (chainUi === null) return;
     chainUi.strip.destroy();
     chainUi.library.destroy();
-    chainUi.dock?.destroy();
     chainUi = null;
     setParamFilter(null);
   };
@@ -394,23 +389,6 @@ export function createShaderDocumentController({
     const gap = chainUi.store.chain()
       .findIndex((/** @type {*} */ entry) => entry.label === selected) + 1;
     chainUi.library.setLegality(chainUi.store.legalInsertions(gap));
-  };
-
-  /**
-   * The catalog schema behind a chain parameter id, which is `<label>.<field>`
-   * over the labelled instance's operator.
-   * @param {string} parameterId - A chain parameter id.
-   * @returns {*|null} The catalog field, or null when nothing declares it.
-   */
-  const catalogField = (parameterId) => {
-    if (chainUi === null) return null;
-    const dot = parameterId.indexOf('.');
-    if (dot < 0) return null;
-    const entry = chainUi.store.chain().find(
-      (/** @type {*} */ candidate) => candidate.label === parameterId.slice(0, dot));
-    return operatorCatalog.operators
-      .find((/** @type {*} */ op) => op.id === entry?.operator)?.params
-      .find((/** @type {*} */ field) => field.id === parameterId.slice(dot + 1)) ?? null;
   };
 
   /**
@@ -458,23 +436,10 @@ export function createShaderDocumentController({
   };
 
   /**
-   * Adapts one lil-gui edit to the document value the store stores: an enum
-   * control carries an option index into the operator's catalog values.
-   * @param {string} parameterId - The edited control's name.
-   * @param {*} value - The control's value.
-   * @returns {void}
-   */
-  const writeDockEdit = (parameterId, value) => {
-    const options = catalogField(parameterId)?.values;
-    writeStageEdit(parameterId,
-      options && typeof value === 'number' ? options[value] : value);
-  };
-
-  /**
-   * Builds the pipeline strip, the stage library and the parameter dock over one
-   * document store, wiring every structural edit, undo and bypass toggle back
-   * through the one apply path and the selection into the parameter GUI's
-   * instance filter.
+   * Builds the pipeline strip and the stage library over one document store,
+   * wiring every structural edit, undo and bypass toggle back through the one
+   * apply path. The stages' parameters render on the strip's chips, so the
+   * effect GUI panel is told to build none of them.
    * @param {*} document - The compiled (valid) v2 document to edit.
    */
   const buildChainUi = async (document) => {
@@ -498,16 +463,7 @@ export function createShaderDocumentController({
       },
       presetId: () => active?.presetId ?? null,
       onEditParameter: writeStageEdit,
-      onSelect: (/** @type {string|null} */ label) => {
-        setParamFilter(label === null ? null : {
-          prefix: `${label}.`,
-          deactivated: deactivatedParamNames,
-          onEdit: writeDockEdit,
-        });
-        syncEffectGui();
-        refreshLibraryLegality();
-        if (label !== null) chainUi?.dock?.setCollapsed(false);
-      },
+      onSelect: () => refreshLibraryLegality(),
     }));
     const library = createChainLibrary({
       doc,
@@ -517,10 +473,8 @@ export function createShaderDocumentController({
       announce,
       onPick: (/** @type {string} */ operatorId) => strip.insertOperator(operatorId),
     });
-    const dock = dockMount && dockToggle
-      ? createParameterDock({ doc, container: dockMount, toggle: dockToggle })
-      : null;
-    chainUi = { store, strip, library, dock };
+    setParamFilter({ external: true });
+    chainUi = { store, strip, library };
   };
 
   /**
@@ -625,8 +579,8 @@ export function createShaderDocumentController({
 
   /**
    * Opens the default chain on catalog defaults through the ordinary load path,
-   * so an unnamed session authors against the same strip, library and dock a
-   * loaded document gets.
+   * so an unnamed session authors against the same strip and library a loaded
+   * document gets.
    * @returns {Promise<boolean>} Whether the scratch document is on screen.
    */
   const loadScratch = () =>

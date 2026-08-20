@@ -1,7 +1,6 @@
 import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement } from './fake_dom.js';
-import { deactivatedParamNames } from '../tools/chain_dock.js';
 import {
   createEffectGui,
   addParamControl,
@@ -2353,7 +2352,7 @@ test('destroy on an unbuilt panel is a no-op', () => {
   assert.deepEqual(h.warnings, []);
 });
 
-// ── The chain editor's selected-instance filter ─────────────────────────────
+// ── The chain editor's external-parameter filter ────────────────────────────
 
 function chainParams() {
   return [
@@ -2365,75 +2364,24 @@ function chainParams() {
   ];
 }
 
-test('the instance filter builds controls only for the prefixed params', () => {
+// §4.4: the chain's parameters render on the pipeline strip's chips, so the
+// panel builds none of them — but the value stream is positional, so every one
+// still claims its slot.
+test('the external filter builds no parameter controls', () => {
   const params = chainParams();
   const h = makeHarness({
     params,
     engineValues: params.map((parameter) => parameter.value),
   });
-  h.state.paramFilter = { prefix: 'sample.', deactivated: deactivatedParamNames };
+  h.state.paramFilter = { external: true };
 
   h.panel.build();
   const fx = h.panel.active();
 
-  assert.equal(fx.controllerByName.has('camera.wander'), false,
-    'another instance\'s params get no control');
+  assert.deepEqual([...fx.controllerByName.keys()], []);
   assert.deepEqual(fx.paramNames, params.map((parameter) => parameter.name),
-    'the value-stream order stays whole so the shown sliders bind correctly');
-  assert.equal(fx.controllerByName.get('sample.pattern-freq').label,
-    'pattern-freq', 'controls are labeled by their field segment');
-
-  // The topology gate sits on "weight", so edge-width renders dimmed — but
-  // present and enabled: deactivation changes what the engine reads, never
-  // what the document carries.
-  const edge = fx.controllerByName.get('sample.edge-width');
-  assert.equal(edge.domElement.classList.contains('param-deactivated'), true);
-  assert.equal(edge.domElement.getAttribute('title'),
-    'Deactivated by the current topology selection');
-  assert.equal(edge.disabled, false);
-  assert.equal(fx.controllerByName.get('sample.pattern-freq')
-    .domElement.classList.contains('param-deactivated'), false);
-});
-
-// §4.4: the dock's edit is the document edit, the engine write its side effect.
-test('a filtered control edit reaches the document write-through and the engine', () => {
-  const params = chainParams();
-  const h = makeHarness({
-    params,
-    engineValues: params.map((parameter) => parameter.value),
-  });
-  const edits = [];
-  h.state.paramFilter = {
-    prefix: 'sample.',
-    deactivated: deactivatedParamNames,
-    onEdit: (name, value) => edits.push([name, value]),
-  };
-  h.panel.build();
-  const fx = h.panel.active();
-
-  fx.controllerByName.get('sample.pattern-freq').setValue(4);
-  fx.controllerByName.get('sample.coverage-mode').setValue(3);
-
-  assert.deepEqual(edits, [['sample.pattern-freq', 4], ['sample.coverage-mode', 3]],
-    'an enum edit carries its option index');
-  assert.ok(h.writes.includes('engine:sample.pattern-freq=4'),
-    'the engine write stays where it was');
-});
-
-// A filter without the hook is the whole non-chain surface; an edit there must
-// not reach for a write-through that is not offered.
-test('a filter with no write-through still edits', () => {
-  const params = chainParams();
-  const h = makeHarness({
-    params,
-    engineValues: params.map((parameter) => parameter.value),
-  });
-  h.state.paramFilter = { prefix: 'sample.' };
-  h.panel.build();
-
-  h.panel.active().controllerByName.get('sample.pattern-freq').setValue(4);
-
-  assert.ok(h.writes.includes('engine:sample.pattern-freq=4'));
+    'the value-stream order stays whole');
+  assert.equal(fx.hasParams, false, 'nothing to sync per frame');
 });
 
 test('a filter change rebuilds the panel on the next sync', () => {
@@ -2445,33 +2393,13 @@ test('a filter change rebuilds the panel on the next sync', () => {
   h.panel.build();
   assert.equal(h.panel.active().controllerByName.has('camera.wander'), true);
 
-  h.state.paramFilter = { prefix: 'sample.', deactivated: deactivatedParamNames };
+  h.state.paramFilter = { external: true };
   h.panel.sync();
   assert.equal(h.panel.active().controllerByName.has('camera.wander'), false);
-  assert.equal(h.panel.active().controllerByName.has('sample.pattern-freq'), true);
+  assert.equal(h.panel.active().controllerByName.has('sample.pattern-freq'), false);
 
   h.state.paramFilter = null;
   h.panel.sync();
   assert.equal(h.panel.active().controllerByName.has('camera.wander'), true,
     'clearing the filter restores the unfiltered panel');
-});
-
-test('sync re-dims against the live topology values', () => {
-  const params = chainParams();
-  const h = makeHarness({
-    params,
-    engineValues: params.map((parameter) => parameter.value),
-  });
-  h.state.paramFilter = { prefix: 'sample.', deactivated: deactivatedParamNames };
-  h.panel.build();
-  const edge = h.panel.active().controllerByName.get('sample.edge-width');
-  assert.equal(edge.domElement.classList.contains('param-deactivated'), true);
-
-  // The coverage gate moves onto edge-fade without any schema rebuild.
-  params[2].value = 3;
-  params[2].requestedValue = 3;
-  h.panel.sync();
-
-  assert.equal(edge.domElement.classList.contains('param-deactivated'), false);
-  assert.equal(edge.domElement.getAttribute('title'), '');
 });

@@ -597,79 +597,13 @@ select.chain-param-control {
   line-height: 1.3;
 }
 
-/* ── Parameter dock ──────────────────────────────────────────────────────── */
-
-.parameter-dock {
-  display: flex;
-  flex-direction: column;
-  flex: 0 0 auto;
-  width: 17rem;
-  max-width: 40vw;
-  border-left: 1px solid var(--panel-border);
-  background: var(--sidebar-bg);
-  font-family: var(--ui-font);
-}
-
-.parameter-dock[data-collapsed="true"] {
-  width: auto;
-  max-width: none;
-}
-
-.parameter-dock[data-collapsed="true"] .gui-container {
-  display: none;
-}
-
-.parameter-dock-toggle {
-  margin: 0;
-  padding: 0.25rem 0.625rem;
-  border: 0;
-  border-bottom: 1px solid var(--panel-border);
-  background: transparent;
-  color: var(--muted-text);
-  font-family: inherit;
-  font-size: 0.6875rem;
-  letter-spacing: 0.08em;
-  text-align: left;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
-.parameter-dock-toggle:hover,
-.parameter-dock-toggle:focus-visible {
-  color: var(--bright-text);
-}
-
-/* The dock sits beside the canvas, never over it, so the global rule that
-   floats the GUI panels across the viewport is undone here. */
-.parameter-dock .gui-container {
-  position: static;
-  z-index: auto;
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  width: 100%;
-  max-height: none;
-  overflow-y: auto;
-  background: transparent;
-  pointer-events: auto;
-}
-
-.parameter-dock .gui-container > .lil-gui {
-  width: 100%;
-  margin: 0 0 1px;
-}
+/* ── Global controls ─────────────────────────────────────────────────────── */
 
 #gui-container .lil-controller.lil-option select,
 #gui-container .lil-controller.lil-option option {
   color-scheme: dark;
   color: var(--text-color);
   background-color: var(--background-color);
-}
-
-/* A field the current topology value deactivates stays present and editable;
-   only the engine stops reading it. */
-#gui-container .lil-controller.param-deactivated {
-  opacity: 0.45;
 }
 
 /* ── Narrow viewports ────────────────────────────────────────────────────── */
@@ -722,13 +656,7 @@ select.chain-param-control {
     display: none;
   }
 
-  .parameter-dock {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1500;
-    width: 15rem;
-    max-width: 70vw;
+  .chain-chip-params {
+    max-width: none;
   }
 }

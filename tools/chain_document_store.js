@@ -521,7 +521,7 @@ export async function createChainDocumentStore({
 
   /**
    * Writes one preset's value for one parameter through the same validator and
-   * the same history as a structural edit: a parameter-dock edit is a document
+   * the same history as a structural edit: a stage-control edit is a document
    * edit, and the engine write is its side effect. Consecutive writes to the
    * same control collapse into one undo entry, so undoing a drag restores the
    * value the run started from; any other edit, undo or redo ends the run.
