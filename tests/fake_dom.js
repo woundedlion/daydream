@@ -3,11 +3,20 @@
 // stand-in plus the globalThis.document install/restore helpers. Covers the
 // surface the daydream modules actually touch — extend this instead of
 // hand-rolling another one-off fake.
+//
+// Not modelled: layout and the box model, CSS, hit-testing, pointer capture.
+// So these ship green here and only a real browser catches them: zero-width or
+// overflowing chips, off-screen flyouts, scroll arrows that never appear,
+// scrollTop clamping, a renamed or deleted CSS rule, a display:none control that
+// still takes a click, focus landing on a non-focusable node, and a drag that
+// loses pointer capture or ignores pointercancel. scripts/workbench-probe.mjs
+// and scripts/browser-smoke.mjs are the jobs that do.
 import { afterEach } from 'node:test';
 
-// Nodes that have left a parent. A parentless node is connected unless it is in
-// here, which is what lets isConnected derive from the parent chain.
-const detached = new WeakSet();
+// Nodes standing in for ones the page already carries. A parentless node is
+// connected only if it is in here, so isConnected derives from the parent chain
+// and a fresh element reads disconnected as in the DOM.
+const rooted = new WeakSet();
 
 // The ownerDocument every fake element carries, as every element in a browser
 // does: enough of a document for a module that builds a node of its own.
@@ -47,12 +56,11 @@ function reparent(nodes, parent) {
   for (const node of nodes) {
     if (!node || typeof node !== 'object') continue;
     node.parentNode = parent;
-    if (parent) {
-      detached.delete(node);
-    } else {
-      detached.add(node);
-      blurRemoved(node);
-    }
+    if (parent) continue;
+    // A removal takes the node out of the page, so a stand-in for one the page
+    // carried stops reading as connected.
+    rooted.delete(node);
+    blurRemoved(node);
   }
 }
 
@@ -253,10 +261,13 @@ function fakeStyle() {
  * @param {Object} [options] - Fake-element options.
  * @param {boolean} [options.allowRedundantRemoval] - Let removeEventListener
  *   no-op on a listener that is not registered.
+ * @param {boolean} [options.connected] - Stand in for a node the page already
+ *   carries, so it and its subtree read as connected.
  * @returns {Object} Fake element.
  */
 export function fakeElement(tag = 'div', options = {}) {
   const allowRedundantRemoval = Boolean(options && options.allowRedundantRemoval);
+  const inPage = Boolean(options && options.connected);
   const classes = new Set();
   const element = {
     listeners: [],
@@ -269,12 +280,12 @@ export function fakeElement(tag = 'div', options = {}) {
     parentNode: null,
     focusCalls: 0,
     scrollIntoViewCalls: 0,
-    // Derived from the parent chain, as in the DOM: a fresh element stands in
-    // for a node the page already carries, and a node whose ancestor left its
-    // parent is disconnected along with it.
+    // Derived from the parent chain, as in the DOM: a node whose ancestor left
+    // its parent is disconnected along with it, and a node that never reached
+    // the page is disconnected until it is appended somewhere that has.
     get isConnected() {
       if (this.parentNode) return Boolean(this.parentNode.isConnected);
-      return !detached.has(this);
+      return rooted.has(this);
     },
     // Elements-only view of childNodes, as in the DOM: appended strings are
     // text nodes and appear in neither this nor firstElementChild.
@@ -516,6 +527,7 @@ export function fakeElement(tag = 'div', options = {}) {
       },
     });
   }
+  if (inPage) rooted.add(element);
   return element;
 }
 
