@@ -170,6 +170,23 @@ test('blitToOffscreen ignores a zero-sized source canvas', () => {
   assert.doesNotThrow(() => rec.blitToOffscreen());
 });
 
+test('blitToOffscreen clears the whole offscreen before drawing into it', () => {
+  const rec = new VideoRecorder(fakeCanvas(64, 32)); // 2:1 into a 1:1 offscreen
+  rec.offscreen = fakeCanvas(100, 100);
+  const log = [];
+  rec.offCtx = {
+    clearRect: (...a) => log.push(`clear:${a.join(',')}`),
+    drawImage: (_img, ...a) => log.push(`draw:${a.join(',')}`),
+  };
+
+  rec.blitToOffscreen();
+
+  // The letterbox bars lie outside the drawn rect, so without this clear every
+  // recorded frame keeps the previous frame's pixels in them.
+  assert.deepEqual(log, ['clear:0,0,100,100', 'draw:0,25,100,50']);
+});
+
+
 // ---------------------------------------------------------------------------
 // MediaRecorder session lifecycle, behind a fake MediaRecorder/captureStream.
 // ---------------------------------------------------------------------------
@@ -209,6 +226,7 @@ class FakeMediaRecorder {
   static isTypeSupported() { return true; }
   constructor(stream, options) {
     this.stream = stream;
+    this.options = options;
     this.mimeType = options.mimeType || 'video/webm';
     this.state = 'inactive';
     this.ondataavailable = null;
@@ -712,6 +730,67 @@ test('streams chunks to disk when the File System Access API is present', async 
     assert.equal(downloaded, false, 'no in-memory blob download while streaming');
     assert.deepEqual(sessionChunks, [], 'streamed chunks are not retained in RAM');
   } finally {
+    restore();
+  }
+});
+
+test('the encoder is opened at the configured bitrate', () => {
+  const restore = installRecorderEnv();
+  try {
+    const auto = new VideoRecorder(recordableCanvas());
+    auto.download = () => {};
+    auto.start('e');
+    assert.equal(auto.mediaRecorder.options.videoBitsPerSecond, 16_000_000,
+      'the constructor default did not reach the encoder');
+    auto.stop();
+    auto.mediaRecorder.onstop();
+
+    const rec = new VideoRecorder(recordableCanvas());
+    rec.download = () => {};
+    rec.bitrateMbps = 24;
+    rec.start('e');
+    // Mbps, not bps: an unconverted 24 would encode at 24 bits per second.
+    assert.equal(rec.mediaRecorder.options.videoBitsPerSecond, 24_000_000);
+  } finally {
+    restore();
+  }
+});
+
+test('the save picker is offered the timestamped name and the container filter', async () => {
+  const restore = installRecorderEnv();
+  const picked = [];
+  const writable = { write: async () => {}, close: async () => {} };
+  globalThis.showSaveFilePicker = async (options) => {
+    picked.push(options);
+    return { createWritable: async () => writable };
+  };
+  mock.timers.enable({ apis: ['setTimeout', 'Date'], now: SAVE_CLOCK });
+  try {
+    // Both the name and the filter follow the container the encoder settled on,
+    // so an advertised-format change has to move them together.
+    for (const [format, name, mime] of [
+      ['mp4', 'swirl_20260102_030405.mp4', 'video/mp4'],
+      ['webm', 'swirl_20260102_030405.webm', 'video/webm'],
+    ]) {
+      picked.length = 0;
+      const rec = new VideoRecorder(recordableCanvas());
+      const sinkFinished = trackSinkFinish(rec);
+      rec.download = () => {};
+      rec.format = format;
+
+      rec.start('swirl');
+      rec.stop();
+      rec.mediaRecorder.onstop();
+      await sinkFinished();
+
+      assert.equal(picked.length, 1);
+      assert.equal(picked[0].suggestedName, name,
+        'the dialog opened on something other than the timestamped file');
+      assert.deepEqual(picked[0].types,
+        [{ description: 'Video', accept: { [mime]: [`.${format}`] } }]);
+    }
+  } finally {
+    mock.timers.reset();
     restore();
   }
 });
