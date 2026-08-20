@@ -973,6 +973,53 @@ test('ShaderBall restores one versioned snapshot before building session control
   assert.equal(h.gui().stored['__accepted.Lens'], undefined);
 });
 
+test('a rejected full-config snapshot is reported and announces no import', () => {
+  const stored = {
+    schemaVersion: 2,
+    accepted: [0, 4294967295],
+    requested: [0, 4294967295],
+    pendingFieldIds: [],
+    hasRuntime: false,
+    runtime: [],
+  };
+  const h = makeHarness({
+    params: shaderBallParams(),
+    fullConfig: true,
+    fullConfigSnapshot: { ...stored },
+    acceptedStored: { [FULL_CONFIG_STORAGE_KEY]: JSON.stringify(stored) },
+    restoreFullConfigAccepted: false,
+    configImportNotice: 'Imported legacy ShaderBall config.',
+  });
+
+  h.panel.build();
+
+  assert.deepEqual(h.restoredFullConfigs, [stored], 'the snapshot never reached the engine');
+  assert.deepEqual(h.warnings,
+    ['ShaderBall: full-config snapshot was rejected: INVALID_VALUE']);
+  assert.deepEqual(h.configNotices, [],
+    'a refused restore announced an import that did not happen');
+  assert.equal(h.configNoticeClears(), 0, 'a refused restore consumed the notice');
+});
+
+test('a stored snapshot that is not a config object never reaches the engine', () => {
+  // The key is a URL fragment a user can hand-edit, so every shape JSON admits
+  // has to stop here rather than at an embind argument conversion.
+  for (const text of ['{not json', 'null', '[]', '"snapshot"', '7']) {
+    const h = makeHarness({
+      params: shaderBallParams(),
+      fullConfig: true,
+      fullConfigSnapshot: null,
+      acceptedStored: { [FULL_CONFIG_STORAGE_KEY]: text },
+    });
+
+    h.panel.build();
+
+    assert.deepEqual(h.restoredFullConfigs, [], `restored from ${text}`);
+    assert.equal(h.warnings.length, 1, `warnings for ${text}`);
+    assert.match(h.warnings[0], /ignoring invalid full-config snapshot/);
+  }
+});
+
 test('Lens Glitch to None persists the exhaustive snapshot bit-exactly', () => {
   const initial = {
     schemaVersion: 2,
@@ -1458,6 +1505,45 @@ test('a schema generation change atomically rebuilds and remounts the panel', ()
 
   h.panel.sync();
   assert.equal(h.gui().ctrl('Bonne Parallel').getValue(), 0.6);
+});
+
+test('a failed schema rebuild keeps the live panel and reports once per generation', () => {
+  const h = makeHarness({ params: [SPEED], engineValues: [0.1], generation: 3 });
+  h.panel.build();
+  h.panel.mount();
+  const live = h.gui();
+
+  // A definitions read yielding no list is what a torn-down engine hands back
+  // across an async effect change.
+  h.state.params = null;
+  h.state.generation = 4;
+  h.panel.sync();
+
+  assert.equal(h.panel.active().gui, live, 'a record that never built was published');
+  assert.equal(h.panel.active().paramGeneration, 3);
+  assert.deepEqual(h.container.children, [live.domElement]);
+  assert.equal(h.warnings.length, 1);
+  assert.match(h.warnings[0], /parameter-schema rebuild failed/);
+
+  h.panel.sync();
+
+  assert.equal(h.warnings.length, 1, 'the same failure logged again on the next frame');
+
+  h.state.generation = 5;
+  h.panel.sync();
+
+  assert.equal(h.warnings.length, 2, 'a fresh generation failing went unreported');
+
+  // The definitions come back: the throttle must not have latched the panel out
+  // of ever rebuilding.
+  h.state.params = [SPEED, GLOW];
+  h.state.engineValues = [0.4, true];
+  h.state.generation = 6;
+  h.panel.sync();
+
+  assert.notEqual(h.panel.active().gui, live);
+  assert.equal(h.gui().ctrl('Speed').getValue(), 0.4);
+  assert.equal(h.warnings.length, 2);
 });
 
 test('a schema rebuild hands keyboard focus back to the same control', () => {
