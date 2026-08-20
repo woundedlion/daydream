@@ -1042,7 +1042,7 @@ test('the pause toggle is offered only when a param animates', () => {
   const animated = makeHarness({ params: [SPEED] });
   animated.panel.build();
   assert.equal(animated.gui().ctrl('pause').label, 'Pause Animation');
-  assert.notEqual(animated.panel.active().pauseController, null);
+  assert.equal(animated.panel.active().pauseController, animated.gui().ctrl('pause'));
 
   const static_ = makeHarness({ params: [{ name: 'Speed', value: 0.1, min: 0, max: 1 }] });
   static_.panel.build();
