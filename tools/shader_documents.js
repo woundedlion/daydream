@@ -414,31 +414,60 @@ export function createShaderDocumentController({
   };
 
   /**
-   * Routes a parameter-dock edit into the active preset: the document is the
-   * source of truth and the engine write, which the dock has already made, is
-   * the side effect. The chain path registers each parameter id verbatim as its
-   * control name, so no alias translation stands between the two.
-   * @param {string} parameterId - The edited control's name.
-   * @param {*} value - The control's value; an enum carries an option index into
-   *   the operator's catalog values, which is the order the chain registers its
-   *   options in.
+   * The live preview's control name for a document parameter: the interpreter
+   * registers each id verbatim, while the compiled build takes its own control
+   * names and bakes the topology fields in, so those reach no control there.
+   * @param {string} parameterId - A chain parameter id.
+   * @param {ParameterDefinition[]} definitions - The engine's definitions.
+   * @returns {string|null} The control name, or null where none takes the value.
+   */
+  const engineControlName = (parameterId, definitions) => {
+    if (active?.compiledSide !== true) return parameterId;
+    if (TOPOLOGY_FIELDS.has(fieldSegment(parameterId))) return null;
+    return engineParameterNames(parameterId).find((candidate) =>
+      definitions.some((definition) => definition.name === candidate)) ?? null;
+  };
+
+  /**
+   * Routes an inline stage-control edit into the active preset: the document is
+   * the source of truth and the engine write is its side effect.
+   * @param {string} parameterId - The edited parameter's id.
+   * @param {*} value - The document value: a number, or an enum8 option id.
    * @returns {void}
    */
-  const writeDockEdit = (parameterId, value) => {
+  const writeStageEdit = (parameterId, value) => {
     if (chainUi === null || active === null || active.presetId === null) return;
-    const values = catalogField(parameterId)?.values;
-    const stored = values && typeof value === 'number' ? values[value] : value;
-    const undoable = chainUi.store.canUndo();
-    const redoable = chainUi.store.canRedo();
-    const result = chainUi.store.setPresetValue(active.presetId, parameterId, stored);
+    const result = chainUi.store.setPresetValue(active.presetId, parameterId, value);
     if (!result.ok) {
       announce(`"${parameterId}" was refused: ${result.diagnostics[0].message}`);
       return;
     }
-    // A drag calls this per pointermove; only the write that opens the undo
-    // run moves the strip's history buttons.
-    if (undoable !== chainUi.store.canUndo() || redoable !== chainUi.store.canRedo())
-      chainUi.strip.render();
+    chainUi.strip.syncHistory();
+    const engine = getEngine();
+    const module = getModule();
+    if (!engine || !module) return;
+    const definitions = engine.getParameterDefinitions();
+    const name = engineControlName(parameterId, definitions);
+    const refusal = name === null ? null
+      : writeEngineValue(engine, module, definitions, name, value);
+    if (refusal) {
+      announce(refusal);
+      return;
+    }
+    invalidate();
+  };
+
+  /**
+   * Adapts one lil-gui edit to the document value the store stores: an enum
+   * control carries an option index into the operator's catalog values.
+   * @param {string} parameterId - The edited control's name.
+   * @param {*} value - The control's value.
+   * @returns {void}
+   */
+  const writeDockEdit = (parameterId, value) => {
+    const options = catalogField(parameterId)?.values;
+    writeStageEdit(parameterId,
+      options && typeof value === 'number' ? options[value] : value);
   };
 
   /**
@@ -467,6 +496,8 @@ export function createShaderDocumentController({
         }
         refreshLibraryLegality();
       },
+      presetId: () => active?.presetId ?? null,
+      onEditParameter: writeStageEdit,
       onSelect: (/** @type {string|null} */ label) => {
         setParamFilter(label === null ? null : {
           prefix: `${label}.`,
@@ -661,6 +692,7 @@ export function createShaderDocumentController({
   });
   presetSelect.addEventListener('change', () => {
     applyPreset(presetSelect.value);
+    chainUi?.strip.render();
   });
   openButton.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', async () => {

@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { createChainDocumentStore } from '../tools/chain_document_store.js';
-import { createChainStrip } from '../tools/chain_strip.js';
+import { createChainStrip, deactivatedParameterIds } from '../tools/chain_strip.js';
 import { compileShaderDocument } from '../shader/shader_workbench.mjs';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
 
@@ -31,8 +31,13 @@ const WARP2 = 3;
 
 restoreDocumentAfterEach();
 
-/** A strip over a fresh store on a fresh fixture copy, plus its spies. */
-async function makeStrip() {
+/**
+ * A strip over a fresh store on a fresh fixture copy, plus its spies.
+ * @param {{presetId?: string|null}} [seams] - The preset the inline controls
+ *   read; omitted, the strip falls back to the document's first.
+ * @returns {Promise<Object>} The harness.
+ */
+async function makeStrip({ presetId = null } = {}) {
   const store = await createChainDocumentStore({
     document: structuredClone(BASE.document), catalog: CATALOG });
   const container = fakeElement('section');
@@ -50,6 +55,7 @@ async function makeStrip() {
   const applied = [];
   const selections = [];
   const announced = [];
+  const edits = [];
   const strip = createChainStrip({
     doc,
     container,
@@ -58,8 +64,10 @@ async function makeStrip() {
     announce: (message) => announced.push(message),
     onApply: () => applied.push(store.programShape().map((entry) => entry.instance)),
     onSelect: (label) => selections.push(label),
+    presetId: () => presetId,
+    onEditParameter: (parameterId, value) => edits.push([parameterId, value]),
   });
-  return { store, container, doc, strip, applied, selections, announced };
+  return { store, container, doc, strip, applied, selections, announced, edits };
 }
 
 const chips = (h) => h.container.querySelectorAll('.chain-chip');
@@ -586,4 +594,215 @@ test('destroy detaches the pointer listeners and empties the strip', async () =>
   assert.equal(h.container.childNodes.length, 0);
   assert.deepEqual(h.container.listeners.filter(
     (listener) => listener.type.startsWith('pointer')), []);
+});
+
+// ── Inline stage parameters ─────────────────────────────────────────────────
+
+const paramsOf = (h, label) =>
+  chipByLabel(h, label).querySelector('.chain-chip-params');
+const rowsOf = (h, label) => paramsOf(h, label).querySelectorAll('.chain-param');
+const rowFor = (h, label, parameterId) =>
+  rowsOf(h, label).find((row) => row.dataset.parameter === parameterId);
+const controlIn = (row) => row.querySelector('.chain-param-control');
+const declarationsFor = (h, label) => h.store.document().descriptor.parameters
+  .filter((parameter) => parameter.id.startsWith(`${label}.`));
+
+test('the selected chip expands into its own stage’s controls', async () => {
+  const h = await makeStrip();
+  assert.equal(paramsOf(h, 'sample'), null, 'an unselected chip carries no controls');
+  assert.equal(h.container.dataset.expanded, 'false');
+
+  chipByLabel(h, 'sample').dispatch('click');
+
+  const chip = chipByLabel(h, 'sample');
+  assert.equal(chip.getAttribute('aria-current'), 'true');
+  assert.equal(chip.querySelector('.chain-chip-disclosure').getAttribute('aria-expanded'),
+    'true', 'selection and expansion are one state');
+  assert.equal(h.container.dataset.expanded, 'true');
+  const region = paramsOf(h, 'sample');
+  assert.equal(region.getAttribute('role'), 'group');
+  assert.equal(region.getAttribute('aria-label'), 'Twin Wave · sample parameters');
+  assert.deepEqual(rowsOf(h, 'sample').map((row) => row.dataset.parameter),
+    declarationsFor(h, 'sample').map((parameter) => parameter.id),
+    'one control per declared parameter, in document order');
+  assert.deepEqual(rowsOf(h, 'sample')
+    .map((row) => row.querySelector('.chain-param-name').textContent),
+  ['Angle Speed', 'Coverage Mode', 'Drift', 'Pattern Freq', 'Speed', 'Weight Mode'],
+  'a control is labeled by its field segment alone: the chip names the instance');
+
+  // The document's declared domain and the active preset's value, not the
+  // engine's idea of either.
+  const freq = controlIn(rowFor(h, 'sample', 'sample.pattern-freq'));
+  const declared = declarationsFor(h, 'sample')
+    .find((parameter) => parameter.id === 'sample.pattern-freq');
+  assert.equal(freq.type, 'range');
+  assert.equal(freq.min, String(declared.domain.minimum));
+  assert.equal(freq.max, String(declared.domain.maximum));
+  assert.equal(Number(freq.value),
+    h.store.document().preset_bank.presets[0].values['sample.pattern-freq']);
+  assert.equal(rowFor(h, 'sample', 'sample.pattern-freq')
+    .querySelector('.chain-param-value').textContent, '3.881');
+
+  chipByLabel(h, 'camera').dispatch('click');
+  assert.equal(paramsOf(h, 'sample'), null, 'only the selected chip is expanded');
+  assert.equal(rowsOf(h, 'camera').length, 1);
+});
+
+test('a stage with no parameters grows no disclosure', async () => {
+  const h = await makeStrip();
+  assert.deepEqual(declarationsFor(h, 'transfer'), []);
+
+  chipByLabel(h, 'transfer').dispatch('click');
+
+  const chip = chipByLabel(h, 'transfer');
+  assert.equal(chip.getAttribute('aria-current'), 'true');
+  assert.equal(chip.querySelector('.chain-chip-disclosure'), null,
+    'a disclosure that opens nothing is not offered');
+  assert.equal(paramsOf(h, 'transfer'), null);
+  assert.equal(h.container.dataset.expanded, 'false');
+});
+
+test('the disclosure collapses the chip it expanded', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'camera').dispatch('click');
+  assert.equal(chipByLabel(h, 'camera')
+    .querySelector('.chain-chip-disclosure').getAttribute('aria-expanded'), 'true');
+
+  chipByLabel(h, 'camera').querySelector('.chain-chip-disclosure').dispatch('click');
+
+  assert.equal(h.store.selectedLabel(), null);
+  assert.equal(paramsOf(h, 'camera'), null);
+  assert.equal(chipByLabel(h, 'camera')
+    .querySelector('.chain-chip-disclosure').getAttribute('aria-expanded'), 'false');
+  assert.deepEqual(h.selections, ['camera', null]);
+
+  chipByLabel(h, 'camera').querySelector('.chain-chip-disclosure').dispatch('click');
+  assert.equal(h.store.selectedLabel(), 'camera', 'and expands it again');
+});
+
+test('a slider edit calls back with the parameter and its value', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'sample').dispatch('click');
+  const row = rowFor(h, 'sample', 'sample.pattern-freq');
+  const slider = controlIn(row);
+
+  slider.value = '5.5';
+  slider.dispatch('input');
+
+  assert.deepEqual(h.edits, [['sample.pattern-freq', 5.5]]);
+  assert.equal(row.querySelector('.chain-param-value').textContent, '5.500');
+  assert.deepEqual(h.applied, [], 'a value edit is no structural edit');
+  assert.equal(controlIn(rowFor(h, 'sample', 'sample.pattern-freq')), slider,
+    'the strip is not rebuilt under the pointer');
+});
+
+test('an enum renders its declared values and edits by option id', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'lens').dispatch('click');
+  const select = controlIn(rowFor(h, 'lens', 'lens.symmetry'));
+  const declared = declarationsFor(h, 'lens')
+    .find((parameter) => parameter.id === 'lens.symmetry');
+
+  assert.equal(select.tagName, 'SELECT');
+  assert.deepEqual(select.options.map((option) => option.value),
+    declared.domain.values);
+  assert.equal(select.value, 'hexagonal-prism', 'the preset’s value is selected');
+
+  select.value = 'octahedral';
+  select.dispatch('change');
+
+  assert.deepEqual(h.edits, [['lens.symmetry', 'octahedral']],
+    'the document stores the option id, never an index');
+});
+
+// §3/§4.4: the union schema survives — a field the topology deactivates is
+// dimmed, but present and editable, because the document still carries it.
+test('a deactivated field renders dimmed but editable', async () => {
+  const h = await makeStrip();
+  h.strip.insertOperator('warp.wave-shear.v2');
+  const label = h.store.chain()
+    .find((entry) => entry.operator === 'warp.wave-shear.v2').label;
+  chipByLabel(h, label).dispatch('click');
+
+  const edge = rowFor(h, label, `${label}.edge-width`);
+  assert.equal(edge.dataset.deactivated, 'true',
+    'the envelope gate opens on flat, which reads no edge width');
+  assert.equal(edge.getAttribute('title'),
+    'Deactivated by the current topology selection');
+  assert.equal(controlIn(edge).disabled, undefined, 'dimmed, not disabled');
+  assert.equal(rowFor(h, label, `${label}.strength`).dataset.deactivated, undefined);
+
+  const envelope = controlIn(rowFor(h, label, `${label}.envelope`));
+  envelope.value = 'edge-fade';
+  envelope.dispatch('change');
+
+  assert.equal(edge.dataset.deactivated, undefined,
+    'the gate moving onto edge-fade re-activates the field in place');
+  assert.equal(edge.getAttribute('title'), '');
+
+  controlIn(edge).value = '0.4';
+  controlIn(edge).dispatch('input');
+  assert.deepEqual(h.edits.at(-1), [`${label}.edge-width`, 0.4]);
+});
+
+test('the inline controls read the named preset', async () => {
+  const h = await makeStrip({ presetId: 'hex-twin-wave-alt' });
+  chipByLabel(h, 'colorize').dispatch('click');
+
+  assert.equal(Number(controlIn(rowFor(h, 'colorize', 'colorize.mapping-frequency'))
+    .value), 2, 'the second preset’s value, not the first’s');
+});
+
+test('the inline controls keep their own keys and take no drag', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'camera').dispatch('click');
+  const slider = controlIn(rowFor(h, 'camera', 'camera.wander'));
+
+  const right = slider.dispatch('keydown', { key: 'ArrowRight' });
+  assert.equal(right.defaultPrevented, false,
+    'a slider’s own arrow keys are not the strip’s chip roving');
+  slider.dispatch('keydown', { key: 'Delete' });
+  assert.deepEqual(labels(h),
+    ['camera', 'lens', 'project', 'warp2', 'sample', 'transfer', 'colorize']);
+
+  slider.dispatch('pointerdown', { isPrimary: true, button: 0, pointerId: 4 });
+  assert.equal(chips(h).some((chip) => chip.dataset.dragging === 'true'), false,
+    'a press on a control must not be captured as a chip drag');
+});
+
+test('syncHistory repaints Undo and Redo without rebuilding the strip', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'camera').dispatch('click');
+  const chip = chipByLabel(h, 'camera');
+  assert.equal(h.container.querySelector('.chain-undo').disabled, true);
+
+  h.store.setPresetValue('hex-twin-wave', 'camera.wander', 0.5);
+  h.strip.syncHistory();
+
+  assert.equal(h.container.querySelector('.chain-undo').disabled, false);
+  assert.equal(chipByLabel(h, 'camera'), chip, 'no rebuild: the chips are the same');
+});
+
+// The union-schema rule reads the document's declarations and the preset values
+// that gate them.
+test('deactivatedParameterIds flags edge-width only while its gate is off edge-fade', () => {
+  const parameters = [
+    { id: 'sample.coverage-mode', storage: 'enum8' },
+    { id: 'sample.edge-width', storage: 'binary32' },
+    { id: 'warp1.envelope', storage: 'enum8' },
+    { id: 'warp1.edge-width', storage: 'binary32' },
+    { id: 'camera.wander', storage: 'binary32' },
+  ];
+  const values = {
+    'sample.coverage-mode': 'weight',
+    'sample.edge-width': 0.1,
+    'warp1.envelope': 'edge-fade',
+    'warp1.edge-width': 0.1,
+    'camera.wander': 0,
+  };
+  assert.deepEqual([...deactivatedParameterIds(parameters, values)],
+    ['sample.edge-width']);
+  assert.deepEqual([...deactivatedParameterIds(
+    [{ id: 'sample.edge-width', storage: 'binary32' }], { 'sample.edge-width': 0.1 })],
+  [], 'no gate, no deactivation');
 });

@@ -16,6 +16,10 @@
  * the gestures name. Selection and the session bypass set live in the store too:
  * the strip is a view plus gesture translation, rebuilt whole after every
  * committed edit with keyboard focus restored to the edited chip.
+ *
+ * The selected chip is the expanded one: it carries its own stage's controls
+ * inline, built from the document's parameter declarations over the active
+ * preset's values, so a stage is tuned where it sits in the pipeline.
  */
 
 import { createPointerDrag } from './pointer_drag.js';
@@ -36,12 +40,14 @@ import { createPointerDrag } from './pointer_drag.js';
  *   setBypassed: (label: string, on: boolean) => EditResult,
  *   legalInsertions: (index: number) => LegalityEntry[],
  *   legalReplacements: (start: number, deleteCount: number) => LegalityEntry[],
+ *   document: () => *,
  *   replaceSpan: (start: number, deleteCount: number,
  *     sequence: Array<{label?: string, operator: string}>) => EditResult,
  *   undo: () => boolean, redo: () => boolean,
  *   canUndo: () => boolean, canRedo: () => boolean,
  * }} ChainStore
  */
+/** @typedef {{id: string, storage: string, domain: *}} ParameterDeclaration */
 /** @typedef {{kind: 'chip', index: number}|{kind: 'operator', operatorId: string}} DragSource */
 /**
  * A drop target: one gap exactly, or a whole band, which resolves to the band's
@@ -61,9 +67,52 @@ const PALETTE_MARGIN = 8;
 // Pointer travel, in CSS pixels, that separates a chip drag from a chip click.
 const DRAG_SLOP = 4;
 
-/** @param {string} carrier @returns {string} The carrier's band title. */
-const carrierTitle = (carrier) =>
-  carrier.length === 0 ? carrier : carrier[0].toUpperCase() + carrier.slice(1);
+// Steps a slider divides its declared domain into.
+const SLIDER_STEPS = 1000;
+
+// Decimals a slider's value readout carries.
+const VALUE_DECIMALS = 3;
+
+const DEACTIVATED_TITLE = 'Deactivated by the current topology selection';
+
+/** @param {string} value @returns {string} The kebab-case value, title-cased. */
+const titleCase = (value) => value.split('-')
+  .map((word) => (word.length === 0 ? word : word[0].toUpperCase() + word.slice(1)))
+  .join(' ');
+
+/** @param {string} id @returns {string} The `<label>.<field>` id's field segment. */
+const fieldOf = (id) => id.slice(id.indexOf('.') + 1);
+
+/**
+ * The parameter ids the current topology selections deactivate: an `edge-width`
+ * field is read by the engine only while its instance's `coverage-mode` or
+ * `envelope` enum sits on `edge-fade`. Deactivation changes what the engine
+ * reads, never what the document carries, so these controls render dimmed
+ * rather than dropping out of the union schema.
+ * @param {ParameterDeclaration[]} parameters - The document's declarations.
+ * @param {Object<string, *>} values - The active preset's values.
+ * @returns {Set<string>} The deactivated parameter ids.
+ */
+export function deactivatedParameterIds(parameters, values) {
+  /** @type {Map<string, *>} */
+  const gates = new Map();
+  for (const parameter of parameters) {
+    if (parameter.storage !== 'enum8' || !parameter.id.includes('.')) continue;
+    const field = fieldOf(parameter.id);
+    if (field !== 'coverage-mode' && field !== 'envelope') continue;
+    const option = values[parameter.id];
+    if (option !== undefined)
+      gates.set(parameter.id.slice(0, parameter.id.indexOf('.')), option);
+  }
+  /** @type {Set<string>} */
+  const deactivated = new Set();
+  for (const parameter of parameters) {
+    if (!parameter.id.includes('.') || fieldOf(parameter.id) !== 'edge-width') continue;
+    const gate = gates.get(parameter.id.slice(0, parameter.id.indexOf('.')));
+    if (gate !== undefined && gate !== 'edge-fade') deactivated.add(parameter.id);
+  }
+  return deactivated;
+}
 
 /**
  * Builds the pipeline strip into a container and wires its gestures.
@@ -79,11 +128,17 @@ const carrierTitle = (carrier) =>
  *   edit, undo/redo and bypass toggle; the caller re-applies the program shape
  *   through the engine.
  * @param {(label: string|null) => void} options.onSelect - Runs when the
- *   selected instance changes; the caller retargets the parameter dock.
+ *   selected instance changes, which is also what expands the chip's controls.
+ * @param {() => string|null} [options.presetId] - The preset the inline stage
+ *   controls read and write; null falls back to the document's first.
+ * @param {(parameterId: string, value: *) => void} [options.onEditParameter] -
+ *   Takes every inline control edit as the document value the store stores: a
+ *   number for a binary32 field, the option id for an enum8 one.
  * @returns {Object} The strip.
  */
 export function createChainStrip({
   doc, container, store, catalog, announce, onApply, onSelect,
+  presetId = () => null, onEditParameter = () => {},
 }) {
   /** @type {Map<string, CatalogOperator>} */
   const operators = new Map(catalog.operators.map((op) => [op.id, op]));
@@ -100,6 +155,14 @@ export function createChainStrip({
   let dragState = null;
   /** @type {BandLayout[]} The current render's band decomposition. */
   let layout = [];
+  /** @type {{undo: *, redo: *}|null} The current render's history buttons. */
+  let history = null;
+  /** @type {ParameterDeclaration[]} The current render's declarations. */
+  let declarations = [];
+  /** @type {Object<string, *>} The values the inline controls show. */
+  let values = {};
+  /** @type {Map<string, *>} The expanded chip's rows, by parameter id. */
+  const rows = new Map();
 
   /**
    * @param {string} tag - Element tag.
@@ -498,6 +561,10 @@ export function createChainStrip({
    * @returns {void}
    */
   const chipKeydown = (event, index, entry, crossing, chip) => {
+    const inside = typeof event.target?.closest === 'function'
+      && (event.target.closest('.chain-chip-params') !== null
+        || event.target.closest('.chain-chip-disclosure') !== null);
+    if (inside) return;
     const key = event.key;
     if (key === 'ArrowRight' || key === 'ArrowLeft') {
       event.preventDefault();
@@ -534,6 +601,115 @@ export function createChainStrip({
     return gap;
   };
 
+  // Deactivation is marked with a data attribute rather than a class for the
+  // same reason drag state is: only the workbench page carries the stylesheet.
+  /** Repaints the dimming of the expanded chip's deactivated controls. */
+  const markDeactivated = () => {
+    const off = deactivatedParameterIds(declarations, values);
+    for (const [id, row] of rows) {
+      if (off.has(id)) {
+        row.dataset.deactivated = 'true';
+        row.setAttribute('title', DEACTIVATED_TITLE);
+      } else {
+        delete row.dataset.deactivated;
+        row.setAttribute('title', '');
+      }
+    }
+  };
+
+  /**
+   * Takes one inline control edit: the document write is the caller's, and the
+   * strip keeps the value it now shows so a topology edit re-dims what the new
+   * selection deactivates.
+   * @param {string} parameterId - The edited parameter.
+   * @param {*} value - The document value.
+   * @returns {void}
+   */
+  const editParameter = (parameterId, value) => {
+    values[parameterId] = value;
+    onEditParameter(parameterId, value);
+    markDeactivated();
+  };
+
+  /**
+   * @param {ParameterDeclaration} declaration - An enum8 declaration.
+   * @returns {*} The dropdown of its domain values.
+   */
+  const enumControl = (declaration) => {
+    const select = el('select', 'chain-param-control');
+    for (const value of declaration.domain?.values ?? []) {
+      const option = el('option', 'chain-param-option');
+      option.value = value;
+      option.textContent = value;
+      option.selected = value === values[declaration.id];
+      select.appendChild(option);
+    }
+    select.addEventListener('change',
+      (/** @type {*} */ event) => editParameter(declaration.id, event.target.value));
+    return select;
+  };
+
+  /**
+   * @param {ParameterDeclaration} declaration - A binary32 declaration.
+   * @param {*} readout - The row's value readout, repainted as the slider moves.
+   * @returns {*} The slider over its domain.
+   */
+  const sliderControl = (declaration, readout) => {
+    const slider = el('input', 'chain-param-control');
+    const minimum = Number(declaration.domain?.minimum);
+    const maximum = Number(declaration.domain?.maximum);
+    const span = maximum - minimum;
+    slider.type = 'range';
+    slider.min = String(minimum);
+    slider.max = String(maximum);
+    slider.step = span > 0 ? String(span / SLIDER_STEPS) : 'any';
+    slider.value = String(values[declaration.id]);
+    slider.addEventListener('input', (/** @type {*} */ event) => {
+      const value = Number(event.target.value);
+      readout.textContent = value.toFixed(VALUE_DECIMALS);
+      editParameter(declaration.id, value);
+    });
+    return slider;
+  };
+
+  /**
+   * The expanded chip's own controls, one row per parameter the document
+   * declares for the instance, labeled by the field segment alone: the chip
+   * already names the instance.
+   * @param {ChainEntry} entry - The expanded chain entry.
+   * @param {ParameterDeclaration[]} declared - The instance's declarations.
+   * @returns {*} The parameter region.
+   */
+  const paramsElement = (entry, declared) => {
+    const region = el('div', 'chain-chip-params');
+    region.dataset.label = entry.label;
+    region.setAttribute('role', 'group');
+    region.setAttribute('aria-label', `${opOf(entry).name} · ${entry.label} parameters`);
+    for (const declaration of declared) {
+      const name = titleCase(fieldOf(declaration.id));
+      const row = el('div', 'chain-param');
+      row.dataset.parameter = declaration.id;
+      const label = el('span', 'chain-param-name');
+      label.textContent = name;
+      row.appendChild(label);
+      if (declaration.storage === 'enum8') {
+        const select = enumControl(declaration);
+        select.setAttribute('aria-label', name);
+        row.appendChild(select);
+      } else {
+        const readout = el('span', 'chain-param-value');
+        readout.textContent = Number(values[declaration.id]).toFixed(VALUE_DECIMALS);
+        const slider = sliderControl(declaration, readout);
+        slider.setAttribute('aria-label', name);
+        row.appendChild(slider);
+        row.appendChild(readout);
+      }
+      rows.set(declaration.id, row);
+      region.appendChild(row);
+    }
+    return region;
+  };
+
   /**
    * @param {number} index - The entry's chain index.
    * @param {ChainEntry} entry - The chain entry.
@@ -551,8 +727,12 @@ export function createChainStrip({
     const op = opOf(entry);
     const isSelected = selected === entry.label;
     const isBypassed = bypassed.has(entry.label);
+    const declared = declarations.filter(
+      (declaration) => declaration.id.startsWith(`${entry.label}.`));
+    const expanded = isSelected && declared.length > 0;
     const chip = el('div', 'chain-chip'
       + (crossing ? ' chain-chip--socket' : '')
+      + (expanded ? ' chain-chip--expanded' : '')
       + (isBypassed ? ' chain-chip--bypassed' : ''));
     chip.dataset.label = entry.label;
     chip.dataset.index = String(index);
@@ -574,6 +754,21 @@ export function createChainStrip({
     label.textContent = `· ${entry.label}`;
     chip.appendChild(name);
     chip.appendChild(label);
+
+    // A stage with no parameters gets no disclosure: it would open nothing.
+    if (declared.length > 0) {
+      const disclosure = el('button', 'chain-chip-disclosure');
+      disclosure.type = 'button';
+      disclosure.setAttribute('aria-expanded', String(expanded));
+      disclosure.setAttribute('aria-label',
+        `Parameters of ${op.name} · ${entry.label}`);
+      disclosure.textContent = expanded ? '▾' : '▸';
+      disclosure.addEventListener('click', (/** @type {*} */ event) => {
+        event.stopPropagation();
+        select(expanded ? null : entry.label);
+      });
+      chip.appendChild(disclosure);
+    }
 
     if (crossing) {
       const pair = el('span', 'chain-chip-pair');
@@ -611,6 +806,8 @@ export function createChainStrip({
       chip.appendChild(toggle);
     }
 
+    if (expanded) chip.appendChild(paramsElement(entry, declared));
+
     chip.addEventListener('click', () => select(entry.label));
     chip.addEventListener('keydown',
       (/** @type {*} */ event) => chipKeydown(event, index, entry, crossing, chip));
@@ -622,7 +819,7 @@ export function createChainStrip({
    * @returns {*} The band's persistent insertion affordance.
    */
   const bandAddButton = (band) => {
-    const title = carrierTitle(band.carrier);
+    const title = titleCase(band.carrier);
     const add = el('button', 'chain-band-add');
     add.type = 'button';
     add.setAttribute('aria-haspopup', 'listbox');
@@ -650,6 +847,14 @@ export function createChainStrip({
     palette = null;
     dragState = null;
     layout = bandLayout();
+    rows.clear();
+
+    const snapshot = store.document();
+    declarations = snapshot.descriptor.parameters;
+    const presets = snapshot.preset_bank.presets;
+    const preset = presets.find(
+      (/** @type {*} */ candidate) => candidate.preset_id === presetId()) ?? presets[0];
+    values = { ...preset?.values };
 
     const chain = store.chain();
     const selected = store.selectedLabel();
@@ -672,6 +877,7 @@ export function createChainStrip({
     redoButton.addEventListener('click', () => redo());
     actions.appendChild(undoButton);
     actions.appendChild(redoButton);
+    history = { undo: undoButton, redo: redoButton };
 
     const strip = el('div', 'chain-strip');
     strip.setAttribute('role', 'listbox');
@@ -679,7 +885,7 @@ export function createChainStrip({
     strip.setAttribute('aria-orientation', 'horizontal');
     const view = { selected, bypassed, tabLabel };
     for (const band of layout) {
-      const title = carrierTitle(band.carrier);
+      const title = titleCase(band.carrier);
       const element = el('div', 'chain-band');
       element.setAttribute('role', 'group');
       element.setAttribute('aria-label', `${title} stages`);
@@ -705,6 +911,8 @@ export function createChainStrip({
     }
 
     container.replaceChildren(actions, strip);
+    container.dataset.expanded = String(rows.size > 0);
+    markDeactivated();
 
     const target = focusLabel !== null ? chipByLabel(focusLabel) : null;
     if (target) {
@@ -783,7 +991,7 @@ export function createChainStrip({
    * @returns {string} The reason for the shared status region.
    */
   const bandRefusal = (band, source) => {
-    const title = carrierTitle(band.carrier);
+    const title = titleCase(band.carrier);
     if (band.gaps.length === 0) return `the ${title} band holds no insertion point`;
     if (source.kind === 'chip') {
       const entry = store.chain()[source.index];
@@ -998,6 +1206,8 @@ export function createChainStrip({
       if (!target || typeof target.closest !== 'function') return false;
       if (target.closest('.chain-chip-bypass') || target.closest('.chain-chip-remove')
           || target.closest('.chain-chip-swap') || target.closest('.chain-band-add')
+          || target.closest('.chain-chip-disclosure')
+          || target.closest('.chain-chip-params')
           || target.closest('.chain-palette')) return false;
       const chip = target.closest('.chain-chip');
       if (!chip) return false;
@@ -1034,6 +1244,18 @@ export function createChainStrip({
     render,
     drag,
     insertOperator,
+
+    /**
+     * Repaints the Undo/Redo buttons a value edit moved, which a rebuild would
+     * do too — but a rebuild during a slider drag would replace the control
+     * under the pointer.
+     * @returns {void}
+     */
+    syncHistory() {
+      if (history === null) return;
+      history.undo.disabled = !store.canUndo();
+      history.redo.disabled = !store.canRedo();
+    },
 
     /** Detaches the strip's listeners and empties its container. */
     destroy() {

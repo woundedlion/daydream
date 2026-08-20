@@ -119,6 +119,22 @@
   font-family: var(--ui-font);
 }
 
+/* An expanded chip is wide, so the strip scrolls rather than crushing the
+   bands around it. The scroller would clip an absolutely placed palette, which
+   therefore flows inline for as long as a chip is open. */
+.chain-strip-region[data-expanded="true"] {
+  overflow-x: auto;
+}
+
+.chain-strip-region[data-expanded="true"] .chain-band {
+  flex: 0 0 auto;
+}
+
+.chain-strip-region[data-expanded="true"] .chain-palette {
+  position: static;
+  max-height: 12rem;
+}
+
 .chain-strip-actions {
   display: flex;
   flex-direction: column;
@@ -289,6 +305,91 @@
 .chain-chip-bypass[aria-pressed="true"] {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.chain-chip-disclosure {
+  margin: 0;
+  padding: 0 0.25rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted-text);
+  font-family: inherit;
+  font-size: 0.625rem;
+  cursor: pointer;
+}
+
+.chain-chip-disclosure:hover,
+.chain-chip-disclosure:focus-visible {
+  color: var(--bright-text);
+}
+
+/* ── Inline stage parameters ─────────────────────────────────────────────── */
+
+.chain-chip--expanded {
+  flex-wrap: wrap;
+  align-items: center;
+  white-space: normal;
+  cursor: default;
+}
+
+.chain-chip-params {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.125rem 0.375rem;
+  flex: 1 0 100%;
+  min-width: 16rem;
+  max-width: 22rem;
+  margin-top: 0.25rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--panel-border);
+}
+
+.chain-param {
+  display: contents;
+}
+
+/* A field the current topology value deactivates stays present and editable;
+   only the engine stops reading it. */
+.chain-param[data-deactivated="true"] {
+  opacity: 0.45;
+}
+
+.chain-param-name {
+  color: var(--muted-text);
+  font-size: 0.625rem;
+  white-space: nowrap;
+}
+
+.chain-param-control {
+  width: 100%;
+  min-width: 6rem;
+  color-scheme: dark;
+  color: var(--panel-text);
+  font: inherit;
+  font-size: 0.625rem;
+  accent-color: var(--accent);
+}
+
+select.chain-param-control {
+  grid-column: 2 / span 2;
+  padding: 0.0625rem 0.25rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.25rem;
+  background: var(--panel-bg);
+}
+
+.chain-param-option {
+  color: var(--panel-text);
+  background-color: var(--panel-bg);
+}
+
+.chain-param-value {
+  color: var(--muted-text);
+  font-family: monospace;
+  font-size: 0.625rem;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .chain-gap {
