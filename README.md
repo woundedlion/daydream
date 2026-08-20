@@ -528,6 +528,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 ├── holosphere_wasm.wasm.sha256 `sha256sum -c` manifest over the installed .wasm and .js — verified by the deploy gate
 ├── holosphere_wasm.toolchain   emsdk + clang versions and the build configuration that produced the module
 ├── holosphere_wasm.d.ts        Hand-written declarations for the installed glue — what the typecheck sees
+├── file_system_access.d.ts     Save-picker declarations lib.dom omits, for recorder.js's streaming sink
 ├── pov_segment_map.json        Firmware segment→canvas golden, installed from Holosphere — read by the segment cross-check
 ├── README.md                   Installed from Holosphere (this file)
 ├── docs/screenshots/           Installed from Holosphere
@@ -538,7 +539,6 @@ Both trees are gated against their repository's tracked file list: every row mus
 ├── daydream.js                 App entry: WASM loader, state wiring, GUI/sidebar
 ├── app_lifecycle.js            Composition-root frame adapter, display-alias heal, Test All
 │                                  ticker, segmented spawn epoch, and teardown
-├── app_lifecycle.d.ts          Hand-written declarations for app_lifecycle.js — what the typecheck sees
 ├── engine_host.js              Owns the main-thread WASM engine + its reassignable display state
 ├── effect_gui.js               Effect panel lifecycle: build, mount, value sync, Export, teardown
 ├── shader_stages.js            DOM-free shader stage taxonomy: schema detection, stage assignment, control labels
@@ -613,6 +613,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── require-tests.mjs       `pretest` guard: fails below the committed test-file floor
 │   ├── serve-manifest.mjs      Local static server constrained to the published site manifest
 │   ├── workbench-probe.mjs     Headless pointer-level probe of the shader workbench's pipeline strip; run it for any tools/ UI change
+│   ├── panel-probe.mjs         Headless probe of the effect panel's real scroll clamping and scroll restore across a rebuild
 │   └── run-tests.mjs           `test` script: runs the suite, gates the total it reports
 │
 ├── tests/                      Node unit tests (`npm test`)
