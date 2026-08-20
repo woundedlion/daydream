@@ -1036,7 +1036,13 @@ export function createChainStrip({
     return commit(store.chain()[index]?.label ?? null);
   };
 
-  container.addEventListener('keydown', (/** @type {*} */ event) => {
+  /**
+   * The container's history shortcut. The container outlives the strip, so
+   * destroy() must take it back off.
+   * @param {*} event - A keydown anywhere in the strip.
+   * @returns {void}
+   */
+  const historyKeydown = (event) => {
     if (!(event.ctrlKey || event.metaKey)) return;
     const key = typeof event.key === 'string' ? event.key.toLowerCase() : '';
     if (key === 'z' && !event.shiftKey) {
@@ -1046,7 +1052,8 @@ export function createChainStrip({
       event.preventDefault();
       redo();
     }
-  });
+  };
+  container.addEventListener('keydown', historyKeydown);
 
   render();
 
@@ -1067,8 +1074,14 @@ export function createChainStrip({
       history.redo.disabled = !store.canRedo();
     },
 
-    /** Detaches the strip's listeners and empties its container. */
+    /**
+     * Detaches the strip's listeners and empties its container. Every other
+     * listener sits on an element the strip built inside the container, so
+     * emptying it drops them.
+     * @returns {void}
+     */
     destroy() {
+      container.removeEventListener('keydown', historyKeydown);
       container.replaceChildren();
     },
   };
