@@ -44,6 +44,7 @@ import {
 import { EngineHost } from "./engine_host.js";
 import { reportPageFailures, showFatalError } from "./tools/banner.js";
 import { showBootstrapFailure } from "./bootstrap.js";
+import { enumConstantName } from "./param_sync.js";
 import { copyToClipboard } from "./tools/copy_text.js";
 import { importLegacyShaderSelection, LEGACY_SHADER_ALIAS } from "./legacy_shader_import.js";
 import { createShaderDocumentController } from "./tools/shader_documents.js";
@@ -310,17 +311,6 @@ export function start({
     if (e.target === doc.getElementById('apply-notice-dismiss')) applyNotice.clear();
   };
   doc.addEventListener('click', onApplyNoticeDismiss);
-
-  /**
-   * Name an enum value for logging.
-   * @param {Object} values - A Module enum object, constant name to value.
-   * @param {Object} result - One of that enum's values.
-   * @returns {string} The enum constant's name, e.g. "READONLY".
-   */
-  function enumConstantName(values, result) {
-    return Object.keys(values).find((name) => values[name] === result)
-      ?? 'unrecognized result';
-  }
 
   /**
    * Narrow the resolution dropdown to the rows the engine reports it can build,
@@ -602,9 +592,9 @@ export function start({
     getFullConfigSnapshot: () => host.engine.getFullConfigSnapshot(),
     getFullConfigFieldDefinitions: () =>
       host.engine.getFullConfigFieldDefinitions(),
-    restoreFullConfigSnapshot: (snapshot) => enumConstantName(
-      host.module.FullConfigRestoreResult,
-      host.engine.restoreFullConfigSnapshot(snapshot)),
+    restoreFullConfigSnapshot: (snapshot) =>
+      host.engine.restoreFullConfigSnapshot(snapshot),
+    fullConfigRestoreResults: () => host.module.FullConfigRestoreResult,
     getConfigImportNotice: () => host.engine.getConfigImportNotice(),
     clearConfigImportNotice: () => host.engine.clearConfigImportNotice(),
     showConfigImportNotice: (message) => applyNotice.show(message, CONFIG_NOTICE),

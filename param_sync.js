@@ -150,3 +150,15 @@ export function paramExportBlocker(values, expectedLength, canCopy) {
 export function paramGenerationStale(snapshotGeneration, streamGeneration) {
   return snapshotGeneration !== streamGeneration;
 }
+
+/**
+ * Name an engine enum value for a log message.
+ * @param {Record<string, unknown>} values - A Module enum object, constant name
+ *   to value.
+ * @param {unknown} result - One of that enum's values.
+ * @returns {string} The enum constant's name, e.g. "READONLY".
+ */
+export function enumConstantName(values, result) {
+  return Object.keys(values).find((name) => values[name] === result)
+    ?? 'unrecognized result';
+}

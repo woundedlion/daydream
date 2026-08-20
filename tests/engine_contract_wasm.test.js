@@ -257,9 +257,9 @@ test('the module EffectSetResult enum matches the fake_engine.js mirror', () => 
   }
 });
 
-// daydream.js compares restoreFullConfigSnapshot's return against
-// module.FullConfigRestoreResult?.APPLIED and segment_worker.js reads the whole
-// roster off the module, both through optional chains: a renumbered or dropped
+// The effect panel compares restoreFullConfigSnapshot's return against
+// module.FullConfigRestoreResult.APPLIED and segment_worker.js reads the whole
+// roster off the module through an optional chain: a renumbered or dropped
 // value reads as a silent restore failure at those call sites.
 test('the module FullConfigRestoreResult enum matches the fake_engine.js mirror', () => {
   assert.ok(M.FullConfigRestoreResult, 'the module must export FullConfigRestoreResult');
