@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { bootstrap, refreshModuleCache, showBootstrapFailure } from '../bootstrap.js';
+import {
+  bootstrap, refreshModuleCache, showBootstrapFailure, VENDOR_REMEDY,
+} from '../bootstrap.js';
 import { fakeElement } from './fake_dom.js';
 
 function fakeDocument() {
@@ -79,6 +81,18 @@ test('failure detail is assigned as text without interpreting markup', () => {
   assert.doesNotThrow(() => showBootstrapFailure(
     { message: markup }, { document: doc }));
   assert.equal(childWithClass(overlay, 'load-error-detail').textContent, markup);
+});
+
+test('the failure overlay names the CDN libraries and their local remedy', () => {
+  const { doc, overlay } = fakeDocument();
+
+  showBootstrapFailure(new Error('failed'), { document: doc });
+
+  const remedy = childWithClass(overlay, 'load-error-remedy').textContent;
+  assert.match(remedy, /three/);
+  assert.match(remedy, /cdn\.jsdelivr\.net/);
+  assert.match(remedy, /importmap:local/);
+  assert.equal(remedy, VENDOR_REMEDY);
 });
 
 test('the failure overlay moves focus onto its reload button', () => {

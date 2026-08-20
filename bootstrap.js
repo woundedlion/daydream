@@ -17,6 +17,13 @@ function errorDetail(error) {
   return String(error);
 }
 
+// The vendored libraries index.html loads from the CDN, and the remedy for a
+// page that cannot reach it. refreshModuleCache is same-origin only, so a
+// Reload re-attempts the CDN fetch but never repairs a cached vendor module.
+export const VENDOR_REMEDY = 'three and lil-gui load from cdn.jsdelivr.net. If '
+  + 'this machine is offline or the CDN is blocked, run `npm run importmap:local` '
+  + 'to serve the vendored copies instead (README §10.8).';
+
 // Extensions refreshModuleCache re-fetches. The WASM binary is in because the
 // deploy binds it to its glue by content hash, so a cached binary against fresh
 // glue is the canonical skew a Reload has to clear.
@@ -113,6 +120,10 @@ export function showBootstrapFailure(error, {
   detail.className = 'load-error-detail';
   detail.textContent = errorDetail(error);
 
+  const remedy = doc.createElement('span');
+  remedy.className = 'load-error-remedy';
+  remedy.textContent = VENDOR_REMEDY;
+
   const reload = doc.createElement('button');
   reload.type = 'button';
   reload.className = 'context-lost-reload';
@@ -131,7 +142,7 @@ export function showBootstrapFailure(error, {
   // The markup ships role="status" for the polite loading message; a boot
   // failure is assertive.
   overlay.setAttribute('role', 'alert');
-  overlay.replaceChildren(title, detail, reload);
+  overlay.replaceChildren(title, detail, remedy, reload);
   // A role swap on a live node is not reliably announced; focus carries it, and
   // leaves the keyboard user on the one control the overlay offers.
   reload.focus({ preventScroll: true });
