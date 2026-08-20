@@ -301,6 +301,9 @@ test('a preset reports its own effect list', () => {
 test('an unknown preset, or one carrying no list, reports none', () => {
   assert.equal(resolutionEffects({ Lo: { favorites: ['A'] } }, 'Mid'), null);
   assert.equal(resolutionEffects({ Lo: { dotSize: 2 } }, 'Lo'), null);
+  for (const name of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
+    assert.equal(resolutionEffects({ Lo: { favorites: ['A'] } }, name), null, name);
+  }
 });
 
 // switchFailureReport turns a runSwitchTransaction outcome into console lines
