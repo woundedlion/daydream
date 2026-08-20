@@ -405,6 +405,20 @@ export function createChainStrip({
   };
 
   /**
+   * The one-for-one replacement of one chip: an operator the chip already
+   * carries keeps its label, and with it every tuned value, rather than
+   * re-seating the stage on the catalog's defaults.
+   * @param {number} index - The chip's chain index.
+   * @param {string} operatorId - The operator replacing it.
+   * @returns {{label?: string, operator: string}} The replacement entry.
+   */
+  const replacementEntry = (index, operatorId) => {
+    const entry = store.chain()[index];
+    return entry !== undefined && entry.operator === operatorId
+      ? { label: entry.label, operator: operatorId } : { operator: operatorId };
+  };
+
+  /**
    * Moves the chip at one chain index to a gap, as the m-for-m span replacement
    * that keeps every label (and so every parameter value).
    * @param {number} index - The chip's chain index.
@@ -538,7 +552,8 @@ export function createChainStrip({
       const result = remove
         ? store.replaceSpan(index, 1, [])
         : store.replaceSpan(index, kind === 'insert' ? 0 : 1,
-          [{ operator: entry.dataset.operator }]);
+          [kind === 'insert' ? { operator: entry.dataset.operator }
+            : replacementEntry(index, entry.dataset.operator)]);
       if (!result.ok) {
         report(result);
         return;
@@ -1251,7 +1266,8 @@ export function createChainStrip({
       return false;
     }
     const result = store.replaceSpan(index, socket === null ? 0 : 1,
-      [{ operator: operatorId }]);
+      [socket === null ? { operator: operatorId }
+        : replacementEntry(socket, operatorId)]);
     if (!result.ok) return report(result);
     return commit(store.chain()[index]?.label ?? null);
   };

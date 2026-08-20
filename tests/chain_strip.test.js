@@ -274,6 +274,36 @@ test('Delete and swap both open a socket replacement palette', async () => {
   assert.equal(h.doc.activeElement.dataset.label, h.store.chain()[PROJECT].label);
 });
 
+// Picking the operator a socket already carries is a no-op, not a re-seat: the
+// instance keeps its label, and with it every tuned value.
+test('a swap onto the operator the socket carries keeps the instance', async () => {
+  const h = await makeStrip();
+  const before = h.store.document();
+  assert.equal(before.preset_bank.presets[0].values['project.pole-fade'] !== 1, true,
+    'the fixture tunes the socket away from the catalog default');
+
+  chipByLabel(h, 'project').querySelector('.chain-chip-swap').dispatch('click');
+  paletteEntries(h)
+    .find((entry) => entry.dataset.operator === 'project.stereographic.v2')
+    .dispatch('click');
+  assert.deepEqual(h.store.document(), before,
+    'label, values, presets and serialization fields are all untouched');
+  assert.equal(h.store.canUndo(), false, 'an edit that changes nothing has nothing to undo');
+  assert.equal(paletteOf(h), null);
+  assert.equal(h.doc.activeElement.dataset.label, 'project');
+
+  chipByLabel(h, 'project').querySelector('.chain-chip-swap').dispatch('click');
+  paletteEntries(h).find((entry) => entry.dataset.operator === 'project.bonne.v2')
+    .dispatch('click');
+  const after = h.store.document();
+  assert.deepEqual(after.descriptor.chain[PROJECT],
+    { label: 'project1', operator: 'project.bonne.v2' },
+    'a different operator retires the instance and seats a fresh one');
+  assert.equal(after.preset_bank.presets[0].values['project1.pole-fade'], 1,
+    'the fresh instance opens on the catalog defaults');
+  assert.equal(h.store.canUndo(), true);
+});
+
 test('a band + and Insert both open the insertion palette at their gap', async () => {
   const h = await makeStrip();
   bandFor(h, 'sphere').querySelector('.chain-band-add').dispatch('click');
@@ -611,6 +641,26 @@ test('a crossing lands on the socket its carrier pair names', async () => {
   assert.equal(h.applied.length, 1, 'the swap re-applies the program');
   assert.equal(chipByLabel(h, h.store.chain()[PROJECT].label)
     .querySelector('.chain-chip-name').textContent, 'Gnomonic');
+});
+
+// The library commits the same one-for-one replacement the socket's swap does,
+// so clicking the projection already in the chain must leave it alone.
+test('a library crossing already in the chain keeps the socket', async () => {
+  const h = await makeStrip();
+  const before = h.store.document();
+
+  assert.equal(h.strip.insertOperator('project.stereographic.v2'), true);
+  assert.deepEqual(h.store.document(), before,
+    'label, values, presets and serialization fields are all untouched');
+  assert.equal(h.store.canUndo(), false, 'an edit that changes nothing has nothing to undo');
+
+  assert.equal(h.strip.insertOperator('project.gnomonic.v2'), true);
+  const after = h.store.document();
+  assert.deepEqual(after.descriptor.chain[PROJECT],
+    { label: 'project1', operator: 'project.gnomonic.v2' });
+  assert.equal(after.preset_bank.presets[0].values['project1.pole-fade'], 1,
+    'the fresh instance opens on the catalog defaults');
+  assert.equal(h.store.canUndo(), true);
 });
 
 test('a crossing no socket in the chain matches is refused', async () => {
