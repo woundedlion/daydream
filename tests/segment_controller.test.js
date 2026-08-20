@@ -1832,9 +1832,9 @@ test('composite() marks the horizontal seam between stacked Y-band segments', ()
   assert.equal(driver.pixels[idx(1, 3, 4)], 222, 'bottom-band interior untouched');
 });
 
-test('composite() draws no x=0 line when only one arm reported', () => {
-  // The x=0 line is arm 1's leading edge seen across the wrap, so a frame whose
-  // only results start at x=0 has no vertical boundary at all.
+test('composite() marks the layout seams, not only the reported segments', () => {
+  // The seams describe the layout, so a frame that only two of the four segments
+  // reported carries the same overlay as a complete one.
   driver.W = 4; driver.H = 4;
   driver.pixels = new Uint16Array(4 * 4 * 3);
 
@@ -1850,10 +1850,10 @@ test('composite() draws no x=0 line when only one arm reported', () => {
 
   c.composite();
 
-  assert.ok(!isCyan(0, 0) && !isCyan(2, 0), 'no vertical seam is drawn');
+  assert.ok(isCyan(2, 0) && isCyan(0, 0), 'arm split at x=2 and wrap seam at x=0 marked');
   assert.ok([0, 1, 2, 3].every((x) => isCyan(x, 2)), 'the band seam is still marked');
-  assert.equal(driver.pixels[idx(0, 0, 4)], 111, 'top-band interior untouched');
-  assert.equal(driver.pixels[idx(2, 0, 4)], 0, 'the unreported arm stays black');
+  assert.equal(driver.pixels[idx(1, 0, 4)], 111, 'top-band interior untouched');
+  assert.equal(driver.pixels[idx(3, 0, 4)], 0, 'the unreported arm stays black');
 });
 
 test('composite() self-heals a broken display-buffer alias instead of throwing', () => {

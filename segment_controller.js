@@ -408,13 +408,14 @@ export class SegmentController {
     /** @type {ReturnType<typeof setTimeout> | null} */
     this.retryTimer = null;
 
-    // Cached boundary-overlay seam coordinates, rebuilt only when renderGen bumps
-    // (segment geometry is fixed within a generation).
+    // Cached boundary-overlay seam coordinates, rebuilt whenever the band table
+    // they were derived from is replaced.
     /** @type {number[]} */
     this.boundaryYs = [];
     /** @type {number[]} */
     this.boundaryXs = [];
-    this.boundaryGen = -1;
+    /** @type {import('./segment_layout.js').SegRange[] | null} */
+    this.boundaryBands = null;
 
     // Cached per-segment band rectangles composite()'s pre-pass validates
     // against, rebuilt only when the layout the cache key names moves.
@@ -1333,7 +1334,7 @@ export class SegmentController {
     // Skip on a fully generation-fenced frame (blitted === 0): the buffer is black
     // and stamping seams would show cyan lines on an otherwise-blank sphere.
     if (this.showBoundaries && blitted > 0) {
-      if (this.boundaryGen !== this.renderGen) this.rebuildBoundaries();
+      if (this.boundaryBands !== bands) this.rebuildBoundaries(bands);
       stampBoundaries(dst, w, h, this.boundaryXs, this.boundaryYs);
     }
 
@@ -1377,24 +1378,25 @@ export class SegmentController {
   }
 
   /**
-   * Recompute the cached boundary-overlay seam coordinates from the current
-   * layout and stamp them with renderGen. Segment geometry is fixed within a
-   * generation, so composite() reuses this cache until the next resolution bump.
+   * Recompute the cached boundary-overlay seam coordinates from the band table,
+   * held against the table they came from. segmentBands() replaces that table
+   * only when the layout moves, so composite() reuses this cache until it does.
+   * @param {import('./segment_layout.js').SegRange[]} bands - The current layout.
+   * @returns {void}
    */
-  rebuildBoundaries() {
+  rebuildBoundaries(bands) {
     const yBounds = new Set();
     const xBounds = new Set();
-    for (const r of this.results) {
-      if (!r) continue;
+    for (const band of bands) {
       // Y does not wrap (y0 == 0 is the top edge); X wraps on the cylinder, so
       // the x == 0 seam is added below only once the layout is split.
-      if (r.y0 > 0) yBounds.add(r.y0);
-      if (r.x0 > 0) xBounds.add(r.x0);
+      if (band.y0 > 0) yBounds.add(band.y0);
+      if (band.x0 > 0) xBounds.add(band.x0);
     }
     if (xBounds.size > 0) xBounds.add(0);
     this.boundaryYs = [...yBounds];
     this.boundaryXs = [...xBounds];
-    this.boundaryGen = this.renderGen;
+    this.boundaryBands = bands;
   }
 
   /**
