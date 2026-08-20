@@ -25,9 +25,14 @@ export const LEGACY_SHADER_PRESETS = Object.freeze([
   ['EquatorGrid', 'open-grid'],
   ['EquatorGrid', 'fine-grid'],
   ['CosmicEyeball', 'mirrored-grid'],
+  ['MobiusGrid', 'mobius-grid'],
+  ['MobiusGrid', 'mobius-grid-2'],
+  ['SignalWeave', 'signal-weave-2'],
+  ['SignalWeave', 'signal-weave-3'],
+  ['SignalWeave', 'signal-weave-4'],
 ]);
 
-const PIPELINE_EFFECTS = Object.freeze({
+export const PIPELINE_EFFECTS = Object.freeze({
   GLITCH_NOISE_GRID_WAVE_SHEAR: 'SignalWeave',
   KALEIDOSCOPE_TWIN_WAVE_INNER_MIRROR: 'KaleidoWave',
   GNOMONIC_KALEIDOSCOPE_GRID_MIRROR: 'AlienOcean',
@@ -42,6 +47,7 @@ const PIPELINE_EFFECTS = Object.freeze({
   STEREOGRAPHIC_HEXAGONAL_PRISM_TWIN_WAVE_INNER_MIRROR: 'HexWave',
   EQUIRECTANGULAR_DODECAHEDRAL_GRID_INNER_MIRROR: 'EquatorGrid',
   STEREOGRAPHIC_GLITCH_GRID_MIRROR: 'CosmicEyeball',
+  STEREOGRAPHIC_MOBIUS_TWIN_WAVE_INNER_MIRROR: 'MobiusGrid',
 });
 
 /**
