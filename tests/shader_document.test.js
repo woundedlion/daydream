@@ -88,12 +88,14 @@ const parseFailure = (source, limits) => {
 
 /** Verifies the reader accepts well-formed JSON as JSON.parse reads it. */
 test('the reader parses a committed document as JSON.parse does', () => {
-  assert.deepEqual(parseShaderDocument(EXAMPLE), JSON.parse(EXAMPLE));
-  assert.deepEqual(parseShaderDocument('{"a":[1,-2.5,1e2,true,false,null,""]}'), {
+  // The reader's objects carry no prototype, so compare the values through a clone.
+  const values = (source) => structuredClone(parseShaderDocument(source));
+  assert.deepEqual(values(EXAMPLE), JSON.parse(EXAMPLE));
+  assert.deepEqual(values('{"a":[1,-2.5,1e2,true,false,null,""]}'), {
     a: [1, -2.5, 100, true, false, null, ''],
   });
-  assert.deepEqual(parseShaderDocument(' \n\t{ "a" : { } , "b" : [ ] } '), { a: {}, b: [] });
-  assert.deepEqual(parseShaderDocument('{"a":"\\u00e9\\n\\\\"}'), { a: 'é\n\\' });
+  assert.deepEqual(values(' \n\t{ "a" : { } , "b" : [ ] } '), { a: {}, b: [] });
+  assert.deepEqual(values('{"a":"\\u00e9\\n\\\\"}'), { a: 'é\n\\' });
   assert.deepEqual(Object.keys(parseShaderDocument('{"é":1}')), ['é']);
 });
 
@@ -105,6 +107,29 @@ test('the reader parses a committed document as JSON.parse does', () => {
 test('the reader rejects what JSON.parse would silently accept', () => {
   assert.deepEqual(parseFailure('{"a":1,"a":2}'), ['DUPLICATE_KEY', '$.a']);
   assert.deepEqual(JSON.parse('{"a":1,"a":2}'), { a: 2 });
+});
+
+/**
+ * Verifies a "__proto__" key lands in the object. Run through the prototype
+ * setter it leaves no unknown field to report and no bytes in the canonical
+ * form, so two different sources take one identity.
+ */
+test('a __proto__ key is an ordinary field, not a prototype write', () => {
+  const bare = parseShaderDocument('{"__proto__":{"schema_version":2}}');
+  assert.deepEqual(Object.keys(bare), ['__proto__']);
+  assert.equal('schema_version' in bare, false);
+
+  const poisoned = compile(EXAMPLE.replace('"descriptor": {', '"descriptor": {"__proto__": {},'));
+  assert.equal(poisoned.status, 'INVALID');
+  assert.deepEqual(poisoned.diagnostics.map((entry) => [entry.code, entry.path]),
+    [['UNKNOWN_FIELD', '$.descriptor.__proto__']]);
+
+  // Metadata takes any key, so this document is accepted, and must stay distinct.
+  const carried = compile(EXAMPLE.replace('"study_metadata": {', '"study_metadata": {"__proto__": 1,'));
+  assert.equal(carried.status, 'VALID');
+  assert.ok(exportShaderDocumentJson(carried.document).includes('"__proto__": 1'));
+  assert.notEqual(exportShaderDocumentJson(carried.document),
+    exportShaderDocumentJson(compile(EXAMPLE).document));
 });
 
 /** Verifies malformed JSON is refused with a phase, code and path. */
@@ -135,7 +160,8 @@ test('the reader enforces the document limits', () => {
 
 /** Verifies a limits override leaves the unnamed limits at their defaults. */
 test('a limits override keeps the defaults it does not name', () => {
-  assert.deepEqual(parseShaderDocument('{"a":{"b":1}}', { bytes: 32 }), { a: { b: 1 } });
+  assert.deepEqual(structuredClone(parseShaderDocument('{"a":{"b":1}}', { bytes: 32 })),
+    { a: { b: 1 } });
   assert.deepEqual(
     parseFailure(`{"a":"${'x'.repeat(DEFAULT_LIMITS.stringLength + 1)}"}`, { bytes: 1 << 20 }),
     ['STRING_LIMIT', '$.a'],
@@ -262,7 +288,7 @@ test('the canonical descriptor keeps chain order and labels', () => {
   const document = example();
   const descriptor = canonicalDescriptor(document);
 
-  assert.deepEqual(descriptor.chain, document.descriptor.chain);
+  assert.deepEqual(structuredClone(descriptor.chain), document.descriptor.chain);
   assert.ok(descriptor.chain.every((entry) => 'label' in entry && 'operator' in entry));
   assert.deepEqual(
     descriptor.parameters.map((parameter) => parameter.id),
