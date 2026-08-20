@@ -558,12 +558,23 @@ test('pointer gestures never start a chip drag', async () => {
     (listener) => listener.type.startsWith('pointer')), []);
 });
 
-test('destroy detaches the pointer listeners and empties the strip', async () => {
+test('destroy detaches the strip listeners and empties the strip', async () => {
   const h = await makeStrip();
+  bandFor(h, 'plane').querySelector('.chain-band-add').dispatch('click');
+  paletteEntries(h)
+    .find((entry) => entry.dataset.operator === 'warp.wave-shear.v2')
+    .dispatch('click');
+  assert.deepEqual(h.container.listeners.map((listener) => listener.type), ['keydown'],
+    'the history shortcut is the one listener the strip binds to its mount');
+
   h.strip.destroy();
   assert.equal(h.container.childNodes.length, 0);
-  assert.deepEqual(h.container.listeners.filter(
-    (listener) => listener.type.startsWith('pointer')), []);
+  assert.deepEqual(h.container.listeners, [],
+    'the next document reuses the mount, so nothing may stay bound to it');
+
+  h.container.dispatch('keydown', { key: 'z', ctrlKey: true });
+  assert.equal(labels(h).length, 8, 'a destroyed strip undoes nothing');
+  assert.equal(h.container.childNodes.length, 0, 'and repaints nothing');
 });
 
 // ── Inline stage parameters ─────────────────────────────────────────────────
