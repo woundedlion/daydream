@@ -514,7 +514,8 @@ export function offeredResolutions(presets, supported) {
  *   leaving the sidebar and the effect switch with nothing to offer.
  */
 export function resolutionEffects(presets, resolution) {
-  return presets[resolution]?.favorites ?? null;
+  const preset = Object.hasOwn(presets, resolution) ? presets[resolution] : null;
+  return preset?.favorites ?? null;
 }
 
 /**
