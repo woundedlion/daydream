@@ -89,11 +89,7 @@ test('holosphere_wasm.d.ts declares the pinned engine method roster', () => {
   // parse as nothing and be pinned by neither loop below.
   const declared = new Set(
     [...body.matchAll(/^\s*([A-Za-z_]\w*)\??\s*\(/gm)].map((m) => m[1]));
-  // getAnimationsPaused is read through an optional call, so it is absent from
-  // ENGINE_METHODS while still being part of the surface the app drives.
-  for (const name of [
-    ...ENGINE_METHODS, ...ENGINE_OPTIONAL_METHODS, 'getAnimationsPaused',
-  ]) {
+  for (const name of [...ENGINE_METHODS, ...ENGINE_OPTIONAL_METHODS]) {
     assert.ok(declared.has(name),
       `holosphere_wasm.d.ts is missing ${name}, which the app calls`);
   }
@@ -726,9 +722,145 @@ test('getParamGeneration and setPoleLod stay exported', () => {
 
   assert.equal(typeof engine.setPoleLod, 'function',
     'setPoleLod must stay callable (daydream.js binds the Pole LOD slider to it)');
-  // daydream.js's slider spans [0, 2].
-  for (const v of [0, 1, 2]) engine.setPoleLod(v);
+  assert.equal(engine.getPoleLod(), 0,
+    'a fresh engine must start undecimated (HS_POLE_LOD_DEFAULT)');
+  // daydream.js's slider spans [0, 2]; the setting is what the segmented
+  // controller has to forward to every worker, so it has to be readable back.
+  for (const v of [0, 1, 2]) {
+    engine.setPoleLod(v);
+    assert.equal(engine.getPoleLod(), v, `setPoleLod(${v}) must read back`);
+  }
+  // Non-finite and negative input clamps off rather than poisoning the walk
+  // with a NaN decimation width; a finite excess saturates instead.
+  for (const v of [-1, Number.NaN, Infinity, -Infinity]) {
+    engine.setPoleLod(v);
+    assert.equal(engine.getPoleLod(), 0, `setPoleLod(${v}) must clamp to 0`);
+  }
+  for (const v of [9, 1000]) {
+    engine.setPoleLod(v);
+    assert.equal(engine.getPoleLod(), 8, `setPoleLod(${v}) must saturate at 8`);
+  }
   engine.setPoleLod(0);
+});
+
+// getPresetIds is the persisted identity behind selectPresetById: daydream.js
+// restores a preset by ID rather than by index, so an ID roster that stops
+// matching the navigation order silently restores a different preset.
+test('getPresetIds names the presets selectPresetById answers to', () => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+
+  const malformed = [];
+  let identified = null;
+  for (const name of Object.keys(engine.getEffectSizes())) {
+    if (engine.setEffect(name) !== M.EffectSetResult.INSTALLED) continue;
+    const ids = engine.getPresetIds();
+    if (!Array.isArray(ids)) {
+      malformed.push(`${name}: getPresetIds returned ${typeof ids}`);
+      continue;
+    }
+    // A fixed-pipeline effect carries no stable metadata and reports none; an
+    // effect that reports any must name every preset it navigates.
+    if (ids.length === 0) continue;
+    if (ids.length !== engine.getPresetCount()) {
+      malformed.push(`${name}: ${ids.length} ids for ${engine.getPresetCount()} presets`);
+    } else if (new Set(ids).size !== ids.length) {
+      malformed.push(`${name}: duplicate ids ${ids.join()}`);
+    } else if (ids.some((id) => typeof id !== 'string' || id === '')) {
+      malformed.push(`${name}: a preset id is not a non-empty string`);
+    }
+    if (!identified && ids.length > 1) identified = { effect: name, ids };
+  }
+  assert.deepEqual(malformed.slice(0, 5), [],
+    `${malformed.length} effects report a malformed preset-id roster`);
+  assert.ok(identified,
+    'no effect carries two identified presets, so selection by ID is unreachable');
+
+  assert.equal(engine.setEffect(identified.effect), M.EffectSetResult.INSTALLED,
+    `setEffect must succeed for ${identified.effect}`);
+  engine.setAnimationsPaused(false);
+
+  // The roster is in navigation order, so the nth ID must select index n.
+  assert.equal(engine.selectPresetById(identified.ids[1]), true,
+    'a listed preset id must be selectable');
+  assert.equal(engine.getPresetIndex(), 1,
+    'the id roster is not in the order the index navigates');
+  assert.equal(engine.getAnimationsPaused(), true,
+    'selectPresetById must engage the pause selectPreset does');
+
+  engine.setAnimationsPaused(false);
+  for (const id of ['', 'no-such-preset']) {
+    assert.equal(engine.selectPresetById(id), false,
+      `selectPresetById("${id}") must be rejected`);
+  }
+  assert.equal(engine.getPresetIndex(), 1,
+    'a rejected selectPresetById must leave the active preset alone');
+  assert.equal(engine.getAnimationsPaused(), false,
+    'a rejected selectPresetById must not engage the pause');
+});
+
+// effect_gui.js round-trips the whole Shader workbench through these four
+// accessors and compares the restore outcome against the enum, so the shapes and
+// the rejection roster are the contract — not just that the methods exist.
+test('the full-config accessors answer as the workbench panel assumes', () => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
+    'setEffect must succeed for a registered effect');
+
+  // effect_gui.js takes null as "this effect keeps no snapshot" and skips the
+  // whole full-config path, so a non-Shader effect must answer with one.
+  assert.equal(engine.getFullConfigSnapshot(), null,
+    'a non-Shader effect must report no snapshot');
+  assert.equal(engine.getFullConfigFieldDefinitions(), null,
+    'a non-Shader effect must report no field definitions');
+  assert.equal(engine.restoreFullConfigSnapshot(null),
+    M.FullConfigRestoreResult.NOT_SHADERBALL,
+    'restoring into a non-Shader effect must be refused by name');
+  assert.equal(typeof engine.getConfigImportNotice(), 'string',
+    'the notice is rendered straight into the panel, so it must be a string');
+
+  assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED,
+    'setEffect must succeed for ShaderBall');
+  const snapshot = engine.getFullConfigSnapshot();
+  assert.deepEqual(Object.keys(snapshot),
+    ['schemaVersion', 'accepted', 'requested', 'pendingFieldIds', 'hasRuntime', 'runtime'],
+    'the snapshot is persisted verbatim, so its keys are the storage format');
+  assert.equal(typeof snapshot.schemaVersion, 'number');
+  assert.equal(snapshot.requested.length, snapshot.accepted.length,
+    'accepted and requested must be the same field count');
+  assert.deepEqual(snapshot.pendingFieldIds, [],
+    'a freshly loaded effect must carry no unresolved edit');
+  assert.equal(typeof snapshot.hasRuntime, 'boolean');
+
+  const fields = engine.getFullConfigFieldDefinitions();
+  assert.equal(fields.length, snapshot.accepted.length,
+    'a field with no definition cannot be labelled without hardcoding its index');
+  assert.deepEqual(fields.map((f) => f.id), fields.map((_, i) => i),
+    'the id is the index into the snapshot arrays');
+  assert.ok(fields.every((f) => typeof f.name === 'string' && f.name.includes('.')),
+    'every field must carry its stable dotted config path');
+
+  assert.equal(engine.restoreFullConfigSnapshot(snapshot),
+    M.FullConfigRestoreResult.APPLIED,
+    'the engine refused the snapshot it had just produced');
+
+  // Each rejection leaves the effect exactly as it was, so a refused restore
+  // needs no rollback — which is why the panel only logs and returns.
+  for (const [outcome, bad] of [
+    [M.FullConfigRestoreResult.UNSUPPORTED_VERSION,
+      { ...snapshot, schemaVersion: snapshot.schemaVersion - 1 }],
+    [M.FullConfigRestoreResult.INVALID_LENGTH,
+      { ...snapshot, accepted: snapshot.accepted.slice(1) }],
+    [M.FullConfigRestoreResult.INVALID_PENDING,
+      { ...snapshot, pendingFieldIds: [snapshot.accepted.length] }],
+  ]) {
+    assert.equal(engine.restoreFullConfigSnapshot(bad), outcome);
+  }
+  assert.deepEqual(engine.getFullConfigSnapshot(), snapshot,
+    'a refused restore changed the effect');
+
+  engine.clearConfigImportNotice();
+  assert.equal(engine.getConfigImportNotice(), '',
+    'the notice must be consumed by the clear the panel pairs with it');
 });
 
 // daydream.js reads the pause indicator through an optional-call guard
