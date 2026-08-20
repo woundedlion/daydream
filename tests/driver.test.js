@@ -526,6 +526,43 @@ test('stepSimulation adds no upload flag when a mid-frame heap growth detached t
   assert.equal(ctx.dotMesh.instanceColor.version, 1, 'driver flagged a detached array');
 });
 
+/** Render adapter tallying the frames it was asked to draw.
+ * @returns {{drawFrame: () => void, frames: number}} The adapter.
+ */
+const countingAdapter = () => ({ frames: 0, drawFrame() { this.frames++; } });
+
+test('stepSimulation advances nothing while paused', () => {
+  const ctx = stepCtx(new Uint16Array([7, 7, 7, 7]));
+  ctx.paused = true;
+  let stats = 0;
+  ctx.updateStats = () => { stats++; };
+  const adapter = countingAdapter();
+
+  assert.equal(Daydream.prototype.stepSimulation.call(ctx, adapter), false);
+  assert.equal(adapter.frames, 0, 'a paused sim drew a frame');
+  assert.deepEqual([...ctx.pixels], [7, 7, 7, 7], 'a paused sim cleared the buffer');
+  assert.equal(stats, 0, 'a paused sim charged the stats a frame time');
+  assert.equal(ctx.dotMesh.instanceColor.version, 0);
+});
+
+test('a queued single step advances one frame and spends itself', () => {
+  const ctx = stepCtx(new Uint16Array([7, 7, 7, 7]));
+  ctx.paused = true;
+  ctx.stepFrames = 2;
+  const adapter = countingAdapter();
+
+  assert.equal(Daydream.prototype.stepSimulation.call(ctx, adapter), true);
+  assert.equal(ctx.stepFrames, 1, 'the step was not spent, so it repeats forever');
+  assert.equal(adapter.frames, 1);
+  assert.deepEqual([...ctx.pixels], [0, 0, 0, 0], 'the stepped frame kept stale pixels');
+
+  assert.equal(Daydream.prototype.stepSimulation.call(ctx, adapter), true);
+  assert.equal(ctx.stepFrames, 0);
+  assert.equal(Daydream.prototype.stepSimulation.call(ctx, adapter), false,
+    'the paused sim advanced past the steps it was given');
+  assert.equal(adapter.frames, 2);
+});
+
 /** Minimal `this` for render(): a paused sim with a pending repaint.
  * @param {Uint16Array} colors - Array the dot mesh's instanceColor aliases.
  * @param {Array<string>} log - Ordered event sink.
@@ -642,6 +679,33 @@ test('a tick whose repaint a heap growth held captures on the next repaint', () 
   assert.equal(ctx.recorder.frames, 2, 'an advanced tick produced no video frame');
   assert.equal(ctx.heldCaptures, 0);
   assert.equal(ctx.needsRender, false, 'kept repainting past an empty backlog');
+});
+
+test('render single-steps a paused sim through the real step', () => {
+  const log = [];
+  const colors = new Uint16Array([7, 7, 7, 7]);
+  const ctx = renderCtx(colors, log);
+  ctx.pixels = colors;
+  ctx.updateStats = () => log.push('updateStats');
+  ctx.stepSimulation = Daydream.prototype.stepSimulation;
+  ctx.needsRender = false;
+  ctx.stepFrames = 1;
+  const adapter = countingAdapter();
+
+  Daydream.prototype.render.call(ctx, adapter);
+
+  assert.equal(adapter.frames, 1, 'the queued step drew no frame');
+  assert.equal(ctx.stepFrames, 0);
+  assert.deepEqual([...colors], [0, 0, 0, 0]);
+  assert.ok(log.includes('renderMainView'));
+
+  // The queue is empty and the clock releases nothing, so the paused sim now
+  // neither advances nor repaints.
+  log.length = 0;
+  Daydream.prototype.render.call(ctx, adapter);
+
+  assert.equal(adapter.frames, 1, 'a paused sim with no queued step advanced');
+  assert.deepEqual(log, ['controls.update']);
 });
 
 test('a held repaint that advanced no tick captures nothing', () => {
