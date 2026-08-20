@@ -205,6 +205,7 @@ class FakeMediaRecorder {
   static instances = [];
   static startError = null;
   static startData = null;
+  static stopData = null;
   static isTypeSupported() { return true; }
   constructor(stream, options) {
     this.stream = stream;
@@ -228,7 +229,14 @@ class FakeMediaRecorder {
       this.ondataavailable({ data: FakeMediaRecorder.startData });
     }
   }
-  stop() { this.state = 'inactive'; }
+  stop() {
+    // Spec order: the state goes inactive at once, then whatever the encoder
+    // still holds is flushed as a last dataavailable ahead of the stop event.
+    this.state = 'inactive';
+    if (FakeMediaRecorder.stopData) {
+      this.ondataavailable?.({ data: FakeMediaRecorder.stopData });
+    }
+  }
 }
 
 /**
@@ -248,6 +256,7 @@ const installRecorderEnv = () => {
   FakeMediaRecorder.instances = [];
   FakeMediaRecorder.startError = null;
   FakeMediaRecorder.startData = null;
+  FakeMediaRecorder.stopData = null;
   FakeMediaRecorder.isTypeSupported = () => true;
   globalThis.MediaRecorder = FakeMediaRecorder;
   globalThis.HTMLCanvasElement = class { captureStream() {} };
@@ -420,6 +429,33 @@ test('a stopped session downloads its own chunks and clears instance state', () 
     assert.deepEqual(downloads[0].chunks, [{ size: 10 }]);
     assert.equal(rec.mediaRecorder, null);
     assert.equal(stream.track.stopped, true);
+  } finally {
+    restore();
+  }
+});
+
+/**
+ * Verifies the last chunk stop() flushes still reaches the output: the encoder
+ * hands over whatever it holds between stop() and the stop event, so a data
+ * handler cleared a step early loses the tail of the recording.
+ */
+test('the chunk flushed by stop is saved with the rest', () => {
+  const restore = installRecorderEnv();
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    const downloads = [];
+    rec.download = (recorder, chunks, name) => downloads.push({ chunks, name });
+    FakeMediaRecorder.stopData = { size: 7 };
+
+    rec.start('tail');
+    const recorder = rec.mediaRecorder;
+    recorder.ondataavailable({ data: { size: 10 } });
+    rec.stop();
+    recorder.onstop();
+
+    assert.equal(downloads.length, 1);
+    assert.deepEqual(downloads[0].chunks, [{ size: 10 }, { size: 7 }],
+      'the tail follows the chunks the timeslice already delivered');
   } finally {
     restore();
   }
