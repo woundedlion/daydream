@@ -79,9 +79,10 @@ if (!args.some((a) => !a.startsWith('-'))) {
 }
 
 // node:test retallies cases across majors, so floors measured on one major are
-// not reproducible on another. Plain runs re-exec under the exact CI pin;
-// re-measurements must start there so the process writing the floors is explicit.
-// Fixture repos carry no workflow pin and continue under their invoking Node.
+// not reproducible on another. Plain runs re-exec under the exact CI pin, or
+// warn and continue here when npx cannot reach it; re-measurements must start
+// there so the process writing the floors is explicit. Fixture repos carry no
+// workflow pin and continue under their invoking Node.
 if (existsSync(NODE_PIN_PATH)) {
   const pin = readFileSync(NODE_PIN_PATH, 'utf8').match(/node-version: *'([\d.]+)'/)?.[1];
   if (!pin) {
@@ -101,25 +102,41 @@ if (existsSync(NODE_PIN_PATH)) {
     process.exit(1);
   }
   if (runningMajor !== pinMajor) {
-    console.error(
-      `run-tests: Node v${process.versions.node} cannot reproduce the CI floors; ` +
-        `re-running with Node ${pin}.`,
-    );
-    const npxArgs = ['--yes', `node@${pin}`, process.argv[1], ...argv];
-    const command = process.platform === 'win32'
-      ? (process.env.ComSpec ?? 'cmd.exe')
-      : 'npx';
-    const commandArgs = process.platform === 'win32'
-      ? ['/d', '/s', '/c', 'npx.cmd', ...npxArgs]
-      : npxArgs;
-    const rerun = spawnSync(command, commandArgs, { stdio: 'inherit' });
-    if (rerun.error) {
+    // npx fetches the pinned Node unless it is already cached, so the handover
+    // is probed first: offline the probe fails and the suite runs here instead
+    // of exiting on npm's error without having run a case.
+    const viaNpx = (...npxArgs) => (process.platform === 'win32'
+      ? [process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', 'npx.cmd', ...npxArgs]]
+      : ['npx', npxArgs]);
+    const probe = spawnSync(...viaNpx('--yes', `node@${pin}`, '--version'), {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      encoding: 'utf8',
+    });
+    const reachable = !probe.error && probe.status === 0
+      && probe.stdout.trim() === `v${pin}`;
+    if (reachable) {
       console.error(
-        `run-tests: could not start Node ${pin} through npx (${rerun.error.message}).`,
+        `run-tests: Node v${process.versions.node} cannot reproduce the CI floors; ` +
+          `re-running with Node ${pin}.`,
       );
-      process.exit(1);
+      const rerun = spawnSync(
+        ...viaNpx('--yes', `node@${pin}`, process.argv[1], ...argv),
+        { stdio: 'inherit' },
+      );
+      if (rerun.error) {
+        console.error(
+          `run-tests: could not start Node ${pin} through npx (${rerun.error.message}).`,
+        );
+        process.exit(1);
+      }
+      process.exit(rerun.status ?? 1);
     }
-    process.exit(rerun.status ?? 1);
+    console.error(
+      `run-tests: Node ${pin} is unavailable through npx ` +
+        `(${probe.error?.message ?? `exit ${probe.status}`}); running the suite on ` +
+        `v${process.versions.node}, whose case tallies may differ from the ` +
+        'committed floors.',
+    );
   }
 }
 

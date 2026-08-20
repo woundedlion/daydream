@@ -7,9 +7,11 @@
 // counts and the roster under test are the fixture's and not this suite's.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
+import {
+  chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync, rmSync,
+} from 'node:fs';
+import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fixtureRepo, expectFailure } from './fixture_repo.js';
 
@@ -369,16 +371,78 @@ test('--update-floors refuses a pattern that does not cover every floor', () => 
 });
 
 /**
+ * Writes the fixture's CI workflow, where the script reads the Node version
+ * the committed floors were measured on.
+ * @param {string} version - Version to spell in the workflow's node-version.
+ */
+const pinNode = (version) => {
+  mkdirSync(join(root, '.github', 'workflows'), { recursive: true });
+  writeFileSync(join(root, '.github', 'workflows', 'js-unit-suite.yml'),
+    `jobs:\n  suite:\n    steps:\n      - with:\n          node-version: '${version}'\n`);
+};
+
+/** Where the npx shim records that the script handed the run over to it. */
+const handoverPath = () => join(root, 'handover.txt');
+
+/**
+ * Puts a fake npx ahead of the real one on PATH and returns the environment
+ * that finds it. The shim answers the script's availability probe with
+ * `reply` on stdout, or fails the probe when that is null; any other
+ * invocation is the handover, which it records and reports as a clean run.
+ * @param {?string} reply - stdout for `--version`, or null to fail the probe.
+ * @returns {Object} Environment with the shim directory first on PATH.
+ */
+const shimNpx = (reply) => {
+  const bin = join(root, 'shim');
+  mkdirSync(bin, { recursive: true });
+  const probe = reply === null
+    ? { cmd: ['exit /b 1'], sh: ['  exit 1'] }
+    : { cmd: [`echo ${reply}`, 'exit /b 0'], sh: [`  echo ${reply}`, '  exit 0'] };
+  writeFileSync(join(bin, 'npx.cmd'), [
+    '@echo off',
+    'if "%3"=="--version" goto probe',
+    `echo handover> "${handoverPath()}"`,
+    'exit /b 0',
+    ':probe',
+    ...probe.cmd,
+    '',
+  ].join('\r\n'));
+  const sh = join(bin, 'npx');
+  writeFileSync(sh, [
+    '#!/bin/sh',
+    'if [ "$3" = "--version" ]; then',
+    ...probe.sh,
+    'fi',
+    `echo handover > "${handoverPath()}"`,
+    'exit 0',
+    '',
+  ].join('\n'));
+  chmodSync(sh, 0o755);
+  const shimmed = { ...env };
+  for (const key of Object.keys(shimmed))
+    if (key.toLowerCase() === 'path') delete shimmed[key];
+  shimmed.PATH = `${bin}${delimiter}${process.env.PATH}`;
+  return shimmed;
+};
+
+/**
+ * Runs the script against the fixture under a prepared environment.
+ * @param {Object} shimmed - Environment to run under.
+ * @returns {Object} The spawnSync result, stdout and stderr as strings.
+ */
+const runUnder = (shimmed) =>
+  spawnSync(process.execPath, [SCRIPT, PATTERN], {
+    cwd: root,
+    env: shimmed,
+    encoding: 'utf8',
+  });
+
+/**
  * Verifies a re-measurement on a Node major other than the one CI measures on
  * is refused. node:test retallies cases across majors, so floors written there
  * are not reproducible and red CI on files nobody touched.
  */
 test('--update-floors refuses a Node major CI does not measure on', () => {
-  const pinNode = (version) => {
-    mkdirSync(join(root, '.github', 'workflows'), { recursive: true });
-    writeFileSync(join(root, '.github', 'workflows', 'js-unit-suite.yml'),
-      `jobs:\n  suite:\n    steps:\n      - with:\n          node-version: '${version}'\n`);
-  };
   const major = Number(process.versions.node.split('.')[0]);
 
   pinNode(`${major - 1}.0.0`);
@@ -389,6 +453,43 @@ test('--update-floors refuses a Node major CI does not measure on', () => {
 
   pinNode(`${major}.0.0`);
   assert.match(run('--update-floors', PATTERN), /wrote 2 floors/);
+});
+
+/**
+ * Verifies a pin npx cannot supply, as on an offline machine, leaves the
+ * suite running here under a diagnostic rather than exiting on npm's failure
+ * without having run a case.
+ */
+test('a pin npx cannot supply falls back to the running Node', () => {
+  const major = Number(process.versions.node.split('.')[0]);
+  pinNode(`${major - 1}.0.0`);
+
+  const result = runUnder(shimNpx(null));
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr,
+    new RegExp(`Node ${major - 1}\\.0\\.0 is unavailable through npx`));
+  assert.match(result.stdout, /each above its committed floor/);
+  assert.equal(existsSync(handoverPath()), false,
+    'a run is never handed to an npx that cannot supply the pin');
+});
+
+/**
+ * Verifies a reachable pin still takes the run: the probe that gates the
+ * fallback must not cost the handover CI measures its floors under.
+ */
+test('a reachable pin still takes the run', () => {
+  const major = Number(process.versions.node.split('.')[0]);
+  const pin = `${major - 1}.0.0`;
+  pinNode(pin);
+
+  const result = runUnder(shimNpx(`v${pin}`));
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, new RegExp(`re-running with Node ${pin}`));
+  assert.equal(existsSync(handoverPath()), true, 'the pinned Node ran the suite');
+  assert.doesNotMatch(result.stdout, /each above its committed floor/,
+    'the gate belongs to the handed-over run, not this one');
 });
 
 /**
