@@ -435,8 +435,8 @@
         "storage": "binary32",
         "unit": "ratio",
         "domain": {
-          "minimum": -4,
-          "maximum": 4
+          "minimum": -1,
+          "maximum": 1
         },
         "interpolation": {
           "kind": "LINEAR"

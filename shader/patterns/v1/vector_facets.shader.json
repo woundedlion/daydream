@@ -496,8 +496,8 @@
         "storage": "binary32",
         "unit": "ratio",
         "domain": {
-          "minimum": -4,
-          "maximum": 4
+          "minimum": -1,
+          "maximum": 1
         },
         "interpolation": {
           "kind": "LINEAR"
@@ -672,7 +672,7 @@
           "source-angle-speed": 0.027,
           "pole-fade": 2.311,
           "camera-wander": 1,
-          "outer-speed": -0.00005,
+          "outer-speed": -5e-05,
           "outer-strength": 0.138,
           "outer-scale": 1,
           "outer-vector-angle": 0,

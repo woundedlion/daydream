@@ -98,8 +98,8 @@
         "classification": "preset",
         "default": 0,
         "domain": {
-          "maximum": 4,
-          "minimum": -4
+          "maximum": 1,
+          "minimum": -1
         },
         "id": "colorize.hue-shift-amount",
         "interpolation": {

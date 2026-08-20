@@ -405,8 +405,8 @@
         "storage": "binary32",
         "unit": "ratio",
         "domain": {
-          "minimum": -4,
-          "maximum": 4
+          "minimum": -1,
+          "maximum": 1
         },
         "interpolation": {
           "kind": "LINEAR"
@@ -635,7 +635,22 @@
         }
       }
     ],
-    "edges": [],
+    "edges": [
+      {
+        "from": "hex-twin-wave-alt",
+        "to": "hex-twin-wave",
+        "path_policy": "parallel",
+        "easing": "EASE_IN_OUT_SIN",
+        "duration": 480
+      },
+      {
+        "from": "hex-twin-wave",
+        "to": "hex-twin-wave-alt",
+        "path_policy": "parallel",
+        "easing": "EASE_IN_OUT_SIN",
+        "duration": 480
+      }
+    ],
     "absent_edge_fallback": {
       "manual": "SNAP",
       "automatic": "REJECT",
