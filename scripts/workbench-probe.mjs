@@ -282,6 +282,29 @@ async function probeStrip(tab) {
   check(planeAfter.length === planeBefore.length + 1,
     `clicking it inserts at the first gap that accepts it (${planeAfter.join(', ')})`);
 
+  // The library commits the same one-for-one replacement a socket's swap does,
+  // so re-picking the projection the chain already carries must keep that
+  // instance rather than re-seat it on the catalog's defaults.
+  const socket = await tab.$eval('.chain-chip--socket',
+    (node) => (node instanceof HTMLElement ? node.dataset.label ?? '' : ''));
+  await (await tab.waitForSelector('.chain-chip--socket .chain-chip-name')).click();
+  const poleFade = `.chain-chip--socket .chain-param[data-parameter="${socket}.pole-fade"]`
+    + ' .chain-param-control';
+  const pole = await boxOf(tab, poleFade);
+  await tab.mouse.click(pole.x + pole.width * SLIDER_FRACTION, centre(pole).y);
+  const poleFadeOf = (/** @type {*} */ saved) =>
+    saved.preset_bank.presets[0].values[`${socket}.pole-fade`];
+  const tuned = poleFadeOf(await savedDocument(tab));
+  check(tuned > 1, `the socket's pole fade tunes off its default (${socket} ${tuned})`);
+
+  await (await tab.waitForSelector(gnomonic)).click();
+  const kept = await tab.$eval('.chain-chip--socket',
+    (node) => (node instanceof HTMLElement ? node.dataset.label ?? '' : ''));
+  const keptFade = poleFadeOf(await savedDocument(tab));
+  check(kept === socket && keptFade === tuned,
+    `re-picking the projection it carries keeps the socket (${socket} → ${kept},`
+    + ` pole fade ${keptFade})`);
+
   return failures;
 }
 

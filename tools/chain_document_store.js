@@ -405,7 +405,8 @@ export async function createChainDocumentStore({
    * commits only if the result passes the v2 validator. An entry whose label
    * survives with the same operator keeps its parameter values; a label
    * omitted from a sequence entry is derived from the operator's family stem
-   * plus the lowest free numeric suffix.
+   * plus the lowest free numeric suffix. A replacement that leaves the chain
+   * as it stands changes nothing and pushes no undo entry.
    * @param {number} start - First chain index of the span.
    * @param {number} deleteCount - Entries the span replaces (0 = insertion).
    * @param {ChainEdit[]} sequence - Replacement entries; [] removes the span.
@@ -444,6 +445,10 @@ export async function createChainDocumentStore({
       ...entries,
       ...current.slice(start + deleteCount).map((entry) => ({ ...entry })),
     ];
+    if (newChain.length === current.length && newChain.every((entry, index) =>
+      entry.label === current[index].label && entry.operator === current[index].operator))
+      return { ok: true };
+
     const newOps = new Map(newChain.map((entry) => [entry.label, entry.operator]));
     if (newOps.size !== newChain.length) {
       return refusal('DUPLICATE_LABEL', '$.descriptor.chain',

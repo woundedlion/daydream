@@ -28,8 +28,8 @@
     "assertions": 77
   },
   "tests/chain_strip.test.js": {
-    "cases": 40,
-    "assertions": 257
+    "cases": 42,
+    "assertions": 272
   },
   "tests/clipboard.test.js": {
     "cases": 7,
