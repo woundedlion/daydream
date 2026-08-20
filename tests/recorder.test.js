@@ -657,6 +657,15 @@ test('a stale onstop does not clobber the session that replaced it', () => {
  * @param {VideoRecorder} rec - Recorder whose next session is instrumented.
  * @returns {() => Promise<void>} Resolves once finish() has run to completion.
  */
+/**
+ * Settles the streaming sink's serialized write chain, which defers every chunk
+ * behind the picker promise, so a test can assert on what the chain did. A
+ * macrotask hop: the chain queues one microtask per link, so awaiting a resolved
+ * promise advances it by a link rather than settling it.
+ * @returns {Promise<void>} Resolves once the queued chunk writes have run.
+ */
+const drainSink = () => new Promise((resolve) => { setTimeout(resolve, 0); });
+
 const trackSinkFinish = (rec) => {
   const openSink = rec.openSink.bind(rec);
   let finished = null;
@@ -833,6 +842,52 @@ test('the in-memory fallback sink stops the session at its byte bound', () => {
 
     recorder.ondataavailable({ data: { size: 1_000_000 } });
     recorder.onstop();
+    assert.equal(notified.length, 1, 'the bound is reported once, not per chunk');
+    assert.equal(downloaded, 512, 'the prefix captured under the bound is still saved');
+  } finally {
+    captured.restore();
+    restore();
+  }
+});
+
+/**
+ * A picker rejection that is not an AbortError leaves the session running with
+ * no file handle, so every chunk lands in the blob buffer for the download at
+ * stop. maxBacklogBytes does not reach that path — it is consulted only before
+ * the picker answers — so the fallback's own byte bound is what stands between a
+ * long capture and an OOM.
+ */
+test('a streaming session with no file handle bounds its in-memory fallback', async () => {
+  const restore = installRecorderEnv();
+  globalThis.showSaveFilePicker = async () => { throw new Error('picker unavailable'); };
+  const captured = installConsoleCapture('warn', 'error');
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    let downloaded = null;
+    rec.download = (recorder, chunks) => { downloaded = chunks.length; };
+    const notified = [];
+    rec.onError = (err) => notified.push(err);
+    const sinkFinished = trackSinkFinish(rec);
+
+    rec.start('handleless');
+    const recorder = rec.mediaRecorder;
+    // Let the picker's rejection settle, so every chunk below is past the
+    // pre-pick backlog cap and reaches the in-memory fallback.
+    await drainSink();
+    for (let i = 0; i < 512; i++) recorder.ondataavailable({ data: { size: 1_000_000 } });
+    await drainSink();
+    assert.equal(rec.isRecording, true, 'a buffer under the bound keeps recording');
+
+    recorder.ondataavailable({ data: { size: 1_000_000 } });
+    await drainSink();
+    assert.equal(rec.isRecording, false, 'the session runs to an OOM instead of stopping');
+    assert.equal(notified.length, 1, 'the host is told the session ended');
+    assert.match(captured.messages.join(' '), /held in memory/,
+      'the stop is reported, not silent');
+
+    recorder.ondataavailable({ data: { size: 1_000_000 } });
+    recorder.onstop();
+    await sinkFinished();
     assert.equal(notified.length, 1, 'the bound is reported once, not per chunk');
     assert.equal(downloaded, 512, 'the prefix captured under the bound is still saved');
   } finally {

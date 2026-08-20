@@ -425,6 +425,37 @@ export class VideoRecorder {
   }
 
   /**
+   * A blob-download buffer bounded at MEMORY_BUFFER_LIMIT_BYTES. Past the bound
+   * the session stops and reports: a stopped recording the user is told about,
+   * and can save, beats an OOM that loses all of it.
+   * @param {MediaRecorder} recorder - Session recorder; a superseded one never
+   *   stops the live session.
+   * @param {Blob[]} chunks - Per-session buffer to fill.
+   * @param {string} cause - Why the video is held in memory, for the report.
+   * @returns {(data: Blob) => void} The bounded chunk sink.
+   */
+  memorySink(recorder, chunks, cause) {
+    let bufferedBytes = 0;
+    let full = false;
+    return (data) => {
+      if (full) return;
+      bufferedBytes += data.size;
+      if (bufferedBytes > MEMORY_BUFFER_LIMIT_BYTES) {
+        full = true;
+        if (this.mediaRecorder === recorder) {
+          this.stop();
+          this.reportFailure(
+            `${cause}, so the whole video is held in memory; `
+            + `recording stopped at ${Math.round(MEMORY_BUFFER_LIMIT_BYTES / 1_000_000)} MB. `
+            + 'What was captured up to that point is saved.');
+        }
+        return;
+      }
+      chunks.push(data);
+    };
+  }
+
+  /**
    * Builds the per-session data sink. With the File System Access API present,
    * streams each chunk straight to a user-chosen file as it arrives, so once the
    * file is open a long recording never buffers the whole video in RAM; chunks
@@ -439,34 +470,16 @@ export class VideoRecorder {
    * @param {MediaRecorder} recorder - Session recorder, queried for its container type.
    * @param {string} effectName - Base name for the suggested file.
    * @param {Blob[]} chunks - Per-session buffer; the fallback path fills it, the
-   *   streaming path leaves it empty (each chunk is released after its disk write).
+   *   streaming path leaves it empty while a file handle holds (each chunk is
+   *   released after its disk write) and falls back to filling it otherwise.
    * @returns {{write: (data: Blob) => void, finish: () => (void|Promise<void>)}} The
    *   session sink. The streaming variant's finish() returns the promise that
    *   settles once the file is flushed and closed; callers may ignore it.
    */
   openSink(recorder, effectName, chunks) {
     if (typeof globalThis.showSaveFilePicker !== 'function') {
-      let bufferedBytes = 0;
-      let full = false;
       return {
-        write: (data) => {
-          if (full) return;
-          bufferedBytes += data.size;
-          if (bufferedBytes > MEMORY_BUFFER_LIMIT_BYTES) {
-            full = true;
-            // Guard against a superseding session, as the streaming sink does:
-            // only stop if this recorder is still the live one.
-            if (this.mediaRecorder === recorder) {
-              this.stop();
-              this.reportFailure(
-                'this browser has no streaming save, so the whole video is held in memory; '
-                + `recording stopped at ${Math.round(MEMORY_BUFFER_LIMIT_BYTES / 1_000_000)} MB. `
-                + 'What was captured up to that point is saved.');
-            }
-            return;
-          }
-          chunks.push(data);
-        },
+        write: this.memorySink(recorder, chunks, 'this browser has no streaming save'),
         finish: () => { if (chunks.length) this.download(recorder, chunks, effectName); },
       };
     }
@@ -485,6 +498,10 @@ export class VideoRecorder {
     // non-numeric, so the bound is always a real number of bytes.
     const bitrateMbps = this.bitrateMbps > 0 ? this.bitrateMbps : 16;
     const maxBacklogBytes = (bitrateMbps * 1_000_000 / 8) * PICKER_GRACE_SECONDS;
+    // maxBacklogBytes only covers the pre-pick hold. Once the picker has
+    // answered without a handle, or createWritable() fails mid-session, every
+    // chunk lands in the blob buffer instead, on the fallback sink's own bound.
+    const hold = this.memorySink(recorder, chunks, 'the streaming save was unavailable');
     const opened = globalThis.showSaveFilePicker({
       suggestedName: filename,
       types: [{ description: 'Video', accept: { [this.mimeForExt(ext)]: [`.${ext}`] } }],
@@ -544,7 +561,7 @@ export class VideoRecorder {
           if (aborted) return;
           // No file handle (picker unavailable, or createWritable failed):
           // buffer every chunk for the blob-download fallback.
-          if (!handle) { chunks.push(data); return; }
+          if (!handle) { hold(data); return; }
           // A prior write errored the writable; stop feeding it.
           if (failed) return;
           if (!writable) {
@@ -553,7 +570,7 @@ export class VideoRecorder {
             } catch (err) {
               console.warn('VideoRecorder: streaming save unavailable, buffering in memory', err);
               handle = null;
-              chunks.push(data);
+              hold(data);
               return;
             }
           }
