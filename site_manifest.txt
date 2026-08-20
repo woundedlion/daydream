@@ -32,6 +32,7 @@ segment_controller.js
 segment_layout.js
 segment_stats_view.js
 segment_worker.js
+shader_stages.js
 sidebar.js
 sidebar_logic.js
 state.js

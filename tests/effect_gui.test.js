@@ -8,6 +8,8 @@ import {
   EXPORT_FAILED,
   FULL_CONFIG_STORAGE_KEY,
   FLASH_MS,
+} from '../effect_gui.js';
+import {
   CURL_LATTICE_STAGE_ORDER,
   FACET_GRID_STAGE_ORDER,
   SHADERBALL_STAGE_ORDER,
@@ -18,7 +20,7 @@ import {
   isShaderBallSchema,
   legacyShaderBallParamNames,
   shaderBallStageAssignments,
-} from '../effect_gui.js';
+} from '../shader_stages.js';
 import { FullConfigRestoreResult } from './fake_engine.js';
 
 // createEffectGui owns the effect panel: which control an engine parameter maps
