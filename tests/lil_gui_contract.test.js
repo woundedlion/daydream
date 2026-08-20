@@ -79,7 +79,8 @@ test('a controller carries the surface the GUI layer chains off it', async () =>
   const controller = gui.add({ count: 1 }, 'count', 0, 10, 1);
 
   for (const method of ['onChange', 'name', 'setValue', 'getValue',
-                        'updateDisplay', 'disable', 'listen', 'destroy']) {
+                        'updateDisplay', 'disable', 'listen', 'destroy',
+                        'decimals']) {
     assert.equal(typeof controller[method], 'function', `controller.${method}`);
   }
   // A single onChange slot, which is why the GUI layer composes handlers itself
@@ -90,6 +91,43 @@ test('a controller carries the surface the GUI layer chains off it', async () =>
   controller.setValue(4);
 
   assert.deepEqual(calls, [['second', 4]], 'the later registration replaced the earlier');
+});
+
+// effect_gui.js reaches past domElement for the node that takes keyboard focus
+// ($select ?? $input ?? $button) and for the Reset/Export buttons it re-labels.
+// A lil-gui rename turns those into a browser TypeError, which is invisible to a
+// double that carries every property.
+test('each controller exposes the focusable widget the GUI layer reaches for', async () => {
+  const gui = await realGUI();
+  const params = { count: 1, label: 'x', on: true, run() {} };
+
+  for (const [prop, extra] of [['count', [0, 10, 1]], ['label', []], ['on', []]]) {
+    const controller = gui.add(params, prop, ...extra);
+    assert.equal(controller.$input?.tagName, 'INPUT', `${prop}.$input`);
+    assert.equal(controller.$button, undefined, `${prop} carries a $button`);
+    assert.equal(typeof controller.$input.focus, 'function');
+  }
+
+  const action = gui.add(params, 'run');
+  assert.equal(action.$input, undefined, 'a button controller carries an $input');
+  assert.ok(action.$button, 'FunctionController no longer exposes $button');
+  assert.equal(action.domElement.contains(action.$button), true,
+    'the button must sit inside the row the panel lays out');
+  assert.equal(typeof action.$button.focus, 'function');
+});
+
+test('decimals chains and rounds the display without moving the value', async () => {
+  const gui = await realGUI();
+
+  const integral = gui.add({ v: 0 }, 'v', 0, 10, 1);
+  assert.equal(integral.decimals(0), integral, 'decimals must return the receiver to chain off');
+  integral.setValue(3.7);
+  assert.equal(integral.$input.value, '4', 'an integer param rendered a fraction');
+  assert.equal(integral.getValue(), 3.7, 'decimals rounded the value, not the display');
+
+  const fractional = gui.add({ v: 0 }, 'v', 0, 10).decimals(3);
+  fractional.setValue(3.14159);
+  assert.equal(fractional.$input.value, '3.142');
 });
 
 // options() has two implementations. daydream.js narrows the resolution dropdown
