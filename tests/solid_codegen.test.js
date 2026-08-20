@@ -243,10 +243,20 @@ test('applyOp and generateFuncAndRecipe share one parameterized-op vocabulary', 
       new RegExp(`applyOp: op "${op}" requires a params object`));
   }
 
-  for (const op of KNOWN_OPS) {
-    if (PARAMETERIZED_OPS.has(op)) continue;
-    generateFuncAndRecipe({ base: 'cube', ops: [op] });
-    applyOp(stubMesh(), op);
+  // A bare string is the whole spelling of an op with no params: both paths
+  // take it, and each emits the nullary call rather than a defaulted one.
+  const bare = [...KNOWN_OPS].filter((op) => !PARAMETERIZED_OPS.has(op));
+  assert.deepEqual(bare.sort(),
+    ['ambo', 'dual', 'gyro', 'kis', 'meta', 'needle', 'zip']);
+
+  for (const op of bare) {
+    const { funcName, recipe } = generateFuncAndRecipe({ base: 'cube', ops: [op] });
+    assert.equal(funcName, `cube_${op}`);
+    assert.equal(recipe, `SolidBuilder(cube(a, b), a, b).${op}().build()`);
+
+    const calls = [];
+    applyOp(stubMesh(calls), op);
+    assert.deepEqual(calls, [{ op, args: [] }]);
   }
 });
 
