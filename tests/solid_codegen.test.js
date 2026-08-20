@@ -334,23 +334,38 @@ test('generateRecipeCpp breaks after the return type when the name fills the lin
 
 /** Verifies no emitted line exceeds the column limit solid_generators.h is formatted at. */
 test('generateRecipeCpp never emits a line past the column limit', () => {
-  const chains = [
-    ['dual'],
-    ['kis', 'ambo', 'gyro', 'meta', 'needle', 'zip', 'dual'],
-    [{ op: 'snub', params: { t: 0.5, twist: 0.28 } }, { op: 'relax', params: { iter: 100 } },
-      { op: 'bevel', params: { t: 0.25 } }],
+  const sweeps = [
+    [SIMPLE_SEEDS, ['dual']],
+    [SIMPLE_SEEDS, ['kis', 'ambo', 'gyro', 'meta', 'needle', 'zip', 'dual']],
+    [SIMPLE_SEEDS,
+      [{ op: 'snub', params: { t: 0.5, twist: 0.28 } }, { op: 'relax', params: { iter: 100 } },
+        { op: 'bevel', params: { t: 0.25 } }]],
+    // Every parameterized op on the longest seed name: the widest funcName the
+    // tool can emit, and the only line allowed to overflow.
+    [['truncatedIcosidodecahedron'],
+      [{ op: 'truncate', params: { t: 0.33 } }, { op: 'chamfer', params: { t: 0.5 } },
+        { op: 'expand', params: { t: 0.5 } }, { op: 'hankin', params: { angle: 54 } },
+        { op: 'relax', params: { iter: 100 } }, { op: 'bevel', params: { t: 0.25 } },
+        { op: 'snub', params: { t: 0.5, twist: 0.28 } }]],
   ];
-  for (const base of SIMPLE_SEEDS) {
-    for (const ops of chains) {
+  // The only break clang-format cannot take: a bare identifier, optionally
+  // carrying the open paren the emitter already broke after. A call list, a
+  // method chain and prose all offer one, so each has to fit.
+  const UNBREAKABLE = /^[A-Za-z_]\w*\(?$/;
+  let overflowed = 0;
+  for (const [seeds, ops] of sweeps) {
+    for (const base of seeds) {
       for (const line of generateRecipeCpp({ base, ops, vCount: 12345 }, 'Archimedean').split('\n')) {
-        // clang-format cannot break a line that offers no break: an identifier
-        // long enough to overflow on its own overflows there too.
+        if (line.length > 80) overflowed++;
         const atom = line.replace(/^\s*(\* )?/, '');
-        assert.ok(line.length <= 80 || !atom.includes(' '),
+        assert.ok(line.length <= 80 || UNBREAKABLE.test(atom),
           `"${line}" is ${line.length} columns for base "${base}"`);
       }
     }
   }
+  // The widest chain overflows on the funcName alone, so the exemption above is
+  // measured against real output rather than left vacuous.
+  assert.ok(overflowed > 0, 'no funcName reaches the limit, so nothing tested it');
 });
 
 /** Verifies generateRecipeCpp falls back to zero vertex/face/internal counts when the item omits them. */
