@@ -22,6 +22,7 @@ import {
   paramGenerationStale,
   paramValueSkew,
   selectorControlValue,
+  enumConstantName,
 } from "./param_sync.js";
 import { formatExportParams } from "./tools/export_params.js";
 
@@ -523,9 +524,12 @@ export function addParamControl(
  * @param {() => Object|null} [deps.getFullConfigSnapshot] - Captures that state.
  * @param {() => Array<Object>|null} [deps.getFullConfigFieldDefinitions] -
  *   Names the fields in a full configuration snapshot.
- * @param {(snapshot: Object) => string} [deps.restoreFullConfigSnapshot] -
- *   Atomically restores a captured state, returning the engine's
- *   FullConfigRestoreResult constant name ("APPLIED" on success).
+ * @param {(snapshot: Object) => unknown} [deps.restoreFullConfigSnapshot] -
+ *   Atomically restores a captured state, returning one FullConfigRestoreResult
+ *   enum value.
+ * @param {() => Record<string, unknown>} [deps.fullConfigRestoreResults] - The
+ *   engine's FullConfigRestoreResult enum, which that value is judged against by
+ *   identity.
  * @param {() => string} [deps.getConfigImportNotice] - Reads a migration notice.
  * @param {() => void} [deps.clearConfigImportNotice] - Consumes that notice.
  * @param {(message: string|null) => void} [deps.showConfigImportNotice] - Shows
@@ -561,7 +565,8 @@ export function createEffectGui({
   usesFullConfigSnapshot = () => false,
   getFullConfigSnapshot = () => null,
   getFullConfigFieldDefinitions = () => null,
-  restoreFullConfigSnapshot = () => 'NO_ENGINE',
+  restoreFullConfigSnapshot = () => null,
+  fullConfigRestoreResults = () => ({}),
   getConfigImportNotice = () => '',
   clearConfigImportNotice = () => {},
   showConfigImportNotice = () => {},
@@ -601,9 +606,11 @@ export function createEffectGui({
       logWarn('ShaderBall: ignoring invalid full-config snapshot', error);
       return;
     }
+    const results = fullConfigRestoreResults();
     const outcome = restoreFullConfigSnapshot(snapshot);
-    if (outcome !== 'APPLIED') {
-      logWarn(`ShaderBall: full-config snapshot was rejected: ${outcome}`);
+    if (outcome !== results.APPLIED) {
+      logWarn('ShaderBall: full-config snapshot was rejected: '
+        + enumConstantName(results, outcome));
       return;
     }
     const notice = getConfigImportNotice();

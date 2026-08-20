@@ -19,6 +19,7 @@ import {
   legacyShaderBallParamNames,
   shaderBallStageAssignments,
 } from '../effect_gui.js';
+import { FullConfigRestoreResult } from './fake_engine.js';
 
 // createEffectGui owns the effect panel: which control an engine parameter maps
 // to, which value stream feeds the sliders each frame, what an Export may copy,
@@ -471,8 +472,10 @@ function makeHarness({
     getFullConfigFieldDefinitions: () => state.fullConfigFieldDefinitions,
     restoreFullConfigSnapshot: (snapshot) => {
       restoredFullConfigs.push(snapshot);
-      return restoreFullConfigAccepted ? 'APPLIED' : 'INVALID_VALUE';
+      return restoreFullConfigAccepted
+        ? FullConfigRestoreResult.APPLIED : FullConfigRestoreResult.INVALID_VALUE;
     },
+    fullConfigRestoreResults: () => FullConfigRestoreResult,
     getConfigImportNotice: () => configImportNotice,
     clearConfigImportNotice: () => { configNoticeClears += 1; },
     showConfigImportNotice: (message) => configNotices.push(message),
