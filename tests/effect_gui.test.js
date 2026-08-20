@@ -4,6 +4,7 @@ import { fakeElement } from './fake_dom.js';
 import {
   createEffectGui,
   addParamControl,
+  sliderDecimals,
   EXPORT_COPIED,
   EXPORT_FAILED,
   FULL_CONFIG_STORAGE_KEY,
@@ -516,10 +517,33 @@ test('a narrow numeric range displays its nonzero slider steps', () => {
   const state = { 'Hue Noise Speed': speed.value };
   const controller = addParamControl(gui, state, speed);
 
-  assert.equal(controller.decimalsSet, 6);
+  assert.equal(controller.decimalsSet, 5);
   assert.equal(controller.getValue(), 0.000016);
   controller.setValue(0);
   assert.equal(controller.getValue(), 0);
+});
+
+// lil-gui steps a bounded control by span/1000 with no explicit step, so a
+// display coarser than that step prints adjacent steps as the same string and
+// its arrow-key increment() re-parses that string back into the live value.
+test('slider decimals resolve one lil-gui step of the range', () => {
+  const step = (min, max) => Math.abs(max - min) / 1000;
+  for (const [min, max] of [
+    [0, 1], [0, 0.15], [0.5, 1], [0, 0.8], [-0.008, 0.008], [0, 10],
+    [0, 2 * Math.PI], [-1, 1], [0, 100], [0, 0.01],
+  ]) {
+    const decimals = sliderDecimals(min, max);
+    assert.ok(Math.pow(10, -decimals) <= step(min, max) * (1 + 1e-9),
+      `[${min}, ${max}] must print finer than its ${step(min, max)} step`);
+    assert.notEqual(min.toFixed(decimals), (min + step(min, max)).toFixed(decimals),
+      `[${min}, ${max}] must print adjacent steps differently`);
+  }
+});
+
+test('slider decimals fall back on a degenerate range', () => {
+  assert.equal(sliderDecimals(1, 1), 3);
+  assert.equal(sliderDecimals(0, Infinity), 3);
+  assert.equal(sliderDecimals(0, NaN), 3);
 });
 
 test('an integer param becomes a slider stepped to whole values', () => {

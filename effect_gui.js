@@ -106,6 +106,21 @@ function paramAddMethod(gui, p, hydrate, legacyNames, persist) {
 }
 
 /**
+ * Decimal places a bounded slider must print to resolve one step of its own
+ * range. lil-gui steps a bounded control by span/1000 and its arrow-key
+ * increment() re-parses the *displayed* string, so a display coarser than the
+ * step prints consecutive steps identically and quantizes the live value.
+ * @param {number} min - Range floor.
+ * @param {number} max - Range ceiling.
+ * @returns {number} Decimals for the controller's decimals().
+ */
+export function sliderDecimals(min, max) {
+  const step = Math.abs(max - min) / 1000;
+  if (!(step > 0) || !Number.isFinite(step)) return 3;
+  return Math.max(0, Math.min(20, Math.ceil(-Math.log10(step) - 1e-9)));
+}
+
+/**
  * Add the lil-gui control one engine parameter definition calls for. A readonly
  * (engine-written telemetry) param becomes a session control: the engine refuses
  * to set it, so seeding it from a URL and writing it back is meaningless.
@@ -131,8 +146,8 @@ export function addParamControl(
     // The engine truncates a fractional write, so offer only what it can hold.
     controller = add(state, p.name, p.min, p.max, 1).decimals(0);
   } else {
-    const decimals = Math.abs(p.max - p.min) <= 0.1 ? 6 : 3;
-    controller = add(state, p.name, p.min, p.max).decimals(decimals);
+    controller = add(state, p.name, p.min, p.max)
+      .decimals(sliderDecimals(p.min, p.max));
   }
   controller.isBoolean = (kind === 'boolean');
   controller.isEnum = (kind === 'enum');
