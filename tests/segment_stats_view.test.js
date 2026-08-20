@@ -14,6 +14,15 @@ const { SegmentStatsView, FAULT_POOL, FAULT_RENDER } =
   await import('../segment_stats_view.js');
 
 /**
+ * An overlay container the page owns, so the view's cache of it stays live the
+ * way it does in a browser. The view creates its own nodes through
+ * doc.createElement, which are unappended and therefore disconnected.
+ * @param {string} tag - Tag name.
+ * @returns {Object} Fake element standing in for a node already in the page.
+ */
+const pageElement = (tag) => fakeElement(tag, { connected: true });
+
+/**
  * Overlay document stand-in: the stats container plus the two global stat bars
  * the overlay hides. Every element it creates throws on an innerHTML write, so
  * a regression from text nodes to markup assignment fails the test rather than
@@ -22,9 +31,9 @@ const { SegmentStatsView, FAULT_POOL, FAULT_RENDER } =
  */
 function makeDoc() {
   const createElement = (tag) => fakeElement(tag);
-  const stats = createElement('div');
-  const desktop = createElement('div');
-  const mobile = createElement('div');
+  const stats = pageElement('div');
+  const desktop = pageElement('div');
+  const mobile = pageElement('div');
   const byId = {
     'segment-stats': stats,
     'global-stats-desktop': desktop,
@@ -249,9 +258,9 @@ test('an inactive pool hides the overlay and hands the stat bars back', () => {
 test('a replaced overlay element is re-resolved instead of written detached', () => {
   const createElement = (tag) => fakeElement(tag);
   const byId = {
-    'segment-stats': createElement('div'),
-    'global-stats-desktop': createElement('div'),
-    'stats-bar': createElement('div'),
+    'segment-stats': pageElement('div'),
+    'global-stats-desktop': pageElement('div'),
+    'stats-bar': pageElement('div'),
   };
   const doc = { getElementById: (id) => byId[id] ?? null, createElement };
   const view = new SegmentStatsView(doc);
@@ -261,7 +270,7 @@ test('a replaced overlay element is re-resolved instead of written detached', ()
   assert.equal(retired.style.display, 'none');
 
   retired.remove();
-  const replacement = createElement('div');
+  const replacement = pageElement('div');
   byId['global-stats-desktop'] = replacement;
 
   view.update(readyState(2));
@@ -275,11 +284,11 @@ test('a replaced overlay element is re-resolved instead of written detached', ()
 // never names the cached node itself.
 test('an overlay element retired with its container is re-resolved', () => {
   const createElement = (tag) => fakeElement(tag);
-  const container = createElement('div');
+  const container = pageElement('div');
   const byId = {
-    'segment-stats': createElement('div'),
+    'segment-stats': pageElement('div'),
     'global-stats-desktop': createElement('div'),
-    'stats-bar': createElement('div'),
+    'stats-bar': pageElement('div'),
   };
   container.append(byId['global-stats-desktop']);
   const doc = { getElementById: (id) => byId[id] ?? null, createElement };

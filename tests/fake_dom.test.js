@@ -366,10 +366,18 @@ test('appendChild refuses a string the way the platform does', () => {
   assert.deepEqual(box.childNodes, [], 'the rejected node was still inserted');
 });
 
+test('a freshly created node is disconnected until it reaches the page', () => {
+  const page = fakeElement('div', { connected: true });
+  const made = fakeElement('span');
+  assert.equal(made.isConnected, false, 'an unappended element read as connected');
+  page.append(made);
+  assert.equal(made.isConnected, true);
+});
+
 // A liveness check reads isConnected off the node it cached, which is usually a
 // descendant of the container the page swapped, not the node the swap named.
 test('every detaching mutator disconnects the subtree it evicts', () => {
-  const root = fakeElement('div');
+  const root = fakeElement('div', { connected: true });
   const branch = fakeElement('div');
   const leaf = fakeElement('span');
   root.appendChild(branch);
@@ -416,8 +424,8 @@ test('focus tracks the document, and unparenting the focused node blurs it', () 
 });
 
 test('a node moved between parents stays connected; remove() disconnects it', () => {
-  const from = fakeElement('div');
-  const to = fakeElement('div');
+  const from = fakeElement('div', { connected: true });
+  const to = fakeElement('div', { connected: true });
   const moved = fakeElement('span');
   from.append(moved);
   to.append(moved);
