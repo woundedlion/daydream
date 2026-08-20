@@ -1467,12 +1467,20 @@ test('unsweepableReason names the ops the engine morph path declines', () => {
 });
 
 test('a slider reaching past its swept band is reported rather than silent', () => {
+  const overreaching = [];
   for (const [op, band] of Object.entries(MORPH_SWEEP)) {
     if (!band) continue;
     for (const [key, { min, max }] of Object.entries(band)) {
       const def = OP_DEFS[op].params[key];
       assert.ok(def, `MORPH_SWEEP bounds ${op}.${key}, which OP_DEFS does not declare`);
-      if (def.min >= min && def.max <= max) continue;
+      if (def.min >= min && def.max <= max) {
+        assert.equal(unsweepableReason({ op, params: { [key]: def.min } }), null,
+          `${op} keeps ${key} inside its band, so no slider position is reported`);
+        assert.equal(unsweepableReason({ op, params: { [key]: def.max } }), null,
+          `${op} keeps ${key} inside its band, so no slider position is reported`);
+        continue;
+      }
+      overreaching.push(`${op}.${key}`);
       // A slider reaching outside its band is legal; the row marker is what
       // keeps it from being silent.
       assert.match(unsweepableReason({ op, params: { [key]: def.max } })
@@ -1481,4 +1489,7 @@ test('a slider reaching past its swept band is reported rather than silent', () 
       `${op} offers ${key} outside its band with nothing reporting it`);
     }
   }
+  // The rows the marker case exists for; pinned so narrowing a slider retires
+  // the row rather than leaving this sweep with nothing to assert.
+  assert.deepEqual(overreaching, ['chamfer.t']);
 });
