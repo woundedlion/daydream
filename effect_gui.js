@@ -1404,7 +1404,6 @@ export function createEffectGui({
     if (!container) return;
     const dom = fx.gui.domElement;
     dom.classList.add('effect-gui');
-    dom.classList.remove('global-gui');
     container.appendChild(dom);
   }
 
