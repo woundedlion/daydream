@@ -1,0 +1,216 @@
+/*
+ * Drives the shader workbench's pipeline strip with a real mouse in headless
+ * Chrome, over the same manifest server scripts/browser-smoke.mjs uses.
+ *
+ *   node scripts/workbench-probe.mjs
+ *
+ * The unit suite renders the strip into tests/fake_dom.js, which has neither
+ * layout nor pointer capture, so it can see neither where a palette lands on
+ * screen nor that a captured press swallows the click behind it. Those need a
+ * browser: palette placement is measured against the control that opened it, and
+ * every gesture below is a genuine mouse down/move/up.
+ */
+import puppeteer from 'puppeteer-core';
+
+import { manifestEntries } from '../tests/site_pages.js';
+import { BROWSER_ARGS, resolveBrowser } from './browser.mjs';
+import { serveManifest } from './serve-manifest.mjs';
+
+const PAGE = 'tools/shader.html';
+const VIEWPORT = { width: 1400, height: 900 };
+const LOAD_TIMEOUT_MS = 90_000;
+const READY_TIMEOUT_MS = 90_000;
+
+// A palette carries a border and the strip a little padding, so its box never
+// starts exactly on the button's. Anything past this is the anchoring failing
+// rather than rounding: the defect this pins put a socket's palette 1070px out.
+const ANCHOR_TOLERANCE_PX = 16;
+
+// Steps a drag is moved in. One jump would leave the strip a single hover to
+// resolve, which is not the gesture a hand makes.
+const DRAG_STEPS = 16;
+
+// Travel that arms a drag: past the strip's slop, so the press stops reading as
+// a click and the drop targets take their live sizes.
+const DRAG_ARM_PX = 8;
+
+/**
+ * @param {import('puppeteer-core').Page} tab - The page under test.
+ * @param {string} selector - Element to find.
+ * @returns {Promise<{x: number, y: number, width: number, height: number}>} Its
+ *   viewport box.
+ */
+async function boxOf(tab, selector) {
+  const handle = await tab.waitForSelector(selector, { timeout: READY_TIMEOUT_MS });
+  const box = await handle.boundingBox();
+  if (box === null) throw new Error(`${selector} has no layout box`);
+  return box;
+}
+
+/** @param {{x: number, y: number, width: number, height: number}} box */
+const centre = (box) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
+
+/**
+ * Presses at one point, travels to a target, and releases: the gesture the
+ * strip's pointer capture sees, rather than a synthesized drop. The target is
+ * resolved once the drag is armed, because the strip widens its gaps into hit
+ * areas the moment one starts and everything to their right moves with them.
+ * @param {import('puppeteer-core').Page} tab - The page under test.
+ * @param {{x: number, y: number}} from - Where the press lands.
+ * @param {() => Promise<{x: number, y: number}>} target - Resolves the release
+ *   point against the layout the running drag has.
+ * @returns {Promise<void>}
+ */
+async function dragFrom(tab, from, target) {
+  await tab.mouse.move(from.x, from.y);
+  await tab.mouse.down();
+  const armed = { x: from.x + DRAG_ARM_PX, y: from.y };
+  await tab.mouse.move(armed.x, armed.y);
+  const to = await target();
+  for (let step = 1; step <= DRAG_STEPS; step += 1) {
+    await tab.mouse.move(
+      armed.x + ((to.x - armed.x) * step) / DRAG_STEPS,
+      armed.y + ((to.y - armed.y) * step) / DRAG_STEPS,
+    );
+  }
+  await tab.mouse.up();
+}
+
+/**
+ * The chip names one band holds, left to right.
+ * @param {import('puppeteer-core').Page} tab - The page under test.
+ * @param {string} carrier - The band's carrier.
+ * @returns {Promise<string[]>} Operator display names.
+ */
+const bandChipNames = (tab, carrier) => tab.$$eval(
+  `.chain-band[data-carrier="${carrier}"] .chain-chip-name`,
+  (nodes) => nodes.map((node) => node.textContent ?? ''));
+
+/**
+ * Opens a palette from one control and reports how far it landed from it.
+ * @param {import('puppeteer-core').Page} tab - The page under test.
+ * @param {string} selector - The control that opens the palette.
+ * @returns {Promise<number>} Distance between the two left edges.
+ */
+async function paletteOffsetFrom(tab, selector) {
+  const control = await boxOf(tab, selector);
+  await tab.mouse.click(centre(control).x, centre(control).y);
+  const palette = await boxOf(tab, '.chain-palette');
+  const offset = Math.abs(palette.x - control.x);
+  await tab.keyboard.press('Escape');
+  await tab.waitForFunction(() => document.querySelector('.chain-palette') === null,
+    { timeout: READY_TIMEOUT_MS });
+  return offset;
+}
+
+/**
+ * Runs every gesture check against a loaded workbench.
+ * @param {import('puppeteer-core').Page} tab - The page under test.
+ * @returns {Promise<string[]>} One line per failure; empty when all pass.
+ */
+async function probeStrip(tab) {
+  const failures = [];
+  /**
+   * @param {boolean} ok - Whether the check held.
+   * @param {string} message - What was checked, and what was measured.
+   * @returns {void}
+   */
+  const check = (ok, message) => {
+    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
+    if (!ok) failures.push(message);
+  };
+
+  const bandOffset = await paletteOffsetFrom(
+    tab, '.chain-band[data-carrier="plane"] .chain-band-add');
+  check(bandOffset <= ANCHOR_TOLERANCE_PX,
+    `a band + opens its palette ${bandOffset.toFixed(1)}px from the button`);
+
+  const socketOffset = await paletteOffsetFrom(
+    tab, '.chain-chip--socket .chain-chip-swap');
+  check(socketOffset <= ANCHOR_TOLERANCE_PX,
+    `a socket swap opens its palette ${socketOffset.toFixed(1)}px from the button`);
+
+  // Wave Shear out of the library and onto the plane band, which holds no stage
+  // on the scratch chain.
+  const before = await bandChipNames(tab, 'plane');
+  await dragFrom(tab,
+    centre(await boxOf(tab, '.chain-library-entry[data-operator="warp.wave-shear.v2"]')),
+    async () => centre(await boxOf(tab, '.chain-band[data-carrier="plane"]')));
+  const after = await bandChipNames(tab, 'plane');
+  check(!before.includes('Wave Shear') && after.includes('Wave Shear'),
+    `dragging a library entry onto a band inserts it (${after.join(', ') || 'nothing'})`);
+
+  // A second sphere stage, so the band holds two chips to reorder and its chips
+  // take the pointer instead of declining it.
+  await (await tab.waitForSelector(
+    '.chain-band[data-carrier="sphere"] .chain-band-add')).click();
+  await (await tab.waitForSelector(
+    '.chain-palette-entry[data-operator="sphere.lens.twist.v2"]')).click();
+  const sphere = await bandChipNames(tab, 'sphere');
+  check(sphere.length === 2, `the sphere band holds two chips (${sphere.join(', ')})`);
+
+  await (await tab.waitForSelector(
+    '.chain-band[data-carrier="sphere"] .chain-chip .chain-chip-name')).click();
+  const selected = await tab.$eval('.chain-strip', (strip) => {
+    const chip = strip.querySelector('.chain-chip[aria-current="true"]');
+    return chip instanceof HTMLElement ? chip.dataset.label ?? '' : null;
+  });
+  check(selected !== null, `clicking a chip selects it (aria-current: ${selected})`);
+
+  // Past the chip that is not the one being dragged: the drop lands in the gap
+  // beyond it, which is the only one the store accepts.
+  await dragFrom(tab,
+    centre(await boxOf(tab,
+      '.chain-band[data-carrier="sphere"] .chain-chip .chain-chip-name')),
+    async () => {
+      const other = await boxOf(tab,
+        '.chain-band[data-carrier="sphere"] .chain-chip:not([data-dragging])');
+      return { x: other.x + other.width - 2, y: centre(other).y };
+    });
+  const reordered = await bandChipNames(tab, 'sphere');
+  check(reordered.join() === [...sphere].reverse().join(),
+    `dragging a chip past another reorders the band (${reordered.join(', ')})`);
+
+  return failures;
+}
+
+let executablePath;
+try {
+  executablePath = resolveBrowser();
+} catch (error) {
+  console.error(`workbench-probe: ${error instanceof Error ? error.message : error}`);
+  process.exit(1);
+}
+
+console.log(`workbench-probe: ${PAGE}, ${executablePath}`);
+
+const site = await serveManifest(manifestEntries());
+const browser = await puppeteer.launch({
+  executablePath,
+  headless: true,
+  args: BROWSER_ARGS,
+});
+
+let failures = [];
+try {
+  const tab = await browser.newPage();
+  await tab.setViewport(VIEWPORT);
+  tab.on('pageerror', (error) => failures.push(`uncaught: ${error.message}`));
+  await tab.goto(`${site.origin}/${PAGE}`, { timeout: LOAD_TIMEOUT_MS });
+  await tab.waitForFunction(() => !document.getElementById('loading-overlay'),
+    { timeout: READY_TIMEOUT_MS });
+  await tab.waitForSelector('.chain-chip', { timeout: READY_TIMEOUT_MS });
+  failures = [...failures, ...await probeStrip(tab)];
+} catch (error) {
+  failures.push(error instanceof Error ? error.message : String(error));
+} finally {
+  await browser.close();
+  await site.close();
+}
+
+if (failures.length > 0) {
+  console.error(`workbench-probe: ${failures.length} checks failed:`);
+  for (const failure of failures) console.error(`  ${failure}`);
+  process.exit(1);
+}
+console.log('workbench-probe: every pipeline-strip gesture behaved.');

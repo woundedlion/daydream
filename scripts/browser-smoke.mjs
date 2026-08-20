@@ -5,36 +5,13 @@
  *
  *   node scripts/browser-smoke.mjs
  *
- * The browser is the one already installed: $CHROME_PATH, else the standard
- * Chrome/Chromium locations. Nothing is downloaded, and a machine with no
- * browser fails rather than reporting a green run over zero pages.
- *
- * Software rasterization (--use-gl=angle --use-angle=swiftshader
- * --enable-unsafe-swiftshader) because a runner has no GPU and every page but
- * palettes.html renders through WebGL.
+ * The browser and its flags come from scripts/browser.mjs.
  */
-import { existsSync } from 'node:fs';
-
 import puppeteer from 'puppeteer-core';
 
 import { manifestEntries, servedPages } from '../tests/site_pages.js';
+import { BROWSER_ARGS, resolveBrowser } from './browser.mjs';
 import { serveManifest } from './serve-manifest.mjs';
-
-const BROWSER_CANDIDATES = [
-  '/usr/bin/google-chrome',
-  '/usr/bin/google-chrome-stable',
-  '/usr/bin/chromium-browser',
-  '/usr/bin/chromium',
-  '/snap/bin/chromium',
-];
-
-const BROWSER_ARGS = [
-  '--no-sandbox',
-  '--disable-dev-shm-usage',
-  '--use-gl=angle',
-  '--use-angle=swiftshader',
-  '--enable-unsafe-swiftshader',
-];
 
 const VIEWPORT = { width: 1280, height: 900 };
 const LOAD_TIMEOUT_MS = 90_000;
@@ -58,29 +35,6 @@ const PAGE_READY = {
   'index.html': enginePainted,
   'tools/shader.html': enginePainted,
 };
-
-/**
- * Path of the browser to drive.
- * @returns {string} An existing executable path.
- * @throws {Error} When neither $CHROME_PATH nor any standard location exists.
- */
-function resolveBrowser() {
-  const declared = process.env.CHROME_PATH;
-  if (declared) {
-    if (!existsSync(declared)) {
-      throw new Error(`CHROME_PATH=${declared} does not exist.`);
-    }
-    return declared;
-  }
-  const found = BROWSER_CANDIDATES.find((path) => existsSync(path));
-  if (!found) {
-    throw new Error(
-      'no Chrome or Chromium found. Set CHROME_PATH, or install one at ' +
-        `${BROWSER_CANDIDATES.join(', ')}.`,
-    );
-  }
-  return found;
-}
 
 /**
  * Counts the draw calls the page issues into its canvases, installed before any
