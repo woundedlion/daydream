@@ -782,7 +782,23 @@ test('an invalid param carries an actionable warning indicator and tooltip', () 
   const note = controller.domElement.querySelector('.visually-hidden');
   assert.equal(note.textContent, warning);
   assert.equal(controller.$select.getAttribute('aria-describedby'), note.id);
-  assert.equal(note.id, 'param-warning-projection');
+  assert.equal(note.id, 'param-warning-Projection');
+});
+
+test('warning ids separate names that differ only in punctuation or case', () => {
+  const gui = fakeGui();
+  const warned = (name) => addParamControl(gui, { [name]: 0 },
+    { name, value: 0, min: 0, max: 1, warning: `${name} is out of range.` });
+
+  const notes = ['Hue Shift', 'Hue-Shift', 'hue shift'].map((name) => {
+    const controller = warned(name);
+    const note = controller.domElement.querySelector('.visually-hidden');
+    assert.equal(controller.$input.getAttribute('aria-describedby'), note.id,
+      'the description points at the note this control published');
+    return note;
+  });
+
+  assert.equal(new Set(notes.map((note) => note.id)).size, notes.length);
 });
 
 test('a param without a warning carries no invalid state or description', () => {
