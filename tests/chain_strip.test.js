@@ -137,13 +137,13 @@ test('the strip lays the chain out as carrier bands with sockets between them', 
   assert.match(chipByLabel(h, 'project').getAttribute('aria-label'),
     /, sphere to plane$/);
 
-  // One roving-tabindex stop and one persistent + per band.
+  // One roving-tabindex stop and a + only where an insertion is legal.
   assert.deepEqual(all.filter((chip) => chip.getAttribute('tabindex') === '0')
     .map((chip) => chip.dataset.label), ['camera']);
   assert.equal(h.container.querySelectorAll('.chain-gap').length, 0);
   assert.deepEqual(bands.map((band) => band.querySelector('.chain-band-add')
-    .getAttribute('aria-label')),
-  ['Add a Sphere stage', 'Add a Plane stage', 'Add a Field stage', 'Add a Color stage']);
+    ?.getAttribute('aria-label') ?? null),
+  ['Add a Sphere stage', 'Add a Plane stage', 'Add a Field stage', null]);
 });
 
 test('endomorphisms carry remove and bypass; sockets carry valid selectors', async () => {

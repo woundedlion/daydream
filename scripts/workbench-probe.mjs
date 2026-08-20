@@ -11,7 +11,7 @@ import { BROWSER_ARGS, resolveBrowser } from './browser.mjs';
 import { serveManifest } from './serve-manifest.mjs';
 
 const PAGE = 'tools/shader.html';
-const VIEWPORT = { width: 1400, height: 900 };
+const VIEWPORT = { width: 1674, height: 543 };
 const TIMEOUT_MS = 90_000;
 const SLIDER_FRACTION = 0.75;
 const VALUE_TOLERANCE = 1e-4;
@@ -76,6 +76,39 @@ async function probeStrip(tab) {
   const expanded = await tab.$$('.chain-chip-params');
   check(expanded.length > 0 && await tab.$('.chain-chip-disclosure') === null,
     `${expanded.length} stage-control groups stay expanded across ${chips.length} chips`);
+  check(await tab.$('.chain-band[data-carrier="color"] .chain-band-add') === null,
+    'a domain with no valid stages has no inert + button');
+
+  const layout = await tab.evaluate(() => {
+    const box = (node) => {
+      const rect = node.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, top: rect.top,
+        bottom: rect.bottom, width: rect.width, height: rect.height };
+    };
+    const chipBoxes = [...document.querySelectorAll('.chain-chip')].map(box);
+    const contained = [...document.querySelectorAll('.chain-band > .chain-chip')]
+      .every((chip) => {
+        const child = chip.getBoundingClientRect();
+        const parent = chip.parentElement.getBoundingClientRect();
+        return child.left >= parent.left && child.right <= parent.right;
+      });
+    const separate = chipBoxes.every((chip, index) => chipBoxes.slice(index + 1)
+      .every((other) => chip.right <= other.left || other.right <= chip.left
+        || chip.bottom <= other.top || other.bottom <= chip.top));
+    return {
+      chipBoxes,
+      contained,
+      separate,
+      strip: box(document.getElementById('chain-strip')),
+      main: box(document.querySelector('.main-area')),
+    };
+  });
+  check(layout.contained && layout.separate,
+    'stage cards stay inside their bands without overlapping');
+  check(layout.chipBoxes.every((box) => box.width <= 320),
+    'expanded stage cards have a compact, bounded width');
+  check(layout.strip.height < VIEWPORT.height * 0.55 && layout.main.height > 200,
+    `the pipeline leaves ${Math.round(layout.main.height)}px for the preview`);
 
   const add = '.chain-band[data-carrier="plane"] .chain-band-add';
   await (await tab.waitForSelector(add)).click();
