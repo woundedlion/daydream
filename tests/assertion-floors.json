@@ -11,6 +11,10 @@
     "cases": 22,
     "assertions": 82
   },
+  "tests/browser_launch.test.js": {
+    "cases": 4,
+    "assertions": 6
+  },
   "tests/chain_apply.test.js": {
     "cases": 11,
     "assertions": 30
@@ -25,11 +29,11 @@
   },
   "tests/chain_library.test.js": {
     "cases": 11,
-    "assertions": 61
+    "assertions": 63
   },
   "tests/chain_strip.test.js": {
-    "cases": 20,
-    "assertions": 166
+    "cases": 27,
+    "assertions": 185
   },
   "tests/clipboard.test.js": {
     "cases": 7,

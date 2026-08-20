@@ -1,21 +1,25 @@
-# Loads every page site_manifest.txt publishes in a real browser and requires a
-# clean console and a painted frame from each. Runs on pull requests for a
-# pre-merge signal, and deploy.yml's `deploy` job needs it, so a page that no
-# longer boots blocks the deploy.
+# The two headless-Chrome jobs. The smoke loads every page site_manifest.txt
+# publishes and requires a clean console and a painted frame from each; the
+# workbench probe drives the shader workbench's pipeline strip with a real mouse
+# and requires each pointer gesture to land what it names. Both run on pull
+# requests for a pre-merge signal, and deploy.yml's `deploy` job needs this
+# workflow, so a page that no longer boots — or a strip whose palettes open off
+# their control and whose chips no longer take a click — blocks the deploy.
 #
-# The unit suite runs over tests/fake_dom.js, so this is the only job that
-# resolves the import map, instantiates the WASM module, drives the render loop
-# and enforces the pages' CSP the way a visitor's browser does.
+# The unit suite runs over tests/fake_dom.js, which has neither layout nor
+# pointer capture, so these are the only jobs that resolve the import map,
+# instantiate the WASM module, drive the render loop, enforce the pages' CSP and
+# measure where an element actually lands, the way a visitor's browser does.
 #
 # The served set is site_manifest.txt, the same list deploy.yml stages _site
 # from: a smoke over the whole repository tree would resolve paths the deployed
 # site does not have.
 #
 # No browser is downloaded. puppeteer-core drives the Chrome the ubuntu-24.04
-# image already ships; scripts/browser-smoke.mjs resolves it from $CHROME_PATH
-# or the standard install paths and fails when it finds none, so an image that
-# drops Chrome reds this job instead of passing over zero pages. The runner has
-# no GPU and every page but palettes.html renders through WebGL, so the script
+# image already ships; scripts/browser.mjs resolves it from $CHROME_PATH or the
+# standard install paths and fails when it finds none, so an image that drops
+# Chrome reds these jobs instead of passing over zero pages. The runner has no
+# GPU and every page but palettes.html renders through WebGL, so the same module
 # launches it on SwiftShader (--use-gl=angle --use-angle=swiftshader
 # --enable-unsafe-swiftshader) under --no-sandbox.
 name: Browser smoke
@@ -33,12 +37,22 @@ concurrency:
 
 jobs:
   browser-smoke:
-    name: Headless page smoke
+    name: ${{ matrix.name }}
     # Explicit label, not ubuntu-latest: the preinstalled Chrome is the browser
     # under test. The label selects an image family, so that Chrome's version
     # still rolls with GitHub's image updates.
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    strategy:
+      # Neither run tells the other anything: a red smoke must not hide which
+      # workbench gestures also broke.
+      fail-fast: false
+      matrix:
+        include:
+          - name: Headless page smoke
+            script: scripts/browser-smoke.mjs
+          - name: Workbench pointer gestures
+            script: scripts/workbench-probe.mjs
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
@@ -62,5 +76,5 @@ jobs:
 
       - run: npm ci
 
-      - name: Smoke the served pages
-        run: node scripts/browser-smoke.mjs
+      - name: Drive the browser
+        run: node ${{ matrix.script }}
