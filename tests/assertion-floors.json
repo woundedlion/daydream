@@ -24,12 +24,12 @@
     "assertions": 331
   },
   "tests/chain_library.test.js": {
-    "cases": 11,
-    "assertions": 63
+    "cases": 12,
+    "assertions": 67
   },
   "tests/chain_strip.test.js": {
-    "cases": 37,
-    "assertions": 236
+    "cases": 38,
+    "assertions": 244
   },
   "tests/clipboard.test.js": {
     "cases": 7,
@@ -231,7 +231,7 @@
   },
   "tests/shader_workbench.test.js": {
     "cases": 43,
-    "assertions": 252
+    "assertions": 254
   },
   "tests/shared.test.js": {
     "cases": 15,

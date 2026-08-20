@@ -1,9 +1,9 @@
 //
 // tools/chain_library.js keeps the whole operator vocabulary browsable under the
 // pipeline strip: domain-grouped entries from the pinned catalog, draggable onto
-// the strip through its drag controller, clickable to insert at the current drop
-// context, and narrowable by a filter that never hides an entry's disabled state
-// or its computed reason.
+// the strip through its drag controller, clickable to insert at the first gap
+// that accepts them, and narrowable by a filter that never hides an entry's
+// disabled state or its computed reason.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -17,8 +17,13 @@ const CATALOG = JSON.parse(readFileSync(
 const AFFINE = CATALOG.operators.find((op) => op.id === 'warp.affine.v2');
 const ROTATE = CATALOG.operators.find((op) => op.id === 'sphere.rotate.v2');
 
-/** A library over the pinned catalog, plus its spies. */
-function makeLibrary() {
+/**
+ * A library over the pinned catalog, plus its spies.
+ * @param {{dropped?: boolean}} [seams] - Whether the strip's drag controller
+ *   reports the release as a committed drop.
+ * @returns {Object} The harness.
+ */
+function makeLibrary({ dropped = true } = {}) {
   const container = fakeElement('section');
   // createPointerDrag captures on the container; the fake element does not
   // model pointer capture.
@@ -30,7 +35,7 @@ function makeLibrary() {
   const drag = {
     start: (source) => { dragCalls.push(['start', source]); return true; },
     hoverFromPoint: (x, y) => dragCalls.push(['hoverFromPoint', x, y]),
-    drop: () => { dragCalls.push(['drop']); return true; },
+    drop: () => { dragCalls.push(['drop']); return dropped; },
     cancel: () => dragCalls.push(['cancel']),
   };
   const picks = [];
@@ -99,17 +104,17 @@ test('the filter is a labelled searchbox', () => {
   assert.notEqual(label.textContent, '');
 });
 
-test('the drop context disables illegal entries with the computed reason', () => {
+test('an entry that fits nowhere is disabled with the computed reason', () => {
   const h = makeLibrary();
   h.library.setLegality([
-    { operator: AFFINE, legal: false, reason: 'consumes the plane carrier' },
+    { operator: AFFINE, legal: false, reason: 'no insertion point accepts it' },
     { operator: ROTATE, legal: true },
   ]);
 
   const disabled = entryFor(h, 'warp.affine.v2');
   assert.equal(disabled.getAttribute('aria-disabled'), 'true');
   const reason = disabled.querySelector('.chain-library-reason');
-  assert.equal(reason.textContent, 'consumes the plane carrier');
+  assert.equal(reason.textContent, 'no insertion point accepts it');
   assert.equal(disabled.getAttribute('aria-describedby'), reason.id);
   assert.equal(entryFor(h, 'sphere.rotate.v2').getAttribute('aria-disabled'), null);
   assert.equal(entries(h).length, CATALOG.operators.length,
@@ -117,14 +122,14 @@ test('the drop context disables illegal entries with the computed reason', () =>
 
   disabled.dispatch('click');
   assert.deepEqual(h.picks, [], 'a disabled entry never picks');
-  assert.deepEqual(h.announced, ['consumes the plane carrier'],
+  assert.deepEqual(h.announced, ['no insertion point accepts it'],
     'the refusal reaches the shared live region');
   entryFor(h, 'sphere.rotate.v2').dispatch('click');
   assert.deepEqual(h.picks, ['sphere.rotate.v2']);
 
   h.library.setLegality(null);
   assert.equal(entryFor(h, 'warp.affine.v2').getAttribute('aria-disabled'), null,
-    'clearing the context re-enables every entry');
+    'clearing the legality re-enables every entry');
 });
 
 test('the filter narrows every group by name or id', () => {
@@ -150,15 +155,15 @@ test('the filter narrows every group by name or id', () => {
   assert.equal(filterOf(h).value, '', 'the filter box survives every rebuild');
 });
 
-test('a filtered-in entry keeps the disabled state its context gave it', () => {
+test('a filtered-in entry keeps the disabled state its legality gave it', () => {
   const h = makeLibrary();
-  h.library.setLegality([{ operator: AFFINE, legal: false, reason: 'wrong carrier' }]);
+  h.library.setLegality([{ operator: AFFINE, legal: false, reason: 'fits nowhere' }]);
   narrow(h, 'affine');
 
   const entry = entryFor(h, 'warp.affine.v2');
   assert.equal(entries(h).length, 1);
   assert.equal(entry.getAttribute('aria-disabled'), 'true');
-  assert.equal(entry.querySelector('.chain-library-reason').textContent, 'wrong carrier');
+  assert.equal(entry.querySelector('.chain-library-reason').textContent, 'fits nowhere');
   assert.equal(entry.getAttribute('aria-describedby'),
     entry.querySelector('.chain-library-reason').id);
 });
@@ -231,15 +236,41 @@ test('a pointer drag on an entry hands off to the strip drag controller', () => 
   assert.equal(h.dragCalls.length, 3);
 });
 
-test('an entry the click context disables still drags', () => {
+test('an entry that fits nowhere still drags', () => {
   const h = makeLibrary();
-  h.library.setLegality([{ operator: AFFINE, legal: false, reason: 'wrong carrier' }]);
+  h.library.setLegality([{ operator: AFFINE, legal: false, reason: 'fits nowhere' }]);
 
   entryFor(h, 'warp.affine.v2').dispatch('pointerdown',
     { isPrimary: true, button: 0, pointerId: 9, clientX: 1, clientY: 2 });
   assert.deepEqual(h.dragCalls, [
     ['start', { kind: 'operator', operatorId: 'warp.affine.v2' }],
   ], 'the drop target carries its own legality');
+});
+
+// The capture a drag opens with retargets the click that follows to the
+// container, so a press that never travels is what reaches an entry as a click.
+test('a press that never travels inserts; one that misses its drop does not', () => {
+  const h = makeLibrary({ dropped: false });
+  const entryAt = (/** @type {string} */ id) => entryFor(h, id);
+  const wave = 'warp.wave-shear.v2';
+
+  entryAt(wave).dispatch('pointerdown',
+    { isPrimary: true, button: 0, pointerId: 3, clientX: 10, clientY: 10 });
+  entryAt(wave).dispatch('pointerup', { pointerId: 3 });
+  assert.deepEqual(h.picks, [wave]);
+
+  entryAt(wave).dispatch('pointerdown',
+    { isPrimary: true, button: 0, pointerId: 4, clientX: 10, clientY: 10 });
+  entryAt(wave).dispatch('pointermove', { pointerId: 4, clientX: 40, clientY: 10 });
+  entryAt(wave).dispatch('pointerup', { pointerId: 4 });
+  assert.deepEqual(h.picks, [wave], 'a drag that missed every target inserts nothing');
+
+  h.library.setLegality([{ operator: AFFINE, legal: false, reason: 'fits nowhere' }]);
+  entryAt('warp.affine.v2').dispatch('pointerdown',
+    { isPrimary: true, button: 0, pointerId: 5, clientX: 10, clientY: 10 });
+  entryAt('warp.affine.v2').dispatch('pointerup', { pointerId: 5 });
+  assert.deepEqual(h.picks, [wave], 'an entry that fits nowhere inserts nothing');
+  assert.equal(h.announced.at(-1), 'fits nowhere');
 });
 
 test('destroy detaches the pointer listeners and empties the library', () => {

@@ -883,7 +883,7 @@ test('a Save As copy carries the edits made since the load', async () => {
     validateShaderDocument(copy, { catalog: JSON.parse(ENGINE_CATALOG) }), []);
 });
 
-test('selecting a chip expands its controls and sets the drop context', async () => {
+test('selecting a chip expands its controls without disabling the library', async () => {
   const harness = await editorWorkbench();
   assert.deepEqual(harness.filters.at(-1), { external: true },
     'the panel renders none of the chain\'s parameters: the chips do');
@@ -896,30 +896,40 @@ test('selecting a chip expands its controls and sets the drop context', async ()
     .map((row) => row.dataset.parameter), ['lens.symmetry'],
   'the selected chip carries its own stage\'s controls');
 
-  // The library's click-insert context is the gap after lens — a sphere gap.
-  const wave = libraryEntries(harness).find(
-    (entry) => entry.dataset.operator === 'warp.wave-shear.v2');
-  assert.equal(wave.getAttribute('aria-disabled'), 'true');
-  assert.match(wave.querySelector('.chain-library-reason').textContent,
-    /plane carrier/);
-  assert.equal(libraryEntries(harness).find(
-    (entry) => entry.dataset.operator === 'sphere.lens.mobius.v2')
-    .getAttribute('aria-disabled'), null);
+  // §4.3: the selection sits in the sphere band, which no plane stage fits, but
+  // the plane band does — so the entry stays live and the click lands there.
+  const entryFor = (/** @type {string} */ id) =>
+    libraryEntries(harness).find((entry) => entry.dataset.operator === id);
+  assert.equal(entryFor('warp.wave-shear.v2').getAttribute('aria-disabled'), null);
+  assert.equal(entryFor('sphere.lens.mobius.v2').getAttribute('aria-disabled'), null);
+
+  const crossing = entryFor('project.stereographic.v2');
+  assert.equal(crossing.getAttribute('aria-disabled'), 'true',
+    'a crossing fills no gap in this chain');
+  assert.match(crossing.querySelector('.chain-library-reason').textContent,
+    /no insertion point accepts it/);
+
+  entryFor('warp.wave-shear.v2').dispatch('click');
+
+  assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator)
+    .filter((id) => id.startsWith('warp.')),
+  ['warp.wave-shear.v2', 'warp.mirror-tile.v2'],
+  'the click inserted at the first plane gap, ahead of the band\'s own stage');
 });
 
 // §4.7: one live region for every refusal. The library's own refusal is the
-// cheapest to provoke — a disabled entry clicked at a drop context that rejects
-// it — and it has to land where the document status does.
+// cheapest to provoke — an entry no gap in the chain accepts — and it has to
+// land where the document status does.
 test('a library refusal is announced in the shared status region', async () => {
   const harness = await editorWorkbench();
   stripChips(harness).find((chip) => chip.dataset.label === 'lens').dispatch('click');
   libraryEntries(harness)
-    .find((entry) => entry.dataset.operator === 'warp.wave-shear.v2')
+    .find((entry) => entry.dataset.operator === 'project.stereographic.v2')
     .dispatch('click');
 
   const status = harness.elements.get('shader-document-status');
   assert.equal(status.dataset.status, 'error');
-  assert.match(status.textContent, /plane carrier/);
+  assert.match(status.textContent, /no insertion point accepts it/);
 });
 
 test('a bypass reshapes the engine program while the saved document keeps the stage', async () => {

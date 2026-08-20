@@ -127,7 +127,7 @@ export function deactivatedParameterIds(parameters, values) {
  * @param {() => void} options.onApply - Runs after every committed structural
  *   edit, undo/redo and bypass toggle; the caller re-applies the program shape
  *   through the engine.
- * @param {(label: string|null) => void} options.onSelect - Runs when the
+ * @param {(label: string|null) => void} [options.onSelect] - Runs when the
  *   selected instance changes, which is also what expands the chip's controls.
  * @param {() => string|null} [options.presetId] - The preset the inline stage
  *   controls read and write; null falls back to the document's first.
@@ -137,7 +137,7 @@ export function deactivatedParameterIds(parameters, values) {
  * @returns {Object} The strip.
  */
 export function createChainStrip({
-  doc, container, store, catalog, announce, onApply, onSelect,
+  doc, container, store, catalog, announce, onApply, onSelect = () => {},
   presetId = () => null, onEditParameter = () => {},
 }) {
   /** @type {Map<string, CatalogOperator>} */
@@ -241,6 +241,53 @@ export function createChainStrip({
       if (band.chips.includes(at)) return at + 1;
     }
     return band.gaps[band.gaps.length - 1];
+  };
+
+  /**
+   * @param {string} operatorId - A catalog operator.
+   * @returns {number[]} Every gap the store accepts it at, in chain order.
+   */
+  const acceptingGaps = (operatorId) => {
+    const chain = store.chain();
+    /** @type {number[]} */
+    const gaps = [];
+    for (let gap = 0; gap <= chain.length; gap += 1) {
+      const entry = store.legalInsertions(gap)
+        .find((candidate) => candidate.operator.id === operatorId);
+      if (entry?.legal) gaps.push(gap);
+    }
+    return gaps;
+  };
+
+  /**
+   * The catalog's legality for a click insertion, which lands at the first gap
+   * that accepts the operator: legal wherever any gap does, and refused only
+   * where none does, with a reason that describes the chain rather than one
+   * gap. A gap whose carrier the operator consumes gives the telling refusal —
+   * a budget, not a carrier mismatch — so its reason is the one kept.
+   * @returns {LegalityEntry[]} One entry per catalog operator, in catalog order.
+   */
+  const insertionLegality = () => {
+    const chain = store.chain();
+    /** @type {Set<string>} */
+    const accepted = new Set();
+    /** @type {Map<string, string>} */
+    const refused = new Map();
+    for (let gap = 0; gap <= chain.length; gap += 1) {
+      const carrier = carrierAt(gap);
+      for (const entry of store.legalInsertions(gap)) {
+        const id = entry.operator.id;
+        if (entry.legal) accepted.add(id);
+        else if (entry.operator.input === carrier && !refused.has(id))
+          refused.set(id, entry.reason ?? '');
+      }
+    }
+    return catalog.operators.map((op) => {
+      if (accepted.has(op.id)) return { operator: op, legal: true };
+      const refusal = refused.get(op.id) ?? `the chain carries no ${op.input} gap`;
+      return { operator: op, legal: false,
+        reason: `no insertion point accepts it: ${refusal}` };
+    });
   };
 
   /** @returns {Array<*>} Every gap element, in chain order. */
@@ -1054,11 +1101,7 @@ export function createChainStrip({
         if (legal.size === 0) return false;
       } else {
         if (!operators.has(source.operatorId)) return false;
-        for (let gap = 0; gap <= chain.length; gap += 1) {
-          const entry = store.legalInsertions(gap)
-            .find((candidate) => candidate.operator.id === source.operatorId);
-          if (entry?.legal) legal.add(gap);
-        }
+        for (const gap of acceptingGaps(source.operatorId)) legal.add(gap);
       }
       dragState = { source, legal, hovered: null };
       markDrop(null, null);
@@ -1146,32 +1189,19 @@ export function createChainStrip({
 
   /**
    * Inserts a catalog operator without a drag: at the gap after the selected
-   * chip when there is a selection, else at the first gap the store accepts it.
+   * chip when that gap accepts it, else at the first gap that does.
    * @param {string} operatorId - The operator to insert.
    * @returns {boolean} Whether the insertion committed.
    */
   const insertOperator = (operatorId) => {
-    const chain = store.chain();
+    const gaps = acceptingGaps(operatorId);
     const selected = store.selectedLabel();
-    let index = null;
-    /** @type {string|undefined} */
-    let reason;
-    if (selected !== null) {
-      const at = chain.findIndex((entry) => entry.label === selected) + 1;
-      const entry = store.legalInsertions(at)
-        .find((candidate) => candidate.operator.id === operatorId);
-      if (entry?.legal) index = at;
-      else reason = entry?.reason;
-    } else {
-      for (let gap = 0; gap <= chain.length && index === null; gap += 1) {
-        const entry = store.legalInsertions(gap)
-          .find((candidate) => candidate.operator.id === operatorId);
-        if (entry?.legal) index = gap;
-        else reason ??= entry?.reason;
-      }
-    }
+    const at = selected === null ? null
+      : store.chain().findIndex((entry) => entry.label === selected) + 1;
+    const index = at !== null && gaps.includes(at) ? at : gaps[0] ?? null;
     if (index === null) {
-      announce(reason ?? `${operatorId} fits nowhere in this chain`);
+      announce(insertionLegality().find((entry) => entry.operator.id === operatorId)
+        ?.reason ?? `${operatorId} fits nowhere in this chain`);
       return false;
     }
     const result = store.replaceSpan(index, 0, [{ operator: operatorId }]);
@@ -1244,6 +1274,7 @@ export function createChainStrip({
     render,
     drag,
     insertOperator,
+    insertionLegality,
 
     /**
      * Repaints the Undo/Redo buttons a value edit moved, which a rebuild would

@@ -562,9 +562,36 @@ test('insertOperator lands after the selection, else at the first legal gap', as
   assert.equal(h.store.chain()[1].operator, 'sphere.lens.glitch.v2',
     'with a selection: the gap after the selected chip');
 
+  // The selection is a sphere chip, so a plane stage takes the first plane gap
+  // rather than refusing.
+  assert.equal(h.strip.insertOperator('warp.wave-shear.v2'), true);
+  assert.equal(h.store.chain()[4].operator, 'warp.wave-shear.v2');
+
   assert.equal(h.strip.insertOperator('sample.grid.v2'), false,
-    'illegal at the selection gap is a refusal, not a silent relocation');
-  assert.notEqual(lastAnnounced(h), '');
+    'a crossing fills no gap: the chain carries one carrier either side of each');
+  assert.match(lastAnnounced(h), /no insertion point accepts it/);
+});
+
+// §4.3: the library's entries are the whole catalog against the whole chain, so
+// an operator the selection's own gap refuses is still one click from the band
+// that takes it.
+test('insertionLegality refuses only what no gap in the chain accepts', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'camera').dispatch('click');
+  const entryFor = (/** @type {string} */ id) =>
+    h.strip.insertionLegality().find((entry) => entry.operator.id === id);
+
+  assert.equal(h.strip.insertionLegality().length, CATALOG.operators.length,
+    'every catalog operator is reported, in catalog order');
+  assert.equal(entryFor('sphere.lens.mobius.v2').legal, true);
+  assert.equal(entryFor('warp.wave-shear.v2').legal, true,
+    'the sphere selection does not disable a plane stage');
+  assert.equal(entryFor('warp.wave-shear.v2').reason, undefined);
+
+  const crossing = entryFor('project.stereographic.v2');
+  assert.equal(crossing.legal, false);
+  assert.match(crossing.reason, /^no insertion point accepts it: produces the/,
+    'the reason describes the chain, not the gap the selection names');
 });
 
 test('pointerdown on a chip begins the drag; its buttons decline it', async () => {

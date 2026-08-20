@@ -376,19 +376,12 @@ export function createShaderDocumentController({
     setParamFilter(null);
   };
 
-  // The library's click-insert legality tracks the drop context: the gap after
-  // the selected chip. No selection clears it, leaving every entry draggable
-  // and click-inserting at the first legal gap.
+  // The library's legality is the chain's, not one gap's: a click inserts at the
+  // first gap that accepts the operator, so only an operator no gap takes is
+  // disabled.
   const refreshLibraryLegality = () => {
     if (chainUi === null) return;
-    const selected = chainUi.store.selectedLabel();
-    if (selected === null) {
-      chainUi.library.setLegality(null);
-      return;
-    }
-    const gap = chainUi.store.chain()
-      .findIndex((/** @type {*} */ entry) => entry.label === selected) + 1;
-    chainUi.library.setLegality(chainUi.store.legalInsertions(gap));
+    chainUi.library.setLegality(chainUi.strip.insertionLegality());
   };
 
   /**
@@ -463,7 +456,6 @@ export function createShaderDocumentController({
       },
       presetId: () => active?.presetId ?? null,
       onEditParameter: writeStageEdit,
-      onSelect: () => refreshLibraryLegality(),
     }));
     const library = createChainLibrary({
       doc,
@@ -475,6 +467,7 @@ export function createShaderDocumentController({
     });
     setParamFilter({ external: true });
     chainUi = { store, strip, library };
+    refreshLibraryLegality();
   };
 
   /**
