@@ -237,7 +237,7 @@ test('lissajous: point lies on the unit sphere (R = 1) for several t', () => {
  * with phase in radians, and a non-2π domain as a plain float literal.
  */
 test('lissajousCodeString emits a C++ LissajousParams initializer', () => {
-  // Matches ChaoticStrings' built-in config{12.0f, 5.0f, 0, 2 * PI_F}.
+  // Matches Fishbowl's built-in config{12.0f, 5.0f, 0, 2 * PI_F}.
   assert.equal(
     lissajousCodeString(12, 5, 0, TWO_PI),
     'LissajousParams{12.0f, 5.0f, 0.0f, 2 * PI_F}');
@@ -290,7 +290,7 @@ test('closingDomain is idempotent', () => {
  * from the one Comets will traverse.
  */
 test('domainClosureWarning flags only domains that do not close', () => {
-  // ChaoticStrings' built-in config: m2 · domain = 5 · 2π, already closed.
+  // Fishbowl's built-in config: m2 · domain = 5 · 2π, already closed.
   assert.equal(domainClosureWarning(5, TWO_PI), null);
   assert.equal(domainClosureWarning(1.06, TWO_PI / 1.06), null);
   assert.equal(domainClosureWarning(0, 3), null);

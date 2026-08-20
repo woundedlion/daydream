@@ -138,7 +138,7 @@ export const closingDomain = (m2, domain) => {
 /**
  * Describes the gap between an authored domain and what the engine traverses.
  * Comets re-snaps the exported domain to closingDomain(), so an unclosed domain
- * previews a different arc than it renders; ChaoticStrings does not snap and
+ * previews a different arc than it renders; Fishbowl does not snap and
  * pinches at the seam instead.
  * @param {number} c2 - Frequency C₂ (m2).
  * @param {number} domain - The authored domain.
@@ -150,7 +150,7 @@ export const domainClosureWarning = (c2, domain, tol = 1e-4) => {
   if (closed === 0 || Math.abs(domain - closed) <= tol * closed) return null;
   return `Domain ${domain.toFixed(3)} does not close the curve. Comets snaps it to ` +
     `${closed.toFixed(3)} (2π·${Math.round((c2 * closed) / TWO_PI)}/C₂), so the preview above ` +
-    `is not the arc it renders; ChaoticStrings keeps ${domain.toFixed(3)} and pinches at the seam.`;
+    `is not the arc it renders; Fishbowl keeps ${domain.toFixed(3)} and pinches at the seam.`;
 };
 
 /**
@@ -158,7 +158,7 @@ export const domainClosureWarning = (c2, domain, tol = 1e-4) => {
  * takes plain numbers and returns the string the page writes into the DOM.
  *
  * The snippet is a C++ `LissajousParams` aggregate initializer — the form the
- * engine's Lissajous effects (ChaoticStrings, Comets) actually consume
+ * engine's Lissajous effects (Fishbowl, Comets) actually consume
  * (core/math/geometry.h: `struct LissajousParams { float m1, m2, a, domain; }`).
  * Phase A is emitted in radians and fed to the engine as-is: the tool's
  * radians-labelled slider matches `lissajous()`'s phase with no π scaling.
