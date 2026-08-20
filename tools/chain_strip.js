@@ -55,6 +55,9 @@ import { createPointerDrag } from './pointer_drag.js';
  * @typedef {{carrier: string, gaps: number[], chips: number[], socket: number|null}} BandLayout
  */
 
+// Keeps a palette clamped inside the viewport clear of its edge.
+const PALETTE_MARGIN = 8;
+
 /** @param {string} carrier @returns {string} The carrier's band title. */
 const carrierTitle = (carrier) =>
   carrier.length === 0 ? carrier : carrier[0].toUpperCase() + carrier.slice(1);
@@ -304,6 +307,30 @@ export function createChainStrip({
     return commit(focusedLabel);
   };
 
+  /**
+   * Anchors an open palette horizontally under the control that opened it. The
+   * stylesheet places it against its offset parent, which is whatever
+   * positioned ancestor happens to sit above it rather than the anchor, so the
+   * offset is measured and written out; a palette near the right edge is
+   * clamped back inside the viewport. A DOM with no layout keeps the
+   * stylesheet's placement.
+   * @param {*} element - The open palette.
+   * @param {*} anchor - The control it opened from.
+   * @returns {void}
+   */
+  const placePalette = (element, anchor) => {
+    const parent = element.offsetParent;
+    if (typeof element.getBoundingClientRect !== 'function'
+      || typeof anchor.getBoundingClientRect !== 'function'
+      || !parent || typeof parent.getBoundingClientRect !== 'function') return;
+    const width = element.getBoundingClientRect().width;
+    const viewport = doc.documentElement?.clientWidth ?? 0;
+    let left = anchor.getBoundingClientRect().left;
+    if (viewport > 0) left = Math.min(left, viewport - width - PALETTE_MARGIN);
+    element.style.left =
+      `${Math.max(PALETTE_MARGIN, left) - parent.getBoundingClientRect().left}px`;
+  };
+
   /** Removes an open palette without committing anything. */
   const closePalette = () => {
     if (palette === null) return;
@@ -321,9 +348,12 @@ export function createChainStrip({
    * @param {number} options.index - The gap or chip chain index.
    * @param {*} options.anchor - Element the palette sits after and Escape
    *   returns focus to.
+   * @param {*} [options.origin] - Control the palette is placed under, where
+   *   that is not the anchor itself; a socket chip anchors the palette but its
+   *   swap button is what opened it.
    * @returns {void}
    */
-  const openPalette = ({ kind, index, anchor }) => {
+  const openPalette = ({ kind, index, anchor, origin = anchor }) => {
     closePalette();
     const chain = store.chain();
     const entries = kind === 'insert'
@@ -432,6 +462,7 @@ export function createChainStrip({
     const parent = anchor.parentNode;
     const at = Array.prototype.indexOf.call(parent.childNodes, anchor);
     parent.insertBefore(element, parent.childNodes[at + 1] ?? null);
+    placePalette(element, origin);
     palette = { element, anchor };
     const first = options.find(
       (option) => option.getAttribute('aria-disabled') !== 'true') ?? options[0];
@@ -544,7 +575,7 @@ export function createChainStrip({
       swap.textContent = 'swap';
       swap.addEventListener('click', (/** @type {*} */ event) => {
         event.stopPropagation();
-        openPalette({ kind: 'replace', index, anchor: chip });
+        openPalette({ kind: 'replace', index, anchor: chip, origin: swap });
       });
       chip.appendChild(swap);
     } else {

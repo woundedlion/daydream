@@ -273,6 +273,61 @@ test('a band + and Insert both open the insertion palette at their gap', async (
   assert.notEqual(lastAnnounced(h), '');
 });
 
+// The palette's offset parent is whatever positioned ancestor sits above it —
+// the band for a band +, the whole strip region for a socket's swap — so its
+// stylesheet placement lands wherever that ancestor starts. These cases give the
+// fake the one measurement the anchoring reads.
+/**
+ * @param {Object} h - A strip harness.
+ * @param {number} width - Width every created element reports.
+ * @param {number} parentLeft - Left edge of the palette's offset parent.
+ * @returns {void}
+ */
+const measureNewElements = (h, width, parentLeft) => {
+  const offsetParent = fakeElement('div');
+  offsetParent.getBoundingClientRect = () => ({ left: parentLeft, width: 1264 });
+  h.doc.documentElement = { clientWidth: 1280 };
+  h.doc.createElement = (/** @type {string} */ tag) => {
+    const node = fakeElement(tag);
+    node.getBoundingClientRect = () => ({ left: 0, width });
+    node.offsetParent = offsetParent;
+    return node;
+  };
+};
+
+test('a palette opens anchored to the control that opened it', async () => {
+  const h = await makeStrip();
+  measureNewElements(h, 208, 8);
+  const swap = chipByLabel(h, 'project').querySelector('.chain-chip-swap');
+  swap.getBoundingClientRect = () => ({ left: 900, width: 40 });
+  swap.dispatch('click');
+  assert.equal(paletteOf(h).style.left, '892px',
+    'the offset is measured against the offset parent, not the parent the anchor sits in');
+
+  h.doc.activeElement.dispatch('keydown', { key: 'Escape' });
+  const add = bandFor(h, 'sphere').querySelector('.chain-band-add');
+  add.getBoundingClientRect = () => ({ left: 298, width: 20 });
+  add.dispatch('click');
+  assert.equal(paletteOf(h).style.left, '290px');
+});
+
+test('a palette near the right edge is clamped back inside the viewport', async () => {
+  const h = await makeStrip();
+  measureNewElements(h, 208, 8);
+  const swap = chipByLabel(h, 'colorize').querySelector('.chain-chip-swap');
+  swap.getBoundingClientRect = () => ({ left: 1250, width: 40 });
+  swap.dispatch('click');
+  assert.equal(paletteOf(h).style.left, '1056px',
+    'clamped to the viewport width less the palette and its margin');
+});
+
+test('a palette keeps its stylesheet placement where nothing measures', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'project').querySelector('.chain-chip-swap').dispatch('click');
+  assert.equal(paletteOf(h).style.left, '',
+    'a DOM without layout writes no offset rather than throwing');
+});
+
 test('undo and redo revert and reapply whole edits through the same apply path', async () => {
   const h = await makeStrip();
   bandFor(h, 'plane').querySelector('.chain-band-add').dispatch('click');
