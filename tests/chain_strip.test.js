@@ -100,7 +100,7 @@ const labels = (h) => h.store.chain().map((entry) => entry.label);
 test('the strip lays the chain out as carrier bands with sockets between them', async () => {
   const h = await makeStrip();
   const strip = h.container.children[1];
-  assert.equal(strip.getAttribute('role'), 'listbox');
+  assert.equal(strip.getAttribute('role'), 'toolbar');
   assert.equal(strip.getAttribute('aria-orientation'), 'horizontal');
   assert.equal(strip.getAttribute('aria-label'), 'Shader chain');
 
@@ -127,7 +127,12 @@ test('the strip lays the chain out as carrier bands with sockets between them', 
 
   const all = chips(h);
   assert.equal(all.length, 7);
-  for (const chip of all) assert.equal(chip.getAttribute('role'), 'option');
+  // A toolbar of groups, not a listbox of options: an option's children are
+  // presentational, so every inline stage control would go unexposed.
+  for (const chip of all) {
+    assert.equal(chip.getAttribute('role'), 'group');
+    assert.equal(chip.getAttribute('aria-selected'), null);
+  }
   const camera = chipByLabel(h, 'camera');
   assert.equal(camera.getAttribute('aria-label'), 'Rotate · camera');
   assert.equal(camera.querySelector('.chain-chip-name').textContent, 'Rotate');
@@ -176,8 +181,8 @@ test('clicking a chip selects it, marks it current, and reports the selection', 
   assert.equal(h.store.selectedLabel(), 'warp2');
   assert.deepEqual(h.selections, ['warp2']);
   const chip = chipByLabel(h, 'warp2');
-  assert.equal(chip.getAttribute('aria-current'), 'true');
-  assert.equal(chip.getAttribute('aria-selected'), 'true');
+  assert.equal(chip.getAttribute('aria-current'), 'true',
+    'aria-current carries the selection a group cannot express as aria-selected');
   assert.equal(h.doc.activeElement, chip, 'the selected chip takes focus');
   assert.equal(chipByLabel(h, 'camera').getAttribute('aria-current'), null);
 

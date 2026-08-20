@@ -790,8 +790,9 @@ export function createChainStrip({
       + (isBypassed ? ' chain-chip--bypassed' : ''));
     chip.dataset.label = entry.label;
     chip.dataset.index = String(index);
-    chip.setAttribute('role', 'option');
-    chip.setAttribute('aria-selected', String(isSelected));
+    // Not a listbox option: an option's children are presentational, which
+    // hides the chip's inline stage controls from assistive technology.
+    chip.setAttribute('role', 'group');
     if (isSelected) chip.setAttribute('aria-current', 'true');
     chip.setAttribute('tabindex', tabLabel === entry.label ? '0' : '-1');
     chip.setAttribute('aria-label', `${op.name} · ${entry.label}`
@@ -956,7 +957,7 @@ export function createChainStrip({
     history = { undo: undoButton, redo: redoButton };
 
     const strip = el('div', 'chain-strip');
-    strip.setAttribute('role', 'listbox');
+    strip.setAttribute('role', 'toolbar');
     strip.setAttribute('aria-label', 'Shader chain');
     strip.setAttribute('aria-orientation', 'horizontal');
     const view = { selected, bypassed, tabLabel };
