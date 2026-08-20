@@ -58,6 +58,9 @@ import { createPointerDrag } from './pointer_drag.js';
 // Keeps a palette clamped inside the viewport clear of its edge.
 const PALETTE_MARGIN = 8;
 
+// Pointer travel, in CSS pixels, that separates a chip drag from a chip click.
+const DRAG_SLOP = 4;
+
 /** @param {string} carrier @returns {string} The carrier's band title. */
 const carrierTitle = (carrier) =>
   carrier.length === 0 ? carrier : carrier[0].toUpperCase() + carrier.slice(1);
@@ -242,6 +245,7 @@ export function createChainStrip({
    * @returns {void}
    */
   const select = (label) => {
+    if (label === store.selectedLabel()) return;
     if (!store.setSelectedLabel(label)) return;
     if (label !== null) focusedLabel = label;
     render({ focusLabel: label });
@@ -822,6 +826,10 @@ export function createChainStrip({
             if (carrierAt(gap) === op.input) legal.add(gap);
           }
         }
+        // A chip with nowhere to go — a crossing, or a band's only stage — must
+        // not take the pointer: the capture retargets the click that follows and
+        // the press would select nothing.
+        if (legal.size === 0) return false;
       } else {
         if (!operators.has(source.operatorId)) return false;
         for (let gap = 0; gap <= chain.length; gap += 1) {
@@ -958,9 +966,17 @@ export function createChainStrip({
     }
   });
 
+  // The press a running chip drag started from, and whether it has travelled far
+  // enough to read as a drag. Pointer capture retargets the click that follows a
+  // captured press to the container, so a press that never moves is turned back
+  // into the chip selection it was meant to be.
+  /** @type {{label: string|null, x: number, y: number, moved: boolean}|null} */
+  let press = null;
+
   const pointer = createPointerDrag({
     element: container,
     onStart: (event) => {
+      press = null;
       const target = /** @type {*} */ (event.target);
       if (!target || typeof target.closest !== 'function') return false;
       if (target.closest('.chain-chip-bypass') || target.closest('.chain-chip-remove')
@@ -970,13 +986,29 @@ export function createChainStrip({
       if (!chip) return false;
       focusedLabel = chip.dataset.label ?? focusedLabel;
       if (!drag.start({ kind: 'chip', index: Number(chip.dataset.index) })) return false;
+      press = {
+        label: chip.dataset.label ?? null,
+        x: event.clientX,
+        y: event.clientY,
+        moved: false,
+      };
       return undefined;
     },
-    onMove: (event) => drag.hoverFromPoint(event.clientX, event.clientY),
-    onEnd: () => {
-      drag.drop();
+    onMove: (event) => {
+      if (press !== null && Math.abs(event.clientX - press.x)
+        + Math.abs(event.clientY - press.y) > DRAG_SLOP) press.moved = true;
+      drag.hoverFromPoint(event.clientX, event.clientY);
     },
-    onCancel: () => drag.cancel(),
+    onEnd: () => {
+      const stationary = press !== null && !press.moved ? press.label : null;
+      press = null;
+      if (drag.drop()) return;
+      if (stationary !== null) select(stationary);
+    },
+    onCancel: () => {
+      press = null;
+      drag.cancel();
+    },
   });
 
   render();
