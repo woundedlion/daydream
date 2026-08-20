@@ -366,6 +366,17 @@ export function paletteStripView({ start, end }) {
 }
 
 /**
+ * The accessible name for the channel-curve plot, which redraws over whichever
+ * phase window the strip shows.
+ * @param {{start: number, end: number}} range - The plotted phase window.
+ * @returns {string} The accessible name.
+ */
+export function waveGraphLabel({ start, end }) {
+  return 'Plot of the sRGB red, green and blue channel curves against '
+    + `normalized palette coordinate t, t ${start.toFixed(3)} to ${end.toFixed(3)}.`;
+}
+
+/**
  * The endpoints a lightness or chroma axis spans, for controls that edit its
  * ends rather than its center and width.
  * @param {{center:number, range:number}} axis - The recipe's axis values.

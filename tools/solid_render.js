@@ -68,6 +68,20 @@ export function meshStatsLine(meshData, edgeCount) {
 }
 
 /**
+ * The preview canvas's accessible name: which solid it is showing and its counts.
+ * @param {string} title - Display name of the base solid.
+ * @param {string[]} ops - Operator names applied to it, in chain order.
+ * @param {SolidMeshData} meshData - The rendered mesh.
+ * @param {number} edgeCount - Unique undirected edges, as counted by the render.
+ * @returns {string} The accessible name.
+ */
+export function meshCanvasLabel(title, ops, meshData, edgeCount) {
+  const chain = ops.length > 0 ? `${title} after ${ops.join(', ')}` : title;
+  return `Real-time 3D preview of ${chain}: ${meshData.vertices.length} vertices, `
+    + `${edgeCount} edges, ${meshData.faces.length} faces.`;
+}
+
+/**
  * Builds the mesh renderer, which owns the four scene objects it swaps.
  * @param {Object} opts - Renderer context.
  * @param {ThreeNamespace} opts.THREE - The three.js namespace.

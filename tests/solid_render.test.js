@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createMeshRenderer, meshStatsLine } from '../tools/solid_render.js';
+import { createMeshRenderer, meshStatsLine, meshCanvasLabel } from '../tools/solid_render.js';
 import { fakeElement } from './fake_dom.js';
 
 // Stand-in for the three.js surface the renderer constructs. The vector math is
@@ -225,6 +225,13 @@ test('the stats line reports vertices, edges, faces and indices', () => {
   assert.equal(meshStatsLine(tetrahedron(), 6), '4V / 6E / 4F / 12I');
   const quads = { vertices: new Array(8), faces: [[0, 1, 2, 3], [4, 5, 6, 7]] };
   assert.equal(meshStatsLine(quads, 12), '8V / 12E / 2F / 8I');
+});
+
+test('the canvas name says which solid is on screen', () => {
+  assert.equal(meshCanvasLabel('Tetrahedron', [], tetrahedron(), 6),
+    'Real-time 3D preview of Tetrahedron: 4 vertices, 6 edges, 4 faces.');
+  assert.equal(meshCanvasLabel('Cube', ['kis', 'dual'], tetrahedron(), 6),
+    'Real-time 3D preview of Cube after kis, dual: 4 vertices, 6 edges, 4 faces.');
 });
 
 test('hiding faces drops the mesh but keeps the edge cage', () => {

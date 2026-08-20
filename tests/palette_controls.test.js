@@ -9,6 +9,7 @@ const {
   createPaletteViewport, axisEndpoints, axisFromEndpoints,
   axisControlState, PALETTE_AXIS_CONTROLS,
   clampRecipeWindow, zoomRecipeWindow, stripDragIntent, paletteStripView,
+  waveGraphLabel,
   STRIP_DRAG_THRESHOLD,
   lockedGroupMove,
   PaletteV4, defaultPaletteRecipe, paletteRecipeFromControls,
@@ -782,6 +783,13 @@ test('the strip says which window it is showing only once it is zoomed', () => {
   assert.equal(zoomed.zoomed, true);
   assert.equal(zoomed.heading, 'sRGB Palette (t ∈ [0.250, 0.500])');
   assert.match(zoomed.ariaLabel, /t 0\.250 to 0\.500\. Press Enter/);
+});
+
+test('the channel-curve plot names the window it is plotting', () => {
+  assert.equal(waveGraphLabel({ start: 0, end: 1 }),
+    'Plot of the sRGB red, green and blue channel curves against normalized '
+    + 'palette coordinate t, t 0.000 to 1.000.');
+  assert.match(waveGraphLabel({ start: 0.25, end: 0.5 }), /t 0\.250 to 0\.500\.$/);
 });
 
 test('a constant axis is edited as one value spanning the whole range', () => {
