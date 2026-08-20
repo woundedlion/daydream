@@ -144,9 +144,9 @@ export class Daydream {
   ];
 
   /**
-   * Build the renderer, cameras, controls, scene, dot mesh, and axis lines, and
-   * wire up resize/camera-change observers. Leaves the sim paused-capable and
-   * ready for render() to be driven from an animation loop.
+   * Build the renderer, cameras, controls, scene, and axis lines, and wire up
+   * resize/camera-change observers. Leaves the sim paused-capable and ready for
+   * render() to be driven from an animation loop once a resolution is applied.
    * @param {Object} [dependencies] - Page seams, the same set start() threads
    *   through the rest of the app; a driver reads no globals of its own.
    * @param {Document} [dependencies.doc] - Document the canvas and overlays live in.
@@ -251,7 +251,10 @@ export class Daydream {
 
     this.labelPool = new LabelPool(this.scene, Daydream.SPHERE_RADIUS, this.doc);
 
-    this.setupDots();
+    // Built by the first updateResolution(), which the app runs before its first
+    // paint; every reader of the mesh treats null as "nothing to draw".
+    /** @type {THREE.InstancedMesh|null} */
+    this.dotMesh = null;
 
     this.axisMaterial = new THREE.LineBasicMaterial({
       color: 0xffffff
@@ -306,8 +309,6 @@ export class Daydream {
     this.strobeColumns = true;
 
     this.statsView = new GlobalStatsView(this.doc);
-
-    this.precomputeMatrices();
   }
 
   /**
