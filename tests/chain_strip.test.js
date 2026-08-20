@@ -27,6 +27,7 @@ assert.equal(BASE.status, 'VALID');
 // (plane endo), sample (crossing), transfer (field endo), colorize (exit).
 const LENS = 1;
 const PROJECT = 2;
+const WARP2 = 3;
 
 restoreDocumentAfterEach();
 
@@ -396,16 +397,42 @@ test('the drag lifecycle reorders a chip within its band', async () => {
   assert.equal(h.applied.length, 1);
 });
 
-test('a socket chip and a hoverless drop both drag to nothing', async () => {
+test('a chip with nowhere to go declines the drag, so its press stays a click',
+  async () => {
+    const h = await makeStrip();
+    assert.equal(h.strip.drag.start({ kind: 'chip', index: PROJECT }), false,
+      'a crossing never reorders');
+    assert.equal(h.strip.drag.start({ kind: 'chip', index: WARP2 }), false,
+      'the only chip in its band has no gap to move to');
+    assert.equal(chips(h).some((chip) => chip.dataset.dragging === 'true'), false);
+  });
+
+test('a hoverless drop unwinds without committing', async () => {
   const h = await makeStrip();
-  assert.equal(h.strip.drag.start({ kind: 'chip', index: PROJECT }), true);
-  assert.equal(h.container.querySelectorAll('.chain-gap')
-    .some((gap) => gap.dataset.drop === 'legal'), false);
+  assert.equal(h.strip.drag.start({ kind: 'chip', index: LENS }), true);
   assert.equal(h.strip.drag.drop(), false);
   assert.deepEqual(h.applied, []);
   assert.equal(h.container.querySelectorAll('.chain-gap')
     .some((gap) => gap.dataset.drop === 'legal'), false,
   'an unwound drag clears its highlights');
+});
+
+test('a chip press that never moves selects instead of dragging', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'lens').dispatch('pointerdown',
+    { isPrimary: true, button: 0, pointerId: 3, clientX: 40, clientY: 10 });
+  h.container.dispatch('pointerup', { pointerId: 3, clientX: 41, clientY: 10 });
+  assert.equal(h.store.selectedLabel(), 'lens');
+  assert.deepEqual(h.selections, ['lens']);
+  assert.deepEqual(h.applied, [], 'a selection is no structural edit');
+
+  chipByLabel(h, 'camera').dispatch('pointerdown',
+    { isPrimary: true, button: 0, pointerId: 4, clientX: 10, clientY: 10 });
+  h.container.dispatch('pointermove', { pointerId: 4, clientX: 90, clientY: 10 });
+  h.container.dispatch('pointerup', { pointerId: 4, clientX: 90, clientY: 10 });
+  assert.equal(h.store.selectedLabel(), 'lens',
+    'a press that travelled is a drag, and moves the selection nowhere');
+  assert.deepEqual(h.selections, ['lens'], 'the selection is announced once');
 });
 
 test('the drag lifecycle inserts a catalog operator at a legal gap', async () => {
