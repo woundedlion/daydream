@@ -32,6 +32,7 @@ export const LEGACY_SHADER_PRESETS = Object.freeze([
   ['SignalWeave', 'signal-weave-4'],
 ]);
 
+/** @type {Readonly<Record<string, string>>} */
 export const PIPELINE_EFFECTS = Object.freeze({
   GLITCH_NOISE_GRID_WAVE_SHEAR: 'SignalWeave',
   KALEIDOSCOPE_TWIN_WAVE_INNER_MIRROR: 'KaleidoWave',
@@ -51,11 +52,26 @@ export const PIPELINE_EFFECTS = Object.freeze({
 });
 
 /**
+ * A persisted ShaderBall save. Every field is optional: what a stored document
+ * carried is whatever the ShaderBall of its day wrote, and classifying that is
+ * this module's job.
+ * @typedef {Object} LegacyShaderSnapshot
+ * @property {number} [schemaVersion] - Save version, current spelling.
+ * @property {number} [schema_version] - Save version, snake-case spelling.
+ * @property {number} [presetIndex] - Selected legacy preset.
+ * @property {string} [acceptedPipeline] - Pipeline the engine last accepted.
+ * @property {string} [pipeline] - Pipeline, pre-accepted/requested split.
+ * @property {boolean} [pendingPipeline] - A structural edit the engine had not taken.
+ * @property {number[]} [accepted] - Accepted configuration field values.
+ * @property {number[]} [runtime] - Legacy runtime state to hand across.
+ */
+
+/**
  * Classifies a supported ShaderBall save before current effect-name validation.
  * @param {string} effect - Persisted effect name.
- * @param {Object|null} snapshot - Versioned legacy snapshot, when available.
+ * @param {LegacyShaderSnapshot|null} snapshot - Versioned legacy snapshot, when available.
  * @returns {{effect: string, migrated: boolean, presetId?: string,
- *   snapshot?: Object|null, customParameters?: Object|null,
+ *   snapshot?: LegacyShaderSnapshot|null, customParameters?: Object|null,
  *   handoff?: Object|null, notice?: string, diagnostic?: string}} The effect to
  *   open and whether it was migrated, always. A migration also carries a
  *   `notice` to show, and one of: `presetId` for a preset that maps to a
@@ -82,22 +98,24 @@ export function importLegacyShaderSelection(effect, snapshot = null) {
       diagnostic: 'UNSUPPORTED_LEGACY_SHADER_VERSION',
     };
   }
-  if (Number.isInteger(snapshot?.presetIndex)
-      && snapshot.presetIndex >= 0 && snapshot.presetIndex < LEGACY_SHADER_PRESETS.length) {
-    const [destination, presetId] = LEGACY_SHADER_PRESETS[snapshot.presetIndex];
+  const presetIndex = snapshot?.presetIndex;
+  if (typeof presetIndex === 'number' && Number.isInteger(presetIndex)
+      && presetIndex >= 0 && presetIndex < LEGACY_SHADER_PRESETS.length) {
+    const [destination, presetId] = LEGACY_SHADER_PRESETS[presetIndex];
     return {
-      effect: destination, presetId, migrated: true, handoff: snapshot.runtime ?? null,
-      notice: `Migrated ShaderBall preset ${snapshot.presetIndex} to ${destination}.`,
+      effect: destination, presetId, migrated: true, handoff: snapshot?.runtime ?? null,
+      notice: `Migrated ShaderBall preset ${presetIndex} to ${destination}.`,
     };
   }
   const pipeline = snapshot?.acceptedPipeline ?? snapshot?.pipeline;
   if (typeof pipeline === 'string' && Object.hasOwn(PIPELINE_EFFECTS, pipeline)
       && !snapshot?.pendingPipeline) {
+    const destination = PIPELINE_EFFECTS[pipeline];
     return {
-      effect: PIPELINE_EFFECTS[pipeline], migrated: true,
-      customParameters: snapshot.accepted ?? null,
-      handoff: snapshot.runtime ?? null,
-      notice: `Migrated a custom ShaderBall configuration to ${PIPELINE_EFFECTS[pipeline]}.`,
+      effect: destination, migrated: true,
+      customParameters: snapshot?.accepted ?? null,
+      handoff: snapshot?.runtime ?? null,
+      notice: `Migrated a custom ShaderBall configuration to ${destination}.`,
     };
   }
   // A bare ShaderBall identity carries no document, so the notice must not claim

@@ -14,6 +14,25 @@
 
 import { resolveActiveEffect } from "./sidebar_logic.js";
 
+/** @typedef {import('./holosphere_wasm.js').HolosphereEngine} HolosphereEngine */
+/** @typedef {import('./holosphere_wasm.js').HolosphereModule} HolosphereModule */
+
+/** One lil-gui control, as the effect panel hands it out. @typedef {{getValue: () => any, setValue: (value: any) => void}} ParamController */
+
+/**
+ * The live effect panel's control record. Absent members are the states the
+ * panel publishes before or without a built GUI.
+ * @typedef {Object} EffectControlRecord
+ * @property {Map<string, ParamController>} [controllerByName] - Control per engine parameter.
+ * @property {string[]} [writableParamNames] - Parameters the engine accepts writes for.
+ * @property {ParamController} [pauseController] - The panel's pause toggle.
+ * @property {{pause: boolean}} [animationState] - Live animation state.
+ */
+
+/** @typedef {{paramValues: Array<[string, any]>, animationsPaused: boolean}} EffectControlSnapshot */
+
+/** @typedef {{applied: boolean, failure: any, recoveryFailure: any}} SwitchOutcome */
+
 /**
  * Outcome of an effect/resolution apply, mirroring the engine's ParamSetResult
  * enum. Only APPLIED counts as applied, so a function that falls off its end
@@ -61,14 +80,15 @@ export function runSwitchTransaction(apply, rollback) {
  * requestedValue and acceptedValue split — so the param list is left empty and
  * only the pause state is carried here.
  *
- * @param {Object|null|undefined} effect - Active effect control state.
+ * @param {EffectControlRecord|null|undefined} effect - Active effect control state.
  * @param {() => boolean} [usesFullConfigSnapshot] - Whether the live effect
  *   persists through the exhaustive versioned snapshot API.
- * @returns {{paramValues: Array<[string, any]>, animationsPaused: boolean}|null}
+ * @returns {EffectControlSnapshot|null}
  */
 export function snapshotEffectControlState(effect,
                                            usesFullConfigSnapshot = () => false) {
   if (!effect?.controllerByName) return null;
+  /** @type {Array<[string, any]>} */
   const paramValues = [];
   if (!usesFullConfigSnapshot()) {
     for (const name of effect.writableParamNames || []) {
@@ -84,8 +104,8 @@ export function snapshotEffectControlState(effect,
 
 /**
  * Restore a copied effect state through the rebuilt GUI controllers.
- * @param {Object|null|undefined} effect - Rebuilt effect control state.
- * @param {{paramValues: Array<[string, any]>, animationsPaused: boolean}|null} snapshot
+ * @param {EffectControlRecord|null|undefined} effect - Rebuilt effect control state.
+ * @param {EffectControlSnapshot|null} snapshot - What snapshotEffectControlState() held.
  * @returns {void}
  */
 export function restoreEffectControlState(effect, snapshot) {
@@ -120,8 +140,7 @@ export function applyInitialState(apply, onSuccess) {
  * previous state remains usable. A failed rollback leaves state, URL, and
  * engine possibly disagreeing, so it additionally earns the fatal banner.
  * @param {string} label - What switched, for the log lines ("Effect"/"Resolution").
- * @param {{applied: boolean, failure: any, recoveryFailure: any}} result - A
- *   runSwitchTransaction() outcome.
+ * @param {SwitchOutcome} result - A runSwitchTransaction() outcome.
  * @returns {{logs: Array<{message: string, error: any}>, notice: string|null,
  *   fatal: string|null}} Console lines and user-visible messages.
  */
@@ -161,7 +180,7 @@ export function switchFailureReport(label, result) {
  * @param {Object} deps - Injected app collaborators.
  * @param {{get: Function, set: Function, update: Function, subscribe: Function}}
  *   deps.appState - The state to subscribe to and roll back.
- * @param {() => any} deps.getActiveEffect - Reads the live effect control record;
+ * @param {() => EffectControlRecord|null} deps.getActiveEffect - Reads the live effect control record;
  *   called again after each rollback apply, which rebuilds it.
  * @param {(preserveParams?: boolean) => string} deps.applyEffect - Applies the
  *   state's effect, returning an ApplyResult.
@@ -201,7 +220,7 @@ export function createSwitchCoordinator({
 
   // Rollback writes appState, so mute the subscription for its duration or the
   // restore would be handled as a fresh switch.
-  const runMuted = (restore) => {
+  const runMuted = (/** @type {() => void} */ restore) => {
     restoring = true;
     try {
       restore();
@@ -210,7 +229,11 @@ export function createSwitchCoordinator({
     }
   };
 
-  const restoreEffect = (effect, url, effectState) => runMuted(() => {
+  const restoreEffect = (
+    /** @type {string} */ effect,
+    /** @type {string} */ url,
+    /** @type {EffectControlSnapshot|null} */ effectState,
+  ) => runMuted(() => {
     appState.set('effect', effect);
     restoreUrl(url);
     if (applyEffect(true) !== ApplyResult.APPLIED) {
@@ -219,7 +242,12 @@ export function createSwitchCoordinator({
     restoreEffectControlState(getActiveEffect(), effectState);
   });
 
-  const restoreResolution = (resolution, effect, url, effectState) => runMuted(() => {
+  const restoreResolution = (
+    /** @type {string} */ resolution,
+    /** @type {string} */ effect,
+    /** @type {string} */ url,
+    /** @type {EffectControlSnapshot|null} */ effectState,
+  ) => runMuted(() => {
     appState.update({ resolution, effect });
     showResolution(resolution);
     restoreUrl(url);
@@ -229,14 +257,15 @@ export function createSwitchCoordinator({
     restoreEffectControlState(getActiveEffect(), effectState);
   });
 
-  const report = (label, result) => {
+  const report = (/** @type {string} */ label, /** @type {SwitchOutcome} */ result) => {
     const { logs, notice, fatal } = switchFailureReport(label, result);
     for (const { message, error } of logs) logError(message, error);
     showNotice(notice);
     if (fatal) showFatal(fatal);
   };
 
-  const onChange = (key, value, old) => {
+  const onChange = (
+    /** @type {string} */ key, /** @type {any} */ value, /** @type {any} */ old) => {
     if (restoring) return;
     if (key === 'effect') {
       const previousUrl = currentUrl();
@@ -283,9 +312,9 @@ export function createSwitchCoordinator({
  *
  * @param {Object} deps - Injected app collaborators.
  * @param {{get: Function, set: Function}} deps.appState - The applied state.
- * @param {() => Object|null} deps.getEngine - The main WASM engine, null until
+ * @param {() => HolosphereEngine|null} deps.getEngine - The main WASM engine, null until
  *   the module finishes loading (the GUI and sidebar are built either way).
- * @param {() => Object|null} deps.getModule - The loaded WASM module, for its
+ * @param {() => HolosphereModule} deps.getModule - The loaded WASM module, for its
  *   EffectSetResult/ResolutionSetResult enums; non-null whenever getEngine()
  *   answers an engine.
  * @param {() => void} deps.invalidateEngineView - Drops the cached pixel view so
@@ -298,9 +327,15 @@ export function createSwitchCoordinator({
  *   applyAnimationPause: Function}} deps.effectGui - The effect panel controller.
  * @param {() => void} deps.clearEffectParamUrl - Drops the outgoing effect's
  *   param URL entries.
- * @param {Object} deps.segments - The SegmentController.
- * @param {Object} deps.driver - The Daydream driver.
- * @param {Object} deps.sidebar - The effect sidebar.
+ * @param {{active: boolean, refreshPresetState: () => void,
+ *   setEffect: (effect: string) => void,
+ *   setResolution: (w: number, h: number) => void}} deps.segments - The SegmentController.
+ * @param {{setStrobeColumns: (strobe: boolean) => void, invalidate: () => void,
+ *   updateResolution: (w: number, h: number, dotSize: number) => void}} deps.driver -
+ *   The Daydream driver.
+ * @param {{setActive: (effect: string) => void,
+ *   setEffects: (names: string[], sizes: Record<string, number>|null) => void}}
+ *   deps.sidebar - The effect sidebar.
  * @param {() => boolean} deps.isRestoring - Whether the effect subscription is
  *   muted (a rollback in progress).
  * @param {(message: string, error?: any) => void} [deps.logError] - Console sink.
@@ -334,6 +369,7 @@ export function createApplyPipeline({
     const effect = appState.get('effect');
     // Compare against the enum value, never by truthiness (every
     // Module.EffectSetResult value is a truthy object).
+    if (!engine) return false;
     const applied =
       engine.setEffect(effect) === getModule().EffectSetResult.INSTALLED;
     driver.setStrobeColumns(engine.strobeColumns());
@@ -423,6 +459,7 @@ export function createApplyPipeline({
 
     driver.updateResolution(p.w, p.h, p.dotSize);
 
+    /** @type {Record<string, number>|null} */
     let effectSizes = null;
     if (engine) {
       try { effectSizes = engine.getEffectSizes(); }
@@ -494,7 +531,7 @@ export function offeredResolutions(presets, supported) {
   const labels = Object.keys(presets);
   if (!supported || supported.length === 0) return { labels, unlabeled: [] };
   const rows = new Set(Array.from(supported, ([w, h]) => `${w}x${h}`));
-  const key = (label) => `${presets[label].w}x${presets[label].h}`;
+  const key = (/** @type {string} */ label) => `${presets[label].w}x${presets[label].h}`;
   const offered = labels.filter((label) => rows.has(key(label)));
   if (offered.length === 0) return { labels, unlabeled: [] };
   const covered = new Set(offered.map(key));

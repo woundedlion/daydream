@@ -62,6 +62,18 @@ export function selectMimeType(
   return '';
 }
 
+/**
+ * A canvas capture track. Manual frame-request mode adds requestFrame(); the
+ * timed fallback the browser drops back to has no such method.
+ * @typedef {MediaStreamTrack & {requestFrame?: () => void}} CaptureTrack
+ */
+
+/**
+ * Where a session's chunks go. The streaming variant's finish() returns the
+ * promise that settles once the file is flushed and closed.
+ * @typedef {{write: (data: Blob) => void, finish: () => (void|Promise<void>)}} VideoSink
+ */
+
 export class VideoRecorder {
   /**
    * Constructs a recorder bound to a source canvas.
@@ -71,26 +83,36 @@ export class VideoRecorder {
    */
   constructor(canvas, frameInterval = 1 / FPS) {
     this.canvas = canvas;
+    /** @type {MediaRecorder|null} */
     this.mediaRecorder = null;
+    /** @type {Blob[]} */
     this.chunks = [];
+    /** @type {MediaStream|null} */
     this.stream = null;
+    /** @type {CaptureTrack|null} */
     this.track = null;
     this.frameInterval = frameInterval;
     this.elapsedSeconds = 0;
     // bitrateMbps, format, and targetHeight are latched at start().
     this.bitrateMbps = 16;
+    /** @type {'auto'|'mp4'|'webm'} */
     this.format = 'auto';
+    /** @type {number|null} */
     this.targetHeight = null;
+    /** @type {HTMLCanvasElement|null} */
     this.offscreen = null;
+    /** @type {CanvasRenderingContext2D|null} */
     this.offCtx = null;
     // Host hook fired whenever a session ends without the host asking for it: a
     // failure to start, an encoder fault, or a cancelled Save dialog. The reason is
     // passed so the UI can report it, and the UI drops its recording state; the
     // record button's label is set on click and would otherwise keep reading "Stop"
     // over a dead session.
+    /** @type {((err: Error) => void)|null} */
     this.onError = null;
     // Host hook fired when an explicit format falls back to the browser's
     // default container. Receives the actual file extension.
+    /** @type {((ext: string) => void)|null} */
     this.onFormatFallback = null;
   }
 
@@ -166,7 +188,7 @@ export class VideoRecorder {
 
     const captureSource = this.ensureOffscreen();
 
-    if (!this.offCtx) {
+    if (!captureSource || !this.offCtx) {
       this.cleanup();
       this.reportFailure('failed to acquire a 2D drawing context for the capture canvas; recording aborted.');
       return;
@@ -175,7 +197,10 @@ export class VideoRecorder {
     // framerate 0: manual frame-request mode, frames are captured on
     // requestFrame(). Browsers without requestFrame would record an empty video
     // in that mode, so fall back to a timed captureStream at the frame rate.
-    let stream, track;
+    /** @type {MediaStream|undefined} */
+    let stream;
+    /** @type {CaptureTrack|undefined} */
+    let track;
     try {
       stream = captureSource.captureStream(0);
       track = stream.getVideoTracks()[0];
@@ -210,6 +235,7 @@ export class VideoRecorder {
     }
 
     // Omit the mimeType key entirely when empty: some engines throw on an empty one.
+    /** @type {MediaRecorderOptions} */
     const options = { videoBitsPerSecond: this.bitrateMbps * 1_000_000 };
     if (mimeType) options.mimeType = mimeType;
     let recorder;
@@ -230,7 +256,9 @@ export class VideoRecorder {
     // ondataavailable/onstop/onerror fire after a fast stop→start may have installed
     // a new session, so the closures bind the per-session chunks/stream/recorder/sink
     // rather than read this.*.
+    /** @type {Blob[]} */
     const chunks = [];
+    /** @type {VideoSink|null} */
     let sink = null;
     let ended = false;
 
@@ -472,9 +500,7 @@ export class VideoRecorder {
    * @param {Blob[]} chunks - Per-session buffer; the fallback path fills it, the
    *   streaming path leaves it empty while a file handle holds (each chunk is
    *   released after its disk write) and falls back to filling it otherwise.
-   * @returns {{write: (data: Blob) => void, finish: () => (void|Promise<void>)}} The
-   *   session sink. The streaming variant's finish() returns the promise that
-   *   settles once the file is flushed and closed; callers may ignore it.
+   * @returns {VideoSink} The session sink; callers may ignore finish()'s promise.
    */
   openSink(recorder, effectName, chunks) {
     if (typeof globalThis.showSaveFilePicker !== 'function') {
@@ -487,7 +513,9 @@ export class VideoRecorder {
     const ext = this.extension(recorder);
     const filename = this.timestampedName(effectName, ext);
 
+    /** @type {FileSystemFileHandle|null} */
     let handle = null;
+    /** @type {FileSystemWritableFileStream|null} */
     let writable = null;
     let failed = false;
     let aborted = false;
@@ -632,6 +660,7 @@ export class VideoRecorder {
   extension(recorder = this.mediaRecorder) {
     const mime = recorder?.mimeType ?? '';
     const subtype = mime.split(';')[0].split('/')[1] ?? '';
+    /** @type {Record<string, string>} */
     const EXT = { mp4: 'mp4', webm: 'webm', 'x-matroska': 'mkv', ogg: 'ogv' };
     return EXT[subtype] ?? (subtype || 'webm');
   }
@@ -643,6 +672,7 @@ export class VideoRecorder {
    * @returns {string} The matching MIME type, defaulting to 'video/webm'.
    */
   mimeForExt(ext) {
+    /** @type {Record<string, string>} */
     const MIME = { mp4: 'video/mp4', webm: 'video/webm', mkv: 'video/x-matroska', ogv: 'video/ogg' };
     return MIME[ext] ?? 'video/webm';
   }

@@ -14,11 +14,9 @@ import { fileURLToPath } from 'node:url';
 const ROOT = new URL('../', import.meta.url);
 
 // Emscripten glue: an install output copied from Holosphere, checked by its
-// build there, and far too large to type-check usefully here. app_lifecycle:
-// outside the pipeline's typed scope (collaborators typed as bare Object);
-// segment_controller imports only its display-alias predicate. Each has a
+// build there, and far too large to type-check usefully here. It has a
 // hand-written `.d.ts` sibling on the roster, which is what resolves the import.
-const NOT_CHECKED = new Set(['holosphere_wasm.js', 'app_lifecycle.js']);
+const NOT_CHECKED = new Set(['holosphere_wasm.js']);
 
 // Never entered: dependency and git metadata, the linked worktrees, the vendored
 // third-party drops, the engine checkout the parity cases read, and tests/,
