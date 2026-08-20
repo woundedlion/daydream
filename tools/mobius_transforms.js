@@ -62,7 +62,7 @@ export const glslComplexFunctions = `
       `;
 
 // --- Projection-domain conventions ----------------------------------------
-// Mirrored from the engine (core/math/3dmath.h). The engine owns these
+// Mirrored from the engine (core/math/stereographic.h). The engine owns these
 // constants and the point-at-infinity behavior built on them; the tool renders
 // what the engine will run, so a divergence here is a lying preview.
 
