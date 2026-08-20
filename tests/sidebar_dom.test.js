@@ -11,7 +11,8 @@ function driveKey(key, activeFor = (btn) => btn) {
   const focused = { dataset: { effect: 'Voronoi' }, focus() {} };
   const self = {
     doc: { activeElement: activeFor(focused) },
-    listEl: { querySelectorAll: () => [focused] },
+    listEl: {},
+    orderedButtons: [focused],
     tabbableBtn: focused,
     setRovingTabbable() {},
     onSelect(name) {
@@ -67,7 +68,6 @@ function driveNav(key, startIdx = 0, count = 3, gridStyle = null) {
     focus() { focusLog.push(i); },
   }));
   const listEl = {
-    querySelectorAll: () => btns,
     ownerDocument: gridStyle
       ? { defaultView: { getComputedStyle: () => gridStyle } }
       : undefined,
@@ -75,6 +75,7 @@ function driveNav(key, startIdx = 0, count = 3, gridStyle = null) {
   const self = {
     doc: { activeElement: btns[startIdx] },
     listEl,
+    orderedButtons: btns,
     tabbableBtn: btns[startIdx],
     setRovingTabbable(b) { rovingLog.push(btns.indexOf(b)); },
     onSelect() {},
