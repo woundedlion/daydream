@@ -59,7 +59,8 @@ function fakeController(owner, object, property, args = []) {
 }
 
 /**
- * A lil-gui root or folder: records the controllers and folders built on it.
+ * A DeepLinkGUI (gui.js) root or folder: records the controllers, folders, and
+ * stored values built on it.
  * @param {string} namespace - Root namespace or folder title.
  * @returns {Object} The GUI double.
  */
@@ -69,6 +70,7 @@ export function fakeGui(namespace) {
     domElement: fakeElement('div'),
     controllers: [],
     folders: [],
+    stored: new Map(),
     destroyed: false,
     add(target, property, ...args) {
       const c = fakeController(gui, target, property, args);
@@ -82,11 +84,39 @@ export function fakeGui(namespace) {
       gui.controllers.push(c);
       return c;
     },
+    addMigrated(target, property, legacyProps, ...args) {
+      const c = gui.add(target, property, ...args);
+      c.legacyProps = legacyProps;
+      return c;
+    },
+    addUnhydrated(target, property, ...args) {
+      const c = gui.add(target, property, ...args);
+      c.unhydrated = true;
+      return c;
+    },
     addFolder(title) {
       const folder = fakeGui(title);
       gui.folders.push(folder);
       return folder;
     },
+    // A display folder prefixes no deep-link key, so its controls answer to the
+    // same names they would at the root.
+    addDisplayFolder(title) {
+      const folder = fakeGui(title);
+      folder.display = true;
+      gui.folders.push(folder);
+      return folder;
+    },
+    appendElement(element) { gui.domElement.appendChild(element); },
+    readStoredNumber(prop) {
+      const value = gui.stored.get(prop);
+      return typeof value === 'number' ? value : undefined;
+    },
+    readStoredString(prop) {
+      const value = gui.stored.get(prop);
+      return value === undefined ? undefined : String(value);
+    },
+    writeStoredValue(prop, value) { gui.stored.set(prop, value); },
     close() { return gui; },
     open() { return gui; },
     destroy() { gui.destroyed = true; },

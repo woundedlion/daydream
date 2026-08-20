@@ -414,13 +414,11 @@ function paramWarningTexts(params) {
  */
 function paramAddMethod(gui, p, hydrate, legacyNames, persist) {
   if (p.readonly || !persist) return (...args) => gui.addSession(...args);
-  if (hydrate && legacyNames.length > 0 && typeof gui.addMigrated === 'function') {
+  if (hydrate && legacyNames.length > 0) {
     return (object, property, ...rest) =>
       gui.addMigrated(object, property, legacyNames, ...rest);
   }
-  if (!hydrate && typeof gui.addUnhydrated === 'function') {
-    return (...args) => gui.addUnhydrated(...args);
-  }
+  if (!hydrate) return (...args) => gui.addUnhydrated(...args);
   return (...args) => gui.add(...args);
 }
 
@@ -478,7 +476,8 @@ export function addParamControl(
  * Build the effect GUI controller for the app's active effect.
  *
  * @param {Object} deps - Injected app collaborators.
- * @param {() => Object} deps.createGui - Makes an empty effect GUI root.
+ * @param {() => Object} deps.createGui - Makes an empty effect GUI root: a
+ *   DeepLinkGUI (gui.js), whose whole add/stored-value surface the panel uses.
  * @param {() => Array<Object>} deps.getParameterDefinitions - Reads the engine's
  *   parameter definitions for the effect it currently has loaded.
  * @param {() => number|undefined} deps.paramGeneration - Reads the engine's
@@ -585,7 +584,7 @@ export function createEffectGui({
     }
     const snapshot = getFullConfigSnapshot();
     if (!snapshot) return;
-    gui?.writeStoredValue?.(FULL_CONFIG_STORAGE_KEY, JSON.stringify(snapshot));
+    gui.writeStoredValue(FULL_CONFIG_STORAGE_KEY, JSON.stringify(snapshot));
   }
 
   function restoreEffectState(gui) {
@@ -593,7 +592,7 @@ export function createEffectGui({
       restoreAcceptedParams(gui);
       return;
     }
-    const text = gui?.readStoredString?.(FULL_CONFIG_STORAGE_KEY);
+    const text = gui.readStoredString(FULL_CONFIG_STORAGE_KEY);
     if (text === undefined) return;
     let snapshot;
     try {
@@ -625,7 +624,7 @@ export function createEffectGui({
         ?? parameter.requestedValue ?? parameter.value;
       // The float form, not the raw value: restoreAcceptedParams() reads the
       // companion key back through the URL number grammar, which rejects a bool.
-      gui?.writeStoredValue?.(
+      gui.writeStoredValue(
         acceptedStorageKey(parameter.name), engineParamValue(accepted));
     }
   }
@@ -641,7 +640,6 @@ export function createEffectGui({
    * @returns {void}
    */
   function restoreAcceptedParams(gui) {
-    if (typeof gui?.readStoredNumber !== 'function') return;
     const probed = new Set();
     for (;;) {
       let parameter;
@@ -961,10 +959,8 @@ export function createEffectGui({
       effectActions.presetIndex = getPresetIndex();
       const presetOptions = enumChoices(
         Array.from({ length: presetCount }, (_, index) => String(index)));
-      const addPreset = typeof fx.gui.addSession === 'function'
-        ? (...args) => fx.gui.addSession(...args)
-        : (...args) => fx.gui.add(...args);
-      const preset = addPreset(effectActions, 'presetIndex', presetOptions)
+      const preset = fx.gui
+        .addSession(effectActions, 'presetIndex', presetOptions)
         .name('Preset');
       fx.preset = { state: effectActions, controller: preset };
       const choose = (index) => {
@@ -1031,9 +1027,9 @@ export function createEffectGui({
       }
     };
     if (params.some(p => p.animated)) {
-      const add = !hydrate && typeof fx.gui.addUnhydrated === 'function'
-        ? (...args) => fx.gui.addUnhydrated(...args)
-        : (...args) => fx.gui.add(...args);
+      const add = hydrate
+        ? (...args) => fx.gui.add(...args)
+        : (...args) => fx.gui.addUnhydrated(...args);
       controller = add(animationState, 'pause').name('Pause Animation');
       controller.onChange(transitionPaused);
     }
@@ -1137,10 +1133,8 @@ export function createEffectGui({
     const stageFolders = new Map();
     if (stageAssignments) {
       for (const stage of stageOrder) {
-        const addFolder = typeof fx.gui.addDisplayFolder === 'function'
-          ? fx.gui.addDisplayFolder.bind(fx.gui)
-          : fx.gui.addFolder.bind(fx.gui);
-        stageFolders.set(stage, addFolder(stageTitles?.get(stage) ?? stage));
+        stageFolders.set(
+          stage, fx.gui.addDisplayFolder(stageTitles?.get(stage) ?? stage));
       }
     }
 
