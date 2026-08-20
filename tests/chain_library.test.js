@@ -213,10 +213,15 @@ test('a pointer drag on an entry hands off to the strip drag controller', () => 
     ['start', { kind: 'operator', operatorId: 'warp.wave-shear.v2' }],
   ]);
 
+  assert.equal(entry().dataset.dragging, 'true',
+    'the entry the gesture was picked up from reads as picked up');
+
   entry().dispatch('pointermove', { pointerId: 5, clientX: 3, clientY: 4 });
   entry().dispatch('pointerup', { pointerId: 5 });
   assert.deepEqual(h.dragCalls.slice(1), [['hoverFromPoint', 3, 4], ['drop']],
     'the library resolves nothing itself; the strip hit-tests the point');
+  assert.equal(entry().dataset.dragging, undefined,
+    'the mark is cleared before the drop, which may re-render the library');
 
   // A group title, a domain tab and the filter box start nothing.
   h.container.querySelector('.chain-library-title').dispatch('pointerdown',

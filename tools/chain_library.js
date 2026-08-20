@@ -178,6 +178,16 @@ export function createChainLibrary({ doc, container, catalog, drag, announce, on
 
   filter.addEventListener('input', () => render());
 
+  /** @type {*|null} The entry a running drag was picked up from. */
+  let picked = null;
+
+  /** Clears the picked-up mark, so the gesture reads as finished. */
+  const release = () => {
+    if (picked === null) return;
+    delete picked.dataset.dragging;
+    picked = null;
+  };
+
   // Drags hand off to the strip's drag controller, which highlights and gates
   // the drop targets; entries stay draggable even when the click context
   // disables them, since the drop target carries its own legality.
@@ -189,13 +199,19 @@ export function createChainLibrary({ doc, container, catalog, drag, announce, on
       const entry = target.closest('.chain-library-entry');
       if (!entry || typeof entry.dataset.operator !== 'string') return false;
       if (!drag.start({ kind: 'operator', operatorId: entry.dataset.operator })) return false;
+      picked = entry;
+      entry.dataset.dragging = 'true';
       return undefined;
     },
     onMove: (event) => drag.hoverFromPoint(event.clientX, event.clientY),
     onEnd: () => {
+      release();
       drag.drop();
     },
-    onCancel: () => drag.cancel(),
+    onCancel: () => {
+      release();
+      drag.cancel();
+    },
   });
 
   container.replaceChildren(label, filter, tabs);
@@ -219,6 +235,7 @@ export function createChainLibrary({ doc, container, catalog, drag, announce, on
 
     /** Detaches the library's listeners and empties its container. */
     destroy() {
+      release();
       pointer.remove();
       container.replaceChildren();
     },
