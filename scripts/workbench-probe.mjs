@@ -248,6 +248,18 @@ async function probeStrip(tab) {
       + `${Math.round(panels.y)} ${Math.round(panels.width)}x${Math.round(panels.height)})`);
   }
 
+  // A plane stage while a sphere chip is expanded: the selection's own gap
+  // refuses it, the plane band takes it, so the entry has to stay live.
+  const entry = '.chain-library-entry[data-operator="warp.wave-shear.v2"]';
+  const disabled = await tab.$eval(entry, (node) => node.getAttribute('aria-disabled'));
+  check(disabled === null,
+    `a stage another band accepts stays enabled (aria-disabled: ${disabled})`);
+  const planeBefore = await bandChipNames(tab, 'plane');
+  await (await tab.waitForSelector(entry)).click();
+  const planeAfter = await bandChipNames(tab, 'plane');
+  check(planeAfter.length === planeBefore.length + 1,
+    `clicking it inserts at the first gap that accepts it (${planeAfter.join(', ')})`);
+
   return failures;
 }
 

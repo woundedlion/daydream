@@ -9,13 +9,13 @@
  * into the same four carrier domains the strip bands into and in the same order,
  * so the whole vocabulary stays browsable while the strip's contextual palettes
  * list only what fits one gap. Entries drag onto the strip, which owns drop
- * legality and hit-tests the pointer itself, and click to insert at the current
- * drop context, where an illegal entry shows disabled with the computed reason
- * instead of vanishing. The filter narrows by name or id and never hides that
- * state: a browsable vocabulary that quietly drops what does not currently fit
- * is the folder banks again. One tab per rendered domain rides along at every
- * width; only the narrow-viewport stylesheet reads it, to show a single group
- * at a time where four will not fit side by side.
+ * legality and hit-tests the pointer itself, and click to insert at the first
+ * gap that accepts them, where an operator no gap accepts shows disabled with
+ * the computed reason instead of vanishing. The filter narrows by name or id
+ * and never hides that state: a browsable vocabulary that quietly drops what
+ * does not currently fit is the folder banks again. One tab per rendered domain
+ * rides along at every width; only the narrow-viewport stylesheet reads it, to
+ * show a single group at a time where four will not fit side by side.
  */
 
 import { createPointerDrag } from './pointer_drag.js';
@@ -36,6 +36,9 @@ import { createPointerDrag } from './pointer_drag.js';
 
 const FILTER_ID = 'chain-library-filter';
 
+// Pointer travel, in CSS pixels, that separates a drag from a click on an entry.
+const DRAG_SLOP = 4;
+
 /** @param {string} carrier @returns {string} The carrier's group title. */
 const carrierTitle = (carrier) =>
   carrier.length === 0 ? carrier : carrier[0].toUpperCase() + carrier.slice(1);
@@ -50,11 +53,11 @@ const carrierTitle = (carrier) =>
  * @param {(message: string) => void} options.announce - Writes the workbench's
  *   one shared live status region; every refusal reports through it.
  * @param {(operatorId: string) => void} options.onPick - Runs when an enabled
- *   entry is clicked; the caller inserts the operator at the drop context.
+ *   entry is clicked; the caller inserts the operator into the chain.
  * @returns {Object} The library.
  */
 export function createChainLibrary({ doc, container, catalog, drag, announce, onPick }) {
-  /** @type {Map<string, LegalityEntry>|null} Null = no drop context; all enabled. */
+  /** @type {Map<string, LegalityEntry>|null} Null = no chain; all enabled. */
   let legality = null;
   /** @type {string|null} The domain the narrow layout shows. */
   let activeCarrier = null;
@@ -81,6 +84,22 @@ export function createChainLibrary({ doc, container, catalog, drag, announce, on
   tabs.setAttribute('aria-label', 'Stage domains');
 
   /**
+   * Activates one entry: an enabled entry inserts, a disabled one reports why
+   * through the shared status region.
+   * @param {*} entry - The entry element.
+   * @returns {void}
+   */
+  const activate = (entry) => {
+    const operatorId = entry.dataset.operator;
+    if (entry.getAttribute('aria-disabled') === 'true') {
+      announce(legality?.get(operatorId)?.reason
+        ?? 'this operator fits nowhere in the chain');
+      return;
+    }
+    onPick(operatorId);
+  };
+
+  /**
    * @param {CatalogOperator} op - A catalog operator.
    * @returns {*} The entry button.
    */
@@ -103,17 +122,13 @@ export function createChainLibrary({ doc, container, catalog, drag, announce, on
       entry.setAttribute('aria-disabled', 'true');
       const reason = el('span', 'chain-library-reason');
       reason.id = `chain-library-reason-${op.id.replace(/[^a-z0-9]+/g, '-')}`;
-      reason.textContent = state.reason ?? 'not legal at the drop context';
+      reason.textContent = state.reason ?? 'this operator fits nowhere in the chain';
       entry.setAttribute('aria-describedby', reason.id);
       entry.appendChild(reason);
     }
-    entry.addEventListener('click', () => {
-      if (entry.getAttribute('aria-disabled') === 'true') {
-        announce(state?.reason ?? 'this operator is not legal at the drop context');
-        return;
-      }
-      onPick(op.id);
-    });
+    // The pointer path takes a mouse press, whose capture retargets its click
+    // to the container; this one carries keyboard activation.
+    entry.addEventListener('click', () => activate(entry));
     return entry;
   };
 
@@ -178,19 +193,18 @@ export function createChainLibrary({ doc, container, catalog, drag, announce, on
 
   filter.addEventListener('input', () => render());
 
-  /** @type {*|null} The entry a running drag was picked up from. */
-  let picked = null;
+  /** @type {{entry: *, x: number, y: number, moved: boolean}|null} The press. */
+  let press = null;
 
   /** Clears the picked-up mark, so the gesture reads as finished. */
   const release = () => {
-    if (picked === null) return;
-    delete picked.dataset.dragging;
-    picked = null;
+    if (press !== null) delete press.entry.dataset.dragging;
   };
 
   // Drags hand off to the strip's drag controller, which highlights and gates
-  // the drop targets; entries stay draggable even when the click context
-  // disables them, since the drop target carries its own legality.
+  // the drop targets; entries stay draggable even when they fit nowhere, since
+  // the drop target carries its own legality. A press that never travels is the
+  // click the capture swallowed, so the release inserts it.
   const pointer = createPointerDrag({
     element: container,
     onStart: (event) => {
@@ -199,17 +213,25 @@ export function createChainLibrary({ doc, container, catalog, drag, announce, on
       const entry = target.closest('.chain-library-entry');
       if (!entry || typeof entry.dataset.operator !== 'string') return false;
       if (!drag.start({ kind: 'operator', operatorId: entry.dataset.operator })) return false;
-      picked = entry;
+      press = { entry, x: event.clientX, y: event.clientY, moved: false };
       entry.dataset.dragging = 'true';
       return undefined;
     },
-    onMove: (event) => drag.hoverFromPoint(event.clientX, event.clientY),
+    onMove: (event) => {
+      if (press !== null && Math.abs(event.clientX - press.x)
+        + Math.abs(event.clientY - press.y) > DRAG_SLOP) press.moved = true;
+      drag.hoverFromPoint(event.clientX, event.clientY);
+    },
     onEnd: () => {
+      const stationary = press !== null && !press.moved ? press.entry : null;
       release();
-      drag.drop();
+      press = null;
+      if (drag.drop() || stationary === null) return;
+      activate(stationary);
     },
     onCancel: () => {
       release();
+      press = null;
       drag.cancel();
     },
   });
@@ -221,9 +243,9 @@ export function createChainLibrary({ doc, container, catalog, drag, announce, on
     render,
 
     /**
-     * Adopts the current drop context's legality, or clears it.
-     * @param {LegalityEntry[]|null} entries - The store's insertion legality at
-     *   the context gap, or null when there is no context.
+     * Adopts the chain's insertion legality, or clears it.
+     * @param {LegalityEntry[]|null} entries - Each operator's legality over the
+     *   whole chain, or null when there is no chain to insert into.
      * @returns {void}
      */
     setLegality(entries) {
