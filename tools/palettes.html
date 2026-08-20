@@ -1831,7 +1831,8 @@
 
       if (intent === 'copy') {
         drawColorStrip();
-        copyPaletteColor(start, event.clientX, event.clientY);
+        copyPaletteColor(start, event.clientX, event.clientY)
+          .catch(reportCopyFailure);
       } else if (activeTab === 'procedural') {
         paletteViewport.zoom(start, end);
         redrawForViewport();
@@ -1886,10 +1887,29 @@
       const copied = await copyToClipboard(hex);
       if (requestId !== copyRequestId) return;
       copyFeedbackStatus.textContent = copied ? 'Copied' : 'Copy failed';
+      dismissCopyFeedbackLater();
+    }
+
+    /** Fades the copy feedback out after the message has had time to read. */
+    function dismissCopyFeedbackLater() {
+      if (copyFeedbackTimer !== null) clearTimeout(copyFeedbackTimer);
       copyFeedbackTimer = setTimeout(() => {
         copyFeedback.classList.remove('is-visible');
         copyFeedbackTimer = null;
       }, 1300);
+    }
+
+    /**
+     * Resolves a copy that threw. The bubble reads 'Copying' from the moment the
+     * attempt starts, so an unreported rejection would strand it there.
+     * @param {any} error - The rejection.
+     * @returns {void}
+     */
+    function reportCopyFailure(error) {
+      console.error(error);
+      if (!copyFeedback || !copyFeedbackStatus) return;
+      copyFeedbackStatus.textContent = 'Copy failed';
+      dismissCopyFeedbackLater();
     }
 
     function zoomAroundCenter() {
@@ -1903,7 +1923,7 @@
 
     function handleStripKeyDown(event) {
       if ((event.key === 'Enter' || event.key === ' ') && !event.shiftKey) {
-        copyPaletteColor(0.5);
+        copyPaletteColor(0.5).catch(reportCopyFailure);
       } else if (event.key === 'ArrowLeft' && event.shiftKey) {
         handleResetZoom();
       } else if (event.key === 'ArrowRight' && event.shiftKey) {
