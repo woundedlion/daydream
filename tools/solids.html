@@ -643,7 +643,8 @@
     // Scene construction from the JS-side mesh copy, and the stats line it
     // reports; the three.js namespace, the scene and the materials below are
     // passed in, so the renderer is unit tested against a stand-in namespace.
-    import { createMeshRenderer, meshStatsLine, MAX_INDEX_LABELS } from './solid_render.js';
+    import { createMeshRenderer, meshStatsLine, meshCanvasLabel, MAX_INDEX_LABELS }
+      from './solid_render.js';
     import { createFrameScheduler, onPageTeardown } from './page_lifecycle.js';
 
     let camera, scene, renderer, controls;
@@ -1823,6 +1824,9 @@
       // Update Stats
       renderBaseSolid();
       document.getElementById('meshStats').innerText = meshStatsLine(meshData, edgeCount);
+      document.getElementById('canvas').setAttribute('aria-label',
+        meshCanvasLabel(formatSolidName(state.base), state.ops.map((o) => o.op),
+          meshData, edgeCount));
     }
 
     // Set true whenever the label set is (re)built, so updateLabels re-projects

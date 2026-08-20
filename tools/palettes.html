@@ -1073,7 +1073,8 @@
       defaultPaletteRecipe, paletteRecipeFromControls, PaletteV4,
       PALETTE_CONTROL_IDS, paletteControlReadings, paletteControlsFromRecipe,
       PALETTE_RECIPE_PRESETS, paletteRecipeAvailability,
-      clampRecipeWindow, zoomRecipeWindow, paletteStripView, stripDragIntent,
+      clampRecipeWindow, zoomRecipeWindow, paletteStripView, waveGraphLabel,
+      stripDragIntent,
       wrapTurns,
       hitTestHueKeyMarker,
       hueKeyState, customHueKeyState, moveCustomHueKey,
@@ -1952,6 +1953,7 @@
           [view.D_R, view.D_G, view.D_B]);
       }
       drawWaveGraph({ canvas: waveGraphCanvas, ctx: waveGraphCtx, palette: plotted });
+      waveGraphCanvas.setAttribute('aria-label', waveGraphLabel(visiblePhaseRange()));
     }
 
     /** Redraws every view of the palette after its viewport moved. */
