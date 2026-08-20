@@ -36,8 +36,7 @@ test('simulator exposes Shader as a standalone tool', () => {
   assert.match(WORKBENCH, /src="\.\.\/main\.js"/);
   assert.match(WORKBENCH, /id="chain-strip"/);
   assert.match(WORKBENCH, /id="chain-library"/);
-  assert.match(WORKBENCH, /id="parameter-dock"/);
-  assert.match(WORKBENCH, /id="parameter-dock-toggle"/);
+  assert.match(WORKBENCH, /id="gui-container"/);
   assert.match(WORKBENCH, /id="shader-document-select"/);
   assert.match(WORKBENCH, /id="shader-preset-select"/);
   assert.match(WORKBENCH, /id="shader-document-open"/);
@@ -52,33 +51,35 @@ test('simulator exposes Shader as a standalone tool', () => {
   assert.doesNotMatch(WORKBENCH, /id="effect-sidebar"/);
   assert.doesNotMatch(WORKBENCH, /id="chain-editor"|id="chain-catalog"/,
     'the sidebar rail and its catalog panel are retired');
+  assert.doesNotMatch(WORKBENCH, /parameter-dock/,
+    'stage parameters live on the strip\'s chips, not in a dock');
   assert.doesNotMatch(WORKBENCH, /shader-workbench-nav/);
   assert.match(WORKBENCH_CSS, /\.lil-controller\.lil-option option\s*\{/);
   assert.match(WORKBENCH_CSS, /color-scheme:\s*dark/);
   assert.match(WORKBENCH_CSS, /background-color:\s*var\(--background-color\)/);
-  assert.match(WORKBENCH_CSS, /\.param-deactivated\s*\{/);
+  assert.match(WORKBENCH_CSS, /\.chain-param\[data-deactivated="true"\]\s*\{/);
 });
 
-// §4.1: three stacked regions plus one dock. The toolbar keeps the engine stats
-// row, the canvas keeps every pixel the four do not need, and the document
-// status output is the one live region the strip, library and dock announce
-// through.
-test('the workbench page lays out the toolbar, strip, canvas, library and dock', () => {
+// §4.1: three stacked regions around the canvas. The toolbar keeps the engine
+// stats row, the canvas keeps every pixel the three do not need, and the
+// document status output is the one live region the strip and library announce
+// through. The global controls keep the floating panel every other page mounts.
+test('the workbench page lays out the toolbar, strip, canvas and library', () => {
   const region = (/** @type {RegExp} */ pattern) => WORKBENCH.search(pattern);
   assert.ok(region(/id="shader-toolbar"/) < region(/id="chain-strip"/));
   assert.ok(region(/id="chain-strip"/) < region(/<main class="main-area"/));
   assert.ok(region(/<main class="main-area"/) < region(/id="chain-library"/));
-  assert.ok(region(/id="canvas-container"/) < region(/id="parameter-dock"/),
-    'the dock sits beside the canvas inside the main area');
-  assert.ok(region(/id="parameter-dock"/) < region(/id="gui-container"/),
-    'the effect GUI moves into the dock');
+  assert.ok(region(/id="canvas-container"/) < region(/<\/main>/),
+    'the canvas is what the main area holds');
+  assert.ok(region(/id="chain-library"/) < region(/id="gui-container"/),
+    'the global controls sit outside the main area, as on every other page');
   assert.ok(region(/id="shader-toolbar"/) < region(/id="global-stats-desktop"/)
     && region(/id="global-stats-desktop"/) < region(/id="chain-strip"/),
   'the engine memory and compute stats stay in the toolbar row');
   assert.match(WORKBENCH,
     /id="shader-document-status"[^>]*role="status"[^>]*aria-live="polite"/);
-  assert.match(WORKBENCH_CSS, /\.parameter-dock \.gui-container \{/,
-    'the dock has to undo the global rule that floats the GUI over the canvas');
+  assert.match(WORKBENCH_CSS, /\.chain-strip-region\[data-expanded="true"\] \{/,
+    'an expanded chip scrolls the strip rather than crushing the bands');
   assert.match(WORKBENCH_CSS, /\[data-carrier="color"\]/,
     'each carrier domain carries its own hue');
 });
@@ -670,17 +671,16 @@ async function editorWorkbench({ source = HEX_WAVE, migration = EMPTY_MIGRATION 
   const ids = ['shader-document-select', 'shader-preset-select',
     'shader-document-open', 'shader-document-save', 'shader-document-file',
     'shader-document-status', 'shader-document-digest', 'shader-parity-toggle',
-    'shader-document-save-as', 'parameter-dock-toggle'];
+    'shader-document-save-as'];
   const elements = new Map(ids.map((id) =>
     [id, fakeElement(id.endsWith('select') ? 'select' : 'div')]));
-  for (const mount of ['chain-strip', 'chain-library', 'parameter-dock']) {
+  for (const mount of ['chain-strip', 'chain-library']) {
     const element = fakeElement('section');
     element.setPointerCapture = () => {};
     element.hasPointerCapture = () => true;
     element.releasePointerCapture = () => {};
     elements.set(mount, element);
   }
-  elements.get('parameter-dock').appendChild(elements.get('parameter-dock-toggle'));
   const doc = installDocument({
     body: fakeElement('body'),
     activeElement: null,
@@ -771,7 +771,6 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
   assert.equal(harness.engine.chainCalls.at(-1).length, 7);
   assert.equal(stripChips(harness).length, 7);
   assert.equal(libraryEntries(harness).length, 34);
-  assert.equal(harness.elements.get('parameter-dock').dataset.collapsed, 'false');
   assert.equal(harness.elements.get('shader-document-digest').textContent,
     harness.elements.get('shader-document-digest').dataset.digest.slice(0, 12),
     'the toolbar shows the digest abbreviated and carries the whole of it');
@@ -805,7 +804,7 @@ test('the parity toggle disarms on a descriptor edit, not on a bypass', async ()
     .querySelector('.chain-chip-bypass').dispatch('click');
   assert.equal(toggle.disabled, false);
 
-  dockEditor(harness, 'sample')('sample.pattern-freq', 7);
+  stageEditor(harness, 'sample')('sample.pattern-freq', 7);
   assert.equal(toggle.disabled, false);
 
   insertIntoPlaneBand(harness, 'warp.wave-shear.v2');
@@ -880,19 +879,18 @@ test('a Save As copy carries the edits made since the load', async () => {
     validateShaderDocument(copy, { catalog: JSON.parse(ENGINE_CATALOG) }), []);
 });
 
-test('selecting a chip publishes the instance filter, the drop context and the dock', async () => {
+test('selecting a chip expands its controls and sets the drop context', async () => {
   const harness = await editorWorkbench();
-  const dock = harness.elements.get('parameter-dock');
-  harness.elements.get('parameter-dock-toggle').dispatch('click');
-  assert.equal(dock.dataset.collapsed, 'true');
+  assert.deepEqual(harness.filters.at(-1), { external: true },
+    'the panel renders none of the chain\'s parameters: the chips do');
 
   stripChips(harness).find((chip) => chip.dataset.label === 'lens').dispatch('click');
 
-  assert.equal(harness.filters.at(-1)?.prefix, 'lens.');
-  assert.equal(typeof harness.filters.at(-1)?.deactivated, 'function');
-  assert.ok(harness.ran.gui > 0, 'the selection resyncs the parameter GUI');
-  assert.equal(dock.dataset.collapsed, 'false',
-    'a selection reopens the dock on the instance it names');
+  const lens = stripChips(harness).find((chip) => chip.dataset.label === 'lens');
+  assert.equal(lens.getAttribute('aria-current'), 'true');
+  assert.deepEqual(lens.querySelectorAll('.chain-param')
+    .map((row) => row.dataset.parameter), ['lens.symmetry'],
+  'the selected chip carries its own stage\'s controls');
 
   // The library's click-insert context is the gap after lens — a sphere gap.
   const wave = libraryEntries(harness).find(
@@ -943,15 +941,23 @@ test('a bypass reshapes the engine program while the saved document keeps the st
 });
 
 /**
- * Selects a chip and hands back the parameter-dock write-through the selection
- * published, as the effect GUI's controller onChange would call it.
+ * Selects a chip and hands back a writer over its inline controls, driving the
+ * control the way a pointer does.
  * @param {Object} harness - An editorWorkbench() result.
  * @param {string} label - The instance to select.
- * @returns {Function} The filter's onEdit.
+ * @returns {(parameterId: string, value: *) => void} The control writer.
  */
-function dockEditor(harness, label) {
+function stageEditor(harness, label) {
   stripChips(harness).find((chip) => chip.dataset.label === label).dispatch('click');
-  return harness.filters.at(-1).onEdit;
+  return (parameterId, value) => {
+    const control = stripChips(harness)
+      .find((chip) => chip.dataset.label === label)
+      .querySelectorAll('.chain-param')
+      .find((row) => row.dataset.parameter === parameterId)
+      .querySelector('.chain-param-control');
+    control.value = String(value);
+    control.dispatch(control.tagName === 'SELECT' ? 'change' : 'input');
+  };
 }
 
 const savedValues = (harness) => {
@@ -959,13 +965,19 @@ const savedValues = (harness) => {
   return JSON.parse(harness.downloads.at(-1)[1]).preset_bank.presets[0].values;
 };
 
-// §4.4: a dock edit is a document edit. The engine already holds the value the
-// dock wrote, so Save reads the document and nothing else.
-test('a dock edit writes the active preset and survives Save without an engine read', async () => {
+// §4.4: a chip control's edit is a document edit, and the engine write is its
+// side effect, so Save reads the document and nothing else.
+test('a chip control writes the active preset and survives Save without an engine read', async () => {
   const harness = await editorWorkbench();
 
-  dockEditor(harness, 'sample')('sample.pattern-freq', 7);
-  dockEditor(harness, 'colorize')('colorize.palette-mapping', 1);
+  stageEditor(harness, 'sample')('sample.pattern-freq', 7);
+  stageEditor(harness, 'colorize')('colorize.palette-mapping', 'bell');
+  assert.ok(harness.engine.writes.some(
+    ([name, value]) => name === 'sample.pattern-freq' && value === 7),
+  'the engine takes the edit as it lands');
+  assert.ok(harness.engine.writes.some(
+    ([name, value]) => name === 'colorize.palette-mapping' && value === 1),
+  'an enum reaches the engine as its option index');
   harness.engine.getParameterDefinitions = () => {
     throw new Error('Save must not read the engine');
   };
@@ -973,14 +985,14 @@ test('a dock edit writes the active preset and survives Save without an engine r
   const values = savedValues(harness);
   assert.equal(values['sample.pattern-freq'], 7);
   assert.equal(values['colorize.palette-mapping'], 'bell',
-    'an enum control edits by option index; the document stores the option id');
+    'the document stores the option id');
 });
 
-test('a dock edit outside the parameter domain is announced, not stored', async () => {
+test('a chip control edit outside the parameter domain is announced, not stored', async () => {
   const harness = await editorWorkbench();
   const before = savedValues(harness)['sample.pattern-freq'];
 
-  dockEditor(harness, 'sample')('sample.pattern-freq', 500);
+  stageEditor(harness, 'sample')('sample.pattern-freq', 500);
 
   const status = harness.elements.get('shader-document-status');
   assert.equal(status.dataset.status, 'error');
@@ -988,15 +1000,15 @@ test('a dock edit outside the parameter domain is announced, not stored', async 
   assert.equal(savedValues(harness)['sample.pattern-freq'], before);
 });
 
-// One history: the strip's Undo covers a dock edit, and a drag's stream of
-// writes is one step in it.
-test('a dock edit joins the structural history and coalesces per control', async () => {
+// One history: the strip's Undo covers a chip control's edit, and a drag's
+// stream of writes is one step in it.
+test('a chip control edit joins the structural history and coalesces per control', async () => {
   const harness = await editorWorkbench();
   const strip = harness.elements.get('chain-strip');
   assert.equal(strip.querySelector('.chain-undo').disabled, true);
   const opening = savedValues(harness)['sample.pattern-freq'];
 
-  const edit = dockEditor(harness, 'sample');
+  const edit = stageEditor(harness, 'sample');
   for (const value of [2, 3, 4]) edit('sample.pattern-freq', value);
   assert.equal(savedValues(harness)['sample.pattern-freq'], 4);
   assert.equal(strip.querySelector('.chain-undo').disabled, false,
@@ -1008,7 +1020,7 @@ test('a dock edit joins the structural history and coalesces per control', async
   assert.equal(strip.querySelector('.chain-undo').disabled, true);
   assert.ok(harness.engine.writes.some(
     ([name, value]) => name === 'sample.pattern-freq' && value === opening),
-  'undoing a dock edit re-applies the restored value to the engine');
+  'undoing the edit re-applies the restored value to the engine');
 });
 
 test('legacy custom Shader URLs preserve their state on the workbench route', () => {
