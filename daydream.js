@@ -17,7 +17,8 @@ import {
   resolutionCorrection,
   resolutionEffects,
 } from "./effect_sequencing.js";
-import { createEffectGui, isShaderBallSchema } from "./effect_gui.js";
+import { createEffectGui } from "./effect_gui.js";
+import { isShaderBallSchema } from "./shader_stages.js";
 import {
   createAppTeardown,
   createApplyNotice,
