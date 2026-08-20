@@ -284,6 +284,13 @@
       z-index: 40;
     }
 
+    /* Reserves the collapsed line the gate feedback usually occupies while
+       still growing for a wrapped message. */
+    #opGateMsg {
+      min-height: 0.75rem;
+      flex-shrink: 0;
+    }
+
     #meshStats {
       background-color: rgba(15, 23, 42, 0.8);
       border: 1px solid var(--slate-700);
@@ -471,7 +478,7 @@
           All</button>
       </div>
       <!-- Gate feedback: why the last op/reorder/base change was rejected. -->
-      <div id="opGateMsg" class="text-[0.6rem] text-amber-400 h-3 leading-3"
+      <div id="opGateMsg" class="text-[0.6rem] text-amber-400 leading-3"
         role="status" aria-atomic="true"></div>
       <!-- Add-operation buttons carry the op name in data-op; a single delegated
            click listener (wired in init) dispatches to addOp, so no handler is
@@ -525,7 +532,7 @@
       <div id="labels" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
       <div id="save-actions">
         <div class="flex flex-col items-end gap-1">
-          <div id="meshStats"></div>
+          <div id="meshStats" role="status" aria-atomic="true"></div>
           <div id="arenaStats"
             class="hidden md:block font-mono text-[0.6rem] text-slate-500 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700 whitespace-nowrap">
           </div>
