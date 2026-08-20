@@ -1,9 +1,10 @@
 //
 // tools/chain_library.js keeps the whole operator vocabulary browsable under the
 // pipeline strip: domain-grouped entries from the pinned catalog, draggable onto
-// the strip through its drag controller, clickable to insert at the first gap
-// that accepts them, and narrowable by a filter that never hides an entry's
-// disabled state or its computed reason.
+// the strip through its drag controller, clickable to land wherever the chain
+// takes them, and narrowable by a filter that never hides an entry's disabled
+// state or the reason its legality computed, which an enabled entry carries too
+// where the route it takes is not plain insertion.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -16,6 +17,7 @@ const CATALOG = JSON.parse(readFileSync(
 
 const AFFINE = CATALOG.operators.find((op) => op.id === 'warp.affine.v2');
 const ROTATE = CATALOG.operators.find((op) => op.id === 'sphere.rotate.v2');
+const GNOMONIC = CATALOG.operators.find((op) => op.id === 'project.gnomonic.v2');
 
 /**
  * A library over the pinned catalog, plus its spies.
@@ -130,6 +132,41 @@ test('an entry that fits nowhere is disabled with the computed reason', () => {
   h.library.setLegality(null);
   assert.equal(entryFor(h, 'warp.affine.v2').getAttribute('aria-disabled'), null,
     'clearing the legality re-enables every entry');
+});
+
+// A crossing fits no gap, so the chain reaches it by replacing the socket over
+// its carrier pair. The entry is live and says which route it takes; only a pair
+// the chain carries no socket for is a dead end.
+test('a crossing entry names the socket it swaps, or says there is none', () => {
+  const h = makeLibrary();
+  h.library.setLegality([
+    { operator: GNOMONIC, legal: true, reason: 'swaps the sphere → plane socket' },
+    { operator: ROTATE, legal: true },
+  ]);
+
+  const crossing = entryFor(h, 'project.gnomonic.v2');
+  assert.equal(crossing.getAttribute('aria-disabled'), null);
+  const route = crossing.querySelector('.chain-library-reason');
+  assert.equal(route.textContent, 'swaps the sphere → plane socket');
+  assert.equal(crossing.getAttribute('aria-describedby'), route.id);
+  assert.equal(entryFor(h, 'sphere.rotate.v2').querySelector('.chain-library-reason'),
+    null, 'a plain insertion names no route');
+
+  crossing.dispatch('click');
+  assert.deepEqual(h.picks, ['project.gnomonic.v2']);
+  assert.deepEqual(h.announced, [], 'an enabled entry refuses nothing');
+
+  h.library.setLegality([{ operator: GNOMONIC, legal: false,
+    reason: 'the chain carries no sphere → plane socket to swap' }]);
+  const dead = entryFor(h, 'project.gnomonic.v2');
+  assert.equal(dead.getAttribute('aria-disabled'), 'true');
+  assert.equal(dead.querySelector('.chain-library-reason').textContent,
+    'the chain carries no sphere → plane socket to swap');
+
+  dead.dispatch('click');
+  assert.deepEqual(h.picks, ['project.gnomonic.v2'], 'a dead crossing picks nothing');
+  assert.equal(h.announced.at(-1),
+    'the chain carries no sphere → plane socket to swap');
 });
 
 test('the filter narrows every group by name or id', () => {

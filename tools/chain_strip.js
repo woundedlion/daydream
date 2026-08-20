@@ -260,11 +260,39 @@ export function createChainStrip({
   };
 
   /**
-   * The catalog's legality for a click insertion, which lands at the first gap
-   * that accepts the operator: legal wherever any gap does, and refused only
-   * where none does, with a reason that describes the chain rather than one
-   * gap. A gap whose carrier the operator consumes gives the telling refusal —
-   * a budget, not a carrier mismatch — so its reason is the one kept.
+   * The sockets a crossing can reach: the chain's crossings over its own
+   * carrier pair. Both sides of a gap carry one carrier, so a crossing fits
+   * none, and replacing one of these sockets is its only route in.
+   * @param {CatalogOperator} op - A catalog operator.
+   * @returns {number[]} Their chain indices, in chain order.
+   */
+  const pairSockets = (op) => {
+    if (op.input === op.output) return [];
+    /** @type {number[]} */
+    const sockets = [];
+    store.chain().forEach((entry, index) => {
+      const socket = opOf(entry);
+      if (socket.input === op.input && socket.output === op.output) sockets.push(index);
+    });
+    return sockets;
+  };
+
+  /**
+   * @param {CatalogOperator} op - A catalog operator.
+   * @returns {number|null} The first socket over its pair the store accepts it
+   *   as a replacement of, or null where none does.
+   */
+  const swapSocket = (op) => pairSockets(op).find((index) => store.legalReplacements(index, 1)
+    .some((entry) => entry.operator.id === op.id && entry.legal)) ?? null;
+
+  /**
+   * The catalog's legality for a click, which lands an endomorphism at the
+   * first gap that accepts it and a crossing on the first socket over its pair
+   * (§4.2: crossings are changed by replacement, not insertion). Either way the
+   * reason describes the chain rather than one gap: an endomorphism no gap
+   * takes reports the refusal from a gap whose carrier it consumes — a budget,
+   * not a carrier mismatch — while a crossing names the socket it swaps, which
+   * it carries alongside a legal verdict so the entry advertises its route.
    * @returns {LegalityEntry[]} One entry per catalog operator, in catalog order.
    */
   const insertionLegality = () => {
@@ -284,6 +312,20 @@ export function createChainStrip({
     }
     return catalog.operators.map((op) => {
       if (accepted.has(op.id)) return { operator: op, legal: true };
+      if (op.input !== op.output) {
+        const pair = `${op.input} → ${op.output}`;
+        const sockets = pairSockets(op);
+        if (sockets.length === 0) {
+          return { operator: op, legal: false,
+            reason: `the chain carries no ${pair} socket to swap` };
+        }
+        if (swapSocket(op) !== null)
+          return { operator: op, legal: true, reason: `swaps the ${pair} socket` };
+        const refusal = store.legalReplacements(sockets[0], 1)
+          .find((entry) => entry.operator.id === op.id)?.reason ?? '';
+        return { operator: op, legal: false,
+          reason: `the ${pair} socket refuses it: ${refusal}` };
+      }
       const refusal = refused.get(op.id) ?? `the chain carries no ${op.input} gap`;
       return { operator: op, legal: false,
         reason: `no insertion point accepts it: ${refusal}` };
@@ -1188,23 +1230,28 @@ export function createChainStrip({
   };
 
   /**
-   * Inserts a catalog operator without a drag: at the gap after the selected
-   * chip when that gap accepts it, else at the first gap that does.
-   * @param {string} operatorId - The operator to insert.
-   * @returns {boolean} Whether the insertion committed.
+   * Lands a catalog operator without a drag: an endomorphism at the gap after
+   * the selected chip when that gap accepts it, else at the first gap that
+   * does; a crossing over the socket its carrier pair names, which is the
+   * replacement the socket's own swap control commits.
+   * @param {string} operatorId - The operator to land.
+   * @returns {boolean} Whether the edit committed.
    */
   const insertOperator = (operatorId) => {
     const gaps = acceptingGaps(operatorId);
     const selected = store.selectedLabel();
     const at = selected === null ? null
       : store.chain().findIndex((entry) => entry.label === selected) + 1;
-    const index = at !== null && gaps.includes(at) ? at : gaps[0] ?? null;
+    const op = operators.get(operatorId);
+    const socket = gaps.length > 0 || op === undefined ? null : swapSocket(op);
+    const index = at !== null && gaps.includes(at) ? at : gaps[0] ?? socket;
     if (index === null) {
       announce(insertionLegality().find((entry) => entry.operator.id === operatorId)
         ?.reason ?? `${operatorId} fits nowhere in this chain`);
       return false;
     }
-    const result = store.replaceSpan(index, 0, [{ operator: operatorId }]);
+    const result = store.replaceSpan(index, socket === null ? 0 : 1,
+      [{ operator: operatorId }]);
     if (!result.ok) return report(result);
     return commit(store.chain()[index]?.label ?? null);
   };

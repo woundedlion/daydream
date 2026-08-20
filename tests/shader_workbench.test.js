@@ -726,12 +726,13 @@ async function editorWorkbench({ source = HEX_WAVE, migration = EMPTY_MIGRATION 
 }
 
 /**
- * Commits an insertion of one operator through the plane band's + palette.
+ * Activates one operator's entry in the plane band's + palette: an entry the
+ * gap accepts commits the insertion, one it refuses announces its reason.
  * @param {Object} harness - An editorWorkbench() result.
- * @param {string} operatorId - The catalog operator to insert.
+ * @param {string} operatorId - The catalog operator to activate.
  * @returns {void}
  */
-function insertIntoPlaneBand(harness, operatorId) {
+function clickPlaneBandEntry(harness, operatorId) {
   const mount = harness.elements.get('chain-strip');
   mount.querySelectorAll('.chain-band')
     .find((band) => band.dataset.carrier === 'plane')
@@ -763,7 +764,7 @@ test('the scratch document opens as a live, editable chain', async () => {
   assert.ok(harness.engine.writes.some(([name]) => name === 'colorize.palette-chroma'),
     'the opening preview carries the catalog defaults');
 
-  insertIntoPlaneBand(harness, 'warp.affine.v2');
+  clickPlaneBandEntry(harness, 'warp.affine.v2');
 
   assert.equal(harness.engine.chainCalls.at(-1).length, 5);
 });
@@ -779,7 +780,7 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
     harness.elements.get('shader-document-digest').dataset.digest.slice(0, 12),
     'the toolbar shows the digest abbreviated and carries the whole of it');
 
-  insertIntoPlaneBand(harness, 'warp.wave-shear.v2');
+  clickPlaneBandEntry(harness, 'warp.wave-shear.v2');
 
   assert.equal(harness.engine.chainCalls.length, 3);
   assert.equal(harness.engine.chainCalls.at(-1).length, 8);
@@ -811,7 +812,7 @@ test('the parity toggle disarms on a descriptor edit, not on a bypass', async ()
   stageEditor(harness, 'sample')('sample.pattern-freq', 7);
   assert.equal(toggle.disabled, false);
 
-  insertIntoPlaneBand(harness, 'warp.wave-shear.v2');
+  clickPlaneBandEntry(harness, 'warp.wave-shear.v2');
 
   assert.equal(toggle.disabled, true);
 });
@@ -829,7 +830,7 @@ test('a descriptor edit under the compiled build returns the preview to the inte
     'the compiled build takes the preset through its own control names');
   assert.match(status.textContent, /compiled build/);
 
-  insertIntoPlaneBand(harness, 'warp.wave-shear.v2');
+  clickPlaneBandEntry(harness, 'warp.wave-shear.v2');
 
   assert.equal(harness.selections.at(-1), 'ShaderChain');
   assert.equal(toggle.disabled, true);
@@ -874,7 +875,7 @@ test('Save As writes a new document id and leaves the loaded one alone', async (
 
 test('a Save As copy carries the edits made since the load', async () => {
   const harness = await editorWorkbench();
-  insertIntoPlaneBand(harness, 'warp.wave-shear.v2');
+  clickPlaneBandEntry(harness, 'warp.wave-shear.v2');
 
   assert.equal(harness.controller.saveAs(), true);
   const copy = JSON.parse(harness.downloads.at(-1)[1]);
@@ -904,10 +905,10 @@ test('selecting a chip expands its controls without disabling the library', asyn
   assert.equal(entryFor('sphere.lens.mobius.v2').getAttribute('aria-disabled'), null);
 
   const crossing = entryFor('project.stereographic.v2');
-  assert.equal(crossing.getAttribute('aria-disabled'), 'true',
-    'a crossing fills no gap in this chain');
+  assert.equal(crossing.getAttribute('aria-disabled'), null,
+    'a crossing fills no gap, but the socket over its pair replaces it');
   assert.match(crossing.querySelector('.chain-library-reason').textContent,
-    /no insertion point accepts it/);
+    /swaps the sphere → plane socket/);
 
   entryFor('warp.wave-shear.v2').dispatch('click');
 
@@ -917,19 +918,16 @@ test('selecting a chip expands its controls without disabling the library', asyn
   'the click inserted at the first plane gap, ahead of the band\'s own stage');
 });
 
-// §4.7: one live region for every refusal. The library's own refusal is the
-// cheapest to provoke — an entry no gap in the chain accepts — and it has to
-// land where the document status does.
-test('a library refusal is announced in the shared status region', async () => {
+// §4.7: one live region for every refusal. A gap's palette carries the whole
+// catalog, so the cheapest refusal to provoke is an entry whose carrier that gap
+// does not, and it has to land where the document status does.
+test('a palette refusal is announced in the shared status region', async () => {
   const harness = await editorWorkbench();
-  stripChips(harness).find((chip) => chip.dataset.label === 'lens').dispatch('click');
-  libraryEntries(harness)
-    .find((entry) => entry.dataset.operator === 'project.stereographic.v2')
-    .dispatch('click');
+  clickPlaneBandEntry(harness, 'sphere.rotate.v2');
 
   const status = harness.elements.get('shader-document-status');
   assert.equal(status.dataset.status, 'error');
-  assert.match(status.textContent, /no insertion point accepts it/);
+  assert.match(status.textContent, /consumes the sphere carrier/);
 });
 
 test('a bypass reshapes the engine program while the saved document keeps the stage', async () => {

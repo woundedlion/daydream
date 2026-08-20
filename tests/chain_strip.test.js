@@ -29,17 +29,36 @@ const LENS = 1;
 const PROJECT = 2;
 const WARP2 = 3;
 
+// The shipped catalog's crossings are the three the pipeline's own bands make,
+// and a valid chain runs sphere to color, so it always carries a socket for
+// every pair. A hypothetical fourth pair is what exercises a crossing the chain
+// has no socket to swap.
+const NO_SOCKET = {
+  id: 'colorize.plane.v2',
+  name: 'Plane Palette',
+  input: 'plane',
+  output: 'color',
+  blocks: {
+    param: { size: 4, align: 4 },
+    prepared: { size: 4, align: 4 },
+    state: { size: 4, align: 4 },
+  },
+  params: [],
+};
+const EXTENDED_CATALOG = { ...CATALOG, operators: [...CATALOG.operators, NO_SOCKET] };
+
 restoreDocumentAfterEach();
 
 /**
  * A strip over a fresh store on a fresh fixture copy, plus its spies.
- * @param {{presetId?: string|null}} [seams] - The preset the inline controls
- *   read; omitted, the strip falls back to the document's first.
+ * @param {{presetId?: string|null, catalog?: *}} [seams] - The preset the
+ *   inline controls read, omitted the strip falls back to the document's first;
+ *   and the operator catalog, for a vocabulary the shipped one cannot express.
  * @returns {Promise<Object>} The harness.
  */
-async function makeStrip({ presetId = null } = {}) {
+async function makeStrip({ presetId = null, catalog = CATALOG } = {}) {
   const store = await createChainDocumentStore({
-    document: structuredClone(BASE.document), catalog: CATALOG });
+    document: structuredClone(BASE.document), catalog });
   const container = fakeElement('section');
   // createPointerDrag captures on the container; the fake element does not
   // model pointer capture, so the pointer-wiring case stubs it.
@@ -60,7 +79,7 @@ async function makeStrip({ presetId = null } = {}) {
     doc,
     container,
     store,
-    catalog: CATALOG,
+    catalog,
     announce: (message) => announced.push(message),
     onApply: () => applied.push(store.programShape().map((entry) => entry.instance)),
     onSelect: (label) => selections.push(label),
@@ -566,16 +585,52 @@ test('insertOperator lands after the selection, else at the first legal gap', as
   // rather than refusing.
   assert.equal(h.strip.insertOperator('warp.wave-shear.v2'), true);
   assert.equal(h.store.chain()[4].operator, 'warp.wave-shear.v2');
+});
 
-  assert.equal(h.strip.insertOperator('sample.grid.v2'), false,
-    'a crossing fills no gap: the chain carries one carrier either side of each');
-  assert.match(lastAnnounced(h), /no insertion point accepts it/);
+// §4.2: a crossing fits no gap — the carrier is the same either side of one
+// — so its route into the chain is the socket over its own pair, which is the
+// replacement that socket's swap control commits.
+test('a crossing lands on the socket its carrier pair names', async () => {
+  const h = await makeStrip();
+  const entryFor = (/** @type {string} */ id) =>
+    h.strip.insertionLegality().find((entry) => entry.operator.id === id);
+
+  const gnomonic = entryFor('project.gnomonic.v2');
+  assert.equal(gnomonic.legal, true);
+  assert.equal(gnomonic.reason, 'swaps the sphere → plane socket',
+    'the entry names the route rather than refusing the gesture');
+  assert.equal(entryFor('sample.rings.v2').reason, 'swaps the plane → field socket');
+
+  assert.equal(h.strip.insertOperator('project.gnomonic.v2'), true);
+  assert.equal(h.store.chain().length, 7,
+    'the crossing replaced the socket; it filled no gap');
+  assert.equal(h.store.chain()[PROJECT].operator, 'project.gnomonic.v2');
+  assert.deepEqual(labels(h).filter((label) => label !== h.store.chain()[PROJECT].label),
+    ['camera', 'lens', 'warp2', 'sample', 'transfer', 'colorize'],
+    'every other instance keeps its label, and so its values');
+  assert.equal(h.applied.length, 1, 'the swap re-applies the program');
+  assert.equal(chipByLabel(h, h.store.chain()[PROJECT].label)
+    .querySelector('.chain-chip-name').textContent, 'Gnomonic');
+});
+
+test('a crossing no socket in the chain matches is refused', async () => {
+  const h = await makeStrip({ catalog: EXTENDED_CATALOG });
+  const entry = h.strip.insertionLegality()
+    .find((candidate) => candidate.operator.id === NO_SOCKET.id);
+  assert.equal(entry.legal, false);
+  assert.equal(entry.reason, 'the chain carries no plane → color socket to swap');
+
+  assert.equal(h.strip.insertOperator(NO_SOCKET.id), false);
+  assert.equal(lastAnnounced(h), 'the chain carries no plane → color socket to swap');
+  assert.deepEqual(labels(h),
+    ['camera', 'lens', 'project', 'warp2', 'sample', 'transfer', 'colorize']);
+  assert.deepEqual(h.applied, [], 'a refusal commits nothing');
 });
 
 // §4.3: the library's entries are the whole catalog against the whole chain, so
 // an operator the selection's own gap refuses is still one click from the band
 // that takes it.
-test('insertionLegality refuses only what no gap in the chain accepts', async () => {
+test('insertionLegality reads the whole chain, not the selection gap', async () => {
   const h = await makeStrip();
   chipByLabel(h, 'camera').dispatch('click');
   const entryFor = (/** @type {string} */ id) =>
@@ -589,8 +644,8 @@ test('insertionLegality refuses only what no gap in the chain accepts', async ()
   assert.equal(entryFor('warp.wave-shear.v2').reason, undefined);
 
   const crossing = entryFor('project.stereographic.v2');
-  assert.equal(crossing.legal, false);
-  assert.match(crossing.reason, /^no insertion point accepts it: produces the/,
+  assert.equal(crossing.legal, true);
+  assert.equal(crossing.reason, 'swaps the sphere → plane socket',
     'the reason describes the chain, not the gap the selection names');
 });
 

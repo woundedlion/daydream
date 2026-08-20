@@ -9,11 +9,13 @@
  * into the same four carrier domains the strip bands into and in the same order,
  * so the whole vocabulary stays browsable while the strip's contextual palettes
  * list only what fits one gap. Entries drag onto the strip, which owns drop
- * legality and hit-tests the pointer itself, and click to insert at the first
- * gap that accepts them, where an operator no gap accepts shows disabled with
- * the computed reason instead of vanishing. The filter narrows by name or id
- * and never hides that state: a browsable vocabulary that quietly drops what
- * does not currently fit is the folder banks again. One tab per rendered domain
+ * legality and hit-tests the pointer itself, and click to land where the chain
+ * takes them. An entry carries whatever reason its legality computed: the route
+ * an enabled one takes where that is not plain insertion — a crossing swaps the
+ * socket over its carrier pair — and why the chain refuses a disabled one,
+ * which shows dimmed instead of vanishing. The filter narrows by name or id and
+ * never hides that state: a browsable vocabulary that quietly drops what does
+ * not currently fit is the folder banks again. One tab per rendered domain
  * rides along at every width; only the narrow-viewport stylesheet reads it, to
  * show a single group at a time where four will not fit side by side.
  */
@@ -120,9 +122,14 @@ export function createChainLibrary({ doc, container, catalog, drag, announce, on
       // aria-disabled is also the styling hook: this module loads on every page,
       // and only the workbench page carries its stylesheet.
       entry.setAttribute('aria-disabled', 'true');
+    }
+    const note = state === undefined || (state.legal && state.reason === undefined)
+      ? null
+      : state.reason ?? 'this operator fits nowhere in the chain';
+    if (note !== null) {
       const reason = el('span', 'chain-library-reason');
       reason.id = `chain-library-reason-${op.id.replace(/[^a-z0-9]+/g, '-')}`;
-      reason.textContent = state.reason ?? 'this operator fits nowhere in the chain';
+      reason.textContent = note;
       entry.setAttribute('aria-describedby', reason.id);
       entry.appendChild(reason);
     }
