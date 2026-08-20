@@ -14,10 +14,15 @@ export const ENGINE_METHODS = [
   'getParamGeneration', 'getEffectSizes', 'strobeColumns', 'setShaderChain',
 ];
 
+/**
+ * The rest of the documented engine surface (README §10.2): read through
+ * optional calls, or driven by no fake at all. Pinned all the same, so a fake
+ * that grows one of them is not reported as mocking a method the engine lacks.
+ */
 export const ENGINE_OPTIONAL_METHODS = [
   'getFullConfigSnapshot', 'restoreFullConfigSnapshot',
   'getFullConfigFieldDefinitions', 'getConfigImportNotice',
-  'clearConfigImportNotice',
+  'clearConfigImportNotice', 'getAnimationsPaused', 'getPresetIds', 'getPoleLod',
 ];
 
 /**
