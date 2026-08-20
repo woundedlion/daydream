@@ -98,8 +98,8 @@
         "classification": "preset",
         "default": 0,
         "domain": {
-          "maximum": 4,
-          "minimum": -4
+          "maximum": 1,
+          "minimum": -1
         },
         "id": "colorize.hue-shift-amount",
         "interpolation": {
@@ -636,14 +636,73 @@
     },
     "choreography": {
       "dwell": {
+        "cup-hue": 600,
         "wave-mirror": 600
       },
       "generated_order": [
-        "wave-mirror"
+        "wave-mirror",
+        "cup-hue"
       ]
     },
-    "edges": [],
+    "edges": [
+      {
+        "duration": 480,
+        "easing": "EASE_IN_OUT_SIN",
+        "from": "cup-hue",
+        "path_policy": "parallel",
+        "to": "wave-mirror"
+      },
+      {
+        "duration": 480,
+        "easing": "EASE_IN_OUT_SIN",
+        "from": "wave-mirror",
+        "path_policy": "parallel",
+        "to": "cup-hue"
+      }
+    ],
     "presets": [
+      {
+        "display_name": "Cup Hue",
+        "preset_id": "cup-hue",
+        "values": {
+          "camera.wander": 1,
+          "colorize.brightness-envelope": "none",
+          "colorize.hue-noise-scale": 1.9717968702316284,
+          "colorize.hue-noise-speed": 0,
+          "colorize.hue-shift-amount": 1,
+          "colorize.hue-shift-mode": "noise",
+          "colorize.mapping-frequency": 1,
+          "colorize.mapping-phase": 0,
+          "colorize.palette-chroma": 1,
+          "colorize.palette-mapping": "cup",
+          "colorize.palette-mode": "triadic",
+          "colorize.phase-oscillation-depth": 0,
+          "colorize.phase-oscillation-speed": 0,
+          "colorize.value-opacity-high": 1,
+          "colorize.value-opacity-low": 1,
+          "lens.symmetry": "dodecahedral",
+          "project.hemisphere": "folded",
+          "project.pole-fade": 2.311000108718872,
+          "sample.angle-speed": 0.027000000700354576,
+          "sample.complexity": 1.7039999961853027,
+          "sample.coverage-mode": "weight-squared",
+          "sample.drift": 0.800000011920929,
+          "sample.pattern-freq": 6.328700065612793,
+          "sample.pattern-mix": 0,
+          "sample.speed": 0.03999999910593033,
+          "sample.weight-mode": "projection",
+          "warp1.field-angle": 2.2305307388305664,
+          "warp1.frequency": 1.4079999923706055,
+          "warp1.speed": -0.0032500000670552254,
+          "warp1.strength": -0.17599999904632568,
+          "warp2.cell-x": 1,
+          "warp2.cell-y": 1,
+          "warp2.offset-x": 0,
+          "warp2.offset-y": 0,
+          "warp2.rotation": 0,
+          "warp2.speed": 0
+        }
+      },
       {
         "display_name": "Wave Mirror",
         "preset_id": "wave-mirror",

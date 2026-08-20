@@ -94,8 +94,8 @@
         "classification": "preset",
         "default": 0,
         "domain": {
-          "maximum": 4,
-          "minimum": -4
+          "maximum": 1,
+          "minimum": -1
         },
         "id": "colorize.hue-shift-amount",
         "interpolation": {
@@ -561,7 +561,22 @@
         "hex-twin-wave-alt"
       ]
     },
-    "edges": [],
+    "edges": [
+      {
+        "duration": 480,
+        "easing": "EASE_IN_OUT_SIN",
+        "from": "hex-twin-wave-alt",
+        "path_policy": "parallel",
+        "to": "hex-twin-wave"
+      },
+      {
+        "duration": 480,
+        "easing": "EASE_IN_OUT_SIN",
+        "from": "hex-twin-wave",
+        "path_policy": "parallel",
+        "to": "hex-twin-wave-alt"
+      }
+    ],
     "presets": [
       {
         "display_name": "Hex Twin Wave",
