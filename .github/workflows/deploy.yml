@@ -208,6 +208,60 @@ jobs:
           fi
           exit $status
 
+      - name: Verify the committed shader mirrors match the pinned engine
+        # The engine's install rules (Holosphere CMakeLists.txt, DAYDREAM_DIR block)
+        # copy scripts/shader_workbench.mjs, scripts/sha256.mjs and the pattern
+        # documents into shader/ here. Edits land on either side, and no suite in
+        # either repository compares the two copies, so this is what holds the
+        # committed mirror to the engine it is pinned to.
+        #
+        # The pattern set is the install's own FILES_MATCHING rule — every
+        # *.shader.json under the engine's patterns/, plus shaderball_migration.json
+        # — walked file by file rather than compared as a directory: shader/patterns/
+        # also carries the v1 fixtures and digest_migration.v1v2.json, which this
+        # repository generates and the engine does not install.
+        #
+        # shader/engine_catalog.json is not in the set. It is the module's own
+        # getShaderChainCatalog() export, pinned to it by
+        # tests/engine_contract_wasm.test.js; the engine's copy is a pretty-printed
+        # spelling of the same catalog and can never byte-match.
+        #
+        # Line endings are compared insensitively: only this repository's
+        # .gitattributes pins any of these paths to LF, so the engine's bytes are
+        # whatever its contributors committed. The byte-exact pin on the v2 documents
+        # is tests/shader_document.test.js.
+        run: |
+          pin="$(cat holosphere_wasm.sha)"
+          mirror() {
+            if [ ! -f "$2" ]; then
+              echo "::error::$2 not found — the Holosphere WASM install writes it; commit it with the .wasm."
+              return 1
+            fi
+            if ! git -c core.autocrlf=false diff --no-index --ignore-cr-at-eol --exit-code -- "$1" "$2"; then
+              echo "::error::$2 has drifted from the pinned engine ($pin) — land the edit in the engine, then re-run the Holosphere WASM install and commit the refreshed mirror."
+              return 1
+            fi
+          }
+          if [ ! -d engine/patterns ]; then
+            echo "::error::the pinned engine ($pin) has no patterns/ directory, so the comparison below would run over nothing. Check the install's FILES_MATCHING rule against this step."
+            exit 1
+          fi
+          documents="$(find engine/patterns -type f \( -name '*.shader.json' -o -name shaderball_migration.json \) -printf '%P\n' | sort)"
+          if [ -z "$documents" ]; then
+            echo "::error::the pinned engine ($pin) installs no pattern documents from patterns/ — a comparison over an empty set is a green step that checks nothing. Check the install's FILES_MATCHING rule against this step."
+            exit 1
+          fi
+          status=0
+          mirror engine/scripts/shader_workbench.mjs shader/shader_workbench.mjs || status=1
+          mirror engine/scripts/sha256.mjs shader/sha256.mjs || status=1
+          count=0
+          for doc in $documents; do
+            count=$((count + 1))
+            mirror "engine/patterns/$doc" "shader/patterns/$doc" || status=1
+          done
+          echo "Compared the two workbench modules and $count pattern documents against $pin."
+          exit $status
+
       - name: Verify the recorded build toolchain matches the pinned engine
         # holosphere_wasm.toolchain records the emsdk that built the committed
         # module. The JS suite only checks its shape, and nothing else here read
