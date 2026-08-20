@@ -250,3 +250,41 @@ test('the deploy gate binds a lone pin move to the binary by content', () => {
       'output can never be deployed: git has nothing to commit for the binary');
   assert.match(step, /exit 1/, 'a pin that moved over a changed binary must fail the gate');
 });
+
+// The engine installs scripts/shader_workbench.mjs, scripts/sha256.mjs and the
+// pattern documents into shader/ here, and edits land on either side. Nothing
+// else compares the two copies: Holosphere's scripts/shader_workbench.test.mjs
+// pins a hash of its own tree, which a daydream-side edit never reaches.
+test('the deploy gate compares the shader mirrors against the engine pin', () => {
+  const workflow = readFileSync(resolve(REPO, '.github/workflows/deploy.yml'), 'utf8');
+  const step = workflow.match(/- name: Verify the committed shader mirrors[\s\S]*?\n\n/)?.[0];
+  assert.ok(step, 'deploy.yml must still compare the installed shader/ set against the pinned engine');
+  const script = step.slice(step.indexOf('run: |'));
+  for (const mirror of ['shader/shader_workbench.mjs', 'shader/sha256.mjs']) {
+    assert.ok(script.includes(mirror),
+      `${mirror} is installed from the engine and pinned by nothing else in this repo`);
+  }
+  assert.match(script, /engine\/patterns/,
+    'the documents must be read out of the pinned engine checkout, not engine HEAD');
+  assert.match(script, /for doc in \$documents/,
+    'the matched set must be walked file by file: shader/patterns/ also carries the '
+      + 'v1 fixtures and digest_migration.v1v2.json, which a directory comparison '
+      + 'reports as extra files');
+  assert.ok(script.includes('shader/patterns/'),
+    "each matched document must be compared against this repo's copy; naming the "
+      + 'engine directory alone leaves the walk comparing nothing');
+  assert.match(script, /shaderball_migration\.json/,
+    'the install matches that name alongside *.shader.json; a glob on the suffix '
+      + 'alone leaves it uncompared');
+  assert.match(script, /-z "\$documents"/,
+    'an empty document set must fail: a comparison over no files is a green step '
+      + 'that checks nothing');
+  assert.match(script, /--ignore-cr-at-eol/,
+    'only this repo pins these paths to LF, so a byte-exact compare reds on the '
+      + "engine's committed line endings rather than on a content edit");
+  assert.ok(!script.includes('engine_catalog.json'),
+    'shader/engine_catalog.json is the module export, pinned by '
+      + "tests/engine_contract_wasm.test.js; the engine's pretty-printed copy can "
+      + 'never byte-match it');
+  assert.match(script, /exit 1/, 'a drifted or missing mirror must fail the gate');
+});
