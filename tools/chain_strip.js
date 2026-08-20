@@ -894,22 +894,20 @@ export function createChainStrip({
 
   /**
    * @param {BandLayout} band - The band the button belongs to.
-   * @returns {*} The band's persistent insertion affordance.
+   * @returns {*|null} The band's insertion affordance, when a stage fits.
    */
   const bandAddButton = (band) => {
     const title = titleCase(band.carrier);
+    const gap = contextGap(band);
+    if (gap === null || !store.legalInsertions(gap).some((entry) => entry.legal))
+      return null;
     const add = el('button', 'chain-band-add');
     add.type = 'button';
     add.setAttribute('aria-haspopup', 'listbox');
     add.setAttribute('aria-label', `Add a ${title} stage`);
     add.textContent = '+';
-    const gap = contextGap(band);
-    if (gap === null || !store.legalInsertions(gap).some((entry) => entry.legal))
-      add.disabled = true;
-    else {
-      add.addEventListener('click',
-        () => openPalette({ kind: 'insert', index: gap, anchor: add }));
-    }
+    add.addEventListener('click',
+      () => openPalette({ kind: 'insert', index: gap, anchor: add }));
     return add;
   };
 
@@ -979,7 +977,8 @@ export function createChainStrip({
             { crossing: false, movable: band.chips.length > 1, ...view }));
         }
       }
-      element.appendChild(bandAddButton(band));
+      const add = bandAddButton(band);
+      if (add !== null) element.appendChild(add);
       strip.appendChild(element);
       if (band.socket !== null) {
         strip.appendChild(chipElement(band.socket, chain[band.socket],

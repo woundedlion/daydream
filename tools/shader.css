@@ -123,9 +123,10 @@
 .chain-strip-actions {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.1875rem;
   flex-shrink: 0;
+  padding-top: 0.25rem;
 }
 
 .chain-strip-actions button {
@@ -149,16 +150,17 @@
   display: flex;
   align-items: stretch;
   gap: 0.25rem;
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
+  width: max-content;
+  min-width: 100%;
 }
 
 .chain-band {
   position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.1875rem;
-  flex: 1 1 auto;
+  flex: 1 0 auto;
   min-width: 7rem;
   padding: 0.25rem 0.375rem;
   border: 1px solid var(--carrier);
@@ -184,12 +186,6 @@
   font: inherit;
   line-height: 1.4;
   cursor: pointer;
-}
-
-.chain-band-add:disabled {
-  border-color: var(--panel-border);
-  color: var(--muted-text);
-  cursor: default;
 }
 
 .chain-chip {
@@ -222,7 +218,7 @@
 }
 
 .chain-chip--socket {
-  align-self: center;
+  align-self: flex-start;
   border-style: dashed;
   border-color: var(--muted-text);
   background: rgb(255 255 255 / 0.03);
@@ -297,6 +293,10 @@
 .chain-chip--expanded {
   flex-wrap: wrap;
   align-items: center;
+  flex-basis: 18rem;
+  width: 18rem;
+  max-width: calc(100vw - 3rem);
+  box-sizing: border-box;
   white-space: normal;
   cursor: default;
 }
@@ -306,9 +306,12 @@
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 0.125rem 0.375rem;
-  flex: 1 0 100%;
-  min-width: 16rem;
-  max-width: 22rem;
+  flex: 0 0 100%;
+  min-width: 0;
+  max-width: none;
+  max-height: 9rem;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
   margin-top: 0.25rem;
   padding-top: 0.25rem;
   border-top: 1px solid var(--panel-border);
