@@ -286,6 +286,13 @@
   word-break: break-word;
 }
 
+.load-error-remedy {
+  max-width: 80%;
+  color: var(--muted-text);
+  font-size: 0.8em;
+  text-align: center;
+}
+
 /* Permanently mounted live region: only its body comes and goes, so a message
    is announced as an insertion into a region already in the accessibility tree. */
 .apply-notice {
