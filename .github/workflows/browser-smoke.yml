@@ -1,10 +1,12 @@
-# The two headless-Chrome jobs. The smoke loads every page site_manifest.txt
+# The three headless-Chrome jobs. The smoke loads every page site_manifest.txt
 # publishes and requires a clean console and a painted frame from each; the
 # workbench probe drives the shader workbench's pipeline strip with a real mouse
-# and requires each pointer gesture to land what it names. Both run on pull
-# requests for a pre-merge signal, and deploy.yml's `deploy` job needs this
-# workflow, so a page that no longer boots — or a strip whose palettes open off
-# their control and whose chips no longer take a click — blocks the deploy.
+# and requires each pointer gesture to land what it names; the panel probe
+# scrolls the effect panel and requires the offset to survive a rebuild, which
+# only a laid-out scroller can answer. All three run on pull requests for a
+# pre-merge signal, and deploy.yml's `deploy` job needs this workflow, so a page
+# that no longer boots — or a strip whose palettes open off their control and
+# whose chips no longer take a click — blocks the deploy.
 #
 # The unit suite runs over tests/fake_dom.js, which has neither layout nor
 # pointer capture, so these are the only jobs that resolve the import map,
@@ -53,6 +55,8 @@ jobs:
             script: scripts/browser-smoke.mjs
           - name: Workbench pointer gestures
             script: scripts/workbench-probe.mjs
+          - name: Effect panel scroll restoration
+            script: scripts/panel-probe.mjs
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
