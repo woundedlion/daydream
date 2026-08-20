@@ -14,11 +14,19 @@
  */
 
 /**
+ * The driver's display aliases: the Three.js instance-colour attribute and the
+ * driver's own pixel handle, both of which must reference the WASM view.
+ * @typedef {Object} DisplayDriver
+ * @property {{instanceColor: {array: Uint16Array|null, needsUpdate: boolean}}} dotMesh
+ * @property {Uint16Array|null} pixels
+ */
+
+/**
  * Re-point both display aliases (Three.js instanceColor + driver.pixels) so
  * source, displayed attribute, and driver.pixels all reference the same WASM
  * view. Shared by EngineHost.refresh(), the frame adapter's alias heal, and
  * SegmentController's composite heal.
- * @param {Object} driver - The Daydream driver owning the dot mesh.
+ * @param {DisplayDriver} driver - The Daydream driver owning the dot mesh.
  * @param {Uint16Array} view - The WASM pixel view to alias.
  * @returns {void}
  */
@@ -30,7 +38,7 @@ export function repointDisplayAliases(driver, view) {
 
 /**
  * Whether either display alias has stopped referencing the engine's pixel view.
- * @param {Object} driver - The Daydream driver owning the dot mesh.
+ * @param {DisplayDriver} driver - The Daydream driver owning the dot mesh.
  * @param {Uint16Array} view - The view both aliases must reference.
  * @returns {boolean} True when at least one alias points elsewhere.
  */
@@ -43,9 +51,12 @@ export function displayAliasesDiverged(driver, view) {
  * Build the per-frame adapter the driver's render loop calls.
  *
  * @param {Object} deps - Injected app collaborators.
- * @param {Object} deps.host - The EngineHost owning the main engine and its view.
- * @param {Object} deps.driver - The Daydream driver.
- * @param {Object} deps.segments - The SegmentController.
+ * @param {{engine: {drawFrame: () => void, getArenaMetrics: () => Object},
+ *   refresh: () => void, view: () => Uint16Array}} deps.host - The EngineHost
+ *   owning the main engine and its view.
+ * @param {DisplayDriver} deps.driver - The Daydream driver.
+ * @param {{ownsDisplay: boolean, active: boolean, frameComposited: boolean,
+ *   tick: () => void, updateStats: () => void}} deps.segments - The SegmentController.
  * @param {() => void} deps.syncEffectGui - Mirrors engine params into the panel.
  * @param {(message: string) => void} [deps.logError] - Console sink for the
  *   once-per-page alias divergence report.
@@ -128,8 +139,9 @@ export function createRenderAdapter({
  * @param {Object} deps - Injected app collaborators.
  * @param {{addEventListener: Function, removeEventListener: Function}}
  *   deps.pageTarget - Where the page listeners live (the window).
- * @param {Array<[string, Function, Object?]>} deps.listeners - Listeners the app
- *   installed, removed from their optional owner target or pageTarget on dispose.
+ * @param {Array<[string, Function, {removeEventListener: Function}?]>}
+ *   deps.listeners - Listeners the app installed, removed from their optional
+ *   owner target or pageTarget on dispose.
  * @param {{dispose: Function}} deps.switches - The switch coordinator.
  * @param {() => void} deps.stopTimers - Stops the app's interval timers.
  * @param {{destroy: Function}} deps.effectGui - The effect panel controller.
@@ -250,7 +262,7 @@ export const INTERACTIVE_KEY_TARGET =
  */
 export function createGlobalKeydownHandler({ dispatch }) {
   return (e) => {
-    const target = e.target;
+    const target = /** @type {Element|null} */ (e.target);
     if (typeof target?.closest === 'function'
         && target.closest(INTERACTIVE_KEY_TARGET)) return;
     dispatch(e);
@@ -303,8 +315,8 @@ export function createPoleLodBinding({ getEngine, onChange }) {
  * reported rather than silently deferred to the next one.
  *
  * @param {Object} deps - Injected app collaborators.
- * @param {() => ?Object} deps.getRecorder - Reads the live recorder, null until
- *   the module load resolves.
+ * @param {() => ?{isRecording: boolean}} deps.getRecorder - Reads the live
+ *   recorder, null until the module load resolves.
  * @param {(message: string) => void} [deps.warn] - Sink for the mid-recording
  *   notice.
  * @returns {{settings: Object, define: (prop: string, initial: *, label: string,
@@ -316,7 +328,9 @@ export function createRecordingSettings({
   getRecorder,
   warn = (message) => console.warn(message),
 }) {
+  /** @type {Object} */
   const settings = {};
+  /** @type {Array<() => void>} */
   const replays = [];
   return {
     settings,
@@ -337,7 +351,7 @@ export function createRecordingSettings({
       });
       // Unguarded: replay() runs immediately after the recorder is constructed,
       // and a null-tolerant replay would drop every setting in silence.
-      replays.push(() => push(getRecorder(), value));
+      replays.push(() => push(/** @type {Object} */ (getRecorder()), value));
     },
     replay() {
       for (const push of replays) push();
@@ -362,8 +376,8 @@ export function createRecordingSettings({
  * @param {(name: string) => void} deps.setEffect - Requests the next effect.
  * @param {() => boolean} deps.engineReady - Whether an engine exists to take a
  *   switch; a tick before the module load lands is skipped, not queued.
- * @param {(fn: Function, ms: number) => *} [deps.schedule] - Timer source.
- * @param {(handle: *) => void} [deps.cancel] - Timer sink.
+ * @param {(fn: () => void, ms: number) => any} [deps.schedule] - Timer source.
+ * @param {(handle: any) => void} [deps.cancel] - Timer sink.
  * @returns {{start: () => void, stop: () => void, running: () => boolean}} The
  *   ticker; start() is idempotent, so a re-entered toggle cannot arm two timers.
  */
@@ -376,6 +390,7 @@ export function createTestAllTicker({
   schedule = (fn, ms) => setInterval(fn, ms),
   cancel = (handle) => clearInterval(handle),
 }) {
+  /** @type {any} */
   let handle = null;
   let index = 0;
 
@@ -417,10 +432,10 @@ const APPLY_NOTICE_MS = 8000;
  * user was given.
  *
  * @param {Object} deps - Injected app collaborators.
- * @param {Object} deps.doc - Document holding the notice elements.
+ * @param {Document} deps.doc - Document holding the notice elements.
  * @param {number} [deps.timeoutMs] - Dwell time before a notice self-clears.
- * @param {(fn: Function, ms: number) => *} [deps.schedule] - Timer source.
- * @param {(handle: *) => void} [deps.cancel] - Timer sink.
+ * @param {(fn: () => void, ms: number) => any} [deps.schedule] - Timer source.
+ * @param {(handle: any) => void} [deps.cancel] - Timer sink.
  * @param {(message: string) => void} [deps.logWarning] - Sink for the
  *   one-shot report that the notice elements are absent.
  * @returns {{show: (message: string|null, owner: string) => void,
@@ -435,9 +450,12 @@ export function createApplyNotice({
   cancel = (handle) => clearTimeout(handle),
   logWarning = (message) => console.warn(message),
 }) {
+  /** @type {{body: HTMLElement, text: HTMLElement}|null} */
   let elements = null;
   let missLogged = false;
+  /** @type {any} */
   let handle = null;
+  /** @type {string|null} */
   let held = null;
 
   // Latched only once both elements are present, so markup that arrives after
@@ -450,7 +468,7 @@ export function createApplyNotice({
       text: doc.getElementById('apply-notice-text'),
     };
     if (found.body && found.text) {
-      elements = found;
+      elements = { body: found.body, text: found.text };
       return elements;
     }
     if (!missLogged) {
@@ -464,7 +482,8 @@ export function createApplyNotice({
     return null;
   };
 
-  const write = (notice, owner) => {
+  const write = (
+    /** @type {string|null} */ notice, /** @type {string|null} */ owner) => {
     const el = resolve();
     if (!el) return;
     const { body, text } = el;
@@ -483,7 +502,7 @@ export function createApplyNotice({
   // Hiding the body takes the dismiss button inside it out of the tree and drops
   // keyboard focus to <body>, so the dwell is served again while the user stands
   // on it. Only the self-clear waits; an explicit clear() is the user's own act.
-  const expire = (owner) => {
+  const expire = (/** @type {string|null} */ owner) => {
     if (elements?.body.contains?.(doc.activeElement)) {
       handle = schedule(() => expire(owner), timeoutMs);
       return;
@@ -619,7 +638,7 @@ export function createFrameLoopGuard({ frame, report, logError = console.error }
       if (reported) return;
       reported = true;
       logError('Render loop frame failed:', e);
-      report(`The render loop hit an error. ${e?.message ?? String(e)}`
+      report(`The render loop hit an error. ${e instanceof Error ? e.message : String(e)}`
         + ' See the browser console for details.');
     }
   };
@@ -656,6 +675,7 @@ export function loadWithDeadline(load, {
   ms = MODULE_LOAD_DEADLINE_MS,
   timers = globalThis,
 } = {}) {
+  /** @type {any} */
   let timer = null;
   const deadline = new Promise((_, reject) => {
     timer = timers.setTimeout(() => reject(new Error(

@@ -47,11 +47,17 @@ export class EffectSidebar {
     // detached document has no defaultView, leaving only the ambient one.
     this.win = this.doc?.defaultView ?? globalThis;
     this.onSelect = onSelect;
-    this.buttons = new Map();      // name -> button element
-    this.orderedButtons = [];      // buttons in the order they are laid out
-    this.items = [];               // [{name, size}]
-    this.gridStride = null;        // measured lazily; see onKeyDown
+    /** @type {Map<string, HTMLButtonElement>} */
+    this.buttons = new Map();
+    /** @type {HTMLElement[]} Buttons in the order they are laid out. */
+    this.orderedButtons = [];
+    /** @type {Array<{name: string, size: number}>} */
+    this.items = [];
+    /** @type {number|null} Measured lazily; see onKeyDown. */
+    this.gridStride = null;
+    /** @type {string|null} */
     this.activeName = null;
+    /** @type {{key: 'name'|'size', dir: 'asc'|'desc'}} */
     this.sort = { key: 'name', dir: 'asc' };
 
     this.heading = this.doc.createElement('h2');
@@ -71,10 +77,12 @@ export class EffectSidebar {
     this.listEl.setAttribute('role', 'listbox');
     this.listEl.setAttribute('aria-label', this.listLabel());
     this.listEl.className = 'effect-list';
-    this.tabbableBtn = null; // option currently holding tabindex=0
-    this.scrolledBtn = null; // option setActive last scrolled into view
+    /** @type {HTMLElement|null} Option currently holding tabindex=0. */
+    this.tabbableBtn = null;
+    /** @type {HTMLElement|null} Option setActive last scrolled into view. */
+    this.scrolledBtn = null;
     this.scrollArrowsRaf = 0;
-    this.onKeyDownBound = (e) => this.onKeyDown(e);
+    this.onKeyDownBound = (/** @type {KeyboardEvent} */ e) => this.onKeyDown(e);
     this.onScrollBound = () => this.scheduleScrollArrows();
     this.onResizeBound = () => {
       this.gridStride = null;
@@ -94,8 +102,9 @@ export class EffectSidebar {
     this.arrowRight.setAttribute('aria-hidden', 'true');
 
     this.listEl.addEventListener('scroll', this.onScrollBound, { passive: true });
+    /** @type {ResizeObserver|null} */
     this.resizeObs = new this.win.ResizeObserver(this.onResizeBound);
-    this.resizeObs.observe(this.listEl);
+    this.resizeObs?.observe(this.listEl);
 
     this.container.appendChild(this.heading);
     this.container.appendChild(this.sortRow);
@@ -135,13 +144,13 @@ export class EffectSidebar {
    * apply the current sort order, active highlight, and roving tabindex anchor,
    * restoring keyboard focus when it was inside the list.
    * @param {Array<string>} names - Effect names, one button per name.
-   * @param {Object} [effectSizes] - Map of effect name to size in bytes; missing or absent entries are treated as 0.
+   * @param {Record<string, number>} [effectSizes] - Map of effect name to size in bytes; missing or absent entries are treated as 0.
    */
   setEffects(names, effectSizes) {
     // Discarding the focused option drops focus to <body>, where the list's
     // keydown handler no longer sees it and Space reaches the global one
     // instead. Name it now; the rebuilt button carrying that name takes it back.
-    const focused = this.doc.activeElement;
+    const focused = /** @type {HTMLElement|null} */ (this.doc.activeElement);
     const refocusName = focused && this.listEl.contains(focused)
       ? (focused.dataset?.effect ?? '') : null;
 
@@ -184,7 +193,7 @@ export class EffectSidebar {
     this.updateActiveClass();
     this.tabbableBtn = null;
     this.setRovingTabbable(
-      this.buttons.get(this.activeName) || this.orderedButtons[0]
+      this.activeButton() || this.orderedButtons[0]
     );
     // Only when focus was already in the list: a rebuild driven from elsewhere
     // must not pull it out of whatever the user is on. An option that left the
@@ -208,7 +217,7 @@ export class EffectSidebar {
     // deselecting it and pointing activeName at a missing entry.
     if (!newBtn) return;
 
-    const oldBtn = this.buttons.get(this.activeName);
+    const oldBtn = this.activeButton();
     if (oldBtn) {
       oldBtn.classList.remove('active');
       oldBtn.setAttribute('aria-selected', 'false');
@@ -230,14 +239,14 @@ export class EffectSidebar {
   /**
    * Set the sort key and direction, reorder the option buttons, and refresh the
    * sort-control UI.
-   * @param {string} key - Sort key, either 'name' or 'size'.
-   * @param {string} dir - Sort direction, either 'asc' or 'desc'.
+   * @param {'name'|'size'} key - Sort key.
+   * @param {'asc'|'desc'} dir - Sort direction.
    */
   sortBy(key, dir) {
     // Moving a node is a remove plus an insert, which drops focus to <body>
     // even though the option itself survives. Hold the focused option and hand
     // it back afterwards; a sort driven from a sort control leaves focus there.
-    const focused = this.doc.activeElement;
+    const focused = /** @type {HTMLElement|null} */ (this.doc.activeElement);
     const refocus = focused && this.listEl.contains(focused) ? focused : null;
     this.sort = { key, dir };
     this.applySortOrder();
@@ -282,7 +291,7 @@ export class EffectSidebar {
    * to descending, others to ascending). The label and the glyph are separate
    * children so the direction arrow can stay presentational; the direction
    * itself reaches assistive tech through the accessible name (syncSortBtn).
-   * @param {string} key - Sort key this button controls ('name' or 'size').
+   * @param {'name'|'size'} key - Sort key this button controls.
    * @param {string} label - Human-readable button label.
    * @returns {HTMLElement} The created sort-control button.
    */
@@ -316,13 +325,14 @@ export class EffectSidebar {
    * presentational direction glyph, and the accessible name. The active button
    * names the direction it sorted in, which the aria-hidden glyph cannot convey.
    * @param {HTMLElement} btn - Sort-control button to sync.
-   * @param {string} key - Sort key this button controls ('name' or 'size').
+   * @param {'name'|'size'} key - Sort key this button controls.
    */
   syncSortBtn(btn, key) {
     const active = this.sort.key === key;
     btn.className = 'sort-btn' + (active ? ' active' : '');
     btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-    btn.querySelector('.sort-glyph').textContent = this.sortGlyph(key);
+    const glyph = btn.querySelector('.sort-glyph');
+    if (glyph) glyph.textContent = this.sortGlyph(key);
     const name = `Sort by ${btn.dataset.sortLabel}`;
     btn.setAttribute('aria-label', active ? `${name}, ${this.dirWord()}` : name);
   }
@@ -354,7 +364,7 @@ export class EffectSidebar {
   /** Mark the currently active effect's button as selected after a rebuild. */
   updateActiveClass() {
     if (!this.activeName) return;
-    const btn = this.buttons.get(this.activeName);
+    const btn = this.activeButton();
     if (btn) {
       btn.classList.add('active');
       btn.setAttribute('aria-selected', 'true');
@@ -362,10 +372,19 @@ export class EffectSidebar {
   }
 
   /**
+   * The active effect's option button.
+   * @returns {HTMLButtonElement|undefined} The button, or undefined when no
+   *   effect is active or the active one is off the roster.
+   */
+  activeButton() {
+    return this.activeName === null ? undefined : this.buttons.get(this.activeName);
+  }
+
+  /**
    * Roving tabindex: make `btn` the list's sole tab stop (tabindex=0), demoting
    * the previous anchor to -1. A null/undefined target leaves the list with no
    * tab stop (e.g. an empty list).
-   * @param {HTMLElement} [btn] - Button to promote to the tab stop, or falsy for none.
+   * @param {HTMLElement|null} [btn] - Button to promote to the tab stop, or falsy for none.
    */
   setRovingTabbable(btn) {
     if (this.tabbableBtn && this.tabbableBtn !== btn) {
@@ -386,8 +405,8 @@ export class EffectSidebar {
     const btns = this.orderedButtons;
     if (!btns.length) return;
 
-    const focused = this.doc.activeElement;
-    const idx = btns.indexOf(focused);
+    const focused = /** @type {HTMLElement|null} */ (this.doc.activeElement);
+    const idx = focused ? btns.indexOf(focused) : -1;
 
     // Measuring the stride forces a style recalc, so it is held until a resize
     // or a new roster invalidates it.

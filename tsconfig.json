@@ -28,19 +28,21 @@
   // `noResolve` also means imports are not followed even for the files below, so
   // an unlisted one degrades to `any` with no diagnostic — tests/tsconfig_roster
   // .test.js keeps this list closed under the rostered modules' own imports.
-  // holosphere_wasm.d.ts and app_lifecycle.d.ts stand in for modules that are
-  // never checked; listing them is what makes those imports resolve under
-  // noResolve.
+  // holosphere_wasm.d.ts stands in for the Emscripten glue, which is never
+  // checked; listing it is what makes that import resolve under noResolve.
+  // file_system_access.d.ts declares the save picker lib.dom omits.
   // tools/ is rostered whole except for the modules that import three, which
   // ships no typings: under noResolve a bare specifier resolves to nothing this
   // program contains, so `@types/three` could not be reached even if installed.
   // tsconfig_roster.test.js holds tools/ to that one exemption. The same puts
-  // geometry.js and everything else reached through driver.js out of range, and
-  // bootstrap.js with them: its dynamic import of daydream.js is an edge the
-  // closure follows.
+  // gui.js (lil-gui), geometry.js and everything else reached through driver.js
+  // out of range, and daydream.js and bootstrap.js with them, since the closure
+  // rule would pull those in. effect_gui.js is reachable but not yet clean: its
+  // controls are lil-gui objects, so typing it means hand-writing a mirror of
+  // the surface gui.js exposes and nothing pins that mirror.
   "files": [
     "holosphere_wasm.d.ts",
-    "app_lifecycle.d.ts",
+    "file_system_access.d.ts",
     "engine_host.js",
     "frame_constants.js",
     "global_stats_view.js",
@@ -48,6 +50,11 @@
     "pixel_view.js",
     "sidebar_logic.js",
     "state.js",
+    "app_lifecycle.js",
+    "legacy_shader_import.js",
+    "sidebar.js",
+    "recorder.js",
+    "effect_sequencing.js",
     "worker_protocol.js",
     "segment_controller.js",
     "segment_layout.js",
