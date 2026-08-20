@@ -242,7 +242,7 @@ export function start({
   const urlSync = new URLSync(appState, ['effect', 'resolution'], {
     resolution: (v) => Object.hasOwn(resolutionPresets, v),
     effect: (v) => knownEffects.has(v),
-  });
+  }, win);
   const legacySelection = importLegacyShaderSelection(appState.get('effect'));
   let legacyUrlPending = legacySelection.migrated;
   if (legacyUrlPending) {
@@ -622,7 +622,7 @@ export function start({
     applyResolution: (preserveParams) => apply.applyResolution(preserveParams),
     currentUrl: () =>
       win.location.pathname + win.location.search + win.location.hash,
-    restoreUrl: replaceUrl,
+    restoreUrl: (url) => replaceUrl(url, win),
     showResolution: (resolution) => resolutionController.setValue(resolution),
     syncResolutionUrl: () => urlSync.schedule(),
     logError: (message, error) => console.error(message, error),

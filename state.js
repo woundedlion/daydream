@@ -113,11 +113,12 @@ export const URL_FLUSH_MAX_RETRIES = 20;
  *   past the limit. Every URL write is cosmetic, so a throw must not escape into
  *   an apply or rollback path that would read it as a state failure.
  * @param {string} url - The URL to write.
+ * @param {Window} [win] - The window whose history is written.
  * @returns {boolean} Whether the URL was written; false when the browser refused it.
  */
-export function replaceUrl(url) {
+export function replaceUrl(url, win = window) {
   try {
-    window.history.replaceState({}, '', url);
+    win.history.replaceState({}, '', url);
     return true;
   } catch (e) {
     console.warn('URL update skipped:', e);
@@ -130,12 +131,13 @@ export function replaceUrl(url) {
  * pathname + query + the existing location.hash, which rebuilding from pathname
  * alone would drop.
  * @param {URLSearchParams} params - The query params to write; empty writes a bare path.
+ * @param {Window} [win] - The window whose location is read and history written.
  * @returns {boolean} Whether the URL was written; false when the browser refused it.
  */
-export function writeUrl(params) {
+export function writeUrl(params, win = window) {
   const qs = params.toString();
-  const base = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
-  return replaceUrl(base + window.location.hash);
+  const base = qs ? `${win.location.pathname}?${qs}` : win.location.pathname;
+  return replaceUrl(base + win.location.hash, win);
 }
 
 /**
@@ -284,8 +286,9 @@ export class URLSync {
    *   default instead of being overwritten. Lives here, in the sync layer, so a
    *   garbage URL value can't poison state regardless of which consumer wires
    *   the URLSync — callers no longer have to re-validate after construction.
+   * @param {Window} [win] - The window this writer reads and writes the URL on.
    */
-  constructor(state, trackedKeys, validators = {}) {
+  constructor(state, trackedKeys, validators = {}, win = window) {
     // Retire the previous writer: orphaned, it would keep its subscription and
     // could still arm a replaceState timer with no handle left to tear it down.
     if (activeURLSync) activeURLSync.dispose();
@@ -303,8 +306,9 @@ export class URLSync {
     this.suspendedDirty = false;
     this.suspendedDelayMs = 0; // delay of a flush suspend() disarmed, re-armed by resume()
     this.retries = 0; // consecutive refused writes, cleared by one that lands
+    this.win = win;
 
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(win.location.search);
     /** @type {Record<string, *>} */
     const patch = {};
     for (const key of trackedKeys) {
@@ -527,7 +531,7 @@ export class URLSync {
    * @returns {void}
    */
   flush() {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(this.win.location.search);
     this.applyPendingReset(params);
     // A cleared tracked key drops its param; leaving it would re-seed the stale
     // value into state on the next load.
@@ -535,7 +539,7 @@ export class URLSync {
       overlayUrlParam(params, key, this.state.get(key));
     }
     this.overlayPending(params);
-    if (!writeUrl(params)) {
+    if (!writeUrl(params, this.win)) {
       this.retries += 1;
       if (this.retries < URL_FLUSH_MAX_RETRIES) {
         this.schedule(URL_FLUSH_RETRY_MS);
