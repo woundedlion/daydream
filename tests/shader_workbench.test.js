@@ -63,7 +63,8 @@ test('simulator exposes Shader as a standalone tool', () => {
 // §4.1: three stacked regions around the canvas. The toolbar keeps the engine
 // stats row, the canvas keeps every pixel the three do not need, and the
 // document status output is the one live region the strip and library announce
-// through. The global controls keep the floating panel every other page mounts.
+// through. The global controls keep the floating panel every other page mounts,
+// inside the main area so it covers the canvas and nothing else.
 test('the workbench page lays out the toolbar, strip, canvas and library', () => {
   const region = (/** @type {RegExp} */ pattern) => WORKBENCH.search(pattern);
   assert.ok(region(/id="shader-toolbar"/) < region(/id="chain-strip"/));
@@ -71,8 +72,11 @@ test('the workbench page lays out the toolbar, strip, canvas and library', () =>
   assert.ok(region(/<main class="main-area"/) < region(/id="chain-library"/));
   assert.ok(region(/id="canvas-container"/) < region(/<\/main>/),
     'the canvas is what the main area holds');
-  assert.ok(region(/id="chain-library"/) < region(/id="gui-container"/),
-    'the global controls sit outside the main area, as on every other page');
+  assert.ok(region(/id="canvas-container"/) < region(/id="gui-container"/)
+    && region(/id="gui-container"/) < region(/<\/main>/),
+  'the global controls float inside the main area, over the canvas alone');
+  assert.ok(WORKBENCH_CSS.includes('#gui-container > .lil-gui {'),
+    'and are capped by that area rather than the viewport');
   assert.ok(region(/id="shader-toolbar"/) < region(/id="global-stats-desktop"/)
     && region(/id="global-stats-desktop"/) < region(/id="chain-strip"/),
   'the engine memory and compute stats stay in the toolbar row');

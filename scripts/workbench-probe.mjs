@@ -7,7 +7,8 @@
  * The unit suite renders the strip into tests/fake_dom.js, which has neither
  * layout nor pointer capture, so it can see neither where a palette lands on
  * screen nor that a captured press swallows the click behind it. Those need a
- * browser: palette placement is measured against the control that opened it, and
+ * browser: palette placement is measured against the control that opened it, the
+ * floating controls are measured against the regions they must not cover, and
  * every gesture below is a genuine mouse down/move/up — including the press on a
  * chip's own slider, which the chip drag must leave alone.
  */
@@ -58,6 +59,14 @@ async function boxOf(tab, selector) {
 
 /** @param {{x: number, y: number, width: number, height: number}} box */
 const centre = (box) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
+
+/**
+ * @param {{x: number, y: number, width: number, height: number}} a - One box.
+ * @param {{x: number, y: number, width: number, height: number}} b - Another.
+ * @returns {boolean} Whether the two boxes share any pixel.
+ */
+const overlaps = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width
+  && a.y < b.y + b.height && b.y < a.y + a.height;
 
 /**
  * Presses at one point, travels to a target, and releases: the gesture the
@@ -228,6 +237,16 @@ async function probeStrip(tab) {
   const stored = (await savedDocument(tab)).preset_bank.presets[0].values['rotate.wander'];
   check(Math.abs(stored - shown) < VALUE_TOLERANCE,
     `the control's value round-trips into the saved document (${stored})`);
+
+  // The global controls float over the canvas: an expanded chip makes the strip
+  // its tallest, which is when a panel pinned to the whole layout covers it.
+  const panels = await boxOf(tab, '#gui-container');
+  for (const region of ['#chain-strip', '#shader-toolbar', '#chain-library']) {
+    const box = await boxOf(tab, region);
+    check(!overlaps(panels, box),
+      `the global controls clear ${region} (panels at ${Math.round(panels.x)},`
+      + `${Math.round(panels.y)} ${Math.round(panels.width)}x${Math.round(panels.height)})`);
+  }
 
   return failures;
 }
