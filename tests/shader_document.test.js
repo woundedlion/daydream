@@ -40,6 +40,15 @@ const MIGRATION = JSON.parse(
   readFileSync(new URL('digest_migration.v1v2.json', PATTERNS), 'utf8'));
 const EXAMPLE = readFileSync(new URL('example.shader.json', PATTERNS), 'utf8');
 
+/**
+ * Reads a file the canonical LF export is pinned against. A CRLF working-tree
+ * copy holds the same content, so line endings are normalized away and every
+ * other byte still has to match.
+ * @param {URL} url - File to read.
+ * @returns {string} The text, LF-terminated.
+ */
+const readPinned = (url) => readFileSync(url, 'utf8').replaceAll('\r\n', '\n');
+
 /** @returns {Object} A fresh parse of the v2 example document, safe to mutate. */
 const example = () => JSON.parse(EXAMPLE);
 
@@ -581,7 +590,7 @@ test('every committed v2 pattern is its v1 fixture expanded, byte-identical', ()
     const expanded = expandV1Document(fixture(name), CATALOG).document;
     assert.equal(
       exportShaderDocumentJson(expanded),
-      readFileSync(new URL(name, PATTERNS), 'utf8'),
+      readPinned(new URL(name, PATTERNS)),
       `${name} drifted from its expansion`,
     );
   }
