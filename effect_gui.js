@@ -389,7 +389,7 @@ function focusWidget(controller) {
  * @returns {string} The element id.
  */
 function paramWarningId(name) {
-  return `param-warning-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+  return `param-warning-${encodeURIComponent(name)}`;
 }
 
 /**
