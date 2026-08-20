@@ -205,6 +205,22 @@ test('every served page carries a CSP permitting no Tailwind CDN origin or blank
 });
 
 /**
+ * Every tool page forbids form submission. `default-src` does not cover
+ * `form-action`, and a meta-delivered policy is the only vehicle these pages
+ * have: GitHub Pages serves no response headers of their own, which is also why
+ * `frame-ancestors` is absent -- it is stripped from a meta policy.
+ */
+test('every tool page CSP forbids form submission', () => {
+  for (const name of PAGES) {
+    const csp = cspOf(`tools/${name}.html`);
+    assert.deepEqual(directive(csp, 'form-action'), ["'none'"],
+      `${name}.html CSP leaves form-action open`);
+    assert.equal(directive(csp, 'frame-ancestors'), null,
+      `${name}.html CSP declares frame-ancestors, which a meta policy drops`);
+  }
+});
+
+/**
  * Pins each served page's script-src to its exact token list. `default-src`
  * alone leaves the directive that actually decides where scripts load from
  * ungated, so an origin added to any page passes CI on the strength of a
