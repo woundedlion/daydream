@@ -169,6 +169,28 @@ async function probeStrip(tab) {
   check(socketOffset <= ANCHOR_TOLERANCE_PX,
     `a socket swap opens its palette ${socketOffset.toFixed(1)}px from the button`);
 
+  // A crossing fits no gap, so the library would read it as permanently dead
+  // were insertion its only route. On the scratch chain the sphere → plane
+  // socket takes this one, and the entry has to say so and commit it.
+  const gnomonic = '.chain-library-entry[data-operator="project.gnomonic.v2"]';
+  const crossing = await tab.$eval(gnomonic, (node) => ({
+    disabled: node.getAttribute('aria-disabled'),
+    reason: node.querySelector('.chain-library-reason')?.textContent ?? '',
+  }));
+  check(crossing.disabled === null && crossing.reason.includes('socket'),
+    `a crossing entry names its swap route (aria-disabled: ${crossing.disabled},`
+    + ` "${crossing.reason}")`);
+  const socketName = () => tab.$eval('.chain-chip--socket .chain-chip-name',
+    (node) => node.textContent ?? '');
+  const projectionBefore = await socketName();
+  await (await tab.waitForSelector(gnomonic)).click();
+  const projectionAfter = await socketName();
+  check(projectionAfter === 'Gnomonic' && projectionBefore !== projectionAfter,
+    `clicking it swaps the socket it named (${projectionBefore} → ${projectionAfter})`);
+  // Clicking an entry scrolls the library to it, and the gestures below measure
+  // entry boxes against the panel as it sits.
+  await tab.$eval('#chain-library', (node) => { node.scrollTop = 0; });
+
   // Wave Shear out of the library and onto the plane band, which holds no stage
   // on the scratch chain.
   const before = await bandChipNames(tab, 'plane');

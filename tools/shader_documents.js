@@ -376,8 +376,9 @@ export function createShaderDocumentController({
     setParamFilter(null);
   };
 
-  // The library's legality is the chain's, not one gap's: a click inserts at the
-  // first gap that accepts the operator, so only an operator no gap takes is
+  // The library's legality is the chain's, not one gap's: a click lands the
+  // operator wherever the chain takes it, the first accepting gap or the socket
+  // a crossing's carrier pair names, so only what neither route reaches is
   // disabled.
   const refreshLibraryLegality = () => {
     if (chainUi === null) return;
