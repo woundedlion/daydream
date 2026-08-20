@@ -41,6 +41,7 @@
       <button id="shader-document-save" type="button" disabled>Save</button>
       <button id="shader-document-save-as" type="button" disabled>Save As</button>
       <button id="shader-parity-toggle" class="shader-parity-toggle" type="button" disabled aria-pressed="false">Compiled build</button>
+      <button id="shader-animation-toggle" type="button" disabled aria-pressed="false">Pause animation</button>
       <button id="shader-document-digest" class="shader-document-digest" type="button" disabled aria-label="Copy the descriptor digest">—</button>
       <input id="shader-document-file" type="file" accept=".json,.shader.json,application/json" hidden>
       <output id="shader-document-status" class="shader-document-status" role="status" aria-live="polite">Loading source documents…</output>
@@ -79,7 +80,6 @@
       </div>
       <div id="gui-container" class="gui-container"></div>
     </main>
-    <section id="chain-library" class="chain-library-region" aria-label="Stage library"></section>
   </div>
   <script type="module" src="../main.js"></script>
 </body>

@@ -10,19 +10,17 @@
  * family crossings drawn as socket chips on the band boundaries. All four bands
  * render whether or not they hold a stage, so the strip reads as the pipeline
  * even where a run is empty. Every structural gesture — palette insertion, ✕
- * removal, socket swap, Alt+Arrow and drag reorder, coarse band drops, undo —
+ * removal, socket selection, button or Alt+Arrow reorder, and undo —
  * funnels into the document store's one span-replacement primitive, so the strip
  * can commit nothing the store's validator refuses; it only decides which spans
  * the gestures name. Selection and the session bypass set live in the store too:
  * the strip is a view plus gesture translation, rebuilt whole after every
  * committed edit with keyboard focus restored to the edited chip.
  *
- * The selected chip is the expanded one: it carries its own stage's controls
- * inline, built from the document's parameter declarations over the active
- * preset's values, so a stage is tuned where it sits in the pipeline.
+ * Every chip carries its stage's controls inline, built from the document's
+ * parameter declarations over the active preset's values, so a stage is tuned
+ * where it sits in the pipeline.
  */
-
-import { createPointerDrag } from './pointer_drag.js';
 
 /** @typedef {{id: string, name: string, input: string, output: string, params: Array<Object>}} CatalogOperator */
 /** @typedef {{carriers: string[], operators: CatalogOperator[]}} OperatorCatalog */
@@ -48,13 +46,6 @@ import { createPointerDrag } from './pointer_drag.js';
  * }} ChainStore
  */
 /** @typedef {{id: string, storage: string, domain: *}} ParameterDeclaration */
-/** @typedef {{kind: 'chip', index: number}|{kind: 'operator', operatorId: string}} DragSource */
-/**
- * A drop target: one gap exactly, or a whole band, which resolves to the band's
- * nearest legal gap. `x` is the viewport abscissa a pointer named the band at,
- * absent for a target named without a pointer.
- * @typedef {{kind: 'gap', index: number}|{kind: 'band', carrier: string, x?: number}} DragTarget
- */
 /**
  * One carrier's run of the chain: the gap indices that fall inside it, the chain
  * indices of its endomorphism chips, and the crossing that closes it.
@@ -63,9 +54,6 @@ import { createPointerDrag } from './pointer_drag.js';
 
 // Keeps a palette clamped inside the viewport clear of its edge.
 const PALETTE_MARGIN = 8;
-
-// Pointer travel, in CSS pixels, that separates a chip drag from a chip click.
-const DRAG_SLOP = 4;
 
 // Steps a slider divides its declared domain into.
 const SLIDER_STEPS = 1000;
@@ -151,8 +139,6 @@ export function createChainStrip({
   let notifiedSelection = null;
   /** @type {{element: *, anchor: *}|null} */
   let palette = null;
-  /** @type {{source: DragSource, legal: Set<number>, hovered: number|null}|null} */
-  let dragState = null;
   /** @type {BandLayout[]} The current render's band decomposition. */
   let layout = [];
   /** @type {{undo: *, redo: *}|null} The current render's history buttons. */
@@ -222,14 +208,8 @@ export function createChainStrip({
   };
 
   /**
-   * @param {string} carrier - A catalog carrier.
-   * @returns {BandLayout|null} That carrier's band in the current render.
-   */
-  const bandOf = (carrier) => layout.find((band) => band.carrier === carrier) ?? null;
-
-  /**
-   * The gap a band's + affordance and a rectangle-less coarse drop aim at: after
-   * the band's selected chip, else the band's last gap.
+   * The gap a band's + affordance aims at: after its selected chip, else the
+   * band's last gap.
    * @param {BandLayout} band - The band.
    * @returns {number|null} A gap index, or null for a band that holds no gap.
    */
@@ -332,9 +312,6 @@ export function createChainStrip({
     });
   };
 
-  /** @returns {Array<*>} Every gap element, in chain order. */
-  const gapElements = () => container.querySelectorAll('.chain-gap');
-
   /**
    * @param {string} selector - Element class selector.
    * @param {string} attribute - Dataset key to match.
@@ -353,9 +330,6 @@ export function createChainStrip({
 
   /** @param {number} index @returns {*|null} The chip at that chain index. */
   const chipAt = (index) => elementBy('.chain-chip', 'index', String(index));
-
-  /** @param {number} index @returns {*|null} The gap element at that position. */
-  const gapAt = (index) => elementBy('.chain-gap', 'index', String(index));
 
   /**
    * Surfaces a store refusal in the shared live region.
@@ -509,9 +483,8 @@ export function createChainStrip({
   };
 
   /**
-   * Opens the one palette: every catalog operator in catalog order, the illegal
-   * ones present but aria-disabled with the reason, plus a leading Remove entry
-   * where the empty replacement is legal.
+   * Opens the one palette with only the operators valid at this position, plus
+   * a leading Remove entry where the empty replacement is legal.
    * @param {Object} options - What the palette replaces.
    * @param {'insert'|'replace'} options.kind - Insertion at a gap or replacement
    *   of one chip.
@@ -544,10 +517,6 @@ export function createChainStrip({
      * @returns {void}
      */
     const activate = (entry) => {
-      if (entry.getAttribute('aria-disabled') === 'true') {
-        announce(entry.dataset.reason ?? 'this operator is not legal here');
-        return;
-      }
       const remove = entry.dataset.remove === 'true';
       const result = remove
         ? store.replaceSpan(index, 1, [])
@@ -586,19 +555,12 @@ export function createChainStrip({
       remove.textContent = 'Remove';
       addOption(remove);
     }
-    for (const legality of entries) {
+    for (const legality of entries.filter((entry) => entry.legal)) {
       const option = el('div', 'chain-palette-entry');
       option.dataset.operator = legality.operator.id;
       const name = el('span', 'chain-palette-name');
       name.textContent = legality.operator.name;
       option.appendChild(name);
-      if (!legality.legal) {
-        option.setAttribute('aria-disabled', 'true');
-        option.dataset.reason = legality.reason ?? '';
-        const reason = el('span', 'chain-palette-reason');
-        reason.textContent = legality.reason ?? '';
-        option.appendChild(reason);
-      }
       addOption(option);
     }
 
@@ -635,8 +597,7 @@ export function createChainStrip({
     parent.insertBefore(element, parent.childNodes[at + 1] ?? null);
     placePalette(element, origin);
     palette = { element, anchor };
-    const first = options.find(
-      (option) => option.getAttribute('aria-disabled') !== 'true') ?? options[0];
+    const first = options[0];
     if (first) first.focus();
   };
 
@@ -667,7 +628,8 @@ export function createChainStrip({
   const chipKeydown = (event, index, entry, crossing, chip) => {
     const inside = typeof event.target?.closest === 'function'
       && (event.target.closest('.chain-chip-params') !== null
-        || event.target.closest('.chain-chip-disclosure') !== null);
+        || event.target.closest('.chain-chip-replace') !== null
+        || event.target.closest('.chain-chip-move') !== null);
     if (inside) return;
     const key = event.key;
     if (key === 'ArrowRight' || key === 'ArrowLeft') {
@@ -694,19 +656,7 @@ export function createChainStrip({
     }
   };
 
-  /**
-   * @param {number} index - Gap position, 0..chain length.
-   * @returns {*} The gap element, a drop target rather than a control.
-   */
-  const gapElement = (index) => {
-    const gap = el('div', 'chain-gap');
-    gap.dataset.index = String(index);
-    gap.setAttribute('aria-hidden', 'true');
-    return gap;
-  };
-
-  // Deactivation is marked with a data attribute rather than a class for the
-  // same reason drag state is: only the workbench page carries the stylesheet.
+  // Only the workbench page carries the stylesheet that reads this attribute.
   /** Repaints the dimming of the expanded chip's deactivated controls. */
   const markDeactivated = () => {
     const off = deactivatedParameterIds(declarations, values);
@@ -833,7 +783,7 @@ export function createChainStrip({
     const isBypassed = bypassed.has(entry.label);
     const declared = declarations.filter(
       (declaration) => declaration.id.startsWith(`${entry.label}.`));
-    const expanded = isSelected && declared.length > 0;
+    const expanded = declared.length > 0;
     const chip = el('div', 'chain-chip'
       + (crossing ? ' chain-chip--socket' : '')
       + (expanded ? ' chain-chip--expanded' : '')
@@ -847,11 +797,6 @@ export function createChainStrip({
     chip.setAttribute('aria-label', `${op.name} · ${entry.label}`
       + (crossing ? `, ${op.input} to ${op.output}` : '')
       + (isBypassed ? ', bypassed' : ''));
-    if (movable) {
-      chip.dataset.movable = 'true';
-      chip.setAttribute('title', 'Drag, or Alt+Arrow, to reorder');
-    }
-
     const name = el('span', 'chain-chip-name');
     name.textContent = op.name;
     const label = el('span', 'chain-chip-label');
@@ -859,35 +804,38 @@ export function createChainStrip({
     chip.appendChild(name);
     chip.appendChild(label);
 
-    // A stage with no parameters gets no disclosure: it would open nothing.
-    if (declared.length > 0) {
-      const disclosure = el('button', 'chain-chip-disclosure');
-      disclosure.type = 'button';
-      disclosure.setAttribute('aria-expanded', String(expanded));
-      disclosure.setAttribute('aria-label',
-        `Parameters of ${op.name} · ${entry.label}`);
-      disclosure.textContent = expanded ? '▾' : '▸';
-      disclosure.addEventListener('click', (/** @type {*} */ event) => {
-        event.stopPropagation();
-        select(expanded ? null : entry.label);
-      });
-      chip.appendChild(disclosure);
-    }
-
     if (crossing) {
       const pair = el('span', 'chain-chip-pair');
       pair.textContent = `${op.input} → ${op.output}`;
       chip.appendChild(pair);
-      const swap = el('button', 'chain-chip-swap');
-      swap.type = 'button';
-      swap.setAttribute('aria-haspopup', 'listbox');
-      swap.setAttribute('aria-label', `Replace ${op.name} · ${entry.label}`);
-      swap.textContent = 'swap';
-      swap.addEventListener('click', (/** @type {*} */ event) => {
+      const functionLabel = el('label', 'chain-chip-function-label');
+      functionLabel.textContent = op.input === 'plane' && op.output === 'field'
+        ? 'Source function' : 'Stage';
+      const replacement = el('select', 'chain-chip-replace');
+      replacement.setAttribute('aria-label', functionLabel.textContent);
+      for (const legality of store.legalReplacements(index, 1)
+        .filter((candidate) => candidate.legal)) {
+        const option = el('option', 'chain-chip-replace-option');
+        option.value = legality.operator.id;
+        option.textContent = legality.operator.name;
+        option.selected = legality.operator.id === entry.operator;
+        replacement.appendChild(option);
+      }
+      replacement.addEventListener('click', (/** @type {*} */ event) => {
         event.stopPropagation();
-        openPalette({ kind: 'replace', index, anchor: chip, origin: swap });
       });
-      chip.appendChild(swap);
+      replacement.addEventListener('change', (/** @type {*} */ event) => {
+        event.stopPropagation();
+        const result = store.replaceSpan(index, 1,
+          [replacementEntry(index, event.target.value)]);
+        if (!result.ok) {
+          report(result);
+          return;
+        }
+        commit(store.chain()[index]?.label ?? null);
+      });
+      functionLabel.appendChild(replacement);
+      chip.appendChild(functionLabel);
     } else {
       const remove = el('button', 'chain-chip-remove');
       remove.type = 'button';
@@ -908,6 +856,32 @@ export function createChainStrip({
         toggleBypass(entry.label);
       });
       chip.appendChild(toggle);
+      if (movable) {
+        const previous = store.chain()[index - 1];
+        const next = store.chain()[index + 1];
+        const earlier = el('button', 'chain-chip-move');
+        earlier.type = 'button';
+        earlier.textContent = '‹';
+        earlier.disabled = previous === undefined
+          || opOf(previous).input !== op.input || opOf(previous).output !== op.output;
+        earlier.setAttribute('aria-label', `Move ${op.name} · ${entry.label} earlier`);
+        earlier.addEventListener('click', (/** @type {*} */ event) => {
+          event.stopPropagation();
+          moveChip(index, index - 1);
+        });
+        const later = el('button', 'chain-chip-move');
+        later.type = 'button';
+        later.textContent = '›';
+        later.disabled = next === undefined
+          || opOf(next).input !== op.input || opOf(next).output !== op.output;
+        later.setAttribute('aria-label', `Move ${op.name} · ${entry.label} later`);
+        later.addEventListener('click', (/** @type {*} */ event) => {
+          event.stopPropagation();
+          moveChip(index, index + 2);
+        });
+        chip.appendChild(earlier);
+        chip.appendChild(later);
+      }
     }
 
     if (expanded) chip.appendChild(paramsElement(entry, declared));
@@ -930,7 +904,8 @@ export function createChainStrip({
     add.setAttribute('aria-label', `Add a ${title} stage`);
     add.textContent = '+';
     const gap = contextGap(band);
-    if (gap === null) add.disabled = true;
+    if (gap === null || !store.legalInsertions(gap).some((entry) => entry.legal))
+      add.disabled = true;
     else {
       add.addEventListener('click',
         () => openPalette({ kind: 'insert', index: gap, anchor: add }));
@@ -949,7 +924,6 @@ export function createChainStrip({
     const active = doc.activeElement ?? null;
     const hadFocus = active !== null && container.contains(active);
     palette = null;
-    dragState = null;
     layout = bandLayout();
     rows.clear();
 
@@ -998,8 +972,7 @@ export function createChainStrip({
       heading.setAttribute('aria-hidden', 'true');
       heading.textContent = title;
       element.appendChild(heading);
-      for (const [at, gap] of band.gaps.entries()) {
-        element.appendChild(gapElement(gap));
+      for (const [at] of band.gaps.entries()) {
         const chip = band.chips[at];
         if (chip !== undefined) {
           element.appendChild(chipElement(chip, chain[chip],
@@ -1034,214 +1007,6 @@ export function createChainStrip({
         fallback.focus();
       }
     }
-  };
-
-  // Drag state is marked with data attributes rather than classes: these modules
-  // load on every page, and only the workbench page carries their stylesheet.
-  /** Clears every drag highlight. */
-  const clearDragMarks = () => {
-    for (const gap of gapElements()) delete gap.dataset.drop;
-    for (const band of container.querySelectorAll('.chain-band')) delete band.dataset.drop;
-    for (const chip of container.querySelectorAll('.chain-chip')) delete chip.dataset.dragging;
-    for (const strip of container.querySelectorAll('.chain-strip')) {
-      delete strip.dataset.dragging;
-    }
-  };
-
-  /**
-   * @param {number} index - A gap position.
-   * @returns {number|null} The gap element's viewport centre, or null where the
-   *   layout is not measurable.
-   */
-  const gapCentre = (index) => {
-    const element = gapAt(index);
-    if (!element || typeof element.getBoundingClientRect !== 'function') return null;
-    const rect = element.getBoundingClientRect();
-    if (!rect || typeof rect.left !== 'number' || typeof rect.width !== 'number') return null;
-    return rect.left + rect.width / 2;
-  };
-
-  /**
-   * The gap a coarse band drop commits at: geometrically nearest the pointer
-   * where the gaps measure, else the legal gap nearest the band's context gap.
-   * @param {BandLayout} band - The hovered band.
-   * @param {Set<number>} legal - The drag's legal gaps.
-   * @param {number|undefined} x - Viewport abscissa of the pointer, if any.
-   * @returns {number|null} The gap, or null when the band accepts none.
-   */
-  const nearestLegalGap = (band, legal, x) => {
-    const candidates = band.gaps.filter((gap) => legal.has(gap));
-    if (candidates.length === 0) return null;
-    if (typeof x === 'number') {
-      const measured = candidates
-        .map((gap) => ({ gap, centre: gapCentre(gap) }))
-        .filter((candidate) => candidate.centre !== null);
-      if (measured.length > 0) {
-        return measured.reduce((best, candidate) =>
-          Math.abs(/** @type {number} */ (candidate.centre) - x)
-            < Math.abs(/** @type {number} */ (best.centre) - x) ? candidate : best).gap;
-      }
-    }
-    const context = contextGap(band);
-    if (context === null) return candidates[0];
-    return candidates.reduce((best, gap) =>
-      Math.abs(gap - context) < Math.abs(best - context) ? gap : best);
-  };
-
-  /**
-   * Why a band accepts the dragged operator nowhere.
-   * @param {BandLayout} band - The refusing band.
-   * @param {DragSource} source - What is being dragged.
-   * @returns {string} The reason for the shared status region.
-   */
-  const bandRefusal = (band, source) => {
-    const title = titleCase(band.carrier);
-    if (band.gaps.length === 0) return `the ${title} band holds no insertion point`;
-    if (source.kind === 'chip') {
-      const entry = store.chain()[source.index];
-      return `${opOf(entry).name} · ${entry.label} cannot move into the ${title} band`;
-    }
-    const legality = store.legalInsertions(band.gaps[0])
-      .find((candidate) => candidate.operator.id === source.operatorId);
-    return legality?.reason ?? `nothing accepts this operator in the ${title} band`;
-  };
-
-  /**
-   * Repaints the drop marks for the current hover.
-   * @param {number|null} active - The gap the drop would commit at.
-   * @param {string|null} refused - Carrier of a band refusing the drag.
-   * @returns {void}
-   */
-  const markDrop = (active, refused) => {
-    const legal = dragState?.legal ?? new Set();
-    for (const gap of gapElements()) {
-      const index = Number(gap.dataset.index);
-      if (index === active) gap.dataset.drop = 'active';
-      else if (legal.has(index)) gap.dataset.drop = 'legal';
-      else delete gap.dataset.drop;
-    }
-    for (const element of container.querySelectorAll('.chain-band')) {
-      const gaps = bandOf(element.dataset.carrier)?.gaps ?? [];
-      if (element.dataset.carrier === refused) element.dataset.drop = 'refused';
-      else if (active !== null && gaps.includes(active)) element.dataset.drop = 'active';
-      else if (gaps.some((gap) => legal.has(gap))) element.dataset.drop = 'legal';
-      else delete element.dataset.drop;
-    }
-  };
-
-  const drag = {
-    /**
-     * Begins a drag and computes its legal drop gaps: for a chip, the gaps of
-     * its own band (a crossing does not reorder); for a catalog operator, every
-     * gap the store would accept it at.
-     * @param {DragSource} source - What is being dragged.
-     * @returns {boolean} Whether the drag was accepted.
-     */
-    start(source) {
-      if (dragState !== null) return false;
-      const chain = store.chain();
-      /** @type {Set<number>} */
-      const legal = new Set();
-      if (source.kind === 'chip') {
-        const entry = chain[source.index];
-        if (entry === undefined) return false;
-        const op = opOf(entry);
-        if (op.input === op.output) {
-          for (let gap = 0; gap <= chain.length; gap += 1) {
-            if (gap === source.index || gap === source.index + 1) continue;
-            if (carrierAt(gap) === op.input) legal.add(gap);
-          }
-        }
-        // A chip with nowhere to go — a crossing, or a band's only stage — must
-        // not take the pointer: the capture retargets the click that follows and
-        // the press would select nothing.
-        if (legal.size === 0) return false;
-      } else {
-        if (!operators.has(source.operatorId)) return false;
-        for (const gap of acceptingGaps(source.operatorId)) legal.add(gap);
-      }
-      dragState = { source, legal, hovered: null };
-      markDrop(null, null);
-      for (const strip of container.querySelectorAll('.chain-strip')) {
-        strip.dataset.dragging = 'true';
-      }
-      if (source.kind === 'chip') {
-        const chip = chipAt(source.index);
-        if (chip) chip.dataset.dragging = 'true';
-      }
-      return true;
-    },
-
-    /**
-     * Aims the drag at a gap, or at a whole band, which resolves to the band's
-     * nearest legal gap; a band that accepts the drag nowhere marks itself
-     * refused and announces why.
-     * @param {DragTarget|null} target - What the pointer is over.
-     * @returns {void}
-     */
-    hover(target) {
-      if (dragState === null) return;
-      /** @type {number|null} */
-      let next = null;
-      /** @type {string|null} */
-      let refused = null;
-      if (target !== null && target.kind === 'gap') {
-        if (dragState.legal.has(target.index)) next = target.index;
-      } else if (target !== null) {
-        const band = bandOf(target.carrier);
-        if (band !== null) {
-          next = nearestLegalGap(band, dragState.legal, target.x);
-          if (next === null) {
-            refused = band.carrier;
-            announce(bandRefusal(band, dragState.source));
-          }
-        }
-      }
-      dragState.hovered = next;
-      markDrop(next, refused);
-    },
-
-    /**
-     * Resolves a viewport point to a drop target and hovers it, so a drag
-     * captured outside the strip needs nothing of the strip but this call.
-     * @param {number} x - Viewport x.
-     * @param {number} y - Viewport y.
-     * @returns {void}
-     */
-    hoverFromPoint(x, y) {
-      if (typeof doc.elementFromPoint !== 'function') return drag.hover(null);
-      const hit = doc.elementFromPoint(x, y);
-      if (!hit || typeof hit.closest !== 'function') return drag.hover(null);
-      const gap = hit.closest('.chain-gap');
-      const index = gap ? Number(gap.dataset.index) : NaN;
-      if (Number.isInteger(index)) return drag.hover({ kind: 'gap', index });
-      const band = hit.closest('.chain-band');
-      const carrier = band ? band.dataset.carrier : undefined;
-      if (typeof carrier !== 'string') return drag.hover(null);
-      return drag.hover({ kind: 'band', carrier, x });
-    },
-
-    /**
-     * Commits the drag at the resolved gap, or unwinds it when there is none.
-     * @returns {boolean} Whether an edit committed.
-     */
-    drop() {
-      if (dragState === null) return false;
-      const { source, hovered } = dragState;
-      dragState = null;
-      clearDragMarks();
-      if (hovered === null) return false;
-      if (source.kind === 'chip') return moveChip(source.index, hovered);
-      const result = store.replaceSpan(hovered, 0, [{ operator: source.operatorId }]);
-      if (!result.ok) return report(result);
-      return commit(store.chain()[hovered]?.label ?? null);
-    },
-
-    /** Unwinds the drag without committing. */
-    cancel() {
-      dragState = null;
-      clearDragMarks();
-    },
   };
 
   /**
@@ -1284,58 +1049,10 @@ export function createChainStrip({
     }
   });
 
-  // The press a running chip drag started from, and whether it has travelled far
-  // enough to read as a drag. Pointer capture retargets the click that follows a
-  // captured press to the container, so a press that never moves is turned back
-  // into the chip selection it was meant to be.
-  /** @type {{label: string|null, x: number, y: number, moved: boolean}|null} */
-  let press = null;
-
-  const pointer = createPointerDrag({
-    element: container,
-    onStart: (event) => {
-      press = null;
-      const target = /** @type {*} */ (event.target);
-      if (!target || typeof target.closest !== 'function') return false;
-      if (target.closest('.chain-chip-bypass') || target.closest('.chain-chip-remove')
-          || target.closest('.chain-chip-swap') || target.closest('.chain-band-add')
-          || target.closest('.chain-chip-disclosure')
-          || target.closest('.chain-chip-params')
-          || target.closest('.chain-palette')) return false;
-      const chip = target.closest('.chain-chip');
-      if (!chip) return false;
-      focusedLabel = chip.dataset.label ?? focusedLabel;
-      if (!drag.start({ kind: 'chip', index: Number(chip.dataset.index) })) return false;
-      press = {
-        label: chip.dataset.label ?? null,
-        x: event.clientX,
-        y: event.clientY,
-        moved: false,
-      };
-      return undefined;
-    },
-    onMove: (event) => {
-      if (press !== null && Math.abs(event.clientX - press.x)
-        + Math.abs(event.clientY - press.y) > DRAG_SLOP) press.moved = true;
-      drag.hoverFromPoint(event.clientX, event.clientY);
-    },
-    onEnd: () => {
-      const stationary = press !== null && !press.moved ? press.label : null;
-      press = null;
-      if (drag.drop()) return;
-      if (stationary !== null) select(stationary);
-    },
-    onCancel: () => {
-      press = null;
-      drag.cancel();
-    },
-  });
-
   render();
 
   return {
     render,
-    drag,
     insertOperator,
     insertionLegality,
 
@@ -1353,7 +1070,6 @@ export function createChainStrip({
 
     /** Detaches the strip's listeners and empties its container. */
     destroy() {
-      pointer.remove();
       container.replaceChildren();
     },
   };

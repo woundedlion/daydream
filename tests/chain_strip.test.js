@@ -2,8 +2,8 @@
 // tools/chain_strip.js renders the pipeline strip — the chain left to right as
 // chips grouped into one band per carrier, with the crossings as socket chips on
 // the band boundaries — and translates every gesture (band + palettes, ✕
-// removal, socket swap, Alt+Arrow and drag reorder, coarse band drops, bypass,
-// undo) into the document store's span-replacement primitive. The fixture is the
+// removal, socket selection, reorder buttons, Alt+Arrow, bypass, undo) into the
+// document store's span-replacement primitive. The fixture is the
 // real hex_wave pattern document over the pinned engine catalog and the real
 // store, so legality, reconciliation and refusal texts are the shipping ones,
 // not doubles.
@@ -25,9 +25,7 @@ assert.equal(BASE.status, 'VALID');
 
 // hex_wave chain: camera, lens (sphere endos), project (crossing), warp2
 // (plane endo), sample (crossing), transfer (field endo), colorize (exit).
-const LENS = 1;
 const PROJECT = 2;
-const WARP2 = 3;
 
 // The shipped catalog's crossings are the three the pipeline's own bands make,
 // and a valid chain runs sphere to color, so it always carries a socket for
@@ -94,8 +92,6 @@ const chipByLabel = (h, label) =>
   chips(h).find((chip) => chip.dataset.label === label);
 const bandFor = (h, carrier) => h.container.querySelectorAll('.chain-band')
   .find((band) => band.dataset.carrier === carrier);
-const gapByIndex = (h, index) => h.container.querySelectorAll('.chain-gap')
-  .find((gap) => Number(gap.dataset.index) === index);
 const paletteOf = (h) => h.container.querySelector('.chain-palette');
 const paletteEntries = (h) => h.container.querySelectorAll('.chain-palette-entry');
 const lastAnnounced = (h) => h.announced.at(-1) ?? '';
@@ -141,32 +137,33 @@ test('the strip lays the chain out as carrier bands with sockets between them', 
   assert.match(chipByLabel(h, 'project').getAttribute('aria-label'),
     /, sphere to plane$/);
 
-  // One roving-tabindex stop, one gap per chain position plus the ends, and one
-  // persistent + per band.
+  // One roving-tabindex stop and one persistent + per band.
   assert.deepEqual(all.filter((chip) => chip.getAttribute('tabindex') === '0')
     .map((chip) => chip.dataset.label), ['camera']);
-  assert.equal(h.container.querySelectorAll('.chain-gap').length, 8);
+  assert.equal(h.container.querySelectorAll('.chain-gap').length, 0);
   assert.deepEqual(bands.map((band) => band.querySelector('.chain-band-add')
     .getAttribute('aria-label')),
   ['Add a Sphere stage', 'Add a Plane stage', 'Add a Field stage', 'Add a Color stage']);
 });
 
-test('only endomorphisms carry ✕ and bypass; only sockets carry swap', async () => {
+test('endomorphisms carry remove and bypass; sockets carry valid selectors', async () => {
   const h = await makeStrip();
   for (const label of ['camera', 'lens', 'warp2', 'transfer']) {
     const chip = chipByLabel(h, label);
     assert.ok(chip.querySelector('.chain-chip-remove'), `${label} carries ✕`);
     assert.ok(chip.querySelector('.chain-chip-bypass'), `${label} carries bypass`);
-    assert.equal(chip.querySelector('.chain-chip-swap'), null);
+    assert.equal(chip.querySelector('.chain-chip-replace'), null);
   }
   for (const label of ['project', 'sample', 'colorize']) {
     const chip = chipByLabel(h, label);
     assert.equal(chip.querySelector('.chain-chip-remove'), null,
       'removal across a crossing is illegal by construction, so no ✕');
     assert.equal(chip.querySelector('.chain-chip-bypass'), null);
-    assert.equal(chip.querySelector('.chain-chip-swap').getAttribute('aria-haspopup'),
-      'listbox');
+    assert.ok(chip.querySelector('.chain-chip-replace'));
   }
+  assert.equal(chipByLabel(h, 'sample')
+    .querySelector('.chain-chip-function-label').textContent.startsWith('Source function'),
+  true);
   const remove = chipByLabel(h, 'lens').querySelector('.chain-chip-remove');
   assert.equal(remove.textContent, '✕');
   assert.match(remove.getAttribute('aria-label'), /^Remove .+ · lens$/);
@@ -241,22 +238,21 @@ test('✕ and Delete remove an endomorphism and re-apply the program', async () 
   assert.equal(paletteOf(h), null, 'Delete on an endomorphism needs no palette');
 });
 
-test('Delete and swap both open a socket replacement palette', async () => {
+test('Delete opens a socket replacement palette containing only valid stages', async () => {
   const h = await makeStrip();
   chipByLabel(h, 'project').dispatch('keydown', { key: 'Delete' });
 
   const palette = paletteOf(h);
   assert.equal(palette.getAttribute('role'), 'listbox');
   const entries = paletteEntries(h);
-  assert.equal(entries.length, CATALOG.operators.length,
-    'every catalog operator, and no Remove: a crossing is removed by replacement');
+  assert.equal(entries.length, 8,
+    'only the projection functions valid for this socket are shown');
   assert.equal(entries[0].dataset.remove, undefined);
   const bonne = entries.find((entry) => entry.dataset.operator === 'project.bonne.v2');
   assert.equal(bonne.getAttribute('aria-disabled'), null,
     'a same-pair operator is enabled');
-  const grid = entries.find((entry) => entry.dataset.operator === 'sample.grid.v2');
-  assert.equal(grid.getAttribute('aria-disabled'), 'true');
-  assert.match(grid.querySelector('.chain-palette-reason').textContent, /plane carrier/);
+  assert.equal(entries.find((entry) => entry.dataset.operator === 'sample.grid.v2'),
+    undefined);
   assert.equal(h.doc.activeElement.dataset.operator, 'project.stereographic.v2',
     'focus moves to the palette\'s first enabled entry');
 
@@ -265,10 +261,9 @@ test('Delete and swap both open a socket replacement palette', async () => {
   assert.equal(h.doc.activeElement, chipByLabel(h, 'project'));
   assert.deepEqual(h.applied, []);
 
-  chipByLabel(h, 'project').querySelector('.chain-chip-swap').dispatch('click');
-  paletteEntries(h)
-    .find((entry) => entry.dataset.operator === 'project.bonne.v2')
-    .dispatch('click');
+  const select = chipByLabel(h, 'project').querySelector('.chain-chip-replace');
+  select.value = 'project.bonne.v2';
+  select.dispatch('change');
   assert.equal(h.store.chain()[PROJECT].operator, 'project.bonne.v2');
   assert.equal(h.applied.length, 1);
   assert.equal(h.doc.activeElement.dataset.label, h.store.chain()[PROJECT].label);
@@ -276,25 +271,23 @@ test('Delete and swap both open a socket replacement palette', async () => {
 
 // Picking the operator a socket already carries is a no-op, not a re-seat: the
 // instance keeps its label, and with it every tuned value.
-test('a swap onto the operator the socket carries keeps the instance', async () => {
+test('selecting the operator the socket carries keeps the instance', async () => {
   const h = await makeStrip();
   const before = h.store.document();
   assert.equal(before.preset_bank.presets[0].values['project.pole-fade'] !== 1, true,
     'the fixture tunes the socket away from the catalog default');
 
-  chipByLabel(h, 'project').querySelector('.chain-chip-swap').dispatch('click');
-  paletteEntries(h)
-    .find((entry) => entry.dataset.operator === 'project.stereographic.v2')
-    .dispatch('click');
+  let select = chipByLabel(h, 'project').querySelector('.chain-chip-replace');
+  select.value = 'project.stereographic.v2';
+  select.dispatch('change');
   assert.deepEqual(h.store.document(), before,
     'label, values, presets and serialization fields are all untouched');
   assert.equal(h.store.canUndo(), false, 'an edit that changes nothing has nothing to undo');
-  assert.equal(paletteOf(h), null);
   assert.equal(h.doc.activeElement.dataset.label, 'project');
 
-  chipByLabel(h, 'project').querySelector('.chain-chip-swap').dispatch('click');
-  paletteEntries(h).find((entry) => entry.dataset.operator === 'project.bonne.v2')
-    .dispatch('click');
+  select = chipByLabel(h, 'project').querySelector('.chain-chip-replace');
+  select.value = 'project.bonne.v2';
+  select.dispatch('change');
   const after = h.store.document();
   assert.deepEqual(after.descriptor.chain[PROJECT],
     { label: 'project1', operator: 'project.bonne.v2' },
@@ -308,7 +301,7 @@ test('a band + and Insert both open the insertion palette at their gap', async (
   const h = await makeStrip();
   bandFor(h, 'sphere').querySelector('.chain-band-add').dispatch('click');
   let entries = paletteEntries(h);
-  assert.equal(entries.length, CATALOG.operators.length);
+  assert.equal(entries.every((entry) => entry.getAttribute('aria-disabled') === null), true);
   entries.find((entry) => entry.dataset.operator === 'sphere.lens.mobius.v2')
     .dispatch('click');
   assert.deepEqual(labels(h).slice(0, 3), ['camera', 'lens', 'sphere1'],
@@ -325,10 +318,7 @@ test('a band + and Insert both open the insertion palette at their gap', async (
   chipByLabel(h, 'camera').dispatch('keydown', { key: 'Insert' });
   entries = paletteEntries(h);
   const illegal = entries.find((entry) => entry.dataset.operator === 'warp.affine.v2');
-  assert.equal(illegal.getAttribute('aria-disabled'), 'true');
-  illegal.dispatch('click');
-  assert.equal(labels(h).length, 9, 'an aria-disabled entry commits nothing');
-  assert.notEqual(lastAnnounced(h), '');
+  assert.equal(illegal, undefined, 'invalid stages are omitted instead of greyed out');
 });
 
 // The palette's offset parent is whatever positioned ancestor sits above it —
@@ -356,13 +346,6 @@ const measureNewElements = (h, width, parentLeft) => {
 test('a palette opens anchored to the control that opened it', async () => {
   const h = await makeStrip();
   measureNewElements(h, 208, 8);
-  const swap = chipByLabel(h, 'project').querySelector('.chain-chip-swap');
-  swap.getBoundingClientRect = () => ({ left: 900, width: 40 });
-  swap.dispatch('click');
-  assert.equal(paletteOf(h).style.left, '892px',
-    'the offset is measured against the offset parent, not the parent the anchor sits in');
-
-  h.doc.activeElement.dispatch('keydown', { key: 'Escape' });
   const add = bandFor(h, 'sphere').querySelector('.chain-band-add');
   add.getBoundingClientRect = () => ({ left: 298, width: 20 });
   add.dispatch('click');
@@ -372,16 +355,16 @@ test('a palette opens anchored to the control that opened it', async () => {
 test('a palette near the right edge is clamped back inside the viewport', async () => {
   const h = await makeStrip();
   measureNewElements(h, 208, 8);
-  const swap = chipByLabel(h, 'colorize').querySelector('.chain-chip-swap');
-  swap.getBoundingClientRect = () => ({ left: 1250, width: 40 });
-  swap.dispatch('click');
+  const add = bandFor(h, 'sphere').querySelector('.chain-band-add');
+  add.getBoundingClientRect = () => ({ left: 1250, width: 40 });
+  add.dispatch('click');
   assert.equal(paletteOf(h).style.left, '1056px',
     'clamped to the viewport width less the palette and its margin');
 });
 
 test('a palette keeps its stylesheet placement where nothing measures', async () => {
   const h = await makeStrip();
-  chipByLabel(h, 'project').querySelector('.chain-chip-swap').dispatch('click');
+  bandFor(h, 'sphere').querySelector('.chain-band-add').dispatch('click');
   assert.equal(paletteOf(h).style.left, '',
     'a DOM without layout writes no offset rather than throwing');
 });
@@ -432,53 +415,14 @@ test('bypass toggles the program shape without touching the document', async () 
   assert.equal(chipByLabel(h, 'lens').classList.contains('chain-chip--bypassed'), false);
 });
 
-test('the drag lifecycle reorders a chip within its band', async () => {
-  const h = await makeStrip();
-  assert.equal(h.strip.drag.start({ kind: 'chip', index: LENS }), true);
-  const legal = h.container.querySelectorAll('.chain-gap')
-    .filter((gap) => gap.dataset.drop === 'legal')
-    .map((gap) => Number(gap.dataset.index));
-  assert.deepEqual(legal, [0],
-    'a sphere endomorphism may only drop into its own band');
-  assert.equal(chipByLabel(h, 'lens').dataset.dragging, 'true');
-
-  h.strip.drag.hover({ kind: 'gap', index: 5 });
-  assert.equal(h.container.querySelectorAll('.chain-gap')
-    .some((gap) => gap.dataset.drop === 'active'), false,
-  'an illegal gap never highlights');
-  h.strip.drag.hover({ kind: 'gap', index: 0 });
-  assert.equal(gapByIndex(h, 0).dataset.drop, 'active');
-
-  assert.equal(h.strip.drag.drop(), true);
-  assert.deepEqual(labels(h).slice(0, 2), ['lens', 'camera']);
-  assert.equal(h.applied.length, 1);
-});
-
-test('a chip with nowhere to go declines the drag, so its press stays a click',
-  async () => {
-    const h = await makeStrip();
-    assert.equal(h.strip.drag.start({ kind: 'chip', index: PROJECT }), false,
-      'a crossing never reorders');
-    assert.equal(h.strip.drag.start({ kind: 'chip', index: WARP2 }), false,
-      'the only chip in its band has no gap to move to');
-    assert.equal(chips(h).some((chip) => chip.dataset.dragging === 'true'), false);
-  });
-
-test('a hoverless drop unwinds without committing', async () => {
-  const h = await makeStrip();
-  assert.equal(h.strip.drag.start({ kind: 'chip', index: LENS }), true);
-  assert.equal(h.strip.drag.drop(), false);
-  assert.deepEqual(h.applied, []);
-  assert.equal(h.container.querySelectorAll('.chain-gap')
-    .some((gap) => gap.dataset.drop === 'legal'), false,
-  'an unwound drag clears its highlights');
-});
-
-test('a chip press that never moves selects instead of dragging', async () => {
+test('a chip selects by click, never by pointer travel', async () => {
   const h = await makeStrip();
   chipByLabel(h, 'lens').dispatch('pointerdown',
     { isPrimary: true, button: 0, pointerId: 3, clientX: 40, clientY: 10 });
   h.container.dispatch('pointerup', { pointerId: 3, clientX: 41, clientY: 10 });
+  assert.equal(h.store.selectedLabel(), null);
+
+  chipByLabel(h, 'lens').dispatch('click');
   assert.equal(h.store.selectedLabel(), 'lens');
   assert.deepEqual(h.selections, ['lens']);
   assert.deepEqual(h.applied, [], 'a selection is no structural edit');
@@ -488,116 +432,20 @@ test('a chip press that never moves selects instead of dragging', async () => {
   h.container.dispatch('pointermove', { pointerId: 4, clientX: 90, clientY: 10 });
   h.container.dispatch('pointerup', { pointerId: 4, clientX: 90, clientY: 10 });
   assert.equal(h.store.selectedLabel(), 'lens',
-    'a press that travelled is a drag, and moves the selection nowhere');
+    'pointer travel moves the selection nowhere');
   assert.deepEqual(h.selections, ['lens'], 'the selection is announced once');
 });
 
-test('the drag lifecycle inserts a catalog operator at a legal gap', async () => {
+test('reorder buttons replace the chip drag affordance', async () => {
   const h = await makeStrip();
-  assert.equal(h.strip.drag.start(
-    { kind: 'operator', operatorId: 'warp.wave-shear.v2' }), true);
-  const legal = h.container.querySelectorAll('.chain-gap')
-    .filter((gap) => gap.dataset.drop === 'legal')
-    .map((gap) => Number(gap.dataset.index));
-  assert.deepEqual(legal, [3, 4], 'the plane band gaps take a plane endo');
+  assert.equal(chipByLabel(h, 'camera').querySelectorAll('.chain-chip-move').length, 2);
+  assert.equal(chipByLabel(h, 'lens').querySelectorAll('.chain-chip-move').length, 2);
+  assert.equal(chipByLabel(h, 'warp2').querySelectorAll('.chain-chip-move').length, 0);
+  assert.equal(chipByLabel(h, 'project').querySelectorAll('.chain-chip-move').length, 0);
 
-  h.strip.drag.hover({ kind: 'gap', index: 3 });
-  h.strip.drag.drop();
-  assert.equal(h.store.chain()[3].operator, 'warp.wave-shear.v2');
-  assert.equal(h.applied.length, 1);
-
-  assert.equal(h.strip.drag.start({ kind: 'operator', operatorId: 'nope.v9' }), false);
-});
-
-test('a coarse band drop snaps to the geometrically nearest legal gap', async () => {
-  const h = await makeStrip();
-  h.strip.drag.start({ kind: 'operator', operatorId: 'warp.wave-shear.v2' });
-  gapByIndex(h, 3).getBoundingClientRect = () => ({ left: 100, width: 10 });
-  gapByIndex(h, 4).getBoundingClientRect = () => ({ left: 300, width: 10 });
-
-  h.strip.drag.hover({ kind: 'band', carrier: 'plane', x: 280 });
-  assert.equal(gapByIndex(h, 4).dataset.drop, 'active');
-  assert.equal(gapByIndex(h, 3).dataset.drop, 'legal');
-
-  h.strip.drag.hover({ kind: 'band', carrier: 'plane', x: 120 });
-  assert.equal(gapByIndex(h, 3).dataset.drop, 'active');
-  assert.equal(h.strip.drag.drop(), true);
-  assert.equal(h.store.chain()[3].operator, 'warp.wave-shear.v2');
-});
-
-test('an unmeasurable band drop falls back to the band context gap', async () => {
-  const h = await makeStrip();
-  h.strip.drag.start({ kind: 'operator', operatorId: 'warp.wave-shear.v2' });
-  h.strip.drag.hover({ kind: 'band', carrier: 'plane' });
-
-  assert.equal(gapByIndex(h, 4).dataset.drop, 'active',
-    'with no selection the context gap is the band\'s last');
-  assert.equal(h.strip.drag.drop(), true);
-  assert.equal(h.store.chain()[4].operator, 'warp.wave-shear.v2');
-});
-
-test('a band with no legal gap refuses the drag and announces why', async () => {
-  const h = await makeStrip();
-  h.strip.drag.start({ kind: 'operator', operatorId: 'sphere.rotate.v2' });
-  h.strip.drag.hover({ kind: 'band', carrier: 'plane', x: 10 });
-
-  assert.equal(bandFor(h, 'plane').dataset.drop, 'refused');
-  assert.equal(bandFor(h, 'sphere').dataset.drop, 'legal',
-    'the band that does accept it stays marked as a target');
-  assert.match(lastAnnounced(h), /carrier/);
-  assert.equal(h.strip.drag.drop(), false);
-  assert.deepEqual(h.applied, []);
-  assert.equal(bandFor(h, 'plane').dataset.drop, undefined,
-    'an unwound drag clears the refusing mark');
-});
-
-test('a running drag marks its bands and widens the strip gaps', async () => {
-  const h = await makeStrip();
-  const stripOf = (harness) => harness.container.querySelector('.chain-strip');
-  h.strip.drag.start({ kind: 'operator', operatorId: 'warp.wave-shear.v2' });
-  assert.equal(stripOf(h).dataset.dragging, 'true',
-    'the strip carries the drag so the stylesheet can give the gaps a hit area');
-  assert.deepEqual(h.container.querySelectorAll('.chain-band')
-    .map((band) => band.dataset.drop), [undefined, 'legal', undefined, undefined],
-  'a band holding a legal gap is a coarse drop target from the start');
-
-  h.strip.drag.hover({ kind: 'gap', index: 3 });
-  assert.equal(bandFor(h, 'plane').dataset.drop, 'active',
-    'the band the drop would commit in reads live, not merely legal');
-
-  h.strip.drag.cancel();
-  assert.equal(stripOf(h).dataset.dragging, undefined);
-  assert.deepEqual(h.container.querySelectorAll('.chain-band')
-    .map((band) => band.dataset.drop), [undefined, undefined, undefined, undefined]);
-});
-
-test('only a chip with somewhere to go advertises the reorder', async () => {
-  const h = await makeStrip();
-  assert.deepEqual(chips(h).filter((chip) => chip.dataset.movable === 'true')
-    .map((chip) => chip.dataset.label), ['camera', 'lens'],
-  'the sole chip in a band, and every crossing, can go nowhere');
-  assert.equal(chipByLabel(h, 'camera').getAttribute('title'),
-    'Drag, or Alt+Arrow, to reorder');
-  assert.equal(chipByLabel(h, 'warp2').getAttribute('title'), null);
-});
-
-test('hoverFromPoint resolves gaps, then bands, then nothing', async () => {
-  const h = await makeStrip();
-  h.strip.drag.start({ kind: 'operator', operatorId: 'warp.wave-shear.v2' });
-
-  h.doc.elementFromPoint = () => gapByIndex(h, 3);
-  h.strip.drag.hoverFromPoint(1, 2);
-  assert.equal(gapByIndex(h, 3).dataset.drop, 'active');
-
-  h.doc.elementFromPoint = () => bandFor(h, 'plane').querySelector('.chain-band-title');
-  h.strip.drag.hoverFromPoint(1, 2);
-  assert.equal(gapByIndex(h, 4).dataset.drop, 'active',
-    'a point off every gap resolves through the band it landed in');
-
-  h.doc.elementFromPoint = () => null;
-  h.strip.drag.hoverFromPoint(1, 2);
-  assert.equal(h.container.querySelectorAll('.chain-gap')
-    .some((gap) => gap.dataset.drop === 'active'), false);
+  const later = chipByLabel(h, 'camera').querySelectorAll('.chain-chip-move')[1];
+  later.dispatch('click');
+  assert.deepEqual(labels(h).slice(0, 2), ['lens', 'camera']);
 });
 
 test('insertOperator lands after the selection, else at the first legal gap', async () => {
@@ -699,25 +547,15 @@ test('insertionLegality reads the whole chain, not the selection gap', async () 
     'the reason describes the chain, not the gap the selection names');
 });
 
-test('pointerdown on a chip begins the drag; its buttons decline it', async () => {
+test('pointer gestures never start a chip drag', async () => {
   const h = await makeStrip();
   chipByLabel(h, 'lens').dispatch('pointerdown',
     { isPrimary: true, button: 0, pointerId: 7 });
-  assert.equal(chipByLabel(h, 'lens').dataset.dragging, 'true');
-  chipByLabel(h, 'lens').dispatch('pointerup', { pointerId: 7 });
   assert.equal(chipByLabel(h, 'lens').dataset.dragging, undefined,
-    'a hoverless release unwinds the drag');
+    'chips have no drag gesture');
   assert.deepEqual(h.applied, []);
-
-  for (const selector of ['.chain-chip-bypass', '.chain-chip-remove']) {
-    chipByLabel(h, 'camera').querySelector(selector)
-      .dispatch('pointerdown', { isPrimary: true, button: 0, pointerId: 8 });
-    assert.equal(chips(h).some((chip) => chip.dataset.dragging === 'true'), false,
-      `${selector} starts no drag`);
-  }
-  chipByLabel(h, 'project').querySelector('.chain-chip-swap')
-    .dispatch('pointerdown', { isPrimary: true, button: 0, pointerId: 9 });
-  assert.equal(chips(h).some((chip) => chip.dataset.dragging === 'true'), false);
+  assert.deepEqual(h.container.listeners.filter(
+    (listener) => listener.type.startsWith('pointer')), []);
 });
 
 test('destroy detaches the pointer listeners and empties the strip', async () => {
@@ -739,18 +577,13 @@ const controlIn = (row) => row.querySelector('.chain-param-control');
 const declarationsFor = (h, label) => h.store.document().descriptor.parameters
   .filter((parameter) => parameter.id.startsWith(`${label}.`));
 
-test('the selected chip expands into its own stage’s controls', async () => {
+test('every stage keeps its controls expanded', async () => {
   const h = await makeStrip();
-  assert.equal(paramsOf(h, 'sample'), null, 'an unselected chip carries no controls');
-  assert.equal(h.container.dataset.expanded, 'false');
-
-  chipByLabel(h, 'sample').dispatch('click');
+  assert.ok(paramsOf(h, 'sample'), 'an unselected chip carries its controls');
+  assert.equal(h.container.dataset.expanded, 'true');
 
   const chip = chipByLabel(h, 'sample');
-  assert.equal(chip.getAttribute('aria-current'), 'true');
-  assert.equal(chip.querySelector('.chain-chip-disclosure').getAttribute('aria-expanded'),
-    'true', 'selection and expansion are one state');
-  assert.equal(h.container.dataset.expanded, 'true');
+  assert.equal(chip.querySelector('.chain-chip-disclosure'), null);
   const region = paramsOf(h, 'sample');
   assert.equal(region.getAttribute('role'), 'group');
   assert.equal(region.getAttribute('aria-label'), 'Twin Wave · sample parameters');
@@ -776,7 +609,7 @@ test('the selected chip expands into its own stage’s controls', async () => {
     .querySelector('.chain-param-value').textContent, '3.881');
 
   chipByLabel(h, 'camera').dispatch('click');
-  assert.equal(paramsOf(h, 'sample'), null, 'only the selected chip is expanded');
+  assert.ok(paramsOf(h, 'sample'), 'selection never collapses another stage');
   assert.equal(rowsOf(h, 'camera').length, 1);
 });
 
@@ -791,25 +624,18 @@ test('a stage with no parameters grows no disclosure', async () => {
   assert.equal(chip.querySelector('.chain-chip-disclosure'), null,
     'a disclosure that opens nothing is not offered');
   assert.equal(paramsOf(h, 'transfer'), null);
-  assert.equal(h.container.dataset.expanded, 'false');
+  assert.equal(h.container.dataset.expanded, 'true');
 });
 
-test('the disclosure collapses the chip it expanded', async () => {
+test('selection does not collapse expanded controls', async () => {
   const h = await makeStrip();
   chipByLabel(h, 'camera').dispatch('click');
-  assert.equal(chipByLabel(h, 'camera')
-    .querySelector('.chain-chip-disclosure').getAttribute('aria-expanded'), 'true');
+  chipByLabel(h, 'lens').dispatch('click');
 
-  chipByLabel(h, 'camera').querySelector('.chain-chip-disclosure').dispatch('click');
-
-  assert.equal(h.store.selectedLabel(), null);
-  assert.equal(paramsOf(h, 'camera'), null);
-  assert.equal(chipByLabel(h, 'camera')
-    .querySelector('.chain-chip-disclosure').getAttribute('aria-expanded'), 'false');
-  assert.deepEqual(h.selections, ['camera', null]);
-
-  chipByLabel(h, 'camera').querySelector('.chain-chip-disclosure').dispatch('click');
-  assert.equal(h.store.selectedLabel(), 'camera', 'and expands it again');
+  assert.equal(h.store.selectedLabel(), 'lens');
+  assert.ok(paramsOf(h, 'camera'));
+  assert.ok(paramsOf(h, 'lens'));
+  assert.deepEqual(h.selections, ['camera', 'lens']);
 });
 
 test('a slider edit calls back with the parameter and its value', async () => {

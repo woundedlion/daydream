@@ -5,7 +5,6 @@
 
 import { applyChainDocument } from './chain_apply.js';
 import { createChainDocumentStore, scratchChainDocument } from './chain_document_store.js';
-import { createChainLibrary } from './chain_library.js';
 import { createChainStrip } from './chain_strip.js';
 import { copyToClipboard } from './copy_text.js';
 
@@ -190,6 +189,8 @@ function defaultDownload(doc, filename, source) {
  * @param {{doc: Document, getEngine: () => *, getModule: () => *,
  * selectEffect: (effect: string) => boolean,
  * syncEffectGui: () => void, invalidate: () => void,
+ * getAnimationsPaused?: () => boolean|null,
+ * setAnimationsPaused?: (paused: boolean) => void,
  * setParamFilter?: (filter: {external: true}|null) => void,
  * fetchText?: (url: string) => Promise<string>, importCompiler?: () => Promise<*>,
  * download?: (filename: string, source: string) => void,
@@ -203,6 +204,8 @@ export function createShaderDocumentController({
   selectEffect,
   syncEffectGui,
   invalidate,
+  getAnimationsPaused = () => null,
+  setAnimationsPaused = () => {},
   setParamFilter = () => {},
   fetchText = async (url) => {
     const response = await fetch(url);
@@ -231,13 +234,13 @@ export function createShaderDocumentController({
     doc.getElementById('shader-document-digest'));
   const parityToggle = /** @type {HTMLButtonElement|null} */ (
     doc.getElementById('shader-parity-toggle'));
+  const animationToggle = /** @type {HTMLButtonElement|null} */ (
+    doc.getElementById('shader-animation-toggle'));
   if (!sourceSelect || !presetSelect || !openButton || !saveButton
       || !fileInput || !status) return null;
-  // The pipeline strip and the stage library mount here on the workbench page;
-  // a page without the mounts (or a compiler without the validator) previews
-  // documents but offers no structural editing.
+  // A page without the strip mount (or a compiler without the validator)
+  // previews documents but offers no structural editing.
   const stripMount = doc.getElementById('chain-strip');
-  const libraryMount = doc.getElementById('chain-library');
 
   /** @type {*} */
   let compiler;
@@ -247,7 +250,7 @@ export function createShaderDocumentController({
   let catalog = new Map();
   /** @type {*|null} */
   let operatorCatalog = null;
-  /** @type {{store: *, strip: *, library: *}|null} */
+  /** @type {{store: *, strip: *}|null} */
   let chainUi = null;
   /** @type {number} Save As copies this session, which their ids count off. */
   let copies = 0;
@@ -313,6 +316,14 @@ export function createShaderDocumentController({
     digestButton.disabled = !digest;
   };
 
+  const showAnimationState = () => {
+    if (!animationToggle) return;
+    const paused = getAnimationsPaused();
+    animationToggle.disabled = paused === null;
+    animationToggle.setAttribute('aria-pressed', String(paused === true));
+    animationToggle.textContent = paused ? 'Resume animation' : 'Pause animation';
+  };
+
   /** @param {CompiledDocument} compiled */
   const populatePresets = (compiled) => {
     presetSelect.replaceChildren();
@@ -338,6 +349,7 @@ export function createShaderDocumentController({
     // document is the authority (the imported compile goes stale on the first
     // structural edit) and its program shape carries the session bypasses.
     const store = chainUi?.store ?? null;
+    const paused = getAnimationsPaused();
     const refusal = active.compiledSide
       ? applyFixedShaderDocument(
         engine, module, store ? { document: store.document() } : active.compiled,
@@ -348,6 +360,11 @@ export function createShaderDocumentController({
         programShape: store ? store.programShape() : null,
         presetId, syncEffectGui, invalidate,
       });
+    if (paused !== null) {
+      setAnimationsPaused(paused);
+      syncEffectGui();
+    }
+    showAnimationState();
     if (refusal) {
       show(`Preset "${presetId}" could not be applied: ${refusal}`, true);
       return false;
@@ -371,18 +388,8 @@ export function createShaderDocumentController({
   const teardownChainUi = () => {
     if (chainUi === null) return;
     chainUi.strip.destroy();
-    chainUi.library.destroy();
     chainUi = null;
     setParamFilter(null);
-  };
-
-  // The library's legality is the chain's, not one gap's: a click lands the
-  // operator wherever the chain takes it, the first accepting gap or the socket
-  // a crossing's carrier pair names, so only what neither route reaches is
-  // disabled.
-  const refreshLibraryLegality = () => {
-    if (chainUi === null) return;
-    chainUi.library.setLegality(chainUi.strip.insertionLegality());
   };
 
   /**
@@ -420,8 +427,14 @@ export function createShaderDocumentController({
     if (!engine || !module) return;
     const definitions = engine.getParameterDefinitions();
     const name = engineControlName(parameterId, definitions);
+    const paused = getAnimationsPaused();
     const refusal = name === null ? null
       : writeEngineValue(engine, module, definitions, name, value);
+    if (paused !== null) {
+      setAnimationsPaused(paused);
+      syncEffectGui();
+    }
+    showAnimationState();
     if (refusal) {
       announce(refusal);
       return;
@@ -430,10 +443,10 @@ export function createShaderDocumentController({
   };
 
   /**
-   * Builds the pipeline strip and the stage library over one document store,
-   * wiring every structural edit, undo and bypass toggle back through the one
-   * apply path. The stages' parameters render on the strip's chips, so the
-   * effect GUI panel is told to build none of them.
+   * Builds the pipeline strip over one document store, wiring every structural
+   * edit, undo and bypass toggle back through the one apply path. The stages'
+   * parameters render on the strip's chips, so the effect GUI panel is told to
+   * build none of them.
    * @param {*} document - The compiled (valid) v2 document to edit.
    */
   const buildChainUi = async (document) => {
@@ -453,22 +466,12 @@ export function createShaderDocumentController({
           show('The edit changed the descriptor: the preview is back on the '
             + 'interpreter and the parity toggle is disarmed.');
         }
-        refreshLibraryLegality();
       },
       presetId: () => active?.presetId ?? null,
       onEditParameter: writeStageEdit,
     }));
-    const library = createChainLibrary({
-      doc,
-      container: libraryMount,
-      catalog: operatorCatalog,
-      drag: strip.drag,
-      announce,
-      onPick: (/** @type {string} */ operatorId) => strip.insertOperator(operatorId),
-    });
     setParamFilter({ external: true });
-    chainUi = { store, strip, library };
-    refreshLibraryLegality();
+    chainUi = { store, strip };
   };
 
   /**
@@ -509,11 +512,9 @@ export function createShaderDocumentController({
     saveButton.disabled = false;
     if (saveAsButton) saveAsButton.disabled = false;
     showDigest();
-    if (stripMount && libraryMount
-        && typeof compiler.validateShaderDocument === 'function') {
+    if (stripMount && typeof compiler.validateShaderDocument === 'function') {
       try {
         await buildChainUi(compiled.document);
-        refreshLibraryLegality();
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         show(`The chain editor could not adopt the document: ${detail}`, true);
@@ -652,6 +653,13 @@ export function createShaderDocumentController({
   });
   saveButton.addEventListener('click', save);
   saveAsButton?.addEventListener('click', saveAs);
+  animationToggle?.addEventListener('click', () => {
+    const paused = getAnimationsPaused();
+    if (paused === null) return;
+    setAnimationsPaused(!paused);
+    showAnimationState();
+    invalidate();
+  });
   // A/B verification only: the toggle swaps which build renders the loaded
   // document and touches neither the document nor the editing surface.
   parityToggle?.addEventListener('click', () => {

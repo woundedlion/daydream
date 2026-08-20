@@ -54,7 +54,6 @@ tools/tailwind.css
 tools/banner.js
 tools/chain_apply.js
 tools/chain_document_store.js
-tools/chain_library.js
 tools/chain_strip.js
 tools/clipboard.js
 tools/copy_text.js
