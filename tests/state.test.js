@@ -205,6 +205,23 @@ test('writeUrl drops the query separator when no params survive', () => {
   assert.deepEqual(calls, ['/sim#frag']);
 });
 
+test('the URL layer reads and writes the window it was handed', () => {
+  const globalCalls = installWindow('?effect=Global', '/global', '');
+  const injectedCalls = [];
+  const injected = {
+    location: { search: '?effect=Injected', pathname: '/injected', hash: '' },
+    history: { replaceState: (state, title, url) => { injectedCalls.push(url); } },
+  };
+  const state = new AppState({ effect: 'Seeded' });
+  const sync = new URLSync(state, ['effect'], {}, injected);
+
+  assert.equal(state.get('effect'), 'Injected');
+  sync.flush();
+
+  assert.deepEqual(injectedCalls, ['/injected?effect=Injected']);
+  assert.deepEqual(globalCalls, []);
+});
+
 test('URLSync.reset leaves a bare path when nothing survives', () => {
   const calls = installWindow('?effect=Voronoi&speed=2', '/sim', '#frag');
   const sync = new URLSync(new AppState({ effect: 'Voronoi' }), []);
