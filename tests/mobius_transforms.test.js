@@ -193,7 +193,7 @@ test('GLSL complex ops match the JS implementations', () => {
 });
 
 // --- projection-domain conventions ----------------------------------------
-// These mirror core/math/3dmath.h (STEREO_INF, stereo, project_div). The
+// These mirror core/math/stereographic.h (STEREO_INF, stereo, project_div). The
 // engine owns them; the shader renders what the engine will run, so a
 // divergence would make the preview lie about the pole cap and about a
 // near-singular divisor.
@@ -208,8 +208,8 @@ test('glslProjectionFunctions constants match the JS exports', () => {
 
 /**
  * Absolute pin on the projection constants. tests/engine_source_parity.test.js
- * diffs them against core/math/3dmath.h, but only where an engine checkout is
- * present; these literals hold the values where it is not.
+ * diffs them against core/math/stereographic.h, but only where an engine
+ * checkout is present; these literals hold the values where it is not.
  */
 test('projection constants hold their engine values (absolute pin)', () => {
   assert.equal(STEREO_INF, 1e4, 'STEREO_INF is the engine sentinel');
