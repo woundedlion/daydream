@@ -294,6 +294,24 @@ test('style keeps only the values a browser would keep', () => {
 
   el.style.opacity = 0;
   assert.equal(el.style.opacity, '0', 'the platform stores a DOMString');
+
+  el.style.gridTemplateColumns = 'repeat(3, minmax(0, 1fr))';
+  el.style.gridTemplateColumns = 'repeat(0, minmax(0, 1fr))';
+  assert.equal(el.style.gridTemplateColumns, 'repeat(3, minmax(0, 1fr))',
+    'a zero repetition count is a track list no browser lays out');
+
+  el.style.left = '12px';
+  el.style.left = `${Number.NaN}px`;
+  assert.equal(el.style.left, '12px', 'an interpolated NaN read back as a length');
+
+  // The interpolation and paren checks cover every property, grammar or not.
+  el.style.width = '40px';
+  el.style.width = `${undefined}px`;
+  assert.equal(el.style.width, '40px');
+  el.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.4)';
+  el.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.4';
+  assert.equal(el.style.boxShadow, '0 2px 8px rgba(0, 0, 0, 0.4)',
+    'an unclosed function read back as written');
 });
 
 test('replaceChildren moves a node out of the parent it came from', () => {

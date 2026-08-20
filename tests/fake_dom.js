@@ -178,24 +178,63 @@ function fakeDataset(element) {
   });
 }
 
+// A CSS <length>/<percentage>, or a bare zero, which needs no unit.
+const LENGTH = '(?:0|-?\\d+(?:\\.\\d+)?(?:px|em|rem|%|vw|vh))';
+// One grid track: a size, a fraction, or a content keyword.
+const TRACK = `(?:auto|min-content|max-content|${LENGTH}|-?\\d+(?:\\.\\d+)?fr)`;
+const TRACK_SIZE = `(?:${TRACK}|minmax\\(\\s*${TRACK}\\s*,\\s*${TRACK}\\s*\\))`;
+const TRACKS = `(?:${TRACK_SIZE}(?:\\s+${TRACK_SIZE})*)`;
+// A track list, `repeat()` included. The repetition count is a positive
+// integer: repeat(0, …) is the shape a row that counted no children emits, and
+// a browser drops the whole declaration rather than laying out one column.
+const TRACK_LIST = new RegExp(
+  `^(?:|none|${TRACKS}|repeat\\(\\s*[1-9]\\d*\\s*,\\s*${TRACKS}\\s*\\))$`);
+
 // The value each of these properties accepts, the empty string (which clears a
-// declaration) included. A property with no entry takes anything.
+// declaration) included. A property with no entry takes any value STYLE_REJECTED
+// below does not catch.
 const STYLE_VALUES = {
   display: /^(?:|none|block|inline|inline-block|flex|inline-flex|grid|inline-grid|contents)$/,
   gridAutoFlow: /^(?:|row|column|dense|row dense|column dense)$/,
+  gridTemplateColumns: TRACK_LIST,
+  gridTemplateRows: TRACK_LIST,
+  left: new RegExp(`^(?:|auto|${LENGTH})$`),
   opacity: /^(?:|0|1|0?\.\d+|\d{1,3}%)$/,
   position: /^(?:|static|relative|absolute|fixed|sticky)$/,
 };
+
+// Tokens no property takes: what a template literal leaves behind when the
+// number or object it interpolated was missing. Every one reaches a browser as a
+// dropped declaration, so none may read back here.
+const STYLE_REJECTED = /undefined|NaN|Infinity|\[object [A-Za-z]*\]/;
+
+/**
+ * Whether every parenthesis in a declaration closes, as a parser needs before
+ * it can read the value at all.
+ * @param {string} text - The value written.
+ * @returns {boolean} True when the value is balanced.
+ */
+function balancedParens(text) {
+  let depth = 0;
+  for (const character of text) {
+    if (character === '(') depth += 1;
+    else if (character === ')' && (depth -= 1) < 0) return false;
+  }
+  return depth === 0;
+}
 
 /**
  * CSSStyleDeclaration stand-in. Writes are stringified, as the platform does,
  * and a value the property does not accept is dropped so the previous one
  * stands — again as the platform does, so invalid CSS cannot read back as the
- * text that was written. A dashed property name reaches nothing in a browser,
- * where the declaration is keyed camelCase, so it throws rather than storing a
- * declaration no read will ever find. An undeclared property reads back as the
- * empty string, as CSSStyleDeclaration yields, so a module branching on `=== ''`
- * takes the same path here as in a browser.
+ * text that was written. Two layers decide that: a per-property grammar for the
+ * properties the modules compute a value for, and, for every property including
+ * the ones with no grammar, a check that the value carries no interpolated
+ * `undefined`/`NaN` and closes its parentheses. A dashed property name reaches
+ * nothing in a browser, where the declaration is keyed camelCase, so it throws
+ * rather than storing a declaration no read will ever find. An undeclared
+ * property reads back as the empty string, as CSSStyleDeclaration yields, so a
+ * module branching on `=== ''` takes the same path here as in a browser.
  * @returns {Object} The style view.
  */
 function fakeStyle() {
@@ -208,6 +247,7 @@ function fakeStyle() {
         throw new Error(`style is keyed camelCase, so "${name}" declares nothing`);
       }
       const text = String(value);
+      if (STYLE_REJECTED.test(text) || !balancedParens(text)) return true;
       const accepts = STYLE_VALUES[name];
       if (!accepts || accepts.test(text)) declared[name] = text;
       return true;
