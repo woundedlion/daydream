@@ -1581,7 +1581,7 @@
           draggingIndex = i;
           e.dataTransfer.effectAllowed = 'move';
           e.dataTransfer.setData('text/plain', i); // Required for Firefox
-          precomputeDropSlots(i);
+          precomputeDropSlots(i).catch(console.error);
           setTimeout(() => el.classList.add('dragging'), 0);
         });
 
@@ -1720,6 +1720,21 @@
       gateMsgTimer = setTimeout(() => { el.innerText = ''; }, 3000);
     }
 
+    /**
+     * Re-enables every add-op button. No later pass revises a verdict the gate
+     * stopped probing for, so an unchecked gate fails open rather than stranding
+     * whatever the last complete pass disabled for the rest of the session.
+     * @param {string} reason - Why the sweep stopped, shown to the user.
+     * @returns {void}
+     */
+    function openOpGate(reason) {
+      for (const btn of document.querySelectorAll('#addOpGrid [data-op]')) {
+        btn.disabled = false;
+        btn.removeAttribute('title');
+      }
+      showGateMsg(`op availability is no longer checked: ${reason}`);
+    }
+
     // Gray out add-op buttons whose op would trap on the CURRENT mesh; the
     // sweep itself is createOpGate in solid_codegen.js.
     async function refreshOpGating() {
@@ -1729,14 +1744,7 @@
       if (!probe) return;
 
       if (probe.abandoned) {
-        // The gate has stopped probing, so no later pass will ever revise this
-        // verdict: an unchecked gate fails open rather than stranding whatever
-        // the last complete pass happened to disable for the rest of the session.
-        for (const btn of buttons) {
-          btn.disabled = false;
-          btn.removeAttribute('title');
-        }
-        showGateMsg('op availability is no longer checked: the validator module will not start');
+        openOpGate('the validator module will not start');
         return;
       }
 
@@ -1798,7 +1806,10 @@
       if (built.classifyFailure) showMeshError(built.classifyFailure);
 
       // The mesh changed, so which ops would now overflow changed too.
-      refreshOpGating();
+      refreshOpGating().catch((e) => {
+        console.error(e);
+        openOpGate('the gate sweep failed');
+      });
     }
 
     // Rebuild the THREE scene from the cached currentMesh + currentFaceClasses,
