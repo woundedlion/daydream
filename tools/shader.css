@@ -599,6 +599,14 @@ select.chain-param-control {
 
 /* ── Global controls ─────────────────────────────────────────────────────── */
 
+/* The panels float inside .main-area, so they overlay the canvas alone and the
+   toolbar, strip and library stay clickable. .main-area is the height they
+   have to fit in, not the viewport the shared stylesheet caps them at. */
+#gui-container,
+#gui-container > .lil-gui {
+  max-height: 100%;
+}
+
 #gui-container .lil-controller.lil-option select,
 #gui-container .lil-controller.lil-option option {
   color-scheme: dark;
