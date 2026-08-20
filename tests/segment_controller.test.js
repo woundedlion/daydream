@@ -2221,7 +2221,8 @@ test('a fault latched by the overrun re-blit paints the overlay on the same tick
 
     c.tick(); // overrun branch: composite() latches the fault mid-tick
     assert.equal(c.faulted, true, 'the re-blit pre-pass latched the fault');
-    assert.ok(statsShown >= 1, 'the overlay painted on the faulting tick, not the next one');
+    // onWorkerFault paints as it latches; tick()'s post-composite guard paints again.
+    assert.equal(statsShown, 2, 'the overlay painted on the faulting tick, not the next one');
   } finally {
     restore();
   }
