@@ -109,10 +109,10 @@ export class ModuleWarmer {
   }
 
   /**
-   * Drop the held compilation. A module a worker refused to instantiate would
-   * otherwise be handed to every pool this page builds, leaving each documented
-   * recovery path (resolution change, mode toggle) rebuilding onto the same
-   * refusal; without it the next spawn compiles per worker instead.
+   * Drop the held compilation, so a spawn that comes before the next warm
+   * compiles per worker instead of being handed a module a worker refused. The
+   * refusal is not latched: a warm past the dedupe window re-fetches and
+   * recompiles, which is what lets a redeployed binary be picked up.
    * @returns {void}
    */
   discard() {
