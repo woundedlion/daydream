@@ -19,6 +19,9 @@ import {
 } from './fake_engine.js';
 import { isViewLive, refreshPixelView } from '../pixel_view.js';
 import { selectorControlValue } from '../param_sync.js';
+import {
+  FIXED_SHADER_MODE_FIELDS, SHADERBALL_STAGE_BOUNDARIES,
+} from '../shader_stages.js';
 
 // The module's stdout, captured rather than dropped: the WASM bridge answers an
 // out-of-domain op argument by clamping it and logging, so this is the only
@@ -614,6 +617,27 @@ test('ShaderBall keeps planar warps when dodecahedral Grid becomes Primitive Lat
     'rendered Planar Warp 1 must remain Projected Vector Noise');
   assert.equal(rendered.find((d) => d.name === 'Planar Warp 2')?.value, mirrorTile,
     'rendered Planar Warp 2 must remain Mirror Tile');
+});
+
+// A promoted fixed Shader registers no stage selectors, so shader_stages.js reads
+// its stage titles out of a JS mirror of the engine's option labels indexed by
+// the full-config snapshot. ShaderBall registers the same slot storage as enum
+// parameters, so its option lists are the mirror's source of truth.
+test('shader_stages.js mirrors ShaderBall stage option labels exactly', () => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
+  const definitions = engine.getParameterDefinitions();
+  const parameterForStage = new Map(
+    [...SHADERBALL_STAGE_BOUNDARIES].map(([name, stage]) => [stage, name]));
+
+  for (const [stage, [field, labels]] of FIXED_SHADER_MODE_FIELDS) {
+    const name = parameterForStage.get(stage);
+    assert.ok(name, `SHADERBALL_STAGE_BOUNDARIES must claim stage ${stage}`);
+    const definition = definitions.find((entry) => entry.name === name);
+    assert.ok(definition, `ShaderBall must register the ${name} selector`);
+    assert.deepEqual(definition.options, labels,
+      `shader_stages.js ${field} labels must mirror the ${name} option roster`);
+  }
 });
 
 test('strobeColumns and getEffectSizes return the shapes daydream consumes', () => {

@@ -124,7 +124,7 @@ function fixedShaderConfig(overrides = {}) {
     ['slots.projection_frame', 1],
     ['slots.surface_noise', 0],
     ['slots.surface_lens', 0],
-    ['slots.warp_program.outer.kind', 2],
+    ['slots.warp_program.outer.kind', 1],
     ['slots.warp_program.inner.kind', 0],
     ['slots.signal_weight', 1],
     ['slots.value_transfer', 0],
@@ -714,9 +714,9 @@ test('promoted Shader controls use their accepted structural modes as folders', 
   assert.equal(assignments.get('Pattern Freq'), 'Function');
   assert.equal(assignments.get('Edge Fade Width'), 'Coverage');
   assert.equal(assignments.get('Palette Chroma'), 'Colorize');
-  assert.equal(titles.get('Planar Warp 1'), 'Affine Transform');
+  assert.equal(titles.get('Planar Warp 1'), 'Affine Frame');
   assert.deepEqual(h.gui().folders.map((folder) => folder.name),
-    ['Camera', 'Spin + Wander', 'Gnomonic', 'Affine Transform',
+    ['Camera', 'Spin + Wander', 'Gnomonic', 'Affine Frame',
       'Primitive Lattice', 'Edge Fade', 'Generated Triadic']);
   assert.equal(h.gui().ctrl('Planar Warp 1 Translation X').label,
     'Translation X');
@@ -755,7 +755,7 @@ test('a promoted Shader snapshot outranks a matching dedicated-effect schema', (
     'slots.function': 3,
     'slots.projection': 6,
     'slots.warp_program.outer.kind': 0,
-    'slots.warp_program.inner.kind': 7,
+    'slots.warp_program.inner.kind': 6,
     'slots.coverage': 1,
     'slots.palette': 2,
   });

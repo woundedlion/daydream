@@ -57,7 +57,7 @@ export const FACET_GRID_STAGE_TITLES = new Map([
   ['Function', 'Grid'],
   ['Colorize', 'Generated Analogous'],
 ]);
-const FIXED_SHADER_MODE_FIELDS = new Map([
+export const FIXED_SHADER_MODE_FIELDS = new Map([
   ['Function', ['slots.function', [
     'Twin Wave', 'Rings', 'Spiral', 'Grid', 'Noise Contour (Projected)',
     'Primitive Lattice', 'Noise Contour (Sphere)',
@@ -76,7 +76,6 @@ const FIXED_SHADER_MODE_FIELDS = new Map([
     'Twist',
     'Kaleidoscope (Azimuthal 6-fold)',
     'Mobius',
-    'Tangent Noise',
     'Kaleidoscope (Tetrahedral)',
     'Kaleidoscope (Octahedral / Cubic)',
     'Kaleidoscope (Dodecahedral / Icosahedral)',
@@ -87,12 +86,12 @@ const FIXED_SHADER_MODE_FIELDS = new Map([
     'Kaleidoscope (Octagonal Prism)',
   ]]],
   ['Planar Warp 1', ['slots.warp_program.outer.kind', [
-    'None', 'Stereo Noise', 'Affine Transform', 'Wave Shear', 'Vortex',
+    'None', 'Affine Frame', 'Wave Shear', 'Vortex',
     'Projected Vector Noise', 'Projected Curl Flow', 'Mirror Tile',
     'Polar Chart',
   ]]],
   ['Planar Warp 2', ['slots.warp_program.inner.kind', [
-    'None', 'Stereo Noise', 'Affine Transform', 'Wave Shear', 'Vortex',
+    'None', 'Affine Frame', 'Wave Shear', 'Vortex',
     'Projected Vector Noise', 'Projected Curl Flow', 'Mirror Tile',
     'Polar Chart',
   ]]],
@@ -108,7 +107,7 @@ const FIXED_SHADER_MODE_FIELDS = new Map([
     'Generated Triadic', 'Generated Complementary', 'Generated Analogous',
   ]]],
 ]);
-const SHADERBALL_STAGE_BOUNDARIES = new Map([
+export const SHADERBALL_STAGE_BOUNDARIES = new Map([
   ['Function', 'Function'],
   ['Projection', 'Projection'],
   ['Projection Frame', 'Projection Frame'],
