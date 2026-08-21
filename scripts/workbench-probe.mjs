@@ -76,10 +76,15 @@ async function probeStrip(tab) {
 
   const initialStages = await tab.$$eval('.chain-chip[aria-expanded]', (nodes) => nodes.map(
     (node) => ({ expanded: node.getAttribute('aria-expanded'),
-      controls: getComputedStyle(node.querySelector('.chain-chip-params')).display })));
+      controls: getComputedStyle(node.querySelector('.chain-chip-params')).display,
+      controlsHeight: node.querySelector('.chain-chip-params').getBoundingClientRect().height,
+      controlsVisibility: getComputedStyle(
+        node.querySelector('.chain-chip-params')).visibility })));
   check(initialStages.length > 0
       && initialStages.every((stage) => stage.expanded === 'false'
-        && stage.controls === 'none'),
+        && stage.controls === 'grid'
+        && stage.controlsHeight === 0
+        && stage.controlsVisibility === 'hidden'),
   `${initialStages.length} stage cards start as single collapsed header rows`);
   const minimalHeaders = await tab.evaluate(() => {
     const rotate = document.querySelector('.chain-chip[data-label="rotate"]');
@@ -94,25 +99,29 @@ async function probeStrip(tab) {
     };
   });
   check(minimalHeaders.icons.join('') === '◉←→×'
-      && minimalHeaders.rotateLabel === 'none'
-      && minimalHeaders.projectLabel === 'none'
-      && minimalHeaders.projectSelector === 'none',
-  'closed cards show only the operation and legal icon controls');
+      && minimalHeaders.rotateLabel !== 'none'
+      && minimalHeaders.projectLabel !== 'none'
+      && minimalHeaders.projectSelector !== 'none',
+  'closed cards show the complete header');
   check(await tab.$('.chain-band[data-carrier="color"] .chain-band-add') === null,
     'a domain with no valid stages has no inert + button');
 
   const hoverHeader = '.chain-chip[data-label="project"] .chain-chip-header';
   const closedCard = await boxOf(tab, '.chain-chip[data-label="project"]');
+  const closedHeader = await boxOf(tab, hoverHeader);
   await (await tab.waitForSelector(hoverHeader)).hover();
   await tab.waitForFunction(() => document.querySelector(
     '.chain-chip[data-label="project"]')?.getAttribute('aria-expanded') === 'true');
   const hoverCard = await boxOf(tab, '.chain-chip[data-label="project"]');
-  check(hoverCard.width > closedCard.width,
-    `an open card expands from ${Math.round(closedCard.width)}px to ${Math.round(hoverCard.width)}px`);
+  const openHeader = await boxOf(tab, hoverHeader);
+  check(Math.abs(hoverCard.width - closedCard.width) < 1
+      && Math.abs(openHeader.width - closedHeader.width) < 1
+      && Math.abs(openHeader.height - closedHeader.height) < 1,
+  `the header stays ${Math.round(openHeader.width)}×${Math.round(openHeader.height)}px when open`);
   check(await tab.$eval('.chain-chip[data-label="project"]', (node) =>
     getComputedStyle(node.querySelector('.chain-chip-label')).display !== 'none'
       && getComputedStyle(node.querySelector('.chain-chip-function-label')).display !== 'none'),
-  'an open card restores its full header metadata');
+  'an open card keeps its full header metadata');
   await tab.mouse.move(0, 0);
   await tab.waitForFunction(() => document.querySelector(
     '.chain-chip[data-label="project"]')?.getAttribute('aria-expanded') === 'false');
@@ -173,8 +182,8 @@ async function probeStrip(tab) {
   });
   check(layout.contained && layout.separate,
     'stage cards stay inside their bands without overlapping');
-  check(layout.chipBoxes.every((box) => box.width <= 320),
-    'collapsed stage headers have a compact, bounded width');
+  check(layout.chipBoxes.every((box) => box.width <= 560),
+    'collapsed stage headers remain bounded while reserving their open width');
   check(layout.stripPosition === 'absolute'
       && Math.abs(layout.strip.top - layout.main.top) < 1
       && Number(layout.stripOpacity) === 0.9,

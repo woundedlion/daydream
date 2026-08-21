@@ -94,7 +94,7 @@ test('simulator exposes Shader as a standalone tool', () => {
   assert.match(WORKBENCH_CSS, /\.chain-param\[data-deactivated="true"\]\s*\{/);
 });
 
-test('transition cards use opaque compact surfaces', () => {
+test('transition cards use opaque surfaces', () => {
   assert.match(WORKBENCH_CSS,
     /\.chain-chip--socket\s*\{[^}]*background:\s*var\(--panel-bg\)/,
     'transition headers keep an opaque reading surface');
@@ -107,9 +107,18 @@ test('transition cards use opaque compact surfaces', () => {
   assert.match(WORKBENCH_CSS,
     /\.chain-palette-entry:hover,[^{]+\{[^}]*background:\s*#[0-9a-f]{6}/i,
     'transition choice hover remains opaque');
+});
+
+test('closed and open cards share one header layout', () => {
   assert.match(WORKBENCH_CSS,
-    /\.chain-chip--socket\.chain-chip--expanded \.chain-chip-name,[^{]+\.chain-chip-label,[^{]+\.chain-chip-pair\s*\{[^}]*display:\s*none/,
-    'expanded transition headers hide redundant stage metadata');
+    /\.chain-chip-params\s*\{[^}]*display:\s*grid[^}]*width:\s*max-content/,
+    'hidden parameter grids reserve the open card width');
+  assert.match(WORKBENCH_CSS,
+    /\.chain-chip:not\(\.chain-chip--expanded\) \.chain-chip-params\s*\{[^}]*height:\s*0[^}]*visibility:\s*hidden/,
+    'closed cards collapse only the parameter body');
+  assert.doesNotMatch(WORKBENCH_CSS,
+    /\.chain-chip[^{]*(?:chain-chip--expanded|:not\(\.chain-chip--expanded\))[^{]*\.chain-chip-(?:name|label|pair|function-label)[^{]*\{/,
+    'header content does not depend on the card state');
 });
 
 // §4.1: three stacked regions around the canvas. The toolbar keeps the engine
