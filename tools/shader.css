@@ -148,7 +148,7 @@
 
 .chain-strip {
   display: flex;
-  align-items: stretch;
+  align-items: flex-start;
   gap: 0.25rem;
   flex: 0 0 auto;
   width: max-content;
@@ -160,7 +160,7 @@
   display: flex;
   align-items: flex-start;
   gap: 0.1875rem;
-  flex: 1 0 auto;
+  flex: 0 0 auto;
   min-width: 7rem;
   padding: 0.25rem 0.375rem;
   border: 1px solid var(--carrier);
