@@ -490,6 +490,17 @@ export function createChainStrip({
   };
 
   /**
+   * Dismisses an open palette on a press outside it. The document outlives the
+   * strip, so destroy() must take this back off.
+   * @param {*} event - A pointerdown anywhere in the document.
+   * @returns {void}
+   */
+  const dismissPalette = (event) => {
+    if (palette === null || palette.element.contains(event.target)) return;
+    closePalette();
+  };
+
+  /**
    * Opens the one palette with only the operators valid at this position, plus
    * a leading Remove entry where the empty replacement is legal.
    * @param {Object} options - What the palette replaces.
@@ -551,9 +562,22 @@ export function createChainStrip({
     const addOption = (option) => {
       option.setAttribute('role', 'option');
       option.setAttribute('tabindex', '-1');
+      option.setAttribute('aria-selected', 'false');
       option.addEventListener('click', () => activate(option));
       options.push(option);
       element.appendChild(option);
+    };
+
+    /**
+     * Focuses one option, carrying the listbox's single selection with it.
+     * @param {*} option - The option to focus.
+     * @returns {void}
+     */
+    const focusOption = (option) => {
+      for (const other of options) {
+        other.setAttribute('aria-selected', String(other === option));
+      }
+      option.focus();
     };
 
     if (removable) {
@@ -585,7 +609,7 @@ export function createChainStrip({
           ? event.target.closest('.chain-palette-entry') : null;
         const at = options.indexOf(target);
         const next = options[at + (key === 'ArrowDown' ? 1 : -1)];
-        if (next) next.focus();
+        if (next) focusOption(next);
         return;
       }
       if (key === 'Enter' || key === ' ') {
@@ -594,6 +618,13 @@ export function createChainStrip({
           ? event.target.closest('.chain-palette-entry') : null;
         if (target) activate(target);
       }
+    });
+
+    element.addEventListener('focusout', (/** @type {*} */ event) => {
+      if (palette?.element !== element) return;
+      const next = event.relatedTarget ?? null;
+      if (next !== null && element.contains(next)) return;
+      closePalette();
     });
 
     // After the anchor, so the palette reads in place; childNodes is walked by
@@ -605,7 +636,7 @@ export function createChainStrip({
     placePalette(element, origin);
     palette = { element, anchor };
     const first = options[0];
-    if (first) first.focus();
+    if (first) focusOption(first);
   };
 
   /**
@@ -1140,6 +1171,7 @@ export function createChainStrip({
     }
   };
   container.addEventListener('keydown', historyKeydown);
+  doc.addEventListener('pointerdown', dismissPalette);
 
   render();
 
@@ -1168,6 +1200,7 @@ export function createChainStrip({
      */
     destroy() {
       container.removeEventListener('keydown', historyKeydown);
+      doc.removeEventListener('pointerdown', dismissPalette);
       container.replaceChildren();
     },
   };

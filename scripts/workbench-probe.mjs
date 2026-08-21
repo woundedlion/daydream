@@ -217,6 +217,20 @@ async function probeStrip(tab) {
   check((await bandChipNames(tab, 'plane')).includes('Wave Shear'),
     'the + menu inserts its selected stage');
 
+  // A palette that survives a press elsewhere outlives the chain it was opened
+  // over; the fake DOM models neither the press nor the focus move.
+  await (await tab.waitForSelector(add)).click();
+  check(await tab.$eval('.chain-palette .chain-palette-entry',
+    (node) => node.getAttribute('aria-selected')) === 'true',
+  'the opened palette marks its focused option selected');
+  const elsewhere = await boxOf(tab,
+    '.chain-band[data-carrier="sphere"] .chain-band-title');
+  check(!overlaps(await boxOf(tab, '.chain-palette'), elsewhere),
+    'the dismissal target sits clear of the open palette');
+  await tab.mouse.click(centre(elsewhere).x, centre(elsewhere).y);
+  check(await tab.$('.chain-palette') === null,
+    'a press outside the palette dismisses it');
+
   const source = '.chain-chip-replace[aria-label="Source function"]';
   const sourceChoices = await tab.$eval(source, (node) => ({
     label: node.getAttribute('aria-label'),
