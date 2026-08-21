@@ -63,18 +63,32 @@ jobs:
 
       # Config in eslint.config.mjs. An over-broad `ignores` list would empty the
       # target set while `eslint .` still exits 0, so count the files the run
-      # actually reported on. The second invocation is the one whose output a
-      # failure is read from.
+      # actually reported on and hold that count to package.json's
+      # `lintFileFloor` — the exact pin scripts/require-tests.mjs holds the test
+      # glob to, for the same reason: a count under it is coverage dropped, one
+      # over it is files the pin does not cover yet. .githooks/pre-push runs this
+      # same check; the two are one gate and move together. The second
+      # invocation is the one whose output a failure is read from.
       - name: Lint JavaScript
         run: |
-          npx eslint . --format json > /tmp/eslint-report.json || true
-          count=$(node -p "JSON.parse(require('fs').readFileSync('/tmp/eslint-report.json','utf8')).length")
-          if [ "$count" -eq 0 ]; then
-            echo "::error::no files selected — the eslint.config.mjs ignores list is broken"
+          report=$(npx eslint . --format json) || true
+          count=$(printf '%s' "$report" | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).length")
+          floor=$(node -p "JSON.parse(require('fs').readFileSync('package.json','utf8')).lintFileFloor ?? ''")
+          if ! printf '%s' "$count" | grep -Eq '^[0-9]+$' ||
+             ! printf '%s' "$floor" | grep -Eq '^[1-9][0-9]*$'; then
+            echo "::error::the lint gate read a file count of '$count' and a \"lintFileFloor\" of '$floor'; it needs an integer from the eslint report and a positive integer from package.json. Without both it passes on any target set."
+            exit 1
+          fi
+          if [ "$count" -lt "$floor" ]; then
+            echo "::error::eslint reported on $count files, under the committed floor of $floor — the eslint.config.mjs ignores list or its file patterns dropped files from this gate. Restore them, or lower \"lintFileFloor\" in package.json if the removal was intended."
+            exit 1
+          fi
+          if [ "$count" -gt "$floor" ]; then
+            echo "::error::eslint reported on $count files but \"lintFileFloor\" in package.json is only $floor — raise it to $count so the files that landed since are covered too."
             exit 1
           fi
           npx eslint .
-          echo "eslint clean: $count files linted."
+          echo "eslint clean: $count files linted, the committed floor of $floor."
 
       - run: npm run typecheck
 

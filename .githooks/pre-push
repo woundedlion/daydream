@@ -37,6 +37,29 @@ if [ ! -f node_modules/.package-lock.json ]; then
 	exit 1
 fi
 
+# `eslint .` exits 0 on an empty target set, so an over-broad `ignores` list in
+# eslint.config.mjs drops files from the gate while it still reads clean. Count
+# the files the run reported on and hold that count to package.json's
+# `lintFileFloor`. Mirror of the workflow's Lint JavaScript step, down to the
+# second invocation being the one whose output a failure is read from; the two
+# are one gate and move together.
+report=$(npx eslint . --format json) || true
+count=$(printf '%s' "$report" | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).length")
+floor=$(node -p "JSON.parse(require('fs').readFileSync('package.json','utf8')).lintFileFloor ?? ''")
+if ! printf '%s' "$count" | grep -Eq '^[0-9]+$' ||
+	! printf '%s' "$floor" | grep -Eq '^[1-9][0-9]*$'; then
+	echo "pre-push: the lint gate read a file count of '$count' and a \"lintFileFloor\" of '$floor'; it needs an integer from the eslint report and a positive integer from package.json. Without both it passes on any target set." >&2
+	exit 1
+fi
+if [ "$count" -lt "$floor" ]; then
+	echo "pre-push: eslint reported on $count files, under the committed floor of $floor — the eslint.config.mjs ignores list or its file patterns dropped files from this gate. Restore them, or lower \"lintFileFloor\" in package.json if the removal was intended." >&2
+	exit 1
+fi
+if [ "$count" -gt "$floor" ]; then
+	echo "pre-push: eslint reported on $count files but \"lintFileFloor\" in package.json is only $floor — raise it to $count so the files that landed since are covered too." >&2
+	exit 1
+fi
+
 npm run lint || exit 1
 npm run typecheck || exit 1
 
