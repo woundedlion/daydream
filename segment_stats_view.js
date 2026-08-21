@@ -18,6 +18,17 @@ import { formatKB } from "./tools/kb_format.js";
 export const FAULT_POOL = -1;
 export const FAULT_RENDER = -2;
 
+/**
+ * Write a cell's text only when it moved: an unchanged textContent write
+ * dirties layout anyway, and most of these figures hold still across frames.
+ * @param {HTMLTableCellElement} cell - Cell to update.
+ * @param {string} text - Text the cell should carry.
+ * @returns {void}
+ */
+function setText(cell, text) {
+  if (cell.textContent !== text) cell.textContent = text;
+}
+
 // The global stat bars this overlay stands in for while segmented mode is on.
 // They belong to the page, so what is hidden here is handed back as it was.
 const STAT_BAR_IDS = ['global-stats-desktop', 'stats-bar'];
@@ -214,23 +225,23 @@ export class SegmentStatsView {
       // A needs_full_frame() effect shades the whole canvas in every worker and
       // the rectangle is only what was sliced out of it, so naming the rect
       // there would claim a segmented render the pool never did.
-      c.range.textContent = !(state.frameSeen[s] && r) ? '?'
+      setText(c.range, !(state.frameSeen[s] && r) ? '?'
         : state.fullFrames?.[s] ? 'full frame'
-        : `x[${r.x0}–${r.x1}] y[${r.y0}–${r.y1}]`;
-      c.compute.textContent = `${timing.toFixed(1)} ms`;
+        : `x[${r.x0}–${r.x1}] y[${r.y0}–${r.y1}]`);
+      setText(c.compute, `${timing.toFixed(1)} ms`);
       // Written only on a crossing: an unchanged class attribute still costs a
       // style invalidation per row per composited frame.
       const computeClass = timing > SLOW_FRAME_MS ? 'seg-time slow' : 'seg-time';
       if (c.compute.className !== computeClass) c.compute.className = computeClass;
 
       const a = state.arenas[s];
-      c.scrA.textContent = a ? formatKB(a.scratch_arena_a.high_water_mark) : '-';
-      c.scrB.textContent = a ? formatKB(a.scratch_arena_b.high_water_mark) : '-';
-      c.persist.textContent = a ? formatKB(a.persistent_arena.usage) : '-';
+      setText(c.scrA, a ? formatKB(a.scratch_arena_a.high_water_mark) : '-');
+      setText(c.scrB, a ? formatKB(a.scratch_arena_b.high_water_mark) : '-');
+      setText(c.persist, a ? formatKB(a.persistent_arena.usage) : '-');
     }
 
-    cells.maxTime.textContent = `${maxTime.toFixed(1)} ms`;
-    cells.wallTime.textContent = `${state.wallTime.toFixed(1)} ms`;
+    setText(cells.maxTime, `${maxTime.toFixed(1)} ms`);
+    setText(cells.wallTime, `${state.wallTime.toFixed(1)} ms`);
     const wallClass = state.wallTime > SLOW_FRAME_MS ? 'seg-time slow' : 'seg-time';
     if (cells.wallTime.className !== wallClass) cells.wallTime.className = wallClass;
   }
