@@ -97,6 +97,15 @@ test('the workbench page lays out the toolbar, pipeline and canvas', () => {
   assert.doesNotMatch(WORKBENCH_CSS,
     /\.chain-chip-params\s*\{[^}]*(?:max-height|overflow-y|scrollbar-gutter):/,
   'stage parameters remain fully visible without their own scroller');
+  assert.match(WORKBENCH_CSS,
+    /\.chain-chip--expanded\s*\{[^}]*width:\s*max-content/,
+  'expanded cards grow to fit their controls');
+  assert.doesNotMatch(WORKBENCH_CSS,
+    /\.chain-chip--expanded\s*\{[^}]*max-width:/,
+  'the horizontal pipeline viewport, not the card, handles narrow screens');
+  assert.match(WORKBENCH_CSS,
+    /grid-template-columns:\s*max-content minmax\(6rem, 9rem\) 4\.75rem/,
+  'parameter labels, sliders, and numeric inputs stay inside the card');
   assert.match(WORKBENCH_CSS, /\[data-carrier="color"\]/,
     'each carrier domain carries its own hue');
 });
