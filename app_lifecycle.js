@@ -151,7 +151,9 @@ export function createRenderAdapter({
  * @param {{dispose: Function}} deps.urlSync - The URL writer.
  * @param {{dispose: Function}} deps.sidebar - The effect sidebar.
  * @param {{dispose: Function}} deps.driver - The Daydream driver.
- * @param {{active: boolean, destroy: Function}} deps.segments - The pool.
+ * @param {{active: boolean, dispose: Function}} deps.segments - The pool, released
+ *   through dispose() so the page discard also drops the warmer's held
+ *   compilation, which destroy() keeps for the next pool the page builds.
  * @param {() => void} deps.strandSegmentWork - Bumps the segmented epoch so an
  *   in-flight spawn continuation cannot land in a discarded page.
  * @param {() => void} deps.removeOverlay - Removes the app's canvas overlays.
@@ -224,7 +226,7 @@ export function createAppTeardown({
     // both, so without this it spawns a worker pool into the discarded page.
     release('clearing the segmented-mode flag', () => { segments.active = false; });
     release('stranding the segment spawn', strandSegmentWork);
-    release('the segment pool', () => segments.destroy());
+    release('the segment pool', () => segments.dispose());
     release('the canvas overlays', removeOverlay);
   }
 
