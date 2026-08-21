@@ -226,7 +226,7 @@ function makeTeardown({
   host.recorder = recorder ? { dispose() { note('recorder.dispose'); } } : null;
   const segments = {
     active: true,
-    destroy() { note(`segments.destroy active=${segments.active} epoch=${epoch}`); },
+    dispose() { note(`segments.dispose active=${segments.active} epoch=${epoch}`); },
   };
   let epoch = 0;
   const teardown = createAppTeardown({
@@ -280,7 +280,7 @@ test('dispose releases in an order nothing can re-enter', () => {
     'sidebar.dispose',
     'driver.dispose',
     'strandSegmentWork',
-    'segments.destroy active=false epoch=1',
+    'segments.dispose active=false epoch=1',
     'removeOverlay',
   ]);
 });
@@ -349,7 +349,7 @@ test('a step that throws does not strand the releases behind it', () => {
     'sidebar.dispose',
     'driver.dispose',
     'strandSegmentWork',
-    'segments.destroy active=false epoch=1',
+    'segments.dispose active=false epoch=1',
     'removeOverlay',
   ], 'dispose runs once, so a stranded release leaks the URL debounce, the '
     + 'WebGL context, and the worker pool with no retry left');

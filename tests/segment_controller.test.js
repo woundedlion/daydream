@@ -291,6 +291,30 @@ test('a failed binary re-fetch drops the module the previous warm left', async (
   c.destroy();
 });
 
+test('dispose drops the held compilation that destroy keeps for the next pool',
+  async () => {
+    const warmer = new ModuleWarmer();
+    await warmer.warm({
+      baseUrl: 'http://localhost:8000/segment_controller.js',
+      minIntervalMs: 0,
+      fetch: () => Promise.resolve({
+        arrayBuffer: () => Promise.resolve(EMPTY_WASM.buffer),
+      }),
+    });
+    assert.ok(warmer.module instanceof WebAssembly.Module, 'the warm compiled');
+
+    const c = makeController({ moduleWarmer: warmer });
+    c.create(2);
+    c.destroy();
+    assert.ok(warmer.module instanceof WebAssembly.Module,
+      'a segmented toggle-off must keep the warm, or re-enabling pays a compile '
+      + 'per worker for a module the page already has');
+
+    c.dispose();
+    assert.equal(warmer.module, null,
+      'the page teardown must release the compiled module; nothing left will '
+      + 'spawn a pool that could be handed it');
+  });
 test('a device cap moves with the memory hint and the mobile layout', () => {
   assert.equal(maxSegmentCount({}, false), 8,
     'no hint (Firefox/Safari) on a desktop layout keeps the full range');

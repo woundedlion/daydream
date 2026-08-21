@@ -909,6 +909,16 @@ export class SegmentController {
   }
 
   /**
+   * Release the pool and the warmer's held compilation. For page teardown only:
+   * destroy() alone keeps the warm, so toggling segmented mode back on rebuilds
+   * the pool on one compile rather than one per worker.
+   */
+  dispose() {
+    this.destroy();
+    this.moduleWarmer.discard();
+  }
+
+  /**
    * Latch a worker fault and break the render-loop deadlock. The faulting worker
    * will never send its 'frame', so we settle the in-flight frame here (resolve
    * its promise, zero `pending`) to release `renderInFlight`; `faulted` then stops
