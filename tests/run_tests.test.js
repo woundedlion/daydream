@@ -384,6 +384,9 @@ const pinNode = (version) => {
 /** Where the npx shim records that the script handed the run over to it. */
 const handoverPath = () => join(root, 'handover.txt');
 
+/** Where the npx shim records the arguments its availability probe was given. */
+const probeArgsPath = () => join(root, 'probe-args.txt');
+
 /**
  * Puts a fake npx ahead of the real one on PATH and returns the environment
  * that finds it. The shim answers the script's availability probe with
@@ -400,19 +403,22 @@ const shimNpx = (reply) => {
     : { cmd: [`echo ${reply}`, 'exit /b 0'], sh: [`  echo ${reply}`, '  exit 0'] };
   writeFileSync(join(bin, 'npx.cmd'), [
     '@echo off',
-    'if "%3"=="--version" goto probe',
+    'for %%a in (%*) do if "%%a"=="--version" goto probe',
     `echo handover> "${handoverPath()}"`,
     'exit /b 0',
     ':probe',
+    `echo %*> "${probeArgsPath()}"`,
     ...probe.cmd,
     '',
   ].join('\r\n'));
   const sh = join(bin, 'npx');
   writeFileSync(sh, [
     '#!/bin/sh',
-    'if [ "$3" = "--version" ]; then',
+    'for arg in "$@"; do',
+    '  [ "$arg" = "--version" ] || continue',
+    `  printf '%s' "$*" > "${probeArgsPath()}"`,
     ...probe.sh,
-    'fi',
+    'done',
     `echo handover > "${handoverPath()}"`,
     'exit 0',
     '',
@@ -472,6 +478,8 @@ test('a pin npx cannot supply falls back to the running Node', () => {
   assert.match(result.stdout, /each above its committed floor/);
   assert.equal(existsSync(handoverPath()), false,
     'a run is never handed to an npx that cannot supply the pin');
+  assert.match(readFileSync(probeArgsPath(), 'utf8'), /--offline/,
+    'the probe resolves the pin from the npm cache or fails, never downloads it');
 });
 
 /**
@@ -488,6 +496,8 @@ test('a reachable pin still takes the run', () => {
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stderr, new RegExp(`re-running with Node ${pin}`));
   assert.equal(existsSync(handoverPath()), true, 'the pinned Node ran the suite');
+  assert.match(readFileSync(probeArgsPath(), 'utf8'), /--offline/,
+    'the probe resolves the pin from the npm cache or fails, never downloads it');
   assert.doesNotMatch(result.stdout, /each above its committed floor/,
     'the gate belongs to the handed-over run, not this one');
 });

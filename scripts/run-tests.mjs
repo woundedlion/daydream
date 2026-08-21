@@ -79,10 +79,11 @@ if (!args.some((a) => !a.startsWith('-'))) {
 }
 
 // node:test retallies cases across majors, so floors measured on one major are
-// not reproducible on another. Plain runs re-exec under the exact CI pin, or
-// warn and continue here when npx cannot reach it; re-measurements must start
-// there so the process writing the floors is explicit. Fixture repos carry no
-// workflow pin and continue under their invoking Node.
+// not reproducible on another. Plain runs re-exec under the exact CI pin when
+// the machine already holds it, or warn and continue here when it does not;
+// re-measurements must start there so the process writing the floors is
+// explicit. Fixture repos carry no workflow pin and continue under their
+// invoking Node.
 if (existsSync(NODE_PIN_PATH)) {
   const pin = readFileSync(NODE_PIN_PATH, 'utf8').match(/node-version: *'([\d.]+)'/)?.[1];
   if (!pin) {
@@ -102,13 +103,14 @@ if (existsSync(NODE_PIN_PATH)) {
     process.exit(1);
   }
   if (runningMajor !== pinMajor) {
-    // npx fetches the pinned Node unless it is already cached, so the handover
-    // is probed first: offline the probe fails and the suite runs here instead
-    // of exiting on npm's error without having run a case.
+    // --offline resolves the pin out of the npm cache or fails, so neither the
+    // probe nor the handover can spend a developer's bandwidth on a second
+    // runtime behind their back; a machine without it runs the suite here.
     const viaNpx = (...npxArgs) => (process.platform === 'win32'
       ? [process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', 'npx.cmd', ...npxArgs]]
       : ['npx', npxArgs]);
-    const probe = spawnSync(...viaNpx('--yes', `node@${pin}`, '--version'), {
+    const pinned = ['--yes', '--offline', `node@${pin}`];
+    const probe = spawnSync(...viaNpx(...pinned, '--version'), {
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf8',
     });
@@ -120,7 +122,7 @@ if (existsSync(NODE_PIN_PATH)) {
           `re-running with Node ${pin}.`,
       );
       const rerun = spawnSync(
-        ...viaNpx('--yes', `node@${pin}`, process.argv[1], ...argv),
+        ...viaNpx(...pinned, process.argv[1], ...argv),
         { stdio: 'inherit' },
       );
       if (rerun.error) {
@@ -135,7 +137,8 @@ if (existsSync(NODE_PIN_PATH)) {
       `run-tests: Node ${pin} is unavailable through npx ` +
         `(${probe.error?.message ?? `exit ${probe.status}`}); running the suite on ` +
         `v${process.versions.node}, whose case tallies may differ from the ` +
-        'committed floors.',
+        `committed floors. Fetch it once with \`npx node@${pin} --version\` and ` +
+        'this run hands over to it.',
     );
   }
 }
