@@ -84,6 +84,10 @@ test('the workbench page lays out the toolbar, pipeline and canvas', () => {
     /id="shader-document-status"[^>]*role="status"[^>]*aria-live="polite"/);
   assert.match(WORKBENCH_CSS, /\.chain-strip-region\s*\{[\s\S]*overflow-x:\s*auto/,
     'expanded chips scroll rather than crushing the bands');
+  assert.match(WORKBENCH_CSS, /\.chain-strip\s*\{[^}]*align-items:\s*flex-start/,
+    'short domain bands do not stretch to the tallest stage');
+  assert.match(WORKBENCH_CSS, /\.chain-band\s*\{[^}]*flex:\s*0 0 auto/,
+    'domain bands size to their contents');
   assert.match(WORKBENCH_CSS, /\[data-carrier="color"\]/,
     'each carrier domain carries its own hue');
 });

@@ -1,6 +1,6 @@
 //
 // tools/chain_strip.js renders the pipeline strip — the chain left to right as
-// chips grouped into one band per carrier, with the crossings as socket chips on
+// chips grouped into one band per editable carrier, with crossings as socket chips on
 // the band boundaries — and translates every gesture (band + palettes, ✕
 // removal, socket selection, reorder buttons, Alt+Arrow, bypass, undo) into the
 // document store's span-replacement primitive. The fixture is the
@@ -97,7 +97,7 @@ const paletteEntries = (h) => h.container.querySelectorAll('.chain-palette-entry
 const lastAnnounced = (h) => h.announced.at(-1) ?? '';
 const labels = (h) => h.store.chain().map((entry) => entry.label);
 
-test('the strip lays the chain out as carrier bands with sockets between them', async () => {
+test('the strip lays the chain out as editable carrier bands with sockets between them', async () => {
   const h = await makeStrip();
   const strip = h.container.children[1];
   assert.equal(strip.getAttribute('role'), 'toolbar');
@@ -106,10 +106,10 @@ test('the strip lays the chain out as carrier bands with sockets between them', 
 
   const bands = strip.querySelectorAll('.chain-band');
   assert.deepEqual(bands.map((band) => band.dataset.carrier),
-    ['sphere', 'plane', 'field', 'color'],
-    'all four bands render whether or not they hold a stage');
+    ['sphere', 'plane', 'field'],
+    'color is the terminal output type, not an editable carrier band');
   assert.deepEqual(bands.map((band) => band.getAttribute('aria-label')),
-    ['Sphere stages', 'Plane stages', 'Field stages', 'Color stages']);
+    ['Sphere stages', 'Plane stages', 'Field stages']);
   for (const band of bands) {
     assert.equal(band.getAttribute('role'), 'group');
     assert.equal(band.querySelector('.chain-band-title').getAttribute('aria-hidden'),
@@ -117,7 +117,7 @@ test('the strip lays the chain out as carrier bands with sockets between them', 
   }
   assert.deepEqual(
     bands.map((band) => band.querySelectorAll('.chain-chip').map((c) => c.dataset.label)),
-    [['camera', 'lens'], ['warp2'], ['transfer'], []]);
+    [['camera', 'lens'], ['warp2'], ['transfer']]);
 
   const sockets = strip.children.filter(
     (child) => child.classList?.contains('chain-chip--socket'));
@@ -148,7 +148,7 @@ test('the strip lays the chain out as carrier bands with sockets between them', 
   assert.equal(h.container.querySelectorAll('.chain-gap').length, 0);
   assert.deepEqual(bands.map((band) => band.querySelector('.chain-band-add')
     ?.getAttribute('aria-label') ?? null),
-  ['Add a Sphere stage', 'Add a Plane stage', 'Add a Field stage', null]);
+  ['Add a Sphere stage', 'Add a Plane stage', 'Add a Field stage']);
 });
 
 test('endomorphisms carry remove and bypass; sockets carry valid selectors', async () => {

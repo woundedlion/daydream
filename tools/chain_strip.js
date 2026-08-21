@@ -6,10 +6,10 @@
 
 /**
  * The pipeline strip: the loaded document's operator chain read left to right in
- * execution order as chips grouped into one band per carrier family, with the
- * family crossings drawn as socket chips on the band boundaries. All four bands
- * render whether or not they hold a stage, so the strip reads as the pipeline
- * even where a run is empty. Every structural gesture — palette insertion, ✕
+ * execution order as chips grouped into one band per editable carrier family, with the
+ * family crossings drawn as socket chips on the band boundaries. The terminal
+ * carrier is the pipeline's output type rather than an editable band, and is
+ * conveyed by its incoming socket. Every structural gesture — palette insertion, ✕
  * removal, socket selection, button or Alt+Arrow reorder, and undo —
  * funnels into the document store's one span-replacement primitive, so the strip
  * can commit nothing the store's validator refuses; it only decides which spans
@@ -172,17 +172,18 @@ export function createChainStrip({
   };
 
   /**
-   * Decomposes the chain into its carrier bands: each band's gap range is the
-   * chain indices whose carrier is that band's, and the crossing that leaves the
-   * band sits between it and the next.
-   * @returns {BandLayout[]} One entry per catalog carrier, in catalog order.
+   * Decomposes the chain into its editable carrier bands: each band's gap range
+   * is the chain indices whose carrier is that band's, and the crossing that
+   * leaves the band sits after it. The catalog's terminal carrier is the output
+   * type and has no band.
+   * @returns {BandLayout[]} One entry per editable carrier, in catalog order.
    */
   const bandLayout = () => {
     const chain = store.chain();
     /** @type {BandLayout[]} */
     const bands = [];
     let index = 0;
-    for (const carrier of catalog.carriers) {
+    for (const carrier of catalog.carriers.slice(0, -1)) {
       /** @type {number[]} */
       const gaps = [];
       /** @type {number[]} */
