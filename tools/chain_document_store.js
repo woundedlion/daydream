@@ -367,9 +367,15 @@ export async function createChainDocumentStore({
       (/** @type {{id: string}} */ parameter) => !owned(parameter.id));
     descriptor.serialization.fields = descriptor.serialization.fields.filter(
       (/** @type {string} */ id) => !owned(id));
+    // A staggered group names a parameter's shared interpolation group where it
+    // declares one and its id otherwise, so an instance prefix does not name
+    // every group its removal strands.
+    const groups = new Set(descriptor.parameters.map(
+      (/** @type {{id: string, interpolation?: {group?: string}}} */ parameter) =>
+        parameter.interpolation?.group ?? parameter.id));
     for (const policy of descriptor.path_policies) {
       if (policy.kind === 'STAGGERED_ORDERED')
-        policy.groups = policy.groups.filter((/** @type {string} */ group) => !owned(group));
+        policy.groups = policy.groups.filter((/** @type {string} */ group) => groups.has(group));
     }
     for (const preset of candidate.preset_bank.presets) {
       for (const key of Object.keys(preset.values))
