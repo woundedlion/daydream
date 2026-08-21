@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs';
 
 import {
   DEFAULT_SCRATCH_CHAIN,
+  UNDO_DEPTH,
   createChainDocumentStore,
   scratchChainDocument,
 } from '../tools/chain_document_store.js';
@@ -362,6 +363,38 @@ test('consecutive writes to one control coalesce into one undo step', async () =
   assert.equal(store.canUndo(), false);
   assert.equal(store.redo(), true);
   assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'), 5);
+});
+
+// Every entry is a whole document clone, so an unbounded history is a session
+// that grows until the tab dies.
+test('the history keeps UNDO_DEPTH entries and drops the oldest past it', async () => {
+  const store = await makeStore();
+  const overflow = 5;
+  // The controls alternate so each write opens its own entry rather than
+  // coalescing into the one before it; after each, the value the history should
+  // walk back through.
+  const walked = [];
+  const refused = [];
+  for (let step = 0; step < UNDO_DEPTH + overflow; step += 1) {
+    const parameter = step % 2 === 0 ? 'sample.pattern-freq' : 'camera.wander';
+    const value = step % 2 === 0 ? 2 + (step % 5) : (step % 10) / 10;
+    if (!store.setPresetValue('hex-twin-wave', parameter, value).ok) refused.push(step);
+    walked.push(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'));
+  }
+  assert.deepEqual(refused, [], 'every write must commit for the depth to be read');
+
+  let undone = 0;
+  while (store.undo()) undone += 1;
+  assert.equal(undone, UNDO_DEPTH, 'the history must stop at its depth');
+  assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'),
+    walked[overflow - 1],
+    'the dropped entries are the oldest, so the opening document is unreachable');
+
+  let redone = 0;
+  while (store.redo()) redone += 1;
+  assert.equal(redone, UNDO_DEPTH, 'every kept entry must reapply');
+  assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'),
+    walked.at(-1));
 });
 
 test('another control, a structural edit, an undo or a redo ends the run', async () => {

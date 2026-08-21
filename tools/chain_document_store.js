@@ -75,6 +75,13 @@ const parameterFromField = (label, field) => {
 };
 
 /**
+ * Undo entries one session keeps. Each is a whole document clone, so this is
+ * what bounds the editor's memory; the oldest is dropped past it.
+ * @type {number}
+ */
+export const UNDO_DEPTH = 100;
+
+/**
  * The default chain a scratch document opens on: the minimal legal chain over
  * the shipped crossings, with the camera in front.
  * @type {ReadonlyArray<ChainEntry>}
@@ -252,11 +259,16 @@ export async function createChainDocumentStore({
    *   undo entry under, so a slider drag's stream of writes is undone whole.
    *   Null for a structural edit, which also ends any open run.
    * @returns {EditResult} The outcome.
+   * @details History past UNDO_DEPTH entries is dropped oldest first. Redo
+   * entries only ever come off the undo stack, so the pair stays within it.
    */
   const commit = (candidate, coalesce = null) => {
     const diagnostics = diagnosticsOf(candidate);
     if (diagnostics.length > 0) return { ok: false, diagnostics };
-    if (coalesce === null || coalesce !== coalesceKey) undoStack.push(doc);
+    if (coalesce === null || coalesce !== coalesceKey) {
+      undoStack.push(doc);
+      if (undoStack.length > UNDO_DEPTH) undoStack.shift();
+    }
     coalesceKey = coalesce;
     redoStack.length = 0;
     doc = candidate;
