@@ -952,11 +952,14 @@ export class Daydream {
   }
 
   /**
-   * Release everything this instance owns: the ResizeObserver, the WebGL
-   * program/geometry/material resources, the OrbitControls listeners, and the
-   * label DOM layer. Call before discarding a Daydream (e.g. on SPA navigation
-   * away) so it leaves behind no live observer firing into a dead scene and no
-   * leaked GPU material/geometry/context.
+   * Release everything this instance owns and undo what it put on the page: the
+   * animation loop, the ResizeObserver, the simulation timer, the context-loss
+   * and canvas-keyboard listeners, the WebGL program/geometry/material
+   * resources and drawing context, the OrbitControls, and the label and
+   * context-lost layers. Call before discarding a Daydream (e.g. on SPA
+   * navigation away) so it leaves behind no live observer firing into a dead
+   * scene, no leaked GPU material/geometry/context, and a #canvas the page can
+   * mount a fresh instance on.
    */
   dispose() {
     // Stop the rAF callback first so it never fires into the nulled dotMesh /
@@ -977,6 +980,9 @@ export class Daydream {
       this.canvas.removeEventListener("keydown", this.onCanvasKeyDown);
       this.canvas.removeEventListener("focus", this.onCanvasFocus);
       this.canvas.removeEventListener("blur", this.onCanvasBlur);
+      // The canvas outlives the driver; a stale latch would orbit a fresh
+      // instance on arrow keys the page had not routed to it.
+      this.canvas.classList.remove("keyboard-focus");
     }
 
     if (this.dotMesh) {

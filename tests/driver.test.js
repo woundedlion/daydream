@@ -454,6 +454,17 @@ test('dispose releases the observer, listeners, and GPU resources', () => {
     'the drawing context was released before the renderer freed its objects');
 });
 
+test('dispose hands the canvas back without the keyboard-orbit latch', () => {
+  const log = [];
+  const ctx = disposeCtx(fakeMesh(log), log);
+  ctx.canvas.classList.add('keyboard-focus');
+
+  Daydream.prototype.dispose.call(ctx);
+
+  assert.equal(ctx.canvas.classList.contains('keyboard-focus'), false,
+    'the #canvas outlives the driver, so a latch left on it makes the next '
+    + "instance's arrow keys orbit a canvas the page never focused");
+});
 test('dispose removes each axis from the scene and frees its geometry', () => {
   const log = [];
   const ctx = disposeCtx(fakeMesh(log), log);
