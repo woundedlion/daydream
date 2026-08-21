@@ -440,7 +440,16 @@ export function start({
           () => apply.applyResolution(true),
           () => loadingOverlay?.remove(),
         );
-        void shaderDocuments?.init();
+        // Workbench-only, and it reports its own load failures through the
+        // toolbar status: an escaped rejection would reach the page-failure
+        // listener and cover a running simulator with the fatal banner.
+        shaderDocuments?.init().catch((err) => {
+          console.error('The shader workbench could not be initialized:', err);
+          const detailText = (err && err.message) ? err.message : String(err);
+          applyNotice.show(
+            `The shader workbench could not be initialized: ${detailText}`,
+            CONFIG_NOTICE);
+        });
       } catch (err) {
         console.error('Initial resolution/effect could not be applied:', err);
         const title = 'No supported resolution and effect could be applied.';
