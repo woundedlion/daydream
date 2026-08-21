@@ -142,6 +142,15 @@ function interfaceMembers(name) {
 }
 
 /**
+ * Method names a named `export interface` declares at its own indentation.
+ * @param {string} name - Interface name.
+ * @returns {Set<string>} The declared method names.
+ */
+const interfaceMethods = (name) => new Set(
+  [...interfaceBody(name).matchAll(/^ {2}([A-Za-z_]\w*)\s*\(/gm)]
+    .map((match) => match[1]));
+
+/**
  * Pins one declared object shape against a value the module produced: the
  * declarations name every key the module returns, and the module returns every
  * member declared without a `?`.
@@ -1333,6 +1342,75 @@ test('PaletteOps exposes the method surface the palette tool drives', () => {
     const inspected = ops.inspectV4(recipe);
     assert.equal(inspected.diagnostics.length, 256 * 6);
     assert.equal(inspected.fallback.length, 256);
+  } finally {
+    ops.delete();
+  }
+});
+
+// solids.html and palettes.html run on these two classes, so they are the
+// tools' half of the boundary; embind's own prototypes are what pins them.
+test('holosphere_wasm.d.ts declares the MeshOps bridge the solids tool drives', () => {
+  const statics = interfaceMethods('MeshOpsStatics');
+  for (const name of statics) {
+    assert.equal(typeof M.MeshOps[name], 'function',
+      `holosphere_wasm.d.ts declares MeshOps.${name}, which the module does not export`);
+  }
+  for (const name of Object.getOwnPropertyNames(M.MeshOps)
+    .filter((key) => typeof M.MeshOps[key] === 'function')) {
+    assert.ok(statics.has(name),
+      `the module exports MeshOps.${name}, which holosphere_wasm.d.ts does not declare`);
+  }
+
+  const handle = interfaceMethods('MeshHandle');
+  for (const name of handle) {
+    assert.equal(typeof M.MeshOps.prototype[name], 'function',
+      `holosphere_wasm.d.ts declares MeshHandle.${name}, which the module does not bind`);
+  }
+  for (const name of Object.getOwnPropertyNames(M.MeshOps.prototype)
+    .filter((key) => key !== 'constructor')) {
+    assert.ok(handle.has(name), `the module binds MeshOps.prototype.${name}, `
+      + 'which holosphere_wasm.d.ts does not declare');
+  }
+
+  assert.deepEqual([...interfaceMembers('MeshOpResultEnum').keys()].sort(),
+    [...MESH_OP_RESULT_NAMES].sort(),
+    'the declared MeshOpResult roster must be the module enum roster');
+
+  const registry = M.MeshOps.getRegistry();
+  assertDeclaredShape('SolidRegistryEntry', registry[0]);
+  const complex = registry.find((/** @type {*} */ e) => e.category === 'Complex');
+  assert.ok(complex, 'the registry must expose a Complex solid to read a recipe from');
+  const recipe = M.MeshOps.getRecipe(complex.name);
+  assertDeclaredShape('SolidRecipe', recipe);
+  assertDeclaredShape('SolidRecipeStep', recipe.ops[0]);
+
+  const mesh = M.MeshOps.fromSolidName('cube');
+  assert.ok(mesh, 'fromSolidName("cube") must build a mesh');
+  assertDeclaredShape('MeshFaces', mesh.getFaces());
+  mesh.delete();
+  assertDeclaredShape('MeshArenaMetrics', M.MeshOps.getArenaMetrics());
+  M.MeshOps.clearToolingMemory();
+});
+
+test('holosphere_wasm.d.ts declares the PaletteOps bridge the palette tool drives', () => {
+  const declared = interfaceMethods('PaletteOps');
+  const ops = new M.PaletteOps();
+  try {
+    for (const name of declared) {
+      assert.equal(typeof ops[name], 'function',
+        `holosphere_wasm.d.ts declares PaletteOps.${name}, which the module does not bind`);
+    }
+    for (const name of Object.getOwnPropertyNames(Object.getPrototypeOf(ops))
+      .filter((key) => key !== 'constructor')) {
+      assert.ok(declared.has(name), `the module binds PaletteOps.${name}, `
+        + 'which holosphere_wasm.d.ts does not declare');
+    }
+
+    const preset = Array.from(ops.effectPresetsV4())[0];
+    assertDeclaredShape('PaletteEffectPreset', preset);
+    const inspected = ops.inspectV4(preset.recipe);
+    assertDeclaredShape('PaletteCompileResult', inspected);
+    assertDeclaredShape('PaletteCompileStatus', inspected.status);
   } finally {
     ops.delete();
   }
