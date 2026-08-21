@@ -14,7 +14,9 @@ import { readFileSync } from 'node:fs';
 import { createChainDocumentStore } from '../tools/chain_document_store.js';
 import { createChainStrip, deactivatedParameterIds } from '../tools/chain_strip.js';
 import { compileShaderDocument } from '../shader/shader_workbench.mjs';
-import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
+import {
+  documentEvents, fakeElement, installDocument, restoreDocumentAfterEach,
+} from './fake_dom.js';
 
 const CATALOG = JSON.parse(readFileSync(
   new URL('../shader/engine_catalog.json', import.meta.url), 'utf8'));
@@ -68,6 +70,7 @@ async function makeStrip({ presetId = null, catalog = CATALOG } = {}) {
     activeElement: null,
     createElement: (/** @type {string} */ tag) => fakeElement(tag),
     elementFromPoint: () => null,
+    ...documentEvents(),
   });
   const applied = [];
   const selections = [];
@@ -301,6 +304,46 @@ test('Delete opens a socket replacement palette containing only valid stages', a
   assert.equal(h.store.chain()[PROJECT].operator, 'project.bonne.v2');
   assert.equal(h.applied.length, 1);
   assert.equal(h.doc.activeElement.dataset.label, h.store.chain()[PROJECT].label);
+});
+
+test('a palette carries its listbox selection on the focused option', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'project').dispatch('keydown', { key: 'Delete' });
+
+  const entries = paletteEntries(h);
+  const selection = () => entries.map((entry) => entry.getAttribute('aria-selected'));
+  assert.deepEqual(selection(), entries.map((_, at) => String(at === 0)),
+    'the opened palette selects the option it focused, and only that one');
+
+  entries[0].dispatch('keydown', { key: 'ArrowDown' });
+  assert.deepEqual(selection(), entries.map((_, at) => String(at === 1)),
+    'the selection follows the arrow-key focus');
+});
+
+// A palette left open over a chain the strip has since rebuilt commits against
+// stale indices, so every way out of it has to close it.
+test('an open palette is dismissed by an outside press and by losing focus', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'project').dispatch('keydown', { key: 'Delete' });
+  const entries = paletteEntries(h);
+
+  h.doc.dispatch('pointerdown', { target: entries[1] });
+  assert.notEqual(paletteOf(h), null, 'a press inside the palette keeps it open');
+  paletteOf(h).dispatch('focusout', { relatedTarget: entries[1] });
+  assert.notEqual(paletteOf(h), null, 'focus moving between options keeps it open');
+
+  paletteOf(h).dispatch('focusout', { relatedTarget: chipByLabel(h, 'camera') });
+  assert.equal(paletteOf(h), null, 'focus leaving the palette dismisses it');
+
+  chipByLabel(h, 'project').dispatch('keydown', { key: 'Delete' });
+  h.doc.dispatch('pointerdown', { target: chipByLabel(h, 'camera') });
+  assert.equal(paletteOf(h), null, 'a press outside dismisses it');
+  assert.deepEqual(h.applied, [], 'neither dismissal committed an edit');
+
+  assert.equal(h.doc.listenerCount('pointerdown'), 1);
+  h.strip.destroy();
+  assert.equal(h.doc.listenerCount('pointerdown'), 0,
+    'the document outlives the strip, so destroy() must take the listener off');
 });
 
 // Picking the operator a socket already carries is a no-op, not a re-seat: the

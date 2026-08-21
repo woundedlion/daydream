@@ -572,6 +572,43 @@ export function fakeElement(tag = 'div', options = {}) {
 }
 
 /**
+ * The listener surface a document stand-in needs for a module that wires a
+ * document-level handler, spread into an installDocument() surface.
+ * dispatch(type, event) runs the matching handlers in registration order over
+ * an event whose `target` defaults to the installed document; removing a
+ * listener that was never added throws, as it does on an element, so a fixture
+ * that omits the add cannot hide a removal that never happens. listenerCount()
+ * reports what is still attached, so a teardown is assertable.
+ * @returns {Object} addEventListener, removeEventListener, listenerCount and dispatch.
+ */
+export function documentEvents() {
+  /** @type {Array<{type: string, handler: Function}>} */
+  const listeners = [];
+  return {
+    /** @param {string} type @param {Function} handler */
+    addEventListener(type, handler) { listeners.push({ type, handler }); },
+    /** @param {string} type @param {Function} handler */
+    removeEventListener(type, handler) {
+      const at = listeners.findIndex((l) => l.type === type && l.handler === handler);
+      if (at < 0) throw new Error(`no ${type} listener on the document to remove`);
+      listeners.splice(at, 1);
+    },
+    /** @param {string} type @returns {number} Listeners registered for the type. */
+    listenerCount(type) {
+      return listeners.filter((listener) => listener.type === type).length;
+    },
+    /** @param {string} type @param {Object} [event] @returns {Object} The dispatched event. */
+    dispatch(type, event = {}) {
+      const dispatched = { type, target: globalThis.document, ...event };
+      for (const listener of [...listeners]) {
+        if (listener.type === type) listener.handler(dispatched);
+      }
+      return dispatched;
+    },
+  };
+}
+
+/**
  * Installs a fake globalThis.document.
  * @param {Object} [surface] - Document members the module under test reads.
  * @returns {Object} The installed document.

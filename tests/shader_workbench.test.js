@@ -20,7 +20,7 @@ import {
   FakeChainEngine, ParamSetResult, unpinnedEngineMethods,
 } from './fake_engine.js';
 import {
-  fakeElement, installDocument, restoreDocumentAfterEach,
+  documentEvents, fakeElement, installDocument, restoreDocumentAfterEach,
 } from './fake_dom.js';
 
 const INDEX = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -783,6 +783,7 @@ async function editorWorkbench({
     activeElement: null,
     getElementById: (id) => elements.get(id) ?? null,
     createElement: (tag) => fakeElement(tag),
+    ...documentEvents(),
   });
   const downloads = [];
   const selections = [];
