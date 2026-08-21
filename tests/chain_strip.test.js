@@ -140,8 +140,6 @@ test('the strip lays the chain out as editable carrier bands with sockets betwee
   assert.equal(camera.getAttribute('aria-label'), 'Rotate · camera');
   assert.equal(camera.querySelector('.chain-chip-name').textContent, 'Rotate');
   assert.equal(camera.querySelector('.chain-chip-label').textContent, '· camera');
-  assert.equal(chipByLabel(h, 'project').querySelector('.chain-chip-pair').textContent,
-    'sphere → plane');
   assert.match(chipByLabel(h, 'project').getAttribute('aria-label'),
     /, sphere to plane$/);
 
@@ -154,7 +152,7 @@ test('the strip lays the chain out as editable carrier bands with sockets betwee
   ['Add a Sphere stage', 'Add a Plane stage', 'Add a Field stage']);
 });
 
-test('endomorphisms carry remove and bypass; sockets carry valid selectors', async () => {
+test('endomorphisms carry controls; sockets carry only valid selectors', async () => {
   const h = await makeStrip();
   for (const label of ['camera', 'lens', 'warp2']) {
     const chip = chipByLabel(h, label);
@@ -168,6 +166,9 @@ test('endomorphisms carry remove and bypass; sockets carry valid selectors', asy
       'removal across a crossing is illegal by construction, so no ✕');
     assert.equal(chip.querySelector('.chain-chip-bypass'), null);
     assert.ok(chip.querySelector('.chain-chip-replace'));
+    assert.equal(chip.querySelector('.chain-chip-name'), null);
+    assert.equal(chip.querySelector('.chain-chip-label'), null);
+    assert.equal(chip.querySelector('.chain-chip-pair'), null);
   }
   for (const [label, text, accessibleName] of [
     ['project', 'Projection: ', 'Projection'],
@@ -595,8 +596,10 @@ test('a crossing lands on the socket its carrier pair names', async () => {
     ['camera', 'lens', 'warp2', 'sample', 'colorize'],
     'every other instance keeps its label, and so its values');
   assert.equal(h.applied.length, 1, 'the swap re-applies the program');
-  assert.equal(chipByLabel(h, h.store.chain()[PROJECT].label)
-    .querySelector('.chain-chip-name').textContent, 'Gnomonic');
+  const selector = chipByLabel(h, h.store.chain()[PROJECT].label)
+    .querySelector('.chain-chip-replace');
+  assert.equal(selector.value, 'project.gnomonic.v2');
+  assert.equal(selector.selectedOptions[0].textContent, 'Gnomonic');
 });
 
 // The library commits the same one-for-one replacement the socket's swap does,
