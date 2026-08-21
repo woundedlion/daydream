@@ -433,8 +433,8 @@ function invStereo(w) {
  * f(z) = (Az + B) / (Cz + D), unproject. This is the reference the engine's
  * fused mobius_transform must reproduce, so it runs the projection and the
  * division the shader itself runs — stereo and projectDiv, which carry the
- * engine's point-at-infinity conventions — rather than the general-purpose cdiv,
- * whose absolute divisor guard the engine deliberately lacks.
+ * engine's point-at-infinity conventions — rather than a general-purpose complex
+ * division, whose absolute divisor guard the engine deliberately lacks.
  * @param {number[]} p - Unit sphere point as [x, y, z].
  * @param {{A:{re:number,im:number}, B:{re:number,im:number}, C:{re:number,im:number}, D:{re:number,im:number}}} coeffs - The Mobius coefficients.
  * @returns {{x:number, y:number, z:number}} The transformed sphere point.

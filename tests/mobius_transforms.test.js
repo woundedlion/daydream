@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const {
-  cmult, cadd, cdiv, snapComplex,
+  cmult, cadd, snapComplex,
   elliptic, hyperbolic, loxodromic, parabolic, inversion, tumble, cayley,
   glslComplexFunctions, glslProjectionFunctions, mobiusCodeString,
   stereo, projectDiv, STEREO_INF, STEREO_POLE_EPS, STEREO_AZIMUTH_EPS,
@@ -81,17 +81,6 @@ test('cadd computes (a+bi)+(c+di)', () => {
   assertComplex(cadd({ re: 1, im: 2 }, { re: 3, im: -5 }), 4, -3, 'cadd');
 });
 
-/** Complex division follows (a+bi)/(c+di). */
-test('cdiv computes (a+bi)/(c+di)', () => {
-  // (1+0i)/(0+1i) = -i
-  assertComplex(cdiv({ re: 1, im: 0 }, { re: 0, im: 1 }), 0, -1, 'cdiv 1/i');
-  assertComplex(cdiv({ re: 3, im: 4 }, { re: 1, im: 0 }), 3, 4, 'cdiv /1');
-});
-
-/** Dividing by a ~zero denominator yields 0 rather than NaN/Infinity. */
-test('cdiv guards against a near-zero denominator', () => {
-  assertComplex(cdiv({ re: 1, im: 1 }, { re: 0, im: 0 }), 0, 0, 'cdiv by ~0');
-});
 
 // --- GLSL/JS parity -------------------------------------------------------
 // The shader can't import the JS module, so the GLSL source for cmult/cadd
@@ -263,9 +252,9 @@ test('stereo keeps the pole cap azimuth at the sentinel magnitude', () => {
 });
 
 /**
- * project_div's guard is relative (|num| vs |den| * STEREO_INF), not the
- * absolute |den| test cdiv uses: a large numerator over a moderate divisor
- * still saturates, and a small numerator over a tiny divisor still divides.
+ * project_div's guard is relative (|num| vs |den| * STEREO_INF), not an
+ * absolute test on |den|: a large numerator over a moderate divisor still
+ * saturates, and a small numerator over a tiny divisor still divides.
  */
 test('projectDiv saturates on the relative magnitude, not an absolute divisor', () => {
   const ordinary = projectDiv({ re: 4, im: 2 }, { re: 2, im: 0 });
@@ -278,9 +267,8 @@ test('projectDiv saturates on the relative magnitude, not an absolute divisor', 
   assert.ok(Math.abs(Math.hypot(bigDiag.re, bigDiag.im) - STEREO_INF) < 1e-6);
   assert.ok(Math.abs(Math.atan2(bigDiag.im, bigDiag.re) - Math.PI / 4) < 1e-12);
 
-  // A divisor cdiv would zero out (|q|^2 = 1.6e-7 < 1e-6) still divides here.
+  // A divisor an absolute |den|^2 < 1e-6 guard would zero out still divides.
   const tiny = { re: 4e-4, im: 0 };
-  assertComplex(cdiv({ re: 1e-6, im: 0 }, tiny), 0, 0, 'cdiv absolute guard');
   assertComplex(projectDiv({ re: 1e-6, im: 0 }, tiny), 1e-6 / 4e-4, 0,
     'projectDiv relative guard');
 
