@@ -60,6 +60,7 @@
     "segment_layout.js",
     "segment_stats_view.js",
     "segment_worker.js",
+    "shader_stages.js",
     "tools/banner.js",
     "tools/chain_apply.js",
     "tools/chain_document_store.js",

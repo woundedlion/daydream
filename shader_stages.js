@@ -57,6 +57,7 @@ export const FACET_GRID_STAGE_TITLES = new Map([
   ['Function', 'Grid'],
   ['Colorize', 'Generated Analogous'],
 ]);
+/** @type {Map<string, [string, string[]]>} */
 export const FIXED_SHADER_MODE_FIELDS = new Map([
   ['Function', ['slots.function', [
     'Twin Wave', 'Rings', 'Spiral', 'Grid', 'Noise Contour (Projected)',
@@ -207,7 +208,7 @@ export function legacyShaderBallParamNames(name) {
  * selectors. The panel's stage grouping and the app's choice of persistence
  * strategy both key off this predicate, so the two cannot disagree about which
  * effect is loaded.
- * @param {Array<Object>} params - Engine parameter definitions.
+ * @param {Array<{name: string}>} params - Engine parameter definitions.
  * @returns {boolean} True when every stage selector is registered.
  */
 export function isShaderBallSchema(params) {
@@ -216,7 +217,7 @@ export function isShaderBallSchema(params) {
 }
 
 /**
- * @param {Array<Object>} params - Engine parameter definitions in stream order.
+ * @param {Array<{name: string}>} params - Engine parameter definitions in stream order.
  * @returns {Map<string, string>|null} Parameter name to pipeline-stage title.
  */
 export function shaderBallStageAssignments(params) {
@@ -231,7 +232,22 @@ export function shaderBallStageAssignments(params) {
 }
 
 /**
- * @param {Array<Object>} params - Engine parameter definitions in stream order.
+ * @param {Array<{name: string}>} params - Engine parameter definitions in stream order.
+ * @param {Map<string, string>} table - Parameter name to pipeline stage.
+ * @returns {Map<string, string>} The table's entries for the names present, in
+ *   stream order; a name the table does not claim is absent.
+ */
+function stagesFrom(params, table) {
+  const assignments = new Map();
+  for (const parameter of params) {
+    const stage = table.get(parameter.name);
+    if (stage) assignments.set(parameter.name, stage);
+  }
+  return assignments;
+}
+
+/**
+ * @param {Array<{name: string}>} params - Engine parameter definitions in stream order.
  * @returns {Map<string, string>|null} Parameter name to fixed pipeline stage.
  */
 export function curlLatticeStageAssignments(params) {
@@ -239,12 +255,11 @@ export function curlLatticeStageAssignments(params) {
   if ([...CURL_LATTICE_STAGE_BY_PARAMETER.keys()].some((name) => !names.has(name))) {
     return null;
   }
-  return new Map(params.map((parameter) =>
-    [parameter.name, CURL_LATTICE_STAGE_BY_PARAMETER.get(parameter.name)]));
+  return stagesFrom(params, CURL_LATTICE_STAGE_BY_PARAMETER);
 }
 
 /**
- * @param {Array<Object>} params - Engine parameter definitions in stream order.
+ * @param {Array<{name: string}>} params - Engine parameter definitions in stream order.
  * @returns {Map<string, string>|null} Parameter name to fixed pipeline stage.
  */
 export function facetGridStageAssignments(params) {
@@ -252,12 +267,11 @@ export function facetGridStageAssignments(params) {
   if ([...FACET_GRID_STAGE_BY_PARAMETER.keys()].some((name) => !names.has(name))) {
     return null;
   }
-  return new Map(params.map((parameter) =>
-    [parameter.name, FACET_GRID_STAGE_BY_PARAMETER.get(parameter.name)]));
+  return stagesFrom(params, FACET_GRID_STAGE_BY_PARAMETER);
 }
 
 /**
- * @param {Array<Object>} params - Fixed Shader parameter definitions.
+ * @param {Array<{name: string}>} params - Fixed Shader parameter definitions.
  * @returns {Map<string, string>|null} Parameter name to fixed pipeline stage; a
  *   name no rule claims is absent, and the panel reports it as unstaged.
  */
@@ -272,6 +286,10 @@ export function fixedShaderStageAssignments(params) {
     ? 'Planar Warp 2' : 'Planar Warp 1';
   const warpStage = [...names].some((name) => name.startsWith('Polar '))
     ? 'Planar Warp 2' : 'Planar Warp 1';
+  /**
+   * @param {string} name - Engine parameter name.
+   * @returns {string|null} The stage that claims it, or null when none does.
+   */
   const stageFor = (name) => {
     if (name === 'Camera Wander') return 'Camera';
     if (name.startsWith('Surface Noise ')) return 'Surface Noise';
@@ -308,8 +326,8 @@ export function fixedShaderStageAssignments(params) {
 }
 
 /**
- * @param {Object|null} snapshot - Versioned Shader configuration snapshot.
- * @param {Array<Object>|null} fields - Snapshot field definitions.
+ * @param {{accepted: number[]}|null} snapshot - Versioned Shader configuration snapshot.
+ * @param {Array<{name: string, id: number}>|null} fields - Snapshot field definitions.
  * @returns {Map<string, string>|null} Fixed stage position to selected mode.
  */
 export function fixedShaderStageTitles(snapshot, fields) {
