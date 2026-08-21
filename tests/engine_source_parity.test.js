@@ -227,9 +227,9 @@ const STEREO_POINTS = (() => {
 })();
 
 // Numerator/divisor pairs spanning project_div's branches: ordinary quotients, a
-// numerator that saturates on the relative test, a divisor small enough that the
-// general cdiv would zero it out, the 0/0 indeterminate form, and magnitudes
-// whose square leaves the representable range.
+// numerator that saturates on the relative test, a divisor small enough that an
+// absolute-guard division would zero it out, the 0/0 indeterminate form, and
+// magnitudes whose square leaves the representable range.
 const PROJECT_DIV_PAIRS = [
   [{ re: 4, im: 2 }, { re: 2, im: 0 }],
   [{ re: 1, im: -3 }, { re: -0.5, im: 0.25 }],

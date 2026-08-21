@@ -137,8 +137,8 @@
     "assertions": 135
   },
   "tests/mobius_transforms.test.js": {
-    "cases": 36,
-    "assertions": 510
+    "cases": 34,
+    "assertions": 506
   },
   "tests/page_lifecycle.test.js": {
     "cases": 13,

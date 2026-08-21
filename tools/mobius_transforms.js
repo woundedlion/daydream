@@ -36,22 +36,6 @@ export function cadd(p, q) {
   return { re: p.re + q.re, im: p.im + q.im };
 }
 
-/**
- * Computes the complex quotient p/q. Returns 0 when |q|^2 < 1e-6 (i.e. |q| <
- * 1e-3) to avoid divide-by-near-zero blow-up.
- * @param {{re:number, im:number}} p - Complex dividend.
- * @param {{re:number, im:number}} q - Complex divisor.
- * @returns {{re:number, im:number}} The complex quotient p/q, or {re:0, im:0} when |q|^2 < 1e-6 (|q| < 1e-3).
- */
-export function cdiv(p, q) {
-  const denom = q.re * q.re + q.im * q.im;
-  if (denom < 1e-6) return { re: 0.0, im: 0.0 };
-  return {
-    re: (p.re * q.re + p.im * q.im) / denom,
-    im: (p.im * q.re - p.re * q.im) / denom,
-  };
-}
-
 // GLSL port of cmult/cadd consumed by the mobius.html fragment shader. Single
 // source of truth for the shader; tests/mobius_transforms.test.js pins this
 // against the JS functions above so the two cannot silently diverge.
@@ -104,7 +88,7 @@ export function stereo(v) {
  * @param {{re:number, im:number}} num - Numerator.
  * @param {{re:number, im:number}} den - Divisor.
  * @returns {{re:number, im:number}} num/den, except a quotient whose magnitude would reach STEREO_INF collapses to the sentinel along the numerator's direction.
- * @details Not general complex division (see cdiv): the guard is relative, so a
+ * @details Not general complex division: the guard is relative, so a
  * near-singular divisor still yields a finite point carrying the numerator's
  * azimuth rather than a fixed constant. Only an exactly zero numerator is the
  * indeterminate 0/0 form, which returns (0,0).
