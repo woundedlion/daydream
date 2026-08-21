@@ -197,7 +197,7 @@ test('pipeline arrows, wheel and background arrow keys scroll the viewport', asy
   assert.equal(viewport.scrollLeft, 120);
 });
 
-test('clicking a chip selects it, marks it current, and reports the selection', async () => {
+test('clicking a chip header toggles its pinned selection', async () => {
   const h = await makeStrip();
   chipByLabel(h, 'warp2').dispatch('click');
 
@@ -209,12 +209,15 @@ test('clicking a chip selects it, marks it current, and reports the selection', 
   assert.equal(h.doc.activeElement, chip, 'the selected chip takes focus');
   assert.equal(chipByLabel(h, 'camera').getAttribute('aria-current'), null);
 
-  // Re-selecting reports once per change, not once per click.
   chipByLabel(h, 'warp2').dispatch('click');
-  assert.deepEqual(h.selections, ['warp2']);
+  assert.equal(h.store.selectedLabel(), null);
+  assert.deepEqual(h.selections, ['warp2', null]);
 
   chipByLabel(h, 'camera').dispatch('keydown', { key: 'Enter' });
-  assert.deepEqual(h.selections, ['warp2', 'camera']);
+  assert.deepEqual(h.selections, ['warp2', null, 'camera']);
+  chipByLabel(h, 'camera').dispatch('keydown', { key: ' ' });
+  assert.equal(h.store.selectedLabel(), null,
+    'keyboard activation closes the pinned card like a click');
 });
 
 test('Left/Right rove focus without editing; Alt+Arrow moves the chip', async () => {
@@ -617,13 +620,34 @@ const controlIn = (row) => row.querySelector('.chain-param-control');
 const declarationsFor = (h, label) => h.store.document().descriptor.parameters
   .filter((parameter) => parameter.id.startsWith(`${label}.`));
 
-test('every stage keeps its controls expanded', async () => {
+test('stage controls open transiently on hover and pin open on click', async () => {
   const h = await makeStrip();
   assert.ok(paramsOf(h, 'sample'), 'an unselected chip carries its controls');
-  assert.equal(h.container.dataset.expanded, 'true');
+  assert.equal(h.container.dataset.expanded, 'false');
 
   const chip = chipByLabel(h, 'sample');
   assert.equal(chip.querySelector('.chain-chip-disclosure'), null);
+  assert.equal(chip.getAttribute('aria-expanded'), 'false');
+  assert.equal(chip.classList.contains('chain-chip--expanded'), false);
+
+  chip.dispatch('mouseenter');
+  assert.equal(chip.getAttribute('aria-expanded'), 'true');
+  assert.equal(chip.classList.contains('chain-chip--expanded'), true);
+  assert.equal(h.container.dataset.expanded, 'true');
+  chip.dispatch('mouseleave');
+  assert.equal(chip.getAttribute('aria-expanded'), 'false');
+  assert.equal(chip.classList.contains('chain-chip--expanded'), false);
+
+  chip.dispatch('click');
+  const pinned = chipByLabel(h, 'sample');
+  assert.equal(pinned.getAttribute('aria-expanded'), 'true');
+  pinned.dispatch('mouseleave');
+  assert.equal(pinned.classList.contains('chain-chip--expanded'), true,
+    'mouse leave preserves a pinned card');
+  pinned.dispatch('click');
+  assert.equal(chipByLabel(h, 'sample').getAttribute('aria-expanded'), 'false');
+  assert.equal(h.container.dataset.expanded, 'false');
+
   const region = paramsOf(h, 'sample');
   assert.equal(region.getAttribute('role'), 'group');
   assert.equal(region.getAttribute('aria-label'), 'Twin Wave · sample parameters');
@@ -649,7 +673,6 @@ test('every stage keeps its controls expanded', async () => {
     .querySelector('.chain-param-value').value, '3.881');
 
   chipByLabel(h, 'camera').dispatch('click');
-  assert.ok(paramsOf(h, 'sample'), 'selection never collapses another stage');
   assert.equal(rowsOf(h, 'camera').length, 1);
 });
 
@@ -666,18 +689,19 @@ test('a stage with no parameters grows no disclosure', async () => {
   assert.equal(chip.getAttribute('aria-current'), 'true');
   assert.equal(chip.querySelector('.chain-chip-disclosure'), null,
     'a disclosure that opens nothing is not offered');
+  assert.equal(chip.getAttribute('aria-expanded'), null);
   assert.equal(paramsOf(h, label), null);
-  assert.equal(h.container.dataset.expanded, 'true');
+  assert.equal(h.container.dataset.expanded, 'false');
 });
 
-test('selection does not collapse expanded controls', async () => {
+test('pinning a stage closes the previously pinned stage', async () => {
   const h = await makeStrip();
   chipByLabel(h, 'camera').dispatch('click');
   chipByLabel(h, 'lens').dispatch('click');
 
   assert.equal(h.store.selectedLabel(), 'lens');
-  assert.ok(paramsOf(h, 'camera'));
-  assert.ok(paramsOf(h, 'lens'));
+  assert.equal(chipByLabel(h, 'camera').getAttribute('aria-expanded'), 'false');
+  assert.equal(chipByLabel(h, 'lens').getAttribute('aria-expanded'), 'true');
   assert.deepEqual(h.selections, ['camera', 'lens']);
 });
 

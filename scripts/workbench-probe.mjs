@@ -72,12 +72,37 @@ async function probeStrip(tab) {
   check(await tab.$('#gui-container > .global-gui') !== null,
     'global controls remain mounted');
 
-  const chips = await tab.$$('.chain-chip');
-  const expanded = await tab.$$('.chain-chip-params');
-  check(expanded.length > 0 && await tab.$('.chain-chip-disclosure') === null,
-    `${expanded.length} stage-control groups stay expanded across ${chips.length} chips`);
+  const initialStages = await tab.$$eval('.chain-chip[aria-expanded]', (nodes) => nodes.map(
+    (node) => ({ expanded: node.getAttribute('aria-expanded'),
+      controls: getComputedStyle(node.querySelector('.chain-chip-params')).display })));
+  check(initialStages.length > 0
+      && initialStages.every((stage) => stage.expanded === 'false'
+        && stage.controls === 'none'),
+  `${initialStages.length} stage cards start as single collapsed header rows`);
   check(await tab.$('.chain-band[data-carrier="color"] .chain-band-add') === null,
     'a domain with no valid stages has no inert + button');
+
+  const hoverHeader = '.chain-chip[data-label="project"] .chain-chip-header';
+  await (await tab.waitForSelector(hoverHeader)).hover();
+  await tab.waitForFunction(() => document.querySelector(
+    '.chain-chip[data-label="project"]')?.getAttribute('aria-expanded') === 'true');
+  const hoverCard = await boxOf(tab, '.chain-chip[data-label="project"]');
+  check(hoverCard.width <= 320,
+    `a transient expanded stage card stays compact (${Math.round(hoverCard.width)}px)`);
+  await tab.mouse.move(0, 0);
+  await tab.waitForFunction(() => document.querySelector(
+    '.chain-chip[data-label="project"]')?.getAttribute('aria-expanded') === 'false');
+  check(true, 'mouse leave closes a transient stage card');
+
+  await (await tab.waitForSelector(hoverHeader)).click();
+  await tab.mouse.move(0, 0);
+  check(await tab.$eval('.chain-chip[data-label="project"]',
+    (node) => node.getAttribute('aria-expanded') === 'true'),
+  'click pins a stage card open after mouse leave');
+  await (await tab.waitForSelector(hoverHeader)).click();
+  check(await tab.$eval('.chain-chip[data-label="project"]',
+    (node) => node.getAttribute('aria-expanded') === 'false'),
+  'clicking a pinned stage header closes it');
 
   const layout = await tab.evaluate(() => {
     const box = (node) => {
@@ -101,14 +126,20 @@ async function probeStrip(tab) {
       separate,
       strip: box(document.getElementById('chain-strip')),
       main: box(document.querySelector('.main-area')),
+      stripOpacity: getComputedStyle(document.getElementById('chain-strip')).opacity,
+      stripPosition: getComputedStyle(document.getElementById('chain-strip')).position,
     };
   });
   check(layout.contained && layout.separate,
     'stage cards stay inside their bands without overlapping');
   check(layout.chipBoxes.every((box) => box.width <= 320),
-    'expanded stage cards have a compact, bounded width');
-  check(layout.strip.height < VIEWPORT.height * 0.55 && layout.main.height > 200,
-    `the pipeline leaves ${Math.round(layout.main.height)}px for the preview`);
+    'collapsed stage headers have a compact, bounded width');
+  check(layout.stripPosition === 'absolute'
+      && Math.abs(layout.strip.top - layout.main.top) < 1
+      && Number(layout.stripOpacity) === 0.9,
+  'the pipeline overlays the preview at 90% opacity');
+  check(layout.main.height > VIEWPORT.height * 0.8,
+    `the preview retains ${Math.round(layout.main.height)}px beneath the pipeline`);
 
   const add = '.chain-band[data-carrier="plane"] .chain-band-add';
   await (await tab.waitForSelector(add)).click();
@@ -153,6 +184,8 @@ async function probeStrip(tab) {
 
   const track = '.chain-chip[data-label="rotate"]'
     + ' .chain-param[data-parameter="rotate.wander"] .chain-param-control';
+  await (await tab.waitForSelector(
+    '.chain-chip[data-label="rotate"] .chain-chip-header')).click();
   const slider = await boxOf(tab, track);
   await tab.mouse.click(slider.x + slider.width * SLIDER_FRACTION, centre(slider).y);
   const shown = Number(await tab.$eval(track, (node) => node.value));
@@ -168,7 +201,7 @@ async function probeStrip(tab) {
     `animation is running after preset/control writes (${animation.text})`);
 
   const panels = await boxOf(tab, '#gui-container');
-  for (const region of ['#chain-strip', '#shader-toolbar']) {
+  for (const region of ['#shader-toolbar']) {
     const box = await boxOf(tab, region);
     check(!overlaps(panels, box), `global controls clear ${region}`);
   }

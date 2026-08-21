@@ -369,9 +369,9 @@ export function createChainStrip({
    * @returns {void}
    */
   const select = (label) => {
-    if (label === store.selectedLabel()) return;
-    if (!store.setSelectedLabel(label)) return;
-    if (label !== null) focusedLabel = label;
+    const selected = label === store.selectedLabel() ? null : label;
+    if (!store.setSelectedLabel(selected)) return;
+    if (selected !== null) focusedLabel = selected;
     render({ focusLabel: label });
     notifySelection();
   };
@@ -624,10 +624,7 @@ export function createChainStrip({
    * @returns {void}
    */
   const chipKeydown = (event, index, entry, crossing, chip) => {
-    const inside = typeof event.target?.closest === 'function'
-      && (event.target.closest('.chain-chip-params') !== null
-        || event.target.closest('.chain-chip-replace') !== null
-        || event.target.closest('.chain-chip-move') !== null);
+    const inside = event.target !== chip;
     if (inside) return;
     const key = event.key;
     if (key === 'ArrowRight' || key === 'ArrowLeft') {
@@ -797,7 +794,8 @@ export function createChainStrip({
     const isBypassed = bypassed.has(entry.label);
     const declared = declarations.filter(
       (declaration) => declaration.id.startsWith(`${entry.label}.`));
-    const expanded = declared.length > 0;
+    const hasParams = declared.length > 0;
+    const expanded = hasParams && isSelected;
     const chip = el('div', 'chain-chip'
       + (crossing ? ' chain-chip--socket' : ' chain-chip--stage')
       + (expanded ? ' chain-chip--expanded' : '')
@@ -808,6 +806,7 @@ export function createChainStrip({
     // hides the chip's inline stage controls from assistive technology.
     chip.setAttribute('role', 'group');
     if (isSelected) chip.setAttribute('aria-current', 'true');
+    if (hasParams) chip.setAttribute('aria-expanded', String(expanded));
     chip.setAttribute('tabindex', tabLabel === entry.label ? '0' : '-1');
     chip.setAttribute('aria-label', `${op.name} · ${entry.label}`
       + (crossing ? `, ${op.input} to ${op.output}` : '')
@@ -816,13 +815,14 @@ export function createChainStrip({
     name.textContent = op.name;
     const label = el('span', 'chain-chip-label');
     label.textContent = `· ${entry.label}`;
-    chip.appendChild(name);
-    chip.appendChild(label);
+    const header = el('div', 'chain-chip-header');
+    header.appendChild(name);
+    header.appendChild(label);
 
     if (crossing) {
       const pair = el('span', 'chain-chip-pair');
       pair.textContent = `${op.input} → ${op.output}`;
-      chip.appendChild(pair);
+      header.appendChild(pair);
       const functionLabel = el('label', 'chain-chip-function-label');
       functionLabel.textContent = op.input === 'plane' && op.output === 'field'
         ? 'Source function' : 'Stage';
@@ -850,7 +850,7 @@ export function createChainStrip({
         commit(store.chain()[index]?.label ?? null);
       });
       functionLabel.appendChild(replacement);
-      chip.appendChild(functionLabel);
+      header.appendChild(functionLabel);
     } else {
       const remove = el('button', 'chain-chip-remove');
       remove.type = 'button';
@@ -860,7 +860,7 @@ export function createChainStrip({
         event.stopPropagation();
         removeChip(index);
       });
-      chip.appendChild(remove);
+      header.appendChild(remove);
       const toggle = el('button', 'chain-chip-bypass');
       toggle.type = 'button';
       toggle.setAttribute('aria-pressed', String(isBypassed));
@@ -870,7 +870,7 @@ export function createChainStrip({
         event.stopPropagation();
         toggleBypass(entry.label);
       });
-      chip.appendChild(toggle);
+      header.appendChild(toggle);
       if (movable) {
         const previous = store.chain()[index - 1];
         const next = store.chain()[index + 1];
@@ -894,14 +894,31 @@ export function createChainStrip({
           event.stopPropagation();
           moveChip(index, index + 2);
         });
-        chip.appendChild(earlier);
-        chip.appendChild(later);
+        header.appendChild(earlier);
+        header.appendChild(later);
       }
     }
 
-    if (expanded) chip.appendChild(paramsElement(entry, declared));
+    chip.appendChild(header);
+    if (hasParams) chip.appendChild(paramsElement(entry, declared));
 
-    chip.addEventListener('click', () => select(entry.label));
+    chip.addEventListener('click', (/** @type {*} */ event) => {
+      const clickedHeader = event.target === chip
+        || event.target?.closest?.('.chain-chip-header') === header;
+      if (clickedHeader) select(entry.label);
+    });
+    if (hasParams) {
+      const setTransientOpen = (open) => {
+        if (store.selectedLabel() === entry.label) return;
+        chip.classList.toggle('chain-chip--expanded', open);
+        chip.setAttribute('aria-expanded', String(open));
+        container.dataset.expanded = String(
+          container.querySelector('.chain-chip--expanded') !== null);
+        if (open) markDeactivated();
+      };
+      chip.addEventListener('mouseenter', () => setTransientOpen(true));
+      chip.addEventListener('mouseleave', () => setTransientOpen(false));
+    }
     chip.addEventListener('keydown',
       (/** @type {*} */ event) => chipKeydown(event, index, entry, crossing, chip));
     return chip;
@@ -1040,7 +1057,8 @@ export function createChainStrip({
 
     container.replaceChildren(actions, scrollButton(viewport, -1), viewport,
       scrollButton(viewport, 1));
-    container.dataset.expanded = String(rows.size > 0);
+    container.dataset.expanded = String(
+      container.querySelector('.chain-chip--expanded') !== null);
     markDeactivated();
 
     const target = focusLabel !== null ? chipByLabel(focusLabel) : null;
