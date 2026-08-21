@@ -31,9 +31,28 @@ const ABSENT_PATHS = [/^\/favicon\.ico$/, /^\/vendor\//];
  */
 const enginePainted = () => !document.getElementById('loading-overlay');
 
+/**
+ * The palette tool's readiness: it fills the effect-recipe list from the
+ * engine's PaletteOps presets, and the markup ships that list holding nothing
+ * but its placeholder option.
+ */
+const paletteRecipesListed = () =>
+  (document.getElementById('effect_recipe_preset')?.children.length ?? 0) > 1;
+
+/**
+ * The solids tool's readiness: the mesh readout is written once the engine's
+ * registry has supplied a solid and the scene has rendered it. Its own draw
+ * count reaches one on the reference sphere the scaffold shows before any mesh
+ * is built.
+ */
+const solidMeshBuilt = () =>
+  (document.getElementById('meshStats')?.textContent ?? '').trim() !== '';
+
 const PAGE_READY = {
   'index.html': enginePainted,
+  'tools/palettes.html': paletteRecipesListed,
   'tools/shader.html': enginePainted,
+  'tools/solids.html': solidMeshBuilt,
 };
 
 /**
