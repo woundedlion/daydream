@@ -53,6 +53,15 @@ const SOURCE = withoutComments(
 
 const WASM_INIT = 'createModuleLoadHandlers(';
 
+test('Curl Facets is offered at both simulator resolutions', () => {
+  for (const roster of ['HiResFavorites', 'LoResFavorites']) {
+    const at = SOURCE.indexOf(`const ${roster} = [`);
+    assert.ok(at >= 0, `daydream.js must still define ${roster}`);
+    assert.match(sliceTo(at, '\n];'), /"CurlFacets"/,
+      `${roster} must offer CurlFacets`);
+  }
+});
+
 /**
  * Extracts the text between a call's parentheses, skipping parens that sit
  * inside strings or template literals.
