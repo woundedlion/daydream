@@ -703,28 +703,28 @@
         "to": "signal-weave-2",
         "path_policy": "parallel",
         "easing": "EASE_IN_OUT_SIN",
-        "duration": 480
+        "duration": 6
       },
       {
         "from": "signal-weave-2",
         "to": "signal-weave-3",
         "path_policy": "parallel",
         "easing": "EASE_IN_OUT_SIN",
-        "duration": 480
+        "duration": 6
       },
       {
         "from": "signal-weave-3",
         "to": "signal-weave-4",
         "path_policy": "parallel",
         "easing": "EASE_IN_OUT_SIN",
-        "duration": 480
+        "duration": 6
       },
       {
         "from": "signal-weave-4",
         "to": "signal-weave",
         "path_policy": "parallel",
         "easing": "EASE_IN_OUT_SIN",
-        "duration": 480
+        "duration": 6
       }
     ],
     "absent_edge_fallback": {
@@ -742,10 +742,10 @@
         "signal-weave-4"
       ],
       "dwell": {
-        "signal-weave": 600,
-        "signal-weave-2": 600,
-        "signal-weave-3": 600,
-        "signal-weave-4": 600
+        "signal-weave": 26,
+        "signal-weave-2": 26,
+        "signal-weave-3": 26,
+        "signal-weave-4": 26
       }
     }
   },

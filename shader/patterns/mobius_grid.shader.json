@@ -630,8 +630,8 @@
     },
     "choreography": {
       "dwell": {
-        "mobius-grid": 600,
-        "mobius-grid-2": 600
+        "mobius-grid": 42,
+        "mobius-grid-2": 42
       },
       "generated_order": [
         "mobius-grid",
@@ -640,14 +640,14 @@
     },
     "edges": [
       {
-        "duration": 480,
+        "duration": 12,
         "easing": "EASE_IN_OUT_SIN",
         "from": "mobius-grid-2",
         "path_policy": "parallel",
         "to": "mobius-grid"
       },
       {
-        "duration": 480,
+        "duration": 12,
         "easing": "EASE_IN_OUT_SIN",
         "from": "mobius-grid",
         "path_policy": "parallel",

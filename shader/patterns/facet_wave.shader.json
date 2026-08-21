@@ -632,8 +632,8 @@
     },
     "choreography": {
       "dwell": {
-        "cup-hue": 600,
-        "wave-mirror": 600
+        "cup-hue": 42,
+        "wave-mirror": 42
       },
       "generated_order": [
         "wave-mirror",
@@ -642,14 +642,14 @@
     },
     "edges": [
       {
-        "duration": 480,
+        "duration": 12,
         "easing": "EASE_IN_OUT_SIN",
         "from": "cup-hue",
         "path_policy": "parallel",
         "to": "wave-mirror"
       },
       {
-        "duration": 480,
+        "duration": 12,
         "easing": "EASE_IN_OUT_SIN",
         "from": "wave-mirror",
         "path_policy": "parallel",
