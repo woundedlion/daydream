@@ -91,7 +91,7 @@ test('insertion backfills presets, fields and staggered groups atomically', asyn
   const result = store.replaceSpan(WARP, 0, [{ operator: 'warp.wave-shear.v2' }]);
   assert.equal(result.ok, true);
   assert.deepEqual(labels(store),
-    ['camera', 'lens', 'project', 'warp1', 'warp2', 'sample', 'transfer', 'colorize']);
+    ['camera', 'lens', 'project', 'warp1', 'warp2', 'sample', 'colorize']);
   const document = store.document();
   const ids = ['speed', 'strength', 'frequency', 'field-angle', 'edge-width', 'envelope']
     .map((field) => `warp1.${field}`);
@@ -172,7 +172,7 @@ test('a crossing cannot be removed, only replaced', async () => {
   ]);
   assert.equal(replacement.ok, true);
   assert.deepEqual(labels(store),
-    ['camera', 'lens', 'project1', 'sample1', 'transfer', 'colorize']);
+    ['camera', 'lens', 'project1', 'sample1', 'colorize']);
   const document = store.document();
   for (const preset of document.preset_bank.presets) {
     assert.equal(preset.values['sample1.complexity'], 0);
@@ -285,7 +285,7 @@ test('bypass shapes the program without touching the document', async () => {
   assert.equal(store.setBypassed('lens', true).ok, true);
   assert.deepEqual(store.bypassedLabels(), ['lens']);
   assert.deepEqual(store.programShape().map((entry) => entry.instance),
-    ['camera', 'project', 'warp2', 'sample', 'transfer', 'colorize']);
+    ['camera', 'project', 'warp2', 'sample', 'colorize']);
   assert.deepEqual(store.programShape()[0],
     { instance: 'camera', operator: 'sphere.rotate.v2' });
   assert.ok(store.chain().some((entry) => entry.label === 'lens'));
@@ -419,7 +419,7 @@ test('legality agrees with replaceSpan', async () => {
 
 test('an exhausted operator budget refuses insertion but not replacement', async () => {
   const catalog = structuredClone(CATALOG);
-  catalog.budgets.max_chain_ops = 7;
+  catalog.budgets.max_chain_ops = 6;
   const store = await makeStore({ catalog });
   for (const entry of store.legalInsertions(WARP)) {
     assert.equal(entry.legal, false);
@@ -433,9 +433,9 @@ test('an exhausted operator budget refuses insertion but not replacement', async
 });
 
 test('arena accounting honors per_param_name_bytes when declared', async () => {
-  // The 7-op fixture chain costs 3587 arena bytes under the engine budgets
+  // The 6-op fixture chain costs 3535 arena bytes under the engine budgets
   // (49-byte overhead + blocks + 34 schema params x 81 name bytes); the
-  // wave-shear insertion brings it to 4162. A budget between the two refuses
+  // wave-shear insertion brings it to 4110. A budget between the two refuses
   // the insertion only while the name figure is counted.
   const catalog = structuredClone(CATALOG);
   catalog.budgets.arena_bytes = 3800;
@@ -504,7 +504,7 @@ test('document() returns an isolated copy', async () => {
   copy.descriptor.chain.length = 0;
   copy.preset_bank.presets[0].values['sample.speed'] = 99;
   assertGreen(store);
-  assert.equal(store.chain().length, 7);
+  assert.equal(store.chain().length, 6);
 });
 
 test('a malformed span or sequence is refused without side effects', async () => {

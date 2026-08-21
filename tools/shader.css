@@ -117,7 +117,7 @@
   background: var(--sidebar-bg);
   color: var(--panel-text);
   font-family: var(--ui-font);
-  overflow-x: auto;
+  overflow: hidden;
 }
 
 .chain-strip-actions {
@@ -155,6 +155,39 @@
   min-width: 100%;
 }
 
+.chain-strip-viewport {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.chain-strip-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.chain-scroll-button {
+  align-self: center;
+  flex: 0 0 auto;
+  width: 1.5rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.25rem;
+  background: var(--panel-bg);
+  color: var(--panel-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.chain-scroll-button:hover,
+.chain-scroll-button:focus-visible {
+  border-color: var(--accent);
+  color: var(--bright-text);
+}
+
 .chain-band {
   position: relative;
   display: flex;
@@ -189,6 +222,7 @@
 }
 
 .chain-chip {
+  position: relative;
   display: flex;
   align-items: baseline;
   gap: 0.25rem;
@@ -202,6 +236,10 @@
   white-space: nowrap;
   cursor: pointer;
   touch-action: none;
+}
+
+.chain-chip--stage {
+  padding-right: 1.5rem;
 }
 
 .chain-chip:hover,
@@ -248,6 +286,13 @@
   font-family: inherit;
   font-size: 0.625rem;
   cursor: pointer;
+}
+
+.chain-chip-remove {
+  position: absolute;
+  top: 0.125rem;
+  right: 0.125rem;
+  line-height: 1;
 }
 
 .chain-chip-remove:hover,
@@ -309,9 +354,6 @@
   flex: 0 0 100%;
   min-width: 0;
   max-width: none;
-  max-height: 9rem;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
   margin-top: 0.25rem;
   padding-top: 0.25rem;
   border-top: 1px solid var(--panel-border);
@@ -357,6 +399,12 @@ select.chain-param-control {
 }
 
 .chain-param-value {
+  width: 4.75rem;
+  min-width: 0;
+  padding: 0.0625rem 0.1875rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.1875rem;
+  background: var(--panel-bg);
   color: var(--muted-text);
   font-family: monospace;
   font-size: 0.625rem;
@@ -421,10 +469,6 @@ select.chain-param-control {
 /* ── Narrow viewports ────────────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
-  .chain-strip-region {
-    overflow-x: auto;
-  }
-
   .chain-strip {
     flex-wrap: nowrap;
   }

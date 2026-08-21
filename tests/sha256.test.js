@@ -91,7 +91,7 @@ test('a committed shader document keeps its recorded digests', () => {
   assert.equal(compiled.status, 'VALID');
   assert.equal(
     compiled.descriptor_digest,
-    'df639eb93c1c7437f204f0283faa8e1d2cf27fb64199c964e161d46a468d187c',
+    '6f11d5472c3a02f6aaac1002b61ed5ff5e8e623f88a4788c35a07b49d24ef878',
   );
   assert.equal(
     compiled.preset_bank_digest,

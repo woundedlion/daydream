@@ -97,7 +97,7 @@ export const FIXED_SHADER_MODE_FIELDS = new Map([
   ]]],
   ['Signal Weight', ['slots.signal_weight', ['None', 'Projection']]],
   ['Value Transfer', ['slots.value_transfer', [
-    'Linear', 'Ridge', 'Iso Contour', 'Smooth Bands',
+    'None', 'Ridge', 'Iso Contour', 'Smooth Bands',
   ]]],
   ['Coverage', ['slots.coverage', [
     'Opaque', 'Projection Weight Squared', 'Value Cutout', 'Edge Fade',

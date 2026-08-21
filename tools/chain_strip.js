@@ -58,15 +58,19 @@ const PALETTE_MARGIN = 8;
 // Steps a slider divides its declared domain into.
 const SLIDER_STEPS = 1000;
 
-// Decimals a slider's value readout carries.
-const VALUE_DECIMALS = 3;
-
 const DEACTIVATED_TITLE = 'Deactivated by the current topology selection';
+
+const MIN_SCROLL_STEP = 160;
+const SCROLL_STEP_RATIO = 0.75;
 
 /** @param {string} value @returns {string} The kebab-case value, title-cased. */
 const titleCase = (value) => value.split('-')
   .map((word) => (word.length === 0 ? word : word[0].toUpperCase() + word.slice(1)))
   .join(' ');
+
+/** @param {number} value @returns {string} A binary32-useful editable value. */
+const formatNumericValue = (value) =>
+  String(Number(Number(value).toPrecision(7)));
 
 /** @param {string} id @returns {string} The `<label>.<field>` id's field segment. */
 const fieldOf = (id) => id.slice(id.indexOf('.') + 1);
@@ -132,6 +136,9 @@ export function createChainStrip({
   const operators = new Map(catalog.operators.map((op) => [op.id, op]));
   /** @param {ChainEntry} entry */
   const opOf = (entry) => /** @type {CatalogOperator} */ (operators.get(entry.operator));
+
+  /** @param {number} index @returns {LegalityEntry[]} */
+  const insertionsAt = (index) => store.legalInsertions(index);
 
   /** @type {string|null} Roving-tabindex position, by instance label. */
   let focusedLabel = null;
@@ -209,20 +216,10 @@ export function createChainStrip({
   };
 
   /**
-   * The gap a band's + affordance aims at: after its selected chip, else the
-   * band's last gap.
    * @param {BandLayout} band - The band.
-   * @returns {number|null} A gap index, or null for a band that holds no gap.
+   * @returns {number|null} The gap after its last stage, or null without a gap.
    */
-  const contextGap = (band) => {
-    if (band.gaps.length === 0) return null;
-    const selected = store.selectedLabel();
-    if (selected !== null) {
-      const at = store.chain().findIndex((entry) => entry.label === selected);
-      if (band.chips.includes(at)) return at + 1;
-    }
-    return band.gaps[band.gaps.length - 1];
-  };
+  const appendGap = (band) => band.gaps[band.gaps.length - 1] ?? null;
 
   /**
    * @param {string} operatorId - A catalog operator.
@@ -233,7 +230,7 @@ export function createChainStrip({
     /** @type {number[]} */
     const gaps = [];
     for (let gap = 0; gap <= chain.length; gap += 1) {
-      const entry = store.legalInsertions(gap)
+      const entry = insertionsAt(gap)
         .find((candidate) => candidate.operator.id === operatorId);
       if (entry?.legal) gaps.push(gap);
     }
@@ -284,7 +281,7 @@ export function createChainStrip({
     const refused = new Map();
     for (let gap = 0; gap <= chain.length; gap += 1) {
       const carrier = carrierAt(gap);
-      for (const entry of store.legalInsertions(gap)) {
+      for (const entry of insertionsAt(gap)) {
         const id = entry.operator.id;
         if (entry.legal) accepted.add(id);
         else if (entry.operator.input === carrier && !refused.has(id))
@@ -501,7 +498,7 @@ export function createChainStrip({
     closePalette();
     const chain = store.chain();
     const entries = kind === 'insert'
-      ? store.legalInsertions(index)
+      ? insertionsAt(index)
       : store.legalReplacements(index, 1);
     const removable = kind === 'replace'
       && opOf(chain[index]).input === opOf(chain[index]).output;
@@ -721,7 +718,7 @@ export function createChainStrip({
     slider.value = String(values[declaration.id]);
     slider.addEventListener('input', (/** @type {*} */ event) => {
       const value = Number(event.target.value);
-      readout.textContent = value.toFixed(VALUE_DECIMALS);
+      readout.value = formatNumericValue(value);
       editParameter(declaration.id, value);
     });
     return slider;
@@ -752,10 +749,26 @@ export function createChainStrip({
         select.setAttribute('aria-label', name);
         row.appendChild(select);
       } else {
-        const readout = el('span', 'chain-param-value');
-        readout.textContent = Number(values[declaration.id]).toFixed(VALUE_DECIMALS);
+        const readout = el('input', 'chain-param-value');
+        readout.type = 'number';
+        readout.value = formatNumericValue(values[declaration.id]);
         const slider = sliderControl(declaration, readout);
         slider.setAttribute('aria-label', name);
+        readout.min = slider.min;
+        readout.max = slider.max;
+        readout.step = slider.step;
+        readout.setAttribute('aria-label', `${name} value`);
+        readout.addEventListener('change', (/** @type {*} */ event) => {
+          const typed = Number(event.target.value);
+          const current = Number(values[declaration.id]);
+          const value = Number.isFinite(typed)
+            ? Math.min(Number(slider.max), Math.max(Number(slider.min), typed))
+            : current;
+          readout.value = formatNumericValue(value);
+          if (value === current) return;
+          slider.value = String(value);
+          editParameter(declaration.id, value);
+        });
         row.appendChild(slider);
         row.appendChild(readout);
       }
@@ -786,7 +799,7 @@ export function createChainStrip({
       (declaration) => declaration.id.startsWith(`${entry.label}.`));
     const expanded = declared.length > 0;
     const chip = el('div', 'chain-chip'
-      + (crossing ? ' chain-chip--socket' : '')
+      + (crossing ? ' chain-chip--socket' : ' chain-chip--stage')
       + (expanded ? ' chain-chip--expanded' : '')
       + (isBypassed ? ' chain-chip--bypassed' : ''));
     chip.dataset.label = entry.label;
@@ -900,8 +913,8 @@ export function createChainStrip({
    */
   const bandAddButton = (band) => {
     const title = titleCase(band.carrier);
-    const gap = contextGap(band);
-    if (gap === null || !store.legalInsertions(gap).some((entry) => entry.legal))
+    const gap = appendGap(band);
+    if (gap === null || !insertionsAt(gap).some((entry) => entry.legal))
       return null;
     const add = el('button', 'chain-band-add');
     add.type = 'button';
@@ -911,6 +924,25 @@ export function createChainStrip({
     add.addEventListener('click',
       () => openPalette({ kind: 'insert', index: gap, anchor: add }));
     return add;
+  };
+
+  /** @param {*} viewport @param {number} direction */
+  const scrollPipeline = (viewport, direction) => {
+    const distance = Math.max(MIN_SCROLL_STEP,
+      Number(viewport.clientWidth ?? 0) * SCROLL_STEP_RATIO);
+    viewport.scrollLeft = Math.max(0,
+      Number(viewport.scrollLeft ?? 0) + direction * distance);
+  };
+
+  /** @param {*} viewport @param {number} direction @returns {*} */
+  const scrollButton = (viewport, direction) => {
+    const button = el('button', 'chain-scroll-button');
+    button.type = 'button';
+    button.setAttribute('aria-label', direction < 0
+      ? 'Scroll shader chain left' : 'Scroll shader chain right');
+    button.textContent = direction < 0 ? '‹' : '›';
+    button.addEventListener('click', () => scrollPipeline(viewport, direction));
+    return button;
   };
 
   /**
@@ -988,7 +1020,26 @@ export function createChainStrip({
       }
     }
 
-    container.replaceChildren(actions, strip);
+    const viewport = el('div', 'chain-strip-viewport');
+    viewport.setAttribute('tabindex', '0');
+    viewport.setAttribute('aria-label', 'Scrollable shader chain');
+    viewport.appendChild(strip);
+    viewport.addEventListener('wheel', (/** @type {*} */ event) => {
+      const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
+        ? event.deltaX : event.deltaY;
+      if (delta === 0) return;
+      viewport.scrollLeft = Math.max(0, Number(viewport.scrollLeft ?? 0) + delta);
+      event.preventDefault();
+    }, { passive: false });
+    viewport.addEventListener('keydown', (/** @type {*} */ event) => {
+      if (event.target !== viewport
+        || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
+      event.preventDefault();
+      scrollPipeline(viewport, event.key === 'ArrowLeft' ? -1 : 1);
+    });
+
+    container.replaceChildren(actions, scrollButton(viewport, -1), viewport,
+      scrollButton(viewport, 1));
     container.dataset.expanded = String(rows.size > 0);
     markDeactivated();
 
