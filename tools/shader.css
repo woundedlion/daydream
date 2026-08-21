@@ -288,15 +288,9 @@
   padding-block: 0.15625rem;
 }
 
-.chain-chip--bypassed .chain-chip-name,
-.chain-chip--bypassed .chain-chip-label {
+.chain-chip--bypassed .chain-chip-name {
   opacity: 0.45;
   text-decoration: line-through;
-}
-
-.chain-chip-label {
-  color: var(--muted-text);
-  font-size: 0.6875rem;
 }
 
 .chain-chip-remove,
