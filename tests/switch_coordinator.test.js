@@ -337,6 +337,26 @@ test('mute() lands a state write without applying it, and reopens after', () => 
   assert.equal(app.applied.effect, 'Beta');
 });
 
+/**
+ * A rollback runs its restore muted, and the applyResolution() it drives mutes
+ * its own off-list effect correction inside that window; an inner mute that
+ * reopened the subscription would expose the rest of the rollback to it.
+ */
+test('a nested mute() leaves the enclosing window muted', () => {
+  const app = makeApp();
+  let insideInner = null;
+
+  app.switches.mute(() => {
+    app.switches.mute(() => { insideInner = app.switches.isRestoring(); });
+    app.appState.set('effect', 'Beta');
+  });
+
+  assert.equal(insideInner, true);
+  assert.deepEqual(app.calls, []);
+  assert.equal(app.applied.effect, 'Alpha');
+  assert.equal(app.switches.isRestoring(), false);
+});
+
 test('mute() reopens the subscription after a throwing write', () => {
   const app = makeApp();
   const failure = new Error('write failed');
