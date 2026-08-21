@@ -160,6 +160,44 @@ test('an enum value outside the option roster is refused by name', () => {
   assert.deepEqual(engine.writes, []);
 });
 
+test('an unresolvable value aborts before the first write', () => {
+  const { engine, order, run } = harness();
+
+  const refusal = run(compiledDocument({
+    'sample.pattern-freq': 3,
+    'sample.coverage-mode': 'shadow',
+    'camera.wander': 0.5,
+  }));
+  assert.match(refusal, /"sample\.coverage-mode" has no option "shadow"/);
+  assert.deepEqual(engine.writes, [],
+    'the values resolve up front, so a late refusal writes none of them');
+  assert.ok(!order.some((step) => step.startsWith('setParameter')));
+});
+
+test('a read-only parameter is refused before the first write', () => {
+  const { engine, run } = harness();
+  const original = engine.getParameterDefinitions.bind(engine);
+  engine.getParameterDefinitions = () => original().map((definition) =>
+    (definition.name === 'camera.wander'
+      ? { ...definition, readonly: true } : definition));
+
+  const refusal = run(compiledDocument({
+    'sample.speed': 0.5, 'camera.wander': 0.5,
+  }));
+  assert.match(refusal, /"camera\.wander" is read-only/);
+  assert.deepEqual(engine.writes, []);
+});
+
+test('a non-numeric value is refused before the first write', () => {
+  const { engine, run } = harness();
+
+  const refusal = run(compiledDocument({
+    'sample.speed': 0.5, 'camera.wander': null,
+  }));
+  assert.match(refusal, /"camera\.wander" has no numeric value/);
+  assert.deepEqual(engine.writes, []);
+});
+
 test('every APPLIED bumps the generation and refreshes the definitions', () => {
   const { engine, run } = harness();
   const before = engine.getParamGeneration();
