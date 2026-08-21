@@ -8,6 +8,14 @@
 # that no longer boots — or a strip whose palettes open off their control and
 # whose chips no longer take a click — blocks the deploy.
 #
+# This repository lands on master by direct push, where the pull_request
+# trigger never fires and deploy.yml's call is the first run — over an already
+# public master. .githooks/pre-push runs the same three scripts before the push
+# completes, the only run that precedes a public master. A `push` trigger here
+# would not add one: deploy.yml already calls this workflow on that event, and a
+# second run would share the concurrency group below and cancel it. The hook's
+# list and the matrix below are one set; move them together.
+#
 # The unit suite runs over tests/fake_dom.js, which has neither layout nor
 # pointer capture, so these are the only jobs that resolve the import map,
 # instantiate the WASM module, drive the render loop, enforce the pages' CSP and
