@@ -232,6 +232,8 @@
       flex-shrink: 0;
       opacity: 0.5;
       transition: opacity 0.2s;
+      /* The grip takes a touch drag, so the page must not scroll under it. */
+      touch-action: none;
     }
 
     .op-item:hover .drag-handle {
@@ -240,6 +242,11 @@
 
     .drag-handle:active {
       cursor: grabbing;
+    }
+
+    /* While a slot the engine rejects is under the pointer. */
+    .drag-handle.drop-blocked {
+      cursor: not-allowed;
     }
 
     .drag-handle svg {
@@ -646,11 +653,11 @@
     import { createMeshRenderer, meshStatsLine, meshCanvasLabel, MAX_INDEX_LABELS }
       from './solid_render.js';
     import { createFrameScheduler, onPageTeardown } from './page_lifecycle.js';
+    import { createPointerDrag } from './pointer_drag.js';
 
     let camera, scene, renderer, controls;
     let meshRenderer = null;
     let labelsContainer;
-    let draggingIndex = -1;
     let createHolosphereModule = null;
 
     // Render materials are configuration-only and identical across updates, so
@@ -1437,11 +1444,6 @@
       titleEl.title = title;
     }
 
-    function enableDrag(e) {
-      const item = e.target.closest('.op-item');
-      if (item) item.draggable = true;
-    }
-
     function reorderOp(from, to) {
       if (to < 0 || to >= state.ops.length || from === to) return;
       const opName = state.ops[from].op;
@@ -1491,107 +1493,122 @@
       return dropSlotIndex(mouseY, [...list.children]);
     }
 
+    // Travel that separates a reorder drag from a press on the grip, replacing
+    // the threshold the browser used to apply before firing dragstart.
+    const DRAG_SLOP_PX = 4;
+
+    /**
+     * Wires one row's reorder drag onto its grip. The pointer is captured on the
+     * grip, so mouse, pen and touch share one path, a press that never travels
+     * leaves no state behind, and a gesture the system takes away arrives as a
+     * cancel rather than stranding the row.
+     * @param {HTMLElement} grip - The row's drag handle.
+     * @param {number} index - The op's position in the chain.
+     * @param {HTMLElement} el - The row element.
+     * @param {HTMLElement} list - The #opsList container.
+     * @returns {void}
+     */
+    function wireRowDrag(grip, index, el, list) {
+      let originY = 0;
+      let dragging = false;
+
+      const clearPreview = () => {
+        el.classList.remove('dragging');
+        grip.classList.remove('drop-blocked');
+        for (const item of list.children) item.style.transform = '';
+      };
+
+      createPointerDrag({
+        element: grip,
+        onStart: (e) => {
+          originY = e.clientY;
+          dragging = false;
+        },
+        onMove: (e) => {
+          if (!dragging) {
+            if (Math.abs(e.clientY - originY) < DRAG_SLOP_PX) return;
+            dragging = true;
+            el.classList.add('dragging');
+            precomputeDropSlots(index).catch(console.error);
+          }
+
+          const targetIndex = getDragTargetIndex(e, list);
+          const items = [...list.children];
+          const draggingItem = items[index];
+          if (!draggingItem) return;
+
+          // An engine-invalid slot gets no insertion preview and no drop cursor.
+          const targetCheck = dropSlotChecks.get(targetIndex);
+          const blocked = Boolean(targetCheck && !targetCheck.ok);
+          grip.classList.toggle('drop-blocked', blocked);
+          if (blocked) {
+            items.forEach((item, idx) => {
+              if (idx !== index) item.style.transform = '';
+            });
+            return;
+          }
+
+          // Amount to visual shift: height of item + gap (space-y-1 is 0.25rem = 4px)
+          const shiftAmount = draggingItem.offsetHeight + 4;
+          items.forEach((item, idx) => {
+            if (idx === index) return;
+            const shift = reorderPreviewShift(index, targetIndex, idx);
+            item.style.transform = shift === 0 ? '' : `translateY(${shift * shiftAmount}px)`;
+          });
+        },
+        onEnd: (e) => {
+          if (!dragging) return;
+          dragging = false;
+          clearPreview();
+
+          const rawTarget = getDragTargetIndex(e, list);
+          const toIndex = dropTargetIndex(rawTarget, index);
+          if (index === toIndex) {
+            renderOps();
+            return;
+          }
+          const slotCheck = dropSlotChecks.get(rawTarget);
+          if (slotCheck && !slotCheck.ok) {
+            showGateMsg(`rejected: ${slotCheck.message}`);
+            renderOps();
+            return;
+          }
+          renderOps(); // snap the drag preview back now; the commit re-renders
+          queueCommit(async () => {
+            const check = await chainIsValid(
+              state.base, movedOps(state.ops, index, toIndex));
+            if (!check.ok) {
+              showGateMsg(`rejected: ${check.message}`);
+              return;
+            }
+            // Re-derived from the live ops: a param edit lands outside the
+            // commit queue, so a clone taken before the await would drop it.
+            state.ops = movedOps(state.ops, index, toIndex);
+            renderOps();
+            update();
+          });
+        },
+        onCancel: () => {
+          dragging = false;
+          clearPreview();
+        },
+      });
+    }
+
     function renderOps() {
       const list = document.getElementById('opsList');
       list.replaceChildren();
-
-      // Container-level Drag Events
-      list.ondragover = (e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-
-        if (draggingIndex === -1) return;
-
-        const targetIndex = getDragTargetIndex(e, list);
-        const items = [...list.children];
-        const draggingItem = items[draggingIndex];
-
-        if (!draggingItem) return;
-
-        // An engine-invalid slot gets no insertion preview and no drop cursor.
-        const targetCheck = dropSlotChecks.get(targetIndex);
-        if (targetCheck && !targetCheck.ok) {
-          e.dataTransfer.dropEffect = 'none';
-          items.forEach((item, idx) => {
-            if (idx !== draggingIndex) item.style.transform = '';
-          });
-          return;
-        }
-
-        // Amount to visual shift: height of item + gap (space-y-1 is 0.25rem = 4px)
-        const shiftAmount = draggingItem.offsetHeight + 4;
-
-        items.forEach((item, idx) => {
-          if (idx === draggingIndex) return;
-          const shift = reorderPreviewShift(draggingIndex, targetIndex, idx);
-          item.style.transform = shift === 0 ? '' : `translateY(${shift * shiftAmount}px)`;
-        });
-      };
-
-      list.ondrop = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const fromIndex = draggingIndex;
-        if (fromIndex === -1) return;
-
-        const rawTarget = getDragTargetIndex(e, list);
-        const toIndex = dropTargetIndex(rawTarget, fromIndex);
-
-        draggingIndex = -1;
-        if (fromIndex === toIndex) {
-          renderOps();
-          return;
-        }
-        const slotCheck = dropSlotChecks.get(rawTarget);
-        if (slotCheck && !slotCheck.ok) {
-          showGateMsg(`rejected: ${slotCheck.message}`);
-          renderOps();
-          return;
-        }
-        renderOps(); // snap the drag preview back now; the commit re-renders
-        queueCommit(async () => {
-          const check = await chainIsValid(
-            state.base, movedOps(state.ops, fromIndex, toIndex));
-          if (!check.ok) {
-            showGateMsg(`rejected: ${check.message}`);
-            return;
-          }
-          // Re-derived from the live ops: a param edit lands outside the commit
-          // queue, so a clone taken before the await would drop it.
-          state.ops = movedOps(state.ops, fromIndex, toIndex);
-          renderOps();
-          update();
-        });
-      };
 
       state.ops.forEach((o, i) => {
         const el = buildOpRow(o, i, {
           opDef: OP_DEFS[o.op],
           count: state.ops.length,
           on: {
-            startDrag: enableDrag,
+            wireDrag: (grip, row) => wireRowDrag(grip, i, row, list),
             move: reorderOp,
             remove: removeOp,
             setParam: updateOpParam,
           },
-        });
-
-        // Item Drag Start/End
-        el.addEventListener('dragstart', (e) => {
-          draggingIndex = i;
-          e.dataTransfer.effectAllowed = 'move';
-          e.dataTransfer.setData('text/plain', i); // Required for Firefox
-          precomputeDropSlots(i).catch(console.error);
-          setTimeout(() => el.classList.add('dragging'), 0);
-        });
-
-        el.addEventListener('dragend', () => {
-          el.draggable = false;
-          el.classList.remove('dragging');
-          draggingIndex = -1;
-          if (list) {
-            [...list.children].forEach(c => c.style.transform = '');
-          }
         });
 
         list.appendChild(el);

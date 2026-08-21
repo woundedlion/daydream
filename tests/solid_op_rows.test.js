@@ -23,23 +23,24 @@ const doc = {
  * @param {number} [index] - Position in the chain.
  * @param {number} [count] - Chain length.
  * @param {{params: Object}} [opDef] - Overrides the OP_DEFS lookup for a name the table has no entry for.
- * @returns {{el: Object, calls: Array<Array<*>>}} The row and the handler call log.
+ * @returns {{el: Object, calls: Array<Array<*>>, wired: Array<Array<*>>}} The row, the handler call log and the grips handed to wireDrag.
  */
 function build(op, index = 0, count = 1, opDef = OP_DEFS[op.op]) {
   const calls = [];
+  const wired = [];
   const record = (name) => (...args) => calls.push([name, ...args]);
   const el = buildOpRow(op, index, {
     opDef,
     count,
     on: {
-      startDrag: record('startDrag'),
+      wireDrag: (...args) => wired.push(args),
       move: record('move'),
       remove: record('remove'),
       setParam: record('setParam'),
     },
     doc,
   });
-  return { el, calls };
+  return { el, calls, wired };
 }
 
 const textOf = (el, selector) => el.querySelector(selector).textContent;
@@ -139,30 +140,32 @@ test('the chain ends disable the move button that would run off them', () => {
   assert.equal(only.querySelector('.move-op-down').disabled, true);
 });
 
-test('the header buttons and grip call their handlers with the row index', () => {
+test('the header buttons call their handlers with the row index', () => {
   const { el, calls } = build({ op: 'kis', params: {} }, 1, 3);
   el.querySelector('.move-op-up').dispatch('click');
   el.querySelector('.move-op-down').dispatch('click');
   el.querySelector('.remove-op-btn').dispatch('click');
-  el.querySelector('.drag-handle').dispatch('mousedown', { kind: 'mouse' });
-  el.querySelector('.drag-handle').dispatch('touchstart', { kind: 'touch' });
 
-  const grip = el.querySelector('.drag-handle');
-  assert.deepEqual(calls.slice(0, 3), [
+  assert.deepEqual(calls, [
     ['move', 1, 0],
     ['move', 1, 2],
     ['remove', 1],
   ]);
-  assert.deepEqual(
-    calls.slice(3).map(([name, ev]) => [name, ev.kind, ev.target === grip]),
-    [
-      ['startDrag', 'mouse', true],
-      ['startDrag', 'touch', true],
-    ],
-  );
 });
 
-test('both parameter inputs report edits, and neither starts a row drag', () => {
+// The grip carries no listener of its own. The page captures the pointer on it
+// (tools/pointer_drag.js), which is what makes mouse and touch reorder over one
+// path and leaves nothing armed behind a press that never dragged.
+test('the row hands its grip and itself to the page drag wiring, once', () => {
+  const { el, wired } = build({ op: 'kis', params: {} }, 1, 3);
+  const grip = el.querySelector('.drag-handle');
+  assert.equal(wired.length, 1, 'the grip is wired exactly once');
+  assert.equal(wired[0][0], grip, 'wireDrag takes the grip');
+  assert.equal(wired[0][1], el, 'wireDrag takes the row the grip belongs to');
+  assert.deepEqual(grip.listeners, [], 'the grip carries no built-in listener');
+});
+
+test('both parameter inputs report their edits', () => {
   const { el, calls } = build({ op: 'truncate', params: { t: 0.33 } }, 2, 4);
   const [row] = el.querySelectorAll('.op-param');
   const range = row.children.find((c) => c.type === 'range');
@@ -171,20 +174,6 @@ test('both parameter inputs report edits, and neither starts a row drag', () => 
   range.dispatch('input', { target: { value: '0.4' } });
   number.dispatch('change', { target: { value: '0.45' } });
   assert.deepEqual(calls, [['setParam', 2, 't', '0.4'], ['setParam', 2, 't', '0.45']]);
-
-  // The chain's reorder listener sits above the row, so a mousedown that
-  // bubbles out of an input would start a drag while the user is scrubbing it.
-  const chain = fakeElement('div');
-  chain.appendChild(el);
-  const reordered = [];
-  chain.addEventListener('mousedown', (e) => reordered.push(e.target));
-
-  range.dispatch('mousedown');
-  number.dispatch('mousedown');
-  assert.deepEqual(reordered, [], 'an input drag would start the row reorder');
-
-  el.dispatch('mousedown');
-  assert.deepEqual(reordered, [el], 'the row body itself still reaches the chain');
 });
 
 test('the drag grip is built as namespaced SVG nodes, not markup', () => {
