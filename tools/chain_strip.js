@@ -793,14 +793,13 @@ export function createChainStrip({
    * @param {ChainEntry} entry - The chain entry.
    * @param {Object} view - Render-pass state.
    * @param {boolean} view.crossing - Whether the operator crosses carriers.
-   * @param {boolean} view.movable - Whether the chip has a gap to move to.
    * @param {string|null} view.selected - The selected label.
    * @param {Set<string>} view.bypassed - The bypassed labels.
    * @param {string|null} view.tabLabel - The roving-tabindex label.
    * @returns {*} The chip element.
    */
   const chipElement = (index, entry, {
-    crossing, movable, selected, bypassed, tabLabel,
+    crossing, selected, bypassed, tabLabel,
   }) => {
     const op = opOf(entry);
     const isSelected = selected === entry.label;
@@ -830,9 +829,9 @@ export function createChainStrip({
     label.textContent = `· ${entry.label}`;
     const header = el('div', 'chain-chip-header');
     header.appendChild(name);
-    header.appendChild(label);
 
     if (crossing) {
+      header.appendChild(label);
       const pair = el('span', 'chain-chip-pair');
       pair.textContent = `${op.input} → ${op.output}`;
       header.appendChild(pair);
@@ -865,51 +864,54 @@ export function createChainStrip({
       functionLabel.appendChild(replacement);
       header.appendChild(functionLabel);
     } else {
-      const remove = el('button', 'chain-chip-remove');
-      remove.type = 'button';
-      remove.setAttribute('aria-label', `Remove ${op.name} · ${entry.label}`);
-      remove.textContent = '✕';
-      remove.addEventListener('click', (/** @type {*} */ event) => {
-        event.stopPropagation();
-        removeChip(index);
-      });
-      header.appendChild(remove);
       const toggle = el('button', 'chain-chip-bypass');
       toggle.type = 'button';
       toggle.setAttribute('aria-pressed', String(isBypassed));
       toggle.setAttribute('aria-label', `Bypass ${op.name} · ${entry.label}`);
-      toggle.textContent = 'bypass';
+      toggle.setAttribute('title', 'Bypass');
+      toggle.textContent = '◉';
       toggle.addEventListener('click', (/** @type {*} */ event) => {
         event.stopPropagation();
         toggleBypass(entry.label);
       });
       header.appendChild(toggle);
-      if (movable) {
-        const previous = store.chain()[index - 1];
-        const next = store.chain()[index + 1];
-        const earlier = el('button', 'chain-chip-move');
-        earlier.type = 'button';
-        earlier.textContent = '‹';
-        earlier.disabled = previous === undefined
-          || opOf(previous).input !== op.input || opOf(previous).output !== op.output;
-        earlier.setAttribute('aria-label', `Move ${op.name} · ${entry.label} earlier`);
-        earlier.addEventListener('click', (/** @type {*} */ event) => {
-          event.stopPropagation();
-          moveChip(index, index - 1);
-        });
-        const later = el('button', 'chain-chip-move');
-        later.type = 'button';
-        later.textContent = '›';
-        later.disabled = next === undefined
-          || opOf(next).input !== op.input || opOf(next).output !== op.output;
-        later.setAttribute('aria-label', `Move ${op.name} · ${entry.label} later`);
-        later.addEventListener('click', (/** @type {*} */ event) => {
-          event.stopPropagation();
-          moveChip(index, index + 2);
-        });
-        header.appendChild(earlier);
-        header.appendChild(later);
-      }
+      const previous = store.chain()[index - 1];
+      const next = store.chain()[index + 1];
+      const earlier = el('button', 'chain-chip-move');
+      earlier.type = 'button';
+      earlier.textContent = '←';
+      earlier.disabled = previous === undefined
+        || opOf(previous).input !== op.input || opOf(previous).output !== op.output;
+      earlier.setAttribute('aria-label', `Move ${op.name} · ${entry.label} earlier`);
+      earlier.setAttribute('title', 'Move earlier');
+      earlier.addEventListener('click', (/** @type {*} */ event) => {
+        event.stopPropagation();
+        moveChip(index, index - 1);
+      });
+      const later = el('button', 'chain-chip-move');
+      later.type = 'button';
+      later.textContent = '→';
+      later.disabled = next === undefined
+        || opOf(next).input !== op.input || opOf(next).output !== op.output;
+      later.setAttribute('aria-label', `Move ${op.name} · ${entry.label} later`);
+      later.setAttribute('title', 'Move later');
+      later.addEventListener('click', (/** @type {*} */ event) => {
+        event.stopPropagation();
+        moveChip(index, index + 2);
+      });
+      header.appendChild(earlier);
+      header.appendChild(later);
+      const remove = el('button', 'chain-chip-remove');
+      remove.type = 'button';
+      remove.setAttribute('aria-label', `Remove ${op.name} · ${entry.label}`);
+      remove.setAttribute('title', 'Delete');
+      remove.textContent = '×';
+      remove.addEventListener('click', (/** @type {*} */ event) => {
+        event.stopPropagation();
+        removeChip(index);
+      });
+      header.appendChild(remove);
+      header.appendChild(label);
     }
 
     chip.appendChild(header);
@@ -1038,7 +1040,7 @@ export function createChainStrip({
         const chip = band.chips[at];
         if (chip !== undefined) {
           element.appendChild(chipElement(chip, chain[chip],
-            { crossing: false, movable: band.chips.length > 1, ...view }));
+            { crossing: false, ...view }));
         }
       }
       const add = bandAddButton(band);
@@ -1046,7 +1048,7 @@ export function createChainStrip({
       strip.appendChild(element);
       if (band.socket !== null) {
         strip.appendChild(chipElement(band.socket, chain[band.socket],
-          { crossing: true, movable: false, ...view }));
+          { crossing: true, ...view }));
       }
     }
 
