@@ -23,7 +23,9 @@ const paramSetResultName = (module, result) =>
  * Every APPLIED setShaderChain bumps the engine's param generation and
  * rebuilds the parameter definitions, so the definitions are snapshot only
  * after the chain lands; enum8 values (topology fields included) are written
- * as the option index that snapshot resolves them to.
+ * as the option index that snapshot resolves them to. Every value is resolved
+ * against that snapshot before the first write, so a value the engine would
+ * refuse aborts the apply with no value written at all.
  *
  * A session bypass compiles a program shape that omits document entries; the
  * omitted instances register no engine parameters, so their preset values are
@@ -63,18 +65,27 @@ export function applyChainDocument({
   const preset = presets.find(
     (/** @type {*} */ candidate) => candidate.preset_id === presetId)
     ?? presets[0];
+  /** @type {Array<[string, number]>} */
+  const writes = [];
   for (const [parameterId, value] of Object.entries(preset?.values ?? {})) {
     const dot = parameterId.indexOf('.');
     if (dot > 0 && bypassed.has(parameterId.slice(0, dot))) continue;
     const definition = definitions.find(
       (candidate) => candidate.name === parameterId);
     if (!definition) return `the chain registered no parameter "${parameterId}"`;
+    if (definition.readonly) return `"${parameterId}" is read-only`;
     let stored = value;
     if (typeof value === 'string') {
       const index = definition.options?.indexOf(value) ?? -1;
       if (index < 0) return `"${parameterId}" has no option "${value}"`;
       stored = index;
     }
+    if (typeof stored !== 'number' || !Number.isFinite(stored))
+      return `"${parameterId}" has no numeric value`;
+    writes.push([parameterId, stored]);
+  }
+
+  for (const [parameterId, stored] of writes) {
     const written = engine.setParameter(parameterId, stored);
     if (written !== module.ParamSetResult.APPLIED)
       return `"${parameterId}" was refused: ${paramSetResultName(module, written)}`;
