@@ -1,9 +1,10 @@
-# The three headless-Chrome jobs. The smoke loads every page site_manifest.txt
+# The four headless-Chrome jobs. The smoke loads every page site_manifest.txt
 # publishes and requires a clean console and a painted frame from each; the
 # workbench probe drives the shader workbench's pipeline strip with a real mouse
 # and requires each pointer gesture to land what it names; the panel probe
 # scrolls the effect panel and requires the offset to survive a rebuild, which
-# only a laid-out scroller can answer. All three run on pull requests for a
+# only a laid-out scroller can answer; the solids probe drags an op row by its
+# grip under both a mouse and a finger. All four run on pull requests for a
 # pre-merge signal, and deploy.yml's `deploy` job needs this workflow, so a page
 # that no longer boots — or a strip whose palettes open off their control and
 # whose chips no longer take a click — blocks the deploy.
@@ -54,7 +55,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
-      # Neither run tells the other anything: a red smoke must not hide which
+      # No run tells the others anything: a red smoke must not hide which
       # workbench gestures also broke.
       fail-fast: false
       matrix:
@@ -65,6 +66,8 @@ jobs:
             script: scripts/workbench-probe.mjs
           - name: Effect panel scroll restoration
             script: scripts/panel-probe.mjs
+          - name: Solids op-chain reorder gestures
+            script: scripts/solids-probe.mjs
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 

@@ -24,7 +24,7 @@ import { unsweepableReason } from './solid_codegen.js';
 /**
  * The row's handlers.
  * @typedef {object} OpRowHandlers
- * @property {(event: Event) => void} startDrag - Begins a reorder drag.
+ * @property {(grip: HTMLElement, row: HTMLElement) => void} wireDrag - Attaches the reorder drag to the row's grip.
  * @property {(from: number, to: number) => void} move - Moves the op one slot.
  * @property {(index: number) => void} remove - Drops the op.
  * @property {(index: number, key: string, value: string) => void} setParam - Writes one parameter.
@@ -99,7 +99,6 @@ function buildParamRow(doc, key, def, value, controlId, opName) {
   const row = doc.createElement('div');
   row.className = 'op-param flex items-center text-[0.6rem] space-x-1';
   row.dataset.key = key;
-  row.draggable = false;
 
   const name = doc.createElement('label');
   name.className = 'w-12 text-slate-400 capitalize truncate';
@@ -170,11 +169,9 @@ export function syncSweepWarning(el, op) {
 export function buildOpRow(op, index, { opDef, count, on, doc = document }) {
   const el = doc.createElement('div');
   el.className = 'op-item flex-col items-stretch text-xs text-indigo-300';
-  el.draggable = false;
 
   const header = doc.createElement('div');
   header.className = 'flex justify-between items-center w-full';
-  header.draggable = false;
 
   const headerLeft = doc.createElement('div');
   headerLeft.className = 'flex items-center';
@@ -196,7 +193,6 @@ export function buildOpRow(op, index, { opDef, count, on, doc = document }) {
 
   const removeButton = buildButton(doc, 'remove-op-btn text-slate-500 hover:text-white',
     '×', `Remove ${op.op} at position ${index + 1}`);
-  removeButton.draggable = false;
   header.append(headerLeft, removeButton);
   el.appendChild(header);
 
@@ -213,15 +209,11 @@ export function buildOpRow(op, index, { opDef, count, on, doc = document }) {
         /** @type {HTMLInputElement} */ (e.target).value;
       range.addEventListener('input', (e) => on.setParam(index, key, readValue(e)));
       number.addEventListener('change', (e) => on.setParam(index, key, readValue(e)));
-      // Don't let an input drag start the row reorder.
-      range.addEventListener('mousedown', (e) => e.stopPropagation());
-      number.addEventListener('mousedown', (e) => e.stopPropagation());
     }
     el.appendChild(controls);
   }
 
-  handle.addEventListener('mousedown', on.startDrag);
-  handle.addEventListener('touchstart', on.startDrag);
+  on.wireDrag(handle, el);
   upButton.addEventListener('click', () => on.move(index, index - 1));
   downButton.addEventListener('click', () => on.move(index, index + 1));
   removeButton.addEventListener('click', () => on.remove(index));
