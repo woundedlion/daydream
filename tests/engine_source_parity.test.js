@@ -95,12 +95,13 @@ function functionBody(source, name) {
  * Evaluates an `inline constexpr float` definition from an engine header.
  * @param {string} source - Header text.
  * @param {string} name - Constant name.
+ * @param {string} path - The header `source` was read from, named in the diagnostic.
  * @param {Object<string, number>} scope - Constants its expression may name.
  * @returns {number} The value, computed in double precision.
  */
-function engineConstant(source, name, scope = {}) {
+function engineConstant(source, name, path, scope = {}) {
   const m = source.match(new RegExp(`inline constexpr float ${name}\\s*=\\s*([^;]+);`));
-  assert.ok(m, `${name} not found in ${MARKER} — the parity reader is out of date`);
+  assert.ok(m, `${name} not found in ${path} — the parity reader is out of date`);
   const expr = m[1].replace(/\s+/g, ' ').replace(/(\d)f\b/g, '$1');
   // Guards the eval below: arithmetic over the named constants, nothing else.
   assert.match(expr, /^[\w\s.+\-*/()]+$/, `${name} = ${expr} is not a plain arithmetic expression`);
@@ -116,12 +117,12 @@ function engineConstant(source, name, scope = {}) {
  */
 test('projection constants match core/math/stereographic.h', { skip: SKIP }, () => {
   const src = header(STEREO_SOURCE);
-  const inf = engineConstant(src, 'STEREO_INF', {}, STEREO_SOURCE);
+  const inf = engineConstant(src, 'STEREO_INF', STEREO_SOURCE);
   assert.equal(MB.STEREO_INF, inf, 'STEREO_INF drifted from the engine sentinel');
   assert.equal(MB.STEREO_POLE_EPS,
-    engineConstant(src, 'STEREO_POLE_EPS', { STEREO_INF: inf }, STEREO_SOURCE),
+    engineConstant(src, 'STEREO_POLE_EPS', STEREO_SOURCE, { STEREO_INF: inf }),
     'STEREO_POLE_EPS drifted from the engine pole cap');
-  assert.equal(MB.STEREO_AZIMUTH_EPS, engineConstant(src, 'STEREO_AZIMUTH_EPS', {}, STEREO_SOURCE),
+  assert.equal(MB.STEREO_AZIMUTH_EPS, engineConstant(src, 'STEREO_AZIMUTH_EPS', STEREO_SOURCE),
     'STEREO_AZIMUTH_EPS drifted from the engine azimuth floor');
 });
 
@@ -132,12 +133,12 @@ test('projection constants match core/math/stereographic.h', { skip: SKIP }, () 
  */
 test('glslProjectionFunctions constants match core/math/stereographic.h', { skip: SKIP }, () => {
   const src = header(STEREO_SOURCE);
-  const inf = engineConstant(src, 'STEREO_INF', {}, STEREO_SOURCE);
+  const inf = engineConstant(src, 'STEREO_INF', STEREO_SOURCE);
   const glsl = MB.glslProjectionFunctions;
   for (const [name, value] of [
     ['STEREO_INF', inf],
-    ['STEREO_POLE_EPS', engineConstant(src, 'STEREO_POLE_EPS', { STEREO_INF: inf }, STEREO_SOURCE)],
-    ['STEREO_AZIMUTH_EPS', engineConstant(src, 'STEREO_AZIMUTH_EPS', {}, STEREO_SOURCE)],
+    ['STEREO_POLE_EPS', engineConstant(src, 'STEREO_POLE_EPS', STEREO_SOURCE, { STEREO_INF: inf })],
+    ['STEREO_AZIMUTH_EPS', engineConstant(src, 'STEREO_AZIMUTH_EPS', STEREO_SOURCE)],
   ]) {
     const m = glsl.match(new RegExp(`const float ${name}\\s*=\\s*([^;]+);`));
     assert.ok(m, `glslProjectionFunctions does not declare ${name}`);
@@ -252,11 +253,11 @@ const PROJECT_DIV_PAIRS = [
  */
 test('stereo and projectDiv match core/math/stereographic.h', { skip: SKIP }, () => {
   const src = header(STEREO_SOURCE);
-  const inf = engineConstant(src, 'STEREO_INF', {}, STEREO_SOURCE);
+  const inf = engineConstant(src, 'STEREO_INF', STEREO_SOURCE);
   const constants = {
     STEREO_INF: inf,
-    STEREO_POLE_EPS: engineConstant(src, 'STEREO_POLE_EPS', { STEREO_INF: inf }, STEREO_SOURCE),
-    STEREO_AZIMUTH_EPS: engineConstant(src, 'STEREO_AZIMUTH_EPS', {}, STEREO_SOURCE),
+    STEREO_POLE_EPS: engineConstant(src, 'STEREO_POLE_EPS', STEREO_SOURCE, { STEREO_INF: inf }),
+    STEREO_AZIMUTH_EPS: engineConstant(src, 'STEREO_AZIMUTH_EPS', STEREO_SOURCE),
   };
   const engineStereo = transpileEngineComplex(src, 'stereo', ['v'], constants);
   const engineProjectDiv = transpileEngineComplex(src, 'project_div', ['num', 'den'], constants);
@@ -670,11 +671,12 @@ test('MORPH_SWEEP matches core/mesh/recipe.h', { skip: SKIP }, () => {
   const graph = header(CONWAY_GRAPH_H);
   const recipe = header(RECIPE_H);
   const clamp = {
-    'ConwayGraph::T_EPS': engineConstant(graph, 'T_EPS'),
-    'ConwayGraph::T_EPS_TRUNCATE_MIN': engineConstant(graph, 'T_EPS_TRUNCATE_MIN'),
-    'ConwayGraph::T_EPS_TRUNCATE_FAR_MAX': engineConstant(graph, 'T_EPS_TRUNCATE_FAR_MAX',
-      { T_EPS_AMBO: engineConstant(graph, 'T_EPS_AMBO') }),
-    CHAMFER_T_MAX: engineConstant(recipe, 'CHAMFER_T_MAX'),
+    'ConwayGraph::T_EPS': engineConstant(graph, 'T_EPS', CONWAY_GRAPH_H),
+    'ConwayGraph::T_EPS_TRUNCATE_MIN': engineConstant(graph, 'T_EPS_TRUNCATE_MIN', CONWAY_GRAPH_H),
+    'ConwayGraph::T_EPS_TRUNCATE_FAR_MAX': engineConstant(
+      graph, 'T_EPS_TRUNCATE_FAR_MAX', CONWAY_GRAPH_H,
+      { T_EPS_AMBO: engineConstant(graph, 'T_EPS_AMBO', CONWAY_GRAPH_H) }),
+    CHAMFER_T_MAX: engineConstant(recipe, 'CHAMFER_T_MAX', RECIPE_H),
   };
   const verdicts = switchReturns(functionBody(recipe, 'is_morphable_step'));
   assert.ok(verdicts.size > 0,
