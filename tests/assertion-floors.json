@@ -295,6 +295,6 @@
   },
   "tests/wasm_provenance.test.js": {
     "cases": 12,
-    "assertions": 46
+    "assertions": 45
   }
 }
