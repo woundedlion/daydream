@@ -21,11 +21,11 @@
   },
   "tests/chain_document_store.test.js": {
     "cases": 34,
-    "assertions": 331
+    "assertions": 328
   },
   "tests/chain_strip.test.js": {
-    "cases": 33,
-    "assertions": 231
+    "cases": 35,
+    "assertions": 238
   },
   "tests/clipboard.test.js": {
     "cases": 7,
@@ -226,8 +226,8 @@
     "assertions": 389
   },
   "tests/shader_workbench.test.js": {
-    "cases": 44,
-    "assertions": 258
+    "cases": 45,
+    "assertions": 278
   },
   "tests/shared.test.js": {
     "cases": 15,
@@ -294,7 +294,7 @@
     "assertions": 34
   },
   "tests/wasm_provenance.test.js": {
-    "cases": 11,
-    "assertions": 34
+    "cases": 12,
+    "assertions": 46
   }
 }

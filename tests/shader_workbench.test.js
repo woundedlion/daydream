@@ -82,12 +82,21 @@ test('the workbench page lays out the toolbar, pipeline and canvas', () => {
   'the engine memory and compute stats stay in the toolbar row');
   assert.match(WORKBENCH,
     /id="shader-document-status"[^>]*role="status"[^>]*aria-live="polite"/);
-  assert.match(WORKBENCH_CSS, /\.chain-strip-region\s*\{[\s\S]*overflow-x:\s*auto/,
+  assert.match(WORKBENCH_CSS, /\.chain-strip-viewport\s*\{[^}]*overflow-x:\s*auto/,
     'expanded chips scroll rather than crushing the bands');
+  assert.match(WORKBENCH_CSS,
+    /\.chain-strip-viewport::-webkit-scrollbar\s*\{[^}]*display:\s*none/,
+  'the pipeline scrollbar stays hidden');
   assert.match(WORKBENCH_CSS, /\.chain-strip\s*\{[^}]*align-items:\s*flex-start/,
     'short domain bands do not stretch to the tallest stage');
   assert.match(WORKBENCH_CSS, /\.chain-band\s*\{[^}]*flex:\s*0 0 auto/,
     'domain bands size to their contents');
+  assert.match(WORKBENCH_CSS,
+    /\.chain-chip-remove\s*\{[^}]*position:\s*absolute[^}]*top:[^}]*right:/,
+  'stage delete controls sit in the upper-right corner');
+  assert.doesNotMatch(WORKBENCH_CSS,
+    /\.chain-chip-params\s*\{[^}]*(?:max-height|overflow-y|scrollbar-gutter):/,
+  'stage parameters remain fully visible without their own scroller');
   assert.match(WORKBENCH_CSS, /\[data-carrier="color"\]/,
     'each carrier domain carries its own hue');
 });
@@ -627,6 +636,8 @@ test('returning to the scratch source reopens the default chain', async () => {
 
 const HEX_WAVE = readFileSync(
   new URL('../shader/patterns/hex_wave.shader.json', import.meta.url), 'utf8');
+const VECTOR_FACETS = readFileSync(
+  new URL('../shader/patterns/vector_facets.shader.json', import.meta.url), 'utf8');
 // No source documents: every load misses the fixed-effect digest catalog and
 // routes onto the chain engine, where the strip mounts.
 const EMPTY_MIGRATION = JSON.stringify({
@@ -762,6 +773,12 @@ function clickPlaneBandEntry(harness, operatorId) {
 const stripChips = (harness) =>
   harness.elements.get('chain-strip').querySelectorAll('.chain-chip');
 
+const displayedParameter = (harness, label, parameterId) => stripChips(harness)
+  .find((chip) => chip.dataset.label === label)
+  .querySelectorAll('.chain-param')
+  .find((row) => row.dataset.parameter === parameterId)
+  .querySelector('.chain-param-value').value;
+
 // §4.5: the workbench opens on a valid, rendering document with the whole
 // authoring surface live — the scratch chain is edited exactly like a load.
 test('the scratch document opens as a live, editable chain', async () => {
@@ -788,8 +805,8 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
   const harness = await editorWorkbench();
   assert.deepEqual(harness.selections, ['ShaderChain', 'ShaderChain']);
   assert.equal(harness.engine.chainCalls.length, 2);
-  assert.equal(harness.engine.chainCalls.at(-1).length, 7);
-  assert.equal(stripChips(harness).length, 7);
+  assert.equal(harness.engine.chainCalls.at(-1).length, 6);
+  assert.equal(stripChips(harness).length, 6);
   assert.equal(harness.elements.get('shader-document-digest').textContent,
     harness.elements.get('shader-document-digest').dataset.digest.slice(0, 12),
     'the toolbar shows the digest abbreviated and carries the whole of it');
@@ -797,16 +814,46 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
   clickPlaneBandEntry(harness, 'warp.wave-shear.v2');
 
   assert.equal(harness.engine.chainCalls.length, 3);
-  assert.equal(harness.engine.chainCalls.at(-1).length, 8);
+  assert.equal(harness.engine.chainCalls.at(-1).length, 7);
   assert.ok(harness.engine.writes.some(([name]) => name === 'warp1.strength'),
     'the re-apply carries the backfilled catalog defaults');
 
   // Save exports the store's edited document, not the load-time compile.
   assert.equal(harness.controller.save(), true);
   const saved = JSON.parse(harness.downloads[0][1]);
-  assert.equal(saved.descriptor.chain.length, 8);
+  assert.equal(saved.descriptor.chain.length, 7);
   assert.ok(Object.keys(saved.preset_bank.presets[0].values)
     .some((id) => id.startsWith('warp1.')));
+});
+
+test('Vector Facets loads its effect preset into the interpreter controls', async () => {
+  const harness = await editorWorkbench({ source: VECTOR_FACETS });
+  const values = JSON.parse(VECTOR_FACETS).preset_bank.presets[0].values;
+
+  assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator), [
+    'sphere.rotate.v2',
+    'sphere.lens.kaleidoscope.v2',
+    'project.gnomonic.v2',
+    'warp.vector-noise.v2',
+    'warp.mirror-tile.v2',
+    'sample.grid.v2',
+    'colorize.generated-palette.v2',
+  ]);
+  for (const [label, parameterId] of [
+    ['camera', 'camera.wander'],
+    ['project', 'project.pole-fade'],
+    ['warp1', 'warp1.strength'],
+    ['warp2', 'warp2.speed'],
+    ['sample', 'sample.pattern-freq'],
+    ['colorize', 'colorize.brightness-depth'],
+  ]) {
+    assert.ok(Math.abs(Number(displayedParameter(harness, label, parameterId))
+      - Number(values[parameterId])) <= 1e-6,
+    `${parameterId} displays the effect preset`);
+    assert.ok(harness.engine.writes.some(([name, value]) =>
+      name === parameterId && value === Number(values[parameterId])),
+    `${parameterId} reaches the interpreter`);
+  }
 });
 
 test('preset and stage writes preserve the animation state', async () => {
@@ -869,7 +916,7 @@ test('a descriptor edit under the compiled build returns the preview to the inte
   assert.equal(harness.selections.at(-1), 'ShaderChain');
   assert.equal(toggle.disabled, true);
   assert.equal(toggle.getAttribute('aria-pressed'), 'false');
-  assert.equal(harness.engine.chainCalls.at(-1).length, 8,
+  assert.equal(harness.engine.chainCalls.at(-1).length, 7,
     'the edited chain is what renders');
   assert.match(status.textContent, /back on the interpreter/);
 });
@@ -913,7 +960,7 @@ test('a Save As copy carries the edits made since the load', async () => {
 
   assert.equal(harness.controller.saveAs(), true);
   const copy = JSON.parse(harness.downloads.at(-1)[1]);
-  assert.equal(copy.descriptor.chain.length, 8);
+  assert.equal(copy.descriptor.chain.length, 7);
   assert.deepEqual(
     validateShaderDocument(copy, { catalog: JSON.parse(ENGINE_CATALOG) }), []);
 });
@@ -955,7 +1002,7 @@ test('a bypass reshapes the engine program while the saved document keeps the st
     .querySelector('.chain-chip-bypass').dispatch('click');
 
   const shape = harness.engine.chainCalls.at(-1);
-  assert.equal(shape.length, 6);
+  assert.equal(shape.length, 5);
   assert.ok(!shape.some((entry) => entry.instance === 'lens'));
   assert.ok(harness.engine.writes.length > writesBefore,
     'the re-apply rewrote the surviving instances');
@@ -965,7 +1012,7 @@ test('a bypass reshapes the engine program while the saved document keeps the st
 
   assert.equal(harness.controller.save(), true);
   const saved = JSON.parse(harness.downloads.at(-1)[1]);
-  assert.equal(saved.descriptor.chain.length, 7);
+  assert.equal(saved.descriptor.chain.length, 6);
   assert.ok(saved.descriptor.chain.some((entry) => entry.label === 'lens'),
     'bypass is session state, never serialized');
 });

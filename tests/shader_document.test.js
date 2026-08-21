@@ -535,7 +535,6 @@ test('a v1 document expands to the deterministic chain of its slots', () => {
     { label: 'project', operator: 'project.equirectangular.v2' },
     { label: 'warp2', operator: 'warp.mirror-tile.v2' },
     { label: 'sample', operator: 'sample.grid.v2' },
-    { label: 'transfer', operator: 'field.transfer.linear.v2' },
     { label: 'colorize', operator: 'colorize.generated-palette.v2' },
   ]);
 

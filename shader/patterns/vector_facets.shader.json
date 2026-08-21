@@ -27,10 +27,6 @@
         "operator": "sample.grid.v2"
       },
       {
-        "label": "transfer",
-        "operator": "field.transfer.linear.v2"
-      },
-      {
         "label": "colorize",
         "operator": "colorize.generated-palette.v2"
       }

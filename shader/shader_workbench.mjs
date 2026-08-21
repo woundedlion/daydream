@@ -791,7 +791,6 @@ const V1_SOURCE_OPERATORS = {
 };
 
 const V1_TRANSFER_OPERATORS = {
-  linear: { operator: 'field.transfer.linear.v2' },
   ridge: { operator: 'field.transfer.ridge.v2' },
   'iso-contour': { operator: 'field.transfer.iso-contour.v2' },
   'smooth-bands': { operator: 'field.transfer.smooth-bands.v2' },
@@ -926,7 +925,7 @@ const v1Slots = (roleNodes) => {
     sample.topology['coverage-mode'] = V1_COVERAGE_MODES[coverage];
   }
 
-  if (material.transfer !== undefined)
+  if (material.transfer !== undefined && material.transfer !== 'linear')
     add('transfer', v1PolicyPick(V1_TRANSFER_OPERATORS, material.transfer, 'stage.material.transfer'));
   if (coverage === 'value-cutout')
     add('cutout', { operator: 'field.coverage.value-cutout.v2' });
