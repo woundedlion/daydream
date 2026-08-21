@@ -508,6 +508,8 @@ function detachedView() {
  */
 function stepCtx(colors) {
   return {
+    // stepSimulation times the draw off the injected window, not a global.
+    win: { performance },
     paused: false,
     stepFrames: 0,
     pixels: colors,
@@ -581,6 +583,7 @@ test('a queued single step advances one frame and spends itself', () => {
  */
 function renderCtx(colors, log) {
   return {
+    win: { performance },
     contextLost: false,
     paused: true,
     stepFrames: 0,

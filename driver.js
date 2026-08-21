@@ -151,7 +151,7 @@ export class Daydream {
    *   through the rest of the app; a driver reads no globals of its own.
    * @param {Document} [dependencies.doc] - Document the canvas and overlays live in.
    * @param {Window|typeof globalThis} [dependencies.win] - Window the pixel
-   *   ratio and the reload are read off.
+   *   ratio, the reload, the resize observer and the frame timer are read off.
    * @param {Navigator} [dependencies.nav] - Navigator carrying the webdriver flag.
    */
   constructor({
@@ -293,7 +293,7 @@ export class Daydream {
     this.fittedDistance = 0;
     this.setCanvasSize();
 
-    this.resizeObserver = new ResizeObserver(() => {
+    this.resizeObserver = new this.win.ResizeObserver(() => {
       this.setCanvasSize();
     });
     this.resizeObserver.observe(this.canvasParent);
@@ -639,11 +639,11 @@ export class Daydream {
     if (isViewLive(this.pixels))
       this.pixels.fill(0);
 
-    const start = performance.now();
+    const start = this.win.performance.now();
     if (adapter) {
       adapter.drawFrame();
     }
-    const duration = performance.now() - start;
+    const duration = this.win.performance.now() - start;
 
     this.updateStats(duration, adapter);
 
