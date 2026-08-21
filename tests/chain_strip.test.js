@@ -170,8 +170,11 @@ test('endomorphisms carry remove and bypass; sockets carry valid selectors', asy
     .querySelector('.chain-chip-function-label').textContent.startsWith('Source function'),
   true);
   const remove = chipByLabel(h, 'lens').querySelector('.chain-chip-remove');
-  assert.equal(remove.textContent, '✕');
+  assert.equal(remove.textContent, '×');
   assert.match(remove.getAttribute('aria-label'), /^Remove .+ · lens$/);
+  const controls = chipByLabel(h, 'camera').querySelector('.chain-chip-header')
+    .querySelectorAll('button');
+  assert.deepEqual(controls.map((button) => button.textContent), ['◉', '←', '→', '×']);
 });
 
 test('pipeline arrows, wheel and background arrow keys scroll the viewport', async () => {
@@ -249,7 +252,7 @@ test('a move the store refuses is announced and leaves the chain alone', async (
     'the refusal reason reaches the shared live region');
 });
 
-test('✕ and Delete remove an endomorphism and re-apply the program', async () => {
+test('× and Delete remove an endomorphism and re-apply the program', async () => {
   const h = await makeStrip();
   chipByLabel(h, 'lens').dispatch('click');
   chipByLabel(h, 'lens').querySelector('.chain-chip-remove').dispatch('click');
@@ -472,7 +475,9 @@ test('reorder buttons replace the chip drag affordance', async () => {
   const h = await makeStrip();
   assert.equal(chipByLabel(h, 'camera').querySelectorAll('.chain-chip-move').length, 2);
   assert.equal(chipByLabel(h, 'lens').querySelectorAll('.chain-chip-move').length, 2);
-  assert.equal(chipByLabel(h, 'warp2').querySelectorAll('.chain-chip-move').length, 0);
+  assert.equal(chipByLabel(h, 'warp2').querySelectorAll('.chain-chip-move').length, 2);
+  assert.equal(chipByLabel(h, 'warp2').querySelectorAll('.chain-chip-move')
+    .every((button) => button.disabled), true);
   assert.equal(chipByLabel(h, 'project').querySelectorAll('.chain-chip-move').length, 0);
 
   const later = chipByLabel(h, 'camera').querySelectorAll('.chain-chip-move')[1];

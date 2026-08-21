@@ -81,16 +81,38 @@ async function probeStrip(tab) {
       && initialStages.every((stage) => stage.expanded === 'false'
         && stage.controls === 'none'),
   `${initialStages.length} stage cards start as single collapsed header rows`);
+  const minimalHeaders = await tab.evaluate(() => {
+    const rotate = document.querySelector('.chain-chip[data-label="rotate"]');
+    const project = document.querySelector('.chain-chip[data-label="project"]');
+    return {
+      icons: [...rotate.querySelectorAll('.chain-chip-header button')]
+        .map((button) => button.textContent),
+      rotateLabel: getComputedStyle(rotate.querySelector('.chain-chip-label')).display,
+      projectLabel: getComputedStyle(project.querySelector('.chain-chip-label')).display,
+      projectSelector: getComputedStyle(
+        project.querySelector('.chain-chip-function-label')).display,
+    };
+  });
+  check(minimalHeaders.icons.join('') === '◉←→×'
+      && minimalHeaders.rotateLabel === 'none'
+      && minimalHeaders.projectLabel === 'none'
+      && minimalHeaders.projectSelector === 'none',
+  'closed cards show only the operation and legal icon controls');
   check(await tab.$('.chain-band[data-carrier="color"] .chain-band-add') === null,
     'a domain with no valid stages has no inert + button');
 
   const hoverHeader = '.chain-chip[data-label="project"] .chain-chip-header';
+  const closedCard = await boxOf(tab, '.chain-chip[data-label="project"]');
   await (await tab.waitForSelector(hoverHeader)).hover();
   await tab.waitForFunction(() => document.querySelector(
     '.chain-chip[data-label="project"]')?.getAttribute('aria-expanded') === 'true');
   const hoverCard = await boxOf(tab, '.chain-chip[data-label="project"]');
-  check(hoverCard.width <= 320,
-    `a transient expanded stage card stays compact (${Math.round(hoverCard.width)}px)`);
+  check(hoverCard.width > closedCard.width,
+    `an open card expands from ${Math.round(closedCard.width)}px to ${Math.round(hoverCard.width)}px`);
+  check(await tab.$eval('.chain-chip[data-label="project"]', (node) =>
+    getComputedStyle(node.querySelector('.chain-chip-label')).display !== 'none'
+      && getComputedStyle(node.querySelector('.chain-chip-function-label')).display !== 'none'),
+  'an open card restores its full header metadata');
   await tab.mouse.move(0, 0);
   await tab.waitForFunction(() => document.querySelector(
     '.chain-chip[data-label="project"]')?.getAttribute('aria-expanded') === 'false');
@@ -105,6 +127,23 @@ async function probeStrip(tab) {
   check(await tab.$eval('.chain-chip[data-label="project"]',
     (node) => node.getAttribute('aria-expanded') === 'false'),
   'clicking a pinned stage header closes it');
+
+  const collapsedDomain = await tab.$eval('.chain-band[data-carrier="sphere"]', (node) => ({
+    band: node.getBoundingClientRect().height,
+    frame: Number.parseFloat(getComputedStyle(node, '::before').height),
+  }));
+  await (await tab.waitForSelector(
+    '.chain-chip[data-label="rotate"] .chain-chip-header')).hover();
+  await tab.waitForFunction(() => document.querySelector(
+    '.chain-chip[data-label="rotate"]')?.getAttribute('aria-expanded') === 'true');
+  const openDomain = await tab.$eval('.chain-band[data-carrier="sphere"]', (node) => ({
+    band: node.getBoundingClientRect().height,
+    frame: Number.parseFloat(getComputedStyle(node, '::before').height),
+  }));
+  check(openDomain.band > collapsedDomain.band
+      && Math.abs(openDomain.frame - collapsedDomain.frame) < 1,
+  `an open stage leaves the domain frame at ${Math.round(openDomain.frame)}px`);
+  await tab.mouse.move(0, 0);
 
   const layout = await tab.evaluate(() => {
     const box = (node) => {
@@ -192,10 +231,14 @@ async function probeStrip(tab) {
     && node.value === 'sample.rings.v2'),
   'the source function changes directly from its selector');
 
+  const sphereBandBefore = await boxOf(tab, '.chain-band[data-carrier="sphere"]');
   await (await tab.waitForSelector(
     '.chain-band[data-carrier="sphere"] .chain-band-add')).click();
   await (await tab.waitForSelector(
     '.chain-palette-entry[data-operator="sphere.lens.twist.v2"]')).click();
+  const sphereBandAfter = await boxOf(tab, '.chain-band[data-carrier="sphere"]');
+  check(sphereBandAfter.width > sphereBandBefore.width,
+    `adding a stage widens its domain (${Math.round(sphereBandBefore.width)}px → ${Math.round(sphereBandAfter.width)}px)`);
   const sphereBefore = await bandChipNames(tab, 'sphere');
   const moveLater = '.chain-band[data-carrier="sphere"]'
     + ' .chain-chip-move[aria-label$="later"]:not(:disabled)';
@@ -207,7 +250,7 @@ async function probeStrip(tab) {
   const track = '.chain-chip[data-label="rotate"]'
     + ' .chain-param[data-parameter="rotate.wander"] .chain-param-control';
   await (await tab.waitForSelector(
-    '.chain-chip[data-label="rotate"] .chain-chip-header')).click();
+    '.chain-chip[data-label="rotate"] .chain-chip-name')).click();
   const slider = await boxOf(tab, track);
   await tab.mouse.click(slider.x + slider.width * SLIDER_FRACTION, centre(slider).y);
   const shown = Number(await tab.$eval(track, (node) => node.value));
