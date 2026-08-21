@@ -76,7 +76,8 @@ const readPinned = (url) => readFileSync(url, 'utf8').replaceAll('\r\n', '\n');
  * @returns {string} The declaration body.
  */
 function interfaceBody(name) {
-  const at = DTS.indexOf(`export interface ${name} {`);
+  const at = DTS.search(
+    new RegExp(`export interface ${name}(?: extends [A-Za-z_]\\w*)? \\{`));
   assert.ok(at >= 0, `holosphere_wasm.d.ts must declare interface ${name}`);
   const end = DTS.indexOf('\n}', at);
   assert.ok(end > at, `interface ${name} must be closed at column 0`);
@@ -121,6 +122,79 @@ test('holosphere_wasm.d.ts declares the engine statics the app calls', () => {
     'the catalog pin below reads this static; the declarations must carry it');
   assert.equal(typeof M.HolosphereEngine.getShaderChainCatalog, 'function',
     'the module must expose getShaderChainCatalog on the constructor');
+});
+
+/**
+ * Members of a named `export interface` and of everything it extends. Only
+ * members at the interface's own indentation count, so the fields of a nested
+ * object type stay out.
+ * @param {string} name - Interface name.
+ * @returns {Map<string, boolean>} Member name to whether it is optional.
+ */
+function interfaceMembers(name) {
+  const base = DTS.match(
+    new RegExp(`export interface ${name} extends ([A-Za-z_]\\w*) \\{`))?.[1];
+  return new Map([
+    ...(base === undefined ? [] : interfaceMembers(base)),
+    ...[...interfaceBody(name).matchAll(/^ {2}(?:readonly )?([A-Za-z_]\w*)(\??):/gm)]
+      .map((match) => [match[1], match[2] === '?']),
+  ]);
+}
+
+/**
+ * Pins one declared object shape against a value the module produced: the
+ * declarations name every key the module returns, and the module returns every
+ * member declared without a `?`.
+ * @param {string} name - Interface name.
+ * @param {*} value - A live instance of the shape.
+ * @returns {void}
+ */
+function assertDeclaredShape(name, value) {
+  const members = interfaceMembers(name);
+  assert.ok(members.size > 0, `${name} must declare at least one member`);
+  const keys = Object.keys(value);
+  for (const key of keys) {
+    assert.ok(members.has(key),
+      `holosphere_wasm.d.ts declares no ${name}.${key}, which the module returns`);
+  }
+  for (const [member, optional] of members) {
+    assert.ok(optional || keys.includes(member),
+      `holosphere_wasm.d.ts declares ${name}.${member}, which the module `
+      + 'does not return');
+  }
+}
+
+// The method roster above is pinned by embind's own prototype; the object
+// shapes those same calls return are not, so a renamed member type-checks and
+// contract-tests green while every read of it answers undefined.
+test('holosphere_wasm.d.ts declares the object shapes the engine returns', () => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+
+  const metrics = engine.getArenaMetrics();
+  assertDeclaredShape('ArenaMetrics', metrics);
+  assertDeclaredShape('ArenaUsage', metrics.persistent_arena);
+  assertDeclaredShape('StackUsage', metrics.stack);
+
+  assert.equal(engine.setEffect('Comets'), M.EffectSetResult.INSTALLED);
+  const toggle = engine.getParameterDefinitions()
+    .find((/** @type {*} */ d) => typeof d.value === 'boolean');
+  assert.ok(toggle, 'Comets must expose a toggle, or this pin has no '
+    + 'BooleanParameterDefinition to check — repoint it at an effect that does');
+  assertDeclaredShape('BooleanParameterDefinition', toggle);
+
+  assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
+  const definitions = engine.getParameterDefinitions();
+  const selector = definitions.find((/** @type {*} */ d) => d.options !== undefined);
+  assert.ok(selector, 'ShaderBall must expose a selector, or this pin never '
+    + 'reaches the optional enum members');
+  for (const definition of [definitions[0], selector]) {
+    assertDeclaredShape('NumericParameterDefinition', definition);
+  }
+
+  const snapshot = engine.getFullConfigSnapshot();
+  assertDeclaredShape('FullConfigSnapshot', snapshot);
+  assertDeclaredShape('FullConfigFieldDefinition',
+    engine.getFullConfigFieldDefinitions()[0]);
 });
 
 // The catalog is the contract the document compiler, the chain editor's
