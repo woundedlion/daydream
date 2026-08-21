@@ -94,18 +94,18 @@ async function probeStrip(tab) {
     return {
       icons: [...rotate.querySelectorAll('.chain-chip-header button')]
         .map((button) => button.textContent),
-      rotateLabel: getComputedStyle(rotate.querySelector('.chain-chip-label')).display,
+      rotateLabel: rotate.querySelector('.chain-chip-label'),
       projectChildren: [...projectHeader.children].map((child) => child.className),
       projectPrefix: functionLabel.firstChild.textContent,
       projectSelector: getComputedStyle(functionLabel).display,
     };
   });
   check(closedHeaders.icons.join('') === '◉←→×'
-      && closedHeaders.rotateLabel !== 'none'
+      && closedHeaders.rotateLabel === null
       && closedHeaders.projectChildren.join('') === 'chain-chip-function-label'
       && closedHeaders.projectPrefix === 'Projection: '
       && closedHeaders.projectSelector !== 'none',
-  'a closed transition card shows only its named selector');
+  'closed domain and transition cards omit instance ids');
   const closedGeometry = await tab.evaluate(() => {
     const box = (selector) => {
       const rect = document.querySelector(selector).getBoundingClientRect();

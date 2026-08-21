@@ -892,8 +892,6 @@ export function createChainStrip({
     } else {
       const name = el('span', 'chain-chip-name');
       name.textContent = op.name;
-      const label = el('span', 'chain-chip-label');
-      label.textContent = `· ${entry.label}`;
       header.appendChild(name);
       const toggle = el('button', 'chain-chip-bypass');
       toggle.type = 'button';
@@ -942,7 +940,6 @@ export function createChainStrip({
         removeChip(index);
       });
       header.appendChild(remove);
-      header.appendChild(label);
     }
 
     chip.appendChild(header);

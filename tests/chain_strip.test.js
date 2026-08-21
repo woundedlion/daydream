@@ -139,7 +139,7 @@ test('the strip lays the chain out as editable carrier bands with sockets betwee
   const camera = chipByLabel(h, 'camera');
   assert.equal(camera.getAttribute('aria-label'), 'Rotate · camera');
   assert.equal(camera.querySelector('.chain-chip-name').textContent, 'Rotate');
-  assert.equal(camera.querySelector('.chain-chip-label').textContent, '· camera');
+  assert.equal(camera.querySelector('.chain-chip-label'), null);
   assert.match(chipByLabel(h, 'project').getAttribute('aria-label'),
     /, sphere to plane$/);
 
@@ -159,6 +159,7 @@ test('endomorphisms carry controls; sockets carry only valid selectors', async (
     assert.ok(chip.querySelector('.chain-chip-remove'), `${label} carries ✕`);
     assert.ok(chip.querySelector('.chain-chip-bypass'), `${label} carries bypass`);
     assert.equal(chip.querySelector('.chain-chip-replace'), null);
+    assert.equal(chip.querySelector('.chain-chip-label'), null);
   }
   for (const label of ['project', 'sample', 'colorize']) {
     const chip = chipByLabel(h, label);
