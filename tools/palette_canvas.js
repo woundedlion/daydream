@@ -212,11 +212,12 @@ export function drawWaveGraph({ canvas, ctx, palette }) {
   ctx.stroke();
 
   // Draw center line (0.5 reference)
+  const yCenter = toY(0.5);
   ctx.strokeStyle = '#475569';
   ctx.setLineDash([5, 5]);
   ctx.beginPath();
-  ctx.moveTo(0, height / 2);
-  ctx.lineTo(width, height / 2);
+  ctx.moveTo(0, yCenter);
+  ctx.lineTo(width, yCenter);
   ctx.stroke();
   ctx.setLineDash([]); // Reset dashed line
 
