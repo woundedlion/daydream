@@ -649,6 +649,7 @@ export function start({
     },
     setParamFilter: (filter) => { paramFilterRef.current = filter; },
     initialEffect: requestedSelection.effect,
+    win,
   }) : null;
 
   testAllController = guiInstance.addSession({ testAll: false }, 'testAll').name('Test All')

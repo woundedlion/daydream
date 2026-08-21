@@ -48,6 +48,7 @@ tools/mobius.html
 tools/palettes.html
 tools/shader.html
 tools/shader.css
+tools/shader_deeplink.js
 tools/shader_documents.js
 tools/solids.html
 tools/tools.css

@@ -8,6 +8,9 @@ import {
 } from '../shader/shader_workbench.mjs';
 import { scratchChainDocument } from '../tools/chain_document_store.js';
 import {
+  decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
+} from '../tools/shader_deeplink.js';
+import {
   applyFixedShaderDocument,
   createShaderDocumentController,
   engineParameterName,
@@ -29,6 +32,35 @@ const ENGINE_CATALOG = readFileSync(
 const SCRATCH = scratchChainDocument(JSON.parse(ENGINE_CATALOG));
 
 restoreDocumentAfterEach();
+
+test('shader state hashes round-trip the complete authoring state', async () => {
+  const state = {
+    document: { document_id: 'study-λ', descriptor: { chain: [] } },
+    preset: 'night',
+    bypassed: ['camera', 'warp1'],
+    paused: true,
+  };
+  const hash = await encodeShaderStateHash(state);
+
+  assert.match(hash, /^#shader=v1\.[A-Za-z0-9_-]+$/);
+  assert.deepEqual(await decodeShaderStateHash(hash), state);
+  assert.equal(await decodeShaderStateHash('#unrelated'), null);
+  await assert.rejects(decodeShaderStateHash('#shader=v1.not-gzip'),
+    /invalid shader link payload/);
+});
+
+test('shader state hash replacement preserves the route and query', () => {
+  const writes = [];
+  const win = {
+    location: { pathname: '/tools/shader.html', search: '?effect=VectorFacets' },
+    history: { replaceState: (_state, _title, url) => writes.push(url) },
+  };
+
+  assert.equal(replaceShaderStateHash('#shader=v1.payload', win), true);
+  assert.deepEqual(writes, [
+    '/tools/shader.html?effect=VectorFacets#shader=v1.payload',
+  ]);
+});
 
 test('simulator exposes Shader as a standalone tool', () => {
   assert.match(INDEX, /href="tools\/shader\.html"[^>]*>Shader/);
@@ -688,14 +720,17 @@ function compiledBuildEngine() {
  * The document controller over the real compiler, the real chain store, and a
  * FakeChainEngine, with the workbench mounts present and hex_wave loaded over
  * the scratch document the page opens on.
- * @param {{source?: string|null, migration?: string}} [seams] - source null
+ * @param {{source?: string|null, migration?: string, hash?: string,
+ *   paused?: boolean}} [seams] - source null
  *   leaves the scratch document loaded.
  * @returns {Promise<Object>} The controller and everything it wrote to.
  */
-async function editorWorkbench({ source = HEX_WAVE, migration = EMPTY_MIGRATION } = {}) {
+async function editorWorkbench({
+  source = HEX_WAVE, migration = EMPTY_MIGRATION, hash = '', paused = false,
+} = {}) {
   const engine = new FakeChainEngine();
   const compiledEngine = compiledBuildEngine();
-  let animationsPaused = false;
+  let animationsPaused = paused;
   const animationWrites = [];
   const writeParameter = engine.setParameter.bind(engine);
   engine.setParameter = (name, value) => {
@@ -725,6 +760,22 @@ async function editorWorkbench({ source = HEX_WAVE, migration = EMPTY_MIGRATION 
   const downloads = [];
   const selections = [];
   const filters = [];
+  const urls = [];
+  const location = {
+    pathname: '/tools/shader.html', search: '?effect=Shader', hash,
+  };
+  const win = {
+    location,
+    history: {
+      replaceState: (_state, _title, url) => {
+        urls.push(url);
+        const next = new URL(url, 'https://example.test');
+        location.pathname = next.pathname;
+        location.search = next.search;
+        location.hash = next.hash;
+      },
+    },
+  };
   const ran = { gui: 0, invalidated: 0 };
   const controller = createShaderDocumentController({
     doc,
@@ -752,13 +803,15 @@ async function editorWorkbench({ source = HEX_WAVE, migration = EMPTY_MIGRATION 
     },
     importCompiler: () => import('../shader/shader_workbench.mjs'),
     download: (filename, source) => downloads.push([filename, source]),
+    win,
   });
   assert.equal(await controller.init(), true);
   if (source !== null)
     assert.equal(await controller.loadSource(source, 'study.shader.json'), true);
+  await controller.flushDeepLink();
   return {
     controller, engine, compiledEngine, elements, downloads, selections, filters, ran,
-    animationWrites, animationsPaused: () => animationsPaused,
+    animationWrites, animationsPaused: () => animationsPaused, urls, win,
   };
 }
 
@@ -808,6 +861,64 @@ test('the scratch document opens as a live, editable chain', async () => {
   clickPlaneBandEntry(harness, 'warp.affine.v2');
 
   assert.equal(harness.engine.chainCalls.at(-1).length, 5);
+});
+
+test('a shader state link restores its document, preset, bypasses, and pause', async () => {
+  const document = JSON.parse(HEX_WAVE);
+  const preset = document.preset_bank.presets[1];
+  preset.values['sample.pattern-freq'] = 7.25;
+  const hash = await encodeShaderStateHash({
+    document,
+    preset: preset.preset_id,
+    bypassed: ['camera'],
+    paused: true,
+  });
+
+  const harness = await editorWorkbench({ source: null, hash });
+
+  assert.equal(harness.elements.get('shader-preset-select').value, preset.preset_id);
+  assert.equal(harness.animationsPaused(), true);
+  assert.ok(harness.engine.writes.some(
+    ([name, value]) => name === 'sample.pattern-freq' && value === 7.25));
+  assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.instance),
+    ['lens', 'project', 'warp2', 'sample', 'colorize']);
+  assert.equal(stripChips(harness).find((chip) => chip.dataset.label === 'camera')
+    .querySelector('.chain-chip-bypass').getAttribute('aria-pressed'), 'true');
+});
+
+test('shader edits keep the full state hash current', async () => {
+  const harness = await editorWorkbench({ source: null });
+  clickPlaneBandEntry(harness, 'warp.affine.v2');
+  stripChips(harness).find((chip) => chip.dataset.label === 'rotate')
+    .querySelector('.chain-chip-bypass').dispatch('click');
+  const value = stripChips(harness).find((chip) => chip.dataset.label === 'sample')
+    .querySelectorAll('.chain-param')
+    .find((row) => row.dataset.parameter === 'sample.pattern-freq')
+    .querySelector('.chain-param-value');
+  value.value = '3.5';
+  value.dispatch('change');
+  harness.elements.get('shader-animation-toggle').dispatch('click');
+  await harness.controller.flushDeepLink();
+
+  const state = await decodeShaderStateHash(harness.win.location.hash);
+  assert.equal(state.document.descriptor.chain.length, 5);
+  assert.equal(state.preset, 'catalog-defaults');
+  assert.deepEqual(state.bypassed, ['rotate']);
+  assert.equal(state.paused, true);
+  assert.equal(state.document.preset_bank.presets[0]
+    .values['sample.pattern-freq'], 3.5);
+});
+
+test('a malformed shader state link falls back to an editable scratch chain', async () => {
+  const harness = await editorWorkbench({
+    source: null, hash: '#shader=v1.not-gzip',
+  });
+
+  assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator),
+    ['sphere.rotate.v2', 'project.stereographic.v2', 'sample.grid.v2',
+      'colorize.generated-palette.v2']);
+  assert.match(harness.elements.get('shader-document-status').textContent,
+    /shader link could not be restored: invalid shader link payload/i);
 });
 
 test('a dynamic document builds the strip, and edits re-apply through the engine', async () => {
