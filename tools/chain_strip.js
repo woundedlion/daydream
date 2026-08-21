@@ -485,8 +485,9 @@ export function createChainStrip({
   /** Removes an open palette without committing anything. */
   const closePalette = () => {
     if (palette === null) return;
-    palette.element.remove();
+    const element = palette.element;
     palette = null;
+    element.remove();
   };
 
   /**
@@ -867,10 +868,13 @@ export function createChainStrip({
       pair.textContent = `${op.input} → ${op.output}`;
       header.appendChild(pair);
       const functionLabel = el('label', 'chain-chip-function-label');
-      functionLabel.textContent = op.input === 'plane' && op.output === 'field'
-        ? 'Source function' : 'Stage';
+      const functionName = op.input === 'sphere' && op.output === 'plane'
+        ? 'Projection'
+        : op.input === 'plane' && op.output === 'field' ? 'Source' : 'Color';
+      functionLabel.textContent = `${functionName}: `;
       const replacement = el('select', 'chain-chip-replace');
-      replacement.setAttribute('aria-label', functionLabel.textContent);
+      replacement.setAttribute('aria-label', functionName === 'Source'
+        ? 'Source function' : functionName);
       for (const legality of store.legalReplacements(index, 1)
         .filter((candidate) => candidate.legal)) {
         const option = el('option', 'chain-chip-replace-option');
