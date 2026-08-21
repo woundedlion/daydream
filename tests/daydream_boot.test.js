@@ -292,3 +292,14 @@ test('narrowing the resolution options rebinds the controller and its handler', 
     'the replacement must re-attach the same handler the original carried, or '
     + 'the dropdown and the muted engine correction diverge');
 });
+
+test('a failed workbench init reports without the page-failure banner', () => {
+  assert.match(wasmReadyBlock(),
+    /shaderDocuments\?\.init\(\)\s*\.catch\(/,
+    'init() is async and the surrounding catch only sees a synchronous throw, '
+    + 'so a dropped rejection reaches the page-failure listener and covers a '
+    + 'running simulator with the fatal banner');
+  assert.match(wasmReadyBlock(), /workbench could not be initialized: \$\{detailText\}`,\s*CONFIG_NOTICE/,
+    'the workbench half must report through the shader config notice, the '
+    + 'owner tag its other messages carry');
+});
