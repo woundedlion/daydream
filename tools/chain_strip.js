@@ -55,8 +55,8 @@
 // Keeps a palette clamped inside the viewport clear of its edge.
 const PALETTE_MARGIN = 8;
 
-// Steps a slider divides its declared domain into.
-const SLIDER_STEPS = 1000;
+// Increments an editable readout's arrow keys divide its declared domain into.
+const READOUT_STEPS = 1000;
 
 const DEACTIVATED_TITLE = 'Deactivated by the current topology selection';
 
@@ -71,6 +71,15 @@ const titleCase = (value) => value.split('-')
 /** @param {number} value @returns {string} A binary32-useful editable value. */
 const formatNumericValue = (value) =>
   String(Number(Number(value).toPrecision(7)));
+
+/**
+ * @param {ParameterDeclaration} declaration - A binary32 declaration.
+ * @returns {string} The increment its numeric readout's arrow keys nudge by.
+ */
+const nudgeStep = (declaration) => {
+  const span = Number(declaration.domain?.maximum) - Number(declaration.domain?.minimum);
+  return span > 0 ? String(span / READOUT_STEPS) : 'any';
+};
 
 /** @param {string} id @returns {string} The `<label>.<field>` id's field segment. */
 const fieldOf = (id) => id.slice(id.indexOf('.') + 1);
@@ -707,11 +716,13 @@ export function createChainStrip({
     const slider = el('input', 'chain-param-control');
     const minimum = Number(declaration.domain?.minimum);
     const maximum = Number(declaration.domain?.maximum);
-    const span = maximum - minimum;
     slider.type = 'range';
     slider.min = String(minimum);
     slider.max = String(maximum);
-    slider.step = span > 0 ? String(span / SLIDER_STEPS) : 'any';
+    // A range input re-snaps its value onto its step grid, so any grid at all
+    // rewrites the authored value the moment the control is touched. Arrow keys
+    // stay usable without one: a step-free range nudges by a hundredth of span.
+    slider.step = 'any';
     slider.value = String(values[declaration.id]);
     slider.addEventListener('input', (/** @type {*} */ event) => {
       const value = Number(event.target.value);
@@ -753,7 +764,9 @@ export function createChainStrip({
         slider.setAttribute('aria-label', name);
         readout.min = slider.min;
         readout.max = slider.max;
-        readout.step = slider.step;
+        // A number input never re-snaps, so the readout carries the finer grid
+        // its arrow keys nudge by.
+        readout.step = nudgeStep(declaration);
         readout.setAttribute('aria-label', `${name} value`);
         readout.addEventListener('change', (/** @type {*} */ event) => {
           const typed = Number(event.target.value);
