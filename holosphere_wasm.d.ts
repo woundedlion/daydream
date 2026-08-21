@@ -6,7 +6,8 @@
  * Holosphere WASM install writes here. The glue itself is a generated install
  * output and is never type-checked (tests/tsconfig_roster.test.js), so this
  * file is what the typecheck sees for the module. It covers the surface the
- * segment pipeline drives; tests/fake_engine.js pins that method roster and all
+ * segment pipeline drives plus the MeshOps and PaletteOps bridges the
+ * standalone tools run on; tests/fake_engine.js pins that method roster and all
  * four result enums — ParamSetResult, ClipSetResult, ResolutionSetResult,
  * EffectSetResult — against the real module, and
  * tests/engine_contract_wasm.test.js pins the declarations below against both.
@@ -198,6 +199,156 @@ export interface HolosphereEngine {
   delete(): void;
 }
 
+/** Usage snapshot of MeshOps' arenas, in bytes; the tooling arenas are its own. */
+export interface MeshArenaMetrics {
+  scratch_arena_a: ArenaUsage;
+  scratch_arena_b: ArenaUsage;
+  persistent_arena: ArenaUsage;
+  tooling_arena: ArenaUsage;
+  tooling_scratch_a: ArenaUsage;
+  tooling_scratch_b: ArenaUsage;
+}
+
+/** One row of the solid registry. */
+export interface SolidRegistryEntry {
+  /** Name fromSolidName() and getRecipe() take. */
+  name: string;
+  /** `Simple` for a registry seed, `Complex` for a recipe-built solid. */
+  category: string;
+}
+
+/** One step of an authored chain, in the engine's own argument units. */
+export interface SolidRecipeStep {
+  op: string;
+  param: number;
+  twist: number;
+}
+
+/** A Complex solid's authored chain: a Simple seed plus the ops applied to it. */
+export interface SolidRecipe {
+  seed: string;
+  ops: SolidRecipeStep[];
+}
+
+/**
+ * Flat face storage: face `i` reads `counts[i]` entries from `indices`,
+ * continuing where face `i - 1` stopped.
+ */
+export interface MeshFaces {
+  indices: Uint16Array;
+  counts: Uint8Array;
+}
+
+/**
+ * A live mesh in the tooling arenas. Every operator answers a new handle or
+ * null, with the reason in MeshOps.getLastResult(); a handle held across
+ * clearToolingMemory() aliases reclaimed storage and is refused as
+ * STALE_WRAPPER.
+ */
+export interface MeshHandle {
+  /** x/y/z per vertex, as a view over the module's memory. */
+  getVertices(): Float32Array | null;
+  getFaces(): MeshFaces | null;
+  /** One classification code per face. */
+  classifyFaces(): Int32Array | null;
+  kis(): MeshHandle | null;
+  ambo(): MeshHandle | null;
+  gyro(): MeshHandle | null;
+  dual(): MeshHandle | null;
+  meta(): MeshHandle | null;
+  needle(): MeshHandle | null;
+  zip(): MeshHandle | null;
+  truncate(t: number): MeshHandle | null;
+  bevel(t: number): MeshHandle | null;
+  chamfer(t: number): MeshHandle | null;
+  expand(t: number): MeshHandle | null;
+  snub(t: number, twist: number): MeshHandle | null;
+  /** Takes the Hankin angle in radians. */
+  hankin(angle: number): MeshHandle | null;
+  relax(iterations: number): MeshHandle | null;
+  /** Embind destructor: releases the C++ instance the handle points at. */
+  delete(): void;
+}
+
+/** The MeshOps class object: solid construction and tooling-arena lifetime. */
+export interface MeshOpsStatics {
+  /** Builds a registered solid; null when the registry carries no such name. */
+  fromSolidName(name: string): MeshHandle | null;
+  /** Every registered solid, the Simple ones first in seed-index order. */
+  getRegistry(): SolidRegistryEntry[];
+  /** A Complex solid's chain; null for a name that carries none. */
+  getRecipe(name: string): SolidRecipe | null;
+  /** Why the last call answered null. */
+  getLastResult(): EnumValue;
+  /** Whether the last call clamped an out-of-domain argument. */
+  getLastAdjusted(): boolean;
+  /** Reclaims the tooling arenas, staling every outstanding MeshHandle. */
+  clearToolingMemory(): void;
+  getArenaMetrics(): MeshArenaMetrics;
+}
+
+/** Why a MeshOps call answered null, compared by identity against the member. */
+export interface MeshOpResultEnum {
+  OK: EnumValue;
+  UNKNOWN_NAME: EnumValue;
+  CONNECTIVITY_OVERFLOW: EnumValue;
+  FACE_DEGREE_OVERFLOW: EnumValue;
+  ARENA_EXHAUSTED: EnumValue;
+  NON_FINITE_ARG: EnumValue;
+  ANGLE_OUT_OF_DOMAIN: EnumValue;
+  STALE_WRAPPER: EnumValue;
+  ARENA_UNAVAILABLE: EnumValue;
+}
+
+/** How one V4 palette compile went; `code` 0 is success. */
+export interface PaletteCompileStatus {
+  code: number;
+  /** Which recipe field an error names. */
+  field: number;
+  /** Bitmask over the recipe fields the compiler wrapped into range. */
+  wrappedFields: number;
+  /** The fields it clamped, in the same bit positions. */
+  clampedFields: number;
+  /** The fields it rewrote into canonical form, in the same bit positions. */
+  canonicalizedFields: number;
+}
+
+/**
+ * One compile and bake. The buffers are absent when the recipe did not compile,
+ * and `diagnostics`/`fallback` also when the bake skipped them. All three alias
+ * the module's memory rather than copying it: the next call into any PaletteOps
+ * rebakes them in place, and heap growth detaches them.
+ */
+export interface PaletteCompileResult {
+  status: PaletteCompileStatus;
+  /** The recipe as the compiler normalized it. */
+  canonicalRecipe?: object;
+  /** 256 sRGB triples. */
+  lut?: Uint8Array;
+  /** Six values per entry: L, C, q, Cmax, hPath, hFinal. */
+  diagnostics?: Float32Array;
+  /** Per entry, non-zero where the color was mapped back into gamut. */
+  fallback?: Uint8Array;
+}
+
+/** One effect-owned recipe the palette tool offers as a starting point. */
+export interface PaletteEffectPreset {
+  name: string;
+  /** True where the effect randomizes the base hue at runtime. */
+  randomHue: boolean;
+  recipe: object;
+}
+
+/** The engine's V4 palette recipe compiler, as tools/palette_math.js drives it. */
+export interface PaletteOps {
+  compileAndBakeV4(recipe: object): PaletteCompileResult;
+  /** compileAndBakeV4 plus the per-entry diagnostics and gamut-fallback flags. */
+  inspectV4(recipe: object): PaletteCompileResult;
+  effectPresetsV4(): PaletteEffectPreset[];
+  /** Embind destructor: releases the C++ instance the handle points at. */
+  delete(): void;
+}
+
 export interface HolosphereModule {
   HolosphereEngine: {
     new (): HolosphereEngine;
@@ -241,6 +392,9 @@ export interface HolosphereModule {
     UNKNOWN_EFFECT: EnumValue;
     UNSUPPORTED_RESOLUTION: EnumValue;
   };
+  MeshOps: MeshOpsStatics;
+  MeshOpResult: MeshOpResultEnum;
+  PaletteOps: { new (): PaletteOps };
 }
 
 /**
