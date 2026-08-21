@@ -28,3 +28,8 @@ docs/screenshots/**        binary
 # catalog joins them so the engine-emitted replacement diffs cleanly.
 shader/engine_catalog.json text eol=lf
 shader/patterns/**         text eol=lf
+
+# Installed verbatim from the engine's LF-pinned copies; without this a Windows
+# install commits CRLF here and forks the mirror from the digests, which are LF.
+shader/sha256.mjs          text eol=lf
+shader/shader_workbench.mjs text eol=lf
