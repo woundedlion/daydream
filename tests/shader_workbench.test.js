@@ -639,6 +639,27 @@ test('an effect the preview engine rejects leaves the export disabled', async ()
   assert.equal(harness.controller.save(), false);
 });
 
+// README §9: unknown or invalid semantics leave the current preview untouched,
+// so a compiler that throws on the input rather than diagnosing it must not
+// take the loaded document down with it either.
+test('a compile that throws is reported and leaves the loaded document previewing', async () => {
+  const harness = workbench();
+  await harness.controller.init();
+  assert.equal(await harness.controller.loadSource(
+    shaderDocument({ digest: 'digest-study' }), 'study.shader.json'), true);
+  const installs = harness.selections.length;
+
+  assert.equal(
+    await harness.controller.loadSource('{ not json', 'broken.shader.json'), false);
+  const status = harness.elements.get('shader-document-status');
+  assert.equal(status.dataset.status, 'error');
+  assert.match(status.textContent, /could not be compiled/);
+  assert.equal(harness.selections.length, installs,
+    'a refused load must not reinstall the preview effect');
+  assert.equal(harness.elements.get('shader-document-save').disabled, false,
+    'the loaded document is still the one Save writes');
+});
+
 // §4.4: every edit is a document edit, so Save serializes the document
 // rather than capturing state only the engine holds.
 test('saving exports the document, harvesting nothing from the engine', async () => {
@@ -754,6 +775,7 @@ function compiledBuildEngine() {
  */
 async function editorWorkbench({
   source = HEX_WAVE, migration = EMPTY_MIGRATION, hash = '', paused = false,
+  selectEffect = () => true,
 } = {}) {
   const engine = new FakeChainEngine();
   const compiledEngine = compiledBuildEngine();
@@ -811,6 +833,7 @@ async function editorWorkbench({
     getModule: () => MODULE,
     selectEffect: (effect) => {
       selections.push(effect);
+      if (!selectEffect(effect)) return false;
       current = effect === 'ShaderChain' ? engine : compiledEngine;
       return true;
     },
@@ -889,6 +912,23 @@ test('the scratch document opens as a live, editable chain', async () => {
   clickPlaneBandEntry(harness, 'warp.affine.v2');
 
   assert.equal(harness.engine.chainCalls.at(-1).length, 5);
+});
+
+// The load that replaces a document tears its editor down; a load the preview
+// engine then refuses would otherwise leave the workbench with none.
+test('an effect the engine rejects leaves the loaded chain editor standing', async () => {
+  let installs = true;
+  const harness = await editorWorkbench({ selectEffect: () => installs });
+  const before = stripChips(harness).map((chip) => chip.dataset.label);
+  assert.ok(before.length > 0, 'the fixture must open with an editor to keep');
+
+  installs = false;
+  assert.equal(
+    await harness.controller.loadSource(HEX_WAVE, 'other.shader.json'), false);
+  assert.match(harness.elements.get('shader-document-status').textContent,
+    /rejected effect "ShaderChain"/);
+  assert.deepEqual(stripChips(harness).map((chip) => chip.dataset.label), before,
+    'the refused load must leave the editor it would have replaced');
 });
 
 test('a shader state link restores its document, preset, bypasses, and pause', async () => {

@@ -513,8 +513,18 @@ export function createShaderDocumentController({
                             precompiled = null, session = null) => {
     linkGeneration += 1;
     compiler ??= await importCompiler();
-    const compiled = precompiled
-      ?? compiler.compileShaderDocument(source, { catalog: operatorCatalog });
+    let compiled = precompiled;
+    if (compiled === null) {
+      // The compiler answers a malformed document with diagnostics, so anything
+      // thrown here is the compiler itself failing on this input.
+      try {
+        compiled = compiler.compileShaderDocument(source, { catalog: operatorCatalog });
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        show(`The document could not be compiled: ${detail}`, true);
+        return false;
+      }
+    }
     if (compiled.status !== 'VALID') {
       show(diagnosticText(compiled), true);
       return false;
@@ -524,11 +534,11 @@ export function createShaderDocumentController({
     // parity toggle to the promoted build.
     const official = [...catalog.values()].find((candidate) =>
       candidate.descriptorDigest === compiled.descriptor_digest) ?? null;
-    teardownChainUi();
     if (!selectEffect(CHAIN_EFFECT)) {
       show(`The preview engine rejected effect "${CHAIN_EFFECT}".`, true);
       return false;
     }
+    teardownChainUi();
     active = {
       compiled,
       filename,
