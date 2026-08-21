@@ -1,5 +1,6 @@
 #!/bin/sh
-# Mirror of .github/workflows/js-unit-suite.yml, run before every push.
+# Mirror of .github/workflows/js-unit-suite.yml and browser-smoke.yml, run
+# before every push.
 #
 # js-tests.yml fires on pull_request only, and daydream lands directly on
 # master, so without this hook the first CI run of the suite is deploy.yml's
@@ -81,4 +82,22 @@ fi
 # Out of the tree before the suite runs, which walks it.
 rm -f "$tmp"
 
-npm test
+npm test || exit 1
+
+# The three headless-Chrome probes of .github/workflows/browser-smoke.yml. That
+# workflow fires on pull_request and from deploy.yml's gate, so on this repo's
+# landing path its first run is after the push, over an already public master.
+# The suite above runs against tests/fake_dom.js, which has neither layout nor
+# pointer capture; these scripts are the only checks that resolve the import
+# map, instantiate the WASM module under each page's CSP, drive real pointer
+# gestures and measure where an element lands. They cost a few minutes, a
+# fraction of the suite above.
+# A machine with no browser cannot run them at all; deploy.yml still does.
+if ! node -e 'import("./scripts/browser.mjs").then((m) => m.resolveBrowser())' 2>/dev/null; then
+	echo "pre-push: no Chrome, Chromium or Edge found, so the browser probes did not run. Set CHROME_PATH to gate layout, CSP and WASM boot here." >&2
+	exit 0
+fi
+
+for probe in scripts/browser-smoke.mjs scripts/workbench-probe.mjs scripts/panel-probe.mjs; do
+	node "$probe" || exit 1
+done
