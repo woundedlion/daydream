@@ -1067,12 +1067,9 @@ export function createChainStrip({
       heading.setAttribute('aria-hidden', 'true');
       heading.textContent = title;
       element.appendChild(heading);
-      for (const [at] of band.gaps.entries()) {
-        const chip = band.chips[at];
-        if (chip !== undefined) {
-          element.appendChild(chipElement(chip, chain[chip],
-            { crossing: false, ...view }));
-        }
+      for (const chip of band.chips) {
+        element.appendChild(chipElement(chip, chain[chip],
+          { crossing: false, ...view }));
       }
       const add = bandAddButton(band);
       if (add !== null) element.appendChild(add);
