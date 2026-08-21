@@ -14,6 +14,8 @@ const PAGE = 'tools/shader.html';
 const VIEWPORT = { width: 1674, height: 543 };
 const TIMEOUT_MS = 90_000;
 const SLIDER_FRACTION = 0.75;
+// A fraction of a domain that lands on no round step grid.
+const OFF_GRID_FRACTION = 0.3170159;
 const VALUE_TOLERANCE = 1e-4;
 
 /** @param {import('puppeteer-core').Page} tab @param {string} selector */
@@ -140,6 +142,26 @@ async function probeStrip(tab) {
   'the pipeline overlays the preview at 90% opacity');
   check(layout.main.height > VIEWPORT.height * 0.8,
     `the preview retains ${Math.round(layout.main.height)}px beneath the pipeline`);
+
+  // A `<input type=range>` re-snaps its value onto its step grid, and a fake DOM
+  // does not: only a real browser shows whether an authored value survives being
+  // written to the control it is edited through.
+  const held = await tab.$$eval('.chain-param-control[type="range"]', (nodes, fraction) => nodes
+    .filter((node) => node instanceof HTMLInputElement)
+    .map((node) => {
+      const minimum = Number(node.min);
+      const probe = minimum + (Number(node.max) - minimum) * fraction;
+      const authored = node.value;
+      node.value = String(probe);
+      const kept = Math.abs(Number(node.value) - probe) <= Math.abs(probe) * 1e-6;
+      node.value = authored;
+      const row = node.closest('.chain-param');
+      return { kept, parameter: row instanceof HTMLElement ? row.dataset.parameter ?? '' : '' };
+    }), OFF_GRID_FRACTION);
+  const snapped = held.filter((entry) => !entry.kept).map((entry) => entry.parameter);
+  check(held.length > 0 && snapped.length === 0,
+    `${held.length} inline sliders hold an off-grid value unsnapped`
+      + (snapped.length > 0 ? ` (${snapped.join(', ')} re-snapped)` : ''));
 
   const add = '.chain-band[data-carrier="plane"] .chain-band-add';
   await (await tab.waitForSelector(add)).click();
