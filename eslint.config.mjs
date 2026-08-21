@@ -36,7 +36,9 @@ export default [
     // scripts/count-assertions.mjs wraps node:assert's function properties; the
     // callable default export is a binding inside the builtin and cannot be
     // wrapped, so `assert(x)` asserts uncounted and sits below its file's
-    // committed floor, deletable without tripping the ratchet.
+    // committed floor, deletable without tripping the ratchet. It counts
+    // invocations, not outcomes, so an assertion whose subject is a literal
+    // holds that floor while covering nothing.
     files: ['tests/**/*.js'],
     rules: {
       'no-restricted-syntax': ['error', {
@@ -44,6 +46,15 @@ export default [
         message:
           'Call node:assert through a property (assert.ok(x)): a bare assert(x) ' +
           'is not counted by scripts/count-assertions.mjs.',
+      }, {
+        selector:
+          'CallExpression[callee.object.name="assert"][callee.property.name!="fail"]' +
+          ':matches([arguments.0.type="Literal"],' +
+          ' [arguments.0.type="TemplateLiteral"][arguments.0.expressions.length=0])',
+        message:
+          'Assert a computed value, not a literal: assert.ok(true) runs, counts, ' +
+          'and holds its floor in tests/assertion-floors.json while ' +
+          'testing nothing.',
       }],
     },
   },
