@@ -204,7 +204,7 @@
   content: '';
   position: absolute;
   z-index: 0;
-  top: -1px;
+  top: 0;
   right: -1px;
   left: -1px;
   height: 2rem;
@@ -278,9 +278,14 @@
 
 .chain-chip--socket {
   align-self: flex-start;
+  margin-top: 0.3125rem;
   border-style: dashed;
   border-color: var(--muted-text);
   background: var(--panel-bg);
+}
+
+.chain-chip--socket:not(.chain-chip--expanded) {
+  padding-block: 0.15625rem;
 }
 
 .chain-chip--bypassed .chain-chip-name,
@@ -289,8 +294,7 @@
   text-decoration: line-through;
 }
 
-.chain-chip-label,
-.chain-chip-pair {
+.chain-chip-label {
   color: var(--muted-text);
   font-size: 0.6875rem;
 }

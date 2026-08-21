@@ -86,23 +86,46 @@ async function probeStrip(tab) {
         && stage.controlsHeight === 0
         && stage.controlsVisibility === 'hidden'),
   `${initialStages.length} stage cards start as single collapsed header rows`);
-  const minimalHeaders = await tab.evaluate(() => {
+  const closedHeaders = await tab.evaluate(() => {
     const rotate = document.querySelector('.chain-chip[data-label="rotate"]');
     const project = document.querySelector('.chain-chip[data-label="project"]');
+    const projectHeader = project.querySelector('.chain-chip-header');
+    const functionLabel = project.querySelector('.chain-chip-function-label');
     return {
       icons: [...rotate.querySelectorAll('.chain-chip-header button')]
         .map((button) => button.textContent),
       rotateLabel: getComputedStyle(rotate.querySelector('.chain-chip-label')).display,
-      projectLabel: getComputedStyle(project.querySelector('.chain-chip-label')).display,
-      projectSelector: getComputedStyle(
-        project.querySelector('.chain-chip-function-label')).display,
+      projectChildren: [...projectHeader.children].map((child) => child.className),
+      projectPrefix: functionLabel.firstChild.textContent,
+      projectSelector: getComputedStyle(functionLabel).display,
     };
   });
-  check(minimalHeaders.icons.join('') === '◉←→×'
-      && minimalHeaders.rotateLabel !== 'none'
-      && minimalHeaders.projectLabel !== 'none'
-      && minimalHeaders.projectSelector !== 'none',
-  'closed cards show the complete header');
+  check(closedHeaders.icons.join('') === '◉←→×'
+      && closedHeaders.rotateLabel !== 'none'
+      && closedHeaders.projectChildren.join('') === 'chain-chip-function-label'
+      && closedHeaders.projectPrefix === 'Projection: '
+      && closedHeaders.projectSelector !== 'none',
+  'a closed transition card shows only its named selector');
+  const closedGeometry = await tab.evaluate(() => {
+    const box = (selector) => {
+      const rect = document.querySelector(selector).getBoundingClientRect();
+      return { top: rect.top, height: rect.height };
+    };
+    const band = document.querySelector('.chain-band[data-carrier="sphere"]');
+    return {
+      domain: box('.chain-chip[data-label="rotate"]'),
+      transition: box('.chain-chip[data-label="project"]'),
+      frameTop: Number.parseFloat(getComputedStyle(band, '::before').top),
+    };
+  });
+  check(Math.abs(closedGeometry.transition.top - closedGeometry.domain.top) < 1
+      && Math.abs(closedGeometry.transition.height - closedGeometry.domain.height) < 1,
+  `closed domain/transition cards align at ${Math.round(closedGeometry.domain.top)}`
+    + `/${Math.round(closedGeometry.transition.top)}px and stand `
+    + `${Math.round(closedGeometry.domain.height)}`
+    + `/${Math.round(closedGeometry.transition.height)}px tall`);
+  check(closedGeometry.frameTop >= 0,
+    'domain frames begin inside the vertical clipping boundary');
   check(await tab.$('.chain-band[data-carrier="color"] .chain-band-add') === null,
     'a domain with no valid stages has no inert + button');
 
@@ -119,20 +142,23 @@ async function probeStrip(tab) {
       && Math.abs(openHeader.height - closedHeader.height) < 1,
   `the header stays ${Math.round(openHeader.width)}×${Math.round(openHeader.height)}px when open`);
   check(await tab.$eval('.chain-chip[data-label="project"]', (node) =>
-    getComputedStyle(node.querySelector('.chain-chip-label')).display !== 'none'
+    node.querySelector('.chain-chip-name') === null
+      && node.querySelector('.chain-chip-label') === null
+      && node.querySelector('.chain-chip-pair') === null
       && getComputedStyle(node.querySelector('.chain-chip-function-label')).display !== 'none'),
-  'an open card keeps its full header metadata');
+  'an open transition card keeps the same selector-only header');
   await tab.mouse.move(0, 0);
   await tab.waitForFunction(() => document.querySelector(
     '.chain-chip[data-label="project"]')?.getAttribute('aria-expanded') === 'false');
   check(true, 'mouse leave closes a transient stage card');
 
-  await (await tab.waitForSelector(hoverHeader)).click();
+  await tab.mouse.click(closedCard.x + 2, closedCard.y + closedCard.height / 2);
   await tab.mouse.move(0, 0);
   check(await tab.$eval('.chain-chip[data-label="project"]',
     (node) => node.getAttribute('aria-expanded') === 'true'),
   'click pins a stage card open after mouse leave');
-  await (await tab.waitForSelector(hoverHeader)).click();
+  const pinnedCard = await boxOf(tab, '.chain-chip[data-label="project"]');
+  await tab.mouse.click(pinnedCard.x + 2, pinnedCard.y + pinnedCard.height / 2);
   check(await tab.$eval('.chain-chip[data-label="project"]',
     (node) => node.getAttribute('aria-expanded') === 'false'),
   'clicking a pinned stage header closes it');

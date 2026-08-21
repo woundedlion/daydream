@@ -855,18 +855,9 @@ export function createChainStrip({
     chip.setAttribute('aria-label', `${op.name} · ${entry.label}`
       + (crossing ? `, ${op.input} to ${op.output}` : '')
       + (isBypassed ? ', bypassed' : ''));
-    const name = el('span', 'chain-chip-name');
-    name.textContent = op.name;
-    const label = el('span', 'chain-chip-label');
-    label.textContent = `· ${entry.label}`;
     const header = el('div', 'chain-chip-header');
-    header.appendChild(name);
 
     if (crossing) {
-      header.appendChild(label);
-      const pair = el('span', 'chain-chip-pair');
-      pair.textContent = `${op.input} → ${op.output}`;
-      header.appendChild(pair);
       const functionLabel = el('label', 'chain-chip-function-label');
       const functionName = op.input === 'sphere' && op.output === 'plane'
         ? 'Projection'
@@ -899,6 +890,11 @@ export function createChainStrip({
       functionLabel.appendChild(replacement);
       header.appendChild(functionLabel);
     } else {
+      const name = el('span', 'chain-chip-name');
+      name.textContent = op.name;
+      const label = el('span', 'chain-chip-label');
+      label.textContent = `· ${entry.label}`;
+      header.appendChild(name);
       const toggle = el('button', 'chain-chip-bypass');
       toggle.type = 'button';
       toggle.setAttribute('aria-pressed', String(isBypassed));
