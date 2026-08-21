@@ -104,7 +104,7 @@ export class EffectSidebar {
     this.listEl.addEventListener('scroll', this.onScrollBound, { passive: true });
     /** @type {ResizeObserver|null} */
     this.resizeObs = new this.win.ResizeObserver(this.onResizeBound);
-    this.resizeObs?.observe(this.listEl);
+    this.resizeObs.observe(this.listEl);
 
     this.container.appendChild(this.heading);
     this.container.appendChild(this.sortRow);
