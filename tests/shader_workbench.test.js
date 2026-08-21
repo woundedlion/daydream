@@ -12,6 +12,7 @@ import {
 } from '../tools/shader_deeplink.js';
 import {
   applyFixedShaderDocument,
+  bakedTopologyFields,
   createShaderDocumentController,
   engineParameterName,
 } from '../tools/shader_documents.js';
@@ -192,6 +193,7 @@ test('the alias table keys stay frozen to the pre-spec promoted labels', () => {
 });
 
 const MODULE = { ParamSetResult };
+const BAKED = bakedTopologyFields(JSON.parse(ENGINE_CATALOG));
 
 const fixedDocument = () => ({ document: {
   preset_bank: { presets: [
@@ -226,7 +228,7 @@ test('a fixed-pipeline preset is staged on the engine preset it names', () => {
   const engine = fixedEngine(() => true);
 
   assert.equal(applyFixedShaderDocument(
-    engine, MODULE, fixedDocument(), 'dusk', ['noon', 'dusk']), null);
+    engine, MODULE, fixedDocument(), 'dusk', ['noon', 'dusk'], BAKED), null);
   assert.deepEqual(engine.selected, ['dusk']);
   assert.deepEqual(engine.writes, [['Pattern Freq', 5]]);
 });
@@ -238,7 +240,7 @@ test('a preset the effect does not carry falls back to its first reference', () 
   const engine = fixedEngine(() => true);
 
   assert.equal(applyFixedShaderDocument(
-    engine, MODULE, fixedDocument(), 'study', ['noon']), null);
+    engine, MODULE, fixedDocument(), 'study', ['noon'], BAKED), null);
   assert.deepEqual(engine.selected, ['noon']);
   assert.deepEqual(engine.writes, [['Pattern Freq', 2]]);
 });
@@ -247,7 +249,7 @@ test('an effect with no reference preset is refused before any engine write', ()
   const engine = fixedEngine(() => true);
 
   assert.equal(
-    applyFixedShaderDocument(engine, MODULE, fixedDocument(), 'noon', []),
+    applyFixedShaderDocument(engine, MODULE, fixedDocument(), 'noon', [], BAKED),
     'the effect has no reference preset');
   assert.deepEqual(engine.selected, []);
   assert.deepEqual(engine.writes, []);
@@ -257,7 +259,7 @@ test('a refused reference preset names the preset the engine rejected', () => {
   const engine = fixedEngine(() => false);
 
   assert.equal(
-    applyFixedShaderDocument(engine, MODULE, fixedDocument(), 'noon', ['noon']),
+    applyFixedShaderDocument(engine, MODULE, fixedDocument(), 'noon', ['noon'], BAKED),
     'the engine refused reference preset "noon"');
   assert.deepEqual(engine.writes, []);
 });
@@ -270,9 +272,34 @@ test('an engine without selectPresetById is refused, not written through', () =>
   delete engine.selectPresetById;
 
   assert.match(
-    String(applyFixedShaderDocument(engine, MODULE, fixedDocument(), 'noon', ['noon'])),
+    String(applyFixedShaderDocument(
+      engine, MODULE, fixedDocument(), 'noon', ['noon'], BAKED)),
     /refused reference preset "noon"/);
   assert.deepEqual(engine.writes, []);
+});
+
+// The skip set is the catalog's own topology flag rather than a hand list, so
+// every flagged field is skipped instead of chasing a control the fixed build
+// never registered and aborting the apply. Palette mapping is the one flagged
+// field a fixed build keeps live, as an ordinary dropdown.
+test('the fixed path skips every topology field the catalog flags', () => {
+  const catalog = JSON.parse(ENGINE_CATALOG);
+  const flagged = catalog.operators.flatMap((/** @type {*} */ operator) =>
+    operator.params.filter((/** @type {*} */ parameter) => parameter.topology === true));
+  const values = Object.fromEntries(flagged
+    .filter((/** @type {*} */ parameter) => parameter.id !== 'palette-mapping')
+    .map((/** @type {*} */ parameter) => [`warp1.${parameter.id}`, parameter.default]));
+  const engine = fixedEngine(() => true);
+  const presets = [{ preset_id: 'noon', values }];
+
+  assert.ok(Object.keys(values).length > 0, 'the catalog flags topology fields');
+  assert.equal(applyFixedShaderDocument(
+    engine, MODULE, { document: { preset_bank: { presets } } },
+    'noon', ['noon'], BAKED), null);
+  assert.deepEqual(engine.writes, []);
+  assert.ok(flagged.some((/** @type {*} */ parameter) =>
+    parameter.id === 'palette-mapping'));
+  assert.equal(BAKED.has('palette-mapping'), false);
 });
 
 const MIGRATION = JSON.stringify({

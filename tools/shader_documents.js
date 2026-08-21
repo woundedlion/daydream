@@ -25,13 +25,27 @@ const DIGEST_ABBREVIATION = 12;
 // The download name the scratch document exports under until Save As renames it.
 const SCRATCH_FILENAME = 'scratch.shader.json';
 
-// Topology enum8 parameters select an operator's structural variant. A fixed
-// effect bakes its variants in, so the fixed path skips them; palette-mapping
-// stays live as an ordinary dropdown.
-const TOPOLOGY_FIELDS = new Set([
-  'weight-mode', 'coverage-mode', 'basis', 'integrator', 'symmetry', 'mode',
-  'hemisphere', 'palette-mode', 'hue-shift-mode', 'brightness-envelope',
-]);
+// The one topology parameter a fixed effect leaves live, as an ordinary
+// dropdown, rather than baking its variant in.
+const LIVE_TOPOLOGY_FIELD = 'palette-mapping';
+
+/**
+ * The topology fields a fixed effect bakes in, read off the catalog's per
+ * parameter `topology` flag. Topology enum8 parameters select an operator's
+ * structural variant, so a fixed build registers no control for them and the
+ * fixed apply path skips their authored values.
+ * @param {*} operatorCatalog - The engine operator catalog.
+ * @returns {Set<string>} The field segments the fixed path skips.
+ */
+export function bakedTopologyFields(operatorCatalog) {
+  const fields = new Set();
+  for (const operator of operatorCatalog?.operators ?? []) {
+    for (const parameter of operator.params ?? [])
+      if (parameter.topology === true) fields.add(parameter.id);
+  }
+  fields.delete(LIVE_TOPOLOGY_FIELD);
+  return fields;
+}
 
 /** @param {string} parameterId */
 const fieldSegment = (parameterId) =>
@@ -131,15 +145,16 @@ function writeEngineValue(engine, module, definitions, name, value) {
 /**
  * @param {*} engine @param {*} module @param {CompiledDocument} compiled
  * @param {string} presetId
+ * @param {Set<string>} baked - The topology fields the effect bakes in.
  * @returns {string|null} Refusal reason, or null once every value is written.
  */
-function applyDocumentValues(engine, module, compiled, presetId) {
+function applyDocumentValues(engine, module, compiled, presetId, baked) {
   const preset = compiled.document.preset_bank.presets
     .find((/** @type {*} */ candidate) => candidate.preset_id === presetId)
     ?? compiled.document.preset_bank.presets[0];
   const definitions = engine.getParameterDefinitions();
   for (const [parameterId, value] of Object.entries(preset?.values ?? {})) {
-    if (TOPOLOGY_FIELDS.has(fieldSegment(parameterId))) continue;
+    if (baked.has(fieldSegment(parameterId))) continue;
     const name = engineParameterNames(parameterId)
       .find((candidate) => definitions.some(
         (/** @type {ParameterDefinition} */ definition) => definition.name === candidate));
@@ -157,16 +172,18 @@ function applyDocumentValues(engine, module, compiled, presetId) {
  * @param {CompiledDocument} compiled
  * @param {string} presetId
  * @param {string[]} referencePresetIds
+ * @param {Set<string>} baked - The topology fields the effect bakes in, from
+ *   bakedTopologyFields.
  * @returns {string|null} Refusal reason, or null once applied.
  */
 export function applyFixedShaderDocument(engine, module, compiled, presetId,
-                                         referencePresetIds) {
+                                         referencePresetIds, baked) {
   const referenceId = referencePresetIds.includes(presetId)
     ? presetId : referencePresetIds[0];
   if (typeof referenceId !== 'string') return 'the effect has no reference preset';
   if (engine.selectPresetById?.(referenceId) !== true)
     return `the engine refused reference preset "${referenceId}"`;
-  return applyDocumentValues(engine, module, compiled, presetId);
+  return applyDocumentValues(engine, module, compiled, presetId, baked);
 }
 
 /** @param {CompiledDocument} compiled */
@@ -254,6 +271,8 @@ export function createShaderDocumentController({
   let catalog = new Map();
   /** @type {*|null} */
   let operatorCatalog = null;
+  /** @type {Set<string>} The catalog's topology fields, once it has loaded. */
+  let bakedFields = new Set();
   /** @type {{store: *, strip: *}|null} */
   let chainUi = null;
   /** @type {number} Save As copies this session, which their ids count off. */
@@ -360,7 +379,7 @@ export function createShaderDocumentController({
     const refusal = active.compiledSide
       ? applyFixedShaderDocument(
         engine, module, store ? { document: store.document() } : active.compiled,
-        presetId, active.referencePresetIds)
+        presetId, active.referencePresetIds, bakedFields)
       : applyChainDocument({
         engine, module,
         compiled: store ? { document: store.document() } : active.compiled,
@@ -410,7 +429,7 @@ export function createShaderDocumentController({
    */
   const engineControlName = (parameterId, definitions) => {
     if (active?.compiledSide !== true) return parameterId;
-    if (TOPOLOGY_FIELDS.has(fieldSegment(parameterId))) return null;
+    if (bakedFields.has(fieldSegment(parameterId))) return null;
     return engineParameterNames(parameterId).find((candidate) =>
       definitions.some((definition) => definition.name === candidate)) ?? null;
   };
@@ -633,6 +652,7 @@ export function createShaderDocumentController({
     try {
       compiler = await importCompiler();
       operatorCatalog = JSON.parse(await fetchText(CATALOG_URL));
+      bakedFields = bakedTopologyFields(operatorCatalog);
       const migration = JSON.parse(await fetchText(MIGRATION_URL));
       const entries = await Promise.all(Object.entries(migration.source_documents)
         .map(async ([effectId, filename]) => {
