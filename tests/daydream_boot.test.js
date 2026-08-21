@@ -272,6 +272,13 @@ test('the segment-count slider carries the device cap as its own maximum', () =>
     + 'GUI showing a count the slider cannot represent');
 });
 
+test('the spawn bounds the pool by the ceiling the device carries now', () => {
+  assert.match(SOURCE,
+    /spawn:\s*\(\)\s*=>\s*segments\.create\(\s*Math\.min\(segCount, maxSegmentCount\(nav, daydream\.isMobile\)\)\)/,
+    'segMax is read once, while driver.isMobile follows the ResizeObserver: a '
+    + 'page opened wide and rotated into the mobile layout would otherwise spawn '
+    + 'the desktop count of WASM heaps on a phone');
+});
 test('the late-bound engine controls are re-applied once the engine exists', () => {
   assert.match(wasmReadyBlock(), /poleLod\.replay\(\)/,
     'the Pole LOD onChange runs while host.engine is null, so the block that '

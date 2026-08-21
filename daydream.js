@@ -702,7 +702,11 @@ export function start({
   let segCount = segState.segments;
   const segSpawn = createSegmentSpawnGuard({
     warmModules,
-    spawn: () => segments.create(segCount),
+    // segMax is the layout the page loaded in; a rotation into the mobile
+    // layout lowers what the device can carry, so the pool is bounded by the
+    // ceiling as it stands at the spawn, not the one the slider was built on.
+    spawn: () => segments.create(
+      Math.min(segCount, maxSegmentCount(nav, daydream.isMobile))),
     isActive: () => segments.active,
   });
   // Declared ahead of the fallback, and assigned before its handler is wired: a
