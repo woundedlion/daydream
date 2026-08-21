@@ -52,12 +52,13 @@ const makeStore = ({ mutate, catalog = CATALOG } = {}) => {
 const assertGreen = (store) =>
   assert.deepEqual(validateShaderDocument(store.document(), { catalog: CATALOG }), []);
 
-/** Adds a STAGGERED_ORDERED policy scheduling every parameter. */
+/** Adds a STAGGERED_ORDERED policy scheduling every interpolation group. */
 const addStaggered = (document) => {
   document.descriptor.path_policies.push({
     id: 'staggered',
     kind: 'STAGGERED_ORDERED',
-    groups: document.descriptor.parameters.map((parameter) => parameter.id),
+    groups: [...new Set(document.descriptor.parameters.map(
+      (parameter) => parameter.interpolation.group ?? parameter.id))],
   });
 };
 
@@ -155,6 +156,25 @@ test('removing an endomorphism drops its instance everywhere', async () => {
   assert.equal(staggered.groups.some(stray), false);
   for (const preset of document.preset_bank.presets)
     assert.equal(Object.keys(preset.values).some(stray), false);
+  assertGreen(store);
+});
+
+test('removing an instance drops the staggered groups it shared', async () => {
+  const store = await makeStore({ mutate: (document) => {
+    const shared = document.descriptor.parameters
+      .filter((parameter) => parameter.id.startsWith('warp2.')
+        && parameter.storage === 'binary32')
+      .slice(0, 2);
+    for (const parameter of shared)
+      parameter.interpolation = { kind: 'NORMALIZED_LINEAR', group: 'warp-mix' };
+    addStaggered(document);
+  } });
+  const staggeredGroups = () => store.document().descriptor.path_policies
+    .find((policy) => policy.id === 'staggered').groups;
+  assert.ok(staggeredGroups().includes('warp-mix'));
+  assert.equal(store.replaceSpan(WARP, 1, []).ok, true);
+  assert.equal(staggeredGroups().includes('warp-mix'), false,
+    'a group no surviving parameter declares is not schedulable');
   assertGreen(store);
 });
 
