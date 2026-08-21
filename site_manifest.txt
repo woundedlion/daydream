@@ -65,6 +65,7 @@ tools/export_params.js
 tools/flyout.js
 tools/kb_format.js
 tools/lissajous_math.js
+tools/lissajous_page.js
 tools/mobius_transforms.js
 tools/page_lifecycle.js
 tools/palette_canvas.js

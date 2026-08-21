@@ -1,5 +1,6 @@
 {
   "eslint.config.mjs": "The lint rules themselves. eslint loads this, and the `lint` step in .github/workflows/js-unit-suite.yml is the gate on it.",
+  "tools/lissajous_page.js": "tools/lissajous.html's entry module. Importing it builds the page: it calls bootstrapTool() at the top level, which stands up a WebGL scene the fake DOM cannot provide. Its math is tests/lissajous_math.test.js's subject, and the page itself is covered by scripts/browser-smoke.mjs.",
   "main.js": "index.html's entry module, whose body is `void bootstrap()`. Importing it starts the simulator, which is why bootstrap.js stays separately importable and tests/bootstrap.test.js covers it there.",
   "vendor-importmap.js": "An IIFE the page loads by script tag, not a module. tests/vendor-importmap.test.js evaluates its source in a node:vm sandbox, which is not a module load.",
   "scripts/browser-smoke.mjs": "Drives headless Chrome over every manifest-served page. It is its own CI job (.github/workflows/browser-smoke.yml), and there is no part of it a unit test could reach without a browser.",
