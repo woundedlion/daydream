@@ -279,7 +279,7 @@
   align-self: flex-start;
   border-style: dashed;
   border-color: var(--muted-text);
-  background: rgb(255 255 255 / 0.03);
+  background: var(--panel-bg);
 }
 
 .chain-chip--bypassed .chain-chip-name,
@@ -297,6 +297,12 @@
 .chain-chip:not(.chain-chip--expanded) .chain-chip-label,
 .chain-chip:not(.chain-chip--expanded) .chain-chip-pair,
 .chain-chip:not(.chain-chip--expanded) .chain-chip-function-label {
+  display: none;
+}
+
+.chain-chip--socket.chain-chip--expanded .chain-chip-name,
+.chain-chip--socket.chain-chip--expanded .chain-chip-label,
+.chain-chip--socket.chain-chip--expanded .chain-chip-pair {
   display: none;
 }
 
@@ -452,13 +458,14 @@ select.chain-param-control {
 .chain-palette-entry {
   padding: 0.1875rem 0.375rem;
   border-radius: 0.25rem;
+  background: #2b2b2b;
   font-size: 0.6875rem;
   cursor: pointer;
 }
 
 .chain-palette-entry:hover,
 .chain-palette-entry:focus-visible {
-  background: rgb(255 255 255 / 0.08);
+  background: #3b3b3b;
   color: var(--bright-text);
 }
 

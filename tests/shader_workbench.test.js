@@ -94,6 +94,24 @@ test('simulator exposes Shader as a standalone tool', () => {
   assert.match(WORKBENCH_CSS, /\.chain-param\[data-deactivated="true"\]\s*\{/);
 });
 
+test('transition cards use opaque compact surfaces', () => {
+  assert.match(WORKBENCH_CSS,
+    /\.chain-chip--socket\s*\{[^}]*background:\s*var\(--panel-bg\)/,
+    'transition headers keep an opaque reading surface');
+  assert.match(WORKBENCH_CSS,
+    /\.chain-palette\s*\{[^}]*background:\s*var\(--panel-bg\)/,
+    'transition palettes keep an opaque panel surface');
+  assert.match(WORKBENCH_CSS,
+    /\.chain-palette-entry\s*\{[^}]*background:\s*#[0-9a-f]{6}/i,
+    'transition choices keep opaque raised rows');
+  assert.match(WORKBENCH_CSS,
+    /\.chain-palette-entry:hover,[^{]+\{[^}]*background:\s*#[0-9a-f]{6}/i,
+    'transition choice hover remains opaque');
+  assert.match(WORKBENCH_CSS,
+    /\.chain-chip--socket\.chain-chip--expanded \.chain-chip-name,[^{]+\.chain-chip-label,[^{]+\.chain-chip-pair\s*\{[^}]*display:\s*none/,
+    'expanded transition headers hide redundant stage metadata');
+});
+
 // §4.1: three stacked regions around the canvas. The toolbar keeps the engine
 // stats row, the canvas keeps every pixel the three do not need, and the
 // document status output is the one live region the strip and library announce

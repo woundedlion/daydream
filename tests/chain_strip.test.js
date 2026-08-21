@@ -169,9 +169,17 @@ test('endomorphisms carry remove and bypass; sockets carry valid selectors', asy
     assert.equal(chip.querySelector('.chain-chip-bypass'), null);
     assert.ok(chip.querySelector('.chain-chip-replace'));
   }
-  assert.equal(chipByLabel(h, 'sample')
-    .querySelector('.chain-chip-function-label').textContent.startsWith('Source function'),
-  true);
+  for (const [label, text, accessibleName] of [
+    ['project', 'Projection: ', 'Projection'],
+    ['sample', 'Source: ', 'Source function'],
+    ['colorize', 'Color: ', 'Color'],
+  ]) {
+    const functionLabel = chipByLabel(h, label)
+      .querySelector('.chain-chip-function-label');
+    assert.equal(functionLabel.textContent, text);
+    assert.equal(functionLabel.querySelector('.chain-chip-replace')
+      .getAttribute('aria-label'), accessibleName);
+  }
   const remove = chipByLabel(h, 'lens').querySelector('.chain-chip-remove');
   assert.equal(remove.textContent, '×');
   assert.match(remove.getAttribute('aria-label'), /^Remove .+ · lens$/);
@@ -344,6 +352,26 @@ test('an open palette is dismissed by an outside press and by losing focus', asy
   h.strip.destroy();
   assert.equal(h.doc.listenerCount('pointerdown'), 0,
     'the document outlives the strip, so destroy() must take the listener off');
+});
+
+test('palette dismissal tolerates focusout during DOM removal', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'project').dispatch('keydown', { key: 'Delete' });
+  const element = paletteOf(h);
+  const remove = element.remove.bind(element);
+  let removals = 0;
+  element.remove = () => {
+    removals += 1;
+    if (removals > 1) throw new Error('palette removed twice');
+    element.dispatch('focusout', { relatedTarget: chipByLabel(h, 'camera') });
+    remove();
+  };
+
+  h.doc.dispatch('pointerdown', { target: chipByLabel(h, 'camera') });
+
+  assert.equal(removals, 1);
+  assert.equal(paletteOf(h), null);
+  assert.deepEqual(h.applied, []);
 });
 
 // Picking the operator a socket already carries is a no-op, not a re-seat: the
