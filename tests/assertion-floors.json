@@ -153,8 +153,8 @@
     "assertions": 424
   },
   "tests/palette_math.test.js": {
-    "cases": 27,
-    "assertions": 1534
+    "cases": 25,
+    "assertions": 1530
   },
   "tests/palette_wheel.test.js": {
     "cases": 20,

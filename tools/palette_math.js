@@ -440,23 +440,6 @@ export class GenerativePalette {
   }
 }
 
-// Where the last of the LUT's 256 sRGB triples starts.
-const LAST_LUT_ENTRY = 255 * 3;
-
-/**
- * Whether a compiled palette's LUT closes on itself exactly, which only a LOOP
- * domain asks for.
- * @param {GenerativePalette} palette - A compiled generative palette.
- * @returns {boolean} True when the domain is LOOP and its first and last LUT
- *   entries are byte-identical, so the palette repeats with no seam.
- */
-export function paletteLoopClosure(palette) {
-  return ENUM_NAMES.domain[palette.canonicalRecipe?.domain ?? -1] === 'LOOP'
-    && palette.lut[0] === palette.lut[LAST_LUT_ENTRY]
-    && palette.lut[1] === palette.lut[LAST_LUT_ENTRY + 1]
-    && palette.lut[2] === palette.lut[LAST_LUT_ENTRY + 2];
-}
-
 /**
  * Linearly remaps a value from the [fromMin, fromMax] range onto [toMin, toMax].
  * Not clamped: inputs outside the source range extrapolate past the target range.

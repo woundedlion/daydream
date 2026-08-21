@@ -8,7 +8,7 @@ const {
   generativePaletteCpp, setPaletteOps,
   NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
   paletteCompileError, COMPILE_CODE_NAMES, RECIPE_FIELD_NAMES,
-  prettyPaletteName, paletteGradientCss, paletteLoopClosure,
+  prettyPaletteName, paletteGradientCss,
 } = await import('../tools/palette_math.js');
 const { defaultPaletteRecipe, PaletteV4 } = await import('../tools/palette_controls.js');
 const { linearRgbToHex } = await import('../tools/color.js');
@@ -466,33 +466,4 @@ test('a single-stop gradient samples the start rather than dividing by zero', ()
     { a: [0.5, 0.5, 0.5], b: [0, 0, 0], c: [1, 1, 1], d: [0, 0, 0] }, 1);
 
   assert.match(flat, /^linear-gradient\(to right, #[0-9a-f]{6}\)$/i);
-});
-
-/**
- * A compiled palette stand-in: only the fields the loop-closure check reads.
- * @param {number} domain - A PaletteV4.domain ordinal.
- * @param {number[]} last - The LUT's last sRGB triple.
- * @returns {{canonicalRecipe: Object, lut: Uint8Array}} The stand-in.
- */
-function closurePalette(domain, last) {
-  const lut = new Uint8Array(256 * 3);
-  lut.set([10, 20, 30], 0);
-  lut.set(last, 255 * 3);
-  return { canonicalRecipe: { domain }, lut };
-}
-
-test('a loop closes only when its ends are byte-identical', () => {
-  assert.equal(
-    paletteLoopClosure(closurePalette(PaletteV4.domain.LOOP, [10, 20, 30])), true);
-  assert.equal(
-    paletteLoopClosure(closurePalette(PaletteV4.domain.LOOP, [10, 20, 31])), false,
-    'one channel off by a bit is not a bit-exact closure');
-});
-
-test('a palette that never asked to loop does not report one', () => {
-  assert.equal(
-    paletteLoopClosure(closurePalette(PaletteV4.domain.MIRROR, [10, 20, 30])), false);
-  assert.equal(
-    paletteLoopClosure({ lut: new Uint8Array(256 * 3) }), false,
-    'an uncompiled palette carries no domain to loop over');
 });

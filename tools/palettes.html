@@ -1059,7 +1059,7 @@
     import {
       ProceduralPalette, GenerativePalette,
       proceduralPaletteCpp, proceduralParamsForViewport,
-      generativePaletteCpp, setPaletteOps, paletteLoopClosure,
+      generativePaletteCpp, setPaletteOps,
       NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
       paletteGradientCss, prettyPaletteName,
     } from './palette_math.js';
@@ -2062,10 +2062,7 @@
       } else {
         try {
           palette = new GenerativePalette(readPaletteRecipe());
-          document.getElementById('gen_status').textContent =
-            paletteLoopClosure(palette)
-              ? 'Recipe valid · Bit-exact loop closure'
-              : 'Recipe valid';
+          document.getElementById('gen_status').textContent = 'Recipe valid';
         } catch (error) {
           document.getElementById('gen_status').textContent = error.message;
           return;
