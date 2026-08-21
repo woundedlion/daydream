@@ -419,3 +419,29 @@ test('the fault overlay is painted once and torn down on recovery', () => {
   assert.equal(table.tagName, 'TABLE', 'recovery rebuilds the table the fault tore down');
   assert.equal(grid(stats).cell(1, 'Compute').textContent, '1.0 ms');
 });
+
+test('a steady frame rewrites no cell of the table', () => {
+  const { doc, stats } = makeDoc();
+  const view = new SegmentStatsView(doc);
+  const state = readyState(3);
+  view.update(state);
+
+  const writes = [];
+  const { rows } = grid(stats);
+  for (const row of rows) {
+    for (const cell of row.children) {
+      let text = cell.textContent;
+      Object.defineProperty(cell, 'textContent', {
+        configurable: true,
+        get: () => text,
+        set(value) { text = value; writes.push(value); },
+      });
+    }
+  }
+
+  view.update(state);
+
+  assert.deepEqual(writes, [],
+    'the ranges and arena marks hold still across frames; writing them anyway '
+    + 'costs a layout invalidation per cell per composited frame');
+});
