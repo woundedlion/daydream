@@ -579,10 +579,10 @@
     },
     "choreography": {
       "dwell": {
-        "coupled-grid": 600,
-        "direct-grid": 600,
-        "double-map": 600,
-        "stretched-grid": 600
+        "coupled-grid": 64,
+        "direct-grid": 64,
+        "double-map": 64,
+        "stretched-grid": 64
       },
       "generated_order": [
         "coupled-grid",
@@ -593,28 +593,28 @@
     },
     "edges": [
       {
-        "duration": 480,
+        "duration": 16,
         "easing": "EASE_IN_OUT_SIN",
         "from": "coupled-grid",
         "path_policy": "parallel",
         "to": "direct-grid"
       },
       {
-        "duration": 480,
+        "duration": 16,
         "easing": "EASE_IN_OUT_SIN",
         "from": "direct-grid",
         "path_policy": "parallel",
         "to": "double-map"
       },
       {
-        "duration": 480,
+        "duration": 16,
         "easing": "EASE_IN_OUT_SIN",
         "from": "double-map",
         "path_policy": "parallel",
         "to": "stretched-grid"
       },
       {
-        "duration": 480,
+        "duration": 16,
         "easing": "EASE_IN_OUT_SIN",
         "from": "stretched-grid",
         "path_policy": "parallel",

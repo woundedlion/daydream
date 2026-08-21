@@ -492,14 +492,14 @@
         "to": "dense-curl",
         "path_policy": "parallel",
         "easing": "EASE_IN_OUT_SIN",
-        "duration": 480
+        "duration": 24
       },
       {
         "from": "dense-curl",
         "to": "open-curl",
         "path_policy": "parallel",
         "easing": "EASE_IN_OUT_SIN",
-        "duration": 480
+        "duration": 24
       }
     ],
     "absent_edge_fallback": {
@@ -511,7 +511,7 @@
     },
     "choreography": {
       "generated_order": ["open-curl", "dense-curl"],
-      "dwell": { "open-curl": 600, "dense-curl": 600 }
+      "dwell": { "open-curl": 92, "dense-curl": 92 }
     }
   },
   "effect_metadata": {

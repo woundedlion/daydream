@@ -549,8 +549,8 @@
     },
     "choreography": {
       "dwell": {
-        "hex-twin-wave": 600,
-        "hex-twin-wave-alt": 600
+        "hex-twin-wave": 42,
+        "hex-twin-wave-alt": 42
       },
       "generated_order": [
         "hex-twin-wave",
@@ -559,14 +559,14 @@
     },
     "edges": [
       {
-        "duration": 480,
+        "duration": 12,
         "easing": "EASE_IN_OUT_SIN",
         "from": "hex-twin-wave-alt",
         "path_policy": "parallel",
         "to": "hex-twin-wave"
       },
       {
-        "duration": 480,
+        "duration": 12,
         "easing": "EASE_IN_OUT_SIN",
         "from": "hex-twin-wave",
         "path_policy": "parallel",

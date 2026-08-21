@@ -525,10 +525,10 @@
     },
     "choreography": {
       "dwell": {
-        "signal-weave": 600,
-        "signal-weave-2": 600,
-        "signal-weave-3": 600,
-        "signal-weave-4": 600
+        "signal-weave": 26,
+        "signal-weave-2": 26,
+        "signal-weave-3": 26,
+        "signal-weave-4": 26
       },
       "generated_order": [
         "signal-weave",
@@ -539,28 +539,28 @@
     },
     "edges": [
       {
-        "duration": 480,
+        "duration": 6,
         "easing": "EASE_IN_OUT_SIN",
         "from": "signal-weave-2",
         "path_policy": "parallel",
         "to": "signal-weave-3"
       },
       {
-        "duration": 480,
+        "duration": 6,
         "easing": "EASE_IN_OUT_SIN",
         "from": "signal-weave-3",
         "path_policy": "parallel",
         "to": "signal-weave-4"
       },
       {
-        "duration": 480,
+        "duration": 6,
         "easing": "EASE_IN_OUT_SIN",
         "from": "signal-weave-4",
         "path_policy": "parallel",
         "to": "signal-weave"
       },
       {
-        "duration": 480,
+        "duration": 6,
         "easing": "EASE_IN_OUT_SIN",
         "from": "signal-weave",
         "path_policy": "parallel",

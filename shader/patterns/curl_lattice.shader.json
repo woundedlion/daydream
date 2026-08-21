@@ -542,8 +542,8 @@
     },
     "choreography": {
       "dwell": {
-        "dense-curl": 600,
-        "open-curl": 600
+        "dense-curl": 92,
+        "open-curl": 92
       },
       "generated_order": [
         "open-curl",
@@ -552,14 +552,14 @@
     },
     "edges": [
       {
-        "duration": 480,
+        "duration": 24,
         "easing": "EASE_IN_OUT_SIN",
         "from": "dense-curl",
         "path_policy": "parallel",
         "to": "open-curl"
       },
       {
-        "duration": 480,
+        "duration": 24,
         "easing": "EASE_IN_OUT_SIN",
         "from": "open-curl",
         "path_policy": "parallel",

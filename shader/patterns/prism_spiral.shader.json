@@ -491,8 +491,8 @@
     },
     "choreography": {
       "dwell": {
-        "prism-spiral": 600,
-        "prism-spiral-2": 600
+        "prism-spiral": 42,
+        "prism-spiral-2": 42
       },
       "generated_order": [
         "prism-spiral",
@@ -501,14 +501,14 @@
     },
     "edges": [
       {
-        "duration": 480,
+        "duration": 12,
         "easing": "EASE_IN_OUT_SIN",
         "from": "prism-spiral-2",
         "path_policy": "parallel",
         "to": "prism-spiral"
       },
       {
-        "duration": 480,
+        "duration": 12,
         "easing": "EASE_IN_OUT_SIN",
         "from": "prism-spiral",
         "path_policy": "parallel",

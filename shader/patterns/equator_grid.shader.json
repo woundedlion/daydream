@@ -595,9 +595,9 @@
     },
     "choreography": {
       "dwell": {
-        "double-map": 600,
-        "fine-grid": 600,
-        "open-grid": 600
+        "double-map": 60,
+        "fine-grid": 60,
+        "open-grid": 60
       },
       "generated_order": [
         "double-map",
@@ -607,21 +607,21 @@
     },
     "edges": [
       {
-        "duration": 480,
+        "duration": 14,
         "easing": "EASE_IN_OUT_SIN",
         "from": "double-map",
         "path_policy": "parallel",
         "to": "open-grid"
       },
       {
-        "duration": 480,
+        "duration": 14,
         "easing": "EASE_IN_OUT_SIN",
         "from": "fine-grid",
         "path_policy": "parallel",
         "to": "double-map"
       },
       {
-        "duration": 480,
+        "duration": 14,
         "easing": "EASE_IN_OUT_SIN",
         "from": "open-grid",
         "path_policy": "parallel",

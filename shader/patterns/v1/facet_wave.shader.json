@@ -714,14 +714,14 @@
         "to": "cup-hue",
         "path_policy": "parallel",
         "easing": "EASE_IN_OUT_SIN",
-        "duration": 480
+        "duration": 12
       },
       {
         "from": "cup-hue",
         "to": "wave-mirror",
         "path_policy": "parallel",
         "easing": "EASE_IN_OUT_SIN",
-        "duration": 480
+        "duration": 12
       }
     ],
     "absent_edge_fallback": {
@@ -737,8 +737,8 @@
         "cup-hue"
       ],
       "dwell": {
-        "wave-mirror": 600,
-        "cup-hue": 600
+        "wave-mirror": 42,
+        "cup-hue": 42
       }
     }
   },
