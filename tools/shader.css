@@ -259,6 +259,7 @@
   display: flex;
   align-items: baseline;
   gap: 0.125rem;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -292,18 +293,6 @@
 .chain-chip-pair {
   color: var(--muted-text);
   font-size: 0.6875rem;
-}
-
-.chain-chip:not(.chain-chip--expanded) .chain-chip-label,
-.chain-chip:not(.chain-chip--expanded) .chain-chip-pair,
-.chain-chip:not(.chain-chip--expanded) .chain-chip-function-label {
-  display: none;
-}
-
-.chain-chip--socket.chain-chip--expanded .chain-chip-name,
-.chain-chip--socket.chain-chip--expanded .chain-chip-label,
-.chain-chip--socket.chain-chip--expanded .chain-chip-pair {
-  display: none;
 }
 
 .chain-chip-remove,
@@ -374,7 +363,7 @@
 }
 
 .chain-chip-params {
-  display: none;
+  display: grid;
   grid-template-columns: max-content 6rem 4rem;
   align-items: center;
   gap: 0.125rem 0.375rem;
@@ -385,8 +374,13 @@
   border-top: 1px solid var(--panel-border);
 }
 
-.chain-chip--expanded .chain-chip-params {
-  display: grid;
+.chain-chip:not(.chain-chip--expanded) .chain-chip-params {
+  height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  visibility: hidden;
 }
 
 .chain-param {
