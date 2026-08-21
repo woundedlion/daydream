@@ -613,7 +613,7 @@ export function start({
     segments,
     driver: daydream,
     sidebar,
-    isRestoring: () => switches.isRestoring(),
+    muteSubscription: (write) => switches.mute(write),
   });
 
   const switches = createSwitchCoordinator({

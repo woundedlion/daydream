@@ -194,44 +194,29 @@ test('a rollback failure is surfaced separately from the switch failure', () => 
 
 // planResolutionApply is the DOM/engine-free core of applyResolution()'s
 // re-apply decision: keep the requested effect when the resolution offers it,
-// else fall back to the list head, and report whether the caller must call
-// applyEffect() itself — a change fires applyEffect via the appState
-// subscription, unless that subscription is muted.
+// else fall back to the list head.
 
-test('offered effect is kept and applied directly (no subscription fire)', () => {
+test('an offered effect is kept', () => {
   assert.deepEqual(
     planResolutionApply(['A', 'B', 'C'], 'B'),
-    { nextEffect: 'B', effectChanged: false, applyDirectly: true });
+    { nextEffect: 'B', effectChanged: false });
 });
 
-test('off-list effect falls back to the first entry; the change fires applyEffect', () => {
+test('an off-list effect falls back to the first entry', () => {
   assert.deepEqual(
     planResolutionApply(['A', 'B', 'C'], 'Z'),
-    { nextEffect: 'A', effectChanged: true, applyDirectly: false });
+    { nextEffect: 'A', effectChanged: true });
 });
 
-test('the first entry itself is kept and applied directly', () => {
+test('the first entry itself is kept', () => {
   assert.deepEqual(
     planResolutionApply(['A', 'B', 'C'], 'A'),
-    { nextEffect: 'A', effectChanged: false, applyDirectly: true });
+    { nextEffect: 'A', effectChanged: false });
 });
 
-test('effectChanged and applyDirectly are complements while the subscription is live', () => {
-  for (const cur of ['A', 'Z', 'C']) {
-    const r = planResolutionApply(['A', 'B', 'C'], cur);
-    assert.equal(r.applyDirectly, !r.effectChanged);
-  }
-});
-
-test('a muted subscription makes the caller apply an off-list correction', () => {
-  assert.deepEqual(
-    planResolutionApply(['A', 'B', 'C'], 'Z', true),
-    { nextEffect: 'A', effectChanged: true, applyDirectly: true });
-});
-
-test('a muted subscription still applies directly when the effect is unchanged', () => {
+test('every offered effect is kept unchanged', () => {
   for (const cur of ['A', 'B', 'C']) {
-    assert.equal(planResolutionApply(['A', 'B', 'C'], cur, true).applyDirectly, true);
+    assert.equal(planResolutionApply(['A', 'B', 'C'], cur).effectChanged, false);
   }
 });
 
@@ -388,7 +373,6 @@ function makeApp({
   sizesFailure = null,
   noEngine = false,
   segmented = false,
-  restoring = false,
   refuseEffectSet = false,
   subscribeEffect = false,
 } = {}) {
@@ -398,6 +382,7 @@ function makeApp({
   const state = { effect, resolution };
   const rejectedEffects = new Set(rejectEffects);
   const rejectedResolutions = new Set(rejectResolutions);
+  let muted = false;
 
   const appState = {
     get: (key) => state[key],
@@ -405,8 +390,9 @@ function makeApp({
       log.push(`state.set ${key}=${value}`);
       if (refuseEffectSet && key === 'effect') return;
       state[key] = value;
-      // The app applies an effect change through its appState subscription.
-      if (subscribeEffect && key === 'effect') pipeline.applyEffect();
+      // The app applies an effect change through its appState subscription,
+      // which a muted write suppresses.
+      if (subscribeEffect && !muted && key === 'effect') pipeline.applyEffect();
     },
   };
 
@@ -462,7 +448,10 @@ function makeApp({
       setEffects: (list, sizes) =>
         log.push(`sidebar.setEffects ${list.join(',')} sizes=${JSON.stringify(sizes)}`),
     },
-    isRestoring: () => restoring,
+    muteSubscription: (write) => {
+      muted = true;
+      try { write(); } finally { muted = false; }
+    },
     logError: (...args) => errors.push(args.join(' ')),
     logWarn: (...args) => warnings.push(args.join(' ')),
   });
@@ -617,7 +606,7 @@ test('a failed size query still lists the effects the resolution offers', () => 
   assert.match(app.warnings[0], /getEffectSizes failed/);
 });
 
-test('an off-list effect is corrected and applied once, through the subscription', () => {
+test('an off-list effect is corrected and applied exactly once', () => {
   const app = makeApp({ resolution: 'Lo', effect: 'Gamma', subscribeEffect: true });
 
   app.pipeline.applyResolution();
@@ -628,14 +617,40 @@ test('an off-list effect is corrected and applied once, through the subscription
   assert.deepEqual(app.log.slice(-2), ['sidebar.setActive Alpha', 'driver.invalidate']);
 });
 
-test('a rollback applies the corrected effect itself, its subscription being muted', () => {
-  const app = makeApp({ resolution: 'Lo', effect: 'Gamma', restoring: true });
+/**
+ * The correction is written muted, so a refused effect is reported through this
+ * call's REJECTED return and the caller's resolution rollback recovers. An
+ * un-muted write would open an effect transaction inside the resolution one,
+ * whose rollback re-applies the off-list effect the new resolution does not
+ * offer — a failure the outer rollback would have survived.
+ */
+test('a correction the engine refuses does not re-enter the subscription', () => {
+  const app = makeApp({
+    resolution: 'Lo', effect: 'Gamma', subscribeEffect: true, rejectEffects: ['Alpha'],
+  });
 
-  app.pipeline.applyResolution();
+  assert.equal(app.pipeline.applyResolution(), ApplyResult.REJECTED);
+
+  assert.deepEqual(app.log.filter((entry) => entry === 'engine.setEffect Alpha'),
+    ['engine.setEffect Alpha'], 'the subscription re-applied the correction');
+  assert.equal(app.log.includes('driver.invalidate'), false);
+});
+
+test('a correction drops the outgoing effect param URL entries', () => {
+  const app = makeApp({ resolution: 'Lo', effect: 'Gamma' });
+
+  app.pipeline.applyResolution(true);
 
   assert.equal(app.state.effect, 'Alpha');
-  assert.deepEqual(app.log.filter((entry) => entry === 'effectGui.build'),
-    ['effectGui.build']);
+  assert.equal(app.log.includes('clearEffectParamUrl'), true);
+});
+
+test('a preserving apply that keeps the effect keeps its param URL entries', () => {
+  const app = makeApp({ resolution: 'Lo', effect: 'Alpha' });
+
+  app.pipeline.applyResolution(true);
+
+  assert.equal(app.log.includes('clearEffectParamUrl'), false);
 });
 
 test('a refused effect correction rejects the resolution change', () => {

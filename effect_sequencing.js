@@ -169,9 +169,10 @@ export function switchFailureReport(label, result) {
  * Every effect/resolution change runs as a transaction: apply it, and on
  * rejection put the previous effect, resolution, URL, and effect control values
  * back. Rollback re-enters appState, so the subscription mutes itself for the
- * duration — isRestoring() exposes that window to applyResolution(), which feeds
- * it to planResolutionApply() to decide whether an effect correction can reach
- * applyEffect() through the subscription or must be applied by hand.
+ * duration — mute() opens that window for callers who write appState and apply
+ * it themselves, as applyResolution() does for an off-list effect correction.
+ * Mute windows nest: an inner one restores the outer's state rather than
+ * ending it.
  *
  * A rejected resolution switch also re-asserts the URL after the current task,
  * because the rollback's appState write lands before the URL writer has flushed
@@ -221,11 +222,12 @@ export function createSwitchCoordinator({
   // Rollback writes appState, so mute the subscription for its duration or the
   // restore would be handled as a fresh switch.
   const runMuted = (/** @type {() => void} */ restore) => {
+    const outer = restoring;
     restoring = true;
     try {
       restore();
     } finally {
-      restoring = false;
+      restoring = outer;
     }
   };
 
@@ -336,8 +338,9 @@ export function createSwitchCoordinator({
  * @param {{setActive: (effect: string) => void,
  *   setEffects: (names: string[], sizes: Record<string, number>|null) => void}}
  *   deps.sidebar - The effect sidebar.
- * @param {() => boolean} deps.isRestoring - Whether the effect subscription is
- *   muted (a rollback in progress).
+ * @param {(write: () => void) => void} deps.muteSubscription - Runs an appState
+ *   write with the switch subscription muted, for state this pipeline applies
+ *   itself.
  * @param {(message: string, error?: any) => void} [deps.logError] - Console sink.
  * @param {(message: string, error?: any) => void} [deps.logWarn] - Console sink.
  * @returns {{applyEffect: (preserveParams?: boolean) => string,
@@ -355,7 +358,7 @@ export function createApplyPipeline({
   segments,
   driver,
   sidebar,
-  isRestoring,
+  muteSubscription,
   logError = (...args) => console.error(...args),
   logWarn = (...args) => console.warn(...args),
 }) {
@@ -467,20 +470,22 @@ export function createApplyPipeline({
     }
     sidebar.setEffects(offered, effectSizes);
 
-    // Done after updateResolution()/setEffects() because appState.set('effect',…)
-    // synchronously fires applyEffect(), which would otherwise build against the
-    // pre-resize dot mesh / stale sidebar.
-    const { nextEffect, effectChanged, applyDirectly } =
-      planResolutionApply(offered, appState.get('effect'), isRestoring());
+    // Done after updateResolution()/setEffects() so the re-apply builds against
+    // the resized dot mesh and the refreshed sidebar.
+    const { nextEffect, effectChanged } =
+      planResolutionApply(offered, appState.get('effect'));
     if (effectChanged) {
-      appState.set('effect', nextEffect);
+      // Muted: an un-muted set opens a nested effect transaction inside this
+      // one, whose rollback re-applies an effect this resolution does not offer
+      // and so fails, reporting the unrecoverable banner. The resolution
+      // transaction's own rollback recovers instead.
+      muteSubscription(() => appState.set('effect', nextEffect));
       if (appState.get('effect') !== nextEffect) return ApplyResult.REJECTED;
     }
 
-    if (applyDirectly) {
-      if (applyEffect(preserveParams) !== ApplyResult.APPLIED) {
-        return ApplyResult.REJECTED;
-      }
+    // A correction's param URL entries belong to the effect it dropped.
+    if (applyEffect(preserveParams && !effectChanged) !== ApplyResult.APPLIED) {
+      return ApplyResult.REJECTED;
     }
 
     driver.invalidate();
@@ -493,27 +498,18 @@ export function createApplyPipeline({
 /**
  * Plan how applyResolution() should re-apply the effect after a resolution
  * change. The requested effect is kept when the new resolution offers it, else
- * corrected to the list's first entry (resolveActiveEffect). A correction runs
- * appState.set('effect', …), which synchronously fires applyEffect() through its
- * subscription, so calling applyEffect() as well would double-apply. A muted
- * subscription applies nothing, so the caller must then do it itself.
+ * corrected to the list's first entry (resolveActiveEffect). The caller writes
+ * the correction with the switch subscription muted and applies it itself, so a
+ * refused correction rejects the resolution change instead of opening a nested
+ * effect transaction inside it.
  * @param {Array<string>} availableEffects - Effects offered at the new resolution.
  * @param {string} currentEffect - The requested/active effect name.
- * @param {boolean} [subscriberMuted=false] - True while the effect subscription is
- *   suppressed (rollback), so a correction cannot re-apply the effect.
- * @returns {{nextEffect: string, effectChanged: boolean, applyDirectly: boolean}}
- *   The effect to activate, whether it differs from currentEffect, and whether the
- *   caller must call applyEffect() itself.
+ * @returns {{nextEffect: string, effectChanged: boolean}} The effect to activate
+ *   and whether it differs from currentEffect.
  */
-export function planResolutionApply(availableEffects, currentEffect,
-                                    subscriberMuted = false) {
+export function planResolutionApply(availableEffects, currentEffect) {
   const nextEffect = resolveActiveEffect(availableEffects, currentEffect);
-  const effectChanged = nextEffect !== currentEffect;
-  return {
-    nextEffect,
-    effectChanged,
-    applyDirectly: !effectChanged || subscriberMuted,
-  };
+  return { nextEffect, effectChanged: nextEffect !== currentEffect };
 }
 
 /**
