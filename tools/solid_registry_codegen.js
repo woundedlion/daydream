@@ -373,7 +373,9 @@ export function generateRegistryCpp(item, baseRecipe = null) {
     + `${recipeBodyCpp(`SEED_${upperSnake(seedName)}`, stepsName, recipe.indent)}\n\n`
     + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
     + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
-    + '// fail; the README registry table counts the entry too.\n'
+    + '// fail; the README registry table counts the entry too. A chain that\n'
+    + '// lowers to more than IslamicStars::MAX_BUILD_STEPS primitive steps\n'
+    + "// fails that effect's static_assert as well.\n"
     + fillCpp([
       `{"${funcName}",`,
       `IslamicStarPatterns::${funcName},`,
