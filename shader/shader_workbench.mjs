@@ -627,8 +627,12 @@ export function validateShaderDocument(document, options = {}) {
     exactKeys(descriptor.serialization, ['schema_version', 'fields'], ['schema_version', 'fields'], '$.descriptor.serialization');
     if (!Number.isInteger(descriptor.serialization.schema_version) || descriptor.serialization.schema_version <= 0)
       fail('semantic', 'INVALID_SERIALIZATION_VERSION', '$.descriptor.serialization.schema_version', 'Serialization schema version must be positive.');
-    array(descriptor.serialization.fields, '$.descriptor.serialization.fields').forEach((field, index) =>
-      id(field, `$.descriptor.serialization.fields[${index}]`));
+    const fields = array(descriptor.serialization.fields, '$.descriptor.serialization.fields');
+    fields.forEach((field, index) => id(field, `$.descriptor.serialization.fields[${index}]`));
+    if (fields.length !== parameters.size || new Set(fields).size !== fields.length ||
+        fields.some((field) => !parameters.has(field)))
+      fail('semantic', 'INVALID_SERIALIZATION_FIELDS', '$.descriptor.serialization.fields',
+        'Serialization fields must name every parameter exactly once.');
   });
   validatePresetBank(document.preset_bank, parameters, pathPolicies, report, guard);
   return diagnostics;
@@ -679,7 +683,8 @@ const quantizeParameter = (parameter) => {
 // The canonical descriptor keeps the chain array in document order with its
 // labels: both are digest-bearing, so reordering stages or renaming an
 // instance is a descriptor change while re-serializing the same document is
-// not.
+// not. Serialization fields are a set - a validated permutation of the
+// parameter ids - so they sort with the parameters.
 export function canonicalDescriptor(document) {
   const source = document.descriptor;
   const descriptor = {
@@ -687,7 +692,10 @@ export function canonicalDescriptor(document) {
     parameters: source.parameters.map(quantizeParameter)
       .sort((a, b) => codePointCompare(a.id, b.id)),
     path_policies: [...source.path_policies].sort((a, b) => codePointCompare(a.id, b.id)),
-    serialization: source.serialization,
+    serialization: {
+      ...source.serialization,
+      fields: [...source.serialization.fields].sort(codePointCompare),
+    },
   };
   return canonicalValue(descriptor);
 }

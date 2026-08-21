@@ -251,6 +251,7 @@ const twinWarpExample = () => {
     interpolation: { kind: 'LOG_POSITIVE' },
     default: 2,
   });
+  document.descriptor.serialization.fields.push('warp1.cell-x');
   for (const preset of document.preset_bank.presets)
     preset.values['warp1.cell-x'] = 2;
   return document;
@@ -294,6 +295,32 @@ test('the canonical descriptor keeps chain order and labels', () => {
     descriptor.parameters.map((parameter) => parameter.id),
     [...descriptor.parameters.map((parameter) => parameter.id)].sort(),
   );
+});
+
+/**
+ * Verifies serialization.fields is held to a duplicate-free permutation of the
+ * parameter ids and that its order is outside the descriptor identity.
+ */
+test('serialization fields name every parameter once and do not order the digest', () => {
+  const baseline = compile(example());
+  assert.equal(baseline.status, 'VALID');
+
+  const reversed = example();
+  reversed.descriptor.serialization.fields.reverse();
+  assert.equal(compile(reversed).descriptor_digest, baseline.descriptor_digest,
+    'field order is a spelling, not an identity');
+
+  const codes = (mutate) => {
+    const document = example();
+    mutate(document.descriptor.serialization.fields);
+    return validate(document).map((diagnostic) => diagnostic.code);
+  };
+  assert.deepEqual(codes((fields) => fields.splice(0)), ['INVALID_SERIALIZATION_FIELDS']);
+  assert.deepEqual(codes((fields) => fields.pop()), ['INVALID_SERIALIZATION_FIELDS']);
+  assert.deepEqual(codes((fields) => { fields[1] = fields[0]; }),
+    ['INVALID_SERIALIZATION_FIELDS'], 'a duplicate hides a missing parameter');
+  assert.deepEqual(codes((fields) => fields.push('sample.ghost-field')),
+    ['INVALID_SERIALIZATION_FIELDS']);
 });
 
 /** Verifies every committed pattern compiles and is keyed by its own digest. */
@@ -347,7 +374,10 @@ const chainDocument = (chain, parameters = [], values = {}) => ({
     chain,
     parameters,
     path_policies: [{ id: 'parallel', kind: 'PARALLEL' }],
-    serialization: { schema_version: 1, fields: [] },
+    serialization: {
+      schema_version: 1,
+      fields: parameters.map((parameter) => parameter.id),
+    },
   },
   preset_bank: {
     schema_version: 1,

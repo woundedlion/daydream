@@ -92,10 +92,10 @@
     ],
     "serialization": {
       "fields": [
-        "sample.pattern-freq",
         "project.central-meridian",
-        "sample.weight-mode",
-        "sample.coverage-mode"
+        "sample.coverage-mode",
+        "sample.pattern-freq",
+        "sample.weight-mode"
       ],
       "schema_version": 1
     }
