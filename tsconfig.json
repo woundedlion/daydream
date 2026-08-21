@@ -78,6 +78,7 @@
     "tools/palette_math.js",
     "tools/palette_wheel.js",
     "tools/pointer_drag.js",
+    "tools/shader_deeplink.js",
     "tools/shader_documents.js",
     "tools/slider.js",
     "tools/solid_build.js",

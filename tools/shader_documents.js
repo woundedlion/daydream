@@ -7,6 +7,9 @@ import { applyChainDocument } from './chain_apply.js';
 import { createChainDocumentStore, scratchChainDocument } from './chain_document_store.js';
 import { createChainStrip } from './chain_strip.js';
 import { copyToClipboard } from './copy_text.js';
+import {
+  decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
+} from './shader_deeplink.js';
 
 const MIGRATION_URL = '../shader/patterns/shaderball_migration.json';
 const CATALOG_URL = '../shader/engine_catalog.json';
@@ -194,7 +197,7 @@ function defaultDownload(doc, filename, source) {
  * setParamFilter?: (filter: {external: true}|null) => void,
  * fetchText?: (url: string) => Promise<string>, importCompiler?: () => Promise<*>,
  * download?: (filename: string, source: string) => void,
- * initialEffect?: string|null}} dependencies - initialEffect is the effect the
+ * initialEffect?: string|null, win?: *}} dependencies - initialEffect is the effect the
  *   page was opened on, which init() honors when it names a catalog source.
  */
 export function createShaderDocumentController({
@@ -215,6 +218,7 @@ export function createShaderDocumentController({
   importCompiler = () => import(COMPILER_URL),
   download = (filename, source) => defaultDownload(doc, filename, source),
   initialEffect = null,
+  win = globalThis,
 }) {
   const sourceSelect = /** @type {HTMLSelectElement|null} */ (
     doc.getElementById('shader-document-select'));
@@ -254,6 +258,9 @@ export function createShaderDocumentController({
   let chainUi = null;
   /** @type {number} Save As copies this session, which their ids count off. */
   let copies = 0;
+  let linkGeneration = 0;
+  /** @type {Promise<void>} */
+  let linkWrite = Promise.resolve();
 
   /** @param {string} message @param {boolean} [error] */
   const show = (message, error = false) => {
@@ -382,6 +389,7 @@ export function createShaderDocumentController({
       : active.compiledSide ? ' · compiled build' : ' · interpreter';
     show(`${title} · ${preset}${side}`);
     showDigest();
+    scheduleDeepLink();
     return true;
   };
 
@@ -422,6 +430,7 @@ export function createShaderDocumentController({
       return;
     }
     chainUi.strip.syncHistory();
+    scheduleDeepLink();
     const engine = getEngine();
     const module = getModule();
     if (!engine || !module) return;
@@ -479,9 +488,11 @@ export function createShaderDocumentController({
    * @param {string} [filename]
    * @param {*} [precompiled] - The catalog's already-compiled document, when the
    *   source is a catalog entry rather than an imported study.
+   * @param {*|null} [session] - Deep-linked preset, bypass, and pause state.
    */
   const loadSource = async (source, filename = 'import.shader.json',
-                            precompiled = null) => {
+                            precompiled = null, session = null) => {
+    linkGeneration += 1;
     compiler ??= await importCompiler();
     const compiled = precompiled
       ?? compiler.compileShaderDocument(source, { catalog: operatorCatalog });
@@ -521,12 +532,31 @@ export function createShaderDocumentController({
         return false;
       }
     }
+    if (session && chainUi) {
+      for (const label of session.bypassed) {
+        const result = chainUi.store.setBypassed(label, true);
+        if (!result.ok) {
+          show(`The shader link could not bypass "${label}": `
+            + `${result.diagnostics[0].message}.`, true);
+          return false;
+        }
+      }
+      chainUi.strip.render();
+    }
     syncParity();
-    const presetId = compiled.document.preset_bank.presets[0]?.preset_id;
+    const presetId = session?.preset
+      ?? compiled.document.preset_bank.presets[0]?.preset_id;
     if (!presetId) {
       show('The document is valid, but it carries no preset to preview.', true);
       return false;
     }
+    if (!compiled.document.preset_bank.presets.some(
+      (/** @type {*} */ preset) => preset.preset_id === presetId)) {
+      show(`The shader link names no document preset "${presetId}".`, true);
+      return false;
+    }
+    presetSelect.value = presetId;
+    if (session) setAnimationsPaused(session.paused);
     return applyPreset(presetId);
   };
 
@@ -539,6 +569,24 @@ export function createShaderDocumentController({
   const currentDocument = () => chainUi
     ? chainUi.store.document()
     : structuredClone(active.compiled.document);
+
+  const scheduleDeepLink = () => {
+    if (!active || active.presetId === null) return;
+    const generation = ++linkGeneration;
+    const state = {
+      document: currentDocument(),
+      preset: active.presetId,
+      bypassed: chainUi?.store.bypassedLabels() ?? [],
+      paused: getAnimationsPaused() === true,
+    };
+    linkWrite = encodeShaderStateHash(state).then((hash) => {
+      if (generation === linkGeneration) replaceShaderStateHash(hash, win);
+    }).catch((error) => {
+      if (generation !== linkGeneration) return;
+      const detail = error instanceof Error ? error.message : String(error);
+      show(`The shader link could not be updated: ${detail}.`, true);
+    });
+  };
 
   /**
    * @param {*} document - The document to write.
@@ -618,12 +666,30 @@ export function createShaderDocumentController({
       show(`Source catalog failed to load: ${detail}`, true);
       return false;
     }
-    // A shared link naming a shipped document opens on that document; anything
-    // else, the legacy Shader route included, opens on the scratch chain.
+    let linked = null;
+    let linkError = '';
+    try {
+      linked = await decodeShaderStateHash(win.location?.hash ?? '');
+    } catch (error) {
+      linkError = error instanceof Error ? error.message : String(error);
+    }
+    if (linked) {
+      const effectId = linked.document.effect_id;
+      sourceSelect.value = catalog.has(effectId) ? effectId : '';
+      const filename = typeof linked.document.document_id === 'string'
+        ? `${linked.document.document_id}.shader.json` : 'linked.shader.json';
+      if (await loadSource(linked.document, filename, null, linked)) return true;
+      linkError = status.textContent || 'the linked state was refused';
+    }
     const requested = catalog.get(initialEffect ?? '');
-    if (requested === undefined) return loadScratch();
-    sourceSelect.value = requested.effectId;
-    return loadSource(requested.source, requested.filename, requested.compiled);
+    let loaded;
+    if (requested === undefined) loaded = await loadScratch();
+    else {
+      sourceSelect.value = requested.effectId;
+      loaded = await loadSource(requested.source, requested.filename, requested.compiled);
+    }
+    if (linkError) show(`The shader link could not be restored: ${linkError}.`, true);
+    return loaded;
   };
 
   sourceSelect.addEventListener('change', async () => {
@@ -659,6 +725,7 @@ export function createShaderDocumentController({
     setAnimationsPaused(!paused);
     showAnimationState();
     invalidate();
+    scheduleDeepLink();
   });
   // A/B verification only: the toggle swaps which build renders the loaded
   // document and touches neither the document nor the editing surface.
@@ -681,5 +748,8 @@ export function createShaderDocumentController({
     else announce('The descriptor digest could not be copied.');
   });
 
-  return { init, loadSource, save, saveAs, applyPreset };
+  return {
+    init, loadSource, save, saveAs, applyPreset,
+    flushDeepLink: () => linkWrite,
+  };
 }
