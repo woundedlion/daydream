@@ -759,14 +759,14 @@
         "to": "mobius-grid-2",
         "path_policy": "parallel",
         "easing": "EASE_IN_OUT_SIN",
-        "duration": 12
+        "duration": 480
       },
       {
         "from": "mobius-grid-2",
         "to": "mobius-grid",
         "path_policy": "parallel",
         "easing": "EASE_IN_OUT_SIN",
-        "duration": 12
+        "duration": 480
       }
     ],
     "absent_edge_fallback": {
@@ -782,8 +782,8 @@
         "mobius-grid-2"
       ],
       "dwell": {
-        "mobius-grid": 42,
-        "mobius-grid-2": 42
+        "mobius-grid": 600,
+        "mobius-grid-2": 600
       }
     }
   },

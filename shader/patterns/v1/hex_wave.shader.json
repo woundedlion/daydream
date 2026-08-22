@@ -641,14 +641,14 @@
         "to": "hex-twin-wave",
         "path_policy": "parallel",
         "easing": "EASE_IN_OUT_SIN",
-        "duration": 12
+        "duration": 480
       },
       {
         "from": "hex-twin-wave",
         "to": "hex-twin-wave-alt",
         "path_policy": "parallel",
         "easing": "EASE_IN_OUT_SIN",
-        "duration": 12
+        "duration": 480
       }
     ],
     "absent_edge_fallback": {
@@ -664,8 +664,8 @@
         "hex-twin-wave-alt"
       ],
       "dwell": {
-        "hex-twin-wave": 42,
-        "hex-twin-wave-alt": 42
+        "hex-twin-wave": 600,
+        "hex-twin-wave-alt": 600
       }
     }
   },
