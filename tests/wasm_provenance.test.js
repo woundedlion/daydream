@@ -215,14 +215,14 @@ test('the unit-suite workflow declares a shell required for the hook suite', () 
       'retires every reference-transaction case as a skip and still reports green');
 });
 
-test('the deploy gate requires the engine CI that built the module', () => {
+test('the deploy gate requires the engine WASM build at the module pin', () => {
   const workflow = readFileSync(resolve(REPO, '.github/workflows/deploy.yml'), 'utf8');
-  const step = workflow.match(/- name: Require the engine's own CI green[\s\S]*?\n\n/)?.[0];
-  assert.ok(step, 'deploy.yml must still gate on the engine CI at the pinned SHA');
+  const step = workflow.match(/- name: Require the engine WASM build green[\s\S]*?\n\n/)?.[0];
+  assert.ok(step, 'deploy.yml must still gate on the engine WASM build at the pinned SHA');
   assert.match(step, /commits\/\$PIN\/check-runs/,
     'the check must be read at the pinned SHA, not at engine HEAD');
-  assert.match(step, /"CI green"/,
-    'the aggregate check is the one that covers the engine WASM job');
+  assert.match(step, /"WASM build \(Emscripten\)"/,
+    'the source-producing WASM job is required without coupling to unrelated checks');
   assert.match(step, /exit 1/, 'an unreadable or non-green check must fail the gate');
 });
 
