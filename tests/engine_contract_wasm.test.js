@@ -896,7 +896,7 @@ test('the full-config accessors answer as the workbench panel assumes', () => {
   assert.equal(engine.getFullConfigFieldDefinitions(), null,
     'a non-Shader effect must report no field definitions');
   assert.equal(engine.restoreFullConfigSnapshot(null),
-    M.FullConfigRestoreResult.NOT_SHADERBALL,
+    M.FullConfigRestoreResult.NOT_SHADER_WORKBENCH,
     'restoring into a non-Shader effect must be refused by name');
   assert.equal(typeof engine.getConfigImportNotice(), 'string',
     'the notice is rendered straight into the panel, so it must be a string');
