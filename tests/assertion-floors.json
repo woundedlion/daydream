@@ -16,16 +16,16 @@
     "assertions": 6
   },
   "tests/chain_apply.test.js": {
-    "cases": 11,
-    "assertions": 30
+    "cases": 14,
+    "assertions": 37
   },
   "tests/chain_document_store.test.js": {
-    "cases": 34,
-    "assertions": 328
+    "cases": 37,
+    "assertions": 354
   },
   "tests/chain_strip.test.js": {
-    "cases": 35,
-    "assertions": 238
+    "cases": 38,
+    "assertions": 282
   },
   "tests/clipboard.test.js": {
     "cases": 7,
@@ -44,16 +44,16 @@
     "assertions": 29
   },
   "tests/daydream_boot.test.js": {
-    "cases": 15,
-    "assertions": 57
+    "cases": 18,
+    "assertions": 68
   },
   "tests/daydream_start.test.js": {
     "cases": 8,
     "assertions": 20
   },
   "tests/driver.test.js": {
-    "cases": 79,
-    "assertions": 585
+    "cases": 80,
+    "assertions": 586
   },
   "tests/driver_clock.test.js": {
     "cases": 4,
@@ -68,8 +68,8 @@
     "assertions": 112
   },
   "tests/engine_contract_wasm.test.js": {
-    "cases": 42,
-    "assertions": 524
+    "cases": 45,
+    "assertions": 807
   },
   "tests/engine_host.test.js": {
     "cases": 21,
@@ -187,15 +187,15 @@
   },
   "tests/run_tests.test.js": {
     "cases": 39,
-    "assertions": 68
+    "assertions": 70
   },
   "tests/segment_composite_wasm.test.js": {
     "cases": 5,
     "assertions": 126
   },
   "tests/segment_controller.test.js": {
-    "cases": 121,
-    "assertions": 613
+    "cases": 122,
+    "assertions": 616
   },
   "tests/segment_crosscheck.test.js": {
     "cases": 4,
@@ -206,8 +206,8 @@
     "assertions": 150
   },
   "tests/segment_stats_view.test.js": {
-    "cases": 17,
-    "assertions": 122
+    "cases": 18,
+    "assertions": 123
   },
   "tests/segment_worker.test.js": {
     "cases": 51,
@@ -222,12 +222,12 @@
     "assertions": 149
   },
   "tests/shader_document.test.js": {
-    "cases": 31,
-    "assertions": 389
+    "cases": 32,
+    "assertions": 400
   },
   "tests/shader_workbench.test.js": {
-    "cases": 45,
-    "assertions": 278
+    "cases": 55,
+    "assertions": 328
   },
   "tests/shared.test.js": {
     "cases": 15,
@@ -262,8 +262,8 @@
     "assertions": 1425
   },
   "tests/solid_op_rows.test.js": {
-    "cases": 13,
-    "assertions": 55
+    "cases": 14,
+    "assertions": 56
   },
   "tests/solid_render.test.js": {
     "cases": 16,
@@ -271,23 +271,23 @@
   },
   "tests/solids_registry_codegen.test.js": {
     "cases": 32,
-    "assertions": 626
+    "assertions": 631
   },
   "tests/state.test.js": {
     "cases": 63,
     "assertions": 1165
   },
   "tests/switch_coordinator.test.js": {
-    "cases": 19,
-    "assertions": 66
+    "cases": 20,
+    "assertions": 70
   },
   "tests/tool_pages.test.js": {
     "cases": 11,
-    "assertions": 212
+    "assertions": 218
   },
   "tests/tsconfig_roster.test.js": {
     "cases": 7,
-    "assertions": 139
+    "assertions": 145
   },
   "tests/vendor-importmap.test.js": {
     "cases": 7,
