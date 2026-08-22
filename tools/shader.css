@@ -258,6 +258,7 @@
 .chain-chip-header {
   display: flex;
   align-items: baseline;
+  min-height: 1.125rem;
   gap: 0.125rem;
   white-space: nowrap;
   cursor: pointer;
