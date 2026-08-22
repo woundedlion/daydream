@@ -283,20 +283,6 @@
       },
       {
         "classification": "preset",
-        "default": 1,
-        "domain": {
-          "maximum": 20,
-          "minimum": 1
-        },
-        "id": "project1.singularity-fade",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
         "default": 0,
         "domain": {
           "maximum": 0.05000000074505806,
@@ -317,6 +303,20 @@
           "minimum": 0
         },
         "id": "project1.projection-wander",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
+        "default": 1,
+        "domain": {
+          "maximum": 20,
+          "minimum": 1
+        },
+        "id": "project1.singularity-fade",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -563,41 +563,41 @@
     ],
     "serialization": {
       "fields": [
-        "colorize.hue-shift-amount",
+        "colorize.brightness-depth",
+        "colorize.brightness-envelope",
         "colorize.hue-noise-scale",
         "colorize.hue-noise-speed",
-        "colorize.palette-chroma",
+        "colorize.hue-shift-amount",
+        "colorize.hue-shift-mode",
         "colorize.mapping-frequency",
         "colorize.mapping-phase",
+        "colorize.palette-chroma",
+        "colorize.palette-mapping",
+        "colorize.palette-mode",
         "colorize.phase-oscillation-depth",
         "colorize.phase-oscillation-speed",
-        "colorize.brightness-depth",
-        "colorize.value-opacity-low",
         "colorize.value-opacity-high",
-        "colorize.palette-mode",
-        "colorize.palette-mapping",
-        "colorize.hue-shift-mode",
-        "colorize.brightness-envelope",
-        "sample1.lattice-cell-scale",
-        "sample1.lattice-shape",
-        "sample1.lattice-softness",
-        "sample1.lattice-radius",
-        "sample1.edge-width",
-        "sample1.weight-mode",
-        "sample1.coverage-mode",
-        "sphere1.wander",
-        "sphere1.spin-speed",
-        "sphere2.scale",
-        "sphere2.strength",
-        "sphere2.speed",
-        "sphere2.basis",
-        "sphere2.integrator",
-        "sphere3.symmetry",
-        "project1.singularity-fade",
+        "colorize.value-opacity-low",
+        "field1.cutout-softness",
+        "field1.cutout-threshold",
         "project1.projection-spin-speed",
         "project1.projection-wander",
-        "field1.cutout-threshold",
-        "field1.cutout-softness"
+        "project1.singularity-fade",
+        "sample1.coverage-mode",
+        "sample1.edge-width",
+        "sample1.lattice-cell-scale",
+        "sample1.lattice-radius",
+        "sample1.lattice-shape",
+        "sample1.lattice-softness",
+        "sample1.weight-mode",
+        "sphere1.spin-speed",
+        "sphere1.wander",
+        "sphere2.basis",
+        "sphere2.integrator",
+        "sphere2.scale",
+        "sphere2.speed",
+        "sphere2.strength",
+        "sphere3.symmetry"
       ],
       "schema_version": 1
     }
@@ -647,9 +647,9 @@
           "colorize.value-opacity-low": 1,
           "field1.cutout-softness": 0.31635937094688416,
           "field1.cutout-threshold": 0.36500000953674316,
-          "project1.singularity-fade": 1,
           "project1.projection-spin-speed": 0.0017500000540167093,
           "project1.projection-wander": 0.008999999612569809,
+          "project1.singularity-fade": 1,
           "sample1.coverage-mode": "weight",
           "sample1.edge-width": 0.2630000114440918,
           "sample1.lattice-cell-scale": 0.9897187352180481,
