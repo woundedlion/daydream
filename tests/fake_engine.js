@@ -80,7 +80,7 @@ export const EffectSetResult = Object.freeze({
 
 export const FullConfigRestoreResult = Object.freeze({
   APPLIED: Object.freeze({ value: 0 }),
-  NOT_SHADERBALL: Object.freeze({ value: 1 }),
+  NOT_SHADER_WORKBENCH: Object.freeze({ value: 1 }),
   UNSUPPORTED_VERSION: Object.freeze({ value: 2 }),
   INVALID_LENGTH: Object.freeze({ value: 3 }),
   INVALID_VALUE: Object.freeze({ value: 4 }),
