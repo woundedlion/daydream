@@ -1,7 +1,7 @@
 {
   "tests/app_lifecycle.test.js": {
-    "cases": 72,
-    "assertions": 173
+    "cases": 76,
+    "assertions": 185
   },
   "tests/banner.test.js": {
     "cases": 13,
@@ -44,8 +44,8 @@
     "assertions": 29
   },
   "tests/daydream_boot.test.js": {
-    "cases": 14,
-    "assertions": 54
+    "cases": 15,
+    "assertions": 57
   },
   "tests/daydream_start.test.js": {
     "cases": 8,
@@ -72,8 +72,8 @@
     "assertions": 524
   },
   "tests/engine_host.test.js": {
-    "cases": 18,
-    "assertions": 53
+    "cases": 21,
+    "assertions": 58
   },
   "tests/engine_source_parity.test.js": {
     "cases": 12,

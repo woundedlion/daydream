@@ -581,15 +581,19 @@ test('the deadline is generous enough for a cold load of the binary', () => {
 /**
  * Guard under test over a frame body the test drives, plus the sinks it writes to.
  * @param {() => void} frame - The per-frame body.
+ * @param {Object} [deps] - Death-latch collaborators, defaulted off.
+ * @param {() => boolean} [deps.moduleDead] - Reads the module's death flag.
+ * @param {() => void} [deps.onModuleDead] - Releases the app on a dead module.
  * @returns {Object} The guarded callback, the reported messages, and the console lines.
  */
-function makeFrameGuard(frame) {
+function makeFrameGuard(frame, deps = {}) {
   const reported = [];
   const logged = [];
   const guarded = createFrameLoopGuard({
     frame,
     report: (message) => reported.push(message),
     logError: (...args) => logged.push(args),
+    ...deps,
   });
   return { guarded, reported, logged };
 }
@@ -652,6 +656,79 @@ test('a frame guard stringifies a thrown value carrying no message', () => {
   guarded();
 
   assert.match(reported[0], /aborted/);
+});
+
+// A trapped module is the failure the re-arm cannot be trusted through: the
+// trap unwinds nothing, so drawFrame() keeps returning without throwing and the
+// clean frames that retract the banner are the corrupt ones.
+
+test('a dead module stops the frames, releases the app, and names the reload', () => {
+  let frames = 0;
+  let dead = false;
+  let releases = 0;
+  const { guarded, reported, logged } = makeFrameGuard(
+    () => { frames += 1; },
+    { moduleDead: () => dead, onModuleDead: () => { releases += 1; } });
+
+  guarded();
+  dead = true;
+  guarded();
+  guarded();
+
+  assert.equal(frames, 2, 'the body must not run once the module is known dead');
+  assert.equal(releases, 1, 'the release runs once, not per frame');
+  assert.equal(reported.length, 1);
+  assert.match(reported[0], /Reload the page/,
+    'no call recovers a trapped module, so the banner has to say what does');
+  assert.equal(logged.length, 1);
+});
+
+test('a dead module is polled on a clean frame, not only on a throw', () => {
+  let dead = false;
+  const { guarded, reported } = makeFrameGuard(
+    () => {}, { moduleDead: () => dead });
+
+  dead = true;
+  guarded();
+
+  assert.equal(reported.length, 1,
+    'a trapped module hands back plausible frames; waiting for a throw waits '
+    + 'for one that never comes');
+});
+
+test('a dead module latches past the clean-frame re-arm', () => {
+  let dead = false;
+  let releases = 0;
+  const { guarded, reported } = makeFrameGuard(
+    () => { if (!dead) throw new Error('view detached'); },
+    { moduleDead: () => dead, onModuleDead: () => { releases += 1; } });
+
+  guarded();
+  assert.equal(reported.length, 1);
+  dead = true;
+  guarded();
+  for (let i = 0; i < FRAME_GUARD_REARM_FRAMES * 2; i++) guarded();
+
+  assert.equal(reported.length, 2,
+    'death is terminal, so no run of clean frames retracts its banner');
+  assert.match(reported[1], /Reload the page/,
+    'the terminal report is the one left standing');
+  assert.equal(releases, 1);
+});
+
+test('a release that throws still leaves the loop stopped', () => {
+  let frames = 0;
+  const { guarded } = makeFrameGuard(
+    () => { frames += 1; },
+    {
+      moduleDead: () => true,
+      onModuleDead: () => { throw new Error('teardown failed'); },
+    });
+
+  assert.throws(() => guarded(), /teardown failed/);
+  guarded();
+
+  assert.equal(frames, 1, 'the latch is set before the release is attempted');
 });
 
 // The global keydown guard: the shortcuts are the canvas's, so a key typed into

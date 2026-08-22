@@ -30,11 +30,30 @@ export class EngineHost {
     this.recorder = null;
     this.pixelView = null;
     this.onViewRefreshed = onViewRefreshed;
+    /** @type {boolean} Latched once the module reports itself trapped. */
+    this.dead = false;
   }
 
   /** Current Uint16Array display view; null until the first refresh() or after a resize. */
   view() {
     return this.pixelView;
+  }
+
+  /**
+   * Whether the WASM module has trapped. HS_CHECK sets Module.HS_MODULE_DEAD
+   * before its __builtin_trap(), and the trap unwinds nothing: the shadow stack
+   * pointer keeps whatever the aborted frame left it at, so every later call
+   * runs on a permanently shortened stack and hands back plausible results
+   * while writing past its end. No call recovers, so the state is terminal and
+   * latches here: a read after dispose() has dropped the module reference still
+   * reports dead. A plain property read, cheap enough for a per-frame caller.
+   * @returns {boolean} Whether the module has trapped.
+   */
+  moduleDead() {
+    if (this.dead) return true;
+    const module = /** @type {{HS_MODULE_DEAD?: boolean}|null} */ (this.module);
+    this.dead = module?.HS_MODULE_DEAD === true;
+    return this.dead;
   }
 
   /**

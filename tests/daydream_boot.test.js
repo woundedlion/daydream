@@ -52,6 +52,7 @@ const SOURCE = withoutComments(
   readFileSync(new URL('../daydream.js', import.meta.url), 'utf8'));
 
 const WASM_INIT = 'createModuleLoadHandlers(';
+const FRAME_GUARD = 'createFrameLoopGuard(';
 
 test('Curl Facets is offered at both simulator resolutions', () => {
   for (const roster of ['HiResFavorites', 'LoResFavorites']) {
@@ -113,6 +114,19 @@ test('the teardown is retained and reachable from the module-load handlers', () 
     + 'app on a failed load and skip startup once a page discard has won');
   assert.match(wasmReadyBlock(), /teardown:\s*\(\)\s*=>\s*appTeardown/,
     'the handlers must read the teardown lazily; it is built after them');
+});
+
+test('the render loop polls the engine death latch and releases the app on it', () => {
+  const at = SOURCE.indexOf(FRAME_GUARD);
+  assert.ok(at >= 0, 'daydream.js must still guard the render loop');
+  const guard = balanced(SOURCE, at + FRAME_GUARD.length - 1);
+
+  assert.match(guard, /moduleDead:\s*\(\)\s*=>\s*host\.moduleDead\(\)/,
+    'a trapped module keeps handing back plausible frames, so the loop has to '
+    + 'poll the host for the flag rather than wait for a throw that never comes');
+  assert.match(guard, /onModuleDead:\s*\(\)\s*=>\s*appTeardown\?\.dispose\(\)/,
+    'the loop, the engine, and every listener otherwise outlive a module no '
+    + 'call can recover');
 });
 
 test('the page-failure surface is the shared one, and it is torn down', () => {
