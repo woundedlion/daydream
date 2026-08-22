@@ -255,6 +255,10 @@
   touch-action: none;
 }
 
+.chain-chip:not(.chain-chip--expanded) {
+  height: 1.75rem;
+}
+
 .chain-chip-header {
   display: flex;
   align-items: baseline;
@@ -283,10 +287,6 @@
   border-style: dashed;
   border-color: var(--muted-text);
   background: var(--panel-bg);
-}
-
-.chain-chip--socket:not(.chain-chip--expanded) {
-  padding-block: 0.15625rem;
 }
 
 .chain-chip--bypassed .chain-chip-name {
