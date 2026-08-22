@@ -132,6 +132,8 @@ async function probeStrip(tab) {
   const hoverHeader = '.chain-chip[data-label="project"] .chain-chip-header';
   const closedCard = await boxOf(tab, '.chain-chip[data-label="project"]');
   const closedHeader = await boxOf(tab, hoverHeader);
+  const closedBackground = await tab.$eval('.chain-chip[data-label="project"]',
+    (node) => getComputedStyle(node).backgroundColor);
   await (await tab.waitForSelector(hoverHeader)).hover();
   await tab.waitForFunction(() => document.querySelector(
     '.chain-chip[data-label="project"]')?.getAttribute('aria-expanded') === 'true');
@@ -158,6 +160,10 @@ async function probeStrip(tab) {
     (node) => node.getAttribute('aria-expanded') === 'true'),
   'click pins a stage card open after mouse leave');
   const pinnedCard = await boxOf(tab, '.chain-chip[data-label="project"]');
+  check(await tab.$eval('.chain-chip[data-label="project"]',
+    (node, expected) => getComputedStyle(node).backgroundColor === expected,
+    closedBackground),
+  `a pinned stage keeps its opaque ${closedBackground} panel`);
   await tab.mouse.click(pinnedCard.x + 2, pinnedCard.y + pinnedCard.height / 2);
   check(await tab.$eval('.chain-chip[data-label="project"]',
     (node) => node.getAttribute('aria-expanded') === 'false'),
