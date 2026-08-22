@@ -268,20 +268,6 @@
       },
       {
         "classification": "preset",
-        "default": 1,
-        "domain": {
-          "maximum": 20,
-          "minimum": 1
-        },
-        "id": "project.pole-fade",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
         "default": 0,
         "domain": {
           "maximum": 0.05000000074505806,
@@ -302,6 +288,20 @@
           "minimum": 0
         },
         "id": "project.projection-wander",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
+        "default": 1,
+        "domain": {
+          "maximum": 20,
+          "minimum": 1
+        },
+        "id": "project.singularity-fade",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -549,9 +549,9 @@
         "colorize.value-opacity-high",
         "colorize.value-opacity-low",
         "project.hemisphere",
-        "project.pole-fade",
         "project.projection-spin-speed",
         "project.projection-wander",
+        "project.singularity-fade",
         "sample.coverage-mode",
         "sample.lattice-cell-scale",
         "sample.lattice-radius",
@@ -615,9 +615,9 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "project.hemisphere": "folded",
-          "project.pole-fade": 1,
           "project.projection-spin-speed": 0.020879197865724564,
           "project.projection-wander": 0.003091752529144287,
+          "project.singularity-fade": 1,
           "sample.coverage-mode": "weight",
           "sample.lattice-cell-scale": 1.2292499542236328,
           "sample.lattice-radius": 0.3329818844795227,

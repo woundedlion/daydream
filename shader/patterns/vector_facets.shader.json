@@ -314,7 +314,7 @@
           "maximum": 20,
           "minimum": 1
         },
-        "id": "project.pole-fade",
+        "id": "project.singularity-fade",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -625,7 +625,7 @@
         "colorize.value-opacity-low",
         "lens.symmetry",
         "project.hemisphere",
-        "project.pole-fade",
+        "project.singularity-fade",
         "sample.angle-speed",
         "sample.complexity",
         "sample.coverage-mode",
@@ -695,7 +695,7 @@
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "dodecahedral",
           "project.hemisphere": "folded",
-          "project.pole-fade": 2.311000108718872,
+          "project.singularity-fade": 2.311000108718872,
           "sample.angle-speed": 0.027000000700354576,
           "sample.complexity": 1.7039999961853027,
           "sample.coverage-mode": "weight-squared",
