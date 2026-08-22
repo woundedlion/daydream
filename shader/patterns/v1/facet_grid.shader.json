@@ -605,28 +605,28 @@
         "to": "direct-grid",
         "path_policy": "parallel",
         "easing": "EASE_IN_OUT_SIN",
-        "duration": 16
+        "duration": 480
       },
       {
         "from": "direct-grid",
         "to": "double-map",
         "path_policy": "parallel",
         "easing": "EASE_IN_OUT_SIN",
-        "duration": 16
+        "duration": 480
       },
       {
         "from": "double-map",
         "to": "stretched-grid",
         "path_policy": "parallel",
         "easing": "EASE_IN_OUT_SIN",
-        "duration": 16
+        "duration": 480
       },
       {
         "from": "stretched-grid",
         "to": "coupled-grid",
         "path_policy": "parallel",
         "easing": "EASE_IN_OUT_SIN",
-        "duration": 16
+        "duration": 480
       }
     ],
     "absent_edge_fallback": {
@@ -644,10 +644,10 @@
         "stretched-grid"
       ],
       "dwell": {
-        "coupled-grid": 64,
-        "direct-grid": 64,
-        "double-map": 64,
-        "stretched-grid": 64
+        "coupled-grid": 600,
+        "direct-grid": 600,
+        "double-map": 600,
+        "stretched-grid": 600
       }
     }
   },

@@ -1056,7 +1056,7 @@ test('Vector Facets loads its effect preset into the interpreter controls', asyn
   ]);
   for (const [label, parameterId] of [
     ['camera', 'camera.wander'],
-    ['project', 'project.pole-fade'],
+    ['project', 'project.singularity-fade'],
     ['warp1', 'warp1.strength'],
     ['warp2', 'warp2.speed'],
     ['sample', 'sample.pattern-freq'],

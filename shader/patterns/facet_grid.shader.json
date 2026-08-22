@@ -274,20 +274,6 @@
       },
       {
         "classification": "preset",
-        "default": 3.431999921798706,
-        "domain": {
-          "maximum": 20,
-          "minimum": 1
-        },
-        "id": "project.singularity-fade",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
         "default": 0,
         "domain": {
           "maximum": 0.05000000074505806,
@@ -313,6 +299,20 @@
         },
         "storage": "binary32",
         "unit": "blend"
+      },
+      {
+        "classification": "preset",
+        "default": 3.431999921798706,
+        "domain": {
+          "maximum": 20,
+          "minimum": 1
+        },
+        "id": "project.singularity-fade",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
       },
       {
         "classification": "preset",
@@ -542,9 +542,9 @@
         "colorize.value-opacity-high",
         "colorize.value-opacity-low",
         "lens.symmetry",
-        "project.singularity-fade",
         "project.projection-spin-speed",
         "project.projection-wander",
+        "project.singularity-fade",
         "sample.angle-speed",
         "sample.complexity",
         "sample.coverage-mode",
@@ -642,9 +642,9 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "dodecahedral",
-          "project.singularity-fade": 3.431999921798706,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 1,
+          "project.singularity-fade": 3.431999921798706,
           "sample.angle-speed": 0.026999998837709427,
           "sample.complexity": 0.5130000114440918,
           "sample.coverage-mode": "weight-squared",
@@ -681,9 +681,9 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "dodecahedral",
-          "project.singularity-fade": 3.431999921798706,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 1,
+          "project.singularity-fade": 3.431999921798706,
           "sample.angle-speed": 0.026999998837709427,
           "sample.complexity": 3,
           "sample.coverage-mode": "weight-squared",
@@ -720,9 +720,9 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "dodecahedral",
-          "project.singularity-fade": 3.431999921798706,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 0.16500000655651093,
+          "project.singularity-fade": 3.431999921798706,
           "sample.angle-speed": 0.026999998837709427,
           "sample.complexity": 3,
           "sample.coverage-mode": "weight-squared",
@@ -759,9 +759,9 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "dodecahedral",
-          "project.singularity-fade": 3.431999921798706,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 0.16500000655651093,
+          "project.singularity-fade": 3.431999921798706,
           "sample.angle-speed": 0.026999998837709427,
           "sample.complexity": 3,
           "sample.coverage-mode": "weight-squared",

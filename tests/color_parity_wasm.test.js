@@ -213,8 +213,8 @@ test('PaletteOps publishes every effect-owned GenerativePalette recipe', () => {
       'GSReactionDiffusion',
       'MobiusRings',
       'Raymarch',
-      'ShaderBall Liquid',
-      'ShaderBall Flyby',
+      'ShaderWorkbench Liquid',
+      'ShaderWorkbench Flyby',
     ]);
     assert.deepEqual(presets.filter((preset) => preset.randomHue)
       .map((preset) => preset.name), [

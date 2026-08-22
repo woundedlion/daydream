@@ -381,7 +381,7 @@ test('palette dismissal tolerates focusout during DOM removal', async () => {
 test('selecting the operator the socket carries keeps the instance', async () => {
   const h = await makeStrip();
   const before = h.store.document();
-  assert.equal(before.preset_bank.presets[0].values['project.pole-fade'] !== 1, true,
+  assert.equal(before.preset_bank.presets[0].values['project.singularity-fade'] !== 1, true,
     'the fixture tunes the socket away from the catalog default');
 
   let select = chipByLabel(h, 'project').querySelector('.chain-chip-replace');
@@ -399,7 +399,7 @@ test('selecting the operator the socket carries keeps the instance', async () =>
   assert.deepEqual(after.descriptor.chain[PROJECT],
     { label: 'project1', operator: 'project.bonne.v2' },
     'a different operator retires the instance and seats a fresh one');
-  assert.equal(after.preset_bank.presets[0].values['project1.pole-fade'], 1,
+  assert.equal(after.preset_bank.presets[0].values['project1.singularity-fade'], 1,
     'the fresh instance opens on the catalog defaults');
   assert.equal(h.store.canUndo(), true);
 });
@@ -618,7 +618,7 @@ test('a library crossing already in the chain keeps the socket', async () => {
   const after = h.store.document();
   assert.deepEqual(after.descriptor.chain[PROJECT],
     { label: 'project1', operator: 'project.gnomonic.v2' });
-  assert.equal(after.preset_bank.presets[0].values['project1.pole-fade'], 1,
+  assert.equal(after.preset_bank.presets[0].values['project1.singularity-fade'], 1,
     'the fresh instance opens on the catalog defaults');
   assert.equal(h.store.canUndo(), true);
 });

@@ -228,7 +228,7 @@ test('a crossing cannot be removed, only replaced', async () => {
   const document = store.document();
   for (const preset of document.preset_bank.presets) {
     assert.equal(preset.values['sample1.complexity'], 0);
-    assert.equal(preset.values['project1.pole-fade'], 1);
+    assert.equal(preset.values['project1.singularity-fade'], 1);
     assert.equal('warp2.rotation' in preset.values, false);
   }
   assertGreen(store);

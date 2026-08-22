@@ -442,14 +442,14 @@
         "to": "prism-spiral-2",
         "path_policy": "parallel",
         "easing": "EASE_IN_OUT_SIN",
-        "duration": 12
+        "duration": 480
       },
       {
         "from": "prism-spiral-2",
         "to": "prism-spiral",
         "path_policy": "parallel",
         "easing": "EASE_IN_OUT_SIN",
-        "duration": 12
+        "duration": 480
       }
     ],
     "absent_edge_fallback": {
@@ -461,7 +461,7 @@
     },
     "choreography": {
       "generated_order": ["prism-spiral", "prism-spiral-2"],
-      "dwell": { "prism-spiral": 42, "prism-spiral-2": 42 }
+      "dwell": { "prism-spiral": 600, "prism-spiral-2": 600 }
     }
   },
   "effect_metadata": {

@@ -246,20 +246,6 @@
       },
       {
         "classification": "preset",
-        "default": 1.6269999742507935,
-        "domain": {
-          "maximum": 20,
-          "minimum": 1
-        },
-        "id": "project.singularity-fade",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
         "default": 0,
         "domain": {
           "maximum": 0.05000000074505806,
@@ -280,6 +266,20 @@
           "minimum": 0
         },
         "id": "project.projection-wander",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
+        "default": 1.6269999742507935,
+        "domain": {
+          "maximum": 20,
+          "minimum": 1
+        },
+        "id": "project.singularity-fade",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -458,9 +458,9 @@
         "colorize.value-opacity-high",
         "colorize.value-opacity-low",
         "lens.symmetry",
-        "project.singularity-fade",
         "project.projection-spin-speed",
         "project.projection-wander",
+        "project.singularity-fade",
         "sample.angle-speed",
         "sample.coverage-mode",
         "sample.pattern-freq",
@@ -534,9 +534,9 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "hexagonal-prism",
-          "project.singularity-fade": 1.6269999742507935,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 1,
+          "project.singularity-fade": 1.6269999742507935,
           "sample.angle-speed": 0.029999999329447746,
           "sample.coverage-mode": "weight-squared",
           "sample.pattern-freq": 5.532700061798096,
@@ -567,9 +567,9 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "hexagonal-prism",
-          "project.singularity-fade": 1.6269999742507935,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 1,
+          "project.singularity-fade": 1.6269999742507935,
           "sample.angle-speed": 0.029999999329447746,
           "sample.coverage-mode": "weight-squared",
           "sample.pattern-freq": 5.532700061798096,
