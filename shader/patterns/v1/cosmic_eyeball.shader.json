@@ -100,7 +100,7 @@
         "unit": "ratio",
         "domain": {
           "minimum": 0.1,
-          "maximum": 20
+          "maximum": 64
         },
         "interpolation": {
           "kind": "LINEAR"

@@ -72,7 +72,7 @@
         "classification": "preset",
         "storage": "binary32",
         "unit": "cycles",
-        "domain": { "minimum": 0.1, "maximum": 20 },
+        "domain": { "minimum": 0.1, "maximum": 64 },
         "interpolation": { "kind": "LINEAR" },
         "default": 2.82629991
       },
