@@ -217,6 +217,15 @@ const UNREFERENCED = ['README.md', 'docs/screenshots'];
 // v1 expansion fixtures under shader/patterns/v1/ stay off Pages.
 const runtimeFetched = (entry) => /^shader\/patterns\/[^/]+\.json$/.test(entry);
 
+test('the site manifest publishes every source catalog document', () => {
+  const migration = JSON.parse(read('shader/patterns/shaderball_migration.json'));
+  const entries = new Set(manifestEntries());
+  const missing = Object.values(migration.source_documents)
+    .map((filename) => `shader/patterns/${filename}`)
+    .filter((path) => !entries.has(path));
+  assert.deepEqual(missing, []);
+});
+
 test('the site manifest publishes nothing the served pages do not reach', () => {
   const entries = manifestEntries();
   const stale = UNREFERENCED.filter((entry) => !entries.includes(entry));
