@@ -92,6 +92,7 @@ shader/patterns/digest_migration.v1v2.json
 shader/patterns/alien_ocean.shader.json
 shader/patterns/contour_lattice.shader.json
 shader/patterns/cosmic_eyeball.shader.json
+shader/patterns/curl_facets.shader.json
 shader/patterns/curl_lattice.shader.json
 shader/patterns/equator_grid.shader.json
 shader/patterns/example.shader.json
