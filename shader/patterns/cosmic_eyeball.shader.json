@@ -313,7 +313,7 @@
         "classification": "preset",
         "default": 1,
         "domain": {
-          "maximum": 20,
+          "maximum": 64,
           "minimum": 0.10000000149011612
         },
         "id": "sample.pattern-freq",
