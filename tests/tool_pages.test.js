@@ -275,19 +275,20 @@ test('tool pages link tailwind.css last so utilities outrank page rules', () => 
   }
 });
 
-// Classes carried purely as querySelector hooks; nothing styles them. The
-// banner's two are inline-styled on purpose — it has to render on a page whose
-// stylesheet is what failed.
-const BEHAVIOR_HOOKS = new Set([
+// Behavior-only hooks need no stylesheet. The banner's two are inline-styled
+// because it has to render when a page stylesheet fails. The expanded chain
+// state is page-scoped and is styled by the shader workbench stylesheet.
+const CLASS_EXEMPTIONS = new Set([
   'op-param', 'move-op-up', 'move-op-down', 'remove-op-btn',
   'fatal-error-message', 'fatal-error-dismiss',
+  'chain-chip--expanded',
 ]);
 
 test('every served page\'s stylesheets define every class it uses', () => {
   for (const { page, sheets, scripts } of SERVED_PAGES) {
     const src = read(page);
     assert.ok(sheets.length > 0, `${page} links no stylesheet in the repo`);
-    const defined = new Set(BEHAVIOR_HOOKS);
+    const defined = new Set(CLASS_EXEMPTIONS);
     for (const sheet of sheets) {
       for (const name of definedClasses(read(...sheet))) defined.add(name);
     }
