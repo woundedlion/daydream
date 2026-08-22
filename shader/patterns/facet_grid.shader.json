@@ -304,7 +304,7 @@
         "classification": "preset",
         "default": 3.431999921798706,
         "domain": {
-          "maximum": 20,
+          "maximum": 64,
           "minimum": 1
         },
         "id": "project.singularity-fade",
