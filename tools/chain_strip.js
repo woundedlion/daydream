@@ -951,7 +951,7 @@ export function createChainStrip({
       if (clickedHeader) select(entry.label);
     });
     if (hasParams) {
-      const setTransientOpen = (open) => {
+      const setTransientOpen = (/** @type {boolean} */ open) => {
         if (store.selectedLabel() === entry.label) return;
         chip.classList.toggle('chain-chip--expanded', open);
         chip.setAttribute('aria-expanded', String(open));
