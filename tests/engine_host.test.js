@@ -243,6 +243,39 @@ test('dispose() runs on a host that never reached a module load', () => {
   assert.equal(host.recorder, null);
 });
 
+// The glue sets Module.HS_MODULE_DEAD ahead of the trap in HS_CHECK. The trap
+// unwinds nothing, so every call after it runs on a shortened shadow stack and
+// returns plausible garbage: the flag is the only signal the host gets.
+
+test('moduleDead() reads false before the load and on a live module', () => {
+  const host = new EngineHost();
+  assert.equal(host.moduleDead(), false, 'no module has not trapped');
+
+  host.module = { HEAPU16: new Uint16Array(4) };
+  assert.equal(host.moduleDead(), false);
+});
+
+test('moduleDead() reads the glue flag once the module traps', () => {
+  const host = new EngineHost();
+  host.module = { HEAPU16: new Uint16Array(4) };
+
+  host.module.HS_MODULE_DEAD = true;
+
+  assert.equal(host.moduleDead(), true);
+});
+
+test('moduleDead() stays dead once observed, dispose() included', () => {
+  const host = new EngineHost();
+  host.module = { HS_MODULE_DEAD: true };
+
+  assert.equal(host.moduleDead(), true);
+  host.dispose();
+
+  assert.equal(host.moduleDead(), true,
+    'dispose() drops the module reference, and a host that read dead through it '
+    + 'must not read live again');
+});
+
 test('refresh() re-fetches and re-notifies when the held view has detached', () => {
   const stale = new Uint16Array(4);
   stale.buffer.transfer(); // Emscripten heap growth detaches the backing buffer in place

@@ -859,6 +859,8 @@ export function start({
       }
     },
     report: showFatalError,
+    moduleDead: () => host.moduleDead(),
+    onModuleDead: () => appTeardown?.dispose(),
   }));
 
   ///////////////////////////////////////////////////////////////////////////////

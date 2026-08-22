@@ -605,7 +605,8 @@ export function createSegmentedFallback({
 export const FRAME_GUARD_REARM_FRAMES = 60;
 
 /**
- * Wrap the render loop's per-frame body so a throw cannot freeze the page.
+ * Wrap the render loop's per-frame body so a throw cannot freeze the page, and
+ * stop the loop for good once the engine module reports itself dead.
  *
  * Three.js re-arms requestAnimationFrame only after the callback returns, so an
  * escaping throw stops the loop for the page's lifetime, silently and with the
@@ -619,16 +620,54 @@ export const FRAME_GUARD_REARM_FRAMES = 60;
  * never re-armed would swallow a later, unrelated failure for the page's
  * lifetime.
  *
+ * A dead module outranks that re-arm. Its trap unwound nothing, so the frames
+ * that follow are plausible rather than correct and need not throw at all — the
+ * clean run that re-arms the report is exactly what a trapped module produces.
+ * moduleDead() is therefore polled after every frame, throwing or not, and what
+ * it reports is terminal: the body is never called again, no later clean frame
+ * retracts the banner, and onModuleDead() releases the app so the page stops
+ * presenting output it cannot stand behind.
+ *
  * @param {Object} deps - Injected collaborators.
  * @param {() => void} deps.frame - The per-frame body.
  * @param {(message: string) => void} deps.report - Renders the failure banner.
  * @param {(...args: *) => void} [deps.logError] - Console sink for the throw.
+ * @param {() => boolean} [deps.moduleDead] - Reads the engine module's death
+ *   flag; polled once per frame, so it has to stay a cheap read.
+ * @param {() => void} [deps.onModuleDead] - Releases the app once the module is
+ *   dead. Runs after the banner, which the release leaves standing.
  * @returns {() => void} The guarded callback for setAnimationLoop.
  */
-export function createFrameLoopGuard({ frame, report, logError = console.error }) {
+export function createFrameLoopGuard({
+  frame,
+  report,
+  logError = console.error,
+  moduleDead = () => false,
+  onModuleDead = () => {},
+}) {
   let reported = false;
   let clean = 0;
+  let dead = false;
+
+  /**
+   * Poll the module's death flag and, the first time it reads dead, latch it:
+   * banner, release, no further frames.
+   * @returns {void}
+   */
+  function checkDead() {
+    if (dead || !moduleDead()) return;
+    // Latched before the release, so a release that throws still leaves the
+    // loop stopped rather than resuming into a dead module.
+    dead = true;
+    logError('Render loop stopped: the rendering engine trapped.');
+    report('The rendering engine hit an unrecoverable internal error and has'
+      + ' been shut down. Reload the page to start it again. See the browser'
+      + ' console for details.');
+    onModuleDead();
+  }
+
   return () => {
+    if (dead) return;
     try {
       frame();
       if (reported && ++clean >= FRAME_GUARD_REARM_FRAMES) {
@@ -637,12 +676,14 @@ export function createFrameLoopGuard({ frame, report, logError = console.error }
       }
     } catch (e) {
       clean = 0;
-      if (reported) return;
-      reported = true;
-      logError('Render loop frame failed:', e);
-      report(`The render loop hit an error. ${e instanceof Error ? e.message : String(e)}`
-        + ' See the browser console for details.');
+      if (!reported) {
+        reported = true;
+        logError('Render loop frame failed:', e);
+        report(`The render loop hit an error. ${e instanceof Error ? e.message : String(e)}`
+          + ' See the browser console for details.');
+      }
     }
+    checkDead();
   };
 }
 
