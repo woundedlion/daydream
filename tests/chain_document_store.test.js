@@ -121,6 +121,8 @@ test('insertion backfills presets, fields and staggered groups atomically', asyn
 
 test('insertion bounds accommodate binary32 catalog defaults', async () => {
   const catalog = structuredClone(CATALOG);
+  catalog.operators = catalog.operators.filter(
+    (operator) => operator.id !== 'sphere.displace.ripple.v2');
   catalog.operators.push({
     id: 'sphere.displace.ripple.v2', name: 'Ripple Displace',
     input: 'sphere', output: 'sphere',
