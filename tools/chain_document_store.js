@@ -62,14 +62,16 @@ const parameterFromField = (label, field) => {
   // their own uppercase vocabulary.
   const kind = field.curve === 'log-positive' ? 'LOG_POSITIVE'
     : field.curve === 'shortest-periodic' ? 'SHORTEST_PERIODIC' : 'LINEAR';
+  const minimum = Math.fround(field.min);
+  const maximum = Math.fround(field.max);
   return {
     id: `${label}.${field.id}`,
     classification: 'preset',
     storage: 'binary32',
     unit: kind === 'SHORTEST_PERIODIC' ? 'radian' : 'ratio',
-    domain: { minimum: field.min, maximum: field.max },
+    domain: { minimum, maximum },
     interpolation: kind === 'SHORTEST_PERIODIC'
-      ? { kind, period: field.max } : { kind },
+      ? { kind, period: maximum } : { kind },
     default: field.default,
   };
 };
