@@ -9,7 +9,9 @@ const COMPILER_URL = new URL('../shader/shader_workbench.mjs', import.meta.url).
 // Mirror of the compiler's LABEL_PATTERN (shader/shader_workbench.mjs).
 const LABEL_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
-/** @typedef {{id: string, name?: string, min?: number, max?: number, default: *, curve?: string, topology?: boolean, values?: string[]}} CatalogField */
+/** @typedef {{id: string, name: string, min: number, max: number, default: *, curve?: string, topology?: false}} CatalogNumericField */
+/** @typedef {{id: string, topology: true, values: string[], default: *}} CatalogTopologyField */
+/** @typedef {CatalogNumericField|CatalogTopologyField} CatalogField */
 /** @typedef {{id: string, name: string, input: string, output: string, blocks?: *, params: CatalogField[]}} CatalogOperator */
 /** @typedef {{label: string, operator: string}} ChainEntry */
 /** @typedef {{label?: string, operator: string}} ChainEdit */
@@ -53,7 +55,7 @@ const parameterFromField = (label, field) => {
       classification: 'preset',
       storage: 'enum8',
       unit: 'mode',
-      domain: { values: [...(field.values ?? [])] },
+      domain: { values: [...field.values] },
       interpolation: { kind: 'MIXED_ENUM' },
       default: field.default,
     };
