@@ -121,15 +121,22 @@ test('closed and open cards share one header layout', () => {
     'header content does not depend on the card state');
 });
 
-// §4.1: three stacked regions around the canvas. The toolbar keeps the engine
-// stats row, the canvas keeps every pixel the three do not need, and the
-// document status output is the one live region the strip and library announce
-// through. The global controls keep the floating panel every other page mounts,
-// inside the main area so it covers the canvas and nothing else.
+// §4.1: the toolbar's slim row over a main area the canvas fills, with the
+// pipeline strip overlaying that area's top edge so the preview keeps the
+// height the strip would otherwise take. The toolbar keeps the engine stats
+// row, and the document status output is the one live region the strip and
+// library announce through. The global controls keep the floating panel every
+// other page mounts, inside the main area so it covers the canvas and nothing
+// else.
 test('the workbench page lays out the toolbar, pipeline and canvas', () => {
   const region = (/** @type {RegExp} */ pattern) => WORKBENCH.search(pattern);
   assert.ok(region(/id="shader-toolbar"/) < region(/id="chain-strip"/));
-  assert.ok(region(/id="chain-strip"/) < region(/<main class="main-area"/));
+  assert.ok(region(/<main class="main-area"/) < region(/id="chain-strip"/)
+    && region(/id="chain-strip"/) < region(/id="canvas-container"/),
+  'the pipeline sits inside the main area, ahead of the canvas it overlays');
+  assert.match(WORKBENCH_CSS,
+    /\.chain-strip-region\s*\{[^}]*position:\s*absolute[^}]*top:\s*0/,
+    'anchored to that area rather than stacked above it');
   assert.ok(region(/id="canvas-container"/) < region(/<\/main>/),
     'the canvas is what the main area holds');
   assert.ok(region(/id="canvas-container"/) < region(/id="gui-container"/)
@@ -151,9 +158,11 @@ test('the workbench page lays out the toolbar, pipeline and canvas', () => {
     'short domain bands do not stretch to the tallest stage');
   assert.match(WORKBENCH_CSS, /\.chain-band\s*\{[^}]*flex:\s*0 0 auto/,
     'domain bands size to their contents');
+  assert.match(WORKBENCH_CSS, /\.chain-chip-header\s*\{[^}]*display:\s*flex/,
+    'the card header lays its controls out in one row');
   assert.match(WORKBENCH_CSS,
-    /\.chain-chip-remove\s*\{[^}]*position:\s*absolute[^}]*top:[^}]*right:/,
-  'stage delete controls sit in the upper-right corner');
+    /\.chain-chip-remove,\s*\.chain-chip-bypass,\s*\.chain-chip-move\s*\{[^}]*display:\s*inline-grid/,
+  'bypass, reorder and delete size alike inside it');
   assert.doesNotMatch(WORKBENCH_CSS,
     /\.chain-chip-params\s*\{[^}]*(?:max-height|overflow-y|scrollbar-gutter):/,
   'stage parameters remain fully visible without their own scroller');
@@ -164,7 +173,7 @@ test('the workbench page lays out the toolbar, pipeline and canvas', () => {
     /\.chain-chip--expanded\s*\{[^}]*max-width:/,
   'the horizontal pipeline viewport, not the card, handles narrow screens');
   assert.match(WORKBENCH_CSS,
-    /grid-template-columns:\s*max-content minmax\(6rem, 9rem\) 4\.75rem/,
+    /\.chain-chip-params\s*\{[^}]*grid-template-columns:\s*max-content 6rem 4rem/,
   'parameter labels, sliders, and numeric inputs stay inside the card');
   assert.match(WORKBENCH_CSS, /\[data-carrier="color"\]/,
     'each carrier domain carries its own hue');
