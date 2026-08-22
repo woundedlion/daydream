@@ -119,6 +119,35 @@ test('insertion backfills presets, fields and staggered groups atomically', asyn
   assertGreen(store);
 });
 
+test('insertion bounds accommodate binary32 catalog defaults', async () => {
+  const catalog = structuredClone(CATALOG);
+  catalog.operators.push({
+    id: 'sphere.displace.ripple.v2', name: 'Ripple Displace',
+    input: 'sphere', output: 'sphere',
+    blocks: {
+      param: { size: 4, align: 4 }, prepared: { size: 4, align: 4 },
+      state: { size: 4, align: 4 },
+    },
+    params: [{
+      id: 'strength', name: 'Ripple Strength', min: 0, max: 0.15,
+      default: 0.15, curve: 'lerp',
+    }],
+  });
+  const store = await makeStore({ catalog });
+
+  const result = store.replaceSpan(PROJECT, 0,
+    [{ operator: 'sphere.displace.ripple.v2' }]);
+  assert.equal(result.ok, true);
+  const document = store.document();
+  const parameter = document.descriptor.parameters.find(
+    (entry) => entry.id === 'sphere1.strength');
+  const stored = Math.fround(0.15);
+  assert.equal(parameter.domain.maximum, stored);
+  assert.equal(parameter.default, 0.15);
+  assert.equal(document.preset_bank.presets[0].values['sphere1.strength'], 0.15);
+  assert.deepEqual(validateShaderDocument(document, { catalog }), []);
+});
+
 test('auto labels take the family stem with the lowest free suffix', async () => {
   const store = await makeStore();
   assert.equal(store.replaceSpan(WARP, 0, [{ operator: 'warp.wave-shear.v2' }]).ok, true);
