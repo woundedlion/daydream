@@ -228,7 +228,7 @@
           "maximum": 20,
           "minimum": 1
         },
-        "id": "project.pole-fade",
+        "id": "project.singularity-fade",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -474,7 +474,7 @@
         "colorize.phase-oscillation-speed",
         "colorize.value-opacity-high",
         "colorize.value-opacity-low",
-        "project.pole-fade",
+        "project.singularity-fade",
         "sample.angle-speed",
         "sample.complexity",
         "sample.coverage-mode",
@@ -535,7 +535,7 @@
           "colorize.phase-oscillation-speed": 0,
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
-          "project.pole-fade": 1.399999976158142,
+          "project.singularity-fade": 1.399999976158142,
           "sample.angle-speed": 0,
           "sample.complexity": 1.8539999723434448,
           "sample.coverage-mode": "edge-fade",

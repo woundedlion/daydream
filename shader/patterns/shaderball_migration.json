@@ -13,6 +13,7 @@
     "facet-wave": "facet_wave.shader.json",
     "contour-lattice": "contour_lattice.shader.json",
     "curl-lattice": "curl_lattice.shader.json",
+    "curl-facets": "curl_facets.shader.json",
     "prism-lattice": "prism_lattice.shader.json",
     "vector-facets": "vector_facets.shader.json",
     "facet-grid": "facet_grid.shader.json",
@@ -40,12 +41,12 @@
       {
         "effect_id": "alien-ocean",
         "display_name": "Alien Ocean",
-        "seconds": 7
+        "seconds": 6
       },
       {
         "effect_id": "glitch-grid",
         "display_name": "Glitch Grid",
-        "seconds": 6
+        "seconds": 5
       },
       {
         "effect_id": "facet-wave",
@@ -55,7 +56,7 @@
       {
         "effect_id": "contour-lattice",
         "display_name": "Contour Lattice",
-        "seconds": 6
+        "seconds": 5
       },
       {
         "effect_id": "curl-lattice",
@@ -63,9 +64,14 @@
         "seconds": 13
       },
       {
+        "effect_id": "curl-facets",
+        "display_name": "Curl Facets",
+        "seconds": 6
+      },
+      {
         "effect_id": "prism-lattice",
         "display_name": "Prism Lattice",
-        "seconds": 6
+        "seconds": 5
       },
       {
         "effect_id": "prism-spiral",
@@ -75,7 +81,7 @@
       {
         "effect_id": "vector-facets",
         "display_name": "Vector Facets",
-        "seconds": 6
+        "seconds": 5
       },
       {
         "effect_id": "facet-grid",
@@ -95,7 +101,7 @@
       {
         "effect_id": "cosmic-eyeball",
         "display_name": "Cosmic Eyeball",
-        "seconds": 6
+        "seconds": 5
       },
       {
         "effect_id": "mobius-grid",

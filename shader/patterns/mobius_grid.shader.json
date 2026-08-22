@@ -349,20 +349,6 @@
       },
       {
         "classification": "preset",
-        "default": 1,
-        "domain": {
-          "maximum": 20,
-          "minimum": 1
-        },
-        "id": "project.pole-fade",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
         "default": 0,
         "domain": {
           "maximum": 0.05000000074505806,
@@ -383,6 +369,20 @@
           "minimum": 0
         },
         "id": "project.projection-wander",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
+        "default": 1,
+        "domain": {
+          "maximum": 20,
+          "minimum": 1
+        },
+        "id": "project.singularity-fade",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -595,9 +595,9 @@
         "lens.mobius-c-re",
         "lens.mobius-d-im",
         "lens.mobius-d-re",
-        "project.pole-fade",
         "project.projection-spin-speed",
         "project.projection-wander",
+        "project.singularity-fade",
         "sample.angle-speed",
         "sample.coverage-mode",
         "sample.drift",
@@ -630,8 +630,8 @@
     },
     "choreography": {
       "dwell": {
-        "mobius-grid": 42,
-        "mobius-grid-2": 42
+        "mobius-grid": 600,
+        "mobius-grid-2": 600
       },
       "generated_order": [
         "mobius-grid",
@@ -640,14 +640,14 @@
     },
     "edges": [
       {
-        "duration": 12,
+        "duration": 480,
         "easing": "EASE_IN_OUT_SIN",
         "from": "mobius-grid-2",
         "path_policy": "parallel",
         "to": "mobius-grid"
       },
       {
-        "duration": 12,
+        "duration": 480,
         "easing": "EASE_IN_OUT_SIN",
         "from": "mobius-grid",
         "path_policy": "parallel",
@@ -681,9 +681,9 @@
           "lens.mobius-c-re": 0,
           "lens.mobius-d-im": 0,
           "lens.mobius-d-re": 0.7071067690849304,
-          "project.pole-fade": 2.1019999980926514,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 1,
+          "project.singularity-fade": 2.1019999980926514,
           "sample.angle-speed": 0.027000000700354576,
           "sample.coverage-mode": "weight-squared",
           "sample.drift": 0.800000011920929,
@@ -724,9 +724,9 @@
           "lens.mobius-c-re": 0,
           "lens.mobius-d-im": 0,
           "lens.mobius-d-re": 0.7071067690849304,
-          "project.pole-fade": 2.1019999980926514,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 1,
+          "project.singularity-fade": 2.1019999980926514,
           "sample.angle-speed": 0.027000000700354576,
           "sample.coverage-mode": "weight-squared",
           "sample.drift": 0.800000011920929,

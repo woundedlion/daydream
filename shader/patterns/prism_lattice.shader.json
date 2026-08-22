@@ -278,20 +278,6 @@
       },
       {
         "classification": "preset",
-        "default": 1,
-        "domain": {
-          "maximum": 20,
-          "minimum": 1
-        },
-        "id": "project.pole-fade",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
         "default": 0,
         "domain": {
           "maximum": 0.05000000074505806,
@@ -312,6 +298,20 @@
           "minimum": 0
         },
         "id": "project.projection-wander",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
+        "default": 1,
+        "domain": {
+          "maximum": 20,
+          "minimum": 1
+        },
+        "id": "project.singularity-fade",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -564,9 +564,9 @@
         "colorize.value-opacity-high",
         "colorize.value-opacity-low",
         "lens.symmetry",
-        "project.pole-fade",
         "project.projection-spin-speed",
         "project.projection-wander",
+        "project.singularity-fade",
         "sample.coverage-mode",
         "sample.lattice-cell-scale",
         "sample.lattice-radius",
@@ -630,9 +630,9 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "pentagonal-prism",
-          "project.pole-fade": 2.2730000019073486,
           "project.projection-spin-speed": 0,
           "project.projection-wander": 1,
+          "project.singularity-fade": 2.2730000019073486,
           "sample.coverage-mode": "weight-squared",
           "sample.lattice-cell-scale": 0.7741405963897705,
           "sample.lattice-radius": 0.2907625138759613,
