@@ -139,18 +139,31 @@ jobs:
           GH_TOKEN: ${{ secrets.POV_TOKEN || github.token }}
           PIN: ${{ steps.engine.outputs.ref }}
         run: |
-          if ! gh api --paginate "repos/woundedlion/pov/commits/$PIN/check-runs" \
-              --jq '.check_runs | sort_by(.started_at) | .[] | [.name, .status, .conclusion] | @tsv' \
-              > /tmp/engine-checks.tsv; then
-            echo "::error::could not read the engine's check runs at $PIN, so the gate cannot confirm the engine's WASM build passed at the pinned source. A private engine repo needs POV_TOKEN with read access."
-            exit 1
-          fi
-          cat /tmp/engine-checks.tsv
-          conclusion="$(awk -F'\t' '$1 == "WASM build (Emscripten)" { c = $3 } END { print c }' /tmp/engine-checks.tsv)"
-          if [ "$conclusion" != "success" ]; then
-            echo "::error::the engine's WASM build at $PIN is '${conclusion:-absent}', so the committed module's source is unverified. Re-run the Holosphere WASM install from a SHA whose WASM build is green and commit the refreshed module."
-            exit 1
-          fi
+          deadline=$((SECONDS + 1800))
+          while :; do
+            if ! gh api --paginate "repos/woundedlion/pov/commits/$PIN/check-runs" \
+                --jq '.check_runs | sort_by(.started_at) | .[] | [.name, .status, .conclusion] | @tsv' \
+                > /tmp/engine-checks.tsv; then
+              echo "::error::could not read the engine's check runs at $PIN, so the gate cannot confirm the engine's WASM build passed at the pinned source. A private engine repo needs POV_TOKEN with read access."
+              exit 1
+            fi
+            cat /tmp/engine-checks.tsv
+            status="$(awk -F'\t' '$1 == "WASM build (Emscripten)" { s = $2 } END { print s }' /tmp/engine-checks.tsv)"
+            conclusion="$(awk -F'\t' '$1 == "WASM build (Emscripten)" { c = $3 } END { print c }' /tmp/engine-checks.tsv)"
+            if [ "$status" = "completed" ]; then
+              if [ "$conclusion" = "success" ]; then
+                break
+              fi
+              echo "::error::the engine's WASM build at $PIN concluded '${conclusion:-unknown}', so the committed module's source is unverified. Re-run the Holosphere WASM install from a SHA whose WASM build is green and commit the refreshed module."
+              exit 1
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::timed out waiting for the engine's WASM build at $PIN (last status: '${status:-absent}')."
+              exit 1
+            fi
+            echo "The engine WASM build at $PIN is '${status:-absent}'; waiting 15 seconds."
+            sleep 15
+          done
 
       - name: Checkout engine (woundedlion/pov) at the pinned SHA
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5

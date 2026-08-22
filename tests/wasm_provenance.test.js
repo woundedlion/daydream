@@ -223,6 +223,10 @@ test('the deploy gate requires the engine WASM build at the module pin', () => {
     'the check must be read at the pinned SHA, not at engine HEAD');
   assert.match(step, /"WASM build \(Emscripten\)"/,
     'the source-producing WASM job is required without coupling to unrelated checks');
+  assert.match(step, /while :; do[\s\S]*status[\s\S]*sleep 15/,
+    'a pending or not-yet-created engine check must be polled instead of failing the deploy');
+  assert.match(step, /SECONDS[\s\S]*deadline/,
+    'the engine-check poll must have a finite timeout');
   assert.match(step, /exit 1/, 'an unreadable or non-green check must fail the gate');
 });
 
