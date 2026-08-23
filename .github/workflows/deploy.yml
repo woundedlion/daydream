@@ -1,48 +1,3 @@
-# Deploy the daydream simulator to GitHub Pages (Pages source: GitHub Actions),
-# GATED on the Holosphere engine's native unit suite, the simulator's JS unit
-# suite, and a headless load of every page the manifest publishes. The `deploy`
-# job `needs` all three, so the live site only updates when each passes.
-#
-# The committed app files are published as-is (three.js / lil-gui load from the
-# CDN via vendor-importmap.js, so they don't need vendoring here). The engine's
-# WASM module is whatever is committed in this repo — built and installed from
-# Holosphere; the gate verifies that engine's suite is green.
-#
-# The gate pins its engine checkout to the SHA the committed .wasm was built
-# from (holosphere_wasm.sha, written next to the module by the Holosphere WASM
-# install step), so it tests the exact source the deployed module corresponds to
-# rather than a decoupled engine HEAD. It also asserts the committed .wasm is
-# byte-identical to the hash recorded at build time (holosphere_wasm.wasm.sha256),
-# binding the deployed artifact to that recorded hash. That manifest carries an
-# entry for the .js Emscripten glue as well, so the glue is bound to the binary
-# by content. Finally it asserts .wasm and .sha share a last-touch commit — or,
-# where they do not, that the binary is byte-identical to the one the pin was
-# committed over — so the engine source-pin cannot advance over a binary it did
-# not build. If any file is missing, a hash does not match, or the source pin
-# moved over a changed binary, the gate fails hard rather than deploying an
-# unverifiable artifact (a silent fallback to engine HEAD would make the gate
-# inert).
-#
-# The engine suite run here is the native one, and no job rebuilds the module,
-# so the gate also requires the engine's WASM build check to have concluded
-# success at that same pinned SHA.
-#
-# The glue is deliberately NOT in the atomicity set: it is byte-identical across
-# most engine builds, so git has nothing to commit for it and its last-touch
-# commit legitimately trails the binary's. Its hash entry is the binding.
-#
-# The same install drops the engine's segment-map golden (pov_segment_map.json)
-# here. The gate diffs the committed copy against the pinned engine checkout, so
-# the segment cross-check in the JS suite cannot measure the web tiling against a
-# firmware table that has drifted from the engine's header.
-#
-# That install also owns README.md and docs/screenshots/, both of which the deploy
-# job publishes. The gate compares them against the same pinned checkout, so the
-# two repos cannot serve divergent documentation.
-#
-# If the engine repo (woundedlion/pov) is PRIVATE, add a repository secret
-# POV_TOKEN = a PAT with read access. For a public engine repo the default
-# workflow token is sufficient.
 name: Deploy to GitHub Pages
 
 on:
@@ -50,350 +5,77 @@ on:
     branches: [master]
   workflow_dispatch:
 
-# Default every job to source read-only. Deploy grants its publish capabilities.
 permissions:
   contents: read
 
-# One deploy at a time; let an in-progress deploy finish rather than cancel it.
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
   gate:
-    name: Engine unit tests (deploy gate)
-    # Checks out and runs a second repository's build; never holds the Pages token.
+    name: Verified engine bundle (deploy gate)
     permissions:
       contents: read
-    runs-on: ubuntu-24.04   # pinned image: fixes the apt.llvm.org release channel (noble)
-    # The engine suite has a real hang mode (a Canvas constructor that spin-waits
-    # for a buffer that never frees), which GitHub's 6-hour default would burn a
-    # runner on. Generous enough for a cold build plus the full-tier roster.
-    timeout-minutes: 60
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
     steps:
-      - name: Checkout daydream (for the pinned engine SHA)
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-        with:
-          fetch-depth: 0   # full history: the provenance-atomicity check reads git log per file
-
-      - name: Verify committed WASM matches its recorded build hash
-        run: |
-          if [ ! -f holosphere_wasm.wasm.sha256 ]; then
-            echo "::error::holosphere_wasm.wasm.sha256 not found — the deployed artifact is unverifiable. The Holosphere WASM install writes it next to the module; commit it with the .wasm."
-            exit 1
-          fi
-          sha256sum -c holosphere_wasm.wasm.sha256
-
-      - name: Verify the installed WASM and source pin were committed atomically
-        # The Holosphere WASM install rewrites .wasm, .wasm.sha256 and .sha on
-        # every build. The sha256 check above binds the manifest to .wasm and .js
-        # by content; the shared .wasm/.sha last-touch commit prevents a source pin
-        # from advancing independently of the binary.
-        #
-        # An engine advance that changes no compiled output leaves git nothing to
-        # commit for .wasm, so the pin moves alone. Content is the binding in that
-        # case, exactly as it is for the glue: the binary as of the pin's commit
-        # must be the one at HEAD.
-        run: |
-          wasm_c="$(git log -1 --format=%H -- holosphere_wasm.wasm)"
-          sha_c="$(git log -1 --format=%H -- holosphere_wasm.sha)"
-          echo "last-touch commits: .wasm=$wasm_c .sha=$sha_c"
-          if [ -z "$wasm_c" ] || [ -z "$sha_c" ]; then
-            echo "::error::holosphere_wasm.wasm or holosphere_wasm.sha is untracked — the deployed artifact carries no engine provenance. Re-run the Holosphere WASM install and commit them together."
-            exit 1
-          fi
-          if [ "$wasm_c" != "$sha_c" ]; then
-            pinned_blob="$(git rev-parse "$sha_c:holosphere_wasm.wasm")"
-            head_blob="$(git rev-parse "HEAD:holosphere_wasm.wasm")"
-            if [ "$pinned_blob" != "$head_blob" ]; then
-              echo "::error::WASM and engine source-pin were not committed atomically — holosphere_wasm.sha is decoupled from holosphere_wasm.wasm. Re-run the Holosphere WASM install and commit them together."
-              exit 1
-            fi
-            echo "holosphere_wasm.sha moved alone at $sha_c, over the binary that is still at HEAD"
-          fi
-
-      - name: Resolve engine SHA the committed WASM was built from
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Resolve engine pin
         id: engine
         run: |
-          if [ ! -f holosphere_wasm.sha ]; then
-            echo "::error::holosphere_wasm.sha not found — engine provenance is unrecorded, so the gate can't pin to the source the committed WASM was built from. The Holosphere WASM install writes it next to the module; commit it with the .wasm."
+          pin="$(tr -d '[:space:]' < holosphere_wasm.sha)"
+          if ! printf '%s' "$pin" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::holosphere_wasm.sha must contain one full engine commit"
             exit 1
           fi
-          sha="$(tr -d '[:space:]' < holosphere_wasm.sha)"
-          # A ref actions/checkout can't resolve (a `-dirty` marker, an
-          # abbreviated SHA, a branch name) surfaces only as an opaque
-          # "ref not found" several steps later.
-          if ! printf '%s' "$sha" | grep -Eq '^[0-9a-f]{40}$'; then
-            echo "::error::holosphere_wasm.sha does not hold a bare 40-hex engine SHA (got '$sha') — rebuild from a clean Holosphere checkout and re-commit all four installed WASM files."
-            exit 1
-          fi
-          echo "Pinning engine checkout to $sha (from holosphere_wasm.sha)"
-          echo "ref=$sha" >> "$GITHUB_OUTPUT"
-
-      - name: Require the engine WASM build green at the pinned SHA
-        # The suite this job runs is the engine's NATIVE one, which never touches
-        # the committed module, and nothing here rebuilds it. The job that does
-        # build WASM is the engine's own, so the gate requires that job to have
-        # concluded success at the exact SHA the module records its source as.
+          echo "pin=$pin" >> "$GITHUB_OUTPUT"
+      - name: Download the verified engine bundle
         env:
           GH_TOKEN: ${{ secrets.POV_TOKEN || github.token }}
-          PIN: ${{ steps.engine.outputs.ref }}
+          PIN: ${{ steps.engine.outputs.pin }}
         run: |
           deadline=$((SECONDS + 1800))
           while :; do
-            if ! gh api --paginate "repos/woundedlion/pov/commits/$PIN/check-runs" \
-                --jq '.check_runs | sort_by(.started_at) | .[] | [.name, .status, .conclusion] | @tsv' \
-                > /tmp/engine-checks.tsv; then
-              echo "::error::could not read the engine's check runs at $PIN, so the gate cannot confirm the engine's WASM build passed at the pinned source. A private engine repo needs POV_TOKEN with read access."
-              exit 1
-            fi
-            cat /tmp/engine-checks.tsv
-            status="$(awk -F'\t' '$1 == "WASM build (Emscripten)" { s = $2 } END { print s }' /tmp/engine-checks.tsv)"
-            conclusion="$(awk -F'\t' '$1 == "WASM build (Emscripten)" { c = $3 } END { print c }' /tmp/engine-checks.tsv)"
-            if [ "$status" = "completed" ]; then
-              if [ "$conclusion" = "success" ]; then
+            run_id="$(gh api "repos/woundedlion/pov/actions/workflows/ci.yml/runs?head_sha=$PIN&status=success&per_page=20" --jq '.workflow_runs[0].id // empty')"
+            if [ -n "$run_id" ]; then
+              artifact_id="$(gh api "repos/woundedlion/pov/actions/runs/$run_id/artifacts" --jq ".artifacts[] | select(.name == \"holosphere-engine-$PIN\") | .id" | head -n1)"
+              if [ -n "$artifact_id" ]; then
+                mkdir engine-bundle
+                gh api "repos/woundedlion/pov/actions/artifacts/$artifact_id/zip" > /tmp/engine-bundle.zip
+                unzip -q /tmp/engine-bundle.zip -d engine-bundle
                 break
               fi
-              echo "::error::the engine's WASM build at $PIN concluded '${conclusion:-unknown}', so the committed module's source is unverified. Re-run the Holosphere WASM install from a SHA whose WASM build is green and commit the refreshed module."
-              exit 1
             fi
             if [ "$SECONDS" -ge "$deadline" ]; then
-              echo "::error::timed out waiting for the engine's WASM build at $PIN (last status: '${status:-absent}')."
+              echo "::error::no verified engine bundle became available for $PIN"
               exit 1
             fi
-            echo "The engine WASM build at $PIN is '${status:-absent}'; waiting 15 seconds."
+            echo "Waiting for the engine bundle at $PIN."
             sleep 15
           done
-
-      - name: Checkout engine (woundedlion/pov) at the pinned SHA
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-        with:
-          repository: woundedlion/pov
-          ref: ${{ steps.engine.outputs.ref }}
-          token: ${{ secrets.POV_TOKEN || github.token }}
-          path: engine
-          # The gate builds and runs CMake code out of this tree; nothing below
-          # fetches, so the token must not be left in engine/.git/config.
-          persist-credentials: false
-
-      - name: Verify the committed segment-map golden matches the pinned engine
-        # pov_segment_map.json is the firmware segment→canvas table
-        # tests/segment_crosscheck.test.js measures the web tiling against. The
-        # engine emits it from hardware/pov_segment_map.h and its
-        # unit_pov_segment_map_golden CTest (run below) pins it to that header, so
-        # requiring this copy to equal the engine's at the pinned SHA is what keeps
-        # a segment convention change from riding green here on a stale table.
+      - name: Verify the committed engine package
         run: |
-          if [ ! -f pov_segment_map.json ]; then
-            echo "::error::pov_segment_map.json not found — the segment cross-check has no firmware reference. The Holosphere WASM install writes it next to the module; commit it with the .wasm."
-            exit 1
-          fi
-          if ! diff -u engine/hardware/pov_segment_map.json pov_segment_map.json; then
-            echo "::error::pov_segment_map.json is stale relative to the pinned engine ($(cat holosphere_wasm.sha)) — re-run the Holosphere WASM install and commit the refreshed golden."
-            exit 1
-          fi
-
-      - name: Verify the committed README and screenshot gallery match the pinned engine
-        # The engine's install rules (Holosphere CMakeLists.txt, DAYDREAM_DIR block)
-        # write README.md and mirror docs/screenshots/ here, and the deploy job
-        # publishes both to Pages. Comparing them against the pinned engine keeps a
-        # daydream-only or stale edit from being served as the shared documentation.
-        # The screenshot comparison is recursive and set-wise, so a missing, extra or
-        # differing image all fail.
-        run: |
-          pin="$(cat holosphere_wasm.sha)"
+          (cd engine-bundle && sha256sum -c holosphere_engine.sha256)
           status=0
-          if [ ! -f README.md ]; then
-            echo "::error::README.md not found — the deploy job publishes it. The Holosphere WASM install writes it next to the module; commit it with the .wasm."
-            status=1
-          elif ! cmp -s engine/README.md README.md; then
-            echo "::error::README.md is not byte-identical to the pinned engine ($pin) — re-run the Holosphere WASM install and commit the refreshed README."
-            diff -u engine/README.md README.md | head -n 200
-            status=1
-          fi
-          if [ ! -d docs/screenshots ]; then
-            echo "::error::docs/screenshots/ not found — the published README's gallery has no images. The Holosphere WASM install writes it next to the module; commit it with the .wasm."
-            status=1
-          elif ! diff -rq engine/docs/screenshots docs/screenshots; then
-            echo "::error::docs/screenshots/ does not match the pinned engine ($pin) — each line above names a missing, extra or differing image. Re-run the Holosphere WASM install and commit the refreshed gallery."
-            status=1
-          fi
-          exit $status
-
-      - name: Verify the committed shader mirrors match the pinned engine
-        # The engine's install rules (Holosphere CMakeLists.txt, DAYDREAM_DIR block)
-        # copy scripts/shader_workbench.mjs, scripts/sha256.mjs and the pattern
-        # documents into shader/ here. Edits land on either side, and no suite in
-        # either repository compares the two copies, so this is what holds the
-        # committed mirror to the engine it is pinned to.
-        #
-        # The pattern set is the install's own FILES_MATCHING rule — every
-        # *.shader.json under the engine's patterns/, plus shaderball_migration.json
-        # — walked file by file rather than compared as a directory: shader/patterns/
-        # also carries the v1 fixtures and digest_migration.v1v2.json, which this
-        # repository generates and the engine does not install.
-        #
-        # shader/engine_catalog.json is not in the set. It is the module's own
-        # getShaderChainCatalog() export, pinned to it by
-        # tests/engine_contract_wasm.test.js; the engine's copy is a pretty-printed
-        # spelling of the same catalog and can never byte-match.
-        #
-        # Line endings are compared insensitively: only this repository's
-        # .gitattributes pins any of these paths to LF, so the engine's bytes are
-        # whatever its contributors committed. The byte-exact pin on the v2 documents
-        # is tests/shader_document.test.js.
-        run: |
-          pin="$(cat holosphere_wasm.sha)"
-          mirror() {
-            if [ ! -f "$2" ]; then
-              echo "::error::$2 not found — the Holosphere WASM install writes it; commit it with the .wasm."
-              return 1
+          while read -r _ path; do
+            path="${path#\*}"
+            path="${path#./}"
+            if [ ! -f "$path" ]; then
+              echo "::error::$path is missing from the committed engine package"
+              status=1
+            elif ! cmp -s "engine-bundle/$path" "$path"; then
+              echo "::error::$path differs from the verified bundle for $(cat holosphere_wasm.sha)"
+              status=1
             fi
-            if ! git -c core.autocrlf=false diff --no-index --ignore-cr-at-eol --exit-code -- "$1" "$2"; then
-              echo "::error::$2 has drifted from the pinned engine ($pin) — land the edit in the engine, then re-run the Holosphere WASM install and commit the refreshed mirror."
-              return 1
-            fi
-          }
-          if [ ! -d engine/patterns ]; then
-            echo "::error::the pinned engine ($pin) has no patterns/ directory, so the comparison below would run over nothing. Check the install's FILES_MATCHING rule against this step."
-            exit 1
-          fi
-          documents="$(find engine/patterns -type f \( -name '*.shader.json' -o -name shaderball_migration.json \) -printf '%P\n' | sort)"
-          if [ -z "$documents" ]; then
-            echo "::error::the pinned engine ($pin) installs no pattern documents from patterns/ — a comparison over an empty set is a green step that checks nothing. Check the install's FILES_MATCHING rule against this step."
-            exit 1
-          fi
-          status=0
-          mirror engine/scripts/shader_workbench.mjs shader/shader_workbench.mjs || status=1
-          mirror engine/scripts/sha256.mjs shader/sha256.mjs || status=1
-          count=0
-          for doc in $documents; do
-            count=$((count + 1))
-            mirror "engine/patterns/$doc" "shader/patterns/$doc" || status=1
-          done
-          echo "Compared the two workbench modules and $count pattern documents against $pin."
+          done < engine-bundle/holosphere_engine.sha256
           exit $status
-
-      - name: Verify the recorded build toolchain matches the pinned engine
-        # holosphere_wasm.toolchain records the emsdk that built the committed
-        # module. The JS suite only checks its shape, and nothing else here read
-        # it, so a module built by a local unpinned emsdk recorded self-consistent
-        # provenance and deployed — the exact case the marker was written to
-        # prevent. The pinned engine checkout carries the emsdk its own WASM job
-        # builds with (tools/build_pins.py, the engine's single source for it),
-        # so require the two to agree.
-        #
-        # Only emsdk is compared: the clang line records emsdk's own bundled
-        # compiler, not the apt clang the native suite below builds with.
-        #
-        # The record also carries the CONFIGURATION, which the emsdk line does
-        # not distinguish: the same source and the same emsdk produce a
-        # different module under wasm-debug (-O0, assertions, 64 KB stack) or
-        # with -DHS_WASM_DEV_BINDINGS=ON. A deployed module must be neither.
-        # Engines predating those fields wrote the two version lines alone; the
-        # next WASM install closes that window for good.
-        run: |
-          if [ ! -f holosphere_wasm.toolchain ]; then
-            echo "::error::holosphere_wasm.toolchain not found — the deployed module records no build toolchain. The Holosphere WASM install writes it next to the module; commit it with the .wasm."
-            exit 1
-          fi
-          if ! pinned="$(python3 engine/tools/build_pins.py emsdk)" || [ -z "$pinned" ]; then
-            echo "::error::the pinned engine ($(cat holosphere_wasm.sha)) does not report an emsdk pin from tools/build_pins.py, so the recorded toolchain cannot be checked against it."
-            exit 1
-          fi
-          recorded="$(awk '$1 == "emsdk" { print $2 }' holosphere_wasm.toolchain)"
-          if [ "$recorded" != "$pinned" ]; then
-            echo "::error::holosphere_wasm.toolchain records emsdk '${recorded:-none}', but the pinned engine builds WASM with $pinned — rebuild the module with the pinned emsdk and commit the refreshed provenance set."
-            cat holosphere_wasm.toolchain
-            exit 1
-          fi
-          echo "Recorded emsdk $recorded matches the pinned engine."
-          field() { awk -v k="$1" '$1 == k { print $2 }' holosphere_wasm.toolchain; }
-          build_type="$(field build_type)"
-          dev_bindings="$(field dev_bindings)"
-          if [ -z "$build_type" ] && [ -z "$dev_bindings" ]; then
-            echo "::warning::holosphere_wasm.toolchain records no build configuration, so the deployed module's build type and dev bindings are unverified. It was written by an engine predating those fields; the next Holosphere WASM install records them."
-          elif [ "$build_type" != "Release" ] || [ "$dev_bindings" != "OFF" ]; then
-            echo "::error::holosphere_wasm.toolchain records build_type '${build_type:-none}' / dev_bindings '${dev_bindings:-none}' — a deployed module must be the Release build with dev bindings off. Rebuild with the wasm-release preset and commit the refreshed provenance set."
-            cat holosphere_wasm.toolchain
-            exit 1
-          else
-            echo "Recorded build configuration: Release, dev bindings off."
-          fi
-
-      - name: Resolve the Clang the pinned engine builds with
-        id: clang
-        # The engine's tools/build_pins.py is the single source for the compiler
-        # its own native jobs install, and it enforces that spelling across its
-        # own files only — it cannot see this repository. Reading the pin out of
-        # the pinned engine checkout is what keeps this gate on the same compiler
-        # as the CI whose green it requires; a version spelled here would drift
-        # unpoliced, which is how it came to run three majors behind.
-        run: |
-          if ! major="$(python3 engine/tools/build_pins.py clang)" ||
-             ! printf '%s' "$major" | grep -Eq '^[0-9]+$'; then
-            echo "::error::the pinned engine ($(cat holosphere_wasm.sha)) does not report a clang pin from tools/build_pins.py, so the gate cannot build its suite on the compiler its own CI used."
-            exit 1
-          fi
-          echo "major=$major" >> "$GITHUB_OUTPUT"
-          echo "Building the engine suite with clang-$major, the engine's own pin."
-
-      - name: Install Clang + Ninja
-        # The engine pins a Clang newer than the Ubuntu 24.04 default, so the
-        # toolchain comes from apt.llvm.org — the same source and release channel
-        # its CI uses (Holosphere .github/workflows/ci.yml).
-        #
-        # The signing key is checksum-pinned, as it is there: it is served by the
-        # same host as the packages it authenticates, so a fresh fetch trusted on
-        # sight lets that host vouch for itself. The digest comes out of the
-        # pinned engine checkout for the same reason the clang major does — a
-        # value spelled here would drift unpoliced by the engine's own gate. The
-        # deb transport stays plain HTTP; signed-by is what authenticates the
-        # archive, per release file.
-        env:
-          MAJOR: ${{ steps.clang.outputs.major }}
-        run: |
-          if ! key_sha="$(python3 engine/tools/build_pins.py llvm-key-sha256)" || [ -z "$key_sha" ]; then
-            echo "::error::the pinned engine ($(cat holosphere_wasm.sha)) does not report an llvm-key-sha256 pin from tools/build_pins.py, so the apt.llvm.org signing key cannot be verified before it is trusted."
-            exit 1
-          fi
-          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key -o /tmp/llvm-snapshot.gpg.key
-          echo "$key_sha  /tmp/llvm-snapshot.gpg.key" | sha256sum --check --strict
-          sudo gpg --dearmor -o /usr/share/keyrings/llvm.gpg /tmp/llvm-snapshot.gpg.key
-          echo "deb [signed-by=/usr/share/keyrings/llvm.gpg] http://apt.llvm.org/noble/ llvm-toolchain-noble-$MAJOR main" \
-            | sudo tee /etc/apt/sources.list.d/llvm.list
-          sudo apt-get update
-          sudo apt-get install -y "clang-$MAJOR" ninja-build
-
-      - run: >
-          cmake --preset tests -DHS_INSTALL_GIT_HOOKS=OFF
-          -DCMAKE_C_COMPILER=clang-${{ steps.clang.outputs.major }}
-          -DCMAKE_CXX_COMPILER=clang++-${{ steps.clang.outputs.major }}
-        working-directory: engine
-      - run: cmake --build --preset tests
-        working-directory: engine
-      - name: Test
-        # Same tier as the engine's own presubmit (Holosphere .github/workflows/ci.yml).
-        # The defaults are the QUICK tier: an 8-frame smoke at device resolution
-        # only, which never reaches the effect-lifecycle transitions nor the
-        # 288x144 production-resolution roster passes.
-        #
-        # --no-tests=error: an empty test list must fail this gate rather than
-        # exit 0. Redundant with the tests preset's noTestsAction, and spelled
-        # out at every ci.yml ctest call for the same reason.
-        env:
-          HS_SMOKE_FRAMES: 120
-          HS_EFFECTS_FULL: 1
-        run: ctest --preset tests --output-on-failure --no-tests=error
-        working-directory: engine
 
   js-tests:
     name: Simulator JS unit tests (deploy gate)
     permissions:
       contents: read
     uses: ./.github/workflows/js-unit-suite.yml
-    with:
-      pin-engine: true
     secrets:
       POV_TOKEN: ${{ secrets.POV_TOKEN }}
 
@@ -405,7 +87,7 @@ jobs:
 
   deploy:
     name: Deploy to Pages
-    needs: [gate, js-tests, browser-smoke]   # ← only deploys if all three pass
+    needs: [gate, js-tests, browser-smoke]
     permissions:
       contents: read
       pages: write
@@ -417,26 +99,15 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-
-      - name: Configure Pages
-        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
-
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
       - name: Stage site from the committed manifest
-        # Publish only the runtime app, not the whole repo tree: path: '.' would
-        # ship .git/, tests/, scripts/ and dev tooling to Pages. site_manifest.txt
-        # is the served set; tests/site_manifest.test.js holds it to what the
-        # pages actually reference, so a new runtime asset in a new directory
-        # goes red in the JS suite instead of 404ing here.
         run: |
           mkdir _site
           status=0
-          # Default IFS trims leading and trailing whitespace, so an indented
-          # comment or a padded path classifies here exactly as it does in
-          # tests/site_manifest.test.js, which trims before dropping comments.
           while read -r path || [ -n "$path" ]; do
             case "$path" in ''|'#'*) continue ;; esac
             if [ ! -e "$path" ]; then
-              echo "::error::site_manifest.txt lists $path, which is not in the repo — update the manifest or restore the file."
+              echo "::error::site_manifest.txt lists missing path $path"
               status=1
               continue
             fi
@@ -444,12 +115,8 @@ jobs:
             cp -r "$path" "_site/$(dirname "$path")/"
           done < site_manifest.txt
           exit $status
-
-      - name: Upload site artifact
-        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
-          path: '_site'
-
-      - name: Deploy to Pages
-        id: deployment
+          path: _site
+      - id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

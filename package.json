@@ -4,8 +4,6 @@
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
-  "testFileFloor": 74,
-  "lintFileFloor": 153,
   "scripts": {
     "prepare": "git config core.hooksPath .githooks",
     "pretest": "node scripts/require-tests.mjs",

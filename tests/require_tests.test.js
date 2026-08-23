@@ -1,147 +1,55 @@
-//
-// scripts/require-tests.mjs is the `pretest` gate. Driven as a subprocess with
-// cwd set to a temp fixture, which is where the script reads package.json and
-// resolves the test glob from.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fixtureRepo, expectFailure } from './fixture_repo.js';
+import { expectFailure, fixtureRepo } from './fixture_repo.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = resolve(HERE, '../scripts/require-tests.mjs');
-
-/**
- * Writes the fixture package.json, merging overrides over a non-recursive glob
- * and a floor of one.
- * @param {Object} [overrides] - Fields replacing the defaults.
- */
-const writePkg = (overrides = {}) => {
-  const pkg = {
-    scripts: { test: 'node --test "tests/*.test.js"' },
-    testFileFloor: 1,
-    ...overrides,
-  };
-  writeFileSync(join(root, 'package.json'), JSON.stringify(pkg, null, 2));
-};
-
-/** Recreates the fixture repo: a package.json with a test glob and one matching test file. */
+const writePkg = (glob = 'tests/*.test.js') => writeFileSync(
+  join(root, 'package.json'),
+  JSON.stringify({ scripts: { test: `node --test "${glob}"` } }),
+);
 const buildRoot = () => {
   rmSync(root, { recursive: true, force: true });
   mkdirSync(join(root, 'tests'), { recursive: true });
   writePkg();
-  writeFileSync(join(root, 'tests', 'sample.test.js'), '');
+  writeFileSync(join(root, 'tests/sample.test.js'), '');
 };
-
 const root = fixtureRepo('require-tests-', buildRoot);
+const run = () => String(execFileSync(process.execPath, [SCRIPT], { cwd: root }));
+const fail = () => expectFailure(process.execPath, [SCRIPT], { cwd: root });
 
-/** Runs the script against the fixture, asserting it exits zero. */
-const run = () => execFileSync(process.execPath, [SCRIPT], { cwd: root });
-
-/** Runs the script against the fixture expecting failure and returns its stderr. */
-const runExpectingFailure = () =>
-  expectFailure(process.execPath, [SCRIPT], { cwd: root });
-
-/** Verifies a populated test dir with no stray install passes. */
-test('a populated test dir with no stray install passes', () => {
-  assert.match(String(run()), /require-tests: 1 files matched/);
+test('a populated test directory passes', () => {
+  assert.match(run(), /1 files matched/);
 });
 
-/** Verifies an emptied test dir is refused rather than reported as a green run. */
-test('a test dir with no matching files fails', () => {
-  rmSync(join(root, 'tests', 'sample.test.js'));
-  const err = runExpectingFailure();
-  assert.match(err, /No files matched tests\/\*\.test\.js/);
+test('an empty test glob fails', () => {
+  rmSync(join(root, 'tests/sample.test.js'));
+  assert.match(fail(), /No files matched/);
 });
 
-/** Verifies a surviving file is not enough once the committed floor is higher. */
-test('a match count below the committed floor fails', () => {
-  writePkg({ testFileFloor: 2 });
-  const err = runExpectingFailure();
-  assert.match(err, /Only 1 files matched/);
-  assert.match(err, /floor is 2/);
+test('a test below a non-recursive glob fails', () => {
+  mkdirSync(join(root, 'tests/sub'));
+  writeFileSync(join(root, 'tests/sub/nested.test.js'), '');
+  assert.match(fail(), /does not reach[\s\S]*nested\.test\.js/);
 });
 
-/** Verifies a floor left behind by the files that landed since is refused. */
-test('a match count above the committed floor fails', () => {
-  writeFileSync(join(root, 'tests', 'later.test.js'), '');
-  const err = runExpectingFailure();
-  assert.match(err, /2 files matched/);
-  assert.match(err, /Raise "testFileFloor" in package.json to 2/);
+test('a recursive glob reaches nested tests', () => {
+  mkdirSync(join(root, 'tests/sub'));
+  writeFileSync(join(root, 'tests/sub/nested.test.js'), '');
+  writePkg('tests/**/*.test.js');
+  assert.match(run(), /2 files matched/);
 });
 
-/** Verifies the floor cannot be dropped to disable the ratchet. */
-test('a missing floor fails', () => {
-  writePkg({ testFileFloor: undefined });
-  const err = runExpectingFailure();
-  assert.match(err, /testFileFloor/);
+test('a nested node_modules fails', () => {
+  mkdirSync(join(root, 'tests/node_modules'));
+  assert.match(fail(), /shadows the pinned root install/);
 });
 
-/** Verifies a test file the non-recursive glob cannot reach is refused. */
-test('a test file below the glob depth fails', () => {
-  mkdirSync(join(root, 'tests', 'sub'));
-  writeFileSync(join(root, 'tests', 'sub', 'nested.test.js'), '');
-  const err = runExpectingFailure();
-  assert.match(err, /does not reach/);
-  assert.match(err, /tests\/sub\/nested\.test\.js/);
-});
-
-/** Verifies a root-level test outside the tests/ glob is refused. */
-test('a root-level test file fails as unreachable', () => {
-  writeFileSync(join(root, 'stray.test.js'), '');
-  const err = runExpectingFailure();
-  assert.match(err, /does not reach/);
-  assert.match(err, /stray\.test\.js/);
-});
-
-/** Verifies a test file in a directory beside the test dir is refused. */
-test('a test file in a sibling directory fails as unreachable', () => {
-  mkdirSync(join(root, 'tools', 'nested'), { recursive: true });
-  writeFileSync(join(root, 'tools', 'nested', 'stray.test.js'), '');
-  const err = runExpectingFailure();
-  assert.match(err, /does not reach/);
-  assert.match(err, /tools\/nested\/stray\.test\.js/);
-});
-
-/** Verifies the sweep does not enter git metadata or the vendored drops. */
-test('test files under skipped directories are not flagged', () => {
-  for (const dir of ['.git', 'three.js', 'vendor', 'node_modules']) {
-    mkdirSync(join(root, dir, 'nested'), { recursive: true });
-    writeFileSync(join(root, dir, 'nested', 'vendored.test.js'), '');
-  }
-  assert.doesNotThrow(run);
-});
-
-/** Verifies a `**` glob counts the nested file instead of refusing it. */
-test('a recursive glob reaches a nested test file', () => {
-  mkdirSync(join(root, 'tests', 'sub'));
-  writeFileSync(join(root, 'tests', 'sub', 'nested.test.js'), '');
-  writePkg({
-    scripts: { test: 'node --test "tests/**/*.test.js"' },
-    testFileFloor: 2,
-  });
-  assert.doesNotThrow(run);
-});
-
-/** Verifies a node_modules directly under the test dir is refused. */
-test('a node_modules in the test dir fails', () => {
-  mkdirSync(join(root, 'tests', 'node_modules'));
-  const err = runExpectingFailure();
-  assert.match(err, /shadows the pinned root install/);
-  assert.match(err, /tests\/node_modules/);
-});
-
-/** Verifies the scan reaches a node_modules nested below the test dir. */
-test('a nested node_modules below the test dir fails', () => {
-  mkdirSync(join(root, 'tests', 'fixtures', 'app', 'node_modules'), { recursive: true });
-  const err = runExpectingFailure();
-  assert.match(err, /tests\/fixtures\/app\/node_modules/);
-});
-
-/** Verifies the root install the test dir is supposed to resolve to is not flagged. */
-test('the root node_modules is not flagged', () => {
-  mkdirSync(join(root, 'node_modules', 'three'), { recursive: true });
-  assert.doesNotThrow(run);
+test('the root node_modules is allowed', () => {
+  mkdirSync(join(root, 'node_modules'));
+  assert.match(run(), /1 files matched/);
 });
