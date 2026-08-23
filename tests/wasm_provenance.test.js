@@ -38,6 +38,13 @@ test('deploy consumes one checksummed engine bundle at the module pin', () => {
   assert.doesNotMatch(workflow, /cmake --build|path: engine/);
 });
 
+test('deploy stops waiting when the pinned engine run cannot publish', () => {
+  const workflow = text('.github/workflows/deploy.yml');
+  assert.match(workflow, /if \[ "\$run_status" = completed \]/);
+  assert.match(workflow, /POV CI for \$PIN concluded \$run_conclusion/);
+  assert.match(workflow, /published no verified engine bundle/);
+});
+
 test('pre-push verifies the working-tree artifacts', () => {
   assert.match(text('.githooks/pre-push'), /DAYDREAM_WASM_CLEAN_REQUIRED=1/);
 });
