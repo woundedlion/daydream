@@ -40,6 +40,7 @@ test('deploy consumes one checksummed engine bundle at the module pin', () => {
 
 test('deploy stops waiting when the pinned engine run cannot publish', () => {
   const workflow = text('.github/workflows/deploy.yml');
+  assert.match(workflow, /\) \|\| true/);
   assert.match(workflow, /if \[ "\$run_status" = completed \]/);
   assert.match(workflow, /POV CI for \$PIN concluded \$run_conclusion/);
   assert.match(workflow, /published no verified engine bundle/);
