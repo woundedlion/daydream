@@ -37,10 +37,21 @@ jobs:
         run: |
           deadline=$((SECONDS + 1800))
           while :; do
-            run_id="$(gh api "repos/woundedlion/pov/actions/workflows/ci.yml/runs?head_sha=$PIN&status=success&per_page=20" --jq '.workflow_runs[0].id // empty')"
+            read -r run_id run_status run_conclusion < <(
+              gh api "repos/woundedlion/pov/actions/workflows/ci.yml/runs?head_sha=$PIN&per_page=1" \
+                --jq '.workflow_runs[0] // empty | [.id, .status, (.conclusion // "-")] | @tsv'
+            )
             if [ -n "$run_id" ]; then
-              artifact_id="$(gh api "repos/woundedlion/pov/actions/runs/$run_id/artifacts" --jq ".artifacts[] | select(.name == \"holosphere-engine-$PIN\") | .id" | head -n1)"
-              if [ -n "$artifact_id" ]; then
+              if [ "$run_status" = completed ]; then
+                if [ "$run_conclusion" != success ]; then
+                  echo "::error::POV CI for $PIN concluded $run_conclusion"
+                  exit 1
+                fi
+                artifact_id="$(gh api "repos/woundedlion/pov/actions/runs/$run_id/artifacts" --jq ".artifacts[] | select(.name == \"holosphere-engine-$PIN\") | .id" | head -n1)"
+                if [ -z "$artifact_id" ]; then
+                  echo "::error::successful POV CI for $PIN published no verified engine bundle"
+                  exit 1
+                fi
                 mkdir engine-bundle
                 gh api "repos/woundedlion/pov/actions/artifacts/$artifact_id/zip" > /tmp/engine-bundle.zip
                 unzip -q /tmp/engine-bundle.zip -d engine-bundle
