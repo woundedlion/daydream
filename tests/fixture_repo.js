@@ -9,6 +9,31 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+const LOCAL_GIT_ENV = [
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+  'GIT_COMMON_DIR',
+  'GIT_CONFIG',
+  'GIT_CONFIG_COUNT',
+  'GIT_CONFIG_PARAMETERS',
+  'GIT_DIR',
+  'GIT_GRAFT_FILE',
+  'GIT_IMPLICIT_WORK_TREE',
+  'GIT_INDEX_FILE',
+  'GIT_NO_REPLACE_OBJECTS',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_PREFIX',
+  'GIT_REPLACE_REF_BASE',
+  'GIT_SHALLOW_FILE',
+  'GIT_WORK_TREE',
+];
+
+/** Returns an environment that cannot redirect fixture commands into the caller's repository. */
+export const isolatedGitEnv = (base = process.env) => {
+  const env = { ...base };
+  for (const name of LOCAL_GIT_ENV) delete env[name];
+  return env;
+};
+
 /**
  * Makes a fixture directory, rebuilt before each case and removed after the
  * suite.

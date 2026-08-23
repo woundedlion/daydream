@@ -16,6 +16,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isolatedGitEnv } from './fixture_repo.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // MSYS sh reads a drive-letter path but not a backslash one.
@@ -104,7 +105,7 @@ describe(
     before(() => {
       root = mkdtempSync(join(tmpdir(), 'ref-txn-hook-'));
       env = {
-        ...process.env,
+        ...isolatedGitEnv(),
         // Never read the operator's git config: a global core.hooksPath would
         // install this very hook into the fixtures.
         GIT_CONFIG_GLOBAL: join(root, 'absent-config'),
