@@ -32,13 +32,11 @@ jobs:
           echo "pin=$pin" >> "$GITHUB_OUTPUT"
       - name: Download the verified engine bundle
         env:
-          GH_TOKEN: ${{ secrets.POV_TOKEN }}
+          # The engine repository is public, so the run token is sufficient.
+          # POV_TOKEN remains available for a future private-repo migration.
+          GH_TOKEN: ${{ secrets.POV_TOKEN || github.token }}
           PIN: ${{ steps.engine.outputs.pin }}
         run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo "::error::POV_TOKEN is required to read the POV Actions artifact"
-            exit 1
-          fi
           deadline=$((SECONDS + 1800))
           while :; do
             read -r run_id run_status run_conclusion < <(

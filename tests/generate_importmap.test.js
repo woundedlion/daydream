@@ -10,7 +10,11 @@ import { mkdirSync, writeFileSync, readFileSync, rmSync, copyFileSync } from 'no
 import { createHash } from 'node:crypto';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fixtureRepo, expectFailure } from './fixture_repo.js';
+import {
+  fixtureRepo,
+  expectFailure,
+  isolatedGitEnv,
+} from './fixture_repo.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT_SRC = resolve(HERE, '../scripts/generate-importmap.mjs');
@@ -52,7 +56,7 @@ const buildRoot = () => {
 const root = fixtureRepo('importmap-', buildRoot);
 
 const env = {
-  ...process.env,
+  ...isolatedGitEnv(),
   // Never read the operator's git config: a global core.excludesFile or
   // core.hooksPath would steer the fixture's add and ls-files.
   GIT_CONFIG_GLOBAL: join(root, 'absent-config'),
