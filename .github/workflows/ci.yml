@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  js-tests:
+    name: Static and unit tests
+    uses: ./.github/workflows/js-unit-suite.yml
+
+  browser:
+    name: Browser tests
+    uses: ./.github/workflows/browser-smoke.yml
+
+  ci-green:
+    name: CI green
+    needs: [js-tests, browser]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every suite
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import sys
+
+          results = json.loads(os.environ["RESULTS"])
+          failed = {name: job["result"] for name, job in results.items()
+                    if job["result"] != "success"}
+          if failed:
+              print(f"::error::required jobs did not succeed: {failed}")
+              sys.exit(1)
+          print("All required Daydream CI jobs succeeded.")
+          PY
