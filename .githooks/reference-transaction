@@ -20,7 +20,7 @@ gitdir=$(git rev-parse --git-common-dir 2>/dev/null) || gitdir=.git
 tokfile="$gitdir/hs-allow-nonff"
 logfile="$gitdir/hs-nonff.log"
 
-while read -r old new ref; do
+while read -r _old new ref; do
 	[ "$ref" = "refs/heads/master" ] || continue
 	cur=$(git rev-parse --verify -q "$ref" 2>/dev/null) || cur=''
 	[ -z "$cur" ] && continue                                # creation
