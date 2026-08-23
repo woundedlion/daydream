@@ -196,7 +196,7 @@ test('glslProjectionFunctions constants match the JS exports', () => {
 });
 
 /**
- * Absolute pin on the projection constants. tests/engine_source_parity.test.js
+ * Absolute pin on the projection constants. WASM parity tests
  * diffs them against core/math/stereographic.h, but only where an engine
  * checkout is present; these literals hold the values where it is not.
  */

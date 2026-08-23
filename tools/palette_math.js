@@ -255,7 +255,7 @@ export function proceduralParamsForViewport(parameters, viewport) {
 
 /**
  * The C++ enumerator each PaletteCompileCode value carries, indexed by value.
- * engine_source_parity.test.js pins it to the `enum class` in core/color/color.h.
+ * Mirrors the `enum class` in the engine color contract.
  * @type {readonly string[]}
  */
 export const COMPILE_CODE_NAMES = Object.freeze([
@@ -271,8 +271,7 @@ export const COMPILE_CODE_NAMES = Object.freeze([
 
 /**
  * The C++ enumerator each PaletteRecipeField value carries, indexed by value.
- * engine_source_parity.test.js pins it, values included, to the `enum class` in
- * core/color/color.h.
+ * Mirrors the values of the engine color contract.
  * @type {readonly string[]}
  */
 export const RECIPE_FIELD_NAMES = Object.freeze([
@@ -501,7 +500,7 @@ export function proceduralPaletteCpp(parameters) {
 
 /**
  * The C++ enumerator each V4 recipe enum value serializes as, indexed by value.
- * The inverse of palette_controls.js's PaletteV4; engine_source_parity.test.js
+ * The inverse of palette_controls.js's PaletteV4; WASM parity tests
  * pins both to the `enum class` rosters in core/color/color.h.
  */
 export const ENUM_NAMES = Object.freeze({

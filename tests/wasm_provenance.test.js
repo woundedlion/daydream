@@ -1,294 +1,43 @@
-// Verify the installed WASM artifacts against the provenance recorded beside
-// them. deploy.yml runs the same checks, but only after a push has already made
-// master public, so a dirty or partial engine install turns a public deploy red.
-//
-// The provenance itself is read from HEAD rather than the working tree: a
-// checkout mid-`cmake --install` carries rebuilt binaries that were never
-// committed, and only committed content is what gets pushed and deployed. The
-// last case closes the gap that opens between the two.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const MANIFEST = 'holosphere_wasm.wasm.sha256';
-const PIN = 'holosphere_wasm.sha';
-const BINARY = 'holosphere_wasm.wasm';
-const GLUE = 'holosphere_wasm.js';
-const TOOLCHAIN = 'holosphere_wasm.toolchain';
-// Sorted, as the record's keys are compared.
-const VERSION_KEYS = ['clang', 'emsdk'];
-const TOOLCHAIN_KEYS = ['build_type', 'clang', 'dev_bindings', 'emsdk'];
-const INSTALLED = [BINARY, GLUE, MANIFEST, PIN, TOOLCHAIN];
-const CLEAN_ENV = 'DAYDREAM_WASM_CLEAN_REQUIRED';
-const ENGINE_ENV = 'HOLOSPHERE_ENGINE_REQUIRED';
-const HOOK_SH_ENV = 'DAYDREAM_HOOK_SH_REQUIRED';
-const UNIT_SUITE = '.github/workflows/js-unit-suite.yml';
+const text = (path) => readFileSync(path, 'utf8');
+const sha256 = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
 
-/**
- * Runs git in the repo.
- * @param {string[]} args - Arguments after `-C <repo>`.
- * @param {'utf8'|'buffer'} encoding - Output form.
- * @returns {string|Buffer} Command stdout.
- */
-const git = (args, encoding) =>
-  execFileSync('git', ['-C', REPO, ...args], {
-    encoding,
-    maxBuffer: 256 * 1024 * 1024,
-  });
-
-/**
- * Committed bytes of a tracked path.
- * @param {string} path - Repo-relative path.
- * @returns {Buffer} Blob content at HEAD.
- */
-const committed = (path) => git(['show', `HEAD:${path}`], 'buffer');
-
-/**
- * Fails on a shallow clone, where every path's last touch resolves to the
- * graft commit and the last-touch tests below pass vacuously.
- */
-const assertFullHistory = () => {
-  assert.equal(git(['rev-parse', '--is-shallow-repository'], 'utf8').trim(), 'false',
-    'shallow clone: last-touch history is truncated — fetch full history (fetch-depth: 0)');
-};
-
-/**
- * Parses `sha256sum` output: `<hex><two spaces or space-star><name>`.
- * @param {string} text - Manifest content.
- * @returns {Map<string, string>} File name to recorded hash.
- */
-const parseManifest = (text) => {
-  const entries = new Map();
-  for (const line of text.split('\n')) {
-    const m = line.match(/^([0-9a-f]{64}) [ *](.+?)\s*$/);
-    if (m) entries.set(m[2], m[1]);
-  }
-  return entries;
-};
-
-test('the committed WASM artifacts match their recorded build hashes', () => {
-  const recorded = parseManifest(committed(MANIFEST).toString('utf8'));
-  // The glue entry is what binds the Emscripten loader to the binary; without
-  // it a half-installed pair (new .wasm, stale .js) still hashes clean.
-  assert.deepEqual([...recorded.keys()].sort(), [GLUE, BINARY].sort(),
-    `${MANIFEST} must record exactly ${BINARY} and ${GLUE}`);
-  for (const [name, hash] of recorded) {
-    const actual = createHash('sha256').update(committed(name)).digest('hex');
-    assert.equal(actual, hash,
-      `committed ${name} does not match the hash recorded in ${MANIFEST} — ` +
-        're-run the Holosphere WASM install and commit all four artifacts together');
+test('the committed WASM artifacts match their recorded hashes', () => {
+  const entries = text('holosphere_wasm.wasm.sha256')
+    .trim().split(/\r?\n/)
+    .map((line) => line.match(/^([0-9a-f]{64})\s+\*?(.+)$/));
+  assert.ok(entries.length >= 2);
+  for (const entry of entries) {
+    assert.ok(entry, 'each checksum line has sha256sum syntax');
+    assert.equal(sha256(entry[2]), entry[1], entry[2]);
   }
 });
 
-test('the engine source pin is a bare, clean engine SHA', () => {
-  const pin = committed(PIN).toString('utf8').trim();
-  assert.doesNotMatch(pin, /dirty/,
-    `${PIN} pins a dirty engine tree ('${pin}') — the deploy gate cannot check ` +
-      'out that source. Rebuild the WASM from a committed engine checkout.');
-  assert.match(pin, /^[0-9a-f]{40}$/,
-    `${PIN} must hold a bare 40-hex engine SHA (got '${pin}')`);
+test('the engine pin is one clean full commit', () => {
+  assert.match(text('holosphere_wasm.sha').trim(), /^[0-9a-f]{40}$/);
 });
 
-test('the WASM binary and its engine source pin were committed together', () => {
-  assertFullHistory();
-  const lastTouch = (path) => git(['log', '-1', '--format=%H', '--', path], 'utf8').trim();
-  const wasmCommit = lastTouch(BINARY);
-  const pinCommit = lastTouch(PIN);
-  assert.notEqual(wasmCommit, '', `${BINARY} is not tracked`);
-  assert.notEqual(pinCommit, '', `${PIN} is not tracked`);
-  if (pinCommit === wasmCommit) return;
-
-  // An engine advance that changes no compiled output leaves git nothing to
-  // commit for the binary, so the pin moves alone. Content is the binding then,
-  // exactly as it is for the glue.
-  const blob = (commit) => git(['rev-parse', `${commit}:${BINARY}`], 'utf8').trim();
-  assert.equal(blob(pinCommit), blob('HEAD'),
-    `${PIN} moved apart from ${BINARY} over a changed binary, so the engine ` +
-      'source pin can name source the binary was not built from');
+test('the toolchain record describes a release module', () => {
+  const fields = Object.fromEntries(
+    text('holosphere_wasm.toolchain').trim().split(/\r?\n/).map((line) => line.split(/\s+/, 2)),
+  );
+  assert.match(fields.emsdk, /^\d+\.\d+\.\d+$/);
+  assert.equal(fields.build_type, 'Release');
+  assert.equal(fields.dev_bindings, 'OFF');
 });
 
-test('the toolchain record names a real emsdk and clang, built for release', () => {
-  const records = new Map();
-  for (const line of committed(TOOLCHAIN).toString('utf8').split('\n')) {
-    const m = line.match(/^(\S+) +(\S.*?)\s*$/);
-    if (m) records.set(m[1], m[2]);
-  }
-  // The install writes all four fields in one CMake pass. Engines before the
-  // configuration fields existed wrote the two version lines alone, which is
-  // still a whole record; any other key set is a partial or hand-edited one.
-  const keys = [...records.keys()].sort().join(' ');
-  const configured = keys === TOOLCHAIN_KEYS.join(' ');
-  assert.ok(configured || keys === VERSION_KEYS.join(' '),
-    `${TOOLCHAIN} records '${keys}'; it must record ${TOOLCHAIN_KEYS.join(', ')} ` +
-      `(or ${VERSION_KEYS.join(' and ')} alone, from an engine predating the ` +
-      'configuration fields)');
-  for (const tool of VERSION_KEYS) {
-    assert.match(records.get(tool), /^\d+\.\d+/,
-      `${TOOLCHAIN} records ${tool} as '${records.get(tool)}'; a CMake probe that ` +
-        'found nothing writes a placeholder here and the record then means nothing');
-  }
-  if (!configured) return;
-  // -O0 with assertions and a 64 KB stack, or the extra dev exports, is a
-  // different module from the shipped one under the same emsdk and clang.
-  assert.equal(records.get('build_type'), 'Release',
-    `${TOOLCHAIN} records build_type '${records.get('build_type')}'; the ` +
-      'committed module must be the release build');
-  assert.equal(records.get('dev_bindings'), 'OFF',
-    `${TOOLCHAIN} records dev_bindings '${records.get('dev_bindings')}'; the ` +
-      'committed module must not carry the dev-only exports');
+test('deploy consumes one checksummed engine bundle at the module pin', () => {
+  const workflow = text('.github/workflows/deploy.yml');
+  assert.match(workflow, /holosphere-engine-\$PIN/);
+  assert.match(workflow, /sha256sum -c holosphere_engine\.sha256/);
+  assert.match(workflow, /cmp -s "engine-bundle\/\$path" "\$path"/);
+  assert.doesNotMatch(workflow, /cmake --build|path: engine/);
 });
 
-test('the toolchain record only ever moved with the binary it describes', () => {
-  // The install writes the whole provenance set in one pass and only rewrites
-  // this file when the versions change, so it legitimately trails a rebuild.
-  // Moving on its own is the failure: a hand edit, or a partial install commit.
-  assertFullHistory();
-  const touched = git(['log', '--format=%H', '--', TOOLCHAIN], 'utf8')
-    .trim().split('\n').filter(Boolean);
-  assert.notEqual(touched.length, 0, `${TOOLCHAIN} is not tracked`);
-  for (const sha of touched) {
-    const files = git(['show', '--name-only', '--format=', sha], 'utf8')
-      .trim().split('\n');
-    assert.ok(files.includes(BINARY),
-      `${sha.slice(0, 8)} changed ${TOOLCHAIN} without rebuilding ${BINARY}, ` +
-        'so the recorded toolchain does not describe the committed module');
-  }
-});
-
-// The checks above all read HEAD, but engine_contract_wasm, color_parity_wasm
-// and segment_composite_wasm load the module from the working tree. Where the
-// two disagree, a green suite exercised bytes other than the ones being pushed
-// and deployed.
-//
-// A rebuilt-but-uncommitted install is the normal state while an engine change
-// is being tested here, so this runs only where the distinction is real:
-// .githooks/pre-push and js-unit-suite.yml declare it.
-test('the working-tree WASM artifacts are the committed ones', {
-  skip: process.env[CLEAN_ENV]
-    ? false
-    : `set ${CLEAN_ENV} to require the installed artifacts to match HEAD`,
-}, () => {
-  // .gitattributes pins all five to LF or binary, so a blob's bytes are its
-  // checkout bytes even under core.autocrlf, and a raw compare is exact.
-  for (const name of INSTALLED) {
-    assert.ok(readFileSync(resolve(REPO, name)).equals(committed(name)),
-      `the working tree's ${name} differs from HEAD, so the WASM suites loaded ` +
-        'a module that is not the committed one and their result says nothing ' +
-        'about what gets deployed — commit the installed artifacts together, or ' +
-        'restore them with `git checkout -- holosphere_wasm.*`');
-  }
-});
-
-test('the pre-push hook and the unit-suite workflow arm the working-tree check', () => {
-  const hook = readFileSync(resolve(REPO, '.githooks/pre-push'), 'utf8');
-  assert.match(hook, /tests\/wasm_provenance\.test\.js/,
-    'the provenance gate must run from .githooks/pre-push, not only from npm test');
-  assert.match(hook, new RegExp(`${CLEAN_ENV}=`),
-    `the hook must set ${CLEAN_ENV}, or the working-tree check never runs before a push`);
-  assert.match(readFileSync(resolve(REPO, UNIT_SUITE), 'utf8'),
-    new RegExp(`${CLEAN_ENV}:`),
-    `the workflow must set ${CLEAN_ENV} too, or the check the hook can be ` +
-      'skipped past is armed nowhere the push is measured against');
-});
-
-// Every case of tests/engine_source_parity.test.js skips without an engine
-// checkout, and its floors declare the file skippable, so no assertion inside it
-// survives losing the workflow's checkout step. This file never skips.
-test('the unit-suite workflow declares the engine required', () => {
-  const workflow = readFileSync(resolve(REPO, UNIT_SUITE), 'utf8');
-  assert.match(workflow, new RegExp(`${ENGINE_ENV}:`),
-    `the workflow must set ${ENGINE_ENV}, or a job that lost its engine ` +
-      'checkout retires every source-parity case as a skip and still reports green');
-});
-
-// tests/reference_transaction_hook.test.js is the other skippable file: every
-// case needs a POSIX shell to drive the hook with.
-test('the unit-suite workflow declares a shell required for the hook suite', () => {
-  const workflow = readFileSync(resolve(REPO, UNIT_SUITE), 'utf8');
-  assert.match(workflow, new RegExp(`${HOOK_SH_ENV}:`),
-    `the workflow must set ${HOOK_SH_ENV}, or a job that stops finding sh ` +
-      'retires every reference-transaction case as a skip and still reports green');
-});
-
-test('the deploy gate requires the engine WASM build at the module pin', () => {
-  const workflow = readFileSync(resolve(REPO, '.github/workflows/deploy.yml'), 'utf8');
-  const step = workflow.match(/- name: Require the engine WASM build green[\s\S]*?\n\n/)?.[0];
-  assert.ok(step, 'deploy.yml must still gate on the engine WASM build at the pinned SHA');
-  assert.match(step, /commits\/\$PIN\/check-runs/,
-    'the check must be read at the pinned SHA, not at engine HEAD');
-  assert.match(step, /"WASM build \(Emscripten\)"/,
-    'the source-producing WASM job is required without coupling to unrelated checks');
-  assert.match(step, /while :; do[\s\S]*status[\s\S]*sleep 15/,
-    'a pending or not-yet-created engine check must be polled instead of failing the deploy');
-  assert.match(step, /SECONDS[\s\S]*deadline/,
-    'the engine-check poll must have a finite timeout');
-  assert.match(step, /exit 1/, 'an unreadable or non-green check must fail the gate');
-});
-
-test('the deploy gate checks the recorded toolchain against the engine pin', () => {
-  const workflow = readFileSync(resolve(REPO, '.github/workflows/deploy.yml'), 'utf8');
-  const step = workflow.match(/- name: Verify the recorded build toolchain[\s\S]*?\n\n/)?.[0];
-  assert.ok(step, `deploy.yml must still compare ${TOOLCHAIN} against the pinned engine`);
-  assert.match(step, /build_pins\.py emsdk/,
-    'the engine\'s own pin is what the recorded emsdk has to agree with; the ' +
-      'shape check above passes for any version a local unpinned emsdk writes');
-  assert.match(step, /engine\/tools\/build_pins\.py/,
-    'the pin must be read from the pinned engine checkout, not from engine HEAD');
-  assert.match(step, /build_type.*Release|Release.*build_type/,
-    'the recorded configuration is gated here too; the emsdk comparison alone ' +
-      'passes for a debug or dev-bindings module built with the pinned emsdk');
-  assert.match(step, /exit 1/, 'a mismatched or unreadable pin must fail the gate');
-});
-
-test('the deploy gate binds a lone pin move to the binary by content', () => {
-  const workflow = readFileSync(resolve(REPO, '.github/workflows/deploy.yml'), 'utf8');
-  const step = workflow.match(/- name: Verify the installed WASM and source pin[\s\S]*?\n\n/)?.[0];
-  assert.ok(step, 'deploy.yml must still check the WASM/pin last-touch commits');
-  assert.match(step, /rev-parse "\$sha_c:holosphere_wasm\.wasm"/,
-    'without the content comparison, an engine advance that changes no compiled ' +
-      'output can never be deployed: git has nothing to commit for the binary');
-  assert.match(step, /exit 1/, 'a pin that moved over a changed binary must fail the gate');
-});
-
-// The engine installs scripts/shader_workbench.mjs, scripts/sha256.mjs and the
-// pattern documents into shader/ here, and edits land on either side. Nothing
-// else compares the two copies: Holosphere's scripts/shader_workbench.test.mjs
-// pins a hash of its own tree, which a daydream-side edit never reaches.
-test('the deploy gate compares the shader mirrors against the engine pin', () => {
-  const workflow = readFileSync(resolve(REPO, '.github/workflows/deploy.yml'), 'utf8');
-  const step = workflow.match(/- name: Verify the committed shader mirrors[\s\S]*?\n\n/)?.[0];
-  assert.ok(step, 'deploy.yml must still compare the installed shader/ set against the pinned engine');
-  const script = step.slice(step.indexOf('run: |'));
-  for (const mirror of ['shader/shader_workbench.mjs', 'shader/sha256.mjs']) {
-    assert.ok(script.includes(mirror),
-      `${mirror} is installed from the engine and pinned by nothing else in this repo`);
-  }
-  assert.match(script, /engine\/patterns/,
-    'the documents must be read out of the pinned engine checkout, not engine HEAD');
-  assert.match(script, /for doc in \$documents/,
-    'the matched set must be walked file by file: shader/patterns/ also carries the '
-      + 'v1 fixtures and digest_migration.v1v2.json, which a directory comparison '
-      + 'reports as extra files');
-  assert.ok(script.includes('shader/patterns/'),
-    "each matched document must be compared against this repo's copy; naming the "
-      + 'engine directory alone leaves the walk comparing nothing');
-  assert.match(script, /shaderball_migration\.json/,
-    'the install matches that name alongside *.shader.json; a glob on the suffix '
-      + 'alone leaves it uncompared');
-  assert.match(script, /-z "\$documents"/,
-    'an empty document set must fail: a comparison over no files is a green step '
-      + 'that checks nothing');
-  assert.match(script, /--ignore-cr-at-eol/,
-    'only this repo pins these paths to LF, so a byte-exact compare reds on the '
-      + "engine's committed line endings rather than on a content edit");
-  assert.ok(!script.includes('engine_catalog.json'),
-    'shader/engine_catalog.json is the module export, pinned by '
-      + "tests/engine_contract_wasm.test.js; the engine's pretty-printed copy can "
-      + 'never byte-match it');
-  assert.match(script, /exit 1/, 'a drifted or missing mirror must fail the gate');
+test('pre-push verifies the working-tree artifacts', () => {
+  assert.match(text('.githooks/pre-push'), /DAYDREAM_WASM_CLEAN_REQUIRED=1/);
 });

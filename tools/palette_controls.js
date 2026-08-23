@@ -485,7 +485,7 @@ export function lockedGroupMove(rawDelta, members) {
  * The V4 recipe enumerants. The ordinals are what a recipe carries across the
  * WASM boundary, so they mirror the `enum class` rosters in core/color/color.h
  * in declaration order. palette_math.js's ENUM_NAMES is the inverse;
- * engine_source_parity.test.js pins both to the engine header.
+ * Both values mirror the engine's palette contract.
  * @type {Object<string, Object<string, number>>}
  */
 export const PaletteV4 = Object.freeze({

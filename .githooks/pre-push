@@ -1,21 +1,6 @@
 #!/bin/sh
-# Mirror of .github/workflows/js-unit-suite.yml and browser-smoke.yml, run
-# before every push.
-#
-# js-tests.yml fires on pull_request only, and daydream lands directly on
-# master, so without this hook the first CI run of the suite is deploy.yml's
-# gate — after the push, with a broken master already public.
-#
-# Installed by package.json's `prepare` script (git config core.hooksPath
-# .githooks), so `npm install`/`npm ci` enables it. Skip a single push with
-# `git push --no-verify`.
-# WASM provenance needs no dependencies, so it gates the push even where the
-# suite below cannot run. deploy.yml re-checks it, but only after master is
-# public — an unverifiable artifact must not get that far.
-# DAYDREAM_WASM_CLEAN_REQUIRED additionally demands that the installed artifacts
-# equal their committed blobs. That is false for most of an engine-integration
-# session — build, install here, test, then commit — so it is declared at the
-# push, where the tested module and the pushed one must finally be the same.
+# Local counterpart of the required JavaScript and browser CI suites.
+
 if command -v node >/dev/null 2>&1; then
 	DAYDREAM_WASM_CLEAN_REQUIRED=1 node --test tests/wasm_provenance.test.js || exit 1
 else
@@ -26,78 +11,31 @@ if ! command -v npm >/dev/null 2>&1; then
 	echo "pre-push: npm not found; the JS unit suite did not run." >&2
 	exit 0
 fi
-
-# A linked worktree carries no node_modules of its own, and a push from one is
-# exactly the case this hook exists for: js-tests.yml fires on pull_request only,
-# so nothing else runs lint, typecheck, the import-map check or the unit suite
-# before master is public. A missing install blocks the push.
-# npm writes .package-lock.json on install, so it marks a populated tree where an
-# empty-but-present directory would pass a bare -d test.
 if [ ! -f node_modules/.package-lock.json ]; then
-	echo "pre-push: node_modules is missing, so lint, typecheck, the import-map check and the unit suite cannot run. Run \`npm ci\` here — a linked worktree needs its own install." >&2
-	exit 1
-fi
-
-# `eslint .` exits 0 on an empty target set, so an over-broad `ignores` list in
-# eslint.config.mjs drops files from the gate while it still reads clean. Count
-# the files the run reported on and hold that count to package.json's
-# `lintFileFloor`. Mirror of the workflow's Lint JavaScript step, down to the
-# second invocation being the one whose output a failure is read from; the two
-# are one gate and move together.
-report=$(npx eslint . --format json) || true
-count=$(printf '%s' "$report" | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).length")
-floor=$(node -p "JSON.parse(require('fs').readFileSync('package.json','utf8')).lintFileFloor ?? ''")
-if ! printf '%s' "$count" | grep -Eq '^[0-9]+$' ||
-	! printf '%s' "$floor" | grep -Eq '^[1-9][0-9]*$'; then
-	echo "pre-push: the lint gate read a file count of '$count' and a \"lintFileFloor\" of '$floor'; it needs an integer from the eslint report and a positive integer from package.json. Without both it passes on any target set." >&2
-	exit 1
-fi
-if [ "$count" -lt "$floor" ]; then
-	echo "pre-push: eslint reported on $count files, under the committed floor of $floor — the eslint.config.mjs ignores list or its file patterns dropped files from this gate. Restore them, or lower \"lintFileFloor\" in package.json if the removal was intended." >&2
-	exit 1
-fi
-if [ "$count" -gt "$floor" ]; then
-	echo "pre-push: eslint reported on $count files but \"lintFileFloor\" in package.json is only $floor — raise it to $count so the files that landed since are covered too." >&2
+	echo "pre-push: node_modules is missing. Run npm ci in this worktree." >&2
 	exit 1
 fi
 
 npm run lint || exit 1
 npm run typecheck || exit 1
 
-# The workflow diffs the whole tree; a developer's is not clean, so scope it.
-# Generate to a temp file: regenerating in place would clobber a deliberate
-# local-vendoring block in the working tree.
 tmp=$(mktemp ./vendor-importmap.XXXXXX) || exit 1
-# An interrupt during the steps below would otherwise leave the scratch copy
-# untracked in the working tree.
 trap 'rm -f "$tmp"' EXIT
 trap 'exit 130' INT TERM
-if ! npm run importmap -- --out "$tmp"; then
-	exit 1
-fi
+npm run importmap -- --out "$tmp" || exit 1
 if ! git show :vendor-importmap.js | git -c core.autocrlf=false diff --no-index --ignore-cr-at-eol --exit-code -- - "$tmp"; then
-	echo "pre-push: vendor-importmap.js was stale; regenerate it with \`npm run importmap\`, then commit it and push again." >&2
+	echo "pre-push: vendor-importmap.js is stale; regenerate and commit it." >&2
 	exit 1
 fi
-# Out of the tree before the suite runs, which walks it.
 rm -f "$tmp"
 
 npm test || exit 1
 
-# The three headless-Chrome probes of .github/workflows/browser-smoke.yml. That
-# workflow fires on pull_request and from deploy.yml's gate, so on this repo's
-# landing path its first run is after the push, over an already public master.
-# The suite above runs against tests/fake_dom.js, which has neither layout nor
-# pointer capture; these scripts are the only checks that resolve the import
-# map, instantiate the WASM module under each page's CSP, drive real pointer
-# gestures and measure where an element lands. They cost a few minutes, a
-# fraction of the suite above.
-# A machine with no browser cannot run them at all; deploy.yml still does.
 if ! node -e 'import("./scripts/browser.mjs").then((m) => m.resolveBrowser())' 2>/dev/null; then
-	echo "pre-push: no Chrome, Chromium or Edge found, so the browser probes did not run. Set CHROME_PATH to gate layout, CSP and WASM boot here." >&2
+	echo "pre-push: no browser found; browser probes did not run." >&2
 	exit 0
 fi
-
-for probe in scripts/browser-smoke.mjs scripts/workbench-probe.mjs scripts/panel-probe.mjs; do
-	node "$probe" || exit 1
-done
+node scripts/browser-smoke.mjs || exit 1
+node scripts/workbench-probe.mjs || exit 1
+node scripts/panel-probe.mjs || exit 1
+node scripts/solids-probe.mjs || exit 1

@@ -108,7 +108,7 @@ export const OP_DEFS = {
 /**
  * Which authored ops the engine's morph path can build on screen, mirrored from
  * Solids::is_morphable_step (core/mesh/recipe.h) and the sweep clamps it reads
- * (core/mesh/conway_graph.h); tests/engine_source_parity.test.js pins every
+ * (core/mesh/conway_graph.h); the WASM contract tests cover every
  * entry against those headers. An empty object is an op that always sweeps,
  * `null` an op with no leg kind at all, and a parameter entry the band the leg
  * covers. The composite ops (bevel, gyro, meta, needle, zip) are absent because

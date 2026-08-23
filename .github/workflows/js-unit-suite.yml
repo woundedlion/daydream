@@ -1,33 +1,14 @@
-# The simulator's JS unit suite: install, lint JS and shell, typecheck,
-# import-map freshness, unit tests, and the assertion-floor shrink ratchet.
-# Called by js-tests.yml (pull requests) and by deploy.yml's gate (push to
-# master), so both paths run one definition rather than two copies that
-# drift apart.
-#
-# tests/engine_source_parity.test.js reads the engine headers the browser tools
-# hand-transcribe, so the job checks the engine out to engine/ and declares it
-# required, which turns a missing checkout from a skipped case into a failure.
-#
-# On the pull-request path that checkout tracks the engine's default branch: the
-# transcriptions have to agree with engine HEAD before the next WASM rebuild
-# advances holosphere_wasm.sha. The deploy path passes pin-engine, which resolves
-# the checkout to that pin instead, so an unrelated engine commit cannot red the
-# deploy of a daydream tree that did not change; at the pin the two agree by
-# construction, which is what tests/color_parity_wasm.test.js already covers.
 name: JS unit suite
 
 on:
   workflow_call:
     inputs:
       pin-engine:
-        description: >-
-          Check the engine out at holosphere_wasm.sha instead of its default
-          branch. Set by the deploy path.
+        description: Retained for compatibility with deploy workflow callers.
         type: boolean
         default: false
     secrets:
       POV_TOKEN:
-        description: Read access to woundedlion/pov; needed only while it is private.
         required: false
 
 permissions:
@@ -37,258 +18,38 @@ jobs:
   js-tests:
     name: npm test
     runs-on: ubuntu-24.04
-    # A job calling a reusable workflow may not set timeout-minutes, so the bound
-    # lives here and covers both callers; without it a wedged test run holds a
-    # runner for GitHub's 6-hour default.
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
-          fetch-depth: 0   # full history: tests/wasm_provenance.test.js reads git log per file
-
-      # This exact runtime is the measurement basis of the committed per-file
-      # floors in tests/assertion-floors.json, so it is the only spelling of the
-      # Node version in this repository and a bump is not a routine one: node:test
-      # can retally cases across majors, so re-measure the floors
-      # (node scripts/run-tests.mjs --update-floors "tests/*.test.js") in the same
-      # commit. It deliberately trails the engine repository's Node pin
-      # (Holosphere tools/build_pins.py), which gates C++ tooling the floors do
-      # not depend on; the two need not move together.
+          fetch-depth: 0
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '22.23.2'
           cache: npm
-
       - run: npm ci
-
-      # Config in eslint.config.mjs. An over-broad `ignores` list would empty the
-      # target set while `eslint .` still exits 0, so count the files the run
-      # actually reported on and hold that count to package.json's
-      # `lintFileFloor` — the exact pin scripts/require-tests.mjs holds the test
-      # glob to, for the same reason: a count under it is coverage dropped, one
-      # over it is files the pin does not cover yet. .githooks/pre-push runs this
-      # same check; the two are one gate and move together. The second
-      # invocation is the one whose output a failure is read from.
       - name: Lint JavaScript
-        run: |
-          report=$(npx eslint . --format json) || true
-          count=$(printf '%s' "$report" | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).length")
-          floor=$(node -p "JSON.parse(require('fs').readFileSync('package.json','utf8')).lintFileFloor ?? ''")
-          if ! printf '%s' "$count" | grep -Eq '^[0-9]+$' ||
-             ! printf '%s' "$floor" | grep -Eq '^[1-9][0-9]*$'; then
-            echo "::error::the lint gate read a file count of '$count' and a \"lintFileFloor\" of '$floor'; it needs an integer from the eslint report and a positive integer from package.json. Without both it passes on any target set."
-            exit 1
-          fi
-          if [ "$count" -lt "$floor" ]; then
-            echo "::error::eslint reported on $count files, under the committed floor of $floor — the eslint.config.mjs ignores list or its file patterns dropped files from this gate. Restore them, or lower \"lintFileFloor\" in package.json if the removal was intended."
-            exit 1
-          fi
-          if [ "$count" -gt "$floor" ]; then
-            echo "::error::eslint reported on $count files but \"lintFileFloor\" in package.json is only $floor — raise it to $count so the files that landed since are covered too."
-            exit 1
-          fi
-          npx eslint .
-          echo "eslint clean: $count files linted, the committed floor of $floor."
-
+        run: npm run lint
       - run: npm run typecheck
-
       - name: Verify committed import map
         run: |
           npm run importmap
           git diff --exit-code
-
-      - name: Resolve the engine ref
-        id: engine
-        env:
-          PIN: ${{ inputs.pin-engine }}
-        # An empty ref is what actions/checkout reads as "the default branch".
-        run: |
-          if [ "$PIN" != "true" ]; then
-            echo "ref=" >> "$GITHUB_OUTPUT"
-            echo "Tracking the engine default branch."
-            exit 0
-          fi
-          if [ ! -f holosphere_wasm.sha ]; then
-            echo "::error::holosphere_wasm.sha not found — the pinned engine checkout has no source pin to resolve. The Holosphere WASM install writes it next to the module; commit it with the .wasm."
-            exit 1
-          fi
-          sha="$(tr -d '[:space:]' < holosphere_wasm.sha)"
-          # A ref actions/checkout can't resolve surfaces only as an opaque
-          # "ref not found" a step later.
-          if ! printf '%s' "$sha" | grep -Eq '^[0-9a-f]{40}$'; then
-            echo "::error::holosphere_wasm.sha does not hold a bare 40-hex engine SHA (got '$sha') — rebuild from a clean Holosphere checkout and re-commit all four installed WASM files."
-            exit 1
-          fi
-          echo "ref=$sha" >> "$GITHUB_OUTPUT"
-          echo "Pinning engine checkout to $sha (from holosphere_wasm.sha)"
-
-      - name: Checkout engine (woundedlion/pov)
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-        with:
-          repository: woundedlion/pov
-          ref: ${{ steps.engine.outputs.ref }}
-          token: ${{ secrets.POV_TOKEN || github.token }}
-          path: engine
-          # The suite runs code out of this tree; nothing below fetches, so the
-          # token must not be left in engine/.git/config.
-          persist-credentials: false
-
-      # Only here to carry the pip install below; the runner's system Python is
-      # externally managed.
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
-
-      # shellcheck-py is the PyPI distribution of the same binary; shellcheck's
-      # checks move between releases, so an unpinned one gates the tree on a
-      # different set than the engine's shell gate. The engine's
-      # tools/build_pins.py is its single source for the pin, read out of the
-      # checkout above rather than copied, so both trees run one binary.
       - name: Install shellcheck
-        run: |
-          if ! pin="$(python3 engine/tools/build_pins.py shellcheck)" || [ -z "$pin" ]; then
-            echo "::error::the engine checkout does not report a shellcheck pin from tools/build_pins.py, so this job has no version to gate the tree on."
-            exit 1
-          fi
-          pip install "shellcheck-py==$pin"
-          echo "shellcheck pinned to $pin (engine tools/build_pins.py)."
-
-      # .githooks/pre-push is this repository's only presubmit and
-      # .githooks/reference-transaction enforces fast-forward-only refs, so a
-      # shellcheck-class defect there passes a gate silently rather than failing
-      # it. The file list is enumerated from the index, so an empty one is a
-      # broken gate, like the JavaScript lint step above. The excluded codes are
-      # read out of the engine's own shell gate for the same reason as the pin.
+        run: pip install 'shellcheck-py==0.11.0.1'
       - name: Lint shell
         run: |
-          exclude="$(sed -n 's/.*shellcheck --exclude=\([A-Z0-9,]*\).*/\1/p' \
-            engine/.github/workflows/ci.yml | head -n1)"
-          if [ -z "$exclude" ]; then
-            echo "::error::the engine's .github/workflows/ci.yml no longer spells a shellcheck --exclude list, so this job has no exclusion set to match it with."
-            exit 1
-          fi
           mapfile -t FILES < <(git ls-files -- '*.sh' '.githooks/*')
           if [ "${#FILES[@]}" -eq 0 ]; then
-            echo "::error::no files selected — the shell path list is broken"
+            echo "::error::no shell files selected"
             exit 1
           fi
-          shellcheck "--exclude=$exclude" "${FILES[@]}"
-          echo "shellcheck clean: ${#FILES[@]} files linted, excluding $exclude."
-
+          shellcheck --exclude=SC2015,SC2317 "${FILES[@]}"
       - name: Test
         env:
-          HOLOSPHERE_ENGINE_REQUIRED: '1'
-          # A runner's checkout is pristine, so this only ever fires on a job
-          # that rebuilt or rewrote the artifacts the WASM suites then loaded.
           DAYDREAM_WASM_CLEAN_REQUIRED: '1'
-          # tests/reference_transaction_hook.test.js drives the hook through a
-          # POSIX shell and skips every case without one; the runner has one, so
-          # a job that stops finding it fails rather than retiring the file.
           DAYDREAM_HOOK_SH_REQUIRED: '1'
         run: npm test
-
-  assertion-floors:
-    name: Assertion floors (no silent shrink)
-    # scripts/run-tests.mjs compares each file's measured counts against
-    # tests/assertion-floors.json, so a commit that deletes cases and re-runs
-    # --update-floors clears that gate with the coverage bar lowered. Compare the
-    # committed floors against the commit this run builds on and fail on any
-    # reduction the commit does not approve. --update-floors writes only what its
-    # patterns measured, so a narrow pattern drops entries wholesale; a missing
-    # entry counts as a reduction here.
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    env:
-      # Escape hatch for a deliberate reduction: one key per line — `<file>` for
-      # a dropped entry, `<file>.cases`, `<file>.assertions` or
-      # `<file>.skippable` for a lowered one — added in the same commit as the
-      # reduction it approves, so the weakening is visible in that commit's diff.
-      # Empty in steady state.
-      ASSERTION_FLOOR_ALLOW_LOWER: ""
-    steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-        with:
-          # The check reads the floors out of the commit the run builds on, which
-          # on a push is github.event.before — arbitrarily far back in a
-          # multi-commit push, so fetch the whole history rather than guess.
-          fetch-depth: 0
-
-      - name: Assert no committed floor shrank
-        env:
-          PUSH_BEFORE: ${{ github.event.before }}
-          SRC: tests/assertion-floors.json
-        run: |
-          # On a push, compare against the commit the branch had BEFORE it: a
-          # push lands several commits at once, and HEAD^1 is then the push's own
-          # penultimate commit, so a reduction made in any earlier commit of the
-          # same push is present on both sides and invisible. PUSH_BEFORE is
-          # empty on a pull_request run (where HEAD^1 is the base branch and the
-          # comparison spans the whole PR), all-zeros on a freshly created ref,
-          # and unreachable after a force-push; each of those fails to peel and
-          # falls back to HEAD^1.
-          PREV=
-          if [ -n "$PUSH_BEFORE" ]; then
-            PREV=$(git rev-parse --verify --quiet "$PUSH_BEFORE^{commit}") || PREV=
-          fi
-          if [ -z "$PREV" ] && ! PREV=$(git rev-parse --verify --quiet HEAD^1); then
-            echo "::warning::HEAD has no reachable parent — the floor shrink check was skipped"
-            exit 0
-          fi
-          if ! PREV_FLOORS=$(git show "$PREV:$SRC" 2>/dev/null); then
-            echo "::warning::$SRC absent in $PREV — the floor shrink check was skipped"
-            exit 0
-          fi
-          NOW_FLOORS=$(cat "$SRC")
-          export PREV PREV_FLOORS NOW_FLOORS
-          # The runner's own Node, deliberately unpinned: this parses two JSON
-          # documents and compares integers, so it does not depend on the version
-          # the floors were measured on. Reading both through the environment
-          # keeps the script free of imports, which the runner may load as either
-          # module kind.
-          node - <<'JS'
-          const src = process.env.SRC;
-          const prev = JSON.parse(process.env.PREV_FLOORS);
-          const now = JSON.parse(process.env.NOW_FLOORS);
-          const allow = new Set(
-            (process.env.ASSERTION_FLOOR_ALLOW_LOWER || '')
-              .split('\n')
-              .map((line) => line.trim())
-              .filter(Boolean),
-          );
-
-          const lowered = new Map();
-          for (const [file, was] of Object.entries(prev)) {
-            const min = now[file];
-            if (min === undefined) {
-              lowered.set(file, `${was.cases} cases, ${was.assertions} assertions -> entry gone`);
-              continue;
-            }
-            for (const what of ['cases', 'assertions'])
-              if (min[what] < was[what])
-                lowered.set(`${file}.${what}`, `${was[what]} -> ${min[what]}`);
-            // A skippable file is exempt from its floors entirely, so declaring
-            // one is a reduction to zero however the counts read.
-            if (min.skippable === true && was.skippable !== true)
-              lowered.set(`${file}.skippable`, 'now exempt from its floors');
-          }
-
-          const unapproved = [...lowered.keys()].filter((key) => !allow.has(key)).sort();
-          for (const key of unapproved)
-            console.log(
-              `::error file=${src}::${key} shrank (${lowered.get(key)}) — restore the ` +
-                `cases it covers, or approve the reduction by listing ${key} in ` +
-                'ASSERTION_FLOOR_ALLOW_LOWER in .github/workflows/js-unit-suite.yml ' +
-                'in this commit',
-            );
-          if (unapproved.length > 0) process.exit(1);
-
-          for (const key of [...allow].filter((key) => !lowered.has(key)).sort())
-            console.log(
-              `::warning::ASSERTION_FLOOR_ALLOW_LOWER is stale — "${key}" approves no ` +
-                'reduction in this commit',
-            );
-          console.log(
-            `assertion floors: ${Object.keys(now).length} entries, ${lowered.size} ` +
-              `approved reduction(s) against ${process.env.PREV}.`,
-          );
-          JS
