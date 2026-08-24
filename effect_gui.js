@@ -275,9 +275,9 @@ export function createEffectGui({
   let rebuildFailureGeneration;
   const acceptedStorageKey = (name) => `__accepted.${name}`;
 
-  function persistEffectState(gui) {
+  function persistEffectState(gui, parameterName = null) {
     if (!usesFullConfigSnapshot()) {
-      persistAcceptedParams(gui);
+      persistAcceptedParams(gui, parameterName);
       return;
     }
     const snapshot = getFullConfigSnapshot();
@@ -315,9 +315,11 @@ export function createEffectGui({
     showConfigImportNotice(notice || null);
   }
 
-  function persistAcceptedParams(gui) {
+  function persistAcceptedParams(gui, parameterName = null) {
     for (const parameter of getParameterDefinitions()) {
-      if (parameter.readonly) continue;
+      if (parameter.readonly || (parameterName !== null && parameter.name !== parameterName)) {
+        continue;
+      }
       const accepted = parameter.acceptedValue
         ?? parameter.requestedValue ?? parameter.value;
       // The float form, not the raw value: restoreAcceptedParams() reads the
@@ -739,9 +741,10 @@ export function createEffectGui({
    * drain. Releasing the pointer also runs the persistence the drag deferred.
    * @param {Object} fx - The effect record owning the controller.
    * @param {Object} controller - The controller to track.
+   * @param {string} parameterName - Engine parameter bound to the controller.
    * @returns {void}
    */
-  function trackDragState(fx, controller) {
+  function trackDragState(fx, controller, parameterName) {
     controller.domElement.addEventListener('pointerdown', () => {
       controller.dragging = true;
       const end = () => {
@@ -751,7 +754,7 @@ export function createEffectGui({
         fx.activeDragEnds.delete(end);
         if (!fx.persistDeferred) return;
         fx.persistDeferred = false;
-        persistEffectState(fx.gui);
+        persistEffectState(fx.gui, parameterName);
       };
       fx.activeDragEnds.add(end);
       dragTarget.addEventListener('pointerup', end);
@@ -861,17 +864,16 @@ export function createEffectGui({
         return;
       }
       fx.writableParamNames.push(p.name);
-      if (controller.isContinuous) trackDragState(fx, controller);
+      if (controller.isContinuous) trackDragState(fx, controller, p.name);
 
       controller.onChange(v => {
         const value = engineParamValue(v);
         setEngineParam(p.name, value);
-        // A drag emits one onChange per pointermove and persistence reads the
-        // whole effect (a definitions marshal, or ShaderBall's full-config
-        // snapshot and its JSON), so it waits for the pointer release, which
-        // sees the same state the last move would have.
+        // A drag emits one onChange per pointermove and full-config persistence
+        // marshals and serializes the whole snapshot, so it waits for the pointer
+        // release, which sees the same state the last move would have.
         if (controller.dragging) fx.persistDeferred = true;
-        else persistEffectState(fx.gui);
+        else persistEffectState(fx.gui, p.name);
         setWorkerParam(p.name, value);
         adoptEnginePause(pause, p);
         fx.warningsDirty = true;

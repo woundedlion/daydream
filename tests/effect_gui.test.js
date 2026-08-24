@@ -2466,6 +2466,23 @@ test('a toggle persists without waiting for a pointer release', () => {
   assert.deepEqual(h.gui().storedWrites, [['__accepted.Glow', 1]]);
 });
 
+test('a parameter edit persists only that parameter\'s accepted value', () => {
+  const speed = { ...SPEED };
+  const glow = { ...GLOW };
+  const h = makeHarness({
+    params: [speed, glow],
+    onEngineParam: (name, value) => {
+      if (name === speed.name) speed.value = value;
+    },
+  });
+  h.panel.build();
+  h.gui().storedWrites.length = 0;
+
+  h.gui().ctrl('Speed').setValue(0.4);
+
+  assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', 0.4]]);
+});
+
 test('a readonly control is never drag-tracked', () => {
   const h = makeHarness({ params: [TELEMETRY] });
   h.panel.build();
