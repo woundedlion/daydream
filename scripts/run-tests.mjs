@@ -17,7 +17,7 @@ const patterns = args.filter((arg) => !arg.startsWith('-'));
 if (patterns.length === 0) {
   console.error(
     'run-tests: pass the test file patterns to run, e.g. ' +
-      '`node scripts/run-tests.mjs "tests/*.test.js"`.',
+      '`node scripts/run-tests.mjs "tests/**/*.test.js"`.',
   );
   process.exit(1);
 }
