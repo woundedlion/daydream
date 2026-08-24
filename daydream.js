@@ -221,7 +221,9 @@ export function start({
   const workbenchEffect = requestedSelection.effect === 'Shader' ? 'Shader'
     : SHADER_DOCUMENT_EFFECTS.includes(requestedEffect) ? requestedEffect : null;
   if (!shaderWorkbench && workbenchEffect) {
-    win.location.replace(shaderWorkbenchUrl(win.location, workbenchEffect));
+    const redirectedEffect = requestedSelection.migrated
+      ? requestedEffect : workbenchEffect;
+    win.location.replace(shaderWorkbenchUrl(win.location, redirectedEffect));
     return { dispose() {} };
   }
 
