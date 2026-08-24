@@ -169,6 +169,7 @@ function fakeController(object, property, args) {
     displayUpdates: 0,
     valueSets: [],
     replayOnChange: false,
+    acceptedUrlValues: [],
     handler: null,
     name(label) { this.label = label; return this; },
     decimals(n) { this.decimalsSet = n; return this; },
@@ -179,6 +180,10 @@ function fakeController(object, property, args) {
       return this;
     },
     getValue() { return this.object[this.property]; },
+    acceptUrlValue(value) {
+      this.acceptedUrlValues.push(value);
+      return this;
+    },
     setValue(v) {
       if (this.getValue() === v) return this;
       this.valueSets.push(v);
@@ -433,7 +438,7 @@ function makeHarness({
       writes.push(`engine:${name}=${value}`);
       const p = state.params.find((d) => d.name === name);
       if (p && pausesOnWrite(p)) engine.paused = true;
-      onEngineParam(name, value, state);
+      return onEngineParam(name, value, state) !== false;
     },
     setWorkerParam: (name, value) => writes.push(`worker:${name}=${value}`),
     setAnimationsPaused: (paused) => {
@@ -2499,7 +2504,28 @@ test('a parameter edit persists only that parameter\'s accepted value', () => {
 
   h.gui().ctrl('Speed').setValue(0.4);
 
+  assert.deepEqual(h.gui().ctrl('Speed').acceptedUrlValues, [0.4]);
   assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', 0.4]]);
+});
+
+test('a refused parameter edit keeps the accepted deep-link value', () => {
+  const speed = {
+    name: 'Speed', value: 0.2, requestedValue: 0.2, acceptedValue: 0.2,
+    min: 0, max: 1, animated: true,
+  };
+  const h = makeHarness({
+    params: [speed],
+    onEngineParam: () => false,
+  });
+  h.panel.build();
+  h.gui().storedWrites.length = 0;
+  const controller = h.gui().ctrl('Speed');
+
+  controller.setValue(0.8);
+
+  assert.equal(controller.getValue(), 0.8);
+  assert.deepEqual(controller.acceptedUrlValues, [0.2]);
+  assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', 0.2]]);
 });
 
 test('a readonly control is never drag-tracked', () => {

@@ -221,7 +221,9 @@ class DeepLinkGUI {
    *
    * Only `onChange` participates in URL persistence and load-time replay;
    * `onFinishChange` is left untouched, so a control wired solely through
-   * `onFinishChange` is not deep-linked.
+   * `onFinishChange` is not deep-linked. A synchronous handler may call
+   * `controller.acceptUrlValue(value)` to persist an accepted value while the
+   * controller continues to display the proposed value.
    * @param {Object} controller - The lil-gui controller to wrap.
    * @param {Function} writeUrl - Callback that persists the control's value to the URL.
    * @param {boolean} [applyOnLoad=false] - When true (value hydrated from URL), replay the caller's onChange once on first registration so its side effect runs at startup.
@@ -229,16 +231,26 @@ class DeepLinkGUI {
    */
   attachUrlWriter(controller, writeUrl, applyOnLoad = false) {
     const userOnChange = [];
+    let urlValue = controller.getValue();
+    controller.acceptUrlValue = (value) => {
+      urlValue = value;
+      return controller;
+    };
     controller.onChange((v) => {
+      urlValue = v;
       for (const fn of userOnChange) fn(v);
-      writeUrl(v);
+      writeUrl(urlValue);
     });
     controller.onChange = (fn) => {
       if (fn) userOnChange.push(fn);
       // For a URL-hydrated value, fire each newly-registered handler once so its
       // load-time side effect runs the deep-linked state — once per handler, so a
       // second fan-out consumer isn't skipped by a single shared latch.
-      if (applyOnLoad && fn) fn(controller.getValue());
+      if (applyOnLoad && fn) {
+        const proposed = controller.getValue();
+        fn(proposed);
+        if (!Object.is(urlValue, proposed)) writeUrl(urlValue);
+      }
       return controller;
     };
     return controller;
