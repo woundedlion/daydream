@@ -54,12 +54,14 @@ const SOURCE = withoutComments(
 const WASM_INIT = 'createModuleLoadHandlers(';
 const FRAME_GUARD = 'createFrameLoopGuard(';
 
-test('Ash Cloud is offered at both simulator resolutions', () => {
-  for (const roster of ['HiResFavorites', 'LoResFavorites']) {
-    const at = SOURCE.indexOf(`const ${roster} = [`);
-    assert.ok(at >= 0, `daydream.js must still define ${roster}`);
-    assert.match(sliceTo(at, '\n];'), /"AshCloud"/,
-      `${roster} must offer AshCloud`);
+test('catalog effects are offered at both simulator resolutions', () => {
+  for (const effect of ['AshCloud', 'HyperLattice']) {
+    for (const roster of ['HiResFavorites', 'LoResFavorites']) {
+      const at = SOURCE.indexOf(`const ${roster} = [`);
+      assert.ok(at >= 0, `daydream.js must still define ${roster}`);
+      assert.match(sliceTo(at, '\n];'), new RegExp(`"${effect}"`),
+        `${roster} must offer ${effect}`);
+    }
   }
 });
 
