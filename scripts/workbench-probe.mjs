@@ -152,7 +152,9 @@ async function probeStrip(tab) {
   await tab.mouse.move(0, 0);
   await tab.waitForFunction(() => document.querySelector(
     '.chain-chip[data-label="project"]')?.getAttribute('aria-expanded') === 'false');
-  check(true, 'mouse leave closes a transient stage card');
+  check(await tab.$eval('.chain-chip[data-label="project"]',
+    (node) => node.getAttribute('aria-expanded') === 'false'),
+  'mouse leave closes a transient stage card');
 
   await tab.mouse.click(closedCard.x + 2, closedCard.y + closedCard.height / 2);
   await tab.mouse.move(0, 0);
