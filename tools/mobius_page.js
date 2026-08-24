@@ -395,10 +395,18 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
     onChange();
   };
 
-  reElement.addEventListener('keydown', onAxisKeyDown('re'));
-  imElement.addEventListener('keydown', onAxisKeyDown('im'));
-  onPageTeardown(() => planeDrag.stop());
+  const reKeyDown = onAxisKeyDown('re');
+  const imKeyDown = onAxisKeyDown('im');
+  reElement.addEventListener('keydown', reKeyDown);
+  imElement.addEventListener('keydown', imKeyDown);
   updateUI();
+  return () => {
+    planeDrag.stop();
+    planeDrag.remove();
+    reElement.removeEventListener('keydown', reKeyDown);
+    imElement.removeEventListener('keydown', imKeyDown);
+    delete uiUpdaters[id];
+  };
 };
 
 const initThree = () => {
@@ -453,19 +461,15 @@ const initThree = () => {
   wireMesh = new THREE.Mesh(wireGeo, wireMat);
   scene.add(wireMesh);
 
-  // Dispose both spheres' GPU resources on teardown (the page otherwise kept
-  // no handle to the wireframe and had no dispose path at all), and run the
-  // scaffold's dispose() to stop its render loop and drop the resize listener.
-  onPageTeardown(() => {
+  updateMobiusUniforms();
+  return () => {
     for (const m of [sphereMesh, wireMesh]) {
       if (!m) continue;
       m.geometry.dispose();
       m.material.dispose();
     }
     result.dispose();
-  });
-
-  updateMobiusUniforms();
+  };
 };
 
 const init = () => {
@@ -499,10 +503,12 @@ const init = () => {
 
   const onParamChange = () => updateMobiusUniforms();
 
-  createComplexPlaneControl('A', config.A, config.MAX_EXTENT, onParamChange);
-  createComplexPlaneControl('B', config.B, config.MAX_EXTENT, onParamChange);
-  createComplexPlaneControl('C', config.C, config.MAX_EXTENT, onParamChange);
-  createComplexPlaneControl('D', config.D, config.MAX_EXTENT, onParamChange);
+  const controlTeardowns = [
+    createComplexPlaneControl('A', config.A, config.MAX_EXTENT, onParamChange),
+    createComplexPlaneControl('B', config.B, config.MAX_EXTENT, onParamChange),
+    createComplexPlaneControl('C', config.C, config.MAX_EXTENT, onParamChange),
+    createComplexPlaneControl('D', config.D, config.MAX_EXTENT, onParamChange),
+  ];
 
   document.getElementById('resetBtn').addEventListener('click', () => {
     stopAnimation();
@@ -517,7 +523,11 @@ const init = () => {
   });
 
   updateCodeSnippet();
-  initThree();
+  const teardownThree = initThree();
+  onPageTeardown(() => {
+    for (const teardown of controlTeardowns) teardown?.();
+    teardownThree();
+  });
 };
 
 bootstrapTool(init, 'Möbius tool');
