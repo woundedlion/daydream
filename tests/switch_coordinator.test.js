@@ -16,8 +16,10 @@ function makeEffectRecord(name, speed, paused, writes = []) {
   return {
     name,
     state,
-    animationState: { pause: paused },
-    pauseController: { setValue: (v) => { state.paused = v; } },
+    pause: {
+      animationState: { pause: paused },
+      controller: { setValue: (v) => { state.paused = v; } },
+    },
     writableParamNames: ['Speed'],
     controllerByName: new Map([['Speed', {
       getValue: () => state.Speed,

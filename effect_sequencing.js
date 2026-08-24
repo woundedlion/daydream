@@ -25,8 +25,8 @@ import { resolveActiveEffect } from "./sidebar_logic.js";
  * @typedef {Object} EffectControlRecord
  * @property {Map<string, ParamController>} [controllerByName] - Control per engine parameter.
  * @property {string[]} [writableParamNames] - Parameters the engine accepts writes for.
- * @property {ParamController} [pauseController] - The panel's pause toggle.
- * @property {{pause: boolean}} [animationState] - Live animation state.
+ * @property {{controller: ParamController|null,
+ *   animationState: {pause: boolean}}} [pause] - Live pause controls and state.
  */
 
 /** @typedef {{paramValues: Array<[string, any]>, animationsPaused: boolean}} EffectControlSnapshot */
@@ -98,7 +98,7 @@ export function snapshotEffectControlState(effect,
   }
   return {
     paramValues,
-    animationsPaused: Boolean(effect.animationState?.pause),
+    animationsPaused: Boolean(effect.pause?.animationState.pause),
   };
 }
 
@@ -110,7 +110,7 @@ export function snapshotEffectControlState(effect,
  */
 export function restoreEffectControlState(effect, snapshot) {
   if (!effect?.controllerByName || !snapshot) return;
-  const pauseController = effect.pauseController;
+  const pauseController = effect.pause?.controller;
   // Restoring an animated param trips effect_gui's take-over auto-pause. Pausing
   // first makes that a no-op; resuming after the loop undoes one it did fire.
   if (snapshot.animationsPaused && pauseController) pauseController.setValue(true);

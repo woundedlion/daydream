@@ -192,8 +192,7 @@ test('rollback restores an unflushed control value to runtime sinks and URL', ()
         effect: {
           controllerByName: new Map([['Speed', controller]]),
           writableParamNames: ['Speed'],
-          animationState: { pause: false },
-          pauseController: null,
+          pause: { animationState: { pause: false }, controller: null },
         },
       };
     };

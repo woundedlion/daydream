@@ -46,8 +46,7 @@ function makeEffectControls(values, paused = false, sinks = null) {
   };
   return {
     state,
-    animationState,
-    pauseController,
+    pause: { animationState, controller: pauseController },
     controllerByName,
     writableParamNames: Object.keys(values).filter((name) => name !== 'Telemetry'),
   };
@@ -62,7 +61,7 @@ test('effect state snapshot copies writable controls and pause state', () => {
   const snapshot = snapshotEffectControlState(effect);
 
   effect.state.Speed = 0.1;
-  effect.animationState.pause = false;
+  effect.pause.animationState.pause = false;
 
   assert.deepEqual(snapshot, {
     paramValues: [['Speed', 0.75], ['Glow', true]],
@@ -89,7 +88,7 @@ test('effect state restoration updates controls, engine, workers, and URL togeth
   restoreEffectControlState(rebuilt, snapshot);
 
   const expected = { Speed: 0.75, Glow: true, paused: true };
-  assert.deepEqual({ ...rebuilt.state, paused: rebuilt.animationState.pause }, expected);
+  assert.deepEqual({ ...rebuilt.state, paused: rebuilt.pause.animationState.pause }, expected);
   assert.deepEqual(sinks.engine, expected);
   assert.deepEqual(sinks.workers, expected);
   assert.deepEqual(sinks.url, expected);
