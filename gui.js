@@ -452,6 +452,14 @@ class DeepLinkGUI {
     return wrapped;
   }
 
+  /** @returns {boolean} Whether the wrapped GUI panel is collapsed. */
+  get closed() { return Boolean(this.gui._closed); }
+  /**
+   * Sets the wrapped GUI panel's open state.
+   * @param {boolean} [open=true] - Whether the panel is expanded.
+   * @returns {void}
+   */
+  open(open = true) { this.gui.open(open); }
   /**
    * Closes (collapses) the wrapped GUI panel.
    * @returns {void}

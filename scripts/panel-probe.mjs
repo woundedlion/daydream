@@ -19,10 +19,12 @@ const PAGE = 'index.html';
 // Short enough that the panel's max-height cap bites and its own .lil-children
 // becomes the scroller, which is what effect_gui.js writes the offset onto.
 const VIEWPORT = { width: 1280, height: 240 };
+const MOBILE_VIEWPORT = { width: 800, height: 720 };
 // The roster's widest parameter schema, so the panel overflows the cap.
 const EFFECT = 'ShapeShifter';
 const TIMEOUT_MS = 90_000;
 const SCROLLER = '.effect-gui .lil-children';
+const PANEL_TITLE = '.effect-gui > .lil-title';
 const RESET = '.effect-action-reset button';
 
 /** @param {import('puppeteer-core').Page} tab */
@@ -117,6 +119,52 @@ async function probePanel(tab) {
   return failures;
 }
 
+/** @param {import('puppeteer-core').Page} tab */
+async function probeMobilePanel(tab) {
+  const failures = [];
+  const check = (ok, message) => {
+    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
+    if (!ok) failures.push(message);
+  };
+
+  await (await tab.waitForSelector(`[data-effect="${EFFECT}"]`, { timeout: TIMEOUT_MS })).click();
+  const initiallyClosed = await tab.$eval(
+    '.effect-gui', (panel) => panel.classList.contains('lil-closed'));
+  check(initiallyClosed, 'the first mobile panel mount is collapsed');
+  await (await tab.waitForSelector(PANEL_TITLE, { timeout: TIMEOUT_MS })).click();
+  await tab.waitForFunction(
+    () => !document.querySelector('.effect-gui')?.classList.contains('lil-closed'),
+    { timeout: TIMEOUT_MS });
+
+  const focusedName = await tab.$eval('.effect-gui', (panel) => {
+    const controller = panel.querySelector('.lil-controller.lil-number');
+    const widget = controller?.querySelector('input');
+    widget?.focus();
+    window.probedPanel = panel;
+    return controller?.querySelector('.lil-name')?.textContent?.trim() ?? '';
+  });
+  check(focusedName !== '', `the opened mobile panel focuses ${focusedName || 'a control'}`);
+
+  await tab.$eval(RESET, (node) => node.click());
+  await tab.waitForFunction(
+    () => document.querySelector('.effect-gui') !== window.probedPanel,
+    { timeout: TIMEOUT_MS });
+  const rebuilt = await tab.evaluate(() => {
+    const panel = document.querySelector('.effect-gui');
+    const widget = document.activeElement;
+    const controller = widget?.closest('.lil-controller.lil-number');
+    return {
+      open: !panel?.classList.contains('lil-closed'),
+      focusedName: controller?.querySelector('.lil-name')?.textContent?.trim() ?? '',
+    };
+  });
+  check(rebuilt.open, 'the rebuilt mobile panel keeps the user-opened state');
+  check(rebuilt.focusedName === focusedName,
+    `the rebuilt mobile panel restores focus to ${focusedName}`);
+
+  return failures;
+}
+
 let executablePath;
 try {
   executablePath = resolveBrowser();
@@ -143,6 +191,12 @@ try {
     { timeout: TIMEOUT_MS });
   await tab.waitForSelector('.effect-gui', { timeout: TIMEOUT_MS });
   failures.push(...await probePanel(tab));
+  await tab.setViewport(MOBILE_VIEWPORT);
+  await tab.reload({ timeout: TIMEOUT_MS });
+  await tab.waitForFunction(() => !document.getElementById('loading-overlay'),
+    { timeout: TIMEOUT_MS });
+  await tab.waitForSelector('.effect-gui', { timeout: TIMEOUT_MS });
+  failures.push(...await probeMobilePanel(tab));
 } catch (error) {
   failures.push(error instanceof Error ? error.message : String(error));
 } finally {

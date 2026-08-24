@@ -207,7 +207,8 @@ function fakeGui(hydrated = {}, stored = {}) {
     $children: childrenElement,
     controllers: [],
     folders: [],
-    closed: false,
+    _closed: false,
+    get closed() { return this._closed; },
     destroyed: 0,
     destroyThrows: null,
     stored,
@@ -229,7 +230,8 @@ function fakeGui(hydrated = {}, stored = {}) {
       this.stored[property] = value;
       this.storedWrites.push([property, value]);
     },
-    close() { this.closed = true; },
+    open(open = true) { this._closed = !open; },
+    close() { this.open(false); },
     appendElement(element) { this.$children.appendChild(element); },
     destroy() {
       this.destroyed += 1;
@@ -1292,16 +1294,19 @@ test('the Reset button re-applies the effect', () => {
 });
 
 test('Reset hands keyboard focus back to the rebuilt Reset button', () => {
-  const h = makeHarness({ params: [SPEED], rebuildOnApply: true });
+  const h = makeHarness({ params: [SPEED], rebuildOnApply: true, isMobile: true });
   h.panel.build();
   h.panel.mount();
   const stale = h.gui();
+  assert.equal(stale.closed, true, 'the first mobile mount keeps its default');
+  stale.open();
   stale.$children.scrollTop = 220;
   h.state.focused = stale.ctrl('reset').$button;
 
   stale.ctrl('reset').object.reset();
 
   assert.notEqual(h.gui(), stale, 'the panel was rebuilt');
+  assert.equal(h.gui().closed, false, 'the rebuilt panel keeps the user state');
   assert.equal(h.gui().ctrl('reset').$button.focusCalls, 1);
   assert.equal(h.gui().$children.scrollTop, 220);
 });
@@ -1564,9 +1569,13 @@ test('a schema rebuild hands keyboard focus back to the same control', () => {
     name: 'Projection', value: 0, options: ['Stereographic', 'Bonne'], animated: true,
   };
   const bonne = { name: 'Bonne Parallel', value: 0.4, min: 0.01, max: 1.5, animated: true };
-  const h = makeHarness({ params: [projection], engineValues: [0], generation: 7 });
+  const h = makeHarness({
+    params: [projection], engineValues: [0], generation: 7, isMobile: true,
+  });
   h.panel.build();
   h.panel.mount();
+  assert.equal(h.gui().closed, true, 'the first mobile mount keeps its default');
+  h.gui().open();
   h.state.focused = h.gui().ctrl('Projection').$select;
 
   h.state.params = [{ ...projection, value: 1 }, bonne];
@@ -1574,6 +1583,7 @@ test('a schema rebuild hands keyboard focus back to the same control', () => {
   h.state.generation = 8;
   h.panel.sync();
 
+  assert.equal(h.gui().closed, false, 'the rebuilt panel keeps the user state');
   assert.equal(h.gui().ctrl('Projection').$select.focusCalls, 1);
   assert.equal(h.gui().ctrl('Bonne Parallel').$input.focusCalls, 0);
 });
@@ -1582,9 +1592,12 @@ test('a schema rebuild moves focus nowhere when the panel never held it', () => 
   const projection = {
     name: 'Projection', value: 0, options: ['Stereographic', 'Bonne'], animated: true,
   };
-  const h = makeHarness({ params: [projection], engineValues: [0], generation: 7 });
+  const h = makeHarness({
+    params: [projection], engineValues: [0], generation: 7, isMobile: true,
+  });
   h.panel.build();
   h.panel.mount();
+  assert.equal(h.gui().closed, true);
   h.state.focused = fakeElement('input');
 
   h.state.params = [{ ...projection, value: 1 }];
@@ -1592,6 +1605,7 @@ test('a schema rebuild moves focus nowhere when the panel never held it', () => 
   h.state.generation = 8;
   h.panel.sync();
 
+  assert.equal(h.gui().closed, true, 'a collapsed panel stays collapsed');
   assert.equal(h.gui().ctrl('Projection').$select.focusCalls, 0);
 });
 
@@ -1605,6 +1619,7 @@ test('a refused edit republishes the warning it raised, and its withdrawal', () 
     params: [projection],
     engineValues: [0],
     generation: 7,
+    isMobile: true,
     // A refusal publishes its reason on the definition without loading an
     // effect, so the schema generation stands still.
     onEngineParam(name, value, state) {
@@ -1616,11 +1631,15 @@ test('a refused edit republishes the warning it raised, and its withdrawal', () 
   });
   h.panel.build();
   h.panel.mount();
+  h.gui().open();
+  h.state.focused = h.gui().ctrl('Projection').$select;
 
   h.gui().ctrl('Projection').setValue(1);
   h.panel.sync();
 
   const controller = h.gui().ctrl('Projection');
+  assert.equal(h.gui().closed, false, 'a warning rebuild keeps the panel open');
+  assert.equal(controller.$select.focusCalls, 1);
   assert.equal(h.panel.active().paramGeneration, 7, 'no effect was loaded');
   assert.equal(controller.domElement.classList.contains('param-warning'), true);
   assert.equal(controller.domElement.getAttribute('title'), warning);

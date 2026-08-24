@@ -273,6 +273,7 @@ export function createEffectGui({
   // Throttle the param/value length-skew warning to once per skew episode.
   let skewLogged = false;
   let rebuildFailureGeneration;
+  let mountClosedOverride;
   /** Storage key for the last engine-accepted value of one parameter. */
   const acceptedStorageKey = (name) => `__accepted.${name}`;
 
@@ -645,7 +646,12 @@ export function createEffectGui({
        */
       reset() {
         const captured = capturePanelFocus(fx);
-        applyEffect();
+        mountClosedOverride = captured.closed;
+        try {
+          applyEffect();
+        } finally {
+          mountClosedOverride = undefined;
+        }
         restorePanelFocus(activeEffect, captured);
       },
       /**
@@ -1013,12 +1019,14 @@ export function createEffectGui({
   /**
    * Capture the panel's scroll offset and focused control ahead of a rebuild.
    * @param {Object|null} fx - The effect record about to be replaced.
-   * @returns {{scrollTop: number, property: string|null}} The captured state.
+   * @returns {{scrollTop: number, property: string|null, closed: boolean}} The
+   *   captured state.
    */
   function capturePanelFocus(fx) {
     return {
       scrollTop: scrollElement(fx?.gui)?.scrollTop ?? 0,
       property: focusedControlProperty(fx),
+      closed: Boolean(fx?.gui?.closed),
     };
   }
 
@@ -1027,11 +1035,12 @@ export function createEffectGui({
    * replaced the captured one. A detached element cannot hold focus, so the
    * replacement must already be mounted.
    * @param {Object|null} fx - The record now published.
-   * @param {{scrollTop: number, property: string|null}} captured - The state
-   *   capturePanelFocus() returned.
+   * @param {{scrollTop: number, property: string|null, closed: boolean}} captured
+   *   - The state capturePanelFocus() returned.
    * @returns {void}
    */
   function restorePanelFocus(fx, captured) {
+    fx?.gui?.open?.(!captured.closed);
     const scroller = scrollElement(fx?.gui);
     if (scroller) scroller.scrollTop = captured.scrollTop;
     if (captured.property === null) return;
@@ -1083,7 +1092,7 @@ export function createEffectGui({
     rebuildFailureGeneration = undefined;
     skewLogged = false;
     if (wasMounted) {
-      mountEffect(next);
+      mountEffect(next, captured.closed);
       restorePanelFocus(next, captured);
     }
     return true;
@@ -1092,11 +1101,14 @@ export function createEffectGui({
   /**
    * Mount one effect record in the current GUI container.
    * @param {Object} fx - Record to mount.
+   * @param {boolean} [closed] - Initial panel state; defaults to a pending
+   *   rebuild state or the mobile layout default.
    * @returns {void}
    */
-  function mountEffect(fx) {
+  function mountEffect(fx, closed = mountClosedOverride ?? isMobile()) {
     if (!fx?.gui) return;
-    if (isMobile()) fx.gui.close();
+    if (closed) fx.gui.close();
+    else fx.gui.open();
     const container = guiContainer();
     if (!container) return;
     const dom = fx.gui.domElement;
