@@ -112,17 +112,24 @@ function makeAdapter({ ownsDisplay = false, active = false,
   return { adapter, calls, errors, driver, host, segments, view };
 }
 
-test('a single-engine frame renders, republishes the view, then syncs the panel', () => {
+test('a single-engine frame renders and republishes the view', () => {
   const a = makeAdapter();
 
   a.adapter.drawFrame();
 
-  assert.deepEqual(a.calls,
-    ['engine.drawFrame', 'host.refresh', 'effectGui.sync']);
+  assert.deepEqual(a.calls, ['engine.drawFrame', 'host.refresh']);
   assert.equal(a.driver.pixels, a.view);
   // A refresh that hands back a fresh view raises the flag, and the frame raises
   // it again unconditionally; three.js still uploads once per render.
   assert.equal(a.driver.dotMesh.instanceColor.version, 2);
+});
+
+test('panel reconciliation is independent of drawing a simulation frame', () => {
+  const a = makeAdapter();
+
+  a.adapter.sync();
+
+  assert.deepEqual(a.calls, ['effectGui.sync']);
 });
 
 test('a spawning pool still renders the main engine and reports its progress', () => {
@@ -131,7 +138,7 @@ test('a spawning pool still renders the main engine and reports its progress', (
   a.adapter.drawFrame();
 
   assert.deepEqual(a.calls,
-    ['segments.updateStats', 'engine.drawFrame', 'host.refresh', 'effectGui.sync']);
+    ['segments.updateStats', 'engine.drawFrame', 'host.refresh']);
 });
 
 test('a pool that owns the display composites instead of drawing', () => {
@@ -139,7 +146,7 @@ test('a pool that owns the display composites instead of drawing', () => {
 
   a.adapter.drawFrame();
 
-  assert.deepEqual(a.calls, ['segments.tick', 'effectGui.sync']);
+  assert.deepEqual(a.calls, ['segments.tick']);
 });
 
 test('a diverged alias is healed in place and reported once', () => {

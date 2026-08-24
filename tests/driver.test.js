@@ -619,6 +619,24 @@ test('render repaints a pending frame while paused', () => {
   assert.equal(ctx.needsRender, false);
 });
 
+test('render reconciles the effect panel while simulation is paused', () => {
+  const log = [];
+  const ctx = renderCtx(new Uint16Array(4), log);
+  ctx.needsRender = false;
+  const adapter = {
+    draws: 0,
+    syncs: 0,
+    drawFrame() { this.draws++; },
+    sync() { this.syncs++; },
+  };
+
+  Daydream.prototype.render.call(ctx, adapter);
+
+  assert.equal(adapter.syncs, 1);
+  assert.equal(adapter.draws, 0);
+  assert.equal(ctx.needsRender, false);
+});
+
 test('render holds the repaint while instanceColor aliases a detached view', () => {
   const log = [];
   const ctx = renderCtx(detachedView(), log);
@@ -654,6 +672,25 @@ function runningCtx(ctx, log) {
   ctx.recorder = fakeRecorder(log);
   return ctx;
 }
+
+test('render reconciles once after an advanced simulation frame', () => {
+  const log = [];
+  const ctx = runningCtx(renderCtx(new Uint16Array(4), log), log);
+  ctx.stepSimulation = (adapter) => {
+    adapter.drawFrame();
+    return true;
+  };
+  const adapter = {
+    drawFrame: () => log.push('drawFrame'),
+    sync: () => log.push('effectGui.sync'),
+  };
+
+  Daydream.prototype.render.call(ctx, adapter);
+
+  assert.deepEqual(log.slice(0, 3),
+    ['drawFrame', 'effectGui.sync', 'controls.update']);
+  assert.equal(log.filter((entry) => entry === 'effectGui.sync').length, 1);
+});
 
 test('render captures one frame per advanced tick, after painting it', () => {
   const log = [];

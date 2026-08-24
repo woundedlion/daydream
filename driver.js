@@ -533,11 +533,12 @@ export class Daydream {
    * updates controls, and repaints the main view, labels, and PiP — but only
    * when the sim stepped, the camera moved, or invalidate() was called. Hands
    * this.recorder one frame per advanced tick the adapter reports capture-ready.
-   * @param {{drawFrame: () => void, getArenaMetrics?: () => ?Object,
-   *   captureReady?: () => boolean}} adapter - Per-frame render adapter (see
+   * @param {{drawFrame: () => void, sync?: () => void,
+   *   getArenaMetrics?: () => ?Object, captureReady?: () => boolean}} adapter - Per-frame render adapter (see
    *   createRenderAdapter): drawFrame() paints the pixel buffer,
-   *   getArenaMetrics() feeds the stats overlay, and captureReady() gates the
-   *   recorder. Both optional methods default to permissive when absent.
+   *   sync() reconciles the effect panel, getArenaMetrics() feeds the stats
+   *   overlay, and captureReady() gates the recorder. Optional methods default
+   *   to permissive when absent.
    */
   render(adapter) {
     if (this.contextLost) return;
@@ -548,6 +549,7 @@ export class Daydream {
     const clockReady = this.advanceFrameClock();
     const advanced =
       (clockReady || this.stepFrames !== 0) && this.stepSimulation(adapter);
+    adapter?.sync?.();
 
     // Services live pointer interaction; emits 'change' (→ needsRender).
     this.controls.update();
