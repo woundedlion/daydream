@@ -193,6 +193,30 @@ function installWindow(search = '', pathname = '/', hash = '') {
   return calls;
 }
 
+/**
+ * A one-slot timer source a URLSync case fires by hand.
+ * @returns {Object} The stand-in and its scheduled delays.
+ */
+function fakeUrlTimer() {
+  const delays = [];
+  let pending = null;
+  return {
+    delays,
+    setTimeout(fn, ms) {
+      pending = fn;
+      delays.push(ms);
+      return 0;
+    },
+    /** Runs the pending timer. @returns {void} */
+    fire() {
+      const fn = pending;
+      pending = null;
+      assert.ok(fn, 'a timer is pending');
+      fn();
+    },
+  };
+}
+
 test('writeUrl assembles pathname, query and hash', () => {
   const calls = installWindow('', '/sim', '#frag');
   writeUrl(new URLSearchParams('effect=Voronoi&speed=2'));
@@ -264,10 +288,10 @@ test('a refused history write does not propagate out of the URL layer', () => {
 test('URLSync holds its ad-hoc buffer through a refused history write', () => {
   const written = [];
   let refuse = true;
-  const delays = [];
+  const timer = fakeUrlTimer();
   const realSetTimeout = globalThis.setTimeout;
   const captured = installConsoleCapture('warn');
-  globalThis.setTimeout = (fn, ms) => { delays.push(ms); return 0; };
+  globalThis.setTimeout = timer.setTimeout;
   globalThis.window = {
     location: { search: '', pathname: '/sim', hash: '' },
     history: {
@@ -283,10 +307,10 @@ test('URLSync holds its ad-hoc buffer through a refused history write', () => {
 
     sync.flush();
     assert.deepEqual(written, [], 'the refused write left the URL as it was');
-    assert.equal(delays.at(-1), URL_FLUSH_RETRY_MS, 'a retry is armed');
+    assert.equal(timer.delays.at(-1), URL_FLUSH_RETRY_MS, 'a retry is armed');
 
     refuse = false;
-    sync.flush();
+    timer.fire();
     assert.deepEqual(written, ['/sim?effect=Voronoi&scale=3'],
       'the retry re-asserts the buffered ad-hoc param');
 
@@ -308,10 +332,10 @@ test('URLSync holds its ad-hoc buffer through a refused history write', () => {
 test('URLSync bounds its retries of a refused history write', () => {
   const written = [];
   let refuse = true;
-  const delays = [];
+  const timer = fakeUrlTimer();
   const realSetTimeout = globalThis.setTimeout;
   const captured = installConsoleCapture('warn');
-  globalThis.setTimeout = (fn, ms) => { delays.push(ms); return 0; };
+  globalThis.setTimeout = timer.setTimeout;
   globalThis.window = {
     location: { search: '', pathname: '/sim', hash: '' },
     history: {
@@ -324,11 +348,12 @@ test('URLSync bounds its retries of a refused history write', () => {
   try {
     const sync = new URLSync(new AppState({ effect: 'Voronoi' }), ['effect']);
     sync.setParam('scale', 3);
-    delays.length = 0;
+    timer.delays.length = 0;
 
-    for (let i = 0; i < URL_FLUSH_MAX_RETRIES + 3; i++) sync.flush();
+    sync.flush();
+    for (let i = 1; i < URL_FLUSH_MAX_RETRIES; i++) timer.fire();
 
-    assert.equal(delays.length, URL_FLUSH_MAX_RETRIES - 1,
+    assert.equal(timer.delays.length, URL_FLUSH_MAX_RETRIES - 1,
       'the retry kept re-arming past the bound');
     assert.equal(captured.messages.filter((m) => m.startsWith('URLSync:')).length, 1,
       'the exhaustion is reported once, not once per refused write');
@@ -349,29 +374,41 @@ test('URLSync bounds its retries of a refused history write', () => {
  * inside that window and drop the buffer while the refusal was still standing.
  */
 test('URLSync will not let a concurrent write shorten an armed retry', () => {
-  const delays = [];
+  const written = [];
+  let refuse = true;
+  const timer = fakeUrlTimer();
   const realSetTimeout = globalThis.setTimeout;
   const warn = console.warn;
   console.warn = () => {};
-  globalThis.setTimeout = (fn, ms) => { delays.push(ms); return 0; };
+  globalThis.setTimeout = timer.setTimeout;
   globalThis.window = {
     location: { search: '', pathname: '/sim', hash: '' },
-    history: { replaceState: () => { throw new Error('rate limit'); } },
+    history: {
+      replaceState: (state, title, url) => {
+        if (refuse) throw new Error('rate limit');
+        written.push(url);
+      },
+    },
   };
   try {
     const state = new AppState({ effect: 'Voronoi' });
     const sync = new URLSync(state, ['effect']);
 
     sync.flush();
-    assert.deepEqual(delays, [URL_FLUSH_RETRY_MS], 'the refusal armed the retry');
+    assert.deepEqual(timer.delays, [URL_FLUSH_RETRY_MS], 'the refusal armed the retry');
 
     sync.setParam('scale', 3);
-    assert.deepEqual(delays, [URL_FLUSH_RETRY_MS],
+    assert.deepEqual(timer.delays, [URL_FLUSH_RETRY_MS],
       'an ad-hoc write did not re-arm at the debounce');
 
     state.set('effect', 'Hankin');
-    assert.deepEqual(delays, [URL_FLUSH_RETRY_MS],
+    assert.deepEqual(timer.delays, [URL_FLUSH_RETRY_MS],
       'a tracked-key change did not re-arm at the debounce either');
+
+    refuse = false;
+    timer.fire();
+    assert.deepEqual(written, ['/sim?effect=Hankin&scale=3'],
+      'the armed retry flushes both concurrent writes');
   } finally {
     globalThis.setTimeout = realSetTimeout;
     console.warn = warn;
