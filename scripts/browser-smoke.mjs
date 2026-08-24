@@ -90,24 +90,35 @@ function installDrawProbe() {
     ['drawImage', 'fill', 'fillRect', 'putImageData', 'stroke']);
 }
 
+/** @returns {void} */
+function installSegmentProbe() {
+  window.daydreamSegmentProbe = { modulePosts: 0, transferPosts: 0 };
+  const postMessage = Worker.prototype.postMessage;
+  Worker.prototype.postMessage = function (message, transferOrOptions) {
+    if (message?.type === 'init'
+        && message.wasmModule instanceof WebAssembly.Module) {
+      window.daydreamSegmentProbe.modulePosts += 1;
+    }
+    const transfer = Array.isArray(transferOrOptions)
+      ? transferOrOptions
+      : transferOrOptions?.transfer;
+    if (transfer?.length > 0) window.daydreamSegmentProbe.transferPosts += 1;
+    return postMessage.call(this, message, transferOrOptions);
+  };
+}
+
 /**
- * Loads one page and collects everything that went wrong on it.
- * @param {import('puppeteer-core').Browser} browser - The running browser.
- * @param {string} origin - Origin the manifest server listens on.
- * @param {string} page - Repo-relative page path.
- * @returns {Promise<string[]>} One line per problem; empty when the page is clean.
+ * @param {import('puppeteer-core').Page} tab
+ * @param {string} origin
+ * @param {string[]} problems
  */
-async function smokePage(browser, origin, page) {
-  const problems = [];
+function collectProblems(tab, origin, problems) {
   /** @param {string} [href] */
   const absent = (href) => {
     if (href === undefined) return false;
     const url = new URL(href, origin);
     return url.origin === origin && ABSENT_PATHS.some((re) => re.test(url.pathname));
   };
-
-  const tab = await browser.newPage();
-  await tab.setViewport(VIEWPORT);
   tab.on('console', (message) => {
     if (message.type() !== 'error' || absent(message.location()?.url)) return;
     problems.push(`console error: ${message.text()}`);
@@ -121,6 +132,20 @@ async function smokePage(browser, origin, page) {
     if (response.status() < 400 || absent(response.url())) return;
     problems.push(`HTTP ${response.status()}: ${response.url()}`);
   });
+}
+
+/**
+ * Loads one page and collects everything that went wrong on it.
+ * @param {import('puppeteer-core').Browser} browser - The running browser.
+ * @param {string} origin - Origin the manifest server listens on.
+ * @param {string} page - Repo-relative page path.
+ * @returns {Promise<string[]>} One line per problem; empty when the page is clean.
+ */
+async function smokePage(browser, origin, page) {
+  const problems = [];
+  const tab = await browser.newPage();
+  await tab.setViewport(VIEWPORT);
+  collectProblems(tab, origin, problems);
 
   await tab.evaluateOnNewDocument(installDrawProbe);
   try {
@@ -139,6 +164,48 @@ async function smokePage(browser, origin, page) {
     }
     const draws = await tab.evaluate(() => window.daydreamSmokeDraws);
     console.log(`  ${page}: ${draws} draw calls`);
+  } catch (error) {
+    problems.push(error instanceof Error ? error.message : String(error));
+  }
+  await tab.close();
+  return problems;
+}
+
+/**
+ * Runs the segmented worker path in a real browser.
+ * @param {import('puppeteer-core').Browser} browser
+ * @param {string} origin
+ * @returns {Promise<string[]>}
+ */
+async function smokeSegmentedMode(browser, origin) {
+  const problems = [];
+  const tab = await browser.newPage();
+  await tab.setViewport(VIEWPORT);
+  collectProblems(tab, origin, problems);
+  await tab.evaluateOnNewDocument(installSegmentProbe);
+
+  const url = new URL('/index.html', origin);
+  url.searchParams.set('view.Segmented POV.segmented', 'true');
+  url.searchParams.set('view.Segmented POV.segments', '2');
+  try {
+    await tab.goto(url.href, { timeout: LOAD_TIMEOUT_MS });
+    await tab.waitForFunction(enginePainted, { timeout: READY_TIMEOUT_MS });
+    await tab.waitForFunction(() => {
+      const overlay = document.getElementById('segment-stats');
+      if (!overlay) return false;
+      const rows = [...(overlay?.querySelectorAll('tr') ?? [])]
+        .filter((row) => /^Seg \d+$/.test(
+          row.querySelector('.seg-label')?.textContent ?? ''));
+      const probe = window.daydreamSegmentProbe;
+      return getComputedStyle(overlay).display !== 'none'
+        && rows.length === 2
+        && rows.every((row) => row.querySelector('.seg-range')?.textContent !== '?')
+        && probe.modulePosts === 2
+        && probe.transferPosts > 0;
+    }, { timeout: READY_TIMEOUT_MS });
+    const probe = await tab.evaluate(() => window.daydreamSegmentProbe);
+    console.log(`  index.html segmented: ${probe.modulePosts} module clones, `
+      + `${probe.transferPosts} transferable posts`);
   } catch (error) {
     problems.push(error instanceof Error ? error.message : String(error));
   }
@@ -178,6 +245,9 @@ try {
     const problems = await smokePage(browser, site.origin, page);
     for (const problem of problems) failures.push(`${page}: ${problem}`);
   }
+  const segmentedProblems = await smokeSegmentedMode(browser, site.origin);
+  for (const problem of segmentedProblems)
+    failures.push(`index.html segmented: ${problem}`);
 } finally {
   await browser.close();
   await site.close();
@@ -188,4 +258,4 @@ if (failures.length > 0) {
   for (const failure of failures) console.error(`  ${failure}`);
   process.exit(1);
 }
-console.log(`browser-smoke: ${pages.length} pages loaded clean and painted.`);
+console.log(`browser-smoke: ${pages.length} pages and segmented mode loaded clean and painted.`);
