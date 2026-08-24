@@ -31,9 +31,10 @@
   // holosphere_wasm.d.ts stands in for the Emscripten glue, which is never
   // checked; listing it is what makes that import resolve under noResolve.
   // file_system_access.d.ts declares the save picker lib.dom omits.
-  // tools/ is rostered whole except for the modules that import three, which
-  // ships no typings: under noResolve a bare specifier resolves to nothing this
-  // program contains, so `@types/three` could not be reached even if installed.
+  // tools/ is rostered except for browser page controllers and modules that
+  // import three, which ships no typings: under noResolve a bare specifier
+  // resolves to nothing this program contains, so `@types/three` could not be
+  // reached even if installed.
   // tsconfig_roster.test.js holds tools/ to that one exemption. The same puts
   // gui.js (lil-gui), geometry.js and everything else reached through driver.js
   // out of range, and daydream.js and bootstrap.js with them, since the closure

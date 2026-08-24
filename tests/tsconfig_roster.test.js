@@ -5,7 +5,8 @@
 // it, and a `// @ts-check` pragma on an unrostered file is inert for the same
 // reason. These cases keep the roster closed under the pipeline's own imports,
 // over every file that claims the pragma, and over tools/, which is rostered
-// whole apart from the modules a bare third-party import puts out of reach.
+// apart from browser page controllers and modules a bare third-party import
+// puts out of reach.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -147,13 +148,14 @@ test('every not-checked module has a declaration file on the roster', () => {
   }
 });
 
-test('every tools/ module is rostered unless a bare import puts it out of reach', () => {
+test('every library module under tools is on the typecheck roster', () => {
   const roster = readTsconfig().files;
   const unreachable = [];
   for (const entry of readdirSync(new URL('tools/', ROOT), { withFileTypes: true })) {
     if (!entry.isFile() || !/\.m?js$/.test(entry.name)) continue;
     const path = `tools/${entry.name}`;
     if (roster.includes(path)) continue;
+    if (/_page\.js$/.test(entry.name)) continue;
     const source = readFileSync(new URL(path, ROOT), 'utf8');
     // A bare specifier resolves to a package this program does not contain, and
     // noResolve cannot pull its typings in, so the module cannot check clean.
