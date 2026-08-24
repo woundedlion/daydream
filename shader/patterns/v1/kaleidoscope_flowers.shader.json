@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "catalog_version": 1,
-  "document_id": "kaleido-wave-v1",
-  "effect_id": "kaleido-wave",
+  "document_id": "kaleidoscope-flowers-v1",
+  "effect_id": "kaleidoscope-flowers",
   "descriptor": {
     "graph": {
       "nodes": [
@@ -20,9 +20,9 @@
           "operator": "pullback.surface_project.v1",
           "policy": {
             "pre_lens_surface": "identity",
-            "lens": "kaleidoscope",
+            "lens": "dodecahedral-kaleidoscope",
             "post_lens_surface": "identity",
-            "projection": "stereographic"
+            "projection": "equirectangular"
           }
         },
         {
@@ -41,7 +41,7 @@
           "role": "source",
           "operator": "pullback.source.v1",
           "policy": {
-            "source": "twin-wave"
+            "source": "grid"
           }
         },
         {
@@ -64,7 +64,7 @@
             "brightness_envelope": "none"
           },
           "resources": [
-            "triadic-palette",
+            "analogous-palette",
             "hue-noise"
           ]
         }
@@ -101,7 +101,7 @@
         "unit": "ratio",
         "domain": {
           "minimum": 0.1,
-          "maximum": 20
+          "maximum": 64
         },
         "interpolation": {
           "kind": "LINEAR"
@@ -117,6 +117,36 @@
         "domain": {
           "minimum": 0,
           "maximum": 0.5
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "complexity",
+        "binding": "complexity",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 3
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "pattern-mix",
+        "binding": "pattern.mix",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
         },
         "interpolation": {
           "kind": "LINEAR"
@@ -444,6 +474,22 @@
         "default": 0
       },
       {
+        "id": "central-meridian",
+        "binding": "central.meridian",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "radian",
+        "domain": {
+          "minimum": 0,
+          "maximum": 6.2831854820251465
+        },
+        "interpolation": {
+          "kind": "SHORTEST_PERIODIC",
+          "period": 6.2831854820251465
+        },
+        "default": 0
+      },
+      {
         "id": "hue-noise-scale",
         "binding": "hue.noise.scale",
         "classification": "preset",
@@ -512,8 +558,8 @@
     ],
     "resources": [
       {
-        "id": "triadic-palette",
-        "kind": "generated-triadic-palette",
+        "id": "analogous-palette",
+        "kind": "generated-analogous-palette",
         "settings": {
           "hue_step": 159
         }
@@ -531,6 +577,8 @@
       "fields": [
         "pattern-freq",
         "speed",
+        "complexity",
+        "pattern-mix",
         "drift",
         "source-angle-speed",
         "pole-fade",
@@ -552,6 +600,7 @@
         "hue-shift-amount",
         "projection-spin-speed",
         "projection-wander",
+        "central-meridian",
         "hue-noise-scale",
         "hue-noise-speed"
       ]
@@ -573,38 +622,131 @@
     "schema_version": 1,
     "presets": [
       {
-        "preset_id": "twin-wave",
-        "display_name": "Twin Wave",
+        "preset_id": "double-map",
+        "display_name": "Double Map",
         "values": {
-          "pattern-freq": 4.9755,
-          "speed": 0.125,
+          "pattern-freq": 3.9407,
+          "speed": 0,
+          "complexity": 3,
+          "pattern-mix": 1,
           "drift": 0.8,
-          "source-angle-speed": 0.05,
-          "pole-fade": 4.971,
+          "source-angle-speed": 0.0269999988,
+          "pole-fade": 2.14,
           "camera-wander": 1,
-          "inner-speed": 0,
+          "inner-speed": 0.00013,
           "inner-rotation": 0,
           "inner-cell-x": 1,
-          "inner-cell-y": 1,
+          "inner-cell-y": 0.997703135,
           "inner-offset-x": 0,
           "inner-offset-y": 0,
-          "palette-chroma": 0.361,
-          "palette-mapping": "linear",
+          "palette-chroma": 1,
+          "palette-mapping": "cup",
+          "mapping-frequency": 2,
+          "mapping-phase": 0,
+          "phase-oscillation-depth": 0,
+          "phase-oscillation-speed": 0,
+          "value-opacity-low": 1,
+          "value-opacity-high": 1,
+          "hue-shift-amount": 0.366,
+          "projection-spin-speed": 0,
+          "projection-wander": 0.165,
+          "central-meridian": 0,
+          "hue-noise-scale": 1.47215629,
+          "hue-noise-speed": 0
+        }
+      },
+      {
+        "preset_id": "open-grid",
+        "display_name": "Open Grid",
+        "values": {
+          "pattern-freq": 3.9407,
+          "speed": 0,
+          "complexity": 3,
+          "pattern-mix": 1,
+          "drift": 0.8,
+          "source-angle-speed": 0.0269999988,
+          "pole-fade": 2.14,
+          "camera-wander": 1,
+          "inner-speed": 0.00013,
+          "inner-rotation": 0,
+          "inner-cell-x": 1,
+          "inner-cell-y": 0.997703135,
+          "inner-offset-x": 0,
+          "inner-offset-y": 0,
+          "palette-chroma": 1,
+          "palette-mapping": "cup",
           "mapping-frequency": 1,
           "mapping-phase": 0,
           "phase-oscillation-depth": 0,
           "phase-oscillation-speed": 0,
           "value-opacity-low": 1,
           "value-opacity-high": 1,
-          "hue-shift-amount": 0.27,
+          "hue-shift-amount": 0.366,
           "projection-spin-speed": 0,
-          "projection-wander": 1,
-          "hue-noise-scale": 2.2033439,
-          "hue-noise-speed": -0.00040800002
+          "projection-wander": 0.165,
+          "central-meridian": 0,
+          "hue-noise-scale": 1.47215629,
+          "hue-noise-speed": 0
+        }
+      },
+      {
+        "preset_id": "fine-grid",
+        "display_name": "Fine Grid",
+        "values": {
+          "pattern-freq": 0.3985,
+          "speed": 0,
+          "complexity": 3,
+          "pattern-mix": 1,
+          "drift": 0.8,
+          "source-angle-speed": 0.0269999988,
+          "pole-fade": 2.14,
+          "camera-wander": 1,
+          "inner-speed": 0.00058,
+          "inner-rotation": 0,
+          "inner-cell-x": 1,
+          "inner-cell-y": 0.901890635,
+          "inner-offset-x": 0,
+          "inner-offset-y": 0,
+          "palette-chroma": 1,
+          "palette-mapping": "cup",
+          "mapping-frequency": 21.212,
+          "mapping-phase": 0,
+          "phase-oscillation-depth": 0,
+          "phase-oscillation-speed": 0,
+          "value-opacity-low": 1,
+          "value-opacity-high": 1,
+          "hue-shift-amount": 0.366,
+          "projection-spin-speed": 0,
+          "projection-wander": 0.165,
+          "central-meridian": 0,
+          "hue-noise-scale": 1.47215629,
+          "hue-noise-speed": 0
         }
       }
     ],
-    "edges": [],
+    "edges": [
+      {
+        "from": "double-map",
+        "to": "open-grid",
+        "path_policy": "parallel",
+        "easing": "EASE_IN_OUT_SIN",
+        "duration": 480
+      },
+      {
+        "from": "open-grid",
+        "to": "fine-grid",
+        "path_policy": "parallel",
+        "easing": "EASE_IN_OUT_SIN",
+        "duration": 480
+      },
+      {
+        "from": "fine-grid",
+        "to": "double-map",
+        "path_policy": "parallel",
+        "easing": "EASE_IN_OUT_SIN",
+        "duration": 480
+      }
+    ],
     "absent_edge_fallback": {
       "manual": "SNAP",
       "automatic": "REJECT",
@@ -614,15 +756,19 @@
     },
     "choreography": {
       "generated_order": [
-        "twin-wave"
+        "double-map",
+        "open-grid",
+        "fine-grid"
       ],
       "dwell": {
-        "twin-wave": 600
+        "double-map": 600,
+        "open-grid": 600,
+        "fine-grid": 600
       }
     }
   },
   "effect_metadata": {
-    "display_name": "Kaleido Wave",
-    "description": "A drifting twin wave reflected through a kaleidoscope."
+    "display_name": "Kaleidoscope Flowers",
+    "description": "Dodecahedral grids mapped continuously around the equator."
   }
 }

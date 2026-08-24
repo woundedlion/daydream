@@ -11,11 +11,11 @@ import {
   FLASH_MS,
 } from '../effect_gui.js';
 import {
-  CURL_LATTICE_STAGE_ORDER,
-  FACET_GRID_STAGE_ORDER,
+  LATTICE_MELT_STAGE_ORDER,
+  KALEIDOSCOPE_SMOOTH_STAGE_ORDER,
   SHADERBALL_STAGE_ORDER,
-  curlLatticeStageAssignments,
-  facetGridStageAssignments,
+  latticeMeltStageAssignments,
+  kaleidoscopeSmoothStageAssignments,
   fixedShaderStageAssignments,
   fixedShaderStageTitles,
   isShaderBallSchema,
@@ -58,7 +58,7 @@ function shaderBallParams() {
   ];
 }
 
-function curlLatticeParams() {
+function latticeMeltParams() {
   return [
     'Lattice Cell Scale',
     'Lattice Shape',
@@ -86,7 +86,7 @@ function curlLatticeParams() {
   ].map((name) => ({ name, value: 0.5, min: 0, max: 1, animated: true }));
 }
 
-function facetGridParams() {
+function kaleidoscopeSmoothParams() {
   return [
     'Pattern Freq',
     'Speed',
@@ -621,9 +621,9 @@ test('ShaderBall builds one URL-transparent bank for every pipeline stage', () =
   assert.equal(h.gui().ctrl('Hue Shift Mode').folder, 'Colorize');
 });
 
-test('CurlLattice controls use the fixed pipeline modes as folders', () => {
-  const params = curlLatticeParams();
-  const assignments = curlLatticeStageAssignments(params);
+test('LatticeMelt controls use the fixed pipeline modes as folders', () => {
+  const params = latticeMeltParams();
+  const assignments = latticeMeltStageAssignments(params);
   const h = makeHarness({
     params,
     engineValues: params.map((parameter) => parameter.value),
@@ -632,7 +632,7 @@ test('CurlLattice controls use the fixed pipeline modes as folders', () => {
   h.panel.build();
 
   assert.deepEqual([...new Set(assignments.values())].sort(),
-    [...CURL_LATTICE_STAGE_ORDER].sort());
+    [...LATTICE_MELT_STAGE_ORDER].sort());
   assert.deepEqual(h.gui().folders.map((folder) => folder.name),
     ['Camera', 'Curl', 'Spin + Wander', 'Folded Sinusoidal',
       'Primitive Lattice', 'Generated Triadic']);
@@ -650,7 +650,7 @@ test('CurlLattice controls use the fixed pipeline modes as folders', () => {
 });
 
 test('a parameter no stage table maps is reported, not quietly rooted', () => {
-  const params = [...curlLatticeParams(),
+  const params = [...latticeMeltParams(),
     { name: 'Ridge Sharpness', value: 0.5, min: 0, max: 1, animated: true }];
   const h = makeHarness({
     params,
@@ -665,9 +665,9 @@ test('a parameter no stage table maps is reported, not quietly rooted', () => {
   assert.match(h.warnings[0], /no pipeline stage claims Ridge Sharpness/);
 });
 
-test('FacetGrid controls use the fixed pipeline modes as folders', () => {
-  const params = facetGridParams();
-  const assignments = facetGridStageAssignments(params);
+test('KaleidoscopeSmooth controls use the fixed pipeline modes as folders', () => {
+  const params = kaleidoscopeSmoothParams();
+  const assignments = kaleidoscopeSmoothStageAssignments(params);
   const h = makeHarness({
     params,
     engineValues: params.map((parameter) => parameter.value),
@@ -676,7 +676,7 @@ test('FacetGrid controls use the fixed pipeline modes as folders', () => {
   h.panel.build();
 
   assert.deepEqual([...new Set(assignments.values())].sort(),
-    [...FACET_GRID_STAGE_ORDER].sort());
+    [...KALEIDOSCOPE_SMOOTH_STAGE_ORDER].sort());
   assert.deepEqual(h.gui().folders.map((folder) => folder.name),
     ['Camera', 'Spin + Wander', 'Stereographic', 'Mirror Tile', 'Grid',
       'Generated Analogous']);
@@ -748,7 +748,7 @@ test('fixed Shader controls retain stage folders without dynamic metadata', () =
 });
 
 test('a promoted Shader snapshot outranks a matching dedicated-effect schema', () => {
-  const params = [...facetGridParams(), {
+  const params = [...kaleidoscopeSmoothParams(), {
     name: 'Central Meridian', value: 0.5, min: 0, max: 1, animated: true,
   }];
   const { snapshot, fields } = fixedShaderConfig({

@@ -2457,7 +2457,7 @@ test('Shader rebuild state uses the exhaustive full-config snapshot', () => {
 });
 
 test('an effect outside the Shader workbench rebuilds from its params', () => {
-  const c = makeController({ effect: 'signal-weave' });
+  const c = makeController({ effect: 'alien-brain' });
   c.getWasmEngine = () => ({
     ...fakeEngine([{ name: 'Speed', value: 0.5 }]),
     getFullConfigSnapshot: () => {

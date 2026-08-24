@@ -4,7 +4,7 @@
 // the band boundaries — and translates every gesture (band + palettes, ✕
 // removal, socket selection, reorder buttons, Alt+Arrow, bypass, undo) into the
 // document store's span-replacement primitive. The fixture is the
-// real hex_wave pattern document over the pinned engine catalog and the real
+// real kaleidoscope_hex_bright pattern document over the pinned engine catalog and the real
 // store, so legality, reconciliation and refusal texts are the shipping ones,
 // not doubles.
 import { test } from 'node:test';
@@ -21,11 +21,11 @@ import {
 const CATALOG = JSON.parse(readFileSync(
   new URL('../shader/engine_catalog.json', import.meta.url), 'utf8'));
 const BASE = compileShaderDocument(readFileSync(
-  new URL('../shader/patterns/hex_wave.shader.json', import.meta.url), 'utf8'),
+  new URL('../shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8'),
 { catalog: CATALOG });
 assert.equal(BASE.status, 'VALID');
 
-// hex_wave chain: camera, lens (sphere endos), project (crossing), warp2
+// kaleidoscope_hex_bright chain: camera, lens (sphere endos), project (crossing), warp2
 // (plane endo), sample (crossing), transfer (field endo), colorize (exit).
 const PROJECT = 2;
 

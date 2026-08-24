@@ -3,28 +3,28 @@
   "descriptor": {
     "chain": [
       {
-        "label": "sphere1",
+        "label": "camera",
         "operator": "sphere.rotate.v2"
       },
       {
-        "label": "sphere2",
-        "operator": "sphere.displace.curl.v2"
-      },
-      {
-        "label": "sphere3",
+        "label": "lens",
         "operator": "sphere.lens.kaleidoscope.v2"
       },
       {
-        "label": "project1",
+        "label": "project",
         "operator": "project.stereographic.v2"
       },
       {
-        "label": "sample1",
-        "operator": "sample.lattice.v2"
+        "label": "warp1",
+        "operator": "warp.polar-chart.v2"
       },
       {
-        "label": "field1",
-        "operator": "field.coverage.value-cutout.v2"
+        "label": "warp2",
+        "operator": "warp.wave-shear.v2"
+      },
+      {
+        "label": "sample",
+        "operator": "sample.lattice.v2"
       },
       {
         "label": "colorize",
@@ -34,12 +34,12 @@
     "parameters": [
       {
         "classification": "preset",
-        "default": 1,
+        "default": 0,
         "domain": {
           "maximum": 1,
           "minimum": 0
         },
-        "id": "colorize.brightness-depth",
+        "id": "camera.wander",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -88,14 +88,14 @@
           "kind": "LINEAR"
         },
         "storage": "binary32",
-        "unit": "ratio"
+        "unit": "turn-per-frame"
       },
       {
         "classification": "preset",
         "default": 0,
         "domain": {
-          "maximum": 4,
-          "minimum": -4
+          "maximum": 1,
+          "minimum": -1
         },
         "id": "colorize.hue-shift-amount",
         "interpolation": {
@@ -125,7 +125,7 @@
         "default": 1,
         "domain": {
           "maximum": 32,
-          "minimum": 1
+          "minimum": 0.009999999776482582
         },
         "id": "colorize.mapping-frequency",
         "interpolation": {
@@ -178,11 +178,11 @@
           "kind": "MIXED_ENUM"
         },
         "storage": "enum8",
-        "unit": "mode"
+        "unit": "mapping"
       },
       {
         "classification": "preset",
-        "default": "triadic",
+        "default": "analogous",
         "domain": {
           "values": [
             "triadic",
@@ -215,15 +215,15 @@
         "classification": "preset",
         "default": 0,
         "domain": {
-          "maximum": 0.009999999776482582,
-          "minimum": -0.009999999776482582
+          "maximum": 0.019999999552965164,
+          "minimum": -0.019999999552965164
         },
         "id": "colorize.phase-oscillation-speed",
         "interpolation": {
           "kind": "LINEAR"
         },
         "storage": "binary32",
-        "unit": "ratio"
+        "unit": "turn-per-frame"
       },
       {
         "classification": "preset",
@@ -255,31 +255,26 @@
       },
       {
         "classification": "preset",
-        "default": 0.05000000074505806,
+        "default": "pentagonal-prism",
         "domain": {
-          "maximum": 0.5,
-          "minimum": 0.0009765625
+          "values": [
+            "azimuthal",
+            "tetrahedral",
+            "octahedral",
+            "dodecahedral",
+            "triangular-prism",
+            "square-prism",
+            "pentagonal-prism",
+            "hexagonal-prism",
+            "octagonal-prism"
+          ]
         },
-        "id": "field1.cutout-softness",
+        "id": "lens.symmetry",
         "interpolation": {
-          "kind": "LOG_POSITIVE"
+          "kind": "MIXED_ENUM"
         },
-        "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
-        "default": 0.5,
-        "domain": {
-          "maximum": 1,
-          "minimum": 0
-        },
-        "id": "field1.cutout-threshold",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
+        "storage": "enum8",
+        "unit": "mode"
       },
       {
         "classification": "preset",
@@ -288,12 +283,12 @@
           "maximum": 0.05000000074505806,
           "minimum": 0
         },
-        "id": "project1.projection-spin-speed",
+        "id": "project.projection-spin-speed",
         "interpolation": {
           "kind": "LINEAR"
         },
         "storage": "binary32",
-        "unit": "ratio"
+        "unit": "turn-per-frame"
       },
       {
         "classification": "preset",
@@ -302,7 +297,7 @@
           "maximum": 1,
           "minimum": 0
         },
-        "id": "project1.projection-wander",
+        "id": "project.projection-wander",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -316,7 +311,7 @@
           "maximum": 20,
           "minimum": 1
         },
-        "id": "project1.singularity-fade",
+        "id": "project.singularity-fade",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -325,7 +320,7 @@
       },
       {
         "classification": "preset",
-        "default": "weight",
+        "default": "weight-squared",
         "domain": {
           "values": [
             "none",
@@ -334,7 +329,7 @@
             "edge-fade"
           ]
         },
-        "id": "sample1.coverage-mode",
+        "id": "sample.coverage-mode",
         "interpolation": {
           "kind": "MIXED_ENUM"
         },
@@ -343,26 +338,12 @@
       },
       {
         "classification": "preset",
-        "default": 0.10000000149011612,
-        "domain": {
-          "maximum": 1,
-          "minimum": 0
-        },
-        "id": "sample1.edge-width",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
         "default": 1,
         "domain": {
           "maximum": 8,
           "minimum": 0.015625
         },
-        "id": "sample1.lattice-cell-scale",
+        "id": "sample.lattice-cell-scale",
         "interpolation": {
           "kind": "LOG_POSITIVE"
         },
@@ -376,9 +357,9 @@
           "maximum": 0.49000000953674316,
           "minimum": 0.015625
         },
-        "id": "sample1.lattice-radius",
+        "id": "sample.lattice-radius",
         "interpolation": {
-          "kind": "LINEAR"
+          "kind": "LOG_POSITIVE"
         },
         "storage": "binary32",
         "unit": "ratio"
@@ -390,7 +371,7 @@
           "maximum": 1,
           "minimum": 0
         },
-        "id": "sample1.lattice-shape",
+        "id": "sample.lattice-shape",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -404,7 +385,7 @@
           "maximum": 1,
           "minimum": 0.0009765625
         },
-        "id": "sample1.lattice-softness",
+        "id": "sample.lattice-softness",
         "interpolation": {
           "kind": "LOG_POSITIVE"
         },
@@ -420,7 +401,7 @@
             "projection"
           ]
         },
-        "id": "sample1.weight-mode",
+        "id": "sample.weight-mode",
         "interpolation": {
           "kind": "MIXED_ENUM"
         },
@@ -431,63 +412,47 @@
         "classification": "preset",
         "default": 0,
         "domain": {
-          "maximum": 0.05000000074505806,
-          "minimum": 0
+          "maximum": 6.2831854820251465,
+          "minimum": -6.2831854820251465
         },
-        "id": "sphere1.spin-speed",
+        "id": "warp1.angular-phase",
         "interpolation": {
-          "kind": "LINEAR"
+          "kind": "SHORTEST_PERIODIC",
+          "period": 6.2831854820251465
         },
         "storage": "binary32",
-        "unit": "ratio"
+        "unit": "radian"
+      },
+      {
+        "classification": "preset",
+        "default": "linear",
+        "domain": {
+          "values": [
+            "linear",
+            "logarithmic"
+          ]
+        },
+        "id": "warp1.mode",
+        "interpolation": {
+          "kind": "MIXED_ENUM"
+        },
+        "storage": "enum8",
+        "unit": "mode"
       },
       {
         "classification": "preset",
         "default": 0,
         "domain": {
-          "maximum": 1,
-          "minimum": 0
+          "maximum": 6.2831854820251465,
+          "minimum": -6.2831854820251465
         },
-        "id": "sphere1.wander",
+        "id": "warp1.radial-phase",
         "interpolation": {
-          "kind": "LINEAR"
+          "kind": "SHORTEST_PERIODIC",
+          "period": 6.2831854820251465
         },
         "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
-        "default": "simplex",
-        "domain": {
-          "values": [
-            "simplex",
-            "fbm3",
-            "ridged3"
-          ]
-        },
-        "id": "sphere2.basis",
-        "interpolation": {
-          "kind": "MIXED_ENUM"
-        },
-        "storage": "enum8",
-        "unit": "mode"
-      },
-      {
-        "classification": "preset",
-        "default": "euler",
-        "domain": {
-          "values": [
-            "euler",
-            "midpoint",
-            "midpoint-2x"
-          ]
-        },
-        "id": "sphere2.integrator",
-        "interpolation": {
-          "kind": "MIXED_ENUM"
-        },
-        "storage": "enum8",
-        "unit": "mode"
+        "unit": "radian"
       },
       {
         "classification": "preset",
@@ -496,9 +461,9 @@
           "maximum": 64,
           "minimum": 0.015625
         },
-        "id": "sphere2.scale",
+        "id": "warp1.radial-scale",
         "interpolation": {
-          "kind": "LINEAR"
+          "kind": "LOG_POSITIVE"
         },
         "storage": "binary32",
         "unit": "ratio"
@@ -507,12 +472,41 @@
         "classification": "preset",
         "default": 0,
         "domain": {
-          "maximum": 0.015625,
-          "minimum": -0.015625
+          "maximum": 0.019999999552965164,
+          "minimum": -0.019999999552965164
         },
-        "id": "sphere2.speed",
+        "id": "warp1.speed",
         "interpolation": {
           "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "turn-per-frame"
+      },
+      {
+        "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 6.2831854820251465,
+          "minimum": -6.2831854820251465
+        },
+        "id": "warp2.field-angle",
+        "interpolation": {
+          "kind": "SHORTEST_PERIODIC",
+          "period": 6.2831854820251465
+        },
+        "storage": "binary32",
+        "unit": "radian"
+      },
+      {
+        "classification": "preset",
+        "default": 1,
+        "domain": {
+          "maximum": 32,
+          "minimum": 0.009999999776482582
+        },
+        "id": "warp2.frequency",
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
         },
         "storage": "binary32",
         "unit": "ratio"
@@ -521,38 +515,29 @@
         "classification": "preset",
         "default": 0,
         "domain": {
-          "maximum": 0.5,
-          "minimum": -0.5
+          "maximum": 0.019999999552965164,
+          "minimum": -0.019999999552965164
         },
-        "id": "sphere2.strength",
+        "id": "warp2.speed",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "turn-per-frame"
+      },
+      {
+        "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 30,
+          "minimum": -30
+        },
+        "id": "warp2.strength",
         "interpolation": {
           "kind": "LINEAR"
         },
         "storage": "binary32",
         "unit": "ratio"
-      },
-      {
-        "classification": "preset",
-        "default": "azimuthal",
-        "domain": {
-          "values": [
-            "azimuthal",
-            "tetrahedral",
-            "octahedral",
-            "dodecahedral",
-            "triangular-prism",
-            "square-prism",
-            "pentagonal-prism",
-            "hexagonal-prism",
-            "octagonal-prism"
-          ]
-        },
-        "id": "sphere3.symmetry",
-        "interpolation": {
-          "kind": "MIXED_ENUM"
-        },
-        "storage": "enum8",
-        "unit": "mode"
       }
     ],
     "path_policies": [
@@ -563,7 +548,7 @@
     ],
     "serialization": {
       "fields": [
-        "colorize.brightness-depth",
+        "camera.wander",
         "colorize.brightness-envelope",
         "colorize.hue-noise-scale",
         "colorize.hue-noise-speed",
@@ -578,35 +563,34 @@
         "colorize.phase-oscillation-speed",
         "colorize.value-opacity-high",
         "colorize.value-opacity-low",
-        "field1.cutout-softness",
-        "field1.cutout-threshold",
-        "project1.projection-spin-speed",
-        "project1.projection-wander",
-        "project1.singularity-fade",
-        "sample1.coverage-mode",
-        "sample1.edge-width",
-        "sample1.lattice-cell-scale",
-        "sample1.lattice-radius",
-        "sample1.lattice-shape",
-        "sample1.lattice-softness",
-        "sample1.weight-mode",
-        "sphere1.spin-speed",
-        "sphere1.wander",
-        "sphere2.basis",
-        "sphere2.integrator",
-        "sphere2.scale",
-        "sphere2.speed",
-        "sphere2.strength",
-        "sphere3.symmetry"
+        "lens.symmetry",
+        "project.projection-spin-speed",
+        "project.projection-wander",
+        "project.singularity-fade",
+        "sample.coverage-mode",
+        "sample.lattice-cell-scale",
+        "sample.lattice-radius",
+        "sample.lattice-shape",
+        "sample.lattice-softness",
+        "sample.weight-mode",
+        "warp1.angular-phase",
+        "warp1.mode",
+        "warp1.radial-phase",
+        "warp1.radial-scale",
+        "warp1.speed",
+        "warp2.field-angle",
+        "warp2.frequency",
+        "warp2.speed",
+        "warp2.strength"
       ],
       "schema_version": 1
     }
   },
-  "document_id": "curl-facets-v1",
-  "effect_id": "curl-facets",
+  "document_id": "kaleidoscope-pent-bright-v1",
+  "effect_id": "kaleidoscope-pent-bright",
   "effect_metadata": {
-    "description": "A softly cut lattice curled across dodecahedral facets.",
-    "display_name": "Curl Facets"
+    "description": "A polar lattice folded through a pentagonal prism.",
+    "display_name": "Kaleidoscope Pent Bright"
   },
   "preset_bank": {
     "absent_edge_fallback": {
@@ -618,53 +602,52 @@
     },
     "choreography": {
       "dwell": {
-        "curl-facets": 600
+        "polar-wave": 600
       },
       "generated_order": [
-        "curl-facets"
+        "polar-wave"
       ]
     },
     "edges": [],
     "presets": [
       {
-        "display_name": "Curl Facets",
-        "preset_id": "curl-facets",
+        "display_name": "Polar Wave",
+        "preset_id": "polar-wave",
         "values": {
-          "colorize.brightness-depth": 1,
+          "camera.wander": 1,
           "colorize.brightness-envelope": "none",
-          "colorize.hue-noise-scale": 2.4029531478881836,
-          "colorize.hue-noise-speed": 0.0001500000071246177,
-          "colorize.hue-shift-amount": -3.247999906539917,
+          "colorize.hue-noise-scale": 2,
+          "colorize.hue-noise-speed": 0,
+          "colorize.hue-shift-amount": 0.2680000066757202,
           "colorize.hue-shift-mode": "noise",
-          "colorize.mapping-frequency": 3.6659998893737793,
-          "colorize.mapping-phase": 0.5979999899864197,
-          "colorize.palette-chroma": 0.3140000104904175,
+          "colorize.mapping-frequency": 1,
+          "colorize.mapping-phase": -0.16599999368190765,
+          "colorize.palette-chroma": 1,
           "colorize.palette-mapping": "cup",
-          "colorize.palette-mode": "triadic",
-          "colorize.phase-oscillation-depth": 0.8560000061988831,
-          "colorize.phase-oscillation-speed": 0.004480000119656324,
+          "colorize.palette-mode": "analogous",
+          "colorize.phase-oscillation-depth": 0,
+          "colorize.phase-oscillation-speed": 0,
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
-          "field1.cutout-softness": 0.31635937094688416,
-          "field1.cutout-threshold": 0.36500000953674316,
-          "project1.projection-spin-speed": 0.0017500000540167093,
-          "project1.projection-wander": 0.008999999612569809,
-          "project1.singularity-fade": 1,
-          "sample1.coverage-mode": "weight",
-          "sample1.edge-width": 0.2630000114440918,
-          "sample1.lattice-cell-scale": 0.9897187352180481,
-          "sample1.lattice-radius": 0.3775731325149536,
-          "sample1.lattice-shape": 0,
-          "sample1.lattice-softness": 0.3456396460533142,
-          "sample1.weight-mode": "projection",
-          "sphere1.spin-speed": 0.019750000908970833,
-          "sphere1.wander": 1,
-          "sphere2.basis": "simplex",
-          "sphere2.integrator": "euler",
-          "sphere2.scale": 5.774218559265137,
-          "sphere2.speed": 0.00040625000838190317,
-          "sphere2.strength": 0.0430000014603138,
-          "sphere3.symmetry": "dodecahedral"
+          "lens.symmetry": "pentagonal-prism",
+          "project.projection-spin-speed": 0,
+          "project.projection-wander": 1,
+          "project.singularity-fade": 2.2730000019073486,
+          "sample.coverage-mode": "weight-squared",
+          "sample.lattice-cell-scale": 0.7741405963897705,
+          "sample.lattice-radius": 0.2907625138759613,
+          "sample.lattice-shape": 1,
+          "sample.lattice-softness": 0.37760838866233826,
+          "sample.weight-mode": "projection",
+          "warp1.angular-phase": 0,
+          "warp1.mode": "linear",
+          "warp1.radial-phase": 0,
+          "warp1.radial-scale": 1,
+          "warp1.speed": 0.00034374999813735485,
+          "warp2.field-angle": 0,
+          "warp2.frequency": 1,
+          "warp2.speed": 0.0009999999310821295,
+          "warp2.strength": 0
         }
       }
     ],

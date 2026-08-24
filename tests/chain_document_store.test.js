@@ -25,11 +25,11 @@ import {
 const CATALOG = JSON.parse(readFileSync(
   new URL('../shader/engine_catalog.json', import.meta.url), 'utf8'));
 const BASE = compileShaderDocument(readFileSync(
-  new URL('../shader/patterns/hex_wave.shader.json', import.meta.url), 'utf8'),
+  new URL('../shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8'),
 { catalog: CATALOG });
 assert.equal(BASE.status, 'VALID');
 
-// hex_wave chain order: camera, lens, project, warp2, sample, transfer,
+// kaleidoscope_hex_bright chain order: camera, lens, project, warp2, sample, transfer,
 // colorize — sphere endos, a sphere->plane crossing, a plane endo, a
 // plane->field crossing, a field endo, the field->color exit.
 const PROJECT = 2;

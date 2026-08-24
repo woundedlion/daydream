@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "catalog_version": 1,
-  "document_id": "glitch-grid-v1",
-  "effect_id": "glitch-grid",
+  "document_id": "alien-core-v1",
+  "effect_id": "alien-core",
   "descriptor": {
     "graph": {
       "nodes": [
@@ -639,7 +639,7 @@
     }
   },
   "effect_metadata": {
-    "display_name": "Glitch Grid",
+    "display_name": "Alien Core",
     "description": "A mirrored grid folded by the glitch lens."
   }
 }

@@ -533,11 +533,11 @@
       "schema_version": 1
     }
   },
-  "document_id": "kaleido-wave-v1",
-  "effect_id": "kaleido-wave",
+  "document_id": "kaleidoscope-hex-soft-v1",
+  "effect_id": "kaleidoscope-hex-soft",
   "effect_metadata": {
     "description": "A drifting twin wave reflected through a kaleidoscope.",
-    "display_name": "Kaleido Wave"
+    "display_name": "Kaleidoscope Hex Soft"
   },
   "preset_bank": {
     "absent_edge_fallback": {

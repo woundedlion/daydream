@@ -54,12 +54,12 @@ const SOURCE = withoutComments(
 const WASM_INIT = 'createModuleLoadHandlers(';
 const FRAME_GUARD = 'createFrameLoopGuard(';
 
-test('Curl Facets is offered at both simulator resolutions', () => {
+test('Ash Cloud is offered at both simulator resolutions', () => {
   for (const roster of ['HiResFavorites', 'LoResFavorites']) {
     const at = SOURCE.indexOf(`const ${roster} = [`);
     assert.ok(at >= 0, `daydream.js must still define ${roster}`);
-    assert.match(sliceTo(at, '\n];'), /"CurlFacets"/,
-      `${roster} must offer CurlFacets`);
+    assert.match(sliceTo(at, '\n];'), /"AshCloud"/,
+      `${roster} must offer AshCloud`);
   }
 });
 

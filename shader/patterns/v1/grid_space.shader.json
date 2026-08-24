@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "catalog_version": 1,
-  "document_id": "facet-wave-v1",
-  "effect_id": "facet-wave",
+  "document_id": "grid-space-v1",
+  "effect_id": "grid-space",
   "descriptor": {
     "graph": {
       "nodes": [
@@ -20,7 +20,7 @@
           "operator": "pullback.surface_project.v1",
           "policy": {
             "pre_lens_surface": "identity",
-            "lens": "dodecahedral-kaleidoscope",
+            "lens": "identity",
             "post_lens_surface": "identity",
             "projection": "gnomonic-folded"
           }
@@ -31,8 +31,8 @@
           "operator": "pullback.planar_warp.v1",
           "policy": {
             "sequence": [
-              "wave-shear",
-              "mirror-tile"
+              "affine-frame",
+              "identity"
             ]
           }
         },
@@ -41,7 +41,7 @@
           "role": "source",
           "operator": "pullback.source.v1",
           "policy": {
-            "source": "grid"
+            "source": "primitive-lattice"
           }
         },
         {
@@ -50,8 +50,8 @@
           "operator": "pullback.material.v1",
           "policy": {
             "weight": "projection",
-            "transfer": "linear",
-            "coverage": "projection-squared"
+            "transfer": "iso-contour",
+            "coverage": "projection"
           }
         },
         {
@@ -94,53 +94,23 @@
     },
     "parameters": [
       {
-        "id": "pattern-freq",
-        "binding": "pattern.freq",
+        "id": "lattice-cell-scale",
+        "binding": "lattice.cell.scale",
         "classification": "preset",
         "storage": "binary32",
         "unit": "ratio",
         "domain": {
-          "minimum": 0.1,
-          "maximum": 64
+          "minimum": 0.015625,
+          "maximum": 8
         },
         "interpolation": {
-          "kind": "LINEAR"
+          "kind": "LOG_POSITIVE"
         },
         "default": 1
       },
       {
-        "id": "speed",
-        "binding": "speed",
-        "classification": "preset",
-        "storage": "binary32",
-        "unit": "turn-per-frame",
-        "domain": {
-          "minimum": 0,
-          "maximum": 0.5
-        },
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "default": 0
-      },
-      {
-        "id": "complexity",
-        "binding": "complexity",
-        "classification": "preset",
-        "storage": "binary32",
-        "unit": "ratio",
-        "domain": {
-          "minimum": 0,
-          "maximum": 3
-        },
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "default": 0
-      },
-      {
-        "id": "pattern-mix",
-        "binding": "pattern.mix",
+        "id": "lattice-shape",
+        "binding": "lattice.shape",
         "classification": "preset",
         "storage": "binary32",
         "unit": "ratio",
@@ -154,34 +124,34 @@
         "default": 0
       },
       {
-        "id": "drift",
-        "binding": "drift",
+        "id": "lattice-softness",
+        "binding": "lattice.softness",
         "classification": "preset",
         "storage": "binary32",
         "unit": "ratio",
         "domain": {
-          "minimum": 0,
-          "maximum": 1.25
+          "minimum": 0.0009765625,
+          "maximum": 1
         },
         "interpolation": {
-          "kind": "LINEAR"
+          "kind": "LOG_POSITIVE"
         },
-        "default": 0
+        "default": 0.05
       },
       {
-        "id": "source-angle-speed",
-        "binding": "source.angle.speed",
+        "id": "lattice-radius",
+        "binding": "lattice.radius",
         "classification": "preset",
         "storage": "binary32",
-        "unit": "turn-per-frame",
+        "unit": "ratio",
         "domain": {
-          "minimum": 0,
-          "maximum": 0.05000000074505806
+          "minimum": 0.015625,
+          "maximum": 0.49
         },
         "interpolation": {
-          "kind": "LINEAR"
+          "kind": "LOG_POSITIVE"
         },
-        "default": 0
+        "default": 0.25
       },
       {
         "id": "pole-fade",
@@ -229,38 +199,8 @@
         "default": 0
       },
       {
-        "id": "outer-strength",
-        "binding": "outer.strength",
-        "classification": "preset",
-        "storage": "binary32",
-        "unit": "ratio",
-        "domain": {
-          "minimum": -30,
-          "maximum": 30
-        },
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "default": 0
-      },
-      {
-        "id": "outer-frequency",
-        "binding": "outer.frequency",
-        "classification": "preset",
-        "storage": "binary32",
-        "unit": "ratio",
-        "domain": {
-          "minimum": 0.01,
-          "maximum": 32
-        },
-        "interpolation": {
-          "kind": "LOG_POSITIVE"
-        },
-        "default": 1
-      },
-      {
-        "id": "outer-field-angle",
-        "binding": "outer.field.angle",
+        "id": "outer-rotation-rate",
+        "binding": "outer.rotation.rate",
         "classification": "preset",
         "storage": "binary32",
         "unit": "radian",
@@ -269,20 +209,19 @@
           "maximum": 6.2831854820251465
         },
         "interpolation": {
-          "kind": "SHORTEST_PERIODIC",
-          "period": 6.2831854820251465
+          "kind": "LINEAR"
         },
         "default": 0
       },
       {
-        "id": "inner-speed",
-        "binding": "inner.speed",
+        "id": "outer-translation-x",
+        "binding": "outer.translation.x",
         "classification": "preset",
         "storage": "binary32",
-        "unit": "turn-per-frame",
+        "unit": "ratio",
         "domain": {
-          "minimum": -0.02,
-          "maximum": 0.02
+          "minimum": -4,
+          "maximum": 4
         },
         "interpolation": {
           "kind": "LINEAR"
@@ -290,30 +229,29 @@
         "default": 0
       },
       {
-        "id": "inner-rotation",
-        "binding": "inner.rotation",
+        "id": "outer-translation-y",
+        "binding": "outer.translation.y",
         "classification": "preset",
         "storage": "binary32",
-        "unit": "radian",
+        "unit": "ratio",
         "domain": {
-          "minimum": -6.2831854820251465,
-          "maximum": 6.2831854820251465
+          "minimum": -4,
+          "maximum": 4
         },
         "interpolation": {
-          "kind": "SHORTEST_PERIODIC",
-          "period": 6.2831854820251465
+          "kind": "LINEAR"
         },
         "default": 0
       },
       {
-        "id": "inner-cell-x",
-        "binding": "inner.cell.x",
+        "id": "outer-scale-x",
+        "binding": "outer.scale.x",
         "classification": "preset",
         "storage": "binary32",
         "unit": "ratio",
         "domain": {
           "minimum": 0.015625,
-          "maximum": 8
+          "maximum": 64
         },
         "interpolation": {
           "kind": "LOG_POSITIVE"
@@ -321,14 +259,14 @@
         "default": 1
       },
       {
-        "id": "inner-cell-y",
-        "binding": "inner.cell.y",
+        "id": "outer-scale-y",
+        "binding": "outer.scale.y",
         "classification": "preset",
         "storage": "binary32",
         "unit": "ratio",
         "domain": {
           "minimum": 0.015625,
-          "maximum": 8
+          "maximum": 64
         },
         "interpolation": {
           "kind": "LOG_POSITIVE"
@@ -336,14 +274,14 @@
         "default": 1
       },
       {
-        "id": "inner-offset-x",
-        "binding": "inner.offset.x",
+        "id": "outer-shear",
+        "binding": "outer.shear",
         "classification": "preset",
         "storage": "binary32",
         "unit": "ratio",
         "domain": {
-          "minimum": -8,
-          "maximum": 8
+          "minimum": -4,
+          "maximum": 4
         },
         "interpolation": {
           "kind": "LINEAR"
@@ -351,19 +289,34 @@
         "default": 0
       },
       {
-        "id": "inner-offset-y",
-        "binding": "inner.offset.y",
+        "id": "iso-level",
+        "binding": "iso.level",
         "classification": "preset",
         "storage": "binary32",
         "unit": "ratio",
         "domain": {
-          "minimum": -8,
-          "maximum": 8
+          "minimum": 0,
+          "maximum": 1
         },
         "interpolation": {
           "kind": "LINEAR"
         },
-        "default": 0
+        "default": 0.5
+      },
+      {
+        "id": "iso-width",
+        "binding": "iso.width",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0.0009765625,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0.05
       },
       {
         "id": "palette-chroma",
@@ -505,6 +458,36 @@
         "default": 0
       },
       {
+        "id": "projection-spin-speed",
+        "binding": "projection.spin.speed",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "turn-per-frame",
+        "domain": {
+          "minimum": 0,
+          "maximum": 0.05
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "projection-wander",
+        "binding": "projection.wander",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
         "id": "hue-noise-scale",
         "binding": "hue.noise.scale",
         "classification": "preset",
@@ -590,24 +573,21 @@
     "serialization": {
       "schema_version": 1,
       "fields": [
-        "pattern-freq",
-        "speed",
-        "complexity",
-        "pattern-mix",
-        "drift",
-        "source-angle-speed",
+        "lattice-cell-scale",
+        "lattice-shape",
+        "lattice-softness",
+        "lattice-radius",
         "pole-fade",
         "camera-wander",
         "outer-speed",
-        "outer-strength",
-        "outer-frequency",
-        "outer-field-angle",
-        "inner-speed",
-        "inner-rotation",
-        "inner-cell-x",
-        "inner-cell-y",
-        "inner-offset-x",
-        "inner-offset-y",
+        "outer-rotation-rate",
+        "outer-translation-x",
+        "outer-translation-y",
+        "outer-scale-x",
+        "outer-scale-y",
+        "outer-shear",
+        "iso-level",
+        "iso-width",
         "palette-chroma",
         "palette-mapping",
         "mapping-frequency",
@@ -617,6 +597,8 @@
         "value-opacity-low",
         "value-opacity-high",
         "hue-shift-amount",
+        "projection-spin-speed",
+        "projection-wander",
         "hue-noise-scale",
         "hue-noise-speed"
       ]
@@ -638,28 +620,25 @@
     "schema_version": 1,
     "presets": [
       {
-        "preset_id": "wave-mirror",
-        "display_name": "Wave Mirror",
+        "preset_id": "affine-contour",
+        "display_name": "Affine Contour",
         "values": {
-          "pattern-freq": 6.3287,
-          "speed": 0.04,
-          "complexity": 1.704,
-          "pattern-mix": 0,
-          "drift": 0.8,
-          "source-angle-speed": 0.027,
-          "pole-fade": 2.311,
+          "lattice-cell-scale": 1.22925,
+          "lattice-shape": 1,
+          "lattice-softness": 0.1608203,
+          "lattice-radius": 0.332981884,
+          "pole-fade": 1,
           "camera-wander": 1,
-          "outer-speed": -0.00325,
-          "outer-strength": -0.176,
-          "outer-frequency": 1.408,
-          "outer-field-angle": 2.2305307,
-          "inner-speed": 0,
-          "inner-rotation": 0,
-          "inner-cell-x": 1,
-          "inner-cell-y": 1,
-          "inner-offset-x": 0,
-          "inner-offset-y": 0,
-          "palette-chroma": 1,
+          "outer-speed": 0.015625,
+          "outer-rotation-rate": 0,
+          "outer-translation-x": 4,
+          "outer-translation-y": 4,
+          "outer-scale-x": 1,
+          "outer-scale-y": 1,
+          "outer-shear": 0,
+          "iso-level": 0.138,
+          "iso-width": 0.227034181,
+          "palette-chroma": 0.62,
           "palette-mapping": "linear",
           "mapping-frequency": 1,
           "mapping-phase": 0,
@@ -667,63 +646,15 @@
           "phase-oscillation-speed": 0,
           "value-opacity-low": 1,
           "value-opacity-high": 1,
-          "hue-shift-amount": 0.721,
-          "hue-noise-scale": 1,
-          "hue-noise-speed": 0
-        }
-      },
-      {
-        "preset_id": "cup-hue",
-        "display_name": "Cup Hue",
-        "values": {
-          "pattern-freq": 6.3287,
-          "speed": 0.04,
-          "complexity": 1.704,
-          "pattern-mix": 0,
-          "drift": 0.8,
-          "source-angle-speed": 0.027,
-          "pole-fade": 2.311,
-          "camera-wander": 1,
-          "outer-speed": -0.00325,
-          "outer-strength": -0.176,
-          "outer-frequency": 1.408,
-          "outer-field-angle": 2.2305307,
-          "inner-speed": 0,
-          "inner-rotation": 0,
-          "inner-cell-x": 1,
-          "inner-cell-y": 1,
-          "inner-offset-x": 0,
-          "inner-offset-y": 0,
-          "palette-chroma": 1,
-          "palette-mapping": "cup",
-          "mapping-frequency": 1,
-          "mapping-phase": 0,
-          "phase-oscillation-depth": 0,
-          "phase-oscillation-speed": 0,
-          "value-opacity-low": 1,
-          "value-opacity-high": 1,
-          "hue-shift-amount": 1,
-          "hue-noise-scale": 1.9717969,
-          "hue-noise-speed": 0
+          "hue-shift-amount": 0.398,
+          "projection-spin-speed": 0.0208791979,
+          "projection-wander": 0.00309175253,
+          "hue-noise-scale": 0.8300313,
+          "hue-noise-speed": 0.000212000014
         }
       }
     ],
-    "edges": [
-      {
-        "from": "wave-mirror",
-        "to": "cup-hue",
-        "path_policy": "parallel",
-        "easing": "EASE_IN_OUT_SIN",
-        "duration": 480
-      },
-      {
-        "from": "cup-hue",
-        "to": "wave-mirror",
-        "path_policy": "parallel",
-        "easing": "EASE_IN_OUT_SIN",
-        "duration": 480
-      }
-    ],
+    "edges": [],
     "absent_edge_fallback": {
       "manual": "SNAP",
       "automatic": "REJECT",
@@ -733,17 +664,15 @@
     },
     "choreography": {
       "generated_order": [
-        "wave-mirror",
-        "cup-hue"
+        "affine-contour"
       ],
       "dwell": {
-        "wave-mirror": 600,
-        "cup-hue": 600
+        "affine-contour": 600
       }
     }
   },
   "effect_metadata": {
-    "display_name": "Facet Wave",
-    "description": "A wave-sheared grid moving across dodecahedral facets."
+    "display_name": "Grid Space",
+    "description": "An affine primitive lattice rendered as soft contours."
   }
 }

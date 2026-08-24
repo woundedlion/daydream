@@ -111,19 +111,19 @@ Building the WASM target in Holosphere installs `holosphere_wasm.js`, `holospher
      - [PetalFlow](#petalflow)
      - [DreamBalls](#dreamballs)
      - [Comets](#comets)
-     - [SignalWeave](#signalweave)
-     - [KaleidoWave](#kaleidowave)
+     - [AlienBrain](#alienbrain)
+     - [KaleidoscopeHexSoft](#kaleidoscopehexsoft)
      - [AlienOcean](#alienocean)
-     - [GlitchGrid](#glitchgrid)
-     - [FacetWave](#facetwave)
-     - [ContourLattice](#contourlattice)
-     - [CurlLattice](#curllattice)
-     - [PrismLattice](#prismlattice)
-     - [PrismSpiral](#prismspiral)
-     - [VectorFacets](#vectorfacets)
-     - [FacetGrid](#facetgrid)
-     - [HexWave](#hexwave)
-     - [EquatorGrid](#equatorgrid)
+     - [AlienCore](#aliencore)
+     - [KaleidoscopeMandala](#kaleidoscopemandala)
+     - [GridSpace](#gridspace)
+     - [LatticeMelt](#latticemelt)
+     - [KaleidoscopePentBright](#kaleidoscopepentbright)
+     - [KaleidoscopeHexOil](#kaleidoscopehexoil)
+     - [KaleidoscopeStainedGlass](#kaleidoscopestainedglass)
+     - [KaleidoscopeSmooth](#kaleidoscopesmooth)
+     - [KaleidoscopeHexBright](#kaleidoscopehexbright)
+     - [KaleidoscopeFlowers](#kaleidoscopeflowers)
      - [CosmicEyeball](#cosmiceyeball)
      - [MobiusGrid](#mobiusgrid)
      - [RingSpin](#ringspin)
@@ -2264,10 +2264,10 @@ A single head traces spherical Lissajous curves, cycling through a dozen configu
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=SignalWeave" target="_blank"><img src="docs/screenshots/SignalWeave.png" alt="SignalWeave" width="280"></a></td>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=AlienBrain" target="_blank"><img src="docs/screenshots/AlienBrain.png" alt="AlienBrain" width="280"></a></td>
 <td valign="top">
 
-#### SignalWeave
+#### AlienBrain
 
 Glitch-folded stereographic grids pulled through an animated wave shear. Four presets morph the grid frequency, complexity, shear strength, and speed inside one composed pipeline.
 
@@ -2276,10 +2276,10 @@ Glitch-folded stereographic grids pulled through an animated wave shear. Four pr
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=KaleidoWave" target="_blank"><img src="docs/screenshots/KaleidoWave.png" alt="KaleidoWave" width="280"></a></td>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=KaleidoscopeHexSoft" target="_blank"><img src="docs/screenshots/KaleidoscopeHexSoft.png" alt="KaleidoscopeHexSoft" width="280"></a></td>
 <td valign="top">
 
-#### KaleidoWave
+#### KaleidoscopeHexSoft
 
 A drifting twin-wave field reflected through a spherical kaleidoscope, projected stereographically, and repeated by an inner mirror tile.
 
@@ -2300,10 +2300,10 @@ A broad folded gnomonic grid drifting inside a fixed mirror frame and a spherica
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=GlitchGrid" target="_blank"><img src="docs/screenshots/GlitchGrid.png" alt="GlitchGrid" width="280"></a></td>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=AlienCore" target="_blank"><img src="docs/screenshots/AlienCore.png" alt="AlienCore" width="280"></a></td>
 <td valign="top">
 
-#### GlitchGrid
+#### AlienCore
 
 A mirrored grid folded by the glitch lens and a folded gnomonic projection. Its high-contrast edge-fade material keeps the discontinuous facets legible while the grid drifts inside a fixed mirror frame.
 
@@ -2312,10 +2312,10 @@ A mirrored grid folded by the glitch lens and a folded gnomonic projection. Its 
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=FacetWave" target="_blank"><img src="docs/screenshots/FacetWave.png" alt="FacetWave" width="280"></a></td>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=KaleidoscopeMandala" target="_blank"><img src="docs/screenshots/KaleidoscopeMandala.png" alt="KaleidoscopeMandala" width="280"></a></td>
 <td valign="top">
 
-#### FacetWave
+#### KaleidoscopeMandala
 
 A wave-sheared grid moving across a folded gnomonic dodecahedral kaleidoscope, then repeated through an inner mirror tile.
 
@@ -2324,10 +2324,10 @@ A wave-sheared grid moving across a folded gnomonic dodecahedral kaleidoscope, t
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=ContourLattice" target="_blank"><img src="docs/screenshots/ContourLattice.png" alt="ContourLattice" width="280"></a></td>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=GridSpace" target="_blank"><img src="docs/screenshots/GridSpace.png" alt="GridSpace" width="280"></a></td>
 <td valign="top">
 
-#### ContourLattice
+#### GridSpace
 
 An affine primitive lattice rendered as soft iso contours through a folded gnomonic projection. The affine frame scrolls the lattice by whole cell windings, so its drift repeats without a visible seam.
 
@@ -2336,10 +2336,10 @@ An affine primitive lattice rendered as soft iso contours through a folded gnomo
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=CurlLattice" target="_blank"><img src="docs/screenshots/CurlLattice.png" alt="CurlLattice" width="280"></a></td>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=LatticeMelt" target="_blank"><img src="docs/screenshots/LatticeMelt.png" alt="LatticeMelt" width="280"></a></td>
 <td valign="top">
 
-#### CurlLattice
+#### LatticeMelt
 
 A folded-sinusoidal sphere projection displaced by curl noise and shaded with a generated triadic palette. Its two presets share one composed pipeline and vary only the surface-noise scale.
 
@@ -2348,10 +2348,10 @@ A folded-sinusoidal sphere projection displaced by curl noise and shaded with a 
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=PrismLattice" target="_blank"><img src="docs/screenshots/PrismLattice.png" alt="PrismLattice" width="280"></a></td>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=KaleidoscopePentBright" target="_blank"><img src="docs/screenshots/KaleidoscopePentBright.png" alt="KaleidoscopePentBright" width="280"></a></td>
 <td valign="top">
 
-#### PrismLattice
+#### KaleidoscopePentBright
 
 A polar primitive lattice folded through a pentagonal-prism kaleidoscope and projected stereographically, its polar chart winding the angular phase one turn per cycle.
 
@@ -2360,10 +2360,10 @@ A polar primitive lattice folded through a pentagonal-prism kaleidoscope and pro
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=PrismSpiral" target="_blank"><img src="docs/screenshots/PrismSpiral.png" alt="PrismSpiral" width="280"></a></td>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=KaleidoscopeHexOil" target="_blank"><img src="docs/screenshots/KaleidoscopeHexOil.png" alt="KaleidoscopeHexOil" width="280"></a></td>
 <td valign="top">
 
-#### PrismSpiral
+#### KaleidoscopeHexOil
 
 A rotating spiral folded through a hexagonal-prism kaleidoscope, projected stereographically, and displaced by direct surface noise whose path length drives the hue rotation.
 
@@ -2372,10 +2372,10 @@ A rotating spiral folded through a hexagonal-prism kaleidoscope, projected stere
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=VectorFacets" target="_blank"><img src="docs/screenshots/VectorFacets.png" alt="VectorFacets" width="280"></a></td>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=KaleidoscopeStainedGlass" target="_blank"><img src="docs/screenshots/KaleidoscopeStainedGlass.png" alt="KaleidoscopeStainedGlass" width="280"></a></td>
 <td valign="top">
 
-#### VectorFacets
+#### KaleidoscopeStainedGlass
 
 A vector-noise grid refracted across folded gnomonic dodecahedral facets and repeated through an inner mirror tile. A cup-shaped palette envelope emphasizes the warped cell interiors.
 
@@ -2384,10 +2384,10 @@ A vector-noise grid refracted across folded gnomonic dodecahedral facets and rep
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=FacetGrid" target="_blank"><img src="docs/screenshots/FacetGrid.png" alt="FacetGrid" width="280"></a></td>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=KaleidoscopeSmooth" target="_blank"><img src="docs/screenshots/KaleidoscopeSmooth.png" alt="KaleidoscopeSmooth" width="280"></a></td>
 <td valign="top">
 
-#### FacetGrid
+#### KaleidoscopeSmooth
 
 A generated analogous-palette grid folded through a dodecahedral kaleidoscope, then projected stereographically and repeated by an inner mirror tile. Its four presets share one composed pipeline and vary only continuous parameters.
 
@@ -2396,10 +2396,10 @@ A generated analogous-palette grid folded through a dodecahedral kaleidoscope, t
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=HexWave" target="_blank"><img src="docs/screenshots/HexWave.png" alt="HexWave" width="280"></a></td>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=KaleidoscopeHexBright" target="_blank"><img src="docs/screenshots/KaleidoscopeHexBright.png" alt="KaleidoscopeHexBright" width="280"></a></td>
 <td valign="top">
 
-#### HexWave
+#### KaleidoscopeHexBright
 
 A mirrored twin-wave field folded through a hexagonal-prism kaleidoscope and projected stereographically, with an analogous generated palette.
 
@@ -2408,10 +2408,10 @@ A mirrored twin-wave field folded through a hexagonal-prism kaleidoscope and pro
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=EquatorGrid" target="_blank"><img src="docs/screenshots/EquatorGrid.png" alt="EquatorGrid" width="280"></a></td>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=KaleidoscopeFlowers" target="_blank"><img src="docs/screenshots/KaleidoscopeFlowers.png" alt="KaleidoscopeFlowers" width="280"></a></td>
 <td valign="top">
 
-#### EquatorGrid
+#### KaleidoscopeFlowers
 
 Dodecahedrally folded grids mapped continuously around an equirectangular equator and repeated through an inner mirror tile. Three presets morph density, coupling, and color mapping without changing structure.
 
@@ -2622,25 +2622,25 @@ Two stages carry approved approximations. Fast square Peirce projection and the 
 
 | Effect ID | Concrete effect | Presets | Legacy source |
 |---|---|---:|---|
-| `signal-weave` | `SignalWeave` | 4 | 0, 21–23 |
-| `kaleido-wave` | `KaleidoWave` | 1 | 1 |
+| `alien-brain` | `AlienBrain` | 4 | 0, 21–23 |
+| `kaleidoscope-hex-soft` | `KaleidoscopeHexSoft` | 1 | 1 |
 | `alien-ocean` | `AlienOcean` | 1 | 2 |
-| `glitch-grid` | `GlitchGrid` | 1 | 3 |
-| `facet-wave` | `FacetWave` | 2 | 5, plus `cup-hue` |
-| `contour-lattice` | `ContourLattice` | 1 | 6 |
-| `curl-lattice` | `CurlLattice` | 2 | 7–8 |
-| `prism-lattice` | `PrismLattice` | 1 | 9 |
-| `prism-spiral` | `PrismSpiral` | 2 | — |
-| `vector-facets` | `VectorFacets` | 1 | 10 |
-| `facet-grid` | `FacetGrid` | 4 | 11, 13–14, plus `stretched-grid` |
-| `hex-wave` | `HexWave` | 2 | 12 |
-| `equator-grid` | `EquatorGrid` | 3 | 15–17 |
+| `alien-core` | `AlienCore` | 1 | 3 |
+| `kaleidoscope-mandala` | `KaleidoscopeMandala` | 2 | 5, plus `cup-hue` |
+| `grid-space` | `GridSpace` | 1 | 6 |
+| `lattice-melt` | `LatticeMelt` | 2 | 7–8 |
+| `kaleidoscope-pent-bright` | `KaleidoscopePentBright` | 1 | 9 |
+| `kaleidoscope-hex-oil` | `KaleidoscopeHexOil` | 2 | — |
+| `kaleidoscope-stained-glass` | `KaleidoscopeStainedGlass` | 1 | 10 |
+| `kaleidoscope-smooth` | `KaleidoscopeSmooth` | 4 | 11, 13–14, plus `stretched-grid` |
+| `kaleidoscope-hex-bright` | `KaleidoscopeHexBright` | 2 | 12 |
+| `kaleidoscope-flowers` | `KaleidoscopeFlowers` | 3 | 15–17 |
 | `cosmic-eyeball` | `CosmicEyeball` | 1 | 18 |
 | `mobius-grid` | `MobiusGrid` | 2 | 19–20 |
 
-These sixteen effects form the product-only `shader-collection` group; family metadata is not part of runtime identity. Each effect's show window is derived from its preset count, giving every preset the shared 600-frame dwell and every transition the shared 480-frame segue. Prism Spiral joined after the ShaderWorkbench migration from a workbench-authored snapshot, so it carries no legacy preset index. Host tests pair each preset that carries a legacy source index with Shader's dynamic evaluator and require the two to agree to within one 16-bit count; Curl Lattice and Facet Grid run theirs in dedicated white-box equivalence suites. The presets authored after the migration have no legacy configuration to pair with, so nothing holds them against the evaluator: Prism Spiral's two, Facet Grid's `stretched-grid`, Hex Wave's `hex-twin-wave-alt`, and Facet Wave's `cup-hue`.
+These sixteen effects form the product-only `shader-collection` group; family metadata is not part of runtime identity. Each effect's show window is derived from its preset count, giving every preset the shared 600-frame dwell and every transition the shared 480-frame segue. Kaleidoscope Hex Oil joined after the ShaderWorkbench migration from a workbench-authored snapshot, so it carries no legacy preset index. Host tests pair each preset that carries a legacy source index with Shader's dynamic evaluator and require the two to agree to within one 16-bit count; Lattice Melt and Kaleidoscope Smooth run theirs in dedicated white-box equivalence suites. The presets authored after the migration have no legacy configuration to pair with, so nothing holds them against the evaluator: Kaleidoscope Hex Oil's two, Kaleidoscope Smooth's `stretched-grid`, Kaleidoscope Hex Bright's `hex-twin-wave-alt`, and Kaleidoscope Mandala's `cup-hue`.
 
-The [shipping device captures](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md) report zero spilled frames for the fourteen effects promoted at capture time, with peaks from 23.30 ms for GlitchGrid to 47.20 ms for VectorFacets; Prism Spiral has no device capture yet. The composed effects let the compiler inline the exact typed pipeline and discard every unused stage. The shared runtime and `GenerativePalette` color stage keep common lifecycle and palette machinery from being duplicated without introducing type erasure in the per-pixel call. No paired capture currently isolates specialization from the other structural differences, so the archive does not claim a dispatch-only speedup.
+The [shipping device captures](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md) report zero spilled frames for the fourteen effects promoted at capture time, with peaks from 23.30 ms for AlienCore to 47.20 ms for KaleidoscopeStainedGlass; Kaleidoscope Hex Oil has no device capture yet. The composed effects let the compiler inline the exact typed pipeline and discard every unused stage. The shared runtime and `GenerativePalette` color stage keep common lifecycle and palette machinery from being duplicated without introducing type erasure in the per-pixel call. No paired capture currently isolates specialization from the other structural differences, so the archive does not claim a dispatch-only speedup.
 
 #### Authoring vocabulary
 

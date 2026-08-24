@@ -90,22 +90,22 @@ shader/engine_catalog.json
 shader/patterns/shaderball_migration.json
 shader/patterns/digest_migration.v1v2.json
 shader/patterns/alien_ocean.shader.json
-shader/patterns/contour_lattice.shader.json
+shader/patterns/grid_space.shader.json
 shader/patterns/cosmic_eyeball.shader.json
-shader/patterns/curl_facets.shader.json
-shader/patterns/curl_lattice.shader.json
-shader/patterns/equator_grid.shader.json
+shader/patterns/ash_cloud.shader.json
+shader/patterns/lattice_melt.shader.json
+shader/patterns/kaleidoscope_flowers.shader.json
 shader/patterns/example.shader.json
-shader/patterns/facet_grid.shader.json
-shader/patterns/facet_wave.shader.json
-shader/patterns/glitch_grid.shader.json
-shader/patterns/hex_wave.shader.json
-shader/patterns/kaleido_wave.shader.json
+shader/patterns/kaleidoscope_smooth.shader.json
+shader/patterns/kaleidoscope_mandala.shader.json
+shader/patterns/alien_core.shader.json
+shader/patterns/kaleidoscope_hex_bright.shader.json
+shader/patterns/kaleidoscope_hex_soft.shader.json
 shader/patterns/mobius_grid.shader.json
-shader/patterns/prism_lattice.shader.json
-shader/patterns/prism_spiral.shader.json
-shader/patterns/signal_weave.shader.json
-shader/patterns/vector_facets.shader.json
+shader/patterns/kaleidoscope_pent_bright.shader.json
+shader/patterns/kaleidoscope_hex_oil.shader.json
+shader/patterns/alien_brain.shader.json
+shader/patterns/kaleidoscope_stained_glass.shader.json
 
 # Documentation the deploy gate pins to the engine checkout.
 README.md

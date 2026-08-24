@@ -12,7 +12,11 @@
       },
       {
         "label": "project",
-        "operator": "project.stereographic.v2"
+        "operator": "project.gnomonic.v2"
+      },
+      {
+        "label": "warp1",
+        "operator": "warp.vector-noise.v2"
       },
       {
         "label": "warp2",
@@ -20,7 +24,7 @@
       },
       {
         "label": "sample",
-        "operator": "sample.twin-wave.v2"
+        "operator": "sample.grid.v2"
       },
       {
         "label": "colorize",
@@ -44,7 +48,21 @@
       },
       {
         "classification": "preset",
-        "default": "none",
+        "default": 1,
+        "domain": {
+          "maximum": 1,
+          "minimum": 0
+        },
+        "id": "colorize.brightness-depth",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
+        "default": "cup",
         "domain": {
           "values": [
             "none",
@@ -178,7 +196,7 @@
       },
       {
         "classification": "preset",
-        "default": "analogous",
+        "default": "triadic",
         "domain": {
           "values": [
             "triadic",
@@ -251,7 +269,7 @@
       },
       {
         "classification": "preset",
-        "default": "hexagonal-prism",
+        "default": "dodecahedral",
         "domain": {
           "values": [
             "azimuthal",
@@ -274,31 +292,20 @@
       },
       {
         "classification": "preset",
-        "default": 0,
+        "default": "folded",
         "domain": {
-          "maximum": 0.05000000074505806,
-          "minimum": 0
+          "values": [
+            "folded",
+            "front",
+            "back"
+          ]
         },
-        "id": "project.projection-spin-speed",
+        "id": "project.hemisphere",
         "interpolation": {
-          "kind": "LINEAR"
+          "kind": "MIXED_ENUM"
         },
-        "storage": "binary32",
-        "unit": "turn-per-frame"
-      },
-      {
-        "classification": "preset",
-        "default": 0,
-        "domain": {
-          "maximum": 1,
-          "minimum": 0
-        },
-        "id": "project.projection-wander",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
+        "storage": "enum8",
+        "unit": "mode"
       },
       {
         "classification": "preset",
@@ -327,6 +334,20 @@
         },
         "storage": "binary32",
         "unit": "turn-per-frame"
+      },
+      {
+        "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 3,
+          "minimum": 0
+        },
+        "id": "sample.complexity",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
       },
       {
         "classification": "preset",
@@ -364,10 +385,24 @@
         "classification": "preset",
         "default": 1,
         "domain": {
-          "maximum": 20,
+          "maximum": 64,
           "minimum": 0.10000000149011612
         },
         "id": "sample.pattern-freq",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 1,
+          "minimum": 0
+        },
+        "id": "sample.pattern-mix",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -403,6 +438,80 @@
         },
         "storage": "enum8",
         "unit": "mode"
+      },
+      {
+        "classification": "preset",
+        "default": "simplex",
+        "domain": {
+          "values": [
+            "simplex",
+            "fbm3",
+            "ridged3"
+          ]
+        },
+        "id": "warp1.basis",
+        "interpolation": {
+          "kind": "MIXED_ENUM"
+        },
+        "storage": "enum8",
+        "unit": "mode"
+      },
+      {
+        "classification": "preset",
+        "default": 1,
+        "domain": {
+          "maximum": 30,
+          "minimum": -30
+        },
+        "id": "warp1.scale",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 0.019999999552965164,
+          "minimum": -0.019999999552965164
+        },
+        "id": "warp1.speed",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "turn-per-frame"
+      },
+      {
+        "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 30,
+          "minimum": -30
+        },
+        "id": "warp1.strength",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 6.2831854820251465,
+          "minimum": -6.2831854820251465
+        },
+        "id": "warp1.vector-angle",
+        "interpolation": {
+          "kind": "SHORTEST_PERIODIC",
+          "period": 6.2831854820251465
+        },
+        "storage": "binary32",
+        "unit": "radian"
       },
       {
         "classification": "preset",
@@ -499,6 +608,7 @@
     "serialization": {
       "fields": [
         "camera.wander",
+        "colorize.brightness-depth",
         "colorize.brightness-envelope",
         "colorize.hue-noise-scale",
         "colorize.hue-noise-speed",
@@ -514,15 +624,21 @@
         "colorize.value-opacity-high",
         "colorize.value-opacity-low",
         "lens.symmetry",
-        "project.projection-spin-speed",
-        "project.projection-wander",
+        "project.hemisphere",
         "project.singularity-fade",
         "sample.angle-speed",
+        "sample.complexity",
         "sample.coverage-mode",
         "sample.drift",
         "sample.pattern-freq",
+        "sample.pattern-mix",
         "sample.speed",
         "sample.weight-mode",
+        "warp1.basis",
+        "warp1.scale",
+        "warp1.speed",
+        "warp1.strength",
+        "warp1.vector-angle",
         "warp2.cell-x",
         "warp2.cell-y",
         "warp2.offset-x",
@@ -533,11 +649,11 @@
       "schema_version": 1
     }
   },
-  "document_id": "hex-wave-v1",
-  "effect_id": "hex-wave",
+  "document_id": "kaleidoscope-stained-glass-v1",
+  "effect_id": "kaleidoscope-stained-glass",
   "effect_metadata": {
-    "description": "A twin wave folded through a hexagonal prism.",
-    "display_name": "Hex Wave"
+    "description": "A vector-noise grid refracted across dodecahedral facets.",
+    "display_name": "Kaleidoscope Stained Glass"
   },
   "preset_bank": {
     "absent_edge_fallback": {
@@ -549,103 +665,56 @@
     },
     "choreography": {
       "dwell": {
-        "hex-twin-wave": 600,
-        "hex-twin-wave-alt": 600
+        "vector-mirror": 600
       },
       "generated_order": [
-        "hex-twin-wave",
-        "hex-twin-wave-alt"
+        "vector-mirror"
       ]
     },
-    "edges": [
-      {
-        "duration": 480,
-        "easing": "EASE_IN_OUT_SIN",
-        "from": "hex-twin-wave-alt",
-        "path_policy": "parallel",
-        "to": "hex-twin-wave"
-      },
-      {
-        "duration": 480,
-        "easing": "EASE_IN_OUT_SIN",
-        "from": "hex-twin-wave",
-        "path_policy": "parallel",
-        "to": "hex-twin-wave-alt"
-      }
-    ],
+    "edges": [],
     "presets": [
       {
-        "display_name": "Hex Twin Wave",
-        "preset_id": "hex-twin-wave",
+        "display_name": "Vector Mirror",
+        "preset_id": "vector-mirror",
         "values": {
           "camera.wander": 1,
-          "colorize.brightness-envelope": "none",
-          "colorize.hue-noise-scale": 1.472156286239624,
-          "colorize.hue-noise-speed": 0.00013800000306218863,
-          "colorize.hue-shift-amount": 0.22599999606609344,
+          "colorize.brightness-depth": 0.6549999713897705,
+          "colorize.brightness-envelope": "cup",
+          "colorize.hue-noise-scale": 1,
+          "colorize.hue-noise-speed": 0,
+          "colorize.hue-shift-amount": 0.7210000157356262,
           "colorize.hue-shift-mode": "noise",
-          "colorize.mapping-frequency": 1.340999960899353,
-          "colorize.mapping-phase": -1,
+          "colorize.mapping-frequency": 1,
+          "colorize.mapping-phase": 0,
           "colorize.palette-chroma": 1,
-          "colorize.palette-mapping": "bell",
-          "colorize.palette-mode": "analogous",
+          "colorize.palette-mapping": "cup",
+          "colorize.palette-mode": "triadic",
           "colorize.phase-oscillation-depth": 0,
           "colorize.phase-oscillation-speed": 0,
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
-          "lens.symmetry": "hexagonal-prism",
-          "project.projection-spin-speed": 0,
-          "project.projection-wander": 1,
-          "project.singularity-fade": 4.9710001945495605,
+          "lens.symmetry": "dodecahedral",
+          "project.hemisphere": "folded",
+          "project.singularity-fade": 2.311000108718872,
           "sample.angle-speed": 0.027000000700354576,
+          "sample.complexity": 1.7039999961853027,
           "sample.coverage-mode": "weight-squared",
           "sample.drift": 0.800000011920929,
-          "sample.pattern-freq": 3.88100004196167,
-          "sample.speed": 0.12859822809696198,
+          "sample.pattern-freq": 4.975500106811523,
+          "sample.pattern-mix": 0,
+          "sample.speed": 0.03999999910593033,
           "sample.weight-mode": "projection",
+          "warp1.basis": "simplex",
+          "warp1.scale": 1,
+          "warp1.speed": -0.00004999999873689376,
+          "warp1.strength": 0.1379999965429306,
+          "warp1.vector-angle": 0,
           "warp2.cell-x": 1,
           "warp2.cell-y": 1,
           "warp2.offset-x": 0,
           "warp2.offset-y": 0,
           "warp2.rotation": 0,
-          "warp2.speed": 0
-        }
-      },
-      {
-        "display_name": "Hex Twin Wave Alt",
-        "preset_id": "hex-twin-wave-alt",
-        "values": {
-          "camera.wander": 1,
-          "colorize.brightness-envelope": "none",
-          "colorize.hue-noise-scale": 1.472156286239624,
-          "colorize.hue-noise-speed": 0.00013800000306218863,
-          "colorize.hue-shift-amount": 0.22599999606609344,
-          "colorize.hue-shift-mode": "noise",
-          "colorize.mapping-frequency": 2,
-          "colorize.mapping-phase": -1,
-          "colorize.palette-chroma": 1,
-          "colorize.palette-mapping": "bell",
-          "colorize.palette-mode": "analogous",
-          "colorize.phase-oscillation-depth": 0,
-          "colorize.phase-oscillation-speed": 0,
-          "colorize.value-opacity-high": 1,
-          "colorize.value-opacity-low": 1,
-          "lens.symmetry": "hexagonal-prism",
-          "project.projection-spin-speed": 0,
-          "project.projection-wander": 1,
-          "project.singularity-fade": 4.9710001945495605,
-          "sample.angle-speed": 0.027000000700354576,
-          "sample.coverage-mode": "weight-squared",
-          "sample.drift": 0.800000011920929,
-          "sample.pattern-freq": 3.88100004196167,
-          "sample.speed": 0.12859822809696198,
-          "sample.weight-mode": "projection",
-          "warp2.cell-x": 1,
-          "warp2.cell-y": 1,
-          "warp2.offset-x": 0,
-          "warp2.offset-y": 0,
-          "warp2.rotation": 0,
-          "warp2.speed": 0
+          "warp2.speed": 0.003279999829828739
         }
       }
     ],
