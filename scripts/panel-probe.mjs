@@ -67,9 +67,7 @@ async function probePanel(tab) {
 
   const focusedControl = await tab.$eval(SCROLLER, (scroller) => {
     const bounds = scroller.getBoundingClientRect();
-    const reset = document.querySelector('.effect-action-reset button');
-    const widgets = [...scroller.querySelectorAll('input, select, button')]
-      .filter((node) => node !== reset)
+    const controllers = [...scroller.querySelectorAll('.lil-controller.lil-number')]
       .sort((a, b) => {
         const middle = (bounds.top + bounds.bottom) / 2;
         const aRect = a.getBoundingClientRect();
@@ -77,13 +75,15 @@ async function probePanel(tab) {
         return Math.abs((aRect.top + aRect.bottom) / 2 - middle)
           - Math.abs((bRect.top + bRect.bottom) / 2 - middle);
       });
-    const widget = widgets[0];
-    if (!widget) throw new Error('the panel has no focusable control');
+    const controller = controllers[0];
+    const widget = controller?.querySelector('input');
+    const name = controller?.querySelector('.lil-name')?.textContent?.trim();
+    if (!widget || !name) throw new Error('the panel has no named number input');
     widget.focus();
-    return widget.closest('.controller')?.querySelector('.name')?.textContent?.trim()
-      ?? widget.textContent?.trim() ?? '';
+    return { name, widget: widget.localName, focused: document.activeElement === widget };
   });
-  check(focusedControl.length > 0, `a visible ${focusedControl || 'unnamed'} control holds focus`);
+  check(focusedControl.focused && focusedControl.widget === 'input',
+    `the visible ${focusedControl.name} number input holds focus`);
 
   const before = await tab.$eval(SCROLLER, (node) => {
     window.probedScroller = node;
@@ -101,11 +101,18 @@ async function probePanel(tab) {
     'the rebuilt panel carries the same scrollable extent');
   check(rebuilt.scrollTop === offset,
     `the rebuilt panel keeps the offset it was scrolled to (${rebuilt.scrollTop} of ${offset})`);
-  const restoredControl = await tab.evaluate(() =>
-    document.activeElement?.closest('.controller')?.querySelector('.name')?.textContent?.trim()
-      ?? document.activeElement?.textContent?.trim() ?? '');
-  check(restoredControl === focusedControl,
-    `the rebuilt panel restores focus to ${focusedControl} (${restoredControl || 'none'})`);
+  const restoredControl = await tab.evaluate(() => {
+    const widget = document.activeElement;
+    const controller = widget?.closest('.lil-controller.lil-number');
+    return {
+      name: controller?.querySelector('.lil-name')?.textContent?.trim() ?? '',
+      widget: widget?.localName ?? '',
+    };
+  });
+  check(restoredControl.name === focusedControl.name
+      && restoredControl.widget === focusedControl.widget,
+    `the rebuilt panel restores focus to the ${focusedControl.name} number input `
+      + `(${restoredControl.name || 'none'} ${restoredControl.widget || 'widget'})`);
 
   return failures;
 }
