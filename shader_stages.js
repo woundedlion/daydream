@@ -62,7 +62,8 @@ export const KALEIDOSCOPE_SMOOTH_STAGE_TITLES = new Map([
 export const FIXED_SHADER_MODE_FIELDS = new Map([
   ['Function', ['slots.function', [
     'Twin Wave', 'Rings', 'Spiral', 'Grid', 'Noise Contour (Projected)',
-    'Primitive Lattice', 'Noise Contour (Sphere)',
+    'Primitive Lattice', 'Noise Contour (Sphere)', 'Spherical Rings',
+    'Escape Fractal', 'Tessellation',
   ]]],
   ['Projection', ['slots.projection', [
     'Folded Sinusoidal', 'Stereographic', 'Gnomonic', 'Bonne',

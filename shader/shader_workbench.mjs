@@ -310,7 +310,7 @@ const scalarCurve = (parameter) => {
  * @returns {Map<string, Object>} Chain label -> catalog operator, for the
  *   entries whose operator the catalog knows.
  */
-const validateChain = (chain, catalog, report) => {
+const validateChain = (chain, catalog, report, guard) => {
   array(chain, '$.descriptor.chain');
   const { budgets, rank, operators } = catalog;
   if (chain.length === 0) {
@@ -322,6 +322,7 @@ const validateChain = (chain, catalog, report) => {
       `The chain exceeds the ${budgets.max_chain_ops}-operator budget.`);
 
   const known = new Map();
+  const resolved = new Array(chain.length);
   const labels = new Set();
   const blockBytes = (blocks) =>
     ['param', 'prepared', 'state'].reduce((total, kind) => {
@@ -332,40 +333,43 @@ const validateChain = (chain, catalog, report) => {
   let arenaBytes = 0;
   chain.forEach((entry, index) => {
     const path = `$.descriptor.chain[${index}]`;
-    exactKeys(entry, ['label', 'operator'], ['label', 'operator'], path);
-    label(entry.label, `${path}.label`);
-    id(entry.operator, `${path}.operator`);
-    if (entry.label.length > budgets.max_instance_id_length)
-      report('BUDGET_EXCEEDED', `${path}.label`,
-        `Label "${entry.label}" exceeds ${budgets.max_instance_id_length} characters.`);
-    if (labels.has(entry.label))
-      report('DUPLICATE_LABEL', `${path}.label`, `Duplicate chain label "${entry.label}".`);
-    labels.add(entry.label);
-    const operator = operators.get(entry.operator);
-    if (!operator) {
-      report('UNKNOWN_OPERATOR', `${path}.operator`,
-        `The catalog carries no operator "${entry.operator}".`);
-      return;
-    }
-    known.set(entry.label, operator);
-    arenaBytes += budgets.per_op_overhead_bytes + blockBytes(operator.blocks)
-      + (budgets.per_param_name_bytes ?? 0) * operator.params.length;
+    guard(() => {
+      exactKeys(entry, ['label', 'operator'], ['label', 'operator'], path);
+      label(entry.label, `${path}.label`);
+      id(entry.operator, `${path}.operator`);
+      if (entry.label.length > budgets.max_instance_id_length)
+        report('BUDGET_EXCEEDED', `${path}.label`,
+          `Label "${entry.label}" exceeds ${budgets.max_instance_id_length} characters.`);
+      if (labels.has(entry.label))
+        report('DUPLICATE_LABEL', `${path}.label`, `Duplicate chain label "${entry.label}".`);
+      labels.add(entry.label);
+      const operator = operators.get(entry.operator);
+      if (!operator) {
+        report('UNKNOWN_OPERATOR', `${path}.operator`,
+          `The catalog carries no operator "${entry.operator}".`);
+        return;
+      }
+      resolved[index] = operator;
+      known.set(entry.label, operator);
+      arenaBytes += budgets.per_op_overhead_bytes + blockBytes(operator.blocks)
+        + (budgets.per_param_name_bytes ?? 0) * operator.params.length;
+    });
   });
   if (arenaBytes > budgets.arena_bytes)
     report('BUDGET_EXCEEDED', '$.descriptor.chain',
       `The chain needs ${arenaBytes} arena bytes of the ${budgets.arena_bytes} budget.`);
 
-  const first = operators.get(chain[0].operator);
+  const first = resolved[0];
   if (first && first.input !== 'sphere')
     report('ENTRY_FAMILY', '$.descriptor.chain[0]',
       `A chain enters on the sphere carrier, not "${first.input}".`);
-  const last = operators.get(chain[chain.length - 1].operator);
+  const last = resolved[chain.length - 1];
   if (last && last.output !== 'color')
     report('EXIT_FAMILY', `$.descriptor.chain[${chain.length - 1}]`,
       `A chain exits on the color carrier, not "${last.output}".`);
   for (let index = 0; index + 1 < chain.length; ++index) {
-    const out = operators.get(chain[index].operator);
-    const next = operators.get(chain[index + 1].operator);
+    const out = resolved[index];
+    const next = resolved[index + 1];
     if (!out || !next || next.input === out.output) continue;
     const path = `$.descriptor.chain[${index + 1}]`;
     if (rank.get(next.input) < rank.get(out.output))
@@ -671,7 +675,7 @@ export function validateShaderDocument(document, options = {}) {
   exactKeys(descriptor,
     ['chain', 'parameters', 'path_policies', 'serialization'],
     ['chain', 'parameters', 'path_policies', 'serialization'], '$.descriptor');
-  const chainOperators = validateChain(descriptor.chain, catalog, report);
+  const chainOperators = validateChain(descriptor.chain, catalog, report, guard);
   const parameters = validateParameters(
     descriptor.parameters, limits, catalog.budgets, chainOperators, report, guard);
   const pathPolicies = validatePathPolicies(
