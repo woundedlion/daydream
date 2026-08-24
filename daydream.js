@@ -194,6 +194,19 @@ export function shaderWorkbenchUrl(location, effect = 'Shader') {
 }
 
 /**
+ * Creates the worker-pool spawn callback from live layout and count state.
+ * @param {Object} segments - Segment controller receiving the bounded count.
+ * @param {() => number} requestedCount - Current GUI-requested segment count.
+ * @param {Navigator | {deviceMemory?: number}} nav - Source of the device hint.
+ * @param {() => boolean} isMobile - Current layout state.
+ * @returns {() => void} A callback that creates the bounded pool.
+ */
+export function createSegmentPoolSpawner(segments, requestedCount, nav, isMobile) {
+  return () => segments.create(
+    Math.min(requestedCount(), maxSegmentCount(nav, isMobile())));
+}
+
+/**
  * Builds the simulator: driver, engine host, state, GUI, sidebar, apply
  * pipeline, recording, and the page listeners, then kicks off the WASM load.
  * @param {Object} [dependencies] - Seams the page owns; each defaults to the real one.
@@ -713,8 +726,8 @@ export function start({
     // segMax is the layout the page loaded in; a rotation into the mobile
     // layout lowers what the device can carry, so the pool is bounded by the
     // ceiling as it stands at the spawn, not the one the slider was built on.
-    spawn: () => segments.create(
-      Math.min(segCount, maxSegmentCount(nav, daydream.isMobile))),
+    spawn: createSegmentPoolSpawner(
+      segments, () => segCount, nav, () => daydream.isMobile),
     isActive: () => segments.active,
   });
   // Declared ahead of the fallback, and assigned before its handler is wired: a
