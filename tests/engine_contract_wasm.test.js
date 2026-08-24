@@ -21,6 +21,8 @@ import { isViewLive, refreshPixelView } from '../pixel_view.js';
 import { selectorControlValue } from '../param_sync.js';
 import {
   FIXED_SHADER_MODE_FIELDS, SHADERBALL_STAGE_BOUNDARIES,
+  kaleidoscopeSmoothStageAssignments, latticeMeltStageAssignments,
+  fixedShaderStageAssignments, shaderBallStageAssignments,
 } from '../shader_stages.js';
 
 // The module's stdout, captured rather than dropped: the WASM bridge answers an
@@ -717,6 +719,32 @@ test('shader_stages.js mirrors ShaderBall stage option labels exactly', () => {
     assert.deepEqual(definition.options, labels,
       `shader_stages.js ${field} labels must mirror the ${name} option roster`);
   }
+});
+
+test('live shader rosters assign Singularity Fade to a stage', () => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  const unassigned = [];
+  let checked = 0;
+  for (const effect of Object.keys(engine.getEffectSizes())) {
+    if (engine.setEffect(effect) !== M.EffectSetResult.INSTALLED) continue;
+    const presets = Math.max(1, engine.getPresetCount());
+    for (let preset = 0; preset < presets; ++preset) {
+      if (preset > 0) engine.selectPreset(preset);
+      const definitions = Array.from(engine.getParameterDefinitions());
+      if (!definitions.some((entry) => entry.name === 'Singularity Fade')) continue;
+      ++checked;
+      const assignments = latticeMeltStageAssignments(definitions)
+        ?? kaleidoscopeSmoothStageAssignments(definitions)
+        ?? shaderBallStageAssignments(definitions)
+        ?? fixedShaderStageAssignments(definitions);
+      if (assignments?.get('Singularity Fade') !== 'Projection') {
+        unassigned.push(`${effect} preset ${preset}`);
+      }
+    }
+  }
+  assert.ok(checked > 0, 'the live engine exposes no Singularity Fade parameter');
+  assert.deepEqual(unassigned, [],
+    `Singularity Fade is unassigned for ${unassigned.join(', ')}`);
 });
 
 test('strobeColumns and effect metadata return the shapes daydream consumes', () => {

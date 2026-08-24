@@ -134,7 +134,7 @@ const LATTICE_MELT_STAGE_BY_PARAMETER = new Map([
   ['Surface Noise Speed', 'Surface Noise'],
   ['Projection Spin Speed', 'Projection Frame'],
   ['Projection Wander', 'Projection Frame'],
-  ['Pole Fade', 'Projection'],
+  ['Singularity Fade', 'Projection'],
   ['Central Meridian', 'Projection'],
   ['Lattice Cell Scale', 'Function'],
   ['Lattice Shape', 'Function'],
@@ -156,7 +156,7 @@ const KALEIDOSCOPE_SMOOTH_STAGE_BY_PARAMETER = new Map([
   ['Camera Wander', 'Camera'],
   ['Projection Spin Speed', 'Projection Frame'],
   ['Projection Wander', 'Projection Frame'],
-  ['Pole Fade', 'Projection'],
+  ['Singularity Fade', 'Projection'],
   ['Planar Warp 2 Speed', 'Planar Warp 2'],
   ['Planar Warp 2 Rotation', 'Planar Warp 2'],
   ['Planar Warp 2 Cell X', 'Planar Warp 2'],
@@ -297,7 +297,7 @@ export function fixedShaderStageAssignments(params) {
     if (name === 'Projection Spin Speed' || name === 'Projection Wander') {
       return 'Projection Frame';
     }
-    if (/^(Pole Fade|Central Meridian|Projection |Peirce |Bonne |Gnomonic )/.test(name)) {
+    if (/^(Singularity Fade|Central Meridian|Projection |Peirce |Bonne |Gnomonic )/.test(name)) {
       return 'Projection';
     }
     if (name.startsWith('Planar Warp 1 ')) return 'Planar Warp 1';
