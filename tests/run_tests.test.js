@@ -4,14 +4,16 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expectFailure, fixtureRepo } from './fixture_repo.js';
+import { expectFailure, fixtureRepo, isolatedGitEnv } from './fixture_repo.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = resolve(HERE, '../scripts/run-tests.mjs');
 const PATTERN = 'tests/*.test.js';
 const EXEMPT = 'tests/uncovered-modules.json';
-const env = { ...process.env };
+const env = isolatedGitEnv(process.env);
 delete env.NODE_TEST_CONTEXT;
+
+const trackFixture = () => execFileSync('git', ['add', '-A'], { cwd: root, env });
 
 const buildRoot = () => {
   rmSync(root, { recursive: true, force: true });
@@ -23,17 +25,35 @@ const buildRoot = () => {
     "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport '../lib.mjs';\ntest('works', () => assert.equal(2 + 2, 4));\n",
   );
   writeFileSync(join(root, 'lib.mjs'), 'export const value = 4;\n');
+  execFileSync('git', ['init', '--quiet'], { cwd: root, env });
 };
 const root = fixtureRepo('run-tests-', buildRoot);
-const run = (...args) => String(execFileSync(
-  process.execPath, [SCRIPT, ...args], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] },
-));
-const fail = (...args) => expectFailure(
-  process.execPath, [SCRIPT, ...args], { cwd: root, env },
-);
+const run = (...args) => {
+  trackFixture();
+  return String(execFileSync(
+    process.execPath, [SCRIPT, ...args], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] },
+  ));
+};
+const fail = (...args) => {
+  trackFixture();
+  return expectFailure(process.execPath, [SCRIPT, ...args], { cwd: root, env });
+};
 
 test('a passing suite that loads every source module passes', () => {
   assert.match(run(PATTERN), /source modules were loaded by tests/);
+});
+
+test('an untracked source module is outside the coverage roster', () => {
+  trackFixture();
+  writeFileSync(join(root, 'scratch.mjs'), 'export const scratch = true;\n');
+  assert.match(
+    String(execFileSync(
+      process.execPath,
+      [SCRIPT, PATTERN],
+      { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] },
+    )),
+    /source modules were loaded by tests/,
+  );
 });
 
 test('a failing test fails the run', () => {
