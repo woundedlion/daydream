@@ -13,6 +13,7 @@ const {
   await import('../tools/lissajous_math.js');
 
 const TWO_PI = 2 * Math.PI;
+const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 
 /**
  * Brute-forces the smallest absolute error of any fraction M/N with both terms
@@ -143,7 +144,7 @@ test('snapToRationalRatio: 8/7 closure fits the closed-curve domain', () => {
 
   const start = lissajous(snappedActiveC, 1, phase, 0);
   const end = lissajous(snappedActiveC, 1, phase, closingPeriod);
-  assert.ok(start.distanceTo(end) < 1e-12);
+  assert.ok(distance(start, end) < 1e-12);
 });
 
 /** Verifies an equal active/passive frequency closes after one 2π/passiveC period. */
@@ -206,6 +207,7 @@ test('lissajous: at t=0 returns the expected point (0, 1, 0)', () => {
   assert.equal(p.x, 0);
   assert.equal(p.y, 1);
   assert.equal(p.z, 0);
+  assert.equal(Object.getPrototypeOf(p), Object.prototype);
 });
 
 test('lissajous: non-trivial samples match analytic coordinates', () => {
@@ -274,7 +276,7 @@ test('closingDomain mirrors the engine snap and lands back on the start point', 
   const closed = closingDomain(1.06, 5.909);
   const start = lissajous(1.06, 1.06, 0, 0);
   const end = lissajous(1.06, 1.06, 0, closed);
-  assert.ok(start.distanceTo(end) < 1e-12);
+  assert.ok(distance(start, end) < 1e-12);
 });
 
 /** Verifies the snap is idempotent, so re-exporting a closed domain stays put. */

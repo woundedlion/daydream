@@ -1,12 +1,11 @@
+// @ts-check
 /*
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
 // Pure math from tools/lissajous.html so it can be unit-tested in Node without
-// a DOM. THREE is imported only so lissajous can return a THREE.Vector3.
-
-import * as THREE from 'three';
+// a DOM.
 import { formatFloatCpp } from './cpp_format.js';
 
 const TWO_PI = 2 * Math.PI;
@@ -30,7 +29,7 @@ const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
  * @param {number} m2 - Orbital frequency C₂.
  * @param {number} a - Phase shift A (radians).
  * @param {number} t - Curve parameter.
- * @returns {THREE.Vector3} Point on the unit sphere.
+ * @returns {{x: number, y: number, z: number}} Point on the unit sphere.
  */
 export const lissajous = (m1, m2, a, t) => {
   const phase = a;
@@ -38,7 +37,7 @@ export const lissajous = (m1, m2, a, t) => {
   const y = Math.cos(m2 * t);
   const z = Math.sin(m2 * t) * Math.sin(m1 * t - phase);
   // Already unit-length: sin²(m2·t)(cos²+sin²) + cos²(m2·t) = 1.
-  return new THREE.Vector3(x, y, z);
+  return { x, y, z };
 };
 
 /**
@@ -48,7 +47,7 @@ export const lissajous = (m1, m2, a, t) => {
  * @param {number} value - The ratio to approximate (e.g., C1/C2), may be negative.
  * @param {number} [maxTerm] - Maximum value for both the numerator and the
  *   denominator (the search grid is square: M, N each range over [1, maxTerm]).
- * @param {?function(number): boolean} [accept] - Optional test on the signed
+ * @param {((value: number) => boolean)|null} [accept] - Optional test on the signed
  *   candidate ratio. Candidates it rejects rank behind every accepted one, so a
  *   ratio it admits always wins and an empty admissible set still returns the
  *   closest fraction.
@@ -108,6 +107,7 @@ export const snapToRationalRatio = (activeC, passiveC, maxTerm = MAX_RATIONAL_TE
   }
 
   const targetRatio = activeC / passiveC;
+  /** @type {((ratio: number) => boolean)|null} */
   const inRange = range
     ? (ratio) => passiveC * ratio >= range.min && passiveC * ratio <= range.max
     : null;
