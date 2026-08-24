@@ -74,9 +74,8 @@ const SERVED_PAGES = servedPages().map((page) => ({
 }));
 
 // Each served page's whole script-src, token by token. 'unsafe-inline' covers
-// the import map vendor-importmap.js injects and the inline module block each
-// tool page carries, so the directive bounds where scripts are fetched from
-// rather than what may run inline, and the origin list is the whole of it.
+// the import map vendor-importmap.js injects; the directive bounds where the
+// external controllers are fetched from, and the origin list is the whole of it.
 const SCRIPT_SRC = {
   'tools/lissajous.html': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
   'tools/mobius.html': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
@@ -186,6 +185,17 @@ test('tool pages load no Tailwind CDN code', () => {
       `${name}.html still references the Tailwind CDN`);
     assert.doesNotMatch(src, /vendor\/tailwindcss\.js/,
       `${name}.html still loads a vendored Tailwind build`);
+  }
+});
+
+test('tool page controllers are external modules', () => {
+  for (const name of PAGES) {
+    const src = pageSrc(name);
+    assert.match(src, /<script\b[^>]*\btype="module"[^>]*\bsrc="[^"]+"[^>]*>/,
+      `${name}.html has no external module controller`);
+    assert.doesNotMatch(src,
+      /<script\b(?=[^>]*\btype="module")(?![^>]*\bsrc=)[^>]*>/,
+      `${name}.html keeps its module controller inline`);
   }
 });
 

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const SOLIDS_HTML = readFileSync(new URL('../tools/solids.html', import.meta.url), 'utf8');
+const SOLIDS_PAGE = readFileSync(new URL('../tools/solids_page.js', import.meta.url), 'utf8');
 
 const {
   OP_DEFS,
@@ -1025,7 +1025,7 @@ test('requireMeshResult flushes only for the reason that calls for it', () => {
 });
 
 test('solids validator resolves the module factory after async initialization', async () => {
-  const match = SOLIDS_HTML.match(/\bcreateChainValidator\((.+)\);/);
+  const match = SOLIDS_PAGE.match(/\bcreateChainValidator\((.+)\);/);
   assert.ok(match);
   const instantiate = Function('createChainValidator', 'Mod', `
     let createHolosphereModule = null;
@@ -1042,12 +1042,12 @@ test('solids validator resolves the module factory after async initialization', 
  * is an object and therefore always truthy, so a gate left testing the call's
  * result directly would pass every chain.
  */
-test('solids.html binds every chainIsValid verdict instead of testing it', () => {
-  const calls = [...SOLIDS_HTML.matchAll(/\bchainIsValid\(/g)].length;
+test('the solids page binds every chainIsValid verdict instead of testing it', () => {
+  const calls = [...SOLIDS_PAGE.matchAll(/\bchainIsValid\(/g)].length;
   assert.ok(calls >= 7, `expected the page's gates to call chainIsValid, found ${calls}`);
-  assert.equal([...SOLIDS_HTML.matchAll(/const \w+ = await chainIsValid\(/g)].length, calls,
+  assert.equal([...SOLIDS_PAGE.matchAll(/const \w+ = await chainIsValid\(/g)].length, calls,
     'every call must bind its verdict; an unbound one is truthy and gates nothing');
-  assert.doesNotMatch(SOLIDS_HTML, /!\s*\(?await chainIsValid\(/,
+  assert.doesNotMatch(SOLIDS_PAGE, /!\s*\(?await chainIsValid\(/,
     'a negated call tests the verdict object, not its ok field');
 });
 
@@ -1211,9 +1211,9 @@ test('savedChainShapeError rejects every unrestorable stored shape', () => {
  * check has to sit ahead of the commit, since inside it the validator's
  * spawn-failure path accepts the chain unseen.
  */
-test('solids.html shape-checks a restore before it commits', () => {
-  const restore = SOLIDS_HTML.match(/function restoreSolid\(item\) \{[\s\S]*?\n {4}\}/)?.[0];
-  assert.ok(restore, 'restoreSolid must stay a named function in solids.html');
+test('the solids page shape-checks a restore before it commits', () => {
+  const restore = SOLIDS_PAGE.match(/function restoreSolid\(item\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(restore, 'restoreSolid must stay a named function in the page module');
   const checkAt = restore.indexOf('savedChainShapeError(item.base, item.ops)');
   assert.ok(checkAt > 0, 'restoreSolid must shape-check the stored base and ops');
   assert.ok(checkAt < restore.indexOf('queueCommit('),
@@ -1227,10 +1227,10 @@ test('solids.html shape-checks a restore before it commits', () => {
  * PNG data URL, so an unbounded list reaches the localStorage quota, after
  * which persistSavedSolids can only report that further saves are session-only.
  */
-test('solids.html caps the saved list before it captures a thumbnail', () => {
-  const save = SOLIDS_HTML.match(/function saveSolid\(\) \{[\s\S]*?\n {4}\}/)?.[0];
-  assert.ok(save, 'saveSolid must stay a named function in solids.html');
-  assert.match(SOLIDS_HTML, /const SAVED_SOLIDS_MAX = \d+;/,
+test('the solids page caps the saved list before it captures a thumbnail', () => {
+  const save = SOLIDS_PAGE.match(/function saveSolid\(\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(save, 'saveSolid must stay a named function in the page module');
+  assert.match(SOLIDS_PAGE, /const SAVED_SOLIDS_MAX = \d+;/,
     'the cap must be a named constant, not a literal inside the gate');
   const capAt = save.indexOf('savedSolids.length >= SAVED_SOLIDS_MAX');
   assert.ok(capAt > 0, 'saveSolid must refuse a save once the list is at the cap');

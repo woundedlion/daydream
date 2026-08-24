@@ -66,12 +66,14 @@ tools/flyout.js
 tools/kb_format.js
 tools/lissajous_math.js
 tools/lissajous_page.js
+tools/mobius_page.js
 tools/mobius_transforms.js
 tools/page_lifecycle.js
 tools/palette_canvas.js
 tools/palette_controls.js
 tools/palette_math.js
 tools/palette_wheel.js
+tools/palettes_page.js
 tools/pointer_drag.js
 tools/shared.js
 tools/slider.js
@@ -80,6 +82,7 @@ tools/solid_codegen.js
 tools/solid_op_rows.js
 tools/solid_registry_codegen.js
 tools/solid_render.js
+tools/solids_page.js
 
 # Shader workbench: the document compiler, the operator catalog, and the v2
 # pattern documents the source catalog fetches by name at runtime. Listed file
