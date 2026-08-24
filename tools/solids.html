@@ -449,6 +449,9 @@
         border-top: 1px solid var(--slate-700);
       }
     }
+    .group:focus-visible .op-tooltip {
+      display: block;
+    }
   </style>
   <!-- Linked last: utilities must outrank tools.css and the rules above. -->
   <link rel="stylesheet" href="tailwind.css">
@@ -479,7 +482,7 @@
       </div>
 
       <div class="flex items-center justify-between">
-        <label class="text-xs uppercase font-semibold text-slate-400">Add Operation</label>
+        <h2 class="text-xs uppercase font-semibold text-slate-400">Add Operation</h2>
         <button type="button" id="clearOpsBtn"
           class="text-[0.65rem] text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">Clear
           All</button>
@@ -501,31 +504,35 @@
         <button type="button" data-op="expand" class="btn btn-secondary text-[0.65rem]">Expand</button>
         <button type="button" data-op="hankin" class="btn btn-secondary text-[0.65rem]">Hankin</button>
         <button type="button" data-op="relax" class="btn btn-secondary text-[0.65rem]">Relax</button>
-        <button type="button" data-op="meta" class="btn btn-secondary text-[0.65rem] relative group">
+        <button type="button" data-op="meta" aria-describedby="metaDescription"
+          class="btn btn-secondary text-[0.65rem] relative group">
           Meta
           <span
-            class="absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
+            id="metaDescription" class="op-tooltip absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
             Kis(Ambo(x))
           </span>
         </button>
-        <button type="button" data-op="needle" class="btn btn-secondary text-[0.65rem] relative group">
+        <button type="button" data-op="needle" aria-describedby="needleDescription"
+          class="btn btn-secondary text-[0.65rem] relative group">
           Needle
           <span
-            class="absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
+            id="needleDescription" class="op-tooltip absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
             Kis(Dual(x))
           </span>
         </button>
-        <button type="button" data-op="zip" class="btn btn-secondary text-[0.65rem] relative group">
+        <button type="button" data-op="zip" aria-describedby="zipDescription"
+          class="btn btn-secondary text-[0.65rem] relative group">
           Zip
           <span
-            class="absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
+            id="zipDescription" class="op-tooltip absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
             Dual(Kis(x))
           </span>
         </button>
-        <button type="button" data-op="bevel" class="btn btn-secondary text-[0.65rem] relative group">
+        <button type="button" data-op="bevel" aria-describedby="bevelDescription"
+          class="btn btn-secondary text-[0.65rem] relative group">
           Bevel
           <span
-            class="absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
+            id="bevelDescription" class="op-tooltip absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
             Truncate(Ambo(x), t)
           </span>
         </button>
@@ -578,7 +585,7 @@
     <!-- Visualization Options (kept out of the left sidebar so the op stack
          retains its vertical space on short viewports) -->
     <div class="space-y-2 border-t border-slate-700 pt-4 mt-4 flex-shrink-0">
-      <label class="text-xs uppercase font-semibold text-slate-400">Visualization</label>
+      <h2 class="text-xs uppercase font-semibold text-slate-400">Visualization</h2>
 
       <div class="flex items-center justify-between">
         <label for="toggleRotate" class="text-sm">Auto Rotate</label>
