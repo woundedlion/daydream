@@ -96,7 +96,7 @@
         "default": 1,
         "domain": {
           "maximum": 32,
-          "minimum": 0.009999999776482582
+          "minimum": 1
         },
         "id": "colorize.mapping-frequency",
         "interpolation": {
@@ -186,8 +186,8 @@
         "classification": "preset",
         "default": 0,
         "domain": {
-          "maximum": 0.019999999552965164,
-          "minimum": -0.019999999552965164
+          "maximum": 0.009999999776482582,
+          "minimum": -0.009999999776482582
         },
         "id": "colorize.phase-oscillation-speed",
         "interpolation": {
@@ -431,7 +431,7 @@
         "default": 0,
         "domain": {
           "maximum": 6.2831854820251465,
-          "minimum": -6.2831854820251465
+          "minimum": 0
         },
         "id": "warp1.rotation",
         "interpolation": {

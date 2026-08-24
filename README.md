@@ -474,8 +474,9 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── png_probe.test.mjs      Node unit test for the PNG validator (corrupt/empty fixtures)
 │   ├── check_screenshots.mjs   Asserts docs/screenshots/ matches the effect roster and decodes (CI)
 │   ├── check_profiles.mjs      Asserts shipping profiles match the Phantasm roster (CI)
-│   ├── run_tests.mjs           `npm test`: runs the .test.mjs suite and rejects empty test files
-│   ├── count_assertions.mjs    NODE_OPTIONS shim counting each test file's node:assert calls
+│   ├── run_tests.mjs           `npm test`: runs the .test.mjs suite and rejects empty cases/files
+│   ├── run_tests.test.mjs      Node regression test for the empty-case rejection
+│   ├── count_assertions.mjs    NODE_OPTIONS shim counting node:assert calls and zero-delta cases
 │   └── report_cases.mjs        node:test reporter tallying per-file case counts
 ├── tools/                      Firmware gates, device profiling, and asset bakes
 │   ├── build_pins.py           Shared external-tool version pins for CI and `just`
