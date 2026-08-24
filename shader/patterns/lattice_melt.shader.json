@@ -118,6 +118,7 @@
         "default": "noise",
         "domain": {
           "values": [
+            "none",
             "noise",
             "path-length"
           ]

@@ -94,6 +94,7 @@
         "default": "path-length",
         "domain": {
           "values": [
+            "none",
             "noise",
             "path-length"
           ]
