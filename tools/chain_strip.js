@@ -710,7 +710,7 @@ export function createChainStrip({
         row.setAttribute('title', DEACTIVATED_TITLE);
       } else {
         delete row.dataset.deactivated;
-        row.setAttribute('title', '');
+        row.removeAttribute('title');
       }
     }
   };

@@ -360,6 +360,10 @@ export function fakeElement(tag = 'div', options = {}) {
       else this.attributes[name] = String(value);
     },
     getAttribute(name) { return name in this.attributes ? this.attributes[name] : null; },
+    removeAttribute(name) {
+      if (name === 'class') classes.clear();
+      delete this.attributes[name];
+    },
     append(...nodes) { detach(nodes); reparent(nodes, this); this.childNodes.push(...nodes); },
     appendChild(node) {
       if (!node || typeof node !== 'object') {
