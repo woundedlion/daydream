@@ -1130,16 +1130,29 @@ test('editing a control writes the engine and the worker pool as floats', () => 
   ]);
 });
 
-test('the pause toggle is offered only when a param animates', () => {
+test('the pause toggle is offered for animated params or multiple presets', () => {
   const animated = makeHarness({ params: [SPEED] });
   animated.panel.build();
   assert.equal(animated.gui().ctrl('pause').label, 'Pause Animation');
   assert.equal(animated.panel.active().pauseController, animated.gui().ctrl('pause'));
 
-  const static_ = makeHarness({ params: [{ name: 'Speed', value: 0.1, min: 0, max: 1 }] });
-  static_.panel.build();
-  assert.equal(static_.gui().ctrl('pause'), undefined);
-  assert.equal(static_.panel.active().pauseController, null);
+  const staticNoPresets = makeHarness();
+  staticNoPresets.panel.build();
+  assert.equal(staticNoPresets.gui().ctrl('pause'), undefined);
+  assert.equal(staticNoPresets.panel.active().pauseController, null);
+
+  const staticPresets = makeHarness({ presetCount: 2 });
+  staticPresets.panel.build();
+  staticPresets.panel.applyAnimationPause();
+  staticPresets.writes.length = 0;
+
+  const pause = staticPresets.gui().ctrl('pause');
+  assert.equal(pause.label, 'Pause Animation');
+  staticPresets.gui().ctrl('presetIndex').setValue(1);
+  assert.equal(pause.getValue(), true);
+  pause.setValue(false);
+  assert.equal(staticPresets.engine.paused, false);
+  assert.deepEqual(staticPresets.writes, ['preset:1', 'paused:false']);
 });
 
 test('touching an animated slider takes over from the animation once', () => {
@@ -1976,7 +1989,7 @@ test('preset effects expose zero-indexed selection and navigation', () => {
   h.gui().ctrl('nextPreset').object.nextPreset();
   assert.deepEqual(h.writes, ['preset:2', 'preset:0']);
   assert.equal(h.gui().ctrl('presetIndex').getValue(), 0);
-  assert.equal(h.gui().ctrl('pause'), undefined);
+  assert.equal(h.gui().ctrl('pause').getValue(), true);
 });
 
 test('preset navigation is available to global keyboard shortcuts', () => {

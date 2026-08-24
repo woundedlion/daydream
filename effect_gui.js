@@ -695,13 +695,13 @@ export function createEffectGui({
   }
 
   /**
-   * Add the "Pause Animation" toggle, offered only when the effect has an
-   * animated param.
+   * Add the "Pause Animation" toggle when the effect has an animated param or
+   * multiple presets available for manual selection.
    * @param {Object} fx - The effect record being built.
    * @param {Array<Object>} params - The engine's parameter definitions.
    * @returns {{animationState: {pause: boolean}, controller: Object|null,
    *   setPaused: (v: boolean) => void}} The toggle's state, its controller (null
-   *   when no param animates), and its state transition.
+   *   when neither animation surface is available), and its state transition.
    */
   function addPauseToggle(fx, params, initialPause = false, hydrate = true) {
     const animationState = { pause: Boolean(initialPause) };
@@ -724,7 +724,7 @@ export function createEffectGui({
         transitionPaused(paused);
       }
     };
-    if (params.some(p => p.animated)) {
+    if (params.some(p => p.animated) || getPresetCount() > 1) {
       const add = hydrate
         ? (...args) => fx.gui.add(...args)
         : (...args) => fx.gui.addUnhydrated(...args);
