@@ -145,6 +145,16 @@ input[type=range]:disabled::-webkit-slider-thumb {
   transform: translateX(1.25rem);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
+
 /*
  * Fixed-right-panel shell: a full-bleed canvas (`.tool-stage`) with a fixed
  * scrolling controls panel pinned to the right (`.tool-panel`), collapsing to

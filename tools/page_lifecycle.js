@@ -50,6 +50,20 @@ export function createFrameScheduler(run) {
 }
 
 /**
+ * Runs a callback whenever a media query changes into its matching state.
+ * @param {*} query - A MediaQueryList or an absent matchMedia result.
+ * @param {Function} run - Callback for a matching change.
+ * @returns {Function} Removes the change listener.
+ */
+export function watchMediaMatch(query, run) {
+  const changed = (/** @type {MediaQueryListEvent} */ event) => {
+    if (event.matches) run();
+  };
+  query?.addEventListener?.('change', changed);
+  return () => query?.removeEventListener?.('change', changed);
+}
+
+/**
  * Runs `teardown` when the page is really going away.
  *
  * pagehide (not unload) so the back/forward cache is respected: a frozen page is
