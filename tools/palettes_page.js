@@ -99,6 +99,7 @@ const defaultParams = {
 
 let parameters = { ...defaultParams };
 let palette;
+let paletteOps = null;
 let recipeTemplate = defaultPaletteRecipe();
 let customHueOffsets = [0, 0.07, 0.14];
 let previousHueMode = PaletteV4.hueMode.HARMONY;
@@ -1061,10 +1062,13 @@ async function init() {
   try {
     const { default: createHolosphereModule } = await import('../holosphere_wasm.js');
     const wasm = await createHolosphereModule();
-    const paletteOps = new wasm.PaletteOps();
+    paletteOps = new wasm.PaletteOps();
     setPaletteOps(paletteOps);
     effectPalettePresets = Array.from(paletteOps.effectPresetsV4());
   } catch (e) {
+    setPaletteOps(null);
+    paletteOps?.delete();
+    paletteOps = null;
     console.error('Failed to load WASM:', e);
     showFatalError('Failed to load the Holosphere WASM engine — the palette '
       + 'tool needs the built holosphere_wasm artifacts. Build the WASM '
@@ -1235,6 +1239,9 @@ async function init() {
   switchTab(paletteTabFromSearch(window.location.search), false);
 
   onPageTeardown(() => {
+    setPaletteOps(null);
+    paletteOps?.delete();
+    paletteOps = null;
     teardownExportFlyout();
     scheduleUpdate.cancel();
     window.removeEventListener('resize', scheduleUpdate);
