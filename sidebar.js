@@ -146,7 +146,7 @@ export class EffectSidebar {
    * @param {Array<string>} names - Effect names, one button per name.
    * @param {Record<string, number>} [effectSizes] - Map of effect name to size in bytes; missing or absent entries are treated as 0.
    * @param {Record<string, number>} [presetCounts] - Map of effect name to
-   *   authored preset count; missing or absent entries are treated as 0.
+   *   authored preset count; the displayed count has a minimum of 1.
    */
   setEffects(names, effectSizes, presetCounts) {
     // Discarding the focused option drops focus to <body>, where the list's
@@ -165,7 +165,7 @@ export class EffectSidebar {
 
     names.forEach(name => {
       const size = effectSizes ? (effectSizes[name] || 0) : 0;
-      const presetCount = presetCounts ? (presetCounts[name] || 0) : 0;
+      const presetCount = Math.max(1, presetCounts ? (presetCounts[name] || 0) : 0);
       this.items.push({ name, size });
 
       const btn = this.doc.createElement('button');

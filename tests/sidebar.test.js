@@ -79,7 +79,7 @@ test('setEffects builds one button per name with its preset count and optional s
   // Voronoi (size>0): name span + size span; Comets (size 0): name span only.
   assert.equal(sidebar.buttons.get('Voronoi').children.length, 2);
   assert.equal(sidebar.buttons.get('Comets').children.length, 1);
-  assert.equal(sidebar.buttons.get('Voronoi').children[0].textContent, 'Voronoi (0)');
+  assert.equal(sidebar.buttons.get('Voronoi').children[0].textContent, 'Voronoi (1)');
   assert.equal(sidebar.buttons.get('Comets').children[0].textContent, 'Comets (12)');
   // No active effect yet: roving tab stop falls to the first option.
   assert.equal(sidebar.tabbableBtn, sidebar.listEl.children[0]);
