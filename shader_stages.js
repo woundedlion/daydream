@@ -142,6 +142,7 @@ const LATTICE_MELT_STAGE_BY_PARAMETER = new Map([
   ['Lattice Softness', 'Function'],
   ['Lattice Radius', 'Function'],
   ['Palette Chroma', 'Colorize'],
+  ['Palette Mapping', 'Colorize'],
   ['Mapping Frequency', 'Colorize'],
   ['Mapping Phase', 'Colorize'],
   ['Phase Oscillation Depth', 'Colorize'],
@@ -171,6 +172,7 @@ const KALEIDOSCOPE_SMOOTH_STAGE_BY_PARAMETER = new Map([
   ['Pattern Mix', 'Function'],
   ['Drift', 'Function'],
   ['Palette Chroma', 'Colorize'],
+  ['Palette Mapping', 'Colorize'],
   ['Mapping Frequency', 'Colorize'],
   ['Mapping Phase', 'Colorize'],
   ['Phase Oscillation Depth', 'Colorize'],
@@ -180,6 +182,123 @@ const KALEIDOSCOPE_SMOOTH_STAGE_BY_PARAMETER = new Map([
   ['Hue Shift Amount', 'Colorize'],
   ['Hue Noise Scale', 'Colorize'],
   ['Hue Noise Speed', 'Colorize'],
+]);
+const FIXED_SHADER_STAGE_BY_PARAMETER = new Map([
+  ['Pattern Freq', 'Function'],
+  ['Speed', 'Function'],
+  ['Source Angle Speed', 'Function'],
+  ['Complexity', 'Function'],
+  ['Pattern Mix', 'Function'],
+  ['Drift', 'Function'],
+  ['Lattice Cell Scale', 'Function'],
+  ['Lattice Shape', 'Function'],
+  ['Lattice Softness', 'Function'],
+  ['Lattice Radius', 'Function'],
+  ['Singularity Fade', 'Projection'],
+  ['Central Meridian', 'Projection'],
+  ['Gnomonic Hemisphere', 'Projection'],
+  ['Peirce Layout', 'Projection'],
+  ['Projection Scale', 'Projection'],
+  ['Projection Spin Speed', 'Projection Frame'],
+  ['Projection Wander', 'Projection Frame'],
+  ['Camera Wander', 'Camera'],
+  ['Surface Noise Scale', 'Surface Noise'],
+  ['Surface Noise Strength', 'Surface Noise'],
+  ['Surface Noise Speed', 'Surface Noise'],
+  ['Surface Noise Direction', 'Surface Noise'],
+  ['Surface Noise Basis', 'Surface Noise'],
+  ['Surface Noise Integrator', 'Surface Noise'],
+  ['Surface Noise Placement', 'Surface Noise'],
+  ['Mobius A Re', 'Lens'],
+  ['Mobius A Im', 'Lens'],
+  ['Mobius B Re', 'Lens'],
+  ['Mobius B Im', 'Lens'],
+  ['Mobius C Re', 'Lens'],
+  ['Mobius C Im', 'Lens'],
+  ['Mobius D Re', 'Lens'],
+  ['Mobius D Im', 'Lens'],
+  ['Mobius A Real', 'Lens'],
+  ['Mobius A Imag', 'Lens'],
+  ['Mobius B Real', 'Lens'],
+  ['Mobius B Imag', 'Lens'],
+  ['Mobius C Real', 'Lens'],
+  ['Mobius C Imag', 'Lens'],
+  ['Mobius D Real', 'Lens'],
+  ['Mobius D Imag', 'Lens'],
+  ['Planar Warp 1 Angular Phase', 'Planar Warp 1'],
+  ['Planar Warp 1 Cell X', 'Planar Warp 1'],
+  ['Planar Warp 1 Cell Y', 'Planar Warp 1'],
+  ['Planar Warp 1 Edge Width', 'Planar Warp 1'],
+  ['Planar Warp 1 Envelope', 'Planar Warp 1'],
+  ['Planar Warp 1 Field Angle', 'Planar Warp 1'],
+  ['Planar Warp 1 Frequency', 'Planar Warp 1'],
+  ['Planar Warp 1 Noise Basis', 'Planar Warp 1'],
+  ['Planar Warp 1 Offset X', 'Planar Warp 1'],
+  ['Planar Warp 1 Offset Y', 'Planar Warp 1'],
+  ['Planar Warp 1 Polar Harmonic', 'Planar Warp 1'],
+  ['Planar Warp 1 Polar Mode', 'Planar Warp 1'],
+  ['Planar Warp 1 Radial Phase', 'Planar Warp 1'],
+  ['Planar Warp 1 Radial Scale', 'Planar Warp 1'],
+  ['Planar Warp 1 Rotation', 'Planar Warp 1'],
+  ['Planar Warp 1 Scale', 'Planar Warp 1'],
+  ['Planar Warp 1 Scale X', 'Planar Warp 1'],
+  ['Planar Warp 1 Scale Y', 'Planar Warp 1'],
+  ['Planar Warp 1 Shear', 'Planar Warp 1'],
+  ['Planar Warp 1 Strength', 'Planar Warp 1'],
+  ['Planar Warp 1 Translation X', 'Planar Warp 1'],
+  ['Planar Warp 1 Translation Y', 'Planar Warp 1'],
+  ['Planar Warp 1 Vector Angle', 'Planar Warp 1'],
+  ['Planar Warp 2 Cell X', 'Planar Warp 2'],
+  ['Planar Warp 2 Cell Y', 'Planar Warp 2'],
+  ['Planar Warp 2 Field Angle', 'Planar Warp 2'],
+  ['Planar Warp 2 Frequency', 'Planar Warp 2'],
+  ['Planar Warp 2 Offset X', 'Planar Warp 2'],
+  ['Planar Warp 2 Offset Y', 'Planar Warp 2'],
+  ['Planar Warp 2 Rotation', 'Planar Warp 2'],
+  ['Planar Warp 2 Strength', 'Planar Warp 2'],
+  ['Iso Level', 'Value Transfer'],
+  ['Iso Width', 'Value Transfer'],
+  ['Cutout Threshold', 'Coverage'],
+  ['Cutout Softness', 'Coverage'],
+  ['Edge Width', 'Coverage'],
+  ['Edge Fade Width', 'Coverage'],
+  ['Palette Chroma', 'Colorize'],
+  ['Palette Mapping', 'Colorize'],
+  ['Mapping Frequency', 'Colorize'],
+  ['Mapping Phase', 'Colorize'],
+  ['Phase Oscillation Depth', 'Colorize'],
+  ['Phase Oscillation Speed', 'Colorize'],
+  ['Brightness Depth', 'Colorize'],
+  ['Value Opacity Low', 'Colorize'],
+  ['Value Opacity High', 'Colorize'],
+  ['Hue Shift Amount', 'Colorize'],
+  ['Hue Noise Scale', 'Colorize'],
+  ['Hue Noise Speed', 'Colorize'],
+]);
+const FIXED_SHADER_WARP_BOUNDARIES = new Map([
+  ['Planar Warp 1 Speed', 'Planar Warp 1'],
+  ['Planar Warp 2 Speed', 'Planar Warp 2'],
+]);
+const FIXED_SHADER_WARP_PARAMETERS = new Set([
+  'Affine Rotation Rate',
+  'Affine Translation X',
+  'Affine Translation Y',
+  'Affine Scale X',
+  'Affine Scale Y',
+  'Affine Shear',
+  'Warp Strength',
+  'Warp Frequency',
+  'Warp Field Angle',
+  'Warp Scale',
+  'Warp Vector Angle',
+  'Mirror Rotation',
+  'Mirror Cell X',
+  'Mirror Cell Y',
+  'Mirror Offset X',
+  'Mirror Offset Y',
+  'Polar Radial Scale',
+  'Polar Radial Phase',
+  'Polar Angular Phase',
 ]);
 
 /**
@@ -257,7 +376,8 @@ export function latticeMeltStageAssignments(params) {
   if ([...LATTICE_MELT_STAGE_BY_PARAMETER.keys()].some((name) => !names.has(name))) {
     return null;
   }
-  return stagesFrom(params, LATTICE_MELT_STAGE_BY_PARAMETER);
+  const assignments = stagesFrom(params, LATTICE_MELT_STAGE_BY_PARAMETER);
+  return assignments.size === params.length ? assignments : null;
 }
 
 /**
@@ -269,13 +389,14 @@ export function kaleidoscopeSmoothStageAssignments(params) {
   if ([...KALEIDOSCOPE_SMOOTH_STAGE_BY_PARAMETER.keys()].some((name) => !names.has(name))) {
     return null;
   }
-  return stagesFrom(params, KALEIDOSCOPE_SMOOTH_STAGE_BY_PARAMETER);
+  const assignments = stagesFrom(params, KALEIDOSCOPE_SMOOTH_STAGE_BY_PARAMETER);
+  return assignments.size === params.length ? assignments : null;
 }
 
 /**
- * @param {Array<{name: string}>} params - Fixed Shader parameter definitions.
- * @returns {Map<string, string>|null} Parameter name to fixed pipeline stage; a
- *   name no rule claims is absent, and the panel reports it as unstaged.
+ * @param {Array<{name: string}>} params - Fixed Shader parameter definitions in
+ *   engine registration order.
+ * @returns {Map<string, string>|null} Parameter name to fixed pipeline stage.
  */
 export function fixedShaderStageAssignments(params) {
   const names = new Set(params.map((parameter) => parameter.name));
@@ -283,45 +404,13 @@ export function fixedShaderStageAssignments(params) {
       || !names.has('Mapping Frequency') || isShaderBallSchema(params)) {
     return null;
   }
-  const hasGenericWarp = [...names].some((name) => name.startsWith('Warp '));
-  const mirrorStage = hasGenericWarp || names.has('Planar Warp 2 Speed')
-    ? 'Planar Warp 2' : 'Planar Warp 1';
-  const warpStage = [...names].some((name) => name.startsWith('Polar '))
-    ? 'Planar Warp 2' : 'Planar Warp 1';
-  /**
-   * @param {string} name - Engine parameter name.
-   * @returns {string|null} The stage that claims it, or null when none does.
-   */
-  const stageFor = (name) => {
-    if (name === 'Camera Wander') return 'Camera';
-    if (name.startsWith('Surface Noise ')) return 'Surface Noise';
-    if (name === 'Projection Spin Speed' || name === 'Projection Wander') {
-      return 'Projection Frame';
-    }
-    if (/^(Singularity Fade|Central Meridian|Projection |Peirce |Bonne |Gnomonic )/.test(name)) {
-      return 'Projection';
-    }
-    if (name.startsWith('Planar Warp 1 ')) return 'Planar Warp 1';
-    if (name.startsWith('Planar Warp 2 ')) return 'Planar Warp 2';
-    if (name.startsWith('Mirror ')) return mirrorStage;
-    if (name.startsWith('Warp ')) return warpStage;
-    if (name.startsWith('Affine ') || name.startsWith('Polar ')) {
-      return 'Planar Warp 1';
-    }
-    if (name.startsWith('Mobius ')) return 'Lens';
-    if (/^(Iso |Band )/.test(name)) return 'Value Transfer';
-    if (/^(Edge(?: Fade)?|Cutout )/.test(name)) return 'Coverage';
-    if (/^(Pattern|Speed$|Source |Complexity|Drift|Lattice )/.test(name)) {
-      return 'Function';
-    }
-    if (/^(Palette|Mapping |Phase Oscillation |Brightness |Value Opacity |Hue )/.test(name)) {
-      return 'Colorize';
-    }
-    return null;
-  };
   const assignments = new Map();
+  let warpStage = null;
   for (const parameter of params) {
-    const stage = stageFor(parameter.name);
+    warpStage = FIXED_SHADER_WARP_BOUNDARIES.get(parameter.name) ?? warpStage;
+    const stage = FIXED_SHADER_STAGE_BY_PARAMETER.get(parameter.name)
+      ?? FIXED_SHADER_WARP_BOUNDARIES.get(parameter.name)
+      ?? (FIXED_SHADER_WARP_PARAMETERS.has(parameter.name) ? warpStage : null);
     if (stage) assignments.set(parameter.name, stage);
   }
   return assignments;

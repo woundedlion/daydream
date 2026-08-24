@@ -721,9 +721,11 @@ test('shader_stages.js mirrors ShaderBall stage option labels exactly', () => {
   }
 });
 
-test('live shader rosters assign Singularity Fade to a stage', () => {
+test('live shader rosters assign every parameter and both planar-warp slots', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   const unassigned = [];
+  const misplaced = [];
+  const dualWarpRosters = [];
   let checked = 0;
   for (const effect of Object.keys(engine.getEffectSizes())) {
     if (engine.setEffect(effect) !== M.EffectSetResult.INSTALLED) continue;
@@ -737,14 +739,25 @@ test('live shader rosters assign Singularity Fade to a stage', () => {
         ?? kaleidoscopeSmoothStageAssignments(definitions)
         ?? shaderBallStageAssignments(definitions)
         ?? fixedShaderStageAssignments(definitions);
+      for (const definition of definitions) {
+        if (!assignments?.has(definition.name)) {
+          unassigned.push(`${effect} preset ${preset}: ${definition.name}`);
+        }
+      }
       if (assignments?.get('Singularity Fade') !== 'Projection') {
-        unassigned.push(`${effect} preset ${preset}`);
+        misplaced.push(`${effect} preset ${preset}: Singularity Fade`);
+      }
+      if (assignments?.get('Planar Warp 1 Speed') === 'Planar Warp 1'
+          && assignments?.get('Planar Warp 2 Speed') === 'Planar Warp 2') {
+        dualWarpRosters.push(`${effect} preset ${preset}`);
       }
     }
   }
   assert.ok(checked > 0, 'the live engine exposes no Singularity Fade parameter');
-  assert.deepEqual(unassigned, [],
-    `Singularity Fade is unassigned for ${unassigned.join(', ')}`);
+  assert.deepEqual(unassigned, [], `unassigned parameters: ${unassigned.join(', ')}`);
+  assert.deepEqual(misplaced, [], `misplaced parameters: ${misplaced.join(', ')}`);
+  assert.ok(dualWarpRosters.length > 0,
+    'the live engine exposes no roster with both planar-warp slots');
 });
 
 test('strobeColumns and effect metadata return the shapes daydream consumes', () => {

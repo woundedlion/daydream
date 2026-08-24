@@ -839,6 +839,14 @@ export function createEffectGui({
       : fallbackFixedAssignments ? SHADERBALL_STAGE_ORDER.filter((stage) =>
         new Set(fallbackFixedAssignments.values()).has(stage))
       : [];
+    const unstagedParams = stageAssignments
+      ? params.filter((parameter) => !stageAssignments.has(parameter.name))
+        .map((parameter) => parameter.name)
+      : [];
+    if (unstagedParams.length > 0) {
+      throw new Error(
+        `Effect GUI: no pipeline stage claims ${unstagedParams.join(', ')}`);
+    }
     const stageFolders = new Map();
     if (stageAssignments) {
       for (const stage of stageOrder) {
@@ -847,7 +855,6 @@ export function createEffectGui({
       }
     }
 
-    const unstagedParams = [];
     params.forEach(p => {
       // A param rendered elsewhere still claims its paramNames slot: the value
       // stream is positional, so building no control must not shift the binding
@@ -861,7 +868,6 @@ export function createEffectGui({
         : p.value;
 
       const stage = stageAssignments?.get(p.name);
-      if (stageAssignments && !stage) unstagedParams.push(p.name);
       const controlGui = stage ? stageFolders.get(stage) : fx.gui;
       const controller = addParamControl(
         controlGui, state, p, !previousParamNames?.has(p.name),
@@ -897,9 +903,6 @@ export function createEffectGui({
         fx.warningsDirty = true;
       });
     });
-    if (unstagedParams.length > 0) {
-      logWarn(`Effect GUI: no pipeline stage claims ${unstagedParams.join(', ')}; shown outside every stage folder`);
-    }
   }
 
   /**
