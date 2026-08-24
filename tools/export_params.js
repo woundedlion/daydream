@@ -10,7 +10,7 @@ import { formatFloatCpp } from './cpp_format.js';
 
 /**
  * Format the live parameter set as a C++ brace-init list for pasting into a
- * Presets<> array. Readonly and non-preset params are skipped. An enum carrying
+ * PRESETS table. Readonly and non-preset params are skipped. An enum carrying
  * exportOptions emits the symbolic entry matching its live numeric index; all
  * other values render as float literals. Effects that interleave unrepresented
  * non-float members still produce a list that must be edited by hand.
