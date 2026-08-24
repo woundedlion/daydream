@@ -73,6 +73,7 @@ function latticeMeltParams() {
     'Surface Noise Strength',
     'Surface Noise Speed',
     'Palette Chroma',
+    'Palette Mapping',
     'Mapping Frequency',
     'Mapping Phase',
     'Phase Oscillation Depth',
@@ -105,6 +106,7 @@ function kaleidoscopeSmoothParams() {
     'Planar Warp 2 Offset X',
     'Planar Warp 2 Offset Y',
     'Palette Chroma',
+    'Palette Mapping',
     'Mapping Frequency',
     'Mapping Phase',
     'Phase Oscillation Depth',
@@ -656,20 +658,17 @@ test('LatticeMelt controls use the fixed pipeline modes as folders', () => {
   assert.deepEqual(h.warnings, [], 'every parameter reached a stage');
 });
 
-test('a parameter no stage table maps is reported, not quietly rooted', () => {
+test('a staged schema fails closed when a parameter has no owner', () => {
   const params = [...latticeMeltParams(),
-    { name: 'Ridge Sharpness', value: 0.5, min: 0, max: 1, animated: true }];
+    { name: 'Palette Surprise', value: 0.5, min: 0, max: 1, animated: true }];
   const h = makeHarness({
     params,
     engineValues: params.map((parameter) => parameter.value),
   });
 
-  h.panel.build();
-
-  assert.equal(h.gui().ctrl('Ridge Sharpness').folder, undefined);
-  assert.equal(h.gui().ctrl('Ridge Sharpness').label, 'Ridge Sharpness');
-  assert.equal(h.warnings.length, 1, 'one warning naming every unmapped param');
-  assert.match(h.warnings[0], /no pipeline stage claims Ridge Sharpness/);
+  assert.throws(() => h.panel.build(), /no pipeline stage claims Palette Surprise/);
+  assert.equal(h.panel.active(), null, 'no partially staged panel is published');
+  assert.equal(h.gui().destroyed, 1, 'the rejected panel is disposed');
 });
 
 test('KaleidoscopeSmooth controls use the fixed pipeline modes as folders', () => {
@@ -752,6 +751,21 @@ test('fixed Shader controls retain stage folders without dynamic metadata', () =
   assert.equal(h.gui().ctrl('Edge Width').folder, 'Coverage');
   assert.deepEqual(h.warnings, [],
     'the Shader stage rules file every name they are given');
+});
+
+test('fixed Shader warp ownership follows each explicit slot boundary', () => {
+  const names = [
+    'Camera Wander', 'Palette Chroma', 'Mapping Frequency',
+    'Planar Warp 1 Speed', 'Mirror Rotation',
+    'Planar Warp 2 Speed', 'Mirror Cell X',
+  ];
+  const assignments = fixedShaderStageAssignments(
+    names.map((name) => ({ name })));
+
+  assert.equal(assignments.get('Planar Warp 1 Speed'), 'Planar Warp 1');
+  assert.equal(assignments.get('Mirror Rotation'), 'Planar Warp 1');
+  assert.equal(assignments.get('Planar Warp 2 Speed'), 'Planar Warp 2');
+  assert.equal(assignments.get('Mirror Cell X'), 'Planar Warp 2');
 });
 
 test('a promoted Shader snapshot outranks a matching dedicated-effect schema', () => {
