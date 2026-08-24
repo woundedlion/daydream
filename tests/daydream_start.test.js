@@ -4,12 +4,27 @@
 // factory, module loader), so the wiring is executed here rather than read out
 // of the source. What each factory does with what it is handed is covered in
 // tests/app_lifecycle.test.js; this is the assembly.
-import { test } from 'node:test';
+import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement, restoreDocumentAfterEach } from './fake_dom.js';
-import { startApp } from './fake_app.js';
+import { startApp as startUntrackedApp } from './fake_app.js';
 
 restoreDocumentAfterEach();
+const startedApps = [];
+afterEach(() => {
+  while (startedApps.length > 0) {
+    const app = startedApps.pop();
+    app.teardown.dispose();
+    app.restore();
+  }
+});
+
+/** Starts an app registered for per-case cleanup. @returns {Object} The app fakes. */
+function startApp(options) {
+  const app = startUntrackedApp(options);
+  startedApps.push(app);
+  return app;
+}
 
 test('start assembles the app and hands back its teardown', () => {
   const { teardown, guis, listeners } = startApp();

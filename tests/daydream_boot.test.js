@@ -7,18 +7,33 @@
 // source read can see, so those cases read it, and each names the failure it
 // prevents. The segmented-POV block below is driven instead, since the assembly
 // it produces carries the names and bounds a source read was standing in for.
-import { test } from 'node:test';
+import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { restoreDocumentAfterEach } from './fake_dom.js';
 import { captureConsole } from './fake_console.js';
 import {
   createSegmentPoolSpawner,
-  startApp,
+  startApp as startUntrackedApp,
   segmentCountControl,
 } from './fake_app.js';
 
 restoreDocumentAfterEach();
+const startedApps = [];
+afterEach(() => {
+  while (startedApps.length > 0) {
+    const app = startedApps.pop();
+    app.teardown.dispose();
+    app.restore();
+  }
+});
+
+/** Starts an app registered for per-case cleanup. @returns {Object} The app fakes. */
+function startApp(options) {
+  const app = startUntrackedApp(options);
+  startedApps.push(app);
+  return app;
+}
 
 /**
  * Blanks a source's comments to spaces, leaving every other offset where it
