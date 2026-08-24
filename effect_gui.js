@@ -510,7 +510,7 @@ export function createEffectGui({
    * @param {Object} fx - The effect record owning the Export button.
    * @param {Array<Object>} params - The engine's parameter definitions.
    * @param {(label: string) => void} flashExport - Shows a transient Export label.
-   * @returns {void}
+   * @returns {Promise<void>|void} Clipboard completion, or nothing when blocked.
    */
   function exportParams(fx, params, flashExport) {
     if (usesFullConfigSnapshot()) {
@@ -520,7 +520,7 @@ export function createEffectGui({
         flashExport(EXPORT_FAILED);
         return;
       }
-      copyText(JSON.stringify(snapshot, null, 2)).then((copied) => {
+      return copyText(JSON.stringify(snapshot, null, 2)).then((copied) => {
         if (activeEffect !== fx) return;
         if (copied) flashExport(EXPORT_COPIED);
         else {
@@ -531,7 +531,6 @@ export function createEffectGui({
         logWarn('Export: clipboard copy failed', err);
         if (activeEffect === fx) flashExport(EXPORT_FAILED);
       });
-      return;
     }
     let values = liveParamValues();
     // The controller fallback needs one control per stream slot, which the
@@ -558,7 +557,7 @@ export function createEffectGui({
       return;
     }
 
-    copyText(text).then((copied) => {
+    return copyText(text).then((copied) => {
       if (activeEffect !== fx) return;
       if (copied) {
         flashExport(EXPORT_COPIED);
@@ -644,9 +643,9 @@ export function createEffectGui({
       /**
        * Copy the current parameter values to the clipboard as a C++ brace-init
        * list of float literals, then flash the outcome on the Export button.
-       * @returns {void}
+       * @returns {Promise<void>|void} Clipboard completion, or nothing when blocked.
        */
-      export() { exportParams(fx, params, flashExport); }
+      export() { return exportParams(fx, params, flashExport); }
     };
     addAction(effectActions, 'reset', RESET_ICON, 'Reset', 'effect-action-reset');
     const exportCtrl = addAction(

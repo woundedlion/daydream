@@ -2252,9 +2252,7 @@ test('a rejected clipboard copy reports the failure', async () => {
   });
   h.panel.build();
 
-  h.gui().ctrl('export').object.export();
-  await Promise.resolve();
-  await Promise.resolve();
+  await h.gui().ctrl('export').object.export();
 
   assert.equal(h.gui().ctrl('export').label, '\u2717');
   assert.match(h.warnings[0], /clipboard copy failed/);
