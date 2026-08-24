@@ -5,7 +5,7 @@
 // asset the served pages reach is covered by an entry.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { dirname, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -211,11 +211,36 @@ test('the site manifest covers every asset the served pages reference', () => {
 // place here only by being published for its own sake.
 const UNREFERENCED = ['README.md', 'docs/screenshots'];
 
-// The source catalog fetches the pattern documents by file name at runtime
-// (their URLs are built from shaderball_migration.json's listing), so the
-// static reference walk cannot reach them. They are listed file by file so the
-// v1 expansion fixtures under shader/patterns/v1/ stay off Pages.
-const runtimeFetched = (entry) => /^shader\/patterns\/[^/]+\.json$/.test(entry);
+const PATTERNS = 'shader/patterns';
+const MIGRATION = `${PATTERNS}/shaderball_migration.json`;
+
+// Documents in the pattern directory that are not source documents: the
+// migration listing itself, the v1-to-v2 digest table and the compiler's worked
+// example. The v1 expansion fixtures under shader/patterns/v1/ belong to
+// neither set and must stay off Pages.
+const PATTERN_NON_SOURCES = [
+  MIGRATION,
+  `${PATTERNS}/digest_migration.v1v2.json`,
+  `${PATTERNS}/example.shader.json`,
+];
+
+/**
+ * The pattern documents the served set must hold. The source catalog fetches
+ * `${PATTERNS}/<filename>` for every shaderball_migration.json source document,
+ * so the static reference walk cannot reach them.
+ * @returns {Set<string>} Repo-relative pattern document paths.
+ */
+const servedPatterns = () => new Set([
+  ...Object.values(JSON.parse(read(MIGRATION)).source_documents).map(
+    (/** @type {*} */ filename) => `${PATTERNS}/${filename}`),
+  ...PATTERN_NON_SOURCES,
+]);
+
+/** @returns {string[]} Repo-relative documents directly in the pattern directory. */
+const patternFiles = () =>
+  readdirSync(resolve(REPO, PATTERNS))
+    .filter((name) => name.endsWith('.json'))
+    .map((name) => `${PATTERNS}/${name}`);
 
 test('the site manifest publishes every source catalog document', () => {
   const migration = JSON.parse(read('shader/patterns/shaderball_migration.json'));
@@ -233,14 +258,33 @@ test('the site manifest publishes nothing the served pages do not reach', () => 
     `the unreferenced allowlist names paths ${MANIFEST} no longer publishes`);
 
   const { seen } = pageWalk();
+  const served = servedPatterns();
   const reached = (entry) =>
     seen.has(entry) || [...seen].some((path) => path.startsWith(`${entry}/`));
   const unreached = entries.filter(
-    (entry) => !UNREFERENCED.includes(entry) && !runtimeFetched(entry) && !reached(entry));
+    (entry) => !UNREFERENCED.includes(entry) && !served.has(entry) && !reached(entry));
   assert.deepEqual(unreached.slice(0, 5), [],
     `${unreached.length} ${MANIFEST} entries are neither a served page, ` +
       'reachable from one, nor declared unreferenced — the manifest is the only ' +
       'thing keeping dev tooling off Pages');
+});
+
+test('the site manifest publishes exactly the pattern documents the catalog fetches', () => {
+  const served = servedPatterns();
+  const listed = new Set(
+    manifestEntries().filter((entry) => entry.startsWith(`${PATTERNS}/`)));
+  const files = patternFiles();
+
+  assert.deepEqual([...served].filter((doc) => !listed.has(doc)).sort(), [],
+    `${MANIFEST} omits pattern documents the source catalog fetches by name — ` +
+      'they would 404 on Pages');
+  assert.deepEqual([...listed].filter((doc) => !served.has(doc)).sort(), [],
+    `${MANIFEST} publishes pattern documents ${MIGRATION} does not name`);
+  assert.deepEqual(files.filter((doc) => !served.has(doc)).sort(), [],
+    `${PATTERNS} holds documents ${MIGRATION} does not name, so nothing demands ` +
+      `a ${MANIFEST} entry for them`);
+  assert.deepEqual([...served].filter((doc) => !files.includes(doc)).sort(), [],
+    `${MIGRATION} names source documents that are not on disk`);
 });
 
 test('the deploy workflow stages the site from the committed manifest', () => {
