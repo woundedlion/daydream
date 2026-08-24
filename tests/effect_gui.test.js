@@ -1939,14 +1939,14 @@ test('an effect switch clears the skew latch', () => {
 // The Export action copies the live values, and reports the outcome on its own
 // button.
 
-test('preset effects expose zero-indexed selection and navigation', () => {
+test('preset effects expose one-based labels and zero-indexed navigation', () => {
   const h = makeHarness({ presetCount: 3, presetIndex: 0 });
   h.panel.build();
 
   assert.deepEqual(h.gui().controllers.slice(0, 5).map((c) => c.property),
     ['reset', 'export', 'presetIndex', 'previousPreset', 'nextPreset']);
   assert.equal(h.gui().ctrl('presetIndex').getValue(), 0);
-  assert.deepEqual(h.gui().ctrl('presetIndex').args, [{ 0: 0, 1: 1, 2: 2 }]);
+  assert.deepEqual(h.gui().ctrl('presetIndex').args, [{ 1: 0, 2: 1, 3: 2 }]);
   assert.equal(h.gui().ctrl('presetIndex').disabled, false);
   assert.equal(h.gui().ctrl('presetIndex').session, true);
   assert.equal(h.gui().ctrl('reset').label, '\u21ba');
@@ -2002,7 +2002,7 @@ test('preset navigation is available to global keyboard shortcuts', () => {
   assert.equal(h.gui().ctrl('presetIndex').getValue(), 1);
 });
 
-test('the preset dropdown selects its zero-indexed value', () => {
+test('the preset dropdown sends its zero-indexed value', () => {
   const h = makeHarness({ presetCount: 4, presetIndex: 1 });
   h.panel.build();
 

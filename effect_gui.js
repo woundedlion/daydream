@@ -656,7 +656,7 @@ export function createEffectGui({
     if (presetCount > 0) {
       effectActions.presetIndex = getPresetIndex();
       const presetOptions = enumChoices(
-        Array.from({ length: presetCount }, (_, index) => String(index)));
+        Array.from({ length: presetCount }, (_, index) => String(index + 1)));
       const preset = fx.gui
         .addSession(effectActions, 'presetIndex', presetOptions)
         .name('Preset');
