@@ -100,6 +100,7 @@ const defaultParams = {
 let parameters = { ...defaultParams };
 let palette;
 let paletteOps = null;
+let WasmModule = null;
 let recipeTemplate = defaultPaletteRecipe();
 let customHueOffsets = [0, 0.07, 0.14];
 let previousHueMode = PaletteV4.hueMode.HARMONY;
@@ -1027,6 +1028,7 @@ function updatePalette() {
       palette = new GenerativePalette(readPaletteRecipe());
       document.getElementById('gen_status').textContent = 'Recipe valid';
     } catch (error) {
+      if (engineTrapped(error)) return;
       document.getElementById('gen_status').textContent = error.message;
       return;
     }
@@ -1052,6 +1054,18 @@ function updatePalette() {
 // canvas column) on the main thread.
 const scheduleUpdate = createFrameScheduler(updatePalette);
 
+function engineTrapped(error) {
+  if (!(error instanceof WebAssembly.RuntimeError)
+      && WasmModule?.HS_MODULE_DEAD !== true)
+    return false;
+  setPaletteOps(null);
+  paletteOps = null;
+  WasmModule = null;
+  showFatalError('The WASM engine hit an internal invariant and is halted — '
+    + 'reload the page.');
+  return true;
+}
+
 /**
      * Initialize the sliders and the first visualization.
      */
@@ -1062,13 +1076,16 @@ async function init() {
   try {
     const { default: createHolosphereModule } = await import('../holosphere_wasm.js');
     const wasm = await createHolosphereModule();
+    WasmModule = wasm;
     paletteOps = new wasm.PaletteOps();
     setPaletteOps(paletteOps);
     effectPalettePresets = Array.from(paletteOps.effectPresetsV4());
   } catch (e) {
+    if (engineTrapped(e)) return;
     setPaletteOps(null);
     paletteOps?.delete();
     paletteOps = null;
+    WasmModule = null;
     console.error('Failed to load WASM:', e);
     showFatalError('Failed to load the Holosphere WASM engine — the palette '
       + 'tool needs the built holosphere_wasm artifacts. Build the WASM '
@@ -1240,8 +1257,10 @@ async function init() {
 
   onPageTeardown(() => {
     setPaletteOps(null);
-    paletteOps?.delete();
+    if (WasmModule?.HS_MODULE_DEAD !== true)
+      paletteOps?.delete();
     paletteOps = null;
+    WasmModule = null;
     teardownExportFlyout();
     scheduleUpdate.cancel();
     window.removeEventListener('resize', scheduleUpdate);
