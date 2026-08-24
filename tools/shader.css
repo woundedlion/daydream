@@ -252,7 +252,6 @@
   font-size: 0.75rem;
   white-space: nowrap;
   cursor: pointer;
-  touch-action: none;
 }
 
 .chain-chip:not(.chain-chip--expanded) {
