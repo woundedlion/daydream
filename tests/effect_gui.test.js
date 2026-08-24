@@ -2059,6 +2059,33 @@ test('natural worker preset advancement keeps live transition values', () => {
   assert.equal(h.gui().ctrl('Speed').getValue(), 0.9);
 });
 
+test('a preset rebuild adopts the post-sync preset range and index', () => {
+  const h = makeHarness({
+    params: [SPEED],
+    engineValues: [0.1],
+    generation: 1,
+    presetCount: 3,
+    presetIndex: 0,
+    onSynchronizePreset: (_index, state) => {
+      state.presetCount = 1;
+      state.presetIndex = 0;
+      state.hostPresetIndex = 0;
+      state.generation = 2;
+    },
+  });
+  h.panel.build();
+  const oldGui = h.gui();
+
+  h.state.presetIndex = 2;
+  h.panel.sync();
+
+  const preset = h.gui().ctrl('presetIndex');
+  assert.equal(oldGui.destroyed, 1);
+  assert.deepEqual(preset.args, [{ 1: 0 }]);
+  assert.equal(preset.getValue(), 0);
+  assert.deepEqual(h.writes, ['syncPreset:2']);
+});
+
 test('a rejected preset selection does not change the pause state', () => {
   const h = makeHarness({
     params: [SPEED], presetCount: 3, presetIndex: 1,
