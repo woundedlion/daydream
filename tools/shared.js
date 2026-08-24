@@ -129,6 +129,8 @@ export function initScene(containerId, canvasId, opts = {}) {
   renderer.setPixelRatio(capPixelRatio(window.devicePixelRatio));
 
   const controls = new OrbitControls(camera, renderer.domElement);
+  canvas.tabIndex = 0;
+  controls.listenToKeyEvents(canvas);
   controls.minDistance = minDistance;
   controls.maxDistance = maxDistance;
   controls.enableDamping = true;

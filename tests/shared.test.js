@@ -167,6 +167,16 @@ test('initScene returns the handles the tool pages destructure', () => {
   assert.deepEqual(s.listeners.added, [['resize', s.resize]]);
 });
 
+test('initScene gives the canvas a focused keyboard route to OrbitControls', () => {
+  const s = mountScene();
+
+  assert.equal(s.canvas.tabIndex, 0);
+  assert.equal(s.controls.keyEventsElement, s.canvas);
+
+  s.dispose();
+  assert.equal(s.controls.keyEventsElement, null);
+});
+
 test('initScene returns the light rig it added when lights are requested', () => {
   const s = mountScene({ lights: true, showSphere: false });
 
