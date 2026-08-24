@@ -286,13 +286,21 @@ test('tool pages link tailwind.css last so utilities outrank page rules', () => 
 });
 
 // Behavior-only hooks need no stylesheet. The banner's two are inline-styled
-// because it has to render when a page stylesheet fails. The expanded chain
-// state is page-scoped and is styled by the shader workbench stylesheet.
+// because it has to render when a page stylesheet fails.
 const CLASS_EXEMPTIONS = new Set([
   'op-param', 'move-op-up', 'move-op-down', 'remove-op-btn',
   'fatal-error-message', 'fatal-error-dismiss',
-  'chain-chip--expanded',
 ]);
+
+// daydream.js loads the shader-document graph on both simulator pages, but it
+// creates the chain strip only in the shader-workbench mode.
+const NON_RENDERING_CLASS_SOURCES = new Map([
+  ['index.html', new Set(['tools/chain_strip.js'])],
+]);
+
+const classSourcesFor = ({ page, scripts }) => scripts
+  .map((segments) => segments.join('/'))
+  .filter((source) => !NON_RENDERING_CLASS_SOURCES.get(page)?.has(source));
 
 test('every served page\'s stylesheets define every class it uses', () => {
   for (const { page, sheets, scripts } of SERVED_PAGES) {
@@ -308,7 +316,8 @@ test('every served page\'s stylesheets define every class it uses', () => {
     // tailwind.css is committed prebuilt with no config or build step, so a
     // utility a script reaches for that no rule defines stays silently unstyled.
     const sources = [[page, referencedClasses(src)],
-      ...scripts.map((s) => [s.join('/'), scriptClasses(read(...s))])];
+      ...classSourcesFor({ page, scripts })
+        .map((source) => [source, scriptClasses(read(source))])];
     for (const [source, tokens] of sources) {
       const missing = [...tokens].filter((c) => !defined.has(c));
       assert.deepEqual(missing, [],
@@ -317,14 +326,13 @@ test('every served page\'s stylesheets define every class it uses', () => {
   }
 });
 
-test('every tools/ module that sets a class is reached from a served page', () => {
-  const gated = new Set(
-    SERVED_PAGES.flatMap(({ scripts }) => scripts.map((s) => s.join('/'))));
+test('every tools/ module that sets a class can render on a served page', () => {
+  const gated = new Set(SERVED_PAGES.flatMap(classSourcesFor));
   for (const file of readdirSync(join(REPO, 'tools')).filter((f) => f.endsWith('.js'))) {
     const path = `tools/${file}`;
     if (scriptClasses(read(path)).size === 0) continue;
     assert.ok(gated.has(path),
-      `${path} sets classes but no served page's module graph reaches it, so nothing gates them`);
+      `${path} sets classes but no served page can render it, so nothing gates them`);
   }
 });
 
