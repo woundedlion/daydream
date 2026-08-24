@@ -953,13 +953,19 @@ test('syncHistory repaints Undo and Redo without rebuilding the strip', async ()
 
 // The union-schema rule reads the document's declarations and the preset values
 // that gate them.
-test('deactivatedParameterIds flags edge-width only while its gate is off edge-fade', () => {
+test('deactivatedParameterIds follows the engine topology gates', () => {
   const parameters = [
     { id: 'sample.coverage-mode', storage: 'enum8' },
     { id: 'sample.edge-width', storage: 'binary32' },
     { id: 'warp1.envelope', storage: 'enum8' },
     { id: 'warp1.edge-width', storage: 'binary32' },
     { id: 'camera.wander', storage: 'binary32' },
+    { id: 'colorize.hue-shift-mode', storage: 'enum8' },
+    { id: 'colorize.hue-shift-amount', storage: 'binary32' },
+    { id: 'colorize.hue-noise-scale', storage: 'binary32' },
+    { id: 'colorize.hue-noise-speed', storage: 'binary32' },
+    { id: 'colorize.brightness-envelope', storage: 'enum8' },
+    { id: 'colorize.brightness-depth', storage: 'binary32' },
   ];
   const values = {
     'sample.coverage-mode': 'weight',
@@ -967,14 +973,22 @@ test('deactivatedParameterIds flags edge-width only while its gate is off edge-f
     'warp1.envelope': 'edge-fade',
     'warp1.edge-width': 0.1,
     'camera.wander': 0,
+    'colorize.hue-shift-mode': 'path-length',
+    'colorize.hue-shift-amount': 1,
+    'colorize.hue-noise-scale': 1,
+    'colorize.hue-noise-speed': 0,
+    'colorize.brightness-envelope': 'none',
+    'colorize.brightness-depth': 1,
   };
   const chain = [
     { label: 'sample', operator: 'sample.grid.v2' },
     { label: 'warp1', operator: 'warp.wave-shear.v2' },
     { label: 'camera', operator: 'sphere.rotate.v2' },
+    { label: 'colorize', operator: 'colorize.generated-palette.v2' },
   ];
   assert.deepEqual([...deactivatedParameterIds(parameters, values, chain, CATALOG)],
-    ['sample.edge-width']);
+    ['sample.edge-width', 'colorize.hue-noise-scale',
+      'colorize.hue-noise-speed', 'colorize.brightness-depth']);
   assert.deepEqual([...deactivatedParameterIds(
     [{ id: 'sample.edge-width', storage: 'binary32' }],
     { 'sample.edge-width': 0.1 }, chain, CATALOG)],
@@ -991,5 +1005,6 @@ test('deactivatedParameterIds flags edge-width only while its gate is off edge-f
     renamedParameters,
     { ...values, 'sample.coverage-style': values['sample.coverage-mode'] },
     chain, renamed,
-  )], ['sample.edge-width']);
+  )], ['colorize.hue-noise-scale', 'colorize.hue-noise-speed',
+    'colorize.brightness-depth']);
 });
