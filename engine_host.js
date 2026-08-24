@@ -114,8 +114,10 @@ export class EngineHost {
     // Before the delete: the frame loop reaches the engine only through the
     // adapter, so a frame that outlives the teardown must find nothing to call.
     this.adapter = null;
-    try { this.engine?.delete(); }
-    catch (error) { console.error('EngineHost: deleting the engine failed:', error); }
+    if (!this.moduleDead()) {
+      try { this.engine?.delete(); }
+      catch (error) { console.error('EngineHost: deleting the engine failed:', error); }
+    }
     this.engine = null;
     this.pixelView = null;
     // The callback closes over the Three.js driver and its display aliases, so

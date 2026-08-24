@@ -283,7 +283,9 @@ test('moduleDead() reads the glue flag once the module traps', () => {
 
 test('moduleDead() stays dead once observed, dispose() included', () => {
   const host = new EngineHost();
+  let deleted = false;
   host.module = { HS_MODULE_DEAD: true };
+  host.engine = { delete() { deleted = true; } };
 
   assert.equal(host.moduleDead(), true);
   host.dispose();
@@ -291,6 +293,7 @@ test('moduleDead() stays dead once observed, dispose() included', () => {
   assert.equal(host.moduleDead(), true,
     'dispose() drops the module reference, and a host that read dead through it '
     + 'must not read live again');
+  assert.equal(deleted, false, 'a trapped module cannot safely run its destructor');
 });
 
 test('refresh() re-fetches and re-notifies when the held view has detached', () => {
