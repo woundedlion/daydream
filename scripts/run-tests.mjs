@@ -1,6 +1,6 @@
 // Run the requested node:test suite, then verify that every first-party source
 // module was loaded by a test or has a reasoned exemption.
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
@@ -58,17 +58,22 @@ try {
 }
 if (status !== 0) process.exit(status);
 
-const roster = [];
-const walkSource = (dir) => {
-  for (const entry of readdirSync(dir === '' ? '.' : dir, { withFileTypes: true })) {
-    const path = dir === '' ? entry.name : `${dir}/${entry.name}`;
-    if (entry.isDirectory()) {
-      if (!SKIP_DIRS.has(entry.name) && !testDirs.has(path)) walkSource(path);
-    } else if (/\.m?js$/.test(entry.name)) roster.push(path);
-  }
-};
-walkSource('');
-roster.sort();
+let tracked;
+try {
+  tracked = execFileSync(
+    'git',
+    ['ls-files', '-z', '--', ':(glob)**/*.js', ':(glob)**/*.mjs'],
+    { encoding: 'utf8' },
+  );
+} catch {
+  console.error('run-tests: git ls-files failed while enumerating source modules.');
+  process.exit(1);
+}
+const roster = tracked.split('\0')
+  .filter(Boolean)
+  .filter((path) => !path.split('/').some((part) => SKIP_DIRS.has(part)))
+  .filter((path) => ![...testDirs].some((dir) => path === dir || path.startsWith(`${dir}/`)))
+  .sort();
 
 let exempt = {};
 if (existsSync(EXEMPT_PATH)) {
