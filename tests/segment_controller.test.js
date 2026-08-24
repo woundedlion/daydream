@@ -16,6 +16,8 @@ import { repointDisplayAliases } from '../app_lifecycle.js';
 const driver = {
   W: 0, H: 0, pixels: null,
   dotMesh: { instanceColor: fakeColorAttribute(null) },
+  invalidations: 0,
+  invalidate() { this.invalidations++; },
 };
 
 
@@ -474,6 +476,7 @@ beforeEach(() => {
   driver.W = 0;
   driver.H = 0;
   driver.pixels = null;
+  driver.invalidations = 0;
   // A fresh attribute per test: the length invariant binds at first upload and
   // the cases below composite at different grid sizes.
   driver.dotMesh.instanceColor = fakeColorAttribute(null);
@@ -1843,6 +1846,38 @@ test('composite() marks both the internal split and the x=0 wrap seam', () => {
   assert.ok(isCyan(0, 0) && isCyan(0, 1), 'wrap-seam boundary at x=0 marked');
   assert.equal(driver.pixels[idx(1, 0, 4)], 111, 'arm-0 interior untouched');
   assert.equal(driver.pixels[idx(3, 0, 4)], 222, 'arm-1 interior untouched');
+});
+
+test('the boundary setter re-composites and invalidates a paused held generation', () => {
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3);
+
+  const c = readyController(2);
+  c.setAnimationsPaused(true);
+  const quadL = new Uint16Array(2 * 2 * 3).fill(111);
+  const quadR = new Uint16Array(2 * 2 * 3).fill(222);
+  c.results = [
+    { pixels: quadL, x0: 0, x1: 2, y0: 0, y1: 2 },
+    { pixels: quadR, x0: 2, x1: 4, y0: 0, y1: 2 },
+  ];
+  c.composite();
+  const posted = c.workers.map((worker) => worker.posted.length);
+
+  c.showBoundaries = true;
+
+  assert.ok(isCyan(0, 0) && isCyan(2, 0),
+    'the held generation gains its boundaries without a simulation tick');
+  assert.equal(driver.invalidations, 1, 'the paused render loop was asked to repaint');
+  c.workers.forEach((worker, index) => {
+    assert.equal(worker.posted.length, posted[index],
+      'refreshing the overlay did not advance or dispatch the simulation');
+  });
+
+  c.showBoundaries = false;
+
+  assert.equal(driver.pixels[idx(0, 0, 4)], 111, 'disabling restores the held left band');
+  assert.equal(driver.pixels[idx(2, 0, 4)], 222, 'disabling restores the held right band');
+  assert.equal(driver.invalidations, 2, 'each visible change requests one repaint');
 });
 
 test('composite() marks every internal split plus the wrap seam for an 8-segment layout', () => {

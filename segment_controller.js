@@ -173,12 +173,15 @@ export class SegmentController {
   /** Backing store for the `active` accessor pair. */
   #active = false;
 
+  /** Backing store for the `showBoundaries` accessor pair. */
+  #showBoundaries = false;
+
   /**
    * Wire the controller to the host's reassignable engine/view via lazy getters.
    * @param {Object} deps - Host-injected dependencies.
    * @param {Object<string, {w:number, h:number}>} deps.resolutionPresets - Resolution table mapping a preset name to its pixel dimensions.
    * @param {{get: (key: string) => any}} deps.appState - Read-only view of the host's pub/sub state; reads the 'resolution' and 'effect' keys.
-   * @param {{W: number, H: number, pixels: Uint16Array|null, dotMesh: {instanceColor: {array: Uint16Array|null, needsUpdate: boolean}}}} deps.driver - Renderer instance owning the live pixel grid (W/H), the display buffer the compositor blits into, and the dot mesh carrying the second display alias: composite() reads both aliases to detect a divergence, and the heal re-points them.
+   * @param {{W: number, H: number, pixels: Uint16Array|null, dotMesh: {instanceColor: {array: Uint16Array|null, needsUpdate: boolean}}, invalidate: () => void}} deps.driver - Renderer instance owning the live pixel grid (W/H), the display buffer the compositor blits into, and the dot mesh carrying the second display alias: composite() reads both aliases to detect a divergence, and the heal re-points them.
    * @param {() => (import('./holosphere_wasm.js').HolosphereEngine|null)} deps.getWasmEngine - Returns the current main-thread HolosphereEngine, or null when none is bound.
    * @param {() => unknown} deps.refreshPixelView - Re-fetches the (possibly detached) WASM pixel view, reporting `true` when it fetched a fresh one. A refresh re-points the display aliases itself, so without that report composite() cannot tell that the buffer it is about to blit into is one the driver never cleared.
    * @param {() => (Uint16Array|null)} deps.getMemoryView - Returns the current Uint16Array view of the display buffer.
@@ -208,7 +211,6 @@ export class SegmentController {
     // Live pool size, set only by create() so it always matches the length of the
     // per-segment arrays composite() and updateStats() index.
     this.count = 4;
-    this.showBoundaries = false;
     // Tracked so create() can carry it into a freshly-spawned pool.
     this.animationsPaused = false;
     // Near-pole azimuthal decimation. Per-module-instance in the engine, so each
@@ -311,6 +313,23 @@ export class SegmentController {
     this.bandCount = 0;
     this.bandW = 0;
     this.bandH = 0;
+  }
+
+  /** @returns {boolean} Whether segment boundaries are drawn. */
+  get showBoundaries() {
+    return this.#showBoundaries;
+  }
+
+  /**
+   * Re-composite the published generation after changing the boundary overlay.
+   * @param {boolean} show - Whether segment boundaries are drawn.
+   */
+  set showBoundaries(show) {
+    const next = Boolean(show);
+    if (next === this.#showBoundaries) return;
+    this.#showBoundaries = next;
+    this.composite();
+    this.driver.invalidate();
   }
 
   /**
