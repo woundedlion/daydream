@@ -5,12 +5,21 @@ import { wireFlyout } from '../tools/flyout.js';
 const eventTarget = () => {
   const listeners = new Map();
   return {
-    addEventListener(type, listener) { listeners.set(type, listener); },
-    removeEventListener(type, listener) {
-      if (listeners.get(type) === listener) listeners.delete(type);
+    addEventListener(type, listener) {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type).add(listener);
     },
-    dispatch(type, event = {}) { listeners.get(type)?.(event); },
-    listenerCount() { return listeners.size; },
+    removeEventListener(type, listener) {
+      const held = listeners.get(type);
+      held?.delete(listener);
+      if (held?.size === 0) listeners.delete(type);
+    },
+    dispatch(type, event = {}) {
+      for (const listener of listeners.get(type) ?? []) listener(event);
+    },
+    listenerCount() {
+      return [...listeners.values()].reduce((count, held) => count + held.size, 0);
+    },
   };
 };
 
@@ -77,12 +86,14 @@ test('flyout dismisses outside and with Escape', () => {
 
 test('flyout teardown removes listeners and closes it', () => {
   const h = harness();
+  const external = () => {};
+  h.root.addEventListener('keydown', external);
   const teardown = wireFlyout(h);
   h.trigger.dispatch('click');
 
   teardown();
 
-  assert.equal(h.root.listenerCount(), 0);
+  assert.equal(h.root.listenerCount(), 1);
   assert.equal(h.trigger.listenerCount(), 0);
   assert.equal(h.documentTarget.listenerCount(), 0);
   assert.ok(!h.classes.has('is-open'));
