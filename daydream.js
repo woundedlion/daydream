@@ -390,6 +390,8 @@ export function start({
     teardown: () => appTeardown,
     start: (module) => {
       host.module = module;
+      if (module.HolosphereEngine.isLive())
+        throw new Error('HolosphereEngine is already live.');
       host.engine = new module.HolosphereEngine();
 
       // Push the Pole LOD value the GUI settled on during the async WASM-load
