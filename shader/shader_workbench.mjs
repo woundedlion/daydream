@@ -272,6 +272,16 @@ const requireCatalog = (catalog) => {
 const operatorField = (operator, fieldId) =>
   operator.params.find((field) => field.id === fieldId);
 
+const scalarCurve = (parameter) => {
+  if (parameter.interpolation.kind === 'LINEAR') return 'lerp';
+  if (parameter.interpolation.kind === 'LOG_POSITIVE') return 'log-positive';
+  if (parameter.interpolation.kind !== 'SHORTEST_PERIODIC') return null;
+  const period = Math.fround(parameter.interpolation.period);
+  if (period === 1) return 'shortest-turn';
+  if (period === Math.fround(2 * Math.PI)) return 'shortest-periodic';
+  return null;
+};
+
 /**
  * Validates the ordered operator chain against the catalog, collecting every
  * semantic finding rather than stopping at the first.
@@ -424,6 +434,16 @@ const validateParameterBinding = (parameter, path, chainOperators, report) => {
       JSON.stringify(parameter.domain.values) !== JSON.stringify(field.values))
     report('ENUM_DOMAIN_MISMATCH', `${path}.domain.values`,
       `Field "${parameter.id}" must carry the catalog's enum values in order.`);
+  if (!field.topology) {
+    const domain = parameter.domain;
+    if (Math.fround(domain.minimum) !== Math.fround(field.min) ||
+        Math.fround(domain.maximum) !== Math.fround(field.max))
+      report('SCALAR_DOMAIN_MISMATCH', `${path}.domain`,
+        `Field "${parameter.id}" must carry the catalog's numeric domain.`);
+    if (scalarCurve(parameter) !== field.curve)
+      report('SCALAR_DOMAIN_MISMATCH', `${path}.interpolation`,
+        `Field "${parameter.id}" must use the catalog's "${field.curve}" curve.`);
+  }
 };
 
 const validateParameters = (parameters, limits, budgets, chainOperators, report, guard) => {

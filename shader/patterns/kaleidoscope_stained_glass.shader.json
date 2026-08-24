@@ -111,8 +111,8 @@
         "classification": "preset",
         "default": 0,
         "domain": {
-          "maximum": 1,
-          "minimum": -1
+          "maximum": 4,
+          "minimum": -4
         },
         "id": "colorize.hue-shift-amount",
         "interpolation": {
@@ -142,7 +142,7 @@
         "default": 1,
         "domain": {
           "maximum": 32,
-          "minimum": 0.009999999776482582
+          "minimum": 1
         },
         "id": "colorize.mapping-frequency",
         "interpolation": {
@@ -232,8 +232,8 @@
         "classification": "preset",
         "default": 0,
         "domain": {
-          "maximum": 0.019999999552965164,
-          "minimum": -0.019999999552965164
+          "maximum": 0.009999999776482582,
+          "minimum": -0.009999999776482582
         },
         "id": "colorize.phase-oscillation-speed",
         "interpolation": {
@@ -463,12 +463,12 @@
         "classification": "preset",
         "default": 1,
         "domain": {
-          "maximum": 30,
-          "minimum": -30
+          "maximum": 64,
+          "minimum": 0.015625
         },
         "id": "warp1.scale",
         "interpolation": {
-          "kind": "LINEAR"
+          "kind": "LOG_POSITIVE"
         },
         "storage": "binary32",
         "unit": "ratio"
@@ -506,7 +506,7 @@
         "default": 0,
         "domain": {
           "maximum": 6.2831854820251465,
-          "minimum": -6.2831854820251465
+          "minimum": 0
         },
         "id": "warp1.vector-angle",
         "interpolation": {
@@ -577,7 +577,7 @@
         "default": 0,
         "domain": {
           "maximum": 6.2831854820251465,
-          "minimum": -6.2831854820251465
+          "minimum": 0
         },
         "id": "warp2.rotation",
         "interpolation": {

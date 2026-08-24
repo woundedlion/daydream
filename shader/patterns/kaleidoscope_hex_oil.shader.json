@@ -100,7 +100,7 @@
         },
         "id": "colorize.mapping-frequency",
         "interpolation": {
-          "kind": "LINEAR"
+          "kind": "LOG_POSITIVE"
         },
         "storage": "binary32",
         "unit": "ratio"
@@ -391,7 +391,8 @@
         },
         "id": "surface.direction",
         "interpolation": {
-          "kind": "LINEAR"
+          "kind": "SHORTEST_PERIODIC",
+          "period": 1
         },
         "storage": "binary32",
         "unit": "turn"
