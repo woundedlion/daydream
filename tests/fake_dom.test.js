@@ -222,6 +222,23 @@ test('textContent and setAttribute hand back the strings a browser stores', () =
   assert.equal(el.getAttribute('tabindex'), '-1');
 });
 
+test('id and class reflect between attributes and properties', () => {
+  const el = fakeElement('div');
+
+  el.id = 'property-id';
+  assert.equal(el.getAttribute('id'), 'property-id');
+  el.setAttribute('id', 'attribute-id');
+  assert.equal(el.id, 'attribute-id');
+
+  el.className = 'alpha beta';
+  assert.equal(el.getAttribute('class'), 'alpha beta');
+  el.setAttribute('class', 'gamma');
+  assert.equal(el.className, 'gamma');
+  assert.equal(el.classList.contains('gamma'), true);
+  el.classList.add('delta');
+  assert.equal(el.getAttribute('class'), 'gamma delta');
+});
+
 test('dataset is a stringifying view over the element data- attributes', () => {
   const el = fakeElement('div');
 

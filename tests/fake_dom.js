@@ -309,11 +309,13 @@ export function fakeElement(tag = 'div', options = {}) {
   const allowRedundantRemoval = Boolean(options && options.allowRedundantRemoval);
   const inPage = Boolean(options && options.connected);
   const classes = new Set();
+  const syncClassAttribute = () => {
+    element.attributes.class = [...classes].join(' ');
+  };
   const element = {
     listeners: [],
     tagName: String(tag).toUpperCase(),
     ownerDocument,
-    id: '',
     style: fakeStyle(),
     attributes: {},
     childNodes: [],
@@ -336,16 +338,27 @@ export function fakeElement(tag = 'div', options = {}) {
       return this.children[0] || null;
     },
     classList: {
-      add: (...names) => { for (const name of names) classes.add(name); },
-      remove: (...names) => { for (const name of names) classes.delete(name); },
+      add: (...names) => {
+        for (const name of names) classes.add(name);
+        syncClassAttribute();
+      },
+      remove: (...names) => {
+        for (const name of names) classes.delete(name);
+        syncClassAttribute();
+      },
       contains: (name) => classes.has(name),
       toggle: (name, force) => {
         const on = force === undefined ? !classes.has(name) : force;
         if (on) classes.add(name); else classes.delete(name);
+        syncClassAttribute();
         return on;
       },
     },
-    setAttribute(name, value) { this.attributes[name] = String(value); },
+    setAttribute(name, value) {
+      if (name === 'id') this.id = value;
+      else if (name === 'class') this.className = value;
+      else this.attributes[name] = String(value);
+    },
     getAttribute(name) { return name in this.attributes ? this.attributes[name] : null; },
     append(...nodes) { detach(nodes); reparent(nodes, this); this.childNodes.push(...nodes); },
     appendChild(node) {
@@ -489,6 +502,12 @@ export function fakeElement(tag = 'div', options = {}) {
     select() {},
     scrollIntoView() { this.scrollIntoViewCalls++; },
   };
+  Object.defineProperty(element, 'id', {
+    enumerable: true,
+    configurable: true,
+    get() { return element.attributes.id ?? ''; },
+    set(value) { element.attributes.id = String(value); },
+  });
   // className and classList are two views of one class set, as in the DOM: a
   // module may set the string and later read the list, or the reverse.
   Object.defineProperty(element, 'className', {
@@ -498,7 +517,9 @@ export function fakeElement(tag = 'div', options = {}) {
     get() { return [...classes].join(' '); },
     set(value) {
       classes.clear();
-      for (const name of String(value).split(/\s+/)) if (name) classes.add(name);
+      const text = String(value);
+      for (const name of text.split(/\s+/)) if (name) classes.add(name);
+      element.attributes.class = text;
     },
   });
   Object.defineProperty(element, 'innerHTML', {
