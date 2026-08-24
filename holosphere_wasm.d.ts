@@ -377,7 +377,7 @@ export interface HolosphereModule {
   };
   FullConfigRestoreResult: {
     APPLIED: EnumValue;
-    NOT_SHADERBALL: EnumValue;
+    NOT_SHADER_WORKBENCH: EnumValue;
     UNSUPPORTED_VERSION: EnumValue;
     INVALID_LENGTH: EnumValue;
     INVALID_VALUE: EnumValue;
