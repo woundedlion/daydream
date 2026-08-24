@@ -25,7 +25,11 @@ const harness = () => {
         else classes.delete(name);
       },
     },
-    contains(target) { return target === root || target === trigger; },
+    contains(target) {
+      for (let node = target; node; node = node.parentNode)
+        if (node === root) return true;
+      return false;
+    },
   };
   const trigger = {
     ...eventTarget(),
@@ -33,9 +37,11 @@ const harness = () => {
     getAttribute(name) { return attributes.get(name); },
     focus() { trigger.focused = true; },
     focused: false,
+    parentNode: root,
   };
+  const inside = { parentNode: trigger };
   const documentTarget = eventTarget();
-  return { root, trigger, documentTarget, classes, attributes };
+  return { root, trigger, inside, documentTarget, classes, attributes };
 };
 
 test('flyout toggles its visible and accessible state', () => {
@@ -57,7 +63,7 @@ test('flyout dismisses outside and with Escape', () => {
   wireFlyout(h);
 
   h.trigger.dispatch('click');
-  h.documentTarget.dispatch('pointerdown', { target: h.trigger });
+  h.documentTarget.dispatch('pointerdown', { target: h.inside });
   assert.ok(h.classes.has('is-open'));
 
   h.documentTarget.dispatch('pointerdown', { target: {} });
