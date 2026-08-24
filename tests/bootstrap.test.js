@@ -314,7 +314,7 @@ test('the reload waits for the re-fetched binary to finish streaming', async () 
   assert.deepEqual(order, ['reload']);
 });
 
-test('refreshModuleCache skips cross-origin and non-module resources', async () => {
+test('refreshModuleCache skips cross-origin and unrelated resources', async () => {
   const calls = [];
   await refreshModuleCache({
     origin: 'http://localhost:8000',
@@ -328,7 +328,11 @@ test('refreshModuleCache skips cross-origin and non-module resources', async () 
     fetch: (url) => { calls.push(url); return Promise.resolve(); },
   });
 
-  assert.deepEqual(calls, ['http://localhost:8000/bootstrap.js']);
+  assert.deepEqual(calls, [
+    'http://localhost:8000/styles/index.css',
+    'http://localhost:8000/pov_segment_map.json',
+    'http://localhost:8000/bootstrap.js',
+  ]);
 });
 
 test('refreshModuleCache survives a rejected re-fetch and a missing timeline', async () => {
