@@ -958,8 +958,8 @@ export class Daydream {
    * resources and drawing context, the OrbitControls, and the label and
    * context-lost layers. Call before discarding a Daydream (e.g. on SPA
    * navigation away) so it leaves behind no live observer firing into a dead
-   * scene, no leaked GPU material/geometry/context, and a #canvas the page can
-   * mount a fresh instance on.
+   * scene and no leaked GPU material, geometry, or context. A fresh instance
+   * requires a new canvas because this method deliberately loses the old context.
    */
   dispose() {
     // Stop the rAF callback first so it never fires into the nulled dotMesh /
