@@ -89,6 +89,7 @@ export const WARM_INTERVAL_MS = 10000;
 export class ModuleWarmer {
   constructor() {
     this.lastWarmAt = -Infinity;
+    this.warmEpoch = 0;
     // Resolved probe URL the stored warm covers. A warm of another module graph
     // must not be served this one's promise, so the window is keyed on it.
     /** @type {string | null} */
@@ -116,6 +117,7 @@ export class ModuleWarmer {
    * @returns {void}
    */
   discard() {
+    this.warmEpoch += 1;
     this.module = null;
   }
 
@@ -143,6 +145,11 @@ export class ModuleWarmer {
     // fetch resolves at the headers; the body must be drained or nothing is cached.
     const drain = (/** @type {string} */ u) =>
       fetchResource(new URL(u, baseUrl), { cache: 'no-cache' }).then((r) => r.arrayBuffer());
+    const epoch = this.warmEpoch + 1;
+    /** @param {WebAssembly.Module | null} compiled */
+    const publish = (compiled) => {
+      if (this.warmEpoch === epoch) this.module = compiled;
+    };
     /** @type {Promise<void>} */
     let warm;
     try {
@@ -166,13 +173,13 @@ export class ModuleWarmer {
         // so nothing left says a module compiled from an earlier one still
         // describes the deployed artifact.
         binary.then((bytes) => WebAssembly.compile(bytes).then(
-          (compiled) => { this.module = compiled; },
+          publish,
           (error) => {
             console.warn('[Segmented] shared WASM compile failed; each worker '
               + 'will compile its own', error);
-            this.module = null;
+            publish(null);
           }),
-        () => { this.module = null; }),
+        () => { publish(null); }),
       ]).then(() => {});
     } catch {
       // A fetch that throws synchronously warmed nothing, so the window stays
@@ -181,6 +188,7 @@ export class ModuleWarmer {
       return Promise.resolve();
     }
     // Stamped only once the promise it describes exists, for the same reason.
+    this.warmEpoch = epoch;
     this.lastWarmAt = now;
     this.lastWarmKey = probe.href;
     this.lastWarm = warm;
