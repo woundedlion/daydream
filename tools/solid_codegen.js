@@ -1281,8 +1281,9 @@ export function createOpGate(validator, retries = 3) {
        * call can overwrite it, so the mesh is freed after the verdict.
        */
       const attempt = (mod, candidate) => {
+        let out = null;
         try {
-          const out = applyOp(mesh, candidate);
+          out = applyOp(mesh, candidate);
           const classes = out.classifyFaces();
           const verdict = classes ? 'ok'
             : (meshOpFailure(mod, 'Face classification').flush ? 'exhausted' : 'bad');
@@ -1291,6 +1292,7 @@ export function createOpGate(validator, retries = 3) {
         } catch (e) {
           validator.noteDeath(e);
           if (e instanceof WebAssembly.RuntimeError) return 'trapped';
+          out?.delete();
           // applyOp raises a soft reject as a throw; of the reasons behind one,
           // only a full arena is cleared by flushing it.
           return meshOpFailure(mod, `Op "${candidate.op}"`).flush ? 'exhausted' : 'bad';
