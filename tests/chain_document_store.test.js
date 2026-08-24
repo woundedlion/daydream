@@ -211,7 +211,7 @@ test('removing an instance drops the staggered groups it shared', async () => {
         && parameter.storage === 'binary32')
       .slice(0, 2);
     for (const parameter of shared)
-      parameter.interpolation = { kind: 'NORMALIZED_LINEAR', group: 'warp-mix' };
+      parameter.interpolation = { ...parameter.interpolation, group: 'warp-mix' };
     addStaggered(document);
   } });
   const staggeredGroups = () => store.document().descriptor.path_policies
