@@ -183,6 +183,7 @@ mock.module('../holosphere_wasm.js', {
       EffectSetResult,
       FullConfigRestoreResult,
       HolosphereEngine: class {
+        static isLive() { return false; }
         constructor() {
           engineInstance = new FakeEngine();
           engineInstance.resolutionOk = nextResolutionOk;

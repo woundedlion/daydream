@@ -245,6 +245,11 @@ async function handleMessage(msg) {
       }
       const mod = await createHolosphereModule(options);
       wasmModule = mod;
+      if (mod.HolosphereEngine.isLive()) {
+        post({ type: 'engineRejected',
+               reason: 'HolosphereEngine is already live' });
+        break;
+      }
       engine = new mod.HolosphereEngine();
       // A rejected resolution leaves no usable geometry: skip the canvasW/canvasH
       // commit, segRange, and ready (symmetric with the setResolution handler's
