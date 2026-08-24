@@ -418,12 +418,12 @@ Both trees are gated against their repository's tracked file list: every row mus
 │       └── gen/                    Python design/fabrication tools (`just pcb` runs `fab.py` only)
 │
 ├── targets/                    Per-target entry points
-│   ├── common/
-│   │   └── phantasm_target.h   Shared Phantasm-class boilerplate — TOTAL_PIXELS=288, RPM=480, LED transport, geometry, boot, effect construction
 │   ├── Holosphere/
 │   │   └── Holosphere.ino      Holosphere entry — NUM_PIXELS=40, RPM=480
 │   ├── Phantasm/
-│   │   └── Phantasm.ino        Phantasm entry — 4×Teensy playlist, per-effect seeds, sync config
+│   │   ├── Phantasm.ino        Phantasm entry — 4×Teensy playlist, per-effect seeds, sync config
+│   │   ├── phantasm_playlist.h HS_PHANTASM_EFFECT_LIST — device show order, per-entry durations, roster drift guards
+│   │   └── phantasm_target.h   Shared Phantasm-class boilerplate — TOTAL_PIXELS=288, RPM=480, LED transport, geometry, boot, effect construction
 │   ├── Profile/
 │   │   └── Profile.ino         Single-effect HS_PROFILE harness on segment 0 of the segmented rig
 │   └── wasm/
@@ -463,6 +463,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── engine_catalog.json     Source operator catalog behind native chain validation
 │   ├── export_engine_catalog.mjs Exports the installed WASM module's operator catalog
 │   ├── sha256.mjs              Shared SHA-256 implementation for shader documents
+│   ├── engine_bindings_contract.test.mjs Node contract tests for WASM engine binding invariants
 │   ├── wasm_smoke.mjs          Runtime WASM smoke: drives every effect at both resolutions (CI)
 │   ├── wasm_smoke_predicates.mjs Module-free smoke decisions: dark band, stack creep budget, param zip
 │   ├── wasm_smoke_predicates.test.mjs Node unit test for those three decisions
@@ -501,6 +502,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── parse_profile.py        Capture-log parser behind the per-window/per-preset reports
 │   ├── pullback_profile_build.py  Profile-image Git-SHA build hook for pullback telemetry
 │   ├── generate_pullback_manifest_header.py  Pullback manifest validator and native-test header generator
+│   ├── pullback_operations.def                Shared capture operation codes and preset count
 │   ├── pullback_capture.py / pullback_capture_native.cpp  Canonical producer + native/WASM backend
 │   ├── pullback_crosscheck.py  Isolated base/candidate pullback capture runner and comparator
 │   ├── device_lock.sh          Host-global per-board lock every device path takes
@@ -518,6 +520,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 ├── Doxyfile                    Doxygen config for the published API reference
 ├── package.json                npm entry points for the scripts/*.mjs tools (ESM; Node ≥ 22, CI pinned via tools/build_pins.py)
 ├── package-lock.json           Pinned dependency set behind those entry points
+├── requirements/               Dependabot-visible Python toolchain pins used by CI
 ├── .clang-format               LLVM-derived C++ style; CI enforces it with clang-format 22
 ├── ruff.toml                   Python lint rules (defect classes only, no formatter) — the ci.yml lint job
 ├── eslint.config.mjs           JavaScript lint rules for scripts/*.mjs (recommended set) — the same job
@@ -632,6 +635,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── record-module-loads.mjs NODE_OPTIONS shim recording loaded test modules
 │   ├── require-tests.mjs       `pretest` guard against empty globs, unreachable tests, and shadow installs
 │   ├── serve-manifest.mjs      Local static server constrained to the published site manifest
+│   ├── verify-ci-green.mjs     Verifies every CI job is covered by the required aggregate check
 │   ├── workbench-probe.mjs     Headless pointer-level probe of the shader workbench's pipeline strip; run it for any tools/ UI change
 │   ├── panel-probe.mjs         Headless probe of the effect panel's real scroll clamping and scroll restore across a rebuild
 │   ├── solids-probe.mjs        Headless pointer-level probe of the solids page's op-chain row reordering
@@ -1797,7 +1801,7 @@ Three hardware drivers form a layered stack.  `dma_led.h` handles the SPI wire p
 
 #### DMA LED Controller (`dma_led.h`)
 
-Non-blocking DMA-based LED output for HD107S (APA102-compatible) LEDs on Teensy 4.x.  Enabled by `#define USE_DMA_LEDS` in the target's boilerplate header (`targets/common/phantasm_target.h`) before it includes the driver; `led.h` stays neutral and the default FastLED/WS2801 path remains as fallback. The FastLED fallback applies only to the single-board `POVDisplay`; the segmented `POVSegmented` driver `#error`s without `USE_DMA_LEDS` (FastLED's bit-bang `show()` masks IRQs for windows that break the sync symbol margins, which are derived from a mask window M ≈ 0), so DMA LEDs are mandatory on Phantasm.
+Non-blocking DMA-based LED output for HD107S (APA102-compatible) LEDs on Teensy 4.x.  Enabled by `#define USE_DMA_LEDS` in the target's boilerplate header (`targets/Phantasm/phantasm_target.h`) before it includes the driver; `led.h` stays neutral and the default FastLED/WS2801 path remains as fallback. The FastLED fallback applies only to the single-board `POVDisplay`; the segmented `POVSegmented` driver `#error`s without `USE_DMA_LEDS` (FastLED's bit-bang `show()` masks IRQs for windows that break the sync symbol margins, which are derived from a mask window M ≈ 0), so DMA LEDs are mandatory on Phantasm.
 
 | Class | Role |
 |---|---|
@@ -2140,7 +2144,7 @@ With `{.persist = true}`, `Canvas` copies the previous frame's buffer into the n
 
 All screenshots below were captured from the [live WebAssembly simulator](https://woundedlion.github.io/daydream/) — the Phantasm 288×144 preset for most, and the Holosphere 96×20 preset for RingShower, Dynamo and Thrusters.
 
-The compile-time roster and tests carry 39 firmware-capable effects. Native and WASM builds add two simulator-only registry entries, the `Shader` workbench and the `ShaderChain` chain interpreter, for 41. The simulator sidebar exposes 35 effects at 288×144 and 34 at 96×20 (§10.5); both stay out of the card lists because they open through the standalone tool. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) contains 36 effects, including all sixteen promoted fixed-pipeline effects and excluding the three Holosphere-96×20-only effects: Dynamo, MobiusRings, and Thrusters. Full-cycle Teensy measurements for that playlist are indexed in the [on-device effect profiles](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md).
+The compile-time roster and tests carry 39 firmware-capable effects. Native and WASM builds add two simulator-only registry entries, the `Shader` workbench and the `ShaderChain` chain interpreter, for 41. The simulator sidebar exposes 35 effects at 288×144 and 34 at 96×20 (§10.5); both stay out of the card lists because they open through the standalone tool. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `targets/Phantasm/phantasm_playlist.h`) contains 36 effects, including all sixteen promoted fixed-pipeline effects and excluding the three Holosphere-96×20-only effects: Dynamo, MobiusRings, and Thrusters. Full-cycle Teensy measurements for that playlist are indexed in the [on-device effect profiles](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md).
 
 ### Core Effects (Modern Engine)
 
@@ -2214,7 +2218,7 @@ Hankin interlace patterns over the Platonic and Archimedean solids. The interlac
 
 Visualizes the real spherical harmonics Yˡₘ(θ, φ) as a colored scalar field over the sphere: the harmonic value drives a positive/negative palette split — negative lobes recolor the positive palette by swapping its red and blue channels and dimming its green — with ambient-occlusion shading. Continuously morphs between (l, m) modes.
 
-**Parameters**: Amplitude, Debug BB
+**Parameters**: Amplitude
 
 </td></tr></table>
 
@@ -2358,7 +2362,7 @@ An affine primitive lattice rendered as soft iso contours through a folded gnomo
 
 An analytic reflective flight through a cubic lattice that opens into a four-dimensional hypercubic lattice under genuine SO(4) rotation. Transparent integer-coordinate hyperplanes expose several lattice shells without raymarching.
 
-**Parameters**: Dimension, Wire Radius, Softness, Far Cells, Pixel AA, Travel, 3D Spin, 4D Spin, Reflection, Color, Shells
+**Parameters**: Dimension, Sphere Radius, Wire Radius, Softness, Far Cells, AA Strength, Speed, 3D Spin, 4D Spin, Chrome Warp, Reflection, Color, Shells
 
 </td></tr></table>
 
@@ -2667,7 +2671,6 @@ Two stages carry approved approximations. Fast square Peirce projection and the 
 | `alien-core` | `AlienCore` | 1 | 3 |
 | `kaleidoscope-mandala` | `KaleidoscopeMandala` | 2 | 5, plus `cup-hue` |
 | `grid-space` | `GridSpace` | 1 | 6 |
-| `hyper-lattice` | `HyperLattice` | 4 | — |
 | `lattice-melt` | `LatticeMelt` | 2 | 7–8 |
 | `ash-cloud` | `AshCloud` | 1 | — |
 | `kaleidoscope-pent-bright` | `KaleidoscopePentBright` | 1 | 9 |
@@ -2804,6 +2807,7 @@ A trap is terminal for the whole module, not just for the call that tripped it. 
 | `getShaderChainCatalog()` → `string` | *(static)* The chain interpreter's operator catalog as one JSON string — budgets, carriers, and every operator-table entry. Budgets, carriers, operator ids and parameter schemas match the catalog the native suite pins as its golden, which is what keeps an editor's stage library from drifting from the operator table the engine actually resolves against. The per-operator block sizes are the building ABI's and are **not** byte-identical to that golden: this module emits wasm32 figures, where a pointer-bearing `prepared` block is 4-byte-aligned and narrower than the 8-byte-aligned LP64 figure the native golden carries (7 of the 38 operators differ). The wasm32 figures are the ones an editor budgets arena bytes against, and the ones this module's own runtime allocates from; `scripts/shader_workbench.test.mjs` holds the two spellings to differing in nothing else |
 | `getPixels()` | Return a zero-copy `Uint16Array` view into WASM linear memory, spanning the active resolution's prefix of the fixed backing buffer |
 | `getBufferLength()` → `int` | Length of the pixel buffer (`W × H × 3`) for sizing the view, and the staleness test for a cached one: a `setResolution` moves this length without detaching the outstanding view |
+| `getEffectPresetCounts()` → `object` | Map from every effect name available at the active resolution to its preset count; returns an empty object when the resolution is unsupported or uninitialized |
 | `setParameter(name, value)` → `ParamSetResult` | Update a live effect parameter; returns `Module.ParamSetResult.APPLIED` on success, else the rejection reason (`NO_EFFECT`, `UNKNOWN_PARAM`, `READONLY`, or `NON_FINITE`). Compare against the enum values — never by truthiness. An `APPLIED` float may still have been clamped to the param's `[min, max]`; read the effective value back via `getParamValues()`. An `APPLIED` write to an *animated* param also engages the animation pause (the animation would otherwise overwrite the value on the next frame), and that pause survives `setEffect` — check `getAnimationsPaused()` afterwards |
 | `setAnimationsPaused(paused)` | Freeze/resume the current effect's animation drivers (the GUI "Pause Animation" toggle) |
 | `getAnimationsPaused()` → `bool` | Whether those drivers are currently frozen. The engine is the owner of this state — an `APPLIED` `setParameter` on an animated param engages the pause by itself — so read it back rather than mirroring the rule in JS |
@@ -3002,7 +3006,7 @@ A page can add its own local imports by setting `window.daydreamExtraImports` to
 
 ### 10.9 Video Recording (`recorder.js`)
 
-A `VideoRecorder` wraps `MediaRecorder` over an offscreen capture canvas's `captureStream(0)` — the manual-frame-request mode where frames are taken on demand. On the single-engine path, every simulation tick calls `recorder.captureFrame()`, which blits the source canvas into the offscreen and requests a frame from the stream; the recorded frame sequence is therefore locked to the effect's simulation rate (16 FPS by default). MediaRecorder timestamps those frames on its wall-clock lifecycle, so simulation pauses and rendering stalls extend both the file duration and the elapsed readout. The segmented path captures only ticks where `captureReady()` reports that a composite landed, so a pool overrun can drop a recorded frame. Manual capture requires the track to expose `requestFrame`; on browsers lacking it the recorder falls back to a wall-clock timer.
+A `VideoRecorder` wraps `MediaRecorder` over an offscreen capture canvas's `captureStream(0)` — the manual-frame-request mode where frames are taken on demand instead of on wall-clock. On the single-engine path, every simulation tick calls `recorder.captureFrame()`, which blits the source canvas into the offscreen and requests a frame from the stream; recorded video is therefore locked to the effect's simulation rate (16 FPS by default) regardless of how fast the browser actually renders, with byte-perfect repeatability between recordings. The segmented path captures only ticks where `captureReady()` reports that a composite landed, so a pool overrun can drop a recorded frame and void both guarantees. The guarantees also require the captured track to expose `requestFrame`; on browsers lacking it the recorder falls back to a wall-clock timer.
 
 Codec priority is MP4/H.264 → WebM/VP9 → WebM/VP8. Capture always goes through the offscreen canvas: it is either scaled to a target height for size-controlled exports, or pinned to the source's start-time size at native resolution. Either way the recorded track's frame size is fixed for the whole session, so a mid-recording resolution change cannot alter the encoded dimensions. The per-frame blit is a centered letterbox/pillarbox fit rather than a plain rescale: the source is scaled until it fills whichever offscreen dimension it reaches first, centered, and the leftover margin is cleared — so a source whose aspect no longer matches the pinned track is bordered, never stretched. A transient 0×0 source mid-resize is skipped and the offscreen keeps its last good frame.
 
@@ -3072,7 +3076,7 @@ Each hardware target has its own `.ino` entry point in `targets/`:
 > the images *fit*, not byte-identity
 > with the bench build.
 
-Target-specific constants live with their target rather than in a global `constants.h` — the Holosphere entry defines its own, while the Phantasm-class targets share `targets/common/phantasm_target.h` (`TOTAL_PIXELS = 288`, `RPM = 480`):
+Target-specific constants live with their target rather than in a global `constants.h` — the Holosphere entry defines its own, while the Phantasm-class targets share `targets/Phantasm/phantasm_target.h` (`TOTAL_PIXELS = 288`, `RPM = 480`):
 ```cpp
 // targets/Holosphere/Holosphere.ino
 static constexpr int NUM_PIXELS = 40;
