@@ -235,8 +235,8 @@
         "storage": "binary32",
         "unit": "radian",
         "domain": {
-          "minimum": -6.2831854820251465,
-          "maximum": 6.2831854820251465
+          "maximum": 6.2831854820251465,
+          "minimum": 0
         },
         "interpolation": {
           "kind": "SHORTEST_PERIODIC",
@@ -360,8 +360,8 @@
         "storage": "binary32",
         "unit": "ratio",
         "domain": {
-          "minimum": 0.01,
-          "maximum": 32
+          "maximum": 32,
+          "minimum": 1
         },
         "interpolation": {
           "kind": "LOG_POSITIVE"
@@ -405,8 +405,8 @@
         "storage": "binary32",
         "unit": "turn-per-frame",
         "domain": {
-          "minimum": -0.02,
-          "maximum": 0.02
+          "maximum": 0.009999999776482582,
+          "minimum": -0.009999999776482582
         },
         "interpolation": {
           "kind": "LINEAR"
@@ -450,8 +450,8 @@
         "storage": "binary32",
         "unit": "ratio",
         "domain": {
-          "minimum": -1,
-          "maximum": 1
+          "maximum": 4,
+          "minimum": -4
         },
         "interpolation": {
           "kind": "LINEAR"

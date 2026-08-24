@@ -312,7 +312,7 @@
         "classification": "preset",
         "storage": "binary32",
         "unit": "turn",
-        "domain": { "minimum": -1, "maximum": 1 },
+        "domain": {"maximum":4,"minimum":-4},
         "interpolation": { "kind": "LINEAR" },
         "default": 0.366
       },

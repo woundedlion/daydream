@@ -789,8 +789,8 @@ test('a transition evaluates between its two presets', () => {
   const middle = at(60);
   assert.equal(middle.raw_progress, 0.5);
   assert.equal(middle.eased_progress, 0.5);
-  assert.equal(middle.values['sample.pattern-freq'], 2,
-    'the log-positive midpoint of 1 and 4 is their geometric mean');
+  assert.equal(middle.values['sample.pattern-freq'], 2.5,
+    'the linear midpoint of 1 and 4 is their arithmetic mean');
   const meridian = middle.values['project.central-meridian'];
   assert.ok(meridian >= 0 && meridian < period);
   assert.ok(meridian > 6 || meridian < 0.2, 'the shortest path crosses the seam');

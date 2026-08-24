@@ -28,8 +28,8 @@
         "classification": "preset",
         "storage": "binary32",
         "unit": "ratio",
-        "domain": { "minimum": 0.01, "maximum": 10.0 },
-        "interpolation": { "kind": "LOG_POSITIVE" },
+        "domain": {"maximum":64,"minimum":0.10000000149011612},
+        "interpolation": {"kind":"LINEAR"},
         "default": 1.0
       },
       {
