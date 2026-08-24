@@ -425,12 +425,12 @@ test('dispose detaches instanceColor before disposing the mesh', () => {
   const ctx = disposeCtx(fakeMesh(log), log);
   Daydream.prototype.dispose.call(ctx);
 
-  const detach = log.indexOf('detach');
-  const disposed = log.indexOf('mesh.dispose(detached)');
-  assert.ok(detach >= 0, 'instanceColor was never detached');
-  assert.ok(disposed > detach, 'the mesh was disposed before instanceColor came off it');
-  assert.ok(log.indexOf('geometry.dispose') < detach,
-    'the geometry outlived the detach it was supposed to precede');
+  const meshTeardown = log.filter((step) => [
+    'geometry.dispose', 'detach', 'mesh.dispose(detached)',
+  ].includes(step));
+  assert.deepEqual(meshTeardown, [
+    'geometry.dispose', 'detach', 'mesh.dispose(detached)',
+  ]);
 });
 
 test('dispose releases the observer, listeners, and GPU resources', () => {
