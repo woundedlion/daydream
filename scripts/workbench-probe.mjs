@@ -266,6 +266,18 @@ async function probeStrip(tab) {
   check(await tab.$eval('.chain-palette .chain-palette-entry',
     (node) => node.getAttribute('aria-selected')) === 'true',
   'the opened palette marks its focused option selected');
+  const anchorBox = await boxOf(tab, add);
+  const paletteBox = await boxOf(tab, '.chain-palette');
+  const palettePosition = await tab.$eval('.chain-palette',
+    (node) => getComputedStyle(node).position);
+  const expectedPaletteLeft = Math.max(8,
+    Math.min(anchorBox.x, VIEWPORT.width - paletteBox.width - 8));
+  check(palettePosition === 'fixed'
+      && Math.abs(paletteBox.x - expectedPaletteLeft) < 1
+      && paletteBox.y >= anchorBox.y + anchorBox.height
+      && paletteBox.y - anchorBox.y - anchorBox.height <= 8,
+  `the palette opens under its anchor at ${Math.round(paletteBox.x)},`
+    + `${Math.round(paletteBox.y)}px`);
   const elsewhere = await boxOf(tab,
     '.chain-band[data-carrier="sphere"] .chain-band-title');
   check(!overlaps(await boxOf(tab, '.chain-palette'), elsewhere),
@@ -327,6 +339,19 @@ async function probeStrip(tab) {
     const box = await boxOf(tab, region);
     check(!overlaps(panels, box), `global controls clear ${region}`);
   }
+
+  await tab.setViewport({ width: 700, height: VIEWPORT.height });
+  await tab.waitForFunction(() => window.innerWidth === 700);
+  await (await tab.waitForSelector(add)).click();
+  const narrowAnchor = await boxOf(tab, add);
+  const narrowPalette = await boxOf(tab, '.chain-palette');
+  const narrowLeft = Math.max(8,
+    Math.min(narrowAnchor.x, 700 - narrowPalette.width - 8));
+  check(Math.abs(narrowPalette.x - narrowLeft) < 1
+      && narrowPalette.y >= narrowAnchor.y + narrowAnchor.height
+      && narrowPalette.x >= 8 && narrowPalette.x + narrowPalette.width <= 692,
+  'the anchored palette stays inside a narrow viewport');
+  await tab.keyboard.press('Escape');
   return failures;
 }
 

@@ -455,44 +455,37 @@ test('a band + appends while Insert opens the insertion palette after focus', as
   assert.equal(illegal, undefined, 'invalid stages are omitted instead of greyed out');
 });
 
-// The palette's offset parent is whatever positioned ancestor sits above it —
-// the band for a band +, the whole strip region for a socket's swap — so its
-// stylesheet placement lands wherever that ancestor starts. These cases give the
-// fake the one measurement the anchoring reads.
 /**
  * @param {Object} h - A strip harness.
  * @param {number} width - Width every created element reports.
- * @param {number} parentLeft - Left edge of the palette's offset parent.
  * @returns {void}
  */
-const measureNewElements = (h, width, parentLeft) => {
-  const offsetParent = fakeElement('div');
-  offsetParent.getBoundingClientRect = () => ({ left: parentLeft, width: 1264 });
+const measureNewElements = (h, width) => {
   h.doc.documentElement = { clientWidth: 1280 };
   h.doc.createElement = (/** @type {string} */ tag) => {
     const node = fakeElement(tag);
     node.getBoundingClientRect = () => ({ left: 0, width });
-    node.offsetParent = offsetParent;
     return node;
   };
 };
 
 test('a palette opens anchored to the control that opened it', async () => {
   const h = await makeStrip();
-  measureNewElements(h, 208, 8);
+  measureNewElements(h, 208);
   const add = bandFor(h, 'sphere').querySelector('.chain-band-add');
-  add.getBoundingClientRect = () => ({ left: 298, width: 20 });
+  add.getBoundingClientRect = () => ({ left: 298, bottom: 52, width: 20 });
   add.dispatch('click');
-  assert.equal(paletteOf(h).style.left, '290px');
+  assert.equal(paletteOf(h).style.left, '298px');
+  assert.equal(paletteOf(h).style.top, '52px');
 });
 
 test('a palette near the right edge is clamped back inside the viewport', async () => {
   const h = await makeStrip();
-  measureNewElements(h, 208, 8);
+  measureNewElements(h, 208);
   const add = bandFor(h, 'sphere').querySelector('.chain-band-add');
-  add.getBoundingClientRect = () => ({ left: 1250, width: 40 });
+  add.getBoundingClientRect = () => ({ left: 1250, bottom: 52, width: 40 });
   add.dispatch('click');
-  assert.equal(paletteOf(h).style.left, '1056px',
+  assert.equal(paletteOf(h).style.left, '1064px',
     'clamped to the viewport width less the palette and its margin');
 });
 
