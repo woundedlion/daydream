@@ -450,7 +450,6 @@ export function createEffectGui({
    */
   function sync() {
     if (!activeEffect || !activeEffect.controllerByName) return;
-    const presetCount = getPresetCount();
     const presetIndex = getPresetIndex();
     // Mirroring the preset can itself load a new schema, so the rebuild follows
     // it — but a refusal must not gate the rebuild, which is what clears the
@@ -467,7 +466,7 @@ export function createEffectGui({
     }
     if (!presetSynced) return;
     adoptPauseDisplay(activeEffect, engineAnimationsPaused());
-    adoptPresetDisplay(activeEffect, presetCount, presetIndex);
+    adoptPresetDisplay(activeEffect, getPresetCount(), getPresetIndex());
     if (!activeEffect.hasParams) return;
     // One focus read for the whole pass: at most one element has focus.
     const focused = focusedElement() ?? null;
