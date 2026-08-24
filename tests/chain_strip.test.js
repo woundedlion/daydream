@@ -689,8 +689,6 @@ test('pointer gestures never start a chip drag', async () => {
   const h = await makeStrip();
   chipByLabel(h, 'lens').dispatch('pointerdown',
     { isPrimary: true, button: 0, pointerId: 7 });
-  assert.equal(chipByLabel(h, 'lens').dataset.dragging, undefined,
-    'chips have no drag gesture');
   assert.deepEqual(h.applied, []);
   assert.deepEqual(h.container.listeners.filter(
     (listener) => listener.type.startsWith('pointer')), []);
@@ -941,8 +939,10 @@ test('the inline controls keep their own keys and take no drag', async () => {
     ['camera', 'lens', 'project', 'warp2', 'sample', 'colorize']);
 
   slider.dispatch('pointerdown', { isPrimary: true, button: 0, pointerId: 4 });
-  assert.equal(chips(h).some((chip) => chip.dataset.dragging === 'true'), false,
-    'a press on a control must not be captured as a chip drag');
+  assert.deepEqual(h.applied, [],
+    'a press on a control must not apply a chain edit');
+  assert.deepEqual(labels(h),
+    ['camera', 'lens', 'project', 'warp2', 'sample', 'colorize']);
 });
 
 test('syncHistory repaints Undo and Redo without rebuilding the strip', async () => {

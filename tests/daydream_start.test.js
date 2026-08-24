@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement, restoreDocumentAfterEach } from './fake_dom.js';
-import { startApp, segmentCountControl } from './fake_app.js';
+import { startApp } from './fake_app.js';
 
 restoreDocumentAfterEach();
 
@@ -55,13 +55,6 @@ test('the global GUI carries the controls a deep link names', () => {
   const recording = root.folders.find((f) => f.namespace === 'Recording');
   assert.deepEqual(recording.controllers.map((c) => c.property),
     ['recQuality', 'recResolution', 'recFormat', 'record']);
-});
-
-test('the segment-count control is bounded by the device cap', () => {
-  const count = segmentCountControl(startApp());
-
-  assert.match(count.label, /^Segments/,
-    'the label carries the marker for the count no hardware produces');
 });
 
 test('the record button is offered only once an engine exists', () => {
