@@ -460,14 +460,14 @@ test('a failed module load reports the failure and tears the app down', () => {
     'the animation loop and window listeners must not outlive the failure UI');
 });
 
-test('a failed load on an already discarded page still reports the failure', () => {
+test('a failed load on an already discarded page is ignored', () => {
   const h = makeLoadHandlers();
   h.appTeardown.dispose();
   h.log.length = 0;
 
   h.handlers.onModuleFailed(new Error('fetch blocked'));
 
-  assert.deepEqual(h.log, ['reportFailure fetch blocked']);
+  assert.deepEqual(h.log, []);
 });
 
 test('both handlers tolerate a module evaluation that never built the teardown', () => {
