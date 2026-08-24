@@ -27,7 +27,7 @@ export const VENDOR_REMEDY = 'three and lil-gui load from cdn.jsdelivr.net. If '
 // Extensions refreshModuleCache re-fetches. The WASM binary is in because the
 // deploy binds it to its glue by content hash, so a cached binary against fresh
 // glue is the canonical skew a Reload has to clear.
-const REFRESHED_EXTENSIONS = ['.js', '.wasm'];
+const REFRESHED_EXTENSIONS = ['.js', '.wasm', '.css', '.json'];
 
 // Re-fetches in flight at once. Past the browser's per-host connection limit
 // the extra requests only queue, and the multi-megabyte binary — the one
