@@ -1,7 +1,9 @@
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { createFrameScheduler, onPageTeardown } = await import('../tools/page_lifecycle.js');
+const {
+  createFrameScheduler, onPageTeardown, watchMediaMatch,
+} = await import('../tools/page_lifecycle.js');
 
 /**
  * Animation-frame double: callbacks queue until flush() runs them, and cancelled
@@ -216,4 +218,25 @@ test('a teardown cancels the scheduler pending frame', () => {
   win.fire(false);
   frames.flush();
   assert.equal(runs, 0);
+});
+
+test('watchMediaMatch runs only for matching changes and detaches', () => {
+  let changed = null;
+  let removed = null;
+  const query = {
+    addEventListener: (_type, listener) => { changed = listener; },
+    removeEventListener: (_type, listener) => { removed = listener; },
+  };
+  let runs = 0;
+  const stop = watchMediaMatch(query, () => { runs++; });
+
+  changed({ matches: false });
+  changed({ matches: true });
+  assert.equal(runs, 1);
+  stop();
+  assert.equal(removed, changed);
+});
+
+test('watchMediaMatch tolerates an unavailable media query', () => {
+  assert.doesNotThrow(() => watchMediaMatch(undefined, () => {})());
 });

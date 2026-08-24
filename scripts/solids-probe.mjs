@@ -107,6 +107,16 @@ async function probeChain(tab) {
     if (!ok) failures.push(message);
   };
 
+  const motion = await tab.$eval('#toggleRotate', (node) => ({
+    checked: node.getAttribute('aria-checked'),
+    transition: getComputedStyle(node).transitionDuration,
+  }));
+  check(motion.checked === 'false', 'reduced motion starts auto-rotation off');
+  check(motion.transition === '0s', 'reduced motion removes control transitions');
+  await tab.click('#toggleRotate');
+  check(await tab.$eval('#toggleRotate', (node) => node.getAttribute('aria-checked')) === 'true',
+    'the rotation switch can explicitly start motion');
+
   for (const [i, op] of OPS.entries()) await addOp(tab, op, i + 1);
   const built = await chainNames(tab);
   check(built.join() === OPS.map((op) => op.toUpperCase()).join(),
@@ -183,6 +193,9 @@ const failures = [];
 try {
   const tab = await browser.newPage();
   await tab.setViewport(VIEWPORT);
+  await tab.emulateMediaFeatures([
+    { name: 'prefers-reduced-motion', value: 'reduce' },
+  ]);
   tab.on('pageerror', (error) => failures.push(`uncaught: ${error.message}`));
   await tab.goto(`${site.origin}/${PAGE}`, { timeout: TIMEOUT_MS });
   // The page declares no loading overlay. Its init titles the base card as its

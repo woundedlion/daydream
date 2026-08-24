@@ -45,7 +45,9 @@ import { buildOpRow, formatParamValue, syncSweepWarning } from './solid_op_rows.
 // passed in, so the renderer is unit tested against a stand-in namespace.
 import { createMeshRenderer, meshStatsLine, meshCanvasLabel, MAX_INDEX_LABELS }
   from './solid_render.js';
-import { createFrameScheduler, onPageTeardown } from './page_lifecycle.js';
+import {
+  createFrameScheduler, onPageTeardown, watchMediaMatch,
+} from './page_lifecycle.js';
 import { createPointerDrag } from './pointer_drag.js';
 
 let camera, scene, renderer, controls;
@@ -90,6 +92,7 @@ const normalMaterial = new THREE.LineBasicMaterial({ vertexColors: true, transpa
 // this, every op-slider pointer tick replays the entire WASM op chain (relax
 // alone is up to 500 iterations) on the main thread.
 const scheduleUpdate = createFrameScheduler(update);
+const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
 
 // WASM Module
 let WasmModule = null;
@@ -99,6 +102,7 @@ let MeshOpsWasm = null;
 const state = {
   base: 'cube',
   ops: [], // Array of objects { op: string, params: object }
+  autoRotate: reducedMotion?.matches !== true,
   showGeodesics: true,
   showFaces: true,
   colorizeFaces: false,
@@ -205,7 +209,7 @@ async function init() {
     minDistance: 0,
     maxDistance: Infinity,
     alpha: true,
-    autoRotate: true,
+    autoRotate: state.autoRotate,
     autoRotateSpeed: 2.0,
     lights: true,
     showSphere: false,
@@ -215,11 +219,14 @@ async function init() {
   camera = result.camera;
   renderer = result.renderer;
   controls = result.controls;
+  const stopWatchingReducedMotion = watchMediaMatch(
+    reducedMotion, () => setAutoRotate(false));
 
   // The scaffold's dispose() stops the render loop and detaches the resize
   // listener; cancelling the pending frame keeps a queued recompute from
   // running against the disposed scene.
   onPageTeardown(() => {
+    stopWatchingReducedMotion();
     scheduleUpdate.cancel();
     meshRenderer?.disposeGeometry();
     faceMaterial.dispose();
@@ -233,6 +240,9 @@ async function init() {
   // Toggles
   // These toggles change only how the cached mesh is presented, so they
   // redraw via renderMesh() instead of update() — no WASM op-chain replay.
+  document.getElementById('toggleRotate').addEventListener('click', () => {
+    setAutoRotate(!state.autoRotate);
+  });
   document.getElementById('toggleGeo').addEventListener('click', () => {
     state.showGeodesics = !state.showGeodesics;
     updateToggles();
@@ -264,9 +274,8 @@ async function init() {
     renderMesh();
   });
 
-  // A click on the animation pauses/unpauses the auto-rotation. Track the
-  // pointer-down position so orbit drags (and multi-touch gestures, via
-  // isPrimary) don't toggle it.
+  // Canvas taps mirror the visible switch; orbit drags and secondary pointers
+  // leave it unchanged.
   const canvasEl = document.getElementById('canvas');
   let pointerDownX = 0, pointerDownY = 0;
   canvasEl.addEventListener('pointerdown', (e) => {
@@ -277,7 +286,7 @@ async function init() {
   canvasEl.addEventListener('pointerup', (e) => {
     if (!e.isPrimary) return;
     if (Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY) < 5) {
-      controls.autoRotate = !controls.autoRotate;
+      setAutoRotate(!state.autoRotate);
     }
   });
 
@@ -471,6 +480,7 @@ function updateToggles() {
   // Each toggle's on/off look is driven by the shared `.toggle-switch.is-on`
   // CSS (tools.css), so syncing state is just toggling that one class.
   const toggleState = {
+    toggleRotate: state.autoRotate,
     toggleGeo: state.showGeodesics,
     toggleFaces: state.showFaces,
     toggleColorize: state.colorizeFaces,
@@ -484,6 +494,12 @@ function updateToggles() {
     btn.classList.toggle('is-on', !!on);
     btn.setAttribute('aria-checked', on ? 'true' : 'false'); // role="switch" state
   }
+}
+
+function setAutoRotate(on) {
+  state.autoRotate = on;
+  controls.autoRotate = on;
+  updateToggles();
 }
 
 // --- SAVED ITEMS ---

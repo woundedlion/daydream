@@ -13,6 +13,22 @@ const read = (...p) => readFileSync(join(REPO, ...p), 'utf8');
 const pageSrc = (name) => read('tools', `${name}.html`);
 const headOf = (src) => src.slice(src.indexOf('<head>'), src.indexOf('</head>'));
 
+test('every tool page inherits the reduced-motion stylesheet fence', () => {
+  const css = read('tools', 'tools.css');
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.match(css, /animation: none !important/);
+  assert.match(css, /transition: none !important/);
+  for (const page of PAGES)
+    assert.match(headOf(pageSrc(page)), /href="tools\.css"/, page);
+});
+
+test('the solids rotation control is keyboard-operable', () => {
+  const source = pageSrc('solids');
+  assert.match(source, /<label for="toggleRotate"[^>]*>Auto Rotate<\/label>/);
+  assert.match(source,
+    /<button id="toggleRotate" type="button"[^>]*role="switch"[^>]*aria-checked="false"/);
+});
+
 // Relative module specifiers, covering `import`, `export … from` and `import()`.
 const SPECIFIER = /(?:from|import)\s*\(?\s*['"](\.[^'"]+\.js)['"]/g;
 
