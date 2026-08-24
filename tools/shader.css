@@ -65,7 +65,7 @@
 }
 
 .shader-document-status {
-  flex: 1 1 14rem;
+  flex: 1 1 0;
   min-width: 0;
   color: var(--muted-text);
   line-height: 1.3;
