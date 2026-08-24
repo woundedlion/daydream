@@ -134,7 +134,8 @@ const directive = (csp, name) =>
  */
 const definedClasses = (css) => {
   const names = new Set();
-  for (const [, name] of css.matchAll(/\.((?:[\w-]|\\.)+)/g)) {
+  const source = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const [, name] of source.matchAll(/\.((?:[\w-]|\\.)+)/g)) {
     names.add(name.replace(/\\/g, ''));
   }
   return names;
@@ -377,13 +378,15 @@ const TAB_CONTRAST_PAIRS = [['.tab-btn', '.tab-btn'], ['.tab-btn.active', '.tab-
  * @returns {string} Everything between its braces.
  */
 function ruleBody(css, selector) {
+  const bodies = [];
   for (const chunk of css.split('}')) {
     const brace = chunk.indexOf('{');
     if (brace !== -1 && chunk.slice(0, brace).replace(/\/\*[\s\S]*?\*\//g, '').trim() === selector) {
-      return chunk.slice(brace + 1);
+      bodies.push(chunk.slice(brace + 1));
     }
   }
-  return assert.fail(`tools.css declares no ${selector} rule`);
+  if (bodies.length === 0) return assert.fail(`tools.css declares no ${selector} rule`);
+  return bodies.join(';');
 }
 
 /**
@@ -394,8 +397,9 @@ function ruleBody(css, selector) {
  * @returns {string} The value, as a `#rrggbb` literal.
  */
 function color(css, selector, property) {
-  const declared = ruleBody(css, selector)
-    .match(new RegExp(`(?:^|;)\\s*${property}\\s*:\\s*([^;]+)`));
+  const declarations = [...ruleBody(css, selector)
+    .matchAll(new RegExp(`(?:^|;)\\s*${property}\\s*:\\s*([^;]+)`, 'g'))];
+  const declared = declarations.at(-1);
   assert.ok(declared, `${selector} declares no ${property}`);
   const value = declared[1].trim();
   const token = value.match(/^var\(\s*(--[\w-]+)\s*\)$/);
@@ -404,6 +408,12 @@ function color(css, selector, property) {
     `${selector} ${property} resolves to ${resolved}, which this reader cannot measure`);
   return resolved;
 }
+
+test('CSS readers ignore comments and honor later declarations', () => {
+  const css = '/* .comment-only {} */ .real { color: #111111; } .real { color: #222222; }';
+  assert.deepEqual([...definedClasses(css)], ['real']);
+  assert.equal(color(css, '.real', 'color'), '#222222');
+});
 
 /**
  * WCAG relative luminance of a `#rrggbb` color.
