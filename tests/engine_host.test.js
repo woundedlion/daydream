@@ -1,6 +1,19 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { EngineHost } from '../engine_host.js';
+import { unpinnedEngineMethods } from './fake_engine.js';
+
+function pixelEngine(getPixels, getBufferLength) {
+  return { getPixels, getBufferLength };
+}
+
+test('pixelEngine mocks only methods the real engine surface pins', () => {
+  assert.deepEqual(
+    unpinnedEngineMethods(pixelEngine(() => new Uint16Array(4), () => 4)),
+    [],
+    'engine_contract_wasm.test.js never checks these against the real module',
+  );
+});
 
 test('view is the accessor method, not a shadowing data field', () => {
   const host = new EngineHost();
@@ -17,7 +30,7 @@ test('refresh() fetches the engine view, caches it, and notifies the alias sync'
   const fresh = new Uint16Array(4);
   let notified = null;
   const host = new EngineHost((view) => { notified = view; });
-  host.engine = { getPixels: () => fresh };
+  host.engine = pixelEngine(() => fresh, () => fresh.length);
 
   host.refresh();
 
@@ -31,7 +44,10 @@ test('refresh() reuses a live view without re-fetching or re-notifying', () => {
   let notifyCalls = 0;
   const host = new EngineHost(() => { notifyCalls++; });
   host.pixelView = live;
-  host.engine = { getPixels: () => { getPixelsCalls++; return new Uint16Array(4); } };
+  host.engine = pixelEngine(
+    () => { getPixelsCalls++; return new Uint16Array(4); },
+    () => live.length,
+  );
 
   host.refresh();
 
@@ -48,7 +64,7 @@ test('refresh() reports whether it fetched a fresh view', () => {
   const host = new EngineHost();
   assert.equal(host.refresh(), false, 'no engine fetches nothing');
 
-  host.engine = { getPixels: () => fresh };
+  host.engine = pixelEngine(() => fresh, () => fresh.length);
   assert.equal(host.refresh(), true, 'the first refresh fetches');
   assert.equal(host.refresh(), false, 'a live view is reused');
 
@@ -61,7 +77,7 @@ test('invalidateView() forces the next refresh() to re-fetch', () => {
   const second = new Uint16Array(4);
   let next = first;
   const host = new EngineHost();
-  host.engine = { getPixels: () => next };
+  host.engine = pixelEngine(() => next, () => next.length);
 
   host.refresh();
   assert.equal(host.view(), first);
@@ -80,9 +96,9 @@ test('refresh() re-fetches when the held view no longer spans the engine buffer'
   let notified = null;
   const host = new EngineHost((view) => { notified = view; });
   host.pixelView = stale;
-  host.engine = { getPixels: () => fresh, getBufferLength: () => 41472 };
+  host.engine = pixelEngine(() => fresh, () => 41472);
 
-  host.refresh();
+  assert.equal(host.refresh(), true);
 
   assert.equal(host.view(), fresh);
   assert.equal(notified, fresh);
@@ -93,12 +109,12 @@ test('refresh() reuses a view that matches the engine buffer length', () => {
   let getPixelsCalls = 0;
   const host = new EngineHost();
   host.pixelView = live;
-  host.engine = {
-    getPixels: () => { getPixelsCalls++; return new Uint16Array(5760); },
-    getBufferLength: () => 5760,
-  };
+  host.engine = pixelEngine(
+    () => { getPixelsCalls++; return new Uint16Array(5760); },
+    () => 5760,
+  );
 
-  host.refresh();
+  assert.equal(host.refresh(), false);
 
   assert.equal(host.view(), live);
   assert.equal(getPixelsCalls, 0);
@@ -109,10 +125,10 @@ test('refresh() survives a resolution change without invalidateView()', () => {
   const large = new Uint16Array(41472);
   const host = new EngineHost();
   let length = 5760;
-  host.engine = {
-    getPixels: () => (length === 5760 ? small : large),
-    getBufferLength: () => length,
-  };
+  host.engine = pixelEngine(
+    () => (length === 5760 ? small : large),
+    () => length,
+  );
 
   host.refresh();
   assert.equal(host.view(), small);
@@ -135,7 +151,7 @@ test('paramGeneration() reports the engine\'s effect-load counter', () => {
 
 test('paramGeneration() is undefined on a module without the accessor', () => {
   const host = new EngineHost();
-  host.engine = { getPixels: () => new Uint16Array(4) };
+  host.engine = pixelEngine(() => new Uint16Array(4), () => 4);
 
   assert.equal(host.paramGeneration(), undefined);
 });
@@ -163,7 +179,7 @@ test('refresh() is a no-op before the load and after dispose()', () => {
   assert.equal(notifyCalls, 0);
 
   const fresh = new Uint16Array(4);
-  host.engine = { getPixels: () => fresh, delete() {} };
+  host.engine = { ...pixelEngine(() => fresh, () => fresh.length), delete() {} };
   host.refresh();
   assert.equal(host.view(), fresh);
   assert.equal(notifyCalls, 1);
@@ -181,7 +197,7 @@ test('dispose() releases the recorder before the engine and leaves the host iner
   host.module = { HEAPU16: new Uint16Array(4) };
   host.recorder = { dispose() { order.push('recorder'); } };
   host.engine = {
-    getPixels: () => new Uint16Array(4),
+    ...pixelEngine(() => new Uint16Array(4), () => 4),
     delete() { order.push(`engine adapter=${host.adapter}`); },
   };
   host.refresh();
@@ -284,7 +300,7 @@ test('refresh() re-fetches and re-notifies when the held view has detached', () 
   let notified = null;
   const host = new EngineHost((view) => { notified = view; });
   host.pixelView = stale;
-  host.engine = { getPixels: () => fresh };
+  host.engine = pixelEngine(() => fresh, () => fresh.length);
 
   host.refresh();
 
