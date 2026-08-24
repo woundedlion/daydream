@@ -136,6 +136,12 @@ test('the derived page roster names every served page', () => {
       'CSP and stylesheet cases never see them');
 });
 
+test('engine-backed pages declare the browser-smoke readiness overlay', () => {
+  for (const page of ['index.html', 'tools/shader.html'])
+    assert.match(read(page), /\bid=["']loading-overlay["']/,
+      `${page} must declare #loading-overlay for the readiness gate`);
+});
+
 /**
  * Reference walk from the served pages over the tracked tree.
  * @returns {{seen: Set<string>, unpublished: string[], dangling: string[],
