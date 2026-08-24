@@ -32,8 +32,6 @@ import { pageWarmer } from "./module_warmer.js";
 import { FAULT_POOL, FAULT_RENDER, SegmentStatsView } from "./segment_stats_view.js";
 import { PROTOCOL_VERSION } from "./worker_protocol.js";
 
-export { ModuleWarmer, WARM_INTERVAL_MS } from "./module_warmer.js";
-
 export const SEGMENT_CONTROLLER_API_VERSION = 2;
 
 // Deadline for all workers to report 'ready'. A non-throwing WASM load failure
@@ -98,31 +96,6 @@ function unrefTimer(timer) {
   const nodeTimer = /** @type {{unref?: () => void}} */ (
     /** @type {unknown} */ (timer));
   nodeTimer.unref?.();
-}
-
-/**
- * Best-effort prime of the worker module graph's HTTP cache and keep-alive
- * connection before a pool spawn, so the burst of cold concurrent worker fetches
- * after an idle period can't lose the race and abort one worker's load. Awaited on
- * the interactive enable path (the primary trigger); a no-op outside a web origin
- * (e.g. under the file://-based unit tests) and swallows fetch failures — the boot
- * auto-retry is the actual guarantee, this only lowers the odds.
- * @details The artifacts are served unversioned, so freshness rests on
- * revalidation: `cache: 'no-cache'` re-fetches a rebuilt binary and costs a 304
- * for an unchanged one, where a reload always re-pulls all 1.8 MB. A call within
- * `minIntervalMs` of the last warm of the SAME base URL reuses that warm's
- * promise; another base URL describes another module graph and warms its own.
- *
- * The drained binary is also compiled into the warmer's module, so the pool spawn
- * that follows spends one compilation of the 2 MB module rather than one per
- * worker. A binary the engine refuses is reported and drops the held module, so
- * the workers compile their own rather than instantiating an artifact this warm
- * has evidence is stale.
- * @param {{fetch?: typeof globalThis.fetch, baseUrl?: string|URL, minIntervalMs?: number, now?: () => number}} [dependencies]
- * @returns {Promise<void>}
- */
-export function warmModules(dependencies) {
-  return pageWarmer.warm(dependencies);
 }
 
 // GUI ceiling on the worker pool, and the two lower ones a constrained device
