@@ -722,7 +722,7 @@ export function createShaderDocumentController({
     return loaded;
   };
 
-  sourceSelect.addEventListener('change', async () => {
+  const onSourceChange = async () => {
     const option = sourceSelect.selectedOptions[0];
     if (!option?.value) {
       await loadScratch();
@@ -734,32 +734,28 @@ export function createShaderDocumentController({
       return;
     }
     await loadSource(entry.source, entry.filename, entry.compiled);
-  });
-  presetSelect.addEventListener('change', () => {
+  };
+  const onPresetChange = () => {
     applyPreset(presetSelect.value);
     chainUi?.strip.render();
-  });
-  openButton.addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', async () => {
+  };
+  const onOpen = () => fileInput.click();
+  const onFileChange = async () => {
     const file = fileInput.files?.[0];
     if (!file) return;
     sourceSelect.value = '';
     await loadSource(await file.text(), file.name);
     fileInput.value = '';
-  });
-  saveButton.addEventListener('click', save);
-  saveAsButton?.addEventListener('click', saveAs);
-  animationToggle?.addEventListener('click', () => {
+  };
+  const onAnimationToggle = () => {
     const paused = getAnimationsPaused();
     if (paused === null) return;
     setAnimationsPaused(!paused);
     showAnimationState();
     invalidate();
     scheduleDeepLink();
-  });
-  // A/B verification only: the toggle swaps which build renders the loaded
-  // document and touches neither the document nor the editing surface.
-  parityToggle?.addEventListener('click', () => {
+  };
+  const onParityToggle = () => {
     if (active === null || !parityArmed()) return;
     const compiledSide = !active.compiledSide;
     const effect = compiledSide ? active.official.effectId : CHAIN_EFFECT;
@@ -770,16 +766,43 @@ export function createShaderDocumentController({
     active.compiledSide = compiledSide;
     syncParity();
     applyPreset(active.presetId ?? presetSelect.value);
-  });
-  digestButton?.addEventListener('click', async () => {
-    const digest = digestButton.dataset.digest;
+  };
+  const onDigest = async () => {
+    const digest = digestButton?.dataset.digest;
     if (!digest) return;
     if (await copyToClipboard(digest)) show(`Copied the descriptor digest ${digest}.`);
     else announce('The descriptor digest could not be copied.');
-  });
+  };
+
+  sourceSelect.addEventListener('change', onSourceChange);
+  presetSelect.addEventListener('change', onPresetChange);
+  openButton.addEventListener('click', onOpen);
+  fileInput.addEventListener('change', onFileChange);
+  saveButton.addEventListener('click', save);
+  saveAsButton?.addEventListener('click', saveAs);
+  animationToggle?.addEventListener('click', onAnimationToggle);
+  // A/B verification only: the toggle swaps which build renders the loaded
+  // document and touches neither the document nor the editing surface.
+  parityToggle?.addEventListener('click', onParityToggle);
+  digestButton?.addEventListener('click', onDigest);
+
+  const dispose = () => {
+    sourceSelect.removeEventListener('change', onSourceChange);
+    presetSelect.removeEventListener('change', onPresetChange);
+    openButton.removeEventListener('click', onOpen);
+    fileInput.removeEventListener('change', onFileChange);
+    saveButton.removeEventListener('click', save);
+    saveAsButton?.removeEventListener('click', saveAs);
+    animationToggle?.removeEventListener('click', onAnimationToggle);
+    parityToggle?.removeEventListener('click', onParityToggle);
+    digestButton?.removeEventListener('click', onDigest);
+    linkGeneration += 1;
+    teardownChainUi();
+  };
 
   return {
     init, loadSource, save, saveAs, applyPreset,
+    dispose,
     flushDeepLink: () => linkWrite,
   };
 }

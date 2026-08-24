@@ -146,6 +146,8 @@ export function createRenderAdapter({
  * @param {{dispose: Function}} deps.switches - The switch coordinator.
  * @param {() => void} deps.stopTimers - Stops the app's interval timers.
  * @param {{destroy: Function}} deps.effectGui - The effect panel controller.
+ * @param {{dispose: Function}|null} [deps.shaderDocuments] - The workbench
+ *   document controller, when this is the authoring route.
  * @param {{destroy: Function}} deps.globalGui - The global GUI root.
  * @param {{dispose: Function}} deps.host - The EngineHost owning engine,
  *   adapter, and recorder.
@@ -169,6 +171,7 @@ export function createAppTeardown({
   switches,
   stopTimers,
   effectGui,
+  shaderDocuments = null,
   globalGui,
   host,
   urlSync,
@@ -218,6 +221,7 @@ export function createAppTeardown({
     release('the switch coordinator', () => switches.dispose());
     release('the app timers', stopTimers);
     release('the effect panel', () => effectGui.destroy());
+    release('the shader document controller', () => shaderDocuments?.dispose());
     release('the global GUI', () => globalGui.destroy());
     release('the engine host', () => host.dispose());
     release('the URL writer', () => urlSync.dispose());
