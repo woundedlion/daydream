@@ -300,13 +300,13 @@ export function createEffectGui({
       }
       if (!Object.hasOwn(snapshot, 'schemaVersion')) snapshot.schemaVersion = 1;
     } catch (error) {
-      logWarn('ShaderBall: ignoring invalid full-config snapshot', error);
+      logWarn('Shader Workbench: ignoring invalid full-config snapshot', error);
       return;
     }
     const results = fullConfigRestoreResults();
     const outcome = restoreFullConfigSnapshot(snapshot);
     if (outcome !== results.APPLIED) {
-      logWarn('ShaderBall: full-config snapshot was rejected: '
+      logWarn('Shader Workbench: full-config snapshot was rejected: '
         + enumConstantName(results, outcome));
       return;
     }
@@ -516,7 +516,7 @@ export function createEffectGui({
     if (usesFullConfigSnapshot()) {
       const snapshot = getFullConfigSnapshot();
       if (!snapshot || typeof copyText !== 'function') {
-        logWarn('Export: ShaderBall full-config snapshot is unavailable');
+        logWarn('Export: Shader Workbench full-config snapshot is unavailable');
         flashExport(EXPORT_FAILED);
         return;
       }
