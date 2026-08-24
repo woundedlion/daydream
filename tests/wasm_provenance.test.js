@@ -1,10 +1,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 const text = (path) => readFileSync(path, 'utf8');
 const sha256 = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
+const engineCandidates = process.env.HOLOSPHERE_ENGINE_DIR
+  ? [resolve(process.env.HOLOSPHERE_ENGINE_DIR)]
+  : ['engine', '../Holosphere', '../pov'].map((path) => resolve(path));
+const engineRoot = engineCandidates.find(
+  (path) => existsSync(resolve(path, 'scripts/shader_workbench.mjs')));
+const engineMissing = `no Holosphere checkout found in ${engineCandidates.join(', ')}`;
+const engineSkip = engineRoot || process.env.HOLOSPHERE_ENGINE_REQUIRED ? false : engineMissing;
+
+const committed = (root, path) => execFileSync(
+  'git', ['-C', root, 'show', `HEAD:${path}`], { encoding: 'buffer' });
 
 test('the committed WASM artifacts match their recorded hashes', () => {
   const entries = text('holosphere_wasm.wasm.sha256')
@@ -28,6 +40,17 @@ test('the toolchain record describes a release module', () => {
   assert.match(fields.emsdk, /^\d+\.\d+\.\d+$/);
   assert.equal(fields.build_type, 'Release');
   assert.equal(fields.dev_bindings, 'OFF');
+});
+
+test('the committed shader modules match engine HEAD byte for byte', { skip: engineSkip }, () => {
+  assert.ok(engineRoot, engineMissing);
+  for (const name of ['shader_workbench.mjs', 'sha256.mjs']) {
+    assert.deepEqual(
+      committed('.', `shader/${name}`),
+      committed(engineRoot, `scripts/${name}`),
+      `${name} differs from engine HEAD`,
+    );
+  }
 });
 
 test('deploy consumes one checksummed engine bundle at the module pin', () => {

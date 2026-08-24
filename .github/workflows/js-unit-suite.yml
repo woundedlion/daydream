@@ -2,6 +2,10 @@ name: JS unit suite
 
 on:
   workflow_call:
+    secrets:
+      POV_TOKEN:
+        description: Read access to woundedlion/pov while it is private.
+        required: false
 
 permissions:
   contents: read
@@ -15,6 +19,13 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           fetch-depth: 0
+          persist-credentials: false
+      - name: Checkout engine HEAD
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: woundedlion/pov
+          token: ${{ secrets.POV_TOKEN || github.token }}
+          path: engine
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
@@ -45,4 +56,5 @@ jobs:
         env:
           DAYDREAM_WASM_CLEAN_REQUIRED: '1'
           DAYDREAM_HOOK_SH_REQUIRED: '1'
+          HOLOSPHERE_ENGINE_REQUIRED: '1'
         run: npm test
