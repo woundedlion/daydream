@@ -88,11 +88,11 @@ const nudgeStep = (declaration) => {
 const fieldOf = (id) => id.slice(id.indexOf('.') + 1);
 
 /**
- * The parameter ids the current topology selections deactivate: an `edge-width`
- * field is read by the engine only while its instance's `coverage-mode` or
- * `envelope` enum sits on `edge-fade`. Deactivation changes what the engine
- * reads, never what the document carries, so these controls render dimmed
- * rather than dropping out of the union schema.
+ * The parameter ids the current topology selections deactivate. Edge widths
+ * require an edge-fade mode, hue controls require their corresponding hue mode,
+ * and brightness depth requires a brightness envelope. Deactivation changes
+ * what the engine reads, never what the document carries, so these controls
+ * render dimmed rather than dropping out of the union schema.
  * @param {ParameterDeclaration[]} parameters - The document's declarations.
  * @param {Object<string, *>} values - The active preset's values.
  * @param {ChainEntry[]} chain - The document's operator instances.
@@ -102,23 +102,33 @@ const fieldOf = (id) => id.slice(id.indexOf('.') + 1);
 export function deactivatedParameterIds(parameters, values, chain, catalog) {
   const operators = new Map(catalog.operators.map((operator) => [operator.id, operator]));
   const operatorByLabel = new Map(chain.map((entry) => [entry.label, operators.get(entry.operator)]));
-  /** @type {Map<string, *>} */
-  const gates = new Map();
-  for (const parameter of parameters) {
-    if (parameter.storage !== 'enum8' || !parameter.id.includes('.')) continue;
-    const label = parameter.id.slice(0, parameter.id.indexOf('.'));
-    const field = fieldOf(parameter.id);
-    const schema = operatorByLabel.get(label)?.params.find((candidate) => candidate.id === field);
-    if (schema?.topology !== true || !schema.values?.includes('edge-fade')) continue;
-    const option = values[parameter.id];
-    if (option !== undefined) gates.set(label, option);
-  }
+  const gateRules = {
+    'edge-width': [
+      ['coverage-mode', (value) => value === 'edge-fade'],
+      ['envelope', (value) => value === 'edge-fade'],
+    ],
+    'hue-shift-amount': [['hue-shift-mode', (value) => value !== 'none']],
+    'hue-noise-scale': [['hue-shift-mode', (value) => value === 'noise']],
+    'hue-noise-speed': [['hue-shift-mode', (value) => value === 'noise']],
+    'brightness-depth': [['brightness-envelope', (value) => value !== 'none']],
+  };
   /** @type {Set<string>} */
   const deactivated = new Set();
   for (const parameter of parameters) {
-    if (!parameter.id.includes('.') || fieldOf(parameter.id) !== 'edge-width') continue;
-    const gate = gates.get(parameter.id.slice(0, parameter.id.indexOf('.')));
-    if (gate !== undefined && gate !== 'edge-fade') deactivated.add(parameter.id);
+    if (!parameter.id.includes('.')) continue;
+    const field = fieldOf(parameter.id);
+    const rules = gateRules[field];
+    if (!rules) continue;
+    const label = parameter.id.slice(0, parameter.id.indexOf('.'));
+    const operator = operatorByLabel.get(label);
+    for (const [gateField, active] of rules) {
+      const schema = operator?.params.find((candidate) => candidate.id === gateField);
+      const value = values[`${label}.${gateField}`];
+      if (schema?.topology === true && value !== undefined && !active(value)) {
+        deactivated.add(parameter.id);
+        break;
+      }
+    }
   }
   return deactivated;
 }
