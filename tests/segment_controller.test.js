@@ -2333,7 +2333,7 @@ test('the fault overlay is an alert that never takes focus', () => {
 
   const alert = stats.firstElementChild;
   assert.equal(alert.getAttribute('role'), 'alert');
-  assert.equal(alert.tabIndex, undefined);
+  assert.equal(alert.tabIndex, -1);
   assert.equal(alert.focusCalls, 0);
 
   c.updateStats();

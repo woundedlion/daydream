@@ -207,6 +207,7 @@ const STYLE_VALUES = {
 // number or object it interpolated was missing. Every one reaches a browser as a
 // dropped declaration, so none may read back here.
 const STYLE_REJECTED = /undefined|NaN|Infinity|\[object [A-Za-z]*\]/;
+const FOCUSABLE_TAGS = new Set(['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA']);
 
 /**
  * Whether every parenthesis in a declaration closes, as a parser needs before
@@ -249,7 +250,11 @@ function fakeStyle() {
       const text = String(value);
       if (STYLE_REJECTED.test(text) || !balancedParens(text)) return true;
       const accepts = STYLE_VALUES[name];
-      if (!accepts || accepts.test(text)) declared[name] = text;
+      if (!accepts || accepts.test(text)) {
+        declared[name] = name === 'gridTemplateColumns' || name === 'gridTemplateRows'
+          ? text.replace(/minmax\(\s*0\s*,/g, 'minmax(0px,')
+          : text;
+      }
       return true;
     },
   });
@@ -511,6 +516,21 @@ export function fakeElement(tag = 'div', options = {}) {
     configurable: true,
     get() { return element.attributes.id ?? ''; },
     set(value) { element.attributes.id = String(value); },
+  });
+  Object.defineProperty(element, 'tabIndex', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      const attribute = element.attributes.tabindex;
+      if (attribute !== undefined) {
+        const parsed = Number.parseInt(attribute, 10);
+        return Number.isNaN(parsed) ? -1 : parsed;
+      }
+      if (FOCUSABLE_TAGS.has(element.tagName)) return 0;
+      if (element.tagName === 'A' && element.getAttribute('href') !== null) return 0;
+      return -1;
+    },
+    set(value) { element.attributes.tabindex = String(value); },
   });
   // className and classList are two views of one class set, as in the DOM: a
   // module may set the string and later read the list, or the reverse.

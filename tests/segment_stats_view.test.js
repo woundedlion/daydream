@@ -398,7 +398,7 @@ test('each fault code names its own source in the headline', () => {
 
     const box = stats.firstElementChild;
     assert.equal(box.getAttribute('role'), 'alert');
-    assert.equal(box.tabIndex, undefined);
+    assert.equal(box.tabIndex, -1);
     assert.equal(box.focusCalls, 0, 'the live region announces without taking focus');
     assert.equal(box.childNodes[0],
       `⚠ Segment ${who} faulted — segmented render halted.`);
