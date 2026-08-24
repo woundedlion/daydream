@@ -126,7 +126,7 @@ const browser = await puppeteer.launch({
   args: BROWSER_ARGS,
 });
 
-let failures = [];
+const failures = [];
 try {
   const tab = await browser.newPage();
   await tab.setViewport(VIEWPORT);
@@ -135,7 +135,7 @@ try {
   await tab.waitForFunction(() => !document.getElementById('loading-overlay'),
     { timeout: TIMEOUT_MS });
   await tab.waitForSelector('.effect-gui', { timeout: TIMEOUT_MS });
-  failures = [...failures, ...await probePanel(tab)];
+  failures.push(...await probePanel(tab));
 } catch (error) {
   failures.push(error instanceof Error ? error.message : String(error));
 } finally {
