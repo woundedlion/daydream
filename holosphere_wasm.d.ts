@@ -354,6 +354,8 @@ export interface PaletteOps {
 export interface HolosphereModule {
   HolosphereEngine: {
     new (): HolosphereEngine;
+    /** Whether the module already owns its single live engine instance. */
+    isLive(): boolean;
     /** Buildable [w, h] rows; the app narrows its resolution presets to these. */
     getSupportedResolutions(): Array<[number, number]>;
     /**
