@@ -605,8 +605,13 @@ export class VideoRecorder {
           try {
             await writable.write(data);
           } catch (err) {
-            console.warn('VideoRecorder: streaming write failed', err);
             failed = true;
+            if (this.mediaRecorder === recorder) {
+              this.stop();
+              this.reportFailure(
+                'streaming write failed mid-session; recording stopped and the saved file is truncated.',
+                err);
+            }
           }
         });
       },
