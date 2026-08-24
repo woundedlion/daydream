@@ -7,7 +7,7 @@
   "scripts": {
     "prepare": "git config core.hooksPath .githooks",
     "pretest": "node scripts/require-tests.mjs",
-    "test": "node scripts/run-tests.mjs --experimental-test-module-mocks \"tests/*.test.js\"",
+    "test": "node scripts/run-tests.mjs --experimental-test-module-mocks \"tests/**/*.test.js\" \"tests/**/*.test.mjs\" \"tests/**/*.spec.js\" \"tests/**/*.spec.mjs\"",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "importmap": "node scripts/generate-importmap.mjs",
