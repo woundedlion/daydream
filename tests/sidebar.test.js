@@ -68,6 +68,18 @@ test('constructor mounts its five nodes and wires listeners + observer', () => {
   assert.deepEqual(observers[0].observed, [sidebar.listEl]);
 });
 
+test('constructor tolerates a window without ResizeObserver', () => {
+  installDom();
+  delete globalThis.ResizeObserver;
+  const container = fakeElement('div');
+  container.ownerDocument = globalThis.document;
+
+  const sidebar = new EffectSidebar(container, () => {});
+
+  assert.equal(sidebar.resizeObs, null);
+  sidebar.dispose();
+});
+
 test('setEffects builds one button per name with its preset count and optional size', () => {
   const { sidebar } = makeSidebar();
   sidebar.setEffects(
@@ -372,6 +384,9 @@ test('dispose detaches every listener/observer and clears refs', () => {
   assert.equal(listEl.listeners.length, 0);
   assert.ok(observer.disconnected);
   assert.equal(sidebar.resizeObs, null);
+  assert.equal(sidebar.tabbableBtn, null);
+  assert.equal(sidebar.scrolledBtn, null);
+  assert.equal(sidebar.scrollArrowsRaf, 0);
   // The pending scroll-arrow rAF is cancelled.
   assert.ok(cancelledRaf.includes(raf));
   // Button click closures nulled, roster map emptied.

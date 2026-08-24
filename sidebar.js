@@ -103,8 +103,9 @@ export class EffectSidebar {
 
     this.listEl.addEventListener('scroll', this.onScrollBound, { passive: true });
     /** @type {ResizeObserver|null} */
-    this.resizeObs = new this.win.ResizeObserver(this.onResizeBound);
-    this.resizeObs.observe(this.listEl);
+    this.resizeObs = this.win.ResizeObserver
+      ? new this.win.ResizeObserver(this.onResizeBound) : null;
+    this.resizeObs?.observe(this.listEl);
 
     this.container.appendChild(this.heading);
     this.container.appendChild(this.sortRow);
@@ -129,6 +130,9 @@ export class EffectSidebar {
     for (const btn of this.buttons.values()) btn.onclick = null;
     this.buttons.clear();
     this.orderedButtons = [];
+    this.tabbableBtn = null;
+    this.scrolledBtn = null;
+    this.scrollArrowsRaf = 0;
     this.nameBtn.onclick = null;
     this.sizeBtn.onclick = null;
     this.listEl.innerHTML = '';
