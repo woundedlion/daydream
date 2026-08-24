@@ -795,7 +795,7 @@ test('the save picker is offered the timestamped name and the container filter',
   }
 });
 
-test('a mid-stream streaming write failure closes the writable, skips download, and reports truncation', async () => {
+test('a mid-stream streaming write failure stops the session and reports truncation', async () => {
   const restore = installRecorderEnv();
   const writes = [];
   let closed = false;
@@ -814,14 +814,20 @@ test('a mid-stream streaming write failure closes the writable, skips download, 
     const rec = new VideoRecorder(recordableCanvas());
     const sinkFinished = trackSinkFinish(rec);
     let downloaded = false;
+    const notified = [];
     rec.download = () => { downloaded = true; };
+    rec.onError = (err) => notified.push(err);
 
     rec.start('stream');
     const recorder = rec.mediaRecorder;
     recorder.ondataavailable({ data: { size: 10 } });
     recorder.ondataavailable({ data: { size: 20 } }); // this write throws
     recorder.ondataavailable({ data: { size: 30 } }); // dropped after the failure
-    rec.stop();
+    await drainSink();
+
+    assert.equal(rec.isRecording, false, 'the failed write stops the active recorder');
+    assert.equal(notified.length, 1, 'the host is notified once');
+    assert.match(notified[0].message, /disk full/);
     recorder.onstop();
 
     await sinkFinished();
