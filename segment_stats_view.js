@@ -122,7 +122,7 @@ export class SegmentStatsView {
       if (!bar) continue;
       if (!(id in this.hiddenStatBars))
         this.hiddenStatBars[id] = bar.style.display ?? '';
-      bar.style.display = 'none';
+      if (bar.style.display !== 'none') bar.style.display = 'none';
     }
   }
 
