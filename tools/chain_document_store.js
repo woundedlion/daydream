@@ -220,6 +220,19 @@ export async function createChainDocumentStore({
         + diagnostics.map((/** @type {Diagnostic} */ d) => d.code).join(', '));
     }
   }
+  /** @type {Map<string, {label: string, parameter: ParameterDeclaration}[]>} */
+  const declarationTemplates = new Map();
+  for (const entry of doc.descriptor.chain) {
+    if (declarationTemplates.has(entry.operator)) continue;
+    const prefix = `${entry.label}.`;
+    declarationTemplates.set(entry.operator, doc.descriptor.parameters
+      .filter((/** @type {ParameterDeclaration} */ parameter) =>
+        parameter.id.startsWith(prefix))
+      .map((/** @type {ParameterDeclaration} */ parameter) => ({
+        label: entry.label,
+        parameter: structuredClone(parameter),
+      })));
+  }
 
   /** @type {string|null} */
   let selected = null;
@@ -397,15 +410,27 @@ export async function createChainDocumentStore({
    */
   const addInstance = (candidate, entry) => {
     const op = /** @type {CatalogOperator} */ (operators.get(entry.operator));
-    for (const field of op.params) {
-      const parameter = parameterFromField(entry.label, field);
+    const templates = declarationTemplates.get(entry.operator);
+    const parameters = templates === undefined
+      ? op.params.map((field) => parameterFromField(entry.label, field))
+      : templates.map(({ label, parameter: template }) => {
+        const parameter = structuredClone(template);
+        const prefix = `${label}.`;
+        parameter.id = `${entry.label}.${parameter.id.slice(prefix.length)}`;
+        if (parameter.interpolation.group?.startsWith(prefix)) {
+          parameter.interpolation.group =
+            `${entry.label}.${parameter.interpolation.group.slice(prefix.length)}`;
+        }
+        return parameter;
+      });
+    for (const parameter of parameters) {
       candidate.descriptor.parameters.push(parameter);
       candidate.descriptor.serialization.fields.push(parameter.id);
       for (const policy of candidate.descriptor.path_policies) {
         if (policy.kind === 'STAGGERED_ORDERED') policy.groups.push(parameter.id);
       }
       for (const preset of candidate.preset_bank.presets)
-        preset.values[parameter.id] = field.default;
+        preset.values[parameter.id] = parameter.default;
     }
   };
 
