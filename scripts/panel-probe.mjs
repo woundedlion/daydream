@@ -23,6 +23,7 @@ const VIEWPORT = { width: 1280, height: 240 };
 const EFFECT = 'ShapeShifter';
 const TIMEOUT_MS = 90_000;
 const SCROLLER = '.effect-gui .lil-children';
+const RESET = '.effect-action-reset button';
 
 /** @param {import('puppeteer-core').Page} tab */
 const scrollerMetrics = (tab) => tab.$eval(SCROLLER, (node) => ({
@@ -64,15 +65,33 @@ async function probePanel(tab) {
   const held = (await scrollerMetrics(tab)).scrollTop;
   check(held === offset, `the panel holds a mid-list offset (${held})`);
 
+  const focusedControl = await tab.$eval(SCROLLER, (scroller) => {
+    const bounds = scroller.getBoundingClientRect();
+    const reset = document.querySelector('.effect-action-reset button');
+    const widgets = [...scroller.querySelectorAll('input, select, button')]
+      .filter((node) => node !== reset)
+      .sort((a, b) => {
+        const middle = (bounds.top + bounds.bottom) / 2;
+        const aRect = a.getBoundingClientRect();
+        const bRect = b.getBoundingClientRect();
+        return Math.abs((aRect.top + aRect.bottom) / 2 - middle)
+          - Math.abs((bRect.top + bRect.bottom) / 2 - middle);
+      });
+    const widget = widgets[0];
+    if (!widget) throw new Error('the panel has no focusable control');
+    widget.focus();
+    return widget.closest('.controller')?.querySelector('.name')?.textContent?.trim()
+      ?? widget.textContent?.trim() ?? '';
+  });
+  check(focusedControl.length > 0, `a visible ${focusedControl || 'unnamed'} control holds focus`);
+
   const before = await tab.$eval(SCROLLER, (node) => {
     window.probedScroller = node;
     return document.querySelectorAll('.effect-gui').length;
   });
   check(before === 1, `exactly one effect panel is mounted (${before})`);
 
-  // Activated rather than clicked: a pointer press focuses the button first, and
-  // the browser scrolls a focused control into view before the handler runs.
-  await tab.$eval('.effect-action-reset button', (node) => node.click());
+  await tab.$eval(RESET, (node) => node.click());
   await tab.waitForFunction(
     () => document.querySelector('.effect-gui .lil-children') !== window.probedScroller,
     { timeout: TIMEOUT_MS });
@@ -82,6 +101,11 @@ async function probePanel(tab) {
     'the rebuilt panel carries the same scrollable extent');
   check(rebuilt.scrollTop === offset,
     `the rebuilt panel keeps the offset it was scrolled to (${rebuilt.scrollTop} of ${offset})`);
+  const restoredControl = await tab.evaluate(() =>
+    document.activeElement?.closest('.controller')?.querySelector('.name')?.textContent?.trim()
+      ?? document.activeElement?.textContent?.trim() ?? '');
+  check(restoredControl === focusedControl,
+    `the rebuilt panel restores focus to ${focusedControl} (${restoredControl || 'none'})`);
 
   return failures;
 }
