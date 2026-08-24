@@ -28,6 +28,7 @@ import { createFrameScheduler } from './page_lifecycle.js';
 /** @typedef {{id: string, name: string, input: string, output: string, params: CatalogParameter[]}} CatalogOperator */
 /** @typedef {{carriers: string[], operators: CatalogOperator[]}} OperatorCatalog */
 /** @typedef {{label: string, operator: string}} ChainEntry */
+/** @typedef {[string, (value: *) => boolean]} GateRule */
 /** @typedef {{operator: CatalogOperator, legal: boolean, reason?: string}} LegalityEntry */
 /** @typedef {{severity: string, phase: string, code: string, path: string, message: string}} Diagnostic */
 /** @typedef {{ok: true}|{ok: false, diagnostics: Diagnostic[]}} EditResult */
@@ -102,6 +103,7 @@ const fieldOf = (id) => id.slice(id.indexOf('.') + 1);
 export function deactivatedParameterIds(parameters, values, chain, catalog) {
   const operators = new Map(catalog.operators.map((operator) => [operator.id, operator]));
   const operatorByLabel = new Map(chain.map((entry) => [entry.label, operators.get(entry.operator)]));
+  /** @type {Record<string, GateRule[]>} */
   const gateRules = {
     'edge-width': [
       ['coverage-mode', (value) => value === 'edge-fade'],
