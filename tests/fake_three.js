@@ -138,8 +138,11 @@ export class OrbitControls {
   constructor(camera, domElement) {
     this.camera = camera;
     this.domElement = domElement;
+    this.keyEventsElement = null;
     this.updates = 0;
   }
+  /** @param {Object} domElement */
+  listenToKeyEvents(domElement) { this.keyEventsElement = domElement; }
   update() { this.updates += 1; }
-  dispose() { log.push('controls.dispose'); }
+  dispose() { this.keyEventsElement = null; log.push('controls.dispose'); }
 }
