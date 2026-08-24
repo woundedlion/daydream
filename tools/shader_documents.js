@@ -25,6 +25,9 @@ const DIGEST_ABBREVIATION = 12;
 // The download name the scratch document exports under until Save As renames it.
 const SCRATCH_FILENAME = 'scratch.shader.json';
 
+export const SHADER_LINK_DEBOUNCE_MS = 200;
+export const SHADER_LINK_MAX_WAIT_MS = 1000;
+
 // The one topology parameter a fixed effect leaves live, as an ordinary
 // dropdown, rather than baking its variant in.
 const LIVE_TOPOLOGY_FIELD = 'palette-mapping';
@@ -280,6 +283,12 @@ export function createShaderDocumentController({
   let linkGeneration = 0;
   /** @type {Promise<void>} */
   let linkWrite = Promise.resolve();
+  /** @type {ReturnType<typeof setTimeout>|null} */
+  let linkDebounceTimer = null;
+  /** @type {ReturnType<typeof setTimeout>|null} */
+  let linkMaxTimer = null;
+  let linkPending = false;
+  let linkDisposed = false;
 
   /** @param {string} message @param {boolean} [error] */
   const show = (message, error = false) => {
@@ -497,6 +506,7 @@ export function createShaderDocumentController({
       },
       presetId: () => active?.presetId ?? null,
       onEditParameter: writeStageEdit,
+      onCommitParameter: () => { void flushDeepLink(); },
     }));
     setParamFilter({ external: true });
     chainUi = { store, strip };
@@ -511,6 +521,7 @@ export function createShaderDocumentController({
    */
   const loadSource = async (source, filename = 'import.shader.json',
                             precompiled = null, session = null) => {
+    await flushDeepLink();
     linkGeneration += 1;
     compiler ??= await importCompiler();
     let compiled = precompiled;
@@ -599,9 +610,18 @@ export function createShaderDocumentController({
     ? chainUi.store.document()
     : structuredClone(active.compiled.document);
 
-  const scheduleDeepLink = () => {
-    if (!active || active.presetId === null) return;
-    const generation = ++linkGeneration;
+  const clearLinkTimers = () => {
+    if (linkDebounceTimer !== null) clearTimeout(linkDebounceTimer);
+    if (linkMaxTimer !== null) clearTimeout(linkMaxTimer);
+    linkDebounceTimer = null;
+    linkMaxTimer = null;
+  };
+
+  const writeDeepLink = () => {
+    clearLinkTimers();
+    if (!linkPending || !active || active.presetId === null) return linkWrite;
+    linkPending = false;
+    const generation = linkGeneration;
     const state = {
       document: currentDocument(),
       preset: active.presetId,
@@ -615,6 +635,21 @@ export function createShaderDocumentController({
       const detail = error instanceof Error ? error.message : String(error);
       show(`The shader link could not be updated: ${detail}.`, true);
     });
+    return linkWrite;
+  };
+
+  const flushDeepLink = () => {
+    chainUi?.strip.flushParameterEdit();
+    return writeDeepLink();
+  };
+
+  const scheduleDeepLink = () => {
+    if (linkDisposed || !active || active.presetId === null) return;
+    linkGeneration += 1;
+    linkPending = true;
+    if (linkDebounceTimer !== null) clearTimeout(linkDebounceTimer);
+    linkDebounceTimer = setTimeout(writeDeepLink, SHADER_LINK_DEBOUNCE_MS);
+    linkMaxTimer ??= setTimeout(writeDeepLink, SHADER_LINK_MAX_WAIT_MS);
   };
 
   /**
@@ -631,6 +666,7 @@ export function createShaderDocumentController({
 
   const save = () => {
     if (!active) return false;
+    void flushDeepLink();
     const document = currentDocument();
     return exportDocument(document, active.filename.endsWith('.shader.json')
       ? active.filename : `${document.effect_id}.shader.json`);
@@ -643,6 +679,7 @@ export function createShaderDocumentController({
    */
   const saveAs = () => {
     if (!active) return false;
+    void flushDeepLink();
     const document = currentDocument();
     copies += 1;
     document.document_id = `${document.document_id}-copy${copies}`;
@@ -726,6 +763,7 @@ export function createShaderDocumentController({
     const option = sourceSelect.selectedOptions[0];
     if (!option?.value) {
       await loadScratch();
+      await flushDeepLink();
       return;
     }
     const entry = catalog.get(option.value);
@@ -734,10 +772,12 @@ export function createShaderDocumentController({
       return;
     }
     await loadSource(entry.source, entry.filename, entry.compiled);
+    await flushDeepLink();
   };
   const onPresetChange = () => {
     applyPreset(presetSelect.value);
     chainUi?.strip.render();
+    void flushDeepLink();
   };
   const onOpen = () => fileInput.click();
   const onFileChange = async () => {
@@ -745,6 +785,7 @@ export function createShaderDocumentController({
     if (!file) return;
     sourceSelect.value = '';
     await loadSource(await file.text(), file.name);
+    await flushDeepLink();
     fileInput.value = '';
   };
   const onAnimationToggle = () => {
@@ -787,6 +828,8 @@ export function createShaderDocumentController({
   digestButton?.addEventListener('click', onDigest);
 
   const dispose = () => {
+    const finalLinkWrite = flushDeepLink();
+    linkDisposed = true;
     sourceSelect.removeEventListener('change', onSourceChange);
     presetSelect.removeEventListener('change', onPresetChange);
     openButton.removeEventListener('click', onOpen);
@@ -796,13 +839,13 @@ export function createShaderDocumentController({
     animationToggle?.removeEventListener('click', onAnimationToggle);
     parityToggle?.removeEventListener('click', onParityToggle);
     digestButton?.removeEventListener('click', onDigest);
-    linkGeneration += 1;
     teardownChainUi();
+    return finalLinkWrite;
   };
 
   return {
     init, loadSource, save, saveAs, applyPreset,
     dispose,
-    flushDeepLink: () => linkWrite,
+    flushDeepLink,
   };
 }

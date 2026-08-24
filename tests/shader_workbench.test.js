@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, test } from 'node:test';
+import { afterEach, beforeEach, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
@@ -15,6 +15,8 @@ import {
   bakedTopologyFields,
   createShaderDocumentController,
   engineParameterName,
+  SHADER_LINK_DEBOUNCE_MS,
+  SHADER_LINK_MAX_WAIT_MS,
 } from '../tools/shader_documents.js';
 import {
   FakeChainEngine, ParamSetResult, unpinnedEngineMethods,
@@ -1016,6 +1018,102 @@ test('shader edits keep the full state hash current', async () => {
   assert.equal(state.paused, true);
   assert.equal(state.document.preset_bank.presets[0]
     .values['sample.pattern-freq'], 3.5);
+});
+
+const sampleFrequencySlider = (harness) => stripChips(harness)
+  .find((chip) => chip.dataset.label === 'sample')
+  .querySelectorAll('.chain-param')
+  .find((row) => row.dataset.parameter === 'sample.pattern-freq')
+  .querySelector('.chain-param-control');
+
+test('continuous shader edits debounce link writes and keep the latest state', async () => {
+  const harness = await editorWorkbench({ source: null });
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    harness.urls.length = 0;
+    const slider = sampleFrequencySlider(harness);
+    for (const value of [2, 3, 4, 5]) {
+      slider.value = String(value);
+      slider.dispatch('input');
+      harness.animationFrames.flush();
+      mock.timers.tick(50);
+    }
+
+    assert.equal(harness.urls.length, 0);
+    mock.timers.tick(SHADER_LINK_DEBOUNCE_MS);
+    await harness.controller.flushDeepLink();
+
+    assert.equal(harness.urls.length, 1);
+    const state = await decodeShaderStateHash(harness.win.location.hash);
+    assert.equal(state.document.preset_bank.presets[0]
+      .values['sample.pattern-freq'], 5);
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+test('continuous shader edits cannot postpone a link write indefinitely', async () => {
+  const harness = await editorWorkbench({ source: null });
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    harness.urls.length = 0;
+    const slider = sampleFrequencySlider(harness);
+    for (let value = 2; value <= 8; value += 1) {
+      slider.value = String(value);
+      slider.dispatch('input');
+      harness.animationFrames.flush();
+      if (value < 8) mock.timers.tick(150);
+    }
+    mock.timers.tick(SHADER_LINK_MAX_WAIT_MS - 900);
+    await harness.controller.flushDeepLink();
+
+    assert.equal(harness.urls.length, 1);
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+test('ending a slider drag flushes its final link without waiting', async () => {
+  const harness = await editorWorkbench({ source: null });
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    harness.urls.length = 0;
+    const slider = sampleFrequencySlider(harness);
+    slider.value = '6.25';
+    slider.dispatch('input');
+    harness.animationFrames.flush();
+
+    slider.dispatch('change');
+    await harness.controller.flushDeepLink();
+
+    assert.equal(harness.urls.length, 1);
+    const state = await decodeShaderStateHash(harness.win.location.hash);
+    assert.equal(state.document.preset_bank.presets[0]
+      .values['sample.pattern-freq'], 6.25);
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+test('save flushes the last slider input before its animation frame', async () => {
+  const harness = await editorWorkbench({ source: null });
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    harness.urls.length = 0;
+    const slider = sampleFrequencySlider(harness);
+    slider.value = '7.5';
+    slider.dispatch('input');
+
+    assert.equal(harness.controller.save(), true);
+    await harness.controller.flushDeepLink();
+
+    assert.equal(harness.urls.length, 1);
+    const state = await decodeShaderStateHash(harness.win.location.hash);
+    assert.equal(state.document.preset_bank.presets[0]
+      .values['sample.pattern-freq'], 7.5);
+  } finally {
+    mock.timers.reset();
+  }
 });
 
 test('a malformed shader state link falls back to an editable scratch chain', async () => {
