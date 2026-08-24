@@ -153,12 +153,16 @@ export function fakeDriver() {
 /**
  * Builds the app against fakes.
  * @param {{loadModule?: () => Promise<Object>, nav?: Object}} [options] - Seam overrides.
- * @returns {Object} The pieces a case asserts on.
+ * @returns {Object} The pieces a case asserts on, plus the global restorer.
  */
 export function startApp({
   loadModule = () => new Promise(() => {}),
   nav = { hardwareConcurrency: 8 },
 } = {}) {
+  const savedGlobals = new Map([
+    'document', 'window', 'ResizeObserver', 'requestAnimationFrame',
+    'cancelAnimationFrame',
+  ].map((key) => [key, globalThis[key]]));
   const ids = ['gui-container', 'effect-sidebar', 'apply-notice-dismiss',
     'apply-notice-body', 'apply-notice-text', 'canvas-container',
     'loading-overlay', 'apply-notice', 'segment-stats'];
@@ -208,7 +212,13 @@ export function startApp({
     },
     loadModule,
   });
-  return { teardown, driver, guis, listeners, docListeners, elements, win };
+  const restore = () => {
+    for (const [key, value] of savedGlobals) {
+      if (value === undefined) delete globalThis[key];
+      else globalThis[key] = value;
+    }
+  };
+  return { teardown, driver, guis, listeners, docListeners, elements, win, restore };
 }
 
 /**
