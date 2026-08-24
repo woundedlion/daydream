@@ -171,10 +171,12 @@ let nextEffectOk = true;
 let nextClipOk = true;
 /** Options the worker handed the module factory, where the instantiate hook lands. */
 let moduleOptions = null;
+/** Module object returned by the mocked factory. */
+let wasmModuleInstance = null;
 mock.module('../holosphere_wasm.js', {
   defaultExport: async (options) => {
     moduleOptions = options;
-    return {
+    wasmModuleInstance = {
       ParamSetResult,
       ClipSetResult,
       ResolutionSetResult,
@@ -190,6 +192,7 @@ mock.module('../holosphere_wasm.js', {
         }
       },
     };
+    return wasmModuleInstance;
   },
 });
 
@@ -239,6 +242,7 @@ beforeEach(() => {
   posted.length = 0;
   engineInstance = null;
   moduleOptions = null;
+  wasmModuleInstance = null;
   nextResolutionOk = true;
   nextEffectOk = true;
   nextClipOk = true;
@@ -497,6 +501,27 @@ test('render still posts a frame when getArenaMetrics throws', async () => {
   const frame = posted.find((p) => p.msg.type === 'frame');
   assert.ok(frame, 'frame still posted');
   assert.equal(frame.msg.arenaMetrics, null);
+});
+
+/** A metrics call that trapped the module faults the worker instead of posting its pixels. */
+test('render faults when getArenaMetrics traps the module', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  engineInstance.metricsThrows = true;
+  wasmModuleInstance.HS_MODULE_DEAD = true;
+  posted.length = 0;
+  const captured = [];
+  const realSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = (fn) => { captured.push(fn); return 0; };
+  try {
+    await dispatch({ type: 'render' });
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
+
+  assert.equal(posted.find((p) => p.msg.type === 'frame'), undefined,
+    'pixels from a trapped module must not reach the composite');
+  assert.equal(captured.length, 1, 'one rethrow task scheduled');
+  assert.throws(() => captured[0](), /binding gone/);
 });
 
 /** A pixel buffer whose length disagrees with the canvas faults instead of zero-filling the tail. */
