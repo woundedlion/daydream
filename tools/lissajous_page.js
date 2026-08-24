@@ -172,8 +172,13 @@ const updateCodeSnippet = () => {
   const warning = document.getElementById('domain_closure_warning');
   if (!warning) return;
   const text = domainClosureWarning(state.C2, state.Duration);
-  warning.textContent = text ?? '';
-  warning.classList.toggle('hidden', text === null);
+  if (text === null) {
+    warning.textContent = '';
+    warning.classList.add('hidden');
+  } else {
+    warning.classList.remove('hidden');
+    warning.textContent = text;
+  }
 };
 
 // --- UI Setup ---

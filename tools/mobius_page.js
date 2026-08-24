@@ -126,11 +126,14 @@ const updateDegenerateWarning = () => {
   const detRe = (A.re * D.re - A.im * D.im) - (B.re * C.re - B.im * C.im);
   const detIm = (A.re * D.im + A.im * D.re) - (B.re * C.im + B.im * C.re);
   const degenerate = Math.hypot(detRe, detIm) < 1e-4;
-  // A live region announces a content change, so the text has to arrive
-  // with the warning; markup that only loses its `hidden` class is silent.
-  const text = degenerate ? DEGENERATE_WARNING : '';
-  if (el.textContent !== text) el.textContent = text;
-  el.classList.toggle('hidden', !degenerate);
+  if (degenerate) {
+    el.classList.remove('hidden');
+    if (el.textContent !== DEGENERATE_WARNING)
+      el.textContent = DEGENERATE_WARNING;
+  } else {
+    el.textContent = '';
+    el.classList.add('hidden');
+  }
 };
 
 const applyConfig = (newVals) => {
