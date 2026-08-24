@@ -669,7 +669,7 @@ export function createShaderDocumentController({
     void flushDeepLink();
     const document = currentDocument();
     return exportDocument(document, active.filename.endsWith('.shader.json')
-      ? active.filename : `${document.effect_id}.shader.json`);
+      ? active.filename : `${document.effect_id ?? document.document_id}.shader.json`);
   };
 
   /**
