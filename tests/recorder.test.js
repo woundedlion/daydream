@@ -313,6 +313,47 @@ test('toggle starts then stops, reporting the true state each time', () => {
   }
 });
 
+test('elapsed time follows the recording wall-clock lifecycle', () => {
+  const restore = installRecorderEnv();
+  try {
+    let nowMs = 10_000;
+    let clockReads = 0;
+    const rec = new VideoRecorder(recordableCanvas(), 1 / 16, () => {
+      clockReads++;
+      return nowMs;
+    });
+    rec.download = () => {};
+    rec.start('e');
+    const recorder = rec.mediaRecorder;
+    const clockReadsAtStart = clockReads;
+
+    rec.captureFrame();
+    rec.captureFrame();
+    assert.equal(clockReads, clockReadsAtStart,
+      'captureFrame does not read the clock on the render path');
+    assert.equal(rec.elapsedSeconds, 0,
+      'captured frames do not manufacture elapsed time');
+
+    nowMs += 5_900;
+    assert.equal(rec.elapsedSeconds, 5.9,
+      'a simulation pause remains part of the recording duration');
+    assert.equal(rec.elapsedFormatted, '0:05');
+
+    nowMs += 55_000;
+    assert.equal(rec.elapsedFormatted, '1:00',
+      'a render stall advances the readout without a captured frame');
+
+    rec.stop();
+    const stoppedElapsed = rec.elapsedSeconds;
+    nowMs += 30_000;
+    assert.equal(rec.elapsedSeconds, stoppedElapsed,
+      'the duration freezes when MediaRecorder stops accepting data');
+    recorder.onstop();
+  } finally {
+    restore();
+  }
+});
+
 /**
  * Verifies abort() ends a live session the way an external fault (a lost canvas
  * context) needs: the stop path still finalizes the output and the host hook
@@ -1076,18 +1117,21 @@ test('captureFrame pillarboxes a taller-than-target source to fit height', () =>
 /**
  * A track without requestFrame is the timed-fallback mode (the capture stream
  * self-samples at the frame rate), not an error: captureFrame skips the manual
- * requestFrame call but still advances the elapsed-time counter.
+ * requestFrame call and elapsed time remains clock-driven.
  */
-test('captureFrame advances elapsed when the track lacks requestFrame', () => {
+test('captureFrame leaves elapsed time clock-driven without requestFrame', () => {
   const restore = installRecorderEnv();
   try {
-    const rec = new VideoRecorder(recordableCanvas());
+    let nowMs = 0;
+    const rec = new VideoRecorder(recordableCanvas(), 1 / 16, () => nowMs);
     rec.download = () => {};
     rec.start('e');
     delete rec.track.requestFrame;
     rec.captureFrame();
     rec.captureFrame();
-    assert.equal(rec.elapsedSeconds, 2 * rec.frameInterval);
+    assert.equal(rec.elapsedSeconds, 0);
+    nowMs = 2_000;
+    assert.equal(rec.elapsedSeconds, 2);
   } finally {
     restore();
   }
@@ -1115,9 +1159,9 @@ test('captureFrame is inert between stop and the async onstop', () => {
     rec.captureFrame();
     assert.equal(draws.length, 1, 'a frame captured while recording blits');
     assert.equal(requested, 1);
-    const elapsedAtStop = rec.elapsedSeconds;
 
     rec.stop();
+    const elapsedAtStop = rec.elapsedSeconds;
     assert.equal(rec.isRecording, false);
     assert.ok(rec.track, 'onstop has not released the track yet');
 
