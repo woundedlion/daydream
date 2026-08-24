@@ -368,6 +368,37 @@ test('repeated repaints do not overwrite the remembered stat-bar display', () =>
   assert.equal(desktop.style.display, 'block');
 });
 
+test('repeated repaints write stat-bar visibility only when it changes', () => {
+  const { doc, desktop, mobile } = makeDoc();
+  const view = new SegmentStatsView(doc);
+  let displayWrites = 0;
+  for (const bar of [desktop, mobile]) {
+    bar.style = new Proxy(bar.style, {
+      set(target, key, value) {
+        if (key === 'display') displayWrites++;
+        target[key] = value;
+        return true;
+      },
+    });
+  }
+
+  view.update(readyState(2));
+  assert.equal(displayWrites, 2);
+  assert.equal(desktop.style.display, 'none');
+  assert.equal(mobile.style.display, 'none');
+
+  for (let frame = 1; frame < 60; frame++) view.update(readyState(2));
+  assert.equal(displayWrites, 2, 'steady-state repaints do not rewrite none');
+
+  view.update(readyState(2, { active: false }));
+  assert.equal(displayWrites, 4);
+  assert.equal(desktop.style.display, '');
+  assert.equal(mobile.style.display, '');
+
+  view.update(readyState(2, { active: false }));
+  assert.equal(displayWrites, 4, 'an inactive repaint has nothing left to restore');
+});
+
 test('a spawning pool reports the worker count instead of a table', () => {
   const { doc, stats } = makeDoc();
   const view = new SegmentStatsView(doc);
