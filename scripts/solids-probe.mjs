@@ -179,7 +179,7 @@ const browser = await puppeteer.launch({
   args: BROWSER_ARGS,
 });
 
-let failures = [];
+const failures = [];
 try {
   const tab = await browser.newPage();
   await tab.setViewport(VIEWPORT);
@@ -203,7 +203,7 @@ try {
     }
     return count > 0 && performance.now() - seen.since > settle;
   }, { timeout: TIMEOUT_MS, polling: 200 }, SETTLE_MS);
-  failures = [...failures, ...await probeChain(tab)];
+  failures.push(...await probeChain(tab));
 } catch (error) {
   failures.push(error instanceof Error ? error.message : String(error));
 } finally {
