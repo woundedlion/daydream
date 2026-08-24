@@ -28,8 +28,11 @@ import {
   stampBoundaries,
 } from "./segment_layout.js";
 import { displayAliasesDiverged } from "./app_lifecycle.js";
+import { pageWarmer } from "./module_warmer.js";
 import { FAULT_POOL, FAULT_RENDER, SegmentStatsView } from "./segment_stats_view.js";
 import { PROTOCOL_VERSION } from "./worker_protocol.js";
+
+export { ModuleWarmer, WARM_INTERVAL_MS } from "./module_warmer.js";
 
 export const SEGMENT_CONTROLLER_API_VERSION = 2;
 
@@ -74,131 +77,6 @@ export const BOOT_RETRY_DELAY_MS = 250;
 // restart paths are the user-driven ones the fault banner names: a resolution
 // change or a segmented-mode toggle.
 export const MAX_FAULTED_REBUILDS = 2;
-
-// Minimum spacing between two actual warms. lil-gui fires onChange per drag
-// step, so the segment-count slider calls warmModules() several times a second;
-// each of those revalidates the whole module graph.
-export const WARM_INTERVAL_MS = 10000;
-
-/**
- * Warm state for one module graph: the dedupe window a burst of warms collapses
- * into, and the compilation the pool spawn hands to its workers. Held on an
- * object rather than in module scope so it has an owner that can be replaced —
- * a second host, or a test that must not inherit another's compilation.
- */
-export class ModuleWarmer {
-  constructor() {
-    this.lastWarmAt = -Infinity;
-    this.warmEpoch = 0;
-    // Resolved probe URL the stored warm covers. A warm of another module graph
-    // must not be served this one's promise, so the window is keyed on it.
-    /** @type {string | null} */
-    this.lastWarmKey = null;
-    /** @type {Promise<void>} */
-    this.lastWarm = Promise.resolve();
-    /**
-     * The binary compiled by the last warm, handed to every worker in its `init`
-     * so the pool instantiates one compilation instead of N. A
-     * WebAssembly.Module is structured-cloneable and carries no state: the
-     * binary declares its own memory rather than importing one, so each instance
-     * still gets an isolated heap and a private global arena. Null before a warm
-     * lands (and outside a web origin), where the worker falls back to fetching
-     * and compiling the binary itself.
-     * @type {WebAssembly.Module | null}
-     */
-    this.module = null;
-  }
-
-  /**
-   * Drop the held compilation, so a spawn that comes before the next warm
-   * compiles per worker instead of being handed a module a worker refused. The
-   * refusal is not latched: a warm past the dedupe window re-fetches and
-   * recompiles, which is what lets a redeployed binary be picked up.
-   * @returns {void}
-   */
-  discard() {
-    this.warmEpoch += 1;
-    this.module = null;
-  }
-
-  /**
-   * Prime the module graph's HTTP cache and compile its binary; see warmModules,
-   * which runs this on the page's warmer.
-   * @param {{fetch?: typeof globalThis.fetch, baseUrl?: string|URL, minIntervalMs?: number, now?: () => number}} [dependencies]
-   * @returns {Promise<void>}
-   */
-  warm({
-    fetch: fetchResource = globalThis.fetch,
-    baseUrl = import.meta.url,
-    minIntervalMs = WARM_INTERVAL_MS,
-    now: clock = Date.now,
-  } = {}) {
-    if (typeof fetchResource !== 'function') return Promise.resolve();
-    let probe;
-    try { probe = new URL('./holosphere_wasm.js', baseUrl); }
-    catch { return Promise.resolve(); }
-    if (probe.protocol !== 'http:' && probe.protocol !== 'https:') return Promise.resolve();
-    const now = clock();
-    if (probe.href === this.lastWarmKey && now - this.lastWarmAt < minIntervalMs) {
-      return this.lastWarm;
-    }
-    // fetch resolves at the headers; the body must be drained or nothing is cached.
-    const drain = (/** @type {string} */ u) =>
-      fetchResource(new URL(u, baseUrl), { cache: 'no-cache' }).then((r) => r.arrayBuffer());
-    const epoch = this.warmEpoch + 1;
-    /** @param {WebAssembly.Module | null} compiled */
-    const publish = (compiled) => {
-      if (this.warmEpoch === epoch) this.module = compiled;
-    };
-    /** @type {Promise<void>} */
-    let warm;
-    try {
-      const workerJs = drain('./segment_worker.js');
-      const glueJs = drain('./holosphere_wasm.js');
-      // The worker's remaining static imports. worker_protocol.js carries
-      // PROTOCOL_VERSION, so a stale copy makes the handshake agree with itself
-      // across exactly the deploy skew it exists to catch.
-      const layoutJs = drain('./segment_layout.js');
-      const protocolJs = drain('./worker_protocol.js');
-      const binary = drain('./holosphere_wasm.wasm');
-      warm = Promise.allSettled([
-        workerJs,
-        glueJs,
-        layoutJs,
-        protocolJs,
-        binary,
-        // A rejected fetch is the cold-cache case and goes unreported; only a
-        // binary the engine refuses gets a diagnostic. Either way the held
-        // module is dropped rather than kept: this warm went back to the origin,
-        // so nothing left says a module compiled from an earlier one still
-        // describes the deployed artifact.
-        binary.then((bytes) => WebAssembly.compile(bytes).then(
-          publish,
-          (error) => {
-            console.warn('[Segmented] shared WASM compile failed; each worker '
-              + 'will compile its own', error);
-            publish(null);
-          }),
-        () => { publish(null); }),
-      ]).then(() => {});
-    } catch {
-      // A fetch that throws synchronously warmed nothing, so the window stays
-      // with the last warm that did: advancing it here would hand every caller
-      // inside the window a promise already settled by an earlier module graph.
-      return Promise.resolve();
-    }
-    // Stamped only once the promise it describes exists, for the same reason.
-    this.warmEpoch = epoch;
-    this.lastWarmAt = now;
-    this.lastWarmKey = probe.href;
-    this.lastWarm = warm;
-    return this.lastWarm;
-  }
-}
-
-// The page's warmer: one dedupe window and one compilation for every pool the
-// page builds, which is what makes an N-worker spawn cost one compile.
-export const pageWarmer = new ModuleWarmer();
 
 /**
  * Render a thrown value as a fault message detail.
@@ -306,7 +184,7 @@ export class SegmentController {
    * @param {() => (Uint16Array|null)} deps.getMemoryView - Returns the current Uint16Array view of the display buffer.
    * @param {(view: Uint16Array) => void} deps.repointDisplayAliases - Re-points BOTH display aliases (Three.js instanceColor.array + driver.pixels) at the given view. Required: only the host knows the mesh, and an implementation that moves one alias leaves the composite in a buffer the GPU never reads.
    * @param {Document} [deps.statsDoc] - DOM document the stats overlay renders into; defaults to the global `document`.
-   * @param {ModuleWarmer} [deps.moduleWarmer] - Warmer whose compilation the spawn hands to its workers; defaults to the page's, so every pool on a page shares one compile.
+   * @param {import('./module_warmer.js').ModuleWarmer} [deps.moduleWarmer] - Warmer whose compilation the spawn hands to its workers; defaults to the page's, so every pool on a page shares one compile.
    * @throws {TypeError} When repointDisplayAliases is not a function.
    */
   constructor({ resolutionPresets, appState, driver, getWasmEngine, refreshPixelView,

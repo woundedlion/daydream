@@ -25,6 +25,7 @@ frame_constants.js
 geometry.js
 global_stats_view.js
 gui.js
+module_warmer.js
 param_sync.js
 pixel_view.js
 recorder.js
