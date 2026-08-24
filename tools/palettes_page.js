@@ -712,9 +712,9 @@ function mountSlider(def) {
 }
 
 /**
-     * Updates all slider positions and value spans from the 'parameters' object.
-     * Used after zooming or resetting zoom.
-     */
+ * Updates all slider positions and value spans from the 'parameters' object.
+ * Used after zooming or resetting zoom.
+ */
 function updateAllSliders() {
   sliderDefinitions.forEach(def => {
     sliderHandles[def.param].setValue(parameters[def.param]);
@@ -722,8 +722,8 @@ function updateAllSliders() {
 }
 
 /**
-     * Helper function to get the normalized (0-1) X coordinate from a pointer event.
-     */
+ * Helper function to get the normalized (0-1) X coordinate from a pointer event.
+ */
 function getNormalizedX(event) {
   if (!colorStripCanvas) return 0; // Safety check
   const rect = colorStripCanvas.getBoundingClientRect();
@@ -732,8 +732,8 @@ function getNormalizedX(event) {
 }
 
 /**
-     * Handles the start of a drag or click on the color strip.
-     */
+ * Handles the start of a drag or click on the color strip.
+ */
 function handleDragStart(event) {
   if (!colorStripCanvas) return false;
 
@@ -746,9 +746,9 @@ function handleDragStart(event) {
 }
 
 /**
-     * Handles pointer movement during a drag.
-     * Cancels selection if the pointer moves above or below the canvas.
-     */
+ * Handles pointer movement during a drag.
+ * Cancels selection if the pointer moves above or below the canvas.
+ */
 function handleDragMove(event) {
   dragEndPosition = getNormalizedX(event);
 
@@ -772,8 +772,8 @@ function handleDragMove(event) {
 }
 
 /**
-     * Handles the end of a drag (zoom) or a simple click (set phase).
-     */
+ * Handles the end of a drag (zoom) or a simple click (set phase).
+ */
 function handleDragEnd(event) {
   if (!colorStripCanvas) return;
 
@@ -951,8 +951,8 @@ function redrawForViewport() {
 
 
 /**
-     * Updates the code output block with the current parameters.
-     */
+ * Updates the code output block with the current parameters.
+ */
 function updatePaletteCodeOutput() {
   const codeOutput = document.getElementById('palette_code_output');
   if (!codeOutput) return;
@@ -1067,8 +1067,8 @@ function engineTrapped(error) {
 }
 
 /**
-     * Initialize the sliders and the first visualization.
-     */
+ * Initialize the sliders and the first visualization.
+ */
 async function init() {
   // Load the engine module first so GenerativePalette can bake its LUT with
   // the exact C++ color math (PaletteOps). The generative tab can't render

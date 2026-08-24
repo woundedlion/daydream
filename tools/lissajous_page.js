@@ -114,10 +114,10 @@ const scheduleUpdate = createFrameScheduler(() => {
 // read/write wiring around them.
 
 /**
-     * Snaps the active frequency (C1 or C2) to maintain a simple rational ratio with the passive frequency.
-     * @param {string} activeId 'C1' or 'C2'.
-     * @param {number} rawNewValue The raw slider value from the input event.
-     */
+ * Snaps the active frequency (C1 or C2) to maintain a simple rational ratio with the passive frequency.
+ * @param {string} activeId 'C1' or 'C2'.
+ * @param {number} rawNewValue The raw slider value from the input event.
+ */
 const snapFrequencies = (activeId, rawNewValue) => {
   if (!state.isRationalLocked) return;
 

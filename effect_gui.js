@@ -273,8 +273,10 @@ export function createEffectGui({
   // Throttle the param/value length-skew warning to once per skew episode.
   let skewLogged = false;
   let rebuildFailureGeneration;
+  /** Storage key for the last engine-accepted value of one parameter. */
   const acceptedStorageKey = (name) => `__accepted.${name}`;
 
+  /** Persist the active effect through its snapshot or accepted-value surface. */
   function persistEffectState(gui, parameterName = null) {
     if (!usesFullConfigSnapshot()) {
       persistAcceptedParams(gui, parameterName);
@@ -285,6 +287,7 @@ export function createEffectGui({
     gui.writeStoredValue(FULL_CONFIG_STORAGE_KEY, JSON.stringify(snapshot));
   }
 
+  /** Restore the active effect through its snapshot or accepted-value surface. */
   function restoreEffectState(gui) {
     if (!usesFullConfigSnapshot()) {
       restoreAcceptedParams(gui);
@@ -315,6 +318,7 @@ export function createEffectGui({
     showConfigImportNotice(notice || null);
   }
 
+  /** Store engine-accepted values, optionally narrowed to one parameter. */
   function persistAcceptedParams(gui, parameterName = null) {
     for (const parameter of getParameterDefinitions()) {
       if (parameter.readonly || (parameterName !== null && parameter.name !== parameterName)) {
@@ -406,12 +410,14 @@ export function createEffectGui({
     return false;
   }
 
+  /** Update the pause controller without writing back to the engine. */
   function adoptPauseDisplay(fx, paused) {
     if (paused === undefined || paused === fx.pause.animationState.pause) return;
     fx.pause.animationState.pause = paused;
     fx.pause.controller?.updateDisplay();
   }
 
+  /** Update the preset controller and its visibility from live engine state. */
   function adoptPresetDisplay(fx, count, index) {
     if (!fx.preset || count <= 0) return;
     if (fx.preset.state.presetIndex === index) return;
@@ -965,6 +971,7 @@ export function createEffectGui({
     }
   }
 
+  /** Return the element that owns a GUI panel's vertical scroll offset. */
   function scrollElement(gui) {
     return gui?.domElement?.querySelector?.('.lil-children') ?? null;
   }
