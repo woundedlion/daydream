@@ -79,6 +79,7 @@ class StubGUI {
    */
   constructor() {
     this.domElement = {};
+    this._closed = false;
     this.$children = { appended: [], appendChild: (child) => {
       this.$children.appended.push(child);
     } };
@@ -103,6 +104,10 @@ class StubGUI {
    * @returns {StubGUI} A fresh nested GUI stub.
    */
   addFolder() { return new StubGUI(); }
+  /** @param {boolean} [open=true] Whether the panel is expanded. */
+  open(open = true) { this._closed = !open; }
+  /** @returns {void} Closes the panel. */
+  close() { this._closed = true; }
   /**
    * Records that the wrapper tore this panel down.
    * @returns {void}
@@ -133,6 +138,19 @@ test('DeepLinkGUI appends custom content to the wrapped controller container', (
   gui.appendElement(element);
 
   assert.deepEqual(gui.gui.$children.appended, [element]);
+});
+
+test('DeepLinkGUI exposes and changes the wrapped panel state', () => {
+  installWindow('');
+  const gui = new DeepLinkGUI({ autoPlace: false });
+
+  assert.equal(gui.closed, false);
+  gui.close();
+  assert.equal(gui.closed, true);
+  gui.open();
+  assert.equal(gui.closed, false);
+  gui.open(false);
+  assert.equal(gui.closed, true);
 });
 
 /**
