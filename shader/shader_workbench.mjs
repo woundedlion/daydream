@@ -1261,8 +1261,7 @@ export function interpolateValue(parameter, from, to, progress) {
     return Math.fround(Math.exp(Math.log(a) + (Math.log(b) - Math.log(a)) * t));
   case 'SHORTEST_PERIODIC': {
     const period = Math.fround(parameter.interpolation.period);
-    let delta = ((b - a + period * 0.5) % period + period) % period - period * 0.5;
-    if (delta >= period * 0.5) delta -= period;
+    const delta = ((b - a + period * 0.5) % period + period) % period - period * 0.5;
     let value = (a + delta * t) % period;
     if (value < 0) value += period;
     const stored = Math.fround(value);
