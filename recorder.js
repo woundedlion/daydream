@@ -6,7 +6,7 @@
 /**
  * Records the WebGL canvas to a video using MediaRecorder.
  * Uses captureStream(0) (manual frame-request mode) so frames are locked
- * to simulation ticks rather than wall-clock time.
+ * to simulation ticks. MediaRecorder timestamps the session in wall-clock time.
  *
  * Codec priority: MP4/H.264 > WebM/VP9 > WebM/VP8.
  *
@@ -78,10 +78,11 @@ export class VideoRecorder {
   /**
    * Constructs a recorder bound to a source canvas.
    * @param {HTMLCanvasElement} canvas - Source canvas to record.
-   * @param {number} frameInterval - Seconds of video added per captured frame;
-   *   drives the elapsed-time counter (defaults to the simulation rate, 1/FPS).
+   * @param {number} frameInterval - Seconds per frame for timed capture fallback
+   *   (defaults to the simulation rate, 1/FPS).
+   * @param {() => number} now - Monotonic clock returning milliseconds.
    */
-  constructor(canvas, frameInterval = 1 / FPS) {
+  constructor(canvas, frameInterval = 1 / FPS, now = () => performance.now()) {
     this.canvas = canvas;
     /** @type {MediaRecorder|null} */
     this.mediaRecorder = null;
@@ -92,6 +93,9 @@ export class VideoRecorder {
     /** @type {CaptureTrack|null} */
     this.track = null;
     this.frameInterval = frameInterval;
+    this.now = now;
+    this.recordingStartedAtMs = null;
+    this.elapsedBaseSeconds = 0;
     this.elapsedSeconds = 0;
     // bitrateMbps, format, and targetHeight are latched at start().
     this.bitrateMbps = 16;
@@ -310,6 +314,7 @@ export class VideoRecorder {
     // encoder buffers the whole recording in memory until stop().
     try {
       recorder.start(RECORDER_TIMESLICE_MS);
+      this.recordingStartedAtMs = this.now();
     } catch (err) {
       recorder.ondataavailable = null;
       recorder.onstop = null;
@@ -339,8 +344,16 @@ export class VideoRecorder {
    */
   stop() {
     if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+      this.freezeElapsed();
       this.mediaRecorder.stop();
     }
+  }
+
+  /** @returns {void} */
+  freezeElapsed() {
+    if (this.recordingStartedAtMs === null) return;
+    this.elapsedBaseSeconds = this.elapsedSeconds;
+    this.recordingStartedAtMs = null;
   }
 
   /**
@@ -362,8 +375,7 @@ export class VideoRecorder {
    * task that rendered it — the source is a WebGL canvas without
    * preserveDrawingBuffer, so a blit after compositing reads transparent black.
    * When an offscreen scaling canvas is in use, blits the source canvas into it
-   * (scaled to the target resolution) before requesting the frame, and advances
-   * the elapsed-time counter by one frame interval.
+   * (scaled to the target resolution) before requesting the frame.
    * @returns {void}
    */
   captureFrame() {
@@ -371,7 +383,6 @@ export class VideoRecorder {
     this.blitToOffscreen();
     // Timed-fallback tracks have no requestFrame; the stream samples on its own.
     if (typeof this.track.requestFrame === 'function') this.track.requestFrame();
-    this.elapsedSeconds += this.frameInterval;
   }
 
   /**
@@ -401,10 +412,8 @@ export class VideoRecorder {
   }
 
   /**
-   * Elapsed recording time as a formatted string. Counts captured frames
-   * (frameInterval each), so it tracks the manual requestFrame path exactly; on
-   * the timed-fallback path (a track without requestFrame, which encodes on the
-   * wall clock) it can drift from the encoded file's real duration.
+   * Elapsed recording time as a formatted string, measured on the same
+   * wall-clock lifecycle as the encoded file.
    * @returns {string} The elapsed time in M:SS form (seconds zero-padded).
    */
   get elapsedFormatted() {
@@ -412,6 +421,21 @@ export class VideoRecorder {
     const m = Math.floor(total / 60);
     const s = total % 60;
     return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
+  /** @returns {number} Elapsed wall-clock seconds in the current or last session. */
+  get elapsedSeconds() {
+    if (this.recordingStartedAtMs === null) return this.elapsedBaseSeconds;
+    return this.elapsedBaseSeconds
+      + Math.max(0, this.now() - this.recordingStartedAtMs) / 1000;
+  }
+
+  /** @param {number} value - Elapsed seconds to retain while idle. */
+  set elapsedSeconds(value) {
+    this.elapsedBaseSeconds = value;
+    if (this.recordingStartedAtMs !== null) {
+      this.recordingStartedAtMs = this.now();
+    }
   }
 
   /**
@@ -742,6 +766,7 @@ export class VideoRecorder {
    * @returns {void}
    */
   cleanup() {
+    this.freezeElapsed();
     this.mediaRecorder = null;
     this.chunks = [];
     if (this.stream) {
