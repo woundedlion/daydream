@@ -441,6 +441,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 ├── CMakeLists.txt              Emscripten build (outputs holosphere_wasm.js + .wasm)
 ├── CMakePresets.json           Canonical presets: wasm-release, wasm-debug, wasm-strict-fp, tests
 ├── cmake/
+│   ├── prune_mirrored_screenshots.cmake  Removes obsolete engine-owned gallery PNGs during install
 │   └── toolchain-native-clang.cmake  Native Clang toolchain behind the tests preset
 ├── platformio.ini              Teensy envs: the two shipping images plus the compile/profiling profiles
 ├── tests/                      Unit tests (CMake subdirectory)
@@ -473,7 +474,8 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── png_probe.mjs           Dependency-free PNG chunk/CRC/inflate validator behind the gallery gate
 │   ├── png_probe.test.mjs      Node unit test for the PNG validator (corrupt/empty fixtures)
 │   ├── check_screenshots.mjs   Asserts docs/screenshots/ matches the effect roster and decodes (CI)
-│   ├── check_profiles.mjs      Asserts shipping profiles match the Phantasm roster (CI)
+│   ├── check_profiles.mjs      Validates indexed timing reports against their rosters and document contract (CI)
+│   ├── check_profiles.test.mjs Node regression tests for timing report structure and set discovery
 │   ├── run_tests.mjs           `npm test`: runs the .test.mjs suite and rejects empty cases/files
 │   ├── run_tests.test.mjs      Node regression test for the empty-case rejection
 │   ├── count_assertions.mjs    NODE_OPTIONS shim counting node:assert calls and zero-delta cases
@@ -645,7 +647,9 @@ Both trees are gated against their repository's tracked file list: every row mus
 ├── vendor/                     Optional self-hosted fonts (CDN fallback)
 ├── node_modules/lil-gui/       Optional local lil-gui (npm install)
 ├── package.json
-└── package-lock.json           Committed dependency pin (the optional trees above are gitignored)
+├── package-lock.json           Committed dependency pin (the optional trees above are gitignored)
+├── .gitattributes              Text and generated-binary attribute rules
+└── .gitignore                  Local dependency, build, and installed-engine exclusions
 ```
 
 [`vendor-importmap.js`](https://github.com/woundedlion/daydream/blob/master/vendor-importmap.js) resolves libraries from jsdelivr, which is the committed default the Pages deploy and a fresh checkout serve; `npm run importmap:local` switches it to the vendored copies for offline dev. See [§10.8](#108-vendor-importmap-cdn-by-default--local-opt-in).
@@ -2683,13 +2687,13 @@ The [shipping device captures](https://github.com/woundedlion/pov/blob/master/do
 
 The parameter schema exposes the broader Shader workbench vocabulary below. A menu entry describes a structurally possible field value, not a promise that its Cartesian combination is compiled for Teensy. The simulator renders valid unmatched combinations dynamically; sliders are active only when the selected schema uses them.
 
-The gap is per value, not only per combination. The `ComposedEffect` derivation layer in `composed_effect.h` reaches a strict subset of the shipped operator catalog, so ten operators — Peirce, Peirce (Fast Square), Bonne, Airocean, Rings, both Noise Contours, Curl Flow, Ridge and Smooth Bands — and 38 further values of the operators it does reach are workbench-only and can never appear in a composed effect: every non-simplex noise basis, the non-Euler curl integrators, the non-flat warp envelopes, the logarithmic polar chart and its harmonics 2–16, the front and back gnomonic hemispheres, and the None signal weight and Opaque coverage. Value Cutout is reachable and selected by Ash Cloud. `tests/test_composed_effect.h` pins that set against the live operator table, so a catalog addition stays classified.
+The gap is per value, not only per combination. The `ComposedEffect` derivation layer in `composed_effect.h` reaches a strict subset of the shipped operator catalog, so fourteen operators — Peirce, Peirce (Fast Square), Bonne, Airocean, Rings, Spherical Rings, Escape Fractal, Tessellation, both Noise Contours, Vortex, Curl Flow, Ridge and Smooth Bands — and 38 further values of the operators it does reach are workbench-only and can never appear in a composed effect: every non-simplex noise basis, the non-Euler curl integrators, the non-flat warp envelopes, the logarithmic polar chart and its harmonics 2–16, the front and back gnomonic hemispheres, and the None signal weight and Opaque coverage. Value Cutout is reachable and selected by Ash Cloud. `tests/test_composed_effect.h` pins that set against the live operator table, so a catalog addition stays classified.
 
 The two planar warps run in their displayed pullback order: **Planar Warp 1** then **Planar Warp 2**, followed by the source function.
 
 | Stage | Options | Produces or controls |
 |---|---|---|
-| **Function** | Twin Wave, Rings, Spiral, Grid, Noise Contour (Projected), Primitive Lattice, Noise Contour (Sphere) | A signed scalar field. The projected contour samples final planar coordinates; the sphere contour samples the post-lens direction in the inverse projection frame. Grid blends between coupled and direct patterns with dedicated mix and complexity controls. |
+| **Function** | Twin Wave, Rings, Spiral, Grid, Noise Contour (Projected), Primitive Lattice, Noise Contour (Sphere), Spherical Rings, Escape Fractal, Tessellation | A signed scalar field. Projected fields sample final planar coordinates; sphere fields sample the post-lens direction in the inverse projection frame. Grid blends between coupled and direct patterns with dedicated mix and complexity controls. |
 | **Projection** | Folded Sinusoidal, Stereographic, Gnomonic, Bonne, Peirce Quincuncial, Dymaxion / Airocean, Equirectangular | Planar coordinates plus region/component identity, projection weight, boundary traits, stable edge identity, and fade distance. |
 | **Projection Frame** | Identity, Spin + Wander | Rotates the sphere before projection. Projection Spin Speed and Projection Wander exist only for Spin + Wander. |
 | **Lens** | None, Glitch, Twist, Kaleidoscope, Mobius | Distorts a unit-sphere direction before projection. Lens-specific controls exist only for an active lens. |
@@ -2707,8 +2711,8 @@ Polyhedral kaleidoscope lenses contract animation-speed and warp/noise-frequency
 
 Noise Contour (Projected) is available with Folded Sinusoidal,
 Stereographic, Gnomonic, and Equirectangular projections. Noise Contour (Sphere)
-works with every projection but rejects non-None planar warps because those
-warps have no sphere-space inverse.
+and Spherical Rings work with every projection but reject non-None planar warps
+because those warps have no sphere-space inverse.
 
 **Camera Wander** sits outside that table: it is always registered, and scales
 how much of a continuous random walk rotates the viewing direction before any
@@ -2797,7 +2801,7 @@ A trap is terminal for the whole module, not just for the call that tripped it. 
 | `setEffect(name)` → `EffectSetResult` | Instantiate a new effect by C++ class name or stable effect ID; `ShaderBall` remains an alias for `Shader`. The call resets all arenas to defaults. Returns `Module.EffectSetResult.INSTALLED` on success, else the rejection reason (`UNKNOWN_EFFECT`, or `UNSUPPORTED_RESOLUTION` when the active resolution has no factory); a rejection keeps the prior effect alive. Compare against the enum values — never by truthiness |
 | `drawFrame()` | Advance one frame and copy pixels to the output buffer |
 | `setShaderChain(entries)` → `{code, entryIndex}` | Program the loaded `ShaderChain` effect with an ordered `[{instance, operator}]` array — the chain's shape and nothing else, no values and no family tags. Alone among the engine results this is a plain JS object, not an embind enum, so compare `code` against the strings: `"APPLIED"` on commit, else the refusal's `ChainStatus` name (`NOT_CHAIN_EFFECT`, `MALFORMED_PAYLOAD`, `TOO_LONG`, `UNKNOWN_OPERATOR`, `CARRIER_MISMATCH`, …), with `entryIndex` naming the offending entry and `-1` a whole-chain refusal. `APPLIED` has already rebuilt the parameter definitions (named `instance.field-id`) and bumped `getParamGeneration()` by the time it returns, so the caller applies preset values by name straight after. Every refusal is transactional — the previous program, its definitions, the generation, and all instance state are left exactly as they were |
-| `getShaderChainCatalog()` → `string` | *(static)* The chain interpreter's operator catalog as one JSON string — budgets, carriers, and every operator-table entry. Budgets, carriers, operator ids and parameter schemas match the catalog the native suite pins as its golden, which is what keeps an editor's stage library from drifting from the operator table the engine actually resolves against. The per-operator block sizes are the building ABI's and are **not** byte-identical to that golden: this module emits wasm32 figures, where a pointer-bearing `prepared` block is 4-byte-aligned and narrower than the 8-byte-aligned LP64 figure the native golden carries (7 of the 33 operators differ). The wasm32 figures are the ones an editor budgets arena bytes against, and the ones this module's own runtime allocates from; `scripts/shader_workbench.test.mjs` holds the two spellings to differing in nothing else |
+| `getShaderChainCatalog()` → `string` | *(static)* The chain interpreter's operator catalog as one JSON string — budgets, carriers, and every operator-table entry. Budgets, carriers, operator ids and parameter schemas match the catalog the native suite pins as its golden, which is what keeps an editor's stage library from drifting from the operator table the engine actually resolves against. The per-operator block sizes are the building ABI's and are **not** byte-identical to that golden: this module emits wasm32 figures, where a pointer-bearing `prepared` block is 4-byte-aligned and narrower than the 8-byte-aligned LP64 figure the native golden carries (7 of the 38 operators differ). The wasm32 figures are the ones an editor budgets arena bytes against, and the ones this module's own runtime allocates from; `scripts/shader_workbench.test.mjs` holds the two spellings to differing in nothing else |
 | `getPixels()` | Return a zero-copy `Uint16Array` view into WASM linear memory, spanning the active resolution's prefix of the fixed backing buffer |
 | `getBufferLength()` → `int` | Length of the pixel buffer (`W × H × 3`) for sizing the view, and the staleness test for a cached one: a `setResolution` moves this length without detaching the outstanding view |
 | `setParameter(name, value)` → `ParamSetResult` | Update a live effect parameter; returns `Module.ParamSetResult.APPLIED` on success, else the rejection reason (`NO_EFFECT`, `UNKNOWN_PARAM`, `READONLY`, or `NON_FINITE`). Compare against the enum values — never by truthiness. An `APPLIED` float may still have been clamped to the param's `[min, max]`; read the effective value back via `getParamValues()`. An `APPLIED` write to an *animated* param also engages the animation pause (the animation would otherwise overwrite the value on the next frame), and that pause survives `setEffect` — check `getAnimationsPaused()` afterwards |
