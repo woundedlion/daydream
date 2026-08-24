@@ -400,7 +400,15 @@ test('index boots through the entry module and bootstrap.js stays importable', (
   assert.match(html, /<script type="module" src="main\.js"><\/script>/);
   assert.doesNotMatch(html, /<script type="module" src="daydream\.js"><\/script>/);
   const source = readFileSync(new URL('../bootstrap.js', import.meta.url), 'utf8');
-  assert.doesNotMatch(source, /^\s*(?:void\s+)?bootstrap\s*\(/m);
+  const body = source.replace(/export\s+async\s+function\s+bootstrap\s*\(/, 'function(');
+  const invocation = /\bbootstrap\s*(?:\?\.\s*)?(?:\(|\.(?:call|apply)\s*\()|\(\s*bootstrap\s*\)\s*\(/;
+  assert.doesNotMatch(body, invocation);
+  for (const spelling of [
+    'await bootstrap()',
+    'bootstrap?.()',
+    '(bootstrap)()',
+    'bootstrap.call(null)',
+  ]) assert.match(spelling, invocation);
 });
 
 test('index identifies new-window tool links and associates stats headers', () => {
