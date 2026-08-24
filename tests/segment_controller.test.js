@@ -2741,8 +2741,8 @@ test('create with an unknown resolution latches a pool fault', () => {
   }
 });
 
-test('create with a layout-illegal segment count latches a pool fault', () => {
-  for (const bad of [3, 0, -2, 2.5, NaN]) {
+test('create with a layout-illegal or oversized segment count latches a pool fault', () => {
+  for (const bad of [3, 0, -2, 2.5, NaN, 10]) {
     const c = makeController();
     c.active = true;
     c.create(6);
