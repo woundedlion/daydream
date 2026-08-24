@@ -11,7 +11,8 @@ export const ENGINE_METHODS = [
   'synchronizePreset', 'nextPreset', 'previousPreset',
   'setPoleLod', 'setClip', 'drawFrame', 'getPixels', 'getArenaMetrics',
   'getParameterDefinitions', 'getParamValues', 'getBufferLength',
-  'getParamGeneration', 'getEffectSizes', 'strobeColumns', 'setShaderChain',
+  'getParamGeneration', 'getEffectSizes', 'getEffectPresetCounts',
+  'strobeColumns', 'setShaderChain',
 ];
 
 /**

@@ -370,7 +370,9 @@ function makeApp({
   rejectEffects = [],
   rejectResolutions = [],
   effectSizes = { Alpha: 12 },
+  presetCounts = { Alpha: 3 },
   sizesFailure = null,
+  presetCountsFailure = null,
   noEngine = false,
   segmented = false,
   refuseEffectSet = false,
@@ -413,6 +415,11 @@ function makeApp({
       if (sizesFailure) throw sizesFailure;
       return effectSizes;
     },
+    getEffectPresetCounts() {
+      log.push('engine.getEffectPresetCounts');
+      if (presetCountsFailure) throw presetCountsFailure;
+      return presetCounts;
+    },
   };
 
   const segments = {
@@ -445,8 +452,9 @@ function makeApp({
     },
     sidebar: {
       setActive: (name) => log.push(`sidebar.setActive ${name}`),
-      setEffects: (list, sizes) =>
-        log.push(`sidebar.setEffects ${list.join(',')} sizes=${JSON.stringify(sizes)}`),
+      setEffects: (list, sizes, counts) => log.push(
+        `sidebar.setEffects ${list.join(',')} sizes=${JSON.stringify(sizes)}`
+        + ` presets=${JSON.stringify(counts)}`),
     },
     muteSubscription: (write) => {
       muted = true;
@@ -550,7 +558,8 @@ test('a resolution change resizes every renderer before re-applying the effect',
     'segments.setResolution 288x144',
     'driver.updateResolution 288x144@0.25',
     'engine.getEffectSizes',
-    'sidebar.setEffects Alpha,Gamma sizes={"Alpha":12}',
+    'engine.getEffectPresetCounts',
+    'sidebar.setEffects Alpha,Gamma sizes={"Alpha":12} presets={"Alpha":3}',
     'engine.setEffect Alpha',
     'driver.setStrobeColumns 7',
     'segments.refreshPresetState',
@@ -602,8 +611,19 @@ test('a failed size query still lists the effects the resolution offers', () => 
 
   app.pipeline.applyResolution();
 
-  assert.equal(app.log.includes('sidebar.setEffects Alpha,Gamma sizes=null'), true);
+  assert.equal(app.log.includes(
+    'sidebar.setEffects Alpha,Gamma sizes=null presets={"Alpha":3}'), true);
   assert.match(app.warnings[0], /getEffectSizes failed/);
+});
+
+test('a failed preset-count query still lists the effects and sizes', () => {
+  const app = makeApp({ presetCountsFailure: new Error('no preset counts') });
+
+  app.pipeline.applyResolution();
+
+  assert.equal(app.log.includes(
+    'sidebar.setEffects Alpha,Gamma sizes={"Alpha":12} presets=null'), true);
+  assert.match(app.warnings[0], /getEffectPresetCounts failed/);
 });
 
 test('an off-list effect is corrected and applied exactly once', () => {

@@ -140,13 +140,15 @@ export class EffectSidebar {
   }
 
   /**
-   * Create the option buttons once for the given effect names and sizes, then
+   * Create the option buttons once for the given effect names and metadata, then
    * apply the current sort order, active highlight, and roving tabindex anchor,
    * restoring keyboard focus when it was inside the list.
    * @param {Array<string>} names - Effect names, one button per name.
    * @param {Record<string, number>} [effectSizes] - Map of effect name to size in bytes; missing or absent entries are treated as 0.
+   * @param {Record<string, number>} [presetCounts] - Map of effect name to
+   *   authored preset count; missing or absent entries are treated as 0.
    */
-  setEffects(names, effectSizes) {
+  setEffects(names, effectSizes, presetCounts) {
     // Discarding the focused option drops focus to <body>, where the list's
     // keydown handler no longer sees it and Space reaches the global one
     // instead. Name it now; the rebuilt button carrying that name takes it back.
@@ -163,6 +165,7 @@ export class EffectSidebar {
 
     names.forEach(name => {
       const size = effectSizes ? (effectSizes[name] || 0) : 0;
+      const presetCount = presetCounts ? (presetCounts[name] || 0) : 0;
       this.items.push({ name, size });
 
       const btn = this.doc.createElement('button');
@@ -175,7 +178,7 @@ export class EffectSidebar {
 
       const nameSpan = this.doc.createElement('span');
       nameSpan.className = 'effect-name';
-      nameSpan.textContent = name;
+      nameSpan.textContent = `${name} (${presetCount})`;
       btn.appendChild(nameSpan);
 
       if (size > 0) {
