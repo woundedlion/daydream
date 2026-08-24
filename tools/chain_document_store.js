@@ -54,7 +54,7 @@ const parameterFromField = (label, field) => {
       id: `${label}.${field.id}`,
       classification: 'preset',
       storage: 'enum8',
-      unit: 'mode',
+      unit: field.id === 'palette-mapping' ? 'mapping' : 'mode',
       domain: { values: [...field.values] },
       interpolation: { kind: 'MIXED_ENUM' },
       default: field.default,
@@ -70,7 +70,8 @@ const parameterFromField = (label, field) => {
     id: `${label}.${field.id}`,
     classification: 'preset',
     storage: 'binary32',
-    unit: kind === 'SHORTEST_PERIODIC' ? 'radian' : 'ratio',
+    unit: kind === 'SHORTEST_PERIODIC' ? 'radian'
+      : field.id.endsWith('speed') ? 'turn-per-frame' : 'ratio',
     domain: { minimum, maximum },
     interpolation: kind === 'SHORTEST_PERIODIC'
       ? { kind, period: maximum } : { kind },
