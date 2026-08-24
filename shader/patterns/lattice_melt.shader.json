@@ -58,7 +58,10 @@
         "domain": {
           "values": [
             "none",
-            "cup"
+            "cup",
+            "bell",
+            "ascending",
+            "descending"
           ]
         },
         "id": "colorize.brightness-envelope",

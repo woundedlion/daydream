@@ -572,6 +572,15 @@ const validatePresetBank = (bank, parameters, pathPolicies, report, guard) => {
     if (order.length !== presetIds.size || new Set(order).size !== presetIds.size ||
         order.some((presetId) => !presetIds.has(presetId)))
       fail('semantic', 'INVALID_GENERATED_ORDER', '$.preset_bank.choreography.generated_order', 'Generated order must contain every preset exactly once.');
+    if (bank.choreography.dwell !== undefined) {
+      const dwell = object(bank.choreography.dwell, '$.preset_bank.choreography.dwell');
+      if (Object.keys(dwell).length !== presetIds.size ||
+          Object.keys(dwell).some((presetId) => !presetIds.has(presetId)))
+        fail('semantic', 'INVALID_DWELL', '$.preset_bank.choreography.dwell', 'Dwell must contain every preset exactly once.');
+      for (const [presetId, duration] of Object.entries(dwell))
+        if (!Number.isInteger(duration) || duration <= 0)
+          fail('semantic', 'INVALID_DWELL', `$.preset_bank.choreography.dwell.${presetId}`, 'Dwell must be a positive tick count.');
+    }
   });
 };
 
@@ -1298,11 +1307,17 @@ export function evaluateTransition(descriptor, bank, fromId, toId, evaluation) {
     fail('transition', 'ABSENT_EDGE', '$.preset_bank.edges', `No transition edge exists from "${fromId}" to "${toId}".`);
   if (!Number.isInteger(evaluation) || evaluation < 0 || evaluation > edge.duration)
     fail('transition', 'INVALID_EVALUATION', '$.transition.evaluation', 'Evaluation must be an integer in [0, duration].');
-  const from = bank.presets.find((preset) => preset.preset_id === fromId).values;
-  const to = bank.presets.find((preset) => preset.preset_id === toId).values;
+  const fromPreset = bank.presets.find((preset) => preset.preset_id === fromId);
+  const toPreset = bank.presets.find((preset) => preset.preset_id === toId);
+  if (!fromPreset || !toPreset)
+    fail('transition', 'INVALID_EDGE_ENDPOINT', '$.preset_bank.presets', 'A transition edge names a missing preset.');
+  const from = fromPreset.values;
+  const to = toPreset.values;
   const raw = Math.fround(evaluation / edge.duration);
   const eased = applyEasing(edge.easing, raw);
   const policy = descriptor.path_policies.find((candidate) => candidate.id === edge.path_policy);
+  if (!policy)
+    fail('transition', 'UNKNOWN_EDGE_PATH', '$.descriptor.path_policies', 'A transition edge names a missing path policy.');
   const parameterGroups = new Map();
   for (const parameter of descriptor.parameters) {
     const group = parameter.interpolation.group ?? parameter.id;

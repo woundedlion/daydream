@@ -117,6 +117,7 @@ Building the WASM target in Holosphere installs `holosphere_wasm.js`, `holospher
      - [AlienCore](#aliencore)
      - [KaleidoscopeMandala](#kaleidoscopemandala)
      - [GridSpace](#gridspace)
+     - [HyperLattice](#hyperlattice)
      - [LatticeMelt](#latticemelt)
      - [KaleidoscopePentBright](#kaleidoscopepentbright)
      - [KaleidoscopeHexOil](#kaleidoscopehexoil)
@@ -321,6 +322,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   │   ├── srgb_decode_lut.h       Generated split-decode tables behind srgb_decode.h
 │   │   ├── gamut_lut.h             Generated sRGB gamut-boundary chroma table for OKLab clipping
 │   │   ├── generative_palette.h    GenerativePalette + PaletteRecipe compilation (via color.h)
+│   │   ├── noise_hue_palette.h     Sphere-noise hue LUTs + reusable NoiseHuePalette wrapper
 │   │   ├── palette_cycler.h        PaletteCycler: dwell-and-fade display LUT over a palette sequence
 │   │   ├── effect_palette_recipes.h Per-effect authored PaletteRecipe constructors
 │   │   ├── triadic_palette_luts.h  Generated bank of 256 triadic palette LUTs, one per base hue (from tools/mindsplatter_palette_gen.cpp)
@@ -375,7 +377,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │       ├── FastNoiseLite.h         Single-header noise library
 │       └── FastNoiseLite_config.h  FastNoiseLite build configuration
 │
-├── effects/                    39 headers covering 38 effects, all firmware — BZReactionDiffusion.h,
+├── effects/                    40 headers covering 39 effects, all firmware — BZReactionDiffusion.h,
 │                                HopfFibration.h, IslamicStars.h, Raymarch.h, … — plus
 │                                shared base ReactionDiffusionBase.h; the
 │                                composed-effect base is
@@ -471,6 +473,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── png_probe.mjs           Dependency-free PNG chunk/CRC/inflate validator behind the gallery gate
 │   ├── png_probe.test.mjs      Node unit test for the PNG validator (corrupt/empty fixtures)
 │   ├── check_screenshots.mjs   Asserts docs/screenshots/ matches the effect roster and decodes (CI)
+│   ├── check_profiles.mjs      Asserts shipping profiles match the Phantasm roster (CI)
 │   ├── run_tests.mjs           `npm test`: runs the .test.mjs suite and rejects empty test files
 │   ├── count_assertions.mjs    NODE_OPTIONS shim counting each test file's node:assert calls
 │   └── report_cases.mjs        node:test reporter tallying per-file case counts
@@ -566,7 +569,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 ├── sidebar_logic.js            DOM-free sidebar sort, keyboard-index and scroll-arrow math
 ├── recorder.js                 MediaRecorder pipeline (mp4 / webm), sim-synced
 ├── global_stats_view.js        Single-engine stats bar: frame draw duration and per-arena usage
-├── module_warmer.js            Deduplicated worker-module fetch and shared WASM compilation
+├── module_warmer.js            Epoch-fenced shared-WASM compilation and warm-cache state
 ├── segment_controller.js       Orchestrates the segmented-POV worker pool:
 │                                  dispatch, generation fence, and compositing
 ├── segment_worker.js           Web Worker that hosts one WASM instance per
@@ -600,6 +603,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── kb_format.js            Dependency-free kilobyte formatter shared by the stat readouts
 │   ├── lissajous_math.js       Pure Lissajous curve math from lissajous.html
 │   ├── lissajous_page.js       Page module extracted from lissajous.html's inline script
+│   ├── mobius_page.js          Controller for the Möbius tool page
 │   ├── mobius_transforms.js    Pure Möbius coefficient presets from mobius.html
 │   ├── page_lifecycle.js       Animation-frame recompute coalescer + bfcache-aware teardown hook
 │   ├── pointer_drag.js         Pointer-drag lifecycle shared by standalone tools
@@ -607,11 +611,13 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── palette_controls.js     DOM-free zoom history and locked-slider delta capping for palettes.html
 │   ├── palette_math.js         ProceduralPalette / GenerativePalette mirror + the PaletteOps bridge
 │   ├── palette_wheel.js        Hue-key wheel raster, markers and pointer arithmetic for palettes.html
+│   ├── palettes_page.js        Controller for the palette tuner page
 │   ├── solid_build.js          Mesh construction and validation for solids.html
 │   ├── solid_codegen.js        Op dispatch, codegen, and op-chain sequencing for solids.html
 │   ├── solid_op_rows.js        DOM construction for one op-chain row of solids.html
 │   ├── solid_registry_codegen.js  Registry-paste emitter: the solids.h Entry, OpStep table, Recipe, and (when solids.h declares none) the seed's SEED_* constant
 │   ├── solid_render.js         Scene construction for solids.html: faces, vertices, edges, normals, index labels
+│   ├── solids_page.js          Controller for the Conway operator tool page
 │   ├── tailwind.css            Prebuilt utility classes the five tool pages use, served same-origin
 │   └── tools.css               Shared design tokens and control styling for the tool pages
 │
@@ -632,7 +638,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 ├── tsconfig.json               checkJs settings for the worker-protocol module set
 ├── eslint.config.mjs           JavaScript lint rules (recommended set) — the js-unit-suite.yml lint step
 ├── .githooks/                  staged pre-commit checks, a pre-push mirror of the JS/browser suites, and the master fast-forward guard
-├── .github/workflows/          ci.yml (PR aggregate), deploy.yml (engine gate → Pages), reusable JS/browser suites
+├── .github/workflows/          ci.yml (PR aggregate), deploy.yml (engine gate → Pages), js-unit-suite.yml + browser-smoke.yml (reusable suites)
 │
 ├── three.js/                   Optional vendored Three.js checkout
 ├── vendor/                     Optional self-hosted fonts (CDN fallback)
@@ -659,7 +665,7 @@ Three build targets share a common engine:
 │  │ Holosphere/  │   │  Effects → Canvas → Filter Pipeline          │    │
 │  │  .ino        │   │      → SDF/Plot → Pixel Buffer               │    │
 │  │              │   │                                              │    │
-│  │ Phantasm/    │   │  effects/  (38 visual algorithms)            │    │
+│  │ Phantasm/    │   │  effects/  (39 visual algorithms)            │    │
 │  │  .ino        │   │                                              │    │
 │  │              │   ├──────────────────────────────────────────────┤    │
 │  │ wasm/        │   │          hardware/  (Drivers)                │    │
@@ -1195,6 +1201,8 @@ Balanced sampling stretches each adaptive step by `BALANCED_SCREEN_STEP_PX / SCR
 
 The `Timeline` class manages a list of running `IAnimation` objects. Each frame, `timeline.step(canvas)` advances all active animations. Finished animations are removed; repeating animations are rewound. All animation types inherit from `AnimationBase` and support method chaining via `.then()` for sequencing.
 
+Animation pause is opt-in per timeline event, not a global stop. Effects schedule parameter drivers and preset choreography with `timeline.add_pausable(..., &anims_paused)`; while the flag is set, both the animation step and any pending start delay are frozen. Passing a pause pointer to an animation constructor freezes only its `step()` call, so the timeline event's start delay still elapses. Events added with `add()` and motion advanced directly by `draw_frame()` continue to run, which lets the GUI pause animated controls without stopping ambient motion.
+
 `animation.h` defines the contract every animation implements — `IAnimation`, the CRTP `AnimationBase`, and `Animation::Space` — and then includes nine fragment headers grouped by what they animate:
 
 | Header | Subject | Contents |
@@ -1482,7 +1490,7 @@ The clip reads the 256 × 128 flash master by default. An effect that clips per 
 | `init_gamut_lut(arena, angle_steps, l_steps)` | Downsamples the flash master into `arena` and points the clip at the copy. Both step counts must divide the master's 256 × 128 and stay at or above `GAMUT_LUT_MIN_ANGLE_STEPS` × `GAMUT_LUT_MIN_L_STEPS` (128 × 64), the coarsest grid the walk resolves — both trapped. Costs `gamut_lut_bytes(angle_steps, l_steps)`. Call from the effect's `init()`, after any `configure_arenas()`. |
 | `release_gamut_lut()` | Drops the copy and points the clip back at the flash master. Registered as an `ArenaResetHook`, so `configure_arenas()` and the mesh carousel's compaction both run it before handing the storage out again. |
 
-Four sites arm a copy: `MeshFeedback`, the Shader workbench, `ShaderChain`, and `Pullback::ComposedEffect::init()` — the last being the base class every one of the fifteen composed effects runs, so each of them arms one too. None downsamples: all four take the full 256 × 128 grid, `gamut_lut_bytes(256, 128)` = 131,072 B of persistent arena apiece. Every other effect clips against the flash master.
+Four sites arm a copy: `MeshFeedback`, the Shader workbench, `ShaderChain`, and `Pullback::ComposedEffect::init()` — the last being the base class every one of the sixteen composed effects runs, so each of them arms one too. None downsamples: all four take the full 256 × 128 grid, `gamut_lut_bytes(256, 128)` = 131,072 B of persistent arena apiece. Every other effect clips against the flash master.
 
 #### Palette Modifiers
 
@@ -1579,6 +1587,7 @@ StaticPalette<ProceduralPalette, Coords<NoiseWarpModifier>,
 | `SolidColorPalette` | Returns a single fixed color for every coordinate |
 | `PaletteFacade<SP>` | Exposes a compile-time `StaticPalette` composition through the polymorphic `Palette` API, for preset tables and baking |
 | `BakedPalette` | Precomputes any palette source (a `Palette` or a `StaticPalette`) into a fast 16-bit LUT for O(1) lookup. Arena-allocated. |
+| `NoiseHuePalette<Source>` | Applies a sphere-domain noise field as a spatial OKLab hue rotation over any palette source. Its shared hue-rotation and cube-map noise LUT preparation is used by ordinary effects, composed shader effects, and the Shader workbench. Call `hue_shift(direction, amount)` once when a whole primitive shares a noise coordinate, `noise_uv(cos_u, sin_u, cos_v, sin_v)` for a seamless two-axis surface field, or `get(t, direction, amount)` directly per sample. |
 
 #### Recipe-Compiled Palettes
 
@@ -1979,7 +1988,7 @@ Boundary symbols (`ZERO`/`HALF`) serve **two** layers at once: they snap the fly
 
 * **Layer 1 — Column phase.** Boundary symbols snap each flywheel twice per revolution; worst-case inter-snap crystal drift is **~0.006 column** at 40 ppm — far below a visible seam, which is the quantitative justification for deleting the column-clock wire.  In **LOCKED** a symbol is accepted only if its implied correction is **≤ G = 4 columns** and its boundary identity matches the flywheel's prediction (the plausibility gate).
 * **Layer 2 — Buffer flip.** The local boundary crossing flips the display buffer; the symbol is a deduplicated backstop.  `try_flip`, keyed on boundary identity (boundaries strictly alternate `ZERO, HALF, …`), makes the flip **exactly-once** even when both the crossing and the symbol fire.  Losing both paths in one half-rev is the only glitch, and it self-heals the next half-rev.
-* **Layer 3 — Content.** The playlist is **epoch-counted**, not `millis()`-gated.  Duration is **per roster entry**, not uniform: `HS_PHANTASM_EFFECT_LIST` carries a seconds column beside each name and `targets/Phantasm/Phantasm.ino` converts it to `EFFECT_REVOLUTIONS[]` at `seconds · RPM / 60`, spanning 6 s (48 revolutions) to 181 s (1,448 revolutions) across the 34-entry roster.  The master emits the `EPOCH` mark (plus R = 3 redundancy repeats) when the current entry's revolutions elapse; every board counts down to the same **absolute** commit boundary regardless of which copy it heard, constructs the next roster entry during the final K = 2-revolution **construction window** (display black on all boards simultaneously), and all swap to its frame 0 at the same boundary.  The beacon broadcasts the absolute effect index so a board that missed every epoch repeat corrects within ~2 s, and a rebooted board rejoins at the correct effect — **fail-dark, never fail-wrong** (a board with no established identity shows black rather than a guessed effect).  Every one of those revolution budgets is absolute, so on a 48-revolution entry the 25-revolution rejoin bound covers more than half the effect's airtime.
+* **Layer 3 — Content.** The playlist is **epoch-counted**, not `millis()`-gated.  Duration is **per roster entry**, not uniform: `HS_PHANTASM_EFFECT_LIST` carries a seconds column beside each name and `targets/Phantasm/Phantasm.ino` converts it to `EFFECT_REVOLUTIONS[]` at `seconds · RPM / 60`, spanning 5 s (40 revolutions) to 181 s (1,448 revolutions) across the 36-entry roster.  The master emits the `EPOCH` mark (plus R = 3 redundancy repeats) when the current entry's revolutions elapse; every board counts down to the same **absolute** commit boundary regardless of which copy it heard, constructs the next roster entry during the final K = 2-revolution **construction window** (display black on all boards simultaneously), and all swap to its frame 0 at the same boundary.  The beacon broadcasts the absolute effect index so a board that missed every epoch repeat corrects within ~2 s, and a rebooted board rejoins at the correct effect — **fail-dark, never fail-wrong** (a board with no established identity shows black rather than a guessed effect).  Every one of those revolution budgets is absolute, so on a 40-revolution entry the 25-revolution rejoin bound covers more than half the effect's airtime.
 
 **Index beacon frame format.** The beacon is a **data** symbol (integrity by *rejection*, not by exactness).  Five base-8 digits at 1-column pitch, each digit a burst of `digit + 1` pulses, digits separated by 5 quiet columns (one past the gap timeout, so the decoder reliably terminates each digit):
 
@@ -2126,7 +2135,7 @@ With `{.persist = true}`, `Canvas` copies the previous frame's buffer into the n
 
 All screenshots below were captured from the [live WebAssembly simulator](https://woundedlion.github.io/daydream/) — the Phantasm 288×144 preset for most, and the Holosphere 96×20 preset for RingShower, Dynamo and Thrusters.
 
-The compile-time roster and tests carry 37 firmware-capable effects. Native and WASM builds add two simulator-only registry entries, the `Shader` workbench and the `ShaderChain` chain interpreter, for 39. The simulator sidebar exposes 33 effects at 288×144 and 32 at 96×20 (§10.5); both stay out of the card lists because they open through the standalone tool. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) contains 34 effects, including all fifteen promoted fixed-pipeline effects and excluding the three Holosphere-96×20-only effects: Dynamo, MobiusRings, and Thrusters. Full-cycle Teensy measurements for that playlist are indexed in the [on-device effect profiles](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md).
+The compile-time roster and tests carry 39 firmware-capable effects. Native and WASM builds add two simulator-only registry entries, the `Shader` workbench and the `ShaderChain` chain interpreter, for 41. The simulator sidebar exposes 35 effects at 288×144 and 34 at 96×20 (§10.5); both stay out of the card lists because they open through the standalone tool. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) contains 36 effects, including all sixteen promoted fixed-pipeline effects and excluding the three Holosphere-96×20-only effects: Dynamo, MobiusRings, and Thrusters. Full-cycle Teensy measurements for that playlist are indexed in the [on-device effect profiles](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md).
 
 ### Core Effects (Modern Engine)
 
@@ -2337,6 +2346,18 @@ An affine primitive lattice rendered as soft iso contours through a folded gnomo
 </td></tr></table>
 
 <table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=HyperLattice" target="_blank"><img src="docs/screenshots/HyperLattice.png" alt="HyperLattice" width="280"></a></td>
+<td valign="top">
+
+#### HyperLattice
+
+An analytic reflective flight through a cubic lattice that opens into a four-dimensional hypercubic lattice under genuine SO(4) rotation. Transparent integer-coordinate hyperplanes expose several lattice shells without raymarching.
+
+**Parameters**: Dimension, Wire Radius, Softness, Far Cells, Pixel AA, Travel, 3D Spin, 4D Spin, Reflection, Color, Shells
+
+</td></tr></table>
+
+<table border="0"><tr>
 <td width="300"><a href="https://woundedlion.github.io/daydream/?effect=LatticeMelt" target="_blank"><img src="docs/screenshots/LatticeMelt.png" alt="LatticeMelt" width="280"></a></td>
 <td valign="top">
 
@@ -2345,6 +2366,18 @@ An affine primitive lattice rendered as soft iso contours through a folded gnomo
 A folded-sinusoidal sphere projection displaced by curl noise and shaded with a generated triadic palette. Its two presets share one composed pipeline and vary only the surface-noise scale.
 
 **Parameters**: Lattice Cell Scale, Lattice Shape, Lattice Softness, Lattice Radius, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Central Meridian, Surface Noise Scale, Surface Noise Strength, Surface Noise Speed, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Brightness Depth, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+
+</td></tr></table>
+
+<table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=AshCloud" target="_blank"><img src="docs/screenshots/AshCloud.png" alt="AshCloud" width="280"></a></td>
+<td valign="top">
+
+#### AshCloud
+
+A primitive lattice displaced by sphere-space curl noise, folded through a dodecahedral kaleidoscope and projected stereographically. A value cutout carves the lattice, so coverage follows the field rather than the projection alone.
+
+**Parameters**: Lattice Cell Scale, Lattice Shape, Lattice Softness, Lattice Radius, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Surface Noise Scale, Surface Noise Strength, Surface Noise Speed, Cutout Threshold, Cutout Softness, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
 
 </td></tr></table>
 
@@ -2546,9 +2579,9 @@ A Fibonacci-spiral field of star-polygon SDFs, continuously deformed by an evolv
 
 #### Raymarch
 
-Volumetric raymarcher that renders twisted tori at the 26 vertices of a disdyakis dodecahedron. Each torus is ray-marched with `Scan::Volume::draw` and lit with metallic Blinn-Phong shading (half-Lambert diffuse, specular highlights, Fresnel rim). A random-walk animation drives the camera orientation.
+Volumetric raymarcher that renders twisted tori at the vertices of a selectable placement solid. Its `uv-surface-noise` preset uses the 26-vertex disdyakis dodecahedron; the selector contains the 21 base solids that fit the 32-copy capacity. Each torus is ray-marched with `Scan::Volume::draw`, lit with metallic Blinn-Phong shading (half-Lambert diffuse, specular highlights, Fresnel rim), and independently tumbled by an energetic random walk. A separate random walk drives the camera orientation. A seamless two-axis UV noise field selects and hue-shifts the generated OKLCH palette across each torus surface through the shared `NoiseHuePalette` machinery also used by the shader effects.
 
-**Parameters**: Pulse Speed, Fill, Max Steps, Diffuse, Specular, Fresnel, Twist, AA Width
+**Parameters**: Base Solid, Pulse Speed, Fill, Max Steps, Diffuse, Specular, Fresnel, Twist, AA Width, Hue Shift, Hue Noise Scale, Hue Noise Speed
 
 </td></tr></table>
 
@@ -2629,7 +2662,9 @@ Two stages carry approved approximations. Fast square Peirce projection and the 
 | `alien-core` | `AlienCore` | 1 | 3 |
 | `kaleidoscope-mandala` | `KaleidoscopeMandala` | 2 | 5, plus `cup-hue` |
 | `grid-space` | `GridSpace` | 1 | 6 |
+| `hyper-lattice` | `HyperLattice` | 4 | — |
 | `lattice-melt` | `LatticeMelt` | 2 | 7–8 |
+| `ash-cloud` | `AshCloud` | 1 | — |
 | `kaleidoscope-pent-bright` | `KaleidoscopePentBright` | 1 | 9 |
 | `kaleidoscope-hex-oil` | `KaleidoscopeHexOil` | 2 | — |
 | `kaleidoscope-stained-glass` | `KaleidoscopeStainedGlass` | 1 | 10 |
@@ -2639,15 +2674,15 @@ Two stages carry approved approximations. Fast square Peirce projection and the 
 | `cosmic-eyeball` | `CosmicEyeball` | 1 | 18 |
 | `mobius-grid` | `MobiusGrid` | 2 | 19–20 |
 
-These sixteen effects form the product-only `shader-collection` group; family metadata is not part of runtime identity. Each effect's show window is derived from its preset count, giving every preset the shared 600-frame dwell and every transition the shared 480-frame segue. Kaleidoscope Hex Oil joined after the ShaderWorkbench migration from a workbench-authored snapshot, so it carries no legacy preset index. Host tests pair each preset that carries a legacy source index with Shader's dynamic evaluator and require the two to agree to within one 16-bit count; Lattice Melt and Kaleidoscope Smooth run theirs in dedicated white-box equivalence suites. The presets authored after the migration have no legacy configuration to pair with, so nothing holds them against the evaluator: Kaleidoscope Hex Oil's two, Kaleidoscope Smooth's `stretched-grid`, Kaleidoscope Hex Bright's `hex-twin-wave-alt`, and Kaleidoscope Mandala's `cup-hue`.
+These sixteen effects form the product-only `shader-collection` group; family metadata is not part of runtime identity. Each effect's show window is derived from its preset count, giving every preset the shared 600-frame dwell and every transition the shared 480-frame segue. Ash Cloud and Kaleidoscope Hex Oil joined after the ShaderWorkbench migration from workbench-authored snapshots, so they carry no legacy preset index. Host tests pair each preset that carries a legacy source index with Shader's dynamic evaluator and require the two to agree to within one 16-bit count; Lattice Melt and Kaleidoscope Smooth run theirs in dedicated white-box equivalence suites. The presets authored after the migration have no legacy configuration to pair with, so nothing holds them against the evaluator: Ash Cloud's one, Kaleidoscope Hex Oil's two, Kaleidoscope Smooth's `stretched-grid`, Kaleidoscope Hex Bright's `hex-twin-wave-alt`, and Kaleidoscope Mandala's `cup-hue`.
 
-The [shipping device captures](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md) report zero spilled frames for the fourteen effects promoted at capture time, with peaks from 23.30 ms for AlienCore to 47.20 ms for KaleidoscopeStainedGlass; Kaleidoscope Hex Oil has no device capture yet. The composed effects let the compiler inline the exact typed pipeline and discard every unused stage. The shared runtime and `GenerativePalette` color stage keep common lifecycle and palette machinery from being duplicated without introducing type erasure in the per-pixel call. No paired capture currently isolates specialization from the other structural differences, so the archive does not claim a dispatch-only speedup.
+The [shipping device captures](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md) report zero spilled frames for all sixteen promoted effects, with peaks from 23.30 ms for AlienCore to 52.39 ms for AshCloud. The composed effects let the compiler inline the exact typed pipeline and discard every unused stage. The shared runtime and `GenerativePalette` color stage keep common lifecycle and palette machinery from being duplicated without introducing type erasure in the per-pixel call. AshCloud's paired global-O3 capture peaks at 48.35 ms, but no paired capture isolates specialization from the other structural differences, so the archive does not claim a dispatch-only speedup.
 
 #### Authoring vocabulary
 
 The parameter schema exposes the broader Shader workbench vocabulary below. A menu entry describes a structurally possible field value, not a promise that its Cartesian combination is compiled for Teensy. The simulator renders valid unmatched combinations dynamically; sliders are active only when the selected schema uses them.
 
-The gap is per value, not only per combination. The `ComposedEffect` derivation layer in `composed_effect.h` reaches a strict subset of the shipped operator catalog, so eleven operators — Peirce, Peirce (Fast Square), Bonne, Airocean, Rings, both Noise Contours, Curl Flow, Ridge, Smooth Bands and Value Cutout — and 38 further values of the operators it does reach are workbench-only and can never appear in a composed effect: every non-simplex noise basis, the non-Euler curl integrators, the non-flat warp envelopes, the logarithmic polar chart and its harmonics 2–16, the front and back gnomonic hemispheres, and the None signal weight and Opaque coverage. `tests/test_composed_effect.h` pins that set against the live operator table, so a catalog addition stays classified.
+The gap is per value, not only per combination. The `ComposedEffect` derivation layer in `composed_effect.h` reaches a strict subset of the shipped operator catalog, so ten operators — Peirce, Peirce (Fast Square), Bonne, Airocean, Rings, both Noise Contours, Curl Flow, Ridge and Smooth Bands — and 38 further values of the operators it does reach are workbench-only and can never appear in a composed effect: every non-simplex noise basis, the non-Euler curl integrators, the non-flat warp envelopes, the logarithmic polar chart and its harmonics 2–16, the front and back gnomonic hemispheres, and the None signal weight and Opaque coverage. Value Cutout is reachable and selected by Ash Cloud. `tests/test_composed_effect.h` pins that set against the live operator table, so a catalog addition stays classified.
 
 The two planar warps run in their displayed pullback order: **Planar Warp 1** then **Planar Warp 2**, followed by the source function.
 
@@ -2699,7 +2734,7 @@ Colorize ──────────> Palette + selected hue-shift source
 ```
 
 
-Schema validity still enforces the cross-stage constraints that have a geometric reason. Noise Contour (Sphere) cannot follow a planar warp. Polar Chart must be the only planar warp, except that Planar Warp 1 Polar Chart may be followed by Wave Shear. It requires Grid or Primitive Lattice, and when it is the only planar warp its seam must land on a whole number of source periods: `Pattern Freq × Polar Harmonic` for Grid, `2π × Lattice Cell Scale × Polar Harmonic` for Primitive Lattice, which is periodic in its cell scale and ignores Pattern Freq. Seam-sensitive projected noise and warp stages cannot cross the cut topology of Bonne, Peirce, or Airocean. Unsafe coordinate bounds and excess noise resources are rejected as well. These incompatible combinations remain pending and report an actionable warning. Manifest availability is separate: the simulator routes valid unmatched combinations dynamically, while firmware exposes the fifteen promoted fixed descriptors rather than the workbench dispatcher.
+Schema validity still enforces the cross-stage constraints that have a geometric reason. Noise Contour (Sphere) cannot follow a planar warp. Polar Chart must be the only planar warp, except that Planar Warp 1 Polar Chart may be followed by Wave Shear. It requires Grid or Primitive Lattice, and when it is the only planar warp its seam must land on a whole number of source periods: `Pattern Freq × Polar Harmonic` for Grid, `2π × Lattice Cell Scale × Polar Harmonic` for Primitive Lattice, which is periodic in its cell scale and ignores Pattern Freq. Seam-sensitive projected noise and warp stages cannot cross the cut topology of Bonne, Peirce, or Airocean. Unsafe coordinate bounds and excess noise resources are rejected as well. These incompatible combinations remain pending and report an actionable warning. Manifest availability is separate: the simulator routes valid unmatched combinations dynamically, while firmware exposes the sixteen promoted fixed descriptors rather than the workbench dispatcher.
 
 Projection seams use topology supplied by the projection kernel rather than guessing from planar coordinates. **Edge Fade** gives both sides of a paired cut the same authored fade, so the seam closes flush without a subducted edge. Glued and periodic edges remain continuous and do not fade. **Singularity Fade** is projection weight; selecting either projection-weight coverage policy carries that attenuation into alpha as well as any separately selected signal weighting.
 
@@ -3092,7 +3127,7 @@ Three layers run the same suite so a regression can't reach the live demo:
 
 - **Local pre-commit hooks** — both repositories reject staged whitespace errors and validate documentation from an isolated copy of the Git index. POV also runs clang-format over staged first-party C++, ruff/eslint over staged sources, and the fast license/build-pin checks. Daydream runs ESLint over staged JavaScript and validates the Pages manifest graph. A required tool missing for an applicable change fails the commit. Builds, typechecking, unit suites, browser probes, firmware budgets, and coverage remain pre-push or CI, keeping the normal hook near two seconds while protected-branch `CI green` remains authoritative.
 
-- **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — on master pushes and pull-request updates (a push to a branch with no open PR triggers nothing), runs the native suite on both Linux (clang-22) and Windows (emsdk Clang, which exercises the `lld-link` / rc.exe toolchain branch from a plain shell), and builds the WASM module. It then **smoke-tests the WASM at runtime** ([`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs)) and **verifies the install provenance set** consumed by Daydream. Native coverage is retained as HTML/LCOV and has a loose 70% line floor against a current baseline around 78%, so catastrophic loss fails without pinning normal refactors to an exact artistic implementation. The native suite also runs at `-O2`, under ASan + UBSan, and for concurrency modules under TSan. A `shard-coverage` job proves every registered CTest belongs to exactly one shard. Pull requests use the quick effect tier; master runs the production-resolution IEEE correctness leg and shipping fast-math smoke leg. Lint checks Python, JavaScript, shell, the `justfile`, and the profiling roster with defect-oriented rules.
+- **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — on master pushes and pull-request updates (a push to a branch with no open PR triggers nothing), runs the native suite on both Linux (clang-22) and Windows (emsdk Clang, which exercises the `lld-link` / rc.exe toolchain branch from a plain shell), and builds the WASM module. It then **smoke-tests the WASM at runtime** ([`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs)) and **verifies the install provenance set** consumed by Daydream. Native coverage is retained as HTML/LCOV and has a loose 70% line floor against a current baseline around 78%, so catastrophic loss fails without pinning normal refactors to an exact artistic implementation. The native suite also runs at `-O2`, under ASan + UBSan, and for concurrency modules under TSan. A `shard-coverage` job proves every registered CTest belongs to exactly one shard. Pull requests use the quick effect tier; master runs the production-resolution IEEE correctness leg and shipping fast-math smoke leg. The five lint legs check Python, JavaScript, shell, the `justfile`, and the profiling roster with defect-oriented rules.
 - **Gated deploy** (`.github/workflows/deploy.yml`, **daydream repo**) — daydream's GitHub Pages source is *GitHub Actions*. On a push to daydream's `master` (or manual dispatch), the engine's native unit suite runs as a **gate** (checking out the engine repo) alongside daydream's own JS suite and its headless-Chrome jobs (`browser-smoke.yml`: the page smoke over every `site_manifest.txt` entry, `workbench-probe.mjs` driving the workbench's pipeline strip with a real mouse, and `panel-probe.mjs` scrolling the effect panel and requiring the offset to survive a rebuild). Those three are the only checks that resolve the import map, instantiate the WASM module under a page's CSP and measure where an element actually lands â€” the unit suite runs over `daydream/tests/fake_dom.js`, which has neither layout nor pointer capture. `deploy` `needs: [gate, js-tests, browser-smoke]`, so only if all three pass does the workflow publish the simulator to Pages. The engine's WASM is whatever is committed in daydream (built + installed from Holosphere). If the engine repo is private, add a `POV_TOKEN` secret (a read-access PAT) for the gate's checkout.
 
 The simulator's JavaScript lives in the daydream repo and carries its own suite there: `tests/*.test.js`, run by `npm test` (`node --test`), covering the driver and clock, the sidebar and GUI, the segment workers and layout, param marshaling, color/palette math, and the geometry tools' math modules. Its anti-vacuity checks reject an empty glob, unreachable test files, shadow dependency installs, and unexplained first-party modules without pinning file, case, or assertion totals. On every pull request, [Daydream CI](https://github.com/woundedlion/daydream/blob/master/.github/workflows/ci.yml) runs the reusable static/unit suite and all four real-browser probes, then reports one required `CI green` status. The deploy workflow calls the same suites before publishing.
