@@ -910,7 +910,7 @@ test('a deactivated field renders dimmed but editable', async () => {
 
   assert.equal(edge.dataset.deactivated, undefined,
     'the gate moving onto edge-fade re-activates the field in place');
-  assert.equal(edge.getAttribute('title'), '');
+  assert.equal(edge.getAttribute('title'), null);
 
   controlIn(edge).value = '0.4';
   controlIn(edge).dispatch('input');
