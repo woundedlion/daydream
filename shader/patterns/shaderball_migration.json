@@ -6,22 +6,22 @@
     4
   ],
   "source_documents": {
-    "signal-weave": "signal_weave.shader.json",
-    "kaleido-wave": "kaleido_wave.shader.json",
+    "alien-brain": "alien_brain.shader.json",
+    "kaleidoscope-hex-soft": "kaleidoscope_hex_soft.shader.json",
     "alien-ocean": "alien_ocean.shader.json",
-    "glitch-grid": "glitch_grid.shader.json",
-    "facet-wave": "facet_wave.shader.json",
-    "contour-lattice": "contour_lattice.shader.json",
-    "curl-lattice": "curl_lattice.shader.json",
-    "curl-facets": "curl_facets.shader.json",
-    "prism-lattice": "prism_lattice.shader.json",
-    "vector-facets": "vector_facets.shader.json",
-    "facet-grid": "facet_grid.shader.json",
-    "hex-wave": "hex_wave.shader.json",
-    "equator-grid": "equator_grid.shader.json",
+    "alien-core": "alien_core.shader.json",
+    "kaleidoscope-mandala": "kaleidoscope_mandala.shader.json",
+    "grid-space": "grid_space.shader.json",
+    "lattice-melt": "lattice_melt.shader.json",
+    "ash-cloud": "ash_cloud.shader.json",
+    "kaleidoscope-pent-bright": "kaleidoscope_pent_bright.shader.json",
+    "kaleidoscope-stained-glass": "kaleidoscope_stained_glass.shader.json",
+    "kaleidoscope-smooth": "kaleidoscope_smooth.shader.json",
+    "kaleidoscope-hex-bright": "kaleidoscope_hex_bright.shader.json",
+    "kaleidoscope-flowers": "kaleidoscope_flowers.shader.json",
     "cosmic-eyeball": "cosmic_eyeball.shader.json",
     "mobius-grid": "mobius_grid.shader.json",
-    "prism-spiral": "prism_spiral.shader.json"
+    "kaleidoscope-hex-oil": "kaleidoscope_hex_oil.shader.json"
   },
   "product_group": {
     "id": "shader-collection",
@@ -29,13 +29,13 @@
     "total_device_seconds": 120,
     "children": [
       {
-        "effect_id": "signal-weave",
-        "display_name": "Signal Weave",
+        "effect_id": "alien-brain",
+        "display_name": "Alien Brain",
         "seconds": 7
       },
       {
-        "effect_id": "kaleido-wave",
-        "display_name": "Kaleido Wave",
+        "effect_id": "kaleidoscope-hex-soft",
+        "display_name": "Kaleidoscope Hex Soft",
         "seconds": 7
       },
       {
@@ -44,58 +44,58 @@
         "seconds": 6
       },
       {
-        "effect_id": "glitch-grid",
-        "display_name": "Glitch Grid",
+        "effect_id": "alien-core",
+        "display_name": "Alien Core",
         "seconds": 5
       },
       {
-        "effect_id": "facet-wave",
-        "display_name": "Facet Wave",
+        "effect_id": "kaleidoscope-mandala",
+        "display_name": "Kaleidoscope Mandala",
         "seconds": 6
       },
       {
-        "effect_id": "contour-lattice",
-        "display_name": "Contour Lattice",
+        "effect_id": "grid-space",
+        "display_name": "Grid Space",
         "seconds": 5
       },
       {
-        "effect_id": "curl-lattice",
-        "display_name": "Curl Lattice",
+        "effect_id": "lattice-melt",
+        "display_name": "Lattice Melt",
         "seconds": 13
       },
       {
-        "effect_id": "curl-facets",
-        "display_name": "Curl Facets",
+        "effect_id": "ash-cloud",
+        "display_name": "Ash Cloud",
         "seconds": 6
       },
       {
-        "effect_id": "prism-lattice",
-        "display_name": "Prism Lattice",
+        "effect_id": "kaleidoscope-pent-bright",
+        "display_name": "Kaleidoscope Pent Bright",
         "seconds": 5
       },
       {
-        "effect_id": "prism-spiral",
-        "display_name": "Prism Spiral",
+        "effect_id": "kaleidoscope-hex-oil",
+        "display_name": "Kaleidoscope Hex Oil",
         "seconds": 6
       },
       {
-        "effect_id": "vector-facets",
-        "display_name": "Vector Facets",
+        "effect_id": "kaleidoscope-stained-glass",
+        "display_name": "Kaleidoscope Stained Glass",
         "seconds": 5
       },
       {
-        "effect_id": "facet-grid",
-        "display_name": "Facet Grid",
+        "effect_id": "kaleidoscope-smooth",
+        "display_name": "Kaleidoscope Smooth",
         "seconds": 19
       },
       {
-        "effect_id": "hex-wave",
-        "display_name": "Hex Wave",
+        "effect_id": "kaleidoscope-hex-bright",
+        "display_name": "Kaleidoscope Hex Bright",
         "seconds": 6
       },
       {
-        "effect_id": "equator-grid",
-        "display_name": "Equator Grid",
+        "effect_id": "kaleidoscope-flowers",
+        "display_name": "Kaleidoscope Flowers",
         "seconds": 13
       },
       {
@@ -113,13 +113,13 @@
   "destinations": [
     {
       "legacy_preset": 0,
-      "effect_id": "signal-weave",
-      "preset_id": "signal-weave",
+      "effect_id": "alien-brain",
+      "preset_id": "alien-brain",
       "pipeline": "GLITCH_NOISE_GRID_WAVE_SHEAR"
     },
     {
       "legacy_preset": 1,
-      "effect_id": "kaleido-wave",
+      "effect_id": "kaleidoscope-hex-soft",
       "preset_id": "twin-wave",
       "pipeline": "KALEIDOSCOPE_TWIN_WAVE_INNER_MIRROR"
     },
@@ -131,85 +131,85 @@
     },
     {
       "legacy_preset": 3,
-      "effect_id": "glitch-grid",
+      "effect_id": "alien-core",
       "preset_id": "folded-glitch",
-      "pipeline": "GNOMONIC_GLITCH_GRID_MIRROR"
+      "pipeline": "GNOMONIC_ALIEN_CORE_MIRROR"
     },
     {
       "legacy_preset": 5,
-      "effect_id": "facet-wave",
+      "effect_id": "kaleidoscope-mandala",
       "preset_id": "wave-mirror",
       "pipeline": "GNOMONIC_DODECAHEDRAL_GRID_WAVE_MIRROR"
     },
     {
       "legacy_preset": 6,
-      "effect_id": "contour-lattice",
+      "effect_id": "grid-space",
       "preset_id": "affine-contour",
       "pipeline": "GNOMONIC_AFFINE_LATTICE_CONTOUR"
     },
     {
       "legacy_preset": 7,
-      "effect_id": "curl-lattice",
+      "effect_id": "lattice-melt",
       "preset_id": "open-curl",
-      "pipeline": "SINUSOIDAL_CURL_LATTICE"
+      "pipeline": "SINUSOIDAL_LATTICE_MELT"
     },
     {
       "legacy_preset": 8,
-      "effect_id": "curl-lattice",
+      "effect_id": "lattice-melt",
       "preset_id": "dense-curl",
-      "pipeline": "SINUSOIDAL_CURL_LATTICE"
+      "pipeline": "SINUSOIDAL_LATTICE_MELT"
     },
     {
       "legacy_preset": 9,
-      "effect_id": "prism-lattice",
+      "effect_id": "kaleidoscope-pent-bright",
       "preset_id": "polar-wave",
       "pipeline": "STEREOGRAPHIC_PRISM_POLAR_WAVE_LATTICE"
     },
     {
       "legacy_preset": 10,
-      "effect_id": "vector-facets",
+      "effect_id": "kaleidoscope-stained-glass",
       "preset_id": "vector-mirror",
       "pipeline": "GNOMONIC_DODECAHEDRAL_GRID_VECTOR_MIRROR"
     },
     {
       "legacy_preset": 11,
-      "effect_id": "facet-grid",
+      "effect_id": "kaleidoscope-smooth",
       "preset_id": "coupled-grid",
       "pipeline": "STEREOGRAPHIC_DODECAHEDRAL_GRID_INNER_MIRROR"
     },
     {
       "legacy_preset": 12,
-      "effect_id": "hex-wave",
+      "effect_id": "kaleidoscope-hex-bright",
       "preset_id": "hex-twin-wave",
       "pipeline": "STEREOGRAPHIC_HEXAGONAL_PRISM_TWIN_WAVE_INNER_MIRROR"
     },
     {
       "legacy_preset": 13,
-      "effect_id": "facet-grid",
+      "effect_id": "kaleidoscope-smooth",
       "preset_id": "direct-grid",
       "pipeline": "STEREOGRAPHIC_DODECAHEDRAL_GRID_INNER_MIRROR"
     },
     {
       "legacy_preset": 14,
-      "effect_id": "facet-grid",
+      "effect_id": "kaleidoscope-smooth",
       "preset_id": "double-map",
       "pipeline": "STEREOGRAPHIC_DODECAHEDRAL_GRID_INNER_MIRROR"
     },
     {
       "legacy_preset": 15,
-      "effect_id": "equator-grid",
+      "effect_id": "kaleidoscope-flowers",
       "preset_id": "double-map",
       "pipeline": "EQUIRECTANGULAR_DODECAHEDRAL_GRID_INNER_MIRROR"
     },
     {
       "legacy_preset": 16,
-      "effect_id": "equator-grid",
+      "effect_id": "kaleidoscope-flowers",
       "preset_id": "open-grid",
       "pipeline": "EQUIRECTANGULAR_DODECAHEDRAL_GRID_INNER_MIRROR"
     },
     {
       "legacy_preset": 17,
-      "effect_id": "equator-grid",
+      "effect_id": "kaleidoscope-flowers",
       "preset_id": "fine-grid",
       "pipeline": "EQUIRECTANGULAR_DODECAHEDRAL_GRID_INNER_MIRROR"
     },
@@ -217,7 +217,7 @@
       "legacy_preset": 18,
       "effect_id": "cosmic-eyeball",
       "preset_id": "mirrored-grid",
-      "pipeline": "STEREOGRAPHIC_GLITCH_GRID_MIRROR"
+      "pipeline": "STEREOGRAPHIC_ALIEN_CORE_MIRROR"
     },
     {
       "legacy_preset": 19,
@@ -233,20 +233,20 @@
     },
     {
       "legacy_preset": 21,
-      "effect_id": "signal-weave",
-      "preset_id": "signal-weave-2",
+      "effect_id": "alien-brain",
+      "preset_id": "alien-brain-2",
       "pipeline": "GLITCH_NOISE_GRID_WAVE_SHEAR"
     },
     {
       "legacy_preset": 22,
-      "effect_id": "signal-weave",
-      "preset_id": "signal-weave-3",
+      "effect_id": "alien-brain",
+      "preset_id": "alien-brain-3",
       "pipeline": "GLITCH_NOISE_GRID_WAVE_SHEAR"
     },
     {
       "legacy_preset": 23,
-      "effect_id": "signal-weave",
-      "preset_id": "signal-weave-4",
+      "effect_id": "alien-brain",
+      "preset_id": "alien-brain-4",
       "pipeline": "GLITCH_NOISE_GRID_WAVE_SHEAR"
     }
   ]

@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "catalog_version": 1,
-  "document_id": "curl-lattice-v1",
-  "effect_id": "curl-lattice",
+  "document_id": "kaleidoscope-smooth-v1",
+  "effect_id": "kaleidoscope-smooth",
   "descriptor": {
     "graph": {
       "nodes": [
@@ -10,35 +10,30 @@
           "label": "camera",
           "role": "outer_camera",
           "operator": "pullback.outer_camera.v1",
-          "policy": {
-            "base_orientation": "negative-z-to-negative-y"
-          }
+          "policy": { "base_orientation": "negative-z-to-negative-y" }
         },
         {
           "label": "surface",
           "role": "surface_project",
           "operator": "pullback.surface_project.v1",
           "policy": {
-            "pre_lens_surface": "curl-noise-simplex-euler",
-            "lens": "identity",
+            "pre_lens_surface": "identity",
+            "lens": "dodecahedral-kaleidoscope",
             "post_lens_surface": "identity",
-            "projection": "folded-sinusoidal"
-          },
-          "resources": ["surface-noise"]
+            "projection": "stereographic"
+          }
         },
         {
           "label": "warp",
           "role": "planar_warp",
           "operator": "pullback.planar_warp.v1",
-          "policy": { "sequence": ["identity", "identity"] }
+          "policy": { "sequence": ["identity", "mirror-tile"] }
         },
         {
           "label": "source",
           "role": "source",
           "operator": "pullback.source.v1",
-          "policy": {
-            "source": "primitive-lattice"
-          }
+          "policy": { "source": "grid" }
         },
         {
           "label": "material",
@@ -47,7 +42,7 @@
           "policy": {
             "weight": "projection",
             "transfer": "linear",
-            "coverage": "projection"
+            "coverage": "projection-squared"
           }
         },
         {
@@ -57,9 +52,9 @@
           "policy": {
             "color": "generated-palette",
             "hue_mode": "noise",
-            "brightness_envelope": "cup"
+            "brightness_envelope": "none"
           },
-          "resources": ["triadic-palette", "hue-noise"]
+          "resources": ["analogous-palette", "hue-noise"]
         }
       ],
       "edges": [
@@ -72,44 +67,64 @@
     },
     "parameters": [
       {
-        "id": "lattice-cell-scale",
-        "binding": "source.lattice-cell-scale",
+        "id": "pattern-freq",
+        "binding": "source.pattern-freq",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "cycles",
+        "domain": { "minimum": 0.1, "maximum": 64 },
+        "interpolation": { "kind": "LINEAR" },
+        "default": 2.82629991
+      },
+      {
+        "id": "speed",
+        "binding": "source.speed",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "radian-per-frame",
+        "domain": { "minimum": 0, "maximum": 0.5 },
+        "interpolation": { "kind": "LINEAR" },
+        "default": 0
+      },
+      {
+        "id": "source-angle-speed",
+        "binding": "source.angle-speed",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "radian-per-frame",
+        "domain": { "minimum": 0, "maximum": 0.05 },
+        "interpolation": { "kind": "LINEAR" },
+        "default": 0.0269999988
+      },
+      {
+        "id": "complexity",
+        "binding": "source.complexity",
         "classification": "preset",
         "storage": "binary32",
         "unit": "ratio",
-        "domain": { "minimum": 0.015625, "maximum": 8 },
-        "interpolation": { "kind": "LOG_POSITIVE" },
-        "default": 0.710265636
+        "domain": { "minimum": 0, "maximum": 3 },
+        "interpolation": { "kind": "LINEAR" },
+        "default": 0.513
       },
       {
-        "id": "lattice-shape",
-        "binding": "source.lattice-shape-blend",
+        "id": "pattern-mix",
+        "binding": "source.pattern-mix",
         "classification": "preset",
         "storage": "binary32",
         "unit": "blend",
         "domain": { "minimum": 0, "maximum": 1 },
         "interpolation": { "kind": "LINEAR" },
-        "default": 1
+        "default": 0
       },
       {
-        "id": "lattice-softness",
-        "binding": "source.lattice-softness",
+        "id": "drift",
+        "binding": "source.secondary-rate",
         "classification": "preset",
         "storage": "binary32",
         "unit": "ratio",
-        "domain": { "minimum": 0.0009765625, "maximum": 1 },
-        "interpolation": { "kind": "LOG_POSITIVE" },
-        "default": 0.455532223
-      },
-      {
-        "id": "lattice-radius",
-        "binding": "source.lattice-radius",
-        "classification": "preset",
-        "storage": "binary32",
-        "unit": "ratio",
-        "domain": { "minimum": 0.015625, "maximum": 0.49 },
+        "domain": { "minimum": 0, "maximum": 1.25 },
         "interpolation": { "kind": "LINEAR" },
-        "default": 0.290762514
+        "default": 0.8
       },
       {
         "id": "pole-fade",
@@ -119,17 +134,7 @@
         "unit": "ratio",
         "domain": { "minimum": 1, "maximum": 20 },
         "interpolation": { "kind": "LINEAR" },
-        "default": 20
-      },
-      {
-        "id": "central-meridian",
-        "binding": "projection.central-meridian",
-        "classification": "preset",
-        "storage": "binary32",
-        "unit": "radian",
-        "domain": { "minimum": 0, "maximum": 6.2831855 },
-        "interpolation": { "kind": "SHORTEST_PERIODIC", "period": 6.2831855 },
-        "default": 0
+        "default": 3.432
       },
       {
         "id": "projection-spin-speed",
@@ -162,32 +167,62 @@
         "default": 1
       },
       {
-        "id": "surface-noise-scale",
-        "binding": "surface-noise.scale",
-        "classification": "preset",
-        "storage": "binary32",
-        "unit": "ratio",
-        "domain": { "minimum": 0.015625, "maximum": 64 },
-        "interpolation": { "kind": "LINEAR" },
-        "default": 1.78815627
-      },
-      {
-        "id": "surface-noise-strength",
-        "binding": "surface-noise.strength",
-        "classification": "preset",
-        "storage": "binary32",
-        "unit": "ratio",
-        "domain": { "minimum": -0.5, "maximum": 0.5 },
-        "interpolation": { "kind": "LINEAR" },
-        "default": 0.0759999976
-      },
-      {
-        "id": "surface-noise-speed",
-        "binding": "surface-noise.speed",
+        "id": "mirror-speed",
+        "binding": "planar-warp-2.speed",
         "classification": "preset",
         "storage": "binary32",
         "unit": "turn-per-frame",
-        "domain": { "minimum": -0.015625, "maximum": 0.015625 },
+        "domain": { "minimum": -0.02, "maximum": 0.02 },
+        "interpolation": { "kind": "LINEAR" },
+        "default": 0.00013
+      },
+      {
+        "id": "mirror-rotation",
+        "binding": "planar-warp-2.rotation",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "radian",
+        "domain": { "minimum": 0, "maximum": 6.2831855 },
+        "interpolation": { "kind": "SHORTEST_PERIODIC", "period": 6.2831855 },
+        "default": 0
+      },
+      {
+        "id": "mirror-cell-x",
+        "binding": "planar-warp-2.cell-x",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": { "minimum": 0.015625, "maximum": 8 },
+        "interpolation": { "kind": "LOG_POSITIVE" },
+        "default": 1
+      },
+      {
+        "id": "mirror-cell-y",
+        "binding": "planar-warp-2.cell-y",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": { "minimum": 0.015625, "maximum": 8 },
+        "interpolation": { "kind": "LOG_POSITIVE" },
+        "default": 0.997703135
+      },
+      {
+        "id": "mirror-offset-x",
+        "binding": "planar-warp-2.offset-x",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": { "minimum": -8, "maximum": 8 },
+        "interpolation": { "kind": "LINEAR" },
+        "default": 0
+      },
+      {
+        "id": "mirror-offset-y",
+        "binding": "planar-warp-2.offset-y",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": { "minimum": -8, "maximum": 8 },
         "interpolation": { "kind": "LINEAR" },
         "default": 0
       },
@@ -229,7 +264,7 @@
         "unit": "turn",
         "domain": { "minimum": -1, "maximum": 1 },
         "interpolation": { "kind": "LINEAR" },
-        "default": -0.165999994
+        "default": 0
       },
       {
         "id": "phase-oscillation-depth",
@@ -250,16 +285,6 @@
         "domain": { "minimum": -0.01, "maximum": 0.01 },
         "interpolation": { "kind": "LINEAR" },
         "default": 0
-      },
-      {
-        "id": "brightness-depth",
-        "binding": "color.brightness-depth",
-        "classification": "preset",
-        "storage": "binary32",
-        "unit": "ratio",
-        "domain": { "minimum": 0, "maximum": 1 },
-        "interpolation": { "kind": "LINEAR" },
-        "default": 1
       },
       {
         "id": "value-opacity-low",
@@ -289,7 +314,7 @@
         "unit": "turn",
         "domain": { "minimum": -1, "maximum": 1 },
         "interpolation": { "kind": "LINEAR" },
-        "default": 0.268000007
+        "default": 0.366
       },
       {
         "id": "hue-noise-scale",
@@ -299,7 +324,7 @@
         "unit": "ratio",
         "domain": { "minimum": 0.015625, "maximum": 8 },
         "interpolation": { "kind": "LOG_POSITIVE" },
-        "default": 2
+        "default": 1.47215629
       },
       {
         "id": "hue-noise-speed",
@@ -312,9 +337,7 @@
         "default": 0
       }
     ],
-    "path_policies": [
-      { "id": "parallel", "kind": "PARALLEL" }
-    ],
+    "path_policies": [{ "id": "parallel", "kind": "PARALLEL" }],
     "clocks": [
       {
         "id": "projection-wander",
@@ -342,14 +365,33 @@
         }
       },
       {
+        "id": "source-primary",
+        "kind": "parameter-rate",
+        "settings": { "binding": "source.speed", "wrap": 6.2831855 }
+      },
+      {
+        "id": "source-secondary",
+        "kind": "scaled-parameter-rate",
+        "settings": {
+          "binding": "source.speed",
+          "scale_binding": "source.secondary-rate",
+          "wrap": 6.2831855
+        }
+      },
+      {
+        "id": "source-angle",
+        "kind": "parameter-rate",
+        "settings": { "binding": "source.angle-speed", "wrap": 6.2831855 }
+      },
+      {
         "id": "projection-spin",
         "kind": "parameter-rate",
         "settings": { "binding": "projection.spin-speed", "wrap": 6.2831855 }
       },
       {
-        "id": "surface-noise-loop",
+        "id": "mirror-phase",
         "kind": "parameter-rate",
-        "settings": { "binding": "surface-noise.speed", "wrap": 1 }
+        "settings": { "binding": "planar-warp-2.speed", "wrap": 1 }
       },
       {
         "id": "hue-noise-loop",
@@ -364,48 +406,47 @@
     ],
     "preparation": [
       { "id": "spatial-frames", "kind": "prepare-orientation-conjugates" },
-      { "id": "surface-loop", "kind": "prepare-noise-loop" },
+      { "id": "source-phases", "kind": "prepare-grid-phases" },
+      { "id": "mirror-tile", "kind": "prepare-mirror-tile" },
       { "id": "hue-luts", "kind": "prepare-hue-rotation-and-noise-luts" }
     ],
     "resources": [
-      {
-        "id": "surface-noise",
-        "kind": "simplex-sphere-curl",
-        "settings": { "seed": 1337, "generator_frequency": 1 }
-      },
       {
         "id": "hue-noise",
         "kind": "simplex-sphere-scalar",
         "settings": { "seed": 6047, "generator_frequency": 1 }
       },
       {
-        "id": "triadic-palette",
-        "kind": "generated-triadic-palette",
+        "id": "analogous-palette",
+        "kind": "generated-analogous-palette",
         "settings": { "initial_hue": 0, "hue_step": 159 }
       }
     ],
     "serialization": {
-      "schema_version": 4,
+      "schema_version": 3,
       "fields": [
-        "lattice-cell-scale",
-        "lattice-shape",
-        "lattice-softness",
-        "lattice-radius",
+        "pattern-freq",
+        "speed",
+        "source-angle-speed",
+        "complexity",
+        "pattern-mix",
+        "drift",
         "pole-fade",
-        "central-meridian",
         "projection-spin-speed",
         "projection-wander",
         "camera-wander",
-        "surface-noise-scale",
-        "surface-noise-strength",
-        "surface-noise-speed",
+        "mirror-speed",
+        "mirror-rotation",
+        "mirror-cell-x",
+        "mirror-cell-y",
+        "mirror-offset-x",
+        "mirror-offset-y",
         "palette-chroma",
         "palette-mapping",
         "mapping-frequency",
         "mapping-phase",
         "phase-oscillation-depth",
         "phase-oscillation-speed",
-        "brightness-depth",
         "value-opacity-low",
         "value-opacity-high",
         "hue-shift-amount",
@@ -426,77 +467,163 @@
     "schema_version": 1,
     "presets": [
       {
-        "preset_id": "open-curl",
-        "display_name": "Open Curl",
+        "preset_id": "coupled-grid",
+        "display_name": "Coupled Grid",
         "values": {
-          "lattice-cell-scale": 0.710265636,
-          "lattice-shape": 1,
-          "lattice-softness": 0.455532223,
-          "lattice-radius": 0.290762514,
-          "pole-fade": 20,
-          "central-meridian": 0,
+          "pattern-freq": 2.82629991,
+          "speed": 0,
+          "source-angle-speed": 0.0269999988,
+          "complexity": 0.513,
+          "pattern-mix": 0,
+          "drift": 0.8,
+          "pole-fade": 3.432,
           "projection-spin-speed": 0,
           "projection-wander": 1,
           "camera-wander": 1,
-          "surface-noise-scale": 1.78815627,
-          "surface-noise-strength": 0.0759999976,
-          "surface-noise-speed": 0,
+          "mirror-speed": 0.00013,
+          "mirror-rotation": 0,
+          "mirror-cell-x": 1,
+          "mirror-cell-y": 0.997703135,
+          "mirror-offset-x": 0,
+          "mirror-offset-y": 0,
           "palette-chroma": 1,
           "palette-mapping": "cup",
           "mapping-frequency": 1,
-          "mapping-phase": -0.165999994,
+          "mapping-phase": 0,
           "phase-oscillation-depth": 0,
           "phase-oscillation-speed": 0,
-          "brightness-depth": 1,
           "value-opacity-low": 1,
           "value-opacity-high": 1,
-          "hue-shift-amount": 0.268000007,
-          "hue-noise-scale": 2,
+          "hue-shift-amount": 0.366,
+          "hue-noise-scale": 1.47215629,
           "hue-noise-speed": 0
         }
       },
       {
-        "preset_id": "dense-curl",
-        "display_name": "Dense Curl",
+        "preset_id": "direct-grid",
+        "display_name": "Direct Grid",
         "values": {
-          "lattice-cell-scale": 0.710265636,
-          "lattice-shape": 1,
-          "lattice-softness": 0.455532223,
-          "lattice-radius": 0.290762514,
-          "pole-fade": 20,
-          "central-meridian": 0,
+          "pattern-freq": 2.82629991,
+          "speed": 0,
+          "source-angle-speed": 0.0269999988,
+          "complexity": 3,
+          "pattern-mix": 1,
+          "drift": 0.8,
+          "pole-fade": 3.432,
           "projection-spin-speed": 0,
           "projection-wander": 1,
           "camera-wander": 1,
-          "surface-noise-scale": 3.29720306,
-          "surface-noise-strength": 0.0759999976,
-          "surface-noise-speed": 0,
+          "mirror-speed": 0.00013,
+          "mirror-rotation": 0,
+          "mirror-cell-x": 1,
+          "mirror-cell-y": 0.997703135,
+          "mirror-offset-x": 0,
+          "mirror-offset-y": 0,
           "palette-chroma": 1,
           "palette-mapping": "cup",
           "mapping-frequency": 1,
-          "mapping-phase": -0.165999994,
+          "mapping-phase": 0,
           "phase-oscillation-depth": 0,
           "phase-oscillation-speed": 0,
-          "brightness-depth": 1,
           "value-opacity-low": 1,
           "value-opacity-high": 1,
-          "hue-shift-amount": 0.268000007,
-          "hue-noise-scale": 2,
+          "hue-shift-amount": 0.366,
+          "hue-noise-scale": 1.47215629,
+          "hue-noise-speed": 0
+        }
+      },
+      {
+        "preset_id": "double-map",
+        "display_name": "Double Map",
+        "values": {
+          "pattern-freq": 3.9407,
+          "speed": 0,
+          "source-angle-speed": 0.0269999988,
+          "complexity": 3,
+          "pattern-mix": 1,
+          "drift": 0.8,
+          "pole-fade": 3.432,
+          "projection-spin-speed": 0,
+          "projection-wander": 0.165,
+          "camera-wander": 1,
+          "mirror-speed": 0.00013,
+          "mirror-rotation": 0,
+          "mirror-cell-x": 1,
+          "mirror-cell-y": 0.997703135,
+          "mirror-offset-x": 0,
+          "mirror-offset-y": 0,
+          "palette-chroma": 1,
+          "palette-mapping": "cup",
+          "mapping-frequency": 2,
+          "mapping-phase": 0,
+          "phase-oscillation-depth": 0,
+          "phase-oscillation-speed": 0,
+          "value-opacity-low": 1,
+          "value-opacity-high": 1,
+          "hue-shift-amount": 0.366,
+          "hue-noise-scale": 1.47215629,
+          "hue-noise-speed": 0
+        }
+      },
+      {
+        "preset_id": "stretched-grid",
+        "display_name": "Stretched Grid",
+        "values": {
+          "pattern-freq": 2.9059,
+          "speed": 0,
+          "source-angle-speed": 0.026999999,
+          "complexity": 3,
+          "pattern-mix": 1,
+          "drift": 0.8,
+          "pole-fade": 3.432,
+          "projection-spin-speed": 0,
+          "projection-wander": 0.165,
+          "camera-wander": 1,
+          "mirror-speed": 0.0027299998,
+          "mirror-rotation": 3.455752,
+          "mirror-cell-x": 0.22321875,
+          "mirror-cell-y": 5.085703,
+          "mirror-offset-x": 0,
+          "mirror-offset-y": 0,
+          "palette-chroma": 1,
+          "palette-mapping": "cup",
+          "mapping-frequency": 1.558,
+          "mapping-phase": 0,
+          "phase-oscillation-depth": 0,
+          "phase-oscillation-speed": 0,
+          "value-opacity-low": 1,
+          "value-opacity-high": 1,
+          "hue-shift-amount": 0.366,
+          "hue-noise-scale": 1.4721563,
           "hue-noise-speed": 0
         }
       }
     ],
     "edges": [
       {
-        "from": "open-curl",
-        "to": "dense-curl",
+        "from": "coupled-grid",
+        "to": "direct-grid",
         "path_policy": "parallel",
         "easing": "EASE_IN_OUT_SIN",
         "duration": 480
       },
       {
-        "from": "dense-curl",
-        "to": "open-curl",
+        "from": "direct-grid",
+        "to": "double-map",
+        "path_policy": "parallel",
+        "easing": "EASE_IN_OUT_SIN",
+        "duration": 480
+      },
+      {
+        "from": "double-map",
+        "to": "stretched-grid",
+        "path_policy": "parallel",
+        "easing": "EASE_IN_OUT_SIN",
+        "duration": 480
+      },
+      {
+        "from": "stretched-grid",
+        "to": "coupled-grid",
         "path_policy": "parallel",
         "easing": "EASE_IN_OUT_SIN",
         "duration": 480
@@ -510,12 +637,22 @@
       "authoring": "SNAP"
     },
     "choreography": {
-      "generated_order": ["open-curl", "dense-curl"],
-      "dwell": { "open-curl": 600, "dense-curl": 600 }
+      "generated_order": [
+        "coupled-grid",
+        "direct-grid",
+        "double-map",
+        "stretched-grid"
+      ],
+      "dwell": {
+        "coupled-grid": 600,
+        "direct-grid": 600,
+        "double-map": 600,
+        "stretched-grid": 600
+      }
     }
   },
   "effect_metadata": {
-    "display_name": "Curl Lattice",
-    "description": "A folded sinusoidal lattice flowing through sphere-space curl noise."
+    "display_name": "Kaleidoscope Smooth",
+    "description": "Mirrored grids folded through a dodecahedral stereographic lens."
   }
 }

@@ -53,13 +53,13 @@ test('shader state hashes round-trip the complete authoring state', async () => 
 test('shader state hash replacement preserves the route and query', () => {
   const writes = [];
   const win = {
-    location: { pathname: '/tools/shader.html', search: '?effect=VectorFacets' },
+    location: { pathname: '/tools/shader.html', search: '?effect=KaleidoscopeStainedGlass' },
     history: { replaceState: (_state, _title, url) => writes.push(url) },
   };
 
   assert.equal(replaceShaderStateHash('#shader=v1.payload', win), true);
   assert.deepEqual(writes, [
-    '/tools/shader.html?effect=VectorFacets#shader=v1.payload',
+    '/tools/shader.html?effect=KaleidoscopeStainedGlass#shader=v1.payload',
   ]);
 });
 
@@ -339,8 +339,8 @@ test('the fixed path skips every topology field the catalog flags', () => {
 });
 
 const MIGRATION = JSON.stringify({
-  source_documents: { EquatorGrid: 'equator_grid.shader.json' },
-  product_group: { children: [{ effect_id: 'EquatorGrid', display_name: 'Equator Grid' }] },
+  source_documents: { KaleidoscopeFlowers: 'kaleidoscope_flowers.shader.json' },
+  product_group: { children: [{ effect_id: 'KaleidoscopeFlowers', display_name: 'Kaleidoscope Flowers' }] },
 });
 
 /** @param {{digest?: string, status?: string, diagnostics?: *}} [shape] */
@@ -350,8 +350,8 @@ const shaderDocument = ({ digest = 'digest-equator', status = 'VALID',
   diagnostics,
   descriptor_digest: digest,
   document: {
-    effect_id: 'EquatorGrid',
-    effect_metadata: { display_name: 'Equator Grid' },
+    effect_id: 'KaleidoscopeFlowers',
+    effect_metadata: { display_name: 'Kaleidoscope Flowers' },
     descriptor: { chain: [{ label: 'sample', operator: 'sample.grid.v2' }] },
     preset_bank: { presets: [
       { preset_id: 'noon', display_name: 'Noon', values: { 'sample.pattern-freq': 2 } },
@@ -403,7 +403,7 @@ function workbenchEngine() {
  *   initialEffect?: string|null}} [seams]
  * @returns {Object} The controller and everything it wrote to.
  */
-function workbench({ files = { 'equator_grid.shader.json': shaderDocument() },
+function workbench({ files = { 'kaleidoscope_flowers.shader.json': shaderDocument() },
                      engine = workbenchEngine(),
                      selectEffect = () => true,
                      initialEffect = null } = {}) {
@@ -467,7 +467,7 @@ const SCRATCH_WRITES = SCRATCH.descriptor.parameters.length;
 async function chooseCatalogSource({ elements, controller }) {
   await controller.init();
   const select = elements.get('shader-document-select');
-  select.value = 'EquatorGrid';
+  select.value = 'KaleidoscopeFlowers';
   await onChange(select)();
 }
 
@@ -487,9 +487,9 @@ test('the source catalog lists each document by its product display name', async
 
   assert.equal(await controller.init(), true);
   const select = elements.get('shader-document-select');
-  assert.deepEqual(select.options.map((option) => option.value), ['', 'EquatorGrid']);
+  assert.deepEqual(select.options.map((option) => option.value), ['', 'KaleidoscopeFlowers']);
   assert.deepEqual(select.options.map((option) => option.textContent),
-    ['Scratch shader', 'Equator Grid']);
+    ['Scratch shader', 'Kaleidoscope Flowers']);
   const status = elements.get('shader-document-status');
   assert.equal(status.dataset.status, 'ok');
   assert.match(status.textContent, /Scratch Chain · Catalog Defaults/,
@@ -501,7 +501,7 @@ test('the source catalog lists each document by its product display name', async
 // the boolean is the only channel a caller can act on.
 test('a catalog document that fails to compile reports its diagnostic', async () => {
   const { controller, elements } = workbench({ files: {
-    'equator_grid.shader.json': shaderDocument({
+    'kaleidoscope_flowers.shader.json': shaderDocument({
       status: 'INVALID',
       diagnostics: [{ code: 'E_ROLE', path: '/descriptor', message: 'unknown role' }],
     }),
@@ -526,15 +526,15 @@ test('a catalog that cannot be fetched is reported, not left half-listed', async
 // The simulator redirects a shader-document deep link here, so the id it
 // carries has to open that document rather than the scratch chain.
 test('a deep-linked document id opens that document', async () => {
-  const harness = workbench({ initialEffect: 'EquatorGrid' });
+  const harness = workbench({ initialEffect: 'KaleidoscopeFlowers' });
 
   assert.equal(await harness.controller.init(), true);
 
-  assert.equal(harness.elements.get('shader-document-select').value, 'EquatorGrid');
+  assert.equal(harness.elements.get('shader-document-select').value, 'KaleidoscopeFlowers');
   assert.deepEqual(harness.engine.chained.at(-1),
     [{ instance: 'sample', operator: 'sample.grid.v2' }]);
   assert.match(harness.elements.get('shader-document-status').textContent,
-    /Equator Grid · Noon/);
+    /Kaleidoscope Flowers · Noon/);
 });
 
 // §4.5: the legacy Shader route names no document, and neither does a
@@ -571,7 +571,7 @@ test('choosing a catalog source previews it through the interpreter', async () =
   assert.equal(presets.disabled, false);
   assert.equal(harness.elements.get('shader-document-save').disabled, false);
   assert.match(harness.elements.get('shader-document-status').textContent,
-    /Equator Grid · Noon · interpreter/);
+    /Kaleidoscope Flowers · Noon · interpreter/);
   assert.equal(harness.elements.get('shader-parity-toggle').disabled, false,
     'the digest match arms the toggle');
   assert.deepEqual(harness.ran, { gui: 2, invalidated: 2 });
@@ -584,13 +584,13 @@ test('the parity toggle swaps the preview onto the compiled build and back', asy
 
   toggle.dispatch('click');
 
-  assert.equal(harness.selections.at(-1), 'EquatorGrid');
+  assert.equal(harness.selections.at(-1), 'KaleidoscopeFlowers');
   assert.equal(toggle.getAttribute('aria-pressed'), 'true');
   assert.deepEqual(harness.engine.selected, ['noon']);
   assert.deepEqual(harness.engine.writes.at(-1), ['Pattern Freq', 2],
     'the compiled build takes the preset through the promoted control names');
   assert.match(harness.elements.get('shader-document-status').textContent,
-    /Equator Grid · Noon · compiled build/);
+    /Kaleidoscope Flowers · Noon · compiled build/);
 
   toggle.dispatch('click');
 
@@ -617,7 +617,7 @@ test('an imported study the catalog does not carry has no parity build', async (
     'the preset lands by parameter id, not by alias name');
   const status = harness.elements.get('shader-document-status');
   assert.equal(status.dataset.status, 'ok');
-  assert.equal(status.textContent, 'Equator Grid · Noon');
+  assert.equal(status.textContent, 'Kaleidoscope Flowers · Noon');
   assert.equal(harness.elements.get('shader-parity-toggle').disabled, true);
   assert.equal(harness.elements.get('shader-document-save').disabled, false);
   assert.deepEqual(harness.ran, { gui: 2, invalidated: 2 });
@@ -651,7 +651,7 @@ test('choosing a preset previews it without reloading the document', async () =>
   assert.deepEqual(harness.engine.selected, []);
   assert.deepEqual(harness.engine.writes.at(-1), ['sample.pattern-freq', 5]);
   assert.match(harness.elements.get('shader-document-status').textContent,
-    /Equator Grid · Dusk/);
+    /Kaleidoscope Flowers · Dusk/);
 });
 
 test('a preview with no engine names the engine rather than the preset', async () => {
@@ -708,13 +708,13 @@ test('saving exports the document, harvesting nothing from the engine', async ()
 
   assert.equal(harness.controller.save(), true);
   const [filename, source] = harness.downloads[0];
-  assert.equal(filename, 'equator_grid.shader.json');
+  assert.equal(filename, 'kaleidoscope_flowers.shader.json');
   const saved = JSON.parse(source);
   assert.equal(saved.preset_bank.presets[0].values['sample.pattern-freq'], 2);
   assert.equal(saved.preset_bank.presets[1].values['sample.pattern-freq'], 5,
     'the presets the session never previewed must survive the round trip');
   assert.match(harness.elements.get('shader-document-status').textContent,
-    /Saved equator_grid\.shader\.json/);
+    /Saved kaleidoscope_flowers\.shader\.json/);
 });
 
 // The workbench roster is what the page's deep-link validator and its
@@ -759,30 +759,30 @@ test('returning to the scratch source reopens the default chain', async () => {
 
 // ── The pipeline strip over the real store, compiler and engine catalog ────
 
-const HEX_WAVE = readFileSync(
-  new URL('../shader/patterns/hex_wave.shader.json', import.meta.url), 'utf8');
-const VECTOR_FACETS = readFileSync(
-  new URL('../shader/patterns/vector_facets.shader.json', import.meta.url), 'utf8');
+const KALEIDOSCOPE_HEX_BRIGHT = readFileSync(
+  new URL('../shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8');
+const KALEIDOSCOPE_STAINED_GLASS = readFileSync(
+  new URL('../shader/patterns/kaleidoscope_stained_glass.shader.json', import.meta.url), 'utf8');
 // No source documents: every load misses the fixed-effect digest catalog and
 // routes onto the chain engine, where the strip mounts.
 const EMPTY_MIGRATION = JSON.stringify({
   source_documents: {}, product_group: { children: [] },
 });
-// hex_wave as a shipped pattern: loading it digests onto a promoted effect, so
+// kaleidoscope_hex_bright as a shipped pattern: loading it digests onto a promoted effect, so
 // the toolbar's parity toggle arms.
 const HEX_MIGRATION = JSON.stringify({
-  source_documents: { HexWave: 'hex_wave.shader.json' },
-  product_group: { children: [{ effect_id: 'HexWave', display_name: 'Hex Wave' }] },
+  source_documents: { KaleidoscopeHexBright: 'kaleidoscope_hex_bright.shader.json' },
+  product_group: { children: [{ effect_id: 'KaleidoscopeHexBright', display_name: 'Kaleidoscope Hex Bright' }] },
 });
 
 /**
  * The promoted build's engine surface: its own reference presets and the
- * alias-named controls hex_wave's parameter ids map onto, which is what makes
+ * alias-named controls kaleidoscope_hex_bright's parameter ids map onto, which is what makes
  * it a different engine surface from the chain interpreter's.
  * @returns {Object} The engine.
  */
 function compiledBuildEngine() {
-  const definitions = JSON.parse(HEX_WAVE).descriptor.parameters.map((parameter) => ({
+  const definitions = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT).descriptor.parameters.map((parameter) => ({
     name: engineParameterName(parameter.id),
     ...(parameter.storage === 'enum8' ? { options: [...parameter.domain.values] } : {}),
   }));
@@ -802,7 +802,7 @@ function compiledBuildEngine() {
 
 /**
  * The document controller over the real compiler, the real chain store, and a
- * FakeChainEngine, with the workbench mounts present and hex_wave loaded over
+ * FakeChainEngine, with the workbench mounts present and kaleidoscope_hex_bright loaded over
  * the scratch document the page opens on.
  * @param {{source?: string|null, migration?: string, hash?: string,
  *   paused?: boolean}} [seams] - source null
@@ -810,7 +810,7 @@ function compiledBuildEngine() {
  * @returns {Promise<Object>} The controller and everything it wrote to.
  */
 async function editorWorkbench({
-  source = HEX_WAVE, migration = EMPTY_MIGRATION, hash = '', paused = false,
+  source = KALEIDOSCOPE_HEX_BRIGHT, migration = EMPTY_MIGRATION, hash = '', paused = false,
   selectEffect = () => true,
 } = {}) {
   const engine = new FakeChainEngine();
@@ -885,7 +885,7 @@ async function editorWorkbench({
       const name = String(url).split('/').pop();
       if (name === 'shaderball_migration.json') return migration;
       if (name === 'engine_catalog.json') return ENGINE_CATALOG;
-      if (name === 'hex_wave.shader.json') return HEX_WAVE;
+      if (name === 'kaleidoscope_hex_bright.shader.json') return KALEIDOSCOPE_HEX_BRIGHT;
       throw new Error(`404 ${name}`);
     },
     importCompiler: () => import('../shader/shader_workbench.mjs'),
@@ -960,7 +960,7 @@ test('an effect the engine rejects leaves the loaded chain editor standing', asy
 
   installs = false;
   assert.equal(
-    await harness.controller.loadSource(HEX_WAVE, 'other.shader.json'), false);
+    await harness.controller.loadSource(KALEIDOSCOPE_HEX_BRIGHT, 'other.shader.json'), false);
   assert.match(harness.elements.get('shader-document-status').textContent,
     /rejected effect "ShaderChain"/);
   assert.deepEqual(stripChips(harness).map((chip) => chip.dataset.label), before,
@@ -968,7 +968,7 @@ test('an effect the engine rejects leaves the loaded chain editor standing', asy
 });
 
 test('a shader state link restores its document, preset, bypasses, and pause', async () => {
-  const document = JSON.parse(HEX_WAVE);
+  const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
   const preset = document.preset_bank.presets[1];
   preset.values['sample.pattern-freq'] = 7.25;
   const hash = await encodeShaderStateHash({
@@ -1050,9 +1050,9 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
     .some((id) => id.startsWith('warp1.')));
 });
 
-test('Vector Facets loads its effect preset into the interpreter controls', async () => {
-  const harness = await editorWorkbench({ source: VECTOR_FACETS });
-  const values = JSON.parse(VECTOR_FACETS).preset_bank.presets[0].values;
+test('Kaleidoscope Stained Glass loads its effect preset into the interpreter controls', async () => {
+  const harness = await editorWorkbench({ source: KALEIDOSCOPE_STAINED_GLASS });
+  const values = JSON.parse(KALEIDOSCOPE_STAINED_GLASS).preset_bank.presets[0].values;
 
   assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator), [
     'sphere.rotate.v2',
@@ -1129,7 +1129,7 @@ test('a descriptor edit under the compiled build returns the preview to the inte
 
   toggle.dispatch('click');
 
-  assert.equal(harness.selections.at(-1), 'HexWave');
+  assert.equal(harness.selections.at(-1), 'KaleidoscopeHexBright');
   assert.deepEqual(harness.compiledEngine.selected, ['hex-twin-wave']);
   assert.ok(harness.compiledEngine.writes.some(([name]) => name === 'Camera Wander'),
     'the compiled build takes the preset through its own control names');
@@ -1152,7 +1152,7 @@ test('Save writes the canonical v2 serialization', async () => {
   assert.equal(harness.controller.save(), true);
   const [filename, source] = harness.downloads.at(-1);
   assert.equal(filename, 'study.shader.json');
-  assert.equal(source, exportShaderDocumentJson(JSON.parse(HEX_WAVE)));
+  assert.equal(source, exportShaderDocumentJson(JSON.parse(KALEIDOSCOPE_HEX_BRIGHT)));
 });
 
 // §4.6: Save As is a copy, not a rename - the loaded document and the
@@ -1163,19 +1163,19 @@ test('Save As writes a new document id and leaves the loaded one alone', async (
   assert.equal(harness.controller.saveAs(), true);
   const [copyName, copySource] = harness.downloads.at(-1);
   const copy = JSON.parse(copySource);
-  assert.equal(copy.document_id, 'hex-wave-v1-copy1');
-  assert.equal(copyName, 'hex-wave-v1-copy1.shader.json');
+  assert.equal(copy.document_id, 'kaleidoscope-hex-bright-v1-copy1');
+  assert.equal(copyName, 'kaleidoscope-hex-bright-v1-copy1.shader.json');
   assert.equal(copySource, exportShaderDocumentJson(copy),
     'a copy is written in the same canonical serialization as Save');
 
   assert.equal(harness.controller.save(), true);
   const [savedName, savedSource] = harness.downloads.at(-1);
   assert.equal(savedName, 'study.shader.json');
-  assert.equal(JSON.parse(savedSource).document_id, 'hex-wave-v1');
+  assert.equal(JSON.parse(savedSource).document_id, 'kaleidoscope-hex-bright-v1');
 
   assert.equal(harness.controller.saveAs(), true);
   assert.equal(JSON.parse(harness.downloads.at(-1)[1]).document_id,
-    'hex-wave-v1-copy2', 'each copy takes an id of its own');
+    'kaleidoscope-hex-bright-v1-copy2', 'each copy takes an id of its own');
 });
 
 test('a Save As copy carries the edits made since the load', async () => {
@@ -1333,22 +1333,22 @@ test('legacy custom Shader URLs preserve their state on the workbench route', ()
 
 test('the workbench route carries the requested shader document', () => {
   assert.equal(
-    shaderWorkbenchUrl('https://example.test/daydream/index.html?effect=signal-weave', 'signal-weave'),
-    '/daydream/tools/shader.html?effect=signal-weave',
+    shaderWorkbenchUrl('https://example.test/daydream/index.html?effect=alien-brain', 'alien-brain'),
+    '/daydream/tools/shader.html?effect=alien-brain',
   );
 });
 
 // A document id is a workbench effect the simulator's favorites never list, so
 // without the route it fails validation and the page opens on its default.
-test('the Curl Facets document deep link routes the simulator to the workbench', () => {
+test('the Ash Cloud document deep link routes the simulator to the workbench', () => {
   const replaced = [];
   const win = {
-    location: { href: 'https://example.test/daydream/index.html?effect=curl-facets',
-                search: '?effect=curl-facets',
+    location: { href: 'https://example.test/daydream/index.html?effect=ash-cloud',
+                search: '?effect=ash-cloud',
                 replace: (url) => replaced.push(url) },
     addEventListener() {}, removeEventListener() {},
   };
   const doc = { documentElement: { dataset: {} } };
   start({ doc, win });
-  assert.deepEqual(replaced, ['/daydream/tools/shader.html?effect=curl-facets']);
+  assert.deepEqual(replaced, ['/daydream/tools/shader.html?effect=ash-cloud']);
 });

@@ -549,13 +549,13 @@ const fixture = (name) =>
 /**
  * Verifies expansion assigns the deterministic slot labels and consumes the
  * v1 policy objects into operator selection plus topology enum8 parameters.
- * equator_grid pins the interesting cases: a kaleidoscope lens variant, a
+ * kaleidoscope_flowers pins the interesting cases: a kaleidoscope lens variant, a
  * mirror in the second warp slot (warp1 vanishes with its identity policy),
  * and coverage folded into the sample stage.
  */
 test('a v1 document expands to the deterministic chain of its slots', () => {
   const { document, parameter_ids } =
-    expandV1Document(fixture('equator_grid.shader.json'), CATALOG);
+    expandV1Document(fixture('kaleidoscope_flowers.shader.json'), CATALOG);
 
   assert.equal(document.schema_version, 2);
   assert.equal(document.catalog_version, 2);
@@ -581,7 +581,7 @@ test('a v1 document expands to the deterministic chain of its slots', () => {
     'v1 camera-wander is the camera walk, not a projection field');
   assert.equal(parameter_ids['source-angle-speed'], 'sample.angle-speed');
   assert.equal(parameter_ids['palette-mapping'], 'colorize.palette-mapping');
-  for (const v1Id of fixture('equator_grid.shader.json').descriptor.parameters
+  for (const v1Id of fixture('kaleidoscope_flowers.shader.json').descriptor.parameters
     .map((parameter) => parameter.id))
     assert.ok(v1Id in parameter_ids, `rewrite map misses "${v1Id}"`);
 
@@ -623,12 +623,12 @@ test('v1 mobius and edge-width parameters route onto the engine field ids', () =
 });
 
 test('expansion is deterministic and the compiler is one code path', () => {
-  const first = expandV1Document(fixture('prism_spiral.shader.json'), CATALOG);
-  const second = expandV1Document(fixture('prism_spiral.shader.json'), CATALOG);
+  const first = expandV1Document(fixture('kaleidoscope_hex_oil.shader.json'), CATALOG);
+  const second = expandV1Document(fixture('kaleidoscope_hex_oil.shader.json'), CATALOG);
   assert.deepEqual(first.document, second.document);
   assert.deepEqual(first.parameter_ids, second.parameter_ids);
 
-  const throughCompile = compile(fixture('prism_spiral.shader.json'));
+  const throughCompile = compile(fixture('kaleidoscope_hex_oil.shader.json'));
   assert.equal(throughCompile.status, 'VALID');
   assert.equal(throughCompile.descriptor_digest,
     compile(first.document).descriptor_digest,

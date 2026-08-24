@@ -579,11 +579,11 @@
       "schema_version": 1
     }
   },
-  "document_id": "equator-grid-v1",
-  "effect_id": "equator-grid",
+  "document_id": "kaleidoscope-flowers-v1",
+  "effect_id": "kaleidoscope-flowers",
   "effect_metadata": {
     "description": "Dodecahedral grids mapped continuously around the equator.",
-    "display_name": "Equator Grid"
+    "display_name": "Kaleidoscope Flowers"
   },
   "preset_bank": {
     "absent_edge_fallback": {

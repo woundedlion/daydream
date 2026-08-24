@@ -744,7 +744,7 @@ test('strobeColumns and effect metadata return the shapes daydream consumes', ()
   assert.deepEqual(invalidCounts.slice(0, 5), [],
     `${invalidCounts.length} getEffectPresetCounts entries are not non-negative integers`);
   assert.equal(presetCounts.Comets, 12);
-  assert.equal(presetCounts.CurlLattice, 2);
+  assert.equal(presetCounts.LatticeMelt, 2);
   assert.equal(presetCounts.Voronoi, 0);
 });
 

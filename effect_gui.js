@@ -26,13 +26,13 @@ import {
 } from "./param_sync.js";
 import { formatExportParams } from "./tools/export_params.js";
 import {
-  CURL_LATTICE_STAGE_ORDER,
-  CURL_LATTICE_STAGE_TITLES,
-  FACET_GRID_STAGE_ORDER,
-  FACET_GRID_STAGE_TITLES,
+  LATTICE_MELT_STAGE_ORDER,
+  LATTICE_MELT_STAGE_TITLES,
+  KALEIDOSCOPE_SMOOTH_STAGE_ORDER,
+  KALEIDOSCOPE_SMOOTH_STAGE_TITLES,
   SHADERBALL_STAGE_ORDER,
-  curlLatticeStageAssignments,
-  facetGridStageAssignments,
+  latticeMeltStageAssignments,
+  kaleidoscopeSmoothStageAssignments,
   fixedShaderStageAssignments,
   fixedShaderStageTitles,
   legacyShaderBallParamNames,
@@ -804,8 +804,8 @@ export function createEffectGui({
     fx.paramWarnings = paramWarningTexts(params);
     fx.paramsExternal = external;
     const shaderBallAssignments = shaderBallStageAssignments(params);
-    const curlLatticeAssignments = curlLatticeStageAssignments(params);
-    const facetGridAssignments = facetGridStageAssignments(params);
+    const latticeMeltAssignments = latticeMeltStageAssignments(params);
+    const kaleidoscopeSmoothAssignments = kaleidoscopeSmoothStageAssignments(params);
     const fixedShaderCandidate = fixedShaderStageAssignments(params);
     const fullConfigSnapshot = fixedShaderCandidate
       ? getFullConfigSnapshot() : null;
@@ -814,17 +814,17 @@ export function createEffectGui({
     const fixedShaderAssignments = fixedShaderTitles ? fixedShaderCandidate : null;
     const fallbackFixedAssignments = fixedShaderTitles ? null : fixedShaderCandidate;
     const stageAssignments = shaderBallAssignments ?? fixedShaderAssignments
-      ?? curlLatticeAssignments ?? facetGridAssignments ?? fallbackFixedAssignments;
+      ?? latticeMeltAssignments ?? kaleidoscopeSmoothAssignments ?? fallbackFixedAssignments;
     const stageTitles = fixedShaderAssignments ? fixedShaderTitles
-      : curlLatticeAssignments ? CURL_LATTICE_STAGE_TITLES
-      : facetGridAssignments ? FACET_GRID_STAGE_TITLES
+      : latticeMeltAssignments ? LATTICE_MELT_STAGE_TITLES
+      : kaleidoscopeSmoothAssignments ? KALEIDOSCOPE_SMOOTH_STAGE_TITLES
       : fixedShaderTitles;
     const stageOrder = shaderBallAssignments
       ? SHADERBALL_STAGE_ORDER
       : fixedShaderAssignments ? SHADERBALL_STAGE_ORDER.filter((stage) =>
         new Set(fixedShaderAssignments.values()).has(stage))
-      : curlLatticeAssignments ? CURL_LATTICE_STAGE_ORDER
-      : facetGridAssignments ? FACET_GRID_STAGE_ORDER
+      : latticeMeltAssignments ? LATTICE_MELT_STAGE_ORDER
+      : kaleidoscopeSmoothAssignments ? KALEIDOSCOPE_SMOOTH_STAGE_ORDER
       : fallbackFixedAssignments ? SHADERBALL_STAGE_ORDER.filter((stage) =>
         new Set(fallbackFixedAssignments.values()).has(stage))
       : [];

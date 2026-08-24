@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "catalog_version": 1,
-  "document_id": "signal-weave-v1",
-  "effect_id": "signal-weave",
+  "document_id": "kaleidoscope-pent-bright-v1",
+  "effect_id": "kaleidoscope-pent-bright",
   "descriptor": {
     "graph": {
       "nodes": [
@@ -20,7 +20,7 @@
           "operator": "pullback.surface_project.v1",
           "policy": {
             "pre_lens_surface": "identity",
-            "lens": "glitch",
+            "lens": "pentagonal-prism-kaleidoscope",
             "post_lens_surface": "identity",
             "projection": "stereographic"
           }
@@ -31,8 +31,8 @@
           "operator": "pullback.planar_warp.v1",
           "policy": {
             "sequence": [
-              "wave-shear",
-              "identity"
+              "polar-chart-linear",
+              "wave-shear"
             ]
           }
         },
@@ -41,7 +41,7 @@
           "role": "source",
           "operator": "pullback.source.v1",
           "policy": {
-            "source": "grid"
+            "source": "primitive-lattice"
           }
         },
         {
@@ -64,7 +64,7 @@
             "brightness_envelope": "none"
           },
           "resources": [
-            "triadic-palette",
+            "analogous-palette",
             "hue-noise"
           ]
         }
@@ -94,53 +94,23 @@
     },
     "parameters": [
       {
-        "id": "pattern-freq",
-        "binding": "pattern.freq",
+        "id": "lattice-cell-scale",
+        "binding": "lattice.cell.scale",
         "classification": "preset",
         "storage": "binary32",
         "unit": "ratio",
         "domain": {
-          "minimum": 0.1,
-          "maximum": 64
+          "minimum": 0.015625,
+          "maximum": 8
         },
         "interpolation": {
-          "kind": "LINEAR"
+          "kind": "LOG_POSITIVE"
         },
         "default": 1
       },
       {
-        "id": "speed",
-        "binding": "speed",
-        "classification": "preset",
-        "storage": "binary32",
-        "unit": "turn-per-frame",
-        "domain": {
-          "minimum": 0,
-          "maximum": 0.5
-        },
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "default": 0
-      },
-      {
-        "id": "complexity",
-        "binding": "complexity",
-        "classification": "preset",
-        "storage": "binary32",
-        "unit": "ratio",
-        "domain": {
-          "minimum": 0,
-          "maximum": 3
-        },
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "default": 0
-      },
-      {
-        "id": "pattern-mix",
-        "binding": "pattern.mix",
+        "id": "lattice-shape",
+        "binding": "lattice.shape",
         "classification": "preset",
         "storage": "binary32",
         "unit": "ratio",
@@ -154,34 +124,34 @@
         "default": 0
       },
       {
-        "id": "drift",
-        "binding": "drift",
+        "id": "lattice-softness",
+        "binding": "lattice.softness",
         "classification": "preset",
         "storage": "binary32",
         "unit": "ratio",
         "domain": {
-          "minimum": 0,
-          "maximum": 1.25
+          "minimum": 0.0009765625,
+          "maximum": 1
         },
         "interpolation": {
-          "kind": "LINEAR"
+          "kind": "LOG_POSITIVE"
         },
-        "default": 0
+        "default": 0.05
       },
       {
-        "id": "source-angle-speed",
-        "binding": "source.angle.speed",
+        "id": "lattice-radius",
+        "binding": "lattice.radius",
         "classification": "preset",
         "storage": "binary32",
-        "unit": "turn-per-frame",
+        "unit": "ratio",
         "domain": {
-          "minimum": 0,
-          "maximum": 0.05000000074505806
+          "minimum": 0.015625,
+          "maximum": 0.49
         },
         "interpolation": {
-          "kind": "LINEAR"
+          "kind": "LOG_POSITIVE"
         },
-        "default": 0
+        "default": 0.25
       },
       {
         "id": "pole-fade",
@@ -229,8 +199,70 @@
         "default": 0
       },
       {
-        "id": "outer-strength",
-        "binding": "outer.strength",
+        "id": "outer-radial-scale",
+        "binding": "outer.radial.scale",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "ratio",
+        "domain": {
+          "minimum": 0.015625,
+          "maximum": 64
+        },
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
+        },
+        "default": 1
+      },
+      {
+        "id": "outer-radial-phase",
+        "binding": "outer.radial.phase",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "radian",
+        "domain": {
+          "minimum": -6.2831854820251465,
+          "maximum": 6.2831854820251465
+        },
+        "interpolation": {
+          "kind": "SHORTEST_PERIODIC",
+          "period": 6.2831854820251465
+        },
+        "default": 0
+      },
+      {
+        "id": "outer-angular-phase",
+        "binding": "outer.angular.phase",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "radian",
+        "domain": {
+          "minimum": -6.2831854820251465,
+          "maximum": 6.2831854820251465
+        },
+        "interpolation": {
+          "kind": "SHORTEST_PERIODIC",
+          "period": 6.2831854820251465
+        },
+        "default": 0
+      },
+      {
+        "id": "inner-speed",
+        "binding": "inner.speed",
+        "classification": "preset",
+        "storage": "binary32",
+        "unit": "turn-per-frame",
+        "domain": {
+          "minimum": -0.02,
+          "maximum": 0.02
+        },
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "default": 0
+      },
+      {
+        "id": "inner-strength",
+        "binding": "inner.strength",
         "classification": "preset",
         "storage": "binary32",
         "unit": "ratio",
@@ -244,8 +276,8 @@
         "default": 0
       },
       {
-        "id": "outer-frequency",
-        "binding": "outer.frequency",
+        "id": "inner-frequency",
+        "binding": "inner.frequency",
         "classification": "preset",
         "storage": "binary32",
         "unit": "ratio",
@@ -259,8 +291,8 @@
         "default": 1
       },
       {
-        "id": "outer-field-angle",
-        "binding": "outer.field.angle",
+        "id": "inner-field-angle",
+        "binding": "inner.field.angle",
         "classification": "preset",
         "storage": "binary32",
         "unit": "radian",
@@ -512,8 +544,8 @@
     ],
     "resources": [
       {
-        "id": "triadic-palette",
-        "kind": "generated-triadic-palette",
+        "id": "analogous-palette",
+        "kind": "generated-analogous-palette",
         "settings": {
           "hue_step": 159
         }
@@ -529,18 +561,20 @@
     "serialization": {
       "schema_version": 1,
       "fields": [
-        "pattern-freq",
-        "speed",
-        "complexity",
-        "pattern-mix",
-        "drift",
-        "source-angle-speed",
+        "lattice-cell-scale",
+        "lattice-shape",
+        "lattice-softness",
+        "lattice-radius",
         "pole-fade",
         "camera-wander",
         "outer-speed",
-        "outer-strength",
-        "outer-frequency",
-        "outer-field-angle",
+        "outer-radial-scale",
+        "outer-radial-phase",
+        "outer-angular-phase",
+        "inner-speed",
+        "inner-strength",
+        "inner-frequency",
+        "inner-field-angle",
         "palette-chroma",
         "palette-mapping",
         "mapping-frequency",
@@ -573,160 +607,40 @@
     "schema_version": 1,
     "presets": [
       {
-        "preset_id": "signal-weave",
-        "display_name": "Signal Weave",
+        "preset_id": "polar-wave",
+        "display_name": "Polar Wave",
         "values": {
-          "pattern-freq": 4.439,
-          "speed": 0.245,
-          "complexity": 0.5,
-          "pattern-mix": 0,
-          "drift": 0,
-          "source-angle-speed": 0,
-          "pole-fade": 1,
-          "camera-wander": 0.8,
-          "outer-speed": 0.015625,
-          "outer-strength": 0.5,
-          "outer-frequency": 1,
-          "outer-field-angle": 0,
-          "palette-chroma": 0.788,
+          "lattice-cell-scale": 0.774140596,
+          "lattice-shape": 1,
+          "lattice-softness": 0.377608389,
+          "lattice-radius": 0.290762514,
+          "pole-fade": 2.273,
+          "camera-wander": 1,
+          "outer-speed": 0.000343749998,
+          "outer-radial-scale": 1,
+          "outer-radial-phase": 0,
+          "outer-angular-phase": 0,
+          "inner-speed": 0.000999999931,
+          "inner-strength": 0,
+          "inner-frequency": 1,
+          "inner-field-angle": 0,
+          "palette-chroma": 1,
           "palette-mapping": "cup",
           "mapping-frequency": 1,
-          "mapping-phase": 0,
+          "mapping-phase": -0.165999994,
           "phase-oscillation-depth": 0,
           "phase-oscillation-speed": 0,
           "value-opacity-low": 1,
           "value-opacity-high": 1,
-          "hue-shift-amount": 0.292,
+          "hue-shift-amount": 0.268000007,
           "projection-spin-speed": 0,
-          "projection-wander": 0,
-          "hue-noise-scale": 0.6304219,
-          "hue-noise-speed": 0
-        }
-      },
-      {
-        "preset_id": "signal-weave-2",
-        "display_name": "Signal Weave 2",
-        "values": {
-          "pattern-freq": 3.1447,
-          "speed": 0.245,
-          "complexity": 0.5,
-          "pattern-mix": 0,
-          "drift": 0,
-          "source-angle-speed": 0,
-          "pole-fade": 1,
-          "camera-wander": 0.8,
-          "outer-speed": 0.00690625,
-          "outer-strength": 2.72,
-          "outer-frequency": 1,
-          "outer-field-angle": 0,
-          "palette-chroma": 0.788,
-          "palette-mapping": "cup",
-          "mapping-frequency": 1,
-          "mapping-phase": 0,
-          "phase-oscillation-depth": 0,
-          "phase-oscillation-speed": 0,
-          "value-opacity-low": 1,
-          "value-opacity-high": 1,
-          "hue-shift-amount": 0.292,
-          "projection-spin-speed": 0,
-          "projection-wander": 0,
-          "hue-noise-scale": 0.6304219,
-          "hue-noise-speed": 0
-        }
-      },
-      {
-        "preset_id": "signal-weave-3",
-        "display_name": "Signal Weave 3",
-        "values": {
-          "pattern-freq": 7.5227,
-          "speed": 0.245,
-          "complexity": 1.698,
-          "pattern-mix": 0,
-          "drift": 0,
-          "source-angle-speed": 0,
-          "pole-fade": 1,
-          "camera-wander": 0.8,
-          "outer-speed": 0.00690625,
-          "outer-strength": 0,
-          "outer-frequency": 1,
-          "outer-field-angle": 0,
-          "palette-chroma": 0.788,
-          "palette-mapping": "cup",
-          "mapping-frequency": 1,
-          "mapping-phase": 0,
-          "phase-oscillation-depth": 0,
-          "phase-oscillation-speed": 0,
-          "value-opacity-low": 1,
-          "value-opacity-high": 1,
-          "hue-shift-amount": 0.292,
-          "projection-spin-speed": 0,
-          "projection-wander": 0,
-          "hue-noise-scale": 0.6304219,
-          "hue-noise-speed": 0
-        }
-      },
-      {
-        "preset_id": "signal-weave-4",
-        "display_name": "Signal Weave 4",
-        "values": {
-          "pattern-freq": 8.8162,
-          "speed": 0.245,
-          "complexity": 1.698,
-          "pattern-mix": 0,
-          "drift": 0,
-          "source-angle-speed": 0,
-          "pole-fade": 1,
-          "camera-wander": 0.8,
-          "outer-speed": 0.00559375,
-          "outer-strength": 1.376,
-          "outer-frequency": 1,
-          "outer-field-angle": 0,
-          "palette-chroma": 0.788,
-          "palette-mapping": "cup",
-          "mapping-frequency": 1,
-          "mapping-phase": 0,
-          "phase-oscillation-depth": 0,
-          "phase-oscillation-speed": 0,
-          "value-opacity-low": 1,
-          "value-opacity-high": 1,
-          "hue-shift-amount": 0.292,
-          "projection-spin-speed": 0,
-          "projection-wander": 0,
-          "hue-noise-scale": 0.6304219,
+          "projection-wander": 1,
+          "hue-noise-scale": 2,
           "hue-noise-speed": 0
         }
       }
     ],
-    "edges": [
-      {
-        "from": "signal-weave",
-        "to": "signal-weave-2",
-        "path_policy": "parallel",
-        "easing": "EASE_IN_OUT_SIN",
-        "duration": 480
-      },
-      {
-        "from": "signal-weave-2",
-        "to": "signal-weave-3",
-        "path_policy": "parallel",
-        "easing": "EASE_IN_OUT_SIN",
-        "duration": 480
-      },
-      {
-        "from": "signal-weave-3",
-        "to": "signal-weave-4",
-        "path_policy": "parallel",
-        "easing": "EASE_IN_OUT_SIN",
-        "duration": 480
-      },
-      {
-        "from": "signal-weave-4",
-        "to": "signal-weave",
-        "path_policy": "parallel",
-        "easing": "EASE_IN_OUT_SIN",
-        "duration": 480
-      }
-    ],
+    "edges": [],
     "absent_edge_fallback": {
       "manual": "SNAP",
       "automatic": "REJECT",
@@ -736,21 +650,15 @@
     },
     "choreography": {
       "generated_order": [
-        "signal-weave",
-        "signal-weave-2",
-        "signal-weave-3",
-        "signal-weave-4"
+        "polar-wave"
       ],
       "dwell": {
-        "signal-weave": 600,
-        "signal-weave-2": 600,
-        "signal-weave-3": 600,
-        "signal-weave-4": 600
+        "polar-wave": 600
       }
     }
   },
   "effect_metadata": {
-    "display_name": "Signal Weave",
-    "description": "Glitch-folded grids pulled through an animated wave shear."
+    "display_name": "Kaleidoscope Pent Bright",
+    "description": "A polar lattice folded through a pentagonal prism."
   }
 }

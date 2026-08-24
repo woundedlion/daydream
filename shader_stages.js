@@ -7,8 +7,9 @@
  * Which pipeline stage each engine parameter of a shader effect belongs to, and
  * what a stage folder and its controls are called. Three schemas are recognized:
  * ShaderBall's selector-driven one, the versioned Fixed Shader snapshot, and the
- * composed CurlLattice and FacetGrid rosters. Name classification only, so the
- * taxonomy is readable and testable apart from the panel that renders it.
+ * composed LatticeMelt and KaleidoscopeSmooth rosters. Name classification
+ * only, so the taxonomy is readable and testable apart from the panel that
+ * renders it.
  */
 
 export const SHADERBALL_STAGE_ORDER = [
@@ -25,7 +26,7 @@ export const SHADERBALL_STAGE_ORDER = [
   'Coverage',
   'Colorize',
 ];
-export const CURL_LATTICE_STAGE_ORDER = [
+export const LATTICE_MELT_STAGE_ORDER = [
   'Camera',
   'Surface Noise',
   'Projection Frame',
@@ -33,7 +34,7 @@ export const CURL_LATTICE_STAGE_ORDER = [
   'Function',
   'Colorize',
 ];
-export const FACET_GRID_STAGE_ORDER = [
+export const KALEIDOSCOPE_SMOOTH_STAGE_ORDER = [
   'Camera',
   'Projection Frame',
   'Projection',
@@ -41,7 +42,7 @@ export const FACET_GRID_STAGE_ORDER = [
   'Function',
   'Colorize',
 ];
-export const CURL_LATTICE_STAGE_TITLES = new Map([
+export const LATTICE_MELT_STAGE_TITLES = new Map([
   ['Camera', 'Camera'],
   ['Surface Noise', 'Curl'],
   ['Projection Frame', 'Spin + Wander'],
@@ -49,7 +50,7 @@ export const CURL_LATTICE_STAGE_TITLES = new Map([
   ['Function', 'Primitive Lattice'],
   ['Colorize', 'Generated Triadic'],
 ]);
-export const FACET_GRID_STAGE_TITLES = new Map([
+export const KALEIDOSCOPE_SMOOTH_STAGE_TITLES = new Map([
   ['Camera', 'Camera'],
   ['Projection Frame', 'Spin + Wander'],
   ['Projection', 'Stereographic'],
@@ -126,7 +127,7 @@ const SHADERBALL_SIGNATURE = [
   'Function', 'Projection', 'Lens', 'Planar Warp 1', 'Planar Warp 2',
   'Signal Weight', 'Value Transfer', 'Coverage', 'Palette',
 ];
-const CURL_LATTICE_STAGE_BY_PARAMETER = new Map([
+const LATTICE_MELT_STAGE_BY_PARAMETER = new Map([
   ['Camera Wander', 'Camera'],
   ['Surface Noise Scale', 'Surface Noise'],
   ['Surface Noise Strength', 'Surface Noise'],
@@ -151,7 +152,7 @@ const CURL_LATTICE_STAGE_BY_PARAMETER = new Map([
   ['Hue Noise Scale', 'Colorize'],
   ['Hue Noise Speed', 'Colorize'],
 ]);
-const FACET_GRID_STAGE_BY_PARAMETER = new Map([
+const KALEIDOSCOPE_SMOOTH_STAGE_BY_PARAMETER = new Map([
   ['Camera Wander', 'Camera'],
   ['Projection Spin Speed', 'Projection Frame'],
   ['Projection Wander', 'Projection Frame'],
@@ -250,24 +251,24 @@ function stagesFrom(params, table) {
  * @param {Array<{name: string}>} params - Engine parameter definitions in stream order.
  * @returns {Map<string, string>|null} Parameter name to fixed pipeline stage.
  */
-export function curlLatticeStageAssignments(params) {
+export function latticeMeltStageAssignments(params) {
   const names = new Set(params.map((parameter) => parameter.name));
-  if ([...CURL_LATTICE_STAGE_BY_PARAMETER.keys()].some((name) => !names.has(name))) {
+  if ([...LATTICE_MELT_STAGE_BY_PARAMETER.keys()].some((name) => !names.has(name))) {
     return null;
   }
-  return stagesFrom(params, CURL_LATTICE_STAGE_BY_PARAMETER);
+  return stagesFrom(params, LATTICE_MELT_STAGE_BY_PARAMETER);
 }
 
 /**
  * @param {Array<{name: string}>} params - Engine parameter definitions in stream order.
  * @returns {Map<string, string>|null} Parameter name to fixed pipeline stage.
  */
-export function facetGridStageAssignments(params) {
+export function kaleidoscopeSmoothStageAssignments(params) {
   const names = new Set(params.map((parameter) => parameter.name));
-  if ([...FACET_GRID_STAGE_BY_PARAMETER.keys()].some((name) => !names.has(name))) {
+  if ([...KALEIDOSCOPE_SMOOTH_STAGE_BY_PARAMETER.keys()].some((name) => !names.has(name))) {
     return null;
   }
-  return stagesFrom(params, FACET_GRID_STAGE_BY_PARAMETER);
+  return stagesFrom(params, KALEIDOSCOPE_SMOOTH_STAGE_BY_PARAMETER);
 }
 
 /**

@@ -8,15 +8,15 @@
       },
       {
         "label": "lens",
-        "operator": "sphere.lens.kaleidoscope.v2"
+        "operator": "sphere.lens.glitch.v2"
       },
       {
         "label": "project",
         "operator": "project.stereographic.v2"
       },
       {
-        "label": "warp2",
-        "operator": "warp.mirror-tile.v2"
+        "label": "warp1",
+        "operator": "warp.wave-shear.v2"
       },
       {
         "label": "sample",
@@ -30,7 +30,7 @@
     "parameters": [
       {
         "classification": "preset",
-        "default": 1,
+        "default": 0,
         "domain": {
           "maximum": 1,
           "minimum": 0
@@ -40,7 +40,7 @@
           "kind": "LINEAR"
         },
         "storage": "binary32",
-        "unit": "blend"
+        "unit": "ratio"
       },
       {
         "classification": "preset",
@@ -60,7 +60,7 @@
       },
       {
         "classification": "preset",
-        "default": 1.472156286239624,
+        "default": 1,
         "domain": {
           "maximum": 8,
           "minimum": 0.015625
@@ -88,7 +88,7 @@
       },
       {
         "classification": "preset",
-        "default": 0.3659999966621399,
+        "default": 0,
         "domain": {
           "maximum": 1,
           "minimum": -1
@@ -98,7 +98,7 @@
           "kind": "LINEAR"
         },
         "storage": "binary32",
-        "unit": "turn"
+        "unit": "ratio"
       },
       {
         "classification": "preset",
@@ -121,14 +121,14 @@
         "default": 1,
         "domain": {
           "maximum": 32,
-          "minimum": 1
+          "minimum": 0.009999999776482582
         },
         "id": "colorize.mapping-frequency",
         "interpolation": {
           "kind": "LOG_POSITIVE"
         },
         "storage": "binary32",
-        "unit": "cycles"
+        "unit": "ratio"
       },
       {
         "classification": "preset",
@@ -142,11 +142,11 @@
           "kind": "LINEAR"
         },
         "storage": "binary32",
-        "unit": "turn"
+        "unit": "ratio"
       },
       {
         "classification": "preset",
-        "default": 1,
+        "default": 0.6200000047683716,
         "domain": {
           "maximum": 1,
           "minimum": 0
@@ -160,7 +160,7 @@
       },
       {
         "classification": "preset",
-        "default": "cup",
+        "default": "linear",
         "domain": {
           "values": [
             "cup",
@@ -178,7 +178,7 @@
       },
       {
         "classification": "preset",
-        "default": "analogous",
+        "default": "triadic",
         "domain": {
           "values": [
             "triadic",
@@ -205,14 +205,14 @@
           "kind": "LINEAR"
         },
         "storage": "binary32",
-        "unit": "turn"
+        "unit": "ratio"
       },
       {
         "classification": "preset",
         "default": 0,
         "domain": {
-          "maximum": 0.009999999776482582,
-          "minimum": -0.009999999776482582
+          "maximum": 0.019999999552965164,
+          "minimum": -0.019999999552965164
         },
         "id": "colorize.phase-oscillation-speed",
         "interpolation": {
@@ -233,7 +233,7 @@
           "kind": "LINEAR"
         },
         "storage": "binary32",
-        "unit": "opacity"
+        "unit": "ratio"
       },
       {
         "classification": "preset",
@@ -247,30 +247,7 @@
           "kind": "LINEAR"
         },
         "storage": "binary32",
-        "unit": "opacity"
-      },
-      {
-        "classification": "preset",
-        "default": "dodecahedral",
-        "domain": {
-          "values": [
-            "azimuthal",
-            "tetrahedral",
-            "octahedral",
-            "dodecahedral",
-            "triangular-prism",
-            "square-prism",
-            "pentagonal-prism",
-            "hexagonal-prism",
-            "octagonal-prism"
-          ]
-        },
-        "id": "lens.symmetry",
-        "interpolation": {
-          "kind": "MIXED_ENUM"
-        },
-        "storage": "enum8",
-        "unit": "mode"
+        "unit": "ratio"
       },
       {
         "classification": "preset",
@@ -284,11 +261,11 @@
           "kind": "LINEAR"
         },
         "storage": "binary32",
-        "unit": "radian-per-frame"
+        "unit": "turn-per-frame"
       },
       {
         "classification": "preset",
-        "default": 1,
+        "default": 0,
         "domain": {
           "maximum": 1,
           "minimum": 0
@@ -298,11 +275,11 @@
           "kind": "LINEAR"
         },
         "storage": "binary32",
-        "unit": "blend"
+        "unit": "ratio"
       },
       {
         "classification": "preset",
-        "default": 3.431999921798706,
+        "default": 1,
         "domain": {
           "maximum": 20,
           "minimum": 1
@@ -316,7 +293,7 @@
       },
       {
         "classification": "preset",
-        "default": 0.026999998837709427,
+        "default": 0,
         "domain": {
           "maximum": 0.05000000074505806,
           "minimum": 0
@@ -326,11 +303,11 @@
           "kind": "LINEAR"
         },
         "storage": "binary32",
-        "unit": "radian-per-frame"
+        "unit": "turn-per-frame"
       },
       {
         "classification": "preset",
-        "default": 0.5130000114440918,
+        "default": 0,
         "domain": {
           "maximum": 3,
           "minimum": 0
@@ -362,7 +339,7 @@
       },
       {
         "classification": "preset",
-        "default": 0.800000011920929,
+        "default": 0,
         "domain": {
           "maximum": 1.25,
           "minimum": 0
@@ -376,7 +353,7 @@
       },
       {
         "classification": "preset",
-        "default": 2.8262999057769775,
+        "default": 1,
         "domain": {
           "maximum": 64,
           "minimum": 0.10000000149011612
@@ -386,7 +363,7 @@
           "kind": "LINEAR"
         },
         "storage": "binary32",
-        "unit": "cycles"
+        "unit": "ratio"
       },
       {
         "classification": "preset",
@@ -400,7 +377,7 @@
           "kind": "LINEAR"
         },
         "storage": "binary32",
-        "unit": "blend"
+        "unit": "ratio"
       },
       {
         "classification": "preset",
@@ -414,7 +391,7 @@
           "kind": "LINEAR"
         },
         "storage": "binary32",
-        "unit": "radian-per-frame"
+        "unit": "turn-per-frame"
       },
       {
         "classification": "preset",
@@ -434,68 +411,12 @@
       },
       {
         "classification": "preset",
-        "default": 1,
-        "domain": {
-          "maximum": 8,
-          "minimum": 0.015625
-        },
-        "id": "warp2.cell-x",
-        "interpolation": {
-          "kind": "LOG_POSITIVE"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
-        "default": 0.9977031350135803,
-        "domain": {
-          "maximum": 8,
-          "minimum": 0.015625
-        },
-        "id": "warp2.cell-y",
-        "interpolation": {
-          "kind": "LOG_POSITIVE"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
-        "default": 0,
-        "domain": {
-          "maximum": 8,
-          "minimum": -8
-        },
-        "id": "warp2.offset-x",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
-        "default": 0,
-        "domain": {
-          "maximum": 8,
-          "minimum": -8
-        },
-        "id": "warp2.offset-y",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
         "default": 0,
         "domain": {
           "maximum": 6.2831854820251465,
-          "minimum": 0
+          "minimum": -6.2831854820251465
         },
-        "id": "warp2.rotation",
+        "id": "warp1.field-angle",
         "interpolation": {
           "kind": "SHORTEST_PERIODIC",
           "period": 6.2831854820251465
@@ -505,17 +426,45 @@
       },
       {
         "classification": "preset",
-        "default": 0.00013000000035390258,
+        "default": 1,
+        "domain": {
+          "maximum": 32,
+          "minimum": 0.009999999776482582
+        },
+        "id": "warp1.frequency",
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
+        "default": 0,
         "domain": {
           "maximum": 0.019999999552965164,
           "minimum": -0.019999999552965164
         },
-        "id": "warp2.speed",
+        "id": "warp1.speed",
         "interpolation": {
           "kind": "LINEAR"
         },
         "storage": "binary32",
         "unit": "turn-per-frame"
+      },
+      {
+        "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 30,
+          "minimum": -30
+        },
+        "id": "warp1.strength",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
       }
     ],
     "path_policies": [
@@ -541,7 +490,6 @@
         "colorize.phase-oscillation-speed",
         "colorize.value-opacity-high",
         "colorize.value-opacity-low",
-        "lens.symmetry",
         "project.projection-spin-speed",
         "project.projection-wander",
         "project.singularity-fade",
@@ -553,21 +501,19 @@
         "sample.pattern-mix",
         "sample.speed",
         "sample.weight-mode",
-        "warp2.cell-x",
-        "warp2.cell-y",
-        "warp2.offset-x",
-        "warp2.offset-y",
-        "warp2.rotation",
-        "warp2.speed"
+        "warp1.field-angle",
+        "warp1.frequency",
+        "warp1.speed",
+        "warp1.strength"
       ],
-      "schema_version": 3
+      "schema_version": 1
     }
   },
-  "document_id": "facet-grid-v1",
-  "effect_id": "facet-grid",
+  "document_id": "alien-brain-v1",
+  "effect_id": "alien-brain",
   "effect_metadata": {
-    "description": "Mirrored grids folded through a dodecahedral stereographic lens.",
-    "display_name": "Facet Grid"
+    "description": "Glitch-folded grids pulled through an animated wave shear.",
+    "display_name": "Alien Brain"
   },
   "preset_bank": {
     "absent_edge_fallback": {
@@ -579,203 +525,191 @@
     },
     "choreography": {
       "dwell": {
-        "coupled-grid": 600,
-        "direct-grid": 600,
-        "double-map": 600,
-        "stretched-grid": 600
+        "alien-brain": 600,
+        "alien-brain-2": 600,
+        "alien-brain-3": 600,
+        "alien-brain-4": 600
       },
       "generated_order": [
-        "coupled-grid",
-        "direct-grid",
-        "double-map",
-        "stretched-grid"
+        "alien-brain",
+        "alien-brain-2",
+        "alien-brain-3",
+        "alien-brain-4"
       ]
     },
     "edges": [
       {
         "duration": 480,
         "easing": "EASE_IN_OUT_SIN",
-        "from": "coupled-grid",
+        "from": "alien-brain-2",
         "path_policy": "parallel",
-        "to": "direct-grid"
+        "to": "alien-brain-3"
       },
       {
         "duration": 480,
         "easing": "EASE_IN_OUT_SIN",
-        "from": "direct-grid",
+        "from": "alien-brain-3",
         "path_policy": "parallel",
-        "to": "double-map"
+        "to": "alien-brain-4"
       },
       {
         "duration": 480,
         "easing": "EASE_IN_OUT_SIN",
-        "from": "double-map",
+        "from": "alien-brain-4",
         "path_policy": "parallel",
-        "to": "stretched-grid"
+        "to": "alien-brain"
       },
       {
         "duration": 480,
         "easing": "EASE_IN_OUT_SIN",
-        "from": "stretched-grid",
+        "from": "alien-brain",
         "path_policy": "parallel",
-        "to": "coupled-grid"
+        "to": "alien-brain-2"
       }
     ],
     "presets": [
       {
-        "display_name": "Coupled Grid",
-        "preset_id": "coupled-grid",
+        "display_name": "Alien Brain",
+        "preset_id": "alien-brain",
         "values": {
-          "camera.wander": 1,
+          "camera.wander": 0.800000011920929,
           "colorize.brightness-envelope": "none",
-          "colorize.hue-noise-scale": 1.472156286239624,
+          "colorize.hue-noise-scale": 0.6304218769073486,
           "colorize.hue-noise-speed": 0,
-          "colorize.hue-shift-amount": 0.3659999966621399,
+          "colorize.hue-shift-amount": 0.2919999957084656,
           "colorize.hue-shift-mode": "noise",
           "colorize.mapping-frequency": 1,
           "colorize.mapping-phase": 0,
-          "colorize.palette-chroma": 1,
+          "colorize.palette-chroma": 0.7879999876022339,
           "colorize.palette-mapping": "cup",
-          "colorize.palette-mode": "analogous",
+          "colorize.palette-mode": "triadic",
           "colorize.phase-oscillation-depth": 0,
           "colorize.phase-oscillation-speed": 0,
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
-          "lens.symmetry": "dodecahedral",
           "project.projection-spin-speed": 0,
-          "project.projection-wander": 1,
-          "project.singularity-fade": 3.431999921798706,
-          "sample.angle-speed": 0.026999998837709427,
-          "sample.complexity": 0.5130000114440918,
+          "project.projection-wander": 0,
+          "project.singularity-fade": 1,
+          "sample.angle-speed": 0,
+          "sample.complexity": 0.5,
           "sample.coverage-mode": "weight-squared",
-          "sample.drift": 0.800000011920929,
-          "sample.pattern-freq": 2.8262999057769775,
+          "sample.drift": 0,
+          "sample.pattern-freq": 4.439000129699707,
           "sample.pattern-mix": 0,
-          "sample.speed": 0,
+          "sample.speed": 0.24500000476837158,
           "sample.weight-mode": "projection",
-          "warp2.cell-x": 1,
-          "warp2.cell-y": 0.9977031350135803,
-          "warp2.offset-x": 0,
-          "warp2.offset-y": 0,
-          "warp2.rotation": 0,
-          "warp2.speed": 0.00013000000035390258
+          "warp1.field-angle": 0,
+          "warp1.frequency": 1,
+          "warp1.speed": 0.015625,
+          "warp1.strength": 0.5
         }
       },
       {
-        "display_name": "Direct Grid",
-        "preset_id": "direct-grid",
+        "display_name": "Alien Brain 2",
+        "preset_id": "alien-brain-2",
         "values": {
-          "camera.wander": 1,
+          "camera.wander": 0.800000011920929,
           "colorize.brightness-envelope": "none",
-          "colorize.hue-noise-scale": 1.472156286239624,
+          "colorize.hue-noise-scale": 0.6304218769073486,
           "colorize.hue-noise-speed": 0,
-          "colorize.hue-shift-amount": 0.3659999966621399,
+          "colorize.hue-shift-amount": 0.2919999957084656,
           "colorize.hue-shift-mode": "noise",
           "colorize.mapping-frequency": 1,
           "colorize.mapping-phase": 0,
-          "colorize.palette-chroma": 1,
+          "colorize.palette-chroma": 0.7879999876022339,
           "colorize.palette-mapping": "cup",
-          "colorize.palette-mode": "analogous",
+          "colorize.palette-mode": "triadic",
           "colorize.phase-oscillation-depth": 0,
           "colorize.phase-oscillation-speed": 0,
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
-          "lens.symmetry": "dodecahedral",
           "project.projection-spin-speed": 0,
-          "project.projection-wander": 1,
-          "project.singularity-fade": 3.431999921798706,
-          "sample.angle-speed": 0.026999998837709427,
-          "sample.complexity": 3,
+          "project.projection-wander": 0,
+          "project.singularity-fade": 1,
+          "sample.angle-speed": 0,
+          "sample.complexity": 0.5,
           "sample.coverage-mode": "weight-squared",
-          "sample.drift": 0.800000011920929,
-          "sample.pattern-freq": 2.8262999057769775,
-          "sample.pattern-mix": 1,
-          "sample.speed": 0,
+          "sample.drift": 0,
+          "sample.pattern-freq": 3.144700050354004,
+          "sample.pattern-mix": 0,
+          "sample.speed": 0.24500000476837158,
           "sample.weight-mode": "projection",
-          "warp2.cell-x": 1,
-          "warp2.cell-y": 0.9977031350135803,
-          "warp2.offset-x": 0,
-          "warp2.offset-y": 0,
-          "warp2.rotation": 0,
-          "warp2.speed": 0.00013000000035390258
+          "warp1.field-angle": 0,
+          "warp1.frequency": 1,
+          "warp1.speed": 0.006906250026077032,
+          "warp1.strength": 2.7200000286102295
         }
       },
       {
-        "display_name": "Double Map",
-        "preset_id": "double-map",
+        "display_name": "Alien Brain 3",
+        "preset_id": "alien-brain-3",
         "values": {
-          "camera.wander": 1,
+          "camera.wander": 0.800000011920929,
           "colorize.brightness-envelope": "none",
-          "colorize.hue-noise-scale": 1.472156286239624,
+          "colorize.hue-noise-scale": 0.6304218769073486,
           "colorize.hue-noise-speed": 0,
-          "colorize.hue-shift-amount": 0.3659999966621399,
+          "colorize.hue-shift-amount": 0.2919999957084656,
           "colorize.hue-shift-mode": "noise",
-          "colorize.mapping-frequency": 2,
+          "colorize.mapping-frequency": 1,
           "colorize.mapping-phase": 0,
-          "colorize.palette-chroma": 1,
+          "colorize.palette-chroma": 0.7879999876022339,
           "colorize.palette-mapping": "cup",
-          "colorize.palette-mode": "analogous",
+          "colorize.palette-mode": "triadic",
           "colorize.phase-oscillation-depth": 0,
           "colorize.phase-oscillation-speed": 0,
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
-          "lens.symmetry": "dodecahedral",
           "project.projection-spin-speed": 0,
-          "project.projection-wander": 0.16500000655651093,
-          "project.singularity-fade": 3.431999921798706,
-          "sample.angle-speed": 0.026999998837709427,
-          "sample.complexity": 3,
+          "project.projection-wander": 0,
+          "project.singularity-fade": 1,
+          "sample.angle-speed": 0,
+          "sample.complexity": 1.6979999542236328,
           "sample.coverage-mode": "weight-squared",
-          "sample.drift": 0.800000011920929,
-          "sample.pattern-freq": 3.940700054168701,
-          "sample.pattern-mix": 1,
-          "sample.speed": 0,
+          "sample.drift": 0,
+          "sample.pattern-freq": 7.52269983291626,
+          "sample.pattern-mix": 0,
+          "sample.speed": 0.24500000476837158,
           "sample.weight-mode": "projection",
-          "warp2.cell-x": 1,
-          "warp2.cell-y": 0.9977031350135803,
-          "warp2.offset-x": 0,
-          "warp2.offset-y": 0,
-          "warp2.rotation": 0,
-          "warp2.speed": 0.00013000000035390258
+          "warp1.field-angle": 0,
+          "warp1.frequency": 1,
+          "warp1.speed": 0.006906250026077032,
+          "warp1.strength": 0
         }
       },
       {
-        "display_name": "Stretched Grid",
-        "preset_id": "stretched-grid",
+        "display_name": "Alien Brain 4",
+        "preset_id": "alien-brain-4",
         "values": {
-          "camera.wander": 1,
+          "camera.wander": 0.800000011920929,
           "colorize.brightness-envelope": "none",
-          "colorize.hue-noise-scale": 1.472156286239624,
+          "colorize.hue-noise-scale": 0.6304218769073486,
           "colorize.hue-noise-speed": 0,
-          "colorize.hue-shift-amount": 0.3659999966621399,
+          "colorize.hue-shift-amount": 0.2919999957084656,
           "colorize.hue-shift-mode": "noise",
-          "colorize.mapping-frequency": 1.5579999685287476,
+          "colorize.mapping-frequency": 1,
           "colorize.mapping-phase": 0,
-          "colorize.palette-chroma": 1,
+          "colorize.palette-chroma": 0.7879999876022339,
           "colorize.palette-mapping": "cup",
-          "colorize.palette-mode": "analogous",
+          "colorize.palette-mode": "triadic",
           "colorize.phase-oscillation-depth": 0,
           "colorize.phase-oscillation-speed": 0,
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
-          "lens.symmetry": "dodecahedral",
           "project.projection-spin-speed": 0,
-          "project.projection-wander": 0.16500000655651093,
-          "project.singularity-fade": 3.431999921798706,
-          "sample.angle-speed": 0.026999998837709427,
-          "sample.complexity": 3,
+          "project.projection-wander": 0,
+          "project.singularity-fade": 1,
+          "sample.angle-speed": 0,
+          "sample.complexity": 1.6979999542236328,
           "sample.coverage-mode": "weight-squared",
-          "sample.drift": 0.800000011920929,
-          "sample.pattern-freq": 2.905900001525879,
-          "sample.pattern-mix": 1,
-          "sample.speed": 0,
+          "sample.drift": 0,
+          "sample.pattern-freq": 8.816200256347656,
+          "sample.pattern-mix": 0,
+          "sample.speed": 0.24500000476837158,
           "sample.weight-mode": "projection",
-          "warp2.cell-x": 0.22321875393390656,
-          "warp2.cell-y": 5.085702896118164,
-          "warp2.offset-x": 0,
-          "warp2.offset-y": 0,
-          "warp2.rotation": 3.455751895904541,
-          "warp2.speed": 0.0027299998328089714
+          "warp1.field-angle": 0,
+          "warp1.frequency": 1,
+          "warp1.speed": 0.005593750160187483,
+          "warp1.strength": 1.3760000467300415
         }
       }
     ],

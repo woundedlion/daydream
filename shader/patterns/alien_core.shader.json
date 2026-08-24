@@ -12,11 +12,11 @@
       },
       {
         "label": "project",
-        "operator": "project.stereographic.v2"
+        "operator": "project.gnomonic.v2"
       },
       {
         "label": "warp1",
-        "operator": "warp.wave-shear.v2"
+        "operator": "warp.mirror-tile.v2"
       },
       {
         "label": "sample",
@@ -251,31 +251,20 @@
       },
       {
         "classification": "preset",
-        "default": 0,
+        "default": "folded",
         "domain": {
-          "maximum": 0.05000000074505806,
-          "minimum": 0
+          "values": [
+            "folded",
+            "front",
+            "back"
+          ]
         },
-        "id": "project.projection-spin-speed",
+        "id": "project.hemisphere",
         "interpolation": {
-          "kind": "LINEAR"
+          "kind": "MIXED_ENUM"
         },
-        "storage": "binary32",
-        "unit": "turn-per-frame"
-      },
-      {
-        "classification": "preset",
-        "default": 0,
-        "domain": {
-          "maximum": 1,
-          "minimum": 0
-        },
-        "id": "project.projection-wander",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
+        "storage": "enum8",
+        "unit": "mode"
       },
       {
         "classification": "preset",
@@ -321,7 +310,7 @@
       },
       {
         "classification": "preset",
-        "default": "weight-squared",
+        "default": "edge-fade",
         "domain": {
           "values": [
             "none",
@@ -345,6 +334,20 @@
           "minimum": 0
         },
         "id": "sample.drift",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
+        "default": 0.10000000149011612,
+        "domain": {
+          "maximum": 1,
+          "minimum": 0
+        },
+        "id": "sample.edge-width",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -411,32 +414,74 @@
       },
       {
         "classification": "preset",
+        "default": 1,
+        "domain": {
+          "maximum": 8,
+          "minimum": 0.015625
+        },
+        "id": "warp1.cell-x",
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
+        "default": 1,
+        "domain": {
+          "maximum": 8,
+          "minimum": 0.015625
+        },
+        "id": "warp1.cell-y",
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 8,
+          "minimum": -8
+        },
+        "id": "warp1.offset-x",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 8,
+          "minimum": -8
+        },
+        "id": "warp1.offset-y",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
         "default": 0,
         "domain": {
           "maximum": 6.2831854820251465,
           "minimum": -6.2831854820251465
         },
-        "id": "warp1.field-angle",
+        "id": "warp1.rotation",
         "interpolation": {
           "kind": "SHORTEST_PERIODIC",
           "period": 6.2831854820251465
         },
         "storage": "binary32",
         "unit": "radian"
-      },
-      {
-        "classification": "preset",
-        "default": 1,
-        "domain": {
-          "maximum": 32,
-          "minimum": 0.009999999776482582
-        },
-        "id": "warp1.frequency",
-        "interpolation": {
-          "kind": "LOG_POSITIVE"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
       },
       {
         "classification": "preset",
@@ -451,20 +496,6 @@
         },
         "storage": "binary32",
         "unit": "turn-per-frame"
-      },
-      {
-        "classification": "preset",
-        "default": 0,
-        "domain": {
-          "maximum": 30,
-          "minimum": -30
-        },
-        "id": "warp1.strength",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
       }
     ],
     "path_policies": [
@@ -490,30 +521,32 @@
         "colorize.phase-oscillation-speed",
         "colorize.value-opacity-high",
         "colorize.value-opacity-low",
-        "project.projection-spin-speed",
-        "project.projection-wander",
+        "project.hemisphere",
         "project.singularity-fade",
         "sample.angle-speed",
         "sample.complexity",
         "sample.coverage-mode",
         "sample.drift",
+        "sample.edge-width",
         "sample.pattern-freq",
         "sample.pattern-mix",
         "sample.speed",
         "sample.weight-mode",
-        "warp1.field-angle",
-        "warp1.frequency",
-        "warp1.speed",
-        "warp1.strength"
+        "warp1.cell-x",
+        "warp1.cell-y",
+        "warp1.offset-x",
+        "warp1.offset-y",
+        "warp1.rotation",
+        "warp1.speed"
       ],
       "schema_version": 1
     }
   },
-  "document_id": "signal-weave-v1",
-  "effect_id": "signal-weave",
+  "document_id": "alien-core-v1",
+  "effect_id": "alien-core",
   "effect_metadata": {
-    "description": "Glitch-folded grids pulled through an animated wave shear.",
-    "display_name": "Signal Weave"
+    "description": "A mirrored grid folded by the glitch lens.",
+    "display_name": "Alien Core"
   },
   "preset_bank": {
     "absent_edge_fallback": {
@@ -525,191 +558,50 @@
     },
     "choreography": {
       "dwell": {
-        "signal-weave": 600,
-        "signal-weave-2": 600,
-        "signal-weave-3": 600,
-        "signal-weave-4": 600
+        "folded-glitch": 600
       },
       "generated_order": [
-        "signal-weave",
-        "signal-weave-2",
-        "signal-weave-3",
-        "signal-weave-4"
+        "folded-glitch"
       ]
     },
-    "edges": [
-      {
-        "duration": 480,
-        "easing": "EASE_IN_OUT_SIN",
-        "from": "signal-weave-2",
-        "path_policy": "parallel",
-        "to": "signal-weave-3"
-      },
-      {
-        "duration": 480,
-        "easing": "EASE_IN_OUT_SIN",
-        "from": "signal-weave-3",
-        "path_policy": "parallel",
-        "to": "signal-weave-4"
-      },
-      {
-        "duration": 480,
-        "easing": "EASE_IN_OUT_SIN",
-        "from": "signal-weave-4",
-        "path_policy": "parallel",
-        "to": "signal-weave"
-      },
-      {
-        "duration": 480,
-        "easing": "EASE_IN_OUT_SIN",
-        "from": "signal-weave",
-        "path_policy": "parallel",
-        "to": "signal-weave-2"
-      }
-    ],
+    "edges": [],
     "presets": [
       {
-        "display_name": "Signal Weave",
-        "preset_id": "signal-weave",
+        "display_name": "Folded Glitch",
+        "preset_id": "folded-glitch",
         "values": {
-          "camera.wander": 0.800000011920929,
+          "camera.wander": 1,
           "colorize.brightness-envelope": "none",
-          "colorize.hue-noise-scale": 0.6304218769073486,
+          "colorize.hue-noise-scale": 1,
           "colorize.hue-noise-speed": 0,
-          "colorize.hue-shift-amount": 0.2919999957084656,
+          "colorize.hue-shift-amount": 0,
           "colorize.hue-shift-mode": "noise",
           "colorize.mapping-frequency": 1,
           "colorize.mapping-phase": 0,
-          "colorize.palette-chroma": 0.7879999876022339,
-          "colorize.palette-mapping": "cup",
+          "colorize.palette-chroma": 0.6200000047683716,
+          "colorize.palette-mapping": "linear",
           "colorize.palette-mode": "triadic",
           "colorize.phase-oscillation-depth": 0,
           "colorize.phase-oscillation-speed": 0,
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
-          "project.projection-spin-speed": 0,
-          "project.projection-wander": 0,
-          "project.singularity-fade": 1,
+          "project.hemisphere": "folded",
+          "project.singularity-fade": 1.399999976158142,
           "sample.angle-speed": 0,
-          "sample.complexity": 0.5,
-          "sample.coverage-mode": "weight-squared",
-          "sample.drift": 0,
-          "sample.pattern-freq": 4.439000129699707,
-          "sample.pattern-mix": 0,
-          "sample.speed": 0.24500000476837158,
+          "sample.complexity": 0,
+          "sample.coverage-mode": "edge-fade",
+          "sample.drift": 1,
+          "sample.edge-width": 0.5,
+          "sample.pattern-freq": 3.565000057220459,
+          "sample.pattern-mix": 1,
+          "sample.speed": 0.23499999940395355,
           "sample.weight-mode": "projection",
-          "warp1.field-angle": 0,
-          "warp1.frequency": 1,
-          "warp1.speed": 0.015625,
-          "warp1.strength": 0.5
-        }
-      },
-      {
-        "display_name": "Signal Weave 2",
-        "preset_id": "signal-weave-2",
-        "values": {
-          "camera.wander": 0.800000011920929,
-          "colorize.brightness-envelope": "none",
-          "colorize.hue-noise-scale": 0.6304218769073486,
-          "colorize.hue-noise-speed": 0,
-          "colorize.hue-shift-amount": 0.2919999957084656,
-          "colorize.hue-shift-mode": "noise",
-          "colorize.mapping-frequency": 1,
-          "colorize.mapping-phase": 0,
-          "colorize.palette-chroma": 0.7879999876022339,
-          "colorize.palette-mapping": "cup",
-          "colorize.palette-mode": "triadic",
-          "colorize.phase-oscillation-depth": 0,
-          "colorize.phase-oscillation-speed": 0,
-          "colorize.value-opacity-high": 1,
-          "colorize.value-opacity-low": 1,
-          "project.projection-spin-speed": 0,
-          "project.projection-wander": 0,
-          "project.singularity-fade": 1,
-          "sample.angle-speed": 0,
-          "sample.complexity": 0.5,
-          "sample.coverage-mode": "weight-squared",
-          "sample.drift": 0,
-          "sample.pattern-freq": 3.144700050354004,
-          "sample.pattern-mix": 0,
-          "sample.speed": 0.24500000476837158,
-          "sample.weight-mode": "projection",
-          "warp1.field-angle": 0,
-          "warp1.frequency": 1,
-          "warp1.speed": 0.006906250026077032,
-          "warp1.strength": 2.7200000286102295
-        }
-      },
-      {
-        "display_name": "Signal Weave 3",
-        "preset_id": "signal-weave-3",
-        "values": {
-          "camera.wander": 0.800000011920929,
-          "colorize.brightness-envelope": "none",
-          "colorize.hue-noise-scale": 0.6304218769073486,
-          "colorize.hue-noise-speed": 0,
-          "colorize.hue-shift-amount": 0.2919999957084656,
-          "colorize.hue-shift-mode": "noise",
-          "colorize.mapping-frequency": 1,
-          "colorize.mapping-phase": 0,
-          "colorize.palette-chroma": 0.7879999876022339,
-          "colorize.palette-mapping": "cup",
-          "colorize.palette-mode": "triadic",
-          "colorize.phase-oscillation-depth": 0,
-          "colorize.phase-oscillation-speed": 0,
-          "colorize.value-opacity-high": 1,
-          "colorize.value-opacity-low": 1,
-          "project.projection-spin-speed": 0,
-          "project.projection-wander": 0,
-          "project.singularity-fade": 1,
-          "sample.angle-speed": 0,
-          "sample.complexity": 1.6979999542236328,
-          "sample.coverage-mode": "weight-squared",
-          "sample.drift": 0,
-          "sample.pattern-freq": 7.52269983291626,
-          "sample.pattern-mix": 0,
-          "sample.speed": 0.24500000476837158,
-          "sample.weight-mode": "projection",
-          "warp1.field-angle": 0,
-          "warp1.frequency": 1,
-          "warp1.speed": 0.006906250026077032,
-          "warp1.strength": 0
-        }
-      },
-      {
-        "display_name": "Signal Weave 4",
-        "preset_id": "signal-weave-4",
-        "values": {
-          "camera.wander": 0.800000011920929,
-          "colorize.brightness-envelope": "none",
-          "colorize.hue-noise-scale": 0.6304218769073486,
-          "colorize.hue-noise-speed": 0,
-          "colorize.hue-shift-amount": 0.2919999957084656,
-          "colorize.hue-shift-mode": "noise",
-          "colorize.mapping-frequency": 1,
-          "colorize.mapping-phase": 0,
-          "colorize.palette-chroma": 0.7879999876022339,
-          "colorize.palette-mapping": "cup",
-          "colorize.palette-mode": "triadic",
-          "colorize.phase-oscillation-depth": 0,
-          "colorize.phase-oscillation-speed": 0,
-          "colorize.value-opacity-high": 1,
-          "colorize.value-opacity-low": 1,
-          "project.projection-spin-speed": 0,
-          "project.projection-wander": 0,
-          "project.singularity-fade": 1,
-          "sample.angle-speed": 0,
-          "sample.complexity": 1.6979999542236328,
-          "sample.coverage-mode": "weight-squared",
-          "sample.drift": 0,
-          "sample.pattern-freq": 8.816200256347656,
-          "sample.pattern-mix": 0,
-          "sample.speed": 0.24500000476837158,
-          "sample.weight-mode": "projection",
-          "warp1.field-angle": 0,
-          "warp1.frequency": 1,
-          "warp1.speed": 0.005593750160187483,
-          "warp1.strength": 1.3760000467300415
+          "warp1.cell-x": 5.381124973297119,
+          "warp1.cell-y": 1,
+          "warp1.offset-x": 1.343999981880188,
+          "warp1.offset-y": -1.4559999704360962,
+          "warp1.rotation": 0.29530972242355347,
+          "warp1.speed": 0
         }
       }
     ],
