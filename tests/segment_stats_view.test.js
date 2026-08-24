@@ -6,12 +6,20 @@
 // Run: node --test --experimental-test-module-mocks "tests/*.test.js"
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { fakeElement } from './fake_dom.js';
 
 import { SLOW_FRAME_MS } from '../frame_constants.js';
 
 const { SegmentStatsView, FAULT_POOL, FAULT_RENDER } =
   await import('../segment_stats_view.js');
+
+test('index provides every container the stats view resolves', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  for (const id of ['segment-stats', 'global-stats-desktop', 'stats-bar']) {
+    assert.match(html, new RegExp(`id=["']${id}["']`), id);
+  }
+});
 
 /**
  * An overlay container the page owns, so the view's cache of it stays live the
