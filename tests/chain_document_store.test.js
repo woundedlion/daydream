@@ -158,6 +158,16 @@ test('auto labels take the family stem with the lowest free suffix', async () =>
   assertGreen(store);
 });
 
+test('auto labels reuse suffixes released by the replaced span', async () => {
+  const store = await makeStore();
+
+  const result = store.replaceSpan(WARP, 1, [{ operator: 'warp.wave-shear.v2' }]);
+
+  assert.equal(result.ok, true);
+  assert.equal(labels(store)[WARP], 'warp1');
+  assertGreen(store);
+});
+
 test('a duplicate explicit label is refused before commit', async () => {
   const store = await makeStore();
   const before = store.document();

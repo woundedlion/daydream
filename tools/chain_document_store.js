@@ -442,7 +442,10 @@ export async function createChainDocumentStore({
       return refusal('INVALID_SEQUENCE', '$.descriptor.chain',
         'a replacement sequence is an array of {label?, operator} entries');
     const current = chain();
-    const used = new Set(current.map((entry) => entry.label));
+    const used = new Set([
+      ...current.slice(0, start),
+      ...current.slice(start + deleteCount),
+    ].map((entry) => entry.label));
     /** @type {ChainEntry[]} */
     const entries = [];
     for (const item of sequence) {
