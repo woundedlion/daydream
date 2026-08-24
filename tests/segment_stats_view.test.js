@@ -418,7 +418,8 @@ test('the fault message is a text node, never markup', () => {
   const msg = box.childNodes[2];
   assert.equal(msg.tagName, 'SPAN');
   assert.equal(msg.textContent, hostile, 'the message is carried verbatim as text');
-  assert.deepEqual(msg.childNodes, [], 'nothing was parsed out of the message');
+  assert.deepEqual(msg.childNodes, [hostile], 'the message remains one text node');
+  assert.deepEqual(msg.children, [], 'nothing was parsed out of the message');
   // The headline is appended as a string, so it too becomes a text node.
   assert.equal(typeof box.childNodes[0], 'string');
   assert.deepEqual(box.childNodes.map((c) => typeof c === 'string' ? 'text' : c.tagName),
