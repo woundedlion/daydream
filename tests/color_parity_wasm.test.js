@@ -11,7 +11,9 @@ import assert from 'node:assert/strict';
 import createHolosphereModule from '../holosphere_wasm.js';
 import * as C from '../tools/color.js';
 import * as P from '../tools/palette_math.js';
-import { defaultPaletteRecipe, oklchLinearRgb, PaletteV4 } from '../tools/palette_controls.js';
+import {
+  defaultPaletteRecipe, maxSrgbGamutChroma, oklchLinearRgb, PaletteV4,
+} from '../tools/palette_controls.js';
 import * as L from '../tools/lissajous_math.js';
 import * as MB from '../tools/mobius_transforms.js';
 
@@ -92,6 +94,31 @@ test('OKLCh transform parity (oklab_to_linear_rgb)', () => {
           + `wasm(${w.r},${w.g},${w.b}) js(${r},${g},${b})`);
       }
     }
+  }
+});
+
+test('widest sRGB gamut chroma matches the engine transform', () => {
+  const wasmMaximum = (lightness) => {
+    let maximum = 0;
+    for (let hue = 0; hue < 360; hue++) {
+      const angle = hue / 360 * Math.PI * 2;
+      let low = 0;
+      let high = 0.5;
+      for (let iteration = 0; iteration < 12; iteration++) {
+        const chroma = (low + high) * 0.5;
+        const rgb = M.oklab_to_linear_rgb(
+          lightness, chroma * Math.cos(angle), chroma * Math.sin(angle));
+        if (rgb.r >= 0 && rgb.r <= 1 && rgb.g >= 0 && rgb.g <= 1
+            && rgb.b >= 0 && rgb.b <= 1) low = chroma;
+        else high = chroma;
+      }
+      maximum = Math.max(maximum, low);
+    }
+    return maximum;
+  };
+
+  for (const lightness of [0.15, 0.5, 0.85]) {
+    assert.equal(maxSrgbGamutChroma(lightness), wasmMaximum(lightness));
   }
 });
 
