@@ -39,7 +39,7 @@ function shaderBallParams() {
     { name: 'Function', ...ENUM },
     { name: 'Pattern Freq', value: 1, min: 0, max: 10, animated: true },
     { name: 'Projection', ...ENUM },
-    { name: 'Pole Fade', value: 1, min: 0, max: 2, animated: true },
+    { name: 'Singularity Fade', value: 1, min: 0, max: 2, animated: true },
     { name: 'Projection Frame', ...ENUM },
     { name: 'Projection Wander', value: 0, min: 0, max: 1, animated: true },
     { name: 'Camera Wander', value: 1, min: 0, max: 1, animated: true },
@@ -64,7 +64,7 @@ function latticeMeltParams() {
     'Lattice Shape',
     'Lattice Softness',
     'Lattice Radius',
-    'Pole Fade',
+    'Singularity Fade',
     'Central Meridian',
     'Projection Spin Speed',
     'Projection Wander',
@@ -94,7 +94,7 @@ function kaleidoscopeSmoothParams() {
     'Complexity',
     'Pattern Mix',
     'Drift',
-    'Pole Fade',
+    'Singularity Fade',
     'Projection Spin Speed',
     'Projection Wander',
     'Camera Wander',
@@ -682,7 +682,7 @@ test('KaleidoscopeSmooth controls use the fixed pipeline modes as folders', () =
       'Generated Analogous']);
   assert.equal(h.gui().ctrl('Camera Wander').folder, 'Camera');
   assert.equal(h.gui().ctrl('Projection Spin Speed').folder, 'Spin + Wander');
-  assert.equal(h.gui().ctrl('Pole Fade').folder, 'Stereographic');
+  assert.equal(h.gui().ctrl('Singularity Fade').folder, 'Stereographic');
   assert.equal(h.gui().ctrl('Planar Warp 2 Cell Y').folder, 'Mirror Tile');
   assert.equal(h.gui().ctrl('Planar Warp 2 Cell Y').label, 'Cell Y');
   assert.equal(h.gui().ctrl('Pattern Mix').folder, 'Grid');
@@ -691,7 +691,7 @@ test('KaleidoscopeSmooth controls use the fixed pipeline modes as folders', () =
 
 test('promoted Shader controls use their accepted structural modes as folders', () => {
   const params = [
-    'Camera Wander', 'Projection Spin Speed', 'Pole Fade',
+    'Camera Wander', 'Projection Spin Speed', 'Singularity Fade',
     'Planar Warp 1 Translation X', 'Pattern Freq', 'Edge Fade Width',
     'Palette Chroma', 'Mapping Frequency',
   ].map((name) => ({ name }));
@@ -709,7 +709,7 @@ test('promoted Shader controls use their accepted structural modes as folders', 
 
   assert.equal(assignments.get('Camera Wander'), 'Camera');
   assert.equal(assignments.get('Projection Spin Speed'), 'Projection Frame');
-  assert.equal(assignments.get('Pole Fade'), 'Projection');
+  assert.equal(assignments.get('Singularity Fade'), 'Projection');
   assert.equal(assignments.get('Planar Warp 1 Translation X'), 'Planar Warp 1');
   assert.equal(assignments.get('Pattern Freq'), 'Function');
   assert.equal(assignments.get('Edge Fade Width'), 'Coverage');
@@ -724,7 +724,7 @@ test('promoted Shader controls use their accepted structural modes as folders', 
 
 test('fixed Shader controls retain stage folders without dynamic metadata', () => {
   const params = [
-    'Camera Wander', 'Pole Fade', 'Planar Warp 1 Speed', 'Warp Strength',
+    'Camera Wander', 'Singularity Fade', 'Planar Warp 1 Speed', 'Warp Strength',
     'Planar Warp 2 Speed', 'Mirror Rotation', 'Pattern Freq',
     'Edge Width', 'Palette Chroma', 'Mapping Frequency',
   ].map((name) => ({ name, value: 0, min: 0, max: 1, animated: true }));
