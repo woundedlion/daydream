@@ -145,13 +145,12 @@ export class SegmentStatsView {
    */
   update(state) {
     const el = this.element('segment-stats');
-    if (!el) return;
-
     if (!state.active) {
-      el.style.display = 'none';
+      if (el) el.style.display = 'none';
       this.showStatBars();
       return;
     }
+    if (!el) return;
 
     this.hideStatBars();
     el.style.display = '';

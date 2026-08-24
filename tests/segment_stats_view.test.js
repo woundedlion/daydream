@@ -252,6 +252,22 @@ test('an inactive pool hides the overlay and hands the stat bars back', () => {
   assert.equal(mobile.style.display, '');
 });
 
+test('an inactive pool hands stat bars back when the overlay is missing', () => {
+  const { doc, desktop, mobile } = makeDoc();
+  const getElementById = doc.getElementById;
+  let overlayPresent = true;
+  doc.getElementById = (id) => id === 'segment-stats' && !overlayPresent
+    ? null : getElementById(id);
+  const view = new SegmentStatsView(doc);
+
+  view.update(readyState(2));
+  overlayPresent = false;
+  view.update(readyState(2, { active: false }));
+
+  assert.equal(desktop.style.display, '');
+  assert.equal(mobile.style.display, '');
+});
+
 // The overlay does not create its containers, so the page can replace one under
 // it. A cached detached node takes writes nobody sees, and the hand-back would
 // restore the bar that left while the live one stays hidden.
