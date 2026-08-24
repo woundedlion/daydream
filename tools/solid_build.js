@@ -171,6 +171,8 @@ export function buildChainMesh(base, ops, ctx) {
   } catch (e) {
     console.error('WASM classifyFaces error:', e);
     if (ctx.onTrap(e)) return null;
+    classifyFailure = `Face classification failed: ${
+      e instanceof Error && e.message ? e.message : String(e)}`;
   }
 
   const meshData = readbackMesh(mesh, ctx);

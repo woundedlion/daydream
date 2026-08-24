@@ -247,17 +247,21 @@ test('an engine trap halts the build at whichever call raised it', () => {
   }
 });
 
-test('a non-trap throw from the classify pass leaves the mesh drawable', () => {
+test('a non-trap classify throw leaves the mesh drawable and reports the failure', () => {
+  const failure = new TypeError('marshalling');
   const { Mod, state } = fakeModule({
-    onOp: (t) => { if (t === 'classifyFaces') throw new TypeError('marshalling'); },
+    onOp: (t) => { if (t === 'classifyFaces') throw failure; },
   });
-  const { ctx, errors } = context(Mod);
+  const { ctx, errors, traps } = context(Mod);
 
   const built = quietly(() => buildChainMesh('cube', [], ctx));
   assert.ok(built, 'a refused colorize pass must not cost the mesh');
   assert.equal(built.faceClasses, null);
-  assert.equal(built.classifyFailure, null);
-  assert.deepEqual(errors, []);
+  assert.equal(built.classifyFailure, 'Face classification failed: marshalling');
+  assert.deepEqual(traps, [failure]);
+  assert.deepEqual(errors, [], 'the page reports the failure after drawing the mesh');
+  assert.deepEqual(state.calls,
+    ['base:cube', 'classifyFaces', 'getVertices', 'getFaces']);
   assert.equal(state.live, 0);
 });
 
