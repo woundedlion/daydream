@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 
 import { FPS, SLOW_FRAME_MS } from '../frame_constants.js';
 
+test('the simulation cadence matches the physical sphere', () => {
+  assert.equal(FPS, 16);
+});
+
 test('the slow-frame threshold is the frame budget rounded to a whole ms', () => {
   const budgetMs = 1000 / FPS;
   assert.ok(Number.isInteger(SLOW_FRAME_MS), 'the threshold is a whole millisecond');
