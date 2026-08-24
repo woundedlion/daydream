@@ -60,8 +60,8 @@ export function displayAliasesDiverged(driver, view) {
  * @param {() => void} deps.syncEffectGui - Mirrors engine params into the panel.
  * @param {(message: string) => void} [deps.logError] - Console sink for the
  *   once-per-page alias divergence report.
- * @returns {{drawFrame: () => void, getArenaMetrics: () => Object|null,
- *   captureReady: () => boolean}} The adapter.
+ * @returns {{drawFrame: () => void, sync: () => void,
+ *   getArenaMetrics: () => Object|null, captureReady: () => boolean}} The adapter.
  */
 export function createRenderAdapter({
   host,
@@ -74,7 +74,7 @@ export function createRenderAdapter({
   return {
     /**
      * Per-frame entry the driver calls: render (segmented or single-engine),
-     * republish the pixel view, then mirror engine params back into the GUI.
+     * then republish the pixel view.
      * @returns {void}
      */
     drawFrame() {
@@ -103,6 +103,9 @@ export function createRenderAdapter({
         }
         driver.dotMesh.instanceColor.needsUpdate = true;
       }
+    },
+    /** Mirror engine parameters into the effect panel. */
+    sync() {
       syncEffectGui();
     },
     /**
