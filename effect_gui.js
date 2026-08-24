@@ -703,13 +703,13 @@ export function createEffectGui({
    */
   function addPauseToggle(fx, params, initialPause = false, hydrate = true) {
     const animationState = { pause: Boolean(initialPause) };
+    let controller = null;
     /**
      * Adopt a pause transition, applying it immediately after initial hydration
      * has been committed to the rebuilt renderers.
      * @param {boolean} v - True to freeze animations, false to resume.
      * @returns {void}
      */
-    let controller = null;
     const transitionPaused = (v) => {
       animationState.pause = Boolean(v);
       if (fx.animationPauseApplied) setAnimationsPaused(animationState.pause);
