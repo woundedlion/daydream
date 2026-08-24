@@ -215,6 +215,28 @@ export function parseShaderDocument(source, limits = DEFAULT_LIMITS) {
   return new JsonReader(source, bounded).parse();
 }
 
+const checkDecodedDocumentDepth = (source, limits = DEFAULT_LIMITS) => {
+  const bounded = { ...DEFAULT_LIMITS, ...limits };
+  const pending = [{ value: source, depth: 0, path: '$' }];
+  while (pending.length > 0) {
+    const { value, depth, path } = pending.pop();
+    if (depth > bounded.depth)
+      fail('parse', 'DEPTH_LIMIT', path, 'The document nesting limit was exceeded.');
+    if (value === null || typeof value !== 'object') continue;
+    if (Array.isArray(value)) {
+      for (let index = value.length - 1; index >= 0; --index)
+        pending.push({ value: value[index], depth: depth + 1, path: `${path}[${index}]` });
+      continue;
+    }
+    const keys = Object.keys(value);
+    for (let index = keys.length - 1; index >= 0; --index) {
+      const key = keys[index];
+      pending.push({ value: value[key], depth: depth + 1, path: `${path}.${key}` });
+    }
+  }
+  return source;
+};
+
 const object = (value, path) => {
   if (value === null || typeof value !== 'object' || Array.isArray(value))
     fail('schema', 'EXPECTED_OBJECT', path, 'Expected an object.');
@@ -1205,7 +1227,9 @@ export function v1DescriptorDigest(document) {
 
 export function compileShaderDocument(source, options = {}) {
   try {
-    let document = typeof source === 'string' ? parseShaderDocument(source, options.limits) : source;
+    let document = typeof source === 'string'
+      ? parseShaderDocument(source, options.limits)
+      : checkDecodedDocumentDepth(source, options.limits);
     object(document, '$');
     let parameterIds = null;
     if (document.schema_version === 1) {
