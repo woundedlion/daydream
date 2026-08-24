@@ -34,6 +34,8 @@ function makeEffectRecord(name, speed, paused, writes = []) {
  * @param {Set<string>} [options.rejectEffects] - Effects applyEffect() rejects.
  * @param {Set<string>} [options.rejectResolutions] - Resolutions applyResolution() rejects.
  * @param {Error} [options.throwOnEffect] - Thrown by applyEffect() for any effect.
+ * @param {() => boolean} [options.moduleDead] - Reads whether that throw trapped
+ *   the engine module.
  * @param {Set<string>} [options.fullConfigEffects] - Effects the panel persists
  *   and restores whole through the full-config snapshot API (ShaderBall).
  */
@@ -41,6 +43,7 @@ function makeApp({
   rejectEffects = new Set(),
   rejectResolutions = new Set(),
   throwOnEffect = null,
+  moduleDead = () => false,
   fullConfigEffects = new Set(),
 } = {}) {
   const appState = new AppState({ effect: 'Alpha', resolution: 'Lo' });
@@ -103,6 +106,7 @@ function makeApp({
     logError: (message, error) => app.errors.push({ message, error }),
     showNotice: (message) => app.notices.push(message),
     showFatal: (message) => app.fatals.push(message),
+    moduleDead,
     // Reads the effect the engine has loaded, not the one appState was just
     // written to: the snapshot is taken before the apply, so it must describe
     // the outgoing effect.
@@ -206,6 +210,22 @@ test('a thrown effect apply is logged and rolled back', () => {
   assert.equal(app.appState.get('effect'), 'Alpha');
   assert.deepEqual(app.errors, [{ message: 'Effect switch failed:', error: failure }]);
   assert.deepEqual(app.fatals, []);
+});
+
+test('a thrown effect apply never rolls back into a trapped module', () => {
+  const failure = new WebAssembly.RuntimeError('unreachable');
+  const app = makeApp({ throwOnEffect: failure, moduleDead: () => true });
+
+  app.appState.set('effect', 'Beta');
+
+  assert.equal(app.appState.get('effect'), 'Beta');
+  assert.deepEqual(applyCalls(app, 'applyEffect').map((call) => call.effect), ['Beta']);
+  assert.deepEqual(app.paramWrites, []);
+  assert.deepEqual(app.errors, [{ message: 'Effect switch failed:', error: failure }]);
+  assert.deepEqual(app.notices, [null]);
+  assert.deepEqual(app.fatals, [
+    'Effect change trapped the rendering engine. Reload the page.',
+  ]);
 });
 
 test('an effect rollback that is itself rejected raises the fatal banner', () => {
