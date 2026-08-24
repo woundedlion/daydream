@@ -18,3 +18,14 @@ test('headless probes retain page errors raised during interactions', () => {
     assert.doesNotMatch(source, /failures = \[\.\.\.failures/, file);
   }
 });
+
+test('the panel probe identifies focus through the lil-gui number controller', () => {
+  const source = readFileSync(
+    new URL('../scripts/panel-probe.mjs', import.meta.url), 'utf8')
+    .replaceAll('\r\n', '\n');
+
+  assert.match(source, /querySelectorAll\('\.lil-controller\.lil-number'\)/);
+  assert.match(source, /querySelector\('\.lil-name'\)/);
+  assert.doesNotMatch(source, /closest\('\.controller'\)|querySelector\('\.name'\)/);
+  assert.doesNotMatch(source, /widget\.textContent/);
+});
