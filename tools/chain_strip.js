@@ -22,7 +22,8 @@
  * where it sits in the pipeline.
  */
 
-/** @typedef {{id: string, name: string, input: string, output: string, params: Array<Object>}} CatalogOperator */
+/** @typedef {{id: string, topology?: boolean, values?: string[]}} CatalogParameter */
+/** @typedef {{id: string, name: string, input: string, output: string, params: CatalogParameter[]}} CatalogOperator */
 /** @typedef {{carriers: string[], operators: CatalogOperator[]}} OperatorCatalog */
 /** @typedef {{label: string, operator: string}} ChainEntry */
 /** @typedef {{operator: CatalogOperator, legal: boolean, reason?: string}} LegalityEntry */
@@ -92,18 +93,23 @@ const fieldOf = (id) => id.slice(id.indexOf('.') + 1);
  * rather than dropping out of the union schema.
  * @param {ParameterDeclaration[]} parameters - The document's declarations.
  * @param {Object<string, *>} values - The active preset's values.
+ * @param {ChainEntry[]} chain - The document's operator instances.
+ * @param {OperatorCatalog} catalog - Catalog declaring each topology field.
  * @returns {Set<string>} The deactivated parameter ids.
  */
-export function deactivatedParameterIds(parameters, values) {
+export function deactivatedParameterIds(parameters, values, chain, catalog) {
+  const operators = new Map(catalog.operators.map((operator) => [operator.id, operator]));
+  const operatorByLabel = new Map(chain.map((entry) => [entry.label, operators.get(entry.operator)]));
   /** @type {Map<string, *>} */
   const gates = new Map();
   for (const parameter of parameters) {
     if (parameter.storage !== 'enum8' || !parameter.id.includes('.')) continue;
+    const label = parameter.id.slice(0, parameter.id.indexOf('.'));
     const field = fieldOf(parameter.id);
-    if (field !== 'coverage-mode' && field !== 'envelope') continue;
+    const schema = operatorByLabel.get(label)?.params.find((candidate) => candidate.id === field);
+    if (schema?.topology !== true || !schema.values?.includes('edge-fade')) continue;
     const option = values[parameter.id];
-    if (option !== undefined)
-      gates.set(parameter.id.slice(0, parameter.id.indexOf('.')), option);
+    if (option !== undefined) gates.set(label, option);
   }
   /** @type {Set<string>} */
   const deactivated = new Set();
@@ -695,7 +701,7 @@ export function createChainStrip({
   // Only the workbench page carries the stylesheet that reads this attribute.
   /** Repaints the dimming of the expanded chip's deactivated controls. */
   const markDeactivated = () => {
-    const off = deactivatedParameterIds(declarations, values);
+    const off = deactivatedParameterIds(declarations, values, store.chain(), catalog);
     for (const [id, row] of rows) {
       if (off.has(id)) {
         row.dataset.deactivated = 'true';
