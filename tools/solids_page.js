@@ -412,7 +412,7 @@ async function generateThumbnails() {
       btn.className = `thumb-btn ${state.base === key ? 'active' : ''}`;
       btn.setAttribute('aria-pressed', state.base === key ? 'true' : 'false');
       btn.dataset.solid = key; // identify the base so restoreSolid can re-highlight it
-      btn.onclick = () => {
+      btn.addEventListener('click', () => {
         queueCommit(async () => {
           // The op stack is kept across a base switch, so it must be valid
           // on the new solid too.
@@ -433,7 +433,7 @@ async function generateThumbnails() {
             b.setAttribute('aria-pressed', selected ? 'true' : 'false');
           });
         });
-      };
+      });
 
       const img = document.createElement('img');
       img.alt = '';
