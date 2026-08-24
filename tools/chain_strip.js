@@ -143,11 +143,13 @@ export function deactivatedParameterIds(parameters, values, chain, catalog) {
  * @param {(parameterId: string, value: *) => void} [options.onEditParameter] -
  *   Takes every inline control edit as the document value the store stores: a
  *   number for a binary32 field, the option id for an enum8 one.
+ * @param {() => void} [options.onCommitParameter] - Flushes work buffered while
+ *   a range control was moving.
  * @returns {Object} The strip.
  */
 export function createChainStrip({
   doc, container, store, catalog, announce, onApply, onSelect = () => {},
-  presetId = () => null, onEditParameter = () => {},
+  presetId = () => null, onEditParameter = () => {}, onCommitParameter = () => {},
 }) {
   /** @type {Map<string, CatalogOperator>} */
   const operators = new Map(catalog.operators.map((op) => [op.id, op]));
@@ -730,6 +732,12 @@ export function createChainStrip({
     pendingSliderEdit = null;
     if (edit !== null) editParameter(edit.parameterId, edit.value);
   });
+  const commitSliderEdit = () => {
+    scheduleSliderEdit.cancel();
+    const edit = pendingSliderEdit;
+    pendingSliderEdit = null;
+    if (edit !== null) editParameter(edit.parameterId, edit.value);
+  };
 
   /**
    * @param {ParameterDeclaration} declaration - An enum8 declaration.
@@ -772,6 +780,10 @@ export function createChainStrip({
       values[declaration.id] = value;
       pendingSliderEdit = { parameterId: declaration.id, value };
       scheduleSliderEdit();
+    });
+    slider.addEventListener('change', () => {
+      commitSliderEdit();
+      onCommitParameter();
     });
     return slider;
   };
@@ -1197,6 +1209,8 @@ export function createChainStrip({
       history.undo.disabled = !store.canUndo();
       history.redo.disabled = !store.canRedo();
     },
+
+    flushParameterEdit: commitSliderEdit,
 
     /**
      * Detaches the strip's listeners and empties its container. Every other
