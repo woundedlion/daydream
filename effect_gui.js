@@ -729,8 +729,6 @@ export function createEffectGui({
       controller = add(animationState, 'pause').name('Pause Animation');
       controller.onChange(transitionPaused);
     }
-    fx.animationState = animationState;
-    fx.pauseController = controller;
     return { animationState, controller, setPaused };
   }
 
@@ -979,7 +977,7 @@ export function createEffectGui({
   function panelControllers(fx) {
     if (!fx) return [];
     const pairs = [...(fx.controllerByName ?? [])];
-    if (fx.pauseController) pairs.push(['pause', fx.pauseController]);
+    if (fx.pause.controller) pairs.push(['pause', fx.pause.controller]);
     if (fx.preset?.controller) pairs.push(['presetIndex', fx.preset.controller]);
     for (const controller of fx.actionControllers ?? []) {
       pairs.push([controller.property, controller]);
@@ -1048,7 +1046,7 @@ export function createEffectGui({
     const wasMounted = Boolean(previous.gui?.domElement?.parentNode);
     const captured = capturePanelFocus(previous);
     const preservedPause = engineAnimationsPaused()
-      ?? Boolean(previous.animationState?.pause);
+      ?? Boolean(previous.pause.animationState.pause);
     let next;
     try {
       next = createEffectRecord({
@@ -1122,9 +1120,9 @@ export function createEffectGui({
      * @returns {void}
      */
     applyAnimationPause() {
-      if (!activeEffect?.animationState) return;
+      if (!activeEffect?.pause) return;
       activeEffect.animationPauseApplied = true;
-      setAnimationsPaused(Boolean(activeEffect.animationState.pause));
+      setAnimationsPaused(Boolean(activeEffect.pause.animationState.pause));
     },
 
     /**

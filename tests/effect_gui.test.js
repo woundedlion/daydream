@@ -1134,12 +1134,12 @@ test('the pause toggle is offered for animated params or multiple presets', () =
   const animated = makeHarness({ params: [SPEED] });
   animated.panel.build();
   assert.equal(animated.gui().ctrl('pause').label, 'Pause Animation');
-  assert.equal(animated.panel.active().pauseController, animated.gui().ctrl('pause'));
+  assert.equal(animated.panel.active().pause.controller, animated.gui().ctrl('pause'));
 
   const staticNoPresets = makeHarness();
   staticNoPresets.panel.build();
   assert.equal(staticNoPresets.gui().ctrl('pause'), undefined);
-  assert.equal(staticNoPresets.panel.active().pauseController, null);
+  assert.equal(staticNoPresets.panel.active().pause.controller, null);
 
   const staticPresets = makeHarness({ presetCount: 2 });
   staticPresets.panel.build();
@@ -1163,7 +1163,7 @@ test('touching an animated slider takes over from the animation once', () => {
   const pause = h.gui().ctrl('pause');
 
   h.gui().ctrl('Speed').setValue(0.5);
-  assert.equal(h.panel.active().animationState.pause, true);
+  assert.equal(h.panel.active().pause.animationState.pause, true);
   assert.equal(pause.displayUpdates, 1);
 
   h.gui().ctrl('Speed').setValue(0.6);
@@ -1184,7 +1184,7 @@ test('a write the engine did not pause by leaves the toggle running', () => {
   h.gui().ctrl('Speed').setValue(0.5);
 
   assert.equal(h.engine.paused, false);
-  assert.equal(h.panel.active().animationState.pause, false);
+  assert.equal(h.panel.active().pause.animationState.pause, false);
   assert.deepEqual(h.writes.filter((w) => w.startsWith('paused')), []);
   assert.deepEqual(h.gui().ctrl('pause').valueSets, []);
 });
@@ -1201,7 +1201,7 @@ test('a write the engine paused by flips the toggle even on a static param', () 
 
   h.gui().ctrl('Width').setValue(1.5);
 
-  assert.equal(h.panel.active().animationState.pause, true,
+  assert.equal(h.panel.active().pause.animationState.pause, true,
     'the toggle must report the engine state, not the definition\'s animated flag');
   assert.deepEqual(h.writes, [
     'engine:Width=1.5', 'worker:Width=1.5', 'paused:true',
@@ -1220,7 +1220,7 @@ test('the toggle resumes when the engine reports animations running again', () =
   h.engine.paused = false;
   h.gui().ctrl('Speed').setValue(0.6);
 
-  assert.equal(h.panel.active().animationState.pause, false);
+  assert.equal(h.panel.active().pause.animationState.pause, false);
   assert.deepEqual(h.writes.filter((w) => w.startsWith('paused')), ['paused:false']);
 });
 
@@ -1232,7 +1232,7 @@ test('without the pause accessor the panel falls back to the animated flag', () 
 
   h.gui().ctrl('Speed').setValue(0.5);
 
-  assert.equal(h.panel.active().animationState.pause, true);
+  assert.equal(h.panel.active().pause.animationState.pause, true);
   assert.deepEqual(h.writes.filter((w) => w.startsWith('paused')), ['paused:true']);
 });
 
@@ -1245,7 +1245,7 @@ test('an effect with no animated param never touches the pause state', () => {
 
   h.gui().ctrl('Width').setValue(1.5);
 
-  assert.equal(h.panel.active().pauseController, null);
+  assert.equal(h.panel.active().pause.controller, null);
   assert.deepEqual(h.writes, ['engine:Width=1.5', 'worker:Width=1.5']);
 });
 
@@ -1253,7 +1253,7 @@ test('a hydrated pause is committed after the effect renderers rebuild', () => {
   const h = makeHarness({ params: [SPEED], hydrated: { pause: true } });
   h.panel.build();
 
-  assert.equal(h.panel.active().animationState.pause, true);
+  assert.equal(h.panel.active().pause.animationState.pause, true);
   assert.deepEqual(h.writes, []);
 
   h.panel.applyAnimationPause();
@@ -2097,7 +2097,7 @@ test('a rejected preset selection does not change the pause state', () => {
 
   h.gui().ctrl('presetIndex').setValue(2);
 
-  assert.equal(h.panel.active().animationState.pause, false);
+  assert.equal(h.panel.active().pause.animationState.pause, false);
   assert.equal(h.engine.paused, false);
   assert.equal(h.gui().ctrl('presetIndex').getValue(), 1);
   assert.deepEqual(h.writes, ['preset:2']);
