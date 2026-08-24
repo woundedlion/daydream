@@ -924,9 +924,28 @@ test('deactivatedParameterIds flags edge-width only while its gate is off edge-f
     'warp1.edge-width': 0.1,
     'camera.wander': 0,
   };
-  assert.deepEqual([...deactivatedParameterIds(parameters, values)],
+  const chain = [
+    { label: 'sample', operator: 'sample.grid.v2' },
+    { label: 'warp1', operator: 'warp.wave-shear.v2' },
+    { label: 'camera', operator: 'sphere.rotate.v2' },
+  ];
+  assert.deepEqual([...deactivatedParameterIds(parameters, values, chain, CATALOG)],
     ['sample.edge-width']);
   assert.deepEqual([...deactivatedParameterIds(
-    [{ id: 'sample.edge-width', storage: 'binary32' }], { 'sample.edge-width': 0.1 })],
+    [{ id: 'sample.edge-width', storage: 'binary32' }],
+    { 'sample.edge-width': 0.1 }, chain, CATALOG)],
   [], 'no gate, no deactivation');
+
+  const renamed = structuredClone(CATALOG);
+  renamed.operators.find((operator) => operator.id === 'sample.grid.v2')
+    .params.find((field) => field.id === 'coverage-mode').id = 'coverage-style';
+  const renamedParameters = parameters.map((parameter) => ({
+    ...parameter,
+    id: parameter.id === 'sample.coverage-mode' ? 'sample.coverage-style' : parameter.id,
+  }));
+  assert.deepEqual([...deactivatedParameterIds(
+    renamedParameters,
+    { ...values, 'sample.coverage-style': values['sample.coverage-mode'] },
+    chain, renamed,
+  )], ['sample.edge-width']);
 });
