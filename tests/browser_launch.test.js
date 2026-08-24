@@ -24,7 +24,7 @@ test('a declared CHROME_PATH that does not exist is a refusal, not a fallback', 
 test('with no CHROME_PATH only the standard locations answer', () => {
   const installed = BROWSER_CANDIDATES.filter((path) => existsSync(path));
   if (installed.length === 0) {
-    assert.throws(() => resolveBrowser({}), /no Chrome or Chromium found/);
+    assert.throws(() => resolveBrowser({}), /no Chrome, Chromium or Edge found/);
   } else {
     assert.equal(resolveBrowser({}), installed[0]);
   }
