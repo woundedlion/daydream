@@ -793,9 +793,7 @@ export function start({
   durationEl.style.display = 'none';
   doc.getElementById('canvas-container')?.appendChild(durationEl);
 
-  // Last string written to durationEl, so the animation loop only touches the DOM
-  // on a second boundary rather than on every display frame.
-  let durationText = null;
+  let durationSecond = null;
 
   // Whether the UI is currently showing a session. A failure hook runs after the
   // recorder has already cleaned up, so its own state cannot tell a failed start
@@ -814,7 +812,7 @@ export function start({
    * @returns {void}
    */
   const showRecording = (isRecording) => {
-    durationText = null;
+    durationSecond = null;
     recordingShown = isRecording;
     const canvasEl = doc.getElementById('canvas-container');
     if (isRecording) {
@@ -873,10 +871,10 @@ export function start({
         daydream.render(host.adapter);
       }
       if (host.recorder?.isRecording) {
-        const elapsed = host.recorder.elapsedFormatted;
-        if (elapsed !== durationText) {
-          durationText = elapsed;
-          durationEl.textContent = elapsed;
+        const elapsedSecond = Math.floor(host.recorder.elapsedSeconds);
+        if (elapsedSecond !== durationSecond) {
+          durationSecond = elapsedSecond;
+          durationEl.textContent = host.recorder.elapsedFormatted;
         }
       }
     },
