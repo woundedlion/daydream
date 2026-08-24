@@ -570,8 +570,8 @@ test('a stalled load rejects at the deadline instead of spinning', async () => {
     'without this the loading overlay spins for the page lifetime');
 });
 
-test('the deadline is generous enough for a cold load of the binary', () => {
-  assert.ok(MODULE_LOAD_DEADLINE_MS >= 60000,
+test('the deadline preserves the cold-load window', () => {
+  assert.equal(MODULE_LOAD_DEADLINE_MS, 90000,
     'a slow-but-working first fetch of the multi-megabyte binary must not trip it');
 });
 

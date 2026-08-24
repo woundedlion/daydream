@@ -4,7 +4,8 @@ import { EngineHost } from '../engine_host.js';
 
 test('view is the accessor method, not a shadowing data field', () => {
   const host = new EngineHost();
-  assert.equal(typeof host.view, 'function');
+  assert.equal(Object.hasOwn(host, 'view'), false);
+  assert.equal(host.view, EngineHost.prototype.view);
 });
 
 test('view() is null until the first refresh()', () => {

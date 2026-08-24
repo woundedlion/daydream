@@ -26,7 +26,7 @@ let container;
 beforeEach(() => {
   container = fakeElement('div');
   installDocument({
-    getElementById: () => container,
+    getElementById: (id) => id === 'c' ? container : null,
     createElement: (tag) => (tag === 'input' ? fakeInput() : fakeElement(tag)),
   });
 });

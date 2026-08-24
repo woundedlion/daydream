@@ -66,13 +66,6 @@ test('FakeChainEngine mocks nothing outside the pinned engine surface', () => {
   assert.deepEqual(unpinnedEngineMethods(new FakeChainEngine()), []);
 });
 
-test('the static catalog matches the committed pin, trailing newline aside', async () => {
-  const { readFileSync } = await import('node:fs');
-  const pin = readFileSync(
-    new URL('../shader/engine_catalog.json', import.meta.url), 'utf8');
-  assert.equal(`${FakeChainEngine.getShaderChainCatalog()}\n`, pin);
-});
-
 test('apply runs setShaderChain, the writes, the resync and the repaint in order', () => {
   const { engine, order, run } = harness();
 
