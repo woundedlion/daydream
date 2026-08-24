@@ -1,7 +1,7 @@
 /*
  * Loads every page site_manifest.txt serves in headless Chrome, over a server
  * that publishes exactly the manifest set, and requires each page to reach a
- * clean console and a painted frame.
+ * clean console, a painted frame and a quiet network.
  *
  *   node scripts/browser-smoke.mjs
  *
@@ -16,6 +16,9 @@ import { serveManifest } from './serve-manifest.mjs';
 const VIEWPORT = { width: 1280, height: 900 };
 const LOAD_TIMEOUT_MS = 90_000;
 const READY_TIMEOUT_MS = 90_000;
+
+const NETWORK_IDLE_MS = 500;
+const NETWORK_IDLE_TIMEOUT_MS = 30_000;
 
 // Paths the served set answers with a 404 by design: Chrome's implicit icon
 // fetch on a page that declares none, and the gitignored offline font drop the
@@ -126,6 +129,14 @@ async function smokePage(browser, origin, page) {
     if (ready) await tab.waitForFunction(ready, { timeout: READY_TIMEOUT_MS });
     await tab.waitForFunction(
       () => window.daydreamSmokeDraws > 0, { timeout: READY_TIMEOUT_MS });
+    try {
+      await tab.waitForNetworkIdle(
+        { idleTime: NETWORK_IDLE_MS, timeout: NETWORK_IDLE_TIMEOUT_MS });
+    } catch {
+      problems.push(
+        `network never went idle for ${NETWORK_IDLE_MS}ms within ` +
+          `${NETWORK_IDLE_TIMEOUT_MS}ms`);
+    }
     const draws = await tab.evaluate(() => window.daydreamSmokeDraws);
     console.log(`  ${page}: ${draws} draw calls`);
   } catch (error) {
