@@ -181,6 +181,10 @@ export function initScene(containerId, canvasId, opts = {}) {
     ? () => onResize({ scene, camera, renderer, controls })
     : defaultResize;
   window.addEventListener('resize', resize);
+  const resizeObserver = typeof ResizeObserver === 'function'
+    ? new ResizeObserver(resize)
+    : null;
+  resizeObserver?.observe(container);
 
   let rafId = 0;
   const animate = () => {
@@ -195,6 +199,7 @@ export function initScene(containerId, canvasId, opts = {}) {
   const dispose = () => {
     cancelAnimationFrame(rafId);
     window.removeEventListener('resize', resize);
+    resizeObserver?.disconnect();
     controls.dispose();
     renderer.dispose();
     // dispose() frees Three's own objects but leaves the WebGL context live,

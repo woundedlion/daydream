@@ -325,7 +325,6 @@ async function init() {
 
   renderSavedList();
   updateToggles();
-  result.resize(); // re-fit the canvas after the sidebars' content settled
   update();
   renderBaseSolid();
 }
