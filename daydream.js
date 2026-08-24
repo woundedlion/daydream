@@ -312,7 +312,7 @@ export function start({
    * truthiness (every enum value is a truthy object).
    * @param {string} name - The engine parameter name.
    * @param {number} value - The float value to write.
-   * @returns {void}
+   * @returns {boolean} True when the engine accepted the value.
    */
   function setEngineParam(name, value) {
     const result = host.engine.setParameter(name, value);
@@ -324,6 +324,7 @@ export function start({
     } else {
       applyNotice.show(null, PARAM_NOTICE);
     }
+    return result === host.module.ParamSetResult.APPLIED;
   }
 
   // Delegated, and the button is resolved at click time: the notice sink resolves

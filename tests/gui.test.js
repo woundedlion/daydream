@@ -405,6 +405,59 @@ test('DeepLinkGUI.add fans a change out to every registered onChange handler', (
   }
 });
 
+test('DeepLinkGUI persists the accepted value after handler fanout', () => {
+  const url = installRecordingWindow('');
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const first = [];
+    const second = [];
+    let accepted = 0;
+    const controller = new DeepLinkGUI({ autoPlace: false }, 'fx')
+      .add({ Mode: 0 }, 'Mode', { Off: 0, On: 1, Invalid: 2 });
+    controller.onChange((value) => {
+      first.push(value);
+      if (value !== 2) accepted = value;
+      controller.acceptUrlValue(accepted);
+    });
+    controller.onChange((value) => second.push(value));
+
+    controller.setValue(1);
+    controller.setValue(2);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
+
+    assert.deepEqual(first, [1, 2]);
+    assert.deepEqual(second, [1, 2]);
+    assert.equal(controller.getValue(), 2, 'the refused request remains visible');
+    assert.equal(new URL(url.written(), 'http://x').searchParams.get('fx.Mode'), '1');
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+test('a refused hydrated value is corrected before the next reload', () => {
+  const url = installRecordingWindow('?fx.Mode=2');
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const controller = new DeepLinkGUI({ autoPlace: false }, 'fx')
+      .add({ Mode: 0 }, 'Mode', { Off: 0, On: 1, Invalid: 2 });
+    controller.onChange((value) => {
+      assert.equal(value, 2);
+      controller.acceptUrlValue(1);
+    });
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
+
+    const corrected = new URL(url.written(), 'http://x');
+    assert.equal(corrected.searchParams.get('fx.Mode'), '1');
+    installWindow(corrected.search);
+    const reloaded = { Mode: 0 };
+    new DeepLinkGUI({ autoPlace: false }, 'fx')
+      .add(reloaded, 'Mode', { Off: 0, On: 1, Invalid: 2 });
+    assert.equal(reloaded.Mode, 1);
+  } finally {
+    mock.timers.reset();
+  }
+});
+
 /**
  * addSession is the deep-link opt-out: a session control is neither seeded from
  * the URL nor written back, so a copied link cannot auto-activate a cycler or a

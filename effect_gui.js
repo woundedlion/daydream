@@ -186,8 +186,8 @@ export function addParamControl(
  *   per-frame value stream.
  * @param {() => ArrayLike<number>|null} deps.engineParamValues - The main
  *   engine's per-frame value stream.
- * @param {(name: string, value: number) => void} deps.setEngineParam - Writes one
- *   parameter to the main engine.
+ * @param {(name: string, value: number) => boolean} deps.setEngineParam - Writes
+ *   one parameter to the main engine and reports acceptance.
  * @param {(name: string, value: number) => void} deps.setWorkerParam - Writes one
  *   parameter to the worker pool.
  * @param {(paused: boolean) => void} deps.setAnimationsPaused - Freezes/resumes
@@ -878,9 +878,15 @@ export function createEffectGui({
       fx.writableParamNames.push(p.name);
       if (controller.isContinuous) trackDragState(fx, controller, p.name);
 
+      const kind = paramControlKind(p);
+      let acceptedControlValue = p.acceptedValue ?? p.value;
+      if (kind === 'boolean') {
+        acceptedControlValue = engineParamValue(acceptedControlValue) > 0.5;
+      }
       controller.onChange(v => {
         const value = engineParamValue(v);
-        setEngineParam(p.name, value);
+        if (setEngineParam(p.name, value) !== false) acceptedControlValue = v;
+        controller.acceptUrlValue?.(acceptedControlValue);
         // A drag emits one onChange per pointermove and full-config persistence
         // marshals and serializes the whole snapshot, so it waits for the pointer
         // release, which sees the same state the last move would have.
