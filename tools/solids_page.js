@@ -13,7 +13,9 @@ import { initScene, copyWithFeedback, showFatalError, bootstrapTool, formatKB } 
 // tested without a DOM or the WASM module. DOM/WASM wiring stays inline.
 import {
   OP_DEFS,
-  savedChainShapeError,
+  SAVED_SOLIDS_MAX,
+  captureSavedSolidThumbnail,
+  queueSavedSolidRestore,
   PLATONIC_SOLIDS,
   CATALAN_BASES,
   formatSolidName,
@@ -487,12 +489,6 @@ function updateToggles() {
 // --- SAVED ITEMS ---
 const SAVED_SOLIDS_KEY = 'daydream.savedSolids.v1';
 const SAVED_THUMB_SIZE = 256;
-// Every card carries a 256x256 PNG data URL, so an uncapped list grows into
-// the browser's localStorage quota; past it persistSavedSolids can only
-// report that the list is session-only. Refuse the save while the store
-// still round-trips instead.
-const SAVED_SOLIDS_MAX = 40;
-
 function loadSavedSolids() {
   try {
     const parsed = JSON.parse(localStorage.getItem(SAVED_SOLIDS_KEY) || '[]');
@@ -557,13 +553,15 @@ function saveSolid() {
     return;
   }
 
-  if (savedSolids.length >= SAVED_SOLIDS_MAX) {
+  const thumbnail = captureSavedSolidThumbnail(
+    savedSolids.length, captureSavedThumbnail);
+  if (thumbnail.full) {
     showGateMsg(`rejected: the saved list is full at ${SAVED_SOLIDS_MAX} — `
       + 'export it, then delete a card to make room');
     return;
   }
 
-  const dataURL = captureSavedThumbnail();
+  const dataURL = thumbnail.dataURL;
 
   const title = formatSolidName(state.base);
 
@@ -780,13 +778,7 @@ function restoreSolid(item) {
   // when its module fails to spawn, and an unrecognized op would then reach
   // renderOps as an undefined OP_DEFS entry and throw into the commit
   // queue's error handler, leaving the page showing the previous chain.
-  const shapeError = savedChainShapeError(item.base, item.ops);
-  if (shapeError) {
-    showGateMsg(`cannot restore "${item.title || 'saved solid'}": ${shapeError}`
-      + ' — delete this card and save the solid again');
-    return;
-  }
-  queueCommit(async () => {
+  const shapeError = queueSavedSolidRestore(item, () => queueCommit(async () => {
     // Saved items were valid when saved, but the engine may have been
     // rebuilt with different limits since; validate on the way back in.
     const check = await chainIsValid(item.base, item.ops);
@@ -795,7 +787,11 @@ function restoreSolid(item) {
       return;
     }
     applyRestore(item);
-  });
+  }));
+  if (shapeError) {
+    showGateMsg(`cannot restore "${item.title || 'saved solid'}": ${shapeError}`
+      + ' — delete this card and save the solid again');
+  }
 }
 
 function applyRestore(item) {

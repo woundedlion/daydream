@@ -12,7 +12,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { restoreDocumentAfterEach } from './fake_dom.js';
 import { captureConsole } from './fake_console.js';
-import { startApp, segmentCountControl } from './fake_app.js';
+import {
+  createSegmentPoolSpawner,
+  startApp,
+  segmentCountControl,
+} from './fake_app.js';
 
 restoreDocumentAfterEach();
 
@@ -298,11 +302,22 @@ test('the segment-count slider carries the device cap as its own maximum', () =>
 });
 
 test('the spawn bounds the pool by the ceiling the device carries now', () => {
-  assert.match(SOURCE,
-    /spawn:\s*\(\)\s*=>\s*segments\.create\(\s*Math\.min\(segCount, maxSegmentCount\(nav, daydream\.isMobile\)\)\)/,
-    'segMax is read once, while driver.isMobile follows the ResizeObserver: a '
-    + 'page opened wide and rotated into the mobile layout would otherwise spawn '
-    + 'the desktop count of WASM heaps on a phone');
+  const created = [];
+  let requested = 8;
+  let mobile = false;
+  const spawn = createSegmentPoolSpawner(
+    { create: (count) => created.push(count) },
+    () => requested,
+    { hardwareConcurrency: 8 },
+    () => mobile);
+
+  spawn();
+  requested = 6;
+  mobile = true;
+  spawn();
+
+  assert.deepEqual(created, [8, 4],
+    'a rotation into the mobile layout must lower the next pool spawn');
 });
 test('the late-bound engine controls are re-applied once the engine exists', () => {
   assert.match(wasmReadyBlock(), /poleLod\.replay\(\)/,

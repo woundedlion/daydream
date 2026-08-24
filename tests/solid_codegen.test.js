@@ -10,6 +10,9 @@ const {
   PARAMETERIZED_OPS,
   applyOp,
   savedChainShapeError,
+  SAVED_SOLIDS_MAX,
+  captureSavedSolidThumbnail,
+  queueSavedSolidRestore,
   formatFloat,
   formatSolidName,
   pctSuffix,
@@ -1206,38 +1209,33 @@ test('savedChainShapeError rejects every unrestorable stored shape', () => {
   }
 });
 
-/**
- * Verifies the page shape-checks a restore before any state is mutated: the
- * check has to sit ahead of the commit, since inside it the validator's
- * spawn-failure path accepts the chain unseen.
- */
-test('the solids page shape-checks a restore before it commits', () => {
-  const restore = SOLIDS_PAGE.match(/function restoreSolid\(item\) \{[\s\S]*?\n\}/)?.[0];
-  assert.ok(restore, 'restoreSolid must stay a named function in the page module');
-  const checkAt = restore.indexOf('savedChainShapeError(item.base, item.ops)');
-  assert.ok(checkAt > 0, 'restoreSolid must shape-check the stored base and ops');
-  assert.ok(checkAt < restore.indexOf('queueCommit('),
-    'the shape check must run before the commit that mutates state');
-  assert.match(restore, /showGateMsg\(`cannot restore/,
-    'a refused restore must say so rather than fail silently');
+test('a malformed saved solid is rejected before its restore is queued', () => {
+  let queued = false;
+  const error = queueSavedSolidRestore(
+    { base: 'cube', ops: [{ op: 'unknown' }] },
+    () => { queued = true; });
+
+  assert.match(error, /unknown operator/);
+  assert.equal(queued, false);
+
+  assert.equal(queueSavedSolidRestore(
+    { base: 'cube', ops: [] }, () => { queued = true; }), null);
+  assert.equal(queued, true);
 });
 
-/**
- * Verifies the saved list is bounded before a card is built. Each card holds a
- * PNG data URL, so an unbounded list reaches the localStorage quota, after
- * which persistSavedSolids can only report that further saves are session-only.
- */
-test('the solids page caps the saved list before it captures a thumbnail', () => {
-  const save = SOLIDS_PAGE.match(/function saveSolid\(\) \{[\s\S]*?\n\}/)?.[0];
-  assert.ok(save, 'saveSolid must stay a named function in the page module');
-  assert.match(SOLIDS_PAGE, /const SAVED_SOLIDS_MAX = \d+;/,
-    'the cap must be a named constant, not a literal inside the gate');
-  const capAt = save.indexOf('savedSolids.length >= SAVED_SOLIDS_MAX');
-  assert.ok(capAt > 0, 'saveSolid must refuse a save once the list is at the cap');
-  assert.ok(capAt < save.indexOf('captureSavedThumbnail('),
-    'the cap must gate ahead of the thumbnail capture it would otherwise discard');
-  assert.ok(capAt < save.indexOf('savedSolids.push('),
-    'the cap must gate ahead of the push it bounds');
+test('a full saved-solid list refuses before thumbnail capture', () => {
+  let captures = 0;
+  const capture = () => {
+    captures++;
+    return 'data:image/png;base64,test';
+  };
+
+  assert.deepEqual(captureSavedSolidThumbnail(SAVED_SOLIDS_MAX, capture),
+    { full: true, dataURL: null });
+  assert.equal(captures, 0);
+  assert.deepEqual(captureSavedSolidThumbnail(SAVED_SOLIDS_MAX - 1, capture),
+    { full: false, dataURL: 'data:image/png;base64,test' });
+  assert.equal(captures, 1);
 });
 
 /** Verifies a transient spawn failure is retried rather than disabling validation for good. */
