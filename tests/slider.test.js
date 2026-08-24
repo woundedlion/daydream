@@ -123,10 +123,10 @@ test('input updates the readout and aria-valuetext before onInput', () => {
     },
   );
 
-  slider.value = '73';
+  slider.value = '70';
   slider.dispatch('input');
 
-  assert.deepEqual(observed, { raw: 73, text: '7.3', aria: '7.3' });
+  assert.deepEqual(observed, { raw: 70, text: '7.0', aria: '7.0' });
 });
 
 /**

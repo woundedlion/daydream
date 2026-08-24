@@ -1969,7 +1969,7 @@ test('preset effects expose one-based labels and zero-indexed navigation', () =>
   assert.equal(actionRow.style.display, '');
   assert.equal(actionRow.style.gridAutoFlow, '');
   assert.equal(actionRow.style.gridTemplateColumns,
-    'repeat(5, minmax(0, 1fr))');
+    'repeat(5, minmax(0px, 1fr))');
   // The live region is out of flow, so it takes no column of its own.
   const [status, ...controls] = actionRow.children;
   assert.equal(status.getAttribute('role'), 'status');
@@ -2111,7 +2111,7 @@ test('effects without presets do not show preset navigation', () => {
   assert.equal(h.gui().ctrl('nextPreset'), undefined);
   assert.equal(h.gui().ctrl('presetIndex'), undefined);
   assert.equal(h.gui().$children.children[0].style.gridTemplateColumns,
-    'repeat(2, minmax(0, 1fr))');
+    'repeat(2, minmax(0px, 1fr))');
 });
 
 test('Export copies the live values as a C++ brace-init list', async () => {

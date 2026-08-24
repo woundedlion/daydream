@@ -222,6 +222,21 @@ test('textContent and setAttribute hand back the strings a browser stores', () =
   assert.equal(el.getAttribute('tabindex'), '-1');
 });
 
+test('tabIndex reflects the attribute and browser focus defaults', () => {
+  const box = fakeElement('div');
+  assert.equal(box.tabIndex, -1);
+  box.setAttribute('tabindex', '0');
+  assert.equal(box.tabIndex, 0);
+  box.tabIndex = -1;
+  assert.equal(box.getAttribute('tabindex'), '-1');
+
+  assert.equal(fakeElement('button').tabIndex, 0);
+  assert.equal(fakeElement('a').tabIndex, -1);
+  const link = fakeElement('a');
+  link.setAttribute('href', '/');
+  assert.equal(link.tabIndex, 0);
+});
+
 test('id and class reflect between attributes and properties', () => {
   const el = fakeElement('div');
 
@@ -319,7 +334,7 @@ test('style keeps only the values a browser would keep', () => {
 
   el.style.gridTemplateColumns = 'repeat(3, minmax(0, 1fr))';
   el.style.gridTemplateColumns = 'repeat(0, minmax(0, 1fr))';
-  assert.equal(el.style.gridTemplateColumns, 'repeat(3, minmax(0, 1fr))',
+  assert.equal(el.style.gridTemplateColumns, 'repeat(3, minmax(0px, 1fr))',
     'a zero repetition count is a track list no browser lays out');
 
   el.style.left = '12px';
