@@ -28,6 +28,10 @@ const BASE = compileShaderDocument(readFileSync(
   new URL('../shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8'),
 { catalog: CATALOG });
 assert.equal(BASE.status, 'VALID');
+const STAINED_GLASS = compileShaderDocument(readFileSync(
+  new URL('../shader/patterns/kaleidoscope_stained_glass.shader.json', import.meta.url), 'utf8'),
+{ catalog: CATALOG });
+assert.equal(STAINED_GLASS.status, 'VALID');
 
 // kaleidoscope_hex_bright chain order: camera, lens, project, warp2, sample, transfer,
 // colorize — sphere endos, a sphere->plane crossing, a plane endo, a
@@ -265,6 +269,21 @@ test('a move that breaks carrier agreement is refused', async () => {
   const result = store.replaceSpan(PROJECT, 2, [warp, project]);
   assert.equal(result.ok, false);
   assert.ok(result.diagnostics.length > 0);
+});
+
+test('removing and reinserting one operator preserves its descriptor digest', async () => {
+  const store = await createChainDocumentStore({
+    document: structuredClone(STAINED_GLASS.document), catalog: CATALOG,
+  });
+  const digest = store.compile().descriptor_digest;
+
+  assert.equal(store.replaceSpan(WARP, 1, []).ok, true);
+  assert.equal(store.replaceSpan(WARP, 0, [
+    { label: 'warp1', operator: 'warp.vector-noise.v2' },
+  ]).ok, true);
+
+  assert.equal(store.compile().descriptor_digest, digest);
+  assertGreen(store);
 });
 
 test('reusing a label under a new operator re-seeds it from catalog defaults', async () => {
