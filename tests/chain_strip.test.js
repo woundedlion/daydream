@@ -7,7 +7,7 @@
 // real kaleidoscope_hex_bright pattern document over the pinned engine catalog and the real
 // store, so legality, reconciliation and refusal texts are the shipping ones,
 // not doubles.
-import { test } from 'node:test';
+import { afterEach, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
@@ -24,6 +24,32 @@ const BASE = compileShaderDocument(readFileSync(
   new URL('../shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8'),
 { catalog: CATALOG });
 assert.equal(BASE.status, 'VALID');
+
+const savedAnimationFrame = {
+  request: globalThis.requestAnimationFrame,
+  cancel: globalThis.cancelAnimationFrame,
+};
+let nextFrame = 0;
+let frameCallbacks = new Map();
+beforeEach(() => {
+  nextFrame = 0;
+  frameCallbacks = new Map();
+  globalThis.requestAnimationFrame = (callback) => {
+    const id = ++nextFrame;
+    frameCallbacks.set(id, callback);
+    return id;
+  };
+  globalThis.cancelAnimationFrame = (id) => frameCallbacks.delete(id);
+});
+afterEach(() => {
+  globalThis.requestAnimationFrame = savedAnimationFrame.request;
+  globalThis.cancelAnimationFrame = savedAnimationFrame.cancel;
+});
+const runFrame = () => {
+  const callbacks = [...frameCallbacks.values()];
+  frameCallbacks.clear();
+  for (const callback of callbacks) callback();
+};
 
 // kaleidoscope_hex_bright chain: camera, lens (sphere endos), project (crossing), warp2
 // (plane endo), sample (crossing), transfer (field endo), colorize (exit).
@@ -794,11 +820,35 @@ test('a slider edit calls back with the parameter and its value', async () => {
   slider.value = '5.5';
   slider.dispatch('input');
 
+  assert.deepEqual(h.edits, [], 'the expensive write waits for the frame');
+  runFrame();
   assert.deepEqual(h.edits, [['sample.pattern-freq', 5.5]]);
   assert.equal(row.querySelector('.chain-param-value').value, '5.5');
   assert.deepEqual(h.applied, [], 'a value edit is no structural edit');
   assert.equal(controlIn(rowFor(h, 'sample', 'sample.pattern-freq')), slider,
     'the strip is not rebuilt under the pointer');
+});
+
+test('slider input coalesces to the latest value in each frame', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'sample').dispatch('click');
+  const row = rowFor(h, 'sample', 'sample.pattern-freq');
+  const slider = controlIn(row);
+
+  for (const value of ['2', '3', '4']) {
+    slider.value = value;
+    slider.dispatch('input');
+  }
+  assert.equal(row.querySelector('.chain-param-value').value, '4');
+  assert.deepEqual(h.edits, []);
+  runFrame();
+  assert.deepEqual(h.edits, [['sample.pattern-freq', 4]]);
+
+  slider.value = '5';
+  slider.dispatch('input');
+  h.strip.destroy();
+  runFrame();
+  assert.deepEqual(h.edits, [['sample.pattern-freq', 4]]);
 });
 
 test('a numeric value can be typed directly and stays within its domain', async () => {
@@ -866,6 +916,7 @@ test('a deactivated field renders dimmed but editable', async () => {
 
   controlIn(edge).value = '0.4';
   controlIn(edge).dispatch('input');
+  runFrame();
   assert.deepEqual(h.edits.at(-1), [`${label}.edge-width`, 0.4]);
 });
 

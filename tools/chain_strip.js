@@ -4,6 +4,8 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import { createFrameScheduler } from './page_lifecycle.js';
+
 /**
  * The pipeline strip: the loaded document's operator chain read left to right in
  * execution order as chips grouped into one band per editable carrier family, with the
@@ -726,6 +728,13 @@ export function createChainStrip({
     onEditParameter(parameterId, value);
     markDeactivated();
   };
+  /** @type {{parameterId: string, value: number}|null} */
+  let pendingSliderEdit = null;
+  const scheduleSliderEdit = createFrameScheduler(() => {
+    const edit = pendingSliderEdit;
+    pendingSliderEdit = null;
+    if (edit !== null) editParameter(edit.parameterId, edit.value);
+  });
 
   /**
    * @param {ParameterDeclaration} declaration - An enum8 declaration.
@@ -765,7 +774,9 @@ export function createChainStrip({
     slider.addEventListener('input', (/** @type {*} */ event) => {
       const value = Number(event.target.value);
       readout.value = formatNumericValue(value);
-      editParameter(declaration.id, value);
+      values[declaration.id] = value;
+      pendingSliderEdit = { parameterId: declaration.id, value };
+      scheduleSliderEdit();
     });
     return slider;
   };
@@ -1199,6 +1210,8 @@ export function createChainStrip({
      * @returns {void}
      */
     destroy() {
+      scheduleSliderEdit.cancel();
+      pendingSliderEdit = null;
       container.removeEventListener('keydown', historyKeydown);
       doc.removeEventListener('pointerdown', dismissPalette);
       container.replaceChildren();
