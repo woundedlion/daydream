@@ -517,10 +517,18 @@ test('a segmented switch refreshes preset state before rebuilding the panel', ()
 
   app.pipeline.applyEffect();
 
-  assert.ok(app.log.indexOf('segments.refreshPresetState')
-    < app.log.indexOf('effectGui.build'));
-  assert.ok(app.log.indexOf('effectGui.build')
-    < app.log.indexOf('segments.setEffect Alpha'));
+  assert.deepEqual(app.log, [
+    'engine.setEffect Alpha',
+    'driver.setStrobeColumns 7',
+    'segments.refreshPresetState',
+    'effectGui.destroy',
+    'clearEffectParamUrl',
+    'effectGui.build',
+    'effectGui.mount',
+    'segments.setEffect Alpha',
+    'effectGui.applyAnimationPause',
+    'sidebar.setActive Alpha',
+  ]);
 });
 
 test('a preserved pause is committed after the segmented effect rebuild', () => {
@@ -528,8 +536,17 @@ test('a preserved pause is committed after the segmented effect rebuild', () => 
 
   app.pipeline.applyEffect(true);
 
-  assert.ok(app.log.indexOf('effectGui.applyAnimationPause')
-    > app.log.indexOf('segments.setEffect Alpha'));
+  assert.deepEqual(app.log, [
+    'engine.setEffect Alpha',
+    'driver.setStrobeColumns 7',
+    'segments.refreshPresetState',
+    'effectGui.destroy',
+    'effectGui.build',
+    'effectGui.mount',
+    'segments.setEffect Alpha',
+    'effectGui.applyAnimationPause',
+    'sidebar.setActive Alpha',
+  ]);
 });
 
 test('an engine that has not loaded yet still gets a sidebar and a mount point', () => {
