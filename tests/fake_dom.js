@@ -514,7 +514,10 @@ export function fakeElement(tag = 'div', options = {}) {
     enumerable: true,
     configurable: true,
     get() { return text; },
-    set(value) { text = value === null || value === undefined ? '' : String(value); },
+    set(value) {
+      text = value === null || value === undefined ? '' : String(value);
+      element.replaceChildren(...(text === '' ? [] : [text]));
+    },
   });
   Object.defineProperty(element, 'dataset', {
     enumerable: true,
