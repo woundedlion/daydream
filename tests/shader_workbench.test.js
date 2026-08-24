@@ -1,4 +1,4 @@
-import test from 'node:test';
+import { afterEach, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
@@ -20,7 +20,8 @@ import {
   FakeChainEngine, ParamSetResult, unpinnedEngineMethods,
 } from './fake_engine.js';
 import {
-  documentEvents, fakeElement, installDocument, restoreDocumentAfterEach,
+  documentEvents, fakeElement, installAnimationFrames, installDocument,
+  restoreDocumentAfterEach,
 } from './fake_dom.js';
 
 const INDEX = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -33,6 +34,10 @@ const ENGINE_CATALOG = readFileSync(
 const SCRATCH = scratchChainDocument(JSON.parse(ENGINE_CATALOG));
 
 restoreDocumentAfterEach();
+
+let animationFrames;
+beforeEach(() => { animationFrames = installAnimationFrames(); });
+afterEach(() => { animationFrames.restore(); });
 
 test('shader state hashes round-trip the complete authoring state', async () => {
   const state = {
@@ -898,7 +903,7 @@ async function editorWorkbench({
   await controller.flushDeepLink();
   return {
     controller, engine, compiledEngine, elements, downloads, selections, filters, ran,
-    animationWrites, animationsPaused: () => animationsPaused, urls, win,
+    animationFrames, animationWrites, animationsPaused: () => animationsPaused, urls, win,
   };
 }
 
@@ -1257,7 +1262,9 @@ function stageEditor(harness, label) {
       .find((row) => row.dataset.parameter === parameterId)
       .querySelector('.chain-param-control');
     control.value = String(value);
-    control.dispatch(control.tagName === 'SELECT' ? 'change' : 'input');
+    const eventType = control.tagName === 'SELECT' ? 'change' : 'input';
+    control.dispatch(eventType);
+    if (eventType === 'input') harness.animationFrames.flush();
   };
 }
 

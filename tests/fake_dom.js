@@ -658,3 +658,37 @@ export function restoreDocumentAfterEach() {
     else globalThis.document = saved;
   });
 }
+
+/**
+ * Installs animation-frame globals whose callbacks run when `flush()` is called.
+ * @returns {{pending: number, flush: () => void, restore: () => void}} The frame queue.
+ */
+export function installAnimationFrames() {
+  const savedRequest = globalThis.requestAnimationFrame;
+  const savedCancel = globalThis.cancelAnimationFrame;
+  const queued = new Map();
+  let nextHandle = 1;
+
+  globalThis.requestAnimationFrame = (callback) => {
+    const handle = nextHandle++;
+    queued.set(handle, callback);
+    return handle;
+  };
+  globalThis.cancelAnimationFrame = (handle) => queued.delete(handle);
+
+  return {
+    get pending() { return queued.size; },
+    flush() {
+      const callbacks = [...queued.values()];
+      queued.clear();
+      for (const callback of callbacks) callback();
+    },
+    restore() {
+      queued.clear();
+      if (savedRequest === undefined) delete globalThis.requestAnimationFrame;
+      else globalThis.requestAnimationFrame = savedRequest;
+      if (savedCancel === undefined) delete globalThis.cancelAnimationFrame;
+      else globalThis.cancelAnimationFrame = savedCancel;
+    },
+  };
+}
