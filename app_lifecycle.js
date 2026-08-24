@@ -52,7 +52,7 @@ export function displayAliasesDiverged(driver, view) {
  *
  * @param {Object} deps - Injected app collaborators.
  * @param {{engine: {drawFrame: () => void, getArenaMetrics: () => Object},
- *   refresh: () => void, view: () => Uint16Array}} deps.host - The EngineHost
+ *   refresh: () => boolean, view: () => Uint16Array|null}} deps.host - The EngineHost
  *   owning the main engine and its view.
  * @param {DisplayDriver} deps.driver - The Daydream driver.
  * @param {{ownsDisplay: boolean, active: boolean, frameComposited: boolean,
@@ -91,6 +91,7 @@ export function createRenderAdapter({
         // All three aliases must point at the one WASM view; log once and
         // re-point rather than throw (throwing here halts the render loop).
         const view = host.view();
+        if (view === null) return;
         if (displayAliasesDiverged(driver, view)) {
           if (!aliasDivergenceLogged) {
             logError(
