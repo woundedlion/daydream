@@ -883,6 +883,7 @@ export function start({
     switches,
     stopTimers: () => { testAllTicker.stop(); applyNotice.clear(); },
     effectGui,
+    shaderDocuments,
     globalGui: guiInstance,
     host,
     urlSync,
