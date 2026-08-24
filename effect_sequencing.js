@@ -349,8 +349,7 @@ export function createSwitchCoordinator({
  *   applyAnimationPause: Function}} deps.effectGui - The effect panel controller.
  * @param {() => void} deps.clearEffectParamUrl - Drops the outgoing effect's
  *   param URL entries.
- * @param {{active: boolean, refreshPresetState: () => void,
- *   setEffect: (effect: string) => void,
+ * @param {{active: boolean, setEffect: (effect: string) => void,
  *   setResolution: (w: number, h: number) => void}} deps.segments - The SegmentController.
  * @param {{setStrobeColumns: (strobe: boolean) => void, invalidate: () => void,
  *   updateResolution: (w: number, h: number, dotSize: number) => void}} deps.driver -
@@ -416,8 +415,6 @@ export function createApplyPipeline({
     // A rejected effect leaves the engine unchanged, so return before the worker
     // broadcast below: sending the rejected name would diverge them from main.
     if (getEngine() && !selectEngineEffect()) return ApplyResult.REJECTED;
-
-    if (getEngine() && segments.active) segments.refreshPresetState();
 
     effectGui.destroy();
     if (!preserveParams) clearEffectParamUrl();
