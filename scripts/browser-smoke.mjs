@@ -53,6 +53,8 @@ const solidMeshBuilt = () =>
 
 const PAGE_READY = {
   'index.html': enginePainted,
+  'tools/lissajous.html': null,
+  'tools/mobius.html': null,
   'tools/palettes.html': paletteRecipesListed,
   'tools/shader.html': enginePainted,
   'tools/solids.html': solidMeshBuilt,
@@ -219,6 +221,13 @@ if (pages.length === 0) {
     'browser-smoke: site_manifest.txt publishes no .html page — refusing to ' +
       'report a green run over an empty page set.',
   );
+  process.exit(1);
+}
+const missingReadiness = pages.filter((page) => !Object.hasOwn(PAGE_READY, page));
+const staleReadiness = Object.keys(PAGE_READY).filter((page) => !pages.includes(page));
+if (missingReadiness.length > 0 || staleReadiness.length > 0) {
+  console.error('browser-smoke: PAGE_READY must name every served page exactly; '
+    + `missing [${missingReadiness.join(', ')}], stale [${staleReadiness.join(', ')}].`);
   process.exit(1);
 }
 
