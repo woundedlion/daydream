@@ -623,6 +623,13 @@ test('the scratch document compiles clean against the catalog', async () => {
     'the one preset carries the catalog defaults');
   assert.deepEqual(Object.keys(values).sort(),
     compiled.document.descriptor.parameters.map((parameter) => parameter.id).sort());
+  const units = new Map(compiled.document.descriptor.parameters.map(
+    (parameter) => [parameter.id, parameter.unit]));
+  for (const id of [
+    'project.projection-spin-speed', 'sample.speed', 'sample.angle-speed',
+    'colorize.hue-noise-speed', 'colorize.phase-oscillation-speed',
+  ]) assert.equal(units.get(id), 'turn-per-frame', id);
+  assert.equal(units.get('colorize.palette-mapping'), 'mapping');
 });
 
 test('the store adopts the scratch document and edits it', async () => {
