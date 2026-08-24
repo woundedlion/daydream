@@ -462,7 +462,6 @@ function makeApp({
 
   const segments = {
     active: segmented,
-    refreshPresetState: () => log.push('segments.refreshPresetState'),
     setEffect: (name) => log.push(`segments.setEffect ${name}`),
     setResolution: (w, h) => log.push(`segments.setResolution ${w}x${h}`),
   };
@@ -551,7 +550,7 @@ test('a segmented pool is told which effect to render', () => {
   ]);
 });
 
-test('a segmented switch refreshes preset state before rebuilding the panel', () => {
+test('a segmented switch rebuilds the worker effect after the panel', () => {
   const app = makeApp({ segmented: true });
 
   app.pipeline.applyEffect();
@@ -559,7 +558,6 @@ test('a segmented switch refreshes preset state before rebuilding the panel', ()
   assert.deepEqual(app.log, [
     'engine.setEffect Alpha',
     'driver.setStrobeColumns 7',
-    'segments.refreshPresetState',
     'effectGui.destroy',
     'clearEffectParamUrl',
     'effectGui.build',
@@ -578,7 +576,6 @@ test('a preserved pause is committed after the segmented effect rebuild', () => 
   assert.deepEqual(app.log, [
     'engine.setEffect Alpha',
     'driver.setStrobeColumns 7',
-    'segments.refreshPresetState',
     'effectGui.destroy',
     'effectGui.build',
     'effectGui.mount',
@@ -617,7 +614,6 @@ test('a resolution change resizes every renderer before re-applying the effect',
     'sidebar.setEffects Alpha,Gamma sizes={"Alpha":12} presets={"Alpha":3}',
     'engine.setEffect Alpha',
     'driver.setStrobeColumns 7',
-    'segments.refreshPresetState',
     'effectGui.destroy',
     'clearEffectParamUrl',
     'effectGui.build',
