@@ -467,27 +467,22 @@ export function createChainStrip({
   };
 
   /**
-   * Anchors an open palette horizontally under the control that opened it. The
-   * stylesheet places it against its offset parent, which is whatever
-   * positioned ancestor happens to sit above it rather than the anchor, so the
-   * offset is measured and written out; a palette near the right edge is
-   * clamped back inside the viewport. A DOM with no layout keeps the
-   * stylesheet's placement.
+   * Anchors an open palette under the control that opened it, clamped inside
+   * the viewport.
    * @param {*} element - The open palette.
    * @param {*} anchor - The control it opened from.
    * @returns {void}
    */
   const placePalette = (element, anchor) => {
-    const parent = element.offsetParent;
     if (typeof element.getBoundingClientRect !== 'function'
-      || typeof anchor.getBoundingClientRect !== 'function'
-      || !parent || typeof parent.getBoundingClientRect !== 'function') return;
+      || typeof anchor.getBoundingClientRect !== 'function') return;
     const width = element.getBoundingClientRect().width;
     const viewport = doc.documentElement?.clientWidth ?? 0;
-    let left = anchor.getBoundingClientRect().left;
+    const anchorBounds = anchor.getBoundingClientRect();
+    let left = anchorBounds.left;
     if (viewport > 0) left = Math.min(left, viewport - width - PALETTE_MARGIN);
-    element.style.left =
-      `${Math.max(PALETTE_MARGIN, left) - parent.getBoundingClientRect().left}px`;
+    element.style.left = `${Math.max(PALETTE_MARGIN, left)}px`;
+    element.style.top = `${anchorBounds.bottom}px`;
   };
 
   /** Removes an open palette without committing anything. */

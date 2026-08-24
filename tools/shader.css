@@ -436,7 +436,7 @@ select.chain-param-control {
 }
 
 .chain-palette {
-  position: static;
+  position: fixed;
   z-index: 2100;
   min-width: 13rem;
   max-height: 12rem;
@@ -499,12 +499,6 @@ select.chain-param-control {
 
   .chain-band {
     flex: 0 0 auto;
-  }
-
-  /* A popover inside a scroller would be clipped by it, so the palette flows. */
-  .chain-palette {
-    position: static;
-    max-height: 12rem;
   }
 
   .chain-chip-params {
