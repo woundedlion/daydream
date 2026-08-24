@@ -31,7 +31,8 @@ import { resolveActiveEffect } from "./sidebar_logic.js";
 
 /** @typedef {{paramValues: Array<[string, any]>, animationsPaused: boolean}} EffectControlSnapshot */
 
-/** @typedef {{applied: boolean, failure: any, recoveryFailure: any}} SwitchOutcome */
+/** @typedef {{applied: boolean, failure: any, recoveryFailure: any,
+ *   moduleDead?: boolean}} SwitchOutcome */
 
 /**
  * Outcome of an effect/resolution apply, mirroring the engine's ParamSetResult
@@ -50,9 +51,12 @@ export const ApplyResult = Object.freeze({
  * @param {() => string} apply - Applies the requested state, returning an
  *   ApplyResult; anything but APPLIED is a rejection.
  * @param {Function} rollback - Restores the previous applied state.
- * @returns {{applied: boolean, failure: any|null, recoveryFailure: any|null}}
+ * @param {() => boolean} [moduleDead] - Reads whether a thrown apply trapped
+ *   the engine module, in which case no rollback call is safe.
+ * @returns {{applied: boolean, failure: any|null, recoveryFailure: any|null,
+ *   moduleDead?: boolean}}
  */
-export function runSwitchTransaction(apply, rollback) {
+export function runSwitchTransaction(apply, rollback, moduleDead = () => false) {
   let failure = null;
   try {
     if (apply() === ApplyResult.APPLIED) {
@@ -60,6 +64,9 @@ export function runSwitchTransaction(apply, rollback) {
     }
   } catch (error) {
     failure = error;
+    if (moduleDead()) {
+      return { applied: false, failure, recoveryFailure: null, moduleDead: true };
+    }
   }
 
   try {
@@ -138,7 +145,8 @@ export function applyInitialState(apply, onSuccess) {
  * Classify a switch transaction's outcome into what the app should report. A
  * rejected switch whose rollback succeeded is reported to the user while the
  * previous state remains usable. A failed rollback leaves state, URL, and
- * engine possibly disagreeing, so it additionally earns the fatal banner.
+ * engine possibly disagreeing, so it additionally earns the fatal banner. A
+ * trapped module is terminal and earns the banner without attempting rollback.
  * @param {string} label - What switched, for the log lines ("Effect"/"Resolution").
  * @param {SwitchOutcome} result - A runSwitchTransaction() outcome.
  * @returns {{logs: Array<{message: string, error: any}>, notice: string|null,
@@ -148,6 +156,13 @@ export function switchFailureReport(label, result) {
   const logs = [];
   if (result.failure) {
     logs.push({ message: `${label} switch failed:`, error: result.failure });
+  }
+  if (result.moduleDead) {
+    return {
+      logs,
+      notice: null,
+      fatal: `${label} change trapped the rendering engine. Reload the page.`,
+    };
   }
   if (!result.recoveryFailure) {
     const notice = result.applied ? null
@@ -196,6 +211,8 @@ export function switchFailureReport(label, result) {
  * @param {(message: string, error: any) => void} deps.logError - Console sink.
  * @param {(message: string|null) => void} deps.showNotice - Recoverable error sink.
  * @param {(message: string) => void} deps.showFatal - Fatal-banner sink.
+ * @param {() => boolean} [deps.moduleDead] - Reads whether the engine module
+ *   trapped after an apply threw.
  * @param {() => boolean} [deps.usesFullConfigSnapshot] - Whether the live effect
  *   persists through the exhaustive versioned snapshot API, which the panel
  *   rebuild restores whole; its parameters are then not replayed one at a time.
@@ -215,6 +232,7 @@ export function createSwitchCoordinator({
   logError,
   showNotice,
   showFatal,
+  moduleDead = () => false,
   usesFullConfigSnapshot = () => false,
 }) {
   let restoring = false;
@@ -276,6 +294,7 @@ export function createSwitchCoordinator({
       report('Effect', runSwitchTransaction(
         () => applyEffect(),
         () => restoreEffect(old, previousUrl, previousEffectState),
+        moduleDead,
       ));
     } else if (key === 'resolution') {
       const previousEffect = appState.get('effect');
@@ -285,6 +304,7 @@ export function createSwitchCoordinator({
       const result = runSwitchTransaction(
         () => applyResolution(),
         () => restoreResolution(old, previousEffect, previousUrl, previousEffectState),
+        moduleDead,
       );
       if (!result.applied) queueMicrotask(syncResolutionUrl);
       report('Resolution', result);

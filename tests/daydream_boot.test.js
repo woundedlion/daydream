@@ -72,6 +72,7 @@ const SOURCE = withoutComments(
 
 const WASM_INIT = 'createModuleLoadHandlers(';
 const FRAME_GUARD = 'createFrameLoopGuard(';
+const SWITCH_COORDINATOR = 'createSwitchCoordinator(';
 
 test('catalog effects are offered at both simulator resolutions', () => {
   for (const effect of ['AshCloud', 'HyperLattice']) {
@@ -148,6 +149,16 @@ test('the render loop polls the engine death latch and releases the app on it', 
   assert.match(guard, /onModuleDead:\s*\(\)\s*=>\s*appTeardown\?\.dispose\(\)/,
     'the loop, the engine, and every listener otherwise outlive a module no '
     + 'call can recover');
+});
+
+test('the switch coordinator checks the engine death latch before rollback', () => {
+  const at = SOURCE.indexOf(SWITCH_COORDINATOR);
+  assert.ok(at >= 0, 'daydream.js must still build the switch coordinator');
+  const deps = balanced(SOURCE, at + SWITCH_COORDINATOR.length - 1);
+
+  assert.match(deps, /moduleDead:\s*\(\)\s*=>\s*host\.moduleDead\(\)/,
+    'an apply throw may be a terminal module trap, so rollback cannot make '
+    + 'another engine call until the module death flag is read');
 });
 
 test('the page-failure surface is the shared one, and it is torn down', () => {

@@ -150,10 +150,16 @@ test('a thrown initial state keeps the loader visible and propagates the error',
 
 test('a successful switch leaves the previous applied state untouched', () => {
   let rollbacks = 0;
-  const result = runSwitchTransaction(() => ApplyResult.APPLIED, () => { rollbacks++; });
+  let deadChecks = 0;
+  const result = runSwitchTransaction(
+    () => ApplyResult.APPLIED,
+    () => { rollbacks++; },
+    () => { deadChecks++; return true; },
+  );
 
   assert.deepEqual(result, { applied: true, failure: null, recoveryFailure: null });
   assert.equal(rollbacks, 0);
+  assert.equal(deadChecks, 0);
 });
 
 test('a rejected switch restores the previous applied state', () => {
@@ -176,6 +182,24 @@ test('a thrown switch restores the previous applied state and reports the failur
   assert.equal(result.failure, failure);
   assert.equal(result.recoveryFailure, null);
   assert.equal(restored, true);
+});
+
+test('a thrown switch does not roll back into a trapped module', () => {
+  const failure = new WebAssembly.RuntimeError('unreachable');
+  let restored = false;
+  const result = runSwitchTransaction(
+    () => { throw failure; },
+    () => { restored = true; },
+    () => true,
+  );
+
+  assert.deepEqual(result, {
+    applied: false,
+    failure,
+    recoveryFailure: null,
+    moduleDead: true,
+  });
+  assert.equal(restored, false);
 });
 
 test('a rollback failure is surfaced separately from the switch failure', () => {
@@ -334,6 +358,21 @@ test('a failed rollback logs both errors and is fatal', () => {
   assert.match(report.logs[1].message, /^Resolution rollback failed/);
   assert.equal(report.notice, null);
   assert.match(report.fatal, /^Resolution change failed .*Reload the page\.$/);
+});
+
+test('a trapped module is fatal without claiming rollback restored the value', () => {
+  const failure = new WebAssembly.RuntimeError('unreachable');
+  const report = switchFailureReport('Effect', {
+    applied: false,
+    failure,
+    recoveryFailure: null,
+    moduleDead: true,
+  });
+
+  assert.deepEqual(report.logs, [{ message: 'Effect switch failed:', error: failure }]);
+  assert.equal(report.notice, null);
+  assert.equal(report.fatal,
+    'Effect change trapped the rendering engine. Reload the page.');
 });
 
 test('a rejected switch whose rollback failed still raises the banner', () => {
