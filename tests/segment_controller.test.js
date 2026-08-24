@@ -291,6 +291,59 @@ test('a failed binary re-fetch drops the module the previous warm left', async (
   c.destroy();
 });
 
+test('a warm that settles behind a newer one leaves its module alone', async () => {
+  const warmer = new ModuleWarmer();
+  /** @type {(bytes: ArrayBuffer) => void} */
+  let releaseStale = () => {};
+  const stale = new Promise((resolve) => { releaseStale = resolve; });
+  const serve = (path, binary) => ({
+    baseUrl: `http://localhost:8000/${path}/segment_controller.js`,
+    minIntervalMs: 0,
+    fetch: (url) => Promise.resolve({
+      arrayBuffer: () => (url.href.endsWith('.wasm')
+        ? binary()
+        : Promise.resolve(new ArrayBuffer(0))),
+    }),
+  });
+
+  const slow = warmer.warm(serve('stale', () => stale));
+  await warmer.warm(serve('fresh', () => Promise.resolve(EMPTY_WASM.buffer)));
+  const fresh = warmer.module;
+  assert.ok(fresh instanceof WebAssembly.Module, 'the newer warm compiled');
+
+  releaseStale(Uint8Array.of(0, 0x61, 0x73, 0x6d, 9, 9, 9, 9).buffer);
+  const stub = mock.method(console, 'warn', () => {});
+  try {
+    await slow;
+  } finally {
+    stub.mock.restore();
+  }
+  assert.equal(warmer.module, fresh,
+    'the superseded warm nulled out a module a later warm had already landed');
+});
+
+test('a warm in flight when a worker refuses the module does not restore it', async () => {
+  const warmer = new ModuleWarmer();
+  /** @type {(bytes: ArrayBuffer) => void} */
+  let releaseBinary = () => {};
+  const binary = new Promise((resolve) => { releaseBinary = resolve; });
+  const warm = warmer.warm({
+    baseUrl: 'http://localhost:8000/refused/segment_controller.js',
+    minIntervalMs: 0,
+    fetch: (url) => Promise.resolve({
+      arrayBuffer: () => (url.href.endsWith('.wasm')
+        ? binary
+        : Promise.resolve(new ArrayBuffer(0))),
+    }),
+  });
+
+  warmer.discard();
+  releaseBinary(EMPTY_WASM.buffer);
+  await warm;
+  assert.equal(warmer.module, null,
+    'the discarded warm handed the pool back the compilation a worker refused');
+});
+
 test('dispose drops the held compilation that destroy keeps for the next pool',
   async () => {
     const warmer = new ModuleWarmer();
