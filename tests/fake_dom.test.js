@@ -205,11 +205,16 @@ test('a listener an earlier handler removed does not run', () => {
 
 test('textContent and setAttribute hand back the strings a browser stores', () => {
   const el = fakeElement('div');
+  const stale = fakeElement('span');
+  el.append(stale);
 
   el.textContent = 7;
   assert.equal(el.textContent, '7');
+  assert.deepEqual(el.childNodes, ['7']);
+  assert.equal(stale.parentNode, null, 'the replaced child stayed parented');
   el.textContent = null;
   assert.equal(el.textContent, '', 'null reads back as the empty string');
+  assert.deepEqual(el.childNodes, []);
   el.textContent = undefined;
   assert.equal(el.textContent, '');
 
