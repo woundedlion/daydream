@@ -566,6 +566,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 ├── sidebar_logic.js            DOM-free sidebar sort, keyboard-index and scroll-arrow math
 ├── recorder.js                 MediaRecorder pipeline (mp4 / webm), sim-synced
 ├── global_stats_view.js        Single-engine stats bar: frame draw duration and per-arena usage
+├── module_warmer.js            Deduplicated worker-module fetch and shared WASM compilation
 ├── segment_controller.js       Orchestrates the segmented-POV worker pool:
 │                                  dispatch, generation fence, and compositing
 ├── segment_worker.js           Web Worker that hosts one WASM instance per
