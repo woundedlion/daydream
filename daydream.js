@@ -40,8 +40,8 @@ import {
   SEGMENT_CONTROLLER_API_VERSION,
   SegmentController,
   maxSegmentCount,
-  warmModules,
 } from "./segment_controller.js";
+import { pageWarmer } from "./module_warmer.js";
 import { EngineHost } from "./engine_host.js";
 import { reportPageFailures, showFatalError } from "./tools/banner.js";
 import { showBootstrapFailure } from "./bootstrap.js";
@@ -725,7 +725,7 @@ export function start({
   // the warmModules() await.
   let segCount = segState.segments;
   const segSpawn = createSegmentSpawnGuard({
-    warmModules,
+    warmModules: () => pageWarmer.warm(),
     // segMax is the layout the page loaded in; a rotation into the mobile
     // layout lowers what the device can carry, so the pool is bounded by the
     // ceiling as it stands at the spawn, not the one the slider was built on.

@@ -29,11 +29,10 @@ const {
   BOOT_WATCHDOG_MS,
   INIT_WATCHDOG_MS,
   RENDER_WATCHDOG_MS,
-  WARM_INTERVAL_MS,
   maxSegmentCount,
-  warmModules,
-  ModuleWarmer,
 } = await import('../segment_controller.js');
+const { ModuleWarmer, WARM_INTERVAL_MS, pageWarmer } = await import('../module_warmer.js');
+const warmModules = (dependencies) => pageWarmer.warm(dependencies);
 const { PROTOCOL_VERSION } = await import('../worker_protocol.js');
 
 const EXPECTED_CONSOLE_MESSAGES = {
