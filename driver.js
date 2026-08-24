@@ -557,7 +557,7 @@ export class Daydream {
 
     // Capture only when the sim advanced. In segmented mode the composite lands a
     // frame late, so captureReady() gates out the leading cleared black frames.
-    const captureDue = Boolean(this.recorder) && advanced &&
+    const captureDue = this.recorder?.isRecording === true && advanced &&
       (typeof adapter?.captureReady !== 'function' || adapter.captureReady());
 
     // Three throws if an attribute's array byteLength differs from the size it gave

@@ -635,7 +635,11 @@ test('render holds the repaint while instanceColor aliases a detached view', () 
  * @returns {Object} Recorder exposing `frames` and captureFrame().
  */
 function fakeRecorder(log) {
-  return { frames: 0, captureFrame() { this.frames++; log?.push('captureFrame'); } };
+  return {
+    isRecording: true,
+    frames: 0,
+    captureFrame() { this.frames++; log?.push('captureFrame'); },
+  };
 }
 
 /** Turns a render context into one whose clock releases a simulation tick.
@@ -726,6 +730,16 @@ test('a held repaint that advanced no tick captures nothing', () => {
   const log = [];
   const ctx = renderCtx(detachedView(), log);
   ctx.recorder = fakeRecorder(log);
+  Daydream.prototype.render.call(ctx, null);
+
+  assert.equal(ctx.recorder.frames, 0);
+  assert.equal(ctx.heldCaptures, 0);
+});
+
+test('an idle recorder does not accrue a held capture', () => {
+  const ctx = runningCtx(renderCtx(detachedView(), []));
+  ctx.recorder.isRecording = false;
+
   Daydream.prototype.render.call(ctx, null);
 
   assert.equal(ctx.recorder.frames, 0);
