@@ -8,6 +8,7 @@
 // where the float-vs-double cosine input can land in an adjacent cell).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import createHolosphereModule from '../holosphere_wasm.js';
 import * as C from '../tools/color.js';
 import * as P from '../tools/palette_math.js';
@@ -215,6 +216,137 @@ function sampleLut(lut) {
   return LUT_SAMPLES.map((index) =>
     [lut[3 * index], lut[3 * index + 1], lut[3 * index + 2]]);
 }
+
+const PALETTE_V4_ENUM_CONTRACT = Object.freeze({
+  hueMode: { field: 4, members: [
+    ['HARMONY', 0, '451451b07735d920'],
+    ['SWEEP', 1, '170c75499fbf2003'],
+    ['CUSTOM', 2, '28f689b9b132a064'],
+  ] },
+  harmony: { field: 5, members: [
+    ['MONOCHROMATIC', 0, '86387ae32c61139a'],
+    ['ANALOGOUS', 1, '451451b07735d920'],
+    ['ACCENTED_ANALOGOUS', 2, '589a11b1b6463634'],
+    ['COMPLEMENTARY', 3, '12f0ccf1699ff4a6'],
+    ['SPLIT_COMPLEMENTARY', 4, '6e151d5a3e66a38e'],
+    ['TRIADIC', 5, '4c973eca5c79f1d1'],
+    ['TETRADIC', 6, '5c79ffa80f5eb54d'],
+    ['SQUARE', 7, '6b68f27ea6c11e51'],
+  ] },
+  direction: { field: 6, members: [
+    ['SHORTEST', 0, '451451b07735d920'],
+    ['CLOCKWISE', 1, '5c959d6f7a45f90d'],
+    ['COUNTERCLOCKWISE', 2, '451451b07735d920'],
+  ] },
+  curve: { field: 14, members: [
+    ['CONSTANT', 0, '865e5efb91ef7e11'],
+    ['ASCENDING', 1, 'e2501b6868fcd624'],
+    ['DESCENDING', 2, '8bdc2f1836f4cbd4'],
+    ['BELL', 3, '451451b07735d920'],
+    ['CUP', 4, '31d26ce609ff89eb'],
+    ['CUSTOM', 5, '0c0c2f8ffefc95c4'],
+  ] },
+  chromaBasis: { field: 22, members: [
+    ['LOCAL_GAMUT', 0, '451451b07735d920'],
+    ['PATH_MINIMUM', 1, 'error:3:22'],
+    ['ABSOLUTE', 2, '2ce168eda43a47ea'],
+  ] },
+  colorPath: { field: 3, members: [
+    ['OKLCH_ARC', 0, '451451b07735d920'],
+    ['OKLAB_CARTESIAN', 1, '545eafa0b655e0e5'],
+  ] },
+  domain: { field: 1, members: [
+    ['STRAIGHT', 0, '451451b07735d920'],
+    ['MIRROR', 1, '7699281a94883cd7'],
+    ['VIGNETTE', 2, '2633c3c8ec269acd'],
+    ['FALLOFF', 3, '693c9a874a07cb2a'],
+    ['LOOP', 4, '5d91f7f1d76267a7'],
+  ] },
+  easing: { field: 2, members: [
+    ['LINEAR', 0, '6033220e629bd792'],
+    ['COSINE', 1, '451451b07735d920'],
+    ['SMOOTHSTEP', 2, '4ccd0f7f0cdc8486'],
+  ] },
+});
+
+function paletteEnumProbeRecipe() {
+  const recipe = defaultPaletteRecipe();
+  recipe.input = { offset: 0.07, span: 0.83 };
+  recipe.easing = 1;
+  recipe.hue = {
+    mode: 0,
+    harmony: 1,
+    direction: 0,
+    baseTurns: 0.17,
+    spreadTurns: 0.19,
+    sweepTurns: 1.25,
+    customTurns: [0, 0.13, 0.4, 0.83],
+  };
+  recipe.lightness = {
+    curve: 3,
+    center: 0.55,
+    range: 0.35,
+    custom: [0.2, 0.75, 0.35, 0.65],
+  };
+  recipe.chroma = {
+    curve: 4,
+    basis: 0,
+    center: 0.45,
+    range: 0.35,
+    headroom: 0.82,
+    custom: [0.15, 0.7, 0.3, 0.6],
+  };
+  recipe.hueTorsion = 0.4;
+  recipe.falloffStart = 0.9;
+  return recipe;
+}
+
+function setPaletteEnum(recipe, group, ordinal) {
+  if (group === 'hueMode') recipe.hue.mode = ordinal;
+  else if (group === 'harmony') recipe.hue.harmony = ordinal;
+  else if (group === 'direction') recipe.hue.direction = ordinal;
+  else if (group === 'curve') recipe.lightness.curve = ordinal;
+  else if (group === 'chromaBasis') recipe.chroma.basis = ordinal;
+  else recipe[group] = ordinal;
+}
+
+function paletteResultFingerprint(result) {
+  if (result.status.code !== 0) {
+    return `error:${result.status.code}:${result.status.field}`;
+  }
+  return createHash('sha256')
+    .update(Uint8Array.from(result.lut))
+    .digest('hex')
+    .slice(0, 16);
+}
+
+test('Palette V4 enum spellings and ordinals match the shipped engine', () => {
+  const ops = new M.PaletteOps();
+  try {
+    for (const [group, { field, members }] of
+      Object.entries(PALETTE_V4_ENUM_CONTRACT)) {
+      const roster = members.map(([name, ordinal]) => [name, ordinal]);
+      assert.deepEqual(Object.entries(PaletteV4[group]), roster, `${group} public roster`);
+      assert.deepEqual(P.ENUM_NAMES[group], roster.map(([name]) => name),
+        `${group} inverse roster`);
+
+      const engineMembers = members.map(([name, ordinal]) => {
+        const recipe = paletteEnumProbeRecipe();
+        setPaletteEnum(recipe, group, ordinal);
+        return [name, ordinal, paletteResultFingerprint(ops.compileAndBakeV4(recipe))];
+      });
+      assert.deepEqual(engineMembers, members, `${group} engine ordinals`);
+
+      const rejectedRecipe = paletteEnumProbeRecipe();
+      setPaletteEnum(rejectedRecipe, group, members.length);
+      const rejected = ops.compileAndBakeV4(rejectedRecipe);
+      assert.deepEqual([rejected.status.code, rejected.status.field], [3, field],
+        `${group} engine roster length`);
+    }
+  } finally {
+    ops.delete();
+  }
+});
 
 test('PaletteOps exposes only the V4 recipe compiler operations', () => {
   const ops = new M.PaletteOps();
