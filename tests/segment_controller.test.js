@@ -2585,25 +2585,18 @@ test('setEffect bumps renderGen so an in-flight old-effect frame is fenced out',
 // A resize drops the worker's effect and its clip, and the worker cannot re-clip
 // without one; a pool left that way renders correctly-sized black frames that
 // pass every fence, watchdog and composite check.
-test('setResolution re-applies the effect so no worker is left unclipped', () => {
+test('setResolution leaves one effect rebuild to the apply pipeline', () => {
   const c = readyController(2, { effect: 'Ribbons' });
   c.getWasmEngine = () => fakeEngine([{ name: 'Speed', value: 0.25 }]);
 
   c.setResolution(8, 8);
 
   for (const w of c.workers) {
-    assert.deepEqual(w.posted.map((m) => m.type),
-      ['init', 'setResolution', 'setEffect'],
-      'the resize is followed by the effect rebuild that restores the clip');
-    assert.equal(w.posted[2].name, 'Ribbons', 'the active effect is restored');
-    assert.deepEqual(w.posted[2].params,
-      [{ name: 'Speed', value: 0.25, acceptedValue: 0.25 }],
-      'tuned values ride along so the rebuild does not land on defaults');
-    assert.equal(w.posted[2].paused, false);
+    assert.deepEqual(w.posted.map((m) => m.type), ['init', 'setResolution']);
   }
 });
 
-test('setResolution carries pause state into its trailing effect rebuild', () => {
+test('setResolution does not rebuild the effect with an empty snapshot', () => {
   const c = readyController(2, { effect: 'Ribbons' });
   c.setAnimationsPaused(true);
   for (const w of c.workers) w.posted.length = 0;
@@ -2611,8 +2604,7 @@ test('setResolution carries pause state into its trailing effect rebuild', () =>
   c.setResolution(8, 8);
 
   for (const w of c.workers) {
-    const msg = w.posted.find((m) => m.type === 'setEffect');
-    assert.equal(msg.paused, true);
+    assert.equal(w.posted.some((m) => m.type === 'setEffect'), false);
   }
 });
 

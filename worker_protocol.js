@@ -99,7 +99,7 @@ export const PROTOCOL_VERSION = 9;
 
 /** Resize the worker's canvas; the worker recomputes its segment rectangle from
  * w/h but does not push it to the engine: a size change tears the effect down,
- * and the engine rejects a clip with no effect. The controller follows with a
+ * and the engine rejects a clip with no effect. The apply pipeline follows with
  * setEffect, which rebuilds the effect and applies the new clip.
  * @typedef {{ type: 'setResolution', w: number, h: number }} SetResolutionMsg */
 
