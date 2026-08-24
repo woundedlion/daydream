@@ -68,15 +68,19 @@ test('constructor mounts its five nodes and wires listeners + observer', () => {
   assert.deepEqual(observers[0].observed, [sidebar.listEl]);
 });
 
-test('setEffects builds one button per name and sizes only when > 0', () => {
+test('setEffects builds one button per name with its preset count and optional size', () => {
   const { sidebar } = makeSidebar();
-  sidebar.setEffects(['Voronoi', 'Comets'], { Voronoi: 2048, Comets: 0 });
+  sidebar.setEffects(
+    ['Voronoi', 'Comets'], { Voronoi: 2048, Comets: 0 },
+    { Voronoi: 0, Comets: 12 });
   assert.equal(sidebar.buttons.size, 2);
   assert.equal(sidebar.listEl.children.length, 2);
   assert.equal(sidebar.items.length, 2);
   // Voronoi (size>0): name span + size span; Comets (size 0): name span only.
   assert.equal(sidebar.buttons.get('Voronoi').children.length, 2);
   assert.equal(sidebar.buttons.get('Comets').children.length, 1);
+  assert.equal(sidebar.buttons.get('Voronoi').children[0].textContent, 'Voronoi (0)');
+  assert.equal(sidebar.buttons.get('Comets').children[0].textContent, 'Comets (12)');
   // No active effect yet: roving tab stop falls to the first option.
   assert.equal(sidebar.tabbableBtn, sidebar.listEl.children[0]);
   assert.equal(sidebar.tabbableBtn.tabIndex, 0);

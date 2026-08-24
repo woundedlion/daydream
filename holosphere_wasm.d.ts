@@ -186,6 +186,8 @@ export interface HolosphereEngine {
   strobeColumns(): boolean;
   /** Effect name to hint size at the active resolution; empty at an unsupported one. */
   getEffectSizes(): Record<string, number>;
+  /** Effect name to authored preset count at the active resolution. */
+  getEffectPresetCounts(): Record<string, number>;
   /**
    * Programs the ShaderChain effect with an ordered operator chain. APPLIED
    * rebuilds the parameter definitions (named `instance.field`) and bumps the

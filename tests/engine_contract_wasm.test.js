@@ -719,7 +719,7 @@ test('shader_stages.js mirrors ShaderBall stage option labels exactly', () => {
   }
 });
 
-test('strobeColumns and getEffectSizes return the shapes daydream consumes', () => {
+test('strobeColumns and effect metadata return the shapes daydream consumes', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
     'setEffect must succeed after the readonly scan');
@@ -735,6 +735,17 @@ test('strobeColumns and getEffectSizes return the shapes daydream consumes', () 
   const nonNumeric = names.filter((name) => typeof sizes[name] !== 'number');
   assert.deepEqual(nonNumeric.slice(0, 5), [],
     `${nonNumeric.length} getEffectSizes entries are not numbers`);
+
+  const presetCounts = engine.getEffectPresetCounts();
+  assert.deepEqual(Object.keys(presetCounts).sort(), names.sort(),
+    'getEffectPresetCounts must cover the same factory roster as getEffectSizes');
+  const invalidCounts = Object.entries(presetCounts).filter(
+    ([, count]) => !Number.isInteger(count) || count < 0);
+  assert.deepEqual(invalidCounts.slice(0, 5), [],
+    `${invalidCounts.length} getEffectPresetCounts entries are not non-negative integers`);
+  assert.equal(presetCounts.Comets, 12);
+  assert.equal(presetCounts.CurlLattice, 2);
+  assert.equal(presetCounts.Voronoi, 0);
 });
 
 // engine_host.js calls getBufferLength through an optional-call guard, so a

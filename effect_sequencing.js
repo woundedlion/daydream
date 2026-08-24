@@ -336,7 +336,8 @@ export function createSwitchCoordinator({
  *   updateResolution: (w: number, h: number, dotSize: number) => void}} deps.driver -
  *   The Daydream driver.
  * @param {{setActive: (effect: string) => void,
- *   setEffects: (names: string[], sizes: Record<string, number>|null) => void}}
+ *   setEffects: (names: string[], sizes: Record<string, number>|null,
+ *     presetCounts: Record<string, number>|null) => void}}
  *   deps.sidebar - The effect sidebar.
  * @param {(write: () => void) => void} deps.muteSubscription - Runs an appState
  *   write with the switch subscription muted, for state this pipeline applies
@@ -464,11 +465,17 @@ export function createApplyPipeline({
 
     /** @type {Record<string, number>|null} */
     let effectSizes = null;
+    /** @type {Record<string, number>|null} */
+    let presetCounts = null;
     if (engine) {
       try { effectSizes = engine.getEffectSizes(); }
       catch (e) { logWarn('getEffectSizes failed (sidebar sizes unavailable):', e); }
+      try { presetCounts = engine.getEffectPresetCounts(); }
+      catch (e) {
+        logWarn('getEffectPresetCounts failed (sidebar preset counts unavailable):', e);
+      }
     }
-    sidebar.setEffects(offered, effectSizes);
+    sidebar.setEffects(offered, effectSizes, presetCounts);
 
     // Done after updateResolution()/setEffects() so the re-apply builds against
     // the resized dot mesh and the refreshed sidebar.
