@@ -995,7 +995,7 @@ test('a rejected full-config snapshot is reported and announces no import', () =
 
   assert.deepEqual(h.restoredFullConfigs, [stored], 'the snapshot never reached the engine');
   assert.deepEqual(h.warnings,
-    ['ShaderBall: full-config snapshot was rejected: INVALID_VALUE']);
+    ['Shader Workbench: full-config snapshot was rejected: INVALID_VALUE']);
   assert.deepEqual(h.configNotices, [],
     'a refused restore announced an import that did not happen');
   assert.equal(h.configNoticeClears(), 0, 'a refused restore consumed the notice');
