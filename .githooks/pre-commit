@@ -1,0 +1,48 @@
+#!/bin/sh
+# Staged-only checks that predict the fast, deterministic CI gates.
+set -eu
+
+CHANGED="$(git diff --cached --name-only --diff-filter=ACMRD)"
+PRESENT="$(git diff --cached --name-only --diff-filter=ACMR)"
+[ -n "$CHANGED" ] || exit 0
+
+if ! git diff --cached --check; then
+  echo "[pre-commit] staged whitespace errors must be fixed."
+  exit 1
+fi
+
+JAVASCRIPT_FILES="$(printf '%s\n' "$PRESENT" | grep -E '\.(js|mjs)$' || true)"
+if [ -n "$JAVASCRIPT_FILES" ]; then
+  if [ ! -x node_modules/.bin/eslint ]; then
+    echo "[pre-commit] node_modules is missing; run npm ci."
+    exit 1
+  fi
+  while IFS= read -r file; do
+    git show ":$file" \
+      | node_modules/.bin/eslint --stdin --stdin-filename "$file"
+  done <<EOF
+$JAVASCRIPT_FILES
+EOF
+fi
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "[pre-commit] node not found; Node.js is required for documentation checks."
+  exit 1
+fi
+
+SNAPSHOT_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/daydream-pre-commit.XXXXXX")"
+SNAPSHOT="$SNAPSHOT_ROOT/repo"
+trap 'rm -rf "$SNAPSHOT_ROOT"' EXIT INT TERM
+mkdir "$SNAPSHOT"
+git checkout-index --all --force --prefix="$SNAPSHOT/"
+LOCAL_GIT_ENV="$(git rev-parse --local-env-vars)"
+INDEX_PATH="$(git rev-parse --path-format=absolute --git-path index)"
+
+(
+  for name in $LOCAL_GIT_ENV; do unset "$name"; done
+  git -C "$SNAPSHOT" init --quiet
+  cp "$INDEX_PATH" "$SNAPSHOT/.git/index"
+  node --test "$SNAPSHOT/tests/site_manifest.test.js"
+)
+
+echo "[pre-commit] staged formatting, lint, and documentation checks passed."
