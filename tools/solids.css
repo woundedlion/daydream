@@ -1,0 +1,434 @@
+:root {
+  --sidebar-width: 224px;
+  /* Grows with viewport width but never collapses (or inverts) below the
+     474px reference width; capped so it doesn't crowd the canvas. */
+  --footer-height: clamp(96px, (100vw - 474px) * 0.22, 220px);
+  --right-sidebar-width: 250px;
+}
+
+body {
+  overflow: hidden;
+  margin: 0;
+  display: flex;
+}
+
+#sidebar {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  height: 100vh;
+  background-color: rgba(15, 23, 42, 0.95);
+  border-right: 1px solid var(--slate-700);
+  display: flex;
+  flex-direction: column;
+  z-index: 20;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+#main {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#canvas-container {
+  flex: 1;
+  position: relative;
+  background: linear-gradient(to bottom, var(--slate-900), var(--slate-800));
+  min-height: 0;
+  /* Allow shrinking */
+  overflow: hidden;
+}
+
+#footer {
+  width: 100%;
+  height: var(--footer-height);
+  background-color: transparent;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(64px, (100vw - 474px) * 0.08), 1fr));
+  grid-auto-rows: calc((var(--footer-height) - 1.5rem) / 2);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.5rem;
+  gap: 0.5rem;
+  z-index: 10;
+}
+
+/* Scrollbar styling for footer */
+#footer::-webkit-scrollbar {
+  height: 8px;
+}
+
+#footer::-webkit-scrollbar-track {
+  background: var(--slate-900);
+}
+
+#footer::-webkit-scrollbar-thumb {
+  background: var(--slate-700);
+  border-radius: 4px;
+}
+
+#footer::-webkit-scrollbar-thumb:hover {
+  background: var(--slate-600);
+}
+
+.thumb-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--slate-800);
+  border: 2px solid var(--slate-700);
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: max(4px, (100vw - 474px) * 0.005);
+  position: relative;
+}
+
+.thumb-btn:hover {
+  border-color: var(--blue-500);
+  background-color: var(--slate-700);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+.thumb-btn.active {
+  border-color: var(--blue-500);
+  background-color: rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.thumb-btn:focus-visible,
+.saved-restore:focus-visible,
+.move-op-btn:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+.thumb-btn img {
+  height: 60%;
+  object-fit: contain;
+  margin-bottom: max(2px, (100vw - 474px) * 0.004);
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
+}
+
+.thumb-btn .thumb-label {
+  font-size: clamp(0.55rem, (100vw - 474px) * 0.008, 0.85rem);
+  text-align: center;
+  line-height: 1.1;
+  color: #cbd5e1;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+/* Full name at readable size, shown over the tile on hover/focus; the
+   resting label above is clamped to two lines and ellipsizes long names. */
+.thumb-name-full {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0.3rem;
+  background: rgba(15, 23, 42, 0.92);
+  border-radius: 0.6rem;
+  font-size: clamp(0.65rem, (100vw - 474px) * 0.01, 0.9rem);
+  line-height: 1.25;
+  color: #e2e8f0;
+  overflow-wrap: anywhere;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.thumb-btn:hover .thumb-name-full,
+.thumb-btn:focus-visible .thumb-name-full {
+  display: flex;
+}
+
+/* .btn / .btn-primary / .btn-secondary now live in tools.css (shared).
+   The add-op grid packs 14 buttons into the sidebar, so it overrides the
+   shared padding with a tighter vertical profile. */
+#addOpGrid .btn {
+  padding: 0.2rem 0.3rem;
+}
+
+/* Ops the validator proved would trap an engine invariant on the current
+   mesh (see chainIsValid). */
+#addOpGrid .btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.op-item {
+  background-color: var(--slate-800);
+  border: 1px solid var(--slate-700);
+  padding: 0.25rem 0.4rem;
+  border-radius: 0.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), border-color 0.2s, opacity 0.2s;
+  user-select: none;
+}
+
+.op-item:hover {
+  border-color: var(--indigo-400);
+}
+
+.op-item.dragging {
+  opacity: 0.2;
+  transform: scale(0.98);
+  border-style: dashed;
+  z-index: 10;
+}
+
+/* Marks a step the engine's morph path declines to sweep; empty and hidden
+   while the step sweeps. */
+.op-unsweepable {
+  margin-left: 0.25rem;
+  cursor: help;
+}
+
+.drag-handle {
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1.25rem;
+  margin-right: 0.25rem;
+  color: var(--slate-500);
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+  /* The grip takes a touch drag, so the page must not scroll under it. */
+  touch-action: none;
+}
+
+.op-item:hover .drag-handle {
+  opacity: 1;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* While a slot the engine rejects is under the pointer. */
+.drag-handle.drop-blocked {
+  cursor: not-allowed;
+}
+
+.drag-handle svg {
+  width: 0.8rem;
+  height: 0.8rem;
+  fill: currentColor;
+}
+
+.move-op-btn {
+  color: var(--slate-500);
+  font-size: 0.7rem;
+  line-height: 1;
+  padding: 0.15rem;
+}
+
+.move-op-btn:disabled {
+  opacity: 0.3;
+}
+
+#saveBtn {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background-color: rgba(15, 23, 42, 0.8);
+  border: 2px solid var(--slate-700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+#save-actions {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  z-index: 40;
+}
+
+/* Reserves the collapsed line the gate feedback usually occupies while
+   still growing for a wrapped message. */
+#opGateMsg {
+  min-height: 0.75rem;
+  flex-shrink: 0;
+}
+
+#meshStats {
+  background-color: rgba(15, 23, 42, 0.8);
+  border: 1px solid var(--slate-700);
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: rgba(165, 180, 252, 0.8);
+  text-transform: uppercase;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+#saveBtn:hover {
+  border-color: var(--blue-500);
+  transform: scale(1.1);
+}
+
+#saveBtn svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  stroke: #fbbf24;
+  fill: none;
+  stroke-width: 2;
+}
+
+#right-sidebar {
+  width: var(--right-sidebar-width);
+  flex-shrink: 0;
+  height: 100vh;
+  background-color: rgba(15, 23, 42, 0.95);
+  border-left: 1px solid var(--slate-700);
+  display: flex;
+  flex-direction: column;
+  z-index: 20;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.saved-item {
+  background-color: var(--slate-800);
+  border: 1px solid var(--slate-700);
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  margin-bottom: 0.75rem;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.saved-restore {
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+
+.saved-item:hover {
+  border-color: var(--blue-500);
+  transform: translateY(-2px);
+}
+
+/* Saved solid whose generated funcName is shared with another card or with
+   an engine-registry entry. */
+.saved-item.name-clash {
+  border-color: #f59e0b;
+}
+
+.saved-item img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 0.25rem;
+  margin-bottom: 0.5rem;
+  background-color: #000;
+}
+
+.saved-item .title {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #cbd5e1;
+  margin-bottom: 0.1rem;
+}
+
+.saved-item .details {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  margin-bottom: 0.5rem;
+}
+
+.saved-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.action-btn {
+  font-size: 0.65rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.2rem;
+  background-color: var(--slate-700);
+  color: #cbd5e1;
+  border: 1px solid var(--slate-600);
+  transition: all 0.2s;
+  font-weight: 600;
+}
+
+.action-btn:hover {
+  background-color: var(--blue-500);
+  color: white;
+  border-color: var(--blue-400);
+}
+
+.del-btn:hover {
+  background-color: #ef4444;
+  border-color: #f87171;
+}
+
+/* Small screens: the three side-by-side columns don't fit, so stack them
+   (canvas, then controls, then saved solids) and let the page scroll. */
+@media (max-width: 640px) {
+  body {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    overflow-y: auto;
+  }
+
+  #main {
+    order: 1;
+    height: 60vh;
+  }
+
+  #sidebar {
+    order: 2;
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--slate-700);
+  }
+
+  #right-sidebar {
+    order: 3;
+    width: 100%;
+    height: auto;
+    border-left: none;
+    border-top: 1px solid var(--slate-700);
+  }
+}
+.group:focus-visible .op-tooltip {
+  display: block;
+}

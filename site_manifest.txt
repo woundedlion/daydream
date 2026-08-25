@@ -46,12 +46,15 @@ holosphere_wasm.wasm
 # Tool pages and their shared modules.
 tools/lissajous.html
 tools/mobius.html
+tools/mobius.css
 tools/palettes.html
+tools/palettes.css
 tools/shader.html
 tools/shader.css
 tools/shader_deeplink.js
 tools/shader_documents.js
 tools/solids.html
+tools/solids.css
 tools/tools.css
 tools/tailwind.css
 tools/banner.js
