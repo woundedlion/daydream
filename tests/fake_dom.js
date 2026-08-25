@@ -9,8 +9,10 @@
 // overflowing chips, off-screen flyouts, scroll arrows that never appear,
 // scrollTop clamping, a renamed or deleted CSS rule, a display:none control that
 // still takes a click, focus landing on a non-focusable node, and a drag that
-// loses pointer capture or ignores pointercancel. scripts/workbench-probe.mjs
-// and scripts/browser-smoke.mjs are the jobs that do.
+// loses pointer capture or ignores pointercancel. The six probes
+// browser-smoke.yml drives are what catch them: scripts/browser-smoke.mjs,
+// workbench-probe.mjs, panel-probe.mjs, solids-probe.mjs, palettes-probe.mjs
+// and mobius-probe.mjs.
 import { afterEach } from 'node:test';
 
 // Nodes standing in for ones the page already carries. A parentless node is

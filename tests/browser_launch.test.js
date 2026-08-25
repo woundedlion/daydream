@@ -1,9 +1,9 @@
 //
-// scripts/browser.mjs picks the browser the two headless-Chrome jobs drive.
+// scripts/browser.mjs picks the browser the six headless-Chrome probes drive.
 // Nothing is ever downloaded, so a machine or a runner image with no Chrome must
 // fail loudly: a resolver that quietly answered nothing would let
-// scripts/browser-smoke.mjs and scripts/workbench-probe.mjs report a green run
-// over zero pages and zero gestures.
+// scripts/browser-smoke.mjs and the five page probes report a green run over
+// zero pages and zero gestures.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
