@@ -568,6 +568,7 @@ export function createChainStrip({
       const focusLabel = remove
         ? (after[index]?.label ?? after[index - 1]?.label ?? null)
         : (after[index]?.label ?? null);
+      if (kind === 'insert') store.setSelectedLabel(focusLabel);
       commit(focusLabel);
     };
 
@@ -1159,7 +1160,8 @@ export function createChainStrip({
    * Lands a catalog operator without a drag: an endomorphism at the gap after
    * the selected chip when that gap accepts it, else at the first gap that
    * does; a crossing over the socket its carrier pair names, which is the
-   * replacement the socket's own swap control commits.
+   * replacement the socket's own swap control commits. A stage that lands in
+   * a gap takes the selection, opening its controls.
    * @param {string} operatorId - The operator to land.
    * @returns {boolean} Whether the edit committed.
    */
@@ -1180,7 +1182,9 @@ export function createChainStrip({
       [socket === null ? { operator: operatorId }
         : replacementEntry(socket, operatorId)]);
     if (!result.ok) return report(result);
-    return commit(store.chain()[index]?.label ?? null);
+    const landed = store.chain()[index]?.label ?? null;
+    if (socket === null) store.setSelectedLabel(landed);
+    return commit(landed);
   };
 
   /**

@@ -267,6 +267,15 @@ async function probeStrip(tab) {
     '.chain-palette-entry[data-operator="warp.wave-shear.v2"]')).click();
   check((await bandChipNames(tab, 'plane')).includes('Wave Shear'),
     'the + menu inserts its selected stage');
+  const planeChips = await tab.$$eval('.chain-band[data-carrier="plane"] .chain-chip',
+    (nodes) => nodes.map((node) => ({
+      name: node.querySelector('.chain-chip-name')?.textContent ?? '',
+      current: node.getAttribute('aria-current'),
+      expanded: node.getAttribute('aria-expanded'),
+    })));
+  const landed = planeChips.find((chip) => chip.name === 'Wave Shear');
+  check(landed?.current === 'true' && landed?.expanded === 'true',
+    'the inserted stage is selected with its controls open');
 
   // A palette that survives a press elsewhere outlives the chain it was opened
   // over; the fake DOM models neither the press nor the focus move.

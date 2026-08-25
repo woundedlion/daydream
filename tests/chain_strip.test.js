@@ -439,6 +439,12 @@ test('a band + appends while Insert opens the insertion palette after focus', as
     .dispatch('click');
   assert.deepEqual(labels(h).slice(0, 3), ['camera', 'lens', 'sphere1'],
     'the band + lands at the band\'s last gap');
+  assert.equal(h.store.selectedLabel(), 'sphere1',
+    'the landed stage is selected, so its controls open on the insert');
+  assert.equal(chipByLabel(h, 'sphere1').getAttribute('aria-current'), 'true');
+  assert.equal(chipByLabel(h, 'sphere1')
+    .classList.contains('chain-chip--expanded'), true);
+  assert.deepEqual(h.selections, ['sphere1']);
   assert.equal(h.applied.length, 1);
 
   chipByLabel(h, 'camera').dispatch('click');
@@ -582,6 +588,8 @@ test('insertOperator lands after the selection, else at the first legal gap', as
   assert.equal(h.strip.insertOperator('warp.curl-flow.v2'), true);
   assert.equal(h.store.chain()[3].operator, 'warp.curl-flow.v2',
     'no selection: the first gap the store accepts');
+  assert.equal(h.store.selectedLabel(), h.store.chain()[3].label,
+    'the landed stage is selected, so its controls open on the insert');
 
   chipByLabel(h, 'camera').dispatch('click');
   assert.equal(h.strip.insertOperator('sphere.lens.glitch.v2'), true);
@@ -779,8 +787,6 @@ test('a stage with no parameters grows no disclosure', async () => {
   const label = h.store.chain()
     .find((entry) => entry.operator === 'sphere.lens.glitch.v2').label;
   assert.deepEqual(declarationsFor(h, label), []);
-
-  chipByLabel(h, label).dispatch('click');
 
   const chip = chipByLabel(h, label);
   assert.equal(chip.getAttribute('aria-current'), 'true');
