@@ -24,9 +24,7 @@ import {
   formatFloat,
   generateFuncAndRecipe,
 } from './solid_codegen.js';
-
-// A namespace is pasted as a C++ qualifier, so guard its shape.
-const CPP_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+import { COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns } from './cpp_format.js';
 
 /**
  * Longest step table a Recipe can describe: its count field is a uint8_t, so a
@@ -150,8 +148,6 @@ function recipeStepCpp(step) {
   return `{Op::${opName.toUpperCase()}}`;
 }
 
-// solids.h is clang-formatted at 80 columns, and the paste goes in verbatim.
-const COLUMN_LIMIT = 80;
 const INDENT = 4;
 
 /**
@@ -164,17 +160,7 @@ const INDENT = 4;
 function docCommentCpp(text) {
   const single = `/** ${text} */`;
   if (single.length <= COLUMN_LIMIT) return single;
-  const lines = [];
-  let line = ' *';
-  for (const word of text.split(' ')) {
-    if (line.length + 1 + word.length > COLUMN_LIMIT) {
-      lines.push(line);
-      line = ' *';
-    }
-    line += ` ${word}`;
-  }
-  lines.push(line);
-  return ['/**', ...lines, ' */'].join('\n');
+  return ['/**', ...fillColumns(text.split(' '), ' * '), ' */'].join('\n');
 }
 
 /**
@@ -186,18 +172,7 @@ function docCommentCpp(text) {
  * @returns {string} The filled text.
  */
 function fillCpp(tokens, first, rest) {
-  const lines = [];
-  let line = ' '.repeat(first) + tokens[0];
-  for (const token of tokens.slice(1)) {
-    if (line.length + 1 + token.length > COLUMN_LIMIT) {
-      lines.push(line);
-      line = ' '.repeat(rest) + token;
-    } else {
-      line += ` ${token}`;
-    }
-  }
-  lines.push(line);
-  return lines.join('\n');
+  return fillColumns(tokens, ' '.repeat(first), ' '.repeat(rest)).join('\n');
 }
 
 /**
