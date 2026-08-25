@@ -1,10 +1,10 @@
 /*
  * Tailwind CSS utilities for the standalone tool pages, generated ahead of time
  * and served same-origin. Covers exactly the utility classes lissajous.html,
- * mobius.html, palettes.html and solids.html reference, statically or from JS,
- * plus Tailwind's preflight reset.
+ * mobius.html, palettes.html, shader.html and solids.html reference, statically
+ * or from JS, plus Tailwind's preflight reset.
  *
- * Regenerate by rendering every candidate class token from those four pages
+ * Regenerate by rendering every candidate class token from those five pages
  * through the pinned Tailwind 3.4.17 build and capturing the stylesheet it
  * emits. Link it last in <head>: the utilities have to outrank tools.css and
  * each page's own rules.
