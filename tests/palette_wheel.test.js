@@ -139,6 +139,7 @@ test('a stack that would run off the bottom is lifted back onto the canvas', () 
   const labels = hueKeyLabelBoxes(
     [{ x: 200, y: 60 }, { x: 200, y: 62 }, { x: 200, y: 64 }], [1, 2, 3], bounds);
 
+  assert.equal(labels.length, 3, 'one box per marker');
   for (const label of labels)
     assert.ok(label.y >= 18 && label.y + label.height <= 120,
       'every box stays on the canvas');
