@@ -855,7 +855,8 @@ export class SegmentController {
    * Snapshot the main engine's accepted and requested parameter values,
    * flattened for structured-clone transport (bools encoded as 1/0). Workers
    * restore the accepted render state first, then replay pending requests.
-   * Readonly params carry no writable state and are left out.
+   * Readonly params carry no writable state and are left out, and an accepted
+   * value equal to the request is omitted so it replays as one write, not two.
    * @returns {import('./worker_protocol.js').SegParam[]}
    */
   snapshotParams() {
@@ -876,7 +877,9 @@ export class SegmentController {
       const accepted = acceptedValue ?? requested;
       const acceptedV = (typeof accepted === 'boolean')
         ? (accepted ? 1.0 : 0.0) : accepted;
-      params.push({ name: p.name, value: v, acceptedValue: acceptedV });
+      params.push(acceptedV === v
+        ? { name: p.name, value: v }
+        : { name: p.name, value: v, acceptedValue: acceptedV });
     }
     return params;
   }

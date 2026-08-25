@@ -2487,8 +2487,8 @@ test('snapshotParams() carries accepted and requested state independently', () =
   assert.deepEqual(c.snapshotParams(), [
     { name: 'Speed', value: 0.9, acceptedValue: 0.4 },
     { name: 'Glow', value: 1.0, acceptedValue: 0.0 },
-    { name: 'Invert', value: 0.0, acceptedValue: 0.0 },
-    { name: 'Count', value: 7, acceptedValue: 7 },
+    { name: 'Invert', value: 0.0 },
+    { name: 'Count', value: 7 },
   ]);
 });
 
@@ -2517,8 +2517,8 @@ test('snapshotParams() leaves readonly telemetry out of the rebuild state', () =
     { name: 'Glow', value: true },
   ]);
   assert.deepEqual(c.snapshotParams(), [
-    { name: 'Speed', value: 0.5, acceptedValue: 0.5 },
-    { name: 'Glow', value: 1.0, acceptedValue: 1.0 },
+    { name: 'Speed', value: 0.5 },
+    { name: 'Glow', value: 1.0 },
   ]);
 });
 
@@ -2552,7 +2552,7 @@ test('an effect outside the Shader workbench rebuilds from its params', () => {
     },
   });
   assert.deepEqual(c.snapshotEffectState(), {
-    params: [{ name: 'Speed', value: 0.5, acceptedValue: 0.5 }],
+    params: [{ name: 'Speed', value: 0.5 }],
   });
 });
 
@@ -2560,7 +2560,7 @@ test('Shader falls back to params until the snapshot API is installed', () => {
   const c = makeController({ effect: 'Shader' });
   c.getWasmEngine = () => fakeEngine([{ name: 'Speed', value: 0.5 }]);
   assert.deepEqual(c.snapshotEffectState(), {
-    params: [{ name: 'Speed', value: 0.5, acceptedValue: 0.5 }],
+    params: [{ name: 'Speed', value: 0.5 }],
   });
 });
 
@@ -2578,8 +2578,8 @@ test('setEffect broadcasts the name plus the tuned param snapshot to every worke
     assert.equal(msgs.length, 1, 'each worker received exactly one setEffect');
     assert.equal(msgs[0].name, 'NewEffect');
     assert.deepEqual(msgs[0].params, [
-      { name: 'Speed', value: 0.5, acceptedValue: 0.5 },
-      { name: 'Glow', value: 1.0, acceptedValue: 1.0 },
+      { name: 'Speed', value: 0.5 },
+      { name: 'Glow', value: 1.0 },
     ]);
     assert.equal(msgs[0].paused, false);
     assert.equal(msgs[0].paramRevision, c.paramRevision);
