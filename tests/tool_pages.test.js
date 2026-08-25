@@ -412,109 +412,264 @@ test('tailwind.css keeps its upstream license banner', () => {
 });
 
 // WCAG 2.1 SC 1.4.3, normal-size text: anything under 18.66px, or under 24px
-// and not bold. Every pair below is well inside that.
+// and not bold. Every rule swept below is well inside that.
 const AA_CONTRAST = 4.5;
 
-// Text rule -> the tools.css rule that paints the surface it sits on. The
-// stylesheet pairs these itself, so nothing about a page can talk either side
-// out of the other.
-const CONTRAST_PAIRS = [['.slider-label', '.param-group']];
+// Sheet -> text rule -> the rule painting the surface under it, front to back
+// where the nearer fill is translucent. Every rule a tools/ stylesheet declares
+// `color` on is listed here or in CONTRAST_EXEMPT, so a colour added to a sheet
+// is measured instead of joining the gate unread. tailwind.css is a vendored
+// prebuilt drop: its rules stay in the cascade but out of the sweep.
+const CONTRAST_SURFACES = {
+  'tools.css': {
+    'body': 'body',
+    '.slider-label': '.param-group',
+    '.btn-primary': '.btn-primary',
+    '.btn-secondary': '.btn-secondary',
+  },
+  'mobius.css': {
+    '.preset-btn': '.preset-btn',
+    '.preset-desc': '.preset-btn',
+    '.complex-plane-label': '.param-group',
+  },
+  'palettes.css': {
+    '#gen_status': '.tab-content',
+    '.recipe-preset': '.recipe-preset',
+    '.recipe-preset-select': '.recipe-preset-select',
+    '.recipe-field > label': '.param-group',
+    '.wave-legend': '.param-group',
+    '.export-trigger': '.export-trigger',
+    '.palette-copy-feedback code': '.palette-copy-feedback',
+    '.palette-swatch-label': '.param-group',
+    '.tab-btn': '.tab-btn',
+    '.tab-btn.active': '.tab-btn.active',
+  },
+  'shader.css': {
+    '.shader-toolbar': ['.shader-toolbar', '.layout-container'],
+    '.shader-toolbar label': ['.shader-toolbar', '.layout-container'],
+    '.shader-toolbar select': '.shader-toolbar select',
+    '.shader-toolbar button': ['.shader-toolbar', '.layout-container'],
+    '.shader-toolbar button:hover:not(:disabled), .shader-toolbar button:focus-visible':
+      ['.shader-toolbar', '.layout-container'],
+    '.shader-parity-toggle[aria-pressed="true"]:not(:disabled)':
+      ['.shader-toolbar', '.layout-container'],
+    '.shader-document-status': ['.shader-toolbar', '.layout-container'],
+    '.shader-document-status[data-status="error"]': ['.shader-toolbar', '.layout-container'],
+    '.chain-scroll-button': '.chain-scroll-button',
+    '.chain-scroll-button:hover, .chain-scroll-button:focus-visible': '.chain-scroll-button',
+    '.chain-chip': '.chain-chip',
+    '.chain-chip:hover, .chain-chip:focus-visible': '.chain-chip',
+    '.chain-chip[aria-current="true"]': '.chain-chip[aria-current="true"]',
+    '.chain-chip-remove, .chain-chip-bypass, .chain-chip-move': '.chain-chip',
+    ['.chain-chip-remove:hover, .chain-chip-remove:focus-visible,'
+      + ' .chain-chip-bypass:hover:not(:disabled), .chain-chip-bypass:focus-visible,'
+      + ' .chain-chip-move:hover:not(:disabled), .chain-chip-move:focus-visible']: '.chain-chip',
+    '.chain-chip-bypass[aria-pressed="true"]': '.chain-chip',
+    '.chain-chip-function-label': '.chain-chip',
+    '.chain-chip-replace': '.chain-chip-replace',
+    '.chain-param-name': '.chain-chip',
+    '.chain-param-control': '.chain-chip',
+    '.chain-param-option': '.chain-param-option',
+    '.chain-param-value': '.chain-param-value',
+    '.chain-palette-entry:hover, .chain-palette-entry:focus-visible':
+      '.chain-palette-entry:hover, .chain-palette-entry:focus-visible',
+    '.chain-palette-entry--remove': '.chain-palette-entry',
+  },
+  'solids.css': {
+    '.thumb-btn .thumb-label': '.thumb-btn',
+    '.thumb-name-full': ['.thumb-name-full', '.thumb-btn'],
+    '.move-op-btn': '.op-item',
+    '.saved-item .title': '.saved-item',
+    '.saved-item .details': '.saved-item',
+    '.action-btn': '.action-btn',
+    '.action-btn:hover': '.action-btn:hover',
+  },
+};
 
-// palettes.html styles its tabs in a <style> of its own. Both label colours sit
-// on a fill the same rule declares, so each pair is one selector read twice.
-const TAB_CONTRAST_PAIRS = [['.tab-btn', '.tab-btn'], ['.tab-btn.active', '.tab-btn.active']];
+// Sheet -> text rule -> why no pair measures it. An empty reason is no
+// exemption: the sweep falls back to demanding a surface for it.
+const CONTRAST_EXEMPT = {
+  'mobius.css': {
+    '.preset-btn.active': 'pressed fill is 20% blue over the translucent sidebar, which the '
+      + 'live canvas backs',
+  },
+  'shader.css': {
+    '.shader-toolbar button:disabled':
+      'inactive control, which SC 1.4.3 exempts from the contrast floor',
+    '.chain-strip-region': 'the strip floats over the live canvas; no rule paints behind it',
+    '.chain-strip-actions button': 'floats over the live canvas on a transparent fill',
+    '.chain-strip-actions button:disabled':
+      'inactive control, which SC 1.4.3 exempts from the contrast floor',
+    '.chain-strip-note': 'floats over the live canvas; the strip paints no fill behind it',
+    '.chain-band-title': 'band tint is 10% carrier over the live canvas',
+    '.chain-band-add': 'band tint is 10% carrier over the live canvas',
+    '.chain-chip-move:disabled, .chain-chip-bypass:disabled':
+      'inactive controls, which SC 1.4.3 exempts from the contrast floor',
+    '.chain-chip-bypass:disabled[aria-pressed="true"]':
+      'inactive control, which SC 1.4.3 exempts from the contrast floor',
+    ['#gui-container .lil-controller.lil-option select,'
+      + ' #gui-container .lil-controller.lil-option option']:
+      'lil-gui sets --text-color and --background-color in its own vendored stylesheet',
+  },
+  'solids.css': {
+    '.drag-handle': 'an SVG grip, not text; SC 1.4.3 is a text criterion',
+    '#meshStats': 'translucent readout over the live canvas',
+  },
+};
 
 /**
- * One rule's declaration block.
+ * Every rule in a stylesheet, comments dropped and selector whitespace
+ * collapsed to the single spaces the tables above spell them with.
+ * @param {string} css - Stylesheet text.
+ * @returns {string[][]} `[selector, declarations]` per rule, in source order.
+ */
+const rules = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '').split('}')
+  .filter((chunk) => chunk.includes('{'))
+  .map((chunk) => [chunk.slice(0, chunk.indexOf('{')).replace(/\s+/g, ' ').trim(),
+    chunk.slice(chunk.indexOf('{') + 1)]);
+
+/** Whether a declaration block sets `color` itself, not `background-color`. */
+const declaresColor = (declarations) => /(?:^|;)\s*color\s*:/.test(declarations);
+
+/**
+ * One rule's declaration block, every same-selector rule in the cascade joined
+ * so a later sheet's override reads the way the browser resolves it.
  * @param {string} css - Stylesheet text.
  * @param {string} selector - The rule's selector, exactly as written.
  * @returns {string} Everything between its braces.
  */
 function ruleBody(css, selector) {
-  const bodies = [];
-  for (const chunk of css.split('}')) {
-    const brace = chunk.indexOf('{');
-    if (brace !== -1 && chunk.slice(0, brace).replace(/\/\*[\s\S]*?\*\//g, '').trim() === selector) {
-      bodies.push(chunk.slice(brace + 1));
-    }
-  }
-  if (bodies.length === 0) return assert.fail(`tools.css declares no ${selector} rule`);
+  const bodies = rules(css).filter(([name]) => name === selector).map(([, body]) => body);
+  if (bodies.length === 0) return assert.fail(`the cascade declares no ${selector} rule`);
   return bodies.join(';');
 }
 
 /**
- * A property's value, with a single `var()` reference resolved against :root.
+ * A property's value, with every `var()` reference resolved against :root.
  * @param {string} css - Stylesheet text.
  * @param {string} selector - Rule to read.
  * @param {string} property - Property to read.
- * @returns {string} The value, as a `#rrggbb` literal.
+ * @returns {string} The value, as a colour literal.
  */
 function color(css, selector, property) {
   const declarations = [...ruleBody(css, selector)
     .matchAll(new RegExp(`(?:^|;)\\s*${property}\\s*:\\s*([^;]+)`, 'g'))];
   const declared = declarations.at(-1);
   assert.ok(declared, `${selector} declares no ${property}`);
-  const value = declared[1].trim();
-  const token = value.match(/^var\(\s*(--[\w-]+)\s*\)$/);
-  const resolved = token ? color(css, ':root', token[1]) : value;
-  assert.match(resolved, /^#[0-9a-f]{6}$/i,
-    `${selector} ${property} resolves to ${resolved}, which this reader cannot measure`);
-  return resolved;
+  let value = declared[1].trim();
+  for (let depth = 0; value.includes('var('); depth += 1) {
+    assert.ok(depth < 8,
+      `${selector} ${property} resolves to ${value}, a var() this reader loops on`);
+    value = value.replace(/var\(\s*(--[\w-]+)\s*\)/g, (_, token) => color(css, ':root', token));
+  }
+  return value;
+}
+
+/**
+ * A rule's fill, whichever of the two properties declares it.
+ * @param {string} css - Stylesheet text.
+ * @param {string} selector - Rule to read.
+ * @returns {string} The value, as a colour literal.
+ */
+const fill = (css, selector) => color(css, selector,
+  /(?:^|;)\s*background-color\s*:/.test(ruleBody(css, selector))
+    ? 'background-color' : 'background');
+
+/**
+ * A colour literal's channels.
+ * @param {string} value - A `#rgb`, `#rrggbb`, `white`, `rgb()` or `rgba()` literal.
+ * @returns {number[]} `[red, green, blue]` over 255, then alpha over 1.
+ */
+function channels(value) {
+  const literal = value.trim() === 'white' ? '#ffffff' : value.trim();
+  const hex = literal.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i)?.[1];
+  if (hex) {
+    const pairs = hex.length === 3 ? [...hex].map((c) => c + c) : hex.match(/../g);
+    return [...pairs.map((pair) => parseInt(pair, 16)), 1];
+  }
+  const inside = literal.match(/^rgba?\(([^)]*)\)$/)?.[1];
+  const parts = inside?.replace('/', ' ').trim().split(/[\s,]+/).map(Number);
+  if (parts && (parts.length === 3 || parts.length === 4) && parts.every((n) => !Number.isNaN(n))) {
+    return [...parts.slice(0, 3), parts.length === 4 ? parts[3] : 1];
+  }
+  return assert.fail(`${value} is a colour this reader cannot measure`);
+}
+
+/**
+ * WCAG relative luminance of a colour.
+ * @param {number[]} rgb - Channels over 255.
+ * @returns {number} Its luminance in [0, 1].
+ */
+function luminance(rgb) {
+  const linear = rgb.slice(0, 3).map((channel) => {
+    const c = channel / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+}
+
+/**
+ * The colour a stack of fills composites to, front to back.
+ * @param {string} css - Stylesheet text.
+ * @param {string|string[]} selectors - Rules declaring the fills.
+ * @returns {number[]} Channels of the opaque result.
+ */
+function surface(css, selectors) {
+  const stack = [].concat(selectors).map((selector) => channels(fill(css, selector)));
+  assert.equal(stack.at(-1)[3], 1,
+    `${[].concat(selectors).at(-1)} is the backmost fill of a pair and has to be opaque`);
+  return stack.reduceRight((back, front) => [
+    ...front.slice(0, 3).map((c, at) => c * front[3] + back[at] * (1 - front[3])), 1]);
+}
+
+/**
+ * Contrast ratio between one rule's text colour and the surface under it.
+ * @param {string} css - Stylesheet text.
+ * @param {string} text - Rule declaring `color`.
+ * @param {string|string[]} surfaces - Rules declaring the fills under it.
+ * @returns {number} The WCAG contrast ratio.
+ */
+function contrast(css, text, surfaces) {
+  const ink = channels(color(css, text, 'color'));
+  assert.equal(ink[3], 1, `${text} is translucent; measure it against what it composites over`);
+  const [light, dark] = [ink, surface(css, surfaces)].map(luminance).sort((a, b) => b - a);
+  return (light + 0.05) / (dark + 0.05);
 }
 
 test('CSS readers ignore comments and honor later declarations', () => {
   const css = '/* .comment-only {} */ .real { color: #111111; } .real { color: #222222; }';
   assert.deepEqual([...definedClasses(css)], ['real']);
   assert.equal(color(css, '.real', 'color'), '#222222');
+  assert.deepEqual(channels('rgb(20 20 20 / 0.95)'), [20, 20, 20, 0.95]);
+  assert.deepEqual(channels('#48f'), [68, 136, 255, 1]);
 });
 
 /**
- * WCAG relative luminance of a `#rrggbb` color.
- * @param {string} hex - The color.
- * @returns {number} Its luminance in [0, 1].
+ * Sweeps every colour the tools/ stylesheets declare against the WCAG AA floor,
+ * each in the cascade its page builds, so a token retuned for looks fails here
+ * wherever the pages that load it sit text on too near a fill.
  */
-function luminance(hex) {
-  const channels = [1, 3, 5].map((at) => {
-    const c = parseInt(hex.slice(at, at + 2), 16) / 255;
-    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
-}
-
-/**
- * Contrast ratio between one rule's text colour and another's fill.
- * @param {string} css - Stylesheet text.
- * @param {string} text - Rule declaring `color`.
- * @param {string} surface - Rule declaring `background-color`.
- * @returns {number} The WCAG contrast ratio.
- */
-function contrast(css, text, surface) {
-  const [light, dark] = [color(css, text, 'color'), color(css, surface, 'background-color')]
-    .map(luminance).sort((a, b) => b - a);
-  return (light + 0.05) / (dark + 0.05);
-}
-
-/**
- * Pins the shared control styling to the WCAG AA contrast floor. These rules
- * style the readout of every slider on two tool pages, so a token retuned for
- * looks takes the whole set of them below the floor at once.
- */
-test('tools.css control text clears the WCAG AA contrast floor', () => {
-  const css = read('tools', 'tools.css');
-  for (const [text, surface] of CONTRAST_PAIRS) {
-    const ratio = contrast(css, text, surface);
-    assert.ok(ratio >= AA_CONTRAST,
-      `${text} on ${surface} measures ${ratio.toFixed(2)}:1, under the ${AA_CONTRAST}:1 AA floor`);
-  }
-});
-
-test('the palettes.html tab controls clear the WCAG AA contrast floor', () => {
-  // Read behind tools.css so the page rules' var() references resolve against
-  // the token block that defines them.
-  const css = read('tools', 'tools.css') + read('tools', 'palettes.css');
-  for (const [text, surface] of TAB_CONTRAST_PAIRS) {
-    const ratio = contrast(css, text, surface);
-    assert.ok(ratio >= AA_CONTRAST,
-      `${text} measures ${ratio.toFixed(2)}:1, under the ${AA_CONTRAST}:1 AA floor`);
+test('every colour a tools/ stylesheet declares clears the WCAG AA floor or says why not', () => {
+  for (const { page, sheets } of SERVED_PAGES) {
+    const cascade = sheets.map((sheet) => read(...sheet)).join('\n');
+    const swept = sheets.filter(([dir, name]) => dir === 'tools' && name !== 'tailwind.css');
+    for (const sheet of swept) {
+      const name = sheet.at(-1);
+      const surfaces = CONTRAST_SURFACES[name] ?? {};
+      const exempt = CONTRAST_EXEMPT[name] ?? {};
+      const selectors = rules(read(...sheet)).filter(([, body]) => declaresColor(body))
+        .map(([selector]) => selector);
+      for (const selector of selectors) {
+        if (exempt[selector]) continue;
+        assert.ok(surfaces[selector],
+          `${page}: ${name} colours ${selector} against no listed surface and no exemption`);
+        const ratio = contrast(cascade, selector, surfaces[selector]);
+        assert.ok(ratio >= AA_CONTRAST, `${name} ${selector} on ${surfaces[selector]} measures `
+          + `${ratio.toFixed(2)}:1, under the ${AA_CONTRAST}:1 AA floor`);
+      }
+      const listed = [...Object.keys(surfaces), ...Object.keys(exempt)];
+      assert.deepEqual(listed.filter((selector) => !selectors.includes(selector)), [],
+        `${name} lists rules that declare no color`);
+    }
   }
 });

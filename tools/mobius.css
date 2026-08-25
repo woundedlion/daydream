@@ -194,7 +194,7 @@ body {
 .complex-plane-label {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.75rem;
-  color: var(--indigo-400);
+  color: var(--indigo-300);
   text-align: center;
   margin-top: 0.5rem;
   white-space: nowrap;
