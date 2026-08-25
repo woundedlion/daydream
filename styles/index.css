@@ -267,6 +267,14 @@
     animation: none;
     border-color: var(--accent);
   }
+
+  /* !important: .scroll-arrow's transition is declared in a later media query. */
+  .tab,
+  .effect-button,
+  .sort-btn,
+  .scroll-arrow {
+    transition: none !important;
+  }
 }
 
 /* Error state when the WASM engine fails to load (see bootstrap.js showBootstrapFailure). */
