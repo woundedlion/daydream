@@ -421,8 +421,7 @@
         },
         "id": "warp1.angular-phase",
         "interpolation": {
-          "kind": "SHORTEST_PERIODIC",
-          "period": 6.2831854820251465
+          "kind": "LINEAR"
         },
         "storage": "binary32",
         "unit": "radian"
@@ -452,8 +451,7 @@
         },
         "id": "warp1.radial-phase",
         "interpolation": {
-          "kind": "SHORTEST_PERIODIC",
-          "period": 6.2831854820251465
+          "kind": "LINEAR"
         },
         "storage": "binary32",
         "unit": "radian"
