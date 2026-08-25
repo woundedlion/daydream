@@ -66,17 +66,27 @@ test('a brighter slice rasters brighter than a darker one', () => {
 });
 
 test('the wheel raster leaves the out-of-gamut corners of its own rim behind', () => {
-  const { data } = raster(0.62, 32);
-  let backdrop = 0;
+  const size = 32;
+  const { data } = raster(0.62, size);
+  const rim = size * 0.47;
+  let outsideRim = 0;
+  let insideRim = 0;
   let painted = 0;
   for (let index = 0; index < data.length; index += 4) {
+    const pixel = index / 4;
+    const dx = (pixel % size) + 0.5 - size / 2;
+    const dy = Math.floor(pixel / size) + 0.5 - size / 2;
     if (data[index] === BACKDROP[0] && data[index + 1] === BACKDROP[1]
-      && data[index + 2] === BACKDROP[2]) backdrop++;
-    else painted++;
+      && data[index + 2] === BACKDROP[2]) {
+      if (Math.hypot(dx, dy) <= rim) insideRim++;
+      else outsideRim++;
+    } else painted++;
   }
 
-  assert.ok(backdrop > 0, 'the square corners fall outside the wheel');
+  assert.ok(outsideRim > 0, 'the square corners fall outside the wheel');
   assert.ok(painted > 0, 'the wheel itself must be painted');
+  assert.ok(insideRim > 0,
+    'hues narrower than the slice max drop out before the rim');
 });
 
 test('hue key markers ring the wheel at the turns their offsets name', () => {
