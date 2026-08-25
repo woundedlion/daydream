@@ -278,6 +278,19 @@ test('the wheel reads deltaMode and yields when the strip cannot scroll', async 
     'a strip with nothing to scroll leaves the wheel to the page');
 });
 
+test('the viewport offset survives the rebuild a committed edit forces', async () => {
+  const h = await makeStrip();
+  const viewport = h.container.querySelector('.chain-strip-viewport');
+  viewport.clientWidth = 400;
+  viewport.scrollWidth = 1600;
+  viewport.scrollLeft = 40;
+
+  chipByLabel(h, 'camera').dispatch('keydown', { key: 'ArrowRight', altKey: true });
+
+  assert.deepEqual(labels(h).slice(0, 2), ['lens', 'camera']);
+  assert.equal(h.container.querySelector('.chain-strip-viewport').scrollLeft, 40);
+});
+
 test('clicking a chip header toggles its pinned selection', async () => {
   const h = await makeStrip();
   chipByLabel(h, 'warp2').dispatch('click');
