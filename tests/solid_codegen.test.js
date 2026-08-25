@@ -1016,6 +1016,14 @@ test('meshOpFailure routes each recorded reason', () => {
   assert.equal(named.reason, 'UNKNOWN_NAME');
   assert.equal(named.flush, false);
   assert.notEqual(named.message, exhausted.message, 'each reason must carry its own remedy');
+
+  const gone = fakeModule(() => { }, { rejects: new Set(['base:cube']), reason: 'ARENA_UNAVAILABLE' });
+  assert.equal(gone.Mod.MeshOps.fromSolidName('cube'), null);
+  const unavailable = meshOpFailure(gone.Mod, 'Base solid "cube"');
+  assert.equal(unavailable.fatal, true, 'an unreservable tooling block leaves no call that can succeed');
+  assert.equal(unavailable.flush, false, 'there is no arena to flush');
+  assert.equal(exhausted.fatal, false, 'a full arena is cleared by the flush, not terminal');
+  assert.equal(named.fatal, false);
 });
 
 /** Verifies a module that binds neither the enum nor getLastResult still yields a message. */
@@ -1052,6 +1060,39 @@ test('requireMeshResult flushes only for the reason that calls for it', () => {
     { Mod, meshOps: Mod.MeshOps, onError: (m) => shown.push(m) }), null);
   assert.equal(state.cleared, 0, 'flushing an intact arena would strand live wrappers');
   assert.equal(shown.length, 1);
+});
+
+/**
+ * Verifies the one reason nothing recovers from stands the tool down instead of
+ * scrolling past on the line the next recompute overwrites.
+ */
+test('requireMeshResult stands the tool down for an unreservable tooling block', () => {
+  const { Mod, state } = fakeModule(
+    () => { }, { rejects: new Set(['base:cube']), reason: 'ARENA_UNAVAILABLE' });
+  const shown = [];
+  const fatal = [];
+  const ctx = {
+    Mod,
+    meshOps: Mod.MeshOps,
+    onError: (m) => shown.push(m),
+    onFatal: (m) => fatal.push(m),
+  };
+  assert.equal(requireMeshResult(Mod.MeshOps.fromSolidName('cube'), 'Base solid "cube"', ctx), null);
+  assert.deepEqual(shown, [], 'a terminal failure must not go to the transient line');
+  assert.equal(fatal.length, 1);
+  assert.match(fatal[0], /reload the page$/);
+  assert.equal(state.cleared, 0, 'there is no arena to flush');
+});
+
+/** Verifies a recoverable failure keeps going to the transient line. */
+test('requireMeshResult leaves a recoverable failure on the transient line', () => {
+  const { Mod } = fakeModule(() => { }, { rejects: new Set(['base:cube']) });
+  const shown = [];
+  const fatal = [];
+  assert.equal(requireMeshResult(Mod.MeshOps.fromSolidName('cube'), 'Base solid "cube"',
+    { Mod, meshOps: Mod.MeshOps, onError: (m) => shown.push(m), onFatal: (m) => fatal.push(m) }), null);
+  assert.equal(shown.length, 1);
+  assert.deepEqual(fatal, []);
 });
 
 test('solids validator resolves the module factory after async initialization', async () => {

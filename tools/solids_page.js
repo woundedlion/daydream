@@ -1202,14 +1202,21 @@ async function refreshOpGating() {
   }
 }
 
+// Drops the module handles and puts the page in its terminal state: every
+// gate reads them, so nothing calls the engine again, and the banner stays up
+// rather than being overwritten by the next recompute.
+function standDown(message) {
+  MeshOpsWasm = null;
+  WasmModule = null;
+  showFatalError(message);
+}
+
 // The live module is unrecoverable after an engine trap (see update()); if
 // one ever escapes the validator gate, fail loudly once instead of letting
 // every later call trap the re-entrancy guard and spam the console.
 function engineTrapped(e) {
   if (!engineHalted(e, WasmModule)) return false;
-  MeshOpsWasm = null;
-  WasmModule = null;
-  showFatalError('The WASM engine hit an internal invariant and is halted — '
+  standDown('The WASM engine hit an internal invariant and is halted — '
     + 'reload the page. (The op that caused this slipped past validation; '
     + 'please report the chain.)');
   return true;
@@ -1230,6 +1237,7 @@ function buildContext() {
     meshOps: MeshOpsWasm,
     vector: (x, y, z) => new THREE.Vector3(x, y, z),
     onError: showMeshError,
+    onFatal: standDown,
     onTrap: engineTrapped,
   };
 }

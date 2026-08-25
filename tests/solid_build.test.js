@@ -70,19 +70,21 @@ function fakeModule({ rejects = new Set(), reason = 'ARENA_EXHAUSTED',
  * @param {Object} Mod - The stand-in module.
  * @param {object} [opts] - Context behaviour.
  * @param {boolean} [opts.trapped] - What onTrap reports for a thrown value.
- * @returns {{ctx: Object, errors: string[], traps: unknown[]}} The context and its recordings.
+ * @returns {{ctx: Object, errors: string[], fatals: string[], traps: unknown[]}} The context and its recordings.
  */
 function context(Mod, { trapped = false } = {}) {
   const errors = [];
+  const fatals = [];
   const traps = [];
   const ctx = {
     Mod,
     meshOps: Mod.MeshOps,
     vector: (x, y, z) => ({ x, y, z }),
     onError: (message) => errors.push(message),
+    onFatal: (message) => fatals.push(message),
     onTrap: (e) => { traps.push(e); return trapped; },
   };
-  return { ctx, errors, traps };
+  return { ctx, errors, fatals, traps };
 }
 
 /**
@@ -151,6 +153,19 @@ test('a different rejection reason on the base solid carries a different remedy'
   assert.match(errors[0], /16-bit element ceiling/,
     'the recorded reason must reach the message, not a generic failure');
   assert.equal(state.cleared, 0, 'flushing an intact arena would strand live wrappers');
+});
+
+test('an unreservable tooling block stands the tool down instead of reporting', () => {
+  const { Mod } = fakeModule({
+    rejects: new Set(['base:cube']), reason: 'ARENA_UNAVAILABLE',
+  });
+  const { ctx, errors, fatals } = context(Mod);
+
+  assert.equal(buildChainMesh('cube', [], ctx), null);
+  assert.deepEqual(errors, [],
+    'no later call can succeed, so the failure must not go to the line the next recompute overwrites');
+  assert.equal(fatals.length, 1);
+  assert.match(fatals[0], /reload the page$/);
 });
 
 test('an exhausted arena on the vertex readback draws nothing and still frees the mesh', () => {
