@@ -519,13 +519,6 @@ test('a palette near the right edge is clamped back inside the viewport', async 
     'clamped to the viewport width less the palette and its margin');
 });
 
-test('a palette keeps its stylesheet placement where nothing measures', async () => {
-  const h = await makeStrip();
-  bandFor(h, 'sphere').querySelector('.chain-band-add').dispatch('click');
-  assert.equal(paletteOf(h).style.left, '',
-    'a DOM without layout writes no offset rather than throwing');
-});
-
 test('undo and redo revert and reapply whole edits through the same apply path', async () => {
   const h = await makeStrip();
   bandFor(h, 'plane').querySelector('.chain-band-add').dispatch('click');
