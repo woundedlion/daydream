@@ -65,6 +65,11 @@ const fail = (phase, code, path, message) => {
   throw new ShaderDocumentError(phase, code, path, message);
 };
 
+const checkStringLength = (value, limit, path) => {
+  if ([...value].length > limit)
+    fail('parse', 'STRING_LIMIT', path, 'The document string limit was exceeded.');
+};
+
 const codePointCompare = (left, right) => {
   const a = [...left];
   const b = [...right];
@@ -182,8 +187,7 @@ class JsonReader {
         } catch {
           fail('parse', 'INVALID_STRING', path, 'The JSON string escape is invalid.');
         }
-        if ([...value].length > this.limits.stringLength)
-          fail('parse', 'STRING_LIMIT', path, 'The document string limit was exceeded.');
+        checkStringLength(value, this.limits.stringLength, path);
         return value;
       }
       if (!escaped && char.charCodeAt(0) < 0x20)
@@ -218,13 +222,19 @@ export function parseShaderDocument(source, limits = DEFAULT_LIMITS) {
   return new JsonReader(source, bounded).parse();
 }
 
-const checkDecodedDocumentDepth = (source, limits = DEFAULT_LIMITS) => {
+// An already-decoded document skipped the reader, so the reader's depth and
+// string limits are enforced over the object graph instead.
+const checkDecodedDocumentLimits = (source, limits = DEFAULT_LIMITS) => {
   const bounded = { ...DEFAULT_LIMITS, ...limits };
   const pending = [{ value: source, depth: 0, path: '$' }];
   while (pending.length > 0) {
     const { value, depth, path } = pending.pop();
     if (depth > bounded.depth)
       fail('parse', 'DEPTH_LIMIT', path, 'The document nesting limit was exceeded.');
+    if (typeof value === 'string') {
+      checkStringLength(value, bounded.stringLength, path);
+      continue;
+    }
     if (value === null || typeof value !== 'object') continue;
     if (Array.isArray(value)) {
       for (let index = value.length - 1; index >= 0; --index)
@@ -234,6 +244,7 @@ const checkDecodedDocumentDepth = (source, limits = DEFAULT_LIMITS) => {
     const keys = Object.keys(value);
     for (let index = keys.length - 1; index >= 0; --index) {
       const key = keys[index];
+      checkStringLength(key, bounded.stringLength, path);
       pending.push({ value: value[key], depth: depth + 1, path: `${path}.${key}` });
     }
   }
@@ -1274,7 +1285,7 @@ export function compileShaderDocument(source, options = {}) {
   try {
     let document = typeof source === 'string'
       ? parseShaderDocument(source, options.limits)
-      : checkDecodedDocumentDepth(source, options.limits);
+      : checkDecodedDocumentLimits(source, options.limits);
     object(document, '$');
     let parameterIds = null;
     if (document.schema_version === 1) {
