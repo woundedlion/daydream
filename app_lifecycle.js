@@ -57,10 +57,11 @@ export function displayAliasesDiverged(driver, view) {
  * @param {DisplayDriver} deps.driver - The Daydream driver.
  * @param {{ownsDisplay: boolean, active: boolean, frameComposited: boolean,
  *   tick: () => void, updateStats: () => void}} deps.segments - The SegmentController.
- * @param {() => void} deps.syncEffectGui - Mirrors engine params into the panel.
+ * @param {(advanced: boolean) => void} deps.syncEffectGui - Mirrors engine params
+ *   into the panel, told whether the simulation stepped this frame.
  * @param {(message: string) => void} [deps.logError] - Console sink for the
  *   once-per-page alias divergence report.
- * @returns {{drawFrame: () => void, sync: () => void,
+ * @returns {{drawFrame: () => void, sync: (advanced: boolean) => void,
  *   getArenaMetrics: () => Object|null, captureReady: () => boolean}} The adapter.
  */
 export function createRenderAdapter({
@@ -104,9 +105,13 @@ export function createRenderAdapter({
         driver.dotMesh.instanceColor.needsUpdate = true;
       }
     },
-    /** Mirror engine parameters into the effect panel. */
-    sync() {
-      syncEffectGui();
+    /**
+     * Mirror engine parameters into the effect panel.
+     * @param {boolean} advanced - Whether the simulation stepped this frame.
+     * @returns {void}
+     */
+    sync(advanced) {
+      syncEffectGui(advanced);
     },
     /**
      * Report the engine's current arena allocation metrics for the driver's HUD.

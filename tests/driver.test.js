@@ -680,9 +680,10 @@ test('render reconciles once after an advanced simulation frame', () => {
     adapter.drawFrame();
     return true;
   };
+  const stepped = [];
   const adapter = {
     drawFrame: () => log.push('drawFrame'),
-    sync: () => log.push('effectGui.sync'),
+    sync: (advanced) => { log.push('effectGui.sync'); stepped.push(advanced); },
   };
 
   Daydream.prototype.render.call(ctx, adapter);
@@ -690,6 +691,24 @@ test('render reconciles once after an advanced simulation frame', () => {
   assert.deepEqual(log.slice(0, 3),
     ['drawFrame', 'effectGui.sync', 'controls.update']);
   assert.equal(log.filter((entry) => entry === 'effectGui.sync').length, 1);
+  assert.deepEqual(stepped, [true], 'the panel is told the simulation stepped');
+});
+
+test('render tells the panel a paused frame did not step the simulation', () => {
+  const log = [];
+  const ctx = renderCtx(new Uint16Array(4), log);
+  ctx.paused = true;
+  ctx.needsRender = true;
+  const stepped = [];
+  const adapter = {
+    drawFrame: () => log.push('drawFrame'),
+    sync: (advanced) => stepped.push(advanced),
+  };
+
+  Daydream.prototype.render.call(ctx, adapter);
+
+  assert.deepEqual(stepped, [false]);
+  assert.equal(log.includes('drawFrame'), false, 'and the simulation did not draw');
 });
 
 test('render captures one frame per advanced tick, after painting it', () => {

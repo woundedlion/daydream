@@ -409,7 +409,7 @@ export function start({
         host,
         driver: daydream,
         segments,
-        syncEffectGui: () => effectGui.sync(),
+        syncEffectGui: (advanced) => effectGui.sync(advanced),
       });
       host.adapter = {
         ...renderAdapter,
