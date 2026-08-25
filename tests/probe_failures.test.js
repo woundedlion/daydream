@@ -6,6 +6,8 @@ const PROBES = [
   ['workbench-probe.mjs', 'probeStrip'],
   ['panel-probe.mjs', 'probePanel'],
   ['solids-probe.mjs', 'probeChain'],
+  ['palettes-probe.mjs', 'probeColorStrip'],
+  ['mobius-probe.mjs', 'probePad'],
 ];
 
 test('headless probes retain page errors raised during interactions', () => {
