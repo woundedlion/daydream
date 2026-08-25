@@ -225,11 +225,17 @@ const recordableCanvas = (w = 64, h = 32) => ({
  */
 class FakeMediaRecorder {
   static instances = [];
+  static constructError = null;
   static startError = null;
   static startData = null;
   static stopData = null;
+  // Stream of the most recent construction attempt, including one that threw:
+  // the only handle on the tracks a failed construction has to release.
+  static lastStream = null;
   static isTypeSupported() { return true; }
   constructor(stream, options) {
+    FakeMediaRecorder.lastStream = stream;
+    if (FakeMediaRecorder.constructError) throw FakeMediaRecorder.constructError;
     this.stream = stream;
     this.options = options;
     this.mimeType = options.mimeType || 'video/webm';
@@ -277,6 +283,8 @@ const installRecorderEnv = () => {
     showSaveFilePicker: globalThis.showSaveFilePicker,
   };
   FakeMediaRecorder.instances = [];
+  FakeMediaRecorder.constructError = null;
+  FakeMediaRecorder.lastStream = null;
   FakeMediaRecorder.startError = null;
   FakeMediaRecorder.startData = null;
   FakeMediaRecorder.stopData = null;
@@ -426,6 +434,51 @@ test('an unsupported explicit format reports the browser-selected container', ()
     assert.deepEqual(fallbacks, ['webm']);
   } finally {
     FakeMediaRecorder.isTypeSupported = () => true;
+    restore();
+  }
+});
+
+/**
+ * Verifies a throwing MediaRecorder constructor stops the capture tracks it was
+ * handed. The stream is not on the instance yet at that point, so cleanup()
+ * cannot reach it and the capture stays live unless the catch releases it.
+ */
+test('a MediaRecorder construction failure stops the acquired capture tracks', () => {
+  const restore = installRecorderEnv();
+  const captured = installConsoleCapture('error');
+  try {
+    const failure = new Error('unsupported recorder options');
+    failure.name = 'NotSupportedError';
+    FakeMediaRecorder.constructError = failure;
+
+    const rec = new VideoRecorder(recordableCanvas());
+    let sinkOpened = false;
+    rec.openSink = () => { sinkOpened = true; };
+    const notified = [];
+    rec.onError = (err) => notified.push(err);
+
+    assert.doesNotThrow(() => rec.start('e'));
+
+    assert.equal(FakeMediaRecorder.instances.length, 0);
+    assert.equal(FakeMediaRecorder.lastStream.track.stopped, true,
+      'the capture track is stopped, so the capture does not stay live');
+    assert.equal(rec.mediaRecorder, null);
+    assert.equal(rec.stream, null);
+    assert.equal(rec.track, null);
+    assert.equal(rec.offscreen, null);
+    assert.equal(rec.offCtx, null);
+    assert.equal(rec.isRecording, false);
+    assert.equal(sinkOpened, false);
+    assert.ok(captured.calls.some((args) => args.includes(failure)));
+    assert.deepEqual(notified, [failure], 'the host is told the session never started');
+
+    FakeMediaRecorder.constructError = null;
+    rec.openSink = () => ({ write() {}, finish() {} });
+    rec.start('retry');
+    assert.equal(rec.isRecording, true);
+    rec.dispose();
+  } finally {
+    captured.restore();
     restore();
   }
 });
