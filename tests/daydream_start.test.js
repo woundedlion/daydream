@@ -6,6 +6,7 @@
 // tests/app_lifecycle.test.js; this is the assembly.
 import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { installConsoleCapture } from './fake_console.js';
 import { fakeElement, restoreDocumentAfterEach } from './fake_dom.js';
 import { startApp as startUntrackedApp } from './fake_app.js';
@@ -39,7 +40,7 @@ test('start assembles the app and hands back its teardown', () => {
 });
 
 test('a dismiss button that mounts after startup still clears the notice', () => {
-  const { docListeners, elements } = startApp();
+  const { docListeners, elements, queried } = startApp();
   const clicks = docListeners.filter(([type]) => type === 'click');
   assert.equal(clicks.length, 1,
     'the dismiss click is delegated to the document, not bound to one element');
@@ -51,10 +52,21 @@ test('a dismiss button that mounts after startup still clears the notice', () =>
   body.hidden = false;
   elements.get('apply-notice-text').textContent = 'Effect change was rejected.';
 
+  const before = queried.length;
   clicks[0][1]({ target: dismiss });
 
   assert.equal(body.hidden, true);
   assert.equal(elements.get('apply-notice-text').textContent, '');
+
+  // Every id this path resolves at click time -- the delegated handler's button
+  // and the notice elements clear() writes through -- pinned against the real
+  // markup, recorded rather than restated: a rename on either side leaves an
+  // inert dismiss button and no other failure.
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const resolved = queried.slice(before);
+  assert.ok(resolved.length > 0, 'the click resolved no id, so nothing is pinned');
+  for (const id of resolved)
+    assert.match(html, new RegExp(`id=["']${id}["']`), id);
 });
 
 test('the global GUI carries the controls a deep link names', () => {
