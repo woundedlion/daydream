@@ -8,9 +8,10 @@ import { fakeElement, installDocument } from './fake_dom.js';
 // bootstrap.js starts the app on import when a document already exists, and
 // daydream.js pulls it in for the failure overlay — so the module graph is
 // loaded here, at import time, before any test installs one.
-const { start, createSegmentPoolSpawner } = await import('../daydream.js');
+const { start, createSegmentPoolSpawner, SHADER_DOCUMENT_EFFECTS } =
+  await import('../daydream.js');
 
-export { createSegmentPoolSpawner };
+export { createSegmentPoolSpawner, SHADER_DOCUMENT_EFFECTS };
 
 // The third add() argument that makes lil-gui build an OptionController: a list
 // of choices, or an object mapping labels to them.
