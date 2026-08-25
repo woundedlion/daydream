@@ -69,6 +69,19 @@ let paramRejectedKey = '';
 let awaitingEffect = false;
 
 /**
+ * Name an engine enum value for a fault message. The fallback keeps the raw
+ * value, which a rejection needs to identify a result this build does not map.
+ * @param {Record<string, unknown>} values - A Module enum object, constant name
+ * to value.
+ * @param {unknown} result - One of that enum's values.
+ * @returns {string} The enum constant's name, or the unmapped raw value.
+ */
+function enumConstantName(values, result) {
+  return Object.entries(values).find(([, value]) => value === result)?.[0]
+    ?? `value ${String(/** @type {{value?: unknown}} */ (result)?.value ?? result)}`;
+}
+
+/**
  * Restore a complete ShaderBall snapshot after the effect has been rebuilt.
  * @param {import('./worker_protocol.js').FullConfigSnapshot|undefined} snapshot
  * @returns {boolean} True when no snapshot was supplied or it was accepted.
@@ -85,9 +98,7 @@ function restoreFullConfig(snapshot) {
   const result = engine.restoreFullConfigSnapshot(snapshot);
   const restoreResults = wasmModule.FullConfigRestoreResult;
   if (result === restoreResults.APPLIED) return true;
-  const name = Object.entries(restoreResults)
-    .find(([, value]) => value === result)?.[0]
-    ?? `value ${String(result?.value ?? result)}`;
+  const name = enumConstantName(restoreResults, result);
   post({ type: 'engineRejected',
          reason: `ShaderBall full-config restore rejected: ${name}` });
   return false;
@@ -136,9 +147,7 @@ function applyClip() {
  */
 function reportParamRejected(name, result) {
   if (!wasmModule) return;
-  const outcome = Object.entries(wasmModule.ParamSetResult)
-    .find(([, value]) => value === result)?.[0]
-    ?? `value ${String(/** @type {{value?: unknown}} */ (result)?.value ?? result)}`;
+  const outcome = enumConstantName(wasmModule.ParamSetResult, result);
   const key = `${name}:${outcome}`;
   if (key === paramRejectedKey) return;
   paramRejectedKey = key;
