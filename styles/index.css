@@ -839,8 +839,9 @@ div.label {
   font-size: 10px;
 }
 
-/* Per-segment stats overlay */
+/* Per-segment stats overlay; the view adds .visible while the pool is active. */
 .segment-stats {
+  display: none;
   position: absolute;
   bottom: 8px;
   left: 8px;
@@ -855,6 +856,10 @@ div.label {
   color: var(--segment-stats-text);
   line-height: 1.4;
   backdrop-filter: blur(4px);
+}
+
+.segment-stats.visible {
+  display: block;
 }
 
 /* The fault message is the string a bug report needs, so it takes hits (and so

@@ -253,12 +253,12 @@ test('an inactive pool hides the overlay and hands the stat bars back', () => {
   const view = new SegmentStatsView(doc);
 
   view.update(readyState(2));
-  assert.equal(stats.style.display, '');
+  assert.equal(stats.classList.contains('visible'), true);
   assert.equal(desktop.style.display, 'none');
   assert.equal(mobile.style.display, 'none');
 
   view.update(readyState(2, { active: false }));
-  assert.equal(stats.style.display, 'none');
+  assert.equal(stats.classList.contains('visible'), false);
   assert.equal(desktop.style.display, '');
   assert.equal(mobile.style.display, '');
 });
