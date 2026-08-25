@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { fakeElement } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
 import {
@@ -1068,6 +1069,16 @@ test('stopping cancels the interval, and starting arms exactly one', () => {
 
 // The shared notice element: the parameter writer and the switch coordinator
 // both announce through it, so ownership decides whose message a clear drops.
+
+// Pins the resolved ids against the real markup: a rename on either side
+// swallows every rejection message behind a single warning.
+test('index provides every apply-notice element the page resolves', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  // body and text are what createApplyNotice resolves; the dismiss button is
+  // the element daydream.js hangs clear() on.
+  for (const id of ['apply-notice-body', 'apply-notice-text', 'apply-notice-dismiss'])
+    assert.match(html, new RegExp(`id=["']${id}["']`), id);
+});
 
 /**
  * Build the notice sink over fake notice elements and a timer the test fires by
