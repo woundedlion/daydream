@@ -92,6 +92,17 @@ function unrefTimer(timer) {
   nodeTimer.unref?.();
 }
 
+/**
+ * A controller field holding a pending setTimeout handle, or null.
+ * @typedef {'initWatchdog'|'bootWatchdog'|'renderWatchdog'|'retryTimer'} TimerField
+ */
+
+/**
+ * Every deadline the controller arms, cleared as a set on teardown and on fault.
+ * @type {TimerField[]}
+ */
+const ALL_TIMERS = ['initWatchdog', 'bootWatchdog', 'renderWatchdog', 'retryTimer'];
+
 // GUI ceiling on the worker pool, and the two lower ones a constrained device
 // gets. Every pool member holds its own WASM instance — 17.5 MB of linear memory
 // before growth — and the main thread holds one more, so an N-segment pool costs
@@ -520,8 +531,7 @@ export class SegmentController {
             // A live pool ends the faulted-rebuild run, so the next fault gets a
             // fresh budget.
             this.faultedRebuilds = 0;
-            this.clearBootWatchdog();
-            this.clearInitWatchdog();
+            this.clearTimers('bootWatchdog', 'initWatchdog');
             console.log(`[Segmented] All ${numSegments} workers ready`);
           }
         } else if (msg.type === 'booted') {
@@ -531,7 +541,7 @@ export class SegmentController {
             return;
           }
           if (!booted[i]) { booted[i] = true; bootedCount++; }
-          if (bootedCount === numSegments) this.clearBootWatchdog();
+          if (bootedCount === numSegments) this.clearTimers('bootWatchdog');
         } else if (msg.type === 'engineRejected') {
           if (msg.sharedModule) this.moduleWarmer.discard();
           this.onWorkerFault(i, `worker seg ${i} engine rejected: ${msg.reason}`);
@@ -652,7 +662,7 @@ export class SegmentController {
       }
     }
 
-    this.clearBootWatchdog();
+    this.clearTimers('bootWatchdog');
     this.bootWatchdog = setTimeout(() => {
       this.bootWatchdog = null;
       if (!this.ready && !this.faulted) {
@@ -666,7 +676,7 @@ export class SegmentController {
     }, BOOT_WATCHDOG_MS);
     unrefTimer(this.bootWatchdog);
 
-    this.clearInitWatchdog();
+    this.clearTimers('initWatchdog');
     this.initWatchdog = setTimeout(() => {
       this.initWatchdog = null;
       if (!this.ready && !this.faulted) {
@@ -694,35 +704,18 @@ export class SegmentController {
     this.onWorkerFault(segId, `worker ${phase} failed: ${errorDetail(error)}`);
   }
 
-  /** Cancel the init watchdog if one is pending. Idempotent. */
-  clearInitWatchdog() {
-    if (this.initWatchdog !== null) {
-      clearTimeout(this.initWatchdog);
-      this.initWatchdog = null;
-    }
-  }
-
-  /** Cancel the boot watchdog if one is pending. Idempotent. */
-  clearBootWatchdog() {
-    if (this.bootWatchdog !== null) {
-      clearTimeout(this.bootWatchdog);
-      this.bootWatchdog = null;
-    }
-  }
-
-  /** Cancel a pending transient-module-load rebuild if one is scheduled. Idempotent. */
-  clearRetryTimer() {
-    if (this.retryTimer !== null) {
-      clearTimeout(this.retryTimer);
-      this.retryTimer = null;
-    }
-  }
-
-  /** Cancel the render watchdog if one is pending. Idempotent. */
-  clearRenderWatchdog() {
-    if (this.renderWatchdog !== null) {
-      clearTimeout(this.renderWatchdog);
-      this.renderWatchdog = null;
+  /**
+   * Cancel whichever of the named deadlines are pending and clear their fields.
+   * Idempotent.
+   * @param {...TimerField} fields - Deadline fields to cancel.
+   * @returns {void}
+   */
+  clearTimers(...fields) {
+    for (const field of fields) {
+      const timer = this[field];
+      if (timer === null) continue;
+      clearTimeout(timer);
+      this[field] = null;
     }
   }
 
@@ -732,7 +725,7 @@ export class SegmentController {
    * gap between reports; a stall (no segment reports for RENDER_WATCHDOG_MS) faults.
    */
   armRenderWatchdog() {
-    this.clearRenderWatchdog();
+    this.clearTimers('renderWatchdog');
     this.renderWatchdog = setTimeout(() => {
       this.renderWatchdog = null;
       if (this.pending > 0 && !this.faulted) {
@@ -766,10 +759,7 @@ export class SegmentController {
    */
   destroy() {
     this.terminateWorkers();
-    this.clearBootWatchdog();
-    this.clearInitWatchdog();
-    this.clearRenderWatchdog();
-    this.clearRetryTimer();
+    this.clearTimers(...ALL_TIMERS);
     this.workers = [];
     this.results = [];
     this.scratch = [];
@@ -827,10 +817,7 @@ export class SegmentController {
    * @param {string} message - Human-readable fault message for the UI/console.
    */
   onWorkerFault(segId, message) {
-    this.clearBootWatchdog();
-    this.clearInitWatchdog();
-    this.clearRenderWatchdog();
-    this.clearRetryTimer();
+    this.clearTimers(...ALL_TIMERS);
     if (!this.faulted) {
       // No auto-restart by design: stay latched until a user-driven resolution/mode
       // change rebuilds the pool, rather than retrying a deterministically-faulting render.
@@ -1065,7 +1052,7 @@ export class SegmentController {
       this.fullFrames.fill(false);
       this.frameStart = performance.now();
       this.frameResolve = () => {
-        this.clearRenderWatchdog();
+        this.clearTimers('renderWatchdog');
         this.wallTime = performance.now() - this.frameStart;
         resolve();
       };
