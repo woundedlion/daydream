@@ -237,7 +237,14 @@ export function start({
     const redirectedEffect = requestedSelection.migrated
       ? requestedEffect : workbenchEffect;
     win.location.replace(shaderWorkbenchUrl(win.location, redirectedEffect));
-    return { dispose() {} };
+    // Nothing was built, but the shape is createAppTeardown's: a caller reads
+    // disposed() on either path.
+    let redirectDisposed = false;
+    return {
+      dispose() { redirectDisposed = true; },
+      onPageHide() {},
+      disposed: () => redirectDisposed,
+    };
   }
 
   ///////////////////////////////////////////////////////////////////////////////
