@@ -1861,12 +1861,15 @@ test('the boundary setter re-composites and invalidates a paused held generation
   ];
   c.composite();
   const posted = c.workers.map((worker) => worker.posted.length);
+  const uploads = driver.dotMesh.instanceColor.version;
 
   c.showBoundaries = true;
 
   assert.ok(isCyan(0, 0) && isCyan(2, 0),
     'the held generation gains its boundaries without a simulation tick');
   assert.equal(driver.invalidations, 1, 'the paused render loop was asked to repaint');
+  assert.equal(driver.dotMesh.instanceColor.version, uploads + 1,
+    'the seams are flagged for upload');
   c.workers.forEach((worker, index) => {
     assert.equal(worker.posted.length, posted[index],
       'refreshing the overlay did not advance or dispatch the simulation');
@@ -1877,6 +1880,8 @@ test('the boundary setter re-composites and invalidates a paused held generation
   assert.equal(driver.pixels[idx(0, 0, 4)], 111, 'disabling restores the held left band');
   assert.equal(driver.pixels[idx(2, 0, 4)], 222, 'disabling restores the held right band');
   assert.equal(driver.invalidations, 2, 'each visible change requests one repaint');
+  assert.equal(driver.dotMesh.instanceColor.version, uploads + 2,
+    'each visible change flags one upload');
 });
 
 test('composite() marks every internal split plus the wrap seam for an 8-segment layout', () => {
