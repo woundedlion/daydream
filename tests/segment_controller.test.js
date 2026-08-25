@@ -31,7 +31,8 @@ const {
   RENDER_WATCHDOG_MS,
   maxSegmentCount,
 } = await import('../segment_controller.js');
-const { ModuleWarmer, WARM_INTERVAL_MS, pageWarmer } = await import('../module_warmer.js');
+const { ModuleWarmer, WARM_INTERVAL_MS, WARM_DEADLINE_MS, pageWarmer } =
+  await import('../module_warmer.js');
 const warmModules = (dependencies) => pageWarmer.warm(dependencies);
 const { PROTOCOL_VERSION } = await import('../worker_protocol.js');
 
@@ -45,6 +46,7 @@ const EXPECTED_CONSOLE_MESSAGES = {
     /^\[Segmented\] additional worker fault \(seg -?\d+\): /,
     /^\[Segmented\] pool faulted on \d+ consecutive effect-switch rebuilds; /,
     /^\[Segmented\] shared WASM compile failed; each worker will compile its own$/,
+    /^\[Segmented\] module warm did not finish within \d+s; /,
   ],
   error: [
     /^\[Segmented\] Worker seg \d+ error:/,
@@ -89,9 +91,59 @@ test('warmModules revalidates the whole worker module graph', async () => {
   ], 'every static import of the worker, or a stale one survives the warm');
   // 'reload' would re-download all 1.8 MB per call; 'no-cache' still refetches a
   // rebuilt binary because the artifacts are served unversioned.
-  for (const [, options] of calls)
-    assert.deepEqual(options, { cache: 'no-cache' });
+  for (const [, options] of calls) {
+    assert.equal(options.cache, 'no-cache');
+    assert.equal(options.signal.aborted, false);
+  }
+  // One controller for the graph: the deadline abandons the whole warm or none
+  // of it.
+  assert.equal(new Set(calls.map(([, options]) => options.signal)).size, 1);
 });
+
+// The pool spawn, its watchdog and the segmented fallback are all downstream of
+// this promise, so a warm that never settles leaves the toggle reading Enabled
+// with no workers behind it and no fault anywhere.
+test('a stalled warm is abandoned on its deadline so the spawn still runs',
+  async () => {
+    const warmer = new ModuleWarmer();
+    await warmer.warm({
+      baseUrl: 'http://localhost:8000/stalled/segment_controller.js',
+      minIntervalMs: 0,
+      fetch: () => Promise.resolve({
+        arrayBuffer: () => Promise.resolve(EMPTY_WASM.buffer),
+      }),
+    });
+    assert.ok(warmer.module instanceof WebAssembly.Module, 'the first warm compiled');
+
+    /** @type {Array<() => void>} */
+    const expire = [];
+    let aborted = 0;
+    const warm = warmer.warm({
+      baseUrl: 'http://localhost:8000/stalled/segment_controller.js',
+      minIntervalMs: 0,
+      timers: {
+        setTimeout: (/** @type {() => void} */ fn, /** @type {number} */ ms) => {
+          assert.equal(ms, WARM_DEADLINE_MS);
+          expire.push(fn);
+          return { unref() {} };
+        },
+        clearTimeout: () => {},
+      },
+      fetch: (/** @type {URL} */ url, /** @type {*} */ options) => {
+        assert.ok(url instanceof URL);
+        options.signal.addEventListener('abort', () => { aborted += 1; });
+        return new Promise(() => {});
+      },
+    });
+
+    assert.equal(expire.length, 1, 'the warm armed exactly one deadline');
+    expire[0]();
+    await warm;
+
+    assert.equal(aborted, 5, 'every stalled re-fetch was aborted');
+    assert.equal(warmer.module, null,
+      'the abandoned warm hands the pool a module it never revalidated');
+  });
 
 // The window is a wall-clock span, so these drive a warmer of their own with an
 // injected clock: on the page's shared warmer the reading would be whatever the

@@ -8,6 +8,34 @@
 // step, so the segment-count slider warms several times a second.
 export const WARM_INTERVAL_MS = 10000;
 
+// Deadline for one warm. Everything the warm produces is best-effort — a primed
+// cache and a shared compilation each worker falls back to producing for itself
+// — but the pool spawn waits on it, so a stalled re-fetch would leave segmented
+// mode enabled with no workers, no watchdog and nothing on screen to say so.
+// Sized alongside the worker init watchdog, which bounds the same binary.
+export const WARM_DEADLINE_MS = 20000;
+
+/**
+ * Settle a warm on the earlier of its own completion and a deadline.
+ * @param {Promise<void>} work - The warm in flight.
+ * @param {number} ms - The deadline, in milliseconds.
+ * @param {{setTimeout: Function, clearTimeout: Function}} timers - Timer source;
+ *   the page, or whatever stands in for it under test.
+ * @param {() => void} abandon - Runs when the deadline wins.
+ * @returns {Promise<void>} Resolves either way: the spawn behind it must run.
+ */
+function warmWithDeadline(work, ms, timers, abandon) {
+  /** @type {any} */
+  let timer = null;
+  const expired = new Promise((resolve) => {
+    timer = timers.setTimeout(() => { abandon(); resolve(undefined); }, ms);
+    // No-op in browsers; keeps an unfired deadline from holding the unit-test
+    // process open.
+    timer?.unref?.();
+  });
+  return Promise.race([work, expired]).finally(() => timers.clearTimeout(timer));
+}
+
 /**
  * Warm state for one module graph: the dedupe window a burst of warms collapses
  * into, and the compilation the pool spawn hands to its workers.
@@ -35,14 +63,17 @@ export class ModuleWarmer {
 
   /**
    * Prime the module graph's HTTP cache and compile its binary.
-   * @param {{fetch?: typeof globalThis.fetch, baseUrl?: string|URL, minIntervalMs?: number, now?: () => number}} [dependencies]
-   * @returns {Promise<void>}
+   * @param {{fetch?: typeof globalThis.fetch, baseUrl?: string|URL, minIntervalMs?: number, now?: () => number, deadlineMs?: number, timers?: {setTimeout: Function, clearTimeout: Function}}} [dependencies]
+   * @returns {Promise<void>} Resolves once the graph is warm, or once the
+   *   deadline abandons it; never rejects, so the spawn behind it always runs.
    */
   warm({
     fetch: fetchResource = globalThis.fetch,
     baseUrl = import.meta.url,
     minIntervalMs = WARM_INTERVAL_MS,
     now: clock = Date.now,
+    deadlineMs = WARM_DEADLINE_MS,
+    timers = globalThis,
   } = {}) {
     if (typeof fetchResource !== 'function') return Promise.resolve();
     let probe;
@@ -53,8 +84,10 @@ export class ModuleWarmer {
     if (probe.href === this.lastWarmKey && now - this.lastWarmAt < minIntervalMs) {
       return this.lastWarm;
     }
+    const controller = new AbortController();
     const drain = (/** @type {string} */ u) =>
-      fetchResource(new URL(u, baseUrl), { cache: 'no-cache' }).then((r) => r.arrayBuffer());
+      fetchResource(new URL(u, baseUrl), { cache: 'no-cache', signal: controller.signal })
+        .then((r) => r.arrayBuffer());
     const epoch = this.warmEpoch + 1;
     /** @param {WebAssembly.Module | null} compiled */
     const publish = (compiled) => {
@@ -86,6 +119,15 @@ export class ModuleWarmer {
     } catch {
       return Promise.resolve();
     }
+    warm = warmWithDeadline(warm, deadlineMs, timers, () => {
+      controller.abort();
+      // The binary never arrived, so a module held from an earlier warm can no
+      // longer be claimed to match the one being served.
+      publish(null);
+      console.warn('[Segmented] module warm did not finish within '
+        + `${Math.round(deadlineMs / 1000)}s; each worker will fetch and `
+        + 'compile its own');
+    });
     this.warmEpoch = epoch;
     this.lastWarmAt = now;
     this.lastWarmKey = probe.href;
