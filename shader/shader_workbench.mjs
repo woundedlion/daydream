@@ -80,6 +80,7 @@ const codePointCompare = (left, right) => {
 // space separators, U+2028/U+2029 and U+FEFF, so this reader would accept
 // documents every conforming JSON parser rejects.
 const JSON_WHITESPACE = new Set([' ', '\t', '\n', '\r']);
+const JSON_NUMBER_PATTERN = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/uy;
 
 class JsonReader {
   constructor(source, limits) {
@@ -194,7 +195,8 @@ class JsonReader {
   }
 
   number(path) {
-    const match = this.source.slice(this.index).match(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/u);
+    JSON_NUMBER_PATTERN.lastIndex = this.index;
+    const match = JSON_NUMBER_PATTERN.exec(this.source);
     if (!match)
       fail('parse', 'INVALID_NUMBER', path, 'The JSON number is malformed.');
     this.index += match[0].length;
@@ -419,6 +421,10 @@ const validateParameterShape = (parameter, path) => {
   exactKeys(parameter.interpolation, ['kind', 'period', 'group'], ['kind'], `${path}.interpolation`);
   if (!INTERPOLATION_KINDS.has(parameter.interpolation.kind))
     fail('semantic', 'UNKNOWN_INTERPOLATION', `${path}.interpolation.kind`, 'The interpolation trait is unknown.');
+  // A period is consulted only under SHORTEST_PERIODIC, and elsewhere is inert
+  // yet still enters the descriptor digest.
+  if (parameter.interpolation.kind !== 'SHORTEST_PERIODIC' && 'period' in parameter.interpolation)
+    fail('schema', 'UNKNOWN_FIELD', `${path}.interpolation.period`, 'Only SHORTEST_PERIODIC interpolation carries a period.');
   if ((parameter.storage === 'enum8') !==
       (parameter.interpolation.kind === 'MIXED_ENUM'))
     fail('semantic', 'STORAGE_INTERPOLATION_MISMATCH', `${path}.interpolation.kind`, 'enum8 values require MIXED_ENUM and MIXED_ENUM requires enum8 storage.');
@@ -574,6 +580,9 @@ const validatePresetBank = (bank, parameters, pathPolicies, report, guard) => {
     guard(() => {
       exactKeys(preset, ['preset_id', 'display_name', 'description', 'values'], ['preset_id', 'values'], path);
       id(preset.preset_id, `${path}.preset_id`);
+      for (const field of ['display_name', 'description'])
+        if (preset[field] !== undefined && typeof preset[field] !== 'string')
+          fail('schema', 'INVALID_PRESET_TEXT', `${path}.${field}`, `Expected a string for "${field}".`);
       if (presetIds.has(preset.preset_id))
         fail('semantic', 'DUPLICATE_PRESET', `${path}.preset_id`, `Duplicate preset ID "${preset.preset_id}".`);
       presetIds.add(preset.preset_id);
@@ -808,7 +817,13 @@ const V1_STAGE_ROLES = Object.freeze([
 const failV1 = (code, path, message) =>
   fail('semantic', code, path, message);
 
-const V1_LENS_OPERATORS = {
+// The v1 expansion tables below are probed with `in` and indexed by document
+// text: a null prototype keeps an inherited Object key from answering a probe,
+// and the freeze keeps the table read-only.
+const v1Table = (entries) =>
+  Object.freeze(Object.assign(Object.create(null), entries));
+
+const V1_LENS_OPERATORS = v1Table({
   glitch: { operator: 'sphere.lens.glitch.v2' },
   twist: { operator: 'sphere.lens.twist.v2' },
   mobius: { operator: 'sphere.lens.mobius.v2' },
@@ -821,9 +836,9 @@ const V1_LENS_OPERATORS = {
   'pentagonal-prism-kaleidoscope': { operator: 'sphere.lens.kaleidoscope.v2', topology: { symmetry: 'pentagonal-prism' } },
   'hexagonal-prism-kaleidoscope': { operator: 'sphere.lens.kaleidoscope.v2', topology: { symmetry: 'hexagonal-prism' } },
   'octagonal-prism-kaleidoscope': { operator: 'sphere.lens.kaleidoscope.v2', topology: { symmetry: 'octagonal-prism' } },
-};
+});
 
-const V1_SURFACE_OPERATORS = {
+const V1_SURFACE_OPERATORS = v1Table({
   'curl-noise-simplex-euler': {
     operator: 'sphere.displace.curl.v2',
     topology: { basis: 'simplex', integrator: 'euler' },
@@ -832,53 +847,53 @@ const V1_SURFACE_OPERATORS = {
     operator: 'sphere.displace.direct.v2',
     topology: { basis: 'simplex' },
   },
-};
+});
 
-const V1_PROJECTION_OPERATORS = {
+const V1_PROJECTION_OPERATORS = v1Table({
   stereographic: { operator: 'project.stereographic.v2' },
   equirectangular: { operator: 'project.equirectangular.v2' },
   'folded-sinusoidal': { operator: 'project.folded-sinusoidal.v2' },
   'gnomonic-folded': { operator: 'project.gnomonic.v2', topology: { hemisphere: 'folded' } },
-};
+});
 
-const V1_WARP_OPERATORS = {
+const V1_WARP_OPERATORS = v1Table({
   'mirror-tile': { operator: 'warp.mirror-tile.v2' },
   'affine-frame': { operator: 'warp.affine.v2' },
   'wave-shear': { operator: 'warp.wave-shear.v2' },
   'vector-noise-simplex': { operator: 'warp.vector-noise.v2', topology: { basis: 'simplex' } },
   'polar-chart-linear': { operator: 'warp.polar-chart.v2', topology: { mode: 'linear' } },
-};
+});
 
-const V1_SOURCE_OPERATORS = {
+const V1_SOURCE_OPERATORS = v1Table({
   grid: { operator: 'sample.grid.v2' },
   'twin-wave': { operator: 'sample.twin-wave.v2' },
   rings: { operator: 'sample.rings.v2' },
   spiral: { operator: 'sample.spiral.v2' },
   'primitive-lattice': { operator: 'sample.lattice.v2' },
-};
+});
 
-const V1_TRANSFER_OPERATORS = {
+const V1_TRANSFER_OPERATORS = v1Table({
   ridge: { operator: 'field.transfer.ridge.v2' },
   'iso-contour': { operator: 'field.transfer.iso-contour.v2' },
   'smooth-bands': { operator: 'field.transfer.smooth-bands.v2' },
-};
+});
 
-const V1_COVERAGE_MODES = {
+const V1_COVERAGE_MODES = v1Table({
   opaque: 'none',
   projection: 'weight',
   'projection-squared': 'weight-squared',
   'edge-fade': 'edge-fade',
-};
+});
 
-const V1_PALETTE_MODES = {
+const V1_PALETTE_MODES = v1Table({
   'triadic-palette': 'triadic',
   'complementary-palette': 'complementary',
   'analogous-palette': 'analogous',
-};
+});
 
 // The v1 identifier is bare or slot-prefixed; the target field id is the
 // engine's Field::id in the owning operator's schema.
-const V1_SAMPLE_FIELDS = {
+const V1_SAMPLE_FIELDS = v1Table({
   'pattern-freq': 'pattern-freq',
   speed: 'speed',
   complexity: 'complexity',
@@ -892,14 +907,14 @@ const V1_SAMPLE_FIELDS = {
   'lattice-shape': 'lattice-shape',
   'lattice-softness': 'lattice-softness',
   'lattice-radius': 'lattice-radius',
-};
+});
 
-const V1_PROJECT_FIELDS = {
+const V1_PROJECT_FIELDS = v1Table({
   'pole-fade': 'singularity-fade',
   'projection-spin-speed': 'projection-spin-speed',
   'projection-wander': 'projection-wander',
   'central-meridian': 'central-meridian',
-};
+});
 
 const V1_COLORIZE_FIELDS = new Set([
   'palette-chroma',
@@ -916,12 +931,12 @@ const V1_COLORIZE_FIELDS = new Set([
   'hue-noise-speed',
 ]);
 
-const V1_SURFACE_FIELDS = {
+const V1_SURFACE_FIELDS = v1Table({
   'surface-noise-scale': 'scale',
   'surface-noise-strength': 'strength',
   'surface-noise-speed': 'speed',
   'surface-noise-direction': 'direction',
-};
+});
 
 const v1PolicyPick = (table, value, path) => {
   const picked = table[value];
@@ -1297,12 +1312,12 @@ export function classifyExport(compiled, registry, capabilityProfile) {
 const clampUnit = (value) => value <= 0 ? 0 : value >= 1 ? 1 : value;
 
 export function applyEasing(kind, progress) {
+  if (!EASING_KINDS.has(kind))
+    fail('transition', 'UNKNOWN_EASING', '$.easing', `Unknown easing "${kind}".`);
   const t = clampUnit(Math.fround(progress));
   if (t === 0 || t === 1) return t;
   if (kind === 'LINEAR') return t;
-  if (kind === 'EASE_IN_OUT_SIN')
-    return Math.fround((1 - Math.cos(Math.PI * t)) * 0.5);
-  fail('transition', 'UNKNOWN_EASING', '$.easing', `Unknown easing "${kind}".`);
+  return Math.fround((1 - Math.cos(Math.PI * t)) * 0.5);
 }
 
 export function interpolateValue(parameter, from, to, progress) {
