@@ -235,6 +235,7 @@ test('pipeline arrows, wheel and background arrow keys scroll the viewport', asy
   const viewport = h.container.querySelector('.chain-strip-viewport');
   const buttons = h.container.querySelectorAll('.chain-scroll-button');
   viewport.clientWidth = 400;
+  viewport.scrollWidth = 1600;
   viewport.scrollLeft = 0;
 
   buttons[1].dispatch('click');
@@ -251,6 +252,30 @@ test('pipeline arrows, wheel and background arrow keys scroll the viewport', asy
   assert.equal(right.defaultPrevented, true);
   viewport.dispatch('keydown', { key: 'ArrowLeft' });
   assert.equal(viewport.scrollLeft, 120);
+});
+
+test('the wheel reads deltaMode and yields when the strip cannot scroll', async () => {
+  const h = await makeStrip();
+  const viewport = h.container.querySelector('.chain-strip-viewport');
+  viewport.clientWidth = 400;
+  viewport.scrollWidth = 1600;
+  viewport.scrollLeft = 0;
+
+  viewport.dispatch('wheel', { deltaX: 0, deltaY: 3, deltaMode: 1 });
+  assert.equal(viewport.scrollLeft, 48, 'a line-mode notch is not 3 pixels');
+  viewport.scrollLeft = 0;
+  viewport.dispatch('wheel', { deltaX: 0, deltaY: 1, deltaMode: 2 });
+  assert.equal(viewport.scrollLeft, 400, 'a page-mode notch is one viewport');
+
+  viewport.dispatch('wheel', { deltaX: 0, deltaY: 5000 });
+  assert.equal(viewport.scrollLeft, 1200, 'the offset stops at the content edge');
+
+  viewport.scrollWidth = 400;
+  viewport.scrollLeft = 0;
+  const idle = viewport.dispatch('wheel', { deltaX: 0, deltaY: 120 });
+  assert.equal(viewport.scrollLeft, 0);
+  assert.equal(idle.defaultPrevented, false,
+    'a strip with nothing to scroll leaves the wheel to the page');
 });
 
 test('clicking a chip header toggles its pinned selection', async () => {
