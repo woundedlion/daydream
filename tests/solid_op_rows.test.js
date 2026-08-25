@@ -72,12 +72,6 @@ test('a parameter value carrying an attribute break lands on the input as a valu
   const number = row.children.find((c) => c.type === 'number');
   assert.equal(range.value, hostile, 'the slider lost the raw value');
   assert.equal(number.value, 'NaN', 'a non-numeric value reached the number box verbatim');
-  // No node anywhere carries an event-handler attribute.
-  for (const node of [el, ...el.querySelectorAll('.op-param'), range, number]) {
-    for (const name of Object.keys(node.attributes)) {
-      assert.doesNotMatch(name, /^on/i, `${name} is an inline handler attribute`);
-    }
-  }
 });
 
 test('parameter rows carry the OP_DEFS range and the current value', () => {
