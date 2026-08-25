@@ -23,9 +23,29 @@ test('every tool page inherits the reduced-motion stylesheet fence', () => {
 
 test('the solids rotation control is keyboard-operable', () => {
   const source = pageSrc('solids');
-  assert.match(source, /<label for="toggleRotate"[^>]*>Auto Rotate<\/label>/);
+  assert.match(source,
+    /<label id="toggleRotateLabel" for="toggleRotate"[^>]*>Auto Rotate<\/label>/);
   assert.match(source,
     /<button id="toggleRotate" type="button"[^>]*role="switch"[^>]*aria-checked="false"/);
+});
+
+// A button's accessible name comes from aria-labelledby, aria-label, its own
+// text subtree or its title — never from a <label for>. These carry a knob div
+// and no text, so without the association all seven announce as unnamed.
+test('every solids visualization switch carries an accessible name', () => {
+  const source = pageSrc('solids');
+  const switches = [...source.matchAll(/<button\b[^>]*role="switch"[^>]*>/g)]
+    .map(([tag]) => tag);
+  assert.equal(switches.length, 7);
+  for (const tag of switches) {
+    const id = tag.match(/\bid="([^"]+)"/)?.[1];
+    const labelledBy = tag.match(/\baria-labelledby="([^"]+)"/)?.[1];
+    assert.ok(labelledBy, `${id} announces as an unnamed switch`);
+    const label = new RegExp(
+      `<label id="${labelledBy}" for="${id}"[^>]*>([^<]+)</label>`).exec(source);
+    assert.ok(label, `${labelledBy} names no label of ${id}`);
+    assert.ok(label[1].trim().length > 0, `${labelledBy} carries no text`);
+  }
 });
 
 // Relative module specifiers, covering `import`, `export … from` and `import()`.
