@@ -62,20 +62,23 @@ const parameterFromField = (label, field) => {
   }
   // Catalog curves are lowercase kebab; document interpolation kinds keep
   // their own uppercase vocabulary.
-  const kind = field.curve === 'log-positive' ? 'LOG_POSITIVE'
-    : field.curve === 'shortest-periodic' ? 'SHORTEST_PERIODIC'
-      : field.curve === 'snap' ? 'SNAP' : 'LINEAR';
   const minimum = Math.fround(field.min);
   const maximum = Math.fround(field.max);
+  const periodic = field.curve === 'shortest-turn' ? { period: 1, unit: 'turn' }
+    : field.curve === 'shortest-periodic' ? { period: maximum, unit: 'radian' }
+      : null;
+  const kind = periodic !== null ? 'SHORTEST_PERIODIC'
+    : field.curve === 'log-positive' ? 'LOG_POSITIVE'
+      : field.curve === 'snap' ? 'SNAP' : 'LINEAR';
   return {
     id: `${label}.${field.id}`,
     classification: 'preset',
     storage: 'binary32',
-    unit: kind === 'SHORTEST_PERIODIC' ? 'radian'
+    unit: periodic !== null ? periodic.unit
       : field.id.endsWith('speed') ? 'turn-per-frame' : 'ratio',
     domain: { minimum, maximum },
-    interpolation: kind === 'SHORTEST_PERIODIC'
-      ? { kind, period: maximum } : { kind },
+    interpolation: periodic !== null
+      ? { kind, period: periodic.period } : { kind },
     default: field.default,
   };
 };

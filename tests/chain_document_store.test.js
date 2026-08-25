@@ -166,6 +166,22 @@ test('insertion bounds accommodate binary32 catalog defaults', async () => {
   assert.deepEqual(validateShaderDocument(document, { catalog }), []);
 });
 
+test('a shortest-turn field backfills as a period-1 periodic parameter', async () => {
+  const store = await makeStore();
+  const legal = store.legalInsertions(PROJECT)
+    .find((entry) => entry.operator.id === 'sphere.displace.direct.v2');
+  assert.equal(legal.legal, true);
+
+  const result = store.replaceSpan(PROJECT, 0,
+    [{ operator: 'sphere.displace.direct.v2' }]);
+  assert.equal(result.ok, true);
+  const direction = store.document().descriptor.parameters.find(
+    (parameter) => parameter.id === 'sphere1.direction');
+  assert.equal(direction.unit, 'turn');
+  assert.deepEqual(direction.interpolation, { kind: 'SHORTEST_PERIODIC', period: 1 });
+  assertGreen(store);
+});
+
 test('auto labels take the family stem with the lowest free suffix', async () => {
   const store = await makeStore();
   assert.equal(store.replaceSpan(WARP, 0, [{ operator: 'warp.wave-shear.v2' }]).ok, true);
