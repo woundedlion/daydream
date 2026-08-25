@@ -1247,9 +1247,12 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
   assert.equal(harness.engine.chainCalls.length, 2);
   assert.equal(harness.engine.chainCalls.at(-1).length, 6);
   assert.equal(stripChips(harness).length, 6);
+  const digest = compileShaderDocument(KALEIDOSCOPE_HEX_BRIGHT,
+    { catalog: JSON.parse(ENGINE_CATALOG) }).descriptor_digest;
+  assert.equal(harness.elements.get('shader-document-digest').dataset.digest, digest,
+    'the toolbar carries the whole descriptor digest');
   assert.equal(harness.elements.get('shader-document-digest').textContent,
-    harness.elements.get('shader-document-digest').dataset.digest.slice(0, 12),
-    'the toolbar shows the digest abbreviated and carries the whole of it');
+    digest.slice(0, 12), 'the toolbar shows the digest abbreviated');
 
   clickPlaneBandEntry(harness, 'warp.wave-shear.v2');
 
