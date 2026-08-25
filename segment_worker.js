@@ -385,8 +385,8 @@ async function handleMessage(msg) {
       // never stepped in this mode.
       const paramValues =
         segId === 0 ? Array.from(engine.getParamValues()) : null;
-      const presetCount = segId === 0 ? engine.getPresetCount?.() ?? null : null;
-      const presetIndex = segId === 0 ? engine.getPresetIndex?.() ?? null : null;
+      const presetCount = segId === 0 ? engine.getPresetCount() : null;
+      const presetIndex = segId === 0 ? engine.getPresetIndex() : null;
 
       const allPixels = engine.getPixels();
       const { x0, x1, y0, y1, w: qw, h: qh } = segRange;
