@@ -4,10 +4,10 @@
 // working tree.
 import { after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 const LOCAL_GIT_ENV = [
   'GIT_ALTERNATE_OBJECT_DIRECTORIES',
@@ -26,6 +26,25 @@ const LOCAL_GIT_ENV = [
   'GIT_SHALLOW_FILE',
   'GIT_WORK_TREE',
 ];
+
+/**
+ * Locates a POSIX shell: PATH first, then the copy Git for Windows ships
+ * alongside its exec path (git is a prerequisite of every hook anyway).
+ * @returns {string|null} Interpreter to spawn, or null if none was found.
+ */
+export const findSh = () => {
+  if (spawnSync('sh', ['-c', 'exit 0']).status === 0) return 'sh';
+  try {
+    const execPath = execFileSync('git', ['--exec-path'], {
+      encoding: 'utf8',
+    }).trim();
+    const candidate = resolve(execPath, '../../../usr/bin/sh.exe');
+    if (existsSync(candidate)) return candidate;
+  } catch {
+    /* fall through to the skip */
+  }
+  return null;
+};
 
 /** Returns an environment that cannot redirect fixture commands into the caller's repository. */
 export const isolatedGitEnv = (base = process.env) => {

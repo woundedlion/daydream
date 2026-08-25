@@ -11,11 +11,11 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isolatedGitEnv } from './fixture_repo.js';
+import { findSh, isolatedGitEnv } from './fixture_repo.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HOOK = resolve(HERE, '../.githooks/pre-commit').replace(/\\/g, '/');
-const SH = spawnSync('sh', ['-c', 'exit 0']).status === 0 ? 'sh' : null;
+const SH = findSh();
 const SKIP = SH || process.env.DAYDREAM_HOOK_SH_REQUIRED
   ? false
   : 'no POSIX shell available';

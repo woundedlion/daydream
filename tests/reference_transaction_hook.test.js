@@ -16,7 +16,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isolatedGitEnv } from './fixture_repo.js';
+import { findSh, isolatedGitEnv } from './fixture_repo.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // MSYS sh reads a drive-letter path but not a backslash one.
@@ -26,24 +26,6 @@ const HOOK = resolve(HERE, '../.githooks/reference-transaction').replace(
 );
 const ZERO = '0'.repeat(40);
 
-/**
- * Locates a POSIX shell: PATH first, then the copy Git for Windows ships
- * alongside its exec path (git is a prerequisite of the hook anyway).
- * @returns {string|null} Interpreter to spawn, or null if none was found.
- */
-const findSh = () => {
-  if (spawnSync('sh', ['-c', 'exit 0']).status === 0) return 'sh';
-  try {
-    const execPath = execFileSync('git', ['--exec-path'], {
-      encoding: 'utf8',
-    }).trim();
-    const candidate = resolve(execPath, '../../../usr/bin/sh.exe');
-    if (existsSync(candidate)) return candidate;
-  } catch {
-    /* fall through to the skip */
-  }
-  return null;
-};
 const SH = findSh();
 const REQUIRED_ENV = 'DAYDREAM_HOOK_SH_REQUIRED';
 const MISSING = 'no POSIX sh available';
