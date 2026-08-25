@@ -167,11 +167,32 @@ const referencedClasses = (src) => {
 };
 
 /**
- * Class tokens a script puts on the elements it builds. Reads the three forms
- * the tool modules use — `className =`, `classList.add`/`toggle`, and the
- * `…Class`/`…Classes` options a caller can override — each of which names its
- * value as a class list; a class assembled some other way (passed positionally,
- * built by interpolation) is out of reach and simply goes ungated.
+ * The text between a call's parentheses.
+ * @param {string} src - Script source.
+ * @param {number} open - Index of the call's opening parenthesis.
+ * @returns {string} The argument text, empty where the call never closes.
+ */
+const callArgs = (src, open) => {
+  let depth = 0;
+  for (let i = open; i < src.length; i++) {
+    const c = src[i];
+    if (c === "'" || c === '"' || c === '`') {
+      const end = src.indexOf(c, i + 1);
+      if (end < 0) return '';
+      i = end;
+    } else if (c === '(') depth++;
+    else if (c === ')' && --depth === 0) return src.slice(open + 1, i);
+  }
+  return '';
+};
+
+/**
+ * Class tokens a script puts on the elements it builds. Reads the four forms
+ * the tool modules use — `className =`, `classList.add`/`toggle`, the
+ * `…Class`/`…Classes` options a caller can override, and the class argument
+ * of an `el(tag, classes)` builder — each of which names its value as a
+ * class list; a class assembled some other way (passed positionally, built by
+ * interpolation) is out of reach and simply goes ungated.
  * @param {string} src - Script source.
  * @returns {Set<string>} Referenced class tokens.
  */
@@ -191,6 +212,13 @@ const scriptClasses = (src) => {
   for (const [, binding] of src.matchAll(
     /\b\w*[Cc]lass(?:es)?\s*[:=]\s*(\[[^\]]*\]|(['"`])[^'"`]*\2)/g)) {
     for (const value of literals(binding)) addTokens(tokens, value);
+  }
+  // An `el(tag, classes)` builder assigns a variable, which the className
+  // form above cannot read; the class list is the call's second argument.
+  for (const match of src.matchAll(/\bel\(\s*(['"`])[a-z]+\1\s*,/g)) {
+    for (const value of literals(callArgs(src, match.index + 2)).slice(1)) {
+      addTokens(tokens, value);
+    }
   }
   return tokens;
 };
@@ -303,10 +331,13 @@ test('tool pages link tailwind.css last so utilities outrank page rules', () => 
 });
 
 // Behavior-only hooks need no stylesheet. The banner's two are inline-styled
-// because it has to render when a page stylesheet fails.
+// because it has to render when a page stylesheet fails. The chain strip's undo
+// and redo are painted by `.chain-strip-actions button`, its replace options by
+// the <select> around them, and --stage is the chip look --socket departs from.
 const CLASS_EXEMPTIONS = new Set([
   'op-param', 'move-op-up', 'move-op-down', 'remove-op-btn',
   'fatal-error-message', 'fatal-error-dismiss',
+  'chain-undo', 'chain-redo', 'chain-chip-replace-option', 'chain-chip--stage',
 ]);
 
 // daydream.js loads the shader-document graph on both simulator pages, but it
@@ -343,13 +374,17 @@ test('every served page\'s stylesheets define every class it uses', () => {
   }
 });
 
-test('every tools/ module that sets a class can render on a served page', () => {
+// A module that builds no element carries no class. Skipping on a token yield
+// of zero instead would excuse exactly the modules whose classes are unreadable.
+const BUILDS_ELEMENTS = /\bcreateElement\(|\.className\b|\.classList\b/;
+
+test('every tools/ module that builds an element can render on a served page', () => {
   const gated = new Set(SERVED_PAGES.flatMap(classSourcesFor));
   for (const file of readdirSync(join(REPO, 'tools')).filter((f) => f.endsWith('.js'))) {
     const path = `tools/${file}`;
-    if (scriptClasses(read(path)).size === 0) continue;
+    if (!BUILDS_ELEMENTS.test(read(path))) continue;
     assert.ok(gated.has(path),
-      `${path} sets classes but no served page can render it, so nothing gates them`);
+      `${path} builds elements but no served page renders it, so nothing gates its classes`);
   }
 });
 
