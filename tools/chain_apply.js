@@ -32,6 +32,10 @@ const paramSetResultName = (module, result) =>
  * skipped rather than refused — the document still carries them, which is what
  * keeps a bypass an A/B toggle instead of a document edit.
  *
+ * A refusal from the write loop runs the resync and the repaint before it
+ * returns: the earlier writes have landed, so the GUI and the frame have to
+ * read the engine rather than the superseded preset.
+ *
  * @param {{engine: *, module: *, compiled: CompiledDocument, presetId: string,
  *   syncEffectGui: () => void, invalidate: () => void,
  *   programShape?: Array<{instance: string, operator: string}>|null}} apply -
@@ -87,8 +91,10 @@ export function applyChainDocument({
 
   for (const [parameterId, stored] of writes) {
     const written = engine.setParameter(parameterId, stored);
-    if (written !== module.ParamSetResult.APPLIED)
-      return `"${parameterId}" was refused: ${paramSetResultName(module, written)}`;
+    if (written === module.ParamSetResult.APPLIED) continue;
+    syncEffectGui();
+    invalidate();
+    return `"${parameterId}" was refused: ${paramSetResultName(module, written)}`;
   }
 
   syncEffectGui();

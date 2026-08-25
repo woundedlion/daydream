@@ -211,11 +211,13 @@ test('every APPLIED bumps the generation and refreshes the definitions', () => {
 });
 
 test('a refused setParameter surfaces the module result name', () => {
-  const { engine, run } = harness();
+  const { engine, order, run } = harness();
   const original = engine.setParameter.bind(engine);
   engine.setParameter = (name, value) =>
     (name === 'sample.speed' ? ParamSetResult.NON_FINITE : original(name, value));
 
   const refusal = run(compiledDocument({ 'sample.speed': 0.5 }));
   assert.match(refusal, /"sample\.speed" was refused: NON_FINITE/);
+  assert.deepEqual(order.slice(-2), ['syncEffectGui', 'invalidate'],
+    'the landed chain still gets the resync and the repaint');
 });
