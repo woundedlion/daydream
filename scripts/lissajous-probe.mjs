@@ -21,6 +21,8 @@ import { BROWSER_ARGS, resolveBrowser } from './browser.mjs';
 import { serveManifest } from './serve-manifest.mjs';
 
 const PAGE = 'tools/lissajous.html';
+// Somewhere else on the origin to leave for, carrying no script of its own.
+const AWAY = 'tools/tools.css';
 const VIEWPORT = { width: 1280, height: 900 };
 const TIMEOUT_MS = 90_000;
 const TWO_PI = 2 * Math.PI;
@@ -210,6 +212,55 @@ async function probeRationalLock(tab) {
   return failures;
 }
 
+/**
+ * Locks the curve, leaves the page, and comes back over a restore that re-runs
+ * the module, requiring the lock checkbox to come back off. A browser carries a
+ * form control's state across a history navigation on its own, so a checkbox it
+ * restores lands in a module that has started over from its own initial state,
+ * and the page then reads locked while it behaves unlocked. Only the browser
+ * writes that state and nothing in the DOM records it, so this is a case no
+ * fake DOM has to answer for. The bfcache is off for this run (see the launch
+ * args): a restore that hits it brings the module's state back with the DOM,
+ * and it is the miss that can split the two.
+ * @param {import('puppeteer-core').Page} tab - The page.
+ * @param {string} origin - The site the manifest server is on.
+ * @returns {Promise<string[]>} One entry per failed check.
+ */
+async function probeHistoryRestore(tab, origin) {
+  const failures = [];
+  const check = (ok, message) => {
+    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
+    if (!ok) failures.push(message);
+  };
+
+  await tab.evaluateOnNewDocument(() => {
+    window.addEventListener(
+      'pageshow', (event) => { window.probeFromCache = event.persisted; });
+  });
+  await tab.goto(`${origin}/${PAGE}`, { timeout: TIMEOUT_MS });
+  await tab.waitForSelector('#C1_slider', { visible: true, timeout: TIMEOUT_MS });
+  await tab.click(LOCK);
+  await tab.goto(`${origin}/${AWAY}`, { timeout: TIMEOUT_MS });
+  await tab.goBack({ waitUntil: 'load', timeout: TIMEOUT_MS });
+  await tab.waitForSelector('#C1_slider', { visible: true, timeout: TIMEOUT_MS });
+
+  const cached = await tab.evaluate(() => window.probeFromCache);
+  check(cached === false, `the restore re-ran the module (persisted ${cached})`);
+  const checked = await tab.$eval(LOCK, (node) => node.checked);
+  const held = await tab.$eval(DOMAIN_SLIDER, (node) => node.disabled);
+  const dim = await tab.$eval(DOMAIN_GROUP,
+    (node) => node.classList.contains('opacity-50'));
+  check(!checked, `the restore leaves the lock off, as the module has it (${checked})`);
+  check(checked === held,
+    `the restored checkbox and the Domain slider agree (checked ${checked}, `
+      + `held ${held})`);
+  check(checked === dim,
+    `the restored checkbox and the Domain dimming agree (checked ${checked}, `
+      + `dimmed ${dim})`);
+
+  return failures;
+}
+
 let executablePath;
 try {
   executablePath = resolveBrowser();
@@ -223,7 +274,9 @@ const site = await serveManifest(manifestEntries());
 const browser = await puppeteer.launch({
   executablePath,
   headless: true,
-  args: BROWSER_ARGS,
+  // Without the bfcache, going back always re-runs the page's modules, which is
+  // the restore probeHistoryRestore is about; nothing else here navigates.
+  args: [...BROWSER_ARGS, '--disable-features=BackForwardCache'],
 });
 
 const failures = [];
@@ -235,6 +288,7 @@ try {
   // The sliders are built by the page's init, before the scene goes up.
   await tab.waitForSelector('#C1_slider', { visible: true, timeout: TIMEOUT_MS });
   failures.push(...await probeRationalLock(tab));
+  failures.push(...await probeHistoryRestore(tab, site.origin));
 } catch (error) {
   failures.push(error instanceof Error ? error.message : String(error));
 } finally {

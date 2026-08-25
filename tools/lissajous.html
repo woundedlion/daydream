@@ -67,14 +67,16 @@
       <div class="param-group">
         <h3 class="text-xl font-semibold text-indigo-400">Rendering</h3>
 
-        <!-- CHECKBOX FOR RATIONAL CONSTRAINT -->
+        <!-- autocomplete="off": the lock lives in lissajous_page.js, which
+             starts every run with it off. Left to itself the browser restores
+             this box across a history navigation without telling the module,
+             and the page then reads locked while it behaves unlocked. -->
         <div class="flex items-center space-x-3 mt-2 mb-4">
-          <input type="checkbox" id="rational_lock"
+          <input type="checkbox" id="rational_lock" autocomplete="off"
             class="h-5 w-5 rounded text-blue-500 border-gray-600 focus:ring-blue-500 bg-slate-800">
           <label for="rational_lock" class="text-white text-base font-medium select-none">Closed Curve
             Constraint (Rational C₁/C₂)</label>
         </div>
-        <!-- END CHECKBOX -->
 
         <div id="Duration_container" class="flex items-center space-x-3 mt-2"></div>
         <div id="Samples_container" class="flex items-center space-x-3 mt-2"></div>
