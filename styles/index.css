@@ -12,7 +12,7 @@
   --button-border: #555;
   --button-border-hover: #777;
   --bright-text: rgb(var(--bright-text-rgb));
-  --muted-text: #888;
+  --muted-text: #8a8a8a;
   --error-text: #e66;
   --warning-text: #facc15;
   --record-indicator: rgb(var(--record-indicator-rgb));

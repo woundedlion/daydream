@@ -236,7 +236,7 @@ body {
 }
 
 .move-op-btn {
-  color: var(--slate-500);
+  color: #94a3b8;
   font-size: 0.7rem;
   line-height: 1;
   padding: 0.15rem;
@@ -388,7 +388,7 @@ body {
 }
 
 .action-btn:hover {
-  background-color: var(--blue-500);
+  background-color: var(--blue-600);
   color: white;
   border-color: var(--blue-400);
 }

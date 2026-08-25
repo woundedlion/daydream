@@ -17,6 +17,8 @@
   --slate-600: #475569;
   --slate-500: #64748b;
   --slate-300: #cbd5e1;
+  --blue-700: #1d4ed8;
+  --blue-600: #2563eb;
   --blue-500: #3b82f6;
   --blue-400: #60a5fa;
   --indigo-400: #818cf8;
@@ -101,12 +103,12 @@ input[type=range]:disabled::-webkit-slider-thumb {
 }
 
 .btn-primary {
-  background-color: var(--blue-500);
+  background-color: var(--blue-600);
   color: white;
 }
 
 .btn-primary:hover {
-  background-color: #2563eb;
+  background-color: var(--blue-700);
 }
 
 .btn-secondary {
