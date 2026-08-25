@@ -749,6 +749,37 @@ test('pointer gestures never start a chip drag', async () => {
     (listener) => listener.type.startsWith('pointer')), []);
 });
 
+test('a strip whose first render throws binds nothing to the mount', async () => {
+  const store = await createChainDocumentStore({
+    document: structuredClone(BASE.document), catalog: CATALOG });
+  const container = fakeElement('section');
+  let failing = true;
+  const doc = installDocument({
+    body: fakeElement('body'),
+    activeElement: null,
+    createElement: (/** @type {string} */ tag) => {
+      if (failing && tag === 'button') throw new Error('render failed');
+      return fakeElement(tag);
+    },
+    elementFromPoint: () => null,
+    ...documentEvents(),
+  });
+  const build = () => createChainStrip({
+    doc, container, store, catalog: CATALOG, announce: () => {}, onApply: () => {},
+  });
+
+  assert.throws(build, /render failed/);
+  assert.deepEqual(container.listeners, [],
+    'the mount outlives the strip, so a failed build may leave nothing on it');
+  assert.equal(doc.listenerCount('pointerdown'), 0);
+
+  failing = false;
+  build();
+  assert.deepEqual(container.listeners.map((listener) => listener.type), ['keydown'],
+    'the next successful build owns the only history shortcut');
+  assert.equal(doc.listenerCount('pointerdown'), 1);
+});
+
 test('destroy detaches the strip listeners and empties the strip', async () => {
   const h = await makeStrip();
   bandFor(h, 'plane').querySelector('.chain-band-add').dispatch('click');
