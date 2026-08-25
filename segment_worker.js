@@ -54,6 +54,9 @@ let segRange = null;
 // clip for a needs_full_frame() effect, so every 'frame' reports what this
 // worker actually shaded rather than the rectangle it sliced out.
 let clipFullFrame = false;
+// Whether getArenaMetrics has already reported a failure, so a persistent fault
+// logs once instead of every frame. Cleared on every effect install and
+// resolution change: a failure under different geometry is a distinct event.
 let arenaMetricsWarned = false;
 // Last `name:outcome` reported by reportParamRejected, so a held slider pushing
 // the same rejection every frame logs once. Cleared on every effect install: the
@@ -299,6 +302,7 @@ async function handleMessage(msg) {
           break;
         }
         paramRejectedKey = '';
+        arenaMetricsWarned = false;
         // Mirrors the engine-driven index without the pause, as in 'init'.
         if (typeof msg.presetIndex === 'number') {
           applyPreset(msg.presetIndex, 'synchronizePreset');
@@ -327,6 +331,7 @@ async function handleMessage(msg) {
         }
         canvasW = msg.w;
         canvasH = msg.h;
+        arenaMetricsWarned = false;
         segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
       }
       break;
