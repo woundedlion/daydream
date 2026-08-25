@@ -13,6 +13,8 @@
  * Three.js, a WASM engine, or a browser.
  */
 
+import { errorDetail } from './bootstrap.js';
+
 /**
  * The driver's display aliases: the Three.js instance-colour attribute and the
  * driver's own pixel handle, both of which must reference the WASM view.
@@ -602,8 +604,7 @@ export function createSegmentedFallback({
   return (label, err) => {
     logError(`Segmented POV: ${label} failed; falling back to the single engine.`,
       err);
-    const detail = (err && err.message) ? err.message : String(err);
-    showNotice(`Segmented POV ${label} failed: ${detail}. `
+    showNotice(`Segmented POV ${label} failed: ${errorDetail(err)}. `
       + 'Falling back to the single engine.');
     segments.active = false;
     strand();
@@ -692,7 +693,7 @@ export function createFrameLoopGuard({
       if (!reported) {
         reported = true;
         logError('Render loop frame failed:', e);
-        report(`The render loop hit an error. ${e instanceof Error ? e.message : String(e)}`
+        report(`The render loop hit an error. ${errorDetail(e)}`
           + ' See the browser console for details.');
       }
     }

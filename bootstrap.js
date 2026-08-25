@@ -6,10 +6,10 @@
 import { showFatalError } from './tools/banner.js';
 
 /**
- * @param {unknown} error Bootstrap failure.
+ * @param {unknown} error Thrown value.
  * @returns {string} Plain-text failure detail.
  */
-function errorDetail(error) {
+export function errorDetail(error) {
   if (error && typeof error === 'object' && 'message' in error &&
       typeof error.message === 'string') {
     return error.message;
