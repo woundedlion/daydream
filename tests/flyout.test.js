@@ -1,70 +1,48 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { wireFlyout } from '../tools/flyout.js';
+import {
+  documentEvents, fakeElement, installDocument, restoreDocumentAfterEach,
+} from './fake_dom.js';
 
-const eventTarget = () => {
-  const listeners = new Map();
+restoreDocumentAfterEach();
+
+/**
+ * The flyout as the pages build it: a root holding the trigger button and the
+ * panel it exposes, with a link inside the panel to press Escape from. Escape
+ * reaches the root by bubbling, as it does in a browser where focus sits on
+ * whatever the reader tabbed to, so a listener attached anywhere but the root
+ * misses it here too.
+ * @returns {Object} The nodes, the document stand-in, and the installed document.
+ */
+function harness() {
+  const root = fakeElement('div', { connected: true });
+  const trigger = fakeElement('button');
+  const panel = fakeElement('div');
+  const item = fakeElement('a');
+  root.appendChild(trigger);
+  root.appendChild(panel);
+  panel.appendChild(item);
+
+  const document = installDocument({ activeElement: null });
   return {
-    addEventListener(type, listener) {
-      if (!listeners.has(type)) listeners.set(type, new Set());
-      listeners.get(type).add(listener);
-    },
-    removeEventListener(type, listener) {
-      const held = listeners.get(type);
-      held?.delete(listener);
-      if (held?.size === 0) listeners.delete(type);
-    },
-    dispatch(type, event = {}) {
-      for (const listener of listeners.get(type) ?? []) listener(event);
-    },
-    listenerCount() {
-      return [...listeners.values()].reduce((count, held) => count + held.size, 0);
-    },
+    root, trigger, panel, item, documentTarget: documentEvents(), document,
+    outside: fakeElement('div'),
   };
-};
-
-const harness = () => {
-  const classes = new Set();
-  const attributes = new Map();
-  const root = {
-    ...eventTarget(),
-    classList: {
-      toggle(name, enabled) {
-        if (enabled) classes.add(name);
-        else classes.delete(name);
-      },
-    },
-    contains(target) {
-      for (let node = target; node; node = node.parentNode)
-        if (node === root) return true;
-      return false;
-    },
-  };
-  const trigger = {
-    ...eventTarget(),
-    setAttribute(name, value) { attributes.set(name, value); },
-    getAttribute(name) { return attributes.get(name); },
-    focus() { trigger.focused = true; },
-    focused: false,
-    parentNode: root,
-  };
-  const inside = { parentNode: trigger };
-  const documentTarget = eventTarget();
-  return { root, trigger, inside, documentTarget, classes, attributes };
-};
+}
 
 test('flyout toggles its visible and accessible state', () => {
   const h = harness();
   wireFlyout(h);
 
-  assert.equal(h.attributes.get('aria-expanded'), 'false');
+  assert.equal(h.trigger.getAttribute('aria-expanded'), 'false');
   h.trigger.dispatch('click');
-  assert.equal(h.attributes.get('aria-expanded'), 'true');
-  assert.ok(h.classes.has('is-open'));
+  assert.equal(h.trigger.getAttribute('aria-expanded'), 'true');
+  assert.ok(h.root.classList.contains('is-open'));
 
   h.trigger.dispatch('click');
-  assert.equal(h.attributes.get('aria-expanded'), 'false');
-  assert.ok(!h.classes.has('is-open'));
+  assert.equal(h.trigger.getAttribute('aria-expanded'), 'false');
+  assert.ok(!h.root.classList.contains('is-open'));
 });
 
 test('flyout dismisses outside and with Escape', () => {
@@ -72,16 +50,25 @@ test('flyout dismisses outside and with Escape', () => {
   wireFlyout(h);
 
   h.trigger.dispatch('click');
-  h.documentTarget.dispatch('pointerdown', { target: h.inside });
-  assert.ok(h.classes.has('is-open'));
+  h.documentTarget.dispatch('pointerdown', { target: h.item });
+  assert.ok(h.root.classList.contains('is-open'), 'a press inside the panel dismissed it');
 
-  h.documentTarget.dispatch('pointerdown', { target: {} });
-  assert.ok(!h.classes.has('is-open'));
+  h.documentTarget.dispatch('pointerdown', { target: h.outside });
+  assert.ok(!h.root.classList.contains('is-open'));
 
   h.trigger.dispatch('click');
-  h.root.dispatch('keydown', { key: 'Escape' });
-  assert.ok(!h.classes.has('is-open'));
-  assert.ok(h.trigger.focused);
+  h.item.dispatch('keydown', { key: 'Escape' });
+  assert.ok(!h.root.classList.contains('is-open'), 'Escape from inside the panel never reached');
+  assert.equal(h.document.activeElement, h.trigger, 'focus must land back on the trigger');
+});
+
+test('flyout ignores a key that is not Escape', () => {
+  const h = harness();
+  wireFlyout(h);
+
+  h.trigger.dispatch('click');
+  h.item.dispatch('keydown', { key: 'ArrowDown' });
+  assert.ok(h.root.classList.contains('is-open'));
 });
 
 test('flyout teardown removes listeners and closes it', () => {
@@ -93,9 +80,9 @@ test('flyout teardown removes listeners and closes it', () => {
 
   teardown();
 
-  assert.equal(h.root.listenerCount(), 1);
-  assert.equal(h.trigger.listenerCount(), 0);
-  assert.equal(h.documentTarget.listenerCount(), 0);
-  assert.ok(!h.classes.has('is-open'));
-  assert.equal(h.attributes.get('aria-expanded'), 'false');
+  assert.deepEqual(h.root.listeners.map((l) => l.handler), [external]);
+  assert.deepEqual(h.trigger.listeners, []);
+  assert.equal(h.documentTarget.listenerCount('pointerdown'), 0);
+  assert.ok(!h.root.classList.contains('is-open'));
+  assert.equal(h.trigger.getAttribute('aria-expanded'), 'false');
 });
