@@ -618,7 +618,8 @@ test('every preset survives the trip out to the controls and back', () => {
     const { values, customHueOffsets } = controlsFor(recipe);
     const readings = paletteControlReadings((id) => values[id], customHueOffsets);
 
-    assertRecipeClose(paletteRecipeFromControls(recipe, readings), recipe, name);
+    assertRecipeClose(
+      paletteRecipeFromControls(defaultPaletteRecipe(), readings), recipe, name);
   }
 });
 
@@ -627,7 +628,10 @@ test('an authored custom-hue recipe keeps its keys through the controls', () => 
   recipe.hue.mode = PaletteV4.hueMode.CUSTOM;
   recipe.hue.customTurns = [0.98, 1.02, 0.73, 0.4];
   const { values, customHueOffsets } = controlsFor(recipe);
-  const back = paletteRecipeFromControls(recipe,
+  // The wheel carries three keys; the fourth rides the template across.
+  const template = defaultPaletteRecipe();
+  template.hue.customTurns = [0, 0, 0, 0.4];
+  const back = paletteRecipeFromControls(template,
     paletteControlReadings((id) => values[id], customHueOffsets));
 
   assertRecipeClose(back.hue.customTurns, recipe.hue.customTurns, 'customTurns');
