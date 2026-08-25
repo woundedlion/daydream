@@ -199,6 +199,7 @@ export class EffectSidebar {
     this.applySortOrder();
     this.updateActiveClass();
     this.tabbableBtn = null;
+    this.scrolledBtn = null;
     this.setRovingTabbable(
       this.activeButton() || this.orderedButtons[0]
     );
