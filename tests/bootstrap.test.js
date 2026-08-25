@@ -260,6 +260,22 @@ test('reload button still reloads when the cache refresh fails', async () => {
   assert.equal(reloads, 1);
 });
 
+test('a reload the page refuses hands the button back', async () => {
+  const { doc, overlay, click } = fakeDocument();
+  const logged = [];
+  showBootstrapFailure(new Error('failed'), {
+    document: doc,
+    location: { reload() { throw new Error('navigation blocked'); } },
+    logger: { error: (...args) => logged.push(args) },
+  });
+
+  const reload = childWithClass(overlay, 'context-lost-reload');
+  await assert.doesNotReject(() => Promise.resolve(click(reload)));
+  assert.equal(reload.disabled, false);
+  assert.equal(reload.textContent, 'Reload');
+  assert.equal(logged.length, 1, 'the dead-end is reported, not swallowed');
+});
+
 const fakeTimeline = (...names) => ({
   getEntriesByType: (type) => type === 'resource' ? names.map((name) => ({ name })) : [],
 });

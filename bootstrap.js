@@ -179,7 +179,8 @@ export function bootRemedy(error) {
 /**
  * @param {unknown} error Bootstrap failure.
  * @param {{document?: Document, location?: Location, title?: string,
- *   refresh?: (dependencies?: {signal?: AbortSignal}) => Promise<void>}} [dependencies]
+ *   refresh?: (dependencies?: {signal?: AbortSignal}) => Promise<void>,
+ *   logger?: Pick<Console, 'error'>}} [dependencies]
  * @returns {boolean} True when the failure was rendered into the overlay; false
  *   when no overlay exists and the caller must surface the error another way.
  */
@@ -188,6 +189,7 @@ export function showBootstrapFailure(error, {
   location: pageLocation = globalThis.location,
   title: titleText = 'Failed to start the simulator.',
   refresh = refreshModuleCache,
+  logger = globalThis.console,
 } = {}) {
   const overlay = doc?.getElementById('loading-overlay');
   if (!overlay) return false;
@@ -220,8 +222,16 @@ export function showBootstrapFailure(error, {
     reload.textContent = 'Reloading…';
     reload.disabled = true;
     // Deadlined: a stalled re-fetch would otherwise leave this button
-    // relabelled, disabled and inert for the page's lifetime.
-    return refreshWithDeadline(refresh).then(() => pageLocation?.reload());
+    // relabelled, disabled and inert for the page's lifetime. The overlay
+    // carries no other control, so a reload the page refuses has to hand this
+    // one back rather than dead-end on an unhandled rejection.
+    return refreshWithDeadline(refresh)
+      .then(() => pageLocation?.reload())
+      .catch((failure) => {
+        logger?.error?.('The reload could not be completed:', failure);
+        reload.textContent = 'Reload';
+        reload.disabled = false;
+      });
   });
 
   overlay.classList.add('error');
