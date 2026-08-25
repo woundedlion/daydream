@@ -1732,6 +1732,31 @@ test('a refused edit republishes the warning it raised, and its withdrawal', () 
   assert.equal(cleared.$select.getAttribute('aria-invalid'), null);
 });
 
+test('a preset selection republishes the warnings the engine now carries', () => {
+  const warning = 'Speed is faster than the segment stream can follow.';
+  const h = makeHarness({
+    params: [{ ...SPEED, warning }],
+    engineValues: [0.9],
+    presetCount: 3,
+    presetIndex: 0,
+  });
+  h.panel.build();
+  h.panel.mount();
+  assert.equal(h.gui().ctrl('Speed').domElement.getAttribute('title'), warning);
+
+  // The preset writes a value the engine accepts, withdrawing the warning with
+  // no schema generation behind it.
+  h.state.params = [SPEED];
+  h.state.engineValues = [0.1];
+  h.gui().ctrl('presetIndex').setValue(2);
+  h.panel.sync();
+
+  const speed = h.gui().ctrl('Speed');
+  assert.equal(speed.domElement.classList.contains('param-warning'), false);
+  assert.equal(speed.domElement.getAttribute('title'), null);
+  assert.equal(speed.$input.getAttribute('aria-invalid'), null);
+});
+
 test('an edit that changes no warning costs one definitions read and no rebuild', () => {
   const h = makeHarness({ params: [SPEED], engineValues: [0.5], generation: 3 });
   h.panel.build();
