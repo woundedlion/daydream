@@ -1181,13 +1181,20 @@ test('a readonly param is a session control with no engine write-back', () => {
 });
 
 test('every parameter participates in rendered-value synchronization', () => {
-  const h = makeHarness({ params: [SPEED, TELEMETRY] });
+  const h = makeHarness({ params: [SPEED, TELEMETRY], engineValues: [0.9, 42] });
   h.panel.build();
 
   // sync() binds over paramNames, so a readonly param stays in the stream it is
   // kept out of the writable set for: the engine writes the value it displays.
   assert.deepEqual(h.panel.active().paramNames, ['Speed', 'Frames']);
   assert.equal(h.panel.active().hasParams, true);
+
+  h.panel.sync();
+
+  assert.equal(h.gui().ctrl('Frames').getValue(), 42,
+    'the readonly telemetry readout adopts the engine value');
+  assert.equal(h.gui().ctrl('Frames').displayUpdates, 1);
+  assert.equal(h.gui().ctrl('Speed').getValue(), 0.9);
 
   const bare = makeHarness({ params: [] });
   bare.panel.build();
