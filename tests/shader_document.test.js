@@ -522,7 +522,7 @@ test('the validator rejects unsupported and incomplete documents', () => {
   assert.equal(code((d) => {
     d.descriptor.parameters[1].id = d.descriptor.parameters[0].id;
   }), 'DUPLICATE_PARAMETER');
-  assert.equal(code((d) => { d.descriptor.parameters[0].interpolation.kind = 'MIXED_ENUM'; }),
+  assert.equal(code((d) => { d.descriptor.parameters[0].interpolation = { kind: 'MIXED_ENUM' }; }),
     'STORAGE_INTERPOLATION_MISMATCH');
   assert.equal(code((d) => { d.descriptor.path_policies = []; }), 'MISSING_PATH_POLICY');
   assert.equal(code((d) => {
