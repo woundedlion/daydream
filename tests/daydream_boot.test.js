@@ -17,6 +17,7 @@ import {
   createSegmentPoolSpawner,
   startApp as startUntrackedApp,
   segmentCountControl,
+  SHADER_DOCUMENT_EFFECTS,
 } from './fake_app.js';
 
 restoreDocumentAfterEach();
@@ -80,6 +81,19 @@ test('catalog effects are offered at both simulator resolutions', () => {
         `${roster} must offer ${effect}`);
     }
   }
+});
+
+test('the shader-document roster names exactly the documents that ship', () => {
+  const manifest = JSON.parse(readFileSync(
+    new URL('../shader/patterns/shaderball_migration.json', import.meta.url),
+    'utf8'));
+
+  assert.deepEqual([...SHADER_DOCUMENT_EFFECTS].sort(),
+    Object.keys(manifest.source_documents).sort(),
+    'the workbench offers exactly the source_documents the manifest lists, '
+    + 'while this roster is what routes ?effect=<id> to the workbench page and '
+    + 'what the URL validator admits: a document in one and not the other '
+    + 'ships with a deep link that silently falls back to the default effect');
 });
 
 /**
