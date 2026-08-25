@@ -67,19 +67,19 @@ test('MORPH_SWEEP matches the engine morphability constants', { skip: engineSkip
   assert.ok(engineRoot, engineMissing);
   const graph = committed(engineRoot, 'core/mesh/conway_graph.h').toString('utf8');
   const recipe = committed(engineRoot, 'core/mesh/recipe.h').toString('utf8');
-  const truncateMin = cppFloatConstant(graph, 'T_EPS_TRUNCATE_MIN');
+  const truncateMin = cppFloatConstant(graph, 'T_TRUNCATE_ARRIVAL_MIN');
   const amboEpsilon = cppFloatConstant(graph, 'T_EPS_AMBO');
   const chamferMin = cppFloatConstant(graph, 'T_EPS');
   const chamferMax = cppFloatConstant(recipe, 'CHAMFER_T_MAX');
 
   assert.match(
     graph,
-    /inline\s+constexpr\s+float\s+T_EPS_TRUNCATE_FAR_MAX\s*=\s*1\.0f\s*-\s*T_EPS_AMBO\s*;/,
+    /inline\s+constexpr\s+float\s+T_TRUNCATE_FAR_MAX\s*=\s*1\.0f\s*-\s*T_EPS_AMBO\s*;/,
     'the truncate far bound changed form; update the parity reader',
   );
   assert.match(
     recipe,
-    /case Op::TRUNCATE:\s*return step\.param >= ConwayGraph::T_EPS_TRUNCATE_MIN &&\s*step\.param <= ConwayGraph::T_EPS_TRUNCATE_FAR_MAX;/,
+    /case Op::TRUNCATE:\s*return step\.param >= ConwayGraph::T_TRUNCATE_ARRIVAL_MIN &&\s*step\.param <= ConwayGraph::T_TRUNCATE_FAR_MAX;/,
     'is_morphable_step no longer uses the parsed truncate bounds',
   );
   assert.match(
