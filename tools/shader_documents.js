@@ -189,11 +189,16 @@ export function applyFixedShaderDocument(engine, module, compiled, presetId,
   return applyDocumentValues(engine, module, compiled, presetId, baked);
 }
 
-/** @param {CompiledDocument} compiled */
+/**
+ * Every diagnostic the compile collected, one per line.
+ * @param {CompiledDocument} compiled
+ */
 function diagnosticText(compiled) {
-  const diagnostic = compiled.diagnostics?.[0];
-  if (!diagnostic) return compiled.status ?? 'INVALID';
-  return `${diagnostic.code} at ${diagnostic.path}: ${diagnostic.message}`;
+  const diagnostics = /** @type {*[]} */ (compiled.diagnostics ?? []);
+  if (diagnostics.length === 0) return compiled.status ?? 'INVALID';
+  return diagnostics
+    .map((diagnostic) => `${diagnostic.code} at ${diagnostic.path}: ${diagnostic.message}`)
+    .join('\n');
 }
 
 /** @param {Document} doc @param {string} filename @param {string} source */
