@@ -906,6 +906,9 @@ async function editorWorkbench({
   const engine = new FakeChainEngine();
   const compiledEngine = compiledBuildEngine();
   let animationsPaused = paused;
+  // writeDeepLink builds its link state synchronously, reading the pause seam
+  // once, so the count tells a write a timer started from one still pending.
+  let pausedReads = 0;
   const animationWrites = [];
   const writeParameter = engine.setParameter.bind(engine);
   engine.setParameter = (name, value) => {
@@ -965,7 +968,7 @@ async function editorWorkbench({
     },
     syncEffectGui: () => { ran.gui += 1; },
     invalidate: () => { ran.invalidated += 1; },
-    getAnimationsPaused: () => animationsPaused,
+    getAnimationsPaused: () => { pausedReads += 1; return animationsPaused; },
     setAnimationsPaused: (paused) => {
       animationsPaused = paused;
       animationWrites.push(paused);
@@ -988,7 +991,8 @@ async function editorWorkbench({
   await controller.flushDeepLink();
   return {
     controller, engine, compiledEngine, elements, downloads, selections, filters, ran,
-    animationFrames, animationWrites, animationsPaused: () => animationsPaused, urls, win,
+    animationFrames, animationWrites, animationsPaused: () => animationsPaused,
+    pausedReads: () => pausedReads, urls, win,
   };
 }
 
@@ -1129,14 +1133,6 @@ test('a deep-linked preset builds the strip from the preset it renders', async (
     .querySelector('.chain-param-value').value, '7.25');
 });
 
-// Settles the write a fired link timer started. encodeShaderStateHash runs a
-// CompressionStream, so the URL lands only after real event-loop turns; the
-// caller must drop the mocked timers first.
-const settleLinkWrite = async (harness) => {
-  for (let turn = 0; turn < 20 && harness.urls.length === 0; turn += 1)
-    await new Promise((resolve) => { setTimeout(resolve, 1); });
-};
-
 test('continuous shader edits debounce link writes and keep the latest state', async () => {
   const harness = await editorWorkbench({ source: null });
   mock.timers.enable({ apis: ['setTimeout'] });
@@ -1151,9 +1147,11 @@ test('continuous shader edits debounce link writes and keep the latest state', a
     }
 
     assert.equal(harness.urls.length, 0);
+    const reads = harness.pausedReads();
     mock.timers.tick(SHADER_LINK_DEBOUNCE_MS);
+    assert.ok(harness.pausedReads() > reads, 'the debounce timer started the write');
     mock.timers.reset();
-    await settleLinkWrite(harness);
+    await harness.controller.flushDeepLink();
 
     assert.equal(harness.urls.length, 1);
     const state = await decodeShaderStateHash(harness.win.location.hash);
@@ -1176,9 +1174,11 @@ test('continuous shader edits cannot postpone a link write indefinitely', async 
       harness.animationFrames.flush();
       if (value < 8) mock.timers.tick(150);
     }
+    const reads = harness.pausedReads();
     mock.timers.tick(SHADER_LINK_MAX_WAIT_MS - 900);
+    assert.ok(harness.pausedReads() > reads, 'the max-wait timer started the write');
     mock.timers.reset();
-    await settleLinkWrite(harness);
+    await harness.controller.flushDeepLink();
 
     assert.equal(harness.urls.length, 1);
   } finally {
