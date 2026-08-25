@@ -763,6 +763,31 @@ test('promoted Shader controls use their accepted structural modes as folders', 
     'Translation X');
 });
 
+test('a renamed snapshot field costs only its own stage folder a title', () => {
+  const params = [
+    'Camera Wander', 'Projection Spin Speed', 'Singularity Fade',
+    'Planar Warp 1 Translation X', 'Pattern Freq', 'Edge Fade Width',
+    'Palette Chroma', 'Mapping Frequency',
+  ].map((name) => ({ name, value: 0, min: 0, max: 1 }));
+  const { snapshot, fields } = fixedShaderConfig();
+  const renamed = fields.map((field) => (field.name === 'slots.projection'
+    ? { ...field, name: 'slots.projection_kind' } : field));
+  const h = makeHarness({
+    params,
+    engineValues: params.map(() => 0),
+    fullConfigSnapshot: snapshot,
+    fullConfigFieldDefinitions: renamed,
+  });
+
+  h.panel.build();
+
+  assert.deepEqual(h.gui().folders.map((folder) => folder.name),
+    ['Camera', 'Spin + Wander', 'Projection', 'Affine Frame',
+      'Primitive Lattice', 'Edge Fade', 'Generated Triadic']);
+  assert.deepEqual(h.warnings,
+    ['Shader stages: the snapshot resolves no mode for slots.projection']);
+});
+
 test('fixed Shader controls retain stage folders without dynamic metadata', () => {
   const params = [
     'Camera Wander', 'Singularity Fade', 'Planar Warp 1 Speed', 'Warp Strength',
