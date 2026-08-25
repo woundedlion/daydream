@@ -1953,6 +1953,28 @@ test('the boundary setter composites nothing when the pool owns no display', () 
   assert.equal(driver.invalidations, 1, 'the repaint is still requested');
 });
 
+test('the boundary setter composites nothing over a latched pool', () => {
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3).fill(77);
+
+  const c = readyController(2);
+  c.active = true;
+  c.results = [
+    { pixels: new Uint16Array(2 * 2 * 3).fill(111), x0: 0, x1: 2, y0: 0, y1: 2 },
+    { pixels: new Uint16Array(2 * 2 * 3).fill(222), x0: 2, x1: 4, y0: 0, y1: 2 },
+  ];
+  c.onWorkerFault(0, 'boom');
+  const invalidations = driver.invalidations;
+
+  c.showBoundaries = true;
+
+  assert.equal(c.ready, true, 'the latch keeps ready for ownsDisplay');
+  assert.equal(driver.pixels[idx(0, 0, 4)], 77,
+    'the halted pool does not repaint the frame under its fault banner');
+  assert.equal(driver.invalidations, invalidations + 1,
+    'the repaint is still requested');
+});
+
 test('composite() marks every internal split plus the wrap seam for an 8-segment layout', () => {
   // Eight segments are two arms of four Y-bands each: internal boundaries at
   // x=4 and y=2,4,6 plus the wrap seam at x=0. The >2-segment case exercises

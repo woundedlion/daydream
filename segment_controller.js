@@ -304,8 +304,9 @@ export class SegmentController {
     this.#showBoundaries = next;
     // The control stays live outside segmented mode, where the pool owns no
     // display buffer: compositing there would zero the single-engine frame or
-    // latch a fault on a controller with nothing to blit.
-    if (this.active && this.ready && this.hasPublishedFrame()) {
+    // latch a fault on a controller with nothing to blit. A latched pool keeps
+    // `ready` for ownsDisplay, so the fault needs its own term here.
+    if (this.active && this.ready && !this.faulted && this.hasPublishedFrame()) {
       this.composite();
       // No simulation tick stands behind this composite, and Three re-uploads
       // the instance colours only on a version bump.
