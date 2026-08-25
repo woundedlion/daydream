@@ -6,7 +6,7 @@
 import { enumConstantName } from '../param_sync.js';
 import { applyChainDocument } from './chain_apply.js';
 import { createChainDocumentStore, scratchChainDocument } from './chain_document_store.js';
-import { createChainStrip } from './chain_strip.js';
+import { createChainStrip, titleCase } from './chain_strip.js';
 import { copyToClipboard } from './copy_text.js';
 import {
   decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
@@ -58,12 +58,6 @@ const fieldSegment = (parameterId) =>
 /** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[]}} ParameterDefinition */
 /** @typedef {{document: *, descriptor_digest?: string, diagnostics?: *, status?: string}} CompiledDocument */
 
-/** @param {string} value */
-function titleWords(value) {
-  return value.split('-').map((part) => part.length === 0
-    ? part : part[0].toUpperCase() + part.slice(1)).join(' ');
-}
-
 /**
  * Maps a v2 document parameter identity (`<label>.<field>`) to the control
  * name a pre-spec promoted effect registered. Newly promoted effects register
@@ -73,15 +67,15 @@ function titleWords(value) {
  */
 export function engineParameterName(parameterId) {
   const dot = parameterId.indexOf('.');
-  if (dot < 0) return titleWords(parameterId);
+  if (dot < 0) return titleCase(parameterId);
   const label = parameterId.slice(0, dot);
   const field = parameterId.slice(dot + 1);
-  if (label === 'warp1') return `Planar Warp 1 ${titleWords(field)}`;
-  if (label === 'warp2') return `Planar Warp 2 ${titleWords(field)}`;
-  if (label === 'surface') return `Surface Noise ${titleWords(field)}`;
-  if (label === 'camera') return `Camera ${titleWords(field)}`;
+  if (label === 'warp1') return `Planar Warp 1 ${titleCase(field)}`;
+  if (label === 'warp2') return `Planar Warp 2 ${titleCase(field)}`;
+  if (label === 'surface') return `Surface Noise ${titleCase(field)}`;
+  if (label === 'camera') return `Camera ${titleCase(field)}`;
   if (label === 'sample' && field === 'angle-speed') return 'Source Angle Speed';
-  return titleWords(field);
+  return titleCase(field);
 }
 
 /** @param {string} parameterId */
@@ -92,7 +86,7 @@ function engineParameterNames(parameterId) {
   const label = parameterId.slice(0, dot);
   const field = parameterId.slice(dot + 1);
   if (label === 'warp1' || label === 'warp2') {
-    const suffix = titleWords(field);
+    const suffix = titleCase(field);
     if (['Rotation Rate', 'Translation X', 'Translation Y', 'Scale X', 'Scale Y', 'Shear']
         .includes(suffix)) return [primary, `Affine ${suffix}`];
     if (['Radial Scale', 'Radial Phase', 'Angular Phase'].includes(suffix))
@@ -130,7 +124,7 @@ function writeEngineValue(engine, module, definitions, name, value) {
   let stored = value;
   if (definition.options) {
     if (typeof value !== 'number') {
-      const label = name === 'Palette Mapping' ? titleWords(String(value)) : value;
+      const label = name === 'Palette Mapping' ? titleCase(String(value)) : value;
       stored = optionIndex(definition, label);
       if (stored < 0) return `"${name}" has no option "${label}"`;
     }
