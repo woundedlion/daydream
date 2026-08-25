@@ -225,6 +225,14 @@ async function probeStrip(tab) {
   check(layout.main.height > VIEWPORT.height * 0.8,
     `the preview retains ${Math.round(layout.main.height)}px beneath the pipeline`);
 
+  const scrollHits = await tab.$$eval('.chain-scroll-button', (nodes) => nodes.map((node) => {
+    const rect = node.getBoundingClientRect();
+    return node.contains(document.elementFromPoint(
+      rect.x + rect.width / 2, rect.y + rect.height / 2));
+  }));
+  check(scrollHits.length === 2 && scrollHits.every((reached) => reached),
+    'the floating panels leave both scroll buttons on top');
+
   // A `<input type=range>` re-snaps its value onto its step grid, and a fake DOM
   // does not: only a real browser shows whether an authored value survives being
   // written to the control it is edited through.
