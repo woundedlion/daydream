@@ -16,7 +16,6 @@ import {
   SAVED_SOLIDS_MAX,
   captureSavedSolidThumbnail,
   queueSavedSolidRestore,
-  PLATONIC_SOLIDS,
   CATALAN_BASES,
   formatSolidName,
   generateFuncAndRecipe,
@@ -125,8 +124,7 @@ let currentMesh = null;
 let currentFaceClasses = null;
 
 // Lists (populated from WASM)
-let PlatonicSolids = [];
-let ArchimedeanSolids = [];
+let SimpleSolids = [];
 let IslamicStarPatterns = [];
 // Every name the engine registry already defines. A generated funcName equal
 // to one of these is a redefinition once the C++ is pasted into solids.h.
@@ -145,9 +143,7 @@ async function init() {
     // Populate Registry from WASM
     const registry = MeshOpsWasm.getRegistry();
     // registry is array of {name, category}
-    // Filter into existing categories
-    PlatonicSolids = [];
-    ArchimedeanSolids = [];
+    SimpleSolids = [];
     IslamicStarPatterns = [];
     RegistrySolidNames = new Set();
 
@@ -160,12 +156,7 @@ async function init() {
       if (cat === "Complex") {
         IslamicStarPatterns.push(name);
       } else {
-        // Simple: Platonic or Archimedean
-        if (PLATONIC_SOLIDS.includes(name)) {
-          PlatonicSolids.push(name);
-        } else {
-          ArchimedeanSolids.push(name);
-        }
+        SimpleSolids.push(name);
       }
     }
 
@@ -333,7 +324,7 @@ async function generateThumbnails() {
   const footer = document.getElementById('footer');
 
   // Gather all solid names from exported lists
-  const thumbKeys = [...PlatonicSolids, ...ArchimedeanSolids, ...IslamicStarPatterns];
+  const thumbKeys = [...SimpleSolids, ...IslamicStarPatterns];
 
   // Create offscreen renderer
   const width = 256; // High-res for larger thumbs
