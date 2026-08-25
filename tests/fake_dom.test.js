@@ -206,6 +206,44 @@ test('a listener an earlier handler removed does not run', () => {
   assert.deepEqual(log, ['leaf']);
 });
 
+test('a disabled control ignores a click while its ancestors still see it', () => {
+  const { leaf, log, listen } = chain();
+  listen('root', 'root');
+  listen('mid', 'mid');
+  listen('leaf', 'leaf');
+  leaf.disabled = true;
+
+  leaf.dispatch('click');
+
+  assert.deepEqual(log, ['mid', 'root'], 'the disabled node runs none of its own');
+});
+
+test('a disabled control still runs its listeners for events disabling never gates', () => {
+  const leaf = fakeElement('button');
+  const seen = [];
+  for (const type of ['click', 'keydown', 'pointerdown', 'input', 'change',
+    'focusin', 'focusout', 'chain-applied']) {
+    leaf.addEventListener(type, () => seen.push(type));
+  }
+  leaf.disabled = true;
+
+  for (const type of ['click', 'keydown', 'pointerdown', 'input', 'change',
+    'focusin', 'focusout', 'chain-applied']) leaf.dispatch(type);
+
+  assert.deepEqual(seen, ['focusin', 'focusout', 'chain-applied']);
+});
+
+test('a disabled flag on a tag that carries no such attribute gates nothing', () => {
+  const div = fakeElement('div');
+  const seen = [];
+  div.addEventListener('click', () => seen.push('click'));
+  div.disabled = true;
+
+  div.dispatch('click');
+
+  assert.deepEqual(seen, ['click'], 'a div is clickable whatever the expando says');
+});
+
 test('textContent and setAttribute hand back the strings a browser stores', () => {
   const el = fakeElement('div');
   const stale = fakeElement('span');

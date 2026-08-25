@@ -213,6 +213,27 @@ const FOCUSABLE_TAGS = new Set(['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA']);
 // Tags carrying a `disabled` IDL attribute, which reads false until written.
 const DISABLEABLE_TAGS = new Set(
   ['BUTTON', 'FIELDSET', 'INPUT', 'OPTGROUP', 'OPTION', 'SELECT', 'TEXTAREA']);
+// The event families a disabled form control never receives: activation,
+// pointer and mouse, keyboard, and the value-change pair. Focus-related events
+// and custom events still reach it.
+const DISABLED_DEAF_EVENTS = new Set([
+  'auxclick', 'change', 'click', 'contextmenu', 'dblclick', 'input',
+  'keydown', 'keypress', 'keyup',
+  'mousedown', 'mousemove', 'mouseup',
+  'pointercancel', 'pointerdown', 'pointermove', 'pointerup',
+]);
+
+/**
+ * Whether a node sits this event out because it is a disabled form control.
+ * Only that node goes deaf: the event still reaches its ancestors.
+ * @param {Object} node - Node the event has reached.
+ * @param {string} type - Event type.
+ * @returns {boolean} True when the node's own listeners must not run.
+ */
+function deafToEvent(node, type) {
+  return node.disabled === true && DISABLEABLE_TAGS.has(node.tagName)
+    && DISABLED_DEAF_EVENTS.has(type);
+}
 
 /**
  * Whether every parenthesis in a declaration closes, as a parser needs before
@@ -306,7 +327,10 @@ function fakeStyle() {
  * dispatching node unless the caller names one), `currentTarget`,
  * stopPropagation() and stopImmediatePropagation(); the two stop methods are
  * the event's own and overwrite any the caller passed. Events bubble unless the
- * caller passes {bubbles: false}.
+ * caller passes {bubbles: false}. A disabled form control runs none of its own
+ * listeners for an activation, pointer, keyboard or value-change event, as in
+ * the DOM, while focus-related events, custom events and every ancestor
+ * listener are unaffected.
  * @param {string} [tag] - Tag name.
  * @param {Object} [options] - Fake-element options.
  * @param {boolean} [options.allowRedundantRemoval] - Let removeEventListener
@@ -480,6 +504,7 @@ export function fakeElement(tag = 'div', options = {}) {
        * @returns {void}
        */
       const fire = (node, capture) => {
+        if (deafToEvent(node, type)) return;
         dispatched.currentTarget = node;
         stoppedHere = false;
         for (const l of [...node.listeners]) {
