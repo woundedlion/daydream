@@ -104,7 +104,6 @@ shader/patterns/cosmic_eyeball.shader.json
 shader/patterns/ash_cloud.shader.json
 shader/patterns/lattice_melt.shader.json
 shader/patterns/kaleidoscope_flowers.shader.json
-shader/patterns/example.shader.json
 shader/patterns/kaleidoscope_smooth.shader.json
 shader/patterns/kaleidoscope_mandala.shader.json
 shader/patterns/alien_core.shader.json

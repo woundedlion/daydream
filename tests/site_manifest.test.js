@@ -221,14 +221,17 @@ const PATTERNS = 'shader/patterns';
 const MIGRATION = `${PATTERNS}/shaderball_migration.json`;
 
 // Documents in the pattern directory that are not source documents: the
-// migration listing itself, the v1-to-v2 digest table and the compiler's worked
-// example. The v1 expansion fixtures under shader/patterns/v1/ belong to
-// neither set and must stay off Pages.
+// migration listing, which the source catalog fetches by URL, and the v1-to-v2
+// digest table, published for its own sake.
 const PATTERN_NON_SOURCES = [
   MIGRATION,
   `${PATTERNS}/digest_migration.v1v2.json`,
-  `${PATTERNS}/example.shader.json`,
 ];
+
+// Pattern documents nothing served fetches: the compiler's worked example is a
+// test input, like the v1 expansion fixtures under shader/patterns/v1/, and
+// stays off Pages.
+const PATTERN_UNPUBLISHED = [`${PATTERNS}/example.shader.json`];
 
 /**
  * The pattern documents the served set must hold. The source catalog fetches
@@ -286,7 +289,10 @@ test('the site manifest publishes exactly the pattern documents the catalog fetc
       'they would 404 on Pages');
   assert.deepEqual([...listed].filter((doc) => !served.has(doc)).sort(), [],
     `${MANIFEST} publishes pattern documents ${MIGRATION} does not name`);
-  assert.deepEqual(files.filter((doc) => !served.has(doc)).sort(), [],
+  assert.deepEqual(PATTERN_UNPUBLISHED.filter((doc) => !files.includes(doc)), [],
+    `the unpublished allowlist names documents ${PATTERNS} no longer holds`);
+  assert.deepEqual(
+    files.filter((doc) => !served.has(doc) && !PATTERN_UNPUBLISHED.includes(doc)).sort(), [],
     `${PATTERNS} holds documents ${MIGRATION} does not name, so nothing demands ` +
       `a ${MANIFEST} entry for them`);
   assert.deepEqual([...served].filter((doc) => !files.includes(doc)).sort(), [],
