@@ -193,6 +193,8 @@ test('rollback restores an unflushed control value to runtime sinks and URL', ()
         globalThis.window.location.search = new URL(url, 'http://x').search;
       },
     },
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (id) => clearTimeout(id),
   };
   new URLSync(new AppState({ effect: 'Old' }), ['effect']);
   mock.timers.enable({ apis: ['setTimeout'] });
@@ -803,6 +805,8 @@ function installRecordingWindow(search, hash = '') {
   globalThis.window = {
     location: { search, pathname: '/', hash },
     history: { replaceState(state, title, url) { lastUrl = url; } },
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (id) => clearTimeout(id),
   };
   return { written: () => lastUrl };
 }
