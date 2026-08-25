@@ -6,10 +6,20 @@
 // Run: node --test --experimental-test-module-mocks "tests/*.test.js"
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { fakeElement } from './fake_dom.js';
 
 import { SLOW_FRAME_MS } from '../frame_constants.js';
 import { GlobalStatsView, STATS_CELL_IDS } from '../global_stats_view.js';
+
+// Pins the module's cell ids against the real markup: a rename on either side
+// blanks the stats bar behind a single console.warn.
+test('index provides every stats cell the view resolves', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  for (const [row, ids] of Object.entries(STATS_CELL_IDS))
+    for (const id of ids)
+      assert.match(html, new RegExp(`id=["']${id}["']`), `${row}: ${id}`);
+});
 
 /**
  * Document stand-in holding one element per stats cell id, counting the lookups
