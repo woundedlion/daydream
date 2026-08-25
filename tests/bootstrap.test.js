@@ -44,7 +44,7 @@ test('bootstrap catches a synchronous loader throw', async () => {
     'the polite loading status is promoted to an assertive alert');
   assert.equal(childWithClass(overlay, 'spinner'), undefined);
   assert.equal(childWithClass(overlay, 'load-error-detail').textContent,
-    'WebGL unavailable');
+    'Error: WebGL unavailable', 'the detail names the error type');
 });
 
 test('bootstrap catches a rejected module import', async () => {
@@ -57,7 +57,7 @@ test('bootstrap catches a rejected module import', async () => {
 
   assert.equal(loaded, false);
   assert.equal(childWithClass(overlay, 'load-error-detail').textContent,
-    'module fetch failed');
+    'TypeError: module fetch failed');
 });
 
 test('bootstrap leaves the loading overlay intact after a successful import', async () => {
@@ -463,7 +463,7 @@ test('bootstrap leaves the fatal banner alone when the overlay renders', async (
   });
 
   assert.equal(fatals, 0);
-  assert.equal(childWithClass(overlay, 'load-error-detail').textContent, 'boom');
+  assert.equal(childWithClass(overlay, 'load-error-detail').textContent, 'Error: boom');
 });
 
 // Booting is the entry module's job alone. As an import-time side effect here it

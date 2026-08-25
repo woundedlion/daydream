@@ -13,12 +13,15 @@
 
 /**
  * @param {unknown} error - Thrown value.
- * @returns {string} Plain-text failure detail.
+ * @returns {string} `Name: message` for a thrown error, else its string form.
+ * @details Duck-typed rather than `instanceof Error`, so an error crossing a
+ *   realm boundary — a worker, an iframe — still renders as one.
  */
 export function errorDetail(error) {
   if (error && typeof error === 'object' && 'message' in error &&
       typeof error.message === 'string') {
-    return error.message;
+    const name = 'name' in error && typeof error.name === 'string' ? error.name : '';
+    return name ? `${name}: ${error.message}` : error.message;
   }
   return String(error);
 }

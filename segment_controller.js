@@ -32,6 +32,7 @@ import { isViewLive } from "./pixel_view.js";
 import { pageWarmer } from "./module_warmer.js";
 import { FAULT_POOL, FAULT_RENDER, SegmentStatsView } from "./segment_stats_view.js";
 import { PROTOCOL_VERSION } from "./worker_protocol.js";
+import { errorDetail } from "./tools/banner.js";
 
 export const SEGMENT_CONTROLLER_API_VERSION = 2;
 
@@ -76,15 +77,6 @@ export const BOOT_RETRY_DELAY_MS = 250;
 // restart paths are the user-driven ones the fault banner names: a resolution
 // change or a segmented-mode toggle.
 export const MAX_FAULTED_REBUILDS = 2;
-
-/**
- * Render a thrown value as a fault message detail.
- * @param {unknown} error - The caught value.
- * @returns {string} `Name: message` for an Error, else its string form.
- */
-function errorDetail(error) {
-  return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-}
 
 /**
  * Release a pending timer's hold on the Node event loop, so an unfired watchdog
