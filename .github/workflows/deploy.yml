@@ -91,6 +91,7 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/js-unit-suite.yml
+    secrets: inherit
 
   browser-smoke:
     name: Headless page smoke (deploy gate)
