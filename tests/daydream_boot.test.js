@@ -415,6 +415,48 @@ test('narrowing the resolution options rebinds the controller and its handler', 
     + 'the dropdown and the muted engine correction diverge');
 });
 
+test('a trapped resolution query stops the startup instead of booting on', async () => {
+  let built = 0;
+  const module = {
+    HS_MODULE_DEAD: false,
+    HolosphereEngine: class {
+      constructor() { built++; }
+      static isLive() { return false; }
+      // HS_CHECK raises the flag ahead of its __builtin_trap(), so it is
+      // already set when the RuntimeError reaches the caller.
+      static getSupportedResolutions() {
+        module.HS_MODULE_DEAD = true;
+        throw new WebAssembly.RuntimeError('unreachable');
+      }
+      setPoleLod() {}
+      delete() {}
+    },
+  };
+  const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
+
+  assert.equal(built, 1, 'the load must have built the engine before the query');
+  const record = app.guis[0].folders
+    .find((folder) => folder.namespace === 'Recording').controllers
+    .find((controller) => controller.property === 'record');
+  assert.equal(record.enabled, false,
+    'the trap unwound nothing, so the shadow stack stays short and the release '
+    + "link's -sASSERTIONS=0 makes the overrun silent: the startup must stop at "
+    + 'the catch rather than run the recorder, the initial apply, and every '
+    + 'module call after them');
+  assert.equal(app.teardown.disposed(), true,
+    'a dead module is terminal, so the panels must not stay live over a canvas '
+    + 'nothing can render into');
+});
+
+test('a workbench init that trapped the module releases the app', () => {
+  const at = SOURCE.indexOf('shaderDocuments?.init().catch(');
+  assert.ok(at >= 0, 'the workbench init rejection must stay handled');
+  assert.match(sliceTo(at, 'CONFIG_NOTICE);'), /abandonOnModuleDeath\(\)/,
+    'a trap is terminal for the whole module, not for the call that tripped it: '
+    + 'without the death read the rejection is reported as an ordinary workbench '
+    + 'failure and the simulator keeps calling into a shortened shadow stack');
+});
+
 test('a failed workbench init reports without the page-failure banner', () => {
   assert.match(wasmReadyBlock(),
     /shaderDocuments\?\.init\(\)\s*\.catch\(/,

@@ -357,15 +357,36 @@ export function start({
   doc.addEventListener('click', onApplyNoticeDismiss);
 
   /**
+   * Release the app when a caught failure came from a trapped module. HS_CHECK
+   * sets HS_MODULE_DEAD ahead of a trap that unwinds nothing, so every later
+   * call runs on a permanently shortened shadow stack and writes past its end
+   * unreported (-sASSERTIONS=0). No call is a recovery path.
+   * @returns {boolean} Whether the module is dead and the app was released.
+   */
+  function abandonOnModuleDeath() {
+    if (!host.moduleDead()) return false;
+    console.error('Startup stopped: the rendering engine trapped.');
+    showFatalError('The rendering engine hit an unrecoverable internal error and'
+      + ' has been shut down. Reload the page to start it again. See the browser'
+      + ' console for details.');
+    appTeardown?.dispose();
+    return true;
+  }
+
+  /**
    * Narrow the resolution dropdown to the rows the engine reports it can build,
    * correcting the active resolution when the hydrated one is not among them.
    * @param {Object} module - The loaded WASM module.
-   * @returns {void}
+   * @returns {boolean} Whether the module survived the query; false leaves the
+   *   app released and the rest of the startup unrun.
    */
   function syncResolutionOptions(module) {
     let supported = null;
     try { supported = module.HolosphereEngine.getSupportedResolutions(); }
-    catch (e) { console.warn('getSupportedResolutions failed (offering every preset):', e); }
+    catch (e) {
+      console.warn('getSupportedResolutions failed (offering every preset):', e);
+      if (abandonOnModuleDeath()) return false;
+    }
 
     const { labels, unlabeled } = offeredResolutions(resolutionPresets, supported);
     if (unlabeled.length > 0) {
@@ -386,6 +407,7 @@ export function start({
       // but the apply is applyInitialState's single preserving one below.
       switches.mute(() => resolutionController.setValue(corrected));
     }
+    return true;
   }
 
   ///////////////////////////////////////////////////////////////////////////////
@@ -420,7 +442,7 @@ export function start({
       // window; its onChange no-op'd while host.engine was null.
       poleLod.replay();
 
-      syncResolutionOptions(module);
+      if (!syncResolutionOptions(module)) return;
 
       // Resolution and effect are both applied once via applyResolution(true) below,
       // before first paint: it sets the hydrated resolution and validates the hydrated
@@ -489,6 +511,7 @@ export function start({
         // listener and cover a running simulator with the fatal banner.
         shaderDocuments?.init().catch((err) => {
           console.error('The shader workbench could not be initialized:', err);
+          if (abandonOnModuleDeath()) return;
           applyNotice.show(
             `The shader workbench could not be initialized: ${errorDetail(err)}`,
             CONFIG_NOTICE);
