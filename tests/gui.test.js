@@ -17,6 +17,7 @@ import {
   snapshotEffectControlState,
   restoreEffectControlState,
 } from '../effect_sequencing.js';
+import { fakeElement } from './fake_dom.js';
 
 // Restore globalThis.window after each test so the stub never leaks to another suite.
 const savedWindow = globalThis.window;
@@ -75,14 +76,13 @@ class StubController {
 // Minimal lil-gui root stub handing back StubControllers and nested folders.
 class StubGUI {
   /**
-   * Creates the root stub with a placeholder DOM element.
+   * Creates the root stub over DOM doubles, so the panel element and the
+   * controller container enforce Node-ness on insertion as the real ones do.
    */
   constructor() {
-    this.domElement = {};
+    this.domElement = fakeElement('div');
     this._closed = false;
-    this.$children = { appended: [], appendChild: (child) => {
-      this.$children.appended.push(child);
-    } };
+    this.$children = fakeElement('div');
     this.destroyed = false;
   }
   /**
@@ -133,11 +133,13 @@ class DeepLinkGUI extends BaseGUI {
 test('DeepLinkGUI appends custom content to the wrapped controller container', () => {
   installWindow('');
   const gui = new DeepLinkGUI({ autoPlace: false });
-  const element = {};
+  const element = fakeElement('div');
 
   gui.appendElement(element);
 
-  assert.deepEqual(gui.gui.$children.appended, [element]);
+  assert.deepEqual(gui.gui.$children.children, [element]);
+  assert.throws(() => gui.appendElement('text'), TypeError,
+    'the container takes a node, not a stand-in for one');
 });
 
 test('DeepLinkGUI exposes and changes the wrapped panel state', () => {
