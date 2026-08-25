@@ -9,6 +9,7 @@ import {
   paramExportBlocker,
   paramGenerationStale,
   selectorControlValue,
+  enumConstantName,
 } from '../param_sync.js';
 
 // resolveParamSync is the DOM-free core of syncGUI()'s per-controller "fight-the-
@@ -210,4 +211,11 @@ test('any generation move makes the snapshot stale', () => {
 
 test('an engine reporting no generation is never stale', () => {
   assert.equal(paramGenerationStale(undefined, undefined), false);
+});
+
+test('an engine enum value is logged by its constant name', () => {
+  const RESULTS = { OK: 0, READONLY: 1, OUT_OF_RANGE: 2 };
+  assert.equal(enumConstantName(RESULTS, 1), 'READONLY');
+  assert.equal(enumConstantName(RESULTS, 9), 'unrecognized result',
+    'a value the mirrored table lacks still names something in the log line');
 });
