@@ -208,12 +208,15 @@ function installWindow(search = '', pathname = '/', hash = '') {
     history: {
       replaceState: (state, title, url) => { calls.push(url); },
     },
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (id) => clearTimeout(id),
   };
   return calls;
 }
 
 /**
- * A one-slot timer source a URLSync case fires by hand.
+ * A one-slot timer source a URLSync case fires by hand, shaped to sit on a
+ * window stub as the timer surface URLSync arms against.
  * @returns {Object} The stand-in and its scheduled delays.
  */
 function fakeUrlTimer() {
@@ -226,6 +229,9 @@ function fakeUrlTimer() {
       delays.push(ms);
       return 0;
     },
+    clearTimeout() { pending = null; },
+    /** @returns {boolean} Whether a timer is currently armed. */
+    armed() { return pending !== null; },
     /** Runs the pending timer. @returns {void} */
     fire() {
       const fn = pending;
@@ -265,6 +271,33 @@ test('the URL layer reads and writes the window it was handed', () => {
   assert.deepEqual(globalCalls, []);
 });
 
+/**
+ * The debounce is the one piece of a URLSync that can outlive a page discard,
+ * so it must be armed on the window the writer was handed rather than the
+ * ambient one, and dispose() must take it back down.
+ */
+test('URLSync arms and cancels its debounce on the window it was handed', () => {
+  installWindow('?effect=Global', '/global', '');
+  const timer = fakeUrlTimer();
+  const injected = {
+    location: { search: '', pathname: '/injected', hash: '' },
+    history: { replaceState: () => {} },
+    setTimeout: timer.setTimeout,
+    clearTimeout: timer.clearTimeout,
+  };
+  const state = new AppState({ effect: 'Voronoi' });
+  const sync = new URLSync(state, ['effect'], {}, injected);
+
+  state.set('effect', 'Hankin');
+  assert.deepEqual(timer.delays, [URL_FLUSH_DEBOUNCE_MS],
+    'the debounce did not arm on the injected window');
+  assert.equal(timer.armed(), true);
+
+  sync.dispose();
+  assert.equal(timer.armed(), false,
+    'dispose left a flush armed into a page that is going away');
+});
+
 test('URLSync.reset leaves a bare path when nothing survives', () => {
   const calls = installWindow('?effect=Voronoi&speed=2', '/sim', '#frag');
   const sync = new URLSync(new AppState({ effect: 'Voronoi' }), []);
@@ -284,6 +317,8 @@ test('a refused history write does not propagate out of the URL layer', () => {
   globalThis.window = {
     location: { search: '', pathname: '/sim', hash: '' },
     history: { replaceState() { throw new Error('rate limit'); } },
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (id) => clearTimeout(id),
   };
   const captured = installConsoleCapture('warn');
   try {
@@ -308,9 +343,7 @@ test('URLSync holds its ad-hoc buffer through a refused history write', () => {
   const written = [];
   let refuse = true;
   const timer = fakeUrlTimer();
-  const realSetTimeout = globalThis.setTimeout;
   const captured = installConsoleCapture('warn');
-  globalThis.setTimeout = timer.setTimeout;
   globalThis.window = {
     location: { search: '', pathname: '/sim', hash: '' },
     history: {
@@ -319,6 +352,8 @@ test('URLSync holds its ad-hoc buffer through a refused history write', () => {
         written.push(url);
       },
     },
+    setTimeout: timer.setTimeout,
+    clearTimeout: timer.clearTimeout,
   };
   try {
     const sync = new URLSync(new AppState({ effect: 'Voronoi' }), ['effect']);
@@ -337,7 +372,6 @@ test('URLSync holds its ad-hoc buffer through a refused history write', () => {
     assert.deepEqual(written.at(-1), '/sim?effect=Voronoi',
       'a landed ad-hoc write is not replayed from the buffer');
   } finally {
-    globalThis.setTimeout = realSetTimeout;
     captured.restore();
   }
 });
@@ -352,9 +386,7 @@ test('URLSync bounds its retries of a refused history write', () => {
   const written = [];
   let refuse = true;
   const timer = fakeUrlTimer();
-  const realSetTimeout = globalThis.setTimeout;
   const captured = installConsoleCapture('warn');
-  globalThis.setTimeout = timer.setTimeout;
   globalThis.window = {
     location: { search: '', pathname: '/sim', hash: '' },
     history: {
@@ -363,6 +395,8 @@ test('URLSync bounds its retries of a refused history write', () => {
         written.push(url);
       },
     },
+    setTimeout: timer.setTimeout,
+    clearTimeout: timer.clearTimeout,
   };
   try {
     const sync = new URLSync(new AppState({ effect: 'Voronoi' }), ['effect']);
@@ -382,7 +416,6 @@ test('URLSync bounds its retries of a refused history write', () => {
     assert.deepEqual(written, ['/sim?effect=Voronoi'],
       'a tracked key is re-read from state, but the abandoned ad-hoc param is gone');
   } finally {
-    globalThis.setTimeout = realSetTimeout;
     captured.restore();
   }
 });
@@ -396,10 +429,8 @@ test('URLSync will not let a concurrent write shorten an armed retry', () => {
   const written = [];
   let refuse = true;
   const timer = fakeUrlTimer();
-  const realSetTimeout = globalThis.setTimeout;
   const warn = console.warn;
   console.warn = () => {};
-  globalThis.setTimeout = timer.setTimeout;
   globalThis.window = {
     location: { search: '', pathname: '/sim', hash: '' },
     history: {
@@ -408,6 +439,8 @@ test('URLSync will not let a concurrent write shorten an armed retry', () => {
         written.push(url);
       },
     },
+    setTimeout: timer.setTimeout,
+    clearTimeout: timer.clearTimeout,
   };
   try {
     const state = new AppState({ effect: 'Voronoi' });
@@ -429,7 +462,6 @@ test('URLSync will not let a concurrent write shorten an armed retry', () => {
     assert.deepEqual(written, ['/sim?effect=Hankin&scale=3'],
       'the armed retry flushes both concurrent writes');
   } finally {
-    globalThis.setTimeout = realSetTimeout;
     console.warn = warn;
   }
 });

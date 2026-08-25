@@ -293,7 +293,8 @@ export class URLSync {
    *   default instead of being overwritten. Lives here, in the sync layer, so a
    *   garbage URL value can't poison state regardless of which consumer wires
    *   the URLSync — callers no longer have to re-validate after construction.
-   * @param {Window} [win] - The window this writer reads and writes the URL on.
+   * @param {Window} [win] - The window this writer reads and writes the URL on,
+   *   and arms its debounce against, so a discarded page takes the timer with it.
    */
   constructor(state, trackedKeys, validators = {}, win = window) {
     // Retire the previous writer: orphaned, it would keep its subscription and
@@ -387,7 +388,7 @@ export class URLSync {
       this.unsubscribe();
       this.unsubscribe = null;
     }
-    if (this.timer !== null) clearTimeout(this.timer);
+    if (this.timer !== null) this.win.clearTimeout(this.timer);
     this.timer = null;
     if (activeURLSync === this) activeURLSync = null;
   }
@@ -404,7 +405,7 @@ export class URLSync {
   suspend() {
     this.suspendDepth += 1;
     if (this.timer === null) return;
-    clearTimeout(this.timer);
+    this.win.clearTimeout(this.timer);
     this.timer = null;
     this.suspendedDirty = true;
     this.suspendedDelayMs = Math.max(this.suspendedDelayMs, this.armedDelayMs);
@@ -442,10 +443,10 @@ export class URLSync {
     }
     if (this.timer !== null) {
       if (delayMs < this.armedDelayMs) return;
-      clearTimeout(this.timer);
+      this.win.clearTimeout(this.timer);
     }
     this.armedDelayMs = delayMs;
-    this.timer = setTimeout(() => {
+    this.timer = this.win.setTimeout(() => {
       this.timer = null;
       this.flush();
     }, delayMs);
