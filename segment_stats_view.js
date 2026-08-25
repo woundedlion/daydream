@@ -267,10 +267,18 @@ export class SegmentStatsView {
     caption.className = 'visually-hidden';
     caption.textContent = 'Per-segment compute time and arena high-water marks';
     table.appendChild(caption);
-    /** @param {string} text - Header label. */
-    const th = (text) => {
+    /** @param {string} text - Column header label. */
+    const colHeader = (text) => {
       const e = this.doc.createElement('th');
       e.setAttribute('scope', 'col');
+      e.textContent = text;
+      return e;
+    };
+    /** @param {string} text - Row header label. */
+    const rowHeader = (text) => {
+      const e = this.doc.createElement('th');
+      e.setAttribute('scope', 'row');
+      e.className = 'seg-label';
       e.textContent = text;
       return e;
     };
@@ -293,8 +301,8 @@ export class SegmentStatsView {
     };
     const spanCell = () => { const e = td(''); e.colSpan = 3; return e; };
 
-    mkRow([th(''), th('Range'), th('Compute'),
-           th('Scr A'), th('Scr B'), th('Persist')]);
+    mkRow([colHeader(''), colHeader('Range'), colHeader('Compute'),
+           colHeader('Scr A'), colHeader('Scr B'), colHeader('Persist')]);
 
     const rows = [];
     for (let s = 0; s < numSegs; s++) {
@@ -303,19 +311,19 @@ export class SegmentStatsView {
       const scrA = td('-');
       const scrB = td('-');
       const persist = td('-');
-      mkRow([td(`Seg ${s}`, 'seg-label'), range, compute, scrA, scrB, persist]);
+      mkRow([rowHeader(`Seg ${s}`), range, compute, scrA, scrB, persist]);
       rows.push({ range, compute, scrA, scrB, persist });
     }
 
     const maxTime = td('', 'seg-time');
-    const maxRow = mkRow([td('max', 'seg-label'), td(''), maxTime, spanCell()]);
+    const maxRow = mkRow([rowHeader('max'), td(''), maxTime, spanCell()]);
     maxRow.className = 'seg-total';
 
     // round-trip spans dispatch to last worker response, so it carries the
     // structured clone, buffer transfer and event-loop latency that `max` — the
     // slowest worker's own drawFrame() — excludes.
     const wallTime = td('', 'seg-time');
-    mkRow([td('round-trip', 'seg-label'), td(''), wallTime, spanCell()]);
+    mkRow([rowHeader('round-trip'), td(''), wallTime, spanCell()]);
 
     el.replaceChildren(table);
     this.statsTable = table;
