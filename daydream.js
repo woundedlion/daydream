@@ -334,6 +334,18 @@ export function start({
     return result === host.module.ParamSetResult.APPLIED;
   }
 
+  /**
+   * Hold or resume animation on every live engine instance.
+   * @param {boolean} paused - Whether animation is held.
+   * @returns {void}
+   * @details The flag is per module instance, so the main engine and every
+   *   pool worker each need their own write.
+   */
+  function setAnimationsPaused(paused) {
+    host.engine.setAnimationsPaused(paused);
+    segments.setAnimationsPaused(paused);
+  }
+
   // Delegated, and the button is resolved at click time: the notice sink resolves
   // its own elements the same way, so markup that arrives after construction is
   // dismissible rather than carrying an inert button.
@@ -592,10 +604,7 @@ export function start({
     engineParamValues: () => host.engine.getParamValues(),
     setEngineParam,
     setWorkerParam: (name, value) => segments.setParameter(name, value),
-    setAnimationsPaused: (paused) => {
-      host.engine.setAnimationsPaused(paused);
-      segments.setAnimationsPaused(paused);
-    },
+    setAnimationsPaused,
     getPresetCount: () => segments.ownsDisplay
       ? (segments.getPresetCount() ?? host.engine.getPresetCount())
       : host.engine.getPresetCount(),
@@ -678,10 +687,7 @@ export function start({
     syncEffectGui: () => effectGui.sync(),
     invalidate: () => daydream.invalidate(),
     getAnimationsPaused: () => host.engine.getAnimationsPaused?.() ?? null,
-    setAnimationsPaused: (paused) => {
-      host.engine.setAnimationsPaused(paused);
-      segments.setAnimationsPaused(paused);
-    },
+    setAnimationsPaused,
     setParamFilter: (filter) => { paramFilterRef.current = filter; },
     initialEffect: requestedSelection.effect,
     win,
