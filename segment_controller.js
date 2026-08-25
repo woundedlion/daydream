@@ -28,6 +28,7 @@ import {
   stampBoundaries,
 } from "./segment_layout.js";
 import { displayAliasesDiverged } from "./app_lifecycle.js";
+import { isViewLive } from "./pixel_view.js";
 import { pageWarmer } from "./module_warmer.js";
 import { FAULT_POOL, FAULT_RENDER, SegmentStatsView } from "./segment_stats_view.js";
 import { PROTOCOL_VERSION } from "./worker_protocol.js";
@@ -302,6 +303,11 @@ export class SegmentController {
     if (next === this.#showBoundaries) return;
     this.#showBoundaries = next;
     this.composite();
+    // No simulation tick stands behind this composite, and Three re-uploads the
+    // instance colours only on a version bump.
+    const instanceColor = this.driver.dotMesh?.instanceColor;
+    if (instanceColor && isViewLive(instanceColor.array))
+      instanceColor.needsUpdate = true;
     this.driver.invalidate();
   }
 
