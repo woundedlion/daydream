@@ -631,7 +631,7 @@ test('documentEvents refuses a removal with no listener behind it', () => {
   events.removeEventListener('keydown', handler);
   assert.equal(events.listenerCount('keydown'), 0);
   assert.throws(() => events.removeEventListener('keydown', handler),
-    'a second removal of the same handler throws');
+    /no keydown listener on the document to remove/);
 });
 
 test('installAnimationFrames queues callbacks until a flush runs them', () => {
