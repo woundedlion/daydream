@@ -12,6 +12,7 @@ import {
 } from '../tools/shader_deeplink.js';
 import {
   applyFixedShaderDocument,
+  BAKED_CONSTANT_IDS,
   bakedTopologyFields,
   createShaderDocumentController,
   engineParameterName,
@@ -343,6 +344,60 @@ test('the fixed path skips every topology field the catalog flags', () => {
   assert.ok(flagged.some((/** @type {*} */ parameter) =>
     parameter.id === 'palette-mapping'));
   assert.equal(BAKED.has('palette-mapping'), false);
+});
+
+const PATTERNS = new URL('../shader/patterns/', import.meta.url);
+/** @param {string} filename */
+const promotedDocument = (filename) =>
+  JSON.parse(readFileSync(new URL(filename, PATTERNS), 'utf8'));
+const PROMOTED = promotedDocument('shaderball_migration.json').source_documents;
+
+// The compiled build hard-codes these values, so it registers no control for
+// them; without the skip the apply refuses on the first one and writes nothing.
+test('the fixed path skips the ids the compiled build bakes in as constants', () => {
+  const engine = fixedEngine(() => true);
+  const values = { 'camera.spin-speed': 0.01975, 'sample.pattern-freq': 3 };
+  const presets = [{ preset_id: 'noon', values }];
+
+  assert.ok(BAKED_CONSTANT_IDS.has('camera.spin-speed'));
+  assert.equal(applyFixedShaderDocument(
+    engine, MODULE, { document: { preset_bank: { presets } } },
+    'noon', ['noon'], BAKED), null);
+  assert.deepEqual(engine.writes, [['Pattern Freq', 3]]);
+});
+
+// Ash Cloud is the document that carries a baked constant, against an engine
+// standing in for its compiled build: every other id resolves, and AshCloud
+// registers no Camera Spin Speed because CAMERA_SPIN_RATE is a constant.
+test('every ash-cloud preset value reaches its compiled build', () => {
+  const ashCloud = promotedDocument(PROMOTED['ash-cloud']);
+  const ids = Object.keys(ashCloud.preset_bank.presets[0].values);
+  const definitions = ids
+    .filter((id) => !BAKED.has(id.slice(id.indexOf('.') + 1)))
+    .map((id) => ({ name: engineParameterName(id) }))
+    .filter((definition) => definition.name !== 'Camera Spin Speed');
+  const engine = fixedEngine(() => true);
+  engine.getParameterDefinitions = () => definitions;
+
+  assert.ok(ids.includes('camera.spin-speed'));
+  assert.equal(applyFixedShaderDocument(
+    engine, MODULE, { document: ashCloud }, 'ash-cloud', ['ash-cloud'], BAKED), null);
+  assert.equal(engine.writes.some(([name]) => name === 'Camera Spin Speed'), false);
+  assert.equal(engine.writes.length, definitions.length);
+});
+
+// A stale exemption would silently cover an id that has since become
+// registrable, so it only holds while a promoted document still carries it.
+test('every baked-constant exemption is still carried by a promoted document', () => {
+  const carried = new Set();
+  for (const filename of Object.values(PROMOTED)) {
+    for (const preset of promotedDocument(String(filename)).preset_bank.presets)
+      for (const id of Object.keys(preset.values)) carried.add(id);
+  }
+
+  assert.ok(carried.size > 0);
+  for (const id of BAKED_CONSTANT_IDS)
+    assert.ok(carried.has(id), `no promoted document carries "${id}"`);
 });
 
 const MIGRATION = JSON.stringify({
