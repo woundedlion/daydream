@@ -406,9 +406,11 @@ export async function createChainDocumentStore({
   };
 
   /**
-   * Declares an added instance's full catalog schema and backfills every
-   * preset, the serialization fields and staggered path-policy groups with
-   * the catalog defaults.
+   * Declares an added instance and backfills every preset, the serialization
+   * fields and staggered path-policy groups with its defaults. The declarations
+   * are the loaded document's for that operator where it carries any — which
+   * may be a strict subset of the catalog's fields — and the catalog's schema
+   * for an operator the document does not use.
    * @param {*} candidate - Document being reconciled.
    * @param {ChainEntry} entry - The added chain entry.
    */
