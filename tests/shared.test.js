@@ -13,6 +13,16 @@ import { register } from 'node:module';
 import {
   log, Mesh, PerspectiveCamera, Scene, WebGLRenderer, OrbitControls,
 } from './fake_three.js';
+import { fakeElement } from './fake_dom.js';
+
+/**
+ * A container element reporting the box the scene is sized against.
+ * @param {number} width - Container client width.
+ * @param {number} height - Container client height.
+ * @returns {Object} The element.
+ */
+const sizedElement = (width, height) =>
+  Object.assign(fakeElement('div'), { clientWidth: width, clientHeight: height });
 
 // Same URL this file's static import above resolved, so shared.js and the
 // assertions below share one module instance — and one `log`. The hook is
@@ -66,8 +76,8 @@ function stubComputedStyle(props) {
  *          cancelAnimationFrame.
  */
 function mountScene(opts = {}) {
-  const canvas = {};
-  const container = { clientWidth: 640, clientHeight: 480 };
+  const canvas = fakeElement('canvas');
+  const container = sizedElement(640, 480);
   const listeners = { added: [], removed: [] };
   const cancelled = [];
   let parkedFrame = null;
@@ -140,7 +150,7 @@ test('initScene throws when the container element is absent', () => {
 });
 
 test('initScene throws when the canvas element is absent', () => {
-  stubDocument({ viewport: { clientWidth: 640, clientHeight: 480 } });
+  stubDocument({ viewport: sizedElement(640, 480) });
   assert.throws(() => initScene('viewport', 'gl'),
     /canvas element #gl not found/);
 });

@@ -1,34 +1,31 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createPointerDrag } from '../tools/pointer_drag.js';
+import { fakeElement } from './fake_dom.js';
 
-/** An element that records captures and the listeners wired onto it. */
-const fakeCanvas = () => {
-  const listeners = new Map();
+/**
+ * The shared fake plus the pointer-capture bookkeeping it does not model: the
+ * ids the element holds, with no re-routing of events to the capturing node.
+ * @returns {Object} A canvas element recording its captures in `captured`.
+ */
+const dragElement = () => {
   const captured = new Set();
-  return {
+  return Object.assign(fakeElement('canvas'), {
     captured,
-    listeners,
-    addEventListener(type, listener) { listeners.set(type, listener); },
-    removeEventListener(type, listener) {
-      if (listeners.get(type) === listener) listeners.delete(type);
-    },
-    dispatch(type, event) { listeners.get(type)?.(event); },
     setPointerCapture(id) { captured.add(id); },
     releasePointerCapture(id) { captured.delete(id); },
     hasPointerCapture(id) { return captured.has(id); },
-  };
+  });
 };
 
 /** A pointerdown that passes the helper's own guard unless overridden. */
 const down = (pointerId = 7, extra = {}) => ({
-  pointerId, isPrimary: true, button: 0, prevented: false,
-  preventDefault() { this.prevented = true; }, ...extra,
+  pointerId, isPrimary: true, button: 0, ...extra,
 });
 
 /** A drag wired onto a fake element, with each callback's calls recorded. */
 const harness = (options = {}) => {
-  const element = fakeCanvas();
+  const element = dragElement();
   const calls = { start: [], move: [], hover: [], end: [], cancel: [] };
   const drag = createPointerDrag({
     element,
@@ -46,41 +43,37 @@ const harness = (options = {}) => {
 
 test('a primary pointerdown starts the drag, captures the pointer and suppresses the default', () => {
   const { element, calls } = harness();
-  const event = down(7);
-  element.dispatch('pointerdown', event);
+  const event = element.dispatch('pointerdown', down(7));
   assert.deepEqual(calls.start, [event]);
   assert.ok(element.hasPointerCapture(7));
-  assert.equal(event.prevented, true);
+  assert.equal(event.defaultPrevented, true);
 });
 
 test('a pointerdown that is not the primary button starts nothing', () => {
   for (const extra of [{ isPrimary: false }, { button: 1 }, { button: 2 }]) {
     const { element, calls } = harness();
-    const event = down(7, extra);
-    element.dispatch('pointerdown', event);
+    const event = element.dispatch('pointerdown', down(7, extra));
     assert.equal(calls.start.length, 0, `${JSON.stringify(extra)} must not start a drag`);
     assert.equal(element.captured.size, 0);
-    assert.equal(event.prevented, false);
+    assert.equal(event.defaultPrevented, false);
   }
 });
 
 test('a second pointerdown while a drag runs is ignored', () => {
   const { element, calls } = harness();
   element.dispatch('pointerdown', down(7));
-  const second = down(9);
-  element.dispatch('pointerdown', second);
+  const second = element.dispatch('pointerdown', down(9));
   assert.equal(calls.start.length, 1);
   assert.ok(!element.hasPointerCapture(9));
-  assert.equal(second.prevented, false);
+  assert.equal(second.defaultPrevented, false);
 });
 
 test('onStart returning false declines the drag, leaving the default intact', () => {
   const { element, calls } = harness({ declineStart: true });
-  const event = down(7);
-  element.dispatch('pointerdown', event);
+  const event = element.dispatch('pointerdown', down(7));
   assert.equal(calls.start.length, 1);
   assert.equal(element.captured.size, 0);
-  assert.equal(event.prevented, false);
+  assert.equal(event.defaultPrevented, false);
   // Declining leaves no drag behind, so the next press is free to start one.
   element.dispatch('pointermove', { pointerId: 7 });
   assert.equal(calls.move.length, 0);
@@ -89,13 +82,10 @@ test('onStart returning false declines the drag, leaving the default intact', ()
 
 test('a move carrying the drag pointer is a move, and any other pointer a hover', () => {
   const { element, calls } = harness();
-  const hoverBefore = { pointerId: 7 };
-  element.dispatch('pointermove', hoverBefore);
+  const hoverBefore = element.dispatch('pointermove', { pointerId: 7 });
   element.dispatch('pointerdown', down(7));
-  const dragged = { pointerId: 7 };
-  const foreign = { pointerId: 9 };
-  element.dispatch('pointermove', dragged);
-  element.dispatch('pointermove', foreign);
+  const dragged = element.dispatch('pointermove', { pointerId: 7 });
+  const foreign = element.dispatch('pointermove', { pointerId: 9 });
   assert.deepEqual(calls.move, [dragged]);
   assert.deepEqual(calls.hover, [hoverBefore, foreign]);
 });
@@ -103,8 +93,7 @@ test('a move carrying the drag pointer is a move, and any other pointer a hover'
 test('a release drops the capture and ends the drag', () => {
   const { element, calls } = harness();
   element.dispatch('pointerdown', down(7));
-  const up = { pointerId: 7 };
-  element.dispatch('pointerup', up);
+  const up = element.dispatch('pointerup', { pointerId: 7 });
   assert.deepEqual(calls.end, [up]);
   assert.equal(calls.cancel.length, 0);
   assert.equal(element.captured.size, 0);
@@ -131,8 +120,7 @@ test('a release with no drag running ends nothing', () => {
 test('a cancelled gesture runs onCancel rather than onEnd', () => {
   const { element, calls } = harness();
   element.dispatch('pointerdown', down(7));
-  const cancel = { pointerId: 7 };
-  element.dispatch('pointercancel', cancel);
+  const cancel = element.dispatch('pointercancel', { pointerId: 7 });
   assert.deepEqual(calls.cancel, [cancel]);
   assert.equal(calls.end.length, 0);
   assert.equal(element.captured.size, 0);
@@ -141,8 +129,7 @@ test('a cancelled gesture runs onCancel rather than onEnd', () => {
 test('a page with no onCancel unwinds a cancelled gesture through onEnd', () => {
   const { element, calls } = harness({ withoutCancel: true });
   element.dispatch('pointerdown', down(7));
-  const cancel = { pointerId: 7 };
-  element.dispatch('pointercancel', cancel);
+  const cancel = element.dispatch('pointercancel', { pointerId: 7 });
   assert.deepEqual(calls.end, [cancel]);
 });
 
@@ -183,8 +170,7 @@ test('the element takes a new drag once the last one ended', () => {
   element.dispatch('pointerdown', down(7));
   element.dispatch('pointerup', { pointerId: 7 });
   element.dispatch('pointerdown', down(9));
-  const moved = { pointerId: 9 };
-  element.dispatch('pointermove', moved);
+  const moved = element.dispatch('pointermove', { pointerId: 9 });
   assert.equal(calls.start.length, 2);
   assert.deepEqual(calls.move, [moved]);
   assert.ok(element.hasPointerCapture(9));
@@ -192,21 +178,28 @@ test('the element takes a new drag once the last one ended', () => {
 
 test('remove() detaches every listener the drag wired', () => {
   const { element, calls, drag } = harness();
-  assert.deepEqual([...element.listeners.keys()].sort(),
+  assert.deepEqual(element.listeners.map((l) => l.type).sort(),
     ['pointercancel', 'pointerdown', 'pointermove', 'pointerup']);
   drag.remove();
-  assert.equal(element.listeners.size, 0);
+  assert.deepEqual(element.listeners, []);
   element.dispatch('pointerdown', down(7));
   assert.equal(calls.start.length, 0);
 });
 
+// The shared fake throws on a removal with no listener behind it, so a second
+// remove() cannot pass for an idempotent one.
+test('remove() detaches once and does not stand in for an idempotent disposal', () => {
+  const { drag } = harness();
+  drag.remove();
+  assert.throws(() => drag.remove(), /no pointerdown listener registered/);
+});
+
 test('a page with no callbacks at all still captures and releases', () => {
-  const element = fakeCanvas();
+  const element = dragElement();
   const drag = createPointerDrag({ element });
-  const event = down(7);
-  element.dispatch('pointerdown', event);
+  const event = element.dispatch('pointerdown', down(7));
   assert.ok(element.hasPointerCapture(7));
-  assert.equal(event.prevented, true);
+  assert.equal(event.defaultPrevented, true);
   element.dispatch('pointermove', { pointerId: 7 });
   element.dispatch('pointerup', { pointerId: 7 });
   assert.equal(element.captured.size, 0);
