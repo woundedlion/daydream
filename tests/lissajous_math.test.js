@@ -142,8 +142,11 @@ test('snapToRationalRatio: 8/7 closure fits the closed-curve domain', () => {
   assert.equal(closingPeriod, 7 * TWO_PI);
   assert.ok(closingPeriod <= MAX_RATIONAL_TERM * TWO_PI);
 
-  const start = lissajous(snappedActiveC, 1, phase, 0);
-  const end = lissajous(snappedActiveC, 1, phase, closingPeriod);
+  // t = 0 is the pole, where sin(m2·t) = 0 drops the axial frequency out of x
+  // and z; sample off it so the closure covers both frequencies.
+  const t0 = 0.31;
+  const start = lissajous(snappedActiveC, 1, phase, t0);
+  const end = lissajous(snappedActiveC, 1, phase, t0 + closingPeriod);
   assert.ok(distance(start, end) < 1e-12);
 });
 
@@ -274,8 +277,10 @@ test('closingDomain mirrors the engine snap and lands back on the start point', 
   assert.equal(closingDomain(-2, 3), 0);
 
   const closed = closingDomain(1.06, 5.909);
-  const start = lissajous(1.06, 1.06, 0, 0);
-  const end = lissajous(1.06, 1.06, 0, closed);
+  // Off the t = 0 pole, where sin(m2·t) = 0 would hide the axial frequency.
+  const t0 = 0.37;
+  const start = lissajous(1.06, 1.06, 0, t0);
+  const end = lissajous(1.06, 1.06, 0, t0 + closed);
   assert.ok(distance(start, end) < 1e-12);
 });
 
