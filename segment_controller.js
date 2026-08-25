@@ -302,12 +302,17 @@ export class SegmentController {
     const next = Boolean(show);
     if (next === this.#showBoundaries) return;
     this.#showBoundaries = next;
-    this.composite();
-    // No simulation tick stands behind this composite, and Three re-uploads the
-    // instance colours only on a version bump.
-    const instanceColor = this.driver.dotMesh?.instanceColor;
-    if (instanceColor && isViewLive(instanceColor.array))
-      instanceColor.needsUpdate = true;
+    // The control stays live outside segmented mode, where the pool owns no
+    // display buffer: compositing there would zero the single-engine frame or
+    // latch a fault on a controller with nothing to blit.
+    if (this.active && this.ready && this.hasPublishedFrame()) {
+      this.composite();
+      // No simulation tick stands behind this composite, and Three re-uploads
+      // the instance colours only on a version bump.
+      const instanceColor = this.driver.dotMesh?.instanceColor;
+      if (instanceColor && isViewLive(instanceColor.array))
+        instanceColor.needsUpdate = true;
+    }
     this.driver.invalidate();
   }
 

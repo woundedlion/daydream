@@ -1852,6 +1852,7 @@ test('the boundary setter re-composites and invalidates a paused held generation
   driver.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = readyController(2);
+  c.active = true; // the app sets this before create(); the setter checks it
   c.setAnimationsPaused(true);
   const quadL = new Uint16Array(2 * 2 * 3).fill(111);
   const quadR = new Uint16Array(2 * 2 * 3).fill(222);
@@ -1882,6 +1883,22 @@ test('the boundary setter re-composites and invalidates a paused held generation
   assert.equal(driver.invalidations, 2, 'each visible change requests one repaint');
   assert.equal(driver.dotMesh.instanceColor.version, uploads + 2,
     'each visible change flags one upload');
+});
+
+test('the boundary setter composites nothing when the pool owns no display', () => {
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3).fill(77);
+
+  // Inactive controller: the single main-thread engine owns the display buffer.
+  const c = makeController();
+  c.count = 2;
+
+  c.showBoundaries = true;
+
+  assert.equal(driver.pixels[idx(0, 0, 4)], 77,
+    'the single-engine frame is left untouched');
+  assert.equal(c.faulted, false, 'no fault latched on a controller holding nothing');
+  assert.equal(driver.invalidations, 1, 'the repaint is still requested');
 });
 
 test('composite() marks every internal split plus the wrap seam for an 8-segment layout', () => {
