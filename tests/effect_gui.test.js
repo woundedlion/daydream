@@ -301,6 +301,10 @@ function fakeGui(hydrated = {}, stored = {}) {
   gui.addDisplayFolder = (name) => {
     const folder = {
       name,
+      _closed: false,
+      get closed() { return this._closed; },
+      open(open = true) { this._closed = !open; },
+      close() { this.open(false); },
       add: (object, property, ...args) => {
         const controller = gui.add(object, property, ...args);
         controller.folder = name;
@@ -628,6 +632,29 @@ test('ShaderBall builds one URL-transparent bank for every pipeline stage', () =
   assert.equal(h.gui().ctrl('Palette').folder, 'Colorize');
   assert.equal(h.gui().ctrl('Palette').label, 'Palette');
   assert.equal(h.gui().ctrl('Hue Shift Mode').folder, 'Colorize');
+});
+
+test('a schema rebuild keeps the stage folders the user collapsed', () => {
+  const params = shaderBallParams();
+  const h = makeHarness({
+    params,
+    engineValues: params.map((parameter) => parameter.value),
+    generation: 7,
+  });
+  h.panel.build();
+  h.panel.mount();
+  const folder = (name) => h.gui().folders.find((f) => f.name === name);
+  folder('Surface Noise').close();
+  folder('Colorize').close();
+
+  h.state.generation = 8;
+  h.panel.sync();
+
+  assert.deepEqual(h.gui().folders.map((f) => f.name), SHADERBALL_STAGE_ORDER,
+    'the panel was rebuilt');
+  assert.equal(folder('Surface Noise').closed, true);
+  assert.equal(folder('Colorize').closed, true);
+  assert.equal(folder('Function').closed, false, 'the rest stay open');
 });
 
 test('LatticeMelt controls use the fixed pipeline modes as folders', () => {
