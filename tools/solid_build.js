@@ -175,7 +175,18 @@ export function buildChainMesh(base, ops, ctx) {
       e instanceof Error && e.message ? e.message : String(e)}`;
   }
 
-  const meshData = readbackMesh(mesh, ctx);
+  let meshData;
+  try {
+    meshData = readbackMesh(mesh, ctx);
+  } catch (e) {
+    console.error('WASM readback error:', e);
+    if (ctx.onTrap(e)) return null;
+    mesh.delete();
+    ctx.meshOps.clearToolingMemory();
+    ctx.onError(`Mesh readback failed: ${
+      e instanceof Error && e.message ? e.message : String(e)}`);
+    return null;
+  }
   mesh.delete();
   ctx.meshOps.clearToolingMemory();
   // A rejected readback leaves no geometry to draw; readbackMesh already
