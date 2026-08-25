@@ -22,10 +22,17 @@ export interface EnumValue {
   readonly value: number;
 }
 
-/** Usage snapshot of a single arena, in bytes. */
+/**
+ * Usage snapshot of a single arena, in bytes. `high_water_mark` is the peak
+ * since the last resplit_arenas(); `lifetime_high_water_mark` is the peak over
+ * the module's whole life, which no resplit clears and which may exceed the
+ * current `capacity`. Size a budget against the lifetime figure; a fill bar or
+ * an overrun check reads the windowed one, which shares capacity's split.
+ */
 export interface ArenaUsage {
   usage: number;
   high_water_mark: number;
+  lifetime_high_water_mark: number;
   capacity: number;
 }
 
