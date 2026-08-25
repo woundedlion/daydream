@@ -414,6 +414,15 @@
   opacity: 0.45;
 }
 
+/* The row generates no box, so its reason is a node of its own, on a line
+   under the control it dims. */
+.chain-param-note {
+  grid-column: 1 / -1;
+  max-width: 12rem;
+  color: var(--muted-text);
+  font-size: 0.5625rem;
+}
+
 .chain-param-name {
   color: var(--muted-text);
   font-size: 0.625rem;
