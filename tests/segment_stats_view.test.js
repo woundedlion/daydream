@@ -479,6 +479,24 @@ test('the fault overlay is painted once and torn down on recovery', () => {
   assert.equal(grid(stats).cell(1, 'Compute').textContent, '1.0 ms');
 });
 
+test('a second fault replaces the standing alert', () => {
+  const { doc, stats } = makeDoc();
+  const view = new SegmentStatsView(doc);
+  view.update(readyState(2, { faulted: true, faultInfo: { segId: 1, message: 'boom' } }));
+  assert.equal(stats.firstElementChild.childNodes[2].textContent, 'boom');
+
+  // The recovery the banner prescribes: toggle segmented mode off, then fault
+  // again on the respawn. The overlay is left standing across the inactive
+  // repaint, so the new fault must not read the old one off the DOM.
+  view.update(readyState(2, { active: false }));
+  view.update(readyState(2, { faulted: true, faultInfo: { segId: 0, message: 'worse' } }));
+  const box = stats.firstElementChild;
+  assert.equal(box.getAttribute('role'), 'alert');
+  assert.equal(box.childNodes[0],
+    '⚠ Segment worker 0 faulted — segmented render halted.');
+  assert.equal(box.childNodes[2].textContent, 'worse');
+});
+
 test('a steady frame rewrites no cell of the table', () => {
   const { doc, stats } = makeDoc();
   const view = new SegmentStatsView(doc);

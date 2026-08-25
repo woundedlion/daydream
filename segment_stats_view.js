@@ -91,6 +91,11 @@ export class SegmentStatsView {
     // only while this overlay is the one hiding that bar.
     /** @type {Object<string, string>} */
     this.hiddenStatBars = {};
+    // Identity of the fault the standing alert box was built from, so a fault
+    // raised while an earlier one is still on screen repaints rather than
+    // leaving the old message up.
+    /** @type {string | null} */
+    this.shownFault = null;
   }
 
   /**
@@ -156,8 +161,11 @@ export class SegmentStatsView {
     el.classList.add('visible');
 
     if (state.faulted) {
-      if (el.firstElementChild?.getAttribute('role') === 'alert') return;
       const f = state.faultInfo;
+      const fault = JSON.stringify([f?.segId ?? null, f?.message ?? null]);
+      if (this.shownFault === fault
+          && el.firstElementChild?.getAttribute('role') === 'alert') return;
+      this.shownFault = fault;
       // Build via text nodes, not innerHTML: the fault message is arbitrary text
       // and must never be parsed as markup.
       const box = this.doc.createElement('div');
