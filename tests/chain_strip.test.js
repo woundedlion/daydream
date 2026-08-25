@@ -12,7 +12,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { createChainDocumentStore } from '../tools/chain_document_store.js';
-import { createChainStrip, deactivatedParameterIds } from '../tools/chain_strip.js';
+import {
+  PARAMETER_GATES, createChainStrip, deactivatedParameterIds,
+} from '../tools/chain_strip.js';
 import { compileShaderDocument } from '../shader/shader_workbench.mjs';
 import {
   documentEvents, fakeElement, installDocument, restoreDocumentAfterEach,
@@ -1082,5 +1084,46 @@ test('deactivatedParameterIds follows the engine topology gates', () => {
     { ...values, 'sample.coverage-style': values['sample.coverage-mode'] },
     chain, renamed,
   )], ['colorize.hue-noise-scale', 'colorize.hue-noise-speed',
-    'colorize.brightness-depth']);
+    'colorize.brightness-depth'],
+  'a renamed gate field silently stops gating: the rule keys are field ids, so '
+    + 'the case below pins them against the shipped catalog');
+});
+
+// The gate keys and gate field ids are literals, so a catalog rename or a
+// dropped enum option would cost the gate without failing anything above.
+test('every parameter gate names a live catalog field and discriminates', () => {
+  /** @type {Map<string, {topology: boolean, values: Set<string>}>} */
+  const fields = new Map();
+  for (const operator of CATALOG.operators) {
+    for (const field of operator.params) {
+      const seen = fields.get(field.id)
+        ?? { topology: false, values: new Set() };
+      seen.topology ||= field.topology === true;
+      for (const value of field.values ?? []) seen.values.add(value);
+      fields.set(field.id, seen);
+    }
+  }
+  assert.deepEqual(Object.keys(PARAMETER_GATES).sort(),
+    ['brightness-depth', 'edge-width', 'hue-noise-scale', 'hue-noise-speed',
+      'hue-shift-amount']);
+  for (const [gated, rules] of Object.entries(PARAMETER_GATES)) {
+    const target = fields.get(gated);
+    assert.ok(target, `no catalog operator declares gated field "${gated}"`);
+    assert.equal(target.topology, false,
+      `"${gated}" is a topology field; gating one selects nothing`);
+    for (const [gateField, active] of rules) {
+      const gate = fields.get(gateField);
+      assert.ok(gate, `"${gated}" is gated on "${gateField}", which no operator declares`);
+      assert.equal(gate.topology, true,
+        `"${gateField}" is not a topology field, so it carries no options to gate on`);
+      const options = [...gate.values];
+      assert.ok(options.some((value) => active(value)),
+        `no "${gateField}" option activates "${gated}"`);
+      assert.ok(options.some((value) => !active(value)),
+        `every "${gateField}" option activates "${gated}"; the gate is inert`);
+    }
+  }
+  assert.deepEqual([...new Set(Object.values(PARAMETER_GATES)
+    .flat().map(([gateField]) => gateField))].sort(),
+  ['brightness-envelope', 'coverage-mode', 'envelope', 'hue-shift-mode']);
 });

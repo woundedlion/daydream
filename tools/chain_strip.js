@@ -104,6 +104,23 @@ const nudgeStep = (declaration) => {
 const fieldOf = (id) => id.slice(id.indexOf('.') + 1);
 
 /**
+ * Which catalog field each gated field is gated on, and the option values that
+ * keep it active. Keyed by field id, not by parameter id, so the rule covers
+ * every instance of every operator declaring that field.
+ * @type {Record<string, GateRule[]>}
+ */
+export const PARAMETER_GATES = Object.freeze({
+  'edge-width': [
+    ['coverage-mode', (value) => value === 'edge-fade'],
+    ['envelope', (value) => value === 'edge-fade'],
+  ],
+  'hue-shift-amount': [['hue-shift-mode', (value) => value !== 'none']],
+  'hue-noise-scale': [['hue-shift-mode', (value) => value === 'noise']],
+  'hue-noise-speed': [['hue-shift-mode', (value) => value === 'noise']],
+  'brightness-depth': [['brightness-envelope', (value) => value !== 'none']],
+});
+
+/**
  * The parameter ids the current topology selections deactivate. Edge widths
  * require an edge-fade mode, hue controls require their corresponding hue mode,
  * and brightness depth requires a brightness envelope. Deactivation changes
@@ -118,23 +135,12 @@ const fieldOf = (id) => id.slice(id.indexOf('.') + 1);
 export function deactivatedParameterIds(parameters, values, chain, catalog) {
   const operators = new Map(catalog.operators.map((operator) => [operator.id, operator]));
   const operatorByLabel = new Map(chain.map((entry) => [entry.label, operators.get(entry.operator)]));
-  /** @type {Record<string, GateRule[]>} */
-  const gateRules = {
-    'edge-width': [
-      ['coverage-mode', (value) => value === 'edge-fade'],
-      ['envelope', (value) => value === 'edge-fade'],
-    ],
-    'hue-shift-amount': [['hue-shift-mode', (value) => value !== 'none']],
-    'hue-noise-scale': [['hue-shift-mode', (value) => value === 'noise']],
-    'hue-noise-speed': [['hue-shift-mode', (value) => value === 'noise']],
-    'brightness-depth': [['brightness-envelope', (value) => value !== 'none']],
-  };
   /** @type {Set<string>} */
   const deactivated = new Set();
   for (const parameter of parameters) {
     if (!parameter.id.includes('.')) continue;
     const field = fieldOf(parameter.id);
-    const rules = gateRules[field];
+    const rules = PARAMETER_GATES[field];
     if (!rules) continue;
     const label = parameter.id.slice(0, parameter.id.indexOf('.'));
     const operator = operatorByLabel.get(label);
