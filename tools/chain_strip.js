@@ -437,6 +437,20 @@ export function createChainStrip({
   };
 
   /**
+   * @param {number} index - A chip's chain index.
+   * @param {number} step - -1 for the earlier neighbour, 1 for the later one.
+   * @returns {boolean} Whether that neighbour is an endomorphism of the same
+   *   carrier, which is the only direction a reorder can name.
+   */
+  const sharesBand = (index, step) => {
+    const chain = store.chain();
+    const neighbour = chain[index + step];
+    if (neighbour === undefined) return false;
+    const op = opOf(chain[index]);
+    return opOf(neighbour).input === op.input && opOf(neighbour).output === op.output;
+  };
+
+  /**
    * Moves the chip at one chain index to a gap, as the m-for-m span replacement
    * that keeps every label (and so every parameter value).
    * @param {number} index - The chip's chain index.
@@ -704,8 +718,14 @@ export function createChainStrip({
     if (key === 'ArrowRight' || key === 'ArrowLeft') {
       event.preventDefault();
       const forward = key === 'ArrowRight';
-      if (event.altKey) moveChip(index, forward ? index + 2 : index - 1);
-      else focusChip(forward ? index + 1 : index - 1);
+      if (!event.altKey) {
+        focusChip(forward ? index + 1 : index - 1);
+        return;
+      }
+      // The same span the '‹ ›' buttons disable themselves outside of: a
+      // crossing has no reorder, and a band edge has no neighbour to swap with.
+      if (crossing || !sharesBand(index, forward ? 1 : -1)) return;
+      moveChip(index, forward ? index + 2 : index - 1);
       return;
     }
     if (key === 'Enter' || key === ' ') {
@@ -956,13 +976,10 @@ export function createChainStrip({
         toggleBypass(entry.label);
       });
       header.appendChild(toggle);
-      const previous = store.chain()[index - 1];
-      const next = store.chain()[index + 1];
       const earlier = el('button', 'chain-chip-move');
       earlier.type = 'button';
       earlier.textContent = '←';
-      earlier.disabled = previous === undefined
-        || opOf(previous).input !== op.input || opOf(previous).output !== op.output;
+      earlier.disabled = !sharesBand(index, -1);
       earlier.setAttribute('aria-label', `Move ${op.name} · ${entry.label} earlier`);
       earlier.setAttribute('title', 'Move earlier');
       earlier.addEventListener('click', (/** @type {*} */ event) => {
@@ -972,8 +989,7 @@ export function createChainStrip({
       const later = el('button', 'chain-chip-move');
       later.type = 'button';
       later.textContent = '→';
-      later.disabled = next === undefined
-        || opOf(next).input !== op.input || opOf(next).output !== op.output;
+      later.disabled = !sharesBand(index, 1);
       later.setAttribute('aria-label', `Move ${op.name} · ${entry.label} later`);
       later.setAttribute('title', 'Move later');
       later.addEventListener('click', (/** @type {*} */ event) => {
