@@ -1,15 +1,16 @@
 #!/bin/sh
-# Local counterpart of the required JavaScript and browser CI suites.
+# Local counterpart of the required JavaScript and browser CI suites. A tree
+# that cannot run them refuses the push; `git push --no-verify` is the escape.
 
-if command -v node >/dev/null 2>&1; then
-	DAYDREAM_WASM_CLEAN_REQUIRED=1 node --test tests/wasm_provenance.test.js || exit 1
-else
-	echo "pre-push: node not found; WASM provenance was not verified." >&2
+if ! command -v node >/dev/null 2>&1; then
+	echo "pre-push: node not found; install Node.js to run the required suites." >&2
+	exit 1
 fi
+DAYDREAM_WASM_CLEAN_REQUIRED=1 node --test tests/wasm_provenance.test.js || exit 1
 
 if ! command -v npm >/dev/null 2>&1; then
-	echo "pre-push: npm not found; the JS unit suite did not run." >&2
-	exit 0
+	echo "pre-push: npm not found; install Node.js to run the required suites." >&2
+	exit 1
 fi
 if [ ! -f node_modules/.package-lock.json ]; then
 	echo "pre-push: node_modules is missing. Run npm ci in this worktree." >&2
@@ -32,8 +33,8 @@ rm -f "$tmp"
 npm test || exit 1
 
 if ! node -e 'import("./scripts/browser.mjs").then((m) => m.resolveBrowser())' 2>/dev/null; then
-	echo "pre-push: no browser found; browser probes did not run." >&2
-	exit 0
+	echo "pre-push: no browser found; set CHROME_PATH or install Chrome, Chromium or Edge to run the browser probes." >&2
+	exit 1
 fi
 node scripts/browser-smoke.mjs || exit 1
 node scripts/workbench-probe.mjs || exit 1
