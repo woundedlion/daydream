@@ -291,7 +291,11 @@ function fixedEngine(answer) {
 }
 
 test('the shader-document engine fakes mock nothing outside the engine surface', () => {
-  assert.deepEqual(unpinnedEngineMethods(fixedEngine(() => true)), []);
+  for (const [name, double] of [
+    ['fixedEngine', fixedEngine(() => true)],
+    ['workbenchEngine', workbenchEngine()],
+    ['compiledBuildEngine', compiledBuildEngine()],
+  ]) assert.deepEqual(unpinnedEngineMethods(double), [], name);
 });
 
 // The writes also pin the topology skip: sample.weight-mode selects a baked
