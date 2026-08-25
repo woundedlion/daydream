@@ -156,8 +156,8 @@ test('applyOp forwards each op its engine arguments', () => {
 
 /** Verifies applyOp rejects an op the mesh wrapper binds no method for. */
 test('applyOp throws on an op the module does not bind', () => {
-  assert.throws(() => applyOp({}, { op: 'frobnicate', params: {} }),
-    /unknown op "frobnicate"/);
+  assert.throws(() => applyOp({}, 'dual'),
+    /unknown op "dual" — not bound by the WASM MeshOps module/);
 });
 
 /**
