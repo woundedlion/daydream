@@ -333,6 +333,9 @@ export class VideoRecorder {
       recorder.onstop = null;
       recorder.onerror = null;
       recorder.stop();
+      // onstop is gone, so endSession() will not run: a sink the picker already
+      // opened has to be closed here or its file handle is never released.
+      sink?.finish();
       this.cleanup();
       this.reportFailure('output setup failed.', err);
     }
