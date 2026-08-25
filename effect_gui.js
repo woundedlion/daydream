@@ -881,6 +881,9 @@ export function createEffectGui({
     // index, so a C++ param reorder can't mis-bind sliders.
     const state = {};
     const external = paramFilter() !== null;
+    // Fixed for the schema this build is committed to: no parameter write adds
+    // or drops a stage selector.
+    const persistParamKeys = !usesFullConfigSnapshot();
     fx.paramNames = [];
     fx.writableParamNames = [];
     fx.controllerByName = new Map();
@@ -927,7 +930,7 @@ export function createEffectGui({
       const controlGui = stage ? stageFolders.get(stage) : fx.gui;
       const controller = addParamControl(
         controlGui, state, p, !previousParamNames?.has(p.name),
-        legacyShaderBallParamNames(p.name), !usesFullConfigSnapshot());
+        legacyShaderBallParamNames(p.name), persistParamKeys);
       if (stage) controller.name(stageControlLabel(stage, p.name));
       fx.paramNames.push(p.name);
       fx.controllerByName.set(p.name, controller);
