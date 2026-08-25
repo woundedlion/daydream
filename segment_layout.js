@@ -49,7 +49,9 @@ export function isValidSegmentCount(total) {
  * holds [0, w/2) on every frame, keeping the `total` rectangles disjoint
  * so they composite into one canvas. The firmware's segment_clip() instead
  * trades the two column halves between the arms every half-revolution, and each
- * arm sweeps the full width over a rotation.
+ * arm sweeps the full width over a rotation. A per-segment timing taken over
+ * these rectangles therefore bounds one fixed column half of what its board
+ * sweeps, not the costlier of the two halves.
  *
  * The firmware takes a power-of-two segment count <= 8, making `total` in
  * {2, 4, 8} the device-backed counts. `total` = 6 is simulator-only extra worker
