@@ -2447,7 +2447,8 @@ test('turning segmented mode off hands the global stat bars back', () => {
 
   c.active = false;
 
-  assert.equal(byId['segment-stats'].style.display, 'none', 'the overlay stayed up');
+  assert.equal(byId['segment-stats'].classList.contains('visible'), false,
+    'the overlay stayed up');
   assert.equal(byId['global-stats-desktop'].style.display, '');
   assert.equal(byId['stats-bar'].style.display, '');
 });
