@@ -215,7 +215,10 @@ export function createChainStrip({
   let declarations = [];
   /** @type {Object<string, *>} The values the inline controls show. */
   let values = {};
-  /** @type {Map<string, *>} The expanded chip's rows, by parameter id. */
+  /**
+   * @type {Map<string, *>} Every chip's parameter rows, by parameter id; a chip
+   * builds its rows whether or not it is the expanded one.
+   */
   const rows = new Map();
 
   /**
