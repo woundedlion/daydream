@@ -11,12 +11,14 @@
 import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { restoreDocumentAfterEach } from './fake_dom.js';
+import { fakeElement, restoreDocumentAfterEach } from './fake_dom.js';
 import { URL_FLUSH_DEBOUNCE_MS } from '../state.js';
 import { EffectSetResult, ResolutionSetResult } from './fake_engine.js';
 import { captureConsole, installConsoleCapture } from './fake_console.js';
+import { createRecordingControls } from '../daydream.js';
 import {
   createSegmentPoolSpawner,
+  fakeGui,
   startApp as startUntrackedApp,
   segmentCountControl,
   SHADER_DOCUMENT_EFFECTS,
@@ -259,6 +261,135 @@ test('the migrated ShaderBall URL is written only once a frame has applied it', 
     'the rename is only discoverable through the notice the release raises');
 });
 
+
+/**
+ * A MediaRecorder stand-in as VideoRecorder presents one: a toggle that flips
+ * the session, the settings the controls push, and the two hooks they wire.
+ * @param {?string} [refusedAs] - Container extension the browser substitutes,
+ *   reported through onFormatFallback from inside the start toggle.
+ * @returns {Object} The recorder double.
+ */
+function fakeRecorder(refusedAs = null) {
+  return {
+    isRecording: false,
+    elapsedSeconds: 0,
+    elapsedFormatted: '0:00',
+    toggle(effect) {
+      this.effect = effect;
+      this.isRecording = !this.isRecording;
+      if (this.isRecording && refusedAs) this.onFormatFallback(refusedAs);
+      return this.isRecording;
+    },
+  };
+}
+
+/**
+ * The recording controls over fakes, with the pieces a case drives and reads.
+ * @param {{labelAxes?: boolean}} [options] - Driver state the notice reads.
+ * @returns {Object} The controls, the attach step, and the surfaces they write.
+ */
+function recordingRig({ labelAxes = false } = {}) {
+  const canvasEl = fakeElement('div');
+  const doc = {
+    createElement: (tag) => fakeElement(tag),
+    getElementById: (id) => (id === 'canvas-container' ? canvasEl : null),
+  };
+  const gui = fakeGui('view');
+  const driver = { frameInterval: 62.5, labelAxes, recorder: null };
+  const notices = [];
+  let recorder = null;
+  const controls = createRecordingControls({
+    doc,
+    gui,
+    driver,
+    getRecorder: () => recorder,
+    getEffect: () => 'IslamicStars',
+    showNotice: (message) => notices.push(message),
+  });
+  const folder = gui.folders.find((f) => f.namespace === 'Recording');
+  return {
+    controls,
+    driver,
+    notices,
+    canvasEl,
+    button: folder.controllers.find((c) => c.property === 'record'),
+    settings: folder.controllers.find((c) => c.property === 'recQuality').object,
+    attach(fake) {
+      recorder = fake;
+      controls.attach(fake);
+      return fake;
+    },
+  };
+}
+
+test('the record toggle announces the session and the container it settled on', () => {
+  const rig = recordingRig({ labelAxes: true });
+  assert.equal(rig.button.enabled, false,
+    'there is no recorder to start until the module load builds one');
+  rig.settings.recFormat = 'MP4';
+
+  const recorder = rig.attach(fakeRecorder('webm'));
+
+  assert.equal(rig.button.enabled, true);
+  assert.equal(recorder.frameInterval, 62.5,
+    'the recorder locks its capture rate to the driver frame interval');
+  assert.equal(recorder.format, 'mp4',
+    'a format chosen before the load must replay into the recorder it built');
+  assert.equal(rig.driver.recorder, recorder,
+    'the driver captures through the recorder, so it must be handed it');
+
+  rig.button.object.record();
+
+  assert.match(rig.notices.at(-1), /^Recording started\./,
+    'the tint, the readout and the label are visual; the notice is what a '
+    + 'screen-reader user gets');
+  assert.match(rig.notices.at(-1), /MP4 is unsupported in this browser/,
+    'on Firefox an MP4 request records WebM, which reaches the user as nothing '
+    + 'at all without this');
+  assert.match(rig.notices.at(-1), /Axis labels are page overlays/,
+    'the labels are page overlays, not canvas pixels, so the file will not '
+    + 'carry what the user can see');
+  assert.equal(rig.canvasEl.classList.contains('recording'), true);
+  assert.equal(rig.button.label, '\u25a0 Stop');
+
+  recorder.elapsedSeconds = 3.4;
+  recorder.elapsedFormatted = '0:03';
+  rig.controls.tick();
+  const overlay = rig.canvasEl.children.find((el) => el.className === 'rec-duration');
+  assert.equal(overlay.textContent, '0:03',
+    'the readout is written per whole second, from the frame loop');
+
+  rig.button.object.record();
+
+  assert.equal(rig.notices.at(-1), 'Recording stopped.',
+    'a stale fallback detail must not be appended to the stop of a session '
+    + 'that encoded fine');
+  assert.equal(rig.canvasEl.classList.contains('recording'), false);
+  assert.equal(rig.button.label, '\u25cf Record');
+
+  rig.controls.removeOverlay();
+  assert.equal(rig.canvasEl.children.length, 0,
+    'the overlay belongs to the controls, so the page teardown drops it');
+});
+
+test('a recorder fault reports its reason and stops offering to stop', () => {
+  const rig = recordingRig();
+  const recorder = rig.attach(fakeRecorder());
+
+  recorder.onError(new Error('the encoder died'));
+  assert.match(rig.notices.at(-1), /^Recording failed to start: .*the encoder died/,
+    'the hook also fires for a start that never produced a session, where '
+    + '"Recording stopped" names something that never happened');
+
+  rig.button.object.record();
+  recorder.onError(new Error('the encoder died'));
+
+  assert.match(rig.notices.at(-1), /^Recording stopped: .*the encoder died/);
+  assert.equal(rig.canvasEl.classList.contains('recording'), false,
+    'the session is already gone: the button must stop offering to stop it');
+  assert.equal(rig.button.label, '\u25cf Record');
+});
+
 test('a failed engine load disposes the app through the retained teardown', async () => {
   const app = await bootedApp({ loadModule: () => Promise.reject(new Error('no wasm')) });
 
@@ -346,10 +477,15 @@ test('the param writer and the switch coordinator own the notice separately', ()
 });
 
 test('a segmented-POV spawn failure is announced, not only logged', () => {
+  // The call site, not the definition above it: the owner tag is the root's.
+  const wired = SOURCE.lastIndexOf('createSegmentedPovControls(');
+  assert.ok(wired >= 0, 'the segmented controls must stay wired to their factory');
   const at = SOURCE.indexOf('createSegmentedFallback(');
   assert.ok(at >= 0, 'the segmented fallback must stay wired to its factory');
   const args = balanced(SOURCE, SOURCE.indexOf('(', at));
-  assert.match(args, /showNotice:\s*\(message\)\s*=>\s*applyNotice\.show\(message, SWITCH_NOTICE\)/,
+  assert.match(args, /showNotice,/, 'the fallback must reach the notice sink');
+  assert.match(balanced(SOURCE, SOURCE.indexOf('(', wired)),
+    /showNotice:\s*\(message\)\s*=>\s*applyNotice\.show\(message, SWITCH_NOTICE\)/,
     'a console-only failure is invisible: the user sees the toggle flip back '
     + 'and cannot tell it from a mis-click, the fault banner covers only latched '
     + 'runtime faults, and the switch owner tag is what keeps a parameter write '
@@ -363,10 +499,15 @@ test('a recording start or stop is announced, not only styled', () => {
   const at = SOURCE.indexOf('const recordState = {');
   assert.ok(at >= 0, 'the record toggle must stay a named binding');
   const body = sliceTo(at, '\n  }};');
-  assert.match(body, /RECORD_NOTICE/,
+  assert.match(body, /showNotice\(/,
     'the canvas tint, the duration readout, and the button label are all '
     + 'visual: without a notice a screen-reader user gets no report that the '
     + 'session started or ended');
+  assert.match(
+    balanced(SOURCE, SOURCE.indexOf('(', SOURCE.lastIndexOf('createRecordingControls('))),
+    /showNotice:\s*\(message\)\s*=>\s*applyNotice\.show\(message, RECORD_NOTICE\)/,
+    'the owner tag belongs to the root: sharing one with the param writer '
+    + 'lets a slider nudge clear a recording report');
   assert.match(body, /Recording started\./);
   assert.match(body, /Recording stopped\./);
   assert.match(body, /!wasRecording && !isRecording/,
@@ -377,7 +518,7 @@ test('a recording start or stop is announced, not only styled', () => {
 });
 
 test('a refused recording container is announced, not silently substituted', () => {
-  const at = SOURCE.indexOf('host.recorder.onFormatFallback =');
+  const at = SOURCE.indexOf('recorder.onFormatFallback =');
   assert.ok(at >= 0, 'the format-fallback hook must stay wired');
   const body = sliceTo(at, '\n      };');
   assert.doesNotMatch(body, /setValue/,
@@ -395,12 +536,12 @@ test('a refused recording container is announced, not silently substituted', () 
 });
 
 test('a recorder fault reports its reason, not just an un-tinted canvas', () => {
-  const at = SOURCE.indexOf('host.recorder.onError =');
+  const at = SOURCE.indexOf('recorder.onError =');
   assert.ok(at >= 0, 'the recorder fault hook must stay wired');
   const body = sliceTo(at, '\n      };');
   assert.match(body, /\(err\)/,
     'the hook is handed the reason; dropping the parameter throws it away');
-  assert.match(body, /applyNotice\.show\([^;]*RECORD_NOTICE\)/,
+  assert.match(body, /showNotice\(/,
     'an encoder fault, a failed start, and a cancelled Save dialog all reach '
     + 'the user as the Record button flicking back, which reads as a mis-click '
     + 'unless the reason is announced');
