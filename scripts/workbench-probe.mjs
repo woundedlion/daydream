@@ -69,6 +69,14 @@ async function probeStrip(tab) {
     'the local effect panel is absent');
   check(await tab.$('#gui-container > .global-gui') !== null,
     'global controls remain mounted');
+  // The band + palette replaced a stage library panel and drag-and-drop
+  // insertion, so the strip is the only chain region the page mounts.
+  const regions = await tab.$$eval('.main-area > *',
+    (nodes) => nodes.map((node) => node.id).join());
+  const draggable = await tab.$('#chain-strip [draggable="true"]');
+  check(regions === 'chain-strip,stats-bar,canvas-container,gui-container'
+      && draggable === null,
+  `the main area mounts ${regions} beside no stage library or draggable chip`);
 
   const initialStages = await tab.$$eval('.chain-chip[aria-expanded]', (nodes) => nodes.map(
     (node) => ({ expanded: node.getAttribute('aria-expanded'),
@@ -345,6 +353,23 @@ async function probeStrip(tab) {
   const sphereAfter = await bandChipNames(tab, 'sphere');
   check(sphereAfter.join() === [...sphereBefore].reverse().join(),
     `reorder buttons move stages (${sphereAfter.join(', ')})`);
+
+  // The retired drag reorder was pointer-driven, so only a real press over a
+  // second stage in the same band shows whether a drop target survived it.
+  const sphereLabels = await tab.$$eval('.chain-band[data-carrier="sphere"] .chain-chip',
+    (nodes) => nodes.map((node) => (node instanceof HTMLElement ? node.dataset.label ?? '' : '')));
+  const dragged = await boxOf(tab,
+    `.chain-chip[data-label="${sphereLabels[0]}"] .chain-chip-header`);
+  await tab.mouse.move(centre(dragged).x, centre(dragged).y);
+  await tab.mouse.down();
+  const onto = await boxOf(tab,
+    `.chain-chip[data-label="${sphereLabels.at(-1)}"] .chain-chip-header`);
+  await tab.mouse.move(centre(onto).x, centre(onto).y, { steps: 8 });
+  await tab.mouse.up();
+  await tab.mouse.move(0, 0);
+  check(sphereLabels.length > 1 && (await bandChipNames(tab, 'sphere')).join()
+      === sphereAfter.join(),
+  `dragging ${sphereLabels[0]} over ${sphereLabels.at(-1)} finds no drop target`);
 
   const track = '.chain-chip[data-label="rotate"]'
     + ' .chain-param[data-parameter="rotate.wander"] .chain-param-control';
