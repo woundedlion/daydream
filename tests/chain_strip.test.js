@@ -1020,8 +1020,11 @@ test('a deactivated field renders dimmed but editable', async () => {
   const edge = rowFor(h, label, `${label}.edge-width`);
   assert.equal(edge.dataset.deactivated, 'true',
     'the envelope gate opens on flat, which reads no edge width');
-  assert.equal(edge.getAttribute('title'),
-    'Deactivated by the current topology selection');
+  // A `display: contents` row hangs no tooltip, so the reason is a node the
+  // control describes itself by.
+  const note = edge.querySelector('.chain-param-note');
+  assert.equal(note.textContent, 'Deactivated by the current topology selection');
+  assert.equal(controlIn(edge).getAttribute('aria-describedby'), note.id);
   assert.equal(controlIn(edge).disabled, false, 'dimmed, not disabled');
   assert.equal(rowFor(h, label, `${label}.strength`).dataset.deactivated, undefined);
 
@@ -1031,7 +1034,8 @@ test('a deactivated field renders dimmed but editable', async () => {
 
   assert.equal(edge.dataset.deactivated, undefined,
     'the gate moving onto edge-fade re-activates the field in place');
-  assert.equal(edge.getAttribute('title'), null);
+  assert.equal(edge.querySelector('.chain-param-note'), null);
+  assert.equal(controlIn(edge).getAttribute('aria-describedby'), null);
 
   controlIn(edge).value = '0.4';
   controlIn(edge).dispatch('input');

@@ -62,7 +62,7 @@ const PALETTE_MARGIN = 8;
 // Increments an editable readout's arrow keys divide its declared domain into.
 const READOUT_STEPS = 1000;
 
-const DEACTIVATED_TITLE = 'Deactivated by the current topology selection';
+const DEACTIVATED_REASON = 'Deactivated by the current topology selection';
 
 // A bypass is a program-shape override, and only the interpreter is sent a
 // program shape; the compiled build takes the document chain whole.
@@ -773,17 +773,52 @@ export function createChainStrip({
     }
   };
 
+  /**
+   * @param {string} parameterId - The deactivated parameter.
+   * @returns {string} The id its reason node is published under, for the row's
+   *   controls to describe themselves by.
+   */
+  const reasonId = (parameterId) => `chain-param-off-${encodeURIComponent(parameterId)}`;
+
+  /**
+   * Points a row's controls at its reason node, or takes the reference back.
+   * @param {*} row - The parameter row.
+   * @param {string|null} id - The reason node's id, or null to clear.
+   * @returns {void}
+   */
+  const describeControls = (row, id) => {
+    for (const selector of ['.chain-param-control', '.chain-param-value']) {
+      const control = row.querySelector(selector);
+      if (control === null) continue;
+      if (id === null) control.removeAttribute('aria-describedby');
+      else control.setAttribute('aria-describedby', id);
+    }
+  };
+
   // Only the workbench page carries the stylesheet that reads this attribute.
-  /** Repaints the dimming of the expanded chip's deactivated controls. */
+  /**
+   * Repaints the dimming of the expanded chip's deactivated controls and the
+   * reason beside them. The row is `display: contents`, so it generates no box
+   * for a tooltip to hang off: the reason is a node, reaching a pointer and
+   * assistive technology alike.
+   */
   const markDeactivated = () => {
     const off = deactivatedParameterIds(declarations, values, store.chain(), catalog);
     for (const [id, row] of rows) {
+      const shown = row.querySelector('.chain-param-note');
       if (off.has(id)) {
         row.dataset.deactivated = 'true';
-        row.setAttribute('title', DEACTIVATED_TITLE);
+        if (shown !== null) continue;
+        const note = el('span', 'chain-param-note');
+        note.setAttribute('id', reasonId(id));
+        note.textContent = DEACTIVATED_REASON;
+        row.appendChild(note);
+        describeControls(row, reasonId(id));
       } else {
         delete row.dataset.deactivated;
-        row.removeAttribute('title');
+        if (shown === null) continue;
+        row.removeChild(shown);
+        describeControls(row, null);
       }
     }
   };

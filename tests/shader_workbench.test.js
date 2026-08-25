@@ -120,6 +120,8 @@ test('simulator exposes Shader as a standalone tool', () => {
   assert.match(WORKBENCH_CSS, /color-scheme:\s*dark/);
   assert.match(WORKBENCH_CSS, /background-color:\s*var\(--background-color\)/);
   assert.match(WORKBENCH_CSS, /\.chain-param\[data-deactivated="true"\]\s*\{/);
+  assert.match(WORKBENCH_CSS, /\.chain-param-note\s*\{[^}]*grid-column:\s*1 \/ -1/,
+    'the reason node takes a row of its own instead of a parameter grid cell');
 });
 
 test('transition cards use opaque surfaces', () => {
