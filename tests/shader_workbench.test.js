@@ -1026,6 +1026,26 @@ const sampleFrequencySlider = (harness) => stripChips(harness)
   .find((row) => row.dataset.parameter === 'sample.pattern-freq')
   .querySelector('.chain-param-control');
 
+// The chips carry the inline stage controls, and they render one preset's
+// values. Eight shipped documents have more than one.
+test('a deep-linked preset builds the strip from the preset it renders', async () => {
+  const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  document.preset_bank.presets[0].values['sample.pattern-freq'] = 1.5;
+  const preset = document.preset_bank.presets[1];
+  preset.values['sample.pattern-freq'] = 7.25;
+  const hash = await encodeShaderStateHash({
+    document, preset: preset.preset_id, bypassed: [], paused: false,
+  });
+
+  const harness = await editorWorkbench({ source: null, hash });
+
+  assert.equal(sampleFrequencySlider(harness).value, '7.25');
+  assert.equal(stripChips(harness).find((chip) => chip.dataset.label === 'sample')
+    .querySelectorAll('.chain-param')
+    .find((row) => row.dataset.parameter === 'sample.pattern-freq')
+    .querySelector('.chain-param-value').value, '7.25');
+});
+
 // Settles the write a fired link timer started. encodeShaderStateHash runs a
 // CompressionStream, so the URL lands only after real event-loop turns; the
 // caller must drop the mocked timers first.

@@ -545,6 +545,20 @@ export function createShaderDocumentController({
       show(diagnosticText(compiled), true);
       return false;
     }
+    // Resolved before anything is built: the strip's inline chip controls render
+    // the active preset's values, so a deep link into a non-first preset would
+    // otherwise describe the first one under the render it names.
+    const presetId = session?.preset
+      ?? compiled.document.preset_bank.presets[0]?.preset_id;
+    if (!presetId) {
+      show('The document is valid, but it carries no preset to preview.', true);
+      return false;
+    }
+    if (!compiled.document.preset_bank.presets.some(
+      (/** @type {*} */ preset) => preset.preset_id === presetId)) {
+      show(`The shader link names no document preset "${presetId}".`, true);
+      return false;
+    }
     // Every load previews through the interpreter, so a shipped pattern opens
     // as editable as a scratch chain; a digest match only arms the toolbar's
     // parity toggle to the promoted build.
@@ -561,10 +575,11 @@ export function createShaderDocumentController({
       official,
       loadedDigest: compiled.descriptor_digest,
       compiledSide: false,
-      presetId: null,
+      presetId,
       referencePresetIds: official?.presetIds ?? [],
     };
     populatePresets(compiled);
+    presetSelect.value = presetId;
     saveButton.disabled = false;
     if (saveAsButton) saveAsButton.disabled = false;
     showDigest();
@@ -589,18 +604,6 @@ export function createShaderDocumentController({
       chainUi.strip.render();
     }
     syncParity();
-    const presetId = session?.preset
-      ?? compiled.document.preset_bank.presets[0]?.preset_id;
-    if (!presetId) {
-      show('The document is valid, but it carries no preset to preview.', true);
-      return false;
-    }
-    if (!compiled.document.preset_bank.presets.some(
-      (/** @type {*} */ preset) => preset.preset_id === presetId)) {
-      show(`The shader link names no document preset "${presetId}".`, true);
-      return false;
-    }
-    presetSelect.value = presetId;
     if (session) setAnimationsPaused(session.paused);
     return applyPreset(presetId);
   };
