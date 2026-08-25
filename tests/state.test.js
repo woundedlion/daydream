@@ -444,6 +444,57 @@ test('URLSync defers a tracked identity rewrite until resume', () => {
   }
 });
 
+test('URLSync counts nested suspensions and writes on the outermost resume', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const calls = installWindow('?effect=ShaderBall', '/sim');
+    const state = new AppState({ effect: 'ShaderBall' });
+    const sync = new URLSync(state, ['effect']);
+    sync.suspend();
+    sync.suspend();
+    state.set('effect', 'Shader');
+    mock.timers.tick(1000);
+    assert.equal(calls.length, 0);
+
+    sync.resume();
+    mock.timers.tick(1000);
+    assert.equal(calls.length, 0, 'the inner resume released the whole suspension');
+
+    sync.resume();
+    mock.timers.tick(1000);
+    assert.equal(calls.length, 1);
+    assert.match(calls[0], /effect=Shader/u);
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+test('URLSync ignores a resume with no suspension outstanding', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const calls = installWindow('?effect=ShaderBall', '/sim');
+    const state = new AppState({ effect: 'ShaderBall' });
+    const sync = new URLSync(state, ['effect']);
+
+    sync.resume();
+    mock.timers.tick(1000);
+    assert.equal(calls.length, 0, 'a bare resume scheduled a write');
+
+    // A stray resume that drove the depth negative would leave the next
+    // suspension unable to bracket anything.
+    sync.suspend();
+    state.set('effect', 'Shader');
+    mock.timers.tick(1000);
+    assert.equal(calls.length, 0, 'the suspension after a bare resume did not hold');
+
+    sync.resume();
+    mock.timers.tick(1000);
+    assert.equal(calls.length, 1);
+  } finally {
+    mock.timers.reset();
+  }
+});
+
 test('URLSync suspend disarms the flush the constructor already armed', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
