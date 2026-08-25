@@ -713,12 +713,6 @@ test('a stale onstop does not clobber the session that replaced it', () => {
 });
 
 /**
- * Wraps a recorder's sink factory so a test can await the session's async
- * finish() chain directly, rather than guessing how many task turns it takes.
- * @param {VideoRecorder} rec - Recorder whose next session is instrumented.
- * @returns {() => Promise<void>} Resolves once finish() has run to completion.
- */
-/**
  * Settles the streaming sink's serialized write chain, which defers every chunk
  * behind the picker promise, so a test can assert on what the chain did. A
  * macrotask hop: the chain queues one microtask per link, so awaiting a resolved
@@ -727,6 +721,12 @@ test('a stale onstop does not clobber the session that replaced it', () => {
  */
 const drainSink = () => new Promise((resolve) => { setTimeout(resolve, 0); });
 
+/**
+ * Wraps a recorder's sink factory so a test can await the session's async
+ * finish() chain directly, rather than guessing how many task turns it takes.
+ * @param {VideoRecorder} rec - Recorder whose next session is instrumented.
+ * @returns {() => Promise<void>} Resolves once finish() has run to completion.
+ */
 const trackSinkFinish = (rec) => {
   const openSink = rec.openSink.bind(rec);
   let finished = null;
