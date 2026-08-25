@@ -33,12 +33,11 @@ test('the solids rotation control is keyboard-operable', () => {
 const SPECIFIER = /(?:from|import)\s*\(?\s*['"](\.[^'"]+\.js)['"]/g;
 
 /**
- * The tools/ modules a page ends up loading. The walk follows the app's own
- * modules too, so a tool module a page reaches only through one (index.html
- * pulls the banner via bootstrap.js) is found; only tools/ modules are
- * collected, since the rest carry no shared-stylesheet obligation.
+ * The modules a page ends up loading, its own and the tools/ ones alike. The
+ * walk follows every relative specifier, so a module a page reaches only
+ * through another (index.html pulls the banner via bootstrap.js) is found.
  * @param {string} page - Repo-relative page path.
- * @returns {string[][]} Path segments of each tools/ module, sorted.
+ * @returns {string[][]} Path segments of each module, sorted.
  */
 const scriptsOf = (page) => {
   const found = new Set();
@@ -46,7 +45,7 @@ const scriptsOf = (page) => {
   const walk = (file) => {
     if (seen.has(file) || !existsSync(join(REPO, file))) return;
     seen.add(file);
-    if (posix.dirname(file) === 'tools' && file.endsWith('.js')) found.add(file);
+    if (file.endsWith('.js')) found.add(file);
     const src = read(file);
     // A page's own `src` attributes are page-relative; a module specifier is
     // relative only when it says so, and a bare one names a vendored package.
