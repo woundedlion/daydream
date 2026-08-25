@@ -23,15 +23,7 @@ const SKIP = SH || process.env.DAYDREAM_HOOK_SH_REQUIRED
 test('pre-commit checks the staged tree', { skip: SKIP }, async (t) => {
   const root = mkdtempSync(join(tmpdir(), 'pre-commit-hook-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  const env = {
-    ...isolatedGitEnv(),
-    GIT_CONFIG_GLOBAL: join(root, 'absent-config'),
-    GIT_CONFIG_SYSTEM: join(root, 'absent-config'),
-    GIT_AUTHOR_NAME: 'fixture',
-    GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
-    GIT_COMMITTER_NAME: 'fixture',
-    GIT_COMMITTER_EMAIL: 'fixture@example.invalid',
-  };
+  const env = isolatedGitEnv();
   const git = (...args) => execFileSync('git', args, { cwd: root, env });
   const runHook = () => {
     const hookEnv = {

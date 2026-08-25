@@ -55,13 +55,7 @@ const buildRoot = () => {
 
 const root = fixtureRepo('importmap-', buildRoot);
 
-const env = {
-  ...isolatedGitEnv(),
-  // Never read the operator's git config: a global core.excludesFile or
-  // core.hooksPath would steer the fixture's add and ls-files.
-  GIT_CONFIG_GLOBAL: join(root, 'absent-config'),
-  GIT_CONFIG_SYSTEM: join(root, 'absent-config'),
-};
+const env = isolatedGitEnv();
 
 /** Runs the fixture's script with the given args and returns the rewritten vendor-importmap.js. */
 const run = (...args) => {

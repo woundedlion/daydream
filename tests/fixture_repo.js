@@ -46,11 +46,30 @@ export const findSh = () => {
   return null;
 };
 
-/** Returns an environment that cannot redirect fixture commands into the caller's repository. */
+// A config path that never exists, so no operator setting reaches a fixture: a
+// global core.excludesFile or core.autocrlf would steer ls-files and add, and a
+// global core.hooksPath would install the caller's hooks into the fixtures.
+const ABSENT_CONFIG = join(tmpdir(), 'daydream-absent-gitconfig', 'absent');
+
+/**
+ * Returns an environment that cannot redirect fixture commands into the
+ * caller's repository, read the operator's git config, or depend on an
+ * identity the operator happens to have configured.
+ * @param {Object} [base] - Environment to derive from.
+ * @returns {Object} The isolated environment.
+ */
 export const isolatedGitEnv = (base = process.env) => {
   const env = { ...base };
   for (const name of LOCAL_GIT_ENV) delete env[name];
-  return env;
+  return {
+    ...env,
+    GIT_CONFIG_GLOBAL: ABSENT_CONFIG,
+    GIT_CONFIG_SYSTEM: ABSENT_CONFIG,
+    GIT_AUTHOR_NAME: 'fixture',
+    GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
+    GIT_COMMITTER_NAME: 'fixture',
+    GIT_COMMITTER_EMAIL: 'fixture@example.invalid',
+  };
 };
 
 /**
