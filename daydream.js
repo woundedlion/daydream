@@ -732,6 +732,17 @@ export function start({
   // Requested size; segments.count follows the live pool and lags this across
   // the warmModules() await.
   let segCount = segState.segments;
+  // Assigned below, after the toggle whose deep-linked handler can reconcile it.
+  let segCountCtrl;
+  // The ceiling is re-read at every spawn, so a narrowing — a rotation into the
+  // mobile layout — bounds the pool below the requested size. setValue, not
+  // updateDisplay, so the deep-link writer re-advertises the running size.
+  const syncSegmentCount = () => {
+    const live = segments.count;
+    if (!segCountCtrl || !Number.isFinite(live) || live === segCount) return;
+    segCount = live;
+    segCountCtrl.setValue(live);
+  };
   const segSpawn = createSegmentSpawnGuard({
     warmModules: () => pageWarmer.warm(),
     // segMax is the layout the page loaded in; a rotation into the mobile
@@ -757,7 +768,7 @@ export function start({
     try {
       segments.active = v;
       if (v) {
-        await segSpawn.respawn();
+        if (await segSpawn.respawn()) syncSegmentCount();
       } else {
         segSpawn.strand();
         segments.destroy();
@@ -772,10 +783,13 @@ export function start({
   // overlay otherwise names boards that cannot exist. A device cap that drops 6
   // from the range takes the marker with it and names the cap instead.
   const segLabel = segMax >= 6 ? 'Segments (6 = sim only)' : `Segments (max ${segMax} here)`;
-  segFolder.add(segState, 'segments', 2, segMax, 2).name(segLabel).onChange(async v => {
+  segCountCtrl = segFolder.add(segState, 'segments', 2, segMax, 2).name(segLabel);
+  segCountCtrl.onChange(async v => {
+    // A reconcile writes the value the handler already acted on.
+    if (v === segCount) return;
     try {
       segCount = v;
-      if (segments.active) await segSpawn.respawn();
+      if (segments.active && await segSpawn.respawn()) syncSegmentCount();
     } catch (e) {
       segmentedFailed('resize', e);
     }
