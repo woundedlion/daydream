@@ -2,7 +2,9 @@ import { mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { installConsoleCapture } from './fake_console.js';
 import { fakeElement } from './fake_dom.js';
-import { selectMimeType, VideoRecorder } from '../recorder.js';
+import {
+  MEMORY_BUFFER_LIMIT_BYTES, PICKER_GRACE_SECONDS, selectMimeType, VideoRecorder,
+} from '../recorder.js';
 
 /**
  * Builds a fake isTypeSupported probe that accepts only the listed MIME types,
@@ -913,7 +915,8 @@ test('an unanswered save dialog stops the session at the backlog bound', async (
     rec.start('unanswered');
     const recorder = rec.mediaRecorder;
     const sessionChunks = rec.chunks;
-    recorder.ondataavailable({ data: { size: 14_000_000 } });
+    const held = (rec.bitrateMbps * 1_000_000 / 8) * PICKER_GRACE_SECONDS - 1_000_000;
+    recorder.ondataavailable({ data: { size: held } });
     assert.equal(rec.isRecording, true, 'a backlog under the bound keeps recording');
 
     recorder.ondataavailable({ data: { size: 2_000_000 } });
@@ -929,7 +932,7 @@ test('an unanswered save dialog stops the session at the backlog bound', async (
     answerPicker();
     await sinkFinished();
 
-    assert.deepEqual(writes, [{ size: 14_000_000 }],
+    assert.deepEqual(writes, [{ size: held }],
       'the chunks held under the bound still reach the chosen file, in order');
     assert.equal(closed, true, 'the file is closed once the late pick lands');
     assert.equal(downloaded, false, 'no in-memory blob download of the dropped tail');
@@ -957,19 +960,21 @@ test('the in-memory fallback sink stops the session at its byte bound', () => {
 
     rec.start('unbounded');
     const recorder = rec.mediaRecorder;
-    for (let i = 0; i < 512; i++) recorder.ondataavailable({ data: { size: 1_000_000 } });
+    const CHUNK_BYTES = 1_000_000;
+    const underBound = MEMORY_BUFFER_LIMIT_BYTES / CHUNK_BYTES;
+    for (let i = 0; i < underBound; i++) recorder.ondataavailable({ data: { size: CHUNK_BYTES } });
     assert.equal(rec.isRecording, true, 'a buffer under the bound keeps recording');
 
-    recorder.ondataavailable({ data: { size: 1_000_000 } });
+    recorder.ondataavailable({ data: { size: CHUNK_BYTES } });
     assert.equal(rec.isRecording, false, 'the session runs to an OOM instead of stopping');
     assert.equal(notified.length, 1, 'the host is told the session ended');
     assert.match(captured.messages.join(' '), /held in memory/,
       'the stop is reported, not silent');
 
-    recorder.ondataavailable({ data: { size: 1_000_000 } });
+    recorder.ondataavailable({ data: { size: CHUNK_BYTES } });
     recorder.onstop();
     assert.equal(notified.length, 1, 'the bound is reported once, not per chunk');
-    assert.equal(downloaded, 512, 'the prefix captured under the bound is still saved');
+    assert.equal(downloaded, underBound, 'the prefix captured under the bound is still saved');
   } finally {
     captured.restore();
     restore();
@@ -1000,22 +1005,24 @@ test('a streaming session with no file handle bounds its in-memory fallback', as
     // Let the picker's rejection settle, so every chunk below is past the
     // pre-pick backlog cap and reaches the in-memory fallback.
     await drainSink();
-    for (let i = 0; i < 512; i++) recorder.ondataavailable({ data: { size: 1_000_000 } });
+    const CHUNK_BYTES = 1_000_000;
+    const underBound = MEMORY_BUFFER_LIMIT_BYTES / CHUNK_BYTES;
+    for (let i = 0; i < underBound; i++) recorder.ondataavailable({ data: { size: CHUNK_BYTES } });
     await drainSink();
     assert.equal(rec.isRecording, true, 'a buffer under the bound keeps recording');
 
-    recorder.ondataavailable({ data: { size: 1_000_000 } });
+    recorder.ondataavailable({ data: { size: CHUNK_BYTES } });
     await drainSink();
     assert.equal(rec.isRecording, false, 'the session runs to an OOM instead of stopping');
     assert.equal(notified.length, 1, 'the host is told the session ended');
     assert.match(captured.messages.join(' '), /held in memory/,
       'the stop is reported, not silent');
 
-    recorder.ondataavailable({ data: { size: 1_000_000 } });
+    recorder.ondataavailable({ data: { size: CHUNK_BYTES } });
     recorder.onstop();
     await sinkFinished();
     assert.equal(notified.length, 1, 'the bound is reported once, not per chunk');
-    assert.equal(downloaded, 512, 'the prefix captured under the bound is still saved');
+    assert.equal(downloaded, underBound, 'the prefix captured under the bound is still saved');
   } finally {
     captured.restore();
     restore();
