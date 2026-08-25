@@ -116,8 +116,10 @@ function restoreFullConfig(snapshot) {
  * clip, and the controller follows with a setEffect that re-applies it. The
  * APPLIED/FULL_FRAME_KEPT split is latched into clipFullFrame and reported on
  * every frame, so the two successes stay distinguishable to the pool.
- * @returns {boolean} False only when this worker is left without usable render
- * geometry, which applyClip has already reported; NO_EFFECT counts as accepted.
+ * @returns {boolean} False when this worker is left without usable render
+ * geometry. An INVALID_BOUNDS clip is reported before answering false; a null
+ * engine or segment range is not, and is only reachable after an init that
+ * broke early and already faulted the controller. NO_EFFECT counts as accepted.
  */
 function applyClip() {
   // wasmModule is non-null whenever engine is — the engine is built from it.
