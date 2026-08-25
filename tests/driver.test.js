@@ -1159,9 +1159,8 @@ test('a keyboard-focused canvas rings and orbits until it loses focus', () => {
  * @returns {Object} Context object for prototype.call, carrying the matrix log.
  */
 function matricesCtx(w, h) {
-  const matrices = [];
-  // Backed like the real attribute, whose array is what setMatrixAt writes into
-  // and what the cache replay copies over wholesale.
+  // Backed like the real attribute, the one destination the composed layout
+  // is copied into.
   const instanceMatrix = { array: new Float32Array(w * h * 16), needsUpdate: false };
   return {
     W: w,
@@ -1169,18 +1168,21 @@ function matricesCtx(w, h) {
     H_OFFSET: Daydream.H_OFFSET,
     pixels: null,
     matrixCache: new Map(),
-    matrices,
     dotMesh: {
       count: w * h,
       instanceColor: null,
       instanceMatrix,
-      setMatrixAt: (i, m) => {
-        matrices[i] = m.clone();
-        m.toArray(instanceMatrix.array, i * 16);
-      },
     },
   };
 }
+
+/** One instance's matrix, read back out of the attribute the driver filled.
+ * @param {Object} ctx - Context from matricesCtx() after the call.
+ * @param {number} i - Instance index.
+ * @returns {THREE.Matrix4} The composed matrix.
+ */
+const matrixAt = (ctx, i) =>
+  new THREE.Matrix4().fromArray(ctx.dotMesh.instanceMatrix.array, i * 16);
 
 /** Instance position for pixel index `i`.
  * @param {Object} ctx - Context from matricesCtx() after the call.
@@ -1188,13 +1190,13 @@ function matricesCtx(w, h) {
  * @returns {THREE.Vector3} The dot centre.
  */
 const dotAt = (ctx, i) =>
-  new THREE.Vector3().setFromMatrixPosition(ctx.matrices[i]);
+  new THREE.Vector3().setFromMatrixPosition(matrixAt(ctx, i));
 
 test('precomputeMatrices places one dot per pixel on the sphere surface', () => {
   const ctx = matricesCtx(8, 5);
   Daydream.prototype.precomputeMatrices.call(ctx);
 
-  assert.equal(ctx.matrices.length, 8 * 5);
+  assert.equal(ctx.dotMesh.instanceMatrix.array.length, 8 * 5 * 16);
   for (let i = 0; i < 8 * 5; i++) {
     assert.ok(Math.abs(dotAt(ctx, i).length() - Daydream.SPHERE_RADIUS) < 1e-4,
       `instance ${i} left the sphere surface`);
@@ -1245,7 +1247,7 @@ test('precomputeMatrices faces every dot outward', () => {
   Daydream.prototype.precomputeMatrices.call(ctx);
 
   for (let i = 0; i < 8 * 5; i++) {
-    const e = ctx.matrices[i].elements;
+    const e = matrixAt(ctx, i).elements;
     // The injected shader hides a dot by its outward normal and extends it along
     // local +x, so local +z must be the surface normal.
     const forward = new THREE.Vector3(e[8], e[9], e[10]).normalize();
@@ -1360,7 +1362,12 @@ test('precomputeMatrices reuses a grid it has already composed', () => {
   // replay is exact or it is not a replay.
   assert.deepEqual(again.dotMesh.instanceMatrix.array,
     first.dotMesh.instanceMatrix.array, 'the replayed grid is not bit-identical');
-  assert.equal(again.matrices.length, 0,
+  // A layout no composition produces: a hit copies it through untouched.
+  const marked = matricesCtx(8, 5);
+  marked.matrixCache = new Map([[[...first.matrixCache.keys()][0],
+    new Float32Array(8 * 5 * 16).fill(7)]]);
+  Daydream.prototype.precomputeMatrices.call(marked);
+  assert.ok(marked.dotMesh.instanceMatrix.array.every((v) => v === 7),
     'the replay composed matrices the cache already holds in the target layout');
 
   const wider = matricesCtx(9, 5);
@@ -1369,7 +1376,7 @@ test('precomputeMatrices reuses a grid it has already composed', () => {
   assert.equal(first.matrixCache.size, 2, 'another grid composes its own entry');
   // Row 0 is the north pole, where every column shares a position; row 1 is the
   // first that separates the two column counts.
-  assert.notDeepEqual(wider.matrices[9].elements, first.matrices[9].elements,
+  assert.notDeepEqual(matrixAt(wider, 9).elements, matrixAt(first, 9).elements,
     'the wider grid took the cached grid\'s matrices');
 });
 
@@ -1684,7 +1691,7 @@ function driverFields() {
 
 // Keys a context carries that are not driver state: the sinks a test reads its
 // assertions out of.
-const CONTEXT_SINKS = new Set(['sized', 'handlers', 'classes', 'acquired', 'matrices']);
+const CONTEXT_SINKS = new Set(['sized', 'handlers', 'classes', 'acquired']);
 
 /** Context keys that are neither driver state, a stand-in for a prototype
  *  method, nor a declared test sink.

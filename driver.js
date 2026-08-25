@@ -880,14 +880,9 @@ export class Daydream {
   precomputeMatrices() {
     const count = this.W * this.H;
     const key = `${this.W}x${this.H}x${this.H_OFFSET}`;
-    const cached = this.matrixCache.get(key);
+    let matrices = this.matrixCache.get(key);
 
-    if (cached) {
-      // The cache holds the instanceMatrix layout itself, so the replay is one
-      // typed-array copy; round-tripping each matrix through an Object3D would
-      // read and write the same 16 floats an element at a time.
-      this.dotMesh.instanceMatrix.array.set(cached);
-    } else {
+    if (!matrices) {
       const dummy = new THREE.Object3D();
       const composed = new Float32Array(count * 16);
       const vector = new THREE.Vector3();
@@ -906,10 +901,14 @@ export class Daydream {
         dummy.updateMatrix();
 
         dummy.matrix.toArray(composed, i * 16);
-        this.dotMesh.setMatrixAt(i, dummy.matrix);
       }
       this.matrixCache.set(key, composed);
+      matrices = composed;
     }
+    // The cache holds the instanceMatrix layout itself, so the upload is one
+    // typed-array copy; round-tripping each matrix through an Object3D would
+    // read and write the same 16 floats an element at a time.
+    this.dotMesh.instanceMatrix.array.set(matrices);
 
     const needed = this.dotMesh.count * 3;
     if (!this.dotMesh.instanceColor) {
