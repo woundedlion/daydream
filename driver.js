@@ -446,6 +446,9 @@ export class Daydream {
    * @param {(delta: number) => boolean} [movePreset] - Selects an adjacent preset.
    */
   keydown(e, movePreset = () => false) {
+    // An Alt/Ctrl/Meta chord is the browser's or the OS's — Ctrl+Space and
+    // Cmd+Space among them — so no playback shortcut claims one.
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
     if (e.key === ' ') {
       this.paused = !this.paused;
       if (!this.paused) this.stepFrames = 0;
@@ -453,8 +456,7 @@ export class Daydream {
     } else if (this.paused && e.key === "ArrowRight") {
       this.stepFrames++;
       e.preventDefault();
-    } else if (!this.paused && !e.altKey && !e.ctrlKey && !e.metaKey
-               && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+    } else if (!this.paused && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
       const delta = e.key === "ArrowLeft" ? -1 : 1;
       if (movePreset(delta)) e.preventDefault();
     }

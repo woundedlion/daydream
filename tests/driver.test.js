@@ -1615,6 +1615,30 @@ test('right-arrow queues single frames only while paused', () => {
   assert.deepEqual(moves, []);
 });
 
+/**
+ * Ctrl+Space and Cmd+Space are the OS input-method and Spotlight chords, and
+ * Alt/Ctrl+Arrow are browser navigation: none of them is a playback shortcut.
+ */
+test('keydown leaves a modifier chord to the browser and the OS', () => {
+  const moves = [];
+  const movePreset = (delta) => { moves.push(delta); return true; };
+
+  for (const modifier of ['altKey', 'ctrlKey', 'metaKey']) {
+    const running = { paused: false, stepFrames: 0 };
+    const chord = { ...keyEvent(' '), [modifier]: true };
+    Daydream.prototype.keydown.call(running, chord, movePreset);
+    assert.equal(running.paused, false, `${modifier}+Space toggled pause`);
+    assert.equal(chord.prevented, false, `${modifier}+Space was swallowed`);
+
+    const paused = { paused: true, stepFrames: 0 };
+    const step = { ...keyEvent('ArrowRight'), [modifier]: true };
+    Daydream.prototype.keydown.call(paused, step, movePreset);
+    assert.equal(paused.stepFrames, 0, `${modifier}+ArrowRight queued a frame step`);
+    assert.equal(step.prevented, false, `${modifier}+ArrowRight was swallowed`);
+  }
+  assert.deepEqual(moves, [], 'a chord reached the preset walk');
+});
+
 test('keydown ignores keys it does not own', () => {
   const ctx = { paused: true, stepFrames: 0 };
   const other = keyEvent('ArrowLeft');
