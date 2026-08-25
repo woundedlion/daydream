@@ -20,10 +20,23 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Checkout engine HEAD
+      - name: Resolve engine pin
+        id: engine
+        run: |
+          pin="$(tr -d '[:space:]' < holosphere_wasm.sha)"
+          if ! printf '%s' "$pin" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::holosphere_wasm.sha must contain one full engine commit"
+            exit 1
+          fi
+          echo "pin=$pin" >> "$GITHUB_OUTPUT"
+      # The mirrored shader modules are compared byte for byte, so the engine
+      # checkout tracks the committed pin: engine tip moves independently and
+      # would make a re-run of an unchanged commit flip verdicts.
+      - name: Checkout the pinned engine
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: woundedlion/pov
+          ref: ${{ steps.engine.outputs.pin }}
           token: ${{ secrets.POV_TOKEN || github.token }}
           path: engine
           persist-credentials: false
