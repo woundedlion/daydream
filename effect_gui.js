@@ -85,6 +85,19 @@ function paramWarningTexts(params) {
 }
 
 /**
+ * The value the engine last took for one parameter: what it admitted for
+ * rendering, else the writable target it holds, else the value it renders. A
+ * definition that carries no accepted value still names a target, which is what
+ * a replay writes back; the rendered value is an animation frame.
+ * @param {{acceptedValue?: *, requestedValue?: *, value: *}} parameter - Engine
+ *   parameter definition.
+ * @returns {*} The accepted value, in the definition's own type.
+ */
+function acceptedParamValue(parameter) {
+  return parameter.acceptedValue ?? parameter.requestedValue ?? parameter.value;
+}
+
+/**
  * The `gui` method a parameter's control is added through: a session control
  * owns no deep-link key, a migrated one accepts its former keys too, and an
  * unhydrated one owns its key but is never seeded from the URL.
@@ -339,8 +352,7 @@ export function createEffectGui({
   function persistAcceptedParams(gui) {
     for (const parameter of getParameterDefinitions()) {
       if (parameter.readonly) continue;
-      persistAcceptedParam(gui, parameter.name, parameter.acceptedValue
-        ?? parameter.requestedValue ?? parameter.value);
+      persistAcceptedParam(gui, parameter.name, acceptedParamValue(parameter));
     }
   }
 
@@ -944,7 +956,7 @@ export function createEffectGui({
       if (controller.isContinuous) trackDragState(fx, controller);
 
       const kind = paramControlKind(p);
-      let acceptedControlValue = p.acceptedValue ?? p.value;
+      let acceptedControlValue = acceptedParamValue(p);
       if (kind === 'boolean') {
         acceptedControlValue = engineParamValue(acceptedControlValue) > 0.5;
       }
