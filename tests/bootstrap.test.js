@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   bootstrap, refreshModuleCache, refreshWithDeadline, showBootstrapFailure,
-  VENDOR_REMEDY,
+  STALE_MODULE_REMEDY, VENDOR_REMEDY,
 } from '../bootstrap.js';
 import { fakeElement } from './fake_dom.js';
 
@@ -84,16 +84,49 @@ test('failure detail is assigned as text without interpreting markup', () => {
   assert.equal(childWithClass(overlay, 'load-error-detail').textContent, markup);
 });
 
-test('the failure overlay names the CDN libraries and their local remedy', () => {
+// Chrome, Firefox and Safari wordings for a module load the browser could not
+// complete, plus the bare-specifier failure an unresolved import map raises.
+const FETCH_FAILURES = [
+  'Failed to fetch dynamically imported module: http://localhost:8000/daydream.js',
+  'error loading dynamically imported module: http://localhost:8000/daydream.js',
+  'Importing a module script failed.',
+  "Failed to resolve module specifier 'three'",
+];
+
+test('a module the browser could not fetch gets the CDN remedy', () => {
+  for (const message of FETCH_FAILURES) {
+    const { doc, overlay } = fakeDocument();
+    showBootstrapFailure(new TypeError(message), { document: doc });
+    const remedy = childWithClass(overlay, 'load-error-remedy')?.textContent;
+    assert.equal(remedy, VENDOR_REMEDY, message);
+    assert.match(remedy, /cdn\.jsdelivr\.net/);
+    assert.match(remedy, /importmap:local/);
+  }
+});
+
+test('a module that failed to link gets the stale-cache remedy', () => {
   const { doc, overlay } = fakeDocument();
 
-  showBootstrapFailure(new Error('failed'), { document: doc });
+  showBootstrapFailure(
+    new SyntaxError(
+      "The requested module './frame_constants.js' does not provide an export " +
+      "named 'SLOW_FRAME_MS'"),
+    { document: doc });
 
-  const remedy = childWithClass(overlay, 'load-error-remedy').textContent;
-  assert.match(remedy, /three/);
-  assert.match(remedy, /cdn\.jsdelivr\.net/);
-  assert.match(remedy, /importmap:local/);
-  assert.equal(remedy, VENDOR_REMEDY);
+  assert.equal(childWithClass(overlay, 'load-error-remedy').textContent,
+    STALE_MODULE_REMEDY,
+    'a deploy-skew failure is sent to the cache remedy, not the CDN one');
+});
+
+test('a failure past the module graph carries no remedy', () => {
+  const { doc, overlay } = fakeDocument();
+
+  showBootstrapFailure(new Error('WebGL unavailable'), { document: doc });
+
+  assert.equal(childWithClass(overlay, 'load-error-remedy'), undefined,
+    'the engine and initial-apply failures are past the vendor libraries');
+  assert.ok(childWithClass(overlay, 'context-lost-reload'),
+    'the reload control survives a failure with no remedy');
 });
 
 test('the failure overlay moves focus onto its reload button', () => {

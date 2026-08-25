@@ -12,6 +12,24 @@ export const VENDOR_REMEDY = 'three and lil-gui load from cdn.jsdelivr.net. If '
   + 'this machine is offline or the CDN is blocked, run `npm run importmap:local` '
   + 'to serve the vendored copies instead (README §10.8).';
 
+// A module the browser fetched but could not link against its importers: the
+// deploy moved under a copy this browser still holds. The Reload sweep is the
+// repair, so the remedy names the control the overlay already offers.
+export const STALE_MODULE_REMEDY = 'A page module did not link against the rest '
+  + 'of the deploy — usually a stale copy left in the browser cache. Reload '
+  + 're-fetches the whole module graph.';
+
+// A module the browser could not fetch at all, across the three engines'
+// wordings. Chrome reports the entry module's URL rather than the one that
+// actually failed, so a blocked CDN and a missing same-origin module are the
+// same string: the vendor remedy is the widest one that still fits both.
+const MODULE_FETCH_FAILURE = new RegExp([
+  'Failed to fetch dynamically imported module',
+  'error loading dynamically imported module',
+  'Importing a module script failed',
+  'Failed to resolve module specifier',
+].join('|'), 'i');
+
 // Extensions refreshModuleCache re-fetches. The WASM binary is in because the
 // deploy binds it to its glue by content hash, so a cached binary against fresh
 // glue is the canonical skew a Reload has to clear. '.mjs' does not end in
@@ -143,6 +161,22 @@ export function refreshWithDeadline(refresh, {
 }
 
 /**
+ * The advice that fits a boot failure's cause.
+ * @param {unknown} error Boot failure.
+ * @returns {string} Remedy text, empty when no advice fits the cause.
+ * @details A fetch failure may be the CDN-hosted vendor libraries; a link or
+ *   parse failure is a cached module against a newer deploy. Everything else
+ *   — the engine, the initial apply — failed past a module graph that had
+ *   already loaded, and neither remedy applies.
+ */
+export function bootRemedy(error) {
+  const detail = errorDetail(error);
+  if (detail.startsWith('SyntaxError')) return STALE_MODULE_REMEDY;
+  if (MODULE_FETCH_FAILURE.test(detail)) return VENDOR_REMEDY;
+  return '';
+}
+
+/**
  * @param {unknown} error Bootstrap failure.
  * @param {{document?: Document, location?: Location, title?: string,
  *   refresh?: (dependencies?: {signal?: AbortSignal}) => Promise<void>}} [dependencies]
@@ -166,9 +200,13 @@ export function showBootstrapFailure(error, {
   detail.className = 'load-error-detail';
   detail.textContent = errorDetail(error);
 
-  const remedy = doc.createElement('span');
-  remedy.className = 'load-error-remedy';
-  remedy.textContent = VENDOR_REMEDY;
+  const remedyText = bootRemedy(error);
+  let remedy = null;
+  if (remedyText) {
+    remedy = doc.createElement('span');
+    remedy.className = 'load-error-remedy';
+    remedy.textContent = remedyText;
+  }
 
   const reload = doc.createElement('button');
   reload.type = 'button';
@@ -190,7 +228,8 @@ export function showBootstrapFailure(error, {
   // The markup ships role="status" for the polite loading message; a boot
   // failure is assertive.
   overlay.setAttribute('role', 'alert');
-  overlay.replaceChildren(title, detail, remedy, reload);
+  overlay.replaceChildren(...(remedy ? [title, detail, remedy, reload]
+    : [title, detail, reload]));
   // A role swap on a live node is not reliably announced; focus carries it, and
   // leaves the keyboard user on the one control the overlay offers.
   reload.focus({ preventScroll: true });
