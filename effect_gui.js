@@ -866,6 +866,9 @@ export function createEffectGui({
           stage, fx.gui.addDisplayFolder(stageTitles?.get(stage) ?? stage));
       }
     }
+    // Keyed by stage, not by folder title: a slot the user collapsed keeps its
+    // state across a rebuild that re-titles it from a new selector value.
+    fx.stageFolders = stageFolders;
 
     params.forEach(p => {
       // A param rendered elsewhere still claims its paramNames slot: the value
@@ -1038,16 +1041,22 @@ export function createEffectGui({
   }
 
   /**
-   * Capture the panel's scroll offset and focused control ahead of a rebuild.
+   * Capture the panel's scroll offset, focused control, and per-stage folder
+   * collapse state ahead of a rebuild.
    * @param {Object|null} fx - The effect record about to be replaced.
-   * @returns {{scrollTop: number, property: string|null, closed: boolean}} The
-   *   captured state.
+   * @returns {{scrollTop: number, property: string|null, closed: boolean,
+   *   stagesClosed: Map<string, boolean>}} The captured state.
    */
   function capturePanelFocus(fx) {
+    const stagesClosed = new Map();
+    for (const [stage, folder] of fx?.stageFolders ?? []) {
+      stagesClosed.set(stage, Boolean(folder.closed));
+    }
     return {
       scrollTop: scrollElement(fx?.gui)?.scrollTop ?? 0,
       property: focusedControlProperty(fx),
       closed: Boolean(fx?.gui?.closed),
+      stagesClosed,
     };
   }
 
@@ -1056,12 +1065,18 @@ export function createEffectGui({
    * replaced the captured one. A detached element cannot hold focus, so the
    * replacement must already be mounted.
    * @param {Object|null} fx - The record now published.
-   * @param {{scrollTop: number, property: string|null, closed: boolean}} captured
-   *   - The state capturePanelFocus() returned.
+   * @param {{scrollTop: number, property: string|null, closed: boolean,
+   *   stagesClosed: Map<string, boolean>}} captured - The state
+   *   capturePanelFocus() returned. A stage the replacement does not carry is
+   *   dropped; one it gained opens.
    * @returns {void}
    */
   function restorePanelFocus(fx, captured) {
     fx?.gui?.open?.(!captured.closed);
+    for (const [stage, folder] of fx?.stageFolders ?? []) {
+      const closed = captured.stagesClosed?.get(stage);
+      if (closed !== undefined) folder.open?.(!closed);
+    }
     const scroller = scrollElement(fx?.gui);
     if (scroller) scroller.scrollTop = captured.scrollTop;
     if (captured.property === null) return;
