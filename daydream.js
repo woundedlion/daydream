@@ -716,87 +716,95 @@ export function start({
     .onChange((v) => { poleLod.apply(v); segments.setPoleLod(v); });
 
   // ── Segmented POV controls ──────────────────────────────────────────────────
-  // The folder name and the segState property names are deep-link key segments
-  // (view.Segmented POV.<prop>); renaming either invalidates links already shared.
-  const segFolder = guiInstance.addFolder('Segmented POV');
-  segFolder.close();
-  // Every pool member holds a WASM heap of its own, so the ceiling is what the
-  // device can carry. The slider is built against it, which is also what bounds a
-  // deep link — addWithHydration clamps an over-cap URL value and rewrites the URL.
-  const segMax = maxSegmentCount(nav, daydream.isMobile);
-  const segState = {
-    segmented: segments.active,
-    segments: Math.min(segments.count, segMax),
-    boundaries: segments.showBoundaries,
-  };
-  // Requested size; segments.count follows the live pool and lags this across
-  // the warmModules() await.
-  let segCount = segState.segments;
-  // Assigned below, after the toggle whose deep-linked handler can reconcile it.
-  let segCountCtrl;
-  // The ceiling is re-read at every spawn, so a narrowing — a rotation into the
-  // mobile layout — bounds the pool below the requested size. setValue, not
-  // updateDisplay, so the deep-link writer re-advertises the running size.
-  const syncSegmentCount = () => {
-    const live = segments.count;
-    if (!segCountCtrl || !Number.isFinite(live) || live === segCount) return;
-    segCount = live;
-    segCountCtrl.setValue(live);
-  };
-  const segSpawn = createSegmentSpawnGuard({
-    warmModules: () => pageWarmer.warm(),
-    // segMax is the layout the page loaded in; a rotation into the mobile
-    // layout lowers what the device can carry, so the pool is bounded by the
-    // ceiling as it stands at the spawn, not the one the slider was built on.
-    spawn: createSegmentPoolSpawner(
-      segments, () => segCount, nav, () => daydream.isMobile),
-    isActive: () => segments.active,
-  });
-  // Declared ahead of the fallback, and assigned before its handler is wired: a
-  // deep-linked `segmented` replays that handler synchronously at registration,
-  // and a throw there reaches the fallback's showToggle.
-  let segEnabledCtrl;
-  const segmentedFailed = createSegmentedFallback({
-    segments,
-    strand: () => segSpawn.strand(),
-    showNotice: (message) => applyNotice.show(message, SWITCH_NOTICE),
-    // No-ops when the toggle is already false.
-    showToggle: (on) => segEnabledCtrl.setValue(on),
-  });
-  segEnabledCtrl = segFolder.add(segState, 'segmented').name('Enabled');
-  segEnabledCtrl.onChange(async v => {
-    try {
-      segments.active = v;
-      if (v) {
-        if (await segSpawn.respawn()) syncSegmentCount();
-      } else {
-        segSpawn.strand();
-        segments.destroy();
-        segments.updateStats();
+  // Not on the workbench page: its effects are programmed through
+  // setShaderChain and no worker message carries that program, so a pool would
+  // install a bare ShaderChain and composite a preview that differs from the
+  // single-engine one. Building nothing keeps a deep link from spawning it too.
+  /** @type {ReturnType<typeof createSegmentSpawnGuard>|null} */
+  let segSpawn = null;
+  if (!shaderWorkbench) {
+    // The folder name and the segState property names are deep-link key segments
+    // (view.Segmented POV.<prop>); renaming either invalidates links already shared.
+    const segFolder = guiInstance.addFolder('Segmented POV');
+    segFolder.close();
+    // Every pool member holds a WASM heap of its own, so the ceiling is what the
+    // device can carry. The slider is built against it, which is also what bounds a
+    // deep link — addWithHydration clamps an over-cap URL value and rewrites the URL.
+    const segMax = maxSegmentCount(nav, daydream.isMobile);
+    const segState = {
+      segmented: segments.active,
+      segments: Math.min(segments.count, segMax),
+      boundaries: segments.showBoundaries,
+    };
+    // Requested size; segments.count follows the live pool and lags this across
+    // the warmModules() await.
+    let segCount = segState.segments;
+    // Assigned below, after the toggle whose deep-linked handler can reconcile it.
+    let segCountCtrl;
+    // The ceiling is re-read at every spawn, so a narrowing — a rotation into the
+    // mobile layout — bounds the pool below the requested size. setValue, not
+    // updateDisplay, so the deep-link writer re-advertises the running size.
+    const syncSegmentCount = () => {
+      const live = segments.count;
+      if (!segCountCtrl || !Number.isFinite(live) || live === segCount) return;
+      segCount = live;
+      segCountCtrl.setValue(live);
+    };
+    segSpawn = createSegmentSpawnGuard({
+      warmModules: () => pageWarmer.warm(),
+      // segMax is the layout the page loaded in; a rotation into the mobile
+      // layout lowers what the device can carry, so the pool is bounded by the
+      // ceiling as it stands at the spawn, not the one the slider was built on.
+      spawn: createSegmentPoolSpawner(
+        segments, () => segCount, nav, () => daydream.isMobile),
+      isActive: () => segments.active,
+    });
+    // Declared ahead of the fallback, and assigned before its handler is wired: a
+    // deep-linked `segmented` replays that handler synchronously at registration,
+    // and a throw there reaches the fallback's showToggle.
+    let segEnabledCtrl;
+    const segmentedFailed = createSegmentedFallback({
+      segments,
+      strand: () => segSpawn.strand(),
+      showNotice: (message) => applyNotice.show(message, SWITCH_NOTICE),
+      // No-ops when the toggle is already false.
+      showToggle: (on) => segEnabledCtrl.setValue(on),
+    });
+    segEnabledCtrl = segFolder.add(segState, 'segmented').name('Enabled');
+    segEnabledCtrl.onChange(async v => {
+      try {
+        segments.active = v;
+        if (v) {
+          if (await segSpawn.respawn()) syncSegmentCount();
+        } else {
+          segSpawn.strand();
+          segments.destroy();
+          segments.updateStats();
+        }
+      } catch (e) {
+        segmentedFailed(v ? 'enable' : 'teardown', e);
       }
-    } catch (e) {
-      segmentedFailed(v ? 'enable' : 'teardown', e);
-    }
-  });
-  // The firmware takes a power-of-two segment count <= 8, so 6 is extra worker
-  // parallelism no hardware produces; the label says so, since the per-segment
-  // overlay otherwise names boards that cannot exist. A device cap that drops 6
-  // from the range takes the marker with it and names the cap instead.
-  const segLabel = segMax >= 6 ? 'Segments (6 = sim only)' : `Segments (max ${segMax} here)`;
-  segCountCtrl = segFolder.add(segState, 'segments', 2, segMax, 2).name(segLabel);
-  segCountCtrl.onChange(async v => {
-    // A reconcile writes the value the handler already acted on.
-    if (v === segCount) return;
-    try {
-      segCount = v;
-      if (segments.active && await segSpawn.respawn()) syncSegmentCount();
-    } catch (e) {
-      segmentedFailed('resize', e);
-    }
-  });
-  segFolder.addSession(segState, 'boundaries').name('Show Boundaries').onChange(v => {
-    segments.showBoundaries = v;
-  });
+    });
+    // The firmware takes a power-of-two segment count <= 8, so 6 is extra worker
+    // parallelism no hardware produces; the label says so, since the per-segment
+    // overlay otherwise names boards that cannot exist. A device cap that drops 6
+    // from the range takes the marker with it and names the cap instead.
+    const segLabel = segMax >= 6 ? 'Segments (6 = sim only)' : `Segments (max ${segMax} here)`;
+    segCountCtrl = segFolder.add(segState, 'segments', 2, segMax, 2).name(segLabel);
+    segCountCtrl.onChange(async v => {
+      // A reconcile writes the value the handler already acted on.
+      if (v === segCount) return;
+      try {
+        segCount = v;
+        if (segments.active && await segSpawn.respawn()) syncSegmentCount();
+      } catch (e) {
+        segmentedFailed('resize', e);
+      }
+    });
+    segFolder.addSession(segState, 'boundaries').name('Show Boundaries').onChange(v => {
+      segments.showBoundaries = v;
+    });
+  }
 
   // Video recording
   const REC_RESOLUTIONS = { 'Native': null, '720p': 720, '1080p': 1080 };
@@ -926,7 +934,7 @@ export function start({
     sidebar,
     driver: daydream,
     segments,
-    strandSegmentWork: () => segSpawn.strand(),
+    strandSegmentWork: () => segSpawn?.strand(),
     removeOverlay: () => durationEl.remove(),
   });
 

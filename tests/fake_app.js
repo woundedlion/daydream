@@ -152,12 +152,15 @@ export function fakeDriver() {
 
 /**
  * Builds the app against fakes.
- * @param {{loadModule?: () => Promise<Object>, nav?: Object}} [options] - Seam overrides.
+ * @param {{loadModule?: () => Promise<Object>, nav?: Object,
+ *   daydreamMode?: string}} [options] - Seam overrides. daydreamMode stamps
+ *   documentElement, the attribute start() reads to route the workbench page.
  * @returns {Object} The pieces a case asserts on, plus the global restorer.
  */
 export function startApp({
   loadModule = () => new Promise(() => {}),
   nav = { hardwareConcurrency: 8 },
+  daydreamMode = undefined,
 } = {}) {
   const savedGlobals = new Map([
     'document', 'window', 'ResizeObserver', 'requestAnimationFrame',
@@ -177,6 +180,7 @@ export function startApp({
       if (at >= 0) docListeners.splice(at, 1);
     },
     body: fakeElement('body'),
+    documentElement: { dataset: daydreamMode ? { daydreamMode } : {} },
   });
   for (const element of elements.values()) element.ownerDocument = doc;
   const listeners = [];
