@@ -104,9 +104,12 @@
 
 /* ── Pipeline strip ──────────────────────────────────────────────────────── */
 
+/* Above .gui-container's 2000: the region's opacity confines the palette to
+   this stacking context, so the palette's own z-index cannot lift it over the
+   floating panels. */
 .chain-strip-region {
   position: absolute;
-  z-index: 300;
+  z-index: 2100;
   top: 0;
   right: 0;
   left: 0;
@@ -475,8 +478,14 @@ select.chain-param-control {
 /* ── Global controls ─────────────────────────────────────────────────────── */
 
 /* The panels float inside .main-area, so they overlay the canvas alone and the
-   toolbar and strip stay clickable. .main-area is the height they have to fit
-   in, not the viewport the shared stylesheet caps them at. */
+   toolbar and strip stay clickable. They hang from its bottom edge, clear of
+   the band the strip grows into as stages open. .main-area is the height they
+   have to fit in, not the viewport the shared stylesheet caps them at. */
+#gui-container {
+  top: auto;
+  bottom: 0;
+}
+
 #gui-container,
 #gui-container > .lil-gui {
   max-height: 100%;
