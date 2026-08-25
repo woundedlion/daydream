@@ -247,6 +247,17 @@ test('custom hue state samples a sweep into three editable keys', () => {
   });
 });
 
+test('a partial sweep resamples onto its own arc, not a full turn', () => {
+  const recipe = defaultPaletteRecipe();
+  recipe.hue.mode = PaletteV4.hueMode.SWEEP;
+  recipe.hue.sweepTurns = 0.25;
+
+  assert.deepEqual(customHueKeyState(recipe), {
+    baseTurns: 0,
+    offsets: [0, 0.125, 0.25],
+  });
+});
+
 test('a LOOP sweep resamples onto the thirds the engine spaces a loop at', () => {
   const recipe = PALETTE_RECIPE_PRESETS.isolightSpectralLoop();
 
