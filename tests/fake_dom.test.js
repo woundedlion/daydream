@@ -619,6 +619,29 @@ test('documentEvents runs the handlers of one type in registration order', () =>
   const supplied = { target: fakeElement('input') };
   assert.equal(events.dispatch('pointerdown', supplied).target, supplied.target,
     'a supplied target wins over the document');
+  assert.equal(events.dispatch('pointerdown', { type: 'wheel' }).type, 'pointerdown',
+    'the dispatched type wins over a supplied one');
+});
+
+test('a document event carries the default and propagation controls', () => {
+  installDocument({});
+  const events = documentEvents();
+  const log = [];
+  events.addEventListener('keydown', (event) => {
+    log.push('first');
+    event.preventDefault();
+  });
+  events.addEventListener('keydown', (event) => {
+    log.push('second');
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+  });
+  events.addEventListener('keydown', () => log.push('third'));
+
+  const dispatched = events.dispatch('keydown');
+  assert.deepEqual(log, ['first', 'second'],
+    'stopImmediatePropagation drops the listeners still to run');
+  assert.equal(dispatched.defaultPrevented, true);
 });
 
 test('documentEvents refuses a removal with no listener behind it', () => {

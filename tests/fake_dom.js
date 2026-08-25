@@ -628,7 +628,9 @@ export function fakeElement(tag = 'div', options = {}) {
  * The listener surface a document stand-in needs for a module that wires a
  * document-level handler, spread into an installDocument() surface.
  * dispatch(type, event) runs the matching handlers in registration order over
- * an event whose `target` defaults to the installed document; removing a
+ * an event whose `target` defaults to the installed document and whose `type`,
+ * preventDefault(), stopPropagation() and stopImmediatePropagation() are the
+ * event's own and overwrite any the caller passed, as on an element; removing a
  * listener that was never added throws, as it does on an element, so a fixture
  * that omits the add cannot hide a removal that never happens. listenerCount()
  * reports what is still attached, so a teardown is assertable.
@@ -652,8 +654,22 @@ export function documentEvents() {
     },
     /** @param {string} type @param {Object} [event] @returns {Object} The dispatched event. */
     dispatch(type, event = {}) {
-      const dispatched = { type, target: globalThis.document, ...event };
+      let stoppedHere = false;
+      // The type and the propagation/default controls belong to the event, so
+      // they overwrite anything the caller supplied rather than the reverse.
+      const dispatched = {
+        target: globalThis.document,
+        ...event,
+        type,
+        defaultPrevented: false,
+        // The document is the root of this fake's path: nothing propagates past
+        // it, so only the immediate form has listeners left to stop.
+        stopPropagation() {},
+        stopImmediatePropagation() { stoppedHere = true; },
+        preventDefault() { dispatched.defaultPrevented = true; },
+      };
       for (const listener of [...listeners]) {
+        if (stoppedHere) break;
         if (listener.type === type) listener.handler(dispatched);
       }
       return dispatched;
