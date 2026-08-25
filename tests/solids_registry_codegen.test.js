@@ -395,6 +395,22 @@ test('generateRegistryCpp never names a star pattern as the Recipe seed', () => 
   assert.match(code, /\{Op::HANKIN, 62\.0f \* IslamicStarPatterns::D2R\},\n {4}\{Op::AMBO\},\n {4}\{Op::HANKIN, 62\.0f \* IslamicStarPatterns::D2R\},\n {4}\{Op::DUAL\},\n\};/);
 });
 
+test('generateRegistryCpp emits a base chain hankin angle no whole degree reproduces', () => {
+  const item = { base: 'icosahedron_hkraw', ops: ['dual'] };
+  const baseRecipe = { seed: 'icosahedron', ops: [chainStep('hankin', 0.5)] };
+  const code = generateRegistryCpp(item, baseRecipe);
+  assert.match(code, /\{Op::HANKIN, 0\.5f\},/,
+    'the radian value stands in for a deg * D2R product that would not read back the same');
+  assert.doesNotMatch(code, /\{Op::HANKIN, [0-9.]+f \* IslamicStarPatterns::D2R\}/);
+});
+
+test('generateRegistryCpp names the base chain hankin angle it cannot emit', () => {
+  const item = { base: 'icosahedron_hkbad', ops: ['dual'] };
+  const baseRecipe = { seed: 'icosahedron', ops: [chainStep('hankin', NaN)] };
+  assert.throws(() => generateRegistryCpp(item, baseRecipe),
+    /generateRegistryCpp: base chain hankin angle non-finite value NaN/);
+});
+
 test('generateRegistryCpp emits base chain params that read back as the same float32', () => {
   const truncateT = Math.fround(5 * D2R_F32);
   const item = { base: 'icosidodecahedron_truncate5d_ambo_dual', ops: [{ op: 'hankin', params: { angle: 40 } }] };
