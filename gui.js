@@ -20,10 +20,11 @@ import {
  * values. An effect switch resets and rebuilds the panel inside that one
  * debounce window, so a raw read would hydrate the incoming effect's controls
  * from the outgoing effect's params.
+ * @param {Window} [win] - The window whose location is read.
  * @returns {URLSearchParams} The query parameters of the current location.
  */
-const getUrlParams = () => {
-  const params = new URLSearchParams(window.location.search);
+const getUrlParams = (win = window) => {
+  const params = new URLSearchParams(win.location.search);
   const sync = getActiveURLSync();
   sync?.applyPendingReset(params);
   sync?.overlayPending(params);
@@ -51,17 +52,20 @@ const optionValues = (options) => {
  * changes can't clobber each other); the per-instance fallback is reached only
  * on standalone tool pages with no URLSync. Writes accumulate per key and merge
  * in one flush.
+ * @param {Window} [win] - The window this writer reads and rewrites; the
+ *   ambient one when omitted.
  * @returns {(key: string, value: (string|number|boolean|null|undefined)) => void}
  *   A writer; `value` null/undefined deletes the key.
  */
-const makeUrlParamWriter = () => {
+const makeUrlParamWriter = (win = null) => {
   let urlTimer = null;
   const pendingUrlWrites = new Map(); // key -> value (null/undefined => delete)
   const commit = () => {
-    const params = getUrlParams();
+    const target = win ?? window;
+    const params = getUrlParams(target);
     for (const [k, v] of pendingUrlWrites) overlayUrlParam(params, k, v);
     pendingUrlWrites.clear();
-    writeUrl(params);
+    writeUrl(params, target);
   };
   const writer = (key, value) => {
     const sync = getActiveURLSync();
@@ -103,8 +107,10 @@ class DeepLinkGUI {
    *   of one flat key namespace. Omitted for an unnamespaced (tool-page) root.
    * @param {DeepLinkGUI} [parent] - Enclosing GUI when this is a sub-folder; a
    *   child shares its root's URL writer instead of owning one.
+   * @param {Window} [win] - The window this subtree reads deep links from and
+   *   writes them back to; inherited from `parent`, else the ambient one.
    */
-  constructor(options, rootNamespace = null, parent = null) {
+  constructor(options, rootNamespace = null, parent = null, win = null) {
     if (options && options.domElement && options.addFolder) {
       this.gui = options;
     } else {
@@ -117,8 +123,16 @@ class DeepLinkGUI {
     this.keySegment = null;
     this.urlKeys = new Set();
     this.children = [];
-    this.urlWriter = parent ? parent.urlWriter : makeUrlParamWriter();
+    this.win = win ?? parent?.win ?? null;
+    this.urlWriter = parent ? parent.urlWriter : makeUrlParamWriter(this.win);
   }
+
+  /**
+   * Reads this subtree's deep-link params, folding in the URL writer's pending
+   * state.
+   * @returns {URLSearchParams} The query parameters of this GUI's window.
+   */
+  urlParams() { return getUrlParams(this.win ?? window); }
 
   /**
    * Collects all deep-link URL param keys managed by this GUI and its sub-folders.
@@ -168,7 +182,7 @@ class DeepLinkGUI {
   readStoredNumber(prop, legacyProps = []) {
     const key = this.getKey(prop);
     this.urlKeys.add(key);
-    const params = getUrlParams();
+    const params = this.urlParams();
     const legacyKey = legacyProps
       .map((legacyProp) => this.getKey(legacyProp))
       .find((candidate) => params.has(candidate));
@@ -195,7 +209,7 @@ class DeepLinkGUI {
   readStoredString(prop) {
     const key = this.getKey(prop);
     this.urlKeys.add(key);
-    const params = getUrlParams();
+    const params = this.urlParams();
     return params.has(key) ? params.get(key) ?? undefined : undefined;
   }
 
@@ -308,7 +322,7 @@ class DeepLinkGUI {
     const key = this.getKey(prop);
     const isFunction = typeof object[prop] === 'function';
 
-    const params = getUrlParams();
+    const params = this.urlParams();
     let urlApplied = false;
     let valClamped = false;
     const legacyKey = legacyProps
@@ -492,21 +506,22 @@ class DeepLinkGUI {
  * Removes deep-link URL params, preserving the given keys. Delegates to the
  * app's URLSync when present, else rewrites the query string directly.
  * @param {Array<string>} [excludedKeys=[]] - Param keys to preserve.
+ * @param {Window} [win] - The window whose query string is rewritten.
  * @returns {void}
  */
-export const resetGUI = (excludedKeys = []) => {
+export const resetGUI = (excludedKeys = [], win = window) => {
   const sync = getActiveURLSync();
   if (sync) {
     sync.reset(excludedKeys);
     return;
   }
-  const params = getUrlParams();
+  const params = getUrlParams(win);
   for (const key of Array.from(params.keys())) {
     if (!excludedKeys.includes(key)) {
       params.delete(key);
     }
   }
-  writeUrl(params);
+  writeUrl(params, win);
 };
 
 export { DeepLinkGUI as GUI };
