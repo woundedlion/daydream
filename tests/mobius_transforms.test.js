@@ -320,67 +320,40 @@ test('GLSL projection ops match the JS implementations', () => {
 
 // --- preset generators ----------------------------------------------------
 
-/** elliptic(0) yields the identity coefficients (A=1, B=0, C=0, D=1). */
-test('elliptic at t=0 is the identity transform', () => {
-  const c = elliptic(0);
-  assertComplex(c.A, 1, 0, 'A');
-  assertComplex(c.B, 0, 0, 'B');
-  assertComplex(c.C, 0, 0, 'C');
-  assertComplex(c.D, 1, 0, 'D');
+/** Every preset generator the module exports, keyed by its export name. */
+const GENERATORS = { elliptic, hyperbolic, loxodromic, parabolic, inversion, tumble, cayley };
+
+/** Every preset starts from the identity coefficients (A=1, B=0, C=0, D=1). */
+test('every preset generator is the identity at t=0', () => {
+  for (const [name, gen] of Object.entries(GENERATORS)) {
+    const c = gen(0);
+    assertComplex(c.A, 1, 0, `${name} A`);
+    assertComplex(c.B, 0, 0, `${name} B`);
+    assertComplex(c.C, 0, 0, `${name} C`);
+    assertComplex(c.D, 1, 0, `${name} D`);
+  }
 });
 
-/** inversion(0) yields the identity coefficients. */
-test('inversion at t=0 is the identity transform', () => {
-  const c = inversion(0);
-  assertComplex(c.A, 1, 0, 'A');
-  assertComplex(c.B, 0, 0, 'B');
-  assertComplex(c.C, 0, 0, 'C');
-  assertComplex(c.D, 1, 0, 'D');
-});
-
-/** tumble(0) yields the identity coefficients. */
-test('tumble at t=0 is the identity transform', () => {
-  const c = tumble(0);
-  assertComplex(c.A, 1, 0, 'A');
-  assertComplex(c.B, 0, 0, 'B');
-  assertComplex(c.C, 0, 0, 'C');
-  assertComplex(c.D, 1, 0, 'D');
-});
-
-/** hyperbolic(0) yields the identity coefficients (unit scale). */
-test('hyperbolic at t=0 is the identity transform (scale 1)', () => {
-  const c = hyperbolic(0);
-  assertComplex(c.A, 1, 0, 'A');
-  assertComplex(c.B, 0, 0, 'B');
-  assertComplex(c.C, 0, 0, 'C');
-  assertComplex(c.D, 1, 0, 'D');
-});
-
-/** parabolic(0) yields the identity coefficients. */
-test('parabolic at t=0 is the identity transform', () => {
-  const c = parabolic(0);
-  assertComplex(c.A, 1, 0, 'A');
-  assertComplex(c.B, 0, 0, 'B');
-  assertComplex(c.C, 0, 0, 'C');
-  assertComplex(c.D, 1, 0, 'D');
-});
-
-/** cayley(0) yields the identity coefficients. */
-test('cayley at t=0 is the identity transform', () => {
-  const c = cayley(0);
-  assertComplex(c.A, 1, 0, 'A');
-  assertComplex(c.B, 0, 0, 'B');
-  assertComplex(c.C, 0, 0, 'C');
-  assertComplex(c.D, 1, 0, 'D');
-});
-
-/** loxodromic(0) yields the identity coefficients. */
-test('loxodromic at t=0 is the identity transform', () => {
-  const c = loxodromic(0);
-  assertComplex(c.A, 1, 0, 'A');
-  assertComplex(c.B, 0, 0, 'B');
-  assertComplex(c.C, 0, 0, 'C');
-  assertComplex(c.D, 1, 0, 'D');
+/**
+ * The two scaling presets wrap their log-scale parameter at gridScaleR = 1.5, so
+ * the flow is seamless: one period later the coefficient magnitudes repeat.
+ * Loxodromic keeps rotating, so only the magnitudes are periodic.
+ */
+test('the scaling presets repeat their magnitudes one flow period later', () => {
+  const logPeriod = 1 / 1.5;
+  for (const [name, gen, speed] of [['hyperbolic', hyperbolic, 0.4], ['loxodromic', loxodromic, 0.3]]) {
+    const period = logPeriod / speed;
+    for (const t of [0, 0.37, 1.4, 5, 42]) {
+      const a = gen(t);
+      const b = gen(t + period);
+      for (const k of ['A', 'D']) {
+        const before = Math.hypot(a[k].re, a[k].im);
+        const after = Math.hypot(b[k].re, b[k].im);
+        assert.ok(Math.abs(before - after) < 1e-9,
+          `${name} |${k}| at t=${t}: ${before} vs ${after} one period later`);
+      }
+    }
+  }
 });
 
 // --- non-trivial goldens (catch a sign flip or wrong rate) ----------------
