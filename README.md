@@ -88,7 +88,7 @@ Building the WASM target in Holosphere installs `holosphere_wasm.js`, `holospher
      - [Hankin Pattern System](#hankin-pattern-system-hankinh)
      - [Solids Library](#solids-library-solidsh-solid_generatorsh)
    - [7.8 Generators](#78-generators-memoryh)
-   - [7.9 The Preset System](#79-the-preset-system-controlpresetsh)
+   - [7.9 The Preset System](#79-the-preset-system-controlchoreographyh)
    - [7.10 Hardware Drivers](#710-hardware-drivers-dma_ledh-pov_singleh-pov_segmentedh)
      - [DMA LED Controller](#dma-led-controller-dma_ledh)
      - [Single-Teensy POV Driver](#single-teensy-pov-driver-pov_singleh)
@@ -1777,23 +1777,23 @@ auto mesh = hs::generate(persistent_arena, Solids::get_by_name, std::string_view
 
 One deliberate exception: `SolidBuilder`'s fluent Conway chain (`solid_generators.h`) owns its own two-arena ping-pong, swapping the scratch arenas between operators, so it manages arena lifecycle directly rather than through `generate()`.
 
-### 7.9 The Preset System (`control/presets.h`)
+### 7.9 The Preset System (`control/choreography.h`)
 
-`Presets<Params, Size>` is a generic template for managing parameter presets. It stores a fixed-size array of `PresetEntry<Params>` (each containing only a `Params` struct — no name field) and provides cyclic navigation (`next()`/`prev()`, with `current_index()`/`prev_index()` reporting where it stands). It interpolates nothing itself: it tracks the entry active before the last move, and the caller drives the crossfade with an `Animation::Lerp` from `prev_get()` to `get()` (the `Params` type supplies the `lerp()` the animation calls).
+`ChoreographedEffect<Derived, Params>` is the engine's one preset system: an `Effect` base owning the effect's live parameter set, its preset table, and the choreography that moves between presets. `Derived` declares its presets — a `PRESETS` table (`std::array<PresetEntry<Params>, N>`) and/or `PRESET_IDS` naming them — plus a `Segue` preset policy, a dwell, a parameter schema version, and a validity predicate:
 
 ```cpp
-Presets<Feedback::Style, 12> presets = {{
-    {{{0.95f, 1.2f, ...}}},
-    {{{0.88f, 0.5f, ...}}},
-    ...
-}};
-presets.next();  // advance to next preset
-presets.apply(style);  // copy current preset into live params
-// or crossfade into it over 48 frames instead of snapping:
-timeline.add(0, Animation::Lerp(style, presets.prev_get(), presets.get(), 48, ease_linear));
+static constexpr Segue::Snap PRESET_SEGUE{};
+static constexpr uint32_t PARAMETER_SCHEMA_VERSION = 1;
+static constexpr uint16_t PRESET_DWELL_FRAMES = 241;
+static constexpr std::array<PresetEntry<Params>, 12> PRESETS = {{ ... }};
+static bool valid_params(const Params &p);
 ```
 
-`get_entries()` returns a span over all entries, const for read-only iteration and mutable for rebinding a preset in place. The free `constexpr` helper `all_presets_in_ranges(entries, in_ranges)` runs a slider-range predicate over an entry table so an effect can `static_assert` its whole preset table against its registered parameter ranges — a loop rather than an unrolled conjunction, so appended entries are covered automatically.
+The effect calls `begin_choreography()` once from `init()` — it configures the engine preset controller from the table (or `PRESET_IDS`) and, under a `Segue::Fade` policy, arms the through-black envelope loop — and `step_choreography()` every frame, which retires the dwell and starts the next automatic transition. A single-preset effect compiles the dwell countdown out. An effect that clocks its own advancement (DreamBalls' sprite hand-off chain) skips the per-frame tick and calls `advancePreset()` from its own schedule instead.
+
+Automatic transitions follow the policy — `Segue::Lerp` crossfades the live parameters into the target, `Segue::Snap` adopts immediately, `Segue::Fade` snaps inside the envelope's dark frame — while manual and synchronized selections always snap. Hooks specialize the mechanics: `preset_params(index)` (static, or a member when the effect patches entries at runtime, e.g. re-binding a noise pointer) overrides the `PRESETS[index]` lookup; `initial_params()` overrides the `PRESETS[0]` startup default; shadowing `adopt_params(target)` re-derives dependent state after a snap; `blend_params(progress)` writes an in-flight Lerp; `set_preset_opacity(value)` receives a Fade envelope. The base also carries schema-versioned parameter snapshots: `serialize_parameters()` tags the live set with `PARAMETER_SCHEMA_VERSION`, and `restore_parameters()` rejects a snapshot taken under a different schema or failing `valid_params()`.
+
+`control/presets.h` holds the table vocabulary: `PresetEntry<Params>` (the row type) and the free `constexpr` helper `all_presets_in_ranges(entries, in_ranges)`, which folds a slider-range predicate over an entry table so an effect can `static_assert` its whole preset table against its registered parameter ranges — a loop rather than an unrolled conjunction, so appended entries are covered automatically.
 
 ### 7.10 Hardware Drivers (`dma_led.h`, `pov_single.h`, `pov_segmented.h`)
 
@@ -2528,7 +2528,7 @@ A head traces a fixed 12:5 spherical Lissajous figure whose long trail is contin
 
 #### MeshFeedback
 
-A selectable Platonic, Archimedean, or Catalan wireframe rendered with `Plot::Mesh`, given a noise-distorted, feedback-loop appearance via `Filter::Pixel::Feedback`. An orientation random-walk tumbles the solid while a `Presets` cycle hard-cuts both the base mesh and feedback/distortion style parameters.
+A selectable Platonic, Archimedean, or Catalan wireframe rendered with `Plot::Mesh`, given a noise-distorted, feedback-loop appearance via `Filter::Pixel::Feedback`. An orientation random-walk tumbles the solid while a `Segue::Snap` preset choreography hard-cuts both the base mesh and feedback/distortion style parameters.
 
 **Parameters**: Base Mesh, Fade, Distort Amp, Distort Freq, Distort Speed, Noise Scale, Hue Shift, Feedback
 
@@ -2943,7 +2943,7 @@ params.forEach(p => {
 });
 ```
 
-`getParamValues()` is polled each frame to sync the GUI with parameter values that the animation system has changed autonomously. The sync skips any control the user is currently interacting with to avoid fighting the slider. A per-effect **Reset** rebuilds the GUI from defaults, and **Export** copies the current `{ name, value }` set as a C++-formatted initializer suitable for `Presets<…>` arrays. If a segmented-render parameter snapshot is temporarily unavailable after an edit, Export uses the values displayed by the current parameter schema. An effect that reports presets also gets a **Preset** dropdown over the zero-indexed live index — a live control, not a readout: choosing an entry selects that preset — flanked by **Previous Preset** / **Next Preset** buttons that step it, and each per-frame sync first mirrors the live preset into the engine that owns the definitions, skipping the rest of the update when that mirror fails.
+`getParamValues()` is polled each frame to sync the GUI with parameter values that the animation system has changed autonomously. The sync skips any control the user is currently interacting with to avoid fighting the slider. A per-effect **Reset** rebuilds the GUI from defaults, and **Export** copies the current `{ name, value }` set as a C++-formatted initializer suitable for `PRESETS` tables. If a segmented-render parameter snapshot is temporarily unavailable after an edit, Export uses the values displayed by the current parameter schema. An effect that reports presets also gets a **Preset** dropdown over the zero-indexed live index — a live control, not a readout: choosing an entry selects that preset — flanked by **Previous Preset** / **Next Preset** buttons that step it, and each per-frame sync first mirrors the live preset into the engine that owns the definitions, skipping the rest of the update when that mirror fails.
 
 Three behaviours the definitions loop above does not show. **Stage folders**: pullback-shaded effects are grouped rather than listed flat — the panel matches the registered names against a per-effect stage assignment and builds one folder per pipeline stage, in pullback order; a parameter no stage claims is still built, at the panel's top level, and the orphan is logged. **Warnings**: a definition carrying a `warning` — the engine's answer to a value it accepted as a request but will not render — renders that text into a node beside the control (a node, not a `title` attribute, which would be mouse-only), and the panel re-reads the warning set after each edit and rebuilds once the engine's warnings have moved off the ones it was built from. **Persistence**: the panel restores itself across a reload, storing accepted parameter values for an ordinary effect and, for one on the full-config path, `getFullConfigSnapshot()` as JSON — replayed through `restoreFullConfigSnapshot()`, which is atomic, so a snapshot that fails to parse or that the engine rejects is dropped rather than half-applied.
 
