@@ -490,13 +490,9 @@ test('tools.css control text clears the WCAG AA contrast floor', () => {
 });
 
 test('the palettes.html tab controls clear the WCAG AA contrast floor', () => {
-  const src = read('tools', 'palettes.html');
-  const open = src.indexOf('<style>');
-  assert.ok(open >= 0, 'palettes.html must still carry its page styles inline');
   // Read behind tools.css so the page rules' var() references resolve against
   // the token block that defines them.
-  const css = read('tools', 'tools.css')
-    + src.slice(open + '<style>'.length, src.indexOf('</style>', open));
+  const css = read('tools', 'tools.css') + read('tools', 'palettes.css');
   for (const [text, surface] of TAB_CONTRAST_PAIRS) {
     const ratio = contrast(css, text, surface);
     assert.ok(ratio >= AA_CONTRAST,
