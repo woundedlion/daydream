@@ -23,6 +23,7 @@
 </head>
 
 <body>
+  <h1 class="visually-hidden">Mobius Transformation Visualizer</h1>
   <div id="canvasContainer">
     <canvas id="threeCanvas" class="w-full h-full" role="img" aria-label="Real-time 3D preview of the Möbius transformation"></canvas>
   </div>
@@ -40,7 +41,7 @@
   <div id="controls">
     <div class="flex justify-between items-center mb-2 px-2 w-full max-w-7xl mx-auto">
       <div class="flex flex-col">
-        <h1 class="text-lg font-bold text-white leading-tight">Mobius Visualizer</h1>
+        <h2 class="text-lg font-bold text-white leading-tight">Mobius Visualizer</h2>
         <p class="text-xs text-indigo-300 font-mono">f(z) = (az + b) / (cz + d)</p>
         <p id="degenerateWarning" class="hidden text-xs text-amber-400 font-medium" role="status"></p>
       </div>
