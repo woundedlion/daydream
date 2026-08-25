@@ -606,6 +606,28 @@ test('bypass toggles the program shape without touching the document', async () 
   assert.equal(chipByLabel(h, 'lens').classList.contains('chain-chip--bypassed'), false);
 });
 
+test('the toolbar keeps one tab stop: chip controls rove, they do not tab', async () => {
+  const h = await makeStrip();
+  const strip = h.container.querySelector('.chain-strip');
+  const headerControls = strip.querySelectorAll(
+    '.chain-chip-bypass, .chain-chip-move, .chain-chip-remove, .chain-chip-replace');
+  assert.ok(headerControls.length >= 12);
+  assert.deepEqual(
+    [...new Set(headerControls.map((node) => node.getAttribute('tabindex')))], ['-1'],
+    'every chip header control is roved to, never tabbed to');
+  assert.deepEqual(
+    strip.querySelectorAll('.chain-chip').map((chip) => chip.getAttribute('tabindex'))
+      .filter((value) => value !== '-1'),
+    ['0'], 'exactly one chip carries the tab stop');
+
+  // The bypass toggle is the one header control with no chip-level gesture.
+  chipByLabel(h, 'lens').dispatch('keydown', { key: 'b' });
+  assert.deepEqual(h.applied.at(-1),
+    ['camera', 'project', 'warp2', 'sample', 'colorize']);
+  chipByLabel(h, 'lens').dispatch('keydown', { key: 'b' });
+  assert.equal(h.applied.at(-1).includes('lens'), true);
+});
+
 // A press that travels off a chip is a real-layout gesture, and no chip binds
 // a pointer listener to observe it: scripts/workbench-probe.mjs owns it.
 test('a chip selects by click', async () => {
