@@ -21,8 +21,8 @@ import {
   formatSolidName,
   generateFuncAndRecipe,
   generateRecipeCpp,
-  computeInternalAngle,
   snapToStep,
+  seedOpParams,
   fanTriangulateFace,
   uniqueEdges,
   dropSlotIndex,
@@ -1101,24 +1101,7 @@ function addOp(opName) {
     showGateMsg(`rejected: a chain carries at most ${MAX_RECIPE_STEPS} ops`);
     return;
   }
-  const def = OP_DEFS[opName];
-  const newOp = { op: opName, params: {} };
-  if (def && def.params) {
-    Object.keys(def.params).forEach(k => {
-      let val = def.params[k].val;
-      if (opName === 'hankin' && k === 'angle') {
-        // computeInternalAngle returns 0 for a null/load-failed mesh; keep
-        // the OP_DEFS default rather than seeding a degenerate 0deg angle.
-        // The half-internal angle is snapped to the control's whole-degree
-        // step so the slider, the number box, the _hk suffix and the emitted
-        // recipe all carry one value; the shift is under 2% of an edge and
-        // never changes the pattern's topology.
-        const derived = (computeInternalAngle(currentMesh) / 2) * (180 / Math.PI);
-        if (derived > 0) val = snapToStep(derived, def.params[k]);
-      }
-      newOp.params[k] = val;
-    });
-  }
+  const newOp = { op: opName, params: seedOpParams(opName, currentMesh) };
   queueCommit(async () => {
     // The grid button is usually grayed before an invalid op can be
     // clicked, but gating is async — validate the exact candidate anyway.
@@ -1183,7 +1166,7 @@ function openOpGate(reason) {
 async function refreshOpGating() {
   const buttons = [...document.querySelectorAll('#addOpGrid [data-op]')];
   const probe = await opGate.refresh(state.base, state.ops,
-    buttons.map((btn) => btn.dataset.op));
+    buttons.map((btn) => btn.dataset.op), currentMesh);
   if (!probe) return;
 
   if (probe.abandoned) {

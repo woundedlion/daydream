@@ -799,6 +799,32 @@ export function computeInternalAngle(mesh) {
 }
 
 /**
+ * Seeds one op's parameters for a candidate chain.
+ * @param {string} opName - The op's OP_DEFS key.
+ * @param {?{faces: Array<Array<number>>, vertices: Array<{x:number, y:number, z:number}>}} mesh - The mesh the op would run on, or null.
+ * @returns {Object<string, number>} The OP_DEFS defaults, except hankin's
+ *   angle, which follows the half-internal angle of `mesh`.
+ * @details The half-internal angle is snapped to the control's whole-degree
+ * step so the slider, the number box, the _hk suffix and the emitted recipe
+ * all carry one value. computeInternalAngle returns 0 for a null or
+ * load-failed mesh, which keeps the OP_DEFS default rather than seeding a
+ * degenerate 0deg angle.
+ */
+export function seedOpParams(opName, mesh) {
+  /** @type {Object<string, number>} */
+  const params = {};
+  for (const [key, def] of Object.entries(OP_DEFS[opName]?.params ?? {})) {
+    let val = def.val;
+    if (opName === 'hankin' && key === 'angle') {
+      const derived = (computeInternalAngle(mesh) / 2) * (180 / Math.PI);
+      if (derived > 0) val = snapToStep(derived, def);
+    }
+    params[key] = val;
+  }
+  return params;
+}
+
+/**
  * Tests whether an ordered planar face has a consistent turn direction.
  *
  * @param {Array<{x:number, y:number, z:number}>} vertices - Mesh vertices.
@@ -1255,11 +1281,14 @@ export function createOpGate(validator, retries = 3) {
    * @param {string} base - Registry name of the seed solid.
    * @param {ChainOp[]} ops - The current chain.
    * @param {string[]} candidates - Op names to probe.
+   * @param {?Object} seedMesh - The current chain's readback mesh, used to
+   *   seed each candidate the way the page would seed it; null falls back to
+   *   the OP_DEFS defaults.
    * @returns {Promise<{bad: Set<string>, complete: boolean}>} The ops that would
    *   trap, and whether the sweep ever got a full pass against a live module.
    *   Where it did not, `bad` is only a lower bound on what would trap.
    */
-  function probe(base, ops, candidates) {
+  function probe(base, ops, candidates, seedMesh) {
     return validator.withValidator(async (Mod) => {
       /** @type {Set<string>} */
       const bad = new Set();
@@ -1316,10 +1345,7 @@ export function createOpGate(validator, retries = 3) {
 
       for (const op of candidates) {
         /** @type {{op: string, params: Object<string, number>}} */
-        const candidate = { op, params: {} };
-        for (const [key, def] of Object.entries(OP_DEFS[op]?.params ?? {})) {
-          candidate.params[key] = def.val;
-        }
+        const candidate = { op, params: seedOpParams(op, seedMesh) };
         let verdict = attempt(Mod, candidate);
         if (verdict === 'exhausted') {
           // A full arena rejects every later candidate too, so reclaim it and
@@ -1350,15 +1376,17 @@ export function createOpGate(validator, retries = 3) {
    * @param {string} base - Registry name of the seed solid.
    * @param {ChainOp[]} ops - The current chain.
    * @param {string[]} candidates - Op names to probe.
+   * @param {?Object} [mesh] - The current chain's readback mesh, used to seed
+   *   each candidate; omitted falls back to the OP_DEFS defaults.
    * @returns {Promise<?OpGateVerdict>} The verdict, or null when the pass was
    *   skipped or the chain changed under it.
    */
-  async function refresh(base, ops, candidates) {
+  async function refresh(base, ops, candidates, mesh = null) {
     const signature = `${base}|${ops.map(opTopologyKey).join(',')}`;
     if (abandoned || signature === lastSignature) return null;
 
     const started = ++generation;
-    const { bad, complete } = await probe(base, structuredClone(ops), candidates);
+    const { bad, complete } = await probe(base, structuredClone(ops), candidates, mesh);
     if (started !== generation) return null;
 
     if (complete) {
