@@ -34,6 +34,7 @@ import { sha256Hex } from '../shader/sha256.mjs';
 
 const PATTERNS = new URL('../shader/patterns/', import.meta.url);
 const FIXTURES = new URL('v1/', PATTERNS);
+const patternNames = readdirSync(PATTERNS).filter((f) => f.endsWith('.shader.json'));
 const CATALOG = JSON.parse(
   readFileSync(new URL('../shader/engine_catalog.json', import.meta.url), 'utf8'));
 const MIGRATION = JSON.parse(
@@ -325,10 +326,9 @@ test('serialization fields name every parameter once and do not order the digest
 
 /** Verifies every committed pattern compiles and is keyed by its own digest. */
 test('every committed shader pattern compiles to a distinct digest', () => {
-  const names = readdirSync(PATTERNS).filter((f) => f.endsWith('.shader.json'));
-  assert.ok(names.length > 1);
+  assert.ok(patternNames.length > 1);
   const digests = new Map();
-  for (const name of names) {
+  for (const name of patternNames) {
     const compiled = compile(readFileSync(new URL(name, PATTERNS), 'utf8'));
     assert.deepEqual(compiled.diagnostics, [], name);
     assert.equal(compiled.status, 'VALID', name);
@@ -647,6 +647,26 @@ test('every committed v2 pattern is its v1 fixture expanded, byte-identical', ()
       exportShaderDocumentJson(expanded),
       readPinned(new URL(name, PATTERNS)),
       `${name} drifted from its expansion`,
+    );
+  }
+});
+
+/**
+ * The canonical-form gate, over the whole pattern directory: a committed
+ * document is what the compiler's exporter writes for it, byte for byte. The
+ * expansion gate above reaches only the documents that have a v1 fixture, so
+ * an engine-exported pattern is pinned here or nowhere.
+ */
+test('every committed pattern document is its own canonical re-export', () => {
+  assert.deepEqual(patternNames.filter((name) => !fixtureNames.includes(name)),
+    ['ash_cloud.shader.json'],
+    'a pattern with no v1 fixture is covered by this gate alone');
+  for (const name of patternNames) {
+    const url = new URL(name, PATTERNS);
+    assert.equal(
+      exportShaderDocumentJson(parseShaderDocument(readFileSync(url, 'utf8'))),
+      readPinned(url),
+      `${name} is not in canonical export form`,
     );
   }
 });
