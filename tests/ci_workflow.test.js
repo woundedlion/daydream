@@ -2,13 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import {
-  ciGreenNeeds,
-  missingCiGreenDependencies,
+  missingTerminalDependencies,
+  terminalJobNeeds,
   workflowJobs,
 } from '../scripts/verify-ci-green.mjs';
 
 const WORKFLOW_DIR = '.github/workflows';
 const WORKFLOW_PATH = `${WORKFLOW_DIR}/ci.yml`;
+const DEPLOY_PATH = `${WORKFLOW_DIR}/deploy.yml`;
 const workflow = readFileSync(WORKFLOW_PATH, 'utf8');
 
 // Every `node-version:` spelling under .github/workflows, tagged with its file.
@@ -19,17 +20,26 @@ const nodePins = (dir) => readdirSync(dir)
   ].map((match) => `${file}: ${match[1]}`));
 
 test('ci-green needs every other workflow job', () => {
-  assert.deepEqual(missingCiGreenDependencies(workflow), []);
+  assert.deepEqual(missingTerminalDependencies(workflow, 'ci-green'), []);
   assert.deepEqual(
-    ciGreenNeeds(workflow).sort(),
+    terminalJobNeeds(workflow, 'ci-green').sort(),
     workflowJobs(workflow).filter((job) => job !== 'ci-green').sort(),
+  );
+});
+
+test('the deploy job needs every other deploy-workflow job', () => {
+  const deploy = readFileSync(DEPLOY_PATH, 'utf8');
+  assert.deepEqual(missingTerminalDependencies(deploy, 'deploy'), []);
+  assert.deepEqual(
+    terminalJobNeeds(deploy, 'deploy').sort(),
+    workflowJobs(deploy).filter((job) => job !== 'deploy').sort(),
   );
 });
 
 test('ci-green dependency check rejects an omitted job', () => {
   const incomplete = workflow.replace(/^ {6}- browser\r?\n/m, '');
   assert.notEqual(incomplete, workflow);
-  assert.deepEqual(missingCiGreenDependencies(incomplete), ['browser']);
+  assert.deepEqual(missingTerminalDependencies(incomplete, 'ci-green'), ['browser']);
 });
 
 test('every workflow pins the Node version package.json requires', () => {
