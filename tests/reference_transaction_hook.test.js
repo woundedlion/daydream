@@ -85,17 +85,7 @@ describe(
 
     before(() => {
       root = mkdtempSync(join(tmpdir(), 'ref-txn-hook-'));
-      env = {
-        ...isolatedGitEnv(),
-        // Never read the operator's git config: a global core.hooksPath would
-        // install this very hook into the fixtures.
-        GIT_CONFIG_GLOBAL: join(root, 'absent-config'),
-        GIT_CONFIG_SYSTEM: join(root, 'absent-config'),
-        GIT_AUTHOR_NAME: 'fixture',
-        GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
-        GIT_COMMITTER_NAME: 'fixture',
-        GIT_COMMITTER_EMAIL: 'fixture@example.invalid',
-      };
+      env = isolatedGitEnv();
 
       repo = join(root, 'repo');
       execFileSync('git', ['init', '-q', '-b', 'master', repo], { env });

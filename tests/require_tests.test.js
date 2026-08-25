@@ -25,11 +25,7 @@ const buildRoot = () => {
   git('add', 'package.json', 'tests/sample.test.js');
 };
 const root = fixtureRepo('require-tests-', buildRoot);
-const env = {
-  ...isolatedGitEnv(),
-  GIT_CONFIG_GLOBAL: join(root, 'absent-config'),
-  GIT_CONFIG_SYSTEM: join(root, 'absent-config'),
-};
+const env = isolatedGitEnv();
 const git = (...args) => execFileSync('git', args, { cwd: root, env });
 const run = () => String(execFileSync(
   process.execPath, [SCRIPT], { cwd: root, env }));
