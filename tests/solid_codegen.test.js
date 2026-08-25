@@ -1143,6 +1143,34 @@ test('createChainValidator carries each rejection reason out to the caller', asy
   assert.notEqual(overflow.message, arena.message, 'each reason must arrive with its own remedy');
 });
 
+/**
+ * Verifies a chain the engine saturated an argument for is refused. The op
+ * succeeds, so only getLastAdjusted() says the rendered mesh came from a value
+ * the chain does not hold — and every MeshOps entry point clears that flag, so
+ * the read has to sit between the op and the next bridge call.
+ */
+test('createChainValidator refuses a chain whose argument the engine clamped', async () => {
+  const calls = [];
+  const { Mod, state } = fakeModule((op) => calls.push(op));
+  Mod.MeshOps.getLastAdjusted = () => { calls.push('adjusted?'); return true; };
+  const verdict = await createChainValidator(async () => Mod)
+    .chainIsValid('cube', [{ op: 'hankin', params: { angle: 95 } }]);
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.message, /^Op "hankin" failed: /);
+  assert.deepEqual(calls, ['base:cube', 'hankin', 'adjusted?'],
+    'the flag must be read straight after the op, before any other bridge call clears it');
+  assert.equal(state.live, 0);
+  assert.equal(state.cleared, 1);
+});
+
+/** Verifies an unsaturated argument leaves the chain accepted. */
+test('createChainValidator accepts a chain the engine did not clamp', async () => {
+  const { Mod } = fakeModule();
+  Mod.MeshOps.getLastAdjusted = () => false;
+  assert.equal((await createChainValidator(async () => Mod)
+    .chainIsValid('cube', [{ op: 'hankin', params: { angle: 54 } }])).ok, true);
+});
+
 /** Verifies an accepted chain carries no message to show. */
 test('createChainValidator reports no reason for a chain it accepts', async () => {
   const { Mod } = fakeModule();

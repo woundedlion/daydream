@@ -92,9 +92,11 @@ export const D2R_F32 = Math.fround(Math.fround(Math.PI) / 180);
  * solid_codegen.test.js pins both paths against these key sequences. The op set
  * must match what the WASM MeshOps class binds, and every range must stay inside
  * the engine's domain for that operator — the bridge clamps an out-of-domain
- * argument and only logs, so the preview would hide a bound the generated C++
- * carries into an always-on engine assert. engine_contract_wasm.test.js pins
- * both.
+ * argument and renders from the clamped value, so the preview would hide a bound
+ * the generated C++ carries into an always-on engine assert. The clamp itself is
+ * reported by MeshOps.getLastAdjusted(), which the chain validator reads, so
+ * these ranges are the first gate rather than the only one.
+ * engine_contract_wasm.test.js pins both.
  * @type {Object<string, {params: Object<string, OpParamDef>}>}
  */
 export const OP_DEFS = {
@@ -1168,6 +1170,10 @@ export function createChainValidator(createModule) {
    * prevention degrades to the old behavior rather than blocking the tool. The
    * result is an object, so callers must test `.ok` — an object is truthy, and
    * a call site left testing the result itself reads every chain as valid.
+   * A chain is also refused when the engine saturated one of its arguments
+   * (getLastAdjusted): the op succeeded, but on a value the tool did not pass,
+   * so the generated C++ would carry the out-of-domain one into a firmware
+   * assert.
    */
   function chainIsValid(base, ops) {
     return withValidator((Mod) => {
@@ -1189,6 +1195,17 @@ export function createChainValidator(createModule) {
         try { if (mesh) mesh.delete(); Ops.clearToolingMemory(); } catch { /* best effort */ }
         return { ok: false, message };
       };
+      // A saturated argument is a success the tool cannot export: the engine
+      // rendered from a value it moved into the operator's domain, not from the
+      // one the chain holds. Frees the mesh and the arenas like a rejection.
+      const saturated = () => {
+        try { if (mesh) mesh.delete(); Ops.clearToolingMemory(); } catch { /* best effort */ }
+        return {
+          ok: false,
+          message: `${what} failed: an argument sat outside its op domain and the `
+            + 'engine clamped it — the exported value would not be the one it drew',
+        };
+      };
       try {
         // A null from any bridge call is a recoverable reject (getLastResult
         // names it), so the chain is not safe for the live module either.
@@ -1197,8 +1214,12 @@ export function createChainValidator(createModule) {
         for (const o of ops) {
           what = `Op "${typeof o === 'string' ? o : o.op}"`;
           const next = applyOp(mesh, o);
+          // Read before any other bridge call — every MeshOps entry point clears
+          // the flag on the way in, so even a getVertices first reads false.
+          const adjusted = Ops.getLastAdjusted?.() === true;
           mesh.delete();
           mesh = next;
+          if (adjusted) return saturated();
         }
         what = 'Face classification';
         const classes = mesh.classifyFaces();
