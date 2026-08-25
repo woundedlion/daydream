@@ -219,41 +219,41 @@ function sampleLut(lut) {
 
 const PALETTE_V4_ENUM_CONTRACT = Object.freeze({
   hueMode: { field: 4, members: [
-    ['HARMONY', 0, '451451b07735d920'],
-    ['SWEEP', 1, '170c75499fbf2003'],
-    ['CUSTOM', 2, '28f689b9b132a064'],
+    ['HARMONY', 0, '5d91f7f1d76267a7'],
+    ['SWEEP', 1, 'a60244b6c2fe8333'],
+    ['CUSTOM', 2, 'd08915eb2126bec3'],
   ] },
   harmony: { field: 5, members: [
-    ['MONOCHROMATIC', 0, '86387ae32c61139a'],
-    ['ANALOGOUS', 1, '451451b07735d920'],
-    ['ACCENTED_ANALOGOUS', 2, '589a11b1b6463634'],
-    ['COMPLEMENTARY', 3, '12f0ccf1699ff4a6'],
-    ['SPLIT_COMPLEMENTARY', 4, '6e151d5a3e66a38e'],
-    ['TRIADIC', 5, '4c973eca5c79f1d1'],
-    ['TETRADIC', 6, '5c79ffa80f5eb54d'],
-    ['SQUARE', 7, '6b68f27ea6c11e51'],
+    ['MONOCHROMATIC', 0, 'a946d6234a3cc136'],
+    ['ANALOGOUS', 1, '5d91f7f1d76267a7'],
+    ['ACCENTED_ANALOGOUS', 2, '4e1bc86da232c6eb'],
+    ['COMPLEMENTARY', 3, 'f83c70aa7a5ee830'],
+    ['SPLIT_COMPLEMENTARY', 4, '0a8168162973aa82'],
+    ['TRIADIC', 5, 'f8be02ee017c1394'],
+    ['TETRADIC', 6, 'ee8ed641095ec256'],
+    ['SQUARE', 7, 'f7dd21d3e85cca1b'],
   ] },
   direction: { field: 6, members: [
-    ['SHORTEST', 0, '451451b07735d920'],
-    ['CLOCKWISE', 1, '5c959d6f7a45f90d'],
-    ['COUNTERCLOCKWISE', 2, '451451b07735d920'],
+    ['SHORTEST', 0, '5d91f7f1d76267a7'],
+    ['CLOCKWISE', 1, '92a5f30fdc6bd1b6'],
+    ['COUNTERCLOCKWISE', 2, '0098cc1e5cedb9a5'],
   ] },
   curve: { field: 14, members: [
-    ['CONSTANT', 0, '865e5efb91ef7e11'],
-    ['ASCENDING', 1, 'e2501b6868fcd624'],
-    ['DESCENDING', 2, '8bdc2f1836f4cbd4'],
-    ['BELL', 3, '451451b07735d920'],
-    ['CUP', 4, '31d26ce609ff89eb'],
-    ['CUSTOM', 5, '0c0c2f8ffefc95c4'],
+    ['CONSTANT', 0, 'de720b6cd67848b9'],
+    ['ASCENDING', 1, '46fb015e6a9bbc0c'],
+    ['DESCENDING', 2, '3704b0e3e560dac8'],
+    ['BELL', 3, '5d91f7f1d76267a7'],
+    ['CUP', 4, 'b3cf93fad7188763'],
+    ['CUSTOM', 5, '5be955544e7c0607'],
   ] },
   chromaBasis: { field: 22, members: [
-    ['LOCAL_GAMUT', 0, '451451b07735d920'],
+    ['LOCAL_GAMUT', 0, '5d91f7f1d76267a7'],
     ['PATH_MINIMUM', 1, 'error:3:22'],
-    ['ABSOLUTE', 2, '2ce168eda43a47ea'],
+    ['ABSOLUTE', 2, '9106f369ad1de6e7'],
   ] },
   colorPath: { field: 3, members: [
-    ['OKLCH_ARC', 0, '451451b07735d920'],
-    ['OKLAB_CARTESIAN', 1, '545eafa0b655e0e5'],
+    ['OKLCH_ARC', 0, '5d91f7f1d76267a7'],
+    ['OKLAB_CARTESIAN', 1, 'd0f0481579c8d202'],
   ] },
   domain: { field: 1, members: [
     ['STRAIGHT', 0, '451451b07735d920'],
@@ -263,9 +263,9 @@ const PALETTE_V4_ENUM_CONTRACT = Object.freeze({
     ['LOOP', 4, '5d91f7f1d76267a7'],
   ] },
   easing: { field: 2, members: [
-    ['LINEAR', 0, '6033220e629bd792'],
-    ['COSINE', 1, '451451b07735d920'],
-    ['SMOOTHSTEP', 2, '4ccd0f7f0cdc8486'],
+    ['LINEAR', 0, 'd3b388c66941525e'],
+    ['COSINE', 1, '5d91f7f1d76267a7'],
+    ['SMOOTHSTEP', 2, 'b277e8d7d2d3f97d'],
   ] },
 });
 
@@ -273,13 +273,19 @@ function paletteEnumProbeRecipe() {
   const recipe = defaultPaletteRecipe();
   recipe.input = { offset: 0.07, span: 0.83 };
   recipe.easing = 1;
+  // LOOP (4), so the closing travel from the last key back to the first is part
+  // of the bake. Under a harmony the spread clamp caps every key-to-key step at
+  // a half turn, which SHORTEST and COUNTERCLOCKWISE resolve identically; the
+  // closing travel is the only step that crosses the wrap, so it is what keeps
+  // those two ordinals apart. LOOP also demands a whole-turn sweep.
+  recipe.domain = 4;
   recipe.hue = {
     mode: 0,
     harmony: 1,
     direction: 0,
     baseTurns: 0.17,
     spreadTurns: 0.19,
-    sweepTurns: 1.25,
+    sweepTurns: 2,
     customTurns: [0, 0.13, 0.4, 0.83],
   };
   recipe.lightness = {
@@ -336,6 +342,10 @@ test('Palette V4 enum spellings and ordinals match the shipped engine', () => {
         return [name, ordinal, paletteResultFingerprint(ops.compileAndBakeV4(recipe))];
       });
       assert.deepEqual(engineMembers, members, `${group} engine ordinals`);
+      // A shared fingerprint would pin two ordinals the engine could swap
+      // undetected, which is the one substitution this case exists to catch.
+      assert.equal(new Set(members.map(([, , mark]) => mark)).size, members.length,
+        `${group} probe recipe separates every member`);
 
       const rejectedRecipe = paletteEnumProbeRecipe();
       setPaletteEnum(rejectedRecipe, group, members.length);
