@@ -1268,10 +1268,12 @@ export function createChainStrip({
       redo();
     }
   };
+  // After the first render: a strip that throws before it returns hands the
+  // caller no destroy(), so listeners bound ahead of it would outlive it on the
+  // container the next successful load renders into.
+  render();
   container.addEventListener('keydown', historyKeydown);
   doc.addEventListener('pointerdown', dismissPalette);
-
-  render();
 
   return {
     render,
