@@ -2093,16 +2093,12 @@ test('an effect switch clears the skew latch', () => {
 // The Export action copies the live values, and reports the outcome on its own
 // button.
 
-test('preset effects expose one-based labels and zero-indexed navigation', () => {
+test('preset controls carry icon labels and accessible names', () => {
   const h = makeHarness({ presetCount: 3, presetIndex: 0 });
   h.panel.build();
 
   assert.deepEqual(h.gui().controllers.slice(0, 5).map((c) => c.property),
     ['reset', 'export', 'presetIndex', 'previousPreset', 'nextPreset']);
-  assert.equal(h.gui().ctrl('presetIndex').getValue(), 0);
-  assert.deepEqual(h.gui().ctrl('presetIndex').args, [{ 1: 0, 2: 1, 3: 2 }]);
-  assert.equal(h.gui().ctrl('presetIndex').disabled, false);
-  assert.equal(h.gui().ctrl('presetIndex').session, true);
   assert.equal(h.gui().ctrl('reset').label, '\u21ba');
   assert.equal(h.gui().ctrl('export').label, '\u29c9');
   assert.equal(h.gui().ctrl('previousPreset').label, '\u25c0');
@@ -2117,6 +2113,13 @@ test('preset effects expose one-based labels and zero-indexed navigation', () =>
     assert.equal(button.getAttribute('aria-label'), label);
     assert.equal(button.getAttribute('title'), label);
   }
+  assert.equal(h.gui().ctrl('presetIndex').$select.getAttribute('aria-label'), 'Preset');
+});
+
+test('the preset action row lays its controls out in one grid row', () => {
+  const h = makeHarness({ presetCount: 3, presetIndex: 0 });
+  h.panel.build();
+
   const actionRow = h.gui().$children.children[0];
   assert.ok(actionRow.classList.contains('effect-action-row'));
   // display/grid-auto-flow belong to the stylesheet; only the count is dynamic.
@@ -2134,9 +2137,18 @@ test('preset effects expose one-based labels and zero-indexed navigation', () =>
     .contains('preset-nav-previous'));
   assert.ok(h.gui().ctrl('presetIndex').domElement.classList
     .contains('preset-nav-selector'));
-  assert.equal(h.gui().ctrl('presetIndex').$select.getAttribute('aria-label'), 'Preset');
   assert.ok(h.gui().ctrl('nextPreset').domElement.classList
     .contains('preset-nav-next'));
+});
+
+test('preset effects expose one-based labels and zero-indexed navigation', () => {
+  const h = makeHarness({ presetCount: 3, presetIndex: 0 });
+  h.panel.build();
+
+  assert.equal(h.gui().ctrl('presetIndex').getValue(), 0);
+  assert.deepEqual(h.gui().ctrl('presetIndex').args, [{ 1: 0, 2: 1, 3: 2 }]);
+  assert.equal(h.gui().ctrl('presetIndex').disabled, false);
+  assert.equal(h.gui().ctrl('presetIndex').session, true);
 
   h.gui().ctrl('previousPreset').object.previousPreset();
   assert.equal(h.gui().ctrl('presetIndex').getValue(), 2);
