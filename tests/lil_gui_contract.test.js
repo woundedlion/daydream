@@ -202,6 +202,29 @@ test('options() on a non-dropdown destroys the receiver and appends a replacemen
     assert.equal(gui.controllers.includes(plain), false, 'the receiver is destroyed');
   });
 
+// gui.js's DeepLinkGUI.closed reads _closed to carry a panel's collapse state
+// across a schema rebuild. lil-gui offers no public getter for it -- its own
+// docs spell the toggle `gui.open( gui._closed )` -- so the private is the API.
+test('_closed tracks the collapse state open() and close() set', async () => {
+  const gui = await realGUI();
+  const folder = gui.addFolder('Shape');
+
+  assert.equal(gui._closed, false, 'a panel starts open');
+  assert.equal(folder._closed, false, 'a folder starts open');
+
+  gui.close();
+  assert.equal(gui._closed, true, 'close() did not record the collapse');
+  assert.equal(folder._closed, false, 'a folder tracks its own state, not the parent panel');
+
+  gui.open();
+  assert.equal(gui._closed, false, 'open() did not record the expansion');
+
+  folder.open(false);
+  assert.equal(folder._closed, true, 'open(false) is the collapsing spelling');
+  folder.open();
+  assert.equal(folder._closed, false);
+});
+
 test('addColor and addFolder hand back the shapes the GUI layer wraps', async () => {
   const gui = await realGUI();
   const color = gui.addColor({ tint: '#ff00ff' }, 'tint');
