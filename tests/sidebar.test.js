@@ -26,17 +26,28 @@ const saved = {
   cancelAnimationFrame: globalThis.cancelAnimationFrame,
 };
 
+// The observer and frame timers the sidebar is expected to take from the
+// container's own window, not from globalThis.
+function makeWindow() {
+  return {
+    ResizeObserver: FakeResizeObserver,
+    // Defer, matching the browser: store the callback but do not run it, so
+    // setEffects' scroll-arrow measurement does not fire synchronously.
+    requestAnimationFrame: (cb) => { const id = ++rafId; rafCallbacks.set(id, cb); return id; },
+    cancelAnimationFrame: (id) => { cancelledRaf.push(id); rafCallbacks.delete(id); },
+  };
+}
+
 function installDom() {
   observers.length = 0;
   rafCallbacks.clear();
   cancelledRaf.length = 0;
   rafId = 0;
-  installDocument({ createElement: (tag) => fakeElement(tag), activeElement: null });
-  globalThis.ResizeObserver = FakeResizeObserver;
-  // Defer, matching the browser: store the callback but do not run it, so
-  // setEffects' scroll-arrow measurement does not fire synchronously.
-  globalThis.requestAnimationFrame = (cb) => { const id = ++rafId; rafCallbacks.set(id, cb); return id; };
-  globalThis.cancelAnimationFrame = (id) => { cancelledRaf.push(id); rafCallbacks.delete(id); };
+  const win = makeWindow();
+  installDocument({
+    createElement: (tag) => fakeElement(tag), activeElement: null, defaultView: win,
+  });
+  return win;
 }
 
 restoreDocumentAfterEach();
@@ -69,14 +80,28 @@ test('constructor mounts its five nodes and wires listeners + observer', () => {
 });
 
 test('constructor tolerates a window without ResizeObserver', () => {
-  installDom();
-  delete globalThis.ResizeObserver;
+  const win = installDom();
+  delete win.ResizeObserver;
   const container = fakeElement('div');
   container.ownerDocument = globalThis.document;
 
   const sidebar = new EffectSidebar(container, () => {});
 
   assert.equal(sidebar.resizeObs, null);
+  sidebar.dispose();
+});
+
+test('a document with no defaultView falls back to the ambient window', () => {
+  installDom();
+  delete globalThis.document.defaultView;
+  Object.assign(globalThis, makeWindow());
+  const container = fakeElement('div');
+  container.ownerDocument = globalThis.document;
+
+  const sidebar = new EffectSidebar(container, () => {});
+
+  assert.equal(sidebar.win, globalThis);
+  assert.equal(observers.length, 1);
   sidebar.dispose();
 });
 
