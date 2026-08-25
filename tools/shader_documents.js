@@ -3,6 +3,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import { enumConstantName } from '../param_sync.js';
 import { applyChainDocument } from './chain_apply.js';
 import { createChainDocumentStore, scratchChainDocument } from './chain_document_store.js';
 import { createChainStrip } from './chain_strip.js';
@@ -111,12 +112,6 @@ function optionIndex(definition, label) {
   return definition.options?.findIndex((option) => option.toLowerCase() === wanted) ?? -1;
 }
 
-/** @param {*} module @param {*} result */
-function paramSetResultName(module, result) {
-  return Object.keys(module.ParamSetResult)
-    .find((name) => module.ParamSetResult[name] === result) ?? 'unrecognized result';
-}
-
 /**
  * Writes one engine parameter.
  * @param {*} engine
@@ -142,7 +137,7 @@ function writeEngineValue(engine, module, definitions, name, value) {
   }
   const result = engine.setParameter(name, stored);
   if (result === module.ParamSetResult.APPLIED) return null;
-  return `"${name}" was refused: ${paramSetResultName(module, result)}`;
+  return `"${name}" was refused: ${enumConstantName(module.ParamSetResult, result)}`;
 }
 
 /**

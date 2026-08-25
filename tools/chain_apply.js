@@ -4,13 +4,10 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import { enumConstantName } from '../param_sync.js';
+
 /** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[]}} ParameterDefinition */
 /** @typedef {{document: *, descriptor_digest?: string}} CompiledDocument */
-
-/** @param {*} module @param {*} result */
-const paramSetResultName = (module, result) =>
-  Object.keys(module.ParamSetResult)
-    .find((name) => module.ParamSetResult[name] === result) ?? 'unrecognized result';
 
 /**
  * Applies a compiled chain document to the chain engine, in the one fixed
@@ -94,7 +91,8 @@ export function applyChainDocument({
     if (written === module.ParamSetResult.APPLIED) continue;
     syncEffectGui();
     invalidate();
-    return `"${parameterId}" was refused: ${paramSetResultName(module, written)}`;
+    return `"${parameterId}" was refused: `
+      + `${enumConstantName(module.ParamSetResult, written)}`;
   }
 
   syncEffectGui();
