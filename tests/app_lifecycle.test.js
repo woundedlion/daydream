@@ -516,6 +516,28 @@ function fakeTimers() {
   };
 }
 
+/**
+ * Recording stand-in for the schedule/cancel timer pair the app_lifecycle
+ * factories take: it keeps the last callback and delay handed to schedule(),
+ * hands back a fresh handle each time, and records every handle passed to
+ * cancel(). One callback is pending at a time, which is the contract these
+ * factories hold; fakeTimers above carries a queue instead.
+ * @returns {Object} The recorder, carrying the schedule/cancel pair to inject.
+ */
+function fakeScheduler() {
+  const timer = {
+    fn: null,
+    ms: null,
+    handle: 0,
+    cancelled: [],
+    schedule: (fn, ms) => { timer.fn = fn; timer.ms = ms; return ++timer.handle; },
+    cancel: (handle) => { timer.cancelled.push(handle); timer.fn = null; },
+    /** Runs the pending callback. @returns {void} */
+    fire: () => { timer.fn(); },
+  };
+  return timer;
+}
+
 test('a load that beats the deadline resolves and cancels the timer', async () => {
   const timers = fakeTimers();
 
@@ -964,7 +986,7 @@ function makeTicker({
 } = {}) {
   const requested = [];
   const state = { effect, engineReady, listIndex: 0 };
-  const timer = { fn: null, ms: null, handle: 0, cancelled: [] };
+  const timer = fakeScheduler();
   const ticker = createTestAllTicker({
     intervalMs: 1000,
     availableEffects: () => lists[state.listIndex],
@@ -974,15 +996,15 @@ function makeTicker({
       if (acceptSwitch) state.effect = name;
     },
     engineReady: () => state.engineReady,
-    schedule: (fn, ms) => { timer.fn = fn; timer.ms = ms; return ++timer.handle; },
-    cancel: (handle) => { timer.cancelled.push(handle); timer.fn = null; },
+    schedule: timer.schedule,
+    cancel: timer.cancel,
   });
   return {
     ticker,
     requested,
     state,
     timer,
-    tick: (n = 1) => { for (let i = 0; i < n; i++) timer.fn(); },
+    tick: (n = 1) => { for (let i = 0; i < n; i++) timer.fire(); },
   };
 }
 
@@ -1077,6 +1099,7 @@ test('stopping cancels the interval, and starting arms exactly one', () => {
 test('index provides every apply-notice element the sink resolves', () => {
   const queried = [];
   const byId = new Map();
+  const timer = fakeScheduler();
   const notice = createApplyNotice({
     doc: {
       getElementById: (id) => {
@@ -1085,8 +1108,8 @@ test('index provides every apply-notice element the sink resolves', () => {
         return byId.get(id);
       },
     },
-    schedule: () => 1,
-    cancel: () => {},
+    schedule: timer.schedule,
+    cancel: timer.cancel,
   });
 
   notice.show('Effect change was rejected.', 'switch'); // the write drives the lookup
@@ -1108,7 +1131,7 @@ function makeApplyNotice() {
   const dismiss = fakeElement('button');
   body.append(text, dismiss); // index.html nests both inside the body
   body.hidden = true; // index.html renders apply-notice-body hidden
-  const timer = { fn: null, ms: null, handle: 0, cancelled: [] };
+  const timer = fakeScheduler();
   const doc = {
     activeElement: null,
     getElementById: (id) => ({
@@ -1120,8 +1143,8 @@ function makeApplyNotice() {
   const notice = createApplyNotice({
     doc,
     timeoutMs: 8000,
-    schedule: (fn, ms) => { timer.fn = fn; timer.ms = ms; return ++timer.handle; },
-    cancel: (handle) => { timer.cancelled.push(handle); timer.fn = null; },
+    schedule: timer.schedule,
+    cancel: timer.cancel,
   });
   return {
     notice,
@@ -1130,17 +1153,18 @@ function makeApplyNotice() {
     text,
     dismiss,
     timer,
-    expire: () => timer.fn(),
+    expire: timer.fire,
   };
 }
 
 test('a document without the notice elements is reported once, not swallowed', () => {
   const warnings = [];
   const present = {};
+  const timer = fakeScheduler();
   const notice = createApplyNotice({
     doc: { getElementById: (id) => present[id] ?? null },
-    schedule: () => 1,
-    cancel: () => {},
+    schedule: timer.schedule,
+    cancel: timer.cancel,
     logWarning: (message) => warnings.push(message),
   });
 
