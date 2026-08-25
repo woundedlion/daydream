@@ -448,8 +448,6 @@ export function createChainStrip({
    * @returns {void}
    */
   const placePalette = (element, anchor) => {
-    if (typeof element.getBoundingClientRect !== 'function'
-      || typeof anchor.getBoundingClientRect !== 'function') return;
     const width = element.getBoundingClientRect().width;
     const viewport = doc.documentElement?.clientWidth ?? 0;
     const anchorBounds = anchor.getBoundingClientRect();

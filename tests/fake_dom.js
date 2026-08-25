@@ -314,7 +314,10 @@ function fakeStyle() {
  * The box metrics -- the client, offset and scroll widths, heights and offsets
  * -- are present and read zero, as they do for an element no layout has
  * measured. They are plain writable fields, so a test that asserts over
- * geometry writes the numbers itself.
+ * geometry writes the numbers itself. getBoundingClientRect() reports the
+ * offset box, which is the zero rect until a test writes one, so a module that
+ * measures unconditionally -- as it may, every Element carrying the method --
+ * takes the same path here as in a browser.
  *
  * childNodes lists every inserted node; children is the elements-only view, as
  * in the DOM, so a string append lands in one and not the other. append()
@@ -552,6 +555,15 @@ export function fakeElement(tag = 'div', options = {}) {
         }
       }
       return dispatched;
+    },
+    getBoundingClientRect() {
+      return {
+        x: this.offsetLeft, y: this.offsetTop,
+        left: this.offsetLeft, top: this.offsetTop,
+        right: this.offsetLeft + this.offsetWidth,
+        bottom: this.offsetTop + this.offsetHeight,
+        width: this.offsetWidth, height: this.offsetHeight,
+      };
     },
     focus() {
       this.focusCalls++;

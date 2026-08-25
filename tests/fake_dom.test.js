@@ -356,6 +356,24 @@ test('a removal with no listener behind it throws unless the fixture opts out', 
   assert.deepEqual(lenient.listeners, [], 'the second removal put the listener back');
 });
 
+test('an unmeasured element reports the zero box every Element carries', () => {
+  const el = fakeElement('div');
+  assert.deepEqual(
+    [el.clientWidth, el.clientHeight, el.offsetWidth, el.offsetHeight,
+      el.offsetLeft, el.offsetTop, el.scrollWidth, el.scrollHeight,
+      el.scrollLeft, el.scrollTop],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(el.getBoundingClientRect(),
+    { x: 0, y: 0, left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 });
+});
+
+test('getBoundingClientRect reports the offset box a test writes', () => {
+  const el = fakeElement('div');
+  Object.assign(el, { offsetLeft: 40, offsetTop: 12, offsetWidth: 200, offsetHeight: 30 });
+  assert.deepEqual(el.getBoundingClientRect(),
+    { x: 40, y: 12, left: 40, top: 12, right: 240, bottom: 42, width: 200, height: 30 });
+});
+
 test('style keeps only the values a browser would keep', () => {
   const el = fakeElement('div');
 
