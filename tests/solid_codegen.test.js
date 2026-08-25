@@ -78,25 +78,52 @@ function stubMesh(calls = []) {
 }
 
 /**
- * Verifies the live-preview dispatch and the C++ generator read exactly the
- * params OP_DEFS declares for every known op, in the same order — so an op that
- * gains or reorders a parameter cannot diverge silently between what the tool
- * previews and what it pastes.
+ * Verifies the live-preview dispatch reads exactly the params OP_DEFS declares
+ * for every known op, in the same order — so an op that gains or reorders a
+ * parameter cannot diverge silently between the table and the preview.
  */
-test('applyOp and generateFuncAndRecipe consume the OP_DEFS params of every known op', () => {
+test('applyOp consumes the OP_DEFS params of every known op', () => {
   assert.ok(KNOWN_OPS.size > 0);
   for (const op of KNOWN_OPS) {
-    const expected = Object.keys(OP_DEFS[op].params);
-
-    const generated = recordingOp(op);
-    generateFuncAndRecipe({ base: 'cube', ops: [generated.spec] });
-    assert.deepEqual([...generated.seen], expected,
-      `generateFuncAndRecipe reads different params than OP_DEFS declares for "${op}"`);
-
     const previewed = recordingOp(op);
     applyOp(stubMesh(), previewed.spec);
-    assert.deepEqual([...previewed.seen], expected,
+    assert.deepEqual([...previewed.seen], Object.keys(OP_DEFS[op].params),
       `applyOp reads different params than OP_DEFS declares for "${op}"`);
+  }
+});
+
+/** An in-band value for a param that differs from its OP_DEFS default. */
+const offDefault = (def) => (def.val === def.max ? def.min : def.max);
+
+/** The argument list the recipe hands one op's builder call. */
+function emittedArguments(recipe, op) {
+  const call = new RegExp(`\\.${op}\\(([^)]*)\\)`).exec(recipe);
+  assert.ok(call, `recipe emits no ${op}() call: ${recipe}`);
+  const args = call[1].trim();
+  return args === '' ? [] : args.split(',');
+}
+
+/**
+ * Verifies the C++ generator carries every declared param into the recipe it
+ * pastes: one argument per declared param, and a value the emitter drops
+ * silently would leave the recipe unchanged. The generator's shared band check
+ * reads every declared key after the emit, so a recording proxy cannot tell
+ * an emitted param from an ignored one.
+ */
+test('generateFuncAndRecipe emits the OP_DEFS params of every known op', () => {
+  assert.ok(KNOWN_OPS.size > 0);
+  for (const op of KNOWN_OPS) {
+    const defs = Object.entries(OP_DEFS[op].params);
+    const defaults = Object.fromEntries(defs.map(([key, def]) => [key, def.val]));
+    const base = generateFuncAndRecipe({ base: 'cube', ops: [{ op, params: defaults }] });
+    assert.equal(emittedArguments(base.recipe, op).length, defs.length,
+      `generateFuncAndRecipe emits the wrong argument count for "${op}"`);
+    for (const [key, def] of defs) {
+      const moved = generateFuncAndRecipe(
+        { base: 'cube', ops: [{ op, params: { ...defaults, [key]: offDefault(def) } }] });
+      assert.notDeepEqual(moved, base,
+        `generateFuncAndRecipe ignores "${key}" of "${op}"`);
+    }
   }
 });
 
