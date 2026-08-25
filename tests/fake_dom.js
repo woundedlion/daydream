@@ -311,6 +311,11 @@ function fakeStyle() {
  * style drops a value its property does not take and refuses a dashed property
  * name, so neither reads back as written.
  *
+ * The box metrics -- the client, offset and scroll widths, heights and offsets
+ * -- are present and read zero, as they do for an element no layout has
+ * measured. They are plain writable fields, so a test that asserts over
+ * geometry writes the numbers itself.
+ *
  * childNodes lists every inserted node; children is the elements-only view, as
  * in the DOM, so a string append lands in one and not the other. append()
  * accepts strings as text nodes; appendChild() takes a node and throws on
@@ -356,6 +361,21 @@ export function fakeElement(tag = 'div', options = {}) {
     parentNode: null,
     focusCalls: 0,
     scrollIntoViewCalls: 0,
+    // The box metrics, as an element no layout has measured reports them.
+    // Nothing here derives one from another: a test that asserts over geometry
+    // writes the numbers it is about, and everything else reads zero.
+    clientWidth: 0,
+    clientHeight: 0,
+    clientTop: 0,
+    clientLeft: 0,
+    offsetWidth: 0,
+    offsetHeight: 0,
+    offsetTop: 0,
+    offsetLeft: 0,
+    scrollWidth: 0,
+    scrollHeight: 0,
+    scrollTop: 0,
+    scrollLeft: 0,
     // Derived from the parent chain, as in the DOM: a node whose ancestor left
     // its parent is disconnected along with it, and a node that never reached
     // the page is disconnected until it is appended somewhere that has.
