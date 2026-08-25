@@ -153,17 +153,17 @@ export function addParamControl(
   controller.isEnum = (kind === 'enum');
   controller.isContinuous = (kind === 'number' || kind === 'integer');
   if (p.warning) {
-    // Assistive technology reads aria-invalid and aria-describedby off the
-    // widget, not off the wrapper the control is drawn in, and reaches the
-    // warning text only through a node — a title attribute is mouse-only.
+    // A visible node beside the control: a title attribute would put the text
+    // behind a hover no keyboard or touch user can reach. aria-invalid and
+    // aria-describedby go on the widget carrying the control's role, not on
+    // the wrapper it is drawn in.
     const widget = focusWidget(controller) ?? controller.domElement;
     const note = controller.domElement.ownerDocument.createElement('span');
     note.id = paramWarningId(p.name);
-    note.className = 'visually-hidden';
+    note.className = 'param-warning-note';
     note.textContent = p.warning;
     controller.domElement.appendChild(note);
     controller.domElement.classList.add('param-warning');
-    controller.domElement.setAttribute('title', p.warning);
     widget.setAttribute('aria-invalid', 'true');
     widget.setAttribute('aria-describedby', note.id);
   }

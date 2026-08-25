@@ -834,6 +834,23 @@
   text-shadow: 0 0 2px var(--page-bg);
 }
 
+/* The engine's refusal note. It takes a line of its own under the control:
+   the desktop layout makes .lil-controller display: contents, so the note is
+   a grid item spanning both columns, and the mobile flex row wraps it. */
+.gui-container .effect-gui .lil-controller.param-warning {
+  flex-wrap: wrap;
+}
+
+.gui-container .effect-gui .param-warning-note {
+  grid-column: 1 / -1;
+  width: 100%;
+  color: var(--warning-text);
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: normal;
+  padding: 2px 0 4px;
+}
+
 div.labelLayer {
   pointer-events: none;
   position: absolute;
