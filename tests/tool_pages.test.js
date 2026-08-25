@@ -15,9 +15,8 @@ const headOf = (src) => src.slice(src.indexOf('<head>'), src.indexOf('</head>'))
 
 test('every tool page inherits the reduced-motion stylesheet fence', () => {
   const css = read('tools', 'tools.css');
-  assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
-  assert.match(css, /animation: none !important/);
-  assert.match(css, /transition: none !important/);
+  assert.match(css,
+    /@media \(prefers-reduced-motion: reduce\) \{[^{}]*\{[^{}]*animation: none !important;[^{}]*transition: none !important;/);
   for (const page of PAGES)
     assert.match(headOf(pageSrc(page)), /href="tools\.css"/, page);
 });
