@@ -6,6 +6,7 @@
 import { refreshPixelView as computePixelView } from "./pixel_view.js";
 
 /** @typedef {import('./holosphere_wasm.js').HolosphereEngine} HolosphereEngine */
+/** @typedef {import('./holosphere_wasm.js').HolosphereModule} HolosphereModule */
 
 /**
  * Owns the main-thread WASM engine and its reassignable display state. The pixel
@@ -20,7 +21,7 @@ export class EngineHost {
    *   display aliases (kept out of this module so it stays DOM/Three-free).
    */
   constructor(onViewRefreshed = () => {}) {
-    /** @type {Object|null} */
+    /** @type {HolosphereModule|null} */
     this.module = null;
     /** @type {HolosphereEngine|null} */
     this.engine = null;
@@ -51,8 +52,7 @@ export class EngineHost {
    */
   moduleDead() {
     if (this.dead) return true;
-    const module = /** @type {{HS_MODULE_DEAD?: boolean}|null} */ (this.module);
-    this.dead = module?.HS_MODULE_DEAD === true;
+    this.dead = this.module?.HS_MODULE_DEAD === true;
     return this.dead;
   }
 
