@@ -67,6 +67,18 @@ const DEACTIVATED_TITLE = 'Deactivated by the current topology selection';
 const MIN_SCROLL_STEP = 160;
 const SCROLL_STEP_RATIO = 0.75;
 
+/**
+ * A socket's function name, by the carrier the crossing produces. A band holds
+ * at most one socket and no two bands produce the same carrier, so these stay
+ * distinct within a strip.
+ * @type {Record<string, {name: string, accessibleName: string}>}
+ */
+const SOCKET_FUNCTIONS = {
+  plane: { name: 'Projection', accessibleName: 'Projection' },
+  field: { name: 'Source', accessibleName: 'Source function' },
+  color: { name: 'Color', accessibleName: 'Color' },
+};
+
 /** @param {string} value @returns {string} The kebab-case value, title-cased. */
 const titleCase = (value) => value.split('-')
   .map((word) => (word.length === 0 ? word : word[0].toUpperCase() + word.slice(1)))
@@ -896,13 +908,13 @@ export function createChainStrip({
 
     if (crossing) {
       const functionLabel = el('label', 'chain-chip-function-label');
-      const functionName = op.input === 'sphere' && op.output === 'plane'
-        ? 'Projection'
-        : op.input === 'plane' && op.output === 'field' ? 'Source' : 'Color';
-      functionLabel.textContent = `${functionName}: `;
+      const socketFunction = SOCKET_FUNCTIONS[op.output] ?? {
+        name: titleCase(op.output),
+        accessibleName: `${titleCase(op.output)} function`,
+      };
+      functionLabel.textContent = `${socketFunction.name}: `;
       const replacement = el('select', 'chain-chip-replace');
-      replacement.setAttribute('aria-label', functionName === 'Source'
-        ? 'Source function' : functionName);
+      replacement.setAttribute('aria-label', socketFunction.accessibleName);
       for (const legality of store.legalReplacements(index, 1)
         .filter((candidate) => candidate.legal)) {
         const option = el('option', 'chain-chip-replace-option');
