@@ -629,7 +629,9 @@
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none; /* Firefox */
-    padding: 0 6px;
+    /* overflow-y is hidden because overflow-x scrolls, so the vertical padding
+       is what keeps the 2px focus ring at its 2px offset out of the clip. */
+    padding: 4px 6px;
   }
 
   .effect-list::-webkit-scrollbar {

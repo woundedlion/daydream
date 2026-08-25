@@ -39,6 +39,10 @@ const OPTION = '.effect-button';
 const ARROW_LEFT = '.scroll-arrow-left';
 const ARROW_RIGHT = '.scroll-arrow-right';
 
+// What the :focus-visible rule in styles/index.css paints outside an option:
+// a 2px ring at a 2px offset.
+const RING_CLEARANCE = 4;
+
 /** @param {import('puppeteer-core').Page} tab */
 const scrollerMetrics = (tab) => tab.$eval(SCROLLER, (node) => ({
   scrollTop: node.scrollTop,
@@ -257,6 +261,18 @@ async function probeSidebar(tab) {
   await tab.keyboard.press('ArrowLeft');
   const back = await focusedIndex(tab);
   check(back === 0, `ArrowLeft crosses back (option ${back})`);
+
+  // overflow-y is hidden on the column-flow list, so the focus ring survives
+  // only where the list's padding leaves it room above and below the option.
+  const ring = await tab.$eval(LIST, (list) => {
+    const box = /** @type {HTMLElement} */ (document.activeElement)
+      .getBoundingClientRect();
+    const track = list.getBoundingClientRect();
+    return { above: box.top - track.top, below: track.bottom - box.bottom };
+  });
+  check(ring.above >= RING_CLEARANCE && ring.below >= RING_CLEARANCE,
+    `the focus ring clears the clip (${ring.above}px above, ${ring.below}px `
+      + `below, ${RING_CLEARANCE}px needed)`);
 
   // Focusing an option in a clipped column scrolls it into view, so the arrow
   // checks re-seat the offset rather than assuming it survived.
