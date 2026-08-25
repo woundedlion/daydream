@@ -103,7 +103,7 @@ export function enumChoices(options) {
 /**
  * Whether the cached param-name list has drifted out of length with the engine's
  * per-frame value stream. A skew means the two can no longer be paired by index,
- * so syncGUI() and export() must skip rather than mis-bind sliders.
+ * so sync() and exportParams() must skip rather than mis-bind sliders.
  * @param {number} namesLength - Length of the effect's cached paramNames list.
  * @param {number} valuesLength - Length of the engine's live value stream.
  * @returns {boolean} True when the lengths differ (do not pair them).

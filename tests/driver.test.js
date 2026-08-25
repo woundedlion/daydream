@@ -526,7 +526,7 @@ test('stepSimulation flags the color upload on a normal frame', () => {
 
 test('stepSimulation adds no upload flag when a mid-frame heap growth detached the view', () => {
   const ctx = stepCtx(new Uint16Array(4));
-  // daydream.js's adapter flags the upload, then syncGUI() -> getParamValues()
+  // daydream.js's adapter flags the upload, then sync() -> getParamValues()
   // grows the heap and detaches the view it just flagged.
   const effect = {
     drawFrame: () => {
