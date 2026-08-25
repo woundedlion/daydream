@@ -15,7 +15,7 @@ const {
   PaletteV4, defaultPaletteRecipe, paletteRecipeFromControls,
   PALETTE_CONTROL_IDS, paletteControlReadings, paletteControlsFromRecipe,
   paletteEnumName, paletteEnumOrdinal,
-  PALETTE_RECIPE_PRESETS,
+  PALETTE_RECIPE_PRESETS, loopSweepTurns,
   paletteRecipeAvailability, wrapTurns, signedTurnDelta, equivalentTurnNear,
   hitTestHueKeyMarker, oklchLinearRgb, maxSrgbGamutChroma,
   hueKeyState, customHueKeyState, customHueTurns, moveCustomHueKey,
@@ -505,6 +505,20 @@ test('a falloff start and a loop sweep are canonicalized by domain', () => {
   const open = paletteRecipeFromControls(defaultPaletteRecipe(),
     { ...CONTROL_READINGS, hueMode: 'SWEEP' });
   assert.equal(open.hue.sweepTurns, 2.5);
+});
+
+/** The sweep slider steps by half a turn, so both halves of a tie are reachable. */
+test('a loop sweep rounds half away from zero, as the engine does', () => {
+  assert.equal(loopSweepTurns(0.5), 1);
+  assert.equal(loopSweepTurns(-0.5), -1);
+  assert.equal(loopSweepTurns(2.5), 3);
+  assert.equal(loopSweepTurns(-2.5), -3);
+  assert.equal(loopSweepTurns(-1.4), -1);
+  assert.equal(loopSweepTurns(0), 0);
+
+  const reversed = paletteRecipeFromControls(defaultPaletteRecipe(),
+    { ...CONTROL_READINGS, domain: 'LOOP', hueMode: 'SWEEP', sweepTurns: -0.5 });
+  assert.equal(reversed.hue.sweepTurns, -1);
 });
 
 test('an axis endpoint pair becomes its center and range', () => {

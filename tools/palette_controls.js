@@ -758,6 +758,19 @@ export function paletteEnumOrdinal(group, name) {
 }
 
 /**
+ * The whole-turn sweep a LOOP domain closes on. The engine rejects a fractional
+ * loop sweep rather than rounding it (core/color/generative_palette.h
+ * canonicalize), so the sweep slider's half-notches are rounded here first — as
+ * roundf rounds, half away from zero. Math.round would send -0.5 to a zero-turn
+ * loop where +0.5 gives a whole turn.
+ * @param {number} turns - The authored sweep, in turns.
+ * @returns {number} The nearest whole turn, ties away from zero.
+ */
+export function loopSweepTurns(turns) {
+  return Math.sign(turns) * Math.round(Math.abs(turns));
+}
+
+/**
  * Marshals the generative tab's control readings into a V4 recipe.
  *
  * Every C++ recipe export and every preview repaint goes through this, and the
@@ -819,12 +832,11 @@ export function paletteRecipeFromControls(template, controls) {
   }
   // A fully saturated center leaves no room to pull back into gamut.
   if (recipe.chroma.center === 1) recipe.chroma.headroom = 1;
-  // The engine canonicalizes both: a falloff start outside a FALLOFF domain, and
-  // a loop closed by a fractional sweep, which it rejects rather than rounds.
+  // The engine canonicalizes a falloff start outside a FALLOFF domain.
   if (recipe.domain !== PaletteV4.domain.FALLOFF) recipe.falloffStart = 0.9;
   if (recipe.domain === PaletteV4.domain.LOOP &&
       recipe.hue.mode === PaletteV4.hueMode.SWEEP) {
-    recipe.hue.sweepTurns = Math.round(recipe.hue.sweepTurns);
+    recipe.hue.sweepTurns = loopSweepTurns(recipe.hue.sweepTurns);
   }
   return recipe;
 }
