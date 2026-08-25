@@ -212,8 +212,8 @@ function defaultDownload(doc, filename, source) {
   downloadBlob(doc, new Blob([source], { type: 'application/json' }), filename);
 }
 
-/** Owns document import, validation, preview selection, editing, and export UI. */
 /**
+ * Owns document import, validation, preview selection, editing, and export UI.
  * @param {{doc: Document, getEngine: () => *, getModule: () => *,
  * selectEffect: (effect: string) => boolean,
  * syncEffectGui: () => void, invalidate: () => void,
