@@ -457,8 +457,7 @@ export function start({
 
       const loadingOverlay = doc.getElementById('loading-overlay');
       // The module is loaded and the engine is built, so a refused initial apply
-      // is a state failure, not a load failure: report it as its own thing and
-      // leave the page (and its teardown) standing.
+      // is a state failure, not a load failure: report it as its own thing.
       try {
         applyInitialState(
           () => apply.applyResolution(true),
@@ -482,6 +481,9 @@ export function start({
           const detailText = (err && err.message) ? err.message : String(err);
           showFatalError(`${title} ${detailText}`);
         }
+        // The rejected apply has already moved the engine, pool, driver and
+        // sidebar; the panels would stay live over a blanked canvas.
+        appTeardown?.dispose();
       }
     },
     discardStartup: () => {
