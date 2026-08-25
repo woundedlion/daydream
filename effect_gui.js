@@ -278,10 +278,18 @@ export function createEffectGui({
   /** Storage key for the last engine-accepted value of one parameter. */
   const acceptedStorageKey = (name) => `__accepted.${name}`;
 
-  /** Persist the active effect through its snapshot or accepted-value surface. */
-  function persistEffectState(gui, parameterName = null) {
+  /**
+   * Persist the active effect through its snapshot or accepted-value surface.
+   * @param {Object} gui - The effect GUI holding the stored values.
+   * @param {{name: string, accepted: *}} [edited] - The one parameter an edit
+   *   moved, carrying the value the write settled on. Narrowing to it keeps a
+   *   per-keystroke persist off the whole-definition marshal.
+   * @returns {void}
+   */
+  function persistEffectState(gui, edited = undefined) {
     if (!usesFullConfigSnapshot()) {
-      persistAcceptedParams(gui, parameterName);
+      if (edited === undefined) persistAcceptedParams(gui);
+      else persistAcceptedParam(gui, edited.name, edited.accepted);
       return;
     }
     const snapshot = getFullConfigSnapshot();
@@ -320,18 +328,19 @@ export function createEffectGui({
     showConfigImportNotice(notice || null);
   }
 
-  /** Store engine-accepted values, optionally narrowed to one parameter. */
-  function persistAcceptedParams(gui, parameterName = null) {
+  /** Store one parameter's engine-accepted value. */
+  function persistAcceptedParam(gui, name, accepted) {
+    // The float form, not the raw value: restoreAcceptedParams() reads the
+    // companion key back through the URL number grammar, which rejects a bool.
+    gui.writeStoredValue(acceptedStorageKey(name), engineParamValue(accepted));
+  }
+
+  /** Store every writable parameter's engine-accepted value. */
+  function persistAcceptedParams(gui) {
     for (const parameter of getParameterDefinitions()) {
-      if (parameter.readonly || (parameterName !== null && parameter.name !== parameterName)) {
-        continue;
-      }
-      const accepted = parameter.acceptedValue
-        ?? parameter.requestedValue ?? parameter.value;
-      // The float form, not the raw value: restoreAcceptedParams() reads the
-      // companion key back through the URL number grammar, which rejects a bool.
-      gui.writeStoredValue(
-        acceptedStorageKey(parameter.name), engineParamValue(accepted));
+      if (parameter.readonly) continue;
+      persistAcceptedParam(gui, parameter.name, parameter.acceptedValue
+        ?? parameter.requestedValue ?? parameter.value);
     }
   }
 
@@ -768,10 +777,9 @@ export function createEffectGui({
    * drain. Releasing the pointer also runs the persistence the drag deferred.
    * @param {Object} fx - The effect record owning the controller.
    * @param {Object} controller - The controller to track.
-   * @param {string} parameterName - Engine parameter bound to the controller.
    * @returns {void}
    */
-  function trackDragState(fx, controller, parameterName) {
+  function trackDragState(fx, controller) {
     controller.domElement.addEventListener('pointerdown', () => {
       controller.dragging = true;
       const end = () => {
@@ -779,9 +787,10 @@ export function createEffectGui({
         dragTarget.removeEventListener('pointerup', end);
         dragTarget.removeEventListener('pointercancel', end);
         fx.activeDragEnds.delete(end);
-        if (!fx.persistDeferred) return;
-        fx.persistDeferred = false;
-        persistEffectState(fx.gui, parameterName);
+        const edited = fx.persistDeferred;
+        if (edited === null) return;
+        fx.persistDeferred = null;
+        persistEffectState(fx.gui, edited);
       };
       fx.activeDragEnds.add(end);
       dragTarget.addEventListener('pointerup', end);
@@ -929,7 +938,7 @@ export function createEffectGui({
         return;
       }
       fx.writableParamNames.push(p.name);
-      if (controller.isContinuous) trackDragState(fx, controller, p.name);
+      if (controller.isContinuous) trackDragState(fx, controller);
 
       const kind = paramControlKind(p);
       let acceptedControlValue = p.acceptedValue ?? p.value;
@@ -940,11 +949,12 @@ export function createEffectGui({
         const value = engineParamValue(v);
         if (setEngineParam(p.name, value) !== false) acceptedControlValue = v;
         controller.acceptUrlValue?.(acceptedControlValue);
+        const edited = { name: p.name, accepted: acceptedControlValue };
         // A drag emits one onChange per pointermove and full-config persistence
         // marshals and serializes the whole snapshot, so it waits for the pointer
         // release, which sees the same state the last move would have.
-        if (controller.dragging) fx.persistDeferred = true;
-        else persistEffectState(fx.gui, p.name);
+        if (controller.dragging) fx.persistDeferred = edited;
+        else persistEffectState(fx.gui, edited);
         setWorkerParam(p.name, value);
         adoptEnginePause(pause, p);
         fx.warningsDirty = true;
@@ -971,7 +981,7 @@ export function createEffectGui({
       gui: createGui(),
       activeDragEnds: new Set(),
       animationPauseApplied: false,
-      persistDeferred: false,
+      persistDeferred: null,
       warningsDirty: false,
     };
 

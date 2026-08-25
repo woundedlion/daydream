@@ -2649,6 +2649,25 @@ test('a parameter edit persists only that parameter\'s accepted value', () => {
   assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', 0.4]]);
 });
 
+test('a per-keystroke persist re-reads no parameter definitions', () => {
+  const speed = { ...SPEED };
+  const h = makeHarness({
+    params: [speed, { ...GLOW }],
+    onEngineParam: (name, value) => {
+      if (name === speed.name) speed.value = value;
+    },
+  });
+  h.panel.build();
+  const before = h.paramDefinitionReads();
+
+  h.gui().ctrl('Speed').setValue(0.4);
+  h.gui().ctrl('Speed').setValue(0.5);
+
+  assert.equal(h.paramDefinitionReads(), before);
+  assert.deepEqual(h.gui().storedWrites.slice(-2),
+    [['__accepted.Speed', 0.4], ['__accepted.Speed', 0.5]]);
+});
+
 test('a refused parameter edit keeps the accepted deep-link value', () => {
   const speed = {
     name: 'Speed', value: 0.2, requestedValue: 0.2, acceptedValue: 0.2,
