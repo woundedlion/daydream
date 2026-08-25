@@ -23,7 +23,7 @@ import {
   proceduralPaletteCpp, proceduralParamsForViewport,
   generativePaletteCpp, setPaletteOps,
   NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
-  paletteGradientCss, prettyPaletteName,
+  paletteGradientCss, prettyPaletteName, paletteAdjustmentSummary,
 } from './palette_math.js';
 // DOM-free interaction and recipe state live in palette_controls.js; the
 // DOM reads and writes around them stay inline.
@@ -1027,7 +1027,9 @@ function updatePalette() {
   } else {
     try {
       palette = new GenerativePalette(readPaletteRecipe());
-      document.getElementById('gen_status').textContent = 'Recipe valid';
+      const adjusted = paletteAdjustmentSummary(palette.status);
+      document.getElementById('gen_status').textContent =
+        adjusted ? `Recipe valid — ${adjusted}` : 'Recipe valid';
     } catch (error) {
       if (engineTrapped(error)) return;
       document.getElementById('gen_status').textContent = error.message;

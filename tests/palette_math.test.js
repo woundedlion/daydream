@@ -7,7 +7,8 @@ const {
   proceduralPaletteCpp, proceduralParamsForViewport,
   generativePaletteCpp, setPaletteOps,
   NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
-  paletteCompileError, COMPILE_CODE_NAMES, RECIPE_FIELD_NAMES,
+  paletteCompileError, paletteAdjustmentSummary,
+  COMPILE_CODE_NAMES, RECIPE_FIELD_NAMES,
   prettyPaletteName, paletteGradientCss,
 } = await import('../tools/palette_math.js');
 const { defaultPaletteRecipe, PaletteV4 } = await import('../tools/palette_controls.js');
@@ -370,6 +371,25 @@ test('paletteCompileError names the engine enumerators', () => {
     'Palette recipe error unnamed 99 at field unnamed 200');
   for (const name of COMPILE_CODE_NAMES) assert.match(name, /^[A-Z][A-Z0-9_]*$/);
   for (const name of RECIPE_FIELD_NAMES) assert.match(name, /^[A-Z][A-Z0-9_]*$/);
+});
+
+/**
+ * A compile that succeeded after rewriting the recipe has to say which fields
+ * it rewrote. INPUT_OFFSET and INPUT_SPAN sit past bit 31, where a bitwise read
+ * of the mask would drop them.
+ */
+test('paletteAdjustmentSummary names every adjusted field', () => {
+  assert.equal(paletteAdjustmentSummary(
+    { wrappedFields: 0, clampedFields: 0, canonicalizedFields: 0 }), '');
+  assert.equal(paletteAdjustmentSummary({}), '');
+  assert.equal(paletteAdjustmentSummary({
+    wrappedFields: 2 ** 7,
+    clampedFields: 2 ** 15 + 2 ** 33 + 2 ** 34,
+    canonicalizedFields: 2 ** 31,
+  }), 'wrapped BASE_TURNS; clamped LIGHTNESS_CENTER, INPUT_OFFSET, INPUT_SPAN; '
+    + 'canonicalized FALLOFF_START');
+  assert.equal(paletteAdjustmentSummary({ wrappedFields: 2 ** 40 }),
+    'wrapped unnamed 40');
 });
 
 test('GenerativePalette uses the canonical recipe and exposes diagnostics', () => {

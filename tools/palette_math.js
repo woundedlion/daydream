@@ -326,6 +326,43 @@ export function paletteCompileError(status) {
 }
 
 /**
+ * The recipe fields one PaletteAdjustments bitmask names.
+ * @param {number} mask - A bitmask over PaletteRecipeField, bit per ordinal.
+ * @returns {string[]} The engine's enumerator name per set bit, in ordinal
+ *   order; a bit past the roster reads as an unnamed ordinal.
+ */
+function adjustedFieldNames(mask) {
+  const names = [];
+  // INPUT_OFFSET and INPUT_SPAN sit past bit 31, so the mask is read as a
+  // double: the bitwise operators would truncate it to 32 bits.
+  for (let field = 0; 2 ** field <= mask; field += 1) {
+    if (Math.floor(mask / 2 ** field) % 2 !== 1) continue;
+    names.push(RECIPE_FIELD_NAMES[field] ?? `unnamed ${field}`);
+  }
+  return names;
+}
+
+/**
+ * Names the silent normalizations a compile applied, so a rewritten recipe does
+ * not read as the one the controls hold.
+ * @param {{wrappedFields?: number, clampedFields?: number, canonicalizedFields?: number}} status - The compiler's status.
+ * @returns {string} One clause per non-empty adjustment mask, or the empty
+ *   string when the compiler changed nothing.
+ */
+export function paletteAdjustmentSummary(status) {
+  const clauses = [];
+  for (const [verb, mask] of /** @type {[string, number|undefined][]} */ ([
+    ['wrapped', status.wrappedFields],
+    ['clamped', status.clampedFields],
+    ['canonicalized', status.canonicalizedFields],
+  ])) {
+    const names = adjustedFieldNames(mask ?? 0);
+    if (names.length) clauses.push(`${verb} ${names.join(', ')}`);
+  }
+  return clauses.join('; ');
+}
+
+/**
  * Compiles a recipe with the engine and copies its aliased module buffers. The
  * bridge returns views onto WASM memory, which the next call reuses, so the
  * results are copied out before they can be overwritten.
@@ -358,7 +395,8 @@ export function compilePaletteRecipe(recipe, inspect = true) {
  */
 export class GenerativePalette {
   /**
-   * Compiles the recipe and keeps the baked LUT and diagnostics.
+   * Compiles the recipe and keeps the baked LUT, diagnostics and the
+   * compile status, which names the normalizations the compiler applied.
    * @param {PaletteRecipe} recipe - A V4 palette recipe.
    * @throws {Error} When the recipe does not compile, carrying the status code and field.
    */
@@ -366,6 +404,7 @@ export class GenerativePalette {
     const result = compilePaletteRecipe(recipe, true);
     if (result.status.code !== 0) throw new Error(paletteCompileError(result.status));
     this.canonicalRecipe = result.canonicalRecipe;
+    this.status = result.status;
     // A successful inspect bake always carries all three buffers.
     this.lut = /** @type {Uint8Array} */ (result.lut);
     this.diagnostics = /** @type {Float32Array} */ (result.diagnostics);
