@@ -6,6 +6,9 @@ import {
   MEMORY_BUFFER_LIMIT_BYTES, PICKER_GRACE_SECONDS, selectMimeType, VideoRecorder,
 } from '../recorder.js';
 
+/** Fixed local wall-clock time so the timestamped file name is exact. */
+const SAVE_CLOCK = new Date(2026, 0, 2, 3, 4, 5);
+
 /**
  * Builds a fake isTypeSupported probe that accepts only the listed MIME types,
  * so each test can pin down exactly which codecs the "browser" advertises.
@@ -1368,9 +1371,6 @@ const installSavePath = () => {
   };
   return spy;
 };
-
-/** Fixed local wall-clock time so the timestamped file name is exact. */
-const SAVE_CLOCK = new Date(2026, 0, 2, 3, 4, 5);
 
 /**
  * Without the File System Access API a stopped session buffers its chunks, packs
