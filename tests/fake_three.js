@@ -3,7 +3,8 @@
 // surface tools/shared.js constructs plus the buffer-attribute double the
 // suites that drive the dot mesh share. three_loader_hooks.js redirects both
 // specifiers here, so shared.js gets these classes and the test importing this
-// module shares their `log`.
+// module shares their `log`. tests/three_contract.test.js pins this surface
+// against the real three.
 
 // Ordered teardown sink. Only the dispose paths append to it.
 export const log = [];
@@ -133,16 +134,18 @@ export class AmbientLight extends Object3D {}
 export class DirectionalLight extends Object3D {}
 export class SpotLight extends Object3D {}
 
+// The state names are three's own (`object`, `_domElementKeyEvents`), so a test
+// reading them reads what a browser would. `updates` is this double's counter.
 export class OrbitControls {
   /** @param {PerspectiveCamera} camera @param {Object} domElement */
   constructor(camera, domElement) {
-    this.camera = camera;
+    this.object = camera;
     this.domElement = domElement;
-    this.keyEventsElement = null;
+    this._domElementKeyEvents = null;
     this.updates = 0;
   }
   /** @param {Object} domElement */
-  listenToKeyEvents(domElement) { this.keyEventsElement = domElement; }
+  listenToKeyEvents(domElement) { this._domElementKeyEvents = domElement; }
   update() { this.updates += 1; }
-  dispose() { this.keyEventsElement = null; log.push('controls.dispose'); }
+  dispose() { this._domElementKeyEvents = null; log.push('controls.dispose'); }
 }
