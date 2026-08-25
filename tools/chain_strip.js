@@ -83,7 +83,7 @@ const SOCKET_FUNCTIONS = {
 };
 
 /** @param {string} value @returns {string} The kebab-case value, title-cased. */
-const titleCase = (value) => value.split('-')
+export const titleCase = (value) => value.split('-')
   .map((word) => (word.length === 0 ? word : word[0].toUpperCase() + word.slice(1)))
   .join(' ');
 
