@@ -248,10 +248,17 @@ export interface MeshFaces {
  * STALE_WRAPPER.
  */
 export interface MeshHandle {
-  /** x/y/z per vertex, as a view over the module's memory. */
+  /**
+   * Flat x/y/z per vertex, copied out of module memory: the array stays valid
+   * after delete() and clearToolingMemory().
+   */
   getVertices(): Float32Array | null;
+  /** Copied out of module memory, on the same terms as getVertices(). */
   getFaces(): MeshFaces | null;
-  /** One classification code per face. */
+  /**
+   * One classification code per face, copied out of module memory on the same
+   * terms as getVertices().
+   */
   classifyFaces(): Int32Array | null;
   kis(): MeshHandle | null;
   ambo(): MeshHandle | null;
