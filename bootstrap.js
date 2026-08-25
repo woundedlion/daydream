@@ -3,19 +3,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-import { showFatalError } from './tools/banner.js';
-
-/**
- * @param {unknown} error Thrown value.
- * @returns {string} Plain-text failure detail.
- */
-export function errorDetail(error) {
-  if (error && typeof error === 'object' && 'message' in error &&
-      typeof error.message === 'string') {
-    return error.message;
-  }
-  return String(error);
-}
+import { errorDetail, showFatalError } from './tools/banner.js';
 
 // The vendored libraries index.html loads from the CDN, and the remedy for a
 // page that cannot reach it. refreshModuleCache is same-origin only, so a
