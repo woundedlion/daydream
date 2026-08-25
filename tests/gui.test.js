@@ -697,6 +697,19 @@ test('DeepLinkGUI keeps a folder key prefix stable across a later same-name sibl
   assert.deepEqual(second.collectUrlKeys(), ['Shape#1.sides']);
 });
 
+test('a display folder does not push a later real folder off its own key', () => {
+  installWindow('');
+  const root = new DeepLinkGUI({ autoPlace: false });
+  const display = root.addDisplayFolder('Shape');
+  display.add({ sides: 3 }, 'sides', 0, 10);
+
+  const real = root.addFolder('Shape');
+  real.add({ glow: false }, 'glow');
+
+  assert.deepEqual(display.collectUrlKeys(), ['sides']);
+  assert.deepEqual(real.collectUrlKeys(), ['Shape.glow']);
+});
+
 /**
  * Verifies the tool-page fallback writer (no active URLSync) merges, not
  * overwrites, params changed within the debounce window: two keys set before
