@@ -321,9 +321,8 @@ export class SegmentController {
       this.composite();
       // No simulation tick stands behind this composite, and Three re-uploads
       // the instance colours only on a version bump.
-      const instanceColor = this.driver.dotMesh?.instanceColor;
-      if (instanceColor && isViewLive(instanceColor.array))
-        instanceColor.needsUpdate = true;
+      const instanceColor = this.driver.dotMesh.instanceColor;
+      if (isViewLive(instanceColor.array)) instanceColor.needsUpdate = true;
     }
     this.driver.invalidate();
   }
