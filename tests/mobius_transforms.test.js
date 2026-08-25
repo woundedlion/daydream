@@ -202,8 +202,6 @@ test('glslProjectionFunctions constants match the JS exports', () => {
  */
 test('projection constants hold their engine values (absolute pin)', () => {
   assert.equal(STEREO_INF, 1e4, 'STEREO_INF is the engine sentinel');
-  assert.equal(STEREO_POLE_EPS, 2 / (STEREO_INF * STEREO_INF),
-    'STEREO_POLE_EPS is the pole cap derived from STEREO_INF');
   assert.equal(STEREO_POLE_EPS, 2e-8, 'STEREO_POLE_EPS value');
   assert.equal(STEREO_AZIMUTH_EPS, 1e-12, 'STEREO_AZIMUTH_EPS value');
 });
