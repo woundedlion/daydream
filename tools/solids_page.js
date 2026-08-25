@@ -50,6 +50,7 @@ import {
   createFrameScheduler, onPageTeardown, watchMediaMatch,
 } from './page_lifecycle.js';
 import { createPointerDrag } from './pointer_drag.js';
+import { downloadBlob } from './download_file.js';
 
 let camera, scene, renderer, controls;
 let meshRenderer = null;
@@ -522,16 +523,7 @@ function exportSavedSolids() {
   const blob = new Blob([JSON.stringify(savedSolids, null, 2)], {
     type: 'application/json',
   });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'daydream-solids.json';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
-  // The click consumes the blob synchronously; the URL only needs to outlive it.
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadBlob(document, blob, 'daydream-solids.json');
 }
 
 function captureSavedThumbnail() {

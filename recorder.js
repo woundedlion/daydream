@@ -21,6 +21,7 @@
  */
 
 import { FPS } from "./frame_constants.js";
+import { downloadBlob } from "./tools/download_file.js";
 
 // Chunk-delivery interval for MediaRecorder.start(); bounds encoder buffering.
 const RECORDER_TIMESLICE_MS = 1000;
@@ -751,28 +752,7 @@ export class VideoRecorder {
   download(recorder, chunks, effectName) {
     const ext = this.extension(recorder);
     const blob = new Blob(chunks, { type: this.mimeForExt(ext) });
-    this.saveWithAnchor(blob, this.timestampedName(effectName, ext));
-  }
-
-  /**
-   * Legacy save path: triggers an anchor-click download and revokes the object
-   * URL on a short timeout once the click has handed the blob to the browser's
-   * download manager.
-   * @param {Blob} blob - The recorded video data to download.
-   * @param {string} filename - File name applied to the download anchor.
-   * @returns {void}
-   */
-  saveWithAnchor(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const a = this.doc.createElement('a');
-    a.href = url;
-    a.download = filename;
-    this.doc.body.appendChild(a);
-    a.click();
-    this.doc.body.removeChild(a);
-
-    // The click consumes the blob synchronously; the URL only needs to outlive it.
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadBlob(this.doc, blob, this.timestampedName(effectName, ext));
   }
 
   /**

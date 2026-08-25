@@ -8,6 +8,7 @@ import { applyChainDocument } from './chain_apply.js';
 import { createChainDocumentStore, scratchChainDocument } from './chain_document_store.js';
 import { createChainStrip, titleCase } from './chain_strip.js';
 import { copyToClipboard } from './copy_text.js';
+import { downloadBlob } from './download_file.js';
 import {
   decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
 } from './shader_deeplink.js';
@@ -192,13 +193,7 @@ function diagnosticText(compiled) {
 
 /** @param {Document} doc @param {string} filename @param {string} source */
 function defaultDownload(doc, filename, source) {
-  const url = URL.createObjectURL(new Blob([source], { type: 'application/json' }));
-  const anchor = doc.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  // The click starts the download asynchronously; the URL has to outlive it.
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadBlob(doc, new Blob([source], { type: 'application/json' }), filename);
 }
 
 /** Owns document import, validation, preview selection, editing, and export UI. */
