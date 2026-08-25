@@ -658,7 +658,7 @@ test('LatticeMelt controls use the fixed pipeline modes as folders', () => {
   assert.deepEqual(h.warnings, [], 'every parameter reached a stage');
 });
 
-test('a staged schema fails closed when a parameter has no owner', () => {
+test('a staged schema builds an unclaimed parameter at the top level', () => {
   const params = [...latticeMeltParams(),
     { name: 'Palette Surprise', value: 0.5, min: 0, max: 1, animated: true }];
   const h = makeHarness({
@@ -666,9 +666,17 @@ test('a staged schema fails closed when a parameter has no owner', () => {
     engineValues: params.map((parameter) => parameter.value),
   });
 
-  assert.throws(() => h.panel.build(), /no pipeline stage claims Palette Surprise/);
-  assert.equal(h.panel.active(), null, 'no partially staged panel is published');
-  assert.equal(h.gui().destroyed, 1, 'the rejected panel is disposed');
+  h.panel.build();
+
+  assert.ok(h.panel.active(), 'the panel is published');
+  assert.equal(h.gui().destroyed, 0, 'the panel is not disposed');
+  assert.equal(h.gui().ctrl('Palette Surprise').folder, undefined,
+    'the orphan sits above the stage folders');
+  assert.deepEqual(params.map((parameter) => parameter.name)
+    .filter((name) => h.gui().ctrl(name).folder === undefined),
+    ['Palette Surprise'], 'every claimed parameter still reaches its stage');
+  assert.deepEqual(h.warnings,
+    ['Effect GUI: no pipeline stage claims Palette Surprise']);
 });
 
 test('KaleidoscopeSmooth controls use the fixed pipeline modes as folders', () => {

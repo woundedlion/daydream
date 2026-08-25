@@ -844,7 +844,7 @@ export function createEffectGui({
         .map((parameter) => parameter.name)
       : [];
     if (unstagedParams.length > 0) {
-      throw new Error(
+      logWarn(
         `Effect GUI: no pipeline stage claims ${unstagedParams.join(', ')}`);
     }
     const stageFolders = new Map();
