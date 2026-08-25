@@ -120,9 +120,9 @@ test('a single-engine frame renders and republishes the view', () => {
 
   assert.deepEqual(a.calls, ['engine.drawFrame', 'host.refresh']);
   assert.equal(a.driver.pixels, a.view);
-  // A refresh that hands back a fresh view raises the flag, and the frame raises
-  // it again unconditionally; three.js still uploads once per render.
-  assert.equal(a.driver.dotMesh.instanceColor.version, 2);
+  // The re-point raises the flag; the per-frame upload is the driver's, flagged
+  // there behind the live-view guard rather than raised again here.
+  assert.equal(a.driver.dotMesh.instanceColor.version, 1);
 });
 
 test('panel reconciliation is independent of drawing a simulation frame', () => {
