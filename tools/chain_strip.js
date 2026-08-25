@@ -67,6 +67,9 @@ const DEACTIVATED_TITLE = 'Deactivated by the current topology selection';
 const MIN_SCROLL_STEP = 160;
 const SCROLL_STEP_RATIO = 0.75;
 
+// Pixels one WheelEvent.DOM_DELTA_LINE notch stands for.
+const WHEEL_LINE_PX = 16;
+
 /**
  * A socket's function name, by the carrier the crossing produces. A band holds
  * at most one socket and no two bands produce the same carrier, so these stay
@@ -1134,7 +1137,16 @@ export function createChainStrip({
       const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
         ? event.deltaX : event.deltaY;
       if (delta === 0) return;
-      viewport.scrollLeft = Math.max(0, Number(viewport.scrollLeft ?? 0) + delta);
+      const width = Number(viewport.clientWidth ?? 0);
+      const overflow = Number(viewport.scrollWidth ?? 0) - width;
+      // Nothing to scroll: the wheel belongs to whatever encloses the strip.
+      if (overflow <= 0) return;
+      // deltaMode counts pixels, lines or pages; a line-mode browser sends 3
+      // where a pixel-mode one sends 100.
+      const scale = event.deltaMode === 1 ? WHEEL_LINE_PX
+        : event.deltaMode === 2 ? Math.max(MIN_SCROLL_STEP, width) : 1;
+      viewport.scrollLeft = Math.min(overflow,
+        Math.max(0, Number(viewport.scrollLeft ?? 0) + delta * scale));
       event.preventDefault();
     }, { passive: false });
     viewport.addEventListener('keydown', (/** @type {*} */ event) => {
