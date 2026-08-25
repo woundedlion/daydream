@@ -43,8 +43,8 @@ import {
 } from "./segment_controller.js";
 import { pageWarmer } from "./module_warmer.js";
 import { EngineHost } from "./engine_host.js";
-import { reportPageFailures, showFatalError } from "./tools/banner.js";
-import { errorDetail, showBootstrapFailure } from "./bootstrap.js";
+import { errorDetail, reportPageFailures, showFatalError } from "./tools/banner.js";
+import { showBootstrapFailure } from "./bootstrap.js";
 import { enumConstantName } from "./param_sync.js";
 import { copyToClipboard } from "./tools/copy_text.js";
 import { importLegacyShaderSelection, LEGACY_SHADER_ALIAS } from "./legacy_shader_import.js";

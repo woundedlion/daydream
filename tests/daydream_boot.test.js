@@ -372,7 +372,8 @@ test('a failed workbench init reports without the page-failure banner', () => {
     'init() is async and the surrounding catch only sees a synchronous throw, '
     + 'so a dropped rejection reaches the page-failure listener and covers a '
     + 'running simulator with the fatal banner');
-  assert.match(wasmReadyBlock(), /workbench could not be initialized: \$\{detailText\}`,\s*CONFIG_NOTICE/,
+  assert.match(wasmReadyBlock(),
+    /workbench could not be initialized: \$\{[^}]+\}`,\s*CONFIG_NOTICE/,
     'the workbench half must report through the shader config notice, the '
     + 'owner tag its other messages carry');
 });

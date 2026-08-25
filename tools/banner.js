@@ -12,6 +12,18 @@
  */
 
 /**
+ * @param {unknown} error - Thrown value.
+ * @returns {string} Plain-text failure detail.
+ */
+export function errorDetail(error) {
+  if (error && typeof error === 'object' && 'message' in error &&
+      typeof error.message === 'string') {
+    return error.message;
+  }
+  return String(error);
+}
+
+/**
  * Build the banner shell — a message slot and a dismiss button — and attach it
  * to the page. The banner is fixed across the top of the viewport, so the
  * dismiss button is what keeps a survivable failure from permanently occluding

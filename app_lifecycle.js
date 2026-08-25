@@ -13,7 +13,7 @@
  * Three.js, a WASM engine, or a browser.
  */
 
-import { errorDetail } from './bootstrap.js';
+import { errorDetail } from './tools/banner.js';
 
 /**
  * The driver's display aliases: the Three.js instance-colour attribute and the
