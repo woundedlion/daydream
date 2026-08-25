@@ -224,8 +224,7 @@
           "maximum": 6.2831854820251465
         },
         "interpolation": {
-          "kind": "SHORTEST_PERIODIC",
-          "period": 6.2831854820251465
+          "kind": "LINEAR"
         },
         "default": 0
       },
@@ -240,8 +239,7 @@
           "maximum": 6.2831854820251465
         },
         "interpolation": {
-          "kind": "SHORTEST_PERIODIC",
-          "period": 6.2831854820251465
+          "kind": "LINEAR"
         },
         "default": 0
       },
