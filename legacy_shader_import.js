@@ -7,8 +7,8 @@ export const LEGACY_SHADER_ALIAS = 'ShaderBall';
 
 /**
  * Maps the retired ShaderBall identity before current effect-name validation.
- * @param {string} effect - Persisted effect name.
- * @returns {{effect: string, migrated: boolean, notice?: string}} The live
+ * @param {string|null} effect - Persisted effect name, null when unset.
+ * @returns {{effect: string|null, migrated: boolean, notice?: string}} The live
  *   effect identity and whether it was migrated.
  */
 export function importLegacyShaderSelection(effect) {
