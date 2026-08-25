@@ -2790,6 +2790,25 @@ test('a refused parameter edit keeps the accepted deep-link value', () => {
   assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', 0.2]]);
 });
 
+test('a definition with no accepted value falls back to its requested target', () => {
+  const speed = {
+    name: 'Speed', value: 0.7, requestedValue: 0.2, min: 0, max: 1, animated: true,
+  };
+  const h = makeHarness({ params: [speed], onEngineParam: () => false });
+  h.panel.build();
+  h.gui().storedWrites.length = 0;
+  const controller = h.gui().ctrl('Speed');
+
+  assert.equal(controller.getValue(), 0.7, 'the control shows the rendered value');
+
+  controller.setValue(0.8);
+
+  assert.deepEqual(controller.acceptedUrlValues, [0.2],
+    'the writable target survives a refused write, not the animation frame');
+  assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', 0.2]],
+    'the rung the whole-list persist writes');
+});
+
 test('a readonly control is never drag-tracked', () => {
   const h = makeHarness({ params: [TELEMETRY] });
   h.panel.build();
