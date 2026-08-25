@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 import { shaderWorkbenchUrl, start, WORKBENCH_EFFECTS } from '../daydream.js';
 import {
-  exportShaderDocumentJson, validateShaderDocument,
+  compileShaderDocument, DEFAULT_LIMITS, exportShaderDocumentJson, validateShaderDocument,
 } from '../shader/shader_workbench.mjs';
 import { scratchChainDocument } from '../tools/chain_document_store.js';
 import {
@@ -56,6 +56,26 @@ test('shader state hashes round-trip the complete authoring state', async () => 
   assert.equal(await decodeShaderStateHash('#unrelated'), null);
   await assert.rejects(decodeShaderStateHash('#shader=v1.not-gzip'),
     /invalid shader link payload/);
+});
+
+test('a deep-linked document is held to the reader string limit', async () => {
+  const overlong = 'x'.repeat(DEFAULT_LIMITS.stringLength + 1);
+  const linked = async (/** @type {*} */ document) => {
+    const hash = await encodeShaderStateHash(
+      { document, preset: 'night', bypassed: [], paused: false });
+    const state = await decodeShaderStateHash(hash);
+    return compileShaderDocument(state.document);
+  };
+  const codes = (/** @type {*} */ compiled) =>
+    compiled.diagnostics.map((/** @type {*} */ diagnostic) => diagnostic.code);
+
+  const nested = { document_id: 'study', descriptor: { chain: [{ label: overlong }] } };
+  assert.equal((await linked(nested)).status, 'INVALID');
+  assert.deepEqual(codes(await linked(nested)), ['STRING_LIMIT']);
+  assert.deepEqual(codes(await linked({ document_id: 'study', [overlong]: 1 })),
+    ['STRING_LIMIT']);
+  // The text path is the reference the deep link has to answer with.
+  assert.deepEqual(codes(compileShaderDocument(JSON.stringify(nested))), ['STRING_LIMIT']);
 });
 
 test('shader state hash replacement preserves the route and query', () => {
