@@ -1487,6 +1487,27 @@ test('sync marshals the definitions once for an effect with an enum control', ()
   assert.equal(h.gui().ctrl('Mode').getValue(), 1, 'the requested enum is adopted');
 });
 
+test('a frame that did not step the simulation skips the definition marshal', () => {
+  const mode = {
+    name: 'Mode', value: 0, requestedValue: 0, options: ['Off', 'On'],
+    animated: true,
+  };
+  const h = makeHarness({ params: [mode, SPEED], engineValues: [0, 0.4] });
+  h.panel.build();
+  const before = h.paramDefinitionReads();
+  h.state.params = [{ ...mode, requestedValue: 1 }, SPEED];
+
+  h.panel.sync(false);
+
+  assert.equal(h.paramDefinitionReads(), before, 'the definitions are not marshalled');
+  assert.equal(h.gui().ctrl('Speed').getValue(), 0.4, 'the value stream still mirrors');
+
+  h.panel.sync(true);
+
+  assert.equal(h.gui().ctrl('Mode').getValue(), 1,
+    'a stepped frame adopts the requested enum');
+});
+
 test('sync leaves a selector the user has open alone', () => {
   const mode = {
     name: 'Mode', value: 0, requestedValue: 0, options: ['Off', 'On'],
@@ -2046,6 +2067,27 @@ test('preset navigation is available to global keyboard shortcuts', () => {
   assert.equal(h.panel.movePreset(1), true);
   assert.deepEqual(h.writes, ['preset:0', 'preset:1']);
   assert.equal(h.gui().ctrl('presetIndex').getValue(), 1);
+});
+
+test('a preset selection adopts requested enums with no stepped frame behind it', () => {
+  const mode = {
+    name: 'Mode', value: 0, requestedValue: 0, options: ['Off', 'On'],
+    animated: true,
+  };
+  const h = makeHarness({
+    params: [mode, SPEED], engineValues: [0, 0.4],
+    presetCount: 3, presetIndex: 0,
+  });
+  h.panel.build();
+  h.state.params = [{ ...mode, requestedValue: 1 }, SPEED];
+
+  h.gui().ctrl('presetIndex').setValue(2);
+
+  assert.equal(h.gui().ctrl('Mode').getValue(), 1, 'the preset selector lands at once');
+
+  h.panel.sync(false);
+
+  assert.equal(h.gui().ctrl('Mode').getValue(), 1, 'and an unstepped frame keeps it');
 });
 
 test('the preset dropdown sends its zero-indexed value', () => {

@@ -234,7 +234,8 @@ export function addParamControl(
  * @param {(message: string, error?: any) => void} [deps.logWarn] - Console sink.
  * @returns {{active: () => Object|null, liveParamValues: () => ArrayLike<number>|null,
  *   movePreset: (delta: number) => boolean, build: () => void,
- *   applyAnimationPause: () => void, mount: () => void, sync: () => void,
+ *   applyAnimationPause: () => void, mount: () => void,
+ *   sync: (advanced?: boolean) => void,
  *   destroy: () => void}}
  */
 export function createEffectGui({
@@ -455,9 +456,12 @@ export function createEffectGui({
   /**
    * Push the engine's per-frame parameter values back into the effect GUI so
    * all rendered params track live without clobbering an active drag.
+   * @param {boolean} [advanced] - Whether the simulation stepped this frame.
+   *   Only the enum-definition marshal is gated on it; every other caller wants
+   *   the full pass and leaves it defaulted.
    * @returns {void}
    */
-  function sync() {
+  function sync(advanced = true) {
     if (!activeEffect || !activeEffect.controllerByName) return;
     const presetIndex = getPresetIndex();
     // Mirroring the preset can itself load a new schema, so the rebuild follows
@@ -479,7 +483,10 @@ export function createEffectGui({
     if (!activeEffect.hasParams) return;
     // One focus read for the whole pass: at most one element has focus.
     const focused = focusedElement() ?? null;
-    adoptRequestedEnums(activeEffect, focused);
+    // getParameterDefinitions() marshals the whole definition array; requested
+    // values move only on a simulation step, so a frame that did not step reads
+    // back what the last pass already adopted.
+    if (advanced) adoptRequestedEnums(activeEffect, focused);
 
     const values = liveParamValues();
     if (!values || values.length === 0) return;
@@ -684,6 +691,9 @@ export function createEffectGui({
         persistEffectState(fx.gui);
         adoptPresetDisplay(fx, count, index);
         adoptPauseDisplay(fx, engineAnimationsPaused() ?? true);
+        // The preset writes requested enum values with no simulation step behind
+        // it, which is the one source sync()'s stepped-frame gate does not cover.
+        adoptRequestedEnums(fx, focusedElement() ?? null);
         return true;
       };
       preset.onChange(choose);
