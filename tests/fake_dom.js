@@ -208,6 +208,9 @@ const STYLE_VALUES = {
 // dropped declaration, so none may read back here.
 const STYLE_REJECTED = /undefined|NaN|Infinity|\[object [A-Za-z]*\]/;
 const FOCUSABLE_TAGS = new Set(['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA']);
+// Tags carrying a `disabled` IDL attribute, which reads false until written.
+const DISABLEABLE_TAGS = new Set(
+  ['BUTTON', 'FIELDSET', 'INPUT', 'OPTGROUP', 'OPTION', 'SELECT', 'TEXTAREA']);
 
 /**
  * Whether every parenthesis in a declaration closes, as a parser needs before
@@ -569,6 +572,7 @@ export function fakeElement(tag = 'div', options = {}) {
     configurable: true,
     value: fakeDataset(element),
   });
+  if (DISABLEABLE_TAGS.has(element.tagName)) element.disabled = false;
   // An <option>'s value falls back to its text, as in the DOM, and `selected`
   // is the flag the owning <select>'s selection views read.
   if (element.tagName === 'OPTION') {
@@ -585,7 +589,6 @@ export function fakeElement(tag = 'div', options = {}) {
   // nothing explicitly selected shows its first option, so a freshly populated
   // select already has a selection, and an empty one has none.
   if (element.tagName === 'SELECT') {
-    element.disabled = false;
     const options = () => element.children.filter((n) => n.tagName === 'OPTION');
     const selection = () => {
       const chosen = options().filter((option) => option.selected);
