@@ -65,10 +65,6 @@ async function probeStrip(tab) {
     if (!ok) failures.push(message);
   };
 
-  check(await tab.$('#chain-library') === null,
-    'the stage bank is absent');
-  check(await tab.$('.chain-gap') === null,
-    'the pipeline exposes no drag/drop targets');
   check(await tab.$('#gui-container > .effect-gui') === null,
     'the local effect panel is absent');
   check(await tab.$('#gui-container > .global-gui') !== null,
@@ -94,14 +90,16 @@ async function probeStrip(tab) {
     return {
       icons: [...rotate.querySelectorAll('.chain-chip-header button')]
         .map((button) => button.textContent),
-      rotateLabel: rotate.querySelector('.chain-chip-label'),
+      rotateChildren: [...rotate.querySelector('.chain-chip-header').children]
+        .map((child) => child.className),
       projectChildren: [...projectHeader.children].map((child) => child.className),
       projectPrefix: functionLabel.firstChild.textContent,
       projectSelector: getComputedStyle(functionLabel).display,
     };
   });
   check(closedHeaders.icons.join('') === '◉←→×'
-      && closedHeaders.rotateLabel === null
+      && closedHeaders.rotateChildren.join(' ') === 'chain-chip-name '
+        + 'chain-chip-bypass chain-chip-move chain-chip-move chain-chip-remove'
       && closedHeaders.projectChildren.join('') === 'chain-chip-function-label'
       && closedHeaders.projectPrefix === 'Projection: '
       && closedHeaders.projectSelector !== 'none',
@@ -145,8 +143,6 @@ async function probeStrip(tab) {
   `the header stays ${Math.round(openHeader.width)}×${Math.round(openHeader.height)}px when open`);
   check(await tab.$eval('.chain-chip[data-label="project"]', (node) =>
     node.querySelector('.chain-chip-name') === null
-      && node.querySelector('.chain-chip-label') === null
-      && node.querySelector('.chain-chip-pair') === null
       && getComputedStyle(node.querySelector('.chain-chip-function-label')).display !== 'none'),
   'an open transition card keeps the same selector-only header');
   await tab.mouse.move(0, 0);

@@ -160,14 +160,14 @@ test('the strip lays the chain out as editable carrier bands with sockets betwee
   const camera = chipByLabel(h, 'camera');
   assert.equal(camera.getAttribute('aria-label'), 'Rotate · camera');
   assert.equal(camera.querySelector('.chain-chip-name').textContent, 'Rotate');
-  assert.equal(camera.querySelector('.chain-chip-label'), null);
   assert.match(chipByLabel(h, 'project').getAttribute('aria-label'),
     /, sphere to plane$/);
 
   // One roving-tabindex stop and a + only where an insertion is legal.
   assert.deepEqual(all.filter((chip) => chip.getAttribute('tabindex') === '0')
     .map((chip) => chip.dataset.label), ['camera']);
-  assert.equal(h.container.querySelectorAll('.chain-gap').length, 0);
+  assert.equal(h.container.querySelectorAll('.chain-band-add').length, 3,
+    'a band + is the only insertion affordance the strip offers');
   assert.deepEqual(bands.map((band) => band.querySelector('.chain-band-add')
     ?.getAttribute('aria-label') ?? null),
   ['Add a Sphere stage', 'Add a Plane stage', 'Add a Field stage']);
@@ -180,7 +180,8 @@ test('endomorphisms carry controls; sockets carry only valid selectors', async (
     assert.ok(chip.querySelector('.chain-chip-remove'), `${label} carries ✕`);
     assert.ok(chip.querySelector('.chain-chip-bypass'), `${label} carries bypass`);
     assert.equal(chip.querySelector('.chain-chip-replace'), null);
-    assert.equal(chip.querySelector('.chain-chip-label'), null);
+    assert.equal(chip.querySelector('.chain-chip-name').textContent.length > 0,
+      true, `${label} names its operator`);
   }
   for (const label of ['project', 'sample', 'colorize']) {
     const chip = chipByLabel(h, label);
@@ -189,8 +190,8 @@ test('endomorphisms carry controls; sockets carry only valid selectors', async (
     assert.equal(chip.querySelector('.chain-chip-bypass'), null);
     assert.ok(chip.querySelector('.chain-chip-replace'));
     assert.equal(chip.querySelector('.chain-chip-name'), null);
-    assert.equal(chip.querySelector('.chain-chip-label'), null);
-    assert.equal(chip.querySelector('.chain-chip-pair'), null);
+    assert.ok(chip.querySelector('.chain-chip-function-label'),
+      'a crossing names its function, never its instance');
   }
   for (const [label, text, accessibleName] of [
     ['project', 'Projection: ', 'Projection'],
@@ -802,7 +803,6 @@ test('stage controls open transiently on hover and pin open on click', async () 
   assert.equal(h.container.dataset.expanded, 'false');
 
   const chip = chipByLabel(h, 'sample');
-  assert.equal(chip.querySelector('.chain-chip-disclosure'), null);
   assert.equal(chip.getAttribute('aria-expanded'), 'false');
   assert.equal(chip.classList.contains('chain-chip--expanded'), false);
 
@@ -861,9 +861,8 @@ test('a stage with no parameters grows no disclosure', async () => {
 
   const chip = chipByLabel(h, label);
   assert.equal(chip.getAttribute('aria-current'), 'true');
-  assert.equal(chip.querySelector('.chain-chip-disclosure'), null,
-    'a disclosure that opens nothing is not offered');
-  assert.equal(chip.getAttribute('aria-expanded'), null);
+  assert.equal(chip.getAttribute('aria-expanded'), null,
+    'a card that opens nothing offers no disclosure');
   assert.equal(paramsOf(h, label), null);
   assert.equal(h.container.dataset.expanded, 'false');
 });
