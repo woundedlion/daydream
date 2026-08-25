@@ -9,6 +9,7 @@ const PROBES = [
   ['solids-probe.mjs', 'probeChain'],
   ['palettes-probe.mjs', 'probeColorStrip'],
   ['mobius-probe.mjs', 'probePad'],
+  ['lissajous-probe.mjs', 'probeRationalLock'],
 ];
 
 test('headless probes retain page errors raised during interactions', () => {

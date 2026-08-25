@@ -42,3 +42,4 @@ node scripts/panel-probe.mjs || exit 1
 node scripts/solids-probe.mjs || exit 1
 node scripts/palettes-probe.mjs || exit 1
 node scripts/mobius-probe.mjs || exit 1
+node scripts/lissajous-probe.mjs || exit 1
