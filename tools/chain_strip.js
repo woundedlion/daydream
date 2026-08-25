@@ -733,6 +733,14 @@ export function createChainStrip({
       select(entry.label);
       return;
     }
+    // The header controls sit outside the tab order, so bypass needs a key of
+    // its own; the other three carry Delete, Alt+Arrow and Insert already.
+    if ((key === 'b' || key === 'B')
+      && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault();
+      if (!crossing) toggleBypass(entry.label);
+      return;
+    }
     if (key === 'Delete' || key === 'Backspace') {
       event.preventDefault();
       if (crossing) openPalette({ kind: 'replace', index, anchor: chip });
@@ -937,6 +945,7 @@ export function createChainStrip({
       };
       functionLabel.textContent = `${socketFunction.name}: `;
       const replacement = el('select', 'chain-chip-replace');
+      replacement.setAttribute('tabindex', '-1');
       replacement.setAttribute('aria-label', socketFunction.accessibleName);
       for (const legality of store.legalReplacements(index, 1)
         .filter((candidate) => candidate.legal)) {
@@ -967,6 +976,7 @@ export function createChainStrip({
       header.appendChild(name);
       const toggle = el('button', 'chain-chip-bypass');
       toggle.type = 'button';
+      toggle.setAttribute('tabindex', '-1');
       toggle.setAttribute('aria-pressed', String(isBypassed));
       toggle.setAttribute('aria-label', `Bypass ${op.name} · ${entry.label}`);
       toggle.setAttribute('title', 'Bypass');
@@ -978,6 +988,7 @@ export function createChainStrip({
       header.appendChild(toggle);
       const earlier = el('button', 'chain-chip-move');
       earlier.type = 'button';
+      earlier.setAttribute('tabindex', '-1');
       earlier.textContent = '←';
       earlier.disabled = !sharesBand(index, -1);
       earlier.setAttribute('aria-label', `Move ${op.name} · ${entry.label} earlier`);
@@ -988,6 +999,7 @@ export function createChainStrip({
       });
       const later = el('button', 'chain-chip-move');
       later.type = 'button';
+      later.setAttribute('tabindex', '-1');
       later.textContent = '→';
       later.disabled = !sharesBand(index, 1);
       later.setAttribute('aria-label', `Move ${op.name} · ${entry.label} later`);
@@ -1000,6 +1012,7 @@ export function createChainStrip({
       header.appendChild(later);
       const remove = el('button', 'chain-chip-remove');
       remove.type = 'button';
+      remove.setAttribute('tabindex', '-1');
       remove.setAttribute('aria-label', `Remove ${op.name} · ${entry.label}`);
       remove.setAttribute('title', 'Delete');
       remove.textContent = '×';
