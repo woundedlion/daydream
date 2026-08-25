@@ -28,6 +28,7 @@ const INTERPOLATION_KINDS = new Set([
   'LINEAR',
   'LOG_POSITIVE',
   'SHORTEST_PERIODIC',
+  'SNAP',
   'NORMALIZED_LINEAR',
   'MIXED_ENUM',
 ]);
@@ -297,6 +298,7 @@ const operatorField = (operator, fieldId) =>
 const scalarCurve = (parameter) => {
   if (parameter.interpolation.kind === 'LINEAR') return 'lerp';
   if (parameter.interpolation.kind === 'LOG_POSITIVE') return 'log-positive';
+  if (parameter.interpolation.kind === 'SNAP') return 'snap';
   if (parameter.interpolation.kind !== 'SHORTEST_PERIODIC') return null;
   const period = Math.fround(parameter.interpolation.period);
   if (period === 1) return 'shortest-turn';
@@ -1324,6 +1326,9 @@ export function interpolateValue(parameter, from, to, progress) {
     const stored = Math.fround(value);
     return stored >= period ? 0 : stored;
   }
+  case 'SNAP':
+    // Progress is inside (0, 1) here: the start value holds until it reaches 1.
+    return a;
   case 'NORMALIZED_LINEAR':
     return fail('transition', 'GROUP_REQUIRED', `parameter.${parameter.id}`, 'Normalized-linear fields must be evaluated as a complete group.');
   default:

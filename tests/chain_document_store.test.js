@@ -123,6 +123,18 @@ test('insertion backfills presets, fields and staggered groups atomically', asyn
   assertGreen(store);
 });
 
+test('an operator with a snap-curve field commits', async () => {
+  const store = await makeStore();
+  const candidate = store.legalReplacements(SAMPLE, 1).find(
+    (entry) => entry.operator.id === 'sample.fractal.v2');
+  assert.equal(candidate.legal, true);
+  assert.deepEqual(store.replaceSpan(SAMPLE, 1, [{ operator: 'sample.fractal.v2' }]), { ok: true });
+  const iterations = store.document().descriptor.parameters.find(
+    (parameter) => parameter.id === 'sample1.fractal-iterations');
+  assert.equal(iterations.interpolation.kind, 'SNAP');
+  assertGreen(store);
+});
+
 test('insertion bounds accommodate binary32 catalog defaults', async () => {
   const catalog = structuredClone(CATALOG);
   catalog.operators = catalog.operators.filter(
