@@ -32,7 +32,8 @@ jobs:
             scripts/panel-probe.mjs \
             scripts/solids-probe.mjs \
             scripts/palettes-probe.mjs \
-            scripts/mobius-probe.mjs
+            scripts/mobius-probe.mjs \
+            scripts/lissajous-probe.mjs
           do
             echo "::group::$script"
             node "$script" || status=1
