@@ -72,6 +72,39 @@ const GATED_WORKFLOWS = [
   ['.github/workflows/deploy.yml', 'deploy'],
 ];
 
+/**
+ * Aggregates the `toJSON(needs)` payload the gating job receives. Only an
+ * explicit `success` string passes, so a renamed or absent result field is an
+ * error rather than a green report.
+ * @param {string | undefined} raw - Serialized job-result mapping.
+ * @returns {{ total: number, failed: Record<string, string> }}
+ */
+export const requiredJobOutcomes = (raw) => {
+  if (typeof raw !== 'string' || raw.trim() === '') {
+    throw new Error('no required-job results were supplied');
+  }
+  const results = JSON.parse(raw);
+  if (results === null || typeof results !== 'object' || Array.isArray(results)) {
+    throw new Error('required-job results are not a mapping');
+  }
+
+  const entries = Object.entries(results);
+  if (entries.length === 0) throw new Error('required-job results name no jobs');
+
+  /** @type {Record<string, string>} */
+  const failed = {};
+  for (const [name, job] of entries) {
+    const result = job === null || typeof job !== 'object'
+      ? undefined
+      : /** @type {Record<string, unknown>} */ (job).result;
+    if (typeof result !== 'string') {
+      throw new Error(`job '${name}' reports no result field`);
+    }
+    if (result !== 'success') failed[name] = result;
+  }
+  return { total: entries.length, failed };
+};
+
 const main = () => {
   let ungated = false;
   for (const [workflowPath, terminal] of GATED_WORKFLOWS) {
@@ -88,18 +121,24 @@ const main = () => {
     return;
   }
 
-  const results = JSON.parse(process.env.RESULTS ?? '');
-  const failed = Object.fromEntries(
-    Object.entries(results)
-      .filter(([, job]) => job.result !== 'success')
-      .map(([name, job]) => [name, job.result]),
-  );
-  if (Object.keys(failed).length > 0) {
-    console.error(`::error::required jobs did not succeed: ${JSON.stringify(failed)}`);
+  let outcomes;
+  try {
+    outcomes = requiredJobOutcomes(process.env.RESULTS);
+  } catch (error) {
+    console.error(
+      `::error::unusable required-job results: ${/** @type {Error} */ (error).message}`,
+    );
     process.exitCode = 1;
     return;
   }
-  console.log(`CI green: ${Object.keys(results).length} required jobs succeeded.`);
+  if (Object.keys(outcomes.failed).length > 0) {
+    console.error(
+      `::error::required jobs did not succeed: ${JSON.stringify(outcomes.failed)}`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`CI green: ${outcomes.total} required jobs succeeded.`);
 };
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main();

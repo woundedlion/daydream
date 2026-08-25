@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import {
   missingTerminalDependencies,
+  requiredJobOutcomes,
   terminalJobNeeds,
   workflowJobs,
 } from '../scripts/verify-ci-green.mjs';
@@ -51,4 +52,62 @@ test('every workflow pins the Node version package.json requires', () => {
   assert.ok(pins.length >= 3, 'the workflows still pin the Node version themselves');
   assert.deepEqual(pins.filter((pin) => !pin.endsWith(`: ${required}`)), [],
     `every setup-node pin must read ${required}`);
+});
+
+const needsPayload = (results) => JSON.stringify(
+  Object.fromEntries(Object.entries(results).map(([name, result]) => [
+    name,
+    { result, outputs: {} },
+  ])),
+);
+
+test('every required job succeeding reports green', () => {
+  const outcomes = requiredJobOutcomes(
+    needsPayload({ 'js-tests': 'success', browser: 'success' }),
+  );
+  assert.deepEqual(outcomes, { total: 2, failed: {} });
+});
+
+test('a failed or cancelled job is reported red', () => {
+  assert.deepEqual(
+    requiredJobOutcomes(
+      needsPayload({ 'js-tests': 'failure', browser: 'success' }),
+    ),
+    { total: 2, failed: { 'js-tests': 'failure' } },
+  );
+  assert.deepEqual(
+    requiredJobOutcomes(
+      needsPayload({ 'js-tests': 'cancelled', browser: 'skipped' }),
+    ),
+    { total: 2, failed: { 'js-tests': 'cancelled', browser: 'skipped' } },
+  );
+});
+
+test('a renamed or missing result field is an error, not a green run', () => {
+  assert.throws(
+    () => requiredJobOutcomes(JSON.stringify({ browser: { outcome: 'success' } })),
+    /job 'browser' reports no result field/,
+  );
+  assert.throws(
+    () => requiredJobOutcomes(JSON.stringify({ browser: {} })),
+    /job 'browser' reports no result field/,
+  );
+  assert.throws(
+    () => requiredJobOutcomes(JSON.stringify({ browser: 'success' })),
+    /job 'browser' reports no result field/,
+  );
+});
+
+test('an absent, empty, or unusable payload is an error', () => {
+  assert.throws(() => requiredJobOutcomes(undefined), /no required-job results/);
+  assert.throws(() => requiredJobOutcomes('   '), /no required-job results/);
+  assert.throws(() => requiredJobOutcomes('{}'), /name no jobs/);
+  assert.throws(() => requiredJobOutcomes('[]'), /not a mapping/);
+  assert.throws(() => requiredJobOutcomes('null'), /not a mapping/);
+});
+
+test('the gating job hands the script every job it needs', () => {
+  const step = workflow.slice(workflow.indexOf('  ci-green:'));
+  assert.match(step, /RESULTS: \$\{\{ toJSON\(needs\) \}\}/);
+  assert.match(step, /node scripts\/verify-ci-green\.mjs/);
 });
