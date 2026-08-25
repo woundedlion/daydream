@@ -25,6 +25,10 @@ import { FPS } from "./frame_constants.js";
 // Chunk-delivery interval for MediaRecorder.start(); bounds encoder buffering.
 const RECORDER_TIMESLICE_MS = 1000;
 
+// Encoder bitrate a session falls back to when the host leaves bitrateMbps unset
+// or non-positive.
+const DEFAULT_BITRATE_MBPS = 16;
+
 // Seconds of video the streaming sink may hold in RAM while the Save dialog is
 // still unanswered; multiplied by the latched bitrate to get the byte bound. Two
 // minutes is far past any real time-to-pick, so the bound is a runaway guard.
@@ -98,7 +102,7 @@ export class VideoRecorder {
     this.elapsedBaseSeconds = 0;
     this.elapsedSeconds = 0;
     // bitrateMbps, format, and targetHeight are latched at start().
-    this.bitrateMbps = 16;
+    this.bitrateMbps = DEFAULT_BITRATE_MBPS;
     /** @type {'auto'|'mp4'|'webm'} */
     this.format = 'auto';
     /** @type {number|null} */
@@ -230,6 +234,11 @@ export class VideoRecorder {
       return;
     }
 
+    // One latch for the encoder and the sink's backlog bound: a host may leave
+    // the field unset or non-numeric, and both must read the same real number.
+    const bitrateMbps = this.bitrateMbps > 0 ? this.bitrateMbps
+      : DEFAULT_BITRATE_MBPS;
+
     const mimeType = selectMimeType(this.format);
 
     // An explicitly-chosen container with no supported codec means we fall back
@@ -240,7 +249,7 @@ export class VideoRecorder {
 
     // Omit the mimeType key entirely when empty: some engines throw on an empty one.
     /** @type {MediaRecorderOptions} */
-    const options = { videoBitsPerSecond: this.bitrateMbps * 1_000_000 };
+    const options = { videoBitsPerSecond: bitrateMbps * 1_000_000 };
     if (mimeType) options.mimeType = mimeType;
     let recorder;
     try {
@@ -325,7 +334,7 @@ export class VideoRecorder {
     }
 
     try {
-      sink = this.openSink(recorder, effectName, chunks);
+      sink = this.openSink(recorder, effectName, chunks, bitrateMbps);
       const pending = chunks.splice(0);
       for (const chunk of pending) sink.write(chunk);
     } catch (err) {
@@ -527,9 +536,11 @@ export class VideoRecorder {
    * @param {Blob[]} chunks - Per-session buffer; the fallback path fills it, the
    *   streaming path leaves it empty while a file handle holds (each chunk is
    *   released after its disk write) and falls back to filling it otherwise.
+   * @param {number} [bitrateMbps=DEFAULT_BITRATE_MBPS] - The session bitrate
+   *   start() latched, bounding the pre-pick backlog.
    * @returns {VideoSink} The session sink; callers may ignore finish()'s promise.
    */
-  openSink(recorder, effectName, chunks) {
+  openSink(recorder, effectName, chunks, bitrateMbps = DEFAULT_BITRATE_MBPS) {
     if (typeof globalThis.showSaveFilePicker !== 'function') {
       return {
         write: this.memorySink(recorder, chunks, 'this browser has no streaming save'),
@@ -549,9 +560,6 @@ export class VideoRecorder {
     let picked = false;
     let backlogBytes = 0;
     let overflowed = false;
-    // Fall back to the constructor default for a bitrate a host left unset or
-    // non-numeric, so the bound is always a real number of bytes.
-    const bitrateMbps = this.bitrateMbps > 0 ? this.bitrateMbps : 16;
     const maxBacklogBytes = (bitrateMbps * 1_000_000 / 8) * PICKER_GRACE_SECONDS;
     // maxBacklogBytes only covers the pre-pick hold. Once the picker has
     // answered without a handle, or createWritable() fails mid-session, every
