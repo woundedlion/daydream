@@ -22,9 +22,11 @@
   },
   // The segment/worker pipeline, whose message shapes must agree across the
   // postMessage boundary with no runtime to catch a mismatch, plus every other
-  // module that checks clean under the options above and whatever opts in with a
-  // `// @ts-check` pragma. A module is absent because it does not yet check
-  // clean, not because checking it would be unwelcome; tests/ is out of scope.
+  // module that checks clean under the options above. Listing a module here is
+  // the whole opt-in: `checkJs` already covers everything the program contains,
+  // and a `// @ts-check` pragma buys nothing on a file this list omits. A module
+  // is absent because it does not yet check clean, not because checking it would
+  // be unwelcome; tests/ is out of scope.
   // `noResolve` also means imports are not followed even for the files below, so
   // an unlisted one degrades to `any` with no diagnostic — tests/tsconfig_roster
   // .test.js keeps this list closed under the rostered modules' own imports.
