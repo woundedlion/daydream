@@ -171,8 +171,11 @@ export function startApp({
     'loading-overlay', 'apply-notice', 'segment-stats'];
   const elements = new Map(ids.map((id) => [id, fakeElement('div')]));
   const docListeners = [];
+  // Every id the app asks the document for, in order, so a case can pin what the
+  // wiring resolves instead of restating it.
+  const queried = [];
   const doc = installDocument({
-    getElementById: (id) => elements.get(id) ?? null,
+    getElementById: (id) => { queried.push(id); return elements.get(id) ?? null; },
     createElement: (tag) => fakeElement(tag),
     addEventListener: (type, handler) => docListeners.push([type, handler]),
     removeEventListener: (type, handler) => {
@@ -222,7 +225,9 @@ export function startApp({
       else globalThis[key] = value;
     }
   };
-  return { teardown, driver, guis, listeners, docListeners, elements, win, restore };
+  return {
+    teardown, driver, guis, listeners, docListeners, elements, queried, win, restore,
+  };
 }
 
 /**
