@@ -115,15 +115,33 @@ test('holosphere_wasm.d.ts declares the engine statics the app calls', () => {
   const decl = body.slice(at, body.indexOf('\n  };', at));
   assert.match(decl, /new\s*\(\s*\)\s*:\s*HolosphereEngine/,
     'the constructor signature must survive the statics being declared beside it');
-  assert.match(decl, /getSupportedResolutions\s*\(/,
+  const declared = new Set(
+    [...decl.matchAll(/^\s*([A-Za-z_]\w*)\??\s*\(/gm)].map((m) => m[1]));
+  declared.delete('new');
+  for (const name of declared) {
+    assert.equal(typeof M.HolosphereEngine[name], 'function',
+      `holosphere_wasm.d.ts declares static ${name}, which the module does not `
+      + 'expose on the constructor');
+  }
+  // embind puts exactly the bound statics on the constructor as callables; its
+  // other own properties (length, name, prototype, argCount) are not functions.
+  for (const name of Object.getOwnPropertyNames(M.HolosphereEngine)) {
+    if (typeof M.HolosphereEngine[name] !== 'function') continue;
+    assert.ok(declared.has(name),
+      `the module exposes static ${name}, which holosphere_wasm.d.ts does not `
+      + 'declare');
+  }
+  // The two-way loop above only pins the pair against each other; these name
+  // the statics the app itself depends on, which losing from both sides would
+  // otherwise leave green.
+  assert.ok(declared.has('isLive'),
+    'daydream.js and segment_worker.js read this static before constructing an '
+    + 'engine; a second instantiation traps and kills the module');
+  assert.ok(declared.has('getSupportedResolutions'),
     'daydream.js narrows its resolution presets through this static; a bare '
     + '`new () => HolosphereEngine` declares it out of existence');
-  assert.equal(typeof M.HolosphereEngine.getSupportedResolutions, 'function',
-    'the module must expose getSupportedResolutions on the constructor');
-  assert.match(decl, /getShaderChainCatalog\s*\(/,
+  assert.ok(declared.has('getShaderChainCatalog'),
     'the catalog pin below reads this static; the declarations must carry it');
-  assert.equal(typeof M.HolosphereEngine.getShaderChainCatalog, 'function',
-    'the module must expose getShaderChainCatalog on the constructor');
 });
 
 /**
