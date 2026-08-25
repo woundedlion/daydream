@@ -585,9 +585,9 @@ test('a bypass unavailable to the render is disabled, with the reason in text', 
   compiledSide = true;
   h.strip.render();
   assert.deepEqual([...new Set(bypasses().map((node) => node.disabled))], [true]);
-  // fake_dom's `disabled` does not gate dispatch(), so no assertion here can
-  // show a disabled button ignoring a click; the pointer belongs to
-  // scripts/workbench-probe.mjs. What is asserted is the state and its reason.
+  bypasses()[0].dispatch('click');
+  assert.deepEqual(h.announced, [], 'the disabled toggle runs no handler at all');
+  assert.deepEqual(h.store.bypassedLabels(), []);
   const note = h.container.querySelector('.chain-strip-note');
   assert.match(note.textContent, /^Bypass applies to the interpreter only:/);
   assert.deepEqual([...new Set(bypasses().map((node) => node.getAttribute('title')))],
