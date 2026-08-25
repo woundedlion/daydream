@@ -59,12 +59,15 @@ restoreDocumentAfterEach();
 
 /**
  * A strip over a fresh store on a fresh fixture copy, plus its spies.
- * @param {{presetId?: string|null, catalog?: *}} [seams] - The preset the
- *   inline controls read, omitted the strip falls back to the document's first;
- *   and the operator catalog, for a vocabulary the shipped one cannot express.
+ * @param {{presetId?: string|null, catalog?: *, bypassAvailable?: () => boolean}}
+ *   [seams] - The preset the inline controls read, omitted the strip falls back
+ *   to the document's first; the operator catalog, for a vocabulary the shipped
+ *   one cannot express; and whether a bypass reaches what is rendering.
  * @returns {Promise<Object>} The harness.
  */
-async function makeStrip({ presetId = null, catalog = CATALOG } = {}) {
+async function makeStrip({
+  presetId = null, catalog = CATALOG, bypassAvailable = () => true,
+} = {}) {
   const store = await createChainDocumentStore({
     document: structuredClone(BASE.document), catalog });
   const container = fakeElement('section');
@@ -89,6 +92,7 @@ async function makeStrip({ presetId = null, catalog = CATALOG } = {}) {
     onSelect: (label) => selections.push(label),
     presetId: () => presetId,
     onEditParameter: (parameterId, value) => edits.push([parameterId, value]),
+    bypassAvailable,
   });
   return { store, container, doc, strip, applied, selections, announced, edits };
 }
@@ -587,6 +591,41 @@ test('bypass toggles the program shape without touching the document', async () 
   toggle.dispatch('click');
   assert.equal(h.applied.at(-1).includes('lens'), true);
   assert.equal(chipByLabel(h, 'lens').classList.contains('chain-chip--bypassed'), false);
+});
+
+// Only the interpreter is handed a program shape, so a bypass on the compiled
+// side of the parity A/B would commit store state the render ignores.
+test('a bypass unavailable to the render is disabled, with the reason in text', async () => {
+  let compiledSide = false;
+  const h = await makeStrip({ bypassAvailable: () => !compiledSide });
+  const bypasses = () => h.container.querySelectorAll('.chain-chip-bypass');
+  assert.ok(bypasses().length >= 3);
+  assert.deepEqual([...new Set(bypasses().map((node) => node.disabled))], [false]);
+  assert.equal(h.container.querySelector('.chain-strip-note'), null);
+
+  compiledSide = true;
+  h.strip.render();
+  assert.deepEqual([...new Set(bypasses().map((node) => node.disabled))], [true]);
+  // fake_dom's `disabled` does not gate dispatch(), so no assertion here can
+  // show a disabled button ignoring a click; the pointer belongs to
+  // scripts/workbench-probe.mjs. What is asserted is the state and its reason.
+  const note = h.container.querySelector('.chain-strip-note');
+  assert.match(note.textContent, /^Bypass applies to the interpreter only:/);
+  assert.deepEqual([...new Set(bypasses().map((node) => node.getAttribute('title')))],
+    [note.textContent], 'the reason is text, not only a title');
+
+  // 'b' reaches the chip, not the disabled button, so the gesture itself refuses.
+  chipByLabel(h, 'lens').dispatch('keydown', { key: 'b' });
+  assert.deepEqual(h.store.bypassedLabels(), []);
+  assert.deepEqual(h.applied, [], 'no program re-apply for a refused bypass');
+  assert.equal(lastAnnounced(h), note.textContent);
+
+  compiledSide = false;
+  h.strip.render();
+  assert.deepEqual([...new Set(bypasses().map((node) => node.disabled))], [false]);
+  assert.equal(h.container.querySelector('.chain-strip-note'), null);
+  chipByLabel(h, 'lens').dispatch('keydown', { key: 'b' });
+  assert.deepEqual(h.store.bypassedLabels(), ['lens']);
 });
 
 test('the toolbar keeps one tab stop: chip controls rove, they do not tab', async () => {

@@ -507,6 +507,9 @@ export function createShaderDocumentController({
         const dropped = syncParity();
         applyPreset(active?.presetId ?? presetSelect.value);
         if (dropped) {
+          // The return to the interpreter re-enables the bypass toggles the
+          // rebuild that led here drew disabled.
+          chainUi?.strip.render();
           show('The edit changed the descriptor: the preview is back on the '
             + 'interpreter and the parity toggle is disarmed.');
         }
@@ -514,6 +517,8 @@ export function createShaderDocumentController({
       presetId: () => active?.presetId ?? null,
       onEditParameter: writeStageEdit,
       onCommitParameter: () => { void flushDeepLink(); },
+      // Only applyChainDocument is handed the program shape a bypass overrides.
+      bypassAvailable: () => active?.compiledSide !== true,
     }));
     setParamFilter({ external: true });
     chainUi = { store, strip };
@@ -816,6 +821,8 @@ export function createShaderDocumentController({
     }
     active.compiledSide = compiledSide;
     syncParity();
+    // The side decides whether the strip's bypass toggles do anything.
+    chainUi?.strip.render();
     applyPreset(active.presetId ?? presetSelect.value);
   };
   const onDigest = async () => {
