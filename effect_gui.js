@@ -515,6 +515,30 @@ export function createEffectGui({
   }
 
   /**
+   * Copy text to the clipboard and report the outcome on the Export label.
+   * @param {Object} fx - The effect record owning the Export button. A copy that
+   *   lands after the effect changed reports nothing: the label belongs to a
+   *   panel that is gone.
+   * @param {string} text - The text to copy.
+   * @param {(label: string) => void} flashExport - Shows a transient Export label.
+   * @returns {Promise<void>} Clipboard completion.
+   */
+  function copyAndFlash(fx, text, flashExport) {
+    return copyText(text).then((copied) => {
+      if (activeEffect !== fx) return;
+      if (copied) {
+        flashExport(EXPORT_COPIED);
+      } else {
+        logWarn('Export: clipboard copy failed');
+        flashExport(EXPORT_FAILED);
+      }
+    }).catch((err) => {
+      logWarn('Export: clipboard copy failed', err);
+      if (activeEffect === fx) flashExport(EXPORT_FAILED);
+    });
+  }
+
+  /**
    * Write the live parameter values to the clipboard as a C++ brace-init list.
    * @param {Object} fx - The effect record owning the Export button.
    * @param {Array<Object>} params - The engine's parameter definitions.
@@ -529,17 +553,7 @@ export function createEffectGui({
         flashExport(EXPORT_FAILED);
         return;
       }
-      return copyText(JSON.stringify(snapshot, null, 2)).then((copied) => {
-        if (activeEffect !== fx) return;
-        if (copied) flashExport(EXPORT_COPIED);
-        else {
-          logWarn('Export: clipboard copy failed');
-          flashExport(EXPORT_FAILED);
-        }
-      }).catch((err) => {
-        logWarn('Export: clipboard copy failed', err);
-        if (activeEffect === fx) flashExport(EXPORT_FAILED);
-      });
+      return copyAndFlash(fx, JSON.stringify(snapshot, null, 2), flashExport);
     }
     let values = liveParamValues();
     // The controller fallback needs one control per stream slot, which the
@@ -566,19 +580,7 @@ export function createEffectGui({
       return;
     }
 
-    return copyText(text).then((copied) => {
-      if (activeEffect !== fx) return;
-      if (copied) {
-        flashExport(EXPORT_COPIED);
-      } else {
-        logWarn('Export: clipboard copy failed');
-        flashExport(EXPORT_FAILED);
-      }
-    }).catch((err) => {
-      logWarn('Export: clipboard copy failed', err);
-      if (activeEffect !== fx) return;
-      flashExport(EXPORT_FAILED);
-    });
+    return copyAndFlash(fx, text, flashExport);
   }
 
   /**
