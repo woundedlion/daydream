@@ -13,6 +13,8 @@
  * scrollLeft/scrollWidth/clientWidth for its scroll arrows — quantities the fake
  * DOM answers from hand-written style objects, so only a real grid decides
  * whether either one is measuring the layout that shipped.
+ * The same suite has no accessibility tree, so the preset dropdown's computed
+ * name is read out of the browser's.
  */
 import puppeteer from 'puppeteer-core';
 
@@ -44,6 +46,9 @@ const ARROW_RIGHT = '.scroll-arrow-right';
 // What the :focus-visible rule in styles/index.css paints outside an option:
 // a 2px ring at a 2px offset.
 const RING_CLEARANCE = 4;
+
+const PRESET_SELECT = '.preset-nav-selector select';
+const PRESET_NAME = 'Preset';
 
 /** @param {import('puppeteer-core').Page} tab */
 const scrollerMetrics = (tab) => tab.$eval(SCROLLER, (node) => ({
@@ -134,6 +139,39 @@ async function probePanel(tab) {
     `the rebuilt panel restores focus to the ${focusedControl.name} number input `
       + `(${restoredControl.name || 'none'} ${restoredControl.widget || 'widget'})`);
 
+  return failures;
+}
+
+/*
+ * The preset dropdown carries no aria-label of its own: lil-gui points the
+ * select at its own .lil-name element, which the action row hides. A fake DOM
+ * has no accessibility tree, so only the browser's computed name says whether
+ * a hidden label element still names the control.
+ * @param {import('puppeteer-core').Page} tab
+ */
+async function probePresetName(tab) {
+  const failures = [];
+  const check = (ok, message) => {
+    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
+    if (!ok) failures.push(message);
+  };
+
+  const cdp = await tab.createCDPSession();
+  await cdp.send('Accessibility.enable');
+  const doc = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
+  const { nodeId } = await cdp.send('DOM.querySelector',
+    { nodeId: doc.root.nodeId, selector: PRESET_SELECT });
+  check(nodeId !== 0, 'the preset dropdown is mounted');
+  if (nodeId === 0) return failures;
+
+  const tree = await cdp.send('Accessibility.getPartialAXTree',
+    { nodeId, fetchRelatives: false });
+  const ax = tree.nodes.find((node) => node.role?.value === 'combobox');
+  const name = ax?.name?.value ?? '';
+  check(name === PRESET_NAME,
+    `the preset dropdown computes the accessible name ${PRESET_NAME} `
+      + `(${name || 'none'})`);
+  await cdp.detach();
   return failures;
 }
 
@@ -394,6 +432,7 @@ try {
     { timeout: TIMEOUT_MS });
   await tab.waitForSelector('.effect-gui', { timeout: TIMEOUT_MS });
   failures.push(...await probePanel(tab));
+  failures.push(...await probePresetName(tab));
   failures.push(...await probeWarningNote(tab, 'desktop'));
   await tab.setViewport(MOBILE_VIEWPORT);
   await tab.reload({ timeout: TIMEOUT_MS });
