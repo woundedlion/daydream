@@ -6,7 +6,10 @@
 // assertions about the module under test rather than about the harness.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
+import {
+  documentEvents, fakeElement, installAnimationFrames, installDocument,
+  restoreDocumentAfterEach,
+} from './fake_dom.js';
 
 restoreDocumentAfterEach();
 
@@ -488,4 +491,181 @@ test('a node moved between parents stays connected; remove() disconnects it', ()
 
   moved.remove();
   assert.equal(moved.isConnected, false);
+});
+
+
+/**
+ * A <select> populated with options carrying the given values.
+ * @param {Array<string>} values - One option per entry, text and value alike.
+ * @returns {Object} The select.
+ */
+function selectOf(values) {
+  const select = fakeElement('select');
+  for (const value of values) {
+    const option = fakeElement('option');
+    option.textContent = value;
+    select.appendChild(option);
+  }
+  return select;
+}
+
+test("an <option>'s value falls back to its text until one is assigned", () => {
+  const option = fakeElement('option');
+  option.textContent = 'Kis';
+  assert.equal(option.value, 'Kis');
+
+  option.value = 'kis';
+  assert.equal(option.value, 'kis', 'an assigned value wins over the text');
+  assert.equal(option.textContent, 'Kis', 'assigning a value leaves the text alone');
+
+  option.textContent = 'Ambo';
+  assert.equal(option.value, 'kis', 'the fallback does not come back');
+
+  option.value = 7;
+  assert.equal(option.value, '7', 'the value is a DOMString');
+
+  const empty = fakeElement('option');
+  assert.equal(empty.value, '', 'no text and no value reads as the empty string');
+  assert.equal(empty.selected, false);
+});
+
+test('a <select> shows its first option until one is explicitly selected', () => {
+  const empty = fakeElement('select');
+  assert.deepEqual(empty.options, []);
+  assert.deepEqual(empty.selectedOptions, []);
+  assert.equal(empty.selectedIndex, -1);
+  assert.equal(empty.value, '');
+
+  const select = selectOf(['a', 'b', 'c']);
+  assert.deepEqual(select.options.map((option) => option.value), ['a', 'b', 'c']);
+  assert.deepEqual(select.selectedOptions.map((option) => option.value), ['a'],
+    'a populated select already has a selection');
+  assert.equal(select.selectedIndex, 0);
+  assert.equal(select.value, 'a');
+
+  select.options[2].selected = true;
+  assert.deepEqual(select.selectedOptions.map((option) => option.value), ['c'],
+    'an explicit selection displaces the implicit first option');
+  assert.equal(select.selectedIndex, 2);
+  assert.equal(select.value, 'c');
+});
+
+test('the <select> views are live over the option children', () => {
+  const select = selectOf(['a', 'b']);
+  select.options[1].selected = true;
+  assert.equal(select.value, 'b');
+
+  const added = fakeElement('option');
+  added.value = 'c';
+  select.appendChild(added);
+  assert.equal(select.options.length, 3, 'the view reads the children, not a snapshot');
+  assert.equal(select.value, 'b', 'appending does not move the selection');
+
+  select.appendChild(fakeElement('span'));
+  assert.deepEqual(select.options.map((option) => option.value), ['a', 'b', 'c'],
+    'a non-option child is not an option');
+
+  select.replaceChildren();
+  assert.equal(select.selectedIndex, -1);
+  assert.equal(select.value, '');
+});
+
+test('selectedIndex and value are the two writable views of one selection', () => {
+  const select = selectOf(['a', 'b', 'c']);
+
+  select.selectedIndex = 1;
+  assert.equal(select.value, 'b');
+  assert.deepEqual(select.options.map((option) => option.selected),
+    [false, true, false], 'the write is exclusive');
+
+  select.value = 'c';
+  assert.equal(select.selectedIndex, 2);
+  assert.deepEqual(select.options.map((option) => option.selected),
+    [false, false, true]);
+
+  select.value = 'missing';
+  assert.deepEqual(select.options.map((option) => option.selected),
+    [false, false, false], 'an unknown value selects nothing');
+  assert.deepEqual(select.selectedOptions.map((option) => option.value), ['a'],
+    'with nothing selected the first option shows again');
+  assert.equal(select.selectedIndex, 0);
+});
+
+test('documentEvents runs the handlers of one type in registration order', () => {
+  const doc = installDocument({});
+  const events = documentEvents();
+  const log = [];
+  const first = () => log.push('first');
+  const second = () => log.push('second');
+  events.addEventListener('keydown', first);
+  events.addEventListener('keydown', second);
+  events.addEventListener('pointerdown', () => log.push('pointer'));
+
+  assert.equal(events.listenerCount('keydown'), 2);
+  assert.equal(events.listenerCount('wheel'), 0);
+
+  const dispatched = events.dispatch('keydown', { key: 'Escape' });
+  assert.deepEqual(log, ['first', 'second'], 'only the matching type ran');
+  assert.equal(dispatched.type, 'keydown');
+  assert.equal(dispatched.key, 'Escape');
+  assert.equal(dispatched.target, doc, 'the target defaults to the installed document');
+
+  log.length = 0;
+  events.removeEventListener('keydown', first);
+  events.dispatch('keydown');
+  assert.deepEqual(log, ['second']);
+  assert.equal(events.listenerCount('keydown'), 1);
+
+  const supplied = { target: fakeElement('input') };
+  assert.equal(events.dispatch('pointerdown', supplied).target, supplied.target,
+    'a supplied target wins over the document');
+});
+
+test('documentEvents refuses a removal with no listener behind it', () => {
+  const events = documentEvents();
+  const handler = () => {};
+  assert.throws(() => events.removeEventListener('keydown', handler),
+    /no keydown listener on the document to remove/);
+
+  events.addEventListener('keydown', handler);
+  events.removeEventListener('keydown', handler);
+  assert.equal(events.listenerCount('keydown'), 0);
+  assert.throws(() => events.removeEventListener('keydown', handler),
+    'a second removal of the same handler throws');
+});
+
+test('installAnimationFrames queues callbacks until a flush runs them', () => {
+  const saved = globalThis.requestAnimationFrame;
+  const frames = installAnimationFrames();
+  try {
+    const log = [];
+    assert.equal(frames.pending, 0);
+
+    const first = requestAnimationFrame(() => log.push('first'));
+    const second = requestAnimationFrame(() => log.push('second'));
+    assert.notEqual(first, second, 'each request answers its own handle');
+    assert.equal(frames.pending, 2);
+    assert.deepEqual(log, [], 'nothing runs before the flush');
+
+    cancelAnimationFrame(first);
+    assert.equal(frames.pending, 1);
+    frames.flush();
+    assert.deepEqual(log, ['second']);
+    assert.equal(frames.pending, 0, 'a flush empties the queue');
+
+    requestAnimationFrame(() => {
+      log.push('outer');
+      requestAnimationFrame(() => log.push('inner'));
+    });
+    frames.flush();
+    assert.deepEqual(log, ['second', 'outer'],
+      'a frame requested during a flush waits for the next one');
+    assert.equal(frames.pending, 1);
+    frames.flush();
+    assert.deepEqual(log, ['second', 'outer', 'inner']);
+  } finally {
+    frames.restore();
+  }
+  assert.equal(globalThis.requestAnimationFrame, saved,
+    'restore hands the globals back');
 });
