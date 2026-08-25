@@ -40,7 +40,7 @@ import {
   wrapTurns,
   hitTestHueKeyMarker,
   hueKeyState, customHueKeyState, moveCustomHueKey,
-  loopSweepTurns,
+  loopSweepTurns, paletteEnumOrdinal,
 } from './palette_controls.js';
 // The two canvas painters take their canvas, context and palette as
 // arguments, so they live in their own module and are unit tested against a
@@ -125,7 +125,6 @@ let selectedHueKey = 0;
 // aria-valuenow/aria-valuetext, which a screen reader re-reads on change.
 let hueKeyHandles = [];
 
-const enumIndex = (group, value) => PaletteV4[group][value];
 const fullViewport = Object.freeze({ start: 0, end: 1 });
 
 function customBaseTurns() {
@@ -1166,7 +1165,7 @@ async function init() {
     const el = document.getElementById(id);
     el?.addEventListener('change', () => {
       if (id === 'gen_hue_mode') {
-        const nextMode = enumIndex('hueMode', el.value);
+        const nextMode = paletteEnumOrdinal('hueMode', el.value);
         if (nextMode === PaletteV4.hueMode.CUSTOM &&
             previousHueMode !== PaletteV4.hueMode.CUSTOM) {
           const sourceRecipe = readPaletteRecipe();
