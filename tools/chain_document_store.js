@@ -63,7 +63,8 @@ const parameterFromField = (label, field) => {
   // Catalog curves are lowercase kebab; document interpolation kinds keep
   // their own uppercase vocabulary.
   const kind = field.curve === 'log-positive' ? 'LOG_POSITIVE'
-    : field.curve === 'shortest-periodic' ? 'SHORTEST_PERIODIC' : 'LINEAR';
+    : field.curve === 'shortest-periodic' ? 'SHORTEST_PERIODIC'
+      : field.curve === 'snap' ? 'SNAP' : 'LINEAR';
   const minimum = Math.fround(field.min);
   const maximum = Math.fround(field.max);
   return {
