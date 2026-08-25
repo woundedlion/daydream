@@ -248,6 +248,10 @@ export async function createChainDocumentStore({
   const redoStack = [];
   /** @type {string|null} Coalesce key the newest undo entry was opened under. */
   let coalesceKey = null;
+  /** @type {{doc: *, result: *}|null} Memo for compile(), keyed on the current
+      document's identity: every edit swaps `doc` for a fresh object rather than
+      mutating it, so a hit is exact. */
+  let compiled = null;
 
   /** @returns {ChainEntry[]} */
   const chain = () => doc.descriptor.chain;
@@ -619,7 +623,15 @@ export async function createChainDocumentStore({
     chain: () => chain().map((entry) => ({ ...entry })),
 
     /** @returns {*} The compiler's full result for the current document, digests included. */
-    compile: () => compiler.compileShaderDocument(structuredClone(doc), { catalog }),
+    compile: () => {
+      if (compiled === null || compiled.doc !== doc) {
+        compiled = {
+          doc,
+          result: compiler.compileShaderDocument(structuredClone(doc), { catalog }),
+        };
+      }
+      return compiled.result;
+    },
 
     /** @returns {string|null} The selected instance label. */
     selectedLabel: () => selected,
