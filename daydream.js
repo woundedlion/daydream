@@ -44,7 +44,7 @@ import {
 import { pageWarmer } from "./module_warmer.js";
 import { EngineHost } from "./engine_host.js";
 import { reportPageFailures, showFatalError } from "./tools/banner.js";
-import { showBootstrapFailure } from "./bootstrap.js";
+import { errorDetail, showBootstrapFailure } from "./bootstrap.js";
 import { enumConstantName } from "./param_sync.js";
 import { copyToClipboard } from "./tools/copy_text.js";
 import { importLegacyShaderSelection, LEGACY_SHADER_ALIAS } from "./legacy_shader_import.js";
@@ -453,7 +453,7 @@ export function start({
       // doesn't keep offering to stop a session that is already gone, and report
       // the reason through the same notice the record toggle writes.
       host.recorder.onError = (err) => {
-        const detail = (err && err.message) ? err.message : String(err);
+        const detail = errorDetail(err);
         applyNotice.show(recordingShown
           ? `Recording stopped: ${detail}`
           : `Recording failed to start: ${detail}`, RECORD_NOTICE);
@@ -475,9 +475,8 @@ export function start({
         // listener and cover a running simulator with the fatal banner.
         shaderDocuments?.init().catch((err) => {
           console.error('The shader workbench could not be initialized:', err);
-          const detailText = (err && err.message) ? err.message : String(err);
           applyNotice.show(
-            `The shader workbench could not be initialized: ${detailText}`,
+            `The shader workbench could not be initialized: ${errorDetail(err)}`,
             CONFIG_NOTICE);
         });
       } catch (err) {
@@ -485,8 +484,7 @@ export function start({
         const title = 'No supported resolution and effect could be applied.';
         if (!showBootstrapFailure(err,
             { document: doc, location: win.location, title })) {
-          const detailText = (err && err.message) ? err.message : String(err);
-          showFatalError(`${title} ${detailText}`);
+          showFatalError(`${title} ${errorDetail(err)}`);
         }
         // The rejected apply has already moved the engine, pool, driver and
         // sidebar; the panels would stay live over a blanked canvas.
@@ -510,8 +508,8 @@ export function start({
         location: win.location,
         title: 'Failed to load the rendering engine.',
       })) {
-        const detailText = (err && err.message) ? err.message : String(err);
-        showFatalError(`Failed to initialize the rendering engine. ${detailText}`);
+        showFatalError(
+          `Failed to initialize the rendering engine. ${errorDetail(err)}`);
       }
     },
   });
