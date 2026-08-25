@@ -446,7 +446,9 @@ const validateParameterShape = (parameter, path) => {
   if (parameter.interpolation.kind === 'SHORTEST_PERIODIC' &&
       !(Number.isFinite(parameter.interpolation.period) && parameter.interpolation.period > 0))
     fail('semantic', 'INVALID_PERIOD', `${path}.interpolation.period`, 'Periodic interpolation requires a positive period.');
-  if (parameter.interpolation.kind === 'NORMALIZED_LINEAR')
+  // A group id schedules staggered transitions under every kind, so it is well-
+  // formedness checked wherever it appears; NORMALIZED_LINEAR also requires one.
+  if (parameter.interpolation.kind === 'NORMALIZED_LINEAR' || 'group' in parameter.interpolation)
     id(parameter.interpolation.group, `${path}.interpolation.group`);
   validateStoredValue(parameter, parameter.default, `${path}.default`);
 };
