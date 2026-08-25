@@ -548,25 +548,16 @@ test('bypass toggles the program shape without touching the document', async () 
   assert.equal(chipByLabel(h, 'lens').classList.contains('chain-chip--bypassed'), false);
 });
 
-test('a chip selects by click, never by pointer travel', async () => {
+// A press that travels off a chip is a real-layout gesture, and no chip binds
+// a pointer listener to observe it: scripts/workbench-probe.mjs owns it.
+test('a chip selects by click', async () => {
   const h = await makeStrip();
-  chipByLabel(h, 'lens').dispatch('pointerdown',
-    { isPrimary: true, button: 0, pointerId: 3, clientX: 40, clientY: 10 });
-  h.container.dispatch('pointerup', { pointerId: 3, clientX: 41, clientY: 10 });
   assert.equal(h.store.selectedLabel(), null);
 
   chipByLabel(h, 'lens').dispatch('click');
   assert.equal(h.store.selectedLabel(), 'lens');
-  assert.deepEqual(h.selections, ['lens']);
-  assert.deepEqual(h.applied, [], 'a selection is no structural edit');
-
-  chipByLabel(h, 'camera').dispatch('pointerdown',
-    { isPrimary: true, button: 0, pointerId: 4, clientX: 10, clientY: 10 });
-  h.container.dispatch('pointermove', { pointerId: 4, clientX: 90, clientY: 10 });
-  h.container.dispatch('pointerup', { pointerId: 4, clientX: 90, clientY: 10 });
-  assert.equal(h.store.selectedLabel(), 'lens',
-    'pointer travel moves the selection nowhere');
   assert.deepEqual(h.selections, ['lens'], 'the selection is announced once');
+  assert.deepEqual(h.applied, [], 'a selection is no structural edit');
 });
 
 test('reorder buttons replace the chip drag affordance', async () => {
