@@ -1,21 +1,36 @@
 //
-// daydream.js is the app's composition root. Its assembly is executed in
-// tests/daydream_start.test.js, which drives start(deps) against fakes, and the
-// factories it composes are driven in tests/app_lifecycle.test.js — the Pole LOD
-// late-bind, the keydown guard, the module-load handlers, the teardown order.
-// What is left here is which closure the root hands each factory: a value only a
-// source read can see, so those cases read it, and each names the failure it
-// prevents. The engine-death and segmented-POV blocks below are driven instead:
-// a started app reaches the latch, the teardown and the switch coordinator
-// through their effects, which is what a source read was standing in for.
+// daydream.js is the app's composition root. tests/daydream_start.test.js drives
+// start(deps) up to the point the WASM load is kicked off, and
+// tests/app_lifecycle.test.js drives the factories it composes. What is left
+// here is the half of the boot that only runs once a module lands — the engine
+// the load builds, the initial apply, the recorder the controls are handed, the
+// resolution dropdown narrowed to what the engine reports, and the release paths
+// a discard racing that startup takes — plus the two control blocks start()
+// lifts out, driven through their factories. Each case asserts on what the page
+// ends up showing or holding, so it survives a re-shaping of start() and reds a
+// wrong one.
+//
+// Four cases below still read the source, because nothing a started app or an
+// injected factory exposes can see what they pin: the module-evaluation version
+// guard, which runs before there is an app; the owner tag the root hands the
+// segmented controls, which only a real worker pool could raise a notice
+// through; and the two halves of the workbench init rejection, whose controller
+// the fake document carries none of the element ids for. Each is anchored on the
+// call site rather than the factory definition above it, and each says which
+// failure it stands in for.
 import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fakeElement, restoreDocumentAfterEach } from './fake_dom.js';
 import { URL_FLUSH_DEBOUNCE_MS } from '../state.js';
-import { EffectSetResult, ResolutionSetResult } from './fake_engine.js';
+import {
+  EffectSetResult, ParamSetResult, ResolutionSetResult,
+} from './fake_engine.js';
 import { captureConsole, installConsoleCapture } from './fake_console.js';
-import { createRecordingControls } from '../daydream.js';
+import {
+  createRecordingControls,
+  createSegmentedPovControls,
+} from '../daydream.js';
 import {
   createSegmentPoolSpawner,
   fakeGui,
@@ -76,14 +91,24 @@ function withoutComments(src) {
 const SOURCE = withoutComments(
   readFileSync(new URL('../daydream.js', import.meta.url), 'utf8'));
 
-test('catalog effects are offered at both simulator resolutions', () => {
+// The two simulator presets, as the driver is told to size itself to them.
+const PHANTASM = [288, 144, 0.25];
+const HOLOSPHERE = [96, 20, 2];
+
+test('catalog effects are offered at both simulator resolutions', async () => {
+  const app = await bootedApp({
+    loadModule: () => Promise.resolve(fakeWasmModule()),
+  });
+  const hiRes = offeredEffects(app);
+
+  captureConsole(() => resolutionControl(app).setValue('Holosphere (96x20)'));
+  const loRes = offeredEffects(app);
+
   for (const effect of ['AshCloud', 'HyperLattice']) {
-    for (const roster of ['HiResFavorites', 'LoResFavorites']) {
-      const at = SOURCE.indexOf(`const ${roster} = [`);
-      assert.ok(at >= 0, `daydream.js must still define ${roster}`);
-      assert.match(sliceTo(at, '\n];'), new RegExp(`"${effect}"`),
-        `${roster} must offer ${effect}`);
-    }
+    assert.ok(hiRes.includes(effect),
+      `the sidebar must offer ${effect} at the high-res preset`);
+    assert.ok(loRes.includes(effect),
+      `the sidebar must offer ${effect} at the low-res preset`);
   }
 });
 
@@ -101,27 +126,6 @@ test('the shader-document roster names exactly the documents that ship', () => {
 });
 
 /**
- * Extracts the text between a call's parentheses, skipping parens that sit
- * inside strings or template literals.
- * @param {string} src - Comment-blanked source text.
- * @param {number} open - Index of the opening '('.
- * @returns {string} The argument-list text.
- */
-function balanced(src, open) {
-  let depth = 0;
-  for (let i = open; i < src.length; i++) {
-    const c = src[i];
-    if (c === "'" || c === '"' || c === '`') {
-      for (i++; i < src.length && src[i] !== c; i++) if (src[i] === '\\') i++;
-      continue;
-    }
-    if (c === '(') depth++;
-    else if (c === ')' && --depth === 0) return src.slice(open + 1, i);
-  }
-  assert.fail(`daydream.js: unbalanced parentheses from index ${open}`);
-}
-
-/**
  * Slices from `at` to the first `sentinel` after it, asserting the sentinel is
  * present so a drifted terminator fails instead of widening the window.
  * @param {number} at - Start index.
@@ -134,40 +138,95 @@ function sliceTo(at, sentinel) {
   return SOURCE.slice(at, end);
 }
 
-const WASM_INIT = 'createModuleLoadHandlers(';
-
 /**
- * The dependency block wiring the WASM module promise, including the startup
- * handler that builds the engine.
- * @returns {string} The argument source.
+ * A module the composition root can boot all the way through: enough engine
+ * surface for the initial resolution apply, the effect panel and one rendered
+ * frame, with the contract-pinned enums so identity comparison behaves as it
+ * does against embind. The counters are what a case reads the constructions,
+ * handle releases, Pole LOD replays and parameter writes off.
+ * @param {{resolutions?: Array<Array<number>>, definitions?: Array<Object>,
+ *   refusedWidth?: ?number}} [options] - The resolutions the engine reports it
+ *   can build, the parameter definitions the effect panel is built from, and a
+ *   width setResolution rejects.
+ * @returns {Object} The module double.
  */
-function wasmReadyBlock() {
-  const at = SOURCE.indexOf(WASM_INIT);
-  assert.ok(at >= 0, `daydream.js must still wire the engine load through ${WASM_INIT}`);
-  return balanced(SOURCE, at + WASM_INIT.length - 1);
-}
-
-/**
- * A WASM module carrying only what the composition root touches before its
- * first apply: the engine constructor, its two statics, and the Pole LOD write
- * the load replays. The initial resolution apply then finds no setResolution
- * and is refused, which disposes the app it had already moved — so a case sees
- * a root that built its engine and then released everything it owned.
- * @returns {Object} The module, with engines() counting the constructions.
- */
-function fakeWasmModule() {
+function fakeWasmModule({
+  resolutions = [[288, 144], [96, 20]],
+  definitions = [],
+  refusedWidth = null,
+} = {}) {
+  const pixels = new Uint16Array(288 * 144 * 3);
   let built = 0;
+  let deleted = 0;
+  const poleLod = [];
+  const params = [];
   return {
     HS_MODULE_DEAD: false,
+    EffectSetResult,
+    ParamSetResult,
+    ResolutionSetResult,
     engines: () => built,
+    deletes: () => deleted,
+    poleLod,
+    params,
     HolosphereEngine: class {
       constructor() { built++; }
       static isLive() { return false; }
-      static getSupportedResolutions() { return [[96, 20]]; }
-      setPoleLod() {}
-      delete() {}
+      static getSupportedResolutions() { return resolutions; }
+      setResolution(w) {
+        return w === refusedWidth
+          ? ResolutionSetResult.UNSUPPORTED : ResolutionSetResult.RESIZED;
+      }
+      setEffect() { return EffectSetResult.INSTALLED; }
+      setParameter(name, value) {
+        params.push([name, value]);
+        return ParamSetResult.APPLIED;
+      }
+      setPoleLod(v) { poleLod.push(v); }
+      setAnimationsPaused() {}
+      getAnimationsPaused() { return false; }
+      getPresetCount() { return 0; }
+      getPresetIndex() { return 0; }
+      getParameterDefinitions() { return definitions.map((d) => ({ ...d })); }
+      getParamValues() { return new Float32Array(0); }
+      getParamGeneration() { return 1; }
+      getEffectSizes() { return {}; }
+      getEffectPresetCounts() { return {}; }
+      getArenaMetrics() { return {}; }
+      strobeColumns() { return false; }
+      drawFrame() {}
+      getPixels() { return pixels; }
+      getBufferLength() { return pixels.length; }
+      delete() { deleted++; }
     },
   };
+}
+
+/** @returns {string} The text the shared notice element is showing. */
+function noticeText(app) {
+  return app.elements.get('apply-notice-text').textContent;
+}
+
+/** @returns {Array<string>} The effects the sidebar is offering. */
+function offeredEffects(app) {
+  return app.elements.get('effect-sidebar')
+    .querySelectorAll('[data-effect]').map((option) => option.dataset.effect);
+}
+
+/** @returns {Object} The live resolution dropdown on the global GUI root. */
+function resolutionControl(app) {
+  return app.guis[0].controllers.find((c) => c.property === 'resolution');
+}
+
+/**
+ * A controller in the Recording folder of a booted app.
+ * @param {Object} app - A startApp() result.
+ * @param {string} property - The bound property name.
+ * @returns {Object} The controller double.
+ */
+function recordingControl(app, property) {
+  return app.guis[0].folders.find((folder) => folder.namespace === 'Recording')
+    .controllers.find((controller) => controller.property === property);
 }
 
 /**
@@ -188,44 +247,6 @@ async function bootedApp(options) {
   }
 }
 
-/**
- * A module the composition root can boot all the way through: enough engine
- * surface for the initial resolution apply, the effect panel and one rendered
- * frame, with the contract-pinned enums so identity comparison behaves as it
- * does against embind.
- * @returns {Object} The module.
- */
-function bootableWasmModule() {
-  const pixels = new Uint16Array(288 * 144 * 3);
-  return {
-    HS_MODULE_DEAD: false,
-    EffectSetResult,
-    ResolutionSetResult,
-    HolosphereEngine: class {
-      static isLive() { return false; }
-      static getSupportedResolutions() { return [[288, 144], [96, 20]]; }
-      setResolution() { return ResolutionSetResult.RESIZED; }
-      setEffect() { return EffectSetResult.INSTALLED; }
-      setPoleLod() {}
-      setAnimationsPaused() {}
-      getAnimationsPaused() { return false; }
-      getPresetCount() { return 0; }
-      getPresetIndex() { return 0; }
-      getParameterDefinitions() { return []; }
-      getParamValues() { return new Float32Array(0); }
-      getParamGeneration() { return 1; }
-      getEffectSizes() { return {}; }
-      getEffectPresetCounts() { return {}; }
-      getArenaMetrics() { return {}; }
-      strobeColumns() { return false; }
-      drawFrame() {}
-      getPixels() { return pixels; }
-      getBufferLength() { return pixels.length; }
-      delete() {}
-    },
-  };
-}
-
 /** Waits out one URL-flush debounce window. @returns {Promise<void>} */
 const settleUrl = () =>
   new Promise((resolve) => setTimeout(resolve, URL_FLUSH_DEBOUNCE_MS * 2));
@@ -234,7 +255,7 @@ test('the migrated ShaderBall URL is written only once a frame has applied it', 
   const app = await bootedApp({
     daydreamMode: 'shader-workbench',
     search: '?effect=ShaderBall',
-    loadModule: () => Promise.resolve(bootableWasmModule()),
+    loadModule: () => Promise.resolve(fakeWasmModule()),
   });
   const notice = app.elements.get('apply-notice-text');
   await settleUrl();
@@ -419,7 +440,7 @@ test('a module that lands after the page was discarded builds no engine', async 
 });
 
 test('a refused initial apply disposes the app it already moved', async () => {
-  const module = fakeWasmModule();
+  const module = fakeWasmModule({ refusedWidth: 288 });
   const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
 
   assert.equal(module.engines(), 1, 'the load must have built the engine');
@@ -454,113 +475,154 @@ test('the page-failure surface is the shared one, and it is torn down', () => {
 });
 
 test('the composition root rejects a stale segmented-controller module', () => {
-  assert.match(SOURCE, /SEGMENT_CONTROLLER_API_VERSION/,
-    'a fresh daydream.js must require a named export absent from stale cached controllers');
   assert.match(SOURCE,
     /SEGMENT_CONTROLLER_API_VERSION !== EXPECTED_SEGMENT_CONTROLLER_API_VERSION/,
-    'a controller from a different API generation must fail inside bootstrap');
+    'a controller from a different API generation must fail at module '
+    + 'evaluation, before there is an app for a case to drive');
 });
 
-test('the param writer and the switch coordinator own the notice separately', () => {
-  const consequence = 'both announce through the one notice element, so each '
-    + 'must tag its writes with an owner of its own; sharing a tag lets a slider '
-    + 'nudge clear a switch rejection';
-  assert.match(SOURCE, /applyNotice\.show\(message, PARAM_NOTICE\)/, consequence);
-  assert.match(SOURCE, /applyNotice\.show\(null, PARAM_NOTICE\)/, consequence);
-  assert.match(SOURCE, /showNotice:\s*\(message\)\s*=>\s*applyNotice\.show\(message, SWITCH_NOTICE\)/,
-    consequence);
-  assert.notEqual(
-    SOURCE.match(/PARAM_NOTICE = '([^']*)'/)?.[1],
-    SOURCE.match(/SWITCH_NOTICE = '([^']*)'/)?.[1],
-    'the two owner tags must differ',
-  );
+test('a parameter write does not clear a rejected switch', async () => {
+  const module = fakeWasmModule({
+    definitions: [{ name: 'Speed', value: 1, min: 0, max: 2 }],
+  });
+  const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
+
+  // Only the switch the case is about is turned down, so its rollback stands
+  // and the coordinator reports a rejection rather than the fatal banner.
+  module.HolosphereEngine.prototype.setResolution = (w) => (w === 96
+    ? ResolutionSetResult.UNSUPPORTED : ResolutionSetResult.RESIZED);
+  captureConsole(() => resolutionControl(app).setValue('Holosphere (96x20)'));
+  const rejection = noticeText(app);
+  assert.match(rejection, /Resolution change was rejected/,
+    'a refused switch whose rollback stood must be reported to the user');
+
+  const speed = app.guis.at(-1).controllers.find((c) => c.property === 'Speed');
+  captureConsole(() => speed.setValue(1.5));
+
+  assert.deepEqual(module.params.at(-1), ['Speed', 1.5],
+    'the write must have reached the engine');
+  assert.equal(noticeText(app), rejection,
+    'both announce through the one notice element, so each must tag its writes '
+    + 'with an owner of its own; sharing a tag lets a slider nudge clear a '
+    + 'switch rejection');
 });
 
-test('a segmented-POV spawn failure is announced, not only logged', () => {
-  // The call site, not the definition above it: the owner tag is the root's.
-  const wired = SOURCE.lastIndexOf('createSegmentedPovControls(');
-  assert.ok(wired >= 0, 'the segmented controls must stay wired to their factory');
-  const at = SOURCE.indexOf('createSegmentedFallback(');
-  assert.ok(at >= 0, 'the segmented fallback must stay wired to its factory');
-  const args = balanced(SOURCE, SOURCE.indexOf('(', at));
-  assert.match(args, /showNotice,/, 'the fallback must reach the notice sink');
-  assert.match(balanced(SOURCE, SOURCE.indexOf('(', wired)),
-    /showNotice:\s*\(message\)\s*=>\s*applyNotice\.show\(message, SWITCH_NOTICE\)/,
+test('a segmented-POV failure is announced and returns the toggle', async () => {
+  const gui = fakeGui('view');
+  const notices = [];
+  let refusals = 1;
+  const segments = {
+    active: false,
+    count: 2,
+    showBoundaries: false,
+    destroy() {
+      // A pool that refuses once: the fallback tears down again on its way
+      // through, and a second throw would escape it rather than be reported.
+      if (refusals-- > 0) throw new Error('a worker would not stop');
+    },
+    updateStats() {},
+  };
+  createSegmentedPovControls({
+    gui,
+    segments,
+    nav: { hardwareConcurrency: 8 },
+    driver: { isMobile: false },
+    showNotice: (message) => notices.push(message),
+  });
+  const enabled = gui.folders.find((f) => f.namespace === 'Segmented POV')
+    .controllers.find((c) => c.property === 'segmented');
+
+  // The handler as lil-gui fires it, leaving `value` untouched until the
+  // fallback writes it back.
+  let settled;
+  captureConsole(() => { settled = enabled.changed(false); });
+  await settled;
+
+  assert.match(notices.at(-1), /Segmented POV teardown failed:.*would not stop/,
     'a console-only failure is invisible: the user sees the toggle flip back '
-    + 'and cannot tell it from a mis-click, the fault banner covers only latched '
-    + 'runtime faults, and the switch owner tag is what keeps a parameter write '
-    + 'from clearing the notice');
-  assert.match(args, /showToggle:\s*\(on\)\s*=>\s*segEnabledCtrl\.setValue\(on\)/,
+    + 'and cannot tell it from a mis-click, and the fault banner covers only '
+    + 'latched runtime faults');
+  assert.equal(enabled.value, false,
     'setValue (not updateDisplay) is what makes the deep-link writer drop '
     + 'segmented=true from the URL');
 });
 
-test('a recording start or stop is announced, not only styled', () => {
-  const at = SOURCE.indexOf('const recordState = {');
-  assert.ok(at >= 0, 'the record toggle must stay a named binding');
-  const body = sliceTo(at, '\n  }};');
-  assert.match(body, /showNotice\(/,
-    'the canvas tint, the duration readout, and the button label are all '
-    + 'visual: without a notice a screen-reader user gets no report that the '
-    + 'session started or ended');
-  assert.match(
-    balanced(SOURCE, SOURCE.indexOf('(', SOURCE.lastIndexOf('createRecordingControls('))),
-    /showNotice:\s*\(message\)\s*=>\s*applyNotice\.show\(message, RECORD_NOTICE\)/,
-    'the owner tag belongs to the root: sharing one with the param writer '
-    + 'lets a slider nudge clear a recording report');
-  assert.match(body, /Recording started\./);
-  assert.match(body, /Recording stopped\./);
-  assert.match(body, /!wasRecording && !isRecording/,
-    'a start that never began a session has already reported why through '
-    + 'onError, and the generic stop message carries the same owner tag, so '
-    + 'writing it here replaces the only explanation the user was given with '
-    + 'one that is also untrue');
+test('the segmented controls report under the switch owner tag', () => {
+  // The call site, not the definition above it: the owner tag is the root's.
+  const at = SOURCE.lastIndexOf('createSegmentedPovControls(');
+  assert.ok(at >= 0, 'the segmented controls must stay wired to their factory');
+  assert.match(sliceTo(at, '\n  });'),
+    /showNotice:\s*\(message\)\s*=>\s*applyNotice\.show\(message, SWITCH_NOTICE\)/,
+    'the owner tag is what keeps a parameter write from clearing the fallback '
+    + 'notice, and only a real worker pool could raise one through a booted '
+    + 'app, so the fakes cannot reach this');
 });
 
-test('a refused recording container is announced, not silently substituted', () => {
-  const at = SOURCE.indexOf('recorder.onFormatFallback =');
-  assert.ok(at >= 0, 'the format-fallback hook must stay wired');
-  const body = sliceTo(at, '\n      };');
-  assert.doesNotMatch(body, /setValue/,
+test('a recording report reaches the shared notice element', async () => {
+  const module = fakeWasmModule({
+    definitions: [{ name: 'Speed', value: 1, min: 0, max: 2 }],
+  });
+  const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
+  const record = recordingControl(app, 'record');
+  const format = recordingControl(app, 'recFormat');
+  const recorder = app.driver.recorder;
+  assert.ok(recorder, 'the load must have handed the controls a recorder');
+
+  recorder.toggle = () => { recorder.onFormatFallback('webm'); return true; };
+  captureConsole(() => record.object.record());
+  const started = noticeText(app);
+
+  assert.match(started, /^Recording started\..*recording as WebM\./,
+    'the tint, the readout and the button label are all visual, and the rig '
+    + 'above injects the sink: what the page needs is that sink pointed at the '
+    + 'one notice element, or the report reaches nobody');
+  assert.equal(format.object.recFormat, 'Auto',
     'rewriting the Rec Format dropdown fires its onChange, which overwrites '
     + "the user's chosen container for the rest of the session");
-  assert.match(body, /formatFallback =/,
-    'the hook fires inside toggle(), whose caller raises the record notice '
-    + 'under the same owner tag: a notice written here would be replaced');
-  const record = sliceTo(SOURCE.indexOf('const recordState = {'), '\n  }};');
-  assert.match(record, /formatFallback = ''/,
-    'a stale detail would be appended to a later session that encoded fine');
-  assert.match(record, /\$\{formatFallback\}/,
-    'without this the fallback reaches the user as nothing at all: on Firefox '
-    + 'an MP4 request records WebM with no report');
+
+  const speed = app.guis.at(-1).controllers.find((c) => c.property === 'Speed');
+  captureConsole(() => speed.setValue(1.5));
+  assert.equal(noticeText(app), started,
+    'the owner tag belongs to the root: sharing one with the param writer lets '
+    + 'a slider nudge clear a recording report');
+
+  recorder.toggle = () => false;
+  captureConsole(() => record.object.record());
+  assert.equal(noticeText(app), 'Recording stopped.',
+    'the end of a session is as unreported as its start without this');
 });
 
-test('a recorder fault reports its reason, not just an un-tinted canvas', () => {
-  const at = SOURCE.indexOf('recorder.onError =');
-  assert.ok(at >= 0, 'the recorder fault hook must stay wired');
-  const body = sliceTo(at, '\n      };');
-  assert.match(body, /\(err\)/,
-    'the hook is handed the reason; dropping the parameter throws it away');
-  assert.match(body, /showNotice\(/,
-    'an encoder fault, a failed start, and a cancelled Save dialog all reach '
-    + 'the user as the Record button flicking back, which reads as a mis-click '
-    + 'unless the reason is announced');
-  assert.match(body, /showRecording\(false\)/,
-    'the session is already gone: the button must stop offering to stop it');
-  assert.match(body, /failed to start/,
-    'the hook also fires for a start that never produced a session, where '
-    + '"Recording stopped" names something that never happened');
+test('a start that never began a session keeps the reason it was given', async () => {
+  const app = await bootedApp({
+    loadModule: () => Promise.resolve(fakeWasmModule()),
+  });
+  const record = recordingControl(app, 'record');
+  const recorder = app.driver.recorder;
+
+  recorder.toggle = () => {
+    recorder.onError(new Error('no encoder'));
+    return false;
+  };
+  captureConsole(() => record.object.record());
+
+  assert.match(noticeText(app), /Recording failed to start:.*no encoder/,
+    'the fault hook has already reported why, and the generic stop message '
+    + 'carries the same owner tag, so writing it would replace the only '
+    + 'explanation the user was given with one that is also untrue');
 });
 
-test('the discard path frees an engine built after disposal', () => {
-  const body = wasmReadyBlock();
-  assert.match(body, /discardStartup:/,
-    'a startup that loses the disposal race owns everything it built; dispose() '
-    + 'has already run and will not revisit it');
-  assert.match(body, /host\.dispose\(\)/,
-    'a WASM engine handle must be deleted, not merely dropped, and the release '
-    + 'that deletes it is EngineHost.dispose() — the same one the page teardown '
-    + 'runs, so the two paths cannot drift');
+test('the discard path releases what the refused startup had already built', async () => {
+  const module = fakeWasmModule({ refusedWidth: 288 });
+  const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
+
+  assert.equal(module.deletes(), 1,
+    'a WASM engine handle must be deleted, not merely dropped, and the startup '
+    + 'that lost the disposal race owns everything it built: the page teardown '
+    + 'and the discard path both release through EngineHost.dispose(), so '
+    + 'whichever of them gets there frees it and neither can drift');
+  assert.equal(app.driver.recorder, null,
+    'the recorder the startup hung on the driver captures a stream from a '
+    + 'canvas the teardown has already released');
 });
 
 test('the segmented POV deep-link keys keep the names shared links carry', () => {
@@ -624,26 +686,60 @@ test('the spawn bounds the pool by the ceiling the device carries now', () => {
   assert.deepEqual(created, [8, 4],
     'a rotation into the mobile layout must lower the next pool spawn');
 });
-test('the late-bound engine controls are re-applied once the engine exists', () => {
-  assert.match(wasmReadyBlock(), /poleLod\.replay\(\)/,
+test('the late-bound engine controls are re-applied once the engine exists', async () => {
+  const module = fakeWasmModule();
+  let deliver;
+  const capture = installConsoleCapture('error', 'warn', 'log');
+  const app = startApp({ loadModule: () => new Promise((resolve) => { deliver = resolve; }) });
+  try {
+    app.guis[0].controllers.find((c) => c.property === 'poleLod').setValue(1.5);
+    deliver(module);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  } finally {
+    capture.restore();
+  }
+
+  assert.deepEqual(module.poleLod, [1.5],
     'the Pole LOD onChange runs while host.engine is null, so the block that '
     + 'builds the engine must replay the binding; without it a ?view.poleLod '
     + 'deep link shows in the GUI but never reaches the engine');
 });
 
-test('narrowing the resolution options rebinds the controller and its handler', () => {
-  const consequence = "lil-gui's base Controller.options() destroys the receiver "
-    + 'and returns a replacement that carries the name but no onChange (only an '
-    + 'OptionController updates itself in place); syncResolutionOptions runs on '
-    + 'every boot, so a discarded return value would leave the live dropdown '
-    + 'writing to nothing and setValue() updating a detached <select>';
-  assert.match(SOURCE, /let resolutionController/, consequence);
-  assert.match(SOURCE, /resolutionController = resolutionController\.options\([^)]*\)\s*\.onChange\(setResolution\)/,
-    consequence);
-  assert.match(SOURCE, /const setResolution = \(v\) => appState\.set\('resolution', v\)/,
-    'the replacement must re-attach the same handler the original carried, or '
-    + 'the dropdown and the muted engine correction diverge');
+test('the resolution dropdown offers only what the engine reports', async () => {
+  const app = await bootedApp({
+    loadModule: () => Promise.resolve(fakeWasmModule({ resolutions: [[96, 20]] })),
+  });
+
+  assert.deepEqual(resolutionControl(app).args[0], ['Holosphere (96x20)'],
+    'an unsupported row the user can still pick applies nothing and reports a '
+    + 'rejection instead');
+  assert.deepEqual(app.driver.resolution, HOLOSPHERE,
+    'a hydrated resolution the engine cannot build must be corrected before '
+    + 'first paint, not left advertised by the GUI and the URL');
 });
+
+// Both lil-gui options() behaviours, which tests/lil_gui_contract.test.js pins
+// against the real widget: the narrowing runs on every boot, so the dropdown
+// the page is left with has to still drive a switch under either.
+for (const optionsReplaces of [false, true]) {
+  const branch = optionsReplaces ? 'a replaced' : 'an updated';
+  test(`${branch} resolution dropdown still drives a switch`, async () => {
+    const app = await bootedApp({
+      optionsReplaces,
+      loadModule: () => Promise.resolve(fakeWasmModule()),
+    });
+    assert.deepEqual(app.driver.resolution, PHANTASM);
+
+    captureConsole(() => resolutionControl(app).setValue('Holosphere (96x20)'));
+
+    assert.deepEqual(app.driver.resolution, HOLOSPHERE,
+      "lil-gui's base Controller.options() destroys the receiver and returns a "
+      + 'replacement that carries the name but no onChange, while an '
+      + 'OptionController updates itself in place; a discarded return value '
+      + 'leaves the live dropdown writing to nothing and the muted engine '
+      + 'correction updating a detached <select>');
+  });
+}
 
 test('a trapped resolution query stops the startup instead of booting on', async () => {
   let built = 0;
@@ -688,13 +784,13 @@ test('a workbench init that trapped the module releases the app', () => {
 });
 
 test('a failed workbench init reports without the page-failure banner', () => {
-  assert.match(wasmReadyBlock(),
-    /shaderDocuments\?\.init\(\)\s*\.catch\(/,
+  const at = SOURCE.indexOf('shaderDocuments?.init().catch(');
+  assert.ok(at >= 0,
     'init() is async and the surrounding catch only sees a synchronous throw, '
     + 'so a dropped rejection reaches the page-failure listener and covers a '
     + 'running simulator with the fatal banner');
-  assert.match(wasmReadyBlock(),
-    /workbench could not be initialized: \$\{[^}]+\}`,\s*CONFIG_NOTICE/,
+  assert.match(sliceTo(at, 'CONFIG_NOTICE);'),
+    /workbench could not be initialized: \$\{[^}]+\}`,\s*$/,
     'the workbench half must report through the shader config notice, the '
     + 'owner tag its other messages carry');
 });

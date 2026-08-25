@@ -26,15 +26,25 @@ const isOptionList = (arg) =>
  * @param {Array<any>} args - Range/options arguments add() was called with.
  * @returns {Object} The controller double.
  */
-function fakeController(owner, object, property, args = []) {
+function fakeController(owner, object, property, args = [], optionsReplaces = false) {
+  // lil-gui exposes one focusable widget per control kind: $select for a choices
+  // list, $button for a function, $input otherwise.
+  const kind = isOptionList(args[0]) ? 'select'
+    : typeof object[property] === 'function' ? 'button' : 'input';
+  const widget = fakeElement(kind);
+  // The effect panel styles, labels and re-parents its rows through this.
+  const domElement = fakeElement('div');
+  domElement.appendChild(widget);
   const controller = {
     object,
     property,
     args,
     value: undefined,
     calls: [],
-    // The effect panel styles, labels and re-parents its rows through this.
-    domElement: fakeElement('div'),
+    domElement,
+    [`$${kind}`]: widget,
+    getValue() { return object[property]; },
+    decimals() { return controller; },
     name(text) { controller.label = text; return controller; },
     onChange(fn) { controller.changed = fn; return controller; },
     setValue(v) { controller.value = v; controller.changed?.(v); return controller; },
@@ -44,12 +54,13 @@ function fakeController(owner, object, property, args = []) {
     // controller is destroyed and a replacement carrying the copied name is
     // appended to the end of the panel. Pinned by tests/lil_gui_contract.test.js.
     options(choices) {
-      if (isOptionList(controller.args[0])) {
+      if (!optionsReplaces && isOptionList(controller.args[0])) {
         controller.args = [choices];
         return controller;
       }
       controller.destroyed = true;
-      const replacement = fakeController(owner, object, property, [choices]);
+      const replacement = fakeController(
+        owner, object, property, [choices], optionsReplaces);
       replacement.label = controller.label;
       const at = owner.controllers.indexOf(controller);
       if (at >= 0) owner.controllers.splice(at, 1);
@@ -67,9 +78,11 @@ function fakeController(owner, object, property, args = []) {
  * A DeepLinkGUI (gui.js) root or folder: records the controllers, folders, and
  * stored values built on it.
  * @param {string} namespace - Root namespace or folder title.
+ * @param {boolean} [optionsReplaces=false] - Builds every controller under the
+ *   base Controller.options() behaviour instead of the OptionController one.
  * @returns {Object} The GUI double.
  */
-export function fakeGui(namespace) {
+export function fakeGui(namespace, optionsReplaces = false) {
   const gui = {
     namespace,
     domElement: fakeElement('div'),
@@ -78,13 +91,13 @@ export function fakeGui(namespace) {
     stored: new Map(),
     destroyed: false,
     add(target, property, ...args) {
-      const c = fakeController(gui, target, property, args);
+      const c = fakeController(gui, target, property, args, optionsReplaces);
       gui.controllers.push(c);
       return c;
     },
     // Session controls carry no deep link, so the two are told apart here.
     addSession(target, property, ...args) {
-      const c = fakeController(gui, target, property, args);
+      const c = fakeController(gui, target, property, args, optionsReplaces);
       c.session = true;
       gui.controllers.push(c);
       return c;
@@ -100,14 +113,14 @@ export function fakeGui(namespace) {
       return c;
     },
     addFolder(title) {
-      const folder = fakeGui(title);
+      const folder = fakeGui(title, optionsReplaces);
       gui.folders.push(folder);
       return folder;
     },
     // A display folder prefixes no deep-link key, so its controls answer to the
     // same names they would at the root.
     addDisplayFolder(title) {
-      const folder = fakeGui(title);
+      const folder = fakeGui(title, optionsReplaces);
       folder.display = true;
       gui.folders.push(folder);
       return folder;
@@ -163,10 +176,12 @@ export function fakeDriver() {
 /**
  * Builds the app against fakes.
  * @param {{loadModule?: () => Promise<Object>, nav?: Object,
- *   daydreamMode?: string, search?: string}} [options] - Seam overrides.
- *   daydreamMode stamps documentElement, the attribute start() reads to route
- *   the workbench page; search is the query string URLSync hydrates from and
- *   the redirect builds its target against.
+ *   daydreamMode?: string, search?: string, optionsReplaces?: boolean}}
+ *   [options] - Seam overrides. daydreamMode stamps documentElement, the
+ *   attribute start() reads to route the workbench page; search is the query
+ *   string URLSync hydrates from and the redirect builds its target against;
+ *   optionsReplaces puts every controller on the destroy-and-replace side of
+ *   options() (see fakeController).
  * @returns {Object} The pieces a case asserts on, plus the global restorer.
  */
 export function startApp({
@@ -174,6 +189,7 @@ export function startApp({
   nav = { hardwareConcurrency: 8 },
   daydreamMode = undefined,
   search = '',
+  optionsReplaces = false,
 } = {}) {
   const savedGlobals = new Map([
     'document', 'window', 'ResizeObserver', 'requestAnimationFrame',
@@ -236,7 +252,7 @@ export function startApp({
     nav,
     createDriver: () => driver,
     createGui: (options, namespace) => {
-      const gui = fakeGui(namespace);
+      const gui = fakeGui(namespace, optionsReplaces);
       guis.push(gui);
       return gui;
     },
