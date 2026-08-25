@@ -2615,6 +2615,98 @@ test('a ShaderBall drag writes one full-config snapshot, at the release', () => 
     [FULL_CONFIG_STORAGE_KEY, JSON.stringify(snapshot(0.5))],
   ], 'the release deep-links the state the last move would have');
 });
+test('a schema rebuild mid-drag still lands the write the drag deferred', () => {
+  const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
+  const h = makeHarness({
+    params: [speed],
+    engineValues: [0.1],
+    generation: 3,
+    onEngineParam: (_name, value) => { speed.value = value; },
+  });
+  h.panel.build();
+  h.panel.mount();
+  const controller = h.gui().ctrl('Speed');
+  const dragged = h.gui();
+  dragged.storedWrites.length = 0;
+
+  controller.domElement.dispatch('pointerdown');
+  controller.setValue(0.75);
+
+  assert.deepEqual(dragged.storedWrites, [], 'the drag defers the write');
+
+  // The rebuild discards the record the pointer release would have run on.
+  h.state.generation = 4;
+  h.state.engineValues = [0.75];
+  h.panel.sync();
+
+  assert.equal(h.guis.length, 2, 'the schema rebuilt under the drag');
+  assert.deepEqual(dragged.storedWrites, [['__accepted.Speed', 0.75]]);
+  assert.deepEqual(h.dragTarget.listeners, []);
+});
+
+test('a schema rebuild mid-drag lands the whole workbench snapshot', () => {
+  const snapshot = (hue) => ({
+    schemaVersion: 2,
+    accepted: [hue],
+    requested: [hue],
+    pendingFieldIds: [],
+    hasRuntime: false,
+    runtime: [],
+  });
+  const h = makeHarness({
+    params: shaderBallParams(),
+    fullConfig: true,
+    fullConfigSnapshot: snapshot(0),
+    generation: 3,
+    onEngineParam: (name, value, state) => {
+      if (name === 'Hue Shift Amount') state.fullConfigSnapshot = snapshot(value);
+    },
+  });
+  h.panel.build();
+  h.panel.mount();
+  const controller = h.gui().ctrl('Hue Shift Amount');
+  const dragged = h.gui();
+  dragged.storedWrites.length = 0;
+
+  controller.domElement.dispatch('pointerdown');
+  controller.setValue(0.5);
+  h.state.generation = 4;
+  h.panel.sync();
+
+  assert.equal(h.guis.length, 2, 'the schema rebuilt under the drag');
+  assert.deepEqual(dragged.storedWrites, [
+    [FULL_CONFIG_STORAGE_KEY, JSON.stringify(snapshot(0.5))],
+  ], 'the configuration a reload restores is the dragged one');
+});
+
+test('a teardown mid-drag persists the deferred write, and a release only once',
+  () => {
+    const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
+    const harness = () => makeHarness({
+      params: [speed],
+      onEngineParam: (_name, value) => { speed.value = value; },
+    });
+
+    const torn = harness();
+    torn.panel.build();
+    torn.gui().storedWrites.length = 0;
+    torn.gui().ctrl('Speed').domElement.dispatch('pointerdown');
+    torn.gui().ctrl('Speed').setValue(0.4);
+    torn.panel.destroy();
+
+    assert.deepEqual(torn.gui().storedWrites, [['__accepted.Speed', 0.4]]);
+
+    const released = harness();
+    released.panel.build();
+    released.gui().storedWrites.length = 0;
+    released.gui().ctrl('Speed').domElement.dispatch('pointerdown');
+    released.gui().ctrl('Speed').setValue(0.6);
+    released.dragTarget.dispatch('pointerup');
+    released.panel.destroy();
+
+    assert.deepEqual(released.gui().storedWrites, [['__accepted.Speed', 0.6]],
+      'the release cleared the slot the teardown would have flushed');
+  });
 
 test('a release that changed no value persists nothing', () => {
   const h = makeHarness({ params: [SPEED] });
