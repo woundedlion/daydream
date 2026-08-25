@@ -417,7 +417,7 @@ const MESH_FAILURE_REMEDY = {
  * Reads back why a mesh-producing MeshOps call returned null.
  * @param {WasmModule} Mod - The WASM module instance that produced the null.
  * @param {string} what - What the caller was building, used in the message.
- * @returns {{reason: string, message: string, flush: boolean}} The MeshOpResult key, a message to show, and whether clearToolingMemory() is the remedy that reason calls for.
+ * @returns {{reason: string, message: string, flush: boolean, fatal: boolean}} The MeshOpResult key, a message to show, whether clearToolingMemory() is the remedy that reason calls for, and whether the reason leaves no MeshOps call that can ever succeed.
  * @details Embind enum values are singletons, so the recorded result is matched
  * by identity against Module.MeshOpResult, never by truthiness. A module that
  * binds neither the enum nor getLastResult reports reason 'UNKNOWN'.
@@ -433,6 +433,9 @@ export function meshOpFailure(Mod, what) {
     reason,
     message: `${what} failed: ${MESH_FAILURE_REMEDY[reason] ?? 'the engine rejected it'}`,
     flush: reason === 'ARENA_EXHAUSTED',
+    // The tooling block itself is unavailable: no later call can succeed, and
+    // no remedy the page can run brings it back.
+    fatal: reason === 'ARENA_UNAVAILABLE',
   };
 }
 
@@ -445,17 +448,22 @@ export function meshOpFailure(Mod, what) {
  * @param {WasmModule} ctx.Mod - The WASM module instance that produced the result.
  * @param {{clearToolingMemory: () => void}} ctx.meshOps - Its MeshOps binding.
  * @param {(message: string) => void} ctx.onError - Surfaces the failure message to the user.
+ * @param {(message: string) => void} [ctx.onFatal] - Stands the tool down for a failure nothing can recover from.
  * @returns {MeshWrapper?} The result, or null when it was a failure.
  * @details MeshOps answers a recoverable failure with null and records the
  * reason (getLastResult); an unchecked null becomes a TypeError several calls
  * later. Only ARENA_EXHAUSTED is cleared by flushing the tooling arenas, so the
- * flush is applied by reason rather than on every failure.
+ * flush is applied by reason rather than on every failure. ARENA_UNAVAILABLE is
+ * not recoverable at all — every later call fails the same way — so it stands
+ * the tool down the way an engine halt does rather than reporting on a line the
+ * next recompute overwrites.
  */
-export function requireMeshResult(result, what, { Mod, meshOps, onError }) {
+export function requireMeshResult(result, what, { Mod, meshOps, onError, onFatal }) {
   if (result) return result;
   const failure = meshOpFailure(Mod, what);
   if (failure.flush) meshOps.clearToolingMemory();
-  onError(failure.message);
+  if (failure.fatal && onFatal) onFatal(failure.message);
+  else onError(failure.message);
   return null;
 }
 

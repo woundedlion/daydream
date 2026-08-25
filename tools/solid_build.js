@@ -39,6 +39,7 @@ import { applyOp, meshOpFailure, requireMeshResult } from './solid_codegen.js';
  * @property {{fromSolidName: (name: string) => MeshWrapper?, clearToolingMemory: () => void}} meshOps - Its MeshOps binding.
  * @property {(x: number, y: number, z: number) => Vertex} vector - Builds one vertex.
  * @property {(message: string) => void} onError - Surfaces a failure to the user.
+ * @property {(message: string) => void} onFatal - Stands the tool down for a failure nothing can recover from.
  * @property {(e: unknown) => boolean} onTrap - Handles a thrown value, reporting whether it was an unrecoverable engine trap.
  */
 
