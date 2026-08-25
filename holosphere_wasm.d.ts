@@ -399,6 +399,12 @@ export interface HolosphereModule {
   MeshOps: MeshOpsStatics;
   MeshOpResult: MeshOpResultEnum;
   PaletteOps: { new (): PaletteOps };
+  /**
+   * Set by HS_CHECK immediately before its trap, and absent until then. The
+   * trap is terminal for the whole module: no later call recovers, so a
+   * caller that sees this must discard the instance.
+   */
+  HS_MODULE_DEAD?: boolean;
 }
 
 /**

@@ -433,8 +433,7 @@ async function handleMessage(msg) {
           },
         };
       } catch (e) {
-        const module = /** @type {{HS_MODULE_DEAD?: boolean}|null} */ (wasmModule);
-        if (module?.HS_MODULE_DEAD === true) throw e;
+        if (wasmModule?.HS_MODULE_DEAD === true) throw e;
         if (!arenaMetricsWarned) {
           console.warn('segment_worker: getArenaMetrics failed:', e);
           arenaMetricsWarned = true;
