@@ -104,7 +104,6 @@ export function createRenderAdapter({
           }
           repointDisplayAliases(driver, view);
         }
-        driver.dotMesh.instanceColor.needsUpdate = true;
       }
     },
     /**
