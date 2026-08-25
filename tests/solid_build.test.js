@@ -231,7 +231,7 @@ test('an op that throws is reported rather than escaping the build', () => {
 });
 
 test('an engine trap halts the build at whichever call raised it', () => {
-  for (const token of ['base:cube', 'kis', 'classifyFaces']) {
+  for (const token of ['base:cube', 'kis', 'classifyFaces', 'getVertices', 'getFaces']) {
     const boom = new WebAssembly.RuntimeError('unreachable');
     const { Mod, state } = fakeModule({
       onOp: (t) => { if (t === token) throw boom; },
@@ -263,6 +263,20 @@ test('a non-trap classify throw leaves the mesh drawable and reports the failure
   assert.deepEqual(state.calls,
     ['base:cube', 'classifyFaces', 'getVertices', 'getFaces']);
   assert.equal(state.live, 0);
+});
+
+test('a non-trap readback throw frees the wrapper and flushes the arenas', () => {
+  const { Mod, state } = fakeModule({
+    onOp: (t) => { if (t === 'getFaces') throw new TypeError('marshalling'); },
+  });
+  const { ctx, errors, traps } = context(Mod);
+
+  assert.equal(quietly(() => buildChainMesh('cube', [], ctx)), null,
+    'a refused readback leaves no geometry to draw');
+  assert.deepEqual(errors, ['Mesh readback failed: marshalling']);
+  assert.equal(traps.length, 1);
+  assert.equal(state.live, 0, 'the wrapper must be freed');
+  assert.equal(state.cleared, 1, 'the tooling arenas must be reclaimed');
 });
 
 test('buildBaseMesh reads one registered solid back and reclaims the arena', () => {
