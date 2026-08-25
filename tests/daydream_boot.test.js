@@ -5,13 +5,14 @@
 // late-bind, the keydown guard, the module-load handlers, the teardown order.
 // What is left here is which closure the root hands each factory: a value only a
 // source read can see, so those cases read it, and each names the failure it
-// prevents. The segmented-POV block below is driven instead, since the assembly
-// it produces carries the names and bounds a source read was standing in for.
+// prevents. The engine-death and segmented-POV blocks below are driven instead:
+// a started app reaches the latch, the teardown and the switch coordinator
+// through their effects, which is what a source read was standing in for.
 import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { restoreDocumentAfterEach } from './fake_dom.js';
-import { captureConsole } from './fake_console.js';
+import { captureConsole, installConsoleCapture } from './fake_console.js';
 import {
   createSegmentPoolSpawner,
   startApp as startUntrackedApp,
@@ -70,10 +71,6 @@ function withoutComments(src) {
 const SOURCE = withoutComments(
   readFileSync(new URL('../daydream.js', import.meta.url), 'utf8'));
 
-const WASM_INIT = 'createModuleLoadHandlers(';
-const FRAME_GUARD = 'createFrameLoopGuard(';
-const SWITCH_COORDINATOR = 'createSwitchCoordinator(';
-
 test('catalog effects are offered at both simulator resolutions', () => {
   for (const effect of ['AshCloud', 'HyperLattice']) {
     for (const roster of ['HiResFavorites', 'LoResFavorites']) {
@@ -119,6 +116,8 @@ function sliceTo(at, sentinel) {
   return SOURCE.slice(at, end);
 }
 
+const WASM_INIT = 'createModuleLoadHandlers(';
+
 /**
  * The dependency block wiring the WASM module promise, including the startup
  * handler that builds the engine.
@@ -130,35 +129,142 @@ function wasmReadyBlock() {
   return balanced(SOURCE, at + WASM_INIT.length - 1);
 }
 
-test('the teardown is retained and reachable from the module-load handlers', () => {
-  assert.match(SOURCE, /appTeardown = createAppTeardown\(/,
-    "createAppTeardown()'s result must be kept: the load handlers dispose the "
-    + 'app on a failed load and skip startup once a page discard has won');
-  assert.match(wasmReadyBlock(), /teardown:\s*\(\)\s*=>\s*appTeardown/,
-    'the handlers must read the teardown lazily; it is built after them');
+/**
+ * A WASM module carrying only what the composition root touches before its
+ * first apply: the engine constructor, its two statics, and the Pole LOD write
+ * the load replays. The initial resolution apply then finds no setResolution
+ * and is refused, which the root reports and survives — so the app is fully
+ * assembled, its render loop armed, and the trap flag is a writable property.
+ * @returns {Object} The module, with engines() counting the constructions.
+ */
+function fakeWasmModule() {
+  let built = 0;
+  return {
+    HS_MODULE_DEAD: false,
+    engines: () => built,
+    HolosphereEngine: class {
+      constructor() { built++; }
+      static isLive() { return false; }
+      static getSupportedResolutions() { return [[96, 20]]; }
+      setPoleLod() {}
+      delete() {}
+    },
+  };
+}
+
+/**
+ * Starts an app and settles its module load, with the console captured across
+ * the whole boot: the refused initial apply reports through it, and the frame
+ * guard binds its default error sink while the app is being built.
+ * @param {Object} [options] - startApp() seam overrides.
+ * @returns {Promise<Object>} The started app fakes.
+ */
+async function bootedApp(options) {
+  const capture = installConsoleCapture('error', 'warn', 'log');
+  try {
+    const app = startApp(options);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    return app;
+  } finally {
+    capture.restore();
+  }
+}
+
+/**
+ * The fatal banners standing in a document, newest last. showFatalError() finds
+ * no overlay in a fake document and builds one per call, so a case clears the
+ * body first and reads what the action under test raised.
+ * @param {Object} doc - The installed fake document.
+ * @returns {Array<string>} The banner messages.
+ */
+const fatalBanners = (doc) => doc.body.children
+  .map((node) => node.querySelector('.fatal-error-message')?.textContent)
+  .filter((text) => text !== undefined && text !== null);
+
+test('a failed engine load disposes the app through the retained teardown', async () => {
+  const app = await bootedApp({ loadModule: () => Promise.reject(new Error('no wasm')) });
+
+  assert.equal(app.teardown.disposed(), true,
+    'the load handlers must reach the teardown the root built after them, or a '
+    + 'page with no engine keeps its listeners, its GUI and its driver');
+  assert.deepEqual(app.listeners, [],
+    'a listener that outlives the failed load reports into a dead app');
 });
 
-test('the render loop polls the engine death latch and releases the app on it', () => {
-  const at = SOURCE.indexOf(FRAME_GUARD);
-  assert.ok(at >= 0, 'daydream.js must still guard the render loop');
-  const guard = balanced(SOURCE, at + FRAME_GUARD.length - 1);
+test('a module that lands after the page was discarded builds no engine', async () => {
+  const module = fakeWasmModule();
+  let deliver;
+  const capture = installConsoleCapture('error', 'warn', 'log');
+  const app = startApp({ loadModule: () => new Promise((resolve) => { deliver = resolve; }) });
+  try {
+    app.teardown.dispose();
+    deliver(module);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  } finally {
+    capture.restore();
+  }
 
-  assert.match(guard, /moduleDead:\s*\(\)\s*=>\s*host\.moduleDead\(\)/,
-    'a trapped module keeps handing back plausible frames, so the loop has to '
-    + 'poll the host for the flag rather than wait for a throw that never comes');
-  assert.match(guard, /onModuleDead:\s*\(\)\s*=>\s*appTeardown\?\.dispose\(\)/,
+  assert.equal(module.engines(), 0,
+    'the handlers must read the teardown lazily and see the discard, or the '
+    + 'startup builds an engine into a torn-down app that will never release it');
+});
+
+test('the render loop releases the app once the engine module traps', async () => {
+  const module = fakeWasmModule();
+  const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
+  const doc = globalThis.document;
+  assert.equal(module.engines(), 1, 'the load must have built the engine');
+  assert.equal(app.teardown.disposed(), false, 'a refused initial apply is not fatal');
+
+  doc.body.replaceChildren();
+  captureConsole(() => app.driver.renderer.frame());
+  assert.deepEqual(fatalBanners(doc), [], 'a clean frame raises nothing');
+  assert.equal(app.teardown.disposed(), false);
+
+  module.HS_MODULE_DEAD = true;
+  captureConsole(() => app.driver.renderer.frame());
+
+  assert.match(fatalBanners(doc).at(-1) ?? '', /unrecoverable internal error/,
+    'a trapped module keeps handing back plausible frames rather than throwing, '
+    + 'so the loop has to poll the death flag to notice at all');
+  assert.equal(app.teardown.disposed(), true,
     'the loop, the engine, and every listener otherwise outlive a module no '
     + 'call can recover');
+  assert.deepEqual(app.listeners, []);
 });
 
-test('the switch coordinator checks the engine death latch before rollback', () => {
-  const at = SOURCE.indexOf(SWITCH_COORDINATOR);
-  assert.ok(at >= 0, 'daydream.js must still build the switch coordinator');
-  const deps = balanced(SOURCE, at + SWITCH_COORDINATOR.length - 1);
+test('a switch that traps the module is reported terminal, not rolled back', async () => {
+  const module = fakeWasmModule();
+  const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
+  const doc = globalThis.document;
+  const resolution = app.guis[0].controllers.find((c) => c.property === 'resolution');
+  module.HS_MODULE_DEAD = true;
 
-  assert.match(deps, /moduleDead:\s*\(\)\s*=>\s*host\.moduleDead\(\)/,
-    'an apply throw may be a terminal module trap, so rollback cannot make '
-    + 'another engine call until the module death flag is read');
+  doc.body.replaceChildren();
+  const { messages } = captureConsole(
+    () => resolution.setValue('Phantasm (288x144)'));
+
+  assert.match(fatalBanners(doc).at(-1) ?? '', /trapped the rendering engine/,
+    'an apply throw under a dead module is terminal, not a rejected switch');
+  assert.deepEqual(messages.filter((line) => /rollback/.test(line)), [],
+    'rollback re-enters the engine, and no call on a trapped module recovers: '
+    + 'the death flag has to be read before the recovery is attempted');
+});
+
+test('a switch that only fails is rolled back before it is reported', async () => {
+  const module = fakeWasmModule();
+  const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
+  const doc = globalThis.document;
+  const resolution = app.guis[0].controllers.find((c) => c.property === 'resolution');
+
+  doc.body.replaceChildren();
+  const { messages } = captureConsole(
+    () => resolution.setValue('Phantasm (288x144)'));
+
+  assert.equal(messages.filter((line) => /rollback/.test(line)).length, 1,
+    'with the module alive the same failure has to attempt the rollback, or '
+    + 'the case above passes on a coordinator that never rolls back at all');
+  assert.doesNotMatch(fatalBanners(doc).at(-1) ?? '', /trapped the rendering engine/);
 });
 
 test('the page-failure surface is the shared one, and it is torn down', () => {
