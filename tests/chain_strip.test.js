@@ -211,6 +211,25 @@ test('endomorphisms carry controls; sockets carry only valid selectors', async (
   assert.deepEqual(controls.map((button) => button.textContent), ['◉', '←', '→', '×']);
 });
 
+test('a socket names the function by the carrier its crossing produces', async () => {
+  const h = await makeStrip();
+  // camera, lens, sample (sphere to field), colorize: the one shipped crossing
+  // that skips the plane band entirely.
+  assert.equal(h.store.replaceSpan(PROJECT, 3,
+    [{ operator: 'sample.spherical-noise.v3' }]).ok, true);
+  h.strip.render();
+
+  const sockets = h.container.querySelectorAll('.chain-chip--socket');
+  const names = sockets.map((chip) => chip.querySelector('.chain-chip-function-label')
+    .textContent);
+  assert.deepEqual(names, ['Source: ', 'Color: ']);
+  assert.deepEqual(
+    sockets.map((chip) => chip.querySelector('.chain-chip-replace')
+      .getAttribute('aria-label')),
+    ['Source function', 'Color'],
+    'the sphere to field crossing is a source, not a second Color socket');
+});
+
 test('pipeline arrows, wheel and background arrow keys scroll the viewport', async () => {
   const h = await makeStrip();
   const viewport = h.container.querySelector('.chain-strip-viewport');
