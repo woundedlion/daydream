@@ -619,6 +619,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── slider.js               Labelled range-slider factory with a live readout
 │   ├── color.js                sRGB ↔ linear math mirroring the engine's transfer function
 │   ├── cpp_format.js           C++ float-literal formatter shared by the code generators
+│   ├── download_file.js        Blob download through a transient anchor click, shared by the tools' export actions
 │   ├── engine_halt.js          Shared halted-engine predicate: the HS_MODULE_DEAD flag or a WebAssembly trap
 │   ├── export_params.js        Formatter behind the GUI's Export action
 │   ├── flyout.js               Button-controlled flyout with outside-click and Escape dismissal
