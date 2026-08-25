@@ -171,6 +171,23 @@ async function probeStrip(tab) {
     (node) => node.getAttribute('aria-expanded') === 'false'),
   'clicking a pinned stage header closes it');
 
+  await tab.mouse.click(closedCard.x + 2, closedCard.y + closedCard.height / 2);
+  const elsewhereLabel = (await tab.$$eval('.chain-chip', (nodes) => nodes.map(
+    (node) => (node instanceof HTMLElement ? node.dataset.label ?? '' : ''))))
+    .find((label) => label !== '' && label !== 'project');
+  const travelled = await boxOf(tab,
+    `.chain-chip[data-label="${elsewhereLabel}"] .chain-chip-header`);
+  await tab.mouse.move(travelled.x + 2, centre(travelled).y);
+  await tab.mouse.down();
+  await tab.mouse.move(0, 0, { steps: 8 });
+  await tab.mouse.up();
+  check((await tab.$$eval('.chain-chip[aria-current="true"]', (nodes) => nodes.map(
+    (node) => (node instanceof HTMLElement ? node.dataset.label ?? '' : ''))))
+    .join() === 'project',
+  `a press that travels off ${elsewhereLabel} leaves the selection alone`);
+  await tab.mouse.click(closedCard.x + 2, closedCard.y + closedCard.height / 2);
+  await tab.mouse.move(0, 0);
+
   const collapsedDomain = await tab.$eval('.chain-band[data-carrier="sphere"]', (node) => ({
     band: node.getBoundingClientRect().height,
     frame: Number.parseFloat(getComputedStyle(node, '::before').height),
