@@ -49,6 +49,7 @@ class FakeEngine {
     /** @type {Uint16Array} Reused frame buffer; see setResolution. */
     this.pixelView = new Uint16Array(0);
     this.resolutionOk = true;
+    this.resolutionAlreadyActive = false;
     this.effectOk = true;
     this.clipOk = true;
     this.fullFrame = false;
@@ -70,6 +71,9 @@ class FakeEngine {
   setResolution(w, h) {
     this.calls.push(['setResolution', w, h]);
     if (!this.resolutionOk) return ResolutionSetResult.UNSUPPORTED;
+    // A request matching the active size is a pure no-op: the effect, its clip
+    // and the pixel buffer all survive.
+    if (this.resolutionAlreadyActive) return ResolutionSetResult.ALREADY_ACTIVE;
     this.curW = w;
     this.curH = h;
     this.effect = null;
@@ -362,6 +366,7 @@ test('a version-mismatched init latches no segment identity', async () => {
   // The recompute reads segId/totalSegs afresh: segId 3 of 4 over 16x8 → [8,16)x[4,8).
   posted.length = 0;
   await dispatch({ type: 'setResolution', w: 16, h: 8 });
+  await dispatch({ type: 'setEffect', name: 'Plasma' });
   await dispatch({ type: 'render' });
   const resized = posted.find((p) => p.msg.type === 'frame').msg;
   assert.deepEqual([resized.x0, resized.x1, resized.y0, resized.y1], [8, 16, 4, 8]);
@@ -642,6 +647,61 @@ test('an accepted setResolution defers the clip until setEffect', async () => {
   await dispatch({ type: 'render' });
   const frame = posted.find((p) => p.msg.type === 'frame').msg;
   assert.deepEqual([frame.x0, frame.x1, frame.y0, frame.y1], [8, 16, 4, 8]);
+});
+
+/**
+ * A RESIZED setResolution tears the effect and its clip down. Without the
+ * following setEffect the engine has nothing to shade, so the render must reach
+ * the controller's fault channel rather than shipping a black band under the
+ * current generation, which no watchdog would ever catch.
+ */
+test('a render after a resize with no setEffect faults instead of zero-filling', async () => {
+  await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
+  await dispatch({ type: 'setResolution', w: 16, h: 8 });
+  assert.equal(engineInstance.effect, null, 'the resize tore the effect down');
+
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  assert.equal(posted.find((p) => p.msg.type === 'frame'), undefined,
+    'no frame posted for an effectless engine');
+  const failed = posted.find((p) => p.msg.type === 'engineRejected');
+  assert.ok(failed, 'engineRejected posted');
+  assert.match(failed.msg.reason, /no effect/);
+  assert.deepEqual(engineInstance.calls.filter((c) => c[0] === 'drawFrame'), [],
+    'the effectless engine is never stepped');
+
+  // The latch is per-render, not one-shot: a second render faults the same way.
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  assert.ok(posted.some((p) => p.msg.type === 'engineRejected'), 'still faulting');
+
+  // The setEffect the controller owes clears it, and rendering resumes.
+  posted.length = 0;
+  await dispatch({ type: 'setEffect', name: 'Plasma' });
+  await dispatch({ type: 'render' });
+  assert.equal(posted.find((p) => p.msg.type === 'engineRejected'), undefined,
+    'the reinstalled effect clears the latch');
+  const frame = posted.find((p) => p.msg.type === 'frame').msg;
+  assert.deepEqual([frame.x0, frame.x1, frame.y0, frame.y1], [8, 16, 4, 8]);
+});
+
+/**
+ * An ALREADY_ACTIVE same-size resize tears nothing down, so it must not latch
+ * the render fault: the controller sends no setEffect the worker can wait for.
+ */
+test('a same-size setResolution keeps rendering without a setEffect', async () => {
+  await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
+  engineInstance.resolutionAlreadyActive = true;
+
+  posted.length = 0;
+  await dispatch({ type: 'setResolution', w: 8, h: 4 });
+  assert.equal(engineInstance.effect, 'Plasma', 'nothing torn down');
+
+  await dispatch({ type: 'render' });
+  assert.equal(posted.find((p) => p.msg.type === 'engineRejected'), undefined,
+    'no fault for a resize that dropped nothing');
+  const frame = posted.find((p) => p.msg.type === 'frame').msg;
+  assert.deepEqual([frame.x0, frame.x1, frame.y0, frame.y1], [4, 8, 2, 4]);
 });
 
 /** A structured-clone failure is reported immediately to the controller. */

@@ -62,6 +62,11 @@ let arenaMetricsWarned = false;
 // the same rejection every frame logs once. Cleared on every effect install: the
 // same name:outcome pair under a different effect is a distinct event.
 let paramRejectedKey = '';
+// Latched by a RESIZED setResolution, which tears the effect and its clip down.
+// The controller follows with a setEffect that reinstalls both; until then the
+// engine has nothing to shade, so a render faults instead of shipping a black
+// band. An ALREADY_ACTIVE resize tears nothing down and does not latch it.
+let awaitingEffect = false;
 
 /**
  * Restore a complete ShaderBall snapshot after the effect has been rebuilt.
@@ -254,6 +259,8 @@ async function handleMessage(msg) {
         break;
       }
       engine = new mod.HolosphereEngine();
+      // The latch tracks the live engine; a fresh one starts unlatched.
+      awaitingEffect = false;
       // A rejected resolution leaves no usable geometry: skip the canvasW/canvasH
       // commit, segRange, and ready (symmetric with the setResolution handler's
       // UNSUPPORTED guard), and post engineRejected so the controller faults at
@@ -303,6 +310,7 @@ async function handleMessage(msg) {
         }
         paramRejectedKey = '';
         arenaMetricsWarned = false;
+        awaitingEffect = false;
         // Mirrors the engine-driven index without the pause, as in 'init'.
         if (typeof msg.presetIndex === 'number') {
           applyPreset(msg.presetIndex, 'synchronizePreset');
@@ -323,11 +331,16 @@ async function handleMessage(msg) {
       if (engine && wasmModule) {
         // Only an explicit UNSUPPORTED keeps the current geometry: RESIZED and
         // ALREADY_ACTIVE both leave the requested size active, so both commit.
-        if (engine.setResolution(msg.w, msg.h)
-            === wasmModule.ResolutionSetResult.UNSUPPORTED) {
+        // They differ in what survives: RESIZED dropped the effect and the clip,
+        // leaving this worker unrenderable until the controller's setEffect.
+        const resolutionResult = engine.setResolution(msg.w, msg.h);
+        if (resolutionResult === wasmModule.ResolutionSetResult.UNSUPPORTED) {
           post({ type: 'engineRejected',
                  reason: `setResolution(${msg.w}, ${msg.h}) rejected` });
           break;
+        }
+        if (resolutionResult === wasmModule.ResolutionSetResult.RESIZED) {
+          awaitingEffect = true;
         }
         canvasW = msg.w;
         canvasH = msg.h;
@@ -374,6 +387,17 @@ async function handleMessage(msg) {
         throw new Error('segment_worker: render before a completed init '
           + `(engine=${engine ? 'set' : 'null'}, `
           + `segRange=${segRange ? 'set' : 'null'})`);
+      }
+      // Reported rather than thrown: the missing setEffect is the controller's
+      // sequencing fault, and engineRejected names it in the fault banner while
+      // leaving this worker's queue alive for the setEffect that recovers it.
+      if (awaitingEffect) {
+        post({
+          type: 'engineRejected',
+          reason: `render at ${canvasW}x${canvasH} with no effect: the resize `
+            + 'tore the effect and clip down and no setEffect followed',
+        });
+        break;
       }
 
       // elapsed: JS wall time (ms) incl. embind overhead.
