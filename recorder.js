@@ -85,9 +85,13 @@ export class VideoRecorder {
    * @param {number} frameInterval - Seconds per frame for timed capture fallback
    *   (defaults to the simulation rate, 1/FPS).
    * @param {() => number} now - Monotonic clock returning milliseconds.
+   * @param {Document} [doc] - Document the capture canvas and download anchor are
+   *   created in; defaults to the global `document`.
    */
-  constructor(canvas, frameInterval = 1 / FPS, now = () => performance.now()) {
+  constructor(canvas, frameInterval = 1 / FPS, now = () => performance.now(),
+              doc = globalThis.document) {
     this.canvas = canvas;
+    this.doc = doc;
     /** @type {MediaRecorder|null} */
     this.mediaRecorder = null;
     /** @type {Blob[]} */
@@ -181,8 +185,6 @@ export class VideoRecorder {
       this.reportFailure('captureStream or MediaRecorder is not supported in this browser.');
       return;
     }
-
-    this.elapsedSeconds = 0;
 
     // Each session pins its capture size at start. Drop an offscreen left by a
     // prior session whose async onstop cleanup has not run yet, so a resolution
@@ -323,6 +325,7 @@ export class VideoRecorder {
     // encoder buffers the whole recording in memory until stop().
     try {
       recorder.start(RECORDER_TIMESLICE_MS);
+      this.elapsedSeconds = 0;
       this.recordingStartedAtMs = this.now();
     } catch (err) {
       recorder.ondataavailable = null;
@@ -474,7 +477,7 @@ export class VideoRecorder {
         w = this.canvas.width > 0 ? this.canvas.width : 1;
         h = this.canvas.height > 0 ? this.canvas.height : 1;
       }
-      this.offscreen = document.createElement('canvas');
+      this.offscreen = this.doc.createElement('canvas');
       this.offCtx = this.offscreen.getContext('2d');
       // A null 2d context must not latch the canvas; drop it so a later start()
       // retries creation rather than reusing a context-less buffer forever.
@@ -761,12 +764,12 @@ export class VideoRecorder {
    */
   saveWithAnchor(blob, filename) {
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = this.doc.createElement('a');
     a.href = url;
     a.download = filename;
-    document.body.appendChild(a);
+    this.doc.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
+    this.doc.body.removeChild(a);
 
     // The click consumes the blob synchronously; the URL only needs to outlive it.
     setTimeout(() => URL.revokeObjectURL(url), 1000);
