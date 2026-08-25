@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  bootstrap, refreshModuleCache, showBootstrapFailure, VENDOR_REMEDY,
+  bootstrap, refreshModuleCache, refreshWithDeadline, showBootstrapFailure,
+  VENDOR_REMEDY,
 } from '../bootstrap.js';
 import { fakeElement } from './fake_dom.js';
 
@@ -167,6 +168,52 @@ test('bootstrap loads on a page whose performance object lacks the control', asy
   }), true);
 });
 
+test('the reload sweep runs on the deadline’s abort signal', async () => {
+  const { doc, overlay, click } = fakeDocument();
+  let signal = null;
+  showBootstrapFailure(new Error('failed'), {
+    document: doc,
+    location: { reload() {} },
+    refresh: async (dependencies) => { signal = dependencies?.signal ?? null; },
+  });
+
+  await click(childWithClass(overlay, 'context-lost-reload'));
+
+  assert.ok(signal instanceof AbortSignal);
+  assert.equal(signal.aborted, false, 'a sweep that finished was never aborted');
+});
+
+// A stalled connection fires no error of its own, so without the deadline the
+// overlay's one control stays relabelled, disabled and inert for good.
+test('refreshWithDeadline aborts a stalled sweep and releases the reload', async () => {
+  let expire = null;
+  let cleared = 0;
+  const timers = {
+    setTimeout: (fn) => { expire = fn; return { unref() {} }; },
+    clearTimeout: () => { cleared += 1; },
+  };
+  let swept = null;
+  const settled = refreshWithDeadline(({ signal }) => {
+    swept = signal;
+    return new Promise(() => {});
+  }, { timers });
+
+  expire();
+  await settled;
+
+  assert.equal(swept.aborted, true);
+  assert.equal(cleared, 1, 'the deadline timer is released with the race');
+});
+
+test('refreshWithDeadline survives a sweep that rejects or throws outright', async () => {
+  const timers = { setTimeout: () => ({ unref() {} }), clearTimeout: () => {} };
+
+  await assert.doesNotReject(() => refreshWithDeadline(
+    () => Promise.reject(new TypeError('offline')), { timers }));
+  await assert.doesNotReject(() => refreshWithDeadline(
+    () => { throw new TypeError('no fetch'); }, { timers }));
+});
+
 test('reload button still reloads when the cache refresh fails', async () => {
   const { doc, overlay, click } = fakeDocument();
   let reloads = 0;
@@ -318,6 +365,28 @@ test('the reload waits for the re-fetched binary to finish streaming', async () 
   await clicked;
   assert.equal(body.drained, true);
   assert.deepEqual(order, ['reload']);
+});
+
+test('refreshModuleCache re-fetches on the signal and drops the queue on abort', async () => {
+  const urls = Array.from({ length: 12 }, (_, i) => `http://localhost:8000/m${i}.js`);
+  const controller = new AbortController();
+  const calls = [];
+
+  await refreshModuleCache({
+    origin: 'http://localhost:8000',
+    performance: fakeTimeline(...urls),
+    signal: controller.signal,
+    fetch: (url, options) => {
+      calls.push([url, options]);
+      controller.abort();
+      return Promise.resolve({ body: null, arrayBuffer: async () => {} });
+    },
+  });
+
+  // The abort lands before any other lane takes its first url, so the eleven
+  // behind it are dropped rather than each rejecting in turn.
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0][1], { cache: 'reload', signal: controller.signal });
 });
 
 test('refreshModuleCache skips cross-origin and unrelated resources', async () => {

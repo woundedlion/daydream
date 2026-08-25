@@ -29,6 +29,13 @@ const REFRESH_CONCURRENCY = 6;
 // a Reload most needs to re-fetch.
 const RESOURCE_TIMING_ENTRIES = 1000;
 
+// Deadline for the Reload sweep. The sweep only primes the cache; the reload
+// chained behind it is the recovery, so a connection that stalls rather than
+// failing must not hold the overlay's one control. Well under the main module
+// load's deadline for that reason: there is a working outcome past this one,
+// and none past that one.
+export const REFRESH_DEADLINE_MS = 20000;
+
 /**
  * Read a re-fetched response to the end of its body.
  * @param {Response} response Re-fetch response.
@@ -55,7 +62,7 @@ async function drainBody(response) {
  * cache from an earlier deploy stays stale and keeps failing to link against
  * its freshly fetched importers.
  * @param {{performance?: Performance, fetch?: typeof globalThis.fetch,
- *   origin?: string}} [dependencies]
+ *   origin?: string, signal?: AbortSignal}} [dependencies]
  * @returns {Promise<void>} Resolves once every re-fetch has been read to the end
  *   of its body and the cache entry it replaces is written.
  */
@@ -63,6 +70,7 @@ export async function refreshModuleCache({
   performance: timeline = globalThis.performance,
   fetch: fetchResource = globalThis.fetch,
   origin = globalThis.location?.origin,
+  signal = undefined,
 } = {}) {
   if (!origin || typeof fetchResource !== 'function') return;
   const modules = new Set();
@@ -73,12 +81,16 @@ export async function refreshModuleCache({
   }
   // Load order, so the queue drains the way the page pulled the graph in.
   const queue = Array.from(modules);
+  const init = signal ? { cache: 'reload', signal } : { cache: 'reload' };
   const lanes = Array.from(
     { length: Math.min(REFRESH_CONCURRENCY, queue.length) },
     async () => {
       for (let url = queue.shift(); url !== undefined; url = queue.shift()) {
+        // An abort rejects every remaining re-fetch in turn; emptying the queue
+        // here settles the sweep on the deadline rather than lanes later.
+        if (signal?.aborted) return;
         // A failed re-fetch leaves its stale entry; the rest of the sweep runs.
-        try { await drainBody(await fetchResource(url, { cache: 'reload' })); }
+        try { await drainBody(await fetchResource(url, init)); }
         catch { /* reported by the reload that follows, not recoverable here */ }
       }
     });
@@ -86,9 +98,54 @@ export async function refreshModuleCache({
 }
 
 /**
+ * Run the module-cache sweep under a deadline, so a re-fetch that stalls rather
+ * than failing cannot hold the reload chained behind it.
+ *
+ * The deadline aborts the sweep's re-fetches and settles this promise, so the
+ * page always reaches the reload, with whatever cache entries the sweep did
+ * replace. The timer is cleared once the race settles, and the sweep's own
+ * rejection is absorbed rather than escaping as an unhandled one.
+ *
+ * @param {(dependencies?: {signal?: AbortSignal}) => Promise<void>} refresh -
+ *   Starts the sweep on the deadline's signal.
+ * @param {{ms?: number, timers?: {setTimeout: Function, clearTimeout: Function},
+ *   createController?: () => AbortController}} [dependencies]
+ * @returns {Promise<void>} Resolves once the sweep settles or the deadline
+ *   aborts it; never rejects, since the reload runs either way.
+ */
+export function refreshWithDeadline(refresh, {
+  ms = REFRESH_DEADLINE_MS,
+  timers = globalThis,
+  createController = () => new AbortController(),
+} = {}) {
+  const controller = createController();
+  /** @type {any} */
+  let timer = null;
+  const expired = new Promise((resolve) => {
+    timer = timers.setTimeout(() => { controller.abort(); resolve(undefined); }, ms);
+    // No-op in browsers; keeps an unfired deadline from holding the unit-test
+    // process open.
+    timer?.unref?.();
+  });
+  // A synchronous throw from refresh() would leave the deadline armed with
+  // nothing to abort and the reload unreached.
+  let swept;
+  try {
+    swept = Promise.resolve(refresh({ signal: controller.signal }));
+  } catch {
+    timers.clearTimeout(timer);
+    return Promise.resolve();
+  }
+  // Raced, not awaited: a lane that ignores the signal must not outlive the
+  // deadline that fired for it.
+  return Promise.race([swept.catch(() => {}), expired])
+    .finally(() => timers.clearTimeout(timer));
+}
+
+/**
  * @param {unknown} error Bootstrap failure.
  * @param {{document?: Document, location?: Location, title?: string,
- *   refresh?: () => Promise<void>}} [dependencies]
+ *   refresh?: (dependencies?: {signal?: AbortSignal}) => Promise<void>}} [dependencies]
  * @returns {boolean} True when the failure was rendered into the overlay; false
  *   when no overlay exists and the caller must surface the error another way.
  */
@@ -124,7 +181,9 @@ export function showBootstrapFailure(error, {
     // carries the state, and a disabled button drops focus.
     reload.textContent = 'Reloading…';
     reload.disabled = true;
-    return refresh().catch(() => {}).then(() => pageLocation?.reload());
+    // Deadlined: a stalled re-fetch would otherwise leave this button
+    // relabelled, disabled and inert for the page's lifetime.
+    return refreshWithDeadline(refresh).then(() => pageLocation?.reload());
   });
 
   overlay.classList.add('error');
