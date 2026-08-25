@@ -1030,13 +1030,15 @@ test('create spawns module workers from the segment worker URL', () => {
   }
 });
 
-test('create() is the sole writer of count, so it matches the pool it describes', () => {
+test('create() moves count and the per-segment arrays to the pool it spawned', () => {
   const c = readyController(4);
   assert.equal(c.count, 4);
+  assert.equal(c.workers.length, 4);
   assert.equal(c.results.length, 4);
 
   c.create(2);
   assert.equal(c.count, 2, 'count follows the rebuilt pool, never leads it');
+  assert.equal(c.workers.length, 2);
   assert.equal(c.results.length, 2);
   assert.equal(c.frameSeen.length, 2);
 });
@@ -1709,8 +1711,7 @@ test('composite() blits each quadrant to its display-buffer offset', () => {
   driver.W = 4; driver.H = 2;
   driver.pixels = new Uint16Array(4 * 2 * 3);
 
-  const c = makeController();
-  c.count = 2;
+  const c = readyController(2);
   c.showBoundaries = false;
   const quad = new Uint16Array(2 * 2 * 3).fill(111);
   c.results = [null, { pixels: quad, x0: 2, x1: 4, y0: 0, y1: 2 }];
@@ -1767,8 +1768,7 @@ test('composite() faults atomically when a non-leading segment overflows', () =>
   driver.W = 4; driver.H = 2;
   driver.pixels = new Uint16Array(4 * 2 * 3);
 
-  const c = makeController();
-  c.count = 2;
+  const c = readyController(2);
   c.showBoundaries = false;
   const good = new Uint16Array(2 * 2 * 3).fill(111);
   const bad = new Uint16Array(2 * 2 * 3).fill(222);
@@ -1825,8 +1825,7 @@ test('composite() faults on a rect that is not that segment\'s band of the layou
   driver.W = 4; driver.H = 4;
   driver.pixels = new Uint16Array(4 * 4 * 3);
 
-  const c = makeController();
-  c.count = 4;
+  const c = readyController(4);
   c.showBoundaries = false;
   // Segment 1's band is [0,2)-[2,4); this is segment 3's, and the same size.
   const quad = new Uint16Array(2 * 2 * 3).fill(123);
@@ -1845,8 +1844,7 @@ test('composite() faults when the layout admits no band for a segment', () => {
   driver.W = 2; driver.H = 2;
   driver.pixels = new Uint16Array(2 * 2 * 3);
 
-  const c = makeController();
-  c.count = 8;
+  const c = readyController(8);
   c.showBoundaries = false;
   const cell = new Uint16Array(1 * 1 * 3).fill(123);
   c.results = [{ pixels: cell, x0: 0, x1: 1, y0: 0, y1: 1 }];
@@ -1882,8 +1880,7 @@ test('composite() marks both the internal split and the x=0 wrap seam', () => {
   driver.W = 4; driver.H = 2;
   driver.pixels = new Uint16Array(4 * 2 * 3);
 
-  const c = makeController();
-  c.count = 2;
+  const c = readyController(2);
   c.showBoundaries = true;
   const quadL = new Uint16Array(2 * 2 * 3).fill(111);
   const quadR = new Uint16Array(2 * 2 * 3).fill(222);
@@ -1943,8 +1940,7 @@ test('the boundary setter composites nothing when the pool owns no display', () 
   driver.pixels = new Uint16Array(4 * 2 * 3).fill(77);
 
   // Inactive controller: the single main-thread engine owns the display buffer.
-  const c = makeController();
-  c.count = 2;
+  const c = readyController(2);
 
   c.showBoundaries = true;
 
@@ -1983,8 +1979,7 @@ test('composite() marks every internal split plus the wrap seam for an 8-segment
   driver.W = 8; driver.H = 8;
   driver.pixels = new Uint16Array(8 * 8 * 3);
 
-  const c = makeController();
-  c.count = 8;
+  const c = readyController(8);
   c.showBoundaries = true;
   // Bands run 0, 1, 3, 2 down an arm: its southern half counts back from the pole.
   const bandYs = [[0, 2], [2, 4], [6, 8], [4, 6]];
@@ -2015,8 +2010,7 @@ test('composite() marks the horizontal seam between stacked Y-band segments', ()
   driver.W = 4; driver.H = 4;
   driver.pixels = new Uint16Array(4 * 4 * 3);
 
-  const c = makeController();
-  c.count = 4;
+  const c = readyController(4);
   c.showBoundaries = true;
   const band = (fill) => new Uint16Array(2 * 2 * 3).fill(fill);
   c.results = [
@@ -2041,8 +2035,7 @@ test('composite() marks the layout seams, not only the reported segments', () =>
   driver.W = 4; driver.H = 4;
   driver.pixels = new Uint16Array(4 * 4 * 3);
 
-  const c = makeController();
-  c.count = 4;
+  const c = readyController(4);
   c.showBoundaries = true;
   const band = (fill) => new Uint16Array(2 * 2 * 3).fill(fill);
   c.results = [
@@ -2101,7 +2094,7 @@ test('composite() clears a buffer the refresh re-fetched', () => {
   driver.W = 4; driver.H = 2;
   driver.pixels = new Uint16Array(4 * 2 * 3);
 
-  const c = makeController();
+  const c = readyController(2);
   // The fresh view carries the engine's last frame, not the driver's clear.
   const fetched = new Uint16Array(4 * 2 * 3).fill(999);
   let refreshed = false;
@@ -2113,7 +2106,6 @@ test('composite() clears a buffer the refresh re-fetched', () => {
   c.getMemoryView = () => driver.pixels;
   const band = new Uint16Array(2 * 2 * 3).fill(111);
   c.results = [{ pixels: band, x0: 0, x1: 2, y0: 0, y1: 2 }, null];
-  c.count = 2;
 
   refreshed = true;
   c.composite();
@@ -2516,7 +2508,7 @@ test('a spawning pool reports the spawn and does not own the display', () => {
     createElement: (tag) => fakeElement(tag),
   };
   c.active = true;
-  c.count = 4;
+  c.create(4);
 
   assert.equal(c.ownsDisplay, false, 'a spawning pool leaves the frame to the main engine');
 
