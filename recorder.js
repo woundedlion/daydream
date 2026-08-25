@@ -32,13 +32,13 @@ const DEFAULT_BITRATE_MBPS = 16;
 // Seconds of video the streaming sink may hold in RAM while the Save dialog is
 // still unanswered; multiplied by the latched bitrate to get the byte bound. Two
 // minutes is far past any real time-to-pick, so the bound is a runaway guard.
-const PICKER_GRACE_SECONDS = 120;
+export const PICKER_GRACE_SECONDS = 120;
 
 // Bytes the in-memory fallback sink may accumulate before it ends the session.
 // Browsers without the File System Access API (Firefox, Safari) hold the whole
 // video here until stop, so the alternative to a bound is an OOM that loses the
 // recording outright rather than saving its prefix.
-const MEMORY_BUFFER_LIMIT_BYTES = 512_000_000;
+export const MEMORY_BUFFER_LIMIT_BYTES = 512_000_000;
 
 /**
  * Pick the best-supported MIME type for the requested output format. Codec
