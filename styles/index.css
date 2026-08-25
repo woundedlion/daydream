@@ -915,6 +915,14 @@ div.label {
   font-variant-numeric: tabular-nums;
 }
 
+/* Row headers take the body cells' metrics, not the column headers'. */
+.segment-stats th.seg-label {
+  padding: 1px 6px;
+  border-bottom: none;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .segment-stats .seg-label {
   text-align: left;
   color: var(--accent-text);

@@ -199,7 +199,7 @@ test('the table is mutated in place and rebuilt only on a segment-count change',
   assert.equal(grid(stats).rows.length, 3 + 3); // header + 3 segments + max + round-trip
 });
 
-test('the generated table names itself and scopes its column headers', () => {
+test('the generated table names itself and scopes its headers', () => {
   const { doc, stats } = makeDoc();
   new SegmentStatsView(doc).update(readyState(2));
 
@@ -208,10 +208,22 @@ test('the generated table names itself and scopes its column headers', () => {
   assert.equal(caption.className, 'visually-hidden');
   assert.equal(caption.textContent,
     'Per-segment compute time and arena high-water marks');
-  const headers = grid(stats).rows[0].children;
+  const { rows } = grid(stats);
+  const headers = rows[0].children;
   assert.equal(headers.length, 6);
   for (const header of headers) {
     assert.equal(header.getAttribute('scope'), 'col');
+  }
+
+  // Every data row leads with its own header: the segments, then max and
+  // round-trip.
+  assert.deepEqual(rows.slice(1).map((row) => row.children[0].textContent),
+    ['Seg 0', 'Seg 1', 'max', 'round-trip']);
+  for (const row of rows.slice(1)) {
+    const label = row.children[0];
+    assert.equal(label.tagName, 'TH');
+    assert.equal(label.getAttribute('scope'), 'row');
+    assert.equal(label.className, 'seg-label');
   }
 });
 
