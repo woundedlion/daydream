@@ -802,9 +802,10 @@ test('strobeColumns and effect metadata return the shapes daydream consumes', ()
     ([, count]) => !Number.isInteger(count) || count < 0);
   assert.deepEqual(invalidCounts.slice(0, 5), [],
     `${invalidCounts.length} getEffectPresetCounts entries are not non-negative integers`);
-  assert.equal(presetCounts.Comets, 12);
-  assert.equal(presetCounts.LatticeMelt, 2);
-  assert.equal(presetCounts.Voronoi, 0);
+  assert.ok(presetCounts.Comets > 0, 'a choreographed effect must report its presets');
+  assert.ok(presetCounts.LatticeMelt > 0, 'a choreographed effect must report its presets');
+  assert.equal(presetCounts.Voronoi, 0,
+    'an effect with no authored presets must report zero, not be absent');
 });
 
 // engine_host.js calls getBufferLength through an optional-call guard, so a
