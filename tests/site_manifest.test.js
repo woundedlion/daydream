@@ -100,7 +100,7 @@ test('every site manifest entry is tracked and present', () => {
   const entries = manifestEntries();
   assert.ok(entries.length > 0, `${MANIFEST} lists nothing`);
   assert.deepEqual([...new Set(entries)], entries, `${MANIFEST} repeats an entry`);
-  const tracked = trackedFiles();
+  const tracked = [...trackedFiles()];
   // Accumulated rather than asserted per entry, so the assertion count does not
   // track the manifest's length.
   const malformed = [];
@@ -109,7 +109,7 @@ test('every site manifest entry is tracked and present', () => {
   for (const entry of entries) {
     if (/^[./]|\\|\/$/.test(entry)) malformed.push(entry);
     if (!existsSync(resolve(REPO, entry))) absent.push(entry);
-    if (![...tracked].some((f) => f === entry || f.startsWith(`${entry}/`)))
+    if (!tracked.some((f) => f === entry || f.startsWith(`${entry}/`)))
       untracked.push(entry);
   }
   assert.deepEqual(malformed.slice(0, 5), [],
