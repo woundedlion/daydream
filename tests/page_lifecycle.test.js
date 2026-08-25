@@ -6,22 +6,23 @@ const {
   createFrameScheduler, onPageTeardown, watchMediaMatch,
 } = await import('../tools/page_lifecycle.js');
 
-const saved = {};
+// The frame queue every case runs against, plus the globalThis.window slot
+// fakeWindow() writes into: installed fresh per case and restored after, so no
+// case inherits another's globals or its pending frames.
+let frames;
+let savedWindow;
 beforeEach(() => {
-  saved.raf = globalThis.requestAnimationFrame;
-  saved.caf = globalThis.cancelAnimationFrame;
-  saved.window = globalThis.window;
+  frames = installAnimationFrames();
+  savedWindow = globalThis.window;
 });
 afterEach(() => {
-  globalThis.requestAnimationFrame = saved.raf;
-  globalThis.cancelAnimationFrame = saved.caf;
-  if (saved.window === undefined) delete globalThis.window;
-  else globalThis.window = saved.window;
+  frames.restore();
+  if (savedWindow === undefined) delete globalThis.window;
+  else globalThis.window = savedWindow;
 });
 
 /** Verifies a scheduled run happens on the frame, not on the call. */
 test('createFrameScheduler defers the run to the next frame', () => {
-  const frames = installAnimationFrames();
   let runs = 0;
   const schedule = createFrameScheduler(() => { runs++; });
 
@@ -33,7 +34,6 @@ test('createFrameScheduler defers the run to the next frame', () => {
 
 /** Verifies a burst of requests in one frame coalesces to a single run. */
 test('createFrameScheduler coalesces a burst into one run', () => {
-  const frames = installAnimationFrames();
   let runs = 0;
   const schedule = createFrameScheduler(() => { runs++; });
 
@@ -45,7 +45,6 @@ test('createFrameScheduler coalesces a burst into one run', () => {
 
 /** Verifies the next frame is schedulable again once the pending one has run. */
 test('createFrameScheduler re-arms after the frame runs', () => {
-  const frames = installAnimationFrames();
   let runs = 0;
   const schedule = createFrameScheduler(() => { runs++; });
 
@@ -58,7 +57,6 @@ test('createFrameScheduler re-arms after the frame runs', () => {
 
 /** Verifies a request made from inside the run itself lands on a later frame. */
 test('createFrameScheduler accepts a request made during its own run', () => {
-  const frames = installAnimationFrames();
   const order = [];
   const schedule = createFrameScheduler(() => {
     order.push('run');
@@ -74,7 +72,6 @@ test('createFrameScheduler accepts a request made during its own run', () => {
 
 /** Verifies cancel() drops the pending frame, so a torn-down page never recomputes. */
 test('cancel drops a pending run', () => {
-  const frames = installAnimationFrames();
   let runs = 0;
   const schedule = createFrameScheduler(() => { runs++; });
 
@@ -87,7 +84,6 @@ test('cancel drops a pending run', () => {
 
 /** Verifies cancel() with nothing pending is a no-op rather than cancelling frame 0. */
 test('cancel with nothing pending cancels nothing', () => {
-  const frames = installAnimationFrames();
   const cancelled = [];
   const realCancel = globalThis.cancelAnimationFrame;
   globalThis.cancelAnimationFrame = (handle) => { cancelled.push(handle); realCancel(handle); };
@@ -104,7 +100,6 @@ test('cancel with nothing pending cancels nothing', () => {
 
 /** Verifies a scheduler is usable again after a cancel, so a restored page recovers. */
 test('a cancelled scheduler can be scheduled again', () => {
-  const frames = installAnimationFrames();
   let runs = 0;
   const schedule = createFrameScheduler(() => { runs++; });
 
@@ -117,7 +112,6 @@ test('a cancelled scheduler can be scheduled again', () => {
 
 /** Verifies two schedulers keep independent pending state. */
 test('schedulers do not share pending state', () => {
-  const frames = installAnimationFrames();
   const runs = [];
   const a = createFrameScheduler(() => runs.push('a'));
   const b = createFrameScheduler(() => runs.push('b'));
@@ -186,7 +180,6 @@ test('onPageTeardown supports several independent teardowns', () => {
 
 /** Verifies the two helpers compose the way the pages wire them: teardown cancels the pending frame. */
 test('a teardown cancels the scheduler pending frame', () => {
-  const frames = installAnimationFrames();
   const win = fakeWindow();
   let runs = 0;
   const schedule = createFrameScheduler(() => { runs++; });
