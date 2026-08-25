@@ -33,6 +33,12 @@ import { engineHalted } from './engine_halt.js';
  */
 
 /**
+ * A mesh read back into plain JS. Vertices use plain {x, y, z} math, which a
+ * THREE.Vector3 satisfies.
+ * @typedef {{faces: Array<Array<number>>, vertices: Array<{x:number, y:number, z:number}>}} SolidMesh
+ */
+
+/**
  * A live WASM MeshOps mesh wrapper. Its op methods are bound by the module, so
  * the surface is reached by name rather than declared here.
  * @typedef {Object<string, any>} MeshWrapper
@@ -756,7 +762,7 @@ export function snapToStep(value, def) {
  * first face, used to characterize a solid's face shape. Returns 0 for
  * degenerate input (no faces, a face with fewer than 3 vertices, or a
  * zero-length edge).
- * @param {{faces: Array<Array<number>>, vertices: Array<{x:number, y:number, z:number}>}} mesh - The mesh whose first face is measured; vertices use plain {x, y, z} math (a THREE.Vector3 satisfies this shape).
+ * @param {?SolidMesh} mesh - The mesh whose first face is measured, or null.
  * @returns {number} The internal angle in radians, or 0 for degenerate input.
  */
 export function computeInternalAngle(mesh) {
@@ -784,7 +790,7 @@ export function computeInternalAngle(mesh) {
 /**
  * Seeds one op's parameters for a candidate chain.
  * @param {string} opName - The op's OP_DEFS key.
- * @param {?{faces: Array<Array<number>>, vertices: Array<{x:number, y:number, z:number}>}} mesh - The mesh the op would run on, or null.
+ * @param {?SolidMesh} mesh - The mesh the op would run on, or null.
  * @returns {Object<string, number>} The OP_DEFS defaults, except hankin's
  *   angle, which follows the half-internal angle of `mesh`.
  * @details The half-internal angle is snapped to the control's whole-degree
@@ -1264,7 +1270,7 @@ export function createOpGate(validator, retries = 3) {
    * @param {string} base - Registry name of the seed solid.
    * @param {ChainOp[]} ops - The current chain.
    * @param {string[]} candidates - Op names to probe.
-   * @param {?Object} seedMesh - The current chain's readback mesh, used to
+   * @param {?SolidMesh} seedMesh - The current chain's readback mesh, used to
    *   seed each candidate the way the page would seed it; null falls back to
    *   the OP_DEFS defaults.
    * @returns {Promise<{bad: Set<string>, complete: boolean}>} The ops that would
@@ -1359,7 +1365,7 @@ export function createOpGate(validator, retries = 3) {
    * @param {string} base - Registry name of the seed solid.
    * @param {ChainOp[]} ops - The current chain.
    * @param {string[]} candidates - Op names to probe.
-   * @param {?Object} [mesh] - The current chain's readback mesh, used to seed
+   * @param {?SolidMesh} [mesh] - The current chain's readback mesh, used to seed
    *   each candidate; omitted falls back to the OP_DEFS defaults.
    * @returns {Promise<?OpGateVerdict>} The verdict, or null when the pass was
    *   skipped or the chain changed under it.
