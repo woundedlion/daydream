@@ -1083,6 +1083,8 @@ export function createChainStrip({
   const render = ({ focusLabel = null, focusBypass = false } = {}) => {
     const active = doc.activeElement ?? null;
     const hadFocus = active !== null && container.contains(active);
+    const scrolled = Number(
+      container.querySelector('.chain-strip-viewport')?.scrollLeft ?? 0);
     palette = null;
     layout = bandLayout();
     rows.clear();
@@ -1174,6 +1176,9 @@ export function createChainStrip({
 
     container.replaceChildren(actions, scrollButton(viewport, -1), viewport,
       scrollButton(viewport, 1));
+    // The strip is rebuilt whole after every committed edit; the horizontal
+    // offset is view state, not document state, so it outlives the rebuild.
+    if (scrolled > 0) viewport.scrollLeft = scrolled;
     container.dataset.expanded = String(
       container.querySelector('.chain-chip--expanded') !== null);
     markDeactivated();
