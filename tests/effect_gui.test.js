@@ -2113,7 +2113,6 @@ test('preset controls carry icon labels and accessible names', () => {
     assert.equal(button.getAttribute('aria-label'), label);
     assert.equal(button.getAttribute('title'), label);
   }
-  assert.equal(h.gui().ctrl('presetIndex').$select.getAttribute('aria-label'), 'Preset');
 });
 
 test('the preset action row lays its controls out in one grid row', () => {

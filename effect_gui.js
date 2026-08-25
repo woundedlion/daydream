@@ -732,7 +732,6 @@ export function createEffectGui({
       addAction(effectActions, 'previousPreset', PREVIOUS_ICON, 'Previous Preset',
         'preset-nav-previous');
       preset.domElement.classList.add('effect-action', 'preset-nav-selector');
-      preset.$select?.setAttribute('aria-label', 'Preset');
       actionRow.appendChild(preset.domElement);
       fx.actionControllers.push(preset);
       addAction(effectActions, 'nextPreset', NEXT_ICON, 'Next Preset',
