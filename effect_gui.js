@@ -825,7 +825,7 @@ export function createEffectGui({
     const fixedShader = fixedShaderStageAssignments(params);
     const fixedTitles = fixedShader
       ? fixedShaderStageTitles(
-        getFullConfigSnapshot(), getFullConfigFieldDefinitions())
+        getFullConfigSnapshot(), getFullConfigFieldDefinitions(), logWarn)
       : null;
     const fixedGrouping = () => {
       const claimed = new Set(fixedShader.values());
@@ -835,8 +835,8 @@ export function createEffectGui({
         order: SHADERBALL_STAGE_ORDER.filter((stage) => claimed.has(stage)),
       };
     };
-    // Only a Fixed Shader whose stage modes resolved outranks the named fixed
-    // pipelines; without titles it is the last resort below.
+    // Only a Fixed Shader carrying a configuration snapshot outranks the named
+    // fixed pipelines; without one it is the last resort below.
     if (fixedTitles) return fixedGrouping();
     const latticeMelt = latticeMeltStageAssignments(params);
     if (latticeMelt) {

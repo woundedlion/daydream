@@ -417,21 +417,31 @@ export function fixedShaderStageAssignments(params) {
 }
 
 /**
+ * The mode each fixed stage folder is titled after, read off the snapshot's
+ * slot fields. A field the snapshot does not resolve — the engine renamed it,
+ * or its accepted value falls outside the option table — is reported and left
+ * out, so that stage falls back to its own name while the rest keep theirs.
  * @param {{accepted: number[]}|null} snapshot - Versioned Shader configuration snapshot.
  * @param {Array<{name: string, id: number}>|null} fields - Snapshot field definitions.
- * @returns {Map<string, string>|null} Fixed stage position to selected mode.
+ * @param {(message: string) => void} [logWarn] - Sink for unresolved fields.
+ * @returns {Map<string, string>|null} Fixed stage position to selected mode, or
+ *   null when there is no snapshot to read.
  */
-export function fixedShaderStageTitles(snapshot, fields) {
+export function fixedShaderStageTitles(snapshot, fields, logWarn = console.warn) {
   if (!snapshot || !Array.isArray(snapshot.accepted) || !Array.isArray(fields)) {
     return null;
   }
   const fieldIds = new Map(fields.map((field) => [field.name, field.id]));
   const titles = new Map([['Camera', 'Camera']]);
+  const unresolved = [];
   for (const [stage, [fieldName, options]] of FIXED_SHADER_MODE_FIELDS) {
     const id = fieldIds.get(fieldName);
     const mode = id === undefined ? undefined : options[snapshot.accepted[id]];
-    if (mode === undefined) return null;
-    titles.set(stage, mode);
+    if (mode === undefined) unresolved.push(fieldName);
+    else titles.set(stage, mode);
+  }
+  if (unresolved.length > 0) {
+    logWarn(`Shader stages: the snapshot resolves no mode for ${unresolved.join(', ')}`);
   }
   return titles;
 }
