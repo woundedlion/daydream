@@ -30,13 +30,13 @@ import {
   LATTICE_MELT_STAGE_TITLES,
   KALEIDOSCOPE_SMOOTH_STAGE_ORDER,
   KALEIDOSCOPE_SMOOTH_STAGE_TITLES,
-  SHADERBALL_STAGE_ORDER,
+  STAGE_ORDER,
   latticeMeltStageAssignments,
   kaleidoscopeSmoothStageAssignments,
   fixedShaderStageAssignments,
   fixedShaderStageTitles,
   legacyShaderBallParamNames,
-  shaderBallControlLabel,
+  stageControlLabel,
   shaderBallStageAssignments,
 } from "./shader_stages.js";
 
@@ -828,7 +828,7 @@ export function createEffectGui({
     const shaderBall = shaderBallStageAssignments(params);
     if (shaderBall) {
       return {
-        assignments: shaderBall, titles: null, order: SHADERBALL_STAGE_ORDER,
+        assignments: shaderBall, titles: null, order: STAGE_ORDER,
       };
     }
     const fixedShader = fixedShaderStageAssignments(params);
@@ -841,7 +841,7 @@ export function createEffectGui({
       return {
         assignments: fixedShader,
         titles: fixedTitles,
-        order: SHADERBALL_STAGE_ORDER.filter((stage) => claimed.has(stage)),
+        order: STAGE_ORDER.filter((stage) => claimed.has(stage)),
       };
     };
     // Only a Fixed Shader carrying a configuration snapshot outranks the named
@@ -928,7 +928,7 @@ export function createEffectGui({
       const controller = addParamControl(
         controlGui, state, p, !previousParamNames?.has(p.name),
         legacyShaderBallParamNames(p.name), !usesFullConfigSnapshot());
-      if (stage) controller.name(shaderBallControlLabel(stage, p.name));
+      if (stage) controller.name(stageControlLabel(stage, p.name));
       fx.paramNames.push(p.name);
       fx.controllerByName.set(p.name, controller);
       if (controller.isEnum) fx.hasEnumControls = true;

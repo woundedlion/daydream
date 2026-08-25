@@ -20,7 +20,7 @@ import {
 import { isViewLive, refreshPixelView } from '../pixel_view.js';
 import { selectorControlValue } from '../param_sync.js';
 import {
-  FIXED_SHADER_MODE_FIELDS, SHADERBALL_STAGE_BOUNDARIES,
+  FIXED_SHADER_MODE_FIELDS, STAGE_BOUNDARIES,
   kaleidoscopeSmoothStageAssignments, latticeMeltStageAssignments,
   fixedShaderStageAssignments, shaderBallStageAssignments,
 } from '../shader_stages.js';
@@ -727,11 +727,11 @@ test('shader_stages.js mirrors ShaderBall stage option labels exactly', () => {
   assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
   const definitions = engine.getParameterDefinitions();
   const parameterForStage = new Map(
-    [...SHADERBALL_STAGE_BOUNDARIES].map(([name, stage]) => [stage, name]));
+    [...STAGE_BOUNDARIES].map(([name, stage]) => [stage, name]));
 
   for (const [stage, [field, labels]] of FIXED_SHADER_MODE_FIELDS) {
     const name = parameterForStage.get(stage);
-    assert.ok(name, `SHADERBALL_STAGE_BOUNDARIES must claim stage ${stage}`);
+    assert.ok(name, `STAGE_BOUNDARIES must claim stage ${stage}`);
     const definition = definitions.find((entry) => entry.name === name);
     assert.ok(definition, `ShaderBall must register the ${name} selector`);
     assert.deepEqual(definition.options, labels,

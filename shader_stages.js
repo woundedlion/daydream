@@ -12,7 +12,7 @@
  * renders it.
  */
 
-export const SHADERBALL_STAGE_ORDER = [
+export const STAGE_ORDER = [
   'Camera',
   'Lens',
   'Surface Noise',
@@ -110,7 +110,7 @@ export const FIXED_SHADER_MODE_FIELDS = new Map([
     'Generated Triadic', 'Generated Complementary', 'Generated Analogous',
   ]]],
 ]);
-export const SHADERBALL_STAGE_BOUNDARIES = new Map([
+export const STAGE_BOUNDARIES = new Map([
   ['Function', 'Function'],
   ['Projection', 'Projection'],
   ['Projection Frame', 'Projection Frame'],
@@ -346,7 +346,7 @@ export function shaderBallStageAssignments(params) {
   const assignments = new Map();
   let stage = 'Function';
   for (const parameter of params) {
-    stage = SHADERBALL_STAGE_BOUNDARIES.get(parameter.name) ?? stage;
+    stage = STAGE_BOUNDARIES.get(parameter.name) ?? stage;
     assignments.set(parameter.name, stage);
   }
   return assignments;
@@ -454,8 +454,8 @@ export function fixedShaderStageTitles(snapshot, fields, logWarn = console.warn)
  * @param {string} name - Engine parameter name.
  * @returns {string} The control's displayed name.
  */
-export function shaderBallControlLabel(stage, name) {
-  if (SHADERBALL_STAGE_BOUNDARIES.has(name)) {
+export function stageControlLabel(stage, name) {
+  if (STAGE_BOUNDARIES.has(name)) {
     if (stage === 'Colorize') return 'Palette';
     return stage === 'Camera' ? 'Wander' : 'Mode';
   }

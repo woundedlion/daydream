@@ -13,7 +13,7 @@ import {
 import {
   LATTICE_MELT_STAGE_ORDER,
   KALEIDOSCOPE_SMOOTH_STAGE_ORDER,
-  SHADERBALL_STAGE_ORDER,
+  STAGE_ORDER,
   latticeMeltStageAssignments,
   kaleidoscopeSmoothStageAssignments,
   fixedShaderStageAssignments,
@@ -601,7 +601,7 @@ test('ShaderBall parameters map to banks in evaluation order', () => {
   // A stage nothing lands in builds an empty folder; a stage nothing lists
   // drops its controls on the floor.
   assert.deepEqual([...new Set(assignments.values())].sort(),
-    [...SHADERBALL_STAGE_ORDER].sort(),
+    [...STAGE_ORDER].sort(),
     'the stage list and the assignments cover the same banks');
   assert.equal(assignments.get('Projection Wander'), 'Projection Frame');
   assert.equal(assignments.get('Surface Noise Scale'), 'Surface Noise');
@@ -620,7 +620,7 @@ test('ShaderBall builds one URL-transparent bank for every pipeline stage', () =
   h.panel.build();
 
   assert.deepEqual(h.gui().folders.map((folder) => folder.name),
-    SHADERBALL_STAGE_ORDER);
+    STAGE_ORDER);
   assert.equal(h.gui().ctrl('Camera Wander').folder, 'Camera');
   assert.equal(h.gui().ctrl('Camera Wander').label, 'Wander');
   assert.equal(h.gui().ctrl('Planar Warp 1').folder, 'Planar Warp 1');
@@ -650,7 +650,7 @@ test('a schema rebuild keeps the stage folders the user collapsed', () => {
   h.state.generation = 8;
   h.panel.sync();
 
-  assert.deepEqual(h.gui().folders.map((f) => f.name), SHADERBALL_STAGE_ORDER,
+  assert.deepEqual(h.gui().folders.map((f) => f.name), STAGE_ORDER,
     'the panel was rebuilt');
   assert.equal(folder('Surface Noise').closed, true);
   assert.equal(folder('Colorize').closed, true);
