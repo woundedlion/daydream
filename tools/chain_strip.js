@@ -64,6 +64,11 @@ const READOUT_STEPS = 1000;
 
 const DEACTIVATED_TITLE = 'Deactivated by the current topology selection';
 
+// A bypass is a program-shape override, and only the interpreter is sent a
+// program shape; the compiled build takes the document chain whole.
+const BYPASS_UNAVAILABLE = 'Bypass applies to the interpreter only: '
+  + 'the compiled build renders the whole chain.';
+
 const MIN_SCROLL_STEP = 160;
 const SCROLL_STEP_RATIO = 0.75;
 
@@ -178,11 +183,15 @@ export function deactivatedParameterIds(parameters, values, chain, catalog) {
  *   number for a binary32 field, the option id for an enum8 one.
  * @param {() => void} [options.onCommitParameter] - Flushes work buffered while
  *   a range control was moving.
+ * @param {() => boolean} [options.bypassAvailable] - Whether a bypass reaches
+ *   what is rendering. False disables the toggles and states why, rather than
+ *   leaving a control that commits store state the render ignores.
  * @returns {Object} The strip.
  */
 export function createChainStrip({
   doc, container, store, catalog, announce, onApply, onSelect = () => {},
   presetId = () => null, onEditParameter = () => {}, onCommitParameter = () => {},
+  bypassAvailable = () => true,
 }) {
   /** @type {Map<string, CatalogOperator>} */
   const operators = new Map(catalog.operators.map((op) => [op.id, op]));
@@ -489,11 +498,16 @@ export function createChainStrip({
   };
 
   /**
-   * Toggles one endomorphism's session bypass and re-applies the program.
+   * Toggles one endomorphism's session bypass and re-applies the program. Runs
+   * for the keyboard path too, which reaches no disabled button.
    * @param {string} label - The instance label.
    * @returns {void}
    */
   const toggleBypass = (label) => {
+    if (!bypassAvailable()) {
+      announce(BYPASS_UNAVAILABLE);
+      return;
+    }
     const on = !store.bypassedLabels().includes(label);
     const result = store.setBypassed(label, on);
     if (!result.ok) {
@@ -981,11 +995,13 @@ export function createChainStrip({
       name.textContent = op.name;
       header.appendChild(name);
       const toggle = el('button', 'chain-chip-bypass');
+      const bypassable = bypassAvailable();
       toggle.type = 'button';
       toggle.setAttribute('tabindex', '-1');
+      toggle.disabled = !bypassable;
       toggle.setAttribute('aria-pressed', String(isBypassed));
       toggle.setAttribute('aria-label', `Bypass ${op.name} · ${entry.label}`);
-      toggle.setAttribute('title', 'Bypass');
+      toggle.setAttribute('title', bypassable ? 'Bypass' : BYPASS_UNAVAILABLE);
       toggle.textContent = '◉';
       toggle.addEventListener('click', (/** @type {*} */ event) => {
         event.stopPropagation();
@@ -1137,6 +1153,13 @@ export function createChainStrip({
     actions.appendChild(undoButton);
     actions.appendChild(redoButton);
     history = { undo: undoButton, redo: redoButton };
+    // The disabled toggles carry no reason of their own, and a title on a
+    // 1.125rem button is not one.
+    if (!bypassAvailable()) {
+      const note = el('p', 'chain-strip-note');
+      note.textContent = BYPASS_UNAVAILABLE;
+      actions.appendChild(note);
+    }
 
     const strip = el('div', 'chain-strip');
     strip.setAttribute('role', 'toolbar');
