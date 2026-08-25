@@ -1,6 +1,6 @@
 import { test, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { installConsoleCapture } from './fake_console.js';
+import { captureConsole, installConsoleCapture } from './fake_console.js';
 import {
   AppState,
   URLSync,
@@ -169,6 +169,25 @@ test('AppState.notify skips a listener added during the same dispatch', () => {
   assert.deepEqual(seen, [], 'a listener added mid-dispatch waits for the next event');
   s.set('a', 3);
   assert.deepEqual(seen, [3]);
+});
+
+test('AppState.notify carries past a throwing subscriber', () => {
+  const s = new AppState({ a: 1, b: 1 });
+  const seen = [];
+  s.subscribe(() => { throw new Error('subscriber blew up'); });
+  s.subscribe((key, value) => seen.push([key, value]));
+
+  const captured = captureConsole(() => {
+    s.set('a', 2);
+    s.update({ a: 3, b: 2 });
+  });
+
+  assert.deepEqual(seen, [['a', 2], ['a', 3], ['b', 2]],
+    'a later subscriber and the rest of the batch were starved');
+  assert.equal(captured.calls.length, 3, 'each swallowed throw is reported once');
+  assert.match(captured.messages[0], /AppState: subscriber threw for key "a"/);
+  assert.equal(captured.calls[0].at(-1).message, 'subscriber blew up',
+    'the caught error itself reaches the console');
 });
 
 // --- URLSync (needs a minimal window stub) ---

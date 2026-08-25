@@ -251,7 +251,14 @@ export class AppState {
     // invoked for the current event; membership is re-checked per call so one
     // removed during dispatch is not invoked either.
     for (const reg of this.listeners.slice()) {
-      if (this.listeners.includes(reg)) reg.fn(key, value, old);
+      if (!this.listeners.includes(reg)) continue;
+      // A throwing subscriber must not strand the listeners after it, nor the
+      // remaining keys of an update() batch; report and carry on.
+      try {
+        reg.fn(key, value, old);
+      } catch (err) {
+        console.error(`AppState: subscriber threw for key "${key}"`, err);
+      }
     }
   }
 
