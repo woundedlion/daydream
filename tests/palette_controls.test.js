@@ -214,6 +214,25 @@ test('custom hue state derives three sensible keys from authored harmonies', () 
   assert.ok(Math.abs(state.offsets[2] - 2 / 3) < 1e-12);
 });
 
+test('a directed harmony walks its anchors the way the direction asks', () => {
+  const recipe = defaultPaletteRecipe();
+  recipe.hue.baseTurns = 0.1;
+  recipe.hue.harmony = PaletteV4.harmony.TRIADIC;
+
+  recipe.hue.direction = PaletteV4.direction.CLOCKWISE;
+  const clockwise = hueKeyState(recipe);
+  assert.equal(clockwise.baseTurns, 0.1);
+  assert.equal(clockwise.offsets.length, 3);
+  assert.ok(Math.abs(clockwise.offsets[1] + 1 / 3) < 1e-12);
+  assert.ok(Math.abs(clockwise.offsets[2] + 2 / 3) < 1e-12);
+
+  recipe.hue.direction = PaletteV4.direction.COUNTERCLOCKWISE;
+  const counter = hueKeyState(recipe);
+  assert.equal(counter.baseTurns, 0.1);
+  assert.ok(Math.abs(counter.offsets[1] - 1 / 3) < 1e-12);
+  assert.ok(Math.abs(counter.offsets[2] - 2 / 3) < 1e-12);
+});
+
 test('hue key state exposes all four tetradic and square anchors', () => {
   const recipe = defaultPaletteRecipe();
   recipe.hue.baseTurns = 0.1;
