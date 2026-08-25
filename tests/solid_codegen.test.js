@@ -1484,13 +1484,17 @@ test('createOpGate reports an unbuildable base as an incomplete pass', async () 
 });
 
 test('MORPH_SWEEP covers the primitive ops and no composite', () => {
-  for (const op of Object.keys(MORPH_SWEEP)) {
-    assert.ok(op in OP_DEFS, `MORPH_SWEEP names ${op}, which the tool cannot author`);
-  }
-  for (const op of ['bevel', 'gyro', 'meta', 'needle', 'zip']) {
+  const COMPOSITES = ['bevel', 'gyro', 'meta', 'needle', 'zip'];
+  for (const op of COMPOSITES) {
     assert.equal(op in MORPH_SWEEP, false,
       `${op} lowers to primitives before the engine's morph check reads it`);
   }
+  // unsweepableReason answers null for an op the table omits, so a primitive
+  // added to OP_DEFS and forgotten here reads as fully swept.
+  assert.deepEqual(
+    [...Object.keys(MORPH_SWEEP), ...COMPOSITES].sort(),
+    Object.keys(OP_DEFS).sort(),
+    'every authored op is either swept or a known composite');
 });
 
 test('unsweepableReason names the ops the engine morph path declines', () => {
