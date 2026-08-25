@@ -65,6 +65,7 @@ tools/clipboard.js
 tools/copy_text.js
 tools/color.js
 tools/cpp_format.js
+tools/download_file.js
 tools/engine_halt.js
 tools/export_params.js
 tools/flyout.js
