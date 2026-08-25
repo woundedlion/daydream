@@ -234,6 +234,8 @@ export function startApp({
       replace: (url) => replaced.push(url),
     },
     history: { replaceState: (state, title, url) => urlWrites.push(url) },
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (id) => clearTimeout(id),
   };
   // Browser globals the sidebar and URL sync reach for directly.
   globalThis.window = win;
