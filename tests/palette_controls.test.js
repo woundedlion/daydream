@@ -514,7 +514,9 @@ test('the generative tab opens on the default recipe', () => {
   assert.equal(sliderValue('gen_torsion'), recipe.hueTorsion);
   assert.equal(sliderValue('gen_headroom'), recipe.chroma.headroom);
   assert.equal(sliderValue('gen_falloff'), recipe.falloffStart);
-  const easing = PALETTES_HTML.match(/<option value="(\w+)" selected>/)?.[1];
+  const easingBlock = PALETTES_HTML.match(/<select[^>]*\bid="gen_easing"[\s\S]*?<\/select>/)?.[0];
+  assert.ok(easingBlock, 'palettes.html must carry a gen_easing select');
+  const easing = easingBlock.match(/<option value="(\w+)" selected>/)?.[1];
   assert.equal(PaletteV4.easing[easing], recipe.easing,
     'the easing option marked selected must be the default recipe\'s');
 });
@@ -787,7 +789,7 @@ test('every generative <select> option names a PaletteV4 member', () => {
     const values = [...block.matchAll(/<option value="([^"]*)"/g)].map((m) => m[1]);
     assert.ok(values.length > 0, `${id} carries no options`);
     for (const value of values) {
-      assert.equal(typeof paletteEnumOrdinal(group, value), 'number',
+      assert.ok(Object.hasOwn(PaletteV4[group], value),
         `${id} option "${value}" is not a PaletteV4.${group} member`);
     }
     options += values.length;
