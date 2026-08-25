@@ -31,6 +31,8 @@ const SIDEBAR_VIEWPORT = { width: 480, height: 720 };
 // The roster's widest parameter schema, so the panel overflows the cap.
 const EFFECT = 'ShapeShifter';
 const TIMEOUT_MS = 90_000;
+// Long enough that a note squeezed onto the control row would be clipped.
+const WARNING = 'Legacy Stereo Noise requires Projection = Stereographic.';
 const SCROLLER = '.effect-gui .lil-children';
 const PANEL_TITLE = '.effect-gui > .lil-title';
 const RESET = '.effect-action-reset button';
@@ -290,6 +292,82 @@ async function probeSidebar(tab) {
   return failures;
 }
 
+/**
+ * The engine's parameter warning, laid out. The fake DOM the unit suite runs
+ * over has no box model, so only a browser decides whether the note the panel
+ * builds is on screen at all, and whether it takes a line of its own rather
+ * than being squeezed onto the row beside the widget.
+ * @param {import('puppeteer-core').Page} tab - The page under probe.
+ * @param {string} layout - Which layout is mounted, for the check text.
+ * @returns {Promise<string[]>} The failed check descriptions.
+ */
+async function probeWarningNote(tab, layout) {
+  const failures = [];
+  const check = (ok, message) => {
+    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
+    if (!ok) failures.push(`${layout}: ${message}`);
+  };
+
+  const note = await tab.evaluate(async (warning) => {
+    const { addParamControl } = await import('/effect_gui.js');
+    const { GUI } = await import('lil-gui');
+    const container = document.querySelector('.gui-container');
+    const gui = new GUI({ container, title: 'Warning Probe', autoPlace: false });
+    gui.domElement.classList.add('effect-gui');
+    try {
+      const controller = addParamControl(gui, { Speed: 0.5 },
+        { name: 'Speed', value: 0.5, min: 0, max: 1, warning });
+      const element = controller.domElement.querySelector('.param-warning-note');
+      if (!element) {
+        return { missing: true, title: controller.domElement.getAttribute('title') };
+      }
+      const style = getComputedStyle(element);
+      const box = element.getBoundingClientRect();
+      const widget = controller.domElement.querySelector('.lil-widget')
+        .getBoundingClientRect();
+      const panel = gui.domElement.getBoundingClientRect();
+      return {
+        missing: false,
+        title: controller.domElement.getAttribute('title'),
+        text: element.textContent,
+        width: Math.round(box.width),
+        height: Math.round(box.height),
+        rects: element.getClientRects().length,
+        visibility: style.visibility,
+        display: style.display,
+        opacity: Number(style.opacity),
+        ownLine: box.top >= widget.bottom - 1,
+        inside: box.left >= panel.left - 1 && box.right <= panel.right + 1,
+        clippedX: element.scrollWidth - element.clientWidth,
+        clippedY: element.scrollHeight - element.clientHeight,
+      };
+    } finally {
+      gui.destroy();
+      gui.domElement.remove();
+    }
+  }, WARNING);
+
+  check(!note.missing, 'the warned control carries a note node');
+  if (note.missing) return failures;
+  check(note.text === WARNING,
+    `the note carries the warning text (${note.text})`);
+  check(note.title === null,
+    `the control publishes no pointer-only tooltip (${note.title})`);
+  check(note.rects > 0 && note.visibility === 'visible' && note.opacity === 1
+      && note.display !== 'none',
+    `the note is rendered (${note.rects} box(es), ${note.visibility}, `
+      + `opacity ${note.opacity})`);
+  check(note.width > 1 && note.height > 1,
+    `the note has a real box (${note.width}x${note.height})`);
+  check(note.ownLine, 'the note sits below the widget, on its own line');
+  check(note.inside, 'the note lays out inside the panel');
+  check(note.clippedX <= 1 && note.clippedY <= 1,
+    `the text is not clipped (${note.clippedX}px wide, ${note.clippedY}px tall `
+      + 'past the box)');
+
+  return failures;
+}
+
 let executablePath;
 try {
   executablePath = resolveBrowser();
@@ -316,12 +394,14 @@ try {
     { timeout: TIMEOUT_MS });
   await tab.waitForSelector('.effect-gui', { timeout: TIMEOUT_MS });
   failures.push(...await probePanel(tab));
+  failures.push(...await probeWarningNote(tab, 'desktop'));
   await tab.setViewport(MOBILE_VIEWPORT);
   await tab.reload({ timeout: TIMEOUT_MS });
   await tab.waitForFunction(() => !document.getElementById('loading-overlay'),
     { timeout: TIMEOUT_MS });
   await tab.waitForSelector('.effect-gui', { timeout: TIMEOUT_MS });
   failures.push(...await probeMobilePanel(tab));
+  failures.push(...await probeWarningNote(tab, 'mobile'));
   await tab.setViewport(SIDEBAR_VIEWPORT);
   await tab.reload({ timeout: TIMEOUT_MS });
   await tab.waitForFunction(() => !document.getElementById('loading-overlay'),

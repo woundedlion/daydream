@@ -869,7 +869,7 @@ test('renamed ShaderBall controls accept every legacy deep-link name', () => {
     ['Hue Noise Amount', 'Hue Shift']);
 });
 
-test('an invalid param carries an actionable warning indicator and tooltip', () => {
+test('an invalid param carries an actionable, on-screen warning note', () => {
   const gui = fakeGui();
   const warning = 'Legacy Stereo Noise requires Projection = Stereographic.';
   const controller = addParamControl(gui, { Projection: 3 }, {
@@ -880,14 +880,16 @@ test('an invalid param carries an actionable warning indicator and tooltip', () 
   });
 
   assert.equal(controller.domElement.classList.contains('param-warning'), true);
-  assert.equal(controller.domElement.getAttribute('title'), warning);
+  assert.equal(controller.domElement.getAttribute('title'), null,
+    'the text is on screen, not behind a pointer-only tooltip');
   // The wrapper is a plain div, so the state and the description belong on the
   // widget that carries the control's role.
   assert.equal(controller.domElement.getAttribute('aria-invalid'), null);
   assert.equal(controller.$select.getAttribute('aria-invalid'), 'true');
 
-  const note = controller.domElement.querySelector('.visually-hidden');
+  const note = controller.domElement.querySelector('.param-warning-note');
   assert.equal(note.textContent, warning);
+  assert.equal(note.classList.contains('visually-hidden'), false);
   assert.equal(controller.$select.getAttribute('aria-describedby'), note.id);
   assert.equal(note.id, 'param-warning-Projection');
 });
@@ -899,7 +901,7 @@ test('warning ids separate names that differ only in punctuation or case', () =>
 
   const notes = ['Hue Shift', 'Hue-Shift', 'hue shift'].map((name) => {
     const controller = warned(name);
-    const note = controller.domElement.querySelector('.visually-hidden');
+    const note = controller.domElement.querySelector('.param-warning-note');
     assert.equal(controller.$input.getAttribute('aria-describedby'), note.id,
       'the description points at the note this control published');
     return note;
@@ -914,7 +916,7 @@ test('a param without a warning carries no invalid state or description', () => 
 
   assert.equal(controller.$input.getAttribute('aria-invalid'), null);
   assert.equal(controller.$input.getAttribute('aria-describedby'), null);
-  assert.equal(controller.domElement.querySelector('.visually-hidden'), null);
+  assert.equal(controller.domElement.querySelector('.param-warning-note'), null);
 });
 
 test('a boolean carrying option labels stays a toggle', () => {
@@ -1749,9 +1751,8 @@ test('a refused edit republishes the warning it raised, and its withdrawal', () 
   assert.equal(controller.$select.focusCalls, 1);
   assert.equal(h.panel.active().paramGeneration, 7, 'no effect was loaded');
   assert.equal(controller.domElement.classList.contains('param-warning'), true);
-  assert.equal(controller.domElement.getAttribute('title'), warning);
   assert.equal(controller.$select.getAttribute('aria-invalid'), 'true');
-  const note = controller.domElement.querySelector('.visually-hidden');
+  const note = controller.domElement.querySelector('.param-warning-note');
   assert.equal(note.textContent, warning);
   assert.equal(controller.$select.getAttribute('aria-describedby'), note.id);
   assert.deepEqual(h.container.children, [h.gui().domElement]);
@@ -1774,7 +1775,8 @@ test('a preset selection republishes the warnings the engine now carries', () =>
   });
   h.panel.build();
   h.panel.mount();
-  assert.equal(h.gui().ctrl('Speed').domElement.getAttribute('title'), warning);
+  assert.equal(h.gui().ctrl('Speed').domElement
+    .querySelector('.param-warning-note').textContent, warning);
 
   // The preset writes a value the engine accepts, withdrawing the warning with
   // no schema generation behind it.
@@ -1785,7 +1787,7 @@ test('a preset selection republishes the warnings the engine now carries', () =>
 
   const speed = h.gui().ctrl('Speed');
   assert.equal(speed.domElement.classList.contains('param-warning'), false);
-  assert.equal(speed.domElement.getAttribute('title'), null);
+  assert.equal(speed.domElement.querySelector('.param-warning-note'), null);
   assert.equal(speed.$input.getAttribute('aria-invalid'), null);
 });
 
@@ -1829,7 +1831,8 @@ test('a warning raised mid-drag lands on the pointer release', () => {
   h.panel.sync();
 
   assert.equal(h.guis.length, 2);
-  assert.equal(h.gui().ctrl('Speed').domElement.getAttribute('title'), warning);
+  assert.equal(h.gui().ctrl('Speed').domElement
+    .querySelector('.param-warning-note').textContent, warning);
 });
 
 test('Lens Glitch to None survives a rebuild before the renderer advances', () => {
