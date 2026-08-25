@@ -52,6 +52,21 @@ export function bakedTopologyFields(operatorCatalog) {
   return fields;
 }
 
+/**
+ * Document parameter ids a compiled build holds as a compile-time constant.
+ * The interpreter registers an ordinary control and reads the authored value;
+ * the compiled effect registers none, so the fixed apply skips the id instead
+ * of reading it as unmatched. AshCloud's CAMERA_SPIN_RATE is the only one.
+ *
+ * Whole ids, not field segments: `sample.spherical-rings.v3` registers a live
+ * `spin-speed` of its own.
+ *
+ * The engine's scripts/wasm_smoke_predicates.mjs holds the same set and gates
+ * the promoted documents against it. It is not part of the installed bundle,
+ * so the two are kept in step by hand.
+ */
+export const BAKED_CONSTANT_IDS = new Set(['camera.spin-speed']);
+
 /** @param {string} parameterId */
 const fieldSegment = (parameterId) =>
   parameterId.slice(parameterId.indexOf('.') + 1);
@@ -147,6 +162,7 @@ function applyDocumentValues(engine, module, compiled, presetId, baked) {
     ?? compiled.document.preset_bank.presets[0];
   const definitions = engine.getParameterDefinitions();
   for (const [parameterId, value] of Object.entries(preset?.values ?? {})) {
+    if (BAKED_CONSTANT_IDS.has(parameterId)) continue;
     if (baked.has(fieldSegment(parameterId))) continue;
     const name = engineParameterNames(parameterId)
       .find((candidate) => definitions.some(
@@ -420,13 +436,15 @@ export function createShaderDocumentController({
   /**
    * The live preview's control name for a document parameter: the interpreter
    * registers each id verbatim, while the compiled build takes its own control
-   * names and bakes the topology fields in, so those reach no control there.
+   * names and bakes the topology fields and the constant ids in, so those reach
+   * no control there.
    * @param {string} parameterId - A chain parameter id.
    * @param {ParameterDefinition[]} definitions - The engine's definitions.
    * @returns {string|null} The control name, or null where none takes the value.
    */
   const engineControlName = (parameterId, definitions) => {
     if (active?.compiledSide !== true) return parameterId;
+    if (BAKED_CONSTANT_IDS.has(parameterId)) return null;
     if (bakedFields.has(fieldSegment(parameterId))) return null;
     return engineParameterNames(parameterId).find((candidate) =>
       definitions.some((definition) => definition.name === candidate)) ?? null;

@@ -385,6 +385,48 @@ async function probeStrip(tab) {
   return failures;
 }
 
+// The promoted document that carries a value its compiled build holds as a
+// constant, so the apply has to skip that id rather than refuse the preset.
+const PARITY_EFFECT = 'ash-cloud';
+const PARITY_TITLE = 'Ash Cloud';
+
+/**
+ * Loads a promoted document and swaps the preview onto its compiled build. The
+ * swap re-applies every authored value through the effect's registered
+ * controls, so one id no control takes refuses the whole preset and the status
+ * reports the error instead of the side.
+ * @param {import('puppeteer-core').Page} tab
+ * @returns {Promise<string[]>} The failed checks.
+ */
+async function probeParity(tab) {
+  const failures = [];
+  /** @param {boolean} ok @param {string} message */
+  const check = (ok, message) => {
+    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
+    if (!ok) failures.push(message);
+  };
+
+  await tab.select('#shader-document-select', PARITY_EFFECT);
+  await tab.waitForFunction((title) => document
+    .getElementById('shader-document-status')?.textContent?.startsWith(title),
+  { timeout: TIMEOUT_MS }, PARITY_TITLE);
+  const loaded = await tab.$eval('#shader-parity-toggle', (node) => ({
+    armed: node instanceof HTMLButtonElement && !node.disabled,
+    status: document.getElementById('shader-document-status')?.dataset.status,
+  }));
+  check(loaded.armed && loaded.status === 'ok',
+    `the parity toggle arms on the loaded ${PARITY_EFFECT} document`);
+
+  await (await tab.waitForSelector('#shader-parity-toggle')).click();
+  const applied = await tab.$eval('#shader-document-status', (node) => ({
+    text: node.textContent ?? '',
+    status: node instanceof HTMLElement ? node.dataset.status : 'error',
+  }));
+  check(applied.status === 'ok' && applied.text.endsWith('compiled build'),
+    `the compiled build takes every authored value (${applied.text})`);
+  return failures;
+}
+
 let executablePath;
 try {
   executablePath = resolveBrowser();
@@ -401,16 +443,28 @@ const browser = await puppeteer.launch({
   args: BROWSER_ARGS,
 });
 
-const failures = [];
-try {
+/**
+ * @param {string[]} collector - Takes the page's uncaught errors.
+ * @returns {Promise<import('puppeteer-core').Page>} The loaded workbench.
+ */
+async function openWorkbench(collector) {
   const tab = await browser.newPage();
   await tab.setViewport(VIEWPORT);
-  tab.on('pageerror', (error) => failures.push(`uncaught: ${error.message}`));
+  tab.on('pageerror', (error) => collector.push(`uncaught: ${error.message}`));
   await tab.goto(`${site.origin}/${PAGE}`, { timeout: TIMEOUT_MS });
   await tab.waitForFunction(() => !document.getElementById('loading-overlay'),
     { timeout: TIMEOUT_MS });
   await tab.waitForSelector('.chain-chip', { timeout: TIMEOUT_MS });
+  return tab;
+}
+
+const failures = [];
+try {
+  const tab = await openWorkbench(failures);
   failures.push(...await probeStrip(tab));
+  // A separate page: the strip probe's structural edits disarm the toggle.
+  const parityTab = await openWorkbench(failures);
+  failures.push(...await probeParity(parityTab));
 } catch (error) {
   failures.push(error instanceof Error ? error.message : String(error));
 } finally {
