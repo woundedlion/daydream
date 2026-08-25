@@ -6,6 +6,7 @@
 // tests/app_lifecycle.test.js; this is the assembly.
 import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { installConsoleCapture } from './fake_console.js';
 import { fakeElement, restoreDocumentAfterEach } from './fake_dom.js';
 import { startApp as startUntrackedApp } from './fake_app.js';
 
@@ -101,14 +102,22 @@ test('the teardown releases the page listeners and the GUI it built', () => {
 });
 
 test('a failed engine load reports and disarms the Test All ticker', async () => {
-  const { guis, elements } = startApp({
-    loadModule: () => Promise.reject(new Error('no wasm')),
-  });
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  const captured = installConsoleCapture('error');
+  let app;
+  try {
+    app = startApp({ loadModule: () => Promise.reject(new Error('no wasm')) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  } finally {
+    captured.restore();
+  }
 
-  const testAll = guis[0].controllers.find((c) => c.property === 'testAll');
+  assert.match(captured.messages.join('|'),
+    /Failed to initialize the Holosphere renderer[\s\S]*no wasm/,
+    'the load failure must name the renderer and carry the underlying error');
+
+  const testAll = app.guis[0].controllers.find((c) => c.property === 'testAll');
   assert.equal(testAll.enabled, false,
     'without an engine the ticker would spin for the page lifetime');
-  assert.ok(elements.get('loading-overlay').classList.contains('error'),
+  assert.ok(app.elements.get('loading-overlay').classList.contains('error'),
     'the failure must reach the overlay, not only the console');
 });
