@@ -73,6 +73,17 @@ test('the global GUI carries the controls a deep link names', () => {
     ['recQuality', 'recResolution', 'recFormat', 'record']);
 });
 
+test('the workbench page builds no segmented POV controls', () => {
+  const { guis } = startApp({ daydreamMode: 'shader-workbench' });
+
+  assert.equal(
+    guis[0].folders.find((f) => f.namespace === 'Segmented POV'), undefined,
+    'workbench effects are programmed through setShaderChain and no worker '
+    + 'message carries that program, so a pool would composite a preview built '
+    + 'from a bare ShaderChain; offering the controls at all -- or leaving them '
+    + 'deep-linkable -- ships that silent difference');
+});
+
 test('the record button is offered only once an engine exists', () => {
   const { guis } = startApp();
   const record = guis[0].folders
