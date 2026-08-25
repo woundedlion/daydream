@@ -118,7 +118,6 @@ class DeepLinkGUI {
     }
     this.rootNamespace = rootNamespace;
     this.parent = parent;
-    this.folderName = null;
     this.folderIndex = 0;
     this.keySegment = null;
     this.urlKeys = new Set();
@@ -448,14 +447,14 @@ class DeepLinkGUI {
   addFolder(name) {
     const folder = this.gui.addFolder(name);
     const wrapped = new DeepLinkGUI(folder, null, this);
-    wrapped.folderName = name;
     wrapped.folderIndex = this.children.length;
     // Fixed here rather than at add() time so a folder's controls can never
     // split across two naming schemes when a same-name sibling appears later.
     // A positional segment for an empty name keeps the level from collapsing;
     // the first claimant of a name keeps the bare segment, so unique-named
-    // folders hold their existing (shared-link-stable) keys.
-    const duplicate = this.children.some((c) => c.folderName === name);
+    // folders hold their existing (shared-link-stable) keys. A display folder
+    // claims no segment, so it is not a claimant.
+    const duplicate = this.children.some((c) => c.keySegment === name);
     wrapped.keySegment = name
       ? (duplicate ? `${name}#${wrapped.folderIndex}` : name)
       : `#${wrapped.folderIndex}`;
@@ -471,7 +470,6 @@ class DeepLinkGUI {
   addDisplayFolder(name) {
     const folder = this.gui.addFolder(name);
     const wrapped = new DeepLinkGUI(folder, null, this);
-    wrapped.folderName = name;
     wrapped.folderIndex = this.children.length;
     wrapped.keySegment = null;
     this.children.push(wrapped);
