@@ -768,6 +768,26 @@ export function canonicalDescriptor(document) {
   return canonicalValue(descriptor);
 }
 
+/**
+ * The descriptor reduced to what identifies the program: the canonical form
+ * without `unit`. A unit is a display label for the editor; the engine reads a
+ * parameter through its storage and domain and never sees it, so two chains
+ * differing only in a label are the same program and must digest alike. The
+ * label stays in the canonical document — this view exists only to be hashed.
+ * @param {*} descriptor - A canonicalDescriptor() result.
+ * @returns {*} The same descriptor with every parameter's unit removed.
+ */
+export function descriptorIdentity(descriptor) {
+  return canonicalValue({
+    ...descriptor,
+    parameters: descriptor.parameters.map((parameter) => {
+      const identity = { ...parameter };
+      delete identity.unit;
+      return identity;
+    }),
+  });
+}
+
 export function canonicalPresetBank(document, descriptor = canonicalDescriptor(document)) {
   const parameters = new Map(descriptor.parameters.map((parameter) => [parameter.id, parameter]));
   const bank = document.preset_bank;
@@ -1261,7 +1281,7 @@ export function compileShaderDocument(source, options = {}) {
     const diagnostics = validateShaderDocument(document, options);
     if (diagnostics.length > 0) return { status: 'INVALID', diagnostics };
     const descriptor = canonicalDescriptor(document);
-    const descriptor_json = stableStringify(descriptor);
+    const descriptor_json = stableStringify(descriptorIdentity(descriptor));
     const descriptor_digest = sha256Hex(descriptor_json);
     const preset_bank = canonicalPresetBank(document, descriptor);
     const preset_bank_json = stableStringify(preset_bank);
@@ -1289,7 +1309,7 @@ export function classifyExport(compiled, registry, capabilityProfile) {
     return { kind: 'REJECTED', diagnostics: compiled.diagnostics };
   const matches = registry.effects.filter((effect) =>
     effect.descriptor_digest === compiled.descriptor_digest &&
-    stableStringify(effect.descriptor) === compiled.descriptor_json);
+    stableStringify(descriptorIdentity(effect.descriptor)) === compiled.descriptor_json);
   if (matches.length > 1)
     return {
       kind: 'REJECTED',
