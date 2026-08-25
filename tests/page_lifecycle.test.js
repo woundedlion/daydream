@@ -1,32 +1,10 @@
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { installAnimationFrames } from './fake_dom.js';
 
 const {
   createFrameScheduler, onPageTeardown, watchMediaMatch,
 } = await import('../tools/page_lifecycle.js');
-
-/**
- * Animation-frame double: callbacks queue until flush() runs them, and cancelled
- * handles are dropped. Handles start at 1 so none is falsy.
- */
-function fakeFrames() {
-  const queued = new Map();
-  let nextHandle = 1;
-  globalThis.requestAnimationFrame = (fn) => {
-    const handle = nextHandle++;
-    queued.set(handle, fn);
-    return handle;
-  };
-  globalThis.cancelAnimationFrame = (handle) => queued.delete(handle);
-  return {
-    get pending() { return queued.size; },
-    flush() {
-      const fns = [...queued.values()];
-      queued.clear();
-      for (const fn of fns) fn();
-    },
-  };
-}
 
 const saved = {};
 beforeEach(() => {
@@ -43,7 +21,7 @@ afterEach(() => {
 
 /** Verifies a scheduled run happens on the frame, not on the call. */
 test('createFrameScheduler defers the run to the next frame', () => {
-  const frames = fakeFrames();
+  const frames = installAnimationFrames();
   let runs = 0;
   const schedule = createFrameScheduler(() => { runs++; });
 
@@ -55,7 +33,7 @@ test('createFrameScheduler defers the run to the next frame', () => {
 
 /** Verifies a burst of requests in one frame coalesces to a single run. */
 test('createFrameScheduler coalesces a burst into one run', () => {
-  const frames = fakeFrames();
+  const frames = installAnimationFrames();
   let runs = 0;
   const schedule = createFrameScheduler(() => { runs++; });
 
@@ -67,7 +45,7 @@ test('createFrameScheduler coalesces a burst into one run', () => {
 
 /** Verifies the next frame is schedulable again once the pending one has run. */
 test('createFrameScheduler re-arms after the frame runs', () => {
-  const frames = fakeFrames();
+  const frames = installAnimationFrames();
   let runs = 0;
   const schedule = createFrameScheduler(() => { runs++; });
 
@@ -80,7 +58,7 @@ test('createFrameScheduler re-arms after the frame runs', () => {
 
 /** Verifies a request made from inside the run itself lands on a later frame. */
 test('createFrameScheduler accepts a request made during its own run', () => {
-  const frames = fakeFrames();
+  const frames = installAnimationFrames();
   const order = [];
   const schedule = createFrameScheduler(() => {
     order.push('run');
@@ -96,7 +74,7 @@ test('createFrameScheduler accepts a request made during its own run', () => {
 
 /** Verifies cancel() drops the pending frame, so a torn-down page never recomputes. */
 test('cancel drops a pending run', () => {
-  const frames = fakeFrames();
+  const frames = installAnimationFrames();
   let runs = 0;
   const schedule = createFrameScheduler(() => { runs++; });
 
@@ -109,7 +87,7 @@ test('cancel drops a pending run', () => {
 
 /** Verifies cancel() with nothing pending is a no-op rather than cancelling frame 0. */
 test('cancel with nothing pending cancels nothing', () => {
-  const frames = fakeFrames();
+  const frames = installAnimationFrames();
   const cancelled = [];
   const realCancel = globalThis.cancelAnimationFrame;
   globalThis.cancelAnimationFrame = (handle) => { cancelled.push(handle); realCancel(handle); };
@@ -126,7 +104,7 @@ test('cancel with nothing pending cancels nothing', () => {
 
 /** Verifies a scheduler is usable again after a cancel, so a restored page recovers. */
 test('a cancelled scheduler can be scheduled again', () => {
-  const frames = fakeFrames();
+  const frames = installAnimationFrames();
   let runs = 0;
   const schedule = createFrameScheduler(() => { runs++; });
 
@@ -139,7 +117,7 @@ test('a cancelled scheduler can be scheduled again', () => {
 
 /** Verifies two schedulers keep independent pending state. */
 test('schedulers do not share pending state', () => {
-  const frames = fakeFrames();
+  const frames = installAnimationFrames();
   const runs = [];
   const a = createFrameScheduler(() => runs.push('a'));
   const b = createFrameScheduler(() => runs.push('b'));
@@ -208,7 +186,7 @@ test('onPageTeardown supports several independent teardowns', () => {
 
 /** Verifies the two helpers compose the way the pages wire them: teardown cancels the pending frame. */
 test('a teardown cancels the scheduler pending frame', () => {
-  const frames = fakeFrames();
+  const frames = installAnimationFrames();
   const win = fakeWindow();
   let runs = 0;
   const schedule = createFrameScheduler(() => { runs++; });

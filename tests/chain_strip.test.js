@@ -17,7 +17,8 @@ import {
 } from '../tools/chain_strip.js';
 import { compileShaderDocument } from '../shader/shader_workbench.mjs';
 import {
-  documentEvents, fakeElement, installDocument, restoreDocumentAfterEach,
+  documentEvents, fakeElement, installAnimationFrames, installDocument,
+  restoreDocumentAfterEach,
 } from './fake_dom.js';
 
 const CATALOG = JSON.parse(readFileSync(
@@ -27,31 +28,10 @@ const BASE = compileShaderDocument(readFileSync(
 { catalog: CATALOG });
 assert.equal(BASE.status, 'VALID');
 
-const savedAnimationFrame = {
-  request: globalThis.requestAnimationFrame,
-  cancel: globalThis.cancelAnimationFrame,
-};
-let nextFrame = 0;
-let frameCallbacks = new Map();
-beforeEach(() => {
-  nextFrame = 0;
-  frameCallbacks = new Map();
-  globalThis.requestAnimationFrame = (callback) => {
-    const id = ++nextFrame;
-    frameCallbacks.set(id, callback);
-    return id;
-  };
-  globalThis.cancelAnimationFrame = (id) => frameCallbacks.delete(id);
-});
-afterEach(() => {
-  globalThis.requestAnimationFrame = savedAnimationFrame.request;
-  globalThis.cancelAnimationFrame = savedAnimationFrame.cancel;
-});
-const runFrame = () => {
-  const callbacks = [...frameCallbacks.values()];
-  frameCallbacks.clear();
-  for (const callback of callbacks) callback();
-};
+let frames = null;
+beforeEach(() => { frames = installAnimationFrames(); });
+afterEach(() => { frames.restore(); });
+const runFrame = () => frames.flush();
 
 // kaleidoscope_hex_bright chain: camera, lens (sphere endos), project (crossing), warp2
 // (plane endo), sample (crossing), transfer (field endo), colorize (exit).
