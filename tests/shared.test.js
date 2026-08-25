@@ -160,7 +160,7 @@ test('initScene returns the handles the tool pages destructure', () => {
   assert.equal(s.renderer.domElement, s.canvas);
   assert.deepEqual(s.renderer.size, [640, 480]);
   assert.equal(s.renderer.pixelRatio, 1, 'the renderer must take the capped ratio');
-  assert.equal(s.controls.camera, s.camera);
+  assert.equal(s.controls.object, s.camera);
   assert.equal(s.controls.domElement, s.canvas);
   assert.deepEqual(s.scene.children, [s.sphere]);
   assert.equal(s.renderer.renders, 1, 'the loop must paint one frame on start');
@@ -171,10 +171,10 @@ test('initScene gives the canvas a focused keyboard route to OrbitControls', () 
   const s = mountScene();
 
   assert.equal(s.canvas.tabIndex, 0);
-  assert.equal(s.controls.keyEventsElement, s.canvas);
+  assert.equal(s.controls._domElementKeyEvents, s.canvas);
 
   s.dispose();
-  assert.equal(s.controls.keyEventsElement, null);
+  assert.equal(s.controls._domElementKeyEvents, null);
 });
 
 test('initScene returns the light rig it added when lights are requested', () => {
