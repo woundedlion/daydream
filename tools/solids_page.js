@@ -6,7 +6,7 @@
  */
 import * as THREE from 'three';
 import { initScene, copyWithFeedback, showFatalError, bootstrapTool, formatKB } from './shared.js';
-import { engineHalted } from './engine_halt.js';
+import { standDownIfHalted } from './engine_halt.js';
 // The shared op table and dispatch, the pure C++ export-string codegen
 // (formatFloat/pctSuffix/recipe builders), the pure face-geometry helpers and
 // the op-chain queue/validator machinery live in solid_codegen.js, and the
@@ -1215,11 +1215,8 @@ function standDown(message) {
 // one ever escapes the validator gate, fail loudly once instead of letting
 // every later call trap the re-entrancy guard and spam the console.
 function engineTrapped(e) {
-  if (!engineHalted(e, WasmModule)) return false;
-  standDown('The WASM engine hit an internal invariant and is halted — '
-    + 'reload the page. (The op that caused this slipped past validation; '
-    + 'please report the chain.)');
-  return true;
+  return standDownIfHalted(e, WasmModule, standDown,
+    '(The op that caused this slipped past validation; please report the chain.)');
 }
 
 // Reports a mesh failure on the stats line; the next recompute overwrites it.

@@ -26,3 +26,24 @@ export function engineHalted(error, module = null) {
   return error instanceof WebAssembly.RuntimeError
     || module?.HS_MODULE_DEAD === true;
 }
+
+/** The sentence a halted engine earns, shared by every tool page. */
+const HALT_NOTICE = 'The WASM engine hit an internal invariant and is halted — '
+  + 'reload the page.';
+
+/**
+ * Reports whether an error halted the engine and, if so, stands the page down.
+ *
+ * The page keeps ownership of its own module handles: standDown drops them and
+ * raises the banner, so nothing calls the halted instance again.
+ * @param {*} error - The error a bridge call threw, if any.
+ * @param {?{HS_MODULE_DEAD?: boolean}} module - The instance the call ran on.
+ * @param {(message: string) => void} standDown - Drops the page's handles and shows the fatal banner.
+ * @param {string} [detail] - A page-specific sentence appended to the banner text.
+ * @returns {boolean} True when the error was an engine halt.
+ */
+export function standDownIfHalted(error, module, standDown, detail = '') {
+  if (!engineHalted(error, module)) return false;
+  standDown(detail ? `${HALT_NOTICE} ${detail}` : HALT_NOTICE);
+  return true;
+}
