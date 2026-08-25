@@ -116,6 +116,35 @@ test('each controller exposes the focusable widget the GUI layer reaches for', a
   assert.equal(typeof action.$button.focus, 'function');
 });
 
+// gui.js's URL writer registers an onChange per controller and replays stored
+// values into them on boot; a write that matches the standing value must not
+// echo back into the URL.
+test('setValue() with the standing value fires no onChange', async () => {
+  const gui = await realGUI();
+  const controller = gui.add({ count: 1 }, 'count', 0, 10, 1);
+  const calls = [];
+  controller.onChange((v) => calls.push(v));
+
+  controller.setValue(1);
+  assert.deepEqual(calls, [], 'an unchanged write still notified');
+
+  controller.setValue(2);
+  controller.setValue(2);
+  assert.deepEqual(calls, [2], 'the repeated write notified a second time');
+});
+
+// effect_gui.js's disposeEffect re-parents its action-row controllers back into
+// the panel before destroy() for exactly this reason.
+test('destroy() throws when the controller row hangs off another parent', async () => {
+  const gui = await realGUI();
+  const controller = gui.add({ count: 1 }, 'count', 0, 10, 1);
+  const elsewhere = fakeElement('div');
+  elsewhere.appendChild(controller.domElement);
+
+  assert.throws(() => controller.destroy(), /not a child/,
+    'destroy() removes from the panel container, not from the current parent');
+});
+
 test('decimals chains and rounds the display without moving the value', async () => {
   const gui = await realGUI();
 
