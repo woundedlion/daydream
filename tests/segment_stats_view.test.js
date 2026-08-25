@@ -206,8 +206,11 @@ test('the generated table names itself and scopes its column headers', () => {
   const caption = stats.firstElementChild.children[0];
   assert.equal(caption.tagName, 'CAPTION');
   assert.equal(caption.className, 'visually-hidden');
-  assert.match(caption.textContent, /\S/);
-  for (const header of grid(stats).rows[0].children) {
+  assert.equal(caption.textContent,
+    'Per-segment compute time and arena high-water marks');
+  const headers = grid(stats).rows[0].children;
+  assert.equal(headers.length, 6);
+  for (const header of headers) {
     assert.equal(header.getAttribute('scope'), 'col');
   }
 });
