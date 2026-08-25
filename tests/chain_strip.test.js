@@ -971,7 +971,7 @@ test('a deactivated field renders dimmed but editable', async () => {
     'the envelope gate opens on flat, which reads no edge width');
   assert.equal(edge.getAttribute('title'),
     'Deactivated by the current topology selection');
-  assert.equal(controlIn(edge).disabled, undefined, 'dimmed, not disabled');
+  assert.equal(controlIn(edge).disabled, false, 'dimmed, not disabled');
   assert.equal(rowFor(h, label, `${label}.strength`).dataset.deactivated, undefined);
 
   const envelope = controlIn(rowFor(h, label, `${label}.envelope`));
