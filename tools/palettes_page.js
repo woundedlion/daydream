@@ -40,6 +40,7 @@ import {
   wrapTurns,
   hitTestHueKeyMarker,
   hueKeyState, customHueKeyState, moveCustomHueKey,
+  loopSweepTurns,
 } from './palette_controls.js';
 // The two canvas painters take their canvas, context and palette as
 // arguments, so they live in their own module and are unit tested against a
@@ -1172,7 +1173,13 @@ async function init() {
           const sourceRecipe = readPaletteRecipe();
           sourceRecipe.hue.mode = previousHueMode;
           sourceRecipe.hue.baseTurns = customBaseTurns();
-          sourceRecipe.hue.sweepTurns = 1;
+          // readPaletteRecipe() saw the dropdown already on CUSTOM, so the loop
+          // sweep it leaves behind is still the raw slider reading.
+          if (sourceRecipe.domain === PaletteV4.domain.LOOP &&
+              previousHueMode === PaletteV4.hueMode.SWEEP) {
+            sourceRecipe.hue.sweepTurns =
+              loopSweepTurns(sourceRecipe.hue.sweepTurns);
+          }
           activateCustomHue(sourceRecipe);
         } else {
           previousHueMode = nextMode;
