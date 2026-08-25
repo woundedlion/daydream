@@ -223,7 +223,7 @@ export function start({
   win = globalThis,
   nav = globalThis.navigator,
   createDriver = () => new Daydream({ doc, win, nav }),
-  createGui = (options, namespace) => new GUI(options, namespace),
+  createGui = (options, namespace) => new GUI(options, namespace, null, win),
   loadModule = createHolosphereModule,
 } = {}) {
   const shaderWorkbench = doc.documentElement?.dataset.daydreamMode === 'shader-workbench';
@@ -301,7 +301,7 @@ export function start({
    * @returns {void}
    */
   function clearEffectParamUrl() {
-    resetGUI(['resolution', 'effect', ...guiInstance.collectUrlKeys()]);
+    resetGUI(['resolution', 'effect', ...guiInstance.collectUrlKeys()], win);
   }
 
   const applyNotice = createApplyNotice({ doc });
