@@ -193,6 +193,10 @@ test('refreshModuleCache re-fetches same-origin scripts past the cache', async (
       'http://localhost:8000/effect_sequencing.js',
       'http://localhost:8000/effect_sequencing.js',
       'http://localhost:8000/tools/shared.js?v=2',
+      // '.mjs' does not end in '.js': the workbench compiler and the digest
+      // module it is hash-coupled to load through the same main.js path.
+      'http://localhost:8000/shader/shader_workbench.mjs',
+      'http://localhost:8000/shader/sha256.mjs',
       // Glue and binary are bound by content hash, so a cached binary against
       // fresh glue is exactly the skew Reload exists to clear.
       'http://localhost:8000/holosphere_wasm.wasm',
@@ -204,6 +208,8 @@ test('refreshModuleCache re-fetches same-origin scripts past the cache', async (
     'http://localhost:8000/daydream.js',
     'http://localhost:8000/effect_sequencing.js',
     'http://localhost:8000/tools/shared.js?v=2',
+    'http://localhost:8000/shader/shader_workbench.mjs',
+    'http://localhost:8000/shader/sha256.mjs',
     'http://localhost:8000/holosphere_wasm.wasm',
   ]);
   for (const [, options] of calls) assert.deepEqual(options, { cache: 'reload' });
