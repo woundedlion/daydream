@@ -85,6 +85,29 @@ test('the global GUI carries the controls a deep link names', () => {
     ['recQuality', 'recResolution', 'recFormat', 'record']);
 });
 
+test('a workbench-only effect deep link is handed to the workbench page', () => {
+  const legacy = startApp({ search: '?effect=ShaderBall' });
+
+  assert.deepEqual(legacy.replaced, ['/tools/shader.html?effect=ShaderBall'],
+    'the retired alias names an effect only the workbench offers, so the '
+    + 'simulator hands the link on instead of dropping it for its default; the '
+    + 'legacy spelling is what travels, because the page that adopts the link '
+    + 'is the one that migrates it and raises the notice');
+  assert.equal(legacy.guis.length, 0,
+    'a redirected load must build no driver, GUI or engine: the page is on its '
+    + 'way out, and what it built would never be torn down');
+  assert.deepEqual(legacy.listeners, [],
+    'a listener installed on a redirecting page outlives it');
+  assert.equal(legacy.teardown.disposed(), false);
+  legacy.teardown.dispose();
+  assert.equal(legacy.teardown.disposed(), true,
+    'nothing was built, but the caller reads disposed() on either path');
+
+  const shipped = startApp({ search: '?effect=alien-brain' });
+  assert.deepEqual(shipped.replaced, ['/tools/shader.html?effect=alien-brain'],
+    'a shipped document carries no legacy identity, so its own id travels');
+});
+
 test('the workbench page builds no segmented POV controls', () => {
   const { guis } = startApp({ daydreamMode: 'shader-workbench' });
 

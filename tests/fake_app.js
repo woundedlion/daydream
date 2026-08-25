@@ -33,6 +33,8 @@ function fakeController(owner, object, property, args = []) {
     args,
     value: undefined,
     calls: [],
+    // The effect panel styles, labels and re-parents its rows through this.
+    domElement: fakeElement('div'),
     name(text) { controller.label = text; return controller; },
     onChange(fn) { controller.changed = fn; return controller; },
     setValue(v) { controller.value = v; controller.changed?.(v); return controller; },
@@ -142,11 +144,18 @@ export function fakeDriver() {
     showPip: false,
     columnFillOverlap: 1,
     recorder: null,
+    pixels: null,
+    dotMesh: { instanceColor: { array: null, needsUpdate: false } },
     renderer: { setAnimationLoop(frame) { this.frame = frame; } },
     keys: [],
+    frames: 0,
     invalidate() { this.invalidated = true; },
     keydown(e) { this.keys.push(e); },
-    render() {},
+    setStrobeColumns(strobe) { this.strobe = strobe; },
+    updateResolution(w, h, dotSize) { this.resolution = [w, h, dotSize]; },
+    // The real driver's render() calls the adapter it is handed; a fake that
+    // swallowed it would leave every per-frame wiring undriven.
+    render(adapter) { this.frames += 1; adapter.drawFrame(); },
     dispose() { this.disposed = true; },
   };
 }
@@ -154,14 +163,17 @@ export function fakeDriver() {
 /**
  * Builds the app against fakes.
  * @param {{loadModule?: () => Promise<Object>, nav?: Object,
- *   daydreamMode?: string}} [options] - Seam overrides. daydreamMode stamps
- *   documentElement, the attribute start() reads to route the workbench page.
+ *   daydreamMode?: string, search?: string}} [options] - Seam overrides.
+ *   daydreamMode stamps documentElement, the attribute start() reads to route
+ *   the workbench page; search is the query string URLSync hydrates from and
+ *   the redirect builds its target against.
  * @returns {Object} The pieces a case asserts on, plus the global restorer.
  */
 export function startApp({
   loadModule = () => new Promise(() => {}),
   nav = { hardwareConcurrency: 8 },
   daydreamMode = undefined,
+  search = '',
 } = {}) {
   const savedGlobals = new Map([
     'document', 'window', 'ResizeObserver', 'requestAnimationFrame',
@@ -188,14 +200,24 @@ export function startApp({
   });
   for (const element of elements.values()) element.ownerDocument = doc;
   const listeners = [];
+  /** @type {string[]} Targets win.location.replace() was sent to. */
+  const replaced = [];
+  /** @type {string[]} URLs written through history.replaceState(). */
+  const urlWrites = [];
   const win = {
     addEventListener: (type, handler) => listeners.push([type, handler]),
     removeEventListener: (type, handler) => {
       const at = listeners.findIndex(([t, h]) => t === type && h === handler);
       if (at >= 0) listeners.splice(at, 1);
     },
-    location: { pathname: '/', search: '', hash: '' },
-    history: { replaceState() {} },
+    location: {
+      pathname: '/',
+      search,
+      hash: '',
+      href: `http://localhost:8000/${search}`,
+      replace: (url) => replaced.push(url),
+    },
+    history: { replaceState: (state, title, url) => urlWrites.push(url) },
   };
   // Browser globals the sidebar and URL sync reach for directly.
   globalThis.window = win;
@@ -227,7 +249,8 @@ export function startApp({
     }
   };
   return {
-    teardown, driver, guis, listeners, docListeners, elements, queried, win, restore,
+    teardown, driver, guis, listeners, docListeners, elements, queried, win,
+    replaced, urlWrites, restore,
   };
 }
 

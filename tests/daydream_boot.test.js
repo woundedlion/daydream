@@ -12,6 +12,8 @@ import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { restoreDocumentAfterEach } from './fake_dom.js';
+import { URL_FLUSH_DEBOUNCE_MS } from '../state.js';
+import { EffectSetResult, ResolutionSetResult } from './fake_engine.js';
 import { captureConsole, installConsoleCapture } from './fake_console.js';
 import {
   createSegmentPoolSpawner,
@@ -183,6 +185,79 @@ async function bootedApp(options) {
     capture.restore();
   }
 }
+
+/**
+ * A module the composition root can boot all the way through: enough engine
+ * surface for the initial resolution apply, the effect panel and one rendered
+ * frame, with the contract-pinned enums so identity comparison behaves as it
+ * does against embind.
+ * @returns {Object} The module.
+ */
+function bootableWasmModule() {
+  const pixels = new Uint16Array(288 * 144 * 3);
+  return {
+    HS_MODULE_DEAD: false,
+    EffectSetResult,
+    ResolutionSetResult,
+    HolosphereEngine: class {
+      static isLive() { return false; }
+      static getSupportedResolutions() { return [[288, 144], [96, 20]]; }
+      setResolution() { return ResolutionSetResult.RESIZED; }
+      setEffect() { return EffectSetResult.INSTALLED; }
+      setPoleLod() {}
+      setAnimationsPaused() {}
+      getAnimationsPaused() { return false; }
+      getPresetCount() { return 0; }
+      getPresetIndex() { return 0; }
+      getParameterDefinitions() { return []; }
+      getParamValues() { return new Float32Array(0); }
+      getParamGeneration() { return 1; }
+      getEffectSizes() { return {}; }
+      getEffectPresetCounts() { return {}; }
+      getArenaMetrics() { return {}; }
+      strobeColumns() { return false; }
+      drawFrame() {}
+      getPixels() { return pixels; }
+      getBufferLength() { return pixels.length; }
+      delete() {}
+    },
+  };
+}
+
+/** Waits out one URL-flush debounce window. @returns {Promise<void>} */
+const settleUrl = () =>
+  new Promise((resolve) => setTimeout(resolve, URL_FLUSH_DEBOUNCE_MS * 2));
+
+test('the migrated ShaderBall URL is written only once a frame has applied it', async () => {
+  const app = await bootedApp({
+    daydreamMode: 'shader-workbench',
+    search: '?effect=ShaderBall',
+    loadModule: () => Promise.resolve(bootableWasmModule()),
+  });
+  const notice = app.elements.get('apply-notice-text');
+  await settleUrl();
+
+  assert.equal(app.teardown.disposed(), false, 'the module must have booted');
+  assert.deepEqual(app.urlWrites, [],
+    'the suspension brackets the whole migration: until the engine has the new '
+    + 'effect, a URL advertising it is a link that reopens on something the app '
+    + 'never applied');
+  assert.equal(notice.textContent, '',
+    'the notice reports a migration that has happened, not one that is pending');
+
+  app.driver.renderer.frame();
+  await settleUrl();
+
+  assert.equal(app.urlWrites.length, 1,
+    'the release sits in the adapter frame callback, which is what makes the '
+    + 'migrated effect reach the URL at all; released from anywhere a run can '
+    + 'skip -- a pool composite, say -- the suspension never lifts and every '
+    + 'later deep-link write is stranded for the session');
+  assert.match(app.urlWrites[0], /[?&]effect=Shader(&|$)/,
+    'the live identity is what a shared link must carry');
+  assert.equal(notice.textContent, 'ShaderBall is now Shader; opened with defaults.',
+    'the rename is only discoverable through the notice the release raises');
+});
 
 test('a failed engine load disposes the app through the retained teardown', async () => {
   const app = await bootedApp({ loadModule: () => Promise.reject(new Error('no wasm')) });
