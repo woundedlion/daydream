@@ -13,7 +13,9 @@
  * dependency; the chain validator takes the WASM module factory by injection.
  */
 
-import { formatFloatCpp } from './cpp_format.js';
+import {
+  COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns, formatFloatCpp,
+} from './cpp_format.js';
 import { engineHalted } from './engine_halt.js';
 
 /**
@@ -449,10 +451,6 @@ export function requireMeshResult(result, what, { Mod, meshOps, onError }) {
   return null;
 }
 
-// A base seed-solid name is pasted as a C++ function call (`base(a, b)`), so
-// guard its shape against the valid-identifier pattern.
-const CPP_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
 // Op params become C++ literals, so reject anything that would emit NaN/Inf or a
 // malformed token. requireFinite covers fractional params; requireCount also
 // enforces a positive integer (e.g. a relax iteration count — the engine's
@@ -657,10 +655,6 @@ function commentCount(value) {
   return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
-// solid_generators.h is clang-formatted at 80 columns, and the paste goes in
-// verbatim.
-const COLUMN_LIMIT = 80;
-
 /**
  * A doxygen block filled at the column limit, the way the blocks already in
  * solid_generators.h are: a continuation carries the same ` * ` prefix at the
@@ -669,18 +663,7 @@ const COLUMN_LIMIT = 80;
  * @returns {string} The block comment.
  */
 function doxygenCpp(tags) {
-  const lines = [];
-  for (const text of tags) {
-    let line = ' *';
-    for (const word of text.split(' ')) {
-      if (line.length + 1 + word.length > COLUMN_LIMIT) {
-        lines.push(line);
-        line = ' *';
-      }
-      line += ` ${word}`;
-    }
-    lines.push(line);
-  }
+  const lines = tags.flatMap((text) => fillColumns(text.split(' '), ' * '));
   return ['/**', ...lines, ' */'].join('\n');
 }
 

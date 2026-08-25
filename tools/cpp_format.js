@@ -3,9 +3,45 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-// Dependency-free C++ float-literal formatter shared by the tool pages' code
+// Dependency-free C++ source formatting shared by the tool pages' code
 // generators, so the THREE-free generators can import it without pulling
 // Three.js into their unit tests.
+
+/**
+ * A value pasted into the engine as a C++ identifier — a seed-solid function
+ * name, a namespace qualifier — must match this or the paste is malformed.
+ */
+export const CPP_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * The engine headers the generators paste into are clang-formatted at 80
+ * columns and the paste goes in verbatim, so this limit is the contract.
+ */
+export const COLUMN_LIMIT = 80;
+
+/**
+ * Greedy fill of `words` at the column limit, the way clang-format packs the
+ * comment bodies and initializer lists already in the engine headers.
+ * @param {string[]} words - The space-separated words, in order.
+ * @param {string} firstIndent - Text the first line starts with.
+ * @param {string} [restIndent] - Text every later line starts with; the first
+ *   line's indent when omitted.
+ * @returns {string[]} The filled lines.
+ */
+export function fillColumns(words, firstIndent, restIndent = firstIndent) {
+  const lines = [];
+  let line = firstIndent + words[0];
+  for (const word of words.slice(1)) {
+    if (line.length + 1 + word.length > COLUMN_LIMIT) {
+      lines.push(line);
+      line = restIndent + word;
+    } else {
+      line += ` ${word}`;
+    }
+  }
+  lines.push(line);
+  return lines;
+}
 
 // toFixed's maximum fractional precision.
 const MAX_FRACTION_DIGITS = 100;
