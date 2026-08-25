@@ -6,6 +6,7 @@
  */
 import * as THREE from 'three';
 import { initScene, copyWithFeedback, showFatalError, bootstrapTool, formatKB } from './shared.js';
+import { engineHalted } from './engine_halt.js';
 // The shared op table and dispatch, the pure C++ export-string codegen
 // (formatFloat/pctSuffix/recipe builders), the pure face-geometry helpers and
 // the op-chain queue/validator machinery live in solid_codegen.js, and the
@@ -1178,7 +1179,7 @@ async function refreshOpGating() {
 // one ever escapes the validator gate, fail loudly once instead of letting
 // every later call trap the re-entrancy guard and spam the console.
 function engineTrapped(e) {
-  if (!(e instanceof WebAssembly.RuntimeError)) return false;
+  if (!engineHalted(e, WasmModule)) return false;
   MeshOpsWasm = null;
   WasmModule = null;
   showFatalError('The WASM engine hit an internal invariant and is halted — '

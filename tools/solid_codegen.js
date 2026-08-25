@@ -14,6 +14,7 @@
  */
 
 import { formatFloatCpp } from './cpp_format.js';
+import { engineHalted } from './engine_halt.js';
 
 /**
  * One op parameter's slider default and range.
@@ -1090,6 +1091,10 @@ export function createCommitQueue(onError = console.error) {
 export function createChainValidator(createModule) {
   /** @type {?Promise<WasmModule>} */
   let modulePromise = null;
+  // The instance behind modulePromise, so a task that never got the module
+  // handed to it can still read the halt flag off it.
+  /** @type {?WasmModule} */
+  let moduleInstance = null;
   // Serializes all validator use: tasks hold the single instance (and sometimes
   // a live mesh wrapper) across awaits, and an interleaved clearToolingMemory
   // from another task would invalidate that wrapper.
@@ -1101,10 +1106,16 @@ export function createChainValidator(createModule) {
    * @details A failed spawn is not cached: the next acquire retries.
    */
   function acquire() {
-    const pending = (modulePromise ||= createModule());
+    const pending = (modulePromise ||= createModule().then((mod) => {
+      moduleInstance = mod;
+      return mod;
+    }));
     return pending.catch(() => {
       // Only drop our own failed attempt; a later acquire may have replaced it.
-      if (modulePromise === pending) modulePromise = null;
+      if (modulePromise === pending) {
+        modulePromise = null;
+        moduleInstance = null;
+      }
       return null;
     });
   }
@@ -1115,7 +1126,9 @@ export function createChainValidator(createModule) {
    * @returns {void}
    */
   function noteDeath(e) {
-    if (e instanceof WebAssembly.RuntimeError) modulePromise = null;
+    if (!engineHalted(e, moduleInstance)) return;
+    modulePromise = null;
+    moduleInstance = null;
   }
 
   /**
@@ -1180,10 +1193,11 @@ export function createChainValidator(createModule) {
         Ops.clearToolingMemory();
         return { ok: true, message: '' };
       } catch (e) {
+        const halted = engineHalted(e, Mod);
         noteDeath(e);
         // A trap tears the instance down: it records no reason and cannot be
         // called again, so neither the reason nor the cleanup is attempted.
-        if (e instanceof WebAssembly.RuntimeError) {
+        if (halted) {
           return { ok: false, message: `${what} exceeded an engine mesh limit` };
         }
         return rejected(e);
@@ -1290,8 +1304,9 @@ export function createOpGate(validator, retries = 3) {
           out.delete();
           return verdict;
         } catch (e) {
+          const halted = engineHalted(e, mod);
           validator.noteDeath(e);
-          if (e instanceof WebAssembly.RuntimeError) return 'trapped';
+          if (halted) return 'trapped';
           out?.delete();
           // applyOp raises a soft reject as a throw; of the reasons behind one,
           // only a full arena is cleared by flushing it.

@@ -52,6 +52,7 @@ import {
   createHueKeyWheelPainter, canvasPoint, wheelTurnAt,
   hueKeyNudgeTurns, hueKeyHandoff, HUE_KEY_NAMES, HUE_KEY_GRAB_RADIUS,
 } from './palette_wheel.js';
+import { engineHalted } from './engine_halt.js';
 import { wireFlyout } from './flyout.js';
 import { createFrameScheduler, onPageTeardown } from './page_lifecycle.js';
 import { createPointerDrag } from './pointer_drag.js';
@@ -1056,9 +1057,7 @@ function updatePalette() {
 const scheduleUpdate = createFrameScheduler(updatePalette);
 
 function engineTrapped(error) {
-  if (!(error instanceof WebAssembly.RuntimeError)
-      && WasmModule?.HS_MODULE_DEAD !== true)
-    return false;
+  if (!engineHalted(error, WasmModule)) return false;
   setPaletteOps(null);
   paletteOps = null;
   WasmModule = null;
