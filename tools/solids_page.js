@@ -178,7 +178,9 @@ async function init() {
     // The engine nulls MeshOpsWasm on halt; stop rather than reschedule forever.
     if (!MeshOpsWasm) return;
     const m = MeshOpsWasm.getArenaMetrics();
-    const fmt = (x) => `${formatKB(x.high_water_mark, 0)} / ${formatKB(x.capacity, 0)}KB`;
+    // Peak over the module's life: every build ends in clearToolingMemory(),
+    // which zeroes the windowed high_water_mark before the next poll reads it.
+    const fmt = (x) => `${formatKB(x.lifetime_high_water_mark, 0)} / ${formatKB(x.capacity, 0)}KB`;
     const statsEl = document.getElementById('arenaStats');
     if (statsEl) {
       statsEl.innerText = `${fmt(m.tooling_arena)}`;
