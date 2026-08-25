@@ -79,11 +79,9 @@ test('ProceduralPalette.get at t=0, t=0.25 and t=0.5 for a known coefficient set
 
   const at0 = p.get(0);
   for (const ch of at0) assert.ok(Math.abs(ch - 1) < NEAR);
-  assert.ok(Math.abs(at0[0] - 1.0) < NEAR);
 
   const at05 = p.get(0.5);
   for (const ch of at05) assert.ok(Math.abs(ch) < NEAR);
-  assert.ok(Math.abs(at05[0] - 0.0) < NEAR);
 
   const at025 = p.get(0.25);
   for (let ch = 0; ch < 3; ch++) {
@@ -91,7 +89,6 @@ test('ProceduralPalette.get at t=0, t=0.25 and t=0.5 for a known coefficient set
       `channel ${ch} linearized at t=0.25: ${at025[ch]}`);
   }
   assert.ok(Math.abs(p.getChannelValue(0.25, 0) - 0.5) < NEAR, 'raw cosine at t=0.25');
-  assert.ok(Math.abs(at025[0] - 0.21404114) < NEAR, `linear at t=0.25: ${at025[0]}`);
 
   assert.ok(Math.abs(p.getChannelValue(0, 0) - 1.0) < NEAR);
   assert.ok(Math.abs(p.getChannelValue(0.5, 0) - 0.0) < NEAR);
@@ -173,15 +170,15 @@ test('proceduralParamsForViewport reparameterizes the exported phase window', ()
     D_R: 0, D_G: 0.25, D_B: 0.75,
   };
   const result = proceduralParamsForViewport(parameters, { start: 0.2, end: 0.6 });
-  assert.deepEqual(result, {
+  const expected = {
     ...parameters,
-    C_R: 0.39999999999999997,
-    C_G: 0.7999999999999999,
-    C_B: -0.39999999999999997,
-    D_R: 0.2,
-    D_G: 0.65,
-    D_B: 0.55,
-  });
+    C_R: 0.4, C_G: 0.8, C_B: -0.4,
+    D_R: 0.2, D_G: 0.65, D_B: 0.55,
+  };
+  assert.deepEqual(Object.keys(result).sort(), Object.keys(expected).sort());
+  for (const [key, want] of Object.entries(expected)) {
+    assert.ok(Math.abs(result[key] - want) < 1e-12, `${key}: ${result[key]} vs ${want}`);
+  }
   assert.equal(parameters.C_R, 1);
 });
 
@@ -213,6 +210,7 @@ test('the reparameterized palette samples the window it stands for', () => {
 test('mapValue computes the expected interpolations', () => {
   assert.equal(mapValue(0.5, 0, 1, 0, 100), 50);
   assert.equal(mapValue(2, 0, 4, 10, 20), 15);
+  assert.equal(mapValue(7, 3, 3, 10, 20), 10, 'a degenerate source range collapses to toMin');
 });
 
 /** Verifies the wave graph's band sits at 10%/90% of the canvas height with the range's ends at its edges. */
