@@ -12,7 +12,7 @@ import {
   enumConstantName,
 } from '../param_sync.js';
 
-// resolveParamSync is the DOM-free core of syncGUI()'s per-controller "fight-the-
+// resolveParamSync is the DOM-free core of sync()'s per-controller "fight-the-
 // slider" decision: coerce the engine's raw value, never clobber a controller the
 // user is editing, and skip a redundant write when the value is unchanged.
 
@@ -148,7 +148,7 @@ test('an enum index passes through as its own float', () => {
   assert.equal(engineParamValue(2), 2);
 });
 
-// paramValueSkew guards syncGUI()/export() from pairing a drifted param-name
+// paramValueSkew guards sync()/exportParams() from pairing a drifted param-name
 // list with the engine's value stream by index.
 
 test('equal lengths do not skew', () => {
