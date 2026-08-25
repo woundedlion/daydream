@@ -46,6 +46,8 @@ class FakeEngine {
   constructor() {
     this.curW = 0;
     this.curH = 0;
+    /** @type {Uint16Array} Reused frame buffer; see setResolution. */
+    this.pixelView = new Uint16Array(0);
     this.resolutionOk = true;
     this.effectOk = true;
     this.clipOk = true;
@@ -72,6 +74,14 @@ class FakeEngine {
     this.curH = h;
     this.effect = null;
     this.clip = null;
+    // Allocated once per size and handed back by every getPixels(), like the
+    // real engine's view into WASM memory. A fresh array per call would hide a
+    // regression that transferred the buffer -- which in a browser detaches the
+    // whole heap, not just this view.
+    this.pixelView = new Uint16Array(w * h * 3);
+    for (let i = 0; i < this.pixelView.length; i++) {
+      this.pixelView[i] = (i * 7) & 0xffff;
+    }
     return ResolutionSetResult.RESIZED;
   }
   // Clearing params models the engine rebuilding to defaults, so the
@@ -140,11 +150,7 @@ class FakeEngine {
   drawFrame() { this.calls.push(['drawFrame']); }
   getParamValues() { return this.paramView; }
   /** Each channel encodes its flat canvas index so extraction can be checked. */
-  getPixels() {
-    const buf = new Uint16Array(this.curW * this.curH * 3);
-    for (let i = 0; i < buf.length; i++) buf[i] = (i * 7) & 0xffff;
-    return buf;
-  }
+  getPixels() { return this.pixelView; }
   getArenaMetrics() {
     if (this.metricsThrows) throw new Error('binding gone');
     const arena = (u, hw, c) => ({ usage: u, high_water_mark: hw, capacity: c });
@@ -577,6 +583,27 @@ test('render streams param values from segment 0 only', async () => {
   await dispatch({ type: 'render' });
   const frame1 = posted.find((p) => p.msg.type === 'frame').msg;
   assert.equal(frame1.paramValues, null, 'non-zero segments omit params');
+});
+
+/** The engine's frame buffer is a view into WASM memory, not a per-call array. */
+test('the worker never transfers the engine pixel view', async () => {
+  await dispatch({
+    type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma',
+  });
+  const view = engineInstance.getPixels();
+  assert.equal(engineInstance.getPixels(), view,
+    'the fake must hand back one reused view; a fresh array per call models no '
+    + 'aliasing hazard, so a transfer regression would be invisible here');
+
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  assert.ok(posted.some((p) => p.msg.type === 'frame'), 'a frame was posted');
+  // Transferring this buffer detaches the whole WASM heap in a browser, not
+  // just this view, so the extraction must copy out of it.
+  assert.equal(view.byteLength, 8 * 4 * 3 * 2, 'the engine view is still attached');
+  assert.deepEqual(
+    posted.flatMap((p) => p.transfer ?? []).filter((b) => b === view.buffer), [],
+    'and its buffer never reaches a transfer list');
 });
 
 /**
