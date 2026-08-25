@@ -247,6 +247,19 @@ test('custom hue state samples a sweep into three editable keys', () => {
   });
 });
 
+test('a LOOP sweep resamples onto the thirds the engine spaces a loop at', () => {
+  const recipe = PALETTE_RECIPE_PRESETS.isolightSpectralLoop();
+
+  const { baseTurns, offsets } = customHueKeyState(recipe);
+  assert.equal(baseTurns, 0);
+  assert.equal(offsets.length, 3);
+  for (const [index, expected] of [0, 1 / 3, 2 / 3].entries())
+    assert.ok(Math.abs(offsets[index] - expected) < 1e-12);
+
+  // The wheel keeps drawing a sweep's own two keys, spaced at sweep/key_count.
+  assert.deepEqual(hueKeyState(recipe).offsets, [0, 0.5]);
+});
+
 test('custom hue state preserves unwrapped offsets from existing custom recipes', () => {
   const recipe = defaultPaletteRecipe();
   recipe.hue.mode = PaletteV4.hueMode.CUSTOM;

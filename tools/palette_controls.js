@@ -606,9 +606,12 @@ function hueKeyStateFromTurns(turns) {
 
 /**
  * The hue keys the wheel draws for a recipe, read in its own hue mode: the
- * authored keys for CUSTOM, the two ends for SWEEP (halved under a LOOP domain,
- * which travels out and back), and the harmony's anchors otherwise —
- * MONOCHROMATIC repeats its single anchor so the wheel still draws a pair.
+ * authored keys for CUSTOM, the two keys a SWEEP resolves to, and the harmony's
+ * anchors otherwise — MONOCHROMATIC repeats its single anchor so the wheel still
+ * draws a pair. A SWEEP holds two keys (core/color/generative_palette.h
+ * control_key_count), so its second lands on half the sweep under a LOOP, which
+ * spaces at sweep*i/key_count, and on the whole sweep under every other domain,
+ * which spaces at sweep*i/(key_count-1).
  * @param {PaletteRecipe} recipe - A V4 palette recipe.
  * @returns {{baseTurns:number, offsets:number[]}} The first key's wrapped turn
  *   and every key's signed offset from it, so keys that walked past the seam
@@ -636,7 +639,8 @@ export function hueKeyState(recipe) {
 /**
  * The three keys a switch into CUSTOM hue mode should author, so the handoff
  * starts on the shape the wheel already showed: a harmony's anchors resampled
- * to three, a sweep's start/middle/end, or the existing custom keys untouched.
+ * to three, a sweep resampled to three keys, or the existing custom keys
+ * untouched.
  * @param {PaletteRecipe} recipe - A V4 palette recipe.
  * @returns {{baseTurns:number, offsets:number[]}} The base turn and the three keys' offsets from it.
  */
@@ -650,8 +654,12 @@ export function customHueKeyState(recipe) {
       : recipe.hue.direction === PaletteV4.direction.COUNTERCLOCKWISE
         ? Math.abs(recipe.hue.sweepTurns)
         : recipe.hue.sweepTurns;
-    turns = [recipe.hue.baseTurns, recipe.hue.baseTurns + sweep * 0.5,
-      recipe.hue.baseTurns + sweep];
+    // Three keys spaced as core/color/generative_palette.h resolve_hues spaces
+    // them for a three-key recipe: sweep*i/key_count under a LOOP, which closes
+    // on base+sweep, and sweep*i/(key_count-1) under every other domain.
+    const step = sweep / (recipe.domain === PaletteV4.domain.LOOP ? 3 : 2);
+    turns = [recipe.hue.baseTurns, recipe.hue.baseTurns + step,
+      recipe.hue.baseTurns + 2 * step];
   } else {
     turns = resampleThreeTurns(directedHarmonyTurns(recipe));
   }
