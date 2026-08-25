@@ -133,8 +133,8 @@ function wasmReadyBlock() {
  * A WASM module carrying only what the composition root touches before its
  * first apply: the engine constructor, its two statics, and the Pole LOD write
  * the load replays. The initial resolution apply then finds no setResolution
- * and is refused, which the root reports and survives — so the app is fully
- * assembled, its render loop armed, and the trap flag is a writable property.
+ * and is refused, which disposes the app it had already moved — so a case sees
+ * a root that built its engine and then released everything it owned.
  * @returns {Object} The module, with engines() counting the constructions.
  */
 function fakeWasmModule() {
@@ -170,17 +170,6 @@ async function bootedApp(options) {
   }
 }
 
-/**
- * The fatal banners standing in a document, newest last. showFatalError() finds
- * no overlay in a fake document and builds one per call, so a case clears the
- * body first and reads what the action under test raised.
- * @param {Object} doc - The installed fake document.
- * @returns {Array<string>} The banner messages.
- */
-const fatalBanners = (doc) => doc.body.children
-  .map((node) => node.querySelector('.fatal-error-message')?.textContent)
-  .filter((text) => text !== undefined && text !== null);
-
 test('a failed engine load disposes the app through the retained teardown', async () => {
   const app = await bootedApp({ loadModule: () => Promise.reject(new Error('no wasm')) });
 
@@ -209,62 +198,16 @@ test('a module that lands after the page was discarded builds no engine', async 
     + 'startup builds an engine into a torn-down app that will never release it');
 });
 
-test('the render loop releases the app once the engine module traps', async () => {
+test('a refused initial apply disposes the app it already moved', async () => {
   const module = fakeWasmModule();
   const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
-  const doc = globalThis.document;
+
   assert.equal(module.engines(), 1, 'the load must have built the engine');
-  assert.equal(app.teardown.disposed(), false, 'a refused initial apply is not fatal');
-
-  doc.body.replaceChildren();
-  captureConsole(() => app.driver.renderer.frame());
-  assert.deepEqual(fatalBanners(doc), [], 'a clean frame raises nothing');
-  assert.equal(app.teardown.disposed(), false);
-
-  module.HS_MODULE_DEAD = true;
-  captureConsole(() => app.driver.renderer.frame());
-
-  assert.match(fatalBanners(doc).at(-1) ?? '', /unrecoverable internal error/,
-    'a trapped module keeps handing back plausible frames rather than throwing, '
-    + 'so the loop has to poll the death flag to notice at all');
   assert.equal(app.teardown.disposed(), true,
-    'the loop, the engine, and every listener otherwise outlive a module no '
-    + 'call can recover');
-  assert.deepEqual(app.listeners, []);
-});
-
-test('a switch that traps the module is reported terminal, not rolled back', async () => {
-  const module = fakeWasmModule();
-  const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
-  const doc = globalThis.document;
-  const resolution = app.guis[0].controllers.find((c) => c.property === 'resolution');
-  module.HS_MODULE_DEAD = true;
-
-  doc.body.replaceChildren();
-  const { messages } = captureConsole(
-    () => resolution.setValue('Phantasm (288x144)'));
-
-  assert.match(fatalBanners(doc).at(-1) ?? '', /trapped the rendering engine/,
-    'an apply throw under a dead module is terminal, not a rejected switch');
-  assert.deepEqual(messages.filter((line) => /rollback/.test(line)), [],
-    'rollback re-enters the engine, and no call on a trapped module recovers: '
-    + 'the death flag has to be read before the recovery is attempted');
-});
-
-test('a switch that only fails is rolled back before it is reported', async () => {
-  const module = fakeWasmModule();
-  const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
-  const doc = globalThis.document;
-  const resolution = app.guis[0].controllers.find((c) => c.property === 'resolution');
-
-  doc.body.replaceChildren();
-  const { messages } = captureConsole(
-    () => resolution.setValue('Phantasm (288x144)'));
-
-  assert.equal(messages.filter((line) => /rollback/.test(line)).length, 1,
-    'with the module alive the same failure has to attempt the rollback, or '
-    + 'the case above passes on a coordinator that never rolls back at all');
-  assert.doesNotMatch(fatalBanners(doc).at(-1) ?? '', /trapped the rendering engine/);
+    'the apply has already moved the engine, pool, driver and sidebar, so the '
+    + 'panels would otherwise stay live over a blanked canvas');
+  assert.deepEqual(app.listeners, [],
+    'a listener that outlives the refused apply reports into a dead app');
 });
 
 test('the page-failure surface is the shared one, and it is torn down', () => {
