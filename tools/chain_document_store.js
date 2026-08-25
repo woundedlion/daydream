@@ -427,8 +427,12 @@ export async function createChainDocumentStore({
     for (const parameter of parameters) {
       candidate.descriptor.parameters.push(parameter);
       candidate.descriptor.serialization.fields.push(parameter.id);
+      // A staggered group names a parameter's shared interpolation group where
+      // it declares one and its id otherwise; sharers contribute one group.
+      const group = parameter.interpolation.group ?? parameter.id;
       for (const policy of candidate.descriptor.path_policies) {
-        if (policy.kind === 'STAGGERED_ORDERED') policy.groups.push(parameter.id);
+        if (policy.kind === 'STAGGERED_ORDERED' && !policy.groups.includes(group))
+          policy.groups.push(group);
       }
       for (const preset of candidate.preset_bank.presets)
         preset.values[parameter.id] = parameter.default;
