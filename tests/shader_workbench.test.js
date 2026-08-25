@@ -1026,6 +1026,14 @@ const sampleFrequencySlider = (harness) => stripChips(harness)
   .find((row) => row.dataset.parameter === 'sample.pattern-freq')
   .querySelector('.chain-param-control');
 
+// Settles the write a fired link timer started. encodeShaderStateHash runs a
+// CompressionStream, so the URL lands only after real event-loop turns; the
+// caller must drop the mocked timers first.
+const settleLinkWrite = async (harness) => {
+  for (let turn = 0; turn < 20 && harness.urls.length === 0; turn += 1)
+    await new Promise((resolve) => { setTimeout(resolve, 1); });
+};
+
 test('continuous shader edits debounce link writes and keep the latest state', async () => {
   const harness = await editorWorkbench({ source: null });
   mock.timers.enable({ apis: ['setTimeout'] });
@@ -1041,7 +1049,8 @@ test('continuous shader edits debounce link writes and keep the latest state', a
 
     assert.equal(harness.urls.length, 0);
     mock.timers.tick(SHADER_LINK_DEBOUNCE_MS);
-    await harness.controller.flushDeepLink();
+    mock.timers.reset();
+    await settleLinkWrite(harness);
 
     assert.equal(harness.urls.length, 1);
     const state = await decodeShaderStateHash(harness.win.location.hash);
@@ -1065,7 +1074,8 @@ test('continuous shader edits cannot postpone a link write indefinitely', async 
       if (value < 8) mock.timers.tick(150);
     }
     mock.timers.tick(SHADER_LINK_MAX_WAIT_MS - 900);
-    await harness.controller.flushDeepLink();
+    mock.timers.reset();
+    await settleLinkWrite(harness);
 
     assert.equal(harness.urls.length, 1);
   } finally {
