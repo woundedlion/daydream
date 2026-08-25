@@ -301,6 +301,34 @@ const installRecorderEnv = () => {
   };
 };
 
+test('isSupported answers false where the DOM globals are absent', () => {
+  const saved = {
+    HTMLCanvasElement: globalThis.HTMLCanvasElement,
+    MediaRecorder: globalThis.MediaRecorder,
+  };
+  delete globalThis.HTMLCanvasElement;
+  delete globalThis.MediaRecorder;
+  try {
+    assert.equal(VideoRecorder.isSupported(), false,
+      'a host with no canvas global must be answered, not thrown at');
+    globalThis.HTMLCanvasElement = class { captureStream() {} };
+    assert.equal(VideoRecorder.isSupported(), false,
+      'a host with no MediaRecorder global must be answered, not thrown at');
+  } finally {
+    globalThis.HTMLCanvasElement = saved.HTMLCanvasElement;
+    globalThis.MediaRecorder = saved.MediaRecorder;
+  }
+});
+
+test('isSupported answers true where captureStream and MediaRecorder both exist', () => {
+  const restore = installRecorderEnv();
+  try {
+    assert.equal(VideoRecorder.isSupported(), true);
+  } finally {
+    restore();
+  }
+});
+
 /** Verifies toggle() reports the real recording state for start then stop. */
 test('toggle starts then stops, reporting the true state each time', () => {
   const restore = installRecorderEnv();

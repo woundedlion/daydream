@@ -130,11 +130,13 @@ export class VideoRecorder {
   }
 
   /**
-   * Reports whether the browser supports canvas recording.
+   * Reports whether the host supports canvas recording. A non-browser host,
+   * where the DOM globals are absent, answers false.
    * @returns {boolean} True if both captureStream and MediaRecorder are available.
    */
   static isSupported() {
-    return typeof HTMLCanvasElement.prototype.captureStream === 'function'
+    return typeof HTMLCanvasElement !== 'undefined'
+      && typeof HTMLCanvasElement.prototype?.captureStream === 'function'
       && typeof MediaRecorder !== 'undefined';
   }
 
