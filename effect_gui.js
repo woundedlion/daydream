@@ -805,6 +805,56 @@ export function createEffectGui({
   }
 
   /**
+   * Pick the pipeline grouping for a parameter list. Each recognizer owns its
+   * stage assignments, folder titles, and folder order together, so the three
+   * cannot disagree; the first that claims the list wins.
+   * @param {Array<Object>} params - The engine's parameter definitions.
+   * @returns {{assignments: Map<string, string>, titles: Map<string, string>|null,
+   *   order: Array<string>}|null} The grouping, or null when none claims the list.
+   */
+  function stageGrouping(params) {
+    const shaderBall = shaderBallStageAssignments(params);
+    if (shaderBall) {
+      return {
+        assignments: shaderBall, titles: null, order: SHADERBALL_STAGE_ORDER,
+      };
+    }
+    const fixedShader = fixedShaderStageAssignments(params);
+    const fixedTitles = fixedShader
+      ? fixedShaderStageTitles(
+        getFullConfigSnapshot(), getFullConfigFieldDefinitions())
+      : null;
+    const fixedGrouping = () => {
+      const claimed = new Set(fixedShader.values());
+      return {
+        assignments: fixedShader,
+        titles: fixedTitles,
+        order: SHADERBALL_STAGE_ORDER.filter((stage) => claimed.has(stage)),
+      };
+    };
+    // Only a Fixed Shader whose stage modes resolved outranks the named fixed
+    // pipelines; without titles it is the last resort below.
+    if (fixedTitles) return fixedGrouping();
+    const latticeMelt = latticeMeltStageAssignments(params);
+    if (latticeMelt) {
+      return {
+        assignments: latticeMelt,
+        titles: LATTICE_MELT_STAGE_TITLES,
+        order: LATTICE_MELT_STAGE_ORDER,
+      };
+    }
+    const kaleidoscopeSmooth = kaleidoscopeSmoothStageAssignments(params);
+    if (kaleidoscopeSmooth) {
+      return {
+        assignments: kaleidoscopeSmooth,
+        titles: KALEIDOSCOPE_SMOOTH_STAGE_TITLES,
+        order: KALEIDOSCOPE_SMOOTH_STAGE_ORDER,
+      };
+    }
+    return fixedShader ? fixedGrouping() : null;
+  }
+
+  /**
    * Build one controller per engine parameter, recording the value-stream order.
    * A ?param=value deep link reaches the engine through the GUI's load-time
    * onChange replay.
@@ -826,31 +876,10 @@ export function createEffectGui({
     fx.hasEnumControls = false;
     fx.paramWarnings = paramWarningTexts(params);
     fx.paramsExternal = external;
-    const shaderBallAssignments = shaderBallStageAssignments(params);
-    const latticeMeltAssignments = latticeMeltStageAssignments(params);
-    const kaleidoscopeSmoothAssignments = kaleidoscopeSmoothStageAssignments(params);
-    const fixedShaderCandidate = fixedShaderStageAssignments(params);
-    const fullConfigSnapshot = fixedShaderCandidate
-      ? getFullConfigSnapshot() : null;
-    const fixedShaderTitles = fixedShaderCandidate ? fixedShaderStageTitles(
-      fullConfigSnapshot, getFullConfigFieldDefinitions()) : null;
-    const fixedShaderAssignments = fixedShaderTitles ? fixedShaderCandidate : null;
-    const fallbackFixedAssignments = fixedShaderTitles ? null : fixedShaderCandidate;
-    const stageAssignments = shaderBallAssignments ?? fixedShaderAssignments
-      ?? latticeMeltAssignments ?? kaleidoscopeSmoothAssignments ?? fallbackFixedAssignments;
-    const stageTitles = fixedShaderAssignments ? fixedShaderTitles
-      : latticeMeltAssignments ? LATTICE_MELT_STAGE_TITLES
-      : kaleidoscopeSmoothAssignments ? KALEIDOSCOPE_SMOOTH_STAGE_TITLES
-      : fixedShaderTitles;
-    const stageOrder = shaderBallAssignments
-      ? SHADERBALL_STAGE_ORDER
-      : fixedShaderAssignments ? SHADERBALL_STAGE_ORDER.filter((stage) =>
-        new Set(fixedShaderAssignments.values()).has(stage))
-      : latticeMeltAssignments ? LATTICE_MELT_STAGE_ORDER
-      : kaleidoscopeSmoothAssignments ? KALEIDOSCOPE_SMOOTH_STAGE_ORDER
-      : fallbackFixedAssignments ? SHADERBALL_STAGE_ORDER.filter((stage) =>
-        new Set(fallbackFixedAssignments.values()).has(stage))
-      : [];
+    const grouping = stageGrouping(params);
+    const stageAssignments = grouping?.assignments ?? null;
+    const stageTitles = grouping?.titles ?? null;
+    const stageOrder = grouping?.order ?? [];
     const unstagedParams = stageAssignments
       ? params.filter((parameter) => !stageAssignments.has(parameter.name))
         .map((parameter) => parameter.name)
