@@ -801,7 +801,7 @@ function restoreSolid(item) {
 
 function applyRestore(item) {
   state.base = item.base;
-  state.ops = structuredClone(item.ops); // Deep copy (ops are plain data)
+  setOps(structuredClone(item.ops)); // Deep copy (ops are plain data)
   // A card saved before a flag existed carries none, and lands on the page's
   // own default for it rather than off.
   const flag = (value, fallback) => !!(value ?? fallback);
@@ -836,10 +836,14 @@ function renderBaseSolid() {
   titleEl.title = title;
 }
 
-function reorderOp(from, to) {
+function reorderOp(from, to, revision) {
+  // Ahead of the state read: a stale index can sit past the end of a list a
+  // landed commit shrank.
+  if (revision !== opsRevision) return;
   if (to < 0 || to >= state.ops.length || from === to) return;
   const opName = state.ops[from].op;
   queueCommit(async () => {
+    if (revision !== opsRevision) return;
     const check = await chainIsValid(state.base, movedOps(state.ops, from, to));
     if (!check.ok) {
       showGateMsg(`rejected: ${check.message}`);
@@ -847,7 +851,7 @@ function reorderOp(from, to) {
     }
     // Re-derived from the live ops: a param edit lands outside the commit
     // queue, so a clone taken before the await would drop it.
-    state.ops = movedOps(state.ops, from, to);
+    setOps(movedOps(state.ops, from, to));
     renderOps();
     update();
     showGateMsg(`moved ${opName} to position ${to + 1}`);
@@ -900,7 +904,7 @@ const DRAG_SLOP_PX = 4;
  * @param {HTMLElement} list - The #opsList container.
  * @returns {void}
  */
-function wireRowDrag(grip, index, el, list) {
+function wireRowDrag(grip, index, el, list, revision) {
   let originY = 0;
   let dragging = false;
 
@@ -967,6 +971,7 @@ function wireRowDrag(grip, index, el, list) {
       }
       renderOps(); // snap the drag preview back now; the commit re-renders
       queueCommit(async () => {
+        if (revision !== opsRevision) return;
         const check = await chainIsValid(
           state.base, movedOps(state.ops, index, toIndex));
         if (!check.ok) {
@@ -975,7 +980,7 @@ function wireRowDrag(grip, index, el, list) {
         }
         // Re-derived from the live ops: a param edit lands outside the
         // commit queue, so a clone taken before the await would drop it.
-        state.ops = movedOps(state.ops, index, toIndex);
+        setOps(movedOps(state.ops, index, toIndex));
         renderOps();
         update();
       });
@@ -991,14 +996,15 @@ function renderOps() {
   const list = document.getElementById('opsList');
   list.replaceChildren();
 
+  const revision = opsRevision;
   state.ops.forEach((o, i) => {
     const el = buildOpRow(o, i, {
       opDef: OP_DEFS[o.op],
       count: state.ops.length,
       on: {
-        wireDrag: (grip, row) => wireRowDrag(grip, i, row, list),
-        move: reorderOp,
-        remove: removeOp,
+        wireDrag: (grip, row) => wireRowDrag(grip, i, row, list, revision),
+        move: (from, to) => reorderOp(from, to, revision),
+        remove: (at) => removeOp(at, revision),
         setParam: updateOpParam,
       },
     });
@@ -1069,8 +1075,25 @@ function updateOpParam(index, key, value) {
 
 const queueCommit = createCommitQueue();
 
-function removeOp(index) {
+// Bumped whenever the op list's membership or order changes. Row handlers close
+// over the revision that built them, and a commit queued ahead of one of them
+// can change the list before it runs -- at which point its render-time index
+// names a different op. Rejecting the stale index is what keeps a second click
+// during an in-flight gating sweep from moving or deleting whatever op now
+// occupies that slot; a param edit leaves the list alone and does not bump it.
+let opsRevision = 0;
+
+/** Replaces the op list and marks every render-time index stale.
+ * @param {Array<{op: string, params: Object<string, number>}>} next - The new op list.
+ * @returns {void} */
+function setOps(next) {
+  state.ops = next;
+  opsRevision++;
+}
+
+function removeOp(index, revision) {
   queueCommit(async () => {
+    if (revision !== opsRevision) return;
     // Removing an op can invalidate the remainder (e.g. deleting the ambo
     // between two hankins), so removal validates like any other mutation.
     const candidate = state.ops.filter((op, i) => i !== index);
@@ -1079,7 +1102,7 @@ function removeOp(index) {
       showGateMsg(`rejected: ${check.message}`);
       return;
     }
-    state.ops = candidate;
+    setOps(candidate);
     renderOps();
     update();
   });
@@ -1102,7 +1125,7 @@ function addOp(opName) {
       showGateMsg(`rejected: ${check.message}`);
       return;
     }
-    state.ops.push(newOp);
+    setOps([...state.ops, newOp]);
     renderOps();
     update();
   });
@@ -1110,7 +1133,7 @@ function addOp(opName) {
 
 function resetOps() {
   queueCommit(async () => {
-    state.ops = [];
+    setOps([]);
     renderOps();
     update();
   });
