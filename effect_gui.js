@@ -688,6 +688,9 @@ export function createEffectGui({
           adoptPresetDisplay(fx, count, getPresetIndex());
           return false;
         }
+        // A preset rewrites every parameter, so it raises or clears warnings
+        // with no schema-generation move behind them.
+        fx.warningsDirty = true;
         persistEffectState(fx.gui);
         adoptPresetDisplay(fx, count, index);
         adoptPauseDisplay(fx, engineAnimationsPaused() ?? true);
