@@ -86,11 +86,6 @@ async function makeStrip({ presetId = null, catalog = CATALOG } = {}) {
   const store = await createChainDocumentStore({
     document: structuredClone(BASE.document), catalog });
   const container = fakeElement('section');
-  // createPointerDrag captures on the container; the fake element does not
-  // model pointer capture, so the pointer-wiring case stubs it.
-  container.setPointerCapture = () => {};
-  container.hasPointerCapture = () => true;
-  container.releasePointerCapture = () => {};
   const doc = installDocument({
     body: fakeElement('body'),
     activeElement: null,
