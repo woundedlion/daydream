@@ -1,6 +1,7 @@
 /*
- * Drives the effect panel's scroll and focus restoration in headless Chrome,
- * over the same manifest server scripts/browser-smoke.mjs uses.
+ * Drives the effect panel's scroll and focus restoration, and the sidebar's two
+ * layout-derived computations, in headless Chrome over the same manifest server
+ * scripts/browser-smoke.mjs uses.
  *
  *   node scripts/panel-probe.mjs
  *
@@ -8,6 +9,10 @@
  * expando: any number written to it reads back. A browser clamps it to
  * scrollHeight - clientHeight, so a panel that has not laid out takes 0 whatever
  * was written. Only a real layout decides whether the offset survives a rebuild.
+ * The sidebar reads gridTemplateRows for its arrow-key column stride and
+ * scrollLeft/scrollWidth/clientWidth for its scroll arrows — quantities the fake
+ * DOM answers from hand-written style objects, so only a real grid decides
+ * whether either one is measuring the layout that shipped.
  */
 import puppeteer from 'puppeteer-core';
 
@@ -20,12 +25,19 @@ const PAGE = 'index.html';
 // becomes the scroller, which is what effect_gui.js writes the offset onto.
 const VIEWPORT = { width: 1280, height: 240 };
 const MOBILE_VIEWPORT = { width: 800, height: 720 };
+// Narrow enough that the column-flow effect list overruns its track and the
+// scroll arrows have something to report; 800px lays the whole roster out.
+const SIDEBAR_VIEWPORT = { width: 480, height: 720 };
 // The roster's widest parameter schema, so the panel overflows the cap.
 const EFFECT = 'ShapeShifter';
 const TIMEOUT_MS = 90_000;
 const SCROLLER = '.effect-gui .lil-children';
 const PANEL_TITLE = '.effect-gui > .lil-title';
 const RESET = '.effect-action-reset button';
+const LIST = '.effect-list';
+const OPTION = '.effect-button';
+const ARROW_LEFT = '.scroll-arrow-left';
+const ARROW_RIGHT = '.scroll-arrow-right';
 
 /** @param {import('puppeteer-core').Page} tab */
 const scrollerMetrics = (tab) => tab.$eval(SCROLLER, (node) => ({
@@ -165,6 +177,103 @@ async function probeMobilePanel(tab) {
   return failures;
 }
 
+/**
+ * Which scroll arrows the sidebar currently shows.
+ * @param {import('puppeteer-core').Page} tab - The page under probe.
+ * @returns {Promise<{left: boolean, right: boolean}>} Arrow visibility.
+ */
+const readArrows = (tab) => tab.evaluate((left, right) => ({
+  left: document.querySelector(left).classList.contains('visible'),
+  right: document.querySelector(right).classList.contains('visible'),
+}), ARROW_LEFT, ARROW_RIGHT);
+
+/**
+ * Poll the arrows until they reach `want`, then report where they stopped: the
+ * refresh is one rAF behind the scroll event, and a miss has to name the state
+ * it settled at rather than stall on a wait.
+ * @param {import('puppeteer-core').Page} tab - The page under probe.
+ * @param {{left: boolean, right: boolean}} want - The expected visibility.
+ * @returns {Promise<{left: boolean, right: boolean}>} The settled visibility.
+ */
+async function settledArrows(tab, want) {
+  let state = await readArrows(tab);
+  for (let tries = 0;
+    tries < 40 && (state.left !== want.left || state.right !== want.right);
+    tries++) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    state = await readArrows(tab);
+  }
+  return state;
+}
+
+/**
+ * The sidebar's two layout-derived reads under the mobile column-flow grid.
+ * @param {import('puppeteer-core').Page} tab - The page under probe.
+ * @returns {Promise<string[]>} The failed check descriptions.
+ */
+async function probeSidebar(tab) {
+  const failures = [];
+  const check = (ok, message) => {
+    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
+    if (!ok) failures.push(message);
+  };
+
+  const grid = await tab.$eval(LIST, (list) => {
+    const style = getComputedStyle(list);
+    return {
+      flow: style.gridAutoFlow,
+      // What columnStride() splits: a resolved track list, not the authored
+      // repeat() the fake DOM hands back verbatim.
+      rows: style.gridTemplateRows,
+      options: list.querySelectorAll('.effect-button').length,
+      overflow: list.scrollWidth - list.clientWidth,
+    };
+  });
+  const stride = grid.rows.trim().split(/\s+/).length;
+  check(grid.flow.includes('column'),
+    `the mobile list is a column-flow grid (${grid.flow})`);
+  check(stride > 1 && stride < grid.options,
+    `gridTemplateRows resolves to ${stride} tracks over ${grid.options} options`);
+  check(grid.overflow > 0,
+    `the list overruns its track by ${grid.overflow}px, so the arrows have work`);
+  if (grid.overflow <= 0 || stride <= 1) return failures;
+
+  const focusedIndex = (page) => page.evaluate((option) => {
+    const options = [...document.querySelectorAll(option)];
+    return options.indexOf(document.activeElement);
+  }, OPTION);
+
+  await tab.$eval(LIST, (list) => {
+    list.scrollLeft = 0;
+    list.querySelector('.effect-button').focus();
+  });
+  check(await focusedIndex(tab) === 0, 'the first option takes focus');
+
+  await tab.keyboard.press('ArrowRight');
+  const right = await focusedIndex(tab);
+  check(right === stride,
+    `ArrowRight crosses one whole column (option ${right}, stride ${stride})`);
+
+  await tab.keyboard.press('ArrowLeft');
+  const back = await focusedIndex(tab);
+  check(back === 0, `ArrowLeft crosses back (option ${back})`);
+
+  // Focusing an option in a clipped column scrolls it into view, so the arrow
+  // checks re-seat the offset rather than assuming it survived.
+  await tab.$eval(LIST, (list) => { list.scrollLeft = 0; });
+  const atStart = await settledArrows(tab, { left: false, right: true });
+  check(!atStart.left && atStart.right,
+    `at the start only the right arrow shows (left ${atStart.left}, `
+      + `right ${atStart.right})`);
+
+  await tab.$eval(LIST, (list) => { list.scrollLeft = list.scrollWidth; });
+  const atEnd = await settledArrows(tab, { left: true, right: false });
+  check(atEnd.left && !atEnd.right,
+    `at the end only the left arrow shows (left ${atEnd.left}, right ${atEnd.right})`);
+
+  return failures;
+}
+
 let executablePath;
 try {
   executablePath = resolveBrowser();
@@ -197,6 +306,12 @@ try {
     { timeout: TIMEOUT_MS });
   await tab.waitForSelector('.effect-gui', { timeout: TIMEOUT_MS });
   failures.push(...await probeMobilePanel(tab));
+  await tab.setViewport(SIDEBAR_VIEWPORT);
+  await tab.reload({ timeout: TIMEOUT_MS });
+  await tab.waitForFunction(() => !document.getElementById('loading-overlay'),
+    { timeout: TIMEOUT_MS });
+  await tab.waitForSelector(`${LIST} ${OPTION}`, { timeout: TIMEOUT_MS });
+  failures.push(...await probeSidebar(tab));
 } catch (error) {
   failures.push(error instanceof Error ? error.message : String(error));
 } finally {
@@ -209,4 +324,6 @@ if (failures.length > 0) {
   for (const failure of failures) console.error(`  ${failure}`);
   process.exit(1);
 }
-console.log('panel-probe: the effect panel restored what it captured.');
+console.log(
+  'panel-probe: the effect panel restored what it captured, '
+  + 'and the sidebar measured the grid it laid out.');
