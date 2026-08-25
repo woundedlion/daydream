@@ -425,12 +425,10 @@ const validateParameterShape = (parameter, path) => {
   exactKeys(parameter.interpolation, ['kind', 'period', 'group'], ['kind'], `${path}.interpolation`);
   if (!INTERPOLATION_KINDS.has(parameter.interpolation.kind))
     fail('semantic', 'UNKNOWN_INTERPOLATION', `${path}.interpolation.kind`, 'The interpolation trait is unknown.');
-  // An off-kind period or group is inert to interpolation yet still enters the
-  // descriptor digest.
+  // A period is consulted only under SHORTEST_PERIODIC, and elsewhere is inert
+  // yet still enters the descriptor digest.
   if (parameter.interpolation.kind !== 'SHORTEST_PERIODIC' && 'period' in parameter.interpolation)
     fail('schema', 'UNKNOWN_FIELD', `${path}.interpolation.period`, 'Only SHORTEST_PERIODIC interpolation carries a period.');
-  if (parameter.interpolation.kind !== 'NORMALIZED_LINEAR' && 'group' in parameter.interpolation)
-    fail('schema', 'UNKNOWN_FIELD', `${path}.interpolation.group`, 'Only NORMALIZED_LINEAR interpolation carries a group.');
   if ((parameter.storage === 'enum8') !==
       (parameter.interpolation.kind === 'MIXED_ENUM'))
     fail('semantic', 'STORAGE_INTERPOLATION_MISMATCH', `${path}.interpolation.kind`, 'enum8 values require MIXED_ENUM and MIXED_ENUM requires enum8 storage.');
