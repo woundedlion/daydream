@@ -20,17 +20,21 @@ export const workflowJobs = (source) => {
   return jobs;
 };
 
-/** @param {string} source @returns {string[]} Job IDs required by ci-green. */
-export const ciGreenNeeds = (source) => {
+/**
+ * @param {string} source @param {string} terminal - Gating job's ID.
+ * @returns {string[]} Job IDs the terminal job requires.
+ */
+export const terminalJobNeeds = (source, terminal) => {
   const lines = source.split(/\r?\n/);
-  const start = lines.findIndex((line) => /^ {2}ci-green:\s*$/.test(line));
-  if (start < 0) throw new Error('workflow has no ci-green job');
+  const jobKey = new RegExp(`^ {2}${terminal}:\\s*$`);
+  const start = lines.findIndex((line) => jobKey.test(line));
+  if (start < 0) throw new Error(`workflow has no ${terminal} job`);
 
   const endOffset = lines.slice(start + 1).findIndex((line) => JOB_KEY.test(line));
   const end = endOffset < 0 ? lines.length : start + 1 + endOffset;
   const block = lines.slice(start + 1, end);
   const needsAt = block.findIndex((line) => /^ {4}needs:\s*/.test(line));
-  if (needsAt < 0) throw new Error('ci-green has no needs list');
+  if (needsAt < 0) throw new Error(`${terminal} has no needs list`);
 
   const tail = block[needsAt].replace(/^ {4}needs:\s*/, '').trim();
   if (tail !== '') {
@@ -49,26 +53,37 @@ export const ciGreenNeeds = (source) => {
       break;
     }
   }
-  if (needs.length === 0) throw new Error('ci-green needs list is empty');
+  if (needs.length === 0) throw new Error(`${terminal} needs list is empty`);
   return needs;
 };
 
-/** @param {string} source @returns {string[]} Jobs omitted from ci-green. */
-export const missingCiGreenDependencies = (source) => {
-  const needs = new Set(ciGreenNeeds(source));
-  return workflowJobs(source).filter((job) => job !== 'ci-green' && !needs.has(job));
+/**
+ * @param {string} source @param {string} terminal - Gating job's ID.
+ * @returns {string[]} Jobs the terminal job does not gate.
+ */
+export const missingTerminalDependencies = (source, terminal) => {
+  const needs = new Set(terminalJobNeeds(source, terminal));
+  return workflowJobs(source).filter((job) => job !== terminal && !needs.has(job));
 };
 
+/** Workflows paired with the job every other job in them must feed. */
+const GATED_WORKFLOWS = [
+  ['.github/workflows/ci.yml', 'ci-green'],
+  ['.github/workflows/deploy.yml', 'deploy'],
+];
+
 const main = () => {
-  const workflowPath = '.github/workflows/ci.yml';
-  const source = readFileSync(workflowPath, 'utf8');
-  const missing = missingCiGreenDependencies(source);
-  if (missing.length > 0) {
-    for (const job of missing) {
+  let ungated = false;
+  for (const [workflowPath, terminal] of GATED_WORKFLOWS) {
+    const source = readFileSync(workflowPath, 'utf8');
+    for (const job of missingTerminalDependencies(source, terminal)) {
       console.error(
-        `::error file=${workflowPath}::job '${job}' is absent from ci-green's needs`,
+        `::error file=${workflowPath}::job '${job}' is absent from ${terminal}'s needs`,
       );
+      ungated = true;
     }
+  }
+  if (ungated) {
     process.exitCode = 1;
     return;
   }
