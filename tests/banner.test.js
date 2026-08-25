@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { showFatalError, bootstrapTool, reportPageFailures } from '../tools/banner.js';
+import {
+  errorDetail, showFatalError, bootstrapTool, reportPageFailures,
+} from '../tools/banner.js';
 import { captureConsole, installConsoleCapture } from './fake_console.js';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
 
@@ -39,6 +41,17 @@ function fakeDocument({ body = true, documentElement = false } = {}) {
 }
 
 const messageOf = (el) => el.querySelector('.fatal-error-message').textContent;
+
+test('errorDetail names the error type ahead of its message', () => {
+  assert.equal(errorDetail(new TypeError('not a function')),
+    'TypeError: not a function');
+  // Structured-cloned across a worker boundary: no longer an Error instance.
+  assert.equal(errorDetail({ name: 'DataCloneError', message: 'rejected' }),
+    'DataCloneError: rejected');
+  assert.equal(errorDetail({ message: 'unnamed' }), 'unnamed');
+  assert.equal(errorDetail('a bare string'), 'a bare string');
+  assert.equal(errorDetail(null), 'null');
+});
 
 test('showFatalError appends one banner carrying the message as textContent', () => {
   const { bodyEl } = fakeDocument();
