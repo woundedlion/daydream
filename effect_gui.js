@@ -1010,7 +1010,8 @@ export function createEffectGui({
   }
 
   /**
-   * Release one effect record without changing which record is published.
+   * Release one effect record without changing which record is published,
+   * flushing the persistence an in-flight drag deferred.
    * @param {Object|null} fx - Record to release.
    * @returns {void}
    */
@@ -1025,6 +1026,12 @@ export function createEffectGui({
       }
       fx.activeDragEnds.clear();
     }
+    // Draining those listeners drops the pointer release that would have run
+    // the persistence a drag deferred, so run it here. A release that already
+    // ran cleared the slot, so this never writes twice.
+    const deferred = fx.persistDeferred ?? null;
+    fx.persistDeferred = null;
+    if (deferred !== null) persistEffectState(fx.gui, deferred);
     const dom = fx.gui.domElement;
     if (dom?.parentNode) dom.parentNode.removeChild(dom);
     // Controller.destroy() removes each domElement from the GUI's own children
