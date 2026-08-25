@@ -137,7 +137,13 @@ test('closed and open cards share one header layout', () => {
 // other page mounts, inside the main area so it covers the canvas and nothing
 // else.
 test('the workbench page lays out the toolbar, pipeline and canvas', () => {
-  const region = (/** @type {RegExp} */ pattern) => WORKBENCH.search(pattern);
+  // search() answers -1 for a missing match, which orders ahead of every real
+  // offset: an ordering assertion whose left operand is deleted would pass.
+  const region = (/** @type {RegExp} */ pattern) => {
+    const at = WORKBENCH.search(pattern);
+    assert.ok(at >= 0, `the workbench page must carry ${pattern}`);
+    return at;
+  };
   assert.ok(region(/id="shader-toolbar"/) < region(/id="chain-strip"/));
   assert.ok(region(/<main class="main-area"/) < region(/id="chain-strip"/)
     && region(/id="chain-strip"/) < region(/id="canvas-container"/),
