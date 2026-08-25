@@ -198,6 +198,27 @@ export function showBootstrapFailure(error, {
 }
 
 /**
+ * Surface a boot failure: into the loading overlay when the page still has
+ * one, and through the fatal banner when it does not.
+ * @param {unknown} error Boot failure.
+ * @param {{title?: string, document?: Document, location?: Location,
+ *   fatal?: (message: string) => void}} [dependencies]
+ * @returns {void}
+ */
+export function reportBootFailure(error, {
+  title = 'Failed to start the simulator.',
+  document: doc = globalThis.document,
+  location: pageLocation = globalThis.location,
+  fatal = showFatalError,
+} = {}) {
+  if (showBootstrapFailure(
+    error, { document: doc, location: pageLocation, title })) {
+    return;
+  }
+  fatal(`${title} ${errorDetail(error)}`);
+}
+
+/**
  * @param {{loader?: () => Promise<unknown>|unknown, document?: Document,
  *   location?: Location, logger?: Pick<Console, 'error'>,
  *   fatal?: (message: string) => void, performance?: Performance}} [dependencies]
@@ -219,9 +240,7 @@ export async function bootstrap({
     return true;
   } catch (error) {
     logger?.error('Failed to bootstrap Daydream:', error);
-    if (!showBootstrapFailure(error, { document: doc, location: pageLocation })) {
-      fatal(`Failed to start the simulator. ${errorDetail(error)}`);
-    }
+    reportBootFailure(error, { document: doc, location: pageLocation, fatal });
     return false;
   }
 }

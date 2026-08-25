@@ -44,7 +44,7 @@ import {
 import { pageWarmer } from "./module_warmer.js";
 import { EngineHost } from "./engine_host.js";
 import { errorDetail, reportPageFailures, showFatalError } from "./tools/banner.js";
-import { showBootstrapFailure } from "./bootstrap.js";
+import { reportBootFailure } from "./bootstrap.js";
 import { enumConstantName } from "./param_sync.js";
 import { copyToClipboard } from "./tools/copy_text.js";
 import { importLegacyShaderSelection, LEGACY_SHADER_ALIAS } from "./legacy_shader_import.js";
@@ -482,10 +482,7 @@ export function start({
       } catch (err) {
         console.error('Initial resolution/effect could not be applied:', err);
         const title = 'No supported resolution and effect could be applied.';
-        if (!showBootstrapFailure(err,
-            { document: doc, location: win.location, title })) {
-          showFatalError(`${title} ${errorDetail(err)}`);
-        }
+        reportBootFailure(err, { document: doc, location: win.location, title });
         // The rejected apply has already moved the engine, pool, driver and
         // sidebar; the panels would stay live over a blanked canvas.
         appTeardown?.dispose();
@@ -503,14 +500,11 @@ export function start({
         testAllController.setValue(false);
         testAllController.disable();
       }
-      if (!showBootstrapFailure(err, {
+      reportBootFailure(err, {
         document: doc,
         location: win.location,
         title: 'Failed to load the rendering engine.',
-      })) {
-        showFatalError(
-          `Failed to initialize the rendering engine. ${errorDetail(err)}`);
-      }
+      });
     },
   });
 
