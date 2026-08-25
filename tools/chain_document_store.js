@@ -32,14 +32,28 @@ const refusal = (code, path, message) => ({
   diagnostics: [{ severity: 'error', phase: 'edit', code, path, message }],
 });
 
-// Mirror of the validator's per-operator arena rounding.
-/** @param {*} blocks */
-const blockBytes = (blocks) =>
-  ['param', 'prepared', 'state'].reduce((total, kind) => {
-    const block = blocks?.[kind] ?? { size: 0, align: 1 };
-    const align = Math.max(1, block.align);
-    return total + Math.ceil(block.size / align) * align;
-  }, 0);
+/**
+ * The arena a chain lays out to, in the validator's cursor form
+ * (shader/shader_workbench.mjs, itself the engine's plan_layout): every block
+ * aligns one running cursor, so a block's padding depends on everything ahead
+ * of it, per-operator overhead and parameter names included.
+ * @param {CatalogOperator[]} ops - Operators of a chain, in chain order.
+ * @param {*} budgets - The catalog's budgets object.
+ * @returns {number} Arena bytes the chain needs.
+ */
+export const chainArenaBytes = (ops, budgets) => {
+  let cursor = 0;
+  for (const op of ops) {
+    for (const kind of ['param', 'prepared', 'state']) {
+      const block = op.blocks?.[kind] ?? { size: 0, align: 1 };
+      const step = Math.max(1, block.align);
+      cursor = Math.ceil(cursor / step) * step + block.size;
+    }
+    cursor += (budgets.per_op_overhead_bytes ?? 0)
+      + (budgets.per_param_name_bytes ?? 0) * op.params.length;
+  }
+  return cursor;
+};
 
 /**
  * The document parameter declaration a catalog field backfills as: the
@@ -308,16 +322,10 @@ export async function createChainDocumentStore({
    * @param {CatalogOperator[]} ops - Operators of a candidate chain.
    * @returns {{arenaBytes: number, paramCount: number}} Totals.
    */
-  const chainCost = (ops) => {
-    let arenaBytes = 0;
-    let paramCount = 0;
-    for (const op of ops) {
-      arenaBytes += (budgets.per_op_overhead_bytes ?? 0) + blockBytes(op.blocks)
-        + (budgets.per_param_name_bytes ?? 0) * op.params.length;
-      paramCount += op.params.length;
-    }
-    return { arenaBytes, paramCount };
-  };
+  const chainCost = (ops) => ({
+    arenaBytes: chainArenaBytes(ops, budgets),
+    paramCount: ops.reduce((total, op) => total + op.params.length, 0),
+  });
 
   /**
    * Why a candidate chain breaks a declared budget, or null when it fits.

@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs';
 import {
   DEFAULT_SCRATCH_CHAIN,
   UNDO_DEPTH,
+  chainArenaBytes,
   createChainDocumentStore,
   scratchChainDocument,
 } from '../tools/chain_document_store.js';
@@ -574,9 +575,9 @@ test('an exhausted operator budget refuses insertion but not replacement', async
 });
 
 test('arena accounting honors per_param_name_bytes when declared', async () => {
-  // The 6-op fixture chain costs 3535 arena bytes under the engine budgets
+  // The 6-op fixture chain costs 3592 arena bytes under the engine budgets
   // (49-byte overhead + blocks + 34 schema params x 81 name bytes); the
-  // wave-shear insertion brings it to 4110. A budget between the two refuses
+  // wave-shear insertion brings it to 4168. A budget between the two refuses
   // the insertion only while the name figure is counted.
   const catalog = structuredClone(CATALOG);
   catalog.budgets.arena_bytes = 3800;
@@ -594,6 +595,57 @@ test('arena accounting honors per_param_name_bytes when declared', async () => {
   const base = await makeStore();
   assert.equal(base.legalInsertions(WARP)
     .find((candidate) => candidate.operator.id === 'warp.wave-shear.v2').legal, true);
+});
+
+test('the store bills a chain the arena bytes the validator does', () => {
+  // The validator's cursor lives inside validateChain and is not exported, so
+  // the agreement is pinned against the figure it prints rather than a third
+  // copy of the formula: a zero arena budget makes it print one for every
+  // chain. Padding depends on everything ahead of a block, so runs of blocks
+  // whose size is not a multiple of their alignment are what separate a cursor
+  // from per-block rounding.
+  const probe = structuredClone(CATALOG);
+  probe.budgets.arena_bytes = 0;
+  const operators = new Map(CATALOG.operators.map(
+    (operator) => [operator.id, operator]));
+  const validatorBytes = (chain) => {
+    const diagnostic = validateShaderDocument(
+      scratchChainDocument(probe, chain), { catalog: probe })
+      .find((entry) => entry.message.includes('arena bytes'));
+    assert.ok(diagnostic, 'the validator reports an arena figure');
+    return Number(/needs (\d+) arena bytes/.exec(diagnostic.message)[1]);
+  };
+  const chains = [
+    DEFAULT_SCRATCH_CHAIN,
+    BASE.document.descriptor.chain,
+    [
+      { label: 'camera', operator: 'sphere.rotate.v2' },
+      { label: 'glitch', operator: 'sphere.lens.glitch.v2' },
+      { label: 'project', operator: 'project.stereographic.v2' },
+      { label: 'sample', operator: 'sample.lattice.v2' },
+      { label: 'colorize', operator: 'colorize.generated-palette.v2' },
+    ],
+  ];
+  const endomorphisms = [
+    'sphere.lens.glitch.v2', 'sphere.lens.twist.v2',
+    'sphere.lens.kaleidoscope.v2', 'sphere.displace.curl.v2',
+  ];
+  for (const operator of endomorphisms) {
+    for (const count of [1, 2, 3, 7, 13]) {
+      chains.push([
+        ...Array.from({ length: count },
+          (unused, index) => ({ label: `endo${index}`, operator })),
+        { label: 'project', operator: 'project.stereographic.v2' },
+        { label: 'sample', operator: 'sample.grid.v2' },
+        { label: 'colorize', operator: 'colorize.generated-palette.v2' },
+      ]);
+    }
+  }
+  for (const chain of chains) {
+    const ops = chain.map((entry) => operators.get(entry.operator));
+    assert.equal(chainArenaBytes(ops, probe.budgets), validatorBytes(chain),
+      chain.map((entry) => entry.operator).join(' -> '));
+  }
 });
 
 test('a removal drops transition edges it makes degenerate', async () => {
