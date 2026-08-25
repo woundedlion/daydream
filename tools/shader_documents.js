@@ -370,7 +370,7 @@ export function createShaderDocumentController({
     for (const preset of compiled.document.preset_bank.presets) {
       const option = doc.createElement('option');
       option.value = preset.preset_id;
-      option.textContent = preset.display_name;
+      option.textContent = preset.display_name ?? preset.preset_id;
       presetSelect.appendChild(option);
     }
     presetSelect.disabled = presetSelect.options.length === 0;
