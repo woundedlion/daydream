@@ -47,10 +47,9 @@ const findSh = () => {
 const SH = findSh();
 const REQUIRED_ENV = 'DAYDREAM_HOOK_SH_REQUIRED';
 const MISSING = 'no POSIX sh available';
-// Every case here skips without a shell, and the floors declare the file
-// skippable, so a runner that lost its sh would retire all of them and still
-// report green. The unit-suite workflow declares the flag, under which the
-// missing shell fails instead.
+// Every case here skips without a shell, so a runner that lost its sh would
+// retire all of them and still report green. The unit-suite workflow declares
+// the flag, under which the missing shell fails instead.
 const SKIP = SH || process.env[REQUIRED_ENV] ? false : MISSING;
 
 describe(
