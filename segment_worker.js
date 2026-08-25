@@ -82,7 +82,7 @@ function enumConstantName(values, result) {
 }
 
 /**
- * Restore a complete ShaderBall snapshot after the effect has been rebuilt.
+ * Restore a complete shader-workbench snapshot after the effect has been rebuilt.
  * @param {import('./worker_protocol.js').FullConfigSnapshot|undefined} snapshot
  * @returns {boolean} True when no snapshot was supplied or it was accepted.
  */
@@ -92,7 +92,7 @@ function restoreFullConfig(snapshot) {
       || typeof engine.restoreFullConfigSnapshot !== 'function'
       || !wasmModule.FullConfigRestoreResult) {
     post({ type: 'engineRejected',
-           reason: 'ShaderBall full-config restore API is unavailable' });
+           reason: 'Shader workbench full-config restore API is unavailable' });
     return false;
   }
   const result = engine.restoreFullConfigSnapshot(snapshot);
@@ -100,7 +100,7 @@ function restoreFullConfig(snapshot) {
   if (result === restoreResults.APPLIED) return true;
   const name = enumConstantName(restoreResults, result);
   post({ type: 'engineRejected',
-         reason: `ShaderBall full-config restore rejected: ${name}` });
+         reason: `Shader workbench full-config restore rejected: ${name}` });
   return false;
 }
 
