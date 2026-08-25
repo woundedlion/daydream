@@ -20,6 +20,8 @@
  *   - refreshPixelView(): re-fetch the (possibly detached) WASM pixel view
  *   - getMemoryView():    current Uint16Array view of the display buffer
  *   - repointDisplayAliases(view): re-point both display aliases at a view
+ *   - displayAliasesDiverged(view): whether either display alias has stopped
+ *     referencing that view
  */
 import {
   compositeSegment,
@@ -27,14 +29,13 @@ import {
   isValidSegmentCount,
   stampBoundaries,
 } from "./segment_layout.js";
-import { displayAliasesDiverged } from "./app_lifecycle.js";
 import { isViewLive } from "./pixel_view.js";
 import { pageWarmer } from "./module_warmer.js";
 import { FAULT_POOL, FAULT_RENDER, SegmentStatsView } from "./segment_stats_view.js";
 import { PROTOCOL_VERSION } from "./worker_protocol.js";
 import { errorDetail } from "./tools/banner.js";
 
-export const SEGMENT_CONTROLLER_API_VERSION = 2;
+export const SEGMENT_CONTROLLER_API_VERSION = 3;
 
 // Deadline for all workers to report 'ready'. A non-throwing WASM load failure
 // fires no onerror and never sends 'ready', so this bound latches a fault instead
@@ -147,21 +148,27 @@ export class SegmentController {
    * @param {Object} deps - Host-injected dependencies.
    * @param {Object<string, {w:number, h:number}>} deps.resolutionPresets - Resolution table mapping a preset name to its pixel dimensions.
    * @param {{get: (key: string) => any}} deps.appState - Read-only view of the host's pub/sub state; reads the 'resolution' and 'effect' keys.
-   * @param {{W: number, H: number, pixels: Uint16Array|null, dotMesh: {instanceColor: {array: Uint16Array|null, needsUpdate: boolean}}, invalidate: () => void}} deps.driver - Renderer instance owning the live pixel grid (W/H), the display buffer the compositor blits into, and the dot mesh carrying the second display alias: composite() reads both aliases to detect a divergence, and the heal re-points them.
+   * @param {{W: number, H: number, pixels: Uint16Array|null, dotMesh: {instanceColor: {array: Uint16Array|null, needsUpdate: boolean}}, invalidate: () => void}} deps.driver - Renderer instance owning the live pixel grid (W/H), the display buffer the compositor blits into, and the dot mesh carrying the second display alias: composite() asks the injected detector about both aliases, and the heal re-points them.
    * @param {() => (import('./holosphere_wasm.js').HolosphereEngine|null)} deps.getWasmEngine - Returns the current main-thread HolosphereEngine, or null when none is bound.
    * @param {() => unknown} deps.refreshPixelView - Re-fetches the (possibly detached) WASM pixel view, reporting `true` when it fetched a fresh one. A refresh re-points the display aliases itself, so without that report composite() cannot tell that the buffer it is about to blit into is one the driver never cleared.
    * @param {() => (Uint16Array|null)} deps.getMemoryView - Returns the current Uint16Array view of the display buffer.
    * @param {(view: Uint16Array) => void} deps.repointDisplayAliases - Re-points BOTH display aliases (Three.js instanceColor.array + driver.pixels) at the given view. Required: only the host knows the mesh, and an implementation that moves one alias leaves the composite in a buffer the GPU never reads.
+   * @param {(view: Uint16Array) => boolean} deps.displayAliasesDiverged - Reports whether either display alias has stopped referencing the given view. Required, and the twin of repointDisplayAliases: the host owns both halves of the alias pair, so the detector and the heal must be supplied together rather than half injected and half reached for.
    * @param {Document} [deps.statsDoc] - DOM document the stats overlay renders into; defaults to the global `document`.
    * @param {import('./module_warmer.js').ModuleWarmer} [deps.moduleWarmer] - Warmer whose compilation the spawn hands to its workers; defaults to the page's, so every pool on a page shares one compile.
-   * @throws {TypeError} When repointDisplayAliases is not a function.
+   * @throws {TypeError} When repointDisplayAliases or displayAliasesDiverged is
+   *   not a function.
    */
   constructor({ resolutionPresets, appState, driver, getWasmEngine, refreshPixelView,
-                getMemoryView, repointDisplayAliases, statsDoc,
-                moduleWarmer = pageWarmer }) {
+                getMemoryView, repointDisplayAliases, displayAliasesDiverged,
+                statsDoc, moduleWarmer = pageWarmer }) {
     if (typeof repointDisplayAliases !== 'function') {
       throw new TypeError('SegmentController: repointDisplayAliases is required '
         + 'and must be a function that re-points both display aliases');
+    }
+    if (typeof displayAliasesDiverged !== 'function') {
+      throw new TypeError('SegmentController: displayAliasesDiverged is required '
+        + 'and must be a function that reports on both display aliases');
     }
     this.resolutionPresets = resolutionPresets;
     this.appState = appState;
@@ -170,6 +177,7 @@ export class SegmentController {
     this.refreshPixelView = refreshPixelView;
     this.getMemoryView = getMemoryView;
     this.repointDisplayAliases = repointDisplayAliases;
+    this.displayAliasesDiverged = displayAliasesDiverged;
     this.moduleWarmer = moduleWarmer;
     /** @type {SegmentStatsView} */
     this.statsView = new SegmentStatsView(statsDoc);
@@ -1142,7 +1150,7 @@ export class SegmentController {
     // On a divergence, self-heal rather than fault the render loop (mirrors the
     // single-engine path): re-point both display aliases at the composite target.
     // driver.render() re-clears driver.pixels next frame, restoring the elision.
-    if (displayAliasesDiverged(this.driver, dst)) {
+    if (this.displayAliasesDiverged(dst)) {
       if (!this.aliasDivergenceLogged) {
         console.error(
           "SegmentController.composite: display-buffer alias diverged " +

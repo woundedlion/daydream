@@ -31,6 +31,7 @@ import {
   createSegmentSpawnGuard,
   createSegmentedFallback,
   createTestAllTicker,
+  displayAliasesDiverged,
   loadWithDeadline,
   repointDisplayAliases,
 } from "./app_lifecycle.js";
@@ -54,7 +55,7 @@ import { createShaderDocumentController } from "./tools/shader_documents.js";
 
 // Dwell time per effect while "Test All" cycles the favorites list.
 const TEST_ALL_INTERVAL_MS = 1000;
-const EXPECTED_SEGMENT_CONTROLLER_API_VERSION = 2;
+const EXPECTED_SEGMENT_CONTROLLER_API_VERSION = 3;
 
 export const SHADER_DOCUMENT_EFFECTS = Object.freeze([
   'alien-brain', 'kaleidoscope-hex-soft', 'alien-ocean', 'alien-core',
@@ -289,6 +290,7 @@ export function start({
     refreshPixelView: () => host.refresh(),
     getMemoryView: () => host.view(),
     repointDisplayAliases: (view) => repointDisplayAliases(daydream, view),
+    displayAliasesDiverged: (view) => displayAliasesDiverged(daydream, view),
     statsDoc: doc,
   });
 

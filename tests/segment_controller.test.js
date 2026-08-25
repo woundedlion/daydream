@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { unpinnedEngineMethods } from './fake_engine.js';
 import { fakeElement } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
-import { repointDisplayAliases } from '../app_lifecycle.js';
+import { displayAliasesDiverged, repointDisplayAliases } from '../app_lifecycle.js';
 
 // Stand-in for the injected Daydream renderer: the grid and display buffer the
 // compositor reads, plus the dot mesh the second display alias lives on.
@@ -520,6 +520,7 @@ function makeController({ resolution = 'lo', effect = 'TestEffect',
     refreshPixelView: () => {},
     getMemoryView: () => driver.pixels,
     repointDisplayAliases: (view) => repointDisplayAliases(driver, view),
+    displayAliasesDiverged: (view) => displayAliasesDiverged(driver, view),
   });
 }
 
@@ -2133,9 +2134,26 @@ test('a controller cannot be built without a two-alias display repointer', () =>
       getWasmEngine: () => null,
       refreshPixelView: () => {},
       getMemoryView: () => driver.pixels,
+      displayAliasesDiverged: () => false,
     }),
     /repointDisplayAliases is required/,
     'an omitted repointer would heal only half the alias pair',
+  );
+});
+
+test('a controller cannot be built without an alias-divergence detector', () => {
+  assert.throws(
+    () => new SegmentController({
+      resolutionPresets: { lo: { w: 4, h: 4 } },
+      appState: { get: () => 'lo' },
+      driver,
+      getWasmEngine: () => null,
+      refreshPixelView: () => {},
+      getMemoryView: () => driver.pixels,
+      repointDisplayAliases: (view) => repointDisplayAliases(driver, view),
+    }),
+    /displayAliasesDiverged is required/,
+    'the detector and the heal are one contract; half of it cannot be reached for',
   );
 });
 
