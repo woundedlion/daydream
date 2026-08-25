@@ -742,7 +742,7 @@ function deleteSolid(index) {
   renderSavedList();
 }
 
-function copyCode(index, lang, btn) {
+async function copyCode(index, lang, btn) {
   const item = savedSolids[index];
   const baseIsStar = IslamicStarPatterns.includes(item.base);
 
@@ -782,8 +782,13 @@ function copyCode(index, lang, btn) {
     return;
   }
 
-  copyWithFeedback(code, { element: btn, copiedClasses: ['text-green-400'] })
-    .then(() => console.log(`${lang.toUpperCase()} copied!`));
+  try {
+    const copied = await copyWithFeedback(
+      code, { element: btn, copiedClasses: ['text-green-400'] });
+    if (!copied) showGateMsg('copy failed: the browser refused clipboard access');
+  } catch (e) {
+    showGateMsg(`copy failed: ${e.message}`);
+  }
 }
 
 function restoreSolid(item) {
