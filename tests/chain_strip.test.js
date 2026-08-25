@@ -319,15 +319,21 @@ test('Left/Right rove focus without editing; Alt+Arrow moves the chip', async ()
   assert.deepEqual(labels(h).slice(0, 2), ['camera', 'lens']);
 });
 
-test('a move the store refuses is announced and leaves the chain alone', async () => {
+test('Alt+Arrow reorders only where the move buttons are enabled', async () => {
   const h = await makeStrip();
-  chipByLabel(h, 'project').dispatch('keydown', { key: 'ArrowRight', altKey: true });
+  const untouched = ['camera', 'lens', 'project', 'warp2', 'sample', 'colorize'];
 
-  assert.deepEqual(labels(h),
-    ['camera', 'lens', 'project', 'warp2', 'sample', 'colorize']);
+  chipByLabel(h, 'project').dispatch('keydown', { key: 'ArrowRight', altKey: true });
+  assert.deepEqual(labels(h), untouched, 'a crossing has no reorder');
+
+  chipByLabel(h, 'warp2').dispatch('keydown', { key: 'ArrowLeft', altKey: true });
+  assert.deepEqual(labels(h), untouched, 'a band edge has no neighbour to swap with');
+  const moves = chipByLabel(h, 'warp2').querySelectorAll('.chain-chip-move');
+  assert.deepEqual(moves.map((button) => button.disabled), [true, true]);
+
   assert.deepEqual(h.applied, []);
-  assert.notEqual(lastAnnounced(h), '',
-    'the refusal reason reaches the shared live region');
+  assert.equal(lastAnnounced(h), '',
+    'an inert gesture writes nothing to the shared live region');
 });
 
 test('× and Delete remove an endomorphism and re-apply the program', async () => {
