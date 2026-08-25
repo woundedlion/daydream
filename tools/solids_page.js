@@ -97,8 +97,8 @@ const scheduleUpdate = createFrameScheduler(update);
 const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
 
 // WASM Module
-let WasmModule = null;
-let MeshOpsWasm = null;
+let wasmModule = null;
+let meshOpsWasm = null;
 
 // --- STATE ---
 const state = {
@@ -127,39 +127,39 @@ let currentMesh = null;
 let currentFaceClasses = null;
 
 // Lists (populated from WASM)
-let SimpleSolids = [];
-let IslamicStarPatterns = [];
+let simpleSolids = [];
+let islamicStarPatterns = [];
 // Every name the engine registry already defines. A generated funcName equal
 // to one of these is a redefinition once the C++ is pasted into solids.h.
 // Empty until the registry loads, which leaves the saved-set check alone.
-let RegistrySolidNames = new Set();
+let registrySolidNames = new Set();
 
 // Initialize
 async function init() {
   // Load WASM
   try {
     ({ default: createHolosphereModule } = await import('../holosphere_wasm.js'));
-    WasmModule = await createHolosphereModule();
-    MeshOpsWasm = WasmModule.MeshOps;
+    wasmModule = await createHolosphereModule();
+    meshOpsWasm = wasmModule.MeshOps;
     console.log('WASM Module Loaded');
 
     // Populate Registry from WASM
-    const registry = MeshOpsWasm.getRegistry();
+    const registry = meshOpsWasm.getRegistry();
     // registry is array of {name, category}
-    SimpleSolids = [];
-    IslamicStarPatterns = [];
-    RegistrySolidNames = new Set();
+    simpleSolids = [];
+    islamicStarPatterns = [];
+    registrySolidNames = new Set();
 
     for (let i = 0; i < registry.length; i++) {
       const item = registry[i];
       const name = item.name;
       const cat = item.category; // "Simple" or "Complex"
 
-      RegistrySolidNames.add(name);
+      registrySolidNames.add(name);
       if (cat === "Complex") {
-        IslamicStarPatterns.push(name);
+        islamicStarPatterns.push(name);
       } else {
-        SimpleSolids.push(name);
+        simpleSolids.push(name);
       }
     }
 
@@ -175,9 +175,9 @@ async function init() {
   // the self-rescheduling loop.
   let arenaMetricsTimer = null;
   function updateArenaMetrics() {
-    // The engine nulls MeshOpsWasm on halt; stop rather than reschedule forever.
-    if (!MeshOpsWasm) return;
-    const m = MeshOpsWasm.getArenaMetrics();
+    // The engine nulls meshOpsWasm on halt; stop rather than reschedule forever.
+    if (!meshOpsWasm) return;
+    const m = meshOpsWasm.getArenaMetrics();
     // Peak over the module's life: every build ends in clearToolingMemory(),
     // which zeroes the windowed high_water_mark before the next poll reads it.
     const fmt = (x) => `${formatKB(x.lifetime_high_water_mark, 0)} / ${formatKB(x.capacity, 0)}KB`;
@@ -329,7 +329,7 @@ async function generateThumbnails() {
   const footer = document.getElementById('footer');
 
   // Gather all solid names from exported lists
-  const thumbKeys = [...SimpleSolids, ...IslamicStarPatterns];
+  const thumbKeys = [...simpleSolids, ...islamicStarPatterns];
 
   // Create offscreen renderer
   const width = 256; // High-res for larger thumbs
@@ -606,7 +606,7 @@ function saveSolid() {
   // The engine registry is the other half: a chain whose name matches an
   // entry solids.h already carries redefines it at paste time.
   const funcName = savedFuncName(item);
-  if (funcName && RegistrySolidNames.has(funcName)) {
+  if (funcName && registrySolidNames.has(funcName)) {
     showGateMsg(`saved: "${funcName}" is already in the engine registry — `
       + `the exported C++ would redefine it; vary an op parameter`);
   } else if (funcName && savedSolids.some(s => savedFuncName(s) === funcName)) {
@@ -647,7 +647,7 @@ function renderSavedList() {
     const el = document.createElement('div');
     el.className = 'saved-item relative pr-6';
     const funcName = savedFuncName(item);
-    const inRegistry = funcName !== null && RegistrySolidNames.has(funcName);
+    const inRegistry = funcName !== null && registrySolidNames.has(funcName);
     if (funcName && (inRegistry || nameCounts.get(funcName) > 1)) {
       el.classList.add('name-clash');
       el.title = inRegistry
@@ -731,7 +731,7 @@ function deleteSolid(index) {
 
 async function copyCode(index, lang, btn) {
   const item = savedSolids[index];
-  const baseIsStar = IslamicStarPatterns.includes(item.base);
+  const baseIsStar = islamicStarPatterns.includes(item.base);
 
   // Namespace of the seed, which the emitted recipe calls. Archimedean and
   // Platonic bases share the `Archimedean::` qualifier (it `using`s
@@ -745,7 +745,7 @@ async function copyCode(index, lang, btn) {
   // has to flatten against the base's own authored chain.
   let baseRecipe = null;
   if (baseIsStar) {
-    baseRecipe = MeshOpsWasm ? MeshOpsWasm.getRecipe(item.base) : null;
+    baseRecipe = meshOpsWasm ? meshOpsWasm.getRecipe(item.base) : null;
     if (!baseRecipe) {
       showGateMsg(`export failed: no authored chain for "${item.base}" — `
         + 'its Recipe mirror cannot be generated');
@@ -1206,8 +1206,8 @@ async function refreshOpGating() {
 // gate reads them, so nothing calls the engine again, and the banner stays up
 // rather than being overwritten by the next recompute.
 function standDown(message) {
-  MeshOpsWasm = null;
-  WasmModule = null;
+  meshOpsWasm = null;
+  wasmModule = null;
   showFatalError(message);
 }
 
@@ -1215,7 +1215,7 @@ function standDown(message) {
 // one ever escapes the validator gate, fail loudly once instead of letting
 // every later call trap the re-entrancy guard and spam the console.
 function engineTrapped(e) {
-  return standDownIfHalted(e, WasmModule, standDown,
+  return standDownIfHalted(e, wasmModule, standDown,
     '(The op that caused this slipped past validation; please report the chain.)');
 }
 
@@ -1230,8 +1230,8 @@ function showMeshError(message) {
 // nulls the module handles, so a context must not outlive a build.
 function buildContext() {
   return {
-    Mod: WasmModule,
-    meshOps: MeshOpsWasm,
+    Mod: wasmModule,
+    meshOps: meshOpsWasm,
     vector: (x, y, z) => new THREE.Vector3(x, y, z),
     onError: showMeshError,
     onFatal: standDown,
@@ -1240,7 +1240,7 @@ function buildContext() {
 }
 
 function update() {
-  if (!WasmModule || !MeshOpsWasm) return;
+  if (!wasmModule || !meshOpsWasm) return;
 
   const built = buildChainMesh(state.base, state.ops, buildContext());
   if (!built) return;
