@@ -29,6 +29,7 @@ import {
   dropTargetIndex,
   reorderPreviewShift,
   movedOps,
+  opTopologyKey,
   createCommitQueue,
   createChainValidator,
   createOpGate,
@@ -1031,6 +1032,7 @@ function updateOpParam(index, key, value) {
   } else if (def) {
     val = snapToStep(val, def);
   }
+  const previous = state.ops[index].params[key];
   state.ops[index].params[key] = val;
 
   // Sync UI elements. The row's data-key names the param it drives, so the
@@ -1045,6 +1047,31 @@ function updateOpParam(index, key, value) {
     if (input) input.value = formatParamValue(val, def);
   }
   if (item) syncSweepWarning(item, state.ops[index]);
+
+  // truncate and bevel short-circuit to ambo at t == 0.5, so a slider tick can
+  // change the element census the way adding an op does. That crossing goes
+  // through the gate like any other mutation: the live module is the page's
+  // only one, and a trap on it costs a reload.
+  const before = {
+    op: state.ops[index].op,
+    params: { ...state.ops[index].params, [key]: previous },
+  };
+  if (opTopologyKey(before) !== opTopologyKey(state.ops[index])) {
+    scheduleUpdate.cancel();
+    queueCommit(async () => {
+      const check = await chainIsValid(state.base, state.ops);
+      if (check.ok) {
+        update();
+        return;
+      }
+      showGateMsg(`rejected: ${check.message}`);
+      if (state.ops[index]?.params?.[key] === val) {
+        state.ops[index].params[key] = previous;
+        renderOps();
+      }
+    });
+    return;
+  }
   scheduleUpdate();
 }
 
