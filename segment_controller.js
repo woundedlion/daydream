@@ -1104,13 +1104,17 @@ export class SegmentController {
    *   check latched a fault: the destination view's length against the driver
    *   grid, or the per-segment pre-pass (out-of-bounds/empty/inverted rect, a
    *   pixel-length mismatch, or a rect that is not that segment's band of the
-   *   current layout). The caller uses this to avoid
-   *   marking a black buffer as a real composited frame.
+   *   current layout). -1 means there was no display buffer to blit into (the
+   *   engine view is missing before the WASM load and after dispose), so nothing
+   *   was read or written and the caller must keep the generation pending. The
+   *   caller uses this to avoid marking a black buffer as a real composited frame.
    */
   composite() {
     const refreshed = this.refreshPixelView() === true;
     const dst = this.getMemoryView();
-    if (!dst) return 0;
+    // Not a fault: the view is absent only while there is no engine to fetch it
+    // from, which the single-engine path treats the same way.
+    if (!dst) return -1;
 
     const w = this.driver.W;
     const h = this.driver.H;
@@ -1350,7 +1354,9 @@ export class SegmentController {
     if (this.pendingFrame) {
       const blitted = this.composite();
       this.updateStats();
-      this.pendingFrame = false;
+      // Held when there was no display buffer to blit into: the assembled
+      // generation is still in `results` and composites on a later tick.
+      this.pendingFrame = blitted < 0;
       // Only a whole generation is a frame: a band left black by a missing slot
       // would otherwise be recorded as one.
       this.frameComposited = blitted === this.count;

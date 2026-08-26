@@ -2411,6 +2411,35 @@ test('a fault latched by composite() mid-tick() does not re-dispatch a doomed re
     assert.equal(w.posted.length, before[i], 'no new render broadcast'));
 });
 
+test('tick() holds the assembled generation when the display buffer is missing', async () => {
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3);
+
+  const c = readyController(2);
+  c.showBoundaries = false;
+  c.tick();
+
+  deliverFrame(c, 0, { x0: 0, x1: 2, y0: 0, y1: 2,
+                       pixels: new Uint16Array(2 * 2 * 3).fill(111) });
+  deliverFrame(c, 1, { x0: 2, x1: 4, y0: 0, y1: 2,
+                       pixels: new Uint16Array(2 * 2 * 3).fill(222) });
+  await flush();
+  assert.equal(c.pendingFrame, true);
+
+  c.getMemoryView = () => null;
+  c.tick();
+  assert.equal(c.faulted, false, 'a missing engine view is not a fault');
+  assert.equal(c.pendingFrame, true, 'the generation is held, not consumed');
+  assert.equal(c.frameComposited, false);
+
+  c.getMemoryView = () => driver.pixels;
+  c.tick();
+  assert.equal(c.pendingFrame, false);
+  assert.equal(c.frameComposited, true, 'the held generation composited whole');
+  assert.equal(driver.pixels[idx(0, 0, 4)], 111);
+  assert.equal(driver.pixels[idx(2, 0, 4)], 222);
+});
+
 test('a fault latched by the overrun re-blit paints the overlay on the same tick', async () => {
   driver.W = 4; driver.H = 2;
   driver.pixels = new Uint16Array(4 * 2 * 3);
