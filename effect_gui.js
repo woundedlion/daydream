@@ -1141,13 +1141,17 @@ export function createEffectGui({
       if (closed !== undefined) folder.open?.(!closed);
     }
     const scroller = scrollElement(fx?.gui);
-    if (scroller) scroller.scrollTop = captured.scrollTop;
-    if (captured.property === null) return;
-    for (const [property, controller] of panelControllers(fx)) {
-      if (property !== captured.property) continue;
-      focusWidget(controller)?.focus?.();
-      return;
+    if (captured.property !== null) {
+      for (const [property, controller] of panelControllers(fx)) {
+        if (property !== captured.property) continue;
+        // A rebuilt panel's control heights differ, so the default
+        // scroll-into-view would land the panel somewhere else.
+        focusWidget(controller)?.focus?.({ preventScroll: true });
+        break;
+      }
     }
+    // Last, so a host that ignores preventScroll is still overridden.
+    if (scroller) scroller.scrollTop = captured.scrollTop;
   }
 
   /**
