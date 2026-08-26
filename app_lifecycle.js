@@ -622,6 +622,12 @@ export function createSegmentedFallback({
 // second of rendering at display rate.
 export const FRAME_GUARD_REARM_FRAMES = 60;
 
+// The banner a trapped module raises, from the render loop and from a startup
+// call alike.
+export const MODULE_TRAP_NOTICE = 'The rendering engine hit an unrecoverable'
+  + ' internal error and has been shut down. Reload the page to start it again.'
+  + ' See the browser console for details.';
+
 /**
  * Wrap the render loop's per-frame body so a throw cannot freeze the page, and
  * stop the loop for good once the engine module reports itself dead.
@@ -678,9 +684,7 @@ export function createFrameLoopGuard({
     // loop stopped rather than resuming into a dead module.
     dead = true;
     logError('Render loop stopped: the rendering engine trapped.');
-    report('The rendering engine hit an unrecoverable internal error and has'
-      + ' been shut down. Reload the page to start it again. See the browser'
-      + ' console for details.');
+    report(MODULE_TRAP_NOTICE);
     onModuleDead();
   }
 

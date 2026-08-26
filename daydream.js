@@ -33,6 +33,7 @@ import {
   createTestAllTicker,
   displayAliasesDiverged,
   loadWithDeadline,
+  MODULE_TRAP_NOTICE,
   repointDisplayAliases,
 } from "./app_lifecycle.js";
 import { AppState, URLSync, replaceUrl } from "./state.js";
@@ -635,9 +636,7 @@ export function start({
   function abandonOnModuleDeath() {
     if (!host.moduleDead()) return false;
     console.error('Startup stopped: the rendering engine trapped.');
-    showFatalError('The rendering engine hit an unrecoverable internal error and'
-      + ' has been shut down. Reload the page to start it again. See the browser'
-      + ' console for details.');
+    showFatalError(MODULE_TRAP_NOTICE);
     appTeardown?.dispose();
     return true;
   }
