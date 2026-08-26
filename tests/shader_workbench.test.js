@@ -1262,7 +1262,7 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
 
   assert.equal(harness.engine.chainCalls.length, 3);
   assert.equal(harness.engine.chainCalls.at(-1).length, 7);
-  assert.ok(harness.engine.writes.some(([name]) => name === 'warp1.strength'),
+  assert.ok(harness.engine.writes.some(([name]) => name === 'wave-shear1.strength'),
     'the re-apply carries the backfilled catalog defaults');
 
   // Save exports the store's edited document, not the load-time compile.
@@ -1270,7 +1270,7 @@ test('a dynamic document builds the strip, and edits re-apply through the engine
   const saved = JSON.parse(harness.downloads[0][1]);
   assert.equal(saved.descriptor.chain.length, 7);
   assert.ok(Object.keys(saved.preset_bank.presets[0].values)
-    .some((id) => id.startsWith('warp1.')));
+    .some((id) => id.startsWith('wave-shear1.')));
 });
 
 test('Kaleidoscope Stained Glass loads its effect preset into the interpreter controls', async () => {
