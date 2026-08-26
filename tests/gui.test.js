@@ -656,6 +656,22 @@ test('readStoredNumber migrates a legacy companion key', () => {
   }
 });
 
+// The query string is parsed once per location and copied per read, so a stale
+// copy or a shared one would hydrate controls from a URL the page has left.
+test('a parsed query string is re-read when the location moves', () => {
+  installWindow('?fx.Speed=1');
+  const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
+
+  assert.equal(gui.urlParams().get('fx.Speed'), '1');
+  const handed = gui.urlParams();
+  handed.set('fx.Speed', '99');
+  assert.equal(gui.urlParams().get('fx.Speed'), '1',
+    'the caller mutated the parse every other read shares');
+
+  globalThis.window.location.search = '?fx.Speed=2';
+  assert.equal(gui.urlParams().get('fx.Speed'), '2');
+});
+
 test('readStoredString returns an opaque namespaced companion value', () => {
   const snapshot = '{"schemaVersion":2,"accepted":[4294967295]}';
   installWindow(`?fx.__fullConfig=${encodeURIComponent(snapshot)}`);
