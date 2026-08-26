@@ -167,6 +167,14 @@ test('deploy stops waiting when the pinned engine run cannot publish', () => {
   assert.match(workflow, /published no verified engine bundle/);
 });
 
+test('the engine checkout can fetch a pin after master advances', () => {
+  const workflow = text('.github/workflows/js-unit-suite.yml');
+  const checkout = workflow.match(
+    /- name: Checkout the pinned engine\n[\s\S]*?(?=\n\s{6}- )/,
+  )?.[0] ?? '';
+  assert.match(checkout, /fetch-depth: 0/);
+});
+
 test('pre-push verifies the working-tree artifacts', () => {
   assert.match(text('.githooks/pre-push'),
     /node --test tests\/wasm_provenance\.test\.js/);
