@@ -13,8 +13,10 @@ import { SLOW_FRAME_MS } from "./frame_constants.js";
 import { formatKB } from "./tools/kb_format.js";
 
 // Sentinel segIds for pool-wide faults with no single worker to blame:
-// FAULT_POOL for a module-load/init timeout, FAULT_RENDER for a render-watchdog
-// timeout. The overlay headline distinguishes them.
+// FAULT_POOL for a module-load/init timeout, FAULT_RENDER for any fault raised
+// on the render path: a watchdog stall, a display-buffer geometry mismatch, or a
+// rejected render. The overlay headline distinguishes them, the detail line says
+// which.
 export const FAULT_POOL = -1;
 export const FAULT_RENDER = -2;
 
@@ -171,10 +173,10 @@ export class SegmentStatsView {
       const box = this.doc.createElement('div');
       box.setAttribute('role', 'alert');
       box.className = 'seg-status seg-fault';
-      // segId < 0 is a pool-wide fault, not one worker; FAULT_RENDER is a render
-      // timeout, other negatives are pool init/module load.
+      // segId < 0 is a pool-wide fault, not one worker; FAULT_RENDER is the whole
+      // render path, other negatives are pool init/module load.
       const who = !f ? 'worker ?'
-        : f.segId === FAULT_RENDER ? 'render timeout'
+        : f.segId === FAULT_RENDER ? 'render pipeline'
         : f.segId < 0 ? 'pool init'
         : `worker ${f.segId}`;
       box.append(`⚠ Segment ${who} faulted — segmented render halted.`);

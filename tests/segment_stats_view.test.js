@@ -434,7 +434,7 @@ test('each fault code names its own source in the headline', () => {
     [{ segId: 0, message: 'boom' }, 'worker 0'],
     [{ segId: 3, message: 'boom' }, 'worker 3'],
     [{ segId: FAULT_POOL, message: 'boom' }, 'pool init'],
-    [{ segId: FAULT_RENDER, message: 'boom' }, 'render timeout'],
+    [{ segId: FAULT_RENDER, message: 'boom' }, 'render pipeline'],
     [{ segId: -7, message: 'boom' }, 'pool init'],
     [null, 'worker ?'],
   ];
