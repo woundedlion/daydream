@@ -9,10 +9,10 @@
 // overflowing chips, off-screen flyouts, scroll arrows that never appear,
 // scrollTop clamping, a renamed or deleted CSS rule, a display:none control that
 // still takes a click, focus landing on a non-focusable node, and a drag that
-// loses pointer capture or ignores pointercancel. The six probes
+// loses pointer capture or ignores pointercancel. The seven probes
 // browser-smoke.yml drives are what catch them: scripts/browser-smoke.mjs,
-// workbench-probe.mjs, panel-probe.mjs, solids-probe.mjs, palettes-probe.mjs
-// and mobius-probe.mjs.
+// workbench-probe.mjs, panel-probe.mjs, solids-probe.mjs, palettes-probe.mjs,
+// mobius-probe.mjs and lissajous-probe.mjs.
 import { afterEach } from 'node:test';
 
 // Nodes standing in for ones the page already carries. A parentless node is
@@ -762,7 +762,10 @@ export function restoreDocumentAfterEach() {
 
 /**
  * Installs animation-frame globals whose callbacks run when `flush()` is called.
- * @returns {{pending: number, flush: () => void, restore: () => void}} The frame queue.
+ * Each callback is handed the DOMHighResTimeStamp a browser passes it; `flush`
+ * takes one so a suite can drive a frame clock of its own.
+ * @returns {{pending: number, flush: (timestamp?: number) => void,
+ *   restore: () => void}} The frame queue.
  */
 export function installAnimationFrames() {
   const savedRequest = globalThis.requestAnimationFrame;
@@ -779,10 +782,10 @@ export function installAnimationFrames() {
 
   return {
     get pending() { return queued.size; },
-    flush() {
+    flush(timestamp = performance.now()) {
       const callbacks = [...queued.values()];
       queued.clear();
-      for (const callback of callbacks) callback();
+      for (const callback of callbacks) callback(timestamp);
     },
     restore() {
       queued.clear();

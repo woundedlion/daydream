@@ -717,6 +717,26 @@ test('documentEvents refuses a removal with no listener behind it', () => {
     /no keydown listener on the document to remove/);
 });
 
+// A browser hands every frame callback the timestamp it fires at; one that read
+// an undefined argument would compute NaN deltas here and animate here alone.
+test('installAnimationFrames hands each callback a frame timestamp', () => {
+  const frames = installAnimationFrames();
+  try {
+    const stamps = [];
+    requestAnimationFrame((timestamp) => stamps.push(timestamp));
+    requestAnimationFrame((timestamp) => stamps.push(timestamp));
+    frames.flush(1234.5);
+    assert.deepEqual(stamps, [1234.5, 1234.5], 'one clock reading per frame');
+
+    requestAnimationFrame((timestamp) => stamps.push(timestamp));
+    frames.flush();
+    assert.equal(typeof stamps[2], 'number', 'an undriven flush still reads a clock');
+    assert.ok(stamps[2] > 0);
+  } finally {
+    frames.restore();
+  }
+});
+
 test('installAnimationFrames queues callbacks until a flush runs them', () => {
   const saved = globalThis.requestAnimationFrame;
   const frames = installAnimationFrames();
