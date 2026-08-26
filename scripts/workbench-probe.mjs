@@ -397,6 +397,17 @@ async function probeStrip(tab) {
       && Math.abs(kept - stored) < VALUE_TOLERANCE,
   `an emptied readout restores ${restored} rather than committing ${kept}`);
 
+  const rename = '.chain-chip[data-label="rotate"] .chain-chip-rename';
+  await tab.click(rename, { count: 3 });
+  await tab.keyboard.type('orbit');
+  await tab.keyboard.press('Tab');
+  await tab.waitForSelector('.chain-chip[data-label="orbit"]', { timeout: TIMEOUT_MS });
+  const renamed = (await savedDocument(tab)).descriptor;
+  check(renamed.chain.some((entry) => entry.label === 'orbit')
+      && renamed.parameters.some((parameter) => parameter.id === 'orbit.wander')
+      && !renamed.parameters.some((parameter) => parameter.id.startsWith('rotate.')),
+  'an inline rename rewrites the instance and its parameter ids');
+
   const animation = await tab.$eval('#shader-animation-toggle', (node) => ({
     disabled: node instanceof HTMLButtonElement ? node.disabled : true,
     text: node.textContent ?? '',
