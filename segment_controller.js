@@ -1286,10 +1286,11 @@ export class SegmentController {
    * Repaint the per-segment stats overlay from this controller's published state.
    * @details The payload names exactly the fields the overlay reads, not the
    * controller, so its dependencies are the listed ones rather than whatever the
-   * class happens to expose. It is not a copy: results, timings, arenas,
-   * fullFrames and frameSeen are the controller's own arrays, refilled in place
-   * as segment frames land, so this call must sit where they hold one frame's
-   * values and the view must read them synchronously and retain none of them.
+   * class happens to expose. It is not a copy: they are the controller's own
+   * arrays — timings, arenas, fullFrames and frameSeen refilled in place as
+   * segment frames land, results swapped whole with `scratch` when a generation
+   * publishes — so this call must sit where they hold one frame's values and the
+   * view must read them synchronously and retain none of them.
    * @returns {void}
    */
   updateStats() {

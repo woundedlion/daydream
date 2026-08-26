@@ -66,6 +66,7 @@ function readyState(n, over = {}) {
   const results = [];
   const timings = [];
   const arenas = [];
+  const fullFrames = [];
   const frameSeen = [];
   for (let s = 0; s < n; s++) {
     results.push({ x0: s * 10, x1: s * 10 + 9, y0: 100 + s, y1: 200 + s });
@@ -75,6 +76,7 @@ function readyState(n, over = {}) {
       scratch_arena_b: { high_water_mark: 2048 * (s + 1) },
       persistent_arena: { usage: 4096 * (s + 1) },
     });
+    fullFrames.push(false);
     frameSeen.push(true);
   }
   return {
@@ -86,6 +88,7 @@ function readyState(n, over = {}) {
     results,
     timings,
     arenas,
+    fullFrames,
     frameSeen,
     wallTime: 12.5,
     ...over,

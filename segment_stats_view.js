@@ -47,7 +47,7 @@ const STAT_BAR_IDS = ['global-stats-desktop', 'stats-bar'];
  *   results: Array<{x0: number, x1: number, y0: number, y1: number} | null>,
  *   timings: number[],
  *   arenas: Array<import('./worker_protocol.js').SegArenaMetrics | null>,
- *   fullFrames?: boolean[],
+ *   fullFrames: boolean[],
  *   frameSeen: boolean[],
  *   wallTime: number,
  * }} SegmentStatsState
@@ -235,7 +235,7 @@ export class SegmentStatsView {
       // the rectangle is only what was sliced out of it, so naming the rect
       // there would claim a segmented render the pool never did.
       setText(c.range, !(state.frameSeen[s] && r) ? '?'
-        : state.fullFrames?.[s] ? 'full frame'
+        : state.fullFrames[s] ? 'full frame'
         : `x[${r.x0}–${r.x1}] y[${r.y0}–${r.y1}]`);
       setText(c.compute, `${timing.toFixed(1)} ms`);
       // Written only on a crossing: an unchanged class attribute still costs a
