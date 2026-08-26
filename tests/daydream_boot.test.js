@@ -24,7 +24,7 @@ import { readFileSync } from 'node:fs';
 import { fakeElement, restoreDocumentAfterEach } from './fake_dom.js';
 import { URL_FLUSH_DEBOUNCE_MS } from '../state.js';
 import {
-  EffectSetResult, ParamSetResult, ResolutionSetResult,
+  EffectSetResult, ParamSetResult, ResolutionSetResult, unpinnedEngineMethods,
 } from './fake_engine.js';
 import { captureConsole, installConsoleCapture } from './fake_console.js';
 import {
@@ -209,6 +209,13 @@ function fakeWasmModule({
     },
   };
 }
+
+// The double every case below boots on: a method the real engine never had
+// would let all of them pass over a surface the browser cannot answer.
+test('the boot double mocks only methods the engine has', () => {
+  const { HolosphereEngine } = fakeWasmModule();
+  assert.deepEqual(unpinnedEngineMethods(new HolosphereEngine()), []);
+});
 
 /** @returns {string} The text the shared notice element is showing. */
 function noticeText(app) {

@@ -24,6 +24,8 @@ export const ENGINE_OPTIONAL_METHODS = [
   'getFullConfigSnapshot', 'restoreFullConfigSnapshot',
   'getFullConfigFieldDefinitions', 'getConfigImportNotice',
   'clearConfigImportNotice', 'getAnimationsPaused', 'getPresetIds', 'getPoleLod',
+  // embind's own handle release, which engine_host.js calls on teardown.
+  'delete',
 ];
 
 /**
