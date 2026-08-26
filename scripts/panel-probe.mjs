@@ -15,6 +15,9 @@
  * whether either one is measuring the layout that shipped.
  * The same suite has no accessibility tree, so the preset dropdown's computed
  * name is read out of the browser's.
+ * A slider drag is lil-gui's own mouse gesture, which the fake DOM does not
+ * raise and cannot interleave a second pointer with, so only a browser says
+ * whether the panel's drag latch tracks the pointer that opened it.
  */
 import { checks, runProbe } from './probe_harness.mjs';
 
@@ -29,9 +32,14 @@ const SIDEBAR_VIEWPORT = { width: 480, height: 720 };
 // The roster's widest parameter schema, so the panel overflows the cap.
 const EFFECT = 'ShapeShifter';
 const TIMEOUT_MS = 90_000;
+// Longer than state.js's URL flush debounce, so a deferred write has landed.
+const URL_SETTLE_MS = 600;
+// Bound on the wait for the query string to stop changing.
+const URL_SETTLE_POLLS = 20;
 // Long enough that a note squeezed onto the control row would be clipped.
 const WARNING = 'Legacy Stereo Noise requires Projection = Stereographic.';
 const SCROLLER = '.effect-gui .lil-children';
+const PANEL_SLIDER = '.effect-gui .lil-controller.lil-number .lil-slider';
 const PANEL_TITLE = '.effect-gui > .lil-title';
 const RESET = '.effect-action-reset button';
 const LIST = '.effect-list';
@@ -130,6 +138,88 @@ async function probePanel(tab) {
       && restoredControl.widget === focusedControl.widget,
     `the rebuilt panel restores focus to the ${focusedControl.name} number input `
       + `(${restoredControl.name || 'none'} ${restoredControl.widget || 'widget'})`);
+
+  return failures;
+}
+
+/**
+ * Drags a panel slider with the mouse, releasing a second pointer over the page
+ * mid-gesture. lil-gui runs the drag on mouse events, and effect_gui.js latches
+ * the controller off a pointerdown, so the two channels only meet in a browser:
+ * the deferred deep-link write must survive the stray release and land on the
+ * drag's own.
+ * @param {import('puppeteer-core').Page} tab
+ */
+async function probeSliderDrag(tab) {
+  const failures = [];
+  const check = (ok, message) => {
+    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
+    if (!ok) failures.push(message);
+  };
+
+  const name = await tab.$eval(PANEL_SLIDER, (slider) => {
+    slider.scrollIntoView({ block: 'center' });
+    return slider.closest('.lil-controller').querySelector('.lil-name').textContent.trim();
+  });
+  const box = await (await tab.$(PANEL_SLIDER)).boundingBox();
+  if (box === null) {
+    check(false, `${name} has no layout box to drag`);
+    return failures;
+  }
+  const valueOf = () => tab.$eval(PANEL_SLIDER, (slider) =>
+    Number(slider.closest('.lil-controller').querySelector('input').value));
+  // The live fx.<name> key is written per move; only __accepted.<name> carries
+  // the persistence the drag defers to its release.
+  const accepted = () => tab.evaluate((param) => new URLSearchParams(location.search)
+    .get(`fx.__accepted.${param}`), name);
+
+  // Waits out the write the panel rebuild above still owes: the baseline the
+  // drag is judged against must not be one landing under it.
+  const settleUrl = async () => {
+    let last = null;
+    for (let poll = 0; poll < URL_SETTLE_POLLS; poll += 1) {
+      const search = await tab.evaluate(() => location.search);
+      if (search === last) return;
+      last = search;
+      await new Promise((resolve) => setTimeout(resolve, URL_SETTLE_MS));
+    }
+  };
+
+  await settleUrl();
+  const before = await valueOf();
+  const acceptedBefore = await accepted();
+  const y = box.y + box.height / 2;
+  await tab.mouse.move(box.x + box.width * 0.2, y);
+  await tab.mouse.down();
+  await tab.mouse.move(box.x + box.width * 0.8, y, { steps: 12 });
+
+  const dragged = await valueOf();
+  check(dragged !== before, `the mouse drag moves ${name} (${before} -> ${dragged})`);
+  check(await tab.$eval(PANEL_SLIDER, (slider) => slider.classList.contains('lil-active')),
+    'lil-gui still owns the gesture it started on mousedown');
+  check(await accepted() === acceptedBefore, 'the drag defers the accepted-value write');
+
+  await tab.evaluate(() => window.dispatchEvent(new PointerEvent(
+    'pointerup', { pointerId: 99, bubbles: true, isPrimary: false })));
+  await new Promise((resolve) => setTimeout(resolve, URL_SETTLE_MS));
+  check(await accepted() === acceptedBefore,
+    'a second pointer releasing mid-gesture flushes nothing');
+
+  await tab.mouse.move(box.x + box.width * 0.9, y, { steps: 4 });
+  const tracked = await valueOf();
+  check(tracked !== dragged, `the drag still tracks the mouse (${tracked})`);
+
+  await tab.mouse.up();
+  await tab.waitForFunction((param, want) => {
+    const at = new URLSearchParams(location.search).get(`fx.__accepted.${param}`);
+    return at !== null && Number(at) === want;
+  }, { timeout: TIMEOUT_MS }, name, tracked).catch(() => {});
+  const written = await accepted();
+  check(Number(written) === tracked,
+    `the release deep-links the dragged value (${written})`);
+  check(await valueOf() === tracked,
+    'the value stream leaves the released value alone');
+  await tab.mouse.move(0, 0);
 
   return failures;
 }
@@ -396,6 +486,7 @@ await runProbe({
     await painted();
     await tab.waitForSelector('.effect-gui');
     failures.push(...await probePanel(tab));
+    failures.push(...await probeSliderDrag(tab));
     failures.push(...await probePresetName(tab));
     failures.push(...await probeWarningNote(tab, 'desktop'));
 

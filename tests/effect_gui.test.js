@@ -509,6 +509,11 @@ const SPEED = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
 const GLOW = { name: 'Glow', value: false, animated: true };
 const TELEMETRY = { name: 'Frames', value: 0, min: 0, max: 99, readonly: true };
 
+/** A pointerdown the drag latch accepts. @returns {Object} The event fields. */
+const pointerDown = (pointerId = 3) => ({ pointerId, isPrimary: true, button: 0 });
+/** The release of one pointer. @returns {Object} The event fields. */
+const pointerUp = (pointerId = 3) => ({ pointerId });
+
 // addParamControl maps one engine parameter definition onto a lil-gui control.
 
 test('a numeric param becomes a slider bounded by the definition', () => {
@@ -1516,7 +1521,7 @@ test('a Lens dropdown keeps requested state ahead of the renderer', () => {
   h.panel.build();
   const controller = h.gui().ctrl('Lens');
 
-  controller.domElement.dispatch('pointerdown');
+  controller.domElement.dispatch('pointerdown', pointerDown());
   assert.equal(controller.dragging, false, 'a dropdown never claims continuous-drag ownership');
   assert.deepEqual(h.dragTarget.listeners, []);
 
@@ -1846,7 +1851,7 @@ test('a warning raised mid-drag lands on the pointer release', () => {
   h.panel.mount();
   const controller = h.gui().ctrl('Speed');
 
-  controller.domElement.dispatch('pointerdown');
+  controller.domElement.dispatch('pointerdown', pointerDown());
   controller.setValue(0.9);
   h.panel.sync();
 
@@ -1854,7 +1859,7 @@ test('a warning raised mid-drag lands on the pointer release', () => {
   assert.equal(h.gui().ctrl('Speed').domElement.classList.contains('param-warning'),
     false);
 
-  h.dragTarget.dispatch('pointerup');
+  h.dragTarget.dispatch('pointerup', pointerUp());
   h.panel.sync();
 
   assert.equal(h.guis.length, 2);
@@ -2577,12 +2582,12 @@ test('a drag registers window listeners that the pointer release drains', () => 
   h.panel.build();
   const controller = h.gui().ctrl('Speed');
 
-  controller.domElement.dispatch('pointerdown');
+  controller.domElement.dispatch('pointerdown', pointerDown());
   assert.equal(controller.dragging, true);
   assert.deepEqual(h.dragTarget.listeners.map((l) => l.type),
     ['pointerup', 'pointercancel']);
 
-  h.dragTarget.dispatch('pointerup');
+  h.dragTarget.dispatch('pointerup', pointerUp());
   assert.equal(controller.dragging, false);
   assert.deepEqual(h.dragTarget.listeners, []);
   assert.equal(h.panel.active().activeDragEnds.size, 0);
@@ -2591,7 +2596,7 @@ test('a drag registers window listeners that the pointer release drains', () => 
 test('destroy drains the drag listeners of a panel torn down mid-drag', () => {
   const h = makeHarness({ params: [SPEED] });
   h.panel.build();
-  h.gui().ctrl('Speed').domElement.dispatch('pointerdown');
+  h.gui().ctrl('Speed').domElement.dispatch('pointerdown', pointerDown());
 
   h.panel.destroy();
 
@@ -2609,13 +2614,13 @@ test('a slider drag defers persistence to the pointer release', () => {
   const controller = h.gui().ctrl('Speed');
   h.gui().storedWrites.length = 0;
 
-  controller.domElement.dispatch('pointerdown');
+  controller.domElement.dispatch('pointerdown', pointerDown());
   controller.setValue(0.2);
   controller.setValue(0.3);
 
   assert.deepEqual(h.gui().storedWrites, [], 'no per-pointermove persistence');
 
-  h.dragTarget.dispatch('pointerup');
+  h.dragTarget.dispatch('pointerup', pointerUp());
 
   assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', 0.3]]);
 });
@@ -2641,13 +2646,13 @@ test('a ShaderBall drag writes one full-config snapshot, at the release', () => 
   const controller = h.gui().ctrl('Hue Shift Amount');
   h.gui().storedWrites.length = 0;
 
-  controller.domElement.dispatch('pointerdown');
+  controller.domElement.dispatch('pointerdown', pointerDown());
   controller.setValue(0.25);
   controller.setValue(0.5);
 
   assert.deepEqual(h.gui().storedWrites, [], 'no snapshot per pointermove');
 
-  h.dragTarget.dispatch('pointerup');
+  h.dragTarget.dispatch('pointerup', pointerUp());
 
   assert.deepEqual(h.gui().storedWrites, [
     [FULL_CONFIG_STORAGE_KEY, JSON.stringify(snapshot(0.5))],
@@ -2667,7 +2672,7 @@ test('a schema rebuild mid-drag still lands the write the drag deferred', () => 
   const dragged = h.gui();
   dragged.storedWrites.length = 0;
 
-  controller.domElement.dispatch('pointerdown');
+  controller.domElement.dispatch('pointerdown', pointerDown());
   controller.setValue(0.75);
 
   assert.deepEqual(dragged.storedWrites, [], 'the drag defers the write');
@@ -2706,7 +2711,7 @@ test('a schema rebuild mid-drag lands the whole workbench snapshot', () => {
   const dragged = h.gui();
   dragged.storedWrites.length = 0;
 
-  controller.domElement.dispatch('pointerdown');
+  controller.domElement.dispatch('pointerdown', pointerDown());
   controller.setValue(0.5);
   h.state.generation = 4;
   h.panel.sync();
@@ -2728,7 +2733,7 @@ test('a teardown mid-drag persists the deferred write, and a release only once',
     const torn = harness();
     torn.panel.build();
     torn.gui().storedWrites.length = 0;
-    torn.gui().ctrl('Speed').domElement.dispatch('pointerdown');
+    torn.gui().ctrl('Speed').domElement.dispatch('pointerdown', pointerDown());
     torn.gui().ctrl('Speed').setValue(0.4);
     torn.panel.destroy();
 
@@ -2737,9 +2742,9 @@ test('a teardown mid-drag persists the deferred write, and a release only once',
     const released = harness();
     released.panel.build();
     released.gui().storedWrites.length = 0;
-    released.gui().ctrl('Speed').domElement.dispatch('pointerdown');
+    released.gui().ctrl('Speed').domElement.dispatch('pointerdown', pointerDown());
     released.gui().ctrl('Speed').setValue(0.6);
-    released.dragTarget.dispatch('pointerup');
+    released.dragTarget.dispatch('pointerup', pointerUp());
     released.panel.destroy();
 
     assert.deepEqual(released.gui().storedWrites, [['__accepted.Speed', 0.6]],
@@ -2751,8 +2756,8 @@ test('a release that changed no value persists nothing', () => {
   h.panel.build();
   h.gui().storedWrites.length = 0;
 
-  h.gui().ctrl('Speed').domElement.dispatch('pointerdown');
-  h.dragTarget.dispatch('pointerup');
+  h.gui().ctrl('Speed').domElement.dispatch('pointerdown', pointerDown());
+  h.dragTarget.dispatch('pointerup', pointerUp());
 
   assert.deepEqual(h.gui().storedWrites, []);
 });
@@ -2847,11 +2852,57 @@ test('a definition with no accepted value falls back to its requested target', (
     'the rung the whole-list persist writes');
 });
 
+// A second finger landing while a slider is held must neither re-latch the
+// control nor release it: the release the panel acts on is the opening
+// pointer's alone.
+test('a second pointer neither re-latches a held control nor releases it', () => {
+  const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
+  const h = makeHarness({
+    params: [speed],
+    onEngineParam: (_name, value) => { speed.value = value; },
+  });
+  h.panel.build();
+  const controller = h.gui().ctrl('Speed');
+  h.gui().storedWrites.length = 0;
+
+  controller.domElement.dispatch('pointerdown', pointerDown(3));
+  controller.setValue(0.4);
+  controller.domElement.dispatch('pointerdown', pointerDown(9));
+
+  assert.deepEqual(h.dragTarget.listeners.map((l) => l.type),
+    ['pointerup', 'pointercancel'], 'the second pointer registers no end pair');
+  assert.equal(h.panel.active().activeDragEnds.size, 1);
+
+  h.dragTarget.dispatch('pointerup', pointerUp(9));
+
+  assert.equal(controller.dragging, true, 'the drag survives the other release');
+  assert.deepEqual(h.gui().storedWrites, [], 'nothing is flushed mid-gesture');
+
+  h.dragTarget.dispatch('pointerup', pointerUp(3));
+
+  assert.equal(controller.dragging, false);
+  assert.deepEqual(h.dragTarget.listeners, []);
+  assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', 0.4]]);
+});
+
+test('a non-primary or secondary-button pointerdown starts no drag', () => {
+  for (const extra of [{ isPrimary: false }, { button: 1 }, { button: 2 }]) {
+    const h = makeHarness({ params: [SPEED] });
+    h.panel.build();
+    const controller = h.gui().ctrl('Speed');
+
+    controller.domElement.dispatch('pointerdown', { ...pointerDown(), ...extra });
+
+    assert.equal(controller.dragging, false, `${JSON.stringify(extra)} must not latch`);
+    assert.deepEqual(h.dragTarget.listeners, []);
+  }
+});
+
 test('a readonly control is never drag-tracked', () => {
   const h = makeHarness({ params: [TELEMETRY] });
   h.panel.build();
 
-  h.gui().ctrl('Frames').domElement.dispatch('pointerdown');
+  h.gui().ctrl('Frames').domElement.dispatch('pointerdown', pointerDown());
 
   assert.deepEqual(h.dragTarget.listeners, []);
 });
@@ -2861,8 +2912,8 @@ test('toggles and dropdowns are never drag-tracked', () => {
   const h = makeHarness({ params: [GLOW, mode] });
   h.panel.build();
 
-  h.gui().ctrl('Glow').domElement.dispatch('pointerdown');
-  h.gui().ctrl('Mode').domElement.dispatch('pointerdown');
+  h.gui().ctrl('Glow').domElement.dispatch('pointerdown', pointerDown());
+  h.gui().ctrl('Mode').domElement.dispatch('pointerdown', pointerDown());
 
   assert.deepEqual(h.dragTarget.listeners, []);
 });

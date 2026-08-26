@@ -793,18 +793,26 @@ export function createEffectGui({
   }
 
   /**
-   * Flag a controller as dragging until the pointer is released, so sync()'s
-   * value stream doesn't fight the drag. The drag-end listeners live on the drag
-   * target, so they join the effect record's set for a GUI destroyed mid-drag to
-   * drain. Releasing the pointer also runs the persistence the drag deferred.
+   * Flag a controller as dragging until the pointer that opened the gesture is
+   * released, so sync()'s value stream doesn't fight the drag. The drag-end
+   * listeners live on the drag target, so they join the effect record's set for
+   * a GUI destroyed mid-drag to drain. Releasing the pointer also runs the
+   * persistence the drag deferred.
+   *
+   * lil-gui runs the gesture itself on mouse and touch events, so the latch only
+   * observes it: a pointer capture through tools/pointer_drag.js would suppress
+   * the compatibility mousedown the slider drag starts on.
    * @param {Object} fx - The effect record owning the controller.
    * @param {Object} controller - The controller to track.
    * @returns {void}
    */
   function trackDragState(fx, controller) {
-    controller.domElement.addEventListener('pointerdown', () => {
+    controller.domElement.addEventListener('pointerdown', (event) => {
+      if (!event.isPrimary || event.button !== 0 || controller.dragging) return;
+      const { pointerId } = event;
       controller.dragging = true;
-      const end = () => {
+      const end = (release) => {
+        if (release.pointerId !== pointerId) return;
         controller.dragging = false;
         dragTarget.removeEventListener('pointerup', end);
         dragTarget.removeEventListener('pointercancel', end);
