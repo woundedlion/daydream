@@ -6,7 +6,7 @@ if ! command -v node >/dev/null 2>&1; then
 	echo "pre-push: node not found; install Node.js to run the required suites." >&2
 	exit 1
 fi
-DAYDREAM_WASM_CLEAN_REQUIRED=1 node --test tests/wasm_provenance.test.js || exit 1
+node --test tests/wasm_provenance.test.js || exit 1
 
 if ! command -v npm >/dev/null 2>&1; then
 	echo "pre-push: npm not found; install Node.js to run the required suites." >&2

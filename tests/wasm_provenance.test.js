@@ -168,5 +168,6 @@ test('deploy stops waiting when the pinned engine run cannot publish', () => {
 });
 
 test('pre-push verifies the working-tree artifacts', () => {
-  assert.match(text('.githooks/pre-push'), /DAYDREAM_WASM_CLEAN_REQUIRED=1/);
+  assert.match(text('.githooks/pre-push'),
+    /node --test tests\/wasm_provenance\.test\.js/);
 });

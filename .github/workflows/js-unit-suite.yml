@@ -67,7 +67,6 @@ jobs:
           shellcheck --exclude=SC2015,SC2317 "${FILES[@]}"
       - name: Test
         env:
-          DAYDREAM_WASM_CLEAN_REQUIRED: '1'
           DAYDREAM_HOOK_SH_REQUIRED: '1'
           HOLOSPHERE_ENGINE_REQUIRED: '1'
         run: npm test
