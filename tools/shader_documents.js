@@ -581,11 +581,16 @@ export function createShaderDocumentController({
     // parity toggle to the promoted build.
     const official = [...catalog.values()].find((candidate) =>
       candidate.descriptorDigest === compiled.descriptor_digest) ?? null;
+    // Ahead of the teardown: a refusal here must leave the editor it would
+    // have replaced standing.
     if (!selectEffect(CHAIN_EFFECT)) {
       show(`The preview engine rejected effect "${CHAIN_EFFECT}".`, true);
       return false;
     }
     teardownChainUi();
+    const previous = active;
+    // The strip renders the active preset's values, so the document is adopted
+    // before the editor is built.
     active = {
       compiled,
       filename,
@@ -595,18 +600,26 @@ export function createShaderDocumentController({
       presetId,
       referencePresetIds: official?.presetIds ?? [],
     };
-    populatePresets(compiled);
-    presetSelect.value = presetId;
-    saveButton.disabled = false;
-    if (saveAsButton) saveAsButton.disabled = false;
-    showDigest();
+    /**
+     * Puts the toolbar back on the document the engine is still rendering: the
+     * program is only written once every step below has succeeded, so a refusal
+     * before that must not leave the two describing different documents.
+     * @returns {boolean} The load's refusal.
+     */
+    const abandon = () => {
+      teardownChainUi();
+      active = previous;
+      if (previous?.compiledSide && previous.official)
+        selectEffect(previous.official.effectId);
+      return false;
+    };
     if (stripMount && typeof compiler.validateShaderDocument === 'function') {
       try {
         await buildChainUi(compiled.document);
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         show(`The chain editor could not adopt the document: ${detail}`, true);
-        return false;
+        return abandon();
       }
     }
     if (session && chainUi) {
@@ -615,11 +628,16 @@ export function createShaderDocumentController({
         if (!result.ok) {
           show(`The shader link could not bypass "${label}": `
             + `${result.diagnostics[0].message}.`, true);
-          return false;
+          return abandon();
         }
       }
       chainUi.strip.render();
     }
+    populatePresets(compiled);
+    presetSelect.value = presetId;
+    saveButton.disabled = false;
+    if (saveAsButton) saveAsButton.disabled = false;
+    showDigest();
     syncParity();
     if (session) setAnimationsPaused(session.paused);
     return applyPreset(presetId);
