@@ -50,6 +50,15 @@ const RING_CLEARANCE = 4;
 const PRESET_SELECT = '.preset-nav-selector select';
 const PRESET_NAME = 'Preset';
 
+// One widget of each kind lil-gui zeroes the outline on, plus the select it
+// leaves alone, paired with the name the check text reads under.
+const FOCUSABLE = [
+  ['number input', `${SCROLLER} .lil-controller.lil-number input`],
+  ['action button', RESET],
+  ['folder title', PANEL_TITLE],
+  ['preset dropdown', PRESET_SELECT],
+];
+
 /** @param {import('puppeteer-core').Page} tab */
 const scrollerMetrics = (tab) => tab.$eval(SCROLLER, (node) => ({
   scrollTop: node.scrollTop,
@@ -138,6 +147,32 @@ async function probePanel(tab) {
       && restoredControl.widget === focusedControl.widget,
     `the rebuilt panel restores focus to the ${focusedControl.name} number input `
       + `(${restoredControl.name || 'none'} ${restoredControl.widget || 'widget'})`);
+
+  // lil-gui injects `.lil-gui input, .lil-gui button { outline: none }`, which
+  // outranks an unscoped `:focus-visible`. The fake DOM resolves no cascade, so
+  // only a browser says which rule reaches the widget. A computed outline-width
+  // stays at the `medium` keyword's 3px under `outline: none`, so the style has
+  // to be read alongside it.
+  for (const [what, selector] of FOCUSABLE) {
+    // A button matches :focus-visible only in keyboard modality, which any key
+    // press establishes.
+    await tab.keyboard.press('Shift');
+    const focused = await tab.$eval(selector, (node) => {
+      node.focus();
+      return document.activeElement === node;
+    });
+    const ring = await tab.evaluate(() => {
+      const style = getComputedStyle(document.activeElement);
+      return {
+        width: Number.parseFloat(style.outlineWidth),
+        style: style.outlineStyle,
+        offset: style.outlineOffset,
+      };
+    });
+    check(focused && ring.width > 0 && ring.style !== 'none',
+      `the focused ${what} paints a ${ring.width}px ${ring.style} focus ring at `
+        + `${ring.offset}`);
+  }
 
   return failures;
 }
