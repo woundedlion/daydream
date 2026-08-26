@@ -253,12 +253,30 @@ test('refreshWithDeadline aborts a stalled sweep and releases the reload', async
 });
 
 test('refreshWithDeadline survives a sweep that rejects or throws outright', async () => {
-  const timers = { setTimeout: () => ({ unref() {} }), clearTimeout: () => {} };
+  let cleared = 0;
+  const timers = {
+    setTimeout: () => ({ unref() {} }),
+    clearTimeout: () => { cleared += 1; },
+  };
+  const swept = [];
 
-  await assert.doesNotReject(() => refreshWithDeadline(
-    () => Promise.reject(new TypeError('offline')), { timers }));
-  await assert.doesNotReject(() => refreshWithDeadline(
-    () => { throw new TypeError('no fetch'); }, { timers }));
+  await assert.doesNotReject(() => refreshWithDeadline(({ signal }) => {
+    swept.push(signal);
+    return Promise.reject(new TypeError('offline'));
+  }, { timers }));
+
+  assert.equal(swept.length, 1, 'the sweep the deadline races is the one passed in');
+  assert.equal(swept[0].aborted, false, 'a sweep that rejected was never aborted');
+  assert.equal(cleared, 1, 'a rejected sweep releases the deadline timer');
+
+  await assert.doesNotReject(() => refreshWithDeadline(({ signal }) => {
+    swept.push(signal);
+    throw new TypeError('no fetch');
+  }, { timers }));
+
+  assert.equal(swept.length, 2);
+  assert.equal(cleared, 2,
+    'a synchronous throw leaves the deadline armed with nothing to abort');
 });
 
 test('reload button still reloads when the cache refresh fails', async () => {
