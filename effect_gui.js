@@ -194,106 +194,165 @@ export function addParamControl(
   return controller;
 }
 
+// Collaborator members that must be callable, and those that stand in when the
+// caller leaves them out. host.dragTarget is an event target, not a function,
+// so it is checked apart.
+const ENGINE_MEMBERS = [
+  'getParameterDefinitions', 'paramGeneration', 'paramValues', 'setParam',
+  'setAnimationsPaused', 'animationsPaused', 'getPresetCount', 'getPresetIndex',
+  'synchronizePreset', 'selectPreset',
+];
+const SEGMENT_MEMBERS = ['ownsDisplay', 'paramValues', 'setParam'];
+const HOST_MEMBERS = ['createGui', 'container', 'isMobile', 'applyEffect'];
+const CONFIG_DEFAULTS = {
+  inUse: () => false,
+  snapshot: () => null,
+  fieldDefinitions: () => null,
+  restore: () => null,
+  restoreResults: () => ({}),
+  importNotice: () => '',
+  clearImportNotice: () => {},
+  showImportNotice: () => {},
+};
+const HOST_DEFAULTS = {
+  focusedElement: () => null,
+  paramFilter: () => null,
+  logWarn: (...args) => console.warn(...args),
+};
+
+/**
+ * Fill a collaborator group's absent members in and check that every member the
+ * panel will call is callable.
+ * @param {string} group - Group name, which a fault message names.
+ * @param {Object|undefined} members - What the caller passed for the group.
+ * @param {Array<string>} required - Members with no stand-in.
+ * @param {Object} [defaults] - Members that stand in when absent.
+ * @returns {Object} The filled group.
+ * @throws {TypeError} On a group that is not an object, or a member that is not
+ *   a function.
+ */
+function checkedGroup(group, members, required, defaults = {}) {
+  if (members === null || typeof members !== 'object') {
+    throw new TypeError(`createEffectGui: the ${group} collaborator is missing.`);
+  }
+  const filled = { ...defaults, ...members };
+  for (const name of [...required, ...Object.keys(defaults)]) {
+    if (typeof filled[name] !== 'function') {
+      throw new TypeError(`createEffectGui: ${group}.${name} must be a function.`);
+    }
+  }
+  return filled;
+}
+
 /**
  * Build the effect GUI controller for the app's active effect.
  *
- * @param {Object} deps - Injected app collaborators.
- * @param {() => Object} deps.createGui - Makes an empty effect GUI root: a
- *   DeepLinkGUI (gui.js), whose whole add/stored-value surface the panel uses.
- * @param {() => Array<Object>} deps.getParameterDefinitions - Reads the engine's
- *   parameter definitions for the effect it currently has loaded.
- * @param {() => number|undefined} deps.paramGeneration - Reads the engine's
+ * The four collaborators are checked once here, so a mis-wired page fails where
+ * it is composed rather than at the first frame that happens to call the slot.
+ *
+ * @param {Object} deps - Injected app collaborators, in four groups.
+ * @param {Object} deps.engine - The main engine the panel reads and writes.
+ * @param {() => Array<Object>} deps.engine.getParameterDefinitions - Reads the
+ *   parameter definitions for the effect the engine currently has loaded.
+ * @param {() => number|undefined} deps.engine.paramGeneration - Reads the
  *   effect-load generation, stamped onto each definitions snapshot.
- * @param {() => boolean} deps.segmentsOwnDisplay - Whether the worker pool owns
- *   the display, making its values (not the idle main engine's) the live ones.
- * @param {() => ArrayLike<number>|null} deps.segmentParamValues - The pool's
+ * @param {() => ArrayLike<number>|null} deps.engine.paramValues - The engine's
  *   per-frame value stream.
- * @param {() => ArrayLike<number>|null} deps.engineParamValues - The main
- *   engine's per-frame value stream.
- * @param {(name: string, value: number) => boolean} deps.setEngineParam - Writes
- *   one parameter to the main engine and reports acceptance.
- * @param {(name: string, value: number) => void} deps.setWorkerParam - Writes one
- *   parameter to the worker pool.
- * @param {(paused: boolean) => void} deps.setAnimationsPaused - Freezes/resumes
- *   animation-driven params on every engine.
- * @param {() => number} deps.getPresetCount - Number of presets on the live effect.
- * @param {() => number} deps.getPresetIndex - Selected preset on the live effect.
- * @param {(index: number) => boolean} deps.synchronizePreset - Mirrors a live
- *   worker preset into the engine that owns GUI parameter definitions.
- * @param {(index: number) => boolean} deps.selectPreset - Selects one preset on every engine.
- * @param {() => boolean|undefined} deps.engineAnimationsPaused - Reads the main
- *   engine's animation-pause state, undefined on a module without the accessor.
- * @param {() => void} deps.applyEffect - Rebuilds the panel from engine state
- *   (the Reset button).
- * @param {() => Object|null} deps.guiContainer - The element the panel mounts in.
- * @param {() => boolean} deps.isMobile - Whether to mount the panel collapsed.
- * @param {{addEventListener: Function, removeEventListener: Function}}
- *   deps.dragTarget - Where the drag-end listeners live (the window): a lil-gui
- *   drag continues outside the control's own DOM.
- * @param {() => Object|null} [deps.focusedElement] - The document's focused
- *   element. A control whose number input has focus is being typed into, so the
- *   per-frame value stream must leave it alone.
- * @param {() => {external: true}|null} [deps.paramFilter] - The chain editor's
- *   marker that the active effect's parameters are rendered outside this panel,
- *   on the pipeline strip's chips: when non-null, the panel builds no parameter
- *   controls, though every parameter still claims its value-stream slot. A
- *   change is detected in sync() and rebuilds the panel.
- * @param {(text: string) => Promise<boolean>} deps.copyText - Copies text using
- *   the browser's available clipboard path.
- * @param {() => boolean} [deps.usesFullConfigSnapshot] - Whether the active
- *   effect persists through the exhaustive versioned snapshot API.
- * @param {() => Object|null} [deps.getFullConfigSnapshot] - Captures that state.
- * @param {() => Array<Object>|null} [deps.getFullConfigFieldDefinitions] -
- *   Names the fields in a full configuration snapshot.
- * @param {(snapshot: Object) => unknown} [deps.restoreFullConfigSnapshot] -
- *   Atomically restores a captured state, returning one FullConfigRestoreResult
- *   enum value.
- * @param {() => Record<string, unknown>} [deps.fullConfigRestoreResults] - The
+ * @param {(name: string, value: number) => boolean} deps.engine.setParam - Writes
+ *   one parameter and reports acceptance.
+ * @param {(paused: boolean) => void} deps.engine.setAnimationsPaused -
+ *   Freezes/resumes animation-driven params on every engine.
+ * @param {() => boolean|undefined} deps.engine.animationsPaused - Reads the
+ *   animation-pause state, undefined on a module without the accessor.
+ * @param {() => number} deps.engine.getPresetCount - Number of presets on the
+ *   live effect.
+ * @param {() => number} deps.engine.getPresetIndex - Selected preset on the live
+ *   effect.
+ * @param {(index: number) => boolean} deps.engine.synchronizePreset - Mirrors a
+ *   live worker preset into the engine that owns GUI parameter definitions.
+ * @param {(index: number) => boolean} deps.engine.selectPreset - Selects one
+ *   preset on every engine.
+ *
+ * @param {Object} deps.segments - The worker pool, which may own the display.
+ * @param {() => boolean} deps.segments.ownsDisplay - Whether the pool owns the
+ *   display, making its values (not the idle main engine's) the live ones.
+ * @param {() => ArrayLike<number>|null} deps.segments.paramValues - The pool's
+ *   per-frame value stream.
+ * @param {(name: string, value: number) => void} deps.segments.setParam - Writes
+ *   one parameter to the pool.
+ *
+ * @param {Object} [deps.config] - The exhaustive versioned snapshot API some
+ *   effects persist through. Absent leaves the panel on the per-parameter
+ *   accepted-value surface.
+ * @param {() => boolean} [deps.config.inUse] - Whether the active effect
+ *   persists through the snapshot API.
+ * @param {() => Object|null} [deps.config.snapshot] - Captures that state.
+ * @param {() => Array<Object>|null} [deps.config.fieldDefinitions] - Names the
+ *   fields in a snapshot.
+ * @param {(snapshot: Object) => unknown} [deps.config.restore] - Atomically
+ *   restores a captured state, returning one FullConfigRestoreResult value.
+ * @param {() => Record<string, unknown>} [deps.config.restoreResults] - The
  *   engine's FullConfigRestoreResult enum, which that value is judged against by
  *   identity.
- * @param {() => string} [deps.getConfigImportNotice] - Reads a migration notice.
- * @param {() => void} [deps.clearConfigImportNotice] - Consumes that notice.
- * @param {(message: string|null) => void} [deps.showConfigImportNotice] - Shows
+ * @param {() => string} [deps.config.importNotice] - Reads a migration notice.
+ * @param {() => void} [deps.config.clearImportNotice] - Consumes that notice.
+ * @param {(message: string|null) => void} [deps.config.showImportNotice] - Shows
  *   or clears the migration notice.
- * @param {(message: string, error?: any) => void} [deps.logWarn] - Console sink.
+ *
+ * @param {Object} deps.host - The page the panel mounts into.
+ * @param {() => Object} deps.host.createGui - Makes an empty effect GUI root: a
+ *   DeepLinkGUI (gui.js), whose whole add/stored-value surface the panel uses.
+ * @param {() => Object|null} deps.host.container - The element the panel mounts in.
+ * @param {() => boolean} deps.host.isMobile - Whether to mount the panel collapsed.
+ * @param {?(text: string) => Promise<boolean>} deps.host.copyText - Copies text
+ *   using the browser's available clipboard path, null where there is none.
+ * @param {() => void} deps.host.applyEffect - Rebuilds the panel from engine
+ *   state (the Reset button).
+ * @param {{addEventListener: Function, removeEventListener: Function}}
+ *   deps.host.dragTarget - Where the drag-end listeners live (the window): a
+ *   lil-gui drag continues outside the control's own DOM.
+ * @param {() => Object|null} [deps.host.focusedElement] - The document's focused
+ *   element. A control whose number input has focus is being typed into, so the
+ *   per-frame value stream must leave it alone.
+ * @param {() => {external: true}|null} [deps.host.paramFilter] - The chain
+ *   editor's marker that the active effect's parameters are rendered outside
+ *   this panel, on the pipeline strip's chips: when non-null, the panel builds
+ *   no parameter controls, though every parameter still claims its value-stream
+ *   slot. A change is detected in sync() and rebuilds the panel.
+ * @param {(message: string, error?: any) => void} [deps.host.logWarn] - Console sink.
  * @returns {{active: () => Object|null, liveParamValues: () => ArrayLike<number>|null,
  *   movePreset: (delta: number) => boolean, build: () => void,
  *   applyAnimationPause: () => void, mount: () => void,
  *   sync: (advanced?: boolean) => void,
  *   destroy: () => void}}
+ * @throws {TypeError} On a missing collaborator or an uncallable member.
  */
-export function createEffectGui({
-  createGui,
-  getParameterDefinitions,
-  paramGeneration,
-  segmentsOwnDisplay,
-  segmentParamValues,
-  engineParamValues,
-  setEngineParam,
-  setWorkerParam,
-  setAnimationsPaused,
-  getPresetCount,
-  getPresetIndex,
-  synchronizePreset,
-  selectPreset,
-  engineAnimationsPaused,
-  applyEffect,
-  guiContainer,
-  isMobile,
-  dragTarget,
-  focusedElement = () => null,
-  paramFilter = () => null,
-  copyText,
-  usesFullConfigSnapshot = () => false,
-  getFullConfigSnapshot = () => null,
-  getFullConfigFieldDefinitions = () => null,
-  restoreFullConfigSnapshot = () => null,
-  fullConfigRestoreResults = () => ({}),
-  getConfigImportNotice = () => '',
-  clearConfigImportNotice = () => {},
-  showConfigImportNotice = () => {},
-  logWarn = (...args) => console.warn(...args),
-}) {
+export function createEffectGui({ engine, segments, config, host }) {
+  const {
+    getParameterDefinitions, paramGeneration, setAnimationsPaused, getPresetCount,
+    getPresetIndex, synchronizePreset, selectPreset,
+    paramValues: engineParamValues, setParam: setEngineParam,
+    animationsPaused: engineAnimationsPaused,
+  } = checkedGroup('engine', engine, ENGINE_MEMBERS);
+  const {
+    ownsDisplay: segmentsOwnDisplay, paramValues: segmentParamValues,
+    setParam: setWorkerParam,
+  } = checkedGroup('segments', segments, SEGMENT_MEMBERS);
+  const {
+    inUse: usesFullConfigSnapshot, snapshot: getFullConfigSnapshot,
+    fieldDefinitions: getFullConfigFieldDefinitions,
+    restore: restoreFullConfigSnapshot, restoreResults: fullConfigRestoreResults,
+    importNotice: getConfigImportNotice, clearImportNotice: clearConfigImportNotice,
+    showImportNotice: showConfigImportNotice,
+  } = checkedGroup('config', config ?? {}, [], CONFIG_DEFAULTS);
+  const {
+    createGui, container: guiContainer, isMobile, dragTarget, copyText,
+    applyEffect, focusedElement, paramFilter, logWarn,
+  } = checkedGroup('host', host, HOST_MEMBERS, HOST_DEFAULTS);
+  if (typeof dragTarget?.addEventListener !== 'function'
+      || typeof dragTarget?.removeEventListener !== 'function') {
+    throw new TypeError('createEffectGui: host.dragTarget must be an event target.');
+  }
   let activeEffect = null;
   // Throttle the param/value length-skew warning to once per skew episode.
   let skewLogged = false;
