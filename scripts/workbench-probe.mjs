@@ -511,12 +511,8 @@ try {
 }
 
 console.log(`workbench-probe: ${PAGE}, ${executablePath}`);
-const site = await serveStagedSite();
-const browser = await puppeteer.launch({
-  executablePath,
-  headless: true,
-  args: BROWSER_ARGS,
-});
+let site = null;
+let browser = null;
 
 /**
  * @param {string[]} collector - Takes the page's uncaught errors.
@@ -536,6 +532,12 @@ async function openWorkbench(collector) {
 
 const failures = [];
 try {
+  site = await serveStagedSite();
+  browser = await puppeteer.launch({
+    executablePath,
+    headless: true,
+    args: BROWSER_ARGS,
+  });
   const tab = await openWorkbench(failures);
   failures.push(...await probeStrip(tab));
   // A separate page: the strip probe's structural edits disarm the toggle.
@@ -544,8 +546,8 @@ try {
 } catch (error) {
   failures.push(error instanceof Error ? error.message : String(error));
 } finally {
-  await browser.close();
-  await site.close();
+  await browser?.close();
+  await site?.close();
 }
 
 if (failures.length > 0) {

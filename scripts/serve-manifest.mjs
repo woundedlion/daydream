@@ -39,13 +39,21 @@ export async function serveManifest(entries, root = ROOT) {
     entries.some((entry) => path === entry || path.startsWith(`${entry}/`));
 
   const server = createServer((req, res) => {
-    const requested = decodeURIComponent(
-      new URL(req.url ?? '/', 'http://localhost').pathname).replace(/^\/+/, '');
-    const path = requested === '' ? 'index.html' : requested;
-    const target = resolve(root, path);
-    const ok = served(path) && target.startsWith(`${root}${sep}`) &&
-      existsSync(target) && statSync(target).isFile();
-    if (!ok) {
+    /** @type {?string} */
+    let target = null;
+    try {
+      const requested = decodeURIComponent(
+        new URL(req.url ?? '/', 'http://localhost').pathname).replace(/^\/+/, '');
+      const path = requested === '' ? 'index.html' : requested;
+      const candidate = resolve(root, path);
+      if (served(path) && candidate.startsWith(`${root}${sep}`) &&
+        existsSync(candidate) && statSync(candidate).isFile()) {
+        target = candidate;
+      }
+    } catch {
+      // A malformed percent escape, or a file that moved between the two calls.
+    }
+    if (target === null) {
       res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
       res.end('not in site_manifest.txt\n');
       return;
@@ -53,12 +61,25 @@ export async function serveManifest(entries, root = ROOT) {
     res.writeHead(200, {
       'content-type': MIME[extname(target)] ?? 'application/octet-stream',
     });
-    createReadStream(target).pipe(res);
+    const body = createReadStream(target);
+    // The headers are already out, so a read fault can only be reported by
+    // cutting the response short.
+    body.on('error', () => res.destroy());
+    body.pipe(res);
   });
 
   await new Promise((done, fail) => {
-    server.once('error', fail);
-    server.listen(0, '127.0.0.1', done);
+    /** @param {Error} error */
+    const refuse = (error) => fail(error);
+    server.once('error', refuse);
+    server.listen(0, '127.0.0.1', () => {
+      server.off('error', refuse);
+      // Past the bind nothing is left to settle, and an unhandled 'error' event
+      // would take the process down under the probe still running.
+      server.on('error',
+        (error) => console.error(`serve-manifest: ${error.message}`));
+      done(undefined);
+    });
   });
   const address = server.address();
   if (address === null || typeof address === 'string') {

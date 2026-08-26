@@ -241,15 +241,16 @@ try {
 
 console.log(`browser-smoke: ${pages.length} pages, ${executablePath}`);
 
-const site = await serveStagedSite();
-const browser = await puppeteer.launch({
-  executablePath,
-  headless: true,
-  args: BROWSER_ARGS,
-});
-
+let site = null;
+let browser = null;
 const failures = [];
 try {
+  site = await serveStagedSite();
+  browser = await puppeteer.launch({
+    executablePath,
+    headless: true,
+    args: BROWSER_ARGS,
+  });
   for (const page of pages) {
     const problems = await smokePage(browser, site.origin, page);
     for (const problem of problems) failures.push(`${page}: ${problem}`);
@@ -257,9 +258,11 @@ try {
   const segmentedProblems = await smokeSegmentedMode(browser, site.origin);
   for (const problem of segmentedProblems)
     failures.push(`index.html segmented: ${problem}`);
+} catch (error) {
+  failures.push(error instanceof Error ? error.message : String(error));
 } finally {
-  await browser.close();
-  await site.close();
+  await browser?.close();
+  await site?.close();
 }
 
 if (failures.length > 0) {

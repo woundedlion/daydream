@@ -181,15 +181,16 @@ try {
 }
 
 console.log(`solids-probe: ${PAGE}, ${executablePath}`);
-const site = await serveStagedSite();
-const browser = await puppeteer.launch({
-  executablePath,
-  headless: true,
-  args: BROWSER_ARGS,
-});
-
+let site = null;
+let browser = null;
 const failures = [];
 try {
+  site = await serveStagedSite();
+  browser = await puppeteer.launch({
+    executablePath,
+    headless: true,
+    args: BROWSER_ARGS,
+  });
   const tab = await browser.newPage();
   await tab.setViewport(VIEWPORT);
   await tab.emulateMediaFeatures([
@@ -219,8 +220,8 @@ try {
 } catch (error) {
   failures.push(error instanceof Error ? error.message : String(error));
 } finally {
-  await browser.close();
-  await site.close();
+  await browser?.close();
+  await site?.close();
 }
 
 if (failures.length > 0) {
