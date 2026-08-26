@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createPointerDrag } from '../tools/pointer_drag.js';
+import { createPointerDrag, innerRect } from '../tools/pointer_drag.js';
 import { fakeElement } from './fake_dom.js';
 
 /**
@@ -205,4 +205,34 @@ test('a page with no callbacks at all still captures and releases', () => {
   assert.equal(element.captured.size, 0);
   drag.stop();
   assert.equal(element.captured.size, 0);
+});
+
+// Tailwind's preflight gives the tool canvases a 1px border, which the border
+// box carries and the bitmap does not: a pointer scaled by the rect misses both
+// ends of the surface it is scrubbing.
+test('innerRect reports the padding box, not the bordered rect', () => {
+  const element = fakeElement('canvas');
+  element.offsetLeft = 40;
+  element.offsetTop = 10;
+  element.offsetWidth = 1000;
+  element.offsetHeight = 240;
+  element.clientLeft = 1;
+  element.clientTop = 1;
+  element.clientWidth = 998;
+  element.clientHeight = 238;
+
+  assert.deepEqual(innerRect(element),
+    { left: 41, top: 11, width: 998, height: 238 });
+});
+
+test('innerRect leaves an unbordered element its own rect', () => {
+  const element = fakeElement('canvas');
+  element.offsetLeft = 5;
+  element.offsetTop = 6;
+  element.offsetWidth = 300;
+  element.offsetHeight = 100;
+  element.clientWidth = 300;
+  element.clientHeight = 100;
+
+  assert.deepEqual(innerRect(element), { left: 5, top: 6, width: 300, height: 100 });
 });

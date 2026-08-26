@@ -53,6 +53,30 @@ export async function boxOf(tab, selector) {
 }
 
 /**
+ * The padding box of one element, which boxOf's border box overstates by the
+ * border on every side. A canvas' bitmap and an absolutely positioned child's
+ * percentages both sit inside the border, so a gesture aimed at a fraction of
+ * the border box lands somewhere else on the surface it is scrubbing.
+ * @param {import('puppeteer-core').Page} tab - The page.
+ * @param {string} selector - The element to measure.
+ * @returns {Promise<{x: number, y: number, width: number, height: number}>} Its box.
+ * @throws {Error} When the element never lays one out.
+ */
+export async function paddingBoxOf(tab, selector) {
+  await tab.waitForSelector(selector);
+  const box = await tab.$eval(selector, (node) => {
+    const rect = node.getBoundingClientRect();
+    return {
+      x: rect.left + node.clientLeft, y: rect.top + node.clientTop,
+      width: node.clientWidth, height: node.clientHeight,
+    };
+  });
+  if (!(box.width > 0 && box.height > 0))
+    throw new Error(`${selector} has no layout box`);
+  return box;
+}
+
+/**
  * Walks a pointer from one viewport point to another without pressing it.
  * @param {import('puppeteer-core').Page} tab - The page.
  * @param {{x: number, y: number}} from - Where the walk starts.

@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { initScene, bootstrapTool, wireCopyBlock } from './shared.js';
 import { onPageTeardown } from './page_lifecycle.js';
-import { createPointerDrag } from './pointer_drag.js';
+import { createPointerDrag, innerRect } from './pointer_drag.js';
 import {
   elliptic, hyperbolic, loxodromic, parabolic,
   inversion, tumble, cayley, snapComplex,
@@ -330,7 +330,10 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
   uiUpdaters[id] = updateUI;
 
   const handleInput = (clientX, clientY) => {
-    const rect = planeElement.getBoundingClientRect();
+    // The dot rides .complex-plane-inner, which spans the pad's padding box, so
+    // the pointer has to be normalized against that box rather than the border
+    // box getBoundingClientRect() reports.
+    const rect = innerRect(planeElement);
     if (rect.width <= 0 || rect.height <= 0) return;
     if (isAnimating) stopAnimation();
 

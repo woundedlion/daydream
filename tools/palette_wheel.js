@@ -195,7 +195,7 @@ export function wheelTurnAt(x, y, width, height) {
  * canvas does not share with its display box.
  * @param {number} clientX - Viewport x.
  * @param {number} clientY - Viewport y.
- * @param {{left: number, top: number, width: number, height: number}} rect - The canvas' display box.
+ * @param {{left: number, top: number, width: number, height: number}} rect - The canvas' padding box, which is where the bitmap is drawn.
  * @param {number} width - Canvas width, in pixels.
  * @param {number} height - Canvas height, in pixels.
  * @returns {{x: number, y: number}} The point, in canvas pixels.
