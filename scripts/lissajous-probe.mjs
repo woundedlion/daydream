@@ -30,12 +30,12 @@ const DOMAIN_SLIDER = '#Duration_slider';
 const DOMAIN_GROUP = '#Duration_container';
 const DOMAIN_READOUT = '#Duration_value';
 const DRAG_STEPS = 8;
-// Largest numerator and denominator the ratio search admits, and the frequency
-// sliders' range; tools/lissajous_math.js and tools/lissajous_page.js own them.
+// Largest denominator the ratio search admits, and the frequency sliders'
+// range; tools/lissajous_math.js and tools/lissajous_page.js own them.
 const MAX_RATIONAL_TERM = 8;
 const FREQUENCY_RANGE = { min: 1, max: 100 };
 // The exported literals are float32 round-trips, so a snapped ratio matches to
-// far inside this, while distinct fractions of terms <= 8 stand 1/56 apart.
+// far inside this, while distinct fractions of denominator <= 8 stand 1/64 apart.
 const RATIO_EPSILON = 1e-4;
 // The Domain readout carries three decimals, so it names the exported period to
 // within half of the last place. The thumb sits on the control's own step grid,
@@ -72,9 +72,8 @@ async function exported(tab) {
 function rationalRatio(c1, c2) {
   const ratio = c1 / c2;
   for (let n = 1; n <= MAX_RATIONAL_TERM; n++) {
-    for (let m = 1; m <= MAX_RATIONAL_TERM; m++) {
-      if (Math.abs(ratio - m / n) <= RATIO_EPSILON) return { m, n };
-    }
+    const m = Math.round(ratio * n);
+    if (m >= 1 && Math.abs(ratio - m / n) <= RATIO_EPSILON) return { m, n };
   }
   return null;
 }
@@ -163,8 +162,10 @@ export async function probeRationalLock(tab) {
   check(await disabled(), 'the lock disables the Domain slider');
   check(await dimmed(), 'the lock dims the Domain control');
   const locked = await exported(tab);
-  check(locked.c1 !== opening.c1,
-    `the lock snaps C1 off ${opening.c1} (${locked.c1})`);
+  check(locked.c1 === opening.c1
+      && Math.abs(locked.domain - opening.domain) <= DOMAIN_READOUT_EPSILON,
+  `the lock leaves the already-closing default alone `
+    + `(C1 ${locked.c1}, domain ${locked.domain.toFixed(4)})`);
   requireClosed(locked, 'the lock');
   check(!await warned(), 'a locked curve raises no closure warning');
 
