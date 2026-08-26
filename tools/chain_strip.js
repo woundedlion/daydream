@@ -848,7 +848,10 @@ export function createChainStrip({
         readout.step = nudgeStep(declaration);
         readout.setAttribute('aria-label', `${name} value`);
         readout.addEventListener('change', (/** @type {*} */ event) => {
-          const typed = Number(event.target.value);
+          // A number input reports content it cannot parse as the empty string,
+          // which Number() reads as a finite 0 rather than as no value.
+          const raw = String(event.target.value ?? '').trim();
+          const typed = raw === '' ? Number.NaN : Number(raw);
           const current = Number(values[declaration.id]);
           const value = Number.isFinite(typed)
             ? Math.min(Number(slider.max), Math.max(Number(slider.min), typed))

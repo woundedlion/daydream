@@ -860,6 +860,24 @@ test('a numeric value can be typed directly and stays within its domain', async 
   assert.deepEqual(h.edits.at(-1), ['sample.pattern-freq', Number(slider.max)]);
 });
 
+// A browser's number input reports content it cannot parse as the empty
+// string, which is what the listener sees when an author types letters.
+test('an unparsable numeric entry restores the stored value', async () => {
+  const h = await makeStrip();
+  const row = rowFor(h, 'sample', 'sample.pattern-freq');
+  const slider = controlIn(row);
+  const value = row.querySelector('.chain-param-value');
+  const authored = value.value;
+  const position = slider.value;
+
+  value.value = '';
+  value.dispatch('change');
+
+  assert.equal(value.value, authored);
+  assert.equal(slider.value, position);
+  assert.deepEqual(h.edits, []);
+});
+
 test('an enum renders its declared values and edits by option id', async () => {
   const h = await makeStrip();
   chipByLabel(h, 'lens').dispatch('click');
