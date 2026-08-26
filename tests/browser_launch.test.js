@@ -59,3 +59,10 @@ test('the launch flags carry the runner a GPU-less rasterizer', () => {
     'a runner has no GPU, and every workbench page renders through WebGL');
   assert.ok(BROWSER_ARGS.includes('--enable-unsafe-swiftshader'));
 });
+
+test('the launch flags put the vendor CDN beyond every probe', () => {
+  assert.ok(BROWSER_ARGS.includes('--host-resolver-rules=MAP cdn.jsdelivr.net ~NOTFOUND'),
+    'the probes are served three.js and lil-gui from their own origin; a page '
+      + 'that reached jsdelivr instead would hand a CDN incident the power to '
+      + 'red the required gate');
+});

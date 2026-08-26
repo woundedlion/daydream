@@ -5,10 +5,14 @@
  *   node scripts/generate-importmap.mjs            # all-CDN (default, deploy-safe)
  *   node scripts/generate-importmap.mjs --local    # local where vendored, else CDN
  *   node scripts/generate-importmap.mjs --out F    # write to F instead of vendor-importmap.js
+ *   node scripts/generate-importmap.mjs --vendor-root D  # probe D for the vendored dirs
  *
  * `--local` checks the filesystem for the vendored library entry points and
  * sets each library to 'local' only when present, so a partial vendoring
- * (e.g. node_modules but no three.js/) still resolves correctly.
+ * (e.g. node_modules but no three.js/) still resolves correctly. `--vendor-root`
+ * aims those probes at a tree other than the repository, which is how
+ * scripts/vendor-stage.mjs bakes a map for the scratch site the browser probes
+ * are served out of.
  *
  * Only the GENERATED block in vendor-importmap.js is rewritten: the vendoring
  * decision, the version pins, and the Subresource Integrity hashes. The version
@@ -38,6 +42,12 @@ if (TARGET === undefined || TARGET.startsWith('--')) {
   console.error('generate-importmap: --out requires a path');
   process.exit(1);
 }
+const vendorIndex = process.argv.indexOf('--vendor-root');
+const VENDOR_ROOT = vendorIndex === -1 ? ROOT : process.argv[vendorIndex + 1];
+if (VENDOR_ROOT === undefined || VENDOR_ROOT.startsWith('--')) {
+  console.error('generate-importmap: --vendor-root requires a path');
+  process.exit(1);
+}
 
 const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
 const versions = {
@@ -63,7 +73,7 @@ const probes = {
 
 const vendor = {};
 for (const [lib, entry] of Object.entries(probes)) {
-  vendor[lib] = local && existsSync(resolve(ROOT, entry)) ? 'local' : 'cdn';
+  vendor[lib] = local && existsSync(resolve(VENDOR_ROOT, entry)) ? 'local' : 'cdn';
 }
 
 const fail = (msg) => { console.error(`generate-importmap: ${msg}`); process.exit(1); };

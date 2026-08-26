@@ -1,7 +1,8 @@
 /*
- * The static server scripts/browser-smoke.mjs loads its pages over: it
- * publishes exactly site_manifest.txt's set out of the repository, so the smoke
- * sees the layout deploy.yml stages rather than the whole tree.
+ * The static server the headless probes load their pages over: it publishes
+ * exactly the entries it is handed out of one directory, so the smoke sees the
+ * layout deploy.yml stages rather than the whole tree. scripts/vendor-stage.mjs
+ * points it at a scratch copy that vendors three.js and lil-gui.
  */
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
