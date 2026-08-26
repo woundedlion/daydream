@@ -296,33 +296,24 @@ async function probeMobilePanel(tab) {
 }
 
 /**
- * Which scroll arrows the sidebar currently shows.
+ * Move the sidebar to one edge and wait through its queued arrow refresh.
  * @param {import('puppeteer-core').Page} tab - The page under probe.
- * @returns {Promise<{left: boolean, right: boolean}>} Arrow visibility.
+ * @param {'start'|'end'} edge - Horizontal edge to reach.
+ * @returns {Promise<{left: boolean, right: boolean, offset: number, limit: number}>}
+ *   Arrow visibility and scroll geometry after the refresh.
  */
-const readArrows = (tab) => tab.evaluate((left, right) => ({
-  left: document.querySelector(left).classList.contains('visible'),
-  right: document.querySelector(right).classList.contains('visible'),
-}), ARROW_LEFT, ARROW_RIGHT);
-
-/**
- * Poll the arrows until they reach `want`, then report where they stopped: the
- * refresh is one rAF behind the scroll event, and a miss has to name the state
- * it settled at rather than stall on a wait.
- * @param {import('puppeteer-core').Page} tab - The page under probe.
- * @param {{left: boolean, right: boolean}} want - The expected visibility.
- * @returns {Promise<{left: boolean, right: boolean}>} The settled visibility.
- */
-async function settledArrows(tab, want) {
-  let state = await readArrows(tab);
-  for (let tries = 0;
-    tries < 40 && (state.left !== want.left || state.right !== want.right);
-    tries++) {
-    await new Promise((resolve) => setTimeout(resolve, 25));
-    state = await readArrows(tab);
-  }
-  return state;
-}
+const scrollToEdge = (tab, edge) => tab.$eval(LIST,
+  (list, targetEdge, leftSelector, rightSelector) => new Promise((resolve) => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    const limit = list.scrollWidth - list.clientWidth;
+    list.scrollTo({ left: targetEdge === 'start' ? 0 : limit, behavior: 'instant' });
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve({
+      left: document.querySelector(leftSelector).classList.contains('visible'),
+      right: document.querySelector(rightSelector).classList.contains('visible'),
+      offset: list.scrollLeft,
+      limit,
+    })));
+  }), edge, ARROW_LEFT, ARROW_RIGHT);
 
 /**
  * The sidebar's two layout-derived reads under the mobile column-flow grid.
@@ -384,18 +375,15 @@ async function probeSidebar(tab) {
     `the focus ring clears the clip (${ring.above}px above, ${ring.below}px `
       + `below, ${RING_CLEARANCE}px needed)`);
 
-  // Focusing an option in a clipped column scrolls it into view, so the arrow
-  // checks re-seat the offset rather than assuming it survived.
-  await tab.$eval(LIST, (list) => { list.scrollLeft = 0; });
-  const atStart = await settledArrows(tab, { left: false, right: true });
+  const atStart = await scrollToEdge(tab, 'start');
   check(!atStart.left && atStart.right,
     `at the start only the right arrow shows (left ${atStart.left}, `
-      + `right ${atStart.right})`);
+      + `right ${atStart.right}, offset ${atStart.offset}/${atStart.limit})`);
 
-  await tab.$eval(LIST, (list) => { list.scrollLeft = list.scrollWidth; });
-  const atEnd = await settledArrows(tab, { left: true, right: false });
+  const atEnd = await scrollToEdge(tab, 'end');
   check(atEnd.left && !atEnd.right,
-    `at the end only the left arrow shows (left ${atEnd.left}, right ${atEnd.right})`);
+    `at the end only the left arrow shows (left ${atEnd.left}, `
+      + `right ${atEnd.right}, offset ${atEnd.offset}/${atEnd.limit})`);
 
   return failures;
 }
