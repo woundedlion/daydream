@@ -705,6 +705,9 @@ function deliverFrame(controller, segId, overrides = {}) {
       presetCount: overrides.presetCount ?? null,
       presetIndex: overrides.presetIndex ?? null,
       fullFrame: overrides.fullFrame ?? false,
+      // Left undefined unless a case supplies one: a worker that reports no
+      // divergence omits the field entirely.
+      warnings: overrides.warnings,
     },
   });
 }
@@ -806,6 +809,34 @@ test('the clip disposition each worker reports is published per segment', async 
   c.renderParallel();
   assert.deepEqual(c.fullFrames, [false, false],
     'a segment that goes silent must not keep a prior generation flag');
+});
+
+/**
+ * A worker whose engine refuses a parameter or a preset renders a configuration
+ * its peers do not, and console.error on a worker thread reaches no one; the
+ * frame's notices are the pool's only channel for it.
+ */
+test('the divergence notices each worker reports are published per segment', async () => {
+  const c = makeController();
+  c.create(2);
+  const done = c.renderParallel();
+  assert.deepEqual(c.warnings, [null, null], 'a dispatch starts every segment clean');
+
+  deliverFrame(c, 0, { x0: 0, x1: 2, y0: 0, y1: 2 });
+  deliverFrame(c, 1, { x0: 2, x1: 4, y0: 0, y1: 2, warnings: ['Ghost refused'] });
+  assert.deepEqual(c.warnings, [null, ['Ghost refused']]);
+  await done;
+
+  /** @type {Object|null} */
+  let painted = null;
+  c.statsView.update = (state) => { painted = state; };
+  c.updateStats();
+  assert.deepEqual(painted?.warnings, [null, ['Ghost refused']],
+    'the overlay payload carries them');
+
+  c.renderParallel();
+  assert.deepEqual(c.warnings, [null, null],
+    'a segment that goes silent must not keep a prior generation notice');
 });
 
 test('a frame dispatched before a resolution change is dropped but still settles', async () => {

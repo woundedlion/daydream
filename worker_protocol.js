@@ -172,6 +172,13 @@ export const PROTOCOL_VERSION = 9;
  * the effect's param list) so the GUI can track rendered changes the
  * un-stepped main engine cannot supply; null on every other segment.
  *
+ * `warnings` carries the divergence notices standing on this worker since its
+ * last effect install — a setParameter or preset the engine refused, leaving the
+ * segment rendering a configuration its peers do not. The whole standing set is
+ * re-sent every frame so the overlay's marker lasts as long as the divergence,
+ * and the field is omitted while there is none. Optional in both directions, so
+ * it is not a version-breaking field.
+ *
  * `fullFrame` is the disposition of the worker's last setClip: false when the
  * band was installed (`APPLIED`) and the engine shaded only the rectangle, true
  * when the effect reports `needs_full_frame()` (`FULL_FRAME_KEPT`) and the
@@ -187,6 +194,7 @@ export const PROTOCOL_VERSION = 9;
  *   paramRevision: number, presetCount: number | null,
  *   presetIndex: number | null,
  *   fullFrame: boolean,
+ *   warnings?: string[]|undefined,
  * }} FrameMsg
  */
 

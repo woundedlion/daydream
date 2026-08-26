@@ -163,6 +163,41 @@ test('a worker that shaded the whole canvas is not reported as a band render', (
   assert.equal(cell(2, 'Range').textContent, 'x[10–19] y[101–201]');
 });
 
+test('a segment whose engine refused a write is marked with its notices', () => {
+  const { doc, stats } = makeDoc();
+  const view = new SegmentStatsView(doc);
+  const state = readyState(2);
+  state.warnings = [null, ['setParameter(Ghost) rejected: UNKNOWN_PARAM',
+    'selectPreset(9) rejected: 3 presets, still on 0']];
+  view.update(state);
+
+  const { cell } = grid(stats);
+  assert.equal(cell(1, '').textContent, 'Seg 0');
+  assert.equal(cell(1, '').className, 'seg-label');
+  assert.equal(cell(2, '').textContent, 'Seg 1 ⚠');
+  assert.equal(cell(2, '').className, 'seg-label seg-diverged');
+  assert.equal(cell(2, '').title,
+    'setParameter(Ghost) rejected: UNKNOWN_PARAM; '
+    + 'selectPreset(9) rejected: 3 presets, still on 0');
+
+  state.warnings = [null, null];
+  view.update(state);
+  assert.equal(cell(2, '').textContent, 'Seg 1', 'a reconverged segment loses the mark');
+  assert.equal(cell(2, '').className, 'seg-label');
+  assert.equal(cell(2, '').title, '');
+});
+
+// A worker sending no warnings field at all is the ordinary case and the
+// backward-compatible one.
+test('a state carrying no warnings marks nothing', () => {
+  const { doc, stats } = makeDoc();
+  new SegmentStatsView(doc).update(readyState(2));
+
+  const { cell } = grid(stats);
+  assert.equal(cell(1, '').textContent, 'Seg 0');
+  assert.equal(cell(2, '').className, 'seg-label');
+});
+
 test('max time covers the live segments only, ignoring a stale tail entry', () => {
   const { doc, stats } = makeDoc();
   const state = readyState(2);
