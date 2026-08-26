@@ -9,7 +9,18 @@
 import { formatFloatCpp } from './cpp_format.js';
 
 const TWO_PI = 2 * Math.PI;
+
+/**
+ * The largest denominator the ratio search admits, and its default numerator
+ * cap. The closing period is 2π·N/passiveC, so the denominator is what the
+ * Domain control's range budgets.
+ * @type {number}
+ */
 export const MAX_RATIONAL_TERM = 8;
+
+// Numerators the range-bounded search will walk, so a control range far wider
+// than the passive frequency cannot spin the grid unboundedly.
+const MAX_SEARCH_NUMERATOR = 1024;
 
 /**
  * Greatest common divisor of two non-negative integers (Euclid). Used to reduce
@@ -19,6 +30,25 @@ export const MAX_RATIONAL_TERM = 8;
  * @returns {number} gcd(a, b); gcd(0, 0) is 0.
  */
 const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
+
+/**
+ * The reduced ratio of a pair that already closes: the smallest denominator in
+ * [1, maxTerm] whose multiple of the ratio is a whole number of active turns.
+ * @param {number} ratio - Active over passive frequency.
+ * @param {number} maxTerm - Largest denominator to try.
+ * @param {number} [tol] - Relative tolerance on the whole-number test.
+ * @returns {?{ M: number, N: number }} The reduced ratio, or null when the pair
+ *   closes at no denominator this small.
+ */
+const closingRatio = (ratio, maxTerm, tol = 1e-9) => {
+  for (let N = 1; N <= maxTerm; N++) {
+    const M = Math.round(ratio * N);
+    if (Math.abs(ratio * N - M) > tol * Math.max(1, Math.abs(M))) continue;
+    const g = gcd(Math.abs(M), N);
+    return { M: M / g, N: N / g };
+  }
+  return null;
+};
 
 /**
  * The spherical Lissajous parametric curve (on the unit sphere, R = 1).
@@ -45,15 +75,18 @@ export const lissajous = (m1, m2, a, t) => {
  * A negative target returns a negative numerator (sign carried on M, N stays
  * positive); the search grid itself is positive, so the sign is split off first.
  * @param {number} value - The ratio to approximate (e.g., C1/C2), may be negative.
- * @param {number} [maxTerm] - Maximum value for both the numerator and the
- *   denominator (the search grid is square: M, N each range over [1, maxTerm]).
+ * @param {number} [maxTerm] - Maximum denominator, and the default maximum
+ *   numerator (the search grid is then square: M, N each range over [1, maxTerm]).
  * @param {((value: number) => boolean)|null} [accept] - Optional test on the signed
  *   candidate ratio. Candidates it rejects rank behind every accepted one, so a
  *   ratio it admits always wins and an empty admissible set still returns the
  *   closest fraction.
+ * @param {number} [maxNumerator] - Maximum numerator, when the reachable
+ *   ratios run past the denominator cap.
  * @returns {{ M: number, N: number }} The best simple rational ratio.
  */
-export const findBestRationalRatio = (value, maxTerm = MAX_RATIONAL_TERM, accept = null) => {
+export const findBestRationalRatio = (value, maxTerm = MAX_RATIONAL_TERM, accept = null,
+  maxNumerator = maxTerm) => {
   if (value === 0) return { M: 0, N: 1 };
 
   const sign = value < 0 ? -1 : 1;
@@ -65,7 +98,7 @@ export const findBestRationalRatio = (value, maxTerm = MAX_RATIONAL_TERM, accept
   let minDiff = Infinity;
 
   for (let N = 1; N <= maxTerm; N++) {
-    for (let M = 1; M <= maxTerm; M++) {
+    for (let M = 1; M <= maxNumerator; M++) {
       const ratio = M / N;
       const accepted = !accept || accept(sign * ratio);
       const diff = Math.abs(absValue - ratio);
@@ -107,11 +140,25 @@ export const snapToRationalRatio = (activeC, passiveC, maxTerm = MAX_RATIONAL_TE
   }
 
   const targetRatio = activeC / passiveC;
+  // A pair that already closes within the denominator budget is left exactly
+  // where it was authored; re-snapping it would move a closed curve off its
+  // own ratio.
+  const closing = closingRatio(targetRatio, maxTerm);
+  if (closing !== null) {
+    return { snappedActiveC: activeC, m: closing.M, n: closing.N,
+      closingPeriod: (TWO_PI * closing.N) / passiveC };
+  }
+
   /** @type {((ratio: number) => boolean)|null} */
   const inRange = range
     ? (ratio) => passiveC * ratio >= range.min && passiveC * ratio <= range.max
     : null;
-  const { M, N } = findBestRationalRatio(targetRatio, maxTerm, inRange);
+  // The range reaches ratios the denominator cap alone excludes: a control
+  // running to 100 over a passive 5 holds every M/N up to 20·maxTerm.
+  const reachable = range
+    ? Math.ceil((Math.abs(range.max) / Math.abs(passiveC)) * maxTerm) : maxTerm;
+  const maxNumerator = Math.min(MAX_SEARCH_NUMERATOR, Math.max(maxTerm, reachable));
+  const { M, N } = findBestRationalRatio(targetRatio, maxTerm, inRange, maxNumerator);
 
   const snappedActiveC = passiveC * (M / N);
 
