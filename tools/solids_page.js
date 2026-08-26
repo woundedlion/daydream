@@ -904,6 +904,9 @@ const DRAG_SLOP_PX = 4;
  * @param {number} index - The op's position in the chain.
  * @param {HTMLElement} el - The row element.
  * @param {HTMLElement} list - The #opsList container.
+ * @param {number} revision - opsRevision this row was rendered against; the
+ *   queued commit drops the drag when the list has changed since, because
+ *   `index` then names a different op.
  * @returns {void}
  */
 function wireRowDrag(grip, index, el, list, revision) {

@@ -23,7 +23,9 @@
  *
  * @param {number|boolean} current - The controller's current value
  *   (c.getValue()); a boolean for a toggle, a number for a slider.
- * @param {number} incoming - The engine's raw numeric value for this parameter.
+ * @param {*} incoming - The engine's latest value for this parameter: a raw
+ *   float from the value stream, or an enum selector's requested value.
+ *   Compared and returned unchanged unless isBoolean thresholds it.
  * @param {boolean} isBoolean - Whether the controller is a boolean toggle (the
  *   engine streams bools as 0/1 floats, thresholded at 0.5).
  * @param {boolean} isEditing - Whether the user is actively editing this
@@ -70,8 +72,11 @@ export function engineParamValue(value) {
 }
 
 /**
+ * The state an interactive selector must display: the latest requested value
+ * when the definition carries one, otherwise the renderer-owned value. `??`
+ * rather than `||` because 0 is a valid enum index.
  * @param {{value: *, requestedValue?: *}} parameter - Engine parameter definition.
- * @returns {*} The state an interactive selector must display.
+ * @returns {*} The value to display.
  */
 export function selectorControlValue(parameter) {
   return parameter.requestedValue ?? parameter.value;

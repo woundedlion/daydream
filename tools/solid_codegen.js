@@ -76,7 +76,7 @@ import { engineHalted } from './engine_halt.js';
  */
 
 /**
- * Mirror of solid_generators.h `static constexpr float D2R = PI_F / 180.0f`
+ * Mirror of solid_generators.h `inline constexpr float D2R = PI_F / 180.0f`
  * with PI_F = float(PI). The preview and the emitted C++ both convert a hankin
  * angle through it, so the preview must round the product to float32 the way
  * the engine's float multiply does — at 54 and 73 degrees a double PI/180
