@@ -41,7 +41,10 @@ export const terminalJobNeeds = (source, terminal) => {
     const value = tail.startsWith('[') && tail.endsWith(']')
       ? tail.slice(1, -1)
       : tail;
-    return value.split(',').map((job) => job.trim()).filter(Boolean);
+    // A flow list may quote its entries; unquoted job ids read the same either way.
+    return value.split(',')
+      .map((job) => job.trim().replace(/^["'](.*)["']$/, '$1').trim())
+      .filter(Boolean);
   }
 
   const needs = [];
