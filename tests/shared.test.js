@@ -32,7 +32,8 @@ register('./three_loader_hooks.js', import.meta.url, {
   data: { fakeThreeUrl: import.meta.resolve('./fake_three.js') },
 });
 
-const { capPixelRatio, getCssColor, initScene } = await import('../tools/shared.js');
+const shared = await import('../tools/shared.js');
+const { capPixelRatio, getCssColor, initScene } = shared;
 
 const RAF_ID = 7;
 
@@ -101,6 +102,24 @@ function mountScene(opts = {}) {
     ...initScene('viewport', 'gl', opts),
   };
 }
+
+// A scene page reaches these through shared.js rather than their own modules,
+// so a re-export that stopped tracking its source would ship a stale function
+// no source module's test could see.
+test('the re-exports are the functions their source modules export', async () => {
+  const sources = {
+    './clipboard.js': ['copyToClipboard', 'copyWithFeedback', 'COPY_FEEDBACK', 'wireCopyBlock'],
+    './cpp_format.js': ['formatFloatCpp'],
+    './kb_format.js': ['formatKB'],
+    './banner.js': ['showFatalError', 'bootstrapTool', 'reportPageFailures'],
+  };
+  for (const [specifier, names] of Object.entries(sources)) {
+    const module = await import(new URL(specifier, import.meta.resolve('../tools/shared.js')));
+    for (const name of names) {
+      assert.equal(shared[name], module[name], `shared.${name}`);
+    }
+  }
+});
 
 test('capPixelRatio preserves low-density displays and caps high-density displays', () => {
   assert.equal(capPixelRatio(0.75), 0.75);
