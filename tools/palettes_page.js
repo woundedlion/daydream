@@ -55,7 +55,7 @@ import {
 import { standDownIfHalted } from './engine_halt.js';
 import { wireFlyout } from './flyout.js';
 import { createFrameScheduler, onPageTeardown } from './page_lifecycle.js';
-import { createPointerDrag } from './pointer_drag.js';
+import { createPointerDrag, innerRect } from './pointer_drag.js';
 
 // --- Palette Class and Data Structure ---
 
@@ -235,7 +235,7 @@ function syncHueKeyHandles(degrees) {
 
 function wheelPointerPosition(event) {
   return canvasPoint(event.clientX, event.clientY,
-    hueKeyWheelCanvas.getBoundingClientRect(),
+    innerRect(hueKeyWheelCanvas),
     hueKeyWheelCanvas.width, hueKeyWheelCanvas.height);
 }
 
@@ -727,7 +727,7 @@ function updateAllSliders() {
  */
 function getNormalizedX(event) {
   if (!colorStripCanvas) return 0; // Safety check
-  const rect = colorStripCanvas.getBoundingClientRect();
+  const rect = innerRect(colorStripCanvas);
   const x = event.clientX - rect.left;
   return rect.width > 0 ? Math.max(0, Math.min(1, x / rect.width)) : 0;
 }

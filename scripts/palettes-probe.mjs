@@ -13,7 +13,7 @@
  * wheel marker and requires the key it gripped to take the hue under the
  * pointer.
  */
-import { boxOf, centre, checks, dragBetween, runProbe } from './probe_harness.mjs';
+import { centre, checks, dragBetween, paddingBoxOf, runProbe } from './probe_harness.mjs';
 
 const PAGE = 'tools/palettes.html';
 const VIEWPORT = { width: 1280, height: 900 };
@@ -75,7 +75,9 @@ async function probeColorStrip(tab) {
   const { failures, check } = checks();
 
   await tab.$eval(STRIP, (node) => node.scrollIntoView({ block: 'center' }));
-  const box = await boxOf(tab, STRIP);
+  // The gradient fills the canvas' padding box, inside the border its bounding
+  // rect carries, so the positions the page reports are fractions of that box.
+  const box = await paddingBoxOf(tab, STRIP);
   check(box.width > 0 && box.height > 0,
     `the strip lays out ${Math.round(box.width)}x${Math.round(box.height)}`);
 
@@ -113,6 +115,14 @@ async function probeColorStrip(tab) {
   check(reset.start === 0 && reset.end === 1,
     `resetting the zoom restores the whole palette (${reset.start}, ${reset.end})`);
 
+  // The palette's own first column: a pointer scaled by the bordered rect stops
+  // a border width short of it and phase 0 is unreachable.
+  await dragBetween(tab, at(0), at(0.5), { steps: DRAG_STEPS });
+  const fromEdge = await headingRange(tab);
+  check(fromEdge.start === 0,
+    `a drag from the strip's leading edge reaches phase 0 (${fromEdge.start})`);
+  await tab.$eval(RESET, (node) => node.click());
+
   // The bound only a real layout carries: a pointer that leaves the strip
   // vertically abandons the selection, and the capture keeps delivering the
   // moves that say so.
@@ -147,7 +157,9 @@ async function probeHueWheel(tab) {
   check(opening.length >= 2, `the wheel publishes ${opening.length} hue keys`);
 
   await tab.$eval(WHEEL, (node) => node.scrollIntoView({ block: 'center' }));
-  const box = await boxOf(tab, WHEEL);
+  // The wheel is drawn in its padding box too, so a marker's canvas point maps
+  // back through that box rather than the bordered one.
+  const box = await paddingBoxOf(tab, WHEEL);
 
   // Grip where the page drew, by asking the wheel's own marker geometry rather
   // than a copy of the formula.

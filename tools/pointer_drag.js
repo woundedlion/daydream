@@ -16,6 +16,27 @@
  */
 
 /**
+ * An element's padding box in viewport coordinates — its content box wherever it
+ * carries no padding.
+ *
+ * getBoundingClientRect() reports the border box, but a canvas' bitmap and an
+ * absolutely positioned child's percentages both start inside the border, so a
+ * pointer normalized against the rect on a bordered element lands one border
+ * width off and never reaches either end.
+ * @param {HTMLElement} element - Element the pointer is over.
+ * @returns {{left: number, top: number, width: number, height: number}} The box.
+ */
+export function innerRect(element) {
+  const rect = element.getBoundingClientRect();
+  return {
+    left: rect.left + element.clientLeft,
+    top: rect.top + element.clientTop,
+    width: element.clientWidth,
+    height: element.clientHeight,
+  };
+}
+
+/**
  * Wires the drag. The opening pointerdown is the primary button's alone, and
  * only while no drag is running; once accepted, the pointer is captured, the
  * pointerdown's default action is suppressed, and every later event is filtered
