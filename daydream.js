@@ -627,6 +627,12 @@ export function start({
   };
   doc.addEventListener('click', onApplyNoticeDismiss);
 
+  // Assigned by the teardown wiring at the end of start(), which runs before the
+  // WASM load it kicks off. Declared above its readers rather than beside that
+  // wiring: a read before the assignment then reads null instead of throwing
+  // out of the temporal dead zone.
+  let appTeardown = null;
+
   /**
    * Release the app when a caught failure came from a trapped module. HS_CHECK
    * sets HS_MODULE_DEAD ahead of a trap that unwinds nothing, so every later
@@ -694,10 +700,6 @@ export function start({
     setEffect: (name) => appState.set('effect', name),
     engineReady: () => Boolean(host.engine),
   });
-
-  // Assigned by the teardown wiring at the end of this module, which runs before
-  // the WASM load below it is kicked off.
-  let appTeardown = null;
 
   const moduleLoad = createModuleLoadHandlers({
     teardown: () => appTeardown,
