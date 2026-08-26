@@ -29,13 +29,18 @@ export const BROWSER_CANDIDATES = [
 ];
 
 // Software rasterization because a runner has no GPU and every workbench page
-// renders through WebGL.
+// renders through WebGL. The probes are served scripts/vendor-stage.mjs's tree,
+// where three.js and lil-gui resolve out of node_modules, so nothing they load
+// has any business reaching jsdelivr: the resolver rule turns a page that
+// regressed to the CDN into a failed request rather than a green run that a CDN
+// incident could red.
 export const BROWSER_ARGS = [
   '--no-sandbox',
   '--disable-dev-shm-usage',
   '--use-gl=angle',
   '--use-angle=swiftshader',
   '--enable-unsafe-swiftshader',
+  '--host-resolver-rules=MAP cdn.jsdelivr.net ~NOTFOUND',
 ];
 
 /**

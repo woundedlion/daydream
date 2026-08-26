@@ -9,9 +9,9 @@
  */
 import puppeteer from 'puppeteer-core';
 
-import { manifestEntries, servedPages } from '../tests/site_pages.js';
+import { servedPages } from '../tests/site_pages.js';
 import { BROWSER_ARGS, resolveBrowser } from './browser.mjs';
-import { serveManifest } from './serve-manifest.mjs';
+import { serveStagedSite } from './vendor-stage.mjs';
 
 const VIEWPORT = { width: 1280, height: 900 };
 const LOAD_TIMEOUT_MS = 90_000;
@@ -241,7 +241,7 @@ try {
 
 console.log(`browser-smoke: ${pages.length} pages, ${executablePath}`);
 
-const site = await serveManifest(manifestEntries());
+const site = await serveStagedSite();
 const browser = await puppeteer.launch({
   executablePath,
   headless: true,

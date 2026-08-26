@@ -16,9 +16,8 @@
  */
 import puppeteer from 'puppeteer-core';
 
-import { manifestEntries } from '../tests/site_pages.js';
 import { BROWSER_ARGS, resolveBrowser } from './browser.mjs';
-import { serveManifest } from './serve-manifest.mjs';
+import { serveStagedSite } from './vendor-stage.mjs';
 
 const PAGE = 'tools/lissajous.html';
 // Somewhere else on the origin to leave for, carrying no script of its own.
@@ -271,7 +270,7 @@ try {
 }
 
 console.log(`lissajous-probe: ${PAGE}, ${executablePath}`);
-const site = await serveManifest(manifestEntries());
+const site = await serveStagedSite();
 const browser = await puppeteer.launch({
   executablePath,
   headless: true,
