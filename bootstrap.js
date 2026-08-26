@@ -19,6 +19,21 @@ export const STALE_MODULE_REMEDY = 'A page module did not link against the rest 
   + 'of the deploy — usually a stale copy left in the browser cache. Reload '
   + 're-fetches the whole module graph.';
 
+/**
+ * A module-evaluation guard's report that the graph is mixing generations —
+ * a cached module against a newer deploy, which links but no longer agrees.
+ * The engines raise the same skew as a SyntaxError only when the mismatch is
+ * an export name, so a guard that reads a version has to say so itself for the
+ * boot failure to reach the stale-cache remedy.
+ */
+export class StaleModuleError extends Error {
+  /** @param {string} message - What did not agree, and what repairs it. */
+  constructor(message) {
+    super(message);
+    this.name = 'StaleModuleError';
+  }
+}
+
 // A module the browser could not fetch at all, across the three engines'
 // wordings. Chrome reports the entry module's URL rather than the one that
 // actually failed, so a blocked CDN and a missing same-origin module are the
@@ -165,12 +180,14 @@ export function refreshWithDeadline(refresh, {
  * @param {unknown} error Boot failure.
  * @returns {string} Remedy text, empty when no advice fits the cause.
  * @details A fetch failure may be the CDN-hosted vendor libraries; a link or
- *   parse failure is a cached module against a newer deploy. Everything else
+ *   parse failure, and a version guard that raised StaleModuleError, are a
+ *   cached module against a newer deploy. Everything else
  *   — the engine, the initial apply — failed past a module graph that had
  *   already loaded, and neither remedy applies.
  */
 export function bootRemedy(error) {
   const detail = errorDetail(error);
+  if (error instanceof StaleModuleError) return STALE_MODULE_REMEDY;
   if (detail.startsWith('SyntaxError')) return STALE_MODULE_REMEDY;
   if (MODULE_FETCH_FAILURE.test(detail)) return VENDOR_REMEDY;
   return '';

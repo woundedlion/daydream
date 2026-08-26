@@ -46,7 +46,7 @@ import {
 import { pageWarmer } from "./module_warmer.js";
 import { EngineHost } from "./engine_host.js";
 import { errorDetail, reportPageFailures, showFatalError } from "./tools/banner.js";
-import { reportBootFailure } from "./bootstrap.js";
+import { reportBootFailure, StaleModuleError } from "./bootstrap.js";
 import { enumConstantName } from "./param_sync.js";
 import { copyToClipboard } from "./tools/copy_text.js";
 import { importLegacyShaderSelection, LEGACY_SHADER_ALIAS } from "./legacy_shader_import.js";
@@ -75,7 +75,8 @@ export const WORKBENCH_EFFECTS = Object.freeze([
 ]);
 
 if (SEGMENT_CONTROLLER_API_VERSION !== EXPECTED_SEGMENT_CONTROLLER_API_VERSION) {
-  throw new Error('Cached segment_controller.js is incompatible; reload the simulator.');
+  throw new StaleModuleError(
+    'Cached segment_controller.js is incompatible; reload the simulator.');
 }
 
 const HiResFavorites = [

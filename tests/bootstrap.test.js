@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   bootstrap, refreshModuleCache, refreshWithDeadline, showBootstrapFailure,
-  STALE_MODULE_REMEDY, VENDOR_REMEDY,
+  StaleModuleError, STALE_MODULE_REMEDY, VENDOR_REMEDY,
 } from '../bootstrap.js';
 import { fakeElement } from './fake_dom.js';
 
@@ -116,6 +116,20 @@ test('a module that failed to link gets the stale-cache remedy', () => {
   assert.equal(childWithClass(overlay, 'load-error-remedy').textContent,
     STALE_MODULE_REMEDY,
     'a deploy-skew failure is sent to the cache remedy, not the CDN one');
+});
+
+test('a version guard that tripped gets the stale-cache remedy', () => {
+  const { doc, overlay } = fakeDocument();
+
+  showBootstrapFailure(
+    new StaleModuleError(
+      'Cached segment_controller.js is incompatible; reload the simulator.'),
+    { document: doc });
+
+  assert.equal(childWithClass(overlay, 'load-error-remedy').textContent,
+    STALE_MODULE_REMEDY,
+    'a guard that reads a version number raises no SyntaxError, so without a '
+    + 'type of its own the one failure the sweep repairs is offered no remedy');
 });
 
 test('a failure past the module graph carries no remedy', () => {

@@ -503,10 +503,15 @@ test('the page-failure surface is the shared one, and it is torn down', () => {
 });
 
 test('the composition root rejects a stale segmented-controller module', () => {
-  assert.match(SOURCE,
-    /SEGMENT_CONTROLLER_API_VERSION !== EXPECTED_SEGMENT_CONTROLLER_API_VERSION/,
+  const at = SOURCE.indexOf(
+    'SEGMENT_CONTROLLER_API_VERSION !== EXPECTED_SEGMENT_CONTROLLER_API_VERSION');
+  assert.ok(at > 0,
     'a controller from a different API generation must fail at module '
     + 'evaluation, before there is an app for a case to drive');
+  assert.match(sliceTo(at, '\n}'), /throw new StaleModuleError\(/,
+    'the guard is the stale-cache case the boot overlay carries a remedy for: '
+    + 'a plain Error reads as a failure past the module graph and is offered '
+    + 'none (tests/bootstrap.test.js pins the classification)');
 });
 
 test('a parameter write does not clear a rejected switch', async () => {
