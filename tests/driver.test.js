@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import {
   Daydream, dotDetailFor, fitDistance, initialAspect, MOBILE_BREAKPOINT_PX,
 } from '../driver.js';
-import { repointDisplayAliases } from '../app_lifecycle.js';
+import { repointDisplayAliases } from '../display_aliases.js';
 import { captureConsole } from './fake_console.js';
 import { fakeElement } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';

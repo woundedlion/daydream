@@ -21,21 +21,19 @@ import { createEffectGui } from "./effect_gui.js";
 import { isShaderBallSchema } from "./shader_stages.js";
 import {
   createAppTeardown,
-  createApplyNotice,
   createFrameLoopGuard,
   createGlobalKeydownHandler,
   createModuleLoadHandlers,
-  createPoleLodBinding,
-  createRecordingSettings,
   createRenderAdapter,
-  createSegmentSpawnGuard,
-  createSegmentedFallback,
   createTestAllTicker,
-  displayAliasesDiverged,
   loadWithDeadline,
   MODULE_TRAP_NOTICE,
-  repointDisplayAliases,
 } from "./app_lifecycle.js";
+import { createApplyNotice } from "./apply_notice.js";
+import { displayAliasesDiverged, repointDisplayAliases } from "./display_aliases.js";
+import { createPoleLodBinding } from "./pole_lod.js";
+import { createRecordingSettings } from "./recording_settings.js";
+import { createSegmentSpawnGuard, createSegmentedFallback } from "./segment_policy.js";
 import { AppState, URLSync, replaceUrl } from "./state.js";
 import { VideoRecorder } from "./recorder.js";
 import {
