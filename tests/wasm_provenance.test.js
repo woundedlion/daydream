@@ -2,8 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+import {
+  BAKED_CONSTANT_IDS, bakedTopologyFields, engineParameterNames,
+} from '../tools/shader_documents.js';
 import { MORPH_SWEEP } from '../tools/solid_codegen.js';
 
 const text = (path) => readFileSync(path, 'utf8');
@@ -62,6 +65,53 @@ test('the committed shader modules match engine HEAD byte for byte', { skip: eng
     );
   }
 });
+
+// One id per alias branch, so the comparison keeps covering the table when the
+// committed documents stop exercising a branch.
+const ALIAS_PROBES = [
+  'bare-id', 'warp1.rotation-rate', 'warp2.radial-scale', 'warp1.cell-x',
+  'warp2.field-angle', 'warp1.unaliased-field', 'surface.scale', 'camera.wander',
+  'sample.angle-speed', 'lens.symmetry',
+];
+
+const controlNameCorpus = () => {
+  const ids = new Set(ALIAS_PROBES);
+  for (const name of readdirSync('shader/patterns')) {
+    if (!name.endsWith('.shader.json')) continue;
+    for (const parameter of JSON.parse(text(`shader/patterns/${name}`))
+      .descriptor?.parameters ?? []) ids.add(parameter.id);
+  }
+  return [...ids].sort();
+};
+
+// tools/shader_documents.js re-implements the engine's promoted-binding
+// predicates for the browser: the live topology field, the baked topology set,
+// the baked-constant exemption and the control-name alias table. That module is
+// not installed here, so the two are pinned by behaviour rather than by bytes.
+test('the browser promoted-binding predicates agree with engine HEAD',
+  { skip: engineSkip }, async () => {
+    assert.ok(engineRoot, engineMissing);
+    const predicates = await import('data:text/javascript;base64,'
+      + committed(engineRoot, 'scripts/wasm_smoke_predicates.mjs').toString('base64'));
+    const catalog = JSON.parse(text('shader/engine_catalog.json'));
+    assert.deepEqual(
+      [...bakedTopologyFields(catalog)].sort(),
+      [...predicates.bakedTopologyFields(catalog)].sort(),
+      'the baked topology fields drifted from engine HEAD',
+    );
+    assert.deepEqual(
+      [...BAKED_CONSTANT_IDS].sort(),
+      [...predicates.BAKED_CONSTANT_IDS].sort(),
+      'the baked-constant exemption drifted from engine HEAD',
+    );
+    for (const parameterId of controlNameCorpus()) {
+      assert.deepEqual(
+        engineParameterNames(parameterId),
+        predicates.engineControlNames(parameterId),
+        `the control names for "${parameterId}" drifted from engine HEAD`,
+      );
+    }
+  });
 
 test('MORPH_SWEEP matches the engine morphability constants', { skip: engineSkip }, () => {
   assert.ok(engineRoot, engineMissing);
