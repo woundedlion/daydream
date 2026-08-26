@@ -154,6 +154,9 @@ test('MORPH_SWEEP matches the engine morphability constants', { skip: engineSkip
 test('deploy consumes one checksummed engine bundle at the module pin', () => {
   const workflow = text('.github/workflows/deploy.yml');
   assert.match(workflow, /holosphere-engine-\$PIN/);
+  assert.match(workflow, /head_sha=\$PIN&branch=master&per_page=10/);
+  assert.match(workflow,
+    /select\(\.event == "push" or \.event == "workflow_dispatch"\)/);
   assert.match(workflow, /sha256sum -c holosphere_engine\.sha256/);
   assert.match(workflow, /cmp -s "engine-bundle\/\$path" "\$path"/);
   assert.doesNotMatch(workflow, /cmake --build|path: engine/);
