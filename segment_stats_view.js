@@ -48,6 +48,7 @@ const STAT_BAR_IDS = ['global-stats-desktop', 'stats-bar'];
  *   timings: number[],
  *   arenas: Array<import('./worker_protocol.js').SegArenaMetrics | null>,
  *   fullFrames: boolean[],
+ *   warnings?: Array<string[] | null>,
  *   frameSeen: boolean[],
  *   wallTime: number,
  * }} SegmentStatsState
@@ -56,6 +57,7 @@ const STAT_BAR_IDS = ['global-stats-desktop', 'stats-bar'];
 /**
  * The cells one segment's row repaint writes.
  * @typedef {{
+ *   label: HTMLTableCellElement,
  *   range: HTMLTableCellElement,
  *   compute: HTMLTableCellElement,
  *   scrA: HTMLTableCellElement,
@@ -231,6 +233,16 @@ export class SegmentStatsView {
       if (timing > maxTime) maxTime = timing;
       const c = cells.rows[s];
 
+      // A segment whose engine refused a parameter or a preset renders a
+      // configuration its peers do not; the row carries the notices verbatim.
+      const warnings = state.warnings?.[s];
+      const diverged = Array.isArray(warnings) && warnings.length > 0;
+      setText(c.label, diverged ? `Seg ${s} ⚠` : `Seg ${s}`);
+      const labelClass = diverged ? 'seg-label seg-diverged' : 'seg-label';
+      if (c.label.className !== labelClass) c.label.className = labelClass;
+      const detail = diverged ? warnings.join('; ') : '';
+      if (c.label.title !== detail) c.label.title = detail;
+
       // A needs_full_frame() effect shades the whole canvas in every worker and
       // the rectangle is only what was sliced out of it, so naming the rect
       // there would claim a segmented render the pool never did.
@@ -313,8 +325,9 @@ export class SegmentStatsView {
       const scrA = td('-');
       const scrB = td('-');
       const persist = td('-');
-      mkRow([rowHeader(`Seg ${s}`), range, compute, scrA, scrB, persist]);
-      rows.push({ range, compute, scrA, scrB, persist });
+      const label = rowHeader(`Seg ${s}`);
+      mkRow([label, range, compute, scrA, scrB, persist]);
+      rows.push({ label, range, compute, scrA, scrB, persist });
     }
 
     const maxTime = td('', 'seg-time');

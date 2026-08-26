@@ -224,6 +224,14 @@ export class SegmentController {
      * @type {boolean[]}
      */
     this.fullFrames = [];
+    /**
+     * Per-segment divergence notices from the last reported frame: a worker
+     * whose engine refused a parameter or a preset renders a configuration its
+     * peers do not, and the pool has no reply channel to learn of it otherwise.
+     * Null where the segment reported none.
+     * @type {Array<string[] | null>}
+     */
+    this.warnings = [];
 
     /** @type {number[] | null} */
     this.paramValues = null;  // segment 0's latest param values, for GUI sync
@@ -480,6 +488,7 @@ export class SegmentController {
     this.timings = new Array(numSegments).fill(0);
     this.arenas = new Array(numSegments).fill(null);
     this.fullFrames = new Array(numSegments).fill(false);
+    this.warnings = new Array(numSegments).fill(null);
     this.frameSeen = new Array(numSegments).fill(false);
     this.paramValues = null;
     this.refreshPresetState();
@@ -583,6 +592,7 @@ export class SegmentController {
             this.timings[msg.segId] = msg.elapsed;
             this.arenas[msg.segId] = msg.arenaMetrics;
             this.fullFrames[msg.segId] = msg.fullFrame === true;
+            this.warnings[msg.segId] = msg.warnings ?? null;
           }
           this.frameSeen[msg.segId] = true;
           this.pending--;
@@ -765,6 +775,7 @@ export class SegmentController {
     this.timings = [];
     this.arenas = [];
     this.fullFrames = [];
+    this.warnings = [];
     this.frameSeen = [];
     this.ready = false;
     this.pending = 0;
@@ -1049,6 +1060,7 @@ export class SegmentController {
       this.timings.fill(0);
       this.arenas.fill(null);
       this.fullFrames.fill(false);
+      this.warnings.fill(null);
       this.frameStart = performance.now();
       this.frameResolve = () => {
         this.clearTimers('renderWatchdog');
@@ -1287,10 +1299,10 @@ export class SegmentController {
    * @details The payload names exactly the fields the overlay reads, not the
    * controller, so its dependencies are the listed ones rather than whatever the
    * class happens to expose. It is not a copy: they are the controller's own
-   * arrays — timings, arenas, fullFrames and frameSeen refilled in place as
-   * segment frames land, results swapped whole with `scratch` when a generation
-   * publishes — so this call must sit where they hold one frame's values and the
-   * view must read them synchronously and retain none of them.
+   * arrays — timings, arenas, fullFrames, warnings and frameSeen refilled in
+   * place as segment frames land, results swapped whole with `scratch` when a
+   * generation publishes — so this call must sit where they hold one frame's
+   * values and the view must read them synchronously and retain none of them.
    * @returns {void}
    */
   updateStats() {
@@ -1304,6 +1316,7 @@ export class SegmentController {
       timings: this.timings,
       arenas: this.arenas,
       fullFrames: this.fullFrames,
+      warnings: this.warnings,
       frameSeen: this.frameSeen,
       wallTime: this.wallTime,
     });

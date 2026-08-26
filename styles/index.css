@@ -935,6 +935,10 @@ div.label {
   color: var(--accent-text);
 }
 
+.segment-stats .seg-label.seg-diverged {
+  color: var(--error-text);
+}
+
 .segment-stats .seg-time {
   color: var(--segment-stats-value);
 }

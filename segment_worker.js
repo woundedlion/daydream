@@ -62,6 +62,14 @@ let arenaMetricsWarned = false;
 // the same rejection every frame logs once. Cleared on every effect install: the
 // same name:outcome pair under a different effect is a distinct event.
 let paramRejectedKey = '';
+// Divergence notices standing on this worker: an engine that refuses a
+// parameter or a preset leaves this segment rendering a configuration its peers
+// do not, which the composite shows as a content discontinuity at its band
+// edges. Every 'frame' carries the whole set, so the controller's marker lasts
+// as long as the divergence. Cleared on every effect install, as
+// paramRejectedKey is.
+/** @type {Set<string>} */
+const divergenceWarnings = new Set();
 // Latched by a RESIZED setResolution, which tears the effect and its clip down.
 // The controller follows with a setEffect that reinstalls both; until then the
 // engine has nothing to shade, so a render faults instead of shipping a black
@@ -151,6 +159,7 @@ function reportParamRejected(name, result) {
   if (!wasmModule) return;
   const outcome = enumConstantName(wasmModule.ParamSetResult, result);
   const key = `${name}:${outcome}`;
+  divergenceWarnings.add(`setParameter(${name}) rejected: ${outcome}`);
   if (key === paramRejectedKey) return;
   paramRejectedKey = key;
   console.error(
@@ -206,9 +215,10 @@ function replayParams(params) {
 function applyPreset(index, method = 'selectPreset') {
   if (!engine || engine[method](index)) return;
   if (engine.getPresetIndex() === index) return;
-  console.error(
-    `segment_worker: segment ${segId} ${method}(${index}) rejected: ` +
-    `${engine.getPresetCount()} presets, still on ${engine.getPresetIndex()}`);
+  const detail = `${method}(${index}) rejected: ${engine.getPresetCount()} `
+    + `presets, still on ${engine.getPresetIndex()}`;
+  divergenceWarnings.add(detail);
+  console.error(`segment_worker: segment ${segId} ${detail}`);
 }
 
 /**
@@ -320,6 +330,7 @@ async function handleMessage(msg) {
           break;
         }
         paramRejectedKey = '';
+        divergenceWarnings.clear();
         arenaMetricsWarned = false;
         awaitingEffect = false;
         // Mirrors the engine-driven index without the pause, as in 'init'.
@@ -493,6 +504,8 @@ async function handleMessage(msg) {
         presetCount,
         presetIndex,
         fullFrame: clipFullFrame,
+        warnings: divergenceWarnings.size > 0
+          ? [...divergenceWarnings] : undefined,
       }, [pixelsCopy.buffer]);
       break;
     }

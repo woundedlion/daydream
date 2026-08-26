@@ -1128,6 +1128,63 @@ test('the index a presetless effect refuses is not logged', async () => {
   assert.deepEqual(logged, [], 'the ordinary effect-switch path is silent');
 });
 
+// console.error reaches no one on a worker thread; the frame's warnings are the
+// only channel by which the pool learns this segment has diverged.
+test('a refused parameter marks every later frame until the effect changes', async () => {
+  await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  assert.equal(posted.find((p) => p.msg.type === 'frame').msg.warnings, undefined,
+    'a converged worker sends no warnings field');
+
+  engineInstance.paramResult = ParamSetResult.UNKNOWN_PARAM;
+  const original = console.error;
+  console.error = () => {};
+  try {
+    await dispatch({ type: 'setParameter', name: 'Ghost', value: 0.5 });
+    await dispatch({ type: 'setParameter', name: 'Ghost', value: 0.6 });
+  } finally {
+    console.error = original;
+  }
+
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  await dispatch({ type: 'render' });
+  const frames = posted.filter((p) => p.msg.type === 'frame');
+  assert.equal(frames.length, 2);
+  for (const frame of frames) {
+    assert.deepEqual(frame.msg.warnings,
+      ['setParameter(Ghost) rejected: UNKNOWN_PARAM'],
+      'the notice stands on every frame, and the repeat adds no duplicate');
+  }
+
+  engineInstance.paramResult = ParamSetResult.APPLIED;
+  await dispatch({ type: 'setEffect', name: 'Waves', paramRevision: 3 });
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  assert.equal(posted.find((p) => p.msg.type === 'frame').msg.warnings, undefined,
+    'the rebuilt effect starts converged');
+});
+
+test('a refused preset index reaches the frame as a warning', async () => {
+  await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4,
+    effectName: 'Plasma' });
+
+  const original = console.error;
+  console.error = () => {};
+  try {
+    await dispatch({ type: 'selectPreset', index: 9, paramRevision: 14 });
+  } finally {
+    console.error = original;
+  }
+
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  assert.deepEqual(posted.find((p) => p.msg.type === 'frame').msg.warnings,
+    ['selectPreset(9) rejected: 3 presets, still on 0']);
+});
+
 // ---------------------------------------------------------------------------
 // Module graph
 // ---------------------------------------------------------------------------
@@ -1219,7 +1276,7 @@ function typedefShapes(source) {
 // together.
 const PROTOCOL_SHAPE_PIN = {
   version: 9,
-  sha256: '8eec7c4e7cf305fb9ebc38b70083c2a4bb799a50c41c0546cf26bc83ef64b2b2',
+  sha256: 'f5920699d3a447add39a12585551fb603041fce6564a390a8b5b8be05599ecc7',
 };
 
 test('a reshaped protocol message forces a PROTOCOL_VERSION bump', () => {
