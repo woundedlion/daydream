@@ -190,10 +190,9 @@ test('sortBy leaves focus on the sort control that drove it', () => {
   }
 });
 
-// sidebar_dom.test.js drives onKeyDown against a hand-built receiver. These go
-// through the listener the constructor registered, so the wiring between the
-// keydown event, the recorded option order, and the roving tab stop is covered
-// too.
+// The keyboard cases all go through the listener the constructor registered, so
+// the wiring between the keydown event, the recorded option order, and the
+// roving tab stop is covered along with the handler.
 test('Enter on the list selects the focused option and eats the native click', () => {
   const { sidebar, selected } = makeSidebar();
   sidebar.setEffects(['A', 'B'], {});
@@ -203,6 +202,59 @@ test('Enter on the list selects the focused option and eats the native click', (
 
   assert.deepEqual(selected, ['B']);
   assert.equal(event.defaultPrevented, true, 'a native click would double-select');
+});
+
+test('Space selects the focused option exactly once', () => {
+  const { sidebar, selected } = makeSidebar();
+  sidebar.setEffects(['A', 'B'], {});
+  document.activeElement = sidebar.buttons.get('B');
+
+  const event = sidebar.listEl.dispatch('keydown', { key: ' ' });
+
+  assert.deepEqual(selected, ['B'], 'Space is the listbox activation key beside Enter');
+  assert.equal(sidebar.tabbableBtn, sidebar.buttons.get('B'));
+  assert.equal(event.defaultPrevented, true,
+    'the page scroll and the native click both ride on an unclaimed Space');
+});
+
+// Keydown reaches the list from a focused non-option (a scrollbar drag, or a
+// child the list wraps): there is no effect name to select.
+test('Enter selects nothing when focus is not on an option', () => {
+  const { sidebar, selected } = makeSidebar();
+  sidebar.setEffects(['A', 'B'], {});
+
+  document.activeElement = sidebar.listEl;
+  const onList = sidebar.listEl.dispatch('keydown', { key: 'Enter' });
+  assert.deepEqual(selected, []);
+  assert.equal(onList.defaultPrevented, true);
+
+  document.activeElement = null;
+  const nowhere = sidebar.listEl.dispatch('keydown', { key: ' ' });
+  assert.deepEqual(selected, []);
+  assert.equal(nowhere.defaultPrevented, true);
+});
+
+test('ArrowUp wraps focus to the last option and Home/End jump to the ends', () => {
+  const { sidebar, selected } = makeSidebar();
+  sidebar.setEffects(['A', 'B', 'C'], {});
+  const [a, b, c] = ['A', 'B', 'C'].map((name) => sidebar.buttons.get(name));
+  document.activeElement = a;
+
+  const wrapped = sidebar.listEl.dispatch('keydown', { key: 'ArrowUp' });
+  assert.equal(document.activeElement, c, 'the first option wraps to the last');
+  assert.equal(sidebar.tabbableBtn, c);
+  assert.equal(wrapped.defaultPrevented, true);
+
+  document.activeElement = b;
+  sidebar.listEl.dispatch('keydown', { key: 'Home' });
+  assert.equal(document.activeElement, a);
+  assert.equal(sidebar.tabbableBtn, a);
+
+  const end = sidebar.listEl.dispatch('keydown', { key: 'End' });
+  assert.equal(document.activeElement, c);
+  assert.equal(sidebar.tabbableBtn, c);
+  assert.equal(end.defaultPrevented, true);
+  assert.deepEqual(selected, [], 'navigating is not selecting');
 });
 
 test('the list claims the keys it navigates with and passes the rest through', () => {
@@ -224,6 +276,29 @@ test('the list claims the keys it navigates with and passes the rest through', (
   assert.equal(ignored.defaultPrevented, false, 'typing still reaches the page');
   assert.equal(document.activeElement, sidebar.buttons.get('B'), 'focus did not move');
   assert.deepEqual(selected, []);
+});
+
+// Only a column-flow grid with resolved rows crosses columns; every other
+// layout walks the list one option per press.
+test('a list that is not a laid-out column grid strides by one option', () => {
+  const { sidebar } = makeSidebar();
+  sidebar.setEffects(['A', 'B', 'C', 'D'], {});
+  const style = { gridAutoFlow: 'row', gridTemplateRows: '20px 20px' };
+  sidebar.listEl.ownerDocument = {
+    defaultView: { getComputedStyle: () => style },
+  };
+  document.activeElement = sidebar.buttons.get('A');
+
+  sidebar.listEl.dispatch('keydown', { key: 'ArrowRight' });
+  assert.equal(document.activeElement, sidebar.buttons.get('B'),
+    'the desktop list is one column, so Right is Down');
+
+  style.gridAutoFlow = 'column';
+  style.gridTemplateRows = 'none';
+  observers[0].cb();
+  sidebar.listEl.dispatch('keydown', { key: 'ArrowRight' });
+  assert.equal(document.activeElement, sidebar.buttons.get('C'),
+    'a column grid that resolves no rows has no stride to cross by');
 });
 
 // Resolving the grid's rows forces a style recalc, which a per-keystroke
