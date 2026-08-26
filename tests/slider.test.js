@@ -147,6 +147,24 @@ test('setValue drives thumb, readout and aria-valuetext without firing onInput',
 });
 
 /**
+ * Verifies setReadout names a value off the step grid without moving the thumb.
+ * Live on lissajous.html's Domain slider under the rational lock: the closing
+ * period is the domain in effect, and the grid cannot hold it.
+ */
+test('setReadout names an off-grid value while the thumb stays on the grid', () => {
+  const { slider, valueSpan, setValue, setReadout } = createSlider(
+    'c', { ...base, step: 0.2, value: 0, scale: 10, decimals: 3 }, null);
+
+  setValue(7.26);
+  assert.equal(slider.value, '72');
+  setReadout(7.26);
+
+  assert.equal(slider.value, '72', 'the thumb keeps the grid point');
+  assert.equal(valueSpan.textContent, '7.260');
+  assert.equal(slider.getAttribute('aria-valuetext'), '7.260');
+});
+
+/**
  * `<input type=range>` accepts only `min + k*step`, so a value merely rounded
  * into scaled units is re-snapped by the browser and the thumb leaves the
  * readout naming a position it is not at. Live on lissajous.html's Domain

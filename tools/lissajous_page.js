@@ -149,6 +149,10 @@ const snapFrequencies = (activeId, rawNewValue) => {
   state.Duration = newDomain < durationConfig.min || newDomain > durationConfig.max
     ? shownDomain
     : newDomain;
+  // The thumb can only land on the step grid, which the closing period misses by
+  // up to half a step. The readout names the domain in effect — what the preview
+  // draws, what the export emits, and what the closure warning judges.
+  sliderHandles.Duration.setReadout(state.Duration);
 
   // 6. Re-render the curve and update the code snippet
   scheduleUpdate();
