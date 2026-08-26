@@ -1213,11 +1213,16 @@ export function expandV1Document(document, catalog) {
   };
 
   const pathPolicies = array(descriptor.path_policies, '$.descriptor.path_policies')
-    .map((policy) => (policy.kind !== 'STAGGERED_ORDERED' ? policy : {
-      ...policy,
-      groups: policy.groups.map((group) =>
-        (group in parameterIds ? parameterIds[group] : group)),
-    }));
+    .map((policy) => {
+      if (policy.kind !== 'STAGGERED_ORDERED') return policy;
+      const groups = policy.groups.map((group) =>
+        (group in parameterIds ? parameterIds[group] : group));
+      // A synthesised topology parameter declares no interpolation group, so it
+      // schedules under its own id, and a staggered path must name every group.
+      for (const topologyId of topologyIds)
+        if (!groups.includes(topologyId)) groups.push(topologyId);
+      return { ...policy, groups };
+    });
 
   const serialization = object(descriptor.serialization, '$.descriptor.serialization');
   const fields = array(serialization.fields, '$.descriptor.serialization.fields')
