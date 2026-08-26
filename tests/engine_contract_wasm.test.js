@@ -19,6 +19,7 @@ import {
 } from './fake_engine.js';
 import { isViewLive, refreshPixelView } from '../pixel_view.js';
 import { selectorControlValue } from '../param_sync.js';
+import { DEFAULT_EFFECT, resolutionPresets } from '../daydream.js';
 import {
   FIXED_SHADER_MODE_FIELDS, STAGE_BOUNDARIES,
   kaleidoscopeSmoothStageAssignments, latticeMeltStageAssignments,
@@ -806,6 +807,36 @@ test('strobeColumns and effect metadata return the shapes daydream consumes', ()
   assert.ok(presetCounts.LatticeMelt > 0, 'a choreographed effect must report its presets');
   assert.equal(presetCounts.Voronoi, 0,
     'an effect with no authored presets must report zero, not be absent');
+});
+
+// daydream.js's per-resolution favorites rosters and its seeded default are
+// hand-written engine class names that nothing else resolves: a renamed effect
+// leaves a sidebar button that cannot install and a deep link that falls
+// through to the default effect.
+test('the favorites rosters and the seeded default name installable effects', () => {
+  const registered = new Set(Object.keys(engine.getEffectSizes()));
+  assert.ok(registered.has(DEFAULT_EFFECT),
+    `daydream.js seeds ${DEFAULT_EFFECT}, which the engine does not register`);
+
+  const unregistered = [];
+  const uninstallable = [];
+  for (const [label, preset] of Object.entries(resolutionPresets)) {
+    if (!resolutionOk(engine.setResolution(preset.w, preset.h))) {
+      uninstallable.push(`${label}: unbuildable resolution`);
+      continue;
+    }
+    for (const name of preset.favorites) {
+      if (!registered.has(name)) unregistered.push(`${label}: ${name}`);
+      else if (engine.setEffect(name) !== M.EffectSetResult.INSTALLED)
+        uninstallable.push(`${label}: ${name}`);
+    }
+  }
+  assert.deepEqual(unregistered.slice(0, 5), [],
+    `${unregistered.length} favorites name effects the engine does not register`);
+  assert.deepEqual(uninstallable.slice(0, 5), [],
+    `${uninstallable.length} favorites do not install at their own resolution`);
+
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
 });
 
 // engine_host.js calls getBufferLength through an optional-call guard, so a

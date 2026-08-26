@@ -154,11 +154,14 @@ const LoResFavorites = [
   "Voronoi",
 ];
 
+// The effect the simulator seeds when the URL names none.
+export const DEFAULT_EFFECT = 'IslamicStars';
+
 // Display metadata (dot size), geometry, and the effect list offered per
 // resolution. The dropdown offers only the subset the engine reports through
 // getSupportedResolutions(). Null prototype: a URL string indexes this table, and
 // an inherited key ("constructor", "toString") would answer as a preset.
-const resolutionPresets = {
+export const resolutionPresets = {
   __proto__: null,
   "Holosphere (96x20)": { h: 20, w: 96, dotSize: 2, favorites: LoResFavorites },
   "Phantasm (288x144)": { h: 144, w: 288, dotSize: 0.25, favorites: HiResFavorites },
@@ -537,7 +540,7 @@ export function start({
     : Object.values(resolutionPresets).flatMap((preset) => preset.favorites));
   knownEffects.add(LEGACY_SHADER_ALIAS);
   const appState = new AppState({
-    effect: shaderWorkbench ? 'Shader' : 'IslamicStars',
+    effect: shaderWorkbench ? 'Shader' : DEFAULT_EFFECT,
     resolution: "Phantasm (288x144)",
   });
   const urlSync = new URLSync(appState, ['effect', 'resolution'], {
