@@ -1065,6 +1065,39 @@ test('an effect the engine rejects leaves the loaded chain editor standing', asy
     'the refused load must leave the editor it would have replaced');
 });
 
+// The chain program is written last, so a refusal between the adoption and the
+// program leaves the engine on the document that was already loaded; the
+// toolbar has to keep naming that one.
+test('a link whose bypass the store refuses leaves the toolbar on the loaded document', async () => {
+  const harness = await editorWorkbench();
+  const digest = harness.elements.get('shader-document-digest').dataset.digest;
+  const presets = harness.elements.get('shader-preset-select').options.map((o) => o.value);
+  const programs = harness.engine.chainCalls.length;
+
+  const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  const copy = structuredClone(document.preset_bank.presets[0]);
+  copy.preset_id = 'second';
+  document.preset_bank.presets.push(copy);
+  document.preset_bank.choreography.dwell.second =
+    document.preset_bank.choreography.dwell[document.preset_bank.presets[0].preset_id];
+  document.preset_bank.choreography.generated_order.push('second');
+
+  assert.equal(await harness.controller.loadSource(document, 'other.shader.json', null,
+    { preset: 'second', bypassed: ['nosuchstage'], paused: false }), false);
+
+  assert.match(harness.elements.get('shader-document-status').textContent,
+    /could not bypass "nosuchstage"/);
+  assert.equal(harness.engine.chainCalls.length, programs,
+    'the refused load must not reprogram the engine');
+  assert.equal(harness.elements.get('shader-document-digest').dataset.digest, digest);
+  assert.deepEqual(
+    harness.elements.get('shader-preset-select').options.map((o) => o.value), presets,
+    'the preset list must still be the loaded document, not the refused one');
+  harness.controller.save();
+  assert.equal(harness.downloads.at(-1)[0], 'study.shader.json',
+    'Save must still write the document the engine is rendering');
+});
+
 test('a shader state link restores its document, preset, bypasses, and pause', async () => {
   const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
   const preset = document.preset_bank.presets[1];
