@@ -14,7 +14,8 @@ import { GlobalStatsView } from "./global_stats_view.js";
 /**
  * Reuses CSS2DObject label sprites across frames so axis/effect labels can be
  * rebuilt every frame without churning the DOM. acquire() hands out pooled
- * objects in order; cleanup() hides any left over from the previous frame.
+ * objects in order; cleanup() removes from the scene any left over from the
+ * previous frame.
  */
 export class LabelPool {
   /**

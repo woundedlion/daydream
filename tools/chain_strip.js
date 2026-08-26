@@ -12,12 +12,13 @@ import { createFrameScheduler } from './page_lifecycle.js';
  * family crossings drawn as socket chips on the band boundaries. The terminal
  * carrier is the pipeline's output type rather than an editable band, and is
  * conveyed by its incoming socket. Every structural gesture — palette insertion, ✕
- * removal, socket selection, button or Alt+Arrow reorder, and undo —
- * funnels into the document store's one span-replacement primitive, so the strip
- * can commit nothing the store's validator refuses; it only decides which spans
- * the gestures name. Selection and the session bypass set live in the store too:
- * the strip is a view plus gesture translation, rebuilt whole after every
- * committed edit with keyboard focus restored to the edited chip.
+ * removal, socket selection, and button or Alt+Arrow reorder — funnels into the
+ * document store's one span-replacement primitive, so the strip can commit
+ * nothing the store's validator refuses; it only decides which spans the
+ * gestures name. Undo and redo go to the store's history instead. Selection
+ * and the session bypass set live in the store too: the strip is a view plus
+ * gesture translation, rebuilt whole after every committed edit with keyboard
+ * focus restored to the edited chip.
  *
  * Every chip carries its stage's controls inline, built from the document's
  * parameter declarations over the active preset's values, so a stage is tuned

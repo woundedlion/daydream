@@ -311,8 +311,8 @@ export function createShaderDocumentController({
     status.dataset.status = error ? 'error' : 'ok';
   };
 
-  // The one shared live region: the strip and the library both report through
-  // it, and an empty message clears it.
+  // The one shared live region: the page and the strip both report through it,
+  // and an empty message clears it.
   /** @param {string} message */
   const announce = (message) => show(message, message !== '');
 
@@ -731,8 +731,8 @@ export function createShaderDocumentController({
 
   /**
    * Opens the default chain on catalog defaults through the ordinary load path,
-   * so an unnamed session authors against the same strip and library a loaded
-   * document gets.
+   * so an unnamed session authors against the same strip a loaded document
+   * gets.
    * @returns {Promise<boolean>} Whether the scratch document is on screen.
    */
   const loadScratch = () =>

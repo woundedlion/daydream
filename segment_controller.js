@@ -289,8 +289,10 @@ export class SegmentController {
     /** @type {SegmentStatsView} */
     this.statsView = new SegmentStatsView(statsDoc);
 
-    // Live pool size, set only by create() so it always matches the length of the
-    // per-segment arrays composite() and updateStats() index.
+    // Segment count create() last requested, and the size a rebuild reuses. It
+    // matches the length of the per-segment arrays composite() and updateStats()
+    // index only while a pool stands: this initial value and the one destroy()
+    // leaves behind stand against empty arrays.
     this.count = 4;
     // Tracked so create() can carry it into a freshly-spawned pool.
     this.animationsPaused = false;

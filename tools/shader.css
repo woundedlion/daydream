@@ -86,8 +86,7 @@
   margin-left: auto;
 }
 
-/* One fixed hue per carrier domain, worn by both the strip band and the library
-   group: the colour is what says a stage from this group goes up there. */
+/* One fixed hue per carrier domain, worn by the strip band. */
 [data-carrier="sphere"] {
   --carrier: #5aa9ff;
   --carrier-fill: rgb(90 169 255 / 0.1);
