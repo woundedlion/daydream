@@ -131,13 +131,14 @@ export const PARAMETER_GATES = Object.freeze({
   'hue-shift-amount': [['hue-shift-mode', (value) => value !== 'none']],
   'hue-noise-scale': [['hue-shift-mode', (value) => value === 'noise']],
   'hue-noise-speed': [['hue-shift-mode', (value) => value === 'noise']],
-  'brightness-depth': [['brightness-envelope', (value) => value !== 'none']],
+  'brightness-bottom': [['brightness-envelope', (value) => value !== 'none']],
+  'brightness-top': [['brightness-envelope', (value) => value !== 'none']],
 });
 
 /**
  * The parameter ids the current topology selections deactivate. Edge widths
  * require an edge-fade mode, hue controls require their corresponding hue mode,
- * and brightness depth requires a brightness envelope. Deactivation changes
+ * and brightness endpoints require a brightness envelope. Deactivation changes
  * what the engine reads, never what the document carries, so these controls
  * render dimmed rather than dropping out of the union schema.
  * @param {ParameterDeclaration[]} parameters - The document's declarations.

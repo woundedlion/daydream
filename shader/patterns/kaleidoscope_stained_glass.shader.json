@@ -28,7 +28,7 @@
       },
       {
         "label": "colorize",
-        "operator": "colorize.generated-palette.v2"
+        "operator": "colorize.generated-palette.v3"
       }
     ],
     "parameters": [
@@ -48,12 +48,12 @@
       },
       {
         "classification": "preset",
-        "default": 1,
+        "default": 0,
         "domain": {
           "maximum": 1,
           "minimum": 0
         },
-        "id": "colorize.brightness-depth",
+        "id": "colorize.brightness-bottom",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -78,6 +78,20 @@
         },
         "storage": "enum8",
         "unit": "mode"
+      },
+      {
+        "classification": "preset",
+        "default": 1,
+        "domain": {
+          "maximum": 1,
+          "minimum": 0
+        },
+        "id": "colorize.brightness-top",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
       },
       {
         "classification": "preset",
@@ -390,7 +404,7 @@
         "default": 1,
         "domain": {
           "maximum": 64,
-          "minimum": 0.10000000149011612
+          "minimum": 0.009999999776482582
         },
         "id": "sample.pattern-freq",
         "interpolation": {
@@ -612,8 +626,9 @@
     "serialization": {
       "fields": [
         "camera.wander",
-        "colorize.brightness-depth",
+        "colorize.brightness-bottom",
         "colorize.brightness-envelope",
+        "colorize.brightness-top",
         "colorize.hue-noise-scale",
         "colorize.hue-noise-speed",
         "colorize.hue-shift-amount",
@@ -682,8 +697,9 @@
         "preset_id": "vector-mirror",
         "values": {
           "camera.wander": 1,
-          "colorize.brightness-depth": 0.6549999713897705,
+          "colorize.brightness-bottom": 0.3449999988079071,
           "colorize.brightness-envelope": "cup",
+          "colorize.brightness-top": 1,
           "colorize.hue-noise-scale": 1,
           "colorize.hue-noise-speed": 0,
           "colorize.hue-shift-amount": 0.7210000157356262,

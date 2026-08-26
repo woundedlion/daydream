@@ -13,6 +13,8 @@
     "kaleidoscope-mandala": "kaleidoscope_mandala.shader.json",
     "grid-space": "grid_space.shader.json",
     "lattice-melt": "lattice_melt.shader.json",
+    "chromatic-lichen": "chromatic_lichen.shader.json",
+    "mermaid-skin": "mermaid_skin.shader.json",
     "ash-cloud": "ash_cloud.shader.json",
     "kaleidoscope-pent-bright": "kaleidoscope_pent_bright.shader.json",
     "kaleidoscope-stained-glass": "kaleidoscope_stained_glass.shader.json",
@@ -61,7 +63,17 @@
       {
         "effect_id": "lattice-melt",
         "display_name": "Lattice Melt",
-        "seconds": 13
+        "seconds": 7
+      },
+      {
+        "effect_id": "chromatic-lichen",
+        "display_name": "Chromatic Lichen",
+        "seconds": 6
+      },
+      {
+        "effect_id": "mermaid-skin",
+        "display_name": "Mermaid Skin",
+        "seconds": 6
       },
       {
         "effect_id": "ash-cloud",
@@ -86,7 +98,7 @@
       {
         "effect_id": "kaleidoscope-smooth",
         "display_name": "Kaleidoscope Smooth",
-        "seconds": 19
+        "seconds": 13
       },
       {
         "effect_id": "kaleidoscope-hex-bright",

@@ -968,7 +968,8 @@ const V1_COLORIZE_FIELDS = new Set([
   'mapping-phase',
   'phase-oscillation-depth',
   'phase-oscillation-speed',
-  'brightness-depth',
+  'brightness-bottom',
+  'brightness-top',
   'value-opacity-low',
   'value-opacity-high',
   'hue-shift-amount',
@@ -1060,7 +1061,7 @@ const v1Slots = (roleNodes) => {
   const paletteKind = colorPolicy.color ?? 'generated-palette';
   if (paletteKind !== 'generated-palette' && paletteKind !== 'generated_palette')
     failV1('V1_POLICY_UNSUPPORTED', 'stage.color', `No colorize operator expands "${paletteKind}".`);
-  add('colorize', { operator: 'colorize.generated-palette.v2' });
+  add('colorize', { operator: 'colorize.generated-palette.v3' });
   const colorize = slots[slots.length - 1];
   for (const resource of color.resources ?? [])
     if (resource in V1_PALETTE_MODES)
@@ -1121,6 +1122,8 @@ const v1ParameterTarget = (parameterId, slotsByLabel) => {
     return bind('surface', V1_SURFACE_FIELDS[parameterId]);
   if (parameterId === 'iso-level' || parameterId === 'iso-width')
     return bind('transfer', parameterId);
+  if (parameterId === 'brightness-depth')
+    return bind('colorize', 'brightness-bottom');
   if (parameterId in V1_SAMPLE_FIELDS)
     return bind('sample', V1_SAMPLE_FIELDS[parameterId]);
   if (parameterId in V1_PROJECT_FIELDS)
@@ -1179,8 +1182,34 @@ export function expandV1Document(document, catalog) {
     parameterIds[parameter.id] = target;
     const { binding: droppedBinding, ...kept } = parameter;
     void droppedBinding;
+    if (parameter.id === 'brightness-depth')
+      kept.default = 1 - kept.default;
+    if (target === 'sample.pattern-freq' &&
+        slotsByLabel.get('sample')?.operator === 'sample.grid.v2') {
+      const schema = operatorField(operators.get('sample.grid.v2'), 'pattern-freq');
+      kept.domain = { minimum: schema.min, maximum: schema.max };
+    }
     return { ...kept, id: target };
   });
+
+  const parameterIdSet = new Set(parameters.map((parameter) => parameter.id));
+  const compatibilityParameters = (parameterIdSet.has('colorize.brightness-bottom')
+    ? ['brightness-bottom', 'brightness-top'] : [])
+    .map((field) => {
+      const parameterId = `colorize.${field}`;
+      if (parameterIdSet.has(parameterId)) return null;
+      const schema = operatorField(operators.get('colorize.generated-palette.v3'), field);
+      return {
+        id: parameterId,
+        classification: 'preset',
+        storage: 'binary32',
+        unit: 'ratio',
+        domain: { minimum: schema.min, maximum: schema.max },
+        interpolation: { kind: 'LINEAR' },
+        default: schema.default,
+      };
+    })
+    .filter(Boolean);
 
   // Policy-determined topology choices become ordinary enum8 parameters whose
   // domain is the catalog's value list; every preset then carries the choice.
@@ -1206,15 +1235,18 @@ export function expandV1Document(document, catalog) {
       });
     }
   }
-  const topologyIds = topologyParameters.map((parameter) => parameter.id);
-  const topologyDefaults = Object.fromEntries(
-    topologyParameters.map((parameter) => [parameter.id, parameter.default]));
+  const synthesizedParameters = [...compatibilityParameters, ...topologyParameters];
+  const synthesizedIds = synthesizedParameters.map((parameter) => parameter.id);
+  const synthesizedDefaults = Object.fromEntries(
+    synthesizedParameters.map((parameter) => [parameter.id, parameter.default]));
 
   const rewriteId = (parameterId, path) => {
     if (!(parameterId in parameterIds))
       failV1('V1_PARAMETER_UNMAPPED', path, `Unknown v1 parameter "${parameterId}".`);
     return parameterIds[parameterId];
   };
+  const rewriteValue = (parameterId, value) =>
+    parameterId === 'brightness-depth' ? 1 - value : value;
 
   const pathPolicies = array(descriptor.path_policies, '$.descriptor.path_policies')
     .map((policy) => {
@@ -1223,8 +1255,8 @@ export function expandV1Document(document, catalog) {
         (group in parameterIds ? parameterIds[group] : group));
       // A synthesised topology parameter declares no interpolation group, so it
       // schedules under its own id, and a staggered path must name every group.
-      for (const topologyId of topologyIds)
-        if (!groups.includes(topologyId)) groups.push(topologyId);
+      for (const synthesizedId of synthesizedIds)
+        if (!groups.includes(synthesizedId)) groups.push(synthesizedId);
       return { ...policy, groups };
     });
 
@@ -1238,8 +1270,9 @@ export function expandV1Document(document, catalog) {
     values: {
       ...Object.fromEntries(Object.entries(object(preset.values, '$.preset_bank.presets'))
         .map(([parameterId, value]) =>
-          [rewriteId(parameterId, `preset.${preset.preset_id}.${parameterId}`), value])),
-      ...topologyDefaults,
+          [rewriteId(parameterId, `preset.${preset.preset_id}.${parameterId}`),
+            rewriteValue(parameterId, value)])),
+      ...synthesizedDefaults,
     },
   }));
 
@@ -1249,11 +1282,11 @@ export function expandV1Document(document, catalog) {
     catalog_version: OPERATOR_CATALOG_VERSION,
     descriptor: {
       chain,
-      parameters: [...parameters, ...topologyParameters],
+      parameters: [...parameters, ...synthesizedParameters],
       path_policies: pathPolicies,
       serialization: {
         schema_version: serialization.schema_version,
-        fields: [...fields, ...topologyIds],
+        fields: [...fields, ...synthesizedIds],
       },
     },
     preset_bank: { ...bank, presets },

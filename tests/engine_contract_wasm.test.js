@@ -244,7 +244,7 @@ const DEFAULT_CHAIN = [
   { instance: 'camera', operator: 'sphere.rotate.v2' },
   { instance: 'project', operator: 'project.stereographic.v2' },
   { instance: 'sample', operator: 'sample.grid.v2' },
-  { instance: 'colorize', operator: 'colorize.generated-palette.v2' },
+  { instance: 'colorize', operator: 'colorize.generated-palette.v3' },
 ];
 
 test('setShaderChain applies a chain, registers label.field params and bumps the generation', () => {
@@ -295,7 +295,7 @@ test('setShaderChain refuses transactionally and names the offending entry', () 
     { instance: 'camera', operator: 'sphere.rotate.v2' },
     { instance: 'project', operator: 'project.unknown.v9' },
     { instance: 'sample', operator: 'sample.grid.v2' },
-    { instance: 'colorize', operator: 'colorize.generated-palette.v2' },
+    { instance: 'colorize', operator: 'colorize.generated-palette.v3' },
   ]);
   assert.equal(unknown.code, 'UNKNOWN_OPERATOR');
   assert.equal(unknown.entryIndex, 1,

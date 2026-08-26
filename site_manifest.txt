@@ -95,7 +95,7 @@ tools/solid_registry_codegen.js
 tools/solid_render.js
 tools/solids_page.js
 
-# Shader workbench: the document compiler, the operator catalog, and the v2
+# Shader workbench: the document compiler, the operator catalog, and the
 # pattern documents the source catalog fetches by name at runtime. Listed file
 # by file so the v1 expansion fixtures under shader/patterns/v1/ do not ship.
 shader/sha256.mjs
@@ -108,6 +108,8 @@ shader/patterns/grid_space.shader.json
 shader/patterns/cosmic_eyeball.shader.json
 shader/patterns/ash_cloud.shader.json
 shader/patterns/lattice_melt.shader.json
+shader/patterns/chromatic_lichen.shader.json
+shader/patterns/mermaid_skin.shader.json
 shader/patterns/kaleidoscope_flowers.shader.json
 shader/patterns/kaleidoscope_smooth.shader.json
 shader/patterns/kaleidoscope_mandala.shader.json

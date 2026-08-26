@@ -97,7 +97,7 @@ Building the WASM target in Holosphere installs `holosphere_wasm.js`, `holospher
    - [7.8 Generators](#78-generators-memoryh)
    - [7.9 The Preset System](#79-the-preset-system-controlchoreographyh)
    - [7.10 Hardware Drivers](#710-hardware-drivers-dma_ledh-pov_singleh-pov_segmentedh)
-     - [DMA LED Controller](#dma-led-controller-dma_ledh)
+     - [DMA LED Controller](#dma-led-controller-dma_ledh-hd107s_frameh-dma_led_coreh-dma_led_controllerh)
      - [Single-Teensy POV Driver](#single-teensy-pov-driver-pov_singleh)
      - [Multi-Teensy Segmented POV Driver](#multi-teensy-segmented-pov-driver-pov_segmentedh)
      - [Frame Sync Protocol: 1-Wire Signal Datasheet](#frame-sync-protocol-1-wire-signal-datasheet)
@@ -127,6 +127,8 @@ Building the WASM target in Holosphere installs `holosphere_wasm.js`, `holospher
      - [GridSpace](#gridspace)
      - [HyperLattice](#hyperlattice)
      - [LatticeMelt](#latticemelt)
+     - [ChromaticLichen](#chromaticlichen)
+     - [MermaidSkin](#mermaidskin)
      - [AshCloud](#ashcloud)
      - [KaleidoscopePentBright](#kaleidoscopepentbright)
      - [KaleidoscopeHexOil](#kaleidoscopehexoil)
@@ -145,11 +147,11 @@ Building the WASM target in Holosphere installs `holosphere_wasm.js`, `holospher
      - [Thrusters](#thrusters)
      - [GnomonicStars](#gnomonicstars)
      - [Raymarch](#raymarch)
+     - [DisplacementField](#displacementfield)
+     - [ShapeShifter](#shapeshifter)
    - [Shader Authoring Workbench](#shader-authoring-workbench)
      - [Composed-effect roster](#composed-effect-roster)
      - [Authoring vocabulary](#authoring-vocabulary)
-     - [DisplacementField](#displacementfield)
-     - [ShapeShifter](#shapeshifter)
    - [Legacy Effects (`effects_legacy.h`)](#legacy-effects-effects_legacyh)
 10. [The Web Simulator (Daydream)](#10-the-web-simulator-daydream)
     - [10.1 Process and Threading Model](#101-process-and-threading-model)
@@ -283,7 +285,8 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   │   ├── build_features.h        Canvas size, build-time feature and instrumentation switches
 │   │   └── constants.h             MAX_W, MAX_H, star ratio, pole-LOD tuning
 │   ├── control/                An effect's control surface (registry, params +
-│   │                            apply_if_changed, presets, choreography, transition)
+│   │                            apply_if_changed, ParamHost/PresetHost, presets,
+│   │                            choreography, transition)
 │   ├── containers/             Reusable fixed-capacity containers
 │   │   ├── static_circular_buffer.h Fixed-capacity non-allocating circular buffer
 │   │   └── triangular_bitset.h     Upper-triangular unordered-pair bitset
@@ -297,6 +300,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   │   └── styles.h                Feedback::Style named presets + space/color transform functions
 │   ├── math/                   Vector/quaternion math and scalar curves
 │   │   ├── 3dmath.h                Vector, Quaternion, Spherical, Complex primitives, fast-math approximations, value noise, Snorm3
+│   │   ├── 4dmath.h                Vec4 / Mat4 four-dimensional primitives + coordinate-plane rotation
 │   │   ├── rotate.h                Quaternion projection helpers
 │   │   ├── geometry.h              wrap()/fast_wrap()/shortest_distance, PhiLUT/TrigLUT, pixel ↔ vector mapping, pole_wrap, Orientation, Basis
 │   │   ├── spherical_field.h       Latitude-ring field layout + bilinear sphere sampling
@@ -315,6 +319,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   │   ├── mesh_state.h            Arena-backed MeshState, the flat mesh format the renderer reads
 │   │   ├── conway.h                Conway operators (dual, kis, ambo, truncate, etc.)
 │   │   ├── conway_graph.h          Constexpr solid-to-solid operator edge graph + walk helpers
+│   │   ├── recipe_types.h          Op / OpStep / Recipe: the authored op-chain model
 │   │   ├── recipe.h                Recipe lowering to primitive Conway steps + replay
 │   │   ├── hankin.h                Hankin pattern compilation and update system
 │   │   ├── solid_generators.h     Platonic vertex/face tables, SolidBuilder, and the named solid generators
@@ -326,6 +331,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── color/                  Color math and palettes
 │   │   ├── color.h                 Pixel (16-bit linear), Color4, blend helpers, palettes
 │   │   ├── composition.h           Palette modifiers + StaticPalette composition (via color.h)
+│   │   ├── layer_composite.h       LayerComposite: front-to-back "over" accumulator for layered coverage
 │   │   ├── color_luts.h            Precomputed sRGB ↔ linear LUTs
 │   │   ├── srgb_decode.h           Branchless linear16 → sRGB8 encode from DTCM split tables
 │   │   ├── srgb_decode_lut.h       Generated split-decode tables behind srgb_decode.h
@@ -337,7 +343,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   │   ├── triadic_palette_luts.h  Generated bank of 256 triadic palette LUTs, one per base hue (from tools/mindsplatter_palette_gen.cpp)
 │   │   └── palettes.h              Named ProceduralPalette instances + shared MeshPaletteBank
 │   ├── render/                 Canvas, rasterizers, and the filter pipeline
-│   │   ├── canvas.h                Effect base class + Canvas RAII write-buffer guard
+│   │   ├── canvas.h                Effect base class (framebuffer half) + Canvas RAII write-buffer guard
 │   │   ├── clip.h                  ClipRegion segment clip rectangle + cylindrical render band
 │   │   ├── pullback.h              Typed inverse-render pipeline: umbrella over pullback/'s ten stage headers
 │   │   ├── pullback/               Per-stage pullback headers (contract, fields, surface,
@@ -386,7 +392,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │       ├── FastNoiseLite.h         Single-header noise library
 │       └── FastNoiseLite_config.h  FastNoiseLite build configuration
 │
-├── effects/                    40 headers covering 39 effects, all firmware — BZReactionDiffusion.h,
+├── effects/                    42 headers covering 41 effects, all firmware — BZReactionDiffusion.h,
 │                                HopfFibration.h, IslamicStars.h, Raymarch.h, … — plus
 │                                shared base ReactionDiffusionBase.h; the
 │                                composed-effect base is
@@ -394,8 +400,20 @@ Both trees are gated against their repository's tracked file list: every row mus
 │
 ├── workbench/                  Simulator-only shader authoring surfaces, outside the firmware
 │                                roster; their HS_ENABLE_* gates #error under ARDUINO — see §9
-│   ├── ShaderWorkbench.h       Slot-configured shader with dynamic dispatch: registered as Shader
-│   └── ShaderChain.h           Interpreter for a compiled operator chain: registered as ShaderChain
+│   └── shader/                 The shader authoring workbench; everything independent of
+│                                canvas resolution lives in namespace Workbench
+│       ├── shader_host.h       Slot-configured shader with dynamic dispatch: registered as Shader
+│       ├── chain_host.h        Effect host for a compiled operator chain: registered as ShaderChain
+│       ├── config.h            Slot enums, per-stage parameter families, and the Config they compose
+│       ├── limits.h            Parameter domain bounds and the predicates checking a Config against them
+│       ├── options.h           Display label and stable export spelling of every enumerated field
+│       ├── admission.h         Structural legality: valid configurations, bounds, admitted transitions
+│       ├── presets.h           The authored presets and the assertions holding them to the admission rules
+│       ├── frame_state.h       Prepared stage payloads and the immutable FrameState a shading pass reads
+│       ├── resources.h         Noise-field keys per configuration and whether two of them fit the bank
+│       ├── kernels.h           Pull-back kernels: camera, lens, projection, warp, source, colorize
+│       ├── bindings.h          The pullback binding and its per-stage state providers
+│       └── pipelines.h         Compiled stage adapters, the pipeline catalog, and the program manifest
 │
 ├── hardware/                   Hardware drivers
 │   ├── dma_led.h               Non-blocking DMA LED controller for HD107S (Teensy 4.x)
@@ -468,9 +486,10 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── shader_workbench.mjs    Chain-document validation and canonical identity
 │   ├── shader_workbench_cli.mjs Command-line validator for shader workbench documents
 │   ├── shader_workbench.test.mjs Node contract tests for the shader workbench
+│   ├── pattern_documents.mjs   Shared patterns/*.shader.json discovery and compilation
 │   ├── generate_promoted_shader_documents.mjs Generates canonical promoted-effect documents
 │   ├── promoted_digests.test.mjs Pins each promoted header's descriptor/preset-bank digest to its document
-│   ├── engine_catalog.json     Source operator catalog behind native chain validation
+│   ├── engine_catalog.json     wasm32 operator ABI catalog the browser workbench budgets against
 │   ├── export_engine_catalog.mjs Exports the installed WASM module's operator catalog
 │   ├── sha256.mjs              Shared SHA-256 implementation for shader documents
 │   ├── engine_bindings_contract.test.mjs Node contract tests for WASM engine binding invariants
@@ -494,15 +513,19 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   └── report_cases.mjs        node:test reporter tallying per-file case counts
 ├── tools/                      Firmware gates, device profiling, and asset bakes
 │   ├── build_pins.py           Shared external-tool version pins for CI and `just`
-│   ├── check_coverage.py       Catastrophic llvm-cov line-floor gate
+│   ├── check_coverage.py       Catastrophic llvm-cov line-floor gate, repo-wide and per core/ subtree
 │   ├── check_domain_ratchets.py  Relax-bake and death-harness coverage ratchets
 │   ├── require_test_files.sh   Non-empty guard for glob-discovered test suites (CI)
-│   ├── check_test_dir_pins.sh  Asserts every Python test-suite directory is discovered by CI
+│   ├── check_test_dir_pins.sh  Asserts every Python test-suite directory is discovered by CI and the justfile
+│   ├── ruff_selection_guard.sh / eslint_selection_guard.sh  Anti-vacuity probes for the `just lint` linters
+│   ├── shellcheck_gate.sh      Tracked shell-file selection + shellcheck run behind `just lint`
+│   ├── clang_format_gate.sh    Tracked first-party C++ selection + clang-format run behind `just clang-format`
 │   ├── teensy_gate.py          Size + memory-layout gate parser/classifier (toolchain-free)
 │   ├── teensy_gate_extra.py    PlatformIO post-build glue that runs the gate on every link
 │   ├── teensy_budgets.json     Per-env FLASH/RAM1/RAM2 budgets the gate enforces
 │   ├── teensy_size_table.py    `just teensy-size` wrapper: builds every env + prints the region table
 │   ├── teensy_size_trail.py    Per-commit firmware size trail: ELF section parser, recorder, regression report
+│   ├── teensy_cold_build.sh    Cold `pio run -v` over every environment, teed for the warning gate
 │   ├── teensy_warnings.py      Cold-build first-party warning gate
 │   ├── teensy_warning_baseline.txt  Intentionally empty local-tool default
 │   ├── teensy_pre.py / teensy_isystem.py / teensy_map.py / teensy_nano.py  PlatformIO build hooks
@@ -531,7 +554,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 ├── Doxyfile                    Doxygen config for the published API reference
 ├── package.json                npm entry points for the scripts/*.mjs tools (ESM; Node ≥ 22, CI pinned via tools/build_pins.py)
 ├── package-lock.json           Pinned dependency set behind those entry points
-├── requirements/               Dependabot-visible Python toolchain pins used by CI
+├── requirements/               Dependabot-visible Python toolchain pins used by CI (`*.in` sources, `*.txt` hash locks from `pip-compile --generate-hashes`)
 ├── .clang-format               LLVM-derived C++ style; CI enforces it with clang-format 22
 ├── ruff.toml                   Python lint rules (defect classes only, no formatter) — the ci.yml lint job
 ├── eslint.config.mjs           JavaScript lint rules for scripts/*.mjs (recommended set) — the same job
@@ -568,9 +591,17 @@ Both trees are gated against their repository's tracked file list: every row mus
 ├── main.js                     index.html's entry module: starts the simulator, once
 ├── bootstrap.js                Dynamic-import boot of daydream.js + failure overlay
 ├── daydream.js                 App entry: WASM loader, state wiring, GUI/sidebar
-├── app_lifecycle.js            Composition-root frame adapter, display-alias heal, Test All
-│                                  ticker, segmented spawn epoch, and teardown
+├── app_lifecycle.js            Composition-root frame adapter, Test All ticker,
+│                                  module-load deadline, and teardown
+├── display_aliases.js           Display-buffer alias divergence check and repoint
+├── apply_notice.js              Owner-keyed sink for the shared apply-notice element
+├── recording_settings.js        Recorder settings and their GUI binding
+├── pole_lod.js                  Pole azimuthal-LOD control binding
+├── segment_policy.js            Segmented spawn epoch and the single-engine fallback
 ├── engine_host.js              Owns the main-thread WASM engine + its reassignable display state
+├── apply_notice.js             Shared notice element, owner-keyed so a clear lands only for its holder
+├── display_aliases.js          The display-buffer aliases every renderer writes through, healed together
+├── segment_policy.js           Segmented spawn epoch plus the single-engine fallback a failed spawn runs
 ├── effect_gui.js               Effect panel lifecycle: build, mount, value sync, Export, teardown
 ├── shader_stages.js            DOM-free shader stage taxonomy: schema detection, stage assignment, control labels
 ├── legacy_shader_import.js     Versioned ShaderWorkbench URL/save-state migration importer
@@ -586,6 +617,8 @@ Both trees are gated against their repository's tracked file list: every row mus
 ├── sidebar.js                  Effect list + sort + keyboard navigation
 ├── sidebar_logic.js            DOM-free sidebar sort, keyboard-index and scroll-arrow math
 ├── recorder.js                 MediaRecorder pipeline (mp4 / webm), sim-synced
+├── recording_settings.js       Recording settings the GUI binds before the recorder exists
+├── pole_lod.js                 Pole LOD binding, held until the engine the module load builds exists
 ├── global_stats_view.js        Single-engine stats bar: frame draw duration and per-arena usage
 ├── module_warmer.js            Epoch-fenced shared-WASM compilation and warm-cache state
 ├── segment_controller.js       Orchestrates the segmented-POV worker pool:
@@ -646,18 +679,22 @@ Both trees are gated against their repository's tracked file list: every row mus
 │
 ├── scripts/
 │   ├── browser-smoke.mjs       Headless-Chrome smoke for every manifest-served page
+│   ├── probe_harness.mjs       Manifest server, browser, console/network collector and pointer helpers every probe runs on
 │   ├── browser.mjs             Browser resolution (CHROME_PATH, else the standard Chrome locations) and the launch flags the headless scripts share
 │   ├── generate-importmap.mjs  Bakes the local-vs-CDN decision into vendor-importmap.js
 │   ├── generate-shader-v2-documents.mjs  Regenerates the v2 pattern documents and digest-migration table from the v1 fixtures
 │   ├── record-module-loads.mjs NODE_OPTIONS shim recording loaded test modules
 │   ├── require-tests.mjs       `pretest` guard against empty globs, unreachable tests, and shadow installs
 │   ├── serve-manifest.mjs      Local static server constrained to the published site manifest
+│   ├── probe_harness.mjs       Shared browser-probe runner: page open, problem collection, and the drag/box helpers the six probes share
+│   ├── vendor-stage.mjs        Hard-links the manifest set into a scratch tree served with a node_modules import map, for the headless gate
 │   ├── verify-ci-green.mjs     Verifies every CI job is covered by the required aggregate check
 │   ├── workbench-probe.mjs     Headless pointer-level probe of the shader workbench's pipeline strip; run it for any tools/ UI change
 │   ├── panel-probe.mjs         Headless probe of the effect panel's real scroll clamping and scroll restore across a rebuild
 │   ├── solids-probe.mjs        Headless pointer-level probe of the solids page's op-chain row reordering
 │   ├── palettes-probe.mjs      Headless pointer-level probe of the palette page's strip zoom and hue-key wheel
 │   ├── mobius-probe.mjs        Headless pointer-level probe of the Möbius page's complex-plane pads
+│   ├── lissajous-probe.mjs     Headless pointer-level probe of the Lissajous page's rational frequency lock and the domain it drives
 │   └── run-tests.mjs           `test` script: runs the suite and checks first-party module reachability
 │
 ├── tests/                      Node unit tests (`npm test`)
@@ -694,7 +731,7 @@ Three build targets share a common engine:
 │  │ Holosphere/  │   │  Effects → Canvas → Filter Pipeline          │    │
 │  │  .ino        │   │      → SDF/Plot → Pixel Buffer               │    │
 │  │              │   │                                              │    │
-│  │ Phantasm/    │   │  effects/  (39 visual algorithms)            │    │
+│  │ Phantasm/    │   │  effects/  (41 visual algorithms)            │    │
 │  │  .ino        │   │                                              │    │
 │  │              │   ├──────────────────────────────────────────────┤    │
 │  │ wasm/        │   │          hardware/  (Drivers)                │    │
@@ -935,7 +972,7 @@ The tables below are the library surface, deliberately wider than the set of sta
 
 | Filter | Effect |
 |---|---|
-| `Pixel::Feedback<W, H>` | Style-driven full-screen feedback loop. During `flush()` iterates the full canvas, samples the previous frame from the Canvas front buffer with bilinear interpolation, applies the bound `Feedback::Style`'s spatial transform and color transform with fade, then blends into the back buffer. Frames come from Canvas double-buffering, so the filter holds no frame storage of its own, but it does keep a persistent warp cache: call `init_storage(Arena&)` from the effect's `init()` to reserve `STORAGE_BYTES` from the persistent arena — without it every `flush()` rebuilds the whole control field. The spatial transform is evaluated on a spherical control lattice — latitude rings spaced `DS = style.downsample` rows apart, each carrying a `sin(φ)`-scaled sample count (`W/DS` at the equator) — except in the pole infill bands, the first `DS` rows and the last `max(DS - H_OFFSET, 0)`, which take one ring per row at the full `W/DS` count; ring count, `sample_count()` and `STORAGE_BYTES` therefore all sit above what a flat `(W/DS)×(H/DS)` grid would need. The lattice is then expanded by longitude interpolation into a `W/DS`-column offset field, one row per ring, and bilinearly upsampled while compositing. See `Feedback::Style` below for preset selection. |
+| `Pixel::Feedback<W, H>` | Style-driven full-screen feedback loop. It is a *replacing* terminal, so a pipeline containing it exposes neither `plot()` nor `flush(Canvas&, float)`: the effect calls `filters.begin_frame(canvas, alpha)` once at the top of the frame and plots the frame through the `PreparedTerminalFrame&` it returns. `begin_frame()` runs the feedback pass first — at `alpha >= 1` it writes every pixel, so plotting before it would be erased — and the state it returns has no flush of its own, so the pass cannot be re-run mid-frame. That pass iterates the full canvas, samples the previous frame from the Canvas front buffer with bilinear interpolation, applies the bound `Feedback::Style`'s spatial transform and color transform with fade, then blends into the back buffer. Frames come from Canvas double-buffering, so the filter holds no frame storage of its own, but it does keep a persistent warp cache: call `init_storage(Arena&)` from the effect's `init()` to reserve `STORAGE_BYTES` from the persistent arena — without it every frame rebuilds the whole control field. The spatial transform is evaluated on a spherical control lattice — latitude rings spaced `DS = style.downsample` rows apart, each carrying a `sin(φ)`-scaled sample count (`W/DS` at the equator) — except in the pole infill bands, the first `DS` rows and the last `max(DS - H_OFFSET, 0)`, which take one ring per row at the full `W/DS` count; ring count, `sample_count()` and `STORAGE_BYTES` therefore all sit above what a flat `(W/DS)×(H/DS)` grid would need. The lattice is then expanded by longitude interpolation into a `W/DS`-column offset field, one row per ring, and bilinearly upsampled while compositing. See `Feedback::Style` below for preset selection. |
 | `Pixel::ChromaticShift<W, Spread>` | Emits four taps to simulate chromatic aberration: the unmodified source pixel at its sub-pixel `x`, plus single-channel R, G and B copies offset by `Spread`, `2*Spread` and `3*Spread` columns (`Spread` defaults to 1). Roughly doubles emitted energy — the source tap is kept, not replaced. The three fringe taps are snapped to the rounded integer column while the source tap keeps its sub-pixel `x`. The fringe subtends `3*Spread/W` of a turn, so raising `Spread` with `W` holds its angular width across resolutions. Requires `W > 3*Spread`. |
 
 #### Feedback Styles (`styles.h`)
@@ -1380,7 +1417,7 @@ Transformers integrate with the `MeshOps::transform()` pipeline and can be chain
 
 Both classes derive from `TransformerPool`, which fixes the call order:
 
-1. `init_storage(Arena&)` — from the effect's `init()`, after any `configure_arenas()` and before the first spawn.
+1. `init_storage(Arena&)` — from the effect's `init()`, after any `configure_arenas()` and before the first spawn. It also claims one of the shared `Timeline`'s `MAX_CLEAR_HOOKS` (4) clear-hook slots, so one `Timeline` carries at most four live pools; a fifth traps at registration.
 2. `spawn(in_frames, args...)` — the returned pointer is transient; use it at the call site, not across frames.
 3. `spawn_pausable(paused, in_frames, args...)` — same as `spawn()`, but the whole timeline event, start delay included, freezes while `*paused` is set, the way `Timeline::add_pausable` does. It is the only pool entry point that honours a GUI pause — `spawn()` animates straight through one — and the flag must outlive the event.
 4. `spawn_pinned(in_frames, args...)` — same as `spawn()`, but the pointer may be retained (e.g. registered as a live GUI param). Valid only for an animation that never completes on its own — infinite, or repeating (it rewinds rather than reaching `done()`) — and is added before any finite timeline event, so compaction cannot shift it.
@@ -1519,7 +1556,7 @@ The clip reads the 256 × 128 flash master by default. An effect that clips per 
 | `init_gamut_lut(arena, angle_steps, l_steps)` | Downsamples the flash master into `arena` and points the clip at the copy. Both step counts must divide the master's 256 × 128 and stay at or above `GAMUT_LUT_MIN_ANGLE_STEPS` × `GAMUT_LUT_MIN_L_STEPS` (128 × 64), the coarsest grid the walk resolves — both trapped. Costs `gamut_lut_bytes(angle_steps, l_steps)`. Call from the effect's `init()`, after any `configure_arenas()`. |
 | `release_gamut_lut()` | Drops the copy and points the clip back at the flash master. Registered as an `ArenaResetHook`, so `configure_arenas()` and the mesh carousel's compaction both run it before handing the storage out again. |
 
-Four sites arm a copy: `MeshFeedback`, the Shader workbench, `ShaderChain`, and `Pullback::ComposedEffect::init()` — the last being the base class every one of the sixteen composed effects runs, so each of them arms one too. None downsamples: all four take the full 256 × 128 grid, `gamut_lut_bytes(256, 128)` = 131,072 B of persistent arena apiece. Every other effect clips against the flash master.
+Four sites arm a copy: `MeshFeedback`, the Shader workbench, `ShaderChain`, and `Pullback::ComposedEffect::init()` — the last being the base class every one of the eighteen composed effects runs, so each of them arms one too. None downsamples: all four take the full 256 × 128 grid, `gamut_lut_bytes(256, 128)` = 131,072 B of persistent arena apiece. Every other effect clips against the flash master.
 
 #### Palette Modifiers
 
@@ -1689,11 +1726,12 @@ at the current phase.
 
 ### 7.7 The Mesh System (`core/mesh/`)
 
-The mesh system is split across eleven files:
+The mesh system is split across twelve files:
 
 - **`mesh.h`** — Core data structures (`PolyMesh`, `HalfEdgeMesh`) and fundamental `MeshOps` (compile, clone, classify)
 - **`conway.h`** — Conway mesh operators and vertex transformations
 - **`conway_graph.h`** — Constexpr 23-edge morph graph over the 18 simple-registry solids: per-edge operator/seed/reseed specs, bridge-aware walk weighting, and the closed `ORDERED_TOUR`
+- **`recipe_types.h`** — The authored op-chain model: the `Op` operator set, one `OpStep`, and the `Recipe` chain a registry generator mirrors, split out so the model is not read out of the registry tables written in it
 - **`recipe.h`** — Lowers an authored recipe to primitive steps (`expand_to_primitives`), sizes that lowering at compile time (`lowered_step_count`, `max_lowered_step_count`), replays either form through `SolidBuilder` (`build_recipe`, `build_steps`), and decides which lowered steps a morph leg can sweep (`is_morphable_step`)
 - **`hankin.h`** — Hankin pattern compilation and dynamic update
 - **`mesh_classes.h`** — Congruence-class clustering plus one canonical distance-LUT bake per class, allocated by descending face count under an 18 KB per-mesh budget
@@ -1802,32 +1840,33 @@ One deliberate exception: `SolidBuilder`'s fluent Conway chain (`solid_generator
 `ChoreographedEffect<Derived, Params>` is the engine's one preset system: an `Effect` base owning the effect's live parameter set, its preset table, and the choreography that moves between presets. `Derived` declares its presets — a `PRESETS` table (`std::array<PresetEntry<Params>, N>`) and/or `PRESET_IDS` naming them — plus a `Segue` preset policy, a dwell, a parameter schema version, and a validity predicate:
 
 ```cpp
-static constexpr Segue::Snap PRESET_SEGUE{};
+static constexpr Segue::Preset::Snap PRESET_SEGUE{};
 static constexpr uint32_t PARAMETER_SCHEMA_VERSION = 1;
 static constexpr uint16_t PRESET_DWELL_FRAMES = 241;
 static constexpr std::array<PresetEntry<Params>, 12> PRESETS = {{ ... }};
 static bool valid_params(const Params &p);
 ```
 
-The effect calls `begin_choreography()` once from `init()` — it configures the engine preset controller from the table (or `PRESET_IDS`) and, under a `Segue::Fade` policy, arms the through-black envelope loop — and `step_choreography()` every frame, which retires the dwell and starts the next automatic transition. A single-preset effect compiles the dwell countdown out. An effect that clocks its own advancement (DreamBalls' sprite hand-off chain) skips the per-frame tick and calls `advancePreset()` from its own schedule instead.
+The effect calls `begin_choreography()` once from `init()` — it configures the engine preset controller from the table (or `PRESET_IDS`) and, under a `Segue::Preset::Fade` policy, arms the through-black envelope loop — and `step_choreography()` every frame, which retires the dwell and starts the next automatic transition. A single-preset effect compiles the dwell countdown out. An effect that clocks its own advancement (DreamBalls' sprite hand-off chain) skips the per-frame tick and calls `advancePreset()` from its own schedule instead.
 
-Automatic transitions follow the policy — `Segue::Lerp` crossfades the live parameters into the target, `Segue::Snap` adopts immediately, `Segue::Fade` snaps inside the envelope's dark frame — while manual and synchronized selections always snap. Hooks specialize the mechanics: `preset_params(index)` (static, or a member when the effect patches entries at runtime, e.g. re-binding a noise pointer) overrides the `PRESETS[index]` lookup, and in its static form supplies the startup default too; `initial_params()` overrides whichever of `preset_params(0)` and `PRESETS[0]` would otherwise start the effect; shadowing `adopt_params(target)` re-derives dependent state after a snap; `blend_params(progress)` writes an in-flight Lerp; `set_preset_opacity(value)` receives a Fade envelope. The base also carries schema-versioned parameter snapshots: `serialize_parameters()` tags the live set with `PARAMETER_SCHEMA_VERSION`, and `restore_parameters()` rejects a snapshot taken under a different schema or failing `valid_params()`.
+Automatic transitions follow the policy — `Segue::Preset::Lerp` crossfades the live parameters into the target, `Segue::Preset::Snap` adopts immediately, `Segue::Preset::Fade` snaps inside the envelope's dark frame — while manual and synchronized selections always snap. Hooks specialize the mechanics: `preset_params(index)` (static, or a member when the effect patches entries at runtime, e.g. re-binding a noise pointer) overrides the `PRESETS[index]` lookup, and in its static form supplies the startup default too; `initial_params()` overrides whichever of `preset_params(0)` and `PRESETS[0]` would otherwise start the effect; shadowing `adopt_params(target)` re-derives dependent state after a snap; `transition_armed(target)` fires once as a crossfade arms, capturing the endpoint state the blend interpolates alongside the parameters; `blend_params(progress)` writes an in-flight Lerp; `set_preset_opacity(value)` receives a Fade envelope. The base also carries schema-versioned parameter snapshots: `serialize_parameters()` tags the live set with `PARAMETER_SCHEMA_VERSION`, and `restore_parameters()` rejects a snapshot taken under a different schema or failing `valid_params()`.
 
-`control/presets.h` holds the table vocabulary: `PresetEntry<Params>` (the row type) and the free `constexpr` helper `all_presets_in_ranges(entries, in_ranges)`, which folds a slider-range predicate over an entry table so an effect can `static_assert` its whole preset table against its registered parameter ranges — a loop rather than an unrolled conjunction, so appended entries are covered automatically.
+`control/preset_host.h` holds the controller the choreography drives: the committed index, the vetoable `apply_preset()` hook, and the manual `selectPreset`/`nextPreset`/`previousPreset` surface the WASM bridge calls. `control/presets.h` holds the table vocabulary: `PresetEntry<Params>` (the row type) and the free `constexpr` helper `all_presets_in_ranges(entries, in_ranges)`, which folds a slider-range predicate over an entry table so an effect can `static_assert` its whole preset table against its registered parameter ranges — a loop rather than an unrolled conjunction, so appended entries are covered automatically.
 
 ### 7.10 Hardware Drivers (`dma_led.h`, `pov_single.h`, `pov_segmented.h`)
 
-Three hardware drivers form a layered stack.  `dma_led.h` handles the SPI wire protocol; `pov_single.h` and `pov_segmented.h` sit above it and manage the POV column sweep, differing only in how many Teensys share the work.
+Three hardware drivers form a layered stack. The DMA LED layer handles the SPI wire protocol across four headers: `hd107s_frame.h` (wire format and inline color correction), `dma_led_core.h` (framing, transfer length, stale-transfer predicate), `dma_led_controller.h` (double-buffer orchestration, templated on its transport) and `dma_led.h` (the Teensy SPI/DMA peripheral driver, the only Arduino-only piece). `pov_single.h` and `pov_segmented.h` sit above it and manage the POV column sweep, differing only in how many Teensys share the work; the segmented driver's ISR decisions are split into two further host-tested headers, `pov_handoff.h` and `pov_submit_gate.h`.
 
-#### DMA LED Controller (`dma_led.h`)
+#### DMA LED Controller (`dma_led.h`, `hd107s_frame.h`, `dma_led_core.h`, `dma_led_controller.h`)
 
 Non-blocking DMA-based LED output for HD107S (APA102-compatible) LEDs on Teensy 4.x.  Enabled by `#define USE_DMA_LEDS` in the target's boilerplate header (`targets/Phantasm/phantasm_target.h`) before it includes the driver; `led.h` stays neutral and the default FastLED/WS2801 path remains as fallback. The FastLED fallback applies only to the single-board `POVDisplay`; the segmented `POVSegmented` driver `#error`s without `USE_DMA_LEDS` (FastLED's bit-bang `show()` masks IRQs for windows that break the sync symbol margins, which are derived from a mask window M ≈ 0), so DMA LEDs are mandatory on Phantasm.
 
-| Class | Role |
-|---|---|
-| `HD107SFrame<N>` | Pre-formatted DMA buffer for the HD107S protocol. `packPixel()` writes `Pixel` values directly into the frame buffer with inline color correction (color correction → temperature → brightness), bypassing the CRGB intermediate. The buffer is 32-byte-aligned (`__attribute__((aligned(32)))`) and cleaned with `arm_dcache_flush()` (clean, no invalidate — the buffer is TX-only) for cache coherency. |
-| `TeensySPIDMA` | Low-level DMA+SPI driver wired to LPSPI4. Configures a `DMAChannel` with completion interrupt for fully async byte-stream transmission. |
-| `DMALEDController<N>` | Double-buffered high-level controller. The ISR packs pixels into `backFrame()`, then `submitFrame()` flushes it and triggers async DMA, returning immediately. If the previous transfer is still in flight, `submitFrame()` **drops** the new frame (bumping `getOverrunCount()`) rather than spinning — the in-flight DMA keeps showing the previous column; a transfer that never completes is surfaced as a wedged-channel fault. |
+| Class | Header | Role |
+|---|---|---|
+| `HD107SFrame<N>` | `hd107s_frame.h` | Pre-formatted DMA buffer for the HD107S protocol. `pack_pixel()` writes `Pixel` values directly into the frame buffer with inline color correction (color correction → temperature → brightness), bypassing the CRGB intermediate. The buffer is 32-byte-aligned (`__attribute__((aligned(32)))`) and cleaned with `arm_dcache_flush()` (clean, no invalidate — the buffer is TX-only) for cache coherency. |
+| `TeensySPIDMA` | `dma_led.h` | Low-level DMA+SPI driver wired to LPSPI4. Configures a `DMAChannel` with completion interrupt for fully async byte-stream transmission. |
+| `DMALEDController<N>` | `dma_led_controller.h` | Double-buffered high-level controller. The ISR packs pixels into `back_frame()`, then `submit_frame()` flushes it and triggers async DMA, returning immediately. If the previous transfer is still in flight, `submit_frame()` **drops** the new frame (bumping `get_overrun_count()`) and returns false rather than spinning; a transfer that never completes is surfaced as a wedged-channel fault. The drop returns before the buffers swap, so `back_frame()` still holds the dropped pixels and a caller can re-submit them without repacking. |
+| `next_buffer()`, `transfer_len()`, `transfer_stale()` | `dma_led_core.h` | Free `constexpr` framing and watchdog math the controller's decisions derive from, host-tested without the peripherals. |
 
 The 16-bit linear pipeline reaches from the canvas all the way to the SPI wire with no 8-bit intermediate:
 
@@ -1836,8 +1875,8 @@ The 16-bit linear pipeline reaches from the canvas all the way to the SPI wire w
 const Pixel* buf = effect->display_buffer();               // 16-bit linear pixels
 // Physical LED index comes from the single-source-of-truth map (pov_single_map.h),
 // which applies the top-arm reversal / bottom-arm offset — never the raw row index.
-frame.packPixel(pov::strip_top_led(y, S), buf[y * width + x]); // Pixel → HD107S frame
-ledController.submitFrame();                                // non-blocking DMA, drops on overrun
+frame.pack_pixel(pov::strip_top_led(y, S), buf[y * width + x]); // Pixel → HD107S frame
+(void)ledController.submit_frame();                          // non-blocking DMA; returns false on overrun
 ```
 
 #### Single-Teensy POV Driver (`pov_single.h`)
@@ -1849,14 +1888,16 @@ Main Loop                              ISR (IntervalTimer)
 ──────────                             ───────────────────
 effect->draw_frame()                   show_col() fires every N µs
   Canvas canvas(*this)                   for y in 0..S/2:
-    render to bufs[cur]                    packPixel(strip_top_led(y,S),    get_pixel(x, y))                      // top arm
-  ~Canvas → queue_frame()                  packPixel(strip_bottom_led(y,S), get_pixel(strip_opposite_col(x,W), y)) // bottom arm
-                                         submitFrame() → async DMA
+    render to bufs[cur]                    pack_pixel(strip_top_led(y,S),    get_pixel(x, y))                      // top arm
+  ~Canvas → queue_frame()                  pack_pixel(strip_bottom_led(y,S), get_pixel(strip_opposite_col(x,W), y)) // bottom arm
+                                         submit_frame() → async DMA
                                          x = (x+1) % width
                                          if x==0 || x==width/2: advance_display()
 ```
 
 The top arm's physical LED ordering is reversed (LED 0 at the tip, descending in Y), and the bottom arm shows the opposite half of the image (x offset by W/2).
+
+`show_col()` discards `submit_frame()`'s overrun verdict: this driver carries no retry latch and no dark fallback, so a dropped column leaves the previous column lit for one extra period — the drop returns before the buffer flip. `run()` fail-fast-checks that one composite transfer fits inside a column period, which rules out the systematic overrun that would hold the strip on one frame and is what makes discarding the verdict sound.
 
 | Parameter | Value (Holosphere) |
 |---|---|
@@ -1906,9 +1947,16 @@ The ISR loop has no branches:
 const Pixel* buf = effect->display_buffer();    // fast path: no per-pixel virtual dispatch
 int y = y_base;
 for (int i = 0; i < PPS; ++i, y += y_step) {
-    frame.packPixel(i, buf[y * width + x_col]);
+    frame.pack_pixel(i, buf[y * width + x_col]);
 }
 ```
+
+**ISR state machines**: the wake's non-trivial decisions are split out of the Arduino-only driver into two host-tested headers, which `run_wake_sequence()` drives in ISR order:
+
+| State machine | Header | Role |
+|---|---|---|
+| `EffectHandoff<T>` | `pov_handoff.h` | Foreground↔ISR effect ownership: the teardown counter handshake, the acquire/release publish and adopt of a pending effect, the consumed-generation gate that keeps the ISR off a deleted instance, and the display-window (clip) alternation. The foreground constructs and deletes instances; the ISR only ever dereferences what `live()` handed it. |
+| `SubmitGate`, `SyncPulseGate` | `pov_submit_gate.h` | The LED transport's accept/drop verdict and the sync pin's pulse width. Both submit paths — the fail-dark black frame and the image column — clear their pending state only on an accepted submit, and a dropped column latches a retry that the next wake re-submits without repacking, so a drop costs one flywheel wake (~54 µs) rather than a dark column. A wake that renders nothing has too short a body to carry a scheduled sync pulse, so the pin is held HIGH across the ISR boundary and dropped at the head of the next wake. |
 
 **Effect transparency**: Effects are written against the full 288×144 canvas with no per-segment code. Each board clips rendering to its half-width segment band for the current display window (`clip_to_segment`), except stateful effects (`needs_full_frame()` / `persists_pixels()`), which render the full canvas; the ISR then packs this board's LEDs. Every board reseeds the shared `Pcg32` at every effect build from `EFFECT_SEEDS[]`, which `Phantasm.ino` builds as `hs::stable_effect_seed(#name)` (`core/platform/rng.h`) so an entry's stream follows its name rather than its roster position; `hs::epoch_seed(effect index)` (epoch 0 is the identity seed `1337`) is the fallback for a board that supplies no seed table. Either way a board's canvas depends only on the beacon-synchronized index — a mid-show joiner renders bit-identically to boards that have been up for hours.
 
@@ -2017,7 +2065,7 @@ Boundary symbols (`ZERO`/`HALF`) serve **two** layers at once: they snap the fly
 
 * **Layer 1 — Column phase.** Boundary symbols snap each flywheel twice per revolution; worst-case inter-snap crystal drift is **~0.006 column** at 40 ppm — far below a visible seam, which is the quantitative justification for deleting the column-clock wire.  In **LOCKED** a symbol is accepted only if its implied correction is **≤ G = 4 columns** and its boundary identity matches the flywheel's prediction (the plausibility gate).
 * **Layer 2 — Buffer flip.** The local boundary crossing flips the display buffer; the symbol is a deduplicated backstop.  `try_flip`, keyed on boundary identity (boundaries strictly alternate `ZERO, HALF, …`), makes the flip **exactly-once** even when both the crossing and the symbol fire.  Losing both paths in one half-rev is the only glitch, and it self-heals the next half-rev.
-* **Layer 3 — Content.** The playlist is **epoch-counted**, not `millis()`-gated.  Duration is **per roster entry**, not uniform: `HS_PHANTASM_EFFECT_LIST` carries a seconds column beside each name and `targets/Phantasm/Phantasm.ino` converts it to `EFFECT_REVOLUTIONS[]` at `seconds · RPM / 60`, spanning 38 s (304 revolutions) to 240 s (1,920 revolutions) across the 36-entry roster.  The master emits the `EPOCH` mark (plus R = 3 redundancy repeats) when the current entry's revolutions elapse; every board counts down to the same **absolute** commit boundary regardless of which copy it heard, constructs the next roster entry during the final K = 2-revolution **construction window** (display black on all boards simultaneously), and all swap to its frame 0 at the same boundary.  The beacon broadcasts the absolute effect index so a board that missed every epoch repeat corrects within ~2 s, and a rebooted board rejoins at the correct effect — **fail-dark, never fail-wrong** (a board with no established identity shows black rather than a guessed effect).  Every one of those revolution budgets is absolute, so on a 304-revolution entry the 25-revolution rejoin bound still costs 8% of the effect's airtime.
+* **Layer 3 — Content.** The playlist is **epoch-counted**, not `millis()`-gated.  Duration is **per roster entry**, not uniform: `HS_PHANTASM_EFFECT_LIST` carries a seconds column beside each name and `targets/Phantasm/Phantasm.ino` converts it to `EFFECT_REVOLUTIONS[]` at `seconds · RPM / 60`, spanning 38 s (304 revolutions) to 240 s (1,920 revolutions) across the 38-entry roster.  The master emits the `EPOCH` mark (plus R = 3 redundancy repeats) when the current entry's revolutions elapse; every board counts down to the same **absolute** commit boundary regardless of which copy it heard, constructs the next roster entry during the final K = 2-revolution **construction window** (display black on all boards simultaneously), and all swap to its frame 0 at the same boundary.  The beacon broadcasts the absolute effect index so a board that missed every epoch repeat corrects within ~2 s, and a rebooted board rejoins at the correct effect — **fail-dark, never fail-wrong** (a board with no established identity shows black rather than a guessed effect).  Every one of those revolution budgets is absolute, so on a 304-revolution entry the 25-revolution rejoin bound still costs 8% of the effect's airtime.
 
 **Index beacon frame format.** The beacon is a **data** symbol (integrity by *rejection*, not by exactness).  Five base-8 digits at 1-column pitch, each digit a burst of `digit + 1` pulses, digits separated by 5 quiet columns (one past the gap timeout, so the decoder reliably terminates each digit):
 
@@ -2136,7 +2184,7 @@ Effects register themselves into a global registry using the `REGISTER_EFFECT(Cl
 
 ### Parameter Registration
 
-Effects expose live-adjustable parameters via `register_param()`. These are reflected into the WASM bridge and auto-generate GUI controls in the simulator:
+Effects expose live-adjustable parameters via `register_param()` (`control/param_host.h`). These are reflected into the WASM bridge and auto-generate GUI controls in the simulator:
 
 ```cpp
 register_param("Twist",   &params.twist, -5.0f, 5.0f);        // float slider (min, max)
@@ -2170,7 +2218,7 @@ Every host-side operation the graph needs is a pure virtual on `EffectTransition
 
 All screenshots below were captured from the [live WebAssembly simulator](https://woundedlion.github.io/daydream/) — the Phantasm 288×144 preset for most, and the Holosphere 96×20 preset for RingShower, Dynamo and Thrusters.
 
-The compile-time roster and tests carry 39 firmware-capable effects. Native and WASM builds add two simulator-only registry entries, the `Shader` workbench and the `ShaderChain` chain interpreter, for 41. The simulator sidebar exposes 35 effects at 288×144 and 34 at 96×20 (§10.5); both stay out of the card lists because they open through the standalone tool. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `targets/Phantasm/phantasm_playlist.h`) contains 36 effects, including all sixteen promoted fixed-pipeline effects and excluding the three Holosphere-96×20-only effects: Dynamo, MobiusRings, and Thrusters. Full-cycle Teensy measurements for that playlist are indexed in the [on-device effect profiles](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md).
+The compile-time roster and tests carry 41 firmware-capable effects. Native and WASM builds add two simulator-only registry entries, the `Shader` workbench and the `ShaderChain` chain interpreter, for 43. The simulator sidebar exposes 37 effects at 288×144 and 36 at 96×20 (§10.5); both stay out of the card lists because they open through the standalone tool. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `targets/Phantasm/phantasm_playlist.h`) contains 38 effects, including all eighteen promoted fixed-pipeline effects and excluding the three Holosphere-96×20-only effects: Dynamo, MobiusRings, and Thrusters. Full-cycle Teensy measurements for that playlist are indexed in the [on-device effect profiles](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md).
 
 ### Core Effects (Modern Engine)
 
@@ -2316,7 +2364,7 @@ A single head traces spherical Lissajous curves, cycling through a dozen configu
 
 Glitch-folded stereographic grids pulled through an animated wave shear. Four presets morph the grid frequency, complexity, shear strength, and speed inside one composed pipeline.
 
-**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 1 Speed, Warp Strength, Warp Frequency, Warp Field Angle, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 1 Speed, Warp Strength, Warp Frequency, Warp Field Angle, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Opacity at Value 0, Opacity at Value 1, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
 
 </td></tr></table>
 
@@ -2328,7 +2376,7 @@ Glitch-folded stereographic grids pulled through an animated wave shear. Four pr
 
 A drifting twin-wave field reflected through a spherical kaleidoscope, projected stereographically, and repeated by an inner mirror tile.
 
-**Parameters**: Pattern Freq, Speed, Drift, Source Angle Speed, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 2 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+**Parameters**: Pattern Freq, Speed, Drift, Source Angle Speed, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 2 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Opacity at Value 0, Opacity at Value 1, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
 
 </td></tr></table>
 
@@ -2340,7 +2388,7 @@ A drifting twin-wave field reflected through a spherical kaleidoscope, projected
 
 A broad folded gnomonic grid drifting inside a fixed mirror frame and a spherical kaleidoscope. Edge-fade coverage and a generated triadic palette give the field its soft, liquid boundary.
 
-**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Singularity Fade, Camera Wander, Planar Warp 1 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Edge Width, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Singularity Fade, Camera Wander, Planar Warp 1 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Edge Width, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Opacity at Value 0, Opacity at Value 1, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
 
 </td></tr></table>
 
@@ -2352,7 +2400,7 @@ A broad folded gnomonic grid drifting inside a fixed mirror frame and a spherica
 
 A mirrored grid folded by the glitch lens and a folded gnomonic projection. Its high-contrast edge-fade material keeps the discontinuous facets legible while the grid drifts inside a fixed mirror frame.
 
-**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Singularity Fade, Camera Wander, Planar Warp 1 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Edge Width, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Singularity Fade, Camera Wander, Planar Warp 1 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Edge Width, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Opacity at Value 0, Opacity at Value 1, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
 
 </td></tr></table>
 
@@ -2364,7 +2412,7 @@ A mirrored grid folded by the glitch lens and a folded gnomonic projection. Its 
 
 A wave-sheared grid moving across a folded gnomonic dodecahedral kaleidoscope, then repeated through an inner mirror tile.
 
-**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Singularity Fade, Camera Wander, Planar Warp 1 Speed, Warp Strength, Warp Frequency, Warp Field Angle, Planar Warp 2 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Singularity Fade, Camera Wander, Planar Warp 1 Speed, Warp Strength, Warp Frequency, Warp Field Angle, Planar Warp 2 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Opacity at Value 0, Opacity at Value 1, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
 
 </td></tr></table>
 
@@ -2376,7 +2424,7 @@ A wave-sheared grid moving across a folded gnomonic dodecahedral kaleidoscope, t
 
 An affine primitive lattice rendered as soft iso contours through a folded gnomonic projection. The affine frame scrolls the lattice by whole cell windings, so its drift repeats without a visible seam.
 
-**Parameters**: Lattice Cell Scale, Lattice Shape, Lattice Softness, Lattice Radius, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 1 Speed, Affine Rotation Rate, Affine Translation X, Affine Translation Y, Affine Scale X, Affine Scale Y, Affine Shear, Iso Level, Iso Width, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+**Parameters**: Lattice Cell Scale, Lattice Shape, Lattice Softness, Lattice Radius, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 1 Speed, Affine Rotation Rate, Affine Translation X, Affine Translation Y, Affine Scale X, Affine Scale Y, Affine Shear, Iso Level, Iso Width, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Opacity at Value 0, Opacity at Value 1, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
 
 </td></tr></table>
 
@@ -2400,7 +2448,31 @@ An analytic reflective flight through cubic and four-dimensional lattices under 
 
 A folded-sinusoidal sphere projection displaced by curl noise and shaded with a generated triadic palette. Its two presets share one composed pipeline and vary only the surface-noise scale.
 
-**Parameters**: Lattice Cell Scale, Lattice Shape, Lattice Softness, Lattice Radius, Projection Spin Speed, Projection Wander, Camera Wander, Central Meridian, Surface Noise Scale, Surface Noise Strength, Surface Noise Speed, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Brightness Depth, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+**Parameters**: Lattice Cell Scale, Lattice Shape, Lattice Softness, Lattice Radius, Projection Spin Speed, Projection Wander, Camera Wander, Central Meridian, Surface Noise Scale, Surface Noise Strength, Surface Noise Speed, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Brightness Bottom, Brightness Top, Opacity at Value 0, Opacity at Value 1, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+
+</td></tr></table>
+
+<table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=MermaidSkin" target="_blank"><img src="docs/screenshots/MermaidSkin.png" alt="MermaidSkin" width="280"></a></td>
+<td valign="top">
+
+#### MermaidSkin
+
+A max-chroma analogous grid folded around the sphere and rippled by curl noise. Its cup palette mapping and slowly drifting noisy hue shift preserve the iridescent skin captured in the saved workbench preset.
+
+**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Projection Spin Speed, Projection Wander, Camera Wander, Central Meridian, Surface Noise Scale, Surface Noise Strength, Surface Noise Speed, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Opacity at Value 0, Opacity at Value 1, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+
+</td></tr></table>
+
+<table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=ChromaticLichen" target="_blank"><img src="docs/screenshots/ChromaticLichen.png" alt="ChromaticLichen" width="280"></a></td>
+<td valign="top">
+
+#### ChromaticLichen
+
+A glitch-folded gnomonic grid displaced by sphere-space curl noise. An analogous generated palette paints the slow lichen-like branching with shifting chromatic bands.
+
+**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Surface Noise Scale, Surface Noise Strength, Surface Noise Speed, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Opacity at Value 0, Opacity at Value 1, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
 
 </td></tr></table>
 
@@ -2412,7 +2484,7 @@ A folded-sinusoidal sphere projection displaced by curl noise and shaded with a 
 
 A primitive lattice displaced by sphere-space curl noise, folded through a dodecahedral kaleidoscope and projected stereographically. A value cutout carves the lattice, so coverage follows the field rather than the projection alone.
 
-**Parameters**: Lattice Cell Scale, Lattice Shape, Lattice Softness, Lattice Radius, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Surface Noise Scale, Surface Noise Strength, Surface Noise Speed, Cutout Threshold, Cutout Softness, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+**Parameters**: Lattice Cell Scale, Lattice Shape, Lattice Softness, Lattice Radius, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Surface Noise Scale, Surface Noise Strength, Surface Noise Speed, Cutout Threshold, Cutout Softness, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Opacity at Value 0, Opacity at Value 1, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
 
 </td></tr></table>
 
@@ -2424,7 +2496,7 @@ A primitive lattice displaced by sphere-space curl noise, folded through a dodec
 
 A polar primitive lattice folded through a pentagonal-prism kaleidoscope and projected stereographically, its polar chart winding the angular phase one turn per cycle.
 
-**Parameters**: Lattice Cell Scale, Lattice Shape, Lattice Softness, Lattice Radius, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 1 Speed, Polar Radial Scale, Polar Radial Phase, Polar Angular Phase, Planar Warp 2 Speed, Warp Strength, Warp Frequency, Warp Field Angle, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+**Parameters**: Lattice Cell Scale, Lattice Shape, Lattice Softness, Lattice Radius, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 1 Speed, Polar Radial Scale, Polar Radial Phase, Polar Angular Phase, Planar Warp 2 Speed, Warp Strength, Warp Frequency, Warp Field Angle, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Opacity at Value 0, Opacity at Value 1, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
 
 </td></tr></table>
 
@@ -2436,7 +2508,7 @@ A polar primitive lattice folded through a pentagonal-prism kaleidoscope and pro
 
 A rotating spiral folded through a hexagonal-prism kaleidoscope, projected stereographically, and displaced by direct surface noise whose path length drives the hue rotation.
 
-**Parameters**: Pattern Freq, Speed, Source Angle Speed, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Surface Noise Scale, Surface Noise Strength, Surface Noise Speed, Surface Noise Direction, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount
+**Parameters**: Pattern Freq, Speed, Source Angle Speed, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Surface Noise Scale, Surface Noise Strength, Surface Noise Speed, Surface Noise Direction, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Opacity at Value 0, Opacity at Value 1, Hue Shift Amount
 
 </td></tr></table>
 
@@ -2448,7 +2520,7 @@ A rotating spiral folded through a hexagonal-prism kaleidoscope, projected stere
 
 A vector-noise grid refracted across folded gnomonic dodecahedral facets and repeated through an inner mirror tile. A cup-shaped palette envelope emphasizes the warped cell interiors.
 
-**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Singularity Fade, Camera Wander, Planar Warp 1 Speed, Warp Strength, Warp Scale, Warp Vector Angle, Planar Warp 2 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Brightness Depth, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Singularity Fade, Camera Wander, Planar Warp 1 Speed, Warp Strength, Warp Scale, Warp Vector Angle, Planar Warp 2 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Brightness Bottom, Brightness Top, Opacity at Value 0, Opacity at Value 1, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
 
 </td></tr></table>
 
@@ -2460,7 +2532,7 @@ A vector-noise grid refracted across folded gnomonic dodecahedral facets and rep
 
 A generated analogous-palette grid folded through a dodecahedral kaleidoscope, then projected stereographically and repeated by an inner mirror tile. Its four presets share one composed pipeline and vary only continuous parameters.
 
-**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 2 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 2 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Opacity at Value 0, Opacity at Value 1, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
 
 </td></tr></table>
 
@@ -2472,7 +2544,7 @@ A generated analogous-palette grid folded through a dodecahedral kaleidoscope, t
 
 A mirrored twin-wave field folded through a hexagonal-prism kaleidoscope and projected stereographically, with an analogous generated palette.
 
-**Parameters**: Pattern Freq, Speed, Drift, Source Angle Speed, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 2 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+**Parameters**: Pattern Freq, Speed, Drift, Source Angle Speed, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 2 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Opacity at Value 0, Opacity at Value 1, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
 
 </td></tr></table>
 
@@ -2484,7 +2556,7 @@ A mirrored twin-wave field folded through a hexagonal-prism kaleidoscope and pro
 
 Dodecahedrally folded grids mapped continuously around an equirectangular equator and repeated through an inner mirror tile. Three presets morph density, coupling, and color mapping without changing structure.
 
-**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Central Meridian, Planar Warp 2 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
+**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Central Meridian, Planar Warp 2 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Opacity at Value 0, Opacity at Value 1, Hue Shift Amount, Hue Noise Scale, Hue Noise Speed
 
 </td></tr></table>
 
@@ -2496,7 +2568,7 @@ Dodecahedrally folded grids mapped continuously around an equirectangular equato
 
 A high-contrast mirrored stereographic grid folded by the glitch lens. Hue follows total mirror displacement, producing the concentric color structure around the moving field.
 
-**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Singularity Fade, Camera Wander, Planar Warp 1 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Edge Width, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Value Opacity Low, Value Opacity High, Hue Shift Amount
+**Parameters**: Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Source Angle Speed, Singularity Fade, Camera Wander, Planar Warp 1 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Edge Width, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Opacity at Value 0, Opacity at Value 1, Hue Shift Amount
 
 </td></tr></table>
 
@@ -2508,7 +2580,7 @@ A high-contrast mirrored stereographic grid folded by the glitch lens. Hue follo
 
 A stereographic twin-wave field folded through an inner mirror tile and a live Möbius lens. The lens follows a continuous 160-frame circular warp cycle while a complementary palette tracks displacement through the fold. Its two presets share the same fixed graph.
 
-**Parameters**: Pattern Freq, Speed, Drift, Source Angle Speed, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 2 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Mobius A Re, Mobius A Im, Mobius B Re, Mobius B Im, Mobius C Re, Mobius C Im, Mobius D Re, Mobius D Im, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Brightness Depth, Value Opacity Low, Value Opacity High, Hue Shift Amount
+**Parameters**: Pattern Freq, Speed, Drift, Source Angle Speed, Singularity Fade, Projection Spin Speed, Projection Wander, Camera Wander, Planar Warp 2 Speed, Mirror Rotation, Mirror Cell X, Mirror Cell Y, Mirror Offset X, Mirror Offset Y, Mobius A Re, Mobius A Im, Mobius B Re, Mobius B Im, Mobius C Re, Mobius C Im, Mobius D Re, Mobius D Im, Palette Chroma, Palette Mapping, Mapping Frequency, Mapping Phase, Phase Oscillation Depth, Phase Oscillation Speed, Brightness Bottom, Brightness Top, Opacity at Value 0, Opacity at Value 1, Hue Shift Amount
 
 </td></tr></table>
 
@@ -2554,7 +2626,7 @@ A head traces a fixed 12:5 spherical Lissajous figure whose long trail is contin
 
 #### MeshFeedback
 
-A selectable Platonic, Archimedean, or Catalan wireframe rendered with `Plot::Mesh`, given a noise-distorted, feedback-loop appearance via `Filter::Pixel::Feedback`. An orientation random-walk tumbles the solid while a `Segue::Snap` preset choreography hard-cuts both the base mesh and feedback/distortion style parameters.
+A selectable Platonic, Archimedean, or Catalan wireframe rendered with `Plot::Mesh`, given a noise-distorted, feedback-loop appearance via `Filter::Pixel::Feedback`. An orientation random-walk tumbles the solid while a `Segue::Preset::Snap` preset choreography hard-cuts both the base mesh and feedback/distortion style parameters.
 
 **Parameters**: Base Mesh, Fade, Distort Amp, Distort Freq, Distort Speed, Noise Scale, Hue Shift, Feedback
 
@@ -2638,7 +2710,7 @@ A stack of evenly spaced soft-stroked rings (`Scan::DistortedRingStack`) sharing
 
 #### ShapeShifter
 
-Concentric polygon, star, or flower outlines drawn through the `Plot` rasterizer. Dense planar stars use direct sampled edges, with pole-crossing edges routed through the shared rasterizer and the same pre-shaded fragment shader. The rings span the full sphere radius under a selectable spacing law — **Spacing** is either uniform steps in radius or screen-balanced, which redistributes the rings away from the poles (subject to a density floor) so their on-screen spacing stays even — and **Alpha Falloff** picks each ring's alpha profile: a flat half, or full at the poles fading toward the equator. A selectable animated waveform offsets each ring's phase to twist the stack back and forth while a global random walk reorients the stack. A periodic timer steps through the presets under a `Segue::Fade` choreography: the whole stack fades out to black, the parameter set snaps to a fresh arrangement of spherical polygons, flowers, or stars inside that dark frame, and the stack fades back in — so two parameter sets never render on the same frame.
+Concentric polygon, star, or flower outlines drawn through the `Plot` rasterizer. Dense planar stars use direct sampled edges, with pole-crossing edges routed through the shared rasterizer and the same pre-shaded fragment shader. The rings span the full sphere radius under a selectable spacing law — **Spacing** is either uniform steps in radius or screen-balanced, which redistributes the rings away from the poles (subject to a density floor) so their on-screen spacing stays even — and **Alpha Falloff** picks each ring's alpha profile: a flat half, or full at the poles fading toward the equator. A selectable animated waveform offsets each ring's phase to twist the stack back and forth while a global random walk reorients the stack. A periodic timer steps through the presets under a `Segue::Preset::Fade` choreography: the whole stack fades out to black, the parameter set snaps to a fresh arrangement of spherical polygons, flowers, or stars inside that dark frame, and the stack fades back in — so two parameter sets never render on the same frame.
 
 **Parameters**: Alpha, Shape, Count, Sides, Function, Amplitude, Speed, Opposite, Alpha Falloff, Spacing
 
@@ -2698,6 +2770,8 @@ Two stages carry approved approximations. Fast square Peirce projection and the 
 | `kaleidoscope-mandala` | `KaleidoscopeMandala` | 2 | 5, plus `cup-hue` |
 | `grid-space` | `GridSpace` | 1 | 6 |
 | `lattice-melt` | `LatticeMelt` | 2 | 7–8 |
+| `chromatic-lichen` | `ChromaticLichen` | 1 | — |
+| `mermaid-skin` | `MermaidSkin` | 1 | — |
 | `ash-cloud` | `AshCloud` | 1 | — |
 | `kaleidoscope-pent-bright` | `KaleidoscopePentBright` | 1 | 9 |
 | `kaleidoscope-hex-oil` | `KaleidoscopeHexOil` | 2 | — |
@@ -2708,9 +2782,9 @@ Two stages carry approved approximations. Fast square Peirce projection and the 
 | `cosmic-eyeball` | `CosmicEyeball` | 1 | 18 |
 | `mobius-grid` | `MobiusGrid` | 2 | 19–20 |
 
-These sixteen effects form the product-only `shader-collection` group; family metadata is not part of runtime identity. Each effect's show window is derived from its preset count, giving every preset the shared 600-frame dwell and every transition the shared 480-frame segue. Ash Cloud and Kaleidoscope Hex Oil joined after the ShaderWorkbench migration from workbench-authored snapshots, so they carry no legacy preset index. Host tests pair each preset that carries a legacy source index with Shader's dynamic evaluator and require the two to agree to within one 16-bit count; Lattice Melt and Kaleidoscope Smooth run theirs in dedicated white-box equivalence suites. The presets authored after the migration have no legacy configuration to pair with, so nothing holds them against the evaluator: Ash Cloud's one, Kaleidoscope Hex Oil's two, Kaleidoscope Smooth's `stretched-grid`, Kaleidoscope Hex Bright's `hex-twin-wave-alt`, and Kaleidoscope Mandala's `cup-hue`.
+These eighteen effects form the product-only `shader-collection` group; family metadata is not part of runtime identity. Each effect's show window is derived from its preset count, giving every preset the shared 600-frame dwell and every transition the shared 480-frame segue. Mermaid Skin, Chromatic Lichen, Ash Cloud, and Kaleidoscope Hex Oil joined after the ShaderWorkbench migration from workbench-authored snapshots, so they carry no legacy preset index. Host tests pair each preset that carries a legacy source index with Shader's dynamic evaluator and require the two to agree to within one 16-bit count; Lattice Melt and Kaleidoscope Smooth run theirs in dedicated white-box equivalence suites. The presets authored after the migration have no legacy configuration to pair with the legacy evaluator.
 
-The [shipping device captures](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md) report zero spilled frames for all sixteen promoted effects, with peaks from 23.30 ms for AlienCore to 52.39 ms for AshCloud. The composed effects let the compiler inline the exact typed pipeline and discard every unused stage. The shared runtime and `GenerativePalette` color stage keep common lifecycle and palette machinery from being duplicated without introducing type erasure in the per-pixel call. AshCloud's paired global-O3 capture peaks at 48.35 ms, but no paired capture isolates specialization from the other structural differences, so the archive does not claim a dispatch-only speedup.
+The [shipping device captures](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md) report zero spilled frames for all sixteen previously profiled promoted effects, with peaks from 23.30 ms for AlienCore to 52.39 ms for AshCloud. MermaidSkin and ChromaticLichen have not yet received on-device timing captures. The composed effects let the compiler inline the exact typed pipeline and discard every unused stage. The shared runtime and `GenerativePalette` color stage keep common lifecycle and palette machinery from being duplicated without introducing type erasure in the per-pixel call. AshCloud's paired global-O3 capture peaks at 48.35 ms, but no paired capture isolates specialization from the other structural differences, so the archive does not claim a dispatch-only speedup.
 
 #### Authoring vocabulary
 
@@ -2770,7 +2844,7 @@ Colorize ──────────> Palette + selected hue-shift source
 ```
 
 
-Schema validity still enforces the cross-stage constraints that have a geometric reason. Noise Contour (Sphere) cannot follow a planar warp. Polar Chart must be the only planar warp, except that Planar Warp 1 Polar Chart may be followed by Wave Shear. It requires Grid or Primitive Lattice, and when it is the only planar warp its seam must land on a whole number of source periods: `Pattern Freq × Polar Harmonic` for Grid, `2π × Lattice Cell Scale × Polar Harmonic` for Primitive Lattice, which is periodic in its cell scale and ignores Pattern Freq. Seam-sensitive projected noise and warp stages cannot cross the cut topology of Bonne, Peirce, or Airocean. Unsafe coordinate bounds and excess noise resources are rejected as well. These incompatible combinations remain pending and report an actionable warning. Manifest availability is separate: the simulator routes valid unmatched combinations dynamically, while firmware exposes the sixteen promoted fixed descriptors rather than the workbench dispatcher.
+Schema validity still enforces the cross-stage constraints that have a geometric reason. Noise Contour (Sphere) cannot follow a planar warp. Polar Chart must be the only planar warp, except that Planar Warp 1 Polar Chart may be followed by Wave Shear. It requires Grid or Primitive Lattice, and when it is the only planar warp its seam must land on a whole number of source periods: `Pattern Freq × Polar Harmonic` for Grid, `2π × Lattice Cell Scale × Polar Harmonic` for Primitive Lattice, which is periodic in its cell scale and ignores Pattern Freq. Seam-sensitive projected noise and warp stages cannot cross the cut topology of Bonne, Peirce, or Airocean. Unsafe coordinate bounds and excess noise resources are rejected as well. These incompatible combinations remain pending and report an actionable warning. Manifest availability is separate: the simulator routes valid unmatched combinations dynamically, while firmware exposes the eighteen promoted fixed descriptors rather than the workbench dispatcher.
 
 Projection seams use topology supplied by the projection kernel rather than guessing from planar coordinates. **Edge Fade** gives both sides of a paired cut the same authored fade, so the seam closes flush without a subducted edge. Glued and periodic edges remain continuous and do not fade. **Singularity Fade** is projection weight; selecting either projection-weight coverage policy carries that attenuation into alpha as well as any separately selected signal weighting.
 
@@ -2863,7 +2937,7 @@ Five further methods carry Shader's whole workbench configuration across a reloa
 | Method | Description |
 |---|---|
 | `getFullConfigSnapshot()` | Return the current Shader workbench's whole state as `{schemaVersion, accepted, requested, pendingFieldIds, hasRuntime, runtime}`, or `null` for another effect. `accepted` and `requested` are `CONFIG_FIELD_COUNT`-long arrays of field values encoded as `uint32`, in `ConfigFieldId` order; `pendingFieldIds` lists the indices of the fields carrying an unresolved edit; `runtime` is the animation clock state, meaningful only when `hasRuntime` |
-| `restoreFullConfigSnapshot(snapshot)` → `FullConfigRestoreResult` | Install a current-schema snapshot atomically: `Module.FullConfigRestoreResult.APPLIED`, else `NOT_SHADER_WORKBENCH`, `UNSUPPORTED_VERSION`, `INVALID_LENGTH` (a missing snapshot, or an array whose length is not the field count), `INVALID_VALUE` (a field or runtime value outside what its slot admits), `INVALID_ACCEPTED` (fields each in range but a combination the effect will not render), or `INVALID_PENDING` (a pending list that is absent, that is not a set of in-range field indices, or that does not name exactly the fields where `accepted` and `requested` differ — retry with `[]`). Compare against the enum values — never by truthiness. Every rejection leaves the effect exactly as it was, so a failed restore needs no rollback. Only schema 8, the current field layout, is accepted; older layouts are intentionally rejected. |
+| `restoreFullConfigSnapshot(snapshot)` → `FullConfigRestoreResult` | Install a current-schema snapshot atomically: `Module.FullConfigRestoreResult.APPLIED`, else `NOT_SHADER_WORKBENCH`, `UNSUPPORTED_VERSION`, `INVALID_LENGTH` (a missing snapshot, or an array whose length is not the field count), `INVALID_VALUE` (a field or runtime value outside what its slot admits), `INVALID_ACCEPTED` (fields each in range but a combination the effect will not render), or `INVALID_PENDING` (a pending list that is absent, that is not a set of in-range field indices, or that does not name exactly the fields where `accepted` and `requested` differ — retry with `[]`). Compare against the enum values — never by truthiness. Every rejection leaves the effect exactly as it was, so a failed restore needs no rollback. Only the current field layout is accepted — the `schemaVersion` a fresh `getFullConfigSnapshot()` reports; older layouts are intentionally rejected. |
 | `getFullConfigFieldDefinitions()` | Return `[{id, name}]` for every field in the snapshot arrays — `id` is the index into `accepted`/`requested`/`pendingFieldIds`, `name` the stable dotted config path — or `null` when the loaded effect is not Shader. Read it to label a field rather than hardcoding an index, which moves when the schema gains a field |
 | `getConfigImportNotice()` → `string` | Reserved compatibility accessor. It returns `""` for the current schema and when the loaded effect is not Shader. |
 | `clearConfigImportNotice()` | Clear the reserved notice buffer. No-op when the loaded effect is not Shader. |
@@ -2955,6 +3029,7 @@ appState.subscribe((key, value, old) => {
 
 The left-edge effect list is a small custom widget:
 
+- **Preset count in the label**: each button reads `Name (N)`, where N is the effect's authored preset count from the engine's `getEffectPresetCounts()` — the registry's `preset_count`, which is `PRESET_IDS.size()` when the effect names its presets and `authored_preset_count()` (the `PRESETS` table's length) otherwise. The displayed value is floored at 1, so an effect with no preset table still shows `(1)`; if the call fails the counts are dropped and every button falls back to that floor.
 - **Persistent button references**: re-sorting by name or size (live `sizeof` from `getEffectSizes()`) re-appends the existing button nodes in the new order without recreating them; `setEffects()` itself rebuilds the list from scratch.
 - **Keyboard navigation**: arrow keys move the focused button (wrapping at the ends), Home and End jump to the first and last; Enter or Space selects.
 - **Mobile horizontal scroll**: when laid out as a horizontal strip, scroll arrows fade in/out based on scroll position via a `ResizeObserver` + scroll listener.
@@ -2973,7 +3048,7 @@ params.forEach(p => {
 
 `getParamValues()` is polled each frame to sync the GUI with parameter values that the animation system has changed autonomously. The sync skips any control the user is currently interacting with to avoid fighting the slider. A per-effect **Reset** rebuilds the GUI from defaults, and **Export** copies the current `{ name, value }` set as a C++-formatted initializer suitable for `PRESETS` tables. If a segmented-render parameter snapshot is temporarily unavailable after an edit, Export uses the values displayed by the current parameter schema. An effect that reports presets also gets a **Preset** dropdown over the zero-indexed live index — a live control, not a readout: choosing an entry selects that preset — flanked by **Previous Preset** / **Next Preset** buttons that step it, and each per-frame sync first mirrors the live preset into the engine that owns the definitions, skipping the rest of the update when that mirror fails.
 
-Three behaviours the definitions loop above does not show. **Stage folders**: pullback-shaded effects are grouped rather than listed flat — the panel matches the registered names against a per-effect stage assignment and builds one folder per pipeline stage, in pullback order; a parameter no stage claims is still built, at the panel's top level, and the orphan is logged. **Warnings**: a definition carrying a `warning` — the engine's answer to a value it accepted as a request but will not render — renders that text into a visible node beside the control, on a line of its own (an on-screen node, not a `title` attribute, which would be mouse-only), and the panel re-reads the warning set after each edit and rebuilds once the engine's warnings have moved off the ones it was built from. **Persistence**: the panel restores itself across a reload, storing accepted parameter values for an ordinary effect and, for one on the full-config path, `getFullConfigSnapshot()` as JSON — replayed through `restoreFullConfigSnapshot()`, which is atomic, so a snapshot that fails to parse or that the engine rejects is dropped rather than half-applied.
+Three behaviours the definitions loop above does not show. **Stage folders**: pullback-shaded effects are grouped rather than listed flat — the panel matches the registered names against a per-effect stage assignment and builds one folder per pipeline stage, in pullback order; a parameter no stage claims is still built, at the panel's top level, and the orphan is logged. **Warnings**: a definition carrying a `warning` — the engine's answer to a value it accepted as a request but will not render — renders that text into a node beside the control (a node, not a `title` attribute, which would be mouse-only), and the panel re-reads the warning set after each edit and rebuilds once the engine's warnings have moved off the ones it was built from. **Persistence**: the panel restores itself across a reload, storing accepted parameter values for an ordinary effect and, for one on the full-config path, `getFullConfigSnapshot()` as JSON — replayed through `restoreFullConfigSnapshot()`, which is atomic, so a snapshot that fails to parse or that the engine rejects is dropped rather than half-applied.
 
 ### 10.7 Segmented POV Workers (`segment_worker.js`)
 
@@ -2993,7 +3068,7 @@ drawFrame() {                postMessage({type:'render'})
 Key properties:
 - **Isolated WASM instances per worker** — each segment has its own arena, its own RNG stream, and its own effect state. The stream is *per effect load*: every `setEffect()` reseeds the shared `Pcg32` from `hs::stable_effect_seed(stable_id)`, mirroring the device's per-effect reseed. The seed is a pure function of the effect's stable id, so every instance loading the same effect derives the same stream locally — a pool rebuilt mid-session matches a main-thread engine that has already switched effects N times.
 - **One shared compilation, warmed before the spawn** — `warmModules()` (`module_warmer.js`, exported as `pageWarmer`) re-fetches the worker's whole module graph — `segment_worker.js`, the WASM glue, `segment_layout.js`, `worker_protocol.js` and the binary — with `cache: 'no-cache'`, so a worker cannot load a module cached from an earlier deploy against freshly fetched peers. It also compiles the drained binary into the page-wide `ModuleWarmer`, and the spawn passes that `WebAssembly.Module` in each worker's `init`: an N-worker pool costs one compilation of the 2.7 MiB module instead of N. Warms are deduped per module graph over `WARM_INTERVAL_MS` (10 s), because lil-gui fires `onChange` per drag step and the segment-count slider would otherwise revalidate the graph several times a second. A binary the engine refuses drops the held module — reported by the worker as `engineRejected` with `sharedModule` — so the next spawn compiles per worker rather than reusing an artifact there is evidence is stale; the refusal is not latched, and a warm past the dedupe window re-fetches.
-- **`setClip(x0, x1, y0, y1)`** — for a non-stateful effect the WASM engine restricts *rendering* to the worker's segment rectangle: the rasterizer's scanline culling skips out-of-clip rows and columns, so out-of-band pixels are never shaded. The pixel readback in `drawFrame()` still copies the full canvas buffer; `segment_worker.js` then extracts that rectangle with one `extractSegment()` call before transferring the result back, so only the segment crosses the worker boundary. That call lives in `segment_layout.js`, the module both ends share: the worker extracts with it and the main thread composites with its `compositeSegment()` counterpart, so one blit routine defines the segment rectangle for both directions.
+- **`setClip(x0, x1, y0, y1)`** — for a non-stateful effect the WASM engine restricts *rendering* to the worker's segment rectangle: the rasterizer's scanline culling skips out-of-clip rows and columns, so out-of-band pixels are never shaded. The pixel readback in `drawFrame()` copies only that same rectangle out of the canvas buffer, leaving the rest of the readback buffer holding whatever it last did; `segment_worker.js` then extracts that rectangle with one `extractSegment()` call before transferring the result back, so only the segment crosses the worker boundary. That call lives in `segment_layout.js`, the module both ends share: the worker extracts with it and the main thread composites with its `compositeSegment()` counterpart, so one blit routine defines the segment rectangle for both directions.
 - **Per-instance render settings must be re-sent** — `setPoleLod` writes `pole_lod_aggressiveness`, a module-global of the WASM instance it is called on. A worker's instance carries its own copy, so a value set on the main-thread engine does not reach the pool: the controller must forward the setting to every worker (a protocol message of its own, applied like `setAnimationsPaused`) or the composited preview renders undecimated while the slider reads non-zero.
 - **Cross-segment stateful effects render full-frame** — an effect whose per-frame state reads pixels *outside* the worker's band (`MeshFeedback`'s feedback warp samples the previous frame at unbounded offsets; `Dynamo` reprojects `World::Trails` under rotation) cannot be band-clipped: a clipped worker would have stale/zero history outside its band, so cross-band trails read as black and seams appear. Those effects report `Effect::needs_full_frame()` (derived from a compile-time `any_crosses_segments` filter-pipeline trait), and `setClip` leaves their clip at the full canvas and reports `FULL_FRAME_KEPT` — every worker computes the bit-identical full frame and `segment_worker.js` slices its segment rectangle from the full readback. This mirrors the device exactly, where each board independently renders the whole canvas; only non-stateful effects keep segmented rendering's clipping win.
 - **One-frame pipeline** — frame N's render is dispatched fire-and-forget; frame N-1's results are composited synchronously when they arrive. The stats overlay's `max` row — the slowest worker's own `drawFrame()` — is the comparable number, and is the closest stand-in for what the multi-Teensy hardware sees. It is not a bound on it: `computeSegmentRange()` pins each arm to a fixed column half, while the firmware's `segment_clip()` trades the two halves between the arms every half-revolution, so a segment's `Compute` — and the `max` over them — covers one of the two halves that board actually sweeps rather than the costlier one. The `round-trip` row below it spans dispatch to last worker response, so it also carries structured-clone, `ArrayBuffer` transfer and main-thread event-loop latency that the hardware has no analogue for.
@@ -3152,7 +3227,7 @@ ctest --preset tests          # run the suite (or: just test)
 
 The suite must use Clang — the engine relies on GCC/Clang `__attribute__` extensions MSVC rejects. The native toolchain file ([`cmake/toolchain-native-clang.cmake`](https://github.com/woundedlion/pov/blob/master/cmake/toolchain-native-clang.cmake)) locates Clang via `EMSDK` (or a sibling `../emsdk`) and, on Windows, transparently handles the resource compiler and `lld-link` so no Visual Studio Developer Prompt is required. Reusable CMake interface targets select test capabilities and widen the host-only budgets: the inline type-erased animation slot (the 64-bit host inflates every embedded pointer past the 32-bit device footprint) and, most significantly, `GLOBAL_ARENA_SIZE` — **8 MiB for host effect harnesses against the device's 298 KiB**, so the effect smoke harness can render every effect without OOMing mid-run. The firmware/WASM footprint is unchanged: the real budget stays available as `DEVICE_GLOBAL_ARENA_SIZE`, which the device-budget `static_assert`s check even in the host suite. A high-water mark measured in the native suite is therefore *not* a device figure — it is a 64-bit measurement against an inflated ceiling.
 
-Coverage spans the math/geometry/memory core, color, easing/waves, the reaction-diffusion graph integrity, filters, the plot samplers and the Scan/mesh rasterizer, solids-registry invariants, the Conway/Hankin mesh operators, and animation. Beyond those unit checks the suite also runs: an effect smoke harness that constructs and renders every effect with asserts on, plus a cross-run determinism pass that re-renders each effect under a fixed clock and diffs the frames — at the small-aspect 96×20 simulator/test resolution by default (the only firmware image that renders 96×20 is Holosphere — the `holosphere`/`holosphere_dma` PlatformIO envs build `-DCANVAS_W=96 -DCANVAS_H=20` and the sketch shows a single effect; the Phantasm image and every other env are 288×144), and additionally at the production 288×144 alongside a white-box correctness block when `HS_EFFECTS_FULL=1` is set. Pull requests use the quick tier; every master push runs the full IEEE correctness leg and the shipping fast-math smoke leg. The suite also includes a death harness that spawns subprocesses to confirm each `HS_CHECK` invariant traps; the Phantasm multi-board sync core (`hardware/pov_sync.h`, spec §12); the HD107S SPI wire-format and color-correction tests; the POV driver tiling proofs (each LED write covers the canvas exactly once); and the WASM param-marshaling coverage (the JS definition/value streams stay index-aligned). `tests/run_tests.cpp` is the driver. Extending it with a `tests/test_<module>.h` takes three edits, each pinned by its own CTest case:
+Coverage spans the math/geometry/memory core, color, easing/waves, the reaction-diffusion graph integrity, filters, the plot samplers and the Scan/mesh rasterizer, solids-registry invariants, the Conway/Hankin mesh operators, and animation. Beyond those unit checks the suite also runs: an effect smoke harness that constructs and renders every effect with asserts on, plus a cross-run determinism pass that re-renders each effect under a fixed clock and diffs the frames — at the small-aspect 96×20 simulator/test resolution by default (the only firmware image that renders 96×20 is Holosphere — the `holosphere`/`holosphere_dma` PlatformIO envs build `-DCANVAS_W=96 -DCANVAS_H=20` and the sketch shows a single effect; the Phantasm image and every other env are 288×144), and additionally at the production 288×144 alongside a white-box correctness block when `HS_EFFECTS_FULL=1` is set. Pull requests use the quick tier; every master push runs the full IEEE correctness leg and the shipping fast-math smoke leg. The suite also includes a death harness that spawns subprocesses to confirm `HS_CHECK` invariants trap — its 230 cases pin 206 of the 707 guard sites the generated census counts (29%), and the remaining 501 are written down per file in `GUARD_GAP_ALLOW`, so the harness is a pinned sample of the fail-fast surface rather than full coverage; the Phantasm multi-board sync core (`hardware/pov_sync.h`, spec §12); the HD107S SPI wire-format and color-correction tests; the POV driver tiling proofs (each LED write covers the canvas exactly once); and the WASM param-marshaling coverage (the JS definition/value streams stay index-aligned). `tests/run_tests.cpp` is the driver. Extending it with a `tests/test_<module>.h` takes three edits, each pinned by its own CTest case:
 
 1. `#include` the header in `run_tests.cpp`'s include block. The `unit_module_includes` test balances that block's size against the roster row count and requires every header in `tests/` outside a small non-module list to be included by name — so neither an orphaned include nor a test file nothing compiles survives.
 2. Add an `X(name, entry_point)` row to `HS_TEST_MODULE_LIST`, the X-macro that expands into `MODULES[]`. `end_module()` rejects a module that runs no assertions, while the `unit_case_calls` CTest scans every `void test_*(` / `void check_*(` definition in `tests/` and requires a reference elsewhere in its own header (or in the shared corpus for cross-file helpers). There are no measured assertion floors or exact case-count pins to update when a test changes.
@@ -3164,8 +3239,8 @@ Three layers run the same suite so a regression can't reach the live demo:
 
 - **Local pre-commit hooks** — both repositories reject staged whitespace errors and validate documentation from an isolated copy of the Git index. POV also runs clang-format over staged first-party C++, ruff/eslint over staged sources, and the fast license/build-pin checks. Daydream runs ESLint over staged JavaScript and validates the Pages manifest graph. A required tool missing for an applicable change fails the commit. Builds, typechecking, unit suites, browser probes, firmware budgets, and coverage remain pre-push or CI, keeping the normal hook near two seconds while protected-branch `CI green` remains authoritative.
 
-- **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — on master pushes and pull-request updates (a push to a branch with no open PR triggers nothing), runs the native suite on Linux (clang-22) and builds the WASM module. The Windows leg (emsdk Clang, which exercises the `lld-link` / rc.exe toolchain branch from a plain shell) runs on master pushes only, and is the one job `ci-green` accepts as `skipped` on a pull request. It then **smoke-tests the WASM at runtime** ([`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs)) and **verifies the install provenance set** consumed by Daydream, then runs Daydream's own suite over that bundle in a `daydream-consumer` job, against the daydream commit pinned in `tools/build_pins.py`. Native coverage is retained as HTML/LCOV and has a loose 70% line floor against a current baseline around 78%, so catastrophic loss fails without pinning normal refactors to an exact artistic implementation. The native suite also runs at `-O2`, under ASan + UBSan, and for concurrency modules under TSan. A `shard-coverage` job proves every registered CTest belongs to exactly one shard. Pull requests use the quick effect tier; master runs the production-resolution IEEE correctness leg and shipping fast-math smoke leg. The five lint legs check Python, JavaScript, shell, the `justfile`, and the profiling roster with defect-oriented rules.
-- **Gated deploy** (`.github/workflows/deploy.yml`, **daydream repo**) — daydream's GitHub Pages source is *GitHub Actions*. On a push to daydream's `master` (or manual dispatch), the engine's native unit suite runs as a **gate** (checking out the engine repo) alongside daydream's own JS suite and its headless-Chrome job (`browser-smoke.yml`, which drives six probes in one runner: the page smoke over every `site_manifest.txt` entry, `workbench-probe.mjs` driving the workbench's pipeline strip with a real mouse, `panel-probe.mjs` scrolling the effect panel and requiring the offset to survive a rebuild, `solids-probe.mjs` dragging the solids page's op-chain rows into a new order, `palettes-probe.mjs` sweeping the palette strip's zoom and hue-key wheel, and `mobius-probe.mjs` pressing the Möbius page's complex-plane pads). Those six are the only checks that resolve the import map, instantiate the WASM module under a page's CSP and measure where an element actually lands — the unit suite runs over `daydream/tests/fake_dom.js`, which has neither layout nor pointer capture. `deploy` `needs: [gate, js-tests, browser-smoke]`, so only if all three pass does the workflow publish the simulator to Pages. The engine's WASM is whatever is committed in daydream (built + installed from Holosphere). If the engine repo is private, add a `POV_TOKEN` secret (a read-access PAT) for the gate's checkout.
+- **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — on master pushes and pull-request updates (a push to a branch with no open PR triggers nothing), runs the native suite on Linux (clang-22) and builds the WASM module. The Windows leg (emsdk Clang, which exercises the `lld-link` / rc.exe toolchain branch from a plain shell) runs on master pushes only, and is the one job `ci-green` accepts as `skipped` on a pull request. It then **smoke-tests the WASM at runtime** ([`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs)) and **verifies the install provenance set** consumed by Daydream, then runs Daydream's own suite over that bundle in a `daydream-consumer` job, against the daydream commit pinned in `tools/build_pins.py`. Native coverage is retained as HTML/LCOV and has a loose 70% line floor against a current baseline around 78%, so catastrophic loss fails without pinning normal refactors to an exact artistic implementation. The native suite also runs at `-O2`, under ASan + UBSan, and for concurrency modules under TSan. A `shard-coverage` job proves every registered CTest belongs to exactly one shard. Pull requests use the quick effect tier; master runs the production-resolution IEEE correctness leg and shipping fast-math smoke leg. The six lint legs check Python, JavaScript, shell, the GitHub workflows, the `justfile`, and the profiling roster with defect-oriented rules.
+- **Gated deploy** (`.github/workflows/deploy.yml`, **daydream repo**) — daydream's GitHub Pages source is *GitHub Actions*. On a push to daydream's `master` (or manual dispatch), the engine's native unit suite runs as a **gate** (checking out the engine repo) alongside daydream's own JS suite and its headless-Chrome job (`browser-smoke.yml`, which drives seven probes in one runner: the page smoke over every `site_manifest.txt` entry, `workbench-probe.mjs` driving the workbench's pipeline strip with a real mouse, `panel-probe.mjs` scrolling the effect panel and requiring the offset to survive a rebuild, `solids-probe.mjs` dragging the solids page's op-chain rows into a new order, `palettes-probe.mjs` sweeping the palette strip's zoom and hue-key wheel, `mobius-probe.mjs` pressing the Möbius page's complex-plane pads, and `lissajous-probe.mjs` driving the Lissajous page's rational frequency lock). Those seven are the only checks that resolve the import map, instantiate the WASM module under a page's CSP and measure where an element actually lands — the unit suite runs over `daydream/tests/fake_dom.js`, which has neither layout nor pointer capture. `deploy` `needs: [gate, js-tests, browser-smoke]`, so only if all three pass does the workflow publish the simulator to Pages. The engine's WASM is whatever is committed in daydream (built + installed from Holosphere). If the engine repo is private, add a `POV_TOKEN` secret (a read-access PAT) for the gate's checkout.
 
 The simulator's JavaScript lives in the daydream repo and carries its own suite there: `tests/*.test.js`, run by `npm test` (`node --test`), covering the driver and clock, the sidebar and GUI, the segment workers and layout, param marshaling, color/palette math, and the geometry tools' math modules. Its anti-vacuity checks reject an empty glob, unreachable test files, shadow dependency installs, and unexplained first-party modules without pinning file, case, or assertion totals. On every pull request, [Daydream CI](https://github.com/woundedlion/daydream/blob/master/.github/workflows/ci.yml) runs the reusable static/unit suite and all six real-browser probes, then reports one required `CI green` status. The deploy workflow calls the same suites before publishing.
 

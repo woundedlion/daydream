@@ -395,7 +395,7 @@ const MINIMAL_CHAIN = [
   { label: 'camera', operator: 'sphere.rotate.v2' },
   { label: 'project', operator: 'project.stereographic.v2' },
   { label: 'sample', operator: 'sample.grid.v2' },
-  { label: 'colorize', operator: 'colorize.generated-palette.v2' },
+  { label: 'colorize', operator: 'colorize.generated-palette.v3' },
 ];
 
 /** @param {Object} document @returns {string[]} The collected codes. */
@@ -565,7 +565,7 @@ test('a v1 document expands to the deterministic chain of its slots', () => {
     { label: 'project', operator: 'project.equirectangular.v2' },
     { label: 'warp2', operator: 'warp.mirror-tile.v2' },
     { label: 'sample', operator: 'sample.grid.v2' },
-    { label: 'colorize', operator: 'colorize.generated-palette.v2' },
+    { label: 'colorize', operator: 'colorize.generated-palette.v3' },
   ]);
 
   const byId = new Map(document.descriptor.parameters.map((p) => [p.id, p]));
@@ -602,10 +602,15 @@ test('a v1 document expands to the deterministic chain of its slots', () => {
  * fade width under edge-fade, the cutout transition width (cutout-softness)
  * under value-cutout.
  */
-test('v1 mobius and edge-width parameters route onto the engine field ids', () => {
+test('v1 renamed parameters route onto the engine field ids', () => {
   const mobius = expandV1Document(fixture('mobius_grid.shader.json'), CATALOG);
   assert.equal(mobius.parameter_ids['mobius-a-re'], 'lens.mobius-a-re');
   assert.equal(mobius.parameter_ids['mobius-d-im'], 'lens.mobius-d-im');
+  assert.equal(mobius.parameter_ids['brightness-depth'], 'colorize.brightness-bottom');
+  for (const preset of mobius.document.preset_bank.presets) {
+    assert.equal(preset.values['colorize.brightness-bottom'], 0);
+    assert.equal(preset.values['colorize.brightness-top'], 1);
+  }
 
   const fade = expandV1Document(fixture('alien_ocean.shader.json'), CATALOG);
   assert.equal(fade.parameter_ids['edge-width'], 'sample.edge-width');
@@ -659,7 +664,11 @@ test('every committed v2 pattern is its v1 fixture expanded, byte-identical', ()
  */
 test('every committed pattern document is its own canonical re-export', () => {
   assert.deepEqual(patternNames.filter((name) => !fixtureNames.includes(name)),
-    ['ash_cloud.shader.json'],
+    [
+      'ash_cloud.shader.json',
+      'chromatic_lichen.shader.json',
+      'mermaid_skin.shader.json',
+    ],
     'a pattern with no v1 fixture is covered by this gate alone');
   for (const name of patternNames) {
     const url = new URL(name, PATTERNS);

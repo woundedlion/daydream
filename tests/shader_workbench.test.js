@@ -215,7 +215,7 @@ test('the workbench page lays out the toolbar, pipeline and canvas', () => {
     'each carrier domain carries its own hue');
 });
 
-// The alias table serves effects promoted before the chain schema: a v2
+// The alias table serves effects promoted before the chain schema: a document
 // parameter id is <label>.<field>, and the label picks the family whose
 // registered control names the field maps onto.
 test('v2 document parameter IDs map to pre-spec promoted controls', () => {
@@ -225,6 +225,8 @@ test('v2 document parameter IDs map to pre-spec promoted controls', () => {
   assert.equal(engineParameterName('warp2.speed'), 'Planar Warp 2 Speed');
   assert.equal(engineParameterName('camera.wander'), 'Camera Wander');
   assert.equal(engineParameterName('surface.scale'), 'Surface Noise Scale');
+  assert.equal(engineParameterName('colorize.value-opacity-low'), 'Opacity at Value 0');
+  assert.equal(engineParameterName('colorize.value-opacity-high'), 'Opacity at Value 1');
 });
 
 /** @param {string} field The plain Title Case control name an alias-free label yields. */
@@ -261,7 +263,7 @@ test('the alias table keys stay frozen to the pre-spec promoted labels', () => {
     }
   }
   assert.deepEqual([...aliased].sort(),
-    ['camera', 'sample', 'surface', 'warp1', 'warp2']);
+    ['camera', 'colorize', 'sample', 'surface', 'warp1', 'warp2']);
 });
 
 const MODULE = { ParamSetResult };
@@ -1040,7 +1042,7 @@ test('the scratch document opens as a live, editable chain', async () => {
   assert.deepEqual(harness.selections, ['ShaderChain']);
   assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator),
     ['sphere.rotate.v2', 'project.stereographic.v2', 'sample.grid.v2',
-      'colorize.generated-palette.v2']);
+      'colorize.generated-palette.v3']);
   assert.deepEqual(stripChips(harness).map((chip) => chip.dataset.label),
     ['rotate', 'project', 'sample', 'colorize']);
   assert.deepEqual(
@@ -1296,7 +1298,7 @@ test('a malformed shader state link falls back to an editable scratch chain', as
 
   assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator),
     ['sphere.rotate.v2', 'project.stereographic.v2', 'sample.grid.v2',
-      'colorize.generated-palette.v2']);
+      'colorize.generated-palette.v3']);
   assert.match(harness.elements.get('shader-document-status').textContent,
     /shader link could not be restored: invalid shader link payload/i);
 });
@@ -1340,7 +1342,7 @@ test('Kaleidoscope Stained Glass loads its effect preset into the interpreter co
     'warp.vector-noise.v2',
     'warp.mirror-tile.v2',
     'sample.grid.v2',
-    'colorize.generated-palette.v2',
+    'colorize.generated-palette.v3',
   ]);
   for (const [label, parameterId] of [
     ['camera', 'camera.wander'],
@@ -1348,7 +1350,7 @@ test('Kaleidoscope Stained Glass loads its effect preset into the interpreter co
     ['warp1', 'warp1.strength'],
     ['warp2', 'warp2.speed'],
     ['sample', 'sample.pattern-freq'],
-    ['colorize', 'colorize.brightness-depth'],
+    ['colorize', 'colorize.brightness-bottom'],
   ]) {
     assert.ok(Math.abs(Number(displayedParameter(harness, label, parameterId))
       - Number(values[parameterId])) <= 1e-6,

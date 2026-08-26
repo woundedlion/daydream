@@ -19,7 +19,7 @@ const CHAIN = [
   { label: 'camera', operator: 'sphere.rotate.v2' },
   { label: 'project', operator: 'project.stereographic.v2' },
   { label: 'sample', operator: 'sample.grid.v2' },
-  { label: 'colorize', operator: 'colorize.generated-palette.v2' },
+  { label: 'colorize', operator: 'colorize.generated-palette.v3' },
 ];
 
 /**
