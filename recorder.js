@@ -550,7 +550,10 @@ export class VideoRecorder {
     if (typeof globalThis.showSaveFilePicker !== 'function') {
       return {
         write: this.memorySink(recorder, chunks, 'this browser has no streaming save'),
-        finish: () => { if (chunks.length) this.download(recorder, chunks, effectName); },
+        finish: () => {
+          if (chunks.length) this.download(recorder, chunks, effectName);
+          else console.warn('VideoRecorder: session produced no data; nothing to download');
+        },
       };
     }
 

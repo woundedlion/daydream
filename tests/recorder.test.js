@@ -580,6 +580,33 @@ test('a stopped session downloads its own chunks and clears instance state', () 
 });
 
 /**
+ * Verifies the buffered path reports an empty session the way the streaming
+ * path does, so a browser without showSaveFilePicker leaves the same trail as
+ * one with it.
+ */
+test('a buffered session that captured nothing is reported', () => {
+  const restore = installRecorderEnv();
+  const captured = installConsoleCapture('warn');
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    const downloads = [];
+    rec.download = (recorder, chunks, name) => downloads.push({ chunks, name });
+
+    rec.start('empty');
+    const recorder = rec.mediaRecorder;
+    rec.stop();
+    recorder.onstop();
+
+    assert.equal(downloads.length, 0, 'an empty buffer must not reach the anchor path');
+    assert.equal(captured.messages.length, 1);
+    assert.match(captured.messages[0], /session produced no data/);
+  } finally {
+    captured.restore();
+    restore();
+  }
+});
+
+/**
  * Verifies the last chunk stop() flushes still reaches the output: the encoder
  * hands over whatever it holds between stop() and the stop event, so a data
  * handler cleared a step early loses the tail of the recording.
