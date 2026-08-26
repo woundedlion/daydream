@@ -225,6 +225,22 @@ test('_closed tracks the collapse state open() and close() set', async () => {
   assert.equal(folder._closed, false);
 });
 
+// effect_gui.js finds the panel's scroll container by class ('.lil-children')
+// to carry a scroll offset across a rebuild, and styles/index.css sizes the
+// preset dropdown through '.lil-display'. Neither is reachable through a
+// controller property, so a rename surfaces only as a null scroller and an
+// unstyled row in the browser.
+test('the panel classes the scroll restore and the stylesheet select on hold',
+  async () => {
+    const gui = await realGUI();
+    const dropdown = gui.add({ preset: '1' }, 'preset', ['1', '2']);
+
+    assert.equal(gui.domElement.querySelector('.lil-children'), gui.$children,
+      'the panel scroll container is no longer .lil-children');
+    assert.equal(dropdown.domElement.querySelector('.lil-display'), dropdown.$display,
+      'an OptionController no longer wraps its select in .lil-display');
+  });
+
 test('addColor and addFolder hand back the shapes the GUI layer wraps', async () => {
   const gui = await realGUI();
   const color = gui.addColor({ tint: '#ff00ff' }, 'tint');
