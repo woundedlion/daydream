@@ -15,6 +15,11 @@ vendor-importmap.js
 main.js
 bootstrap.js
 app_lifecycle.js
+apply_notice.js
+display_aliases.js
+pole_lod.js
+recording_settings.js
+segment_policy.js
 daydream.js
 legacy_shader_import.js
 driver.js

@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { unpinnedEngineMethods } from './fake_engine.js';
 import { fakeElement } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
-import { displayAliasesDiverged, repointDisplayAliases } from '../app_lifecycle.js';
+import { displayAliasesDiverged, repointDisplayAliases } from '../display_aliases.js';
 
 // Stand-in for the injected Daydream renderer: the grid and display buffer the
 // compositor reads, plus the dot mesh the second display alias lives on.
