@@ -421,6 +421,31 @@ async function probeStrip(tab) {
     check(!overlaps(panels, box), `global controls clear ${region}`);
   }
 
+  // A source that skips the plane band: reachable once that band is empty, and
+  // expandable back out of, both through the socket selector's sequences.
+  const planeRemove = '.chain-band[data-carrier="plane"] .chain-chip-remove';
+  for (let left = 8; left > 0; left -= 1) {
+    const chip = await tab.$(planeRemove);
+    if (chip === null) break;
+    await chip.click();
+  }
+  const collapsed = await tab.$eval(source, (node) => (node instanceof HTMLSelectElement
+    ? [...node.options].map((option) => option.value) : []));
+  check(collapsed.includes('sample.spherical-rings.v3'),
+    `an emptied plane band opens ${collapsed.length} source choices`);
+  await tab.select(source, 'sample.spherical-rings.v3');
+  const skipping = await boxOf(tab, source);
+  check(await tab.$('.chain-band[data-carrier="plane"] .chain-band-add') === null
+      && (await bandChipNames(tab, 'plane')).length === 0
+      && skipping.width < VIEWPORT.width / 2,
+  `a plane-skipping source empties the plane band behind a ${Math.round(skipping.width)}px selector`);
+  await tab.select(source, 'project.gnomonic.v2 sample.fractal.v2');
+  check(await tab.$('.chain-band[data-carrier="plane"] .chain-band-add') !== null
+      && await tab.$eval('.chain-chip-replace[aria-label="Projection"]',
+        (node) => (node instanceof HTMLSelectElement ? node.value : ''))
+        === 'project.gnomonic.v2',
+  'the socket sequence re-opens the plane band and its projection');
+
   await tab.setViewport({ width: 700, height: VIEWPORT.height });
   await tab.waitForFunction(() => window.innerWidth === 700);
   await (await tab.waitForSelector(add)).click();

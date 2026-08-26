@@ -601,6 +601,42 @@ test('legality agrees with replaceSpan', async () => {
   }
 });
 
+test('legalSequences bridges a span with a run of crossings', async () => {
+  const store = await makeStore();
+  /** @param {Array<{operators: Array<{id: string}>}>} entries */
+  const ids = (entries) => entries.map(({ operators }) =>
+    operators.map((operator) => operator.id).join(' '));
+
+  // A plane endomorphism's span takes the removal and every plane-to-plane
+  // operator; a longer run would have to return to the plane carrier, which
+  // makes it an insertion into a shorter run rather than another bridge.
+  const endomorphism = store.legalSequences(WARP, 1, 3);
+  assert.equal(ids(endomorphism)[0], '');
+  assert.equal(endomorphism.every(({ operators }) => operators.length <= 1), true);
+  assert.deepEqual(ids(store.legalSequences(PROJECT, 1, 3)),
+    store.legalReplacements(PROJECT, 1)
+      .filter((entry) => entry.legal).map((entry) => entry.operator.id),
+    'a span no longer run can bridge keeps its one-operator set');
+
+  // Project + warp + sample collapse into one sphere-to-field source.
+  assert.deepEqual(ids(store.legalSequences(PROJECT, 3, 1)),
+    ['sample.spherical-rings.v3', 'sample.spherical-noise.v3']);
+  assert.equal(store.replaceSpan(PROJECT, 3,
+    [{ operator: 'sample.spherical-rings.v3' }]).ok, true);
+
+  // The source expands back into a projection and a plane sampler: 2 sphere
+  // sources plus 8 projections over 8 plane sources.
+  const expansions = ids(store.legalSequences(PROJECT, 1, 3));
+  assert.equal(expansions.length, 66);
+  assert.equal(expansions.includes('project.stereographic.v2 sample.grid.v2'), true);
+  assert.equal(store.replaceSpan(PROJECT, 1, [
+    { operator: 'project.stereographic.v2' }, { operator: 'sample.grid.v2' }]).ok, true);
+  assert.deepEqual(store.chain().slice(PROJECT).map((entry) => entry.operator),
+    ['project.stereographic.v2', 'sample.grid.v2', 'colorize.generated-palette.v2']);
+  assertGreen(store);
+  assert.throws(() => store.legalSequences(99, 0, 1), RangeError);
+});
+
 test('an exhausted operator budget refuses insertion but not replacement', async () => {
   const catalog = structuredClone(CATALOG);
   catalog.budgets.max_chain_ops = 6;

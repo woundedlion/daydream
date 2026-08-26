@@ -196,6 +196,60 @@ test('a socket names the function by the carrier its crossing produces', async (
     'the sphere to field crossing is a source, not a second Color socket');
 });
 
+test('a socket collapses an emptied band and expands back out of one', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'warp2').dispatch('keydown', { key: 'Delete' });
+  assert.deepEqual(labels(h), ['camera', 'lens', 'project', 'sample', 'colorize'],
+    'the plane band is empty, so Project and Sample are adjacent crossings');
+
+  let select = chipByLabel(h, 'sample').querySelector('.chain-chip-replace');
+  assert.equal(select.options.some((option) =>
+    option.value === 'sample.spherical-rings.v3'), true,
+  'a source skipping the plane band is offered where that band is empty');
+  select.value = 'sample.spherical-rings.v3';
+  select.dispatch('change');
+  assert.deepEqual(h.store.chain().map((entry) => entry.operator),
+    ['sphere.rotate.v2', 'sphere.lens.kaleidoscope.v2',
+      'sample.spherical-rings.v3', 'colorize.generated-palette.v2'],
+    'the one source replaces both crossings');
+  assert.equal(bandFor(h, 'plane').querySelector('.chain-band-add'), null,
+    'a skipped band has no gap to insert at');
+
+  select = h.container.querySelectorAll('.chain-chip--socket')[0]
+    .querySelector('.chain-chip-replace');
+  assert.equal(select.options.length, 66,
+    '2 sphere sources plus 8 projections over 8 plane sources');
+  select.value = 'project.equirectangular.v2 sample.lattice.v2';
+  select.dispatch('change');
+  assert.deepEqual(h.store.chain().map((entry) => entry.operator),
+    ['sphere.rotate.v2', 'sphere.lens.kaleidoscope.v2', 'project.equirectangular.v2',
+      'sample.lattice.v2', 'colorize.generated-palette.v2']);
+  assert.ok(bandFor(h, 'plane').querySelector('.chain-band-add'),
+    'the plane band and its 15-operator vocabulary are back');
+  assert.equal(h.applied.length, 3);
+});
+
+test('a loaded plane-skipping chain reaches the plane vocabulary through Delete', async () => {
+  const h = await makeStrip();
+  assert.equal(h.store.replaceSpan(PROJECT, 3,
+    [{ operator: 'sample.spherical-noise.v3' }]).ok, true);
+  h.strip.render();
+
+  const socket = h.container.querySelectorAll('.chain-chip--socket')[0];
+  socket.dispatch('keydown', { key: 'Delete' });
+  const pair = paletteEntries(h).find((entry) =>
+    entry.dataset.operator === 'project.gnomonic.v2 sample.fractal.v2');
+  assert.equal(pair.querySelector('.chain-palette-name').textContent,
+    'Gnomonic → Escape Fractal');
+  pair.dispatch('click');
+
+  assert.equal(paletteOf(h), null);
+  assert.deepEqual(h.store.chain().map((entry) => entry.operator),
+    ['sphere.rotate.v2', 'sphere.lens.kaleidoscope.v2', 'project.gnomonic.v2',
+      'sample.fractal.v2', 'colorize.generated-palette.v2']);
+  assert.ok(bandFor(h, 'plane').querySelector('.chain-band-add'));
+});
+
 test('pipeline arrows, wheel and background arrow keys scroll the viewport', async () => {
   const h = await makeStrip();
   const viewport = h.container.querySelector('.chain-strip-viewport');
