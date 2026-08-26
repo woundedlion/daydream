@@ -18,6 +18,7 @@ const LABEL_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 /** @typedef {{severity: string, phase: string, code: string, path: string, message: string}} Diagnostic */
 /** @typedef {{ok: true}|{ok: false, diagnostics: Diagnostic[]}} EditResult */
 /** @typedef {{operator: CatalogOperator, legal: boolean, reason?: string}} LegalityEntry */
+/** @typedef {{operators: CatalogOperator[]}} SequenceEntry */
 /** @typedef {{id: string, classification: string, storage: string, unit: string, domain: *, interpolation: *, default: *}} ParameterDeclaration */
 
 /**
@@ -387,6 +388,60 @@ export async function createChainDocumentStore({
   };
 
   /**
+   * Every legal sequence of at most `maxLength` operators that replaces the
+   * span, shortest first and in catalog order within a length. A sequence is
+   * either the empty removal, one operator the span's neighbors accept, or a
+   * run of crossings carrying the chain from the span's entry carrier to its
+   * exit while crossing each carrier at most once — a run that revisits a
+   * carrier is an insertion into a shorter run, not another way to bridge the
+   * span, so leaving those out keeps the enumeration bounded by the carrier
+   * count. Every candidate is costed against the declared budgets.
+   * @param {number} start - First chain index of the span.
+   * @param {number} deleteCount - Entries the span covers (0 = insertion).
+   * @param {number} maxLength - Longest sequence to enumerate.
+   * @returns {SequenceEntry[]} The legal sequences.
+   */
+  const legalSequences = (start, deleteCount, maxLength) => {
+    const error = spanError(start, deleteCount);
+    if (error !== null) throw new RangeError(`chain document store: ${error}`);
+    const before = carrierBefore(start);
+    const after = carrierAfter(start + deleteCount);
+    const kept = chain().map(operatorOf);
+    kept.splice(start, deleteCount);
+    /** @type {CatalogOperator[][]} */
+    const candidates = [];
+    if (before === after) candidates.push([]);
+    if (maxLength >= 1) {
+      for (const op of catalog.operators)
+        if (op.input === before && op.output === after) candidates.push([op]);
+    }
+    /** @type {{ops: CatalogOperator[], carrier: string, seen: Set<string>}[]} */
+    let frontier = [{ ops: [], carrier: before, seen: new Set([before]) }];
+    for (let length = 1; length <= maxLength && frontier.length > 0; length += 1) {
+      /** @type {typeof frontier} */
+      const next = [];
+      for (const node of frontier) {
+        for (const op of catalog.operators) {
+          if (op.input !== node.carrier || op.input === op.output) continue;
+          if (node.seen.has(op.output)) continue;
+          const ops = [...node.ops, op];
+          // The exit carrier ends the run: nothing may leave it and return.
+          if (op.output === after) {
+            if (length >= 2) candidates.push(ops);
+            continue;
+          }
+          next.push({ ops, carrier: op.output, seen: new Set([...node.seen, op.output]) });
+        }
+      }
+      frontier = next;
+    }
+    return candidates
+      .filter((ops) => budgetReason(
+        [...kept.slice(0, start), ...ops, ...kept.slice(start)]) === null)
+      .map((operators) => ({ operators }));
+  };
+
+  /**
    * Strips the removed instances from parameters, serialization fields,
    * staggered path-policy groups and every preset.
    * @param {*} candidate - Document being reconciled.
@@ -708,6 +763,7 @@ export async function createChainDocumentStore({
      */
     legalReplacements: (start, deleteCount) => spanLegality(start, deleteCount),
 
+    legalSequences,
     replaceSpan,
     relabel,
     setPresetValue,

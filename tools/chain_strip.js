@@ -30,6 +30,12 @@ import { createFrameScheduler } from './page_lifecycle.js';
 /** @typedef {{label: string, operator: string}} ChainEntry */
 /** @typedef {[string, (value: *) => boolean]} GateRule */
 /** @typedef {{operator: CatalogOperator, legal: boolean, reason?: string}} LegalityEntry */
+/** @typedef {{operators: CatalogOperator[]}} SequenceEntry */
+/**
+ * One offer of the replacement palette or a socket's selector: the span it
+ * names and the operator sequence that takes its place.
+ * @typedef {{start: number, deleteCount: number, operators: CatalogOperator[]}} SpanChoice
+ */
 /** @typedef {{severity: string, phase: string, code: string, path: string, message: string}} Diagnostic */
 /** @typedef {{ok: true}|{ok: false, diagnostics: Diagnostic[]}} EditResult */
 /**
@@ -41,7 +47,8 @@ import { createFrameScheduler } from './page_lifecycle.js';
  *   bypassedLabels: () => string[],
  *   setBypassed: (label: string, on: boolean) => EditResult,
  *   legalInsertions: (index: number) => LegalityEntry[],
- *   legalReplacements: (start: number, deleteCount: number) => LegalityEntry[],
+ *   legalSequences: (start: number, deleteCount: number,
+ *     maxLength: number) => SequenceEntry[],
  *   document: () => *,
  *   replaceSpan: (start: number, deleteCount: number,
  *     sequence: Array<{label?: string, operator: string}>) => EditResult,
@@ -367,6 +374,53 @@ export function createChainStrip({
   };
 
   /**
+   * The replacement entries a span choice commits: a position the choice keeps
+   * on the same operator keeps its instance, and with it every tuned value.
+   * @param {SpanChoice} choice - The offer being taken.
+   * @returns {Array<{label?: string, operator: string}>} The sequence.
+   */
+  const choiceEntries = (choice) => choice.operators.map((op, at) =>
+    (at < choice.deleteCount ? replacementEntry(choice.start + at, op.id)
+      : { operator: op.id }));
+
+  /** @param {CatalogOperator[]} operators @returns {string} The choice's key. */
+  const choiceKey = (operators) => operators.map((op) => op.id).join(' ');
+
+  /**
+   * What a socket offers in its selector and its replacement palette: the
+   * sequences that stand in for the crossing — a longer one re-opening the
+   * carrier bands the crossing skips — plus the single operators that swallow
+   * it together with the unbroken run of crossings before it, which is the
+   * collapse of a band the chain no longer stops in.
+   * @param {number} index - The crossing's chain index.
+   * @returns {SpanChoice[]} The offers, narrowest span first.
+   */
+  const socketChoices = (index) => {
+    const chain = store.chain();
+    /** @type {Map<string, SpanChoice>} */
+    const choices = new Map();
+    /**
+     * @param {number} start - Span start.
+     * @param {number} deleteCount - Span length.
+     * @param {number} maxLength - Longest sequence to offer.
+     * @returns {void}
+     */
+    const offer = (start, deleteCount, maxLength) => {
+      for (const { operators } of store.legalSequences(start, deleteCount, maxLength)) {
+        const key = choiceKey(operators);
+        if (!choices.has(key)) choices.set(key, { start, deleteCount, operators });
+      }
+    };
+    offer(index, 1, catalog.carriers.length - 1);
+    for (let start = index; start > 0; start -= 1) {
+      const previous = opOf(chain[start - 1]);
+      if (previous.input === previous.output) break;
+      offer(start - 1, index - start + 2, 1);
+    }
+    return [...choices.values()];
+  };
+
+  /**
    * @param {number} index - A chip's chain index.
    * @param {number} step - -1 for the earlier neighbour, 1 for the later one.
    * @returns {boolean} Whether that neighbour is an endomorphism of the same
@@ -497,11 +551,12 @@ export function createChainStrip({
   const openPalette = ({ kind, index, anchor, origin = anchor }) => {
     closePalette();
     const chain = store.chain();
-    const entries = kind === 'insert'
-      ? insertionsAt(index)
-      : store.legalReplacements(index, 1);
-    const removable = kind === 'replace'
-      && opOf(chain[index]).input === opOf(chain[index]).output;
+    /** @type {Map<string, SpanChoice>} */
+    const choices = new Map(kind === 'insert'
+      ? insertionsAt(index).filter((candidate) => candidate.legal).map((candidate) =>
+        [candidate.operator.id,
+          { start: index, deleteCount: 0, operators: [candidate.operator] }])
+      : socketChoices(index).map((choice) => [choiceKey(choice.operators), choice]));
     const title = kind === 'insert'
       ? `Insert at position ${index + 1}`
       : `Replace ${opOf(chain[index]).name} · ${chain[index].label}`;
@@ -515,21 +570,20 @@ export function createChainStrip({
      * @returns {void}
      */
     const activate = (entry) => {
-      const remove = entry.dataset.remove === 'true';
-      const result = remove
-        ? store.replaceSpan(index, 1, [])
-        : store.replaceSpan(index, kind === 'insert' ? 0 : 1,
-          [kind === 'insert' ? { operator: entry.dataset.operator }
-            : replacementEntry(index, entry.dataset.operator)]);
+      const choice = choices.get(
+        entry.dataset.remove === 'true' ? '' : entry.dataset.operator);
+      if (choice === undefined) return;
+      const result = store.replaceSpan(choice.start, choice.deleteCount,
+        choiceEntries(choice));
       if (!result.ok) {
         report(result);
         return;
       }
       palette = null;
       const after = store.chain();
-      const focusLabel = remove
+      const focusLabel = choice.operators.length === 0
         ? (after[index]?.label ?? after[index - 1]?.label ?? null)
-        : (after[index]?.label ?? null);
+        : (after[choice.start]?.label ?? null);
       if (kind === 'insert') store.setSelectedLabel(focusLabel);
       commit(focusLabel);
     };
@@ -561,17 +615,19 @@ export function createChainStrip({
       option.focus();
     };
 
-    if (removable) {
-      const remove = el('div', 'chain-palette-entry chain-palette-entry--remove');
-      remove.dataset.remove = 'true';
-      remove.textContent = 'Remove';
-      addOption(remove);
-    }
-    for (const legality of entries.filter((entry) => entry.legal)) {
+    for (const [key, choice] of choices) {
+      if (choice.operators.length === 0) {
+        const remove = el('div', 'chain-palette-entry chain-palette-entry--remove');
+        remove.dataset.remove = 'true';
+        remove.textContent = 'Remove';
+        addOption(remove);
+        continue;
+      }
       const option = el('div', 'chain-palette-entry');
-      option.dataset.operator = legality.operator.id;
+      option.dataset.operator = key;
       const name = el('span', 'chain-palette-name');
-      name.textContent = legality.operator.name;
+      name.textContent = choice.operators.map((candidate) => candidate.name)
+        .join(' → ');
       option.appendChild(name);
       addOption(option);
     }
@@ -950,12 +1006,14 @@ export function createChainStrip({
       const replacement = el('select', 'chain-chip-replace');
       replacement.setAttribute('tabindex', '-1');
       replacement.setAttribute('aria-label', socketFunction.accessibleName);
-      for (const legality of store.legalReplacements(index, 1)
-        .filter((candidate) => candidate.legal)) {
+      const choices = new Map(socketChoices(index).map(
+        (choice) => [choiceKey(choice.operators), choice]));
+      for (const [key, choice] of choices) {
         const option = el('option', 'chain-chip-replace-option');
-        option.value = legality.operator.id;
-        option.textContent = legality.operator.name;
-        option.selected = legality.operator.id === entry.operator;
+        option.value = key;
+        option.textContent = choice.operators.map((candidate) => candidate.name)
+          .join(' → ');
+        option.selected = key === entry.operator;
         replacement.appendChild(option);
       }
       replacement.addEventListener('click', (/** @type {*} */ event) => {
@@ -963,13 +1021,15 @@ export function createChainStrip({
       });
       replacement.addEventListener('change', (/** @type {*} */ event) => {
         event.stopPropagation();
-        const result = store.replaceSpan(index, 1,
-          [replacementEntry(index, event.target.value)]);
+        const choice = choices.get(event.target.value);
+        if (choice === undefined) return;
+        const result = store.replaceSpan(choice.start, choice.deleteCount,
+          choiceEntries(choice));
         if (!result.ok) {
           report(result);
           return;
         }
-        commit(store.chain()[index]?.label ?? null);
+        commit(store.chain()[choice.start]?.label ?? null);
       });
       functionLabel.appendChild(replacement);
       header.appendChild(functionLabel);
