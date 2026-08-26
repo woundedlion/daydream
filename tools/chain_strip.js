@@ -536,14 +536,11 @@ export function createChainStrip({
    * @param {'insert'|'replace'} options.kind - Insertion at a gap or replacement
    *   of one chip.
    * @param {number} options.index - The gap or chip chain index.
-   * @param {*} options.anchor - Element the palette sits after and Escape
-   *   returns focus to.
-   * @param {*} [options.origin] - Control the palette is placed under, where
-   *   that is not the anchor itself; a socket chip anchors the palette but its
-   *   swap button is what opened it.
+   * @param {*} options.anchor - Element the palette sits after and under, and
+   *   the one Escape returns focus to.
    * @returns {void}
    */
-  const openPalette = ({ kind, index, anchor, origin = anchor }) => {
+  const openPalette = ({ kind, index, anchor }) => {
     closePalette();
     const chain = store.chain();
     /** @type {Map<string, SpanChoice>} */
@@ -665,7 +662,7 @@ export function createChainStrip({
     const parent = anchor.parentNode;
     const at = Array.prototype.indexOf.call(parent.childNodes, anchor);
     parent.insertBefore(element, parent.childNodes[at + 1] ?? null);
-    placePalette(element, origin);
+    placePalette(element, anchor);
     palette = { element, anchor };
     const first = options[0];
     if (first) focusOption(first);
