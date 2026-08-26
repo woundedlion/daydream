@@ -50,8 +50,7 @@
 
 /* Keyboard focus ring; the UA default is near-invisible over the dark theme.
    Unscoped so anything focusable added later inherits it. :where() holds the
-   selector at one-class specificity, so lil-gui's own `outline: none` widgets
-   keep their built-in focus styling. #canvas opts out — see the inset rule. */
+   selector at one-class specificity. #canvas opts out — see the inset rule. */
 :focus-visible:not(:where(#canvas)) {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
@@ -60,6 +59,14 @@
 /* Inset: the canvas fills its container, so an outset ring would be clipped.
    Class, not :focus-visible — see Daydream.setupKeyboardOrbit. */
 #canvas.keyboard-focus {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* lil-gui injects `.lil-gui input, .lil-gui button { outline: none }`, which
+   outranks the one-class rule above; the class plus pseudo-class here outranks
+   it back. Inset because the panel's .lil-children clips an outset ring. */
+.lil-gui :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
 }
