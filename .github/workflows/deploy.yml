@@ -42,8 +42,8 @@ jobs:
           deadline=$((SECONDS + 1800))
           while :; do
             read -r run_id run_status run_conclusion < <(
-              gh api "repos/woundedlion/pov/actions/workflows/ci.yml/runs?head_sha=$PIN&branch=master&event=push&per_page=1" \
-                --jq '.workflow_runs[0] // empty | [.id, .status, (.conclusion // "-")] | @tsv'
+              gh api "repos/woundedlion/pov/actions/workflows/ci.yml/runs?head_sha=$PIN&branch=master&per_page=10" \
+                --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")][0] // empty | [.id, .status, (.conclusion // "-")] | @tsv'
             ) || true
             if [ -n "$run_id" ]; then
               if [ "$run_status" = completed ]; then
