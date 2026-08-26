@@ -785,18 +785,22 @@ export function createShaderDocumentController({
     }
     if (linked) {
       const effectId = linked.document.effect_id;
-      sourceSelect.value = catalog.has(effectId) ? effectId : '';
       const filename = typeof linked.document.document_id === 'string'
         ? `${linked.document.document_id}.shader.json` : 'linked.shader.json';
-      if (await loadSource(linked.document, filename, null, linked)) return true;
+      // Named only once the load stands: a refused link falls through to the
+      // requested effect or the scratch chain, which name themselves.
+      if (await loadSource(linked.document, filename, null, linked)) {
+        sourceSelect.value = catalog.has(effectId) ? effectId : '';
+        return true;
+      }
       linkError = status.textContent || 'the linked state was refused';
     }
     const requested = catalog.get(initialEffect ?? '');
     let loaded;
     if (requested === undefined) loaded = await loadScratch();
     else {
-      sourceSelect.value = requested.effectId;
       loaded = await loadSource(requested.source, requested.filename, requested.compiled);
+      if (loaded) sourceSelect.value = requested.effectId;
     }
     if (linkError) show(`The shader link could not be restored: ${linkError}.`, true);
     return loaded;
