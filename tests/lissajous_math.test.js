@@ -187,11 +187,46 @@ test('snapToRationalRatio: a range keeps the snapped frequency reachable', () =>
 
   const { m, n, snappedActiveC, closingPeriod } =
     snapToRationalRatio(100, passiveC, MAX_RATIONAL_TERM, { min: 1, max: 100 });
-  assert.equal(snappedActiveC, 91);
-  assert.equal(m, 7);
-  assert.equal(n, 1);
-  assert.equal(closingPeriod, TWO_PI / 13);
+  assert.equal(m, 23);
+  assert.equal(n, 3);
+  assert.ok(snappedActiveC > 1 && snappedActiveC <= 100, `${snappedActiveC} is reachable`);
+  assert.equal(snappedActiveC, passiveC * (23 / 3));
+  assert.equal(closingPeriod, (TWO_PI * 3) / 13);
+  assert.ok(closingPeriod <= MAX_RATIONAL_TERM * TWO_PI);
   assert.equal(domainClosureWarning(passiveC, closingPeriod), null);
+});
+
+/**
+ * Verifies the tool's own Fishbowl default 12/5 survives the closed-curve
+ * constraint: the pair already closes, so the frequency and the 2π domain both
+ * stay put rather than snapping to a ratio the term cap can express.
+ */
+test('snapToRationalRatio: an already-closing pair is left alone', () => {
+  const { m, n, snappedActiveC, closingPeriod } =
+    snapToRationalRatio(12, 5, MAX_RATIONAL_TERM, { min: 1, max: 100 });
+  assert.equal(snappedActiveC, 12);
+  assert.equal(m, 12);
+  assert.equal(n, 5);
+  assert.equal(closingPeriod, TWO_PI);
+  assert.equal(domainClosureWarning(5, closingPeriod), null);
+
+  // Off the t = 0 pole, where sin(m2·t) = 0 would hide the axial frequency.
+  const t0 = 0.29;
+  const start = lissajous(snappedActiveC, 5, 0.4, t0);
+  const end = lissajous(snappedActiveC, 5, 0.4, t0 + closingPeriod);
+  assert.ok(distance(start, end) < 1e-12);
+});
+
+/**
+ * Verifies a ratio needing more cycles than the denominator cap still snaps:
+ * the short circuit only fires for a pair that closes within the budget.
+ */
+test('snapToRationalRatio: a pair closing past the denominator cap still snaps', () => {
+  const { m, n, snappedActiveC } =
+    snapToRationalRatio(13, 11, MAX_RATIONAL_TERM, { min: 1, max: 100 });
+  assert.ok(n <= MAX_RATIONAL_TERM, `denominator ${n} within the cap`);
+  assert.notEqual(snappedActiveC, 13);
+  assert.equal(snappedActiveC, 11 * (m / n));
 });
 
 /**

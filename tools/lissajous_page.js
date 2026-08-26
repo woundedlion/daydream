@@ -129,12 +129,8 @@ const snapFrequencies = (activeId, rawNewValue) => {
   const rawActiveC = rawNewValue / activeConfig.scale;
 
   // 2-3. Snap to the closest simple rational ratio and compute the closing
-  // domain. The pure core (lissajous_math.js) handles the math; the DOM
-  // read/write below stays inline. The snapped value scales the passive
-  // frequency by up to MAX_RATIONAL_TERM, so the search is confined to the
-  // slider's range: clamping its result afterwards would reopen the very
-  // curve this just closed, while the domain below, the lock checkbox and
-  // the closure warning all kept describing the unclamped ratio.
+  // domain. The search takes the slider's range: clamping its result
+  // afterwards would reopen the curve it just closed.
   const { snappedActiveC, closingPeriod: newDomain } = snapToRationalRatio(
     rawActiveC, passiveC, MAX_RATIONAL_TERM,
     { min: activeConfig.min, max: activeConfig.max });
