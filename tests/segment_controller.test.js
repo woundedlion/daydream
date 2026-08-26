@@ -532,6 +532,9 @@ beforeEach(() => {
   // A fresh attribute per test: the length invariant binds at first upload and
   // the cases below composite at different grid sizes.
   driver.dotMesh.instanceColor = fakeColorAttribute(null);
+  // destroy() keeps the compilation, so a default-warmer spawn in a later
+  // test would carry the module this one warmed.
+  pageWarmer.discard();
   FakeWorker.instances = [];
   FakeWorker.constructionCount = 0;
   FakeWorker.failConstructionAt = -1;
