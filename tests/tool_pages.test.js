@@ -467,6 +467,7 @@ const CONTRAST_SURFACES = {
     '.chain-chip-bypass[aria-pressed="true"]': '.chain-chip',
     '.chain-chip-function-label': '.chain-chip',
     '.chain-chip-replace': '.chain-chip-replace',
+    '.chain-chip-rename': '.chain-chip-rename',
     '.chain-param-name': '.chain-chip',
     '.chain-param-note': '.chain-chip',
     '.chain-param-control': '.chain-chip',
