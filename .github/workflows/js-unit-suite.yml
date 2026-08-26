@@ -39,6 +39,7 @@ jobs:
           ref: ${{ steps.engine.outputs.pin }}
           token: ${{ secrets.POV_TOKEN || github.token }}
           path: engine
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
