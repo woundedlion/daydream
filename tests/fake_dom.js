@@ -298,11 +298,12 @@ function fakeStyle() {
  * event), read {passive}/{signal}, and assert removal; a {once} listener drops
  * as it fires, a listener an earlier handler removed does not fire, and removal
  * pairs on the capture flag, as in the DOM, so a capture-mismatched removal
- * leaves the listener on the list. focus() and
- * scrollIntoView() record their call counts the same way; focus() also points
- * the installed document's activeElement at the node, and unparenting a node
- * that holds focus drops it to the body, so a reorder built out of re-appends
- * loses focus the way it does in the DOM. Removing a listener
+ * leaves the listener on the list. focus() and scrollIntoView() record their
+ * call counts the same way; focus() also keeps its last options bag in
+ * focusOptions and points the installed document's activeElement at the node,
+ * and unparenting a node that holds focus drops it to the body, so a reorder
+ * built out of re-appends loses focus the way it does in the DOM.
+ * Removing a listener
  * that was never added throws rather than no-opping as the DOM does, so a
  * fixture that omits the add cannot hide a removal that never happens; pass
  * {allowRedundantRemoval: true} where the second removal is the thing under
@@ -363,6 +364,7 @@ export function fakeElement(tag = 'div', options = {}) {
     childNodes: [],
     parentNode: null,
     focusCalls: 0,
+    focusOptions: undefined,
     scrollIntoViewCalls: 0,
     // The box metrics, as an element no layout has measured reports them.
     // Nothing here derives one from another: a test that asserts over geometry
@@ -565,8 +567,9 @@ export function fakeElement(tag = 'div', options = {}) {
         width: this.offsetWidth, height: this.offsetHeight,
       };
     },
-    focus() {
+    focus(options) {
       this.focusCalls++;
+      this.focusOptions = options;
       const doc = activeDocument();
       if (doc) doc.activeElement = this;
     },

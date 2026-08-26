@@ -1409,6 +1409,9 @@ test('Reset hands keyboard focus back to the parameter that held it', () => {
   stale.ctrl('reset').object.reset();
 
   assert.equal(h.gui().ctrl('Glow').$input.focusCalls, 1);
+  // The rebuilt rows are not the captured ones, so the browser's own
+  // scroll-into-view would move the panel off the offset just restored.
+  assert.deepEqual(h.gui().ctrl('Glow').$input.focusOptions, { preventScroll: true });
   assert.equal(h.gui().ctrl('reset').$button.focusCalls, 0);
 });
 

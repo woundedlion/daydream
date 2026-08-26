@@ -522,6 +522,10 @@ test('focus tracks the document, and unparenting the focused node blurs it', () 
 
   row.focus();
   assert.equal(doc.activeElement, row);
+  assert.equal(row.focusOptions, undefined, 'a bare focus() recorded an options bag');
+  row.focus({ preventScroll: true });
+  assert.deepEqual(row.focusOptions, { preventScroll: true },
+    'the options bag focus() was handed is not readable');
 
   list.appendChild(row); // a move, not an insert
   assert.equal(doc.activeElement, null, 'the re-append kept focus on the moved node');
