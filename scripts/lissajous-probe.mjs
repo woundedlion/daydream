@@ -37,9 +37,10 @@ const FREQUENCY_RANGE = { min: 1, max: 100 };
 // The exported literals are float32 round-trips, so a snapped ratio matches to
 // far inside this, while distinct fractions of terms <= 8 stand 1/56 apart.
 const RATIO_EPSILON = 1e-4;
-// The Domain control's step, in radians: its readout sits on that grid while the
-// exported domain is the unrounded period.
-const DOMAIN_STEP = TWO_PI / 500;
+// The Domain readout carries three decimals, so it names the exported period to
+// within half of the last place. The thumb sits on the control's own step grid,
+// which is coarser (2*PI/500) and cannot hold the period.
+const DOMAIN_READOUT_EPSILON = 5e-4;
 
 /**
  * The parameters the page exports, at the snippet's full precision, once the
@@ -125,6 +126,22 @@ async function probeRationalLock(tab) {
       `${subject} keeps both frequencies on their sliders (${params.c1}, ${params.c2})`);
   };
 
+  /**
+   * Requires the Domain readout to name the period the page exports. The thumb
+   * can only sit on the control's step grid, so the readout is the only part of
+   * the control that can name the domain actually in effect.
+   * @param {import('puppeteer-core').Page} page - The page.
+   * @param {{domain: number}} params - What the page exports.
+   * @param {string} subject - What produced them, for the check message.
+   * @returns {Promise<void>} Once the check is recorded.
+   */
+  const requireReadout = async (page, params, subject) => {
+    const shown = Number(await page.$eval(DOMAIN_READOUT, (node) => node.textContent));
+    check(Math.abs(shown - params.domain) <= DOMAIN_READOUT_EPSILON,
+      `${subject} leaves the Domain readout naming the exported period `
+        + `(${shown} for ${params.domain.toFixed(4)})`);
+  };
+
   const disabled = () => tab.$eval(DOMAIN_SLIDER, (node) => node.disabled);
   const dimmed = () =>
     tab.$eval(DOMAIN_GROUP, (node) => node.classList.contains('opacity-50'));
@@ -160,9 +177,7 @@ async function probeRationalLock(tab) {
   requireClosed(draggedC1, 'the C1 drag');
   check(draggedC1.domain !== locked.domain,
     `the C1 drag drives the disabled Domain control (${draggedC1.domain.toFixed(4)})`);
-  const shown = Number(await tab.$eval(DOMAIN_READOUT, (node) => node.textContent));
-  check(Math.abs(shown - draggedC1.domain) <= DOMAIN_STEP,
-    `the Domain readout follows the computed period (${shown})`);
+  await requireReadout(tab, draggedC1, 'the C1 drag');
 
   // The other frequency: the held side flips to C1, and the domain is recomputed
   // against it.
@@ -171,6 +186,7 @@ async function probeRationalLock(tab) {
   check(draggedC2.c2 !== draggedC1.c2,
     `the C2 drag moves the frequency (${draggedC1.c2} to ${draggedC2.c2})`);
   requireClosed(draggedC2, 'the C2 drag');
+  await requireReadout(tab, draggedC2, 'the C2 drag');
 
   // Control 3, the Domain slider: while the lock holds it, the refusal is the
   // UA's, so a real pointer on its track is what tests it.
