@@ -419,28 +419,31 @@ export async function createChainDocumentStore({
 
   /**
    * Declares an added instance and backfills every preset, the serialization
-   * fields and staggered path-policy groups with its defaults. The declarations
-   * are the loaded document's for that operator where it carries any — which
-   * may be a strict subset of the catalog's fields — and the catalog's schema
-   * for an operator the document does not use.
+   * fields and staggered path-policy groups with its defaults. The instance
+   * carries the operator's whole catalog schema in catalog field order: a
+   * field an existing instance of the same operator declares takes that
+   * declaration and its value, and the rest are declared from the catalog at
+   * its defaults, so a document narrowing an operator to a subset of its
+   * fields cannot narrow the instances inserted after it.
    * @param {*} candidate - Document being reconciled.
    * @param {ChainEntry} entry - The added chain entry.
    */
   const addInstance = (candidate, entry) => {
     const op = /** @type {CatalogOperator} */ (operators.get(entry.operator));
-    const templates = declarationTemplates.get(entry.operator);
-    const parameters = templates === undefined
-      ? op.params.map((field) => parameterFromField(entry.label, field))
-      : templates.map(({ label, parameter: template }) => {
-        const parameter = structuredClone(template);
-        const prefix = `${label}.`;
-        parameter.id = `${entry.label}.${parameter.id.slice(prefix.length)}`;
-        if (parameter.interpolation.group?.startsWith(prefix)) {
-          parameter.interpolation.group =
-            `${entry.label}.${parameter.interpolation.group.slice(prefix.length)}`;
-        }
-        return parameter;
-      });
+    const templates = new Map((declarationTemplates.get(entry.operator) ?? []).map(
+      (template) => [template.parameter.id.slice(template.label.length + 1), template]));
+    const parameters = op.params.map((field) => {
+      const template = templates.get(field.id);
+      if (template === undefined) return parameterFromField(entry.label, field);
+      const parameter = structuredClone(template.parameter);
+      const prefix = `${template.label}.`;
+      parameter.id = `${entry.label}.${parameter.id.slice(prefix.length)}`;
+      if (parameter.interpolation.group?.startsWith(prefix)) {
+        parameter.interpolation.group =
+          `${entry.label}.${parameter.interpolation.group.slice(prefix.length)}`;
+      }
+      return parameter;
+    });
     for (const parameter of parameters) {
       candidate.descriptor.parameters.push(parameter);
       candidate.descriptor.serialization.fields.push(parameter.id);
