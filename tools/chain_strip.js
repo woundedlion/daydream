@@ -206,17 +206,12 @@ export function createChainStrip({
   /** @param {ChainEntry} entry */
   const opOf = (entry) => /** @type {CatalogOperator} */ (operators.get(entry.operator));
 
-  /** @param {number} index @returns {LegalityEntry[]} */
-  const insertionsAt = (index) => store.legalInsertions(index);
-
   /** @type {string|null} Roving-tabindex position, by instance label. */
   let focusedLabel = null;
   /** @type {string|null} The last selection onSelect was told about. */
   let notifiedSelection = null;
   /** @type {{element: *, anchor: *}|null} */
   let palette = null;
-  /** @type {BandLayout[]} The current render's band decomposition. */
-  let layout = [];
   /** @type {{undo: *, redo: *}|null} The current render's history buttons. */
   let history = null;
   /** @type {ParameterDeclaration[]} The current render's declarations. */
@@ -553,8 +548,8 @@ export function createChainStrip({
     const chain = store.chain();
     /** @type {Map<string, SpanChoice>} */
     const choices = new Map(kind === 'insert'
-      ? insertionsAt(index).filter((candidate) => candidate.legal).map((candidate) =>
-        [candidate.operator.id,
+      ? store.legalInsertions(index).filter((candidate) => candidate.legal)
+        .map((candidate) => [candidate.operator.id,
           { start: index, deleteCount: 0, operators: [candidate.operator] }])
       : socketChoices(index).map((choice) => [choiceKey(choice.operators), choice]));
     const title = kind === 'insert'
@@ -1120,7 +1115,7 @@ export function createChainStrip({
   const bandAddButton = (band) => {
     const title = titleCase(band.carrier);
     const gap = appendGap(band);
-    if (gap === null || !insertionsAt(gap).some((entry) => entry.legal))
+    if (gap === null || !store.legalInsertions(gap).some((entry) => entry.legal))
       return null;
     const add = el('button', 'chain-band-add');
     add.type = 'button';
@@ -1164,7 +1159,7 @@ export function createChainStrip({
     const scrolled = Number(
       container.querySelector('.chain-strip-viewport')?.scrollLeft ?? 0);
     palette = null;
-    layout = bandLayout();
+    const layout = bandLayout();
     rows.clear();
 
     const snapshot = store.document();
