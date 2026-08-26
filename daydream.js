@@ -725,15 +725,19 @@ export function start({
       host.adapter = {
         ...renderAdapter,
         drawFrame() {
-          renderAdapter.drawFrame();
           // The migrated effect is applied before the first frame, so the URL
           // may advertise it from here. Holding the suspension until a pool
           // composites would strand every later deep-link write for the session
-          // whenever no composite lands.
-          if (legacyUrlPending) {
-            legacyUrlPending = false;
-            urlSync.resume();
-            applyNotice.show(legacySelection.notice, CONFIG_NOTICE);
+          // whenever no composite lands; a frame the guard catches strands it
+          // the same way, so the release runs whether or not the frame threw.
+          try {
+            renderAdapter.drawFrame();
+          } finally {
+            if (legacyUrlPending) {
+              legacyUrlPending = false;
+              urlSync.resume();
+              applyNotice.show(legacySelection.notice, CONFIG_NOTICE);
+            }
           }
         },
       };

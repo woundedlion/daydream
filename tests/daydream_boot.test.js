@@ -145,16 +145,19 @@ function sliceTo(at, sentinel) {
  * does against embind. The counters are what a case reads the constructions,
  * handle releases, Pole LOD replays and parameter writes off.
  * @param {{resolutions?: Array<Array<number>>, definitions?: Array<Object>,
- *   refusedWidth?: ?number}} [options] - The resolutions the engine reports it
- *   can build, the parameter definitions the effect panel is built from, and a
- *   width setResolution rejects.
+ *   refusedWidth?: ?number, failingFrames?: number}} [options] - The resolutions
+ *   the engine reports it can build, the parameter definitions the effect panel
+ *   is built from, a width setResolution rejects, and a count of leading
+ *   drawFrame calls that throw.
  * @returns {Object} The module double.
  */
 function fakeWasmModule({
   resolutions = [[288, 144], [96, 20]],
   definitions = [],
   refusedWidth = null,
+  failingFrames = 0,
 } = {}) {
+  let framesToFail = failingFrames;
   const pixels = new Uint16Array(288 * 144 * 3);
   let built = 0;
   let deleted = 0;
@@ -194,7 +197,12 @@ function fakeWasmModule({
       getEffectPresetCounts() { return {}; }
       getArenaMetrics() { return {}; }
       strobeColumns() { return false; }
-      drawFrame() {}
+      drawFrame() {
+        if (framesToFail > 0) {
+          framesToFail -= 1;
+          throw new Error('engine drawFrame failed');
+        }
+      }
       getPixels() { return pixels; }
       getBufferLength() { return pixels.length; }
       delete() { deleted++; }
@@ -280,6 +288,26 @@ test('the migrated ShaderBall URL is written only once a frame has applied it', 
     'the live identity is what a shared link must carry');
   assert.equal(notice.textContent, 'ShaderBall is now Shader; opened with defaults.',
     'the rename is only discoverable through the notice the release raises');
+});
+
+test('a first frame that throws still releases the migrated URL', async () => {
+  const app = await bootedApp({
+    daydreamMode: 'shader-workbench',
+    search: '?effect=ShaderBall',
+    loadModule: () => Promise.resolve(fakeWasmModule({ failingFrames: 1 })),
+  });
+  await settleUrl();
+  assert.deepEqual(app.urlWrites, [], 'the migration is suspended until a frame');
+
+  // The frame guard catches and keeps the loop armed, so nothing else ever
+  // revisits the suspension.
+  captureConsole(() => app.driver.renderer.frame());
+  await settleUrl();
+
+  assert.equal(app.urlWrites.length, 1,
+    'a frame that throws must not strand the suspension: every later deep-link '
+    + 'write is held for the session behind it');
+  assert.match(app.urlWrites[0], /[?&]effect=Shader(&|$)/);
 });
 
 
