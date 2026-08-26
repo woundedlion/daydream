@@ -524,6 +524,7 @@ const browser = await puppeteer.launch({
  */
 async function openWorkbench(collector) {
   const tab = await browser.newPage();
+  tab.setDefaultTimeout(TIMEOUT_MS);
   await tab.setViewport(VIEWPORT);
   tab.on('pageerror', (error) => collector.push(`uncaught: ${error.message}`));
   await tab.goto(`${site.origin}/${PAGE}`, { timeout: TIMEOUT_MS });
