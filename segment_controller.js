@@ -154,6 +154,102 @@ export class SegmentController {
   /** Backing store for the `showBoundaries` accessor pair. */
   #showBoundaries = false;
 
+  /** @type {Array<FrameResult | null>} */
+  #results = [];
+
+  /**
+   * Staging buffer workers fill during a generation; swapped into `#results`
+   * only once every segment has reported, so `#results` always holds one whole
+   * generation and an overrun re-blit never composites a half-updated mix.
+   * @type {Array<FrameResult | null>}
+   */
+  #scratch = [];
+
+  /** ms per segment (worker-measured). @type {number[]} */
+  #timings = [];
+
+  /** @type {Array<SegArenaMetrics | null>} */
+  #arenas = [];
+
+  /**
+   * Per-segment clip disposition of the last reported frame: true when that
+   * worker's effect reports needs_full_frame() and it shaded the whole canvas
+   * instead of its band. The pool is only N-way parallel where this is false.
+   * @type {boolean[]}
+   */
+  #fullFrames = [];
+
+  /**
+   * Per-segment divergence notices from the last reported frame: a worker
+   * whose engine refused a parameter or a preset renders a configuration its
+   * peers do not, and the pool has no reply channel to learn of it otherwise.
+   * Null where the segment reported none.
+   * @type {Array<string[] | null>}
+   */
+  #warnings = [];
+
+  /** Count of outstanding render responses. */
+  #pending = 0;
+
+  /** Per-segId first-arrival flag, reset each dispatch. @type {boolean[]} */
+  #frameSeen = [];
+
+  #frameStart = 0;
+
+  /** Dispatch -> last worker response (ms). */
+  #wallTime = 0;
+
+  /** @type {(() => void) | null} */
+  #frameResolve = null;
+
+  #ready = false;
+
+  /**
+   * Generation fence: bumps wherever an in-flight frame's results stop being
+   * publishable — a resolution change (sized to a stale W/H, its x1/y1 indexing
+   * past the resized buffer), an effect switch (outgoing effect), a fault latch,
+   * and destroy(). renderParallel snapshots it into #inflightGen at dispatch; a
+   * frame whose snapshot no longer matches is dropped.
+   */
+  #renderGen = 0;
+
+  #inflightGen = 0;
+
+  #renderInFlight = false;
+
+  /** True when workers have new results to display. */
+  #pendingFrame = false;
+
+  /** True only on ticks that blit a real composite. */
+  #frameComposited = false;
+
+  /** Throttle for the composite alias-divergence warning. */
+  #aliasDivergenceLogged = false;
+
+  // Cached boundary-overlay seam coordinates, rebuilt whenever the band table
+  // they were derived from is replaced.
+  /** @type {number[]} */
+  #boundaryYs = [];
+
+  /** @type {number[]} */
+  #boundaryXs = [];
+
+  /** @type {import('./segment_layout.js').SegRange[] | null} */
+  #boundaryBands = null;
+
+  // Cached per-segment band rectangles composite()'s pre-pass validates
+  // against, rebuilt only when the layout the cache key names moves.
+  /** @type {import('./segment_layout.js').SegRange[] | null} */
+  #bands = null;
+
+  #bandGen = -1;
+
+  #bandCount = 0;
+
+  #bandW = 0;
+
+  #bandH = 0;
+
   /**
    * Wire the controller to the host's reassignable engine/view via lazy getters.
    * @param {Object} deps - Host-injected dependencies.
@@ -204,35 +300,6 @@ export class SegmentController {
 
     /** @type {Worker[]} */
     this.workers = [];
-    /** @type {Array<FrameResult | null>} */
-    this.results = [];
-    /**
-     * Staging buffer workers fill during a generation; swapped into `results`
-     * only once every segment has reported, so `results` always holds one whole
-     * generation and an overrun re-blit never composites a half-updated mix.
-     * @type {Array<FrameResult | null>}
-     */
-    this.scratch = [];
-    /** @type {number[]} */
-    this.timings = [];        // ms per segment (worker-measured)
-    /** @type {Array<SegArenaMetrics | null>} */
-    this.arenas = [];
-    /**
-     * Per-segment clip disposition of the last reported frame: true when that
-     * worker's effect reports needs_full_frame() and it shaded the whole canvas
-     * instead of its band. The pool is only N-way parallel where this is false.
-     * @type {boolean[]}
-     */
-    this.fullFrames = [];
-    /**
-     * Per-segment divergence notices from the last reported frame: a worker
-     * whose engine refused a parameter or a preset renders a configuration its
-     * peers do not, and the pool has no reply channel to learn of it otherwise.
-     * Null where the segment reported none.
-     * @type {Array<string[] | null>}
-     */
-    this.warnings = [];
-
     /** @type {number[] | null} */
     this.paramValues = null;  // segment 0's latest param values, for GUI sync
     this.paramRevision = 0;
@@ -240,28 +307,6 @@ export class SegmentController {
     this.presetCount = null;
     /** @type {number | null} */
     this.presetIndex = null;
-
-    this.pending = 0;         // count of outstanding render responses
-    /** @type {boolean[]} */
-    this.frameSeen = [];     // per-segId first-arrival flag, reset each dispatch
-    this.frameStart = 0;
-    this.wallTime = 0;        // dispatch -> last worker response (ms)
-    /** @type {(() => void) | null} */
-    this.frameResolve = null;
-    this.ready = false;
-
-    // Generation fence: renderGen bumps wherever an in-flight frame's results stop
-    // being publishable — a resolution change (sized to a stale W/H, its x1/y1
-    // indexing past the resized buffer), an effect switch (outgoing effect), a
-    // fault latch, and destroy(). renderParallel snapshots it into inflightGen at
-    // dispatch; a frame whose snapshot no longer matches renderGen is dropped.
-    this.renderGen = 0;
-    this.inflightGen = 0;
-
-    this.renderInFlight = false;
-    this.pendingFrame = false; // true when workers have new results to display
-    this.frameComposited = false; // true only on ticks that blit a real composite
-    this.aliasDivergenceLogged = false; // throttle the composite alias-divergence warning
 
     // Fault latch: a worker trap fires onerror but never sends its 'frame', so
     // `pending` never reaches 0. Latch, settle the in-flight frame, stop dispatching.
@@ -289,23 +334,49 @@ export class SegmentController {
     /** @type {ReturnType<typeof setTimeout> | null} */
     this.retryTimer = null;
 
-    // Cached boundary-overlay seam coordinates, rebuilt whenever the band table
-    // they were derived from is replaced.
-    /** @type {number[]} */
-    this.boundaryYs = [];
-    /** @type {number[]} */
-    this.boundaryXs = [];
-    /** @type {import('./segment_layout.js').SegRange[] | null} */
-    this.boundaryBands = null;
+  }
 
-    // Cached per-segment band rectangles composite()'s pre-pass validates
-    // against, rebuilt only when the layout the cache key names moves.
-    /** @type {import('./segment_layout.js').SegRange[] | null} */
-    this.bands = null;
-    this.bandGen = -1;
-    this.bandCount = 0;
-    this.bandW = 0;
-    this.bandH = 0;
+  /**
+   * Whether the last tick blitted a real composited generation, as opposed to
+   * re-blitting the published one over an overrun or leaving the buffer black.
+   * @returns {boolean}
+   */
+  get frameComposited() {
+    return this.#frameComposited;
+  }
+
+  /**
+   * The frame-lifecycle and fence state, for tests and diagnostics. The
+   * per-segment arrays are the controller's own, on the same terms as
+   * updateStats()'s payload: they are refilled in place as segment frames land,
+   * so a caller must read them synchronously and retain none of them.
+   * @returns {{ready: boolean, pending: number, renderGen: number,
+   *   inflightGen: number, renderInFlight: boolean, pendingFrame: boolean,
+   *   frameComposited: boolean, frameSettled: boolean, wallTime: number,
+   *   results: Array<FrameResult | null>, scratch: Array<FrameResult | null>,
+   *   timings: number[], arenas: Array<SegArenaMetrics | null>,
+   *   fullFrames: boolean[], warnings: Array<string[] | null>,
+   *   frameSeen: boolean[]}}
+   */
+  get frameState() {
+    return {
+      ready: this.#ready,
+      pending: this.#pending,
+      renderGen: this.#renderGen,
+      inflightGen: this.#inflightGen,
+      renderInFlight: this.#renderInFlight,
+      pendingFrame: this.#pendingFrame,
+      frameComposited: this.#frameComposited,
+      frameSettled: this.#frameResolve === null,
+      wallTime: this.#wallTime,
+      results: this.#results,
+      scratch: this.#scratch,
+      timings: this.#timings,
+      arenas: this.#arenas,
+      fullFrames: this.#fullFrames,
+      warnings: this.#warnings,
+      frameSeen: this.#frameSeen,
+    };
   }
 
   /** @returns {boolean} Whether segment boundaries are drawn. */
@@ -325,8 +396,8 @@ export class SegmentController {
     // display buffer: compositing there would zero the single-engine frame or
     // latch a fault on a controller with nothing to blit. A latched pool keeps
     // `ready` for ownsDisplay, so the fault needs its own term here.
-    if (this.active && this.ready && !this.faulted && this.hasPublishedFrame()) {
-      this.composite();
+    if (this.active && this.#ready && !this.faulted && this.hasPublishedFrame()) {
+      this.composite(this.#results);
       // No simulation tick stands behind this composite, and Three re-uploads
       // the instance colours only on a version bump.
       const instanceColor = this.driver.dotMesh.instanceColor;
@@ -483,16 +554,16 @@ export class SegmentController {
 
     this.count = numSegments;
     this.workers = [];
-    this.results = new Array(numSegments).fill(null);
-    this.scratch = new Array(numSegments).fill(null);
-    this.timings = new Array(numSegments).fill(0);
-    this.arenas = new Array(numSegments).fill(null);
-    this.fullFrames = new Array(numSegments).fill(false);
-    this.warnings = new Array(numSegments).fill(null);
-    this.frameSeen = new Array(numSegments).fill(false);
+    this.#results = new Array(numSegments).fill(null);
+    this.#scratch = new Array(numSegments).fill(null);
+    this.#timings = new Array(numSegments).fill(0);
+    this.#arenas = new Array(numSegments).fill(null);
+    this.#fullFrames = new Array(numSegments).fill(false);
+    this.#warnings = new Array(numSegments).fill(null);
+    this.#frameSeen = new Array(numSegments).fill(false);
     this.paramValues = null;
     this.refreshPresetState();
-    this.ready = false;
+    this.#ready = false;
 
     const res = this.resolutionPresets[this.appState.get('resolution')];
     if (!res) {
@@ -535,7 +606,7 @@ export class SegmentController {
         if (msg.type === 'ready') {
           if (!readied[i]) { readied[i] = true; readyCount++; }
           if (readyCount === numSegments) {
-            this.ready = true;
+            this.#ready = true;
             // A live pool ends the faulted-rebuild run, so the next fault gets a
             // fresh budget.
             this.faultedRebuilds = 0;
@@ -571,10 +642,10 @@ export class SegmentController {
             return;
           }
           // Count and stage only the first message from each segment.
-          if (this.frameSeen[msg.segId]) return;
+          if (this.#frameSeen[msg.segId]) return;
           // Generation fence: keep only results from the current resolution; still
           // settle the frame either way.
-          if (this.inflightGen === this.renderGen) {
+          if (this.#inflightGen === this.#renderGen) {
             // Mirror segment 0's live params for GUI sync, inside the fence so a
             // stale-generation frame can't publish params against a new descriptor
             // list.
@@ -584,22 +655,22 @@ export class SegmentController {
               this.presetCount = msg.presetCount ?? null;
               this.presetIndex = msg.presetIndex ?? null;
             }
-            this.scratch[msg.segId] = {
+            this.#scratch[msg.segId] = {
               pixels: msg.pixels,
               x0: msg.x0, x1: msg.x1,
               y0: msg.y0, y1: msg.y1,
             };
-            this.timings[msg.segId] = msg.elapsed;
-            this.arenas[msg.segId] = msg.arenaMetrics;
-            this.fullFrames[msg.segId] = msg.fullFrame === true;
-            this.warnings[msg.segId] = msg.warnings ?? null;
+            this.#timings[msg.segId] = msg.elapsed;
+            this.#arenas[msg.segId] = msg.arenaMetrics;
+            this.#fullFrames[msg.segId] = msg.fullFrame === true;
+            this.#warnings[msg.segId] = msg.warnings ?? null;
           }
-          this.frameSeen[msg.segId] = true;
-          this.pending--;
-          if (this.pending === 0 && this.frameResolve) {
-            this.frameResolve();
-            this.frameResolve = null;
-          } else if (this.pending > 0) {
+          this.#frameSeen[msg.segId] = true;
+          this.#pending--;
+          if (this.#pending === 0 && this.#frameResolve) {
+            this.#frameResolve();
+            this.#frameResolve = null;
+          } else if (this.#pending > 0) {
             this.armRenderWatchdog();
           }
         } else {
@@ -617,7 +688,7 @@ export class SegmentController {
         // load failure (a plain Event, not an ErrorEvent) — transient, so rebuild
         // a bounded number of times before latching. A messaged error is a real
         // worker throw and still fails fast.
-        if (!this.ready && (e == null || e.message == null)
+        if (!this.#ready && (e == null || e.message == null)
             && this.bootAttempt < MAX_BOOT_RETRIES) {
           const next = this.bootAttempt + 1;
           console.warn(`[Segmented] seg ${i} module failed to load`
@@ -674,7 +745,7 @@ export class SegmentController {
     this.clearTimers('bootWatchdog');
     this.bootWatchdog = setTimeout(() => {
       this.bootWatchdog = null;
-      if (!this.ready && !this.faulted) {
+      if (!this.#ready && !this.faulted) {
         const stuck = missing(booted);
         this.onWorkerFault(stuck.length === 1 ? stuck[0] : FAULT_POOL,
           `worker module load timed out after ${BOOT_WATCHDOG_MS} ms `
@@ -688,7 +759,7 @@ export class SegmentController {
     this.clearTimers('initWatchdog');
     this.initWatchdog = setTimeout(() => {
       this.initWatchdog = null;
-      if (!this.ready && !this.faulted) {
+      if (!this.#ready && !this.faulted) {
         const stuck = missing(readied);
         this.onWorkerFault(stuck.length === 1 ? stuck[0] : FAULT_POOL,
           `worker init timed out after ${INIT_WATCHDOG_MS} ms `
@@ -737,10 +808,10 @@ export class SegmentController {
     this.clearTimers('renderWatchdog');
     this.renderWatchdog = setTimeout(() => {
       this.renderWatchdog = null;
-      if (this.pending > 0 && !this.faulted) {
+      if (this.#pending > 0 && !this.faulted) {
         this.onWorkerFault(FAULT_RENDER,
           `render stalled: no segment reported a frame for ${RENDER_WATCHDOG_MS} ms `
-          + `(${this.workers.length - this.pending}/${this.workers.length} `
+          + `(${this.workers.length - this.#pending}/${this.workers.length} `
           + `segments responded) — a worker accepted 'render' but stopped progressing`);
       }
     }, RENDER_WATCHDOG_MS);
@@ -770,33 +841,33 @@ export class SegmentController {
     this.terminateWorkers();
     this.clearTimers(...ALL_TIMERS);
     this.workers = [];
-    this.results = [];
-    this.scratch = [];
-    this.timings = [];
-    this.arenas = [];
-    this.fullFrames = [];
-    this.warnings = [];
-    this.frameSeen = [];
-    this.ready = false;
-    this.pending = 0;
+    this.#results = [];
+    this.#scratch = [];
+    this.#timings = [];
+    this.#arenas = [];
+    this.#fullFrames = [];
+    this.#warnings = [];
+    this.#frameSeen = [];
+    this.#ready = false;
+    this.#pending = 0;
     // tick() returns on the !ready guard while the pool respawns, so a stale
     // true here would keep captureReady() green over cleared black frames.
-    this.frameComposited = false;
+    this.#frameComposited = false;
     // Open a new generation before settling: the in-flight render's `.then`
     // resolves on a later microtask, after a fresh pool may exist; bumping here
     // fails its `inflightGen === renderGen` guard so it can't arm the new pool.
-    this.renderGen++;
+    this.#renderGen++;
     // Settle any in-flight render promise so it never leaks unresolved.
-    if (this.frameResolve) {
-      const resolve = this.frameResolve;
-      this.frameResolve = null;
+    if (this.#frameResolve) {
+      const resolve = this.#frameResolve;
+      this.#frameResolve = null;
       resolve();
     }
-    this.renderInFlight = false;
-    this.pendingFrame = false;
+    this.#renderInFlight = false;
+    this.#pendingFrame = false;
     this.faulted = false;
     this.faultInfo = null;
-    this.aliasDivergenceLogged = false;
+    this.#aliasDivergenceLogged = false;
   }
 
   /**
@@ -838,15 +909,15 @@ export class SegmentController {
         + `— first fault already latched, UI shows that one`);
     }
     this.terminateWorkers();
-    this.pending = 0;
-    this.renderInFlight = false;
+    this.#pending = 0;
+    this.#renderInFlight = false;
     // Open a new generation before settling: the in-flight render's `.then` would
     // otherwise pass its `inflightGen === renderGen` guard and publish the frame
     // the faulting worker never completed.
-    this.renderGen++;
-    if (this.frameResolve) {
-      const resolve = this.frameResolve;
-      this.frameResolve = null;
+    this.#renderGen++;
+    if (this.#frameResolve) {
+      const resolve = this.#frameResolve;
+      this.#frameResolve = null;
       resolve();
     }
     // tick() is unreachable while the host is paused and never ran at all for a
@@ -937,12 +1008,12 @@ export class SegmentController {
     }
     // Bump the fence so an in-flight old-effect frame fails inflightGen ===
     // renderGen and can't republish its stale-ordered paramValues.
-    this.renderGen++;
+    this.#renderGen++;
     // Drop settled/pending old-effect results too; otherwise a completed
     // old-effect frame composites once or re-blits via the overrun branch,
     // flashing the outgoing effect on switch.
-    this.results.fill(null);
-    this.pendingFrame = false;
+    this.#results.fill(null);
+    this.#pendingFrame = false;
     this.broadcast({
       type: 'setEffect',
       name,
@@ -1034,9 +1105,9 @@ export class SegmentController {
     // W/H. Drop settled results here; onmessage's fence drops in-flight ones.
     this.paramValues = null;
     this.paramRevision++;
-    this.renderGen++;
-    this.results.fill(null);
-    this.pendingFrame = false;
+    this.#renderGen++;
+    this.#results.fill(null);
+    this.#pendingFrame = false;
     // renderInFlight/pending are left intact: the outstanding old-generation
     // render still owns the in-flight latch and releases it via frameResolve;
     // tick() then dispatches the re-render at the new size. A render that never
@@ -1052,27 +1123,27 @@ export class SegmentController {
    */
   renderParallel() {
     return new Promise((resolve) => {
-      this.inflightGen = this.renderGen;
-      this.pending = this.workers.length;
-      this.frameSeen.fill(false);
+      this.#inflightGen = this.#renderGen;
+      this.#pending = this.workers.length;
+      this.#frameSeen.fill(false);
       // Clear per-segment stats so a segment fenced out (or silent) this frame
       // reports fresh 0/'-' rather than a prior generation's values.
-      this.timings.fill(0);
-      this.arenas.fill(null);
-      this.fullFrames.fill(false);
-      this.warnings.fill(null);
-      this.frameStart = performance.now();
-      this.frameResolve = () => {
+      this.#timings.fill(0);
+      this.#arenas.fill(null);
+      this.#fullFrames.fill(false);
+      this.#warnings.fill(null);
+      this.#frameStart = performance.now();
+      this.#frameResolve = () => {
         this.clearTimers('renderWatchdog');
-        this.wallTime = performance.now() - this.frameStart;
+        this.#wallTime = performance.now() - this.#frameStart;
         resolve();
       };
 
       // An empty pool has nothing to answer the dispatch and arms a watchdog that
       // only fires on `pending > 0`, so settle here rather than never.
       if (this.workers.length === 0) {
-        this.frameResolve();
-        this.frameResolve = null;
+        this.#frameResolve();
+        this.#frameResolve = null;
         return;
       }
 
@@ -1083,8 +1154,8 @@ export class SegmentController {
       // Clearing each slot as it is consumed also keeps a slot left by a
       // fenced-out prior generation out of this one's published frame.
       for (let s = 0; s < this.workers.length; s++) {
-        const retired = this.scratch[s];
-        this.scratch[s] = null;
+        const retired = this.#scratch[s];
+        this.#scratch[s] = null;
         const recycle = retired && retired.pixels && retired.pixels.length > 0
           ? retired.pixels : null;
         try {
@@ -1097,7 +1168,7 @@ export class SegmentController {
           // Mid-dispatch: the un-posted workers never reply, so `pending` never
           // reaches 0 and no watchdog is armed yet. Fault, which settles the
           // promise and releases the in-flight latch.
-          this.scratch.fill(null);
+          this.#scratch.fill(null);
           this.onWorkerFault(s, `render dispatch to seg ${s} failed: `
             + errorDetail(error));
           return;
@@ -1120,8 +1191,11 @@ export class SegmentController {
    *   engine view is missing before the WASM load and after dispose), so nothing
    *   was read or written and the caller must keep the generation pending. The
    *   caller uses this to avoid marking a black buffer as a real composited frame.
+   * @param {Array<FrameResult | null>} results - One whole generation, indexed
+   *   by segment. Only the published generation is ever coherent: a staging
+   *   buffer mid-fill composites a half-updated mix.
    */
-  composite() {
+  composite(results) {
     const refreshed = this.refreshPixelView() === true;
     const dst = this.getMemoryView();
     // Not a fault: the view is absent only while there is no engine to fetch it
@@ -1153,12 +1227,12 @@ export class SegmentController {
     // single-engine path): re-point both display aliases at the composite target.
     // driver.render() re-clears driver.pixels next frame, restoring the elision.
     if (this.displayAliasesDiverged(dst)) {
-      if (!this.aliasDivergenceLogged) {
+      if (!this.#aliasDivergenceLogged) {
         console.error(
           "SegmentController.composite: display-buffer alias diverged " +
           "from getMemoryView() — re-pointing the display aliases at the " +
           "composite target");
-        this.aliasDivergenceLogged = true;
+        this.#aliasDivergenceLogged = true;
       }
       this.repointDisplayAliases(dst);
     }
@@ -1173,7 +1247,7 @@ export class SegmentController {
     // Pre-pass: validate every result before blitting any, so a bad segment faults
     // cleanly (overlay + halt) like a worker fault rather than leaving a partial frame.
     for (let s = 0; s < n; s++) {
-      const r = this.results[s];
+      const r = results[s];
       if (!r || !r.pixels) continue;
       if (r.x0 < 0 || r.y0 < 0 || r.x1 > w || r.y1 > h) {
         this.onWorkerFault(s,
@@ -1219,7 +1293,7 @@ export class SegmentController {
 
     let blitted = 0;
     for (let s = 0; s < n; s++) {
-      const r = this.results[s];
+      const r = results[s];
       if (!r || !r.pixels) continue;
       compositeSegment(dst, r.pixels, w, r);
       blitted++;
@@ -1229,8 +1303,8 @@ export class SegmentController {
     // Skip on a fully generation-fenced frame (blitted === 0): the buffer is black
     // and stamping seams would show cyan lines on an otherwise-blank sphere.
     if (this.showBoundaries && blitted > 0) {
-      if (this.boundaryBands !== bands) this.rebuildBoundaries(bands);
-      stampBoundaries(dst, w, h, this.boundaryXs, this.boundaryYs);
+      if (this.#boundaryBands !== bands) this.rebuildBoundaries(bands);
+      stampBoundaries(dst, w, h, this.#boundaryXs, this.#boundaryYs);
     }
 
     return blitted;
@@ -1249,9 +1323,9 @@ export class SegmentController {
    *   null when the layout admits none, having latched a fault.
    */
   segmentBands(n, w, h) {
-    if (this.bands && this.bandGen === this.renderGen && this.bandCount === n
-        && this.bandW === w && this.bandH === h) {
-      return this.bands;
+    if (this.#bands && this.#bandGen === this.#renderGen && this.#bandCount === n
+        && this.#bandW === w && this.#bandH === h) {
+      return this.#bands;
     }
     const bands = new Array(n);
     for (let s = 0; s < n; s++) {
@@ -1264,11 +1338,11 @@ export class SegmentController {
         return null;
       }
     }
-    this.bands = bands;
-    this.bandGen = this.renderGen;
-    this.bandCount = n;
-    this.bandW = w;
-    this.bandH = h;
+    this.#bands = bands;
+    this.#bandGen = this.#renderGen;
+    this.#bandCount = n;
+    this.#bandW = w;
+    this.#bandH = h;
     return bands;
   }
 
@@ -1289,9 +1363,9 @@ export class SegmentController {
       if (band.x0 > 0) xBounds.add(band.x0);
     }
     if (xBounds.size > 0) xBounds.add(0);
-    this.boundaryYs = [...yBounds];
-    this.boundaryXs = [...xBounds];
-    this.boundaryBands = bands;
+    this.#boundaryYs = [...yBounds];
+    this.#boundaryXs = [...xBounds];
+    this.#boundaryBands = bands;
   }
 
   /**
@@ -1308,17 +1382,17 @@ export class SegmentController {
   updateStats() {
     this.statsView.update({
       active: this.active,
-      ready: this.ready,
+      ready: this.#ready,
       faulted: this.faulted,
       faultInfo: this.faultInfo,
       count: this.count,
-      results: this.results,
-      timings: this.timings,
-      arenas: this.arenas,
-      fullFrames: this.fullFrames,
-      warnings: this.warnings,
-      frameSeen: this.frameSeen,
-      wallTime: this.wallTime,
+      results: this.#results,
+      timings: this.#timings,
+      arenas: this.#arenas,
+      fullFrames: this.#fullFrames,
+      warnings: this.#warnings,
+      frameSeen: this.#frameSeen,
+      wallTime: this.#wallTime,
     });
   }
 
@@ -1329,8 +1403,8 @@ export class SegmentController {
    * @returns {boolean} True when at least one segment carries pixels.
    */
   hasPublishedFrame() {
-    for (let s = 0; s < this.results.length; s++) {
-      const r = this.results[s];
+    for (let s = 0; s < this.#results.length; s++) {
+      const r = this.#results[s];
       if (r && r.pixels) return true;
     }
     return false;
@@ -1344,7 +1418,7 @@ export class SegmentController {
    * @returns {boolean}
    */
   get ownsDisplay() {
-    return this.active && (this.ready || this.faulted);
+    return this.active && (this.#ready || this.faulted);
   }
 
   /**
@@ -1357,23 +1431,23 @@ export class SegmentController {
     // leaves readyCount short forever, so a ready-first guard would never paint the
     // fault overlay.
     if (this.faulted) {
-      this.frameComposited = false;
+      this.#frameComposited = false;
       this.updateStats();
       return;
     }
 
-    if (!(this.ready && this.workers.length > 0)) return;
+    if (!(this.#ready && this.workers.length > 0)) return;
 
     // Apply the previous frame's composite synchronously, over driver.render()'s clear.
-    if (this.pendingFrame) {
-      const blitted = this.composite();
+    if (this.#pendingFrame) {
+      const blitted = this.composite(this.#results);
       this.updateStats();
       // Held when there was no display buffer to blit into: the assembled
       // generation is still in `results` and composites on a later tick.
-      this.pendingFrame = blitted < 0;
+      this.#pendingFrame = blitted < 0;
       // Only a whole generation is a frame: a band left black by a missing slot
       // would otherwise be recorded as one.
-      this.frameComposited = blitted === this.count;
+      this.#frameComposited = blitted === this.count;
     } else if (this.hasPublishedFrame()) {
       // Render overran this tick: re-blit the last published frame over driver's
       // clear so the preview holds it instead of flashing black. `results` is only
@@ -1381,10 +1455,10 @@ export class SegmentController {
       // frame, so frameComposited stays false — the recorder must not capture a
       // duplicate. Stats are left showing the last landed generation: the next
       // render has already zeroed the per-segment arrays this tick.
-      this.composite();
-      this.frameComposited = false;
+      this.composite(this.#results);
+      this.#frameComposited = false;
     } else {
-      this.frameComposited = false;
+      this.#frameComposited = false;
     }
 
     // composite() can latch a fault via its bounds/length pre-pass; bail before
@@ -1396,21 +1470,21 @@ export class SegmentController {
       return;
     }
 
-    if (!this.renderInFlight) {
-      this.renderInFlight = true;
+    if (!this.#renderInFlight) {
+      this.#renderInFlight = true;
       this.renderParallel().then(() => {
         // Publish the fully-assembled generation only if it is still current: a
         // mid-render setResolution() bumps renderGen, and publishing anyway would
         // composite a black or stale-sized frame next tick. The swap makes the
         // completed staging buffer the live one atomically between ticks; the
         // old buffer becomes next generation's scratch.
-        if (this.inflightGen === this.renderGen) {
-          const done = this.scratch;
-          this.scratch = this.results;
-          this.results = done;
-          this.pendingFrame = true;
+        if (this.#inflightGen === this.#renderGen) {
+          const done = this.#scratch;
+          this.#scratch = this.#results;
+          this.#results = done;
+          this.#pendingFrame = true;
         }
-        this.renderInFlight = false;
+        this.#renderInFlight = false;
       }).catch((error) => {
         // A rejected chain would skip the `.then` above and strand renderInFlight
         // latched true with no watchdog armed, wedging the pipeline silently.
