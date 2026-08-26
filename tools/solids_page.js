@@ -1307,6 +1307,9 @@ function labelCameraMoved() {
   return true;
 }
 
+// Scratch vector the per-frame projection reads the renderer's size into.
+const labelSize = new THREE.Vector2();
+
 // Project vertex-index labels onto the canvas. Runs each frame after the
 // render (via initScene's onAfterRender hook), so the labels track the
 // current camera; guarded because the loop starts before init finishes.
@@ -1319,7 +1322,11 @@ function updateLabels() {
     if (!moved && !labelsNeedReproject) return;
     labelsNeedReproject = false;
 
-    const rect = renderer.domElement.getBoundingClientRect();
+    // The renderer's own size, not a bounding rect: the loop runs after every
+    // render and a rect read here would flush layout before writing up to
+    // MAX_INDEX_LABELS label styles. setSize() drives the canvas' CSS box, so
+    // the two agree.
+    const size = renderer.getSize(labelSize);
     const tempV = new THREE.Vector3();
     const camPos = camera.position;
 
@@ -1343,8 +1350,8 @@ function updateLabels() {
           el.style.display = 'none';
         } else {
           el.style.display = 'block';
-          const x = (tempV.x * rect.width / 2) + rect.width / 2;
-          const y = -(tempV.y * rect.height / 2) + rect.height / 2;
+          const x = (tempV.x * size.x / 2) + size.x / 2;
+          const y = -(tempV.y * size.y / 2) + size.y / 2;
           el.style.left = `${x}px`;
           el.style.top = `${y}px`;
         }

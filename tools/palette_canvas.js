@@ -81,25 +81,26 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
   let cachedViewEnd = null;
 
   /**
-   * Repaints the offscreen gradient when the palette or the canvas size changed.
+   * Repaints the offscreen gradient when the palette, the canvas width or the
+   * phase window changed. Each column is one flat color, so the cache is one
+   * device pixel tall and the blit stretches it over the strip's height.
    * @param {StripPalette} palette - Palette sampled per column.
    * @param {number} width - Cache width, in device pixels.
-   * @param {number} height - Cache height, in device pixels.
    * @param {{start: number, end: number}} view - Phase window shown by the strip.
    * @returns {HTMLCanvasElement} The cache canvas, current as of this call.
    */
-  function refreshCache(palette, width, height, view) {
-    if (!cache || cache.width !== width || cache.height !== height) {
+  function refreshCache(palette, width, view) {
+    if (!cache || cache.width !== width) {
       cache = doc.createElement('canvas');
       cache.width = width;
-      cache.height = height;
+      cache.height = 1;
       dirty = true;
     }
     if (view.start !== cachedViewStart || view.end !== cachedViewEnd) dirty = true;
     if (!dirty) return cache;
 
     const cacheCtx = /** @type {CanvasRenderingContext2D} */ (cache.getContext('2d'));
-    const imageData = cacheCtx.createImageData(width, height);
+    const imageData = cacheCtx.createImageData(width, 1);
     const data = imageData.data;
 
     for (let x = 0; x < width; x++) {
@@ -116,13 +117,11 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
       const gInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, g))) * 255);
       const bInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, b))) * 255);
 
-      for (let y = 0; y < height; y++) {
-        const index = (y * width + x) * 4;
-        data[index] = rInt;
-        data[index + 1] = gInt;
-        data[index + 2] = bInt;
-        data[index + 3] = 255; // Alpha
-      }
+      const index = x * 4;
+      data[index] = rInt;
+      data[index + 1] = gInt;
+      data[index + 2] = bInt;
+      data[index + 3] = 255; // Alpha
     }
     cacheCtx.putImageData(imageData, 0, 0);
     cachedViewStart = view.start;
@@ -154,9 +153,10 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
       // One palette sample per device pixel: the gradient is baked at the
       // backing store's size, then blitted over the CSS-pixel box the fitted
       // transform scales by, so a column lands on a pixel.
-      const gradient = refreshCache(palette, canvas.width, canvas.height, view);
+      const gradient = refreshCache(palette, canvas.width, view);
 
-      // Blit the cached gradient, clearing the previous selection overlay.
+      // Blit the cached gradient, stretched over the strip's height and
+      // clearing the previous selection overlay.
       ctx.drawImage(gradient, 0, 0, width, height);
 
       if (selectionRange) {

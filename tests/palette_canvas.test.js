@@ -107,26 +107,37 @@ test('a canvas resize rebuilds the cache without an explicit invalidate', () => 
   canvas.width = 16;
   painter.draw(palette);
   assert.equal(created.length, 2, 'a stale-size cache would blit at the wrong scale');
-  assert.deepEqual([created[1].width, created[1].height], [16, 4]);
+  assert.deepEqual([created[1].width, created[1].height], [16, 1]);
   assert.equal(palette.getCalls, 8 + 16);
 });
 
-test('the baked gradient carries the sRGB-encoded palette, opaque, on every row', () => {
+// A column is one flat color all the way down, so only the width changes what
+// the gradient holds; the blit stretches the one row over the strip.
+test('a height-only resize keeps the baked gradient', () => {
+  const { painter, canvas, palette, created } = stripSetup(8, 4);
+  painter.draw(palette);
+  canvas.height = 64;
+  painter.draw(palette);
+  assert.equal(created.length, 1, 'the cache does not depend on the strip height');
+  assert.equal(palette.getCalls, 8);
+  assert.deepEqual(created[0].ctx.ops.length, 0);
+});
+
+test('the baked gradient carries the sRGB-encoded palette, opaque, one row tall', () => {
   const { painter, palette, created } = stripSetup(4, 2);
   painter.draw(palette);
-  const { data } = created[0].ctx.painted;
+  const image = created[0].ctx.painted;
+  assert.equal(image.height, 1, 'a flat column needs one pixel, not one per row');
 
   const width = 4;
   for (let x = 0; x < width; x++) {
     const t = x / (width - 1);
     const expected = [t, t * 0.5, 1 - t]
       .map((v) => Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, v))) * 255));
-    for (let y = 0; y < 2; y++) {
-      const i = (y * width + x) * 4;
-      assert.deepEqual([data[i], data[i + 1], data[i + 2]], expected,
-        `column ${x} row ${y} is not the sRGB-encoded palette color`);
-      assert.equal(data[i + 3], 255, 'the strip must be opaque');
-    }
+    const i = x * 4;
+    assert.deepEqual([image.data[i], image.data[i + 1], image.data[i + 2]], expected,
+      `column ${x} is not the sRGB-encoded palette color`);
+    assert.equal(image.data[i + 3], 255, 'the strip must be opaque');
   }
 });
 
@@ -166,8 +177,8 @@ test('the strip fits its backing buffer to the displayed size and pixel density'
 
   assert.deepEqual([canvas.width, canvas.height], [800, 192]);
   assert.deepEqual(ctx.ops[0], ['setTransform', 2, 0, 0, 2, 0, 0]);
-  assert.deepEqual([created[0].width, created[0].height], [800, 192],
-    'the gradient must be baked at the backing store size, not the CSS size');
+  assert.deepEqual([created[0].width, created[0].height], [800, 1],
+    'the gradient must be baked at the backing store width, not the CSS width');
   assert.equal(palette.getCalls, 800, 'the strip samples one color per device pixel');
   assert.deepEqual(ctx.ops[1], ['drawImage', created[0], 0, 0, 400, 96],
     'the gradient must be blitted over the CSS-pixel box the transform scales by');
