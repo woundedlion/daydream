@@ -13,10 +13,7 @@
  * the pad and requires the clamped value the capture still reports, and requires
  * the press to have stopped the running preset animation.
  */
-import puppeteer from 'puppeteer-core';
-
-import { BROWSER_ARGS, resolveBrowser } from './browser.mjs';
-import { serveStagedSite } from './vendor-stage.mjs';
+import { boxOf, checks, runProbe, walkTo } from './probe_harness.mjs';
 
 const PAGE = 'tools/mobius.html';
 const VIEWPORT = { width: 1280, height: 900 };
@@ -77,11 +74,7 @@ const caption = ({ re, im }) =>
  * @returns {Promise<string[]>} One entry per failed check.
  */
 async function probePad(tab) {
-  const failures = [];
-  const check = (ok, message) => {
-    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
-    if (!ok) failures.push(message);
-  };
+  const { failures, check } = checks();
 
   await tab.select('#presetSelect', ANIMATED_PRESET);
   await tab.waitForFunction(() =>
@@ -89,8 +82,7 @@ async function probePad(tab) {
   { timeout: TIMEOUT_MS });
 
   await tab.$eval(PAD, (node) => node.scrollIntoView({ block: 'center' }));
-  const box = await (await tab.$(PAD)).boundingBox();
-  if (!box) throw new Error(`the ${PARAM} pad has no layout box`);
+  const box = await boxOf(tab, PAD);
   check(box.width > 0 && box.height > 0,
     `the ${PARAM} pad lays out ${Math.round(box.width)}x${Math.round(box.height)}`);
   const at = (fractionX, fractionY) => ({
@@ -115,12 +107,7 @@ async function probePad(tab) {
     'the press takes the grabbing cursor');
 
   const dragged = valueAt(0.25, 0.75);
-  const to = at(0.25, 0.75);
-  const from = at(0.75, 0.25);
-  for (let i = 1; i <= DRAG_STEPS; i++) {
-    await tab.mouse.move(from.x + ((to.x - from.x) * i) / DRAG_STEPS,
-      from.y + ((to.y - from.y) * i) / DRAG_STEPS);
-  }
+  await walkTo(tab, at(0.75, 0.25), at(0.25, 0.75), DRAG_STEPS);
   const moved = await padReading(tab);
   check(moved.re === dragged.re && moved.im === dragged.im,
     `the drag tracks the pointer to ${caption(dragged)} (${caption(moved)})`);
@@ -148,42 +135,17 @@ async function probePad(tab) {
   return failures;
 }
 
-let executablePath;
-try {
-  executablePath = resolveBrowser();
-} catch (error) {
-  console.error(`mobius-probe: ${error instanceof Error ? error.message : error}`);
-  process.exit(1);
-}
-
-console.log(`mobius-probe: ${PAGE}, ${executablePath}`);
-let site = null;
-let browser = null;
-const failures = [];
-try {
-  site = await serveStagedSite();
-  browser = await puppeteer.launch({
-    executablePath,
-    headless: true,
-    args: BROWSER_ARGS,
-  });
-  const tab = await browser.newPage();
-  await tab.setViewport(VIEWPORT);
-  tab.on('pageerror', (error) => failures.push(`uncaught: ${error.message}`));
-  await tab.goto(`${site.origin}/${PAGE}`, { timeout: TIMEOUT_MS });
-  // The pads are built by the page's init, after the scene is up.
-  await tab.waitForSelector(PAD, { visible: true, timeout: TIMEOUT_MS });
-  failures.push(...await probePad(tab));
-} catch (error) {
-  failures.push(error instanceof Error ? error.message : String(error));
-} finally {
-  await browser?.close();
-  await site?.close();
-}
-
-if (failures.length > 0) {
-  console.error(`mobius-probe: ${failures.length} checks failed:`);
-  for (const failure of failures) console.error(`  ${failure}`);
-  process.exit(1);
-}
-console.log('mobius-probe: the complex-plane pad tracks a real pointer on and off itself.');
+await runProbe({
+  name: 'mobius-probe',
+  page: PAGE,
+  timeoutMs: TIMEOUT_MS,
+  success: 'the complex-plane pad tracks a real pointer on and off itself.',
+  run: async ({ open }) => {
+    const failures = [];
+    const tab = await open({ viewport: VIEWPORT });
+    // The pads are built by the page's init, after the scene is up.
+    await tab.waitForSelector(PAD, { visible: true });
+    failures.push(...await probePad(tab));
+    return failures;
+  },
+});

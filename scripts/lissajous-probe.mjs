@@ -14,10 +14,8 @@
  * C1/C2 an exact simple rational, and the domain the period that ratio closes
  * on.
  */
-import puppeteer from 'puppeteer-core';
-
-import { BROWSER_ARGS, resolveBrowser } from './browser.mjs';
-import { serveStagedSite } from './vendor-stage.mjs';
+import { BROWSER_ARGS } from './browser.mjs';
+import { boxOf, checks, dragBetween, runProbe } from './probe_harness.mjs';
 
 const PAGE = 'tools/lissajous.html';
 // Somewhere else on the origin to leave for, carrying no script of its own.
@@ -32,12 +30,12 @@ const DOMAIN_SLIDER = '#Duration_slider';
 const DOMAIN_GROUP = '#Duration_container';
 const DOMAIN_READOUT = '#Duration_value';
 const DRAG_STEPS = 8;
-// Largest denominator the ratio search admits, and the frequency sliders'
-// range; tools/lissajous_math.js and tools/lissajous_page.js own them.
+// Largest numerator and denominator the ratio search admits, and the frequency
+// sliders' range; tools/lissajous_math.js and tools/lissajous_page.js own them.
 const MAX_RATIONAL_TERM = 8;
 const FREQUENCY_RANGE = { min: 1, max: 100 };
 // The exported literals are float32 round-trips, so a snapped ratio matches to
-// far inside this, while distinct fractions of denominator <= 8 stand 1/64 apart.
+// far inside this, while distinct fractions of terms <= 8 stand 1/56 apart.
 const RATIO_EPSILON = 1e-4;
 // The Domain control's step, in radians: its readout sits on that grid while the
 // exported domain is the unrounded period.
@@ -73,8 +71,9 @@ async function exported(tab) {
 function rationalRatio(c1, c2) {
   const ratio = c1 / c2;
   for (let n = 1; n <= MAX_RATIONAL_TERM; n++) {
-    const m = Math.round(ratio * n);
-    if (m >= 1 && Math.abs(ratio - m / n) <= RATIO_EPSILON) return { m, n };
+    for (let m = 1; m <= MAX_RATIONAL_TERM; m++) {
+      if (Math.abs(ratio - m / n) <= RATIO_EPSILON) return { m, n };
+    }
   }
   return null;
 }
@@ -89,18 +88,12 @@ function rationalRatio(c1, c2) {
  */
 async function dragTrack(tab, selector, from, to) {
   await tab.$eval(selector, (node) => node.scrollIntoView({ block: 'center' }));
-  const box = await (await tab.$(selector)).boundingBox();
-  if (!box) throw new Error(`${selector} has no layout box`);
+  const box = await boxOf(tab, selector);
   const y = box.y + box.height / 2;
   // Held a pixel inside the box, so an endpoint fraction still hits the control.
   const at = (fraction) =>
-    box.x + Math.min(box.width - 1, Math.max(1, box.width * fraction));
-  await tab.mouse.move(at(from), y);
-  await tab.mouse.down();
-  for (let i = 1; i <= DRAG_STEPS; i++) {
-    await tab.mouse.move(at(from + ((to - from) * i) / DRAG_STEPS), y);
-  }
-  await tab.mouse.up();
+    ({ x: box.x + Math.min(box.width - 1, Math.max(1, box.width * fraction)), y });
+  await dragBetween(tab, at(from), at(to), { steps: DRAG_STEPS });
 }
 
 /**
@@ -108,11 +101,7 @@ async function dragTrack(tab, selector, from, to) {
  * @returns {Promise<string[]>} One entry per failed check.
  */
 async function probeRationalLock(tab) {
-  const failures = [];
-  const check = (ok, message) => {
-    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
-    if (!ok) failures.push(message);
-  };
+  const { failures, check } = checks();
 
   /**
    * Requires the exported curve to close: the ratio the lock promises, the
@@ -142,8 +131,7 @@ async function probeRationalLock(tab) {
   const warned = async () =>
     !await tab.$eval(WARNING, (node) => node.classList.contains('hidden'));
 
-  const track = await (await tab.$('#C1_slider')).boundingBox();
-  if (!track) throw new Error('the C1 slider has no layout box');
+  const track = await boxOf(tab, '#C1_slider');
   check(track.width > 0 && track.height > 0,
     `the C1 slider lays out ${Math.round(track.width)}x${Math.round(track.height)}`);
 
@@ -158,10 +146,8 @@ async function probeRationalLock(tab) {
   check(await disabled(), 'the lock disables the Domain slider');
   check(await dimmed(), 'the lock dims the Domain control');
   const locked = await exported(tab);
-  check(locked.c1 === opening.c1
-      && Math.abs(locked.domain - opening.domain) <= DOMAIN_STEP,
-  `the lock leaves the already-closing default alone `
-    + `(C1 ${locked.c1}, domain ${locked.domain.toFixed(4)})`);
+  check(locked.c1 !== opening.c1,
+    `the lock snaps C1 off ${opening.c1} (${locked.c1})`);
   requireClosed(locked, 'the lock');
   check(!await warned(), 'a locked curve raises no closure warning');
 
@@ -227,22 +213,18 @@ async function probeRationalLock(tab) {
  * @returns {Promise<string[]>} One entry per failed check.
  */
 async function probeHistoryRestore(tab, origin) {
-  const failures = [];
-  const check = (ok, message) => {
-    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
-    if (!ok) failures.push(message);
-  };
+  const { failures, check } = checks();
 
   await tab.evaluateOnNewDocument(() => {
     window.addEventListener(
       'pageshow', (event) => { window.probeFromCache = event.persisted; });
   });
-  await tab.goto(`${origin}/${PAGE}`, { timeout: TIMEOUT_MS });
-  await tab.waitForSelector('#C1_slider', { visible: true, timeout: TIMEOUT_MS });
+  await tab.goto(`${origin}/${PAGE}`);
+  await tab.waitForSelector('#C1_slider', { visible: true });
   await tab.click(LOCK);
-  await tab.goto(`${origin}/${AWAY}`, { timeout: TIMEOUT_MS });
-  await tab.goBack({ waitUntil: 'load', timeout: TIMEOUT_MS });
-  await tab.waitForSelector('#C1_slider', { visible: true, timeout: TIMEOUT_MS });
+  await tab.goto(`${origin}/${AWAY}`);
+  await tab.goBack({ waitUntil: 'load' });
+  await tab.waitForSelector('#C1_slider', { visible: true });
 
   const cached = await tab.evaluate(() => window.probeFromCache);
   check(cached === false, `the restore re-ran the module (persisted ${cached})`);
@@ -261,45 +243,21 @@ async function probeHistoryRestore(tab, origin) {
   return failures;
 }
 
-let executablePath;
-try {
-  executablePath = resolveBrowser();
-} catch (error) {
-  console.error(`lissajous-probe: ${error instanceof Error ? error.message : error}`);
-  process.exit(1);
-}
-
-console.log(`lissajous-probe: ${PAGE}, ${executablePath}`);
-let site = null;
-let browser = null;
-const failures = [];
-try {
-  site = await serveStagedSite();
-  browser = await puppeteer.launch({
-    executablePath,
-    headless: true,
-    // Without the bfcache, going back always re-runs the page's modules, which is
-    // the restore probeHistoryRestore is about; nothing else here navigates.
-    args: [...BROWSER_ARGS, '--disable-features=BackForwardCache'],
-  });
-  const tab = await browser.newPage();
-  await tab.setViewport(VIEWPORT);
-  tab.on('pageerror', (error) => failures.push(`uncaught: ${error.message}`));
-  await tab.goto(`${site.origin}/${PAGE}`, { timeout: TIMEOUT_MS });
-  // The sliders are built by the page's init, before the scene goes up.
-  await tab.waitForSelector('#C1_slider', { visible: true, timeout: TIMEOUT_MS });
-  failures.push(...await probeRationalLock(tab));
-  failures.push(...await probeHistoryRestore(tab, site.origin));
-} catch (error) {
-  failures.push(error instanceof Error ? error.message : String(error));
-} finally {
-  await browser?.close();
-  await site?.close();
-}
-
-if (failures.length > 0) {
-  console.error(`lissajous-probe: ${failures.length} checks failed:`);
-  for (const failure of failures) console.error(`  ${failure}`);
-  process.exit(1);
-}
-console.log('lissajous-probe: the rational lock closes the curve under a real pointer.');
+await runProbe({
+  name: 'lissajous-probe',
+  page: PAGE,
+  timeoutMs: TIMEOUT_MS,
+  // Without the bfcache, going back always re-runs the page's modules, which is
+  // the restore probeHistoryRestore is about; nothing else here navigates.
+  args: [...BROWSER_ARGS, '--disable-features=BackForwardCache'],
+  success: 'the rational lock closes the curve under a real pointer.',
+  run: async ({ open, origin }) => {
+    const failures = [];
+    const tab = await open({ viewport: VIEWPORT });
+    // The sliders are built by the page's init, before the scene goes up.
+    await tab.waitForSelector('#C1_slider', { visible: true });
+    failures.push(...await probeRationalLock(tab));
+    failures.push(...await probeHistoryRestore(tab, origin));
+    return failures;
+  },
+});
