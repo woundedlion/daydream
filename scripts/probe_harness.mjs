@@ -96,13 +96,41 @@ export async function dragBetween(tab, from, to, options = {}) {
   await tab.mouse.up();
 }
 
+// Paths the served set answers with a 404 by design: Chrome's implicit icon
+// fetch on a page that declares none, and the gitignored offline font drop the
+// tool pages link behind an onerror fallback to the font CDN.
+const ABSENT_PATHS = [/^\/favicon\.ico$/, /^\/vendor\//];
+
 /**
+ * Watches one tab for everything that went wrong on it: uncaught exceptions,
+ * console errors, refused requests and error responses. A page that swallows an
+ * exception on every chip render clears every geometric assertion, so the
+ * console is as load-bearing as the geometry.
  * @param {import('puppeteer-core').Page} tab - The tab to watch.
+ * @param {string} origin - Origin the manifest server listens on.
  * @param {string[]} problems - Takes one line per problem the page raises.
  * @returns {void}
  */
-function collectProblems(tab, problems) {
+export function collectProblems(tab, origin, problems) {
+  /** @param {string} [href] - Where the problem came from. */
+  const absent = (href) => {
+    if (href === undefined) return false;
+    const url = new URL(href, origin);
+    return url.origin === origin && ABSENT_PATHS.some((re) => re.test(url.pathname));
+  };
+  tab.on('console', (message) => {
+    if (message.type() !== 'error' || absent(message.location()?.url)) return;
+    problems.push(`console error: ${message.text()}`);
+  });
   tab.on('pageerror', (error) => problems.push(`uncaught: ${error.message}`));
+  tab.on('requestfailed', (request) => {
+    if (absent(request.url())) return;
+    problems.push(`request failed: ${request.url()} (${request.failure()?.errorText})`);
+  });
+  tab.on('response', (response) => {
+    if (response.status() < 400 || absent(response.url())) return;
+    problems.push(`HTTP ${response.status()}: ${response.url()}`);
+  });
 }
 
 /**
@@ -142,7 +170,7 @@ export async function runProbe({ name, page, timeoutMs, args = BROWSER_ARGS, suc
       tab.setDefaultTimeout(timeoutMs);
       if (viewport) await tab.setViewport(viewport);
       if (prepare) await prepare(tab);
-      collectProblems(tab, failures);
+      collectProblems(tab, origin, failures);
       await tab.goto(`${origin}/${path}`, { timeout: timeoutMs });
       return tab;
     };
