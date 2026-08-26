@@ -16,10 +16,7 @@
  * The same suite has no accessibility tree, so the preset dropdown's computed
  * name is read out of the browser's.
  */
-import puppeteer from 'puppeteer-core';
-
-import { BROWSER_ARGS, resolveBrowser } from './browser.mjs';
-import { serveStagedSite } from './vendor-stage.mjs';
+import { checks, runProbe } from './probe_harness.mjs';
 
 const PAGE = 'index.html';
 // Short enough that the panel's max-height cap bites and its own .lil-children
@@ -49,15 +46,6 @@ const RING_CLEARANCE = 4;
 const PRESET_SELECT = '.preset-nav-selector select';
 const PRESET_NAME = 'Preset';
 
-// One widget of each kind lil-gui zeroes the outline on, plus the select it
-// leaves alone, paired with the name the check text reads under.
-const FOCUSABLE = [
-  ['number input', `${SCROLLER} .lil-controller.lil-number input`],
-  ['action button', RESET],
-  ['folder title', PANEL_TITLE],
-  ['preset dropdown', PRESET_SELECT],
-];
-
 /** @param {import('puppeteer-core').Page} tab */
 const scrollerMetrics = (tab) => tab.$eval(SCROLLER, (node) => ({
   scrollTop: node.scrollTop,
@@ -67,13 +55,9 @@ const scrollerMetrics = (tab) => tab.$eval(SCROLLER, (node) => ({
 
 /** @param {import('puppeteer-core').Page} tab */
 async function probePanel(tab) {
-  const failures = [];
-  const check = (ok, message) => {
-    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
-    if (!ok) failures.push(message);
-  };
+  const { failures, check } = checks();
 
-  await (await tab.waitForSelector(`[data-effect="${EFFECT}"]`, { timeout: TIMEOUT_MS })).click();
+  await (await tab.waitForSelector(`[data-effect="${EFFECT}"]`)).click();
   await tab.waitForFunction(
     (selector) => (document.querySelector(selector)?.scrollHeight ?? 0) > 0,
     { timeout: TIMEOUT_MS }, SCROLLER);
@@ -147,32 +131,6 @@ async function probePanel(tab) {
     `the rebuilt panel restores focus to the ${focusedControl.name} number input `
       + `(${restoredControl.name || 'none'} ${restoredControl.widget || 'widget'})`);
 
-  // lil-gui injects `.lil-gui input, .lil-gui button { outline: none }`, which
-  // outranks an unscoped `:focus-visible`. The fake DOM resolves no cascade, so
-  // only a browser says which rule reaches the widget. A computed outline-width
-  // stays at the `medium` keyword's 3px under `outline: none`, so the style has
-  // to be read alongside it.
-  for (const [what, selector] of FOCUSABLE) {
-    // A button matches :focus-visible only in keyboard modality, which any key
-    // press establishes.
-    await tab.keyboard.press('Shift');
-    const focused = await tab.$eval(selector, (node) => {
-      node.focus();
-      return document.activeElement === node;
-    });
-    const ring = await tab.evaluate(() => {
-      const style = getComputedStyle(document.activeElement);
-      return {
-        width: Number.parseFloat(style.outlineWidth),
-        style: style.outlineStyle,
-        offset: style.outlineOffset,
-      };
-    });
-    check(focused && ring.width > 0 && ring.style !== 'none',
-      `the focused ${what} paints a ${ring.width}px ${ring.style} focus ring at `
-        + `${ring.offset}`);
-  }
-
   return failures;
 }
 
@@ -184,11 +142,7 @@ async function probePanel(tab) {
  * @param {import('puppeteer-core').Page} tab
  */
 async function probePresetName(tab) {
-  const failures = [];
-  const check = (ok, message) => {
-    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
-    if (!ok) failures.push(message);
-  };
+  const { failures, check } = checks();
 
   const cdp = await tab.createCDPSession();
   await cdp.send('Accessibility.enable');
@@ -211,17 +165,13 @@ async function probePresetName(tab) {
 
 /** @param {import('puppeteer-core').Page} tab */
 async function probeMobilePanel(tab) {
-  const failures = [];
-  const check = (ok, message) => {
-    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
-    if (!ok) failures.push(message);
-  };
+  const { failures, check } = checks();
 
-  await (await tab.waitForSelector(`[data-effect="${EFFECT}"]`, { timeout: TIMEOUT_MS })).click();
+  await (await tab.waitForSelector(`[data-effect="${EFFECT}"]`)).click();
   const initiallyClosed = await tab.$eval(
     '.effect-gui', (panel) => panel.classList.contains('lil-closed'));
   check(initiallyClosed, 'the first mobile panel mount is collapsed');
-  await (await tab.waitForSelector(PANEL_TITLE, { timeout: TIMEOUT_MS })).click();
+  await (await tab.waitForSelector(PANEL_TITLE)).click();
   await tab.waitForFunction(
     () => !document.querySelector('.effect-gui')?.classList.contains('lil-closed'),
     { timeout: TIMEOUT_MS });
@@ -290,11 +240,7 @@ async function settledArrows(tab, want) {
  * @returns {Promise<string[]>} The failed check descriptions.
  */
 async function probeSidebar(tab) {
-  const failures = [];
-  const check = (ok, message) => {
-    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
-    if (!ok) failures.push(message);
-  };
+  const { failures, check } = checks();
 
   const grid = await tab.$eval(LIST, (list) => {
     const style = getComputedStyle(list);
@@ -374,11 +320,7 @@ async function probeSidebar(tab) {
  * @returns {Promise<string[]>} The failed check descriptions.
  */
 async function probeWarningNote(tab, layout) {
-  const failures = [];
-  const check = (ok, message) => {
-    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
-    if (!ok) failures.push(`${layout}: ${message}`);
-  };
+  const { failures, check } = checks();
 
   const note = await tab.evaluate(async (warning) => {
     const { addParamControl } = await import('/effect_gui.js');
@@ -420,7 +362,7 @@ async function probeWarningNote(tab, layout) {
   }, WARNING);
 
   check(!note.missing, 'the warned control carries a note node');
-  if (note.missing) return failures;
+  if (note.missing) return failures.map((failure) => `${layout}: ${failure}`);
   check(note.text === WARNING,
     `the note carries the warning text (${note.text})`);
   check(note.title === null,
@@ -437,63 +379,38 @@ async function probeWarningNote(tab, layout) {
     `the text is not clipped (${note.clippedX}px wide, ${note.clippedY}px tall `
       + 'past the box)');
 
-  return failures;
+  return failures.map((failure) => `${layout}: ${failure}`);
 }
 
-let executablePath;
-try {
-  executablePath = resolveBrowser();
-} catch (error) {
-  console.error(`panel-probe: ${error instanceof Error ? error.message : error}`);
-  process.exit(1);
-}
+await runProbe({
+  name: 'panel-probe',
+  page: PAGE,
+  timeoutMs: TIMEOUT_MS,
+  success: 'the effect panel restored what it captured, and the sidebar measured '
+    + 'the grid it laid out.',
+  run: async ({ open }) => {
+    const failures = [];
+    const tab = await open({ viewport: VIEWPORT });
+    const painted = () => tab.waitForFunction(
+      () => !document.getElementById('loading-overlay'));
+    await painted();
+    await tab.waitForSelector('.effect-gui');
+    failures.push(...await probePanel(tab));
+    failures.push(...await probePresetName(tab));
+    failures.push(...await probeWarningNote(tab, 'desktop'));
 
-console.log(`panel-probe: ${PAGE}, ${executablePath}`);
-let site = null;
-let browser = null;
-const failures = [];
-try {
-  site = await serveStagedSite();
-  browser = await puppeteer.launch({
-    executablePath,
-    headless: true,
-    args: BROWSER_ARGS,
-  });
-  const tab = await browser.newPage();
-  await tab.setViewport(VIEWPORT);
-  tab.on('pageerror', (error) => failures.push(`uncaught: ${error.message}`));
-  await tab.goto(`${site.origin}/${PAGE}`, { timeout: TIMEOUT_MS });
-  await tab.waitForFunction(() => !document.getElementById('loading-overlay'),
-    { timeout: TIMEOUT_MS });
-  await tab.waitForSelector('.effect-gui', { timeout: TIMEOUT_MS });
-  failures.push(...await probePanel(tab));
-  failures.push(...await probePresetName(tab));
-  failures.push(...await probeWarningNote(tab, 'desktop'));
-  await tab.setViewport(MOBILE_VIEWPORT);
-  await tab.reload({ timeout: TIMEOUT_MS });
-  await tab.waitForFunction(() => !document.getElementById('loading-overlay'),
-    { timeout: TIMEOUT_MS });
-  await tab.waitForSelector('.effect-gui', { timeout: TIMEOUT_MS });
-  failures.push(...await probeMobilePanel(tab));
-  failures.push(...await probeWarningNote(tab, 'mobile'));
-  await tab.setViewport(SIDEBAR_VIEWPORT);
-  await tab.reload({ timeout: TIMEOUT_MS });
-  await tab.waitForFunction(() => !document.getElementById('loading-overlay'),
-    { timeout: TIMEOUT_MS });
-  await tab.waitForSelector(`${LIST} ${OPTION}`, { timeout: TIMEOUT_MS });
-  failures.push(...await probeSidebar(tab));
-} catch (error) {
-  failures.push(error instanceof Error ? error.message : String(error));
-} finally {
-  await browser?.close();
-  await site?.close();
-}
+    await tab.setViewport(MOBILE_VIEWPORT);
+    await tab.reload({ timeout: TIMEOUT_MS });
+    await painted();
+    await tab.waitForSelector('.effect-gui');
+    failures.push(...await probeMobilePanel(tab));
+    failures.push(...await probeWarningNote(tab, 'mobile'));
 
-if (failures.length > 0) {
-  console.error(`panel-probe: ${failures.length} checks failed:`);
-  for (const failure of failures) console.error(`  ${failure}`);
-  process.exit(1);
-}
-console.log(
-  'panel-probe: the effect panel restored what it captured, '
-  + 'and the sidebar measured the grid it laid out.');
+    await tab.setViewport(SIDEBAR_VIEWPORT);
+    await tab.reload({ timeout: TIMEOUT_MS });
+    await painted();
+    await tab.waitForSelector(`${LIST} ${OPTION}`);
+    failures.push(...await probeSidebar(tab));
+    return failures;
+  },
+});

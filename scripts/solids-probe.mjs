@@ -12,10 +12,7 @@
  * with a real mouse and again with a real finger, and requires a press that never
  * travels to leave the chain — and the row — exactly as it found them.
  */
-import puppeteer from 'puppeteer-core';
-
-import { BROWSER_ARGS, resolveBrowser } from './browser.mjs';
-import { serveStagedSite } from './vendor-stage.mjs';
+import { centre, checks, dragBetween, runProbe } from './probe_harness.mjs';
 
 const PAGE = 'tools/solids.html';
 // Tall enough that a three-op chain lays out without the list scrolling, so the
@@ -29,9 +26,6 @@ const DRAG_STEPS = 12;
 // How long the base-solid footer must stop growing before its layout is taken as
 // settled.
 const SETTLE_MS = 1_000;
-
-/** @param {{x: number, y: number, width: number, height: number}} box */
-const centre = (box) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
 
 /**
  * The op names the chain shows, in order.
@@ -50,12 +44,10 @@ const chainNames = (tab) => tab.$$eval('#opsList .op-item .font-bold',
  * @returns {Promise<void>}
  */
 async function addOp(tab, op, rows) {
-  await tab.waitForSelector(`#addOpGrid [data-op="${op}"]:not([disabled])`,
-    { timeout: TIMEOUT_MS });
+  await tab.waitForSelector(`#addOpGrid [data-op="${op}"]:not([disabled])`);
   await tab.click(`#addOpGrid [data-op="${op}"]`);
   await tab.waitForFunction(
-    (count) => document.querySelectorAll('#opsList .op-item').length === count,
-    { timeout: TIMEOUT_MS }, rows);
+    (count) => document.querySelectorAll('#opsList .op-item').length === count, {}, rows);
 }
 
 /**
@@ -77,34 +69,19 @@ async function settledNames(tab, expected) {
 }
 
 /**
- * Presses the row's grip and walks the pointer to `y` before releasing.
+ * Presses the row's grip and walks the pointer down the list before releasing.
  * @param {import('puppeteer-core').Page} tab - The page.
  * @param {{x: number, y: number}} from - Where the gesture starts.
  * @param {number} y - Where it ends.
  * @param {boolean} touch - Drive the touchscreen rather than the mouse.
  * @returns {Promise<void>}
  */
-async function dragTo(tab, from, y, touch) {
-  const step = (i) => from.y + ((y - from.y) * i) / DRAG_STEPS;
-  if (touch) {
-    const finger = await tab.touchscreen.touchStart(from.x, from.y);
-    for (let i = 1; i <= DRAG_STEPS; i++) await finger.move(from.x, step(i));
-    await finger.end();
-    return;
-  }
-  await tab.mouse.move(from.x, from.y);
-  await tab.mouse.down();
-  for (let i = 1; i <= DRAG_STEPS; i++) await tab.mouse.move(from.x, step(i));
-  await tab.mouse.up();
-}
+const dragTo = (tab, from, y, touch) =>
+  dragBetween(tab, from, { x: from.x, y }, { steps: DRAG_STEPS, touch });
 
 /** @param {import('puppeteer-core').Page} tab */
 async function probeChain(tab) {
-  const failures = [];
-  const check = (ok, message) => {
-    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
-    if (!ok) failures.push(message);
-  };
+  const { failures, check } = checks();
 
   const motion = await tab.$eval('#toggleRotate', (node) => ({
     checked: node.getAttribute('aria-checked'),
@@ -172,61 +149,37 @@ async function probeChain(tab) {
   return failures;
 }
 
-let executablePath;
-try {
-  executablePath = resolveBrowser();
-} catch (error) {
-  console.error(`solids-probe: ${error instanceof Error ? error.message : error}`);
-  process.exit(1);
-}
-
-console.log(`solids-probe: ${PAGE}, ${executablePath}`);
-let site = null;
-let browser = null;
-const failures = [];
-try {
-  site = await serveStagedSite();
-  browser = await puppeteer.launch({
-    executablePath,
-    headless: true,
-    args: BROWSER_ARGS,
-  });
-  const tab = await browser.newPage();
-  await tab.setViewport(VIEWPORT);
-  await tab.emulateMediaFeatures([
-    { name: 'prefers-reduced-motion', value: 'reduce' },
-  ]);
-  tab.on('pageerror', (error) => failures.push(`uncaught: ${error.message}`));
-  await tab.goto(`${site.origin}/${PAGE}`, { timeout: TIMEOUT_MS });
-  // The page declares no loading overlay. Its init titles the base card as its
-  // last act, after the WASM module is up and the add-op grid's delegated click
-  // listener is wired — a click landing before that reaches nothing.
-  await tab.waitForFunction(
-    () => (document.getElementById('baseTitle')?.textContent ?? '').length > 0,
-    { timeout: TIMEOUT_MS });
-  // Then the base-solid footer, which init deliberately fills one macrotask at a
-  // time: while it runs it both reflows the page under a measured pointer and
-  // starves the WASM validation every op add waits on.
-  await tab.waitForFunction((settle) => {
-    const count = document.querySelectorAll('.thumb-btn').length;
-    const seen = (window.solidsProbeThumbs ??= { count: -1, since: 0 });
-    if (count !== seen.count) {
-      Object.assign(seen, { count, since: performance.now() });
-      return false;
-    }
-    return count > 0 && performance.now() - seen.since > settle;
-  }, { timeout: TIMEOUT_MS, polling: 200 }, SETTLE_MS);
-  failures.push(...await probeChain(tab));
-} catch (error) {
-  failures.push(error instanceof Error ? error.message : String(error));
-} finally {
-  await browser?.close();
-  await site?.close();
-}
-
-if (failures.length > 0) {
-  console.error(`solids-probe: ${failures.length} checks failed:`);
-  for (const failure of failures) console.error(`  ${failure}`);
-  process.exit(1);
-}
-console.log('solids-probe: the op chain reorders under both a mouse and a finger.');
+await runProbe({
+  name: 'solids-probe',
+  page: PAGE,
+  timeoutMs: TIMEOUT_MS,
+  success: 'the op chain reorders under both a mouse and a finger.',
+  run: async ({ open }) => {
+    const failures = [];
+    const tab = await open({
+      viewport: VIEWPORT,
+      prepare: (page) => page.emulateMediaFeatures([
+        { name: 'prefers-reduced-motion', value: 'reduce' },
+      ]),
+    });
+    // The page declares no loading overlay. Its init titles the base card as its
+    // last act, after the WASM module is up and the add-op grid's delegated click
+    // listener is wired — a click landing before that reaches nothing.
+    await tab.waitForFunction(
+      () => (document.getElementById('baseTitle')?.textContent ?? '').length > 0);
+    // Then the base-solid footer, which init deliberately fills one macrotask at a
+    // time: while it runs it both reflows the page under a measured pointer and
+    // starves the WASM validation every op add waits on.
+    await tab.waitForFunction((settle) => {
+      const count = document.querySelectorAll('.thumb-btn').length;
+      const seen = (window.solidsProbeThumbs ??= { count: -1, since: 0 });
+      if (count !== seen.count) {
+        Object.assign(seen, { count, since: performance.now() });
+        return false;
+      }
+      return count > 0 && performance.now() - seen.since > settle;
+    }, { polling: 200 }, SETTLE_MS);
+    failures.push(...await probeChain(tab));
+    return failures;
+  },
+});

@@ -2,6 +2,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { boxOf, centre, checks, dragBetween, runProbe, walkTo }
+  from '../scripts/probe_harness.mjs';
 
 const PROBES = [
   ['workbench-probe.mjs', 'probeStrip'],
@@ -16,10 +18,17 @@ test('headless probes retain page errors raised during interactions', () => {
   for (const [file, interaction] of PROBES) {
     const source = readFileSync(new URL(`../scripts/${file}`, import.meta.url), 'utf8')
       .replaceAll('\r\n', '\n');
-    assert.match(source, /^const failures = \[\];\ntry \{/m, file);
+    assert.match(source, /^await runProbe\(\{$/m, file);
     assert.match(source,
       new RegExp(`failures\\.push\\(\\.\\.\\.await ${interaction}\\(tab\\)\\);`), file);
     assert.doesNotMatch(source, /failures = \[\.\.\.failures/, file);
+  }
+});
+
+test('the probe harness exports the scaffolding every probe runs on', () => {
+  for (const [name, exported] of Object.entries(
+    { runProbe, checks, boxOf, centre, dragBetween, walkTo })) {
+    assert.equal(typeof exported, 'function', name);
   }
 });
 

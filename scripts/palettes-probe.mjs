@@ -13,10 +13,7 @@
  * wheel marker and requires the key it gripped to take the hue under the
  * pointer.
  */
-import puppeteer from 'puppeteer-core';
-
-import { BROWSER_ARGS, resolveBrowser } from './browser.mjs';
-import { serveStagedSite } from './vendor-stage.mjs';
+import { boxOf, centre, checks, dragBetween, runProbe } from './probe_harness.mjs';
 
 const PAGE = 'tools/palettes.html';
 const VIEWPORT = { width: 1280, height: 900 };
@@ -71,39 +68,14 @@ async function settledHueDegrees(tab) {
 }
 
 /**
- * Walks the mouse from one viewport point to another with the button down.
- * @param {import('puppeteer-core').Page} tab - The page.
- * @param {{x: number, y: number}} from - Where the gesture starts.
- * @param {{x: number, y: number}} to - Where it ends.
- * @param {() => Promise<void>} [pressed] - Runs after the press, with the
- *   pointer still down at `from`.
- * @returns {Promise<void>}
- */
-async function dragMouse(tab, from, to, pressed) {
-  await tab.mouse.move(from.x, from.y);
-  await tab.mouse.down();
-  if (pressed) await pressed();
-  for (let i = 1; i <= DRAG_STEPS; i++) {
-    await tab.mouse.move(from.x + ((to.x - from.x) * i) / DRAG_STEPS,
-      from.y + ((to.y - from.y) * i) / DRAG_STEPS);
-  }
-  await tab.mouse.up();
-}
-
-/**
  * @param {import('puppeteer-core').Page} tab - The page.
  * @returns {Promise<string[]>} One entry per failed check.
  */
 async function probeColorStrip(tab) {
-  const failures = [];
-  const check = (ok, message) => {
-    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
-    if (!ok) failures.push(message);
-  };
+  const { failures, check } = checks();
 
   await tab.$eval(STRIP, (node) => node.scrollIntoView({ block: 'center' }));
-  const box = await (await tab.$(STRIP)).boundingBox();
-  if (!box) throw new Error('the palette strip has no layout box');
+  const box = await boxOf(tab, STRIP);
   check(box.width > 0 && box.height > 0,
     `the strip lays out ${Math.round(box.width)}x${Math.round(box.height)}`);
 
@@ -117,8 +89,11 @@ async function probeColorStrip(tab) {
     'the reset-zoom button is hidden while nothing is zoomed');
 
   let cursorPressed = '';
-  await dragMouse(tab, at(ZOOM_FROM), at(ZOOM_TO), async () => {
-    cursorPressed = await tab.$eval(STRIP, (node) => node.style.cursor);
+  await dragBetween(tab, at(ZOOM_FROM), at(ZOOM_TO), {
+    steps: DRAG_STEPS,
+    pressed: async () => {
+      cursorPressed = await tab.$eval(STRIP, (node) => node.style.cursor);
+    },
   });
   check(cursorPressed === 'crosshair',
     `the press opens a selection on the strip (cursor ${cursorPressed || 'unset'})`);
@@ -141,8 +116,8 @@ async function probeColorStrip(tab) {
   // The bound only a real layout carries: a pointer that leaves the strip
   // vertically abandons the selection, and the capture keeps delivering the
   // moves that say so.
-  await dragMouse(tab, at(ZOOM_FROM),
-    { x: at(ZOOM_TO).x, y: box.y - box.height });
+  await dragBetween(tab, at(ZOOM_FROM),
+    { x: at(ZOOM_TO).x, y: box.y - box.height }, { steps: DRAG_STEPS });
   const escaped = await headingRange(tab);
   check(escaped.start === 0 && escaped.end === 1,
     `a drag released above the strip zooms nothing (${escaped.start}, ${escaped.end})`);
@@ -157,28 +132,22 @@ async function probeColorStrip(tab) {
  * @returns {Promise<string[]>} One entry per failed check.
  */
 async function probeHueWheel(tab) {
-  const failures = [];
-  const check = (ok, message) => {
-    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
-    if (!ok) failures.push(message);
-  };
+  const { failures, check } = checks();
 
   await tab.click('#tab-btn-generative');
-  await tab.waitForSelector(WHEEL, { visible: true, timeout: TIMEOUT_MS });
+  await tab.waitForSelector(WHEEL, { visible: true });
   await tab.$eval('#gen_hue_mode', (node) => {
     node.value = 'CUSTOM';
     node.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await tab.waitForFunction(
-    (selector) => document.querySelectorAll(selector).length >= 2,
-    { timeout: TIMEOUT_MS }, HANDLES);
+    (selector) => document.querySelectorAll(selector).length >= 2, {}, HANDLES);
 
   const opening = await settledHueDegrees(tab);
   check(opening.length >= 2, `the wheel publishes ${opening.length} hue keys`);
 
   await tab.$eval(WHEEL, (node) => node.scrollIntoView({ block: 'center' }));
-  const box = await (await tab.$(WHEEL)).boundingBox();
-  if (!box) throw new Error('the hue wheel has no layout box');
+  const box = await boxOf(tab, WHEEL);
 
   // Grip where the page drew, by asking the wheel's own marker geometry rather
   // than a copy of the formula.
@@ -202,7 +171,7 @@ async function probeHueWheel(tab) {
     'hovering a marker offers the grab cursor');
 
   const target = (opening[0] + 90) % 360;
-  await dragMouse(tab, grip, await viewportPointOf(target));
+  await dragBetween(tab, grip, await viewportPointOf(target), { steps: DRAG_STEPS });
   const moved = await settledHueDegrees(tab);
   const missed = Math.abs(((moved[0] - target + 540) % 360) - 180);
   check(missed < HUE_TOLERANCE,
@@ -214,8 +183,8 @@ async function probeHueWheel(tab) {
 
   // A press away from every marker is not a grab: the hit test declines the
   // drag, so the walk that follows moves nothing.
-  const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-  await dragMouse(tab, centre, await viewportPointOf((target + 120) % 360));
+  await dragBetween(tab, centre(box), await viewportPointOf((target + 120) % 360),
+    { steps: DRAG_STEPS });
   const idle = await settledHueDegrees(tab);
   check(idle.join() === moved.join(),
     `a drag that starts off every marker moves no key (${idle.join(', ')})`);
@@ -223,46 +192,20 @@ async function probeHueWheel(tab) {
   return failures;
 }
 
-let executablePath;
-try {
-  executablePath = resolveBrowser();
-} catch (error) {
-  console.error(`palettes-probe: ${error instanceof Error ? error.message : error}`);
-  process.exit(1);
-}
-
-console.log(`palettes-probe: ${PAGE}, ${executablePath}`);
-let site = null;
-let browser = null;
-const failures = [];
-try {
-  site = await serveStagedSite();
-  browser = await puppeteer.launch({
-    executablePath,
-    headless: true,
-    args: BROWSER_ARGS,
-  });
-  const tab = await browser.newPage();
-  await tab.setViewport(VIEWPORT);
-  tab.on('pageerror', (error) => failures.push(`uncaught: ${error.message}`));
-  await tab.goto(`${site.origin}/${PAGE}`, { timeout: TIMEOUT_MS });
-  // The engine fills the effect-recipe list as the last act of startup; the
-  // markup ships it holding nothing but its placeholder option.
-  await tab.waitForFunction(
-    () => (document.getElementById('effect_recipe_preset')?.children.length ?? 0) > 1,
-    { timeout: TIMEOUT_MS });
-  failures.push(...await probeColorStrip(tab));
-  failures.push(...await probeHueWheel(tab));
-} catch (error) {
-  failures.push(error instanceof Error ? error.message : String(error));
-} finally {
-  await browser?.close();
-  await site?.close();
-}
-
-if (failures.length > 0) {
-  console.error(`palettes-probe: ${failures.length} checks failed:`);
-  for (const failure of failures) console.error(`  ${failure}`);
-  process.exit(1);
-}
-console.log('palettes-probe: the strip zooms and the hue keys drag under a real pointer.');
+await runProbe({
+  name: 'palettes-probe',
+  page: PAGE,
+  timeoutMs: TIMEOUT_MS,
+  success: 'the strip zooms and the hue keys drag under a real pointer.',
+  run: async ({ open }) => {
+    const failures = [];
+    const tab = await open({ viewport: VIEWPORT });
+    // The engine fills the effect-recipe list as the last act of startup; the
+    // markup ships it holding nothing but its placeholder option.
+    await tab.waitForFunction(
+      () => (document.getElementById('effect_recipe_preset')?.children.length ?? 0) > 1);
+    failures.push(...await probeColorStrip(tab));
+    failures.push(...await probeHueWheel(tab));
+    return failures;
+  },
+});

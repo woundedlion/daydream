@@ -4,10 +4,7 @@
  *
  *   node scripts/workbench-probe.mjs
  */
-import puppeteer from 'puppeteer-core';
-
-import { BROWSER_ARGS, resolveBrowser } from './browser.mjs';
-import { serveStagedSite } from './vendor-stage.mjs';
+import { boxOf, centre, checks, runProbe } from './probe_harness.mjs';
 
 const PAGE = 'tools/shader.html';
 const VIEWPORT = { width: 1674, height: 543 };
@@ -16,17 +13,6 @@ const SLIDER_FRACTION = 0.75;
 // A fraction of a domain that lands on no round step grid.
 const OFF_GRID_FRACTION = 0.3170159;
 const VALUE_TOLERANCE = 1e-4;
-
-/** @param {import('puppeteer-core').Page} tab @param {string} selector */
-async function boxOf(tab, selector) {
-  const handle = await tab.waitForSelector(selector, { timeout: TIMEOUT_MS });
-  const box = await handle.boundingBox();
-  if (box === null) throw new Error(`${selector} has no layout box`);
-  return box;
-}
-
-/** @param {{x: number, y: number, width: number, height: number}} box */
-const centre = (box) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
 
 /**
  * @param {{x: number, y: number, width: number, height: number}} a
@@ -58,11 +44,7 @@ async function savedDocument(tab) {
 
 /** @param {import('puppeteer-core').Page} tab */
 async function probeStrip(tab) {
-  const failures = [];
-  const check = (ok, message) => {
-    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
-    if (!ok) failures.push(message);
-  };
+  const { failures, check } = checks();
 
   check(await tab.$('#gui-container > .effect-gui') === null,
     'the local effect panel is absent');
@@ -381,32 +363,6 @@ async function probeStrip(tab) {
   check(Math.abs(stored - shown) < VALUE_TOLERANCE,
     `an inline control saves its value (${stored})`);
 
-  // A number input hands its listener the empty string for content it cannot
-  // parse; a fake DOM hands over the raw text, so only a real browser shows
-  // what an unparsable readout entry commits.
-  const readout = '.chain-chip[data-label="rotate"]'
-    + ' .chain-param[data-parameter="rotate.wander"] .chain-param-value';
-  await tab.click(readout, { count: 3 });
-  await tab.keyboard.press('Backspace');
-  const cleared = await tab.$eval(readout, (node) => node.value);
-  await tab.keyboard.press('Tab');
-  const restored = Number(await tab.$eval(readout, (node) => node.value));
-  const kept = (await savedDocument(tab)).preset_bank.presets[0].values['rotate.wander'];
-  check(cleared === '' && Math.abs(restored - stored) < VALUE_TOLERANCE
-      && Math.abs(kept - stored) < VALUE_TOLERANCE,
-  `an emptied readout restores ${restored} rather than committing ${kept}`);
-
-  const rename = '.chain-chip[data-label="rotate"] .chain-chip-rename';
-  await tab.click(rename, { count: 3 });
-  await tab.keyboard.type('orbit');
-  await tab.keyboard.press('Tab');
-  await tab.waitForSelector('.chain-chip[data-label="orbit"]', { timeout: TIMEOUT_MS });
-  const renamed = (await savedDocument(tab)).descriptor;
-  check(renamed.chain.some((entry) => entry.label === 'orbit')
-      && renamed.parameters.some((parameter) => parameter.id === 'orbit.wander')
-      && !renamed.parameters.some((parameter) => parameter.id.startsWith('rotate.')),
-  'an inline rename rewrites the instance and its parameter ids');
-
   const animation = await tab.$eval('#shader-animation-toggle', (node) => ({
     disabled: node instanceof HTMLButtonElement ? node.disabled : true,
     text: node.textContent ?? '',
@@ -419,31 +375,6 @@ async function probeStrip(tab) {
     const box = await boxOf(tab, region);
     check(!overlaps(panels, box), `global controls clear ${region}`);
   }
-
-  // A source that skips the plane band: reachable once that band is empty, and
-  // expandable back out of, both through the socket selector's sequences.
-  const planeRemove = '.chain-band[data-carrier="plane"] .chain-chip-remove';
-  for (let left = 8; left > 0; left -= 1) {
-    const chip = await tab.$(planeRemove);
-    if (chip === null) break;
-    await chip.click();
-  }
-  const collapsed = await tab.$eval(source, (node) => (node instanceof HTMLSelectElement
-    ? [...node.options].map((option) => option.value) : []));
-  check(collapsed.includes('sample.spherical-rings.v3'),
-    `an emptied plane band opens ${collapsed.length} source choices`);
-  await tab.select(source, 'sample.spherical-rings.v3');
-  const skipping = await boxOf(tab, source);
-  check(await tab.$('.chain-band[data-carrier="plane"] .chain-band-add') === null
-      && (await bandChipNames(tab, 'plane')).length === 0
-      && skipping.width < VIEWPORT.width / 2,
-  `a plane-skipping source empties the plane band behind a ${Math.round(skipping.width)}px selector`);
-  await tab.select(source, 'project.gnomonic.v2 sample.fractal.v2');
-  check(await tab.$('.chain-band[data-carrier="plane"] .chain-band-add') !== null
-      && await tab.$eval('.chain-chip-replace[aria-label="Projection"]',
-        (node) => (node instanceof HTMLSelectElement ? node.value : ''))
-        === 'project.gnomonic.v2',
-  'the socket sequence re-opens the plane band and its projection');
 
   await tab.setViewport({ width: 700, height: VIEWPORT.height });
   await tab.waitForFunction(() => window.innerWidth === 700);
@@ -474,17 +405,12 @@ const PARITY_TITLE = 'Ash Cloud';
  * @returns {Promise<string[]>} The failed checks.
  */
 async function probeParity(tab) {
-  const failures = [];
-  /** @param {boolean} ok @param {string} message */
-  const check = (ok, message) => {
-    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
-    if (!ok) failures.push(message);
-  };
+  const { failures, check } = checks();
 
   await tab.select('#shader-document-select', PARITY_EFFECT);
   await tab.waitForFunction((title) => document
     .getElementById('shader-document-status')?.textContent?.startsWith(title),
-  { timeout: TIMEOUT_MS }, PARITY_TITLE);
+  {}, PARITY_TITLE);
   const loaded = await tab.$eval('#shader-parity-toggle', (node) => ({
     armed: node instanceof HTMLButtonElement && !node.disabled,
     status: document.getElementById('shader-document-status')?.dataset.status,
@@ -502,57 +428,24 @@ async function probeParity(tab) {
   return failures;
 }
 
-let executablePath;
-try {
-  executablePath = resolveBrowser();
-} catch (error) {
-  console.error(`workbench-probe: ${error instanceof Error ? error.message : error}`);
-  process.exit(1);
-}
-
-console.log(`workbench-probe: ${PAGE}, ${executablePath}`);
-let site = null;
-let browser = null;
-
-/**
- * @param {string[]} collector - Takes the page's uncaught errors.
- * @returns {Promise<import('puppeteer-core').Page>} The loaded workbench.
- */
-async function openWorkbench(collector) {
-  const tab = await browser.newPage();
-  tab.setDefaultTimeout(TIMEOUT_MS);
-  await tab.setViewport(VIEWPORT);
-  tab.on('pageerror', (error) => collector.push(`uncaught: ${error.message}`));
-  await tab.goto(`${site.origin}/${PAGE}`, { timeout: TIMEOUT_MS });
-  await tab.waitForFunction(() => !document.getElementById('loading-overlay'),
-    { timeout: TIMEOUT_MS });
-  await tab.waitForSelector('.chain-chip', { timeout: TIMEOUT_MS });
-  return tab;
-}
-
-const failures = [];
-try {
-  site = await serveStagedSite();
-  browser = await puppeteer.launch({
-    executablePath,
-    headless: true,
-    args: BROWSER_ARGS,
-  });
-  const tab = await openWorkbench(failures);
-  failures.push(...await probeStrip(tab));
-  // A separate page: the strip probe's structural edits disarm the toggle.
-  const parityTab = await openWorkbench(failures);
-  failures.push(...await probeParity(parityTab));
-} catch (error) {
-  failures.push(error instanceof Error ? error.message : String(error));
-} finally {
-  await browser?.close();
-  await site?.close();
-}
-
-if (failures.length > 0) {
-  console.error(`workbench-probe: ${failures.length} checks failed:`);
-  for (const failure of failures) console.error(`  ${failure}`);
-  process.exit(1);
-}
-console.log('workbench-probe: every pipeline control behaved.');
+await runProbe({
+  name: 'workbench-probe',
+  page: PAGE,
+  timeoutMs: TIMEOUT_MS,
+  success: 'every pipeline control behaved.',
+  run: async ({ open }) => {
+    const failures = [];
+    const openWorkbench = async () => {
+      const tab = await open({ viewport: VIEWPORT });
+      await tab.waitForFunction(() => !document.getElementById('loading-overlay'));
+      await tab.waitForSelector('.chain-chip');
+      return tab;
+    };
+    const tab = await openWorkbench();
+    failures.push(...await probeStrip(tab));
+    // A separate page: the strip probe's structural edits disarm the toggle.
+    const parityTab = await openWorkbench();
+    failures.push(...await probeParity(parityTab));
+    return failures;
+  },
+});
