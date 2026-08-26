@@ -540,7 +540,11 @@ const validateStoredValue = (parameter, value, path) => {
   const stored = Math.fround(value);
   if (!Number.isFinite(stored))
     fail('semantic', 'BINARY32_OVERFLOW', path, 'The value is outside binary32 storage.');
-  if (stored < parameter.domain.minimum || stored > parameter.domain.maximum)
+  // The bounds are compared in binary32 too: a catalog bound the document
+  // copied verbatim need not be float32-exact, and the rounded value would
+  // then fall outside the unrounded domain.
+  if (stored < Math.fround(parameter.domain.minimum) ||
+      stored > Math.fround(parameter.domain.maximum))
     fail('semantic', 'VALUE_OUT_OF_RANGE', path, `The value is outside parameter "${parameter.id}" bounds.`);
   if (parameter.interpolation.kind === 'LOG_POSITIVE' && stored <= 0)
     fail('semantic', 'LOG_DOMAIN', path, 'Log-positive interpolation requires positive values.');
