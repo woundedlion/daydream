@@ -50,9 +50,20 @@ const RESET_ICON = '\u21ba';
 const PREVIOUS_ICON = '\u25c0';
 const NEXT_ICON = '\u25b6';
 export const FULL_CONFIG_STORAGE_KEY = '__fullConfig';
-const RESERVED_CONTROL_NAMES = new Set([
-  'reset', 'export', 'presetIndex', 'previousPreset', 'nextPreset', 'pause'
-]);
+// Panel control names an engine parameter cannot reuse. The action buttons are
+// functions and the preset selector is a session control, so none of those owns
+// a deep-link key; the pause toggle owns `pause`.
+const RESERVED_CONTROL_NAMES = new Set(['pause']);
+
+/**
+ * The key one of the panel's own controls is remembered under across a rebuild,
+ * outside the namespace the engine parameter names occupy.
+ * @param {string} property - The control's bound property name.
+ * @returns {string} The namespaced key.
+ */
+function panelControlKey(property) {
+  return `panel.${property}`;
+}
 
 /**
  * The focusable widget a lil-gui controller built: a dropdown's select, an
@@ -1079,10 +1090,9 @@ export function createEffectGui({
   function panelControllers(fx) {
     if (!fx) return [];
     const pairs = [...(fx.controllerByName ?? [])];
-    if (fx.pause.controller) pairs.push(['pause', fx.pause.controller]);
-    if (fx.preset?.controller) pairs.push(['presetIndex', fx.preset.controller]);
+    if (fx.pause.controller) pairs.push([panelControlKey('pause'), fx.pause.controller]);
     for (const controller of fx.actionControllers ?? []) {
-      pairs.push([controller.property, controller]);
+      pairs.push([panelControlKey(controller.property), controller]);
     }
     return pairs;
   }

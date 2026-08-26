@@ -1145,7 +1145,7 @@ test('Lens Glitch to None persists the exhaustive snapshot bit-exactly', () => {
   assert.deepEqual(JSON.parse(h.gui().stored[FULL_CONFIG_STORAGE_KEY]), updated);
 });
 
-test('build warns when engine params collide with effect controls', () => {
+test('build warns when an engine param claims the pause toggle deep-link key', () => {
   const h = makeHarness({
     params: [
       { name: 'reset', value: 0, min: 0, max: 1 },
@@ -1156,8 +1156,26 @@ test('build warns when engine params collide with effect controls', () => {
 
   h.panel.build();
 
+  // The action buttons are functions and the preset selector is a session
+  // control, so only the pause toggle shares a deep-link key with a parameter.
   assert.equal(h.warnings.length, 1, 'one warning naming every collision');
-  assert.match(h.warnings[0], /conflict with effect controls: reset, export, pause$/);
+  assert.match(h.warnings[0], /conflict with effect controls: pause$/);
+});
+
+test('a param named after an action button keeps the button its focus slot', () => {
+  const h = makeHarness({
+    params: [{ name: 'reset', value: 0, min: 0, max: 1 }],
+    rebuildOnApply: true,
+  });
+  h.panel.build();
+  h.panel.mount();
+  const stale = h.gui();
+  h.state.focused = stale.ctrl('reset').$button;
+
+  stale.ctrl('reset').object.reset();
+
+  assert.equal(h.gui().ctrl('reset').$button.focusCalls, 1,
+    'the same-named parameter took the focus slot of the Reset button');
 });
 
 test('a readonly param is disabled and excluded from the writable set', () => {
