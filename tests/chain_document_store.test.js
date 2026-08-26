@@ -124,6 +124,35 @@ test('insertion backfills presets, fields and staggered groups atomically', asyn
   assertGreen(store);
 });
 
+test('a second instance of a declared operator carries the whole catalog schema', async () => {
+  const store = await makeStore({ mutate: addStaggered });
+  const camera = store.document().descriptor.parameters.find(
+    (parameter) => parameter.id === 'camera.wander');
+  assert.equal(store.document().descriptor.parameters.some(
+    (parameter) => parameter.id === 'camera.spin-speed'), false,
+  'the fixture declares a strict subset of the rotate schema');
+
+  assert.deepEqual(store.replaceSpan(0, 0, [{ label: 'orbit', operator: 'sphere.rotate.v2' }]),
+    { ok: true });
+
+  const document = store.document();
+  const declared = document.descriptor.parameters.filter(
+    (parameter) => parameter.id.startsWith('orbit.'));
+  assert.deepEqual(declared.map((parameter) => parameter.id),
+    ['orbit.wander', 'orbit.spin-speed']);
+  for (const parameter of declared) {
+    assert.ok(document.descriptor.serialization.fields.includes(parameter.id));
+    for (const preset of document.preset_bank.presets)
+      assert.equal(preset.values[parameter.id], parameter.default);
+  }
+  const staggered = document.descriptor.path_policies.find(
+    (policy) => policy.id === 'staggered');
+  assert.ok(staggered.groups.includes('orbit.spin-speed'));
+  assert.equal(declared[0].default, camera.default, 'a declared field keeps its value');
+  assert.equal(declared[1].default, 0, 'the widened field takes the catalog default');
+  assertGreen(store);
+});
+
 test('an operator with a snap-curve field commits', async () => {
   const store = await makeStore();
   const candidate = store.legalReplacements(SAMPLE, 1).find(
@@ -304,12 +333,23 @@ test('removing and reinserting one operator preserves its descriptor digest', as
   const store = await createChainDocumentStore({
     document: structuredClone(STAINED_GLASS.document), catalog: CATALOG,
   });
+  const roundTrip = () => {
+    assert.equal(store.replaceSpan(WARP, 1, []).ok, true);
+    assert.equal(store.replaceSpan(WARP, 0, [
+      { label: 'warp1', operator: 'warp.vector-noise.v2' },
+    ]).ok, true);
+  };
+
+  // The fixture declares vector-noise's edge-width and envelope on no
+  // instance, so the first reinsertion widens warp1 to the catalog schema.
+  roundTrip();
+  const widened = store.document().descriptor.parameters
+    .filter((parameter) => parameter.id.startsWith('warp1.'))
+    .map((parameter) => parameter.id);
+  assert.ok(widened.includes('warp1.edge-width') && widened.includes('warp1.envelope'));
   const digest = store.compile().descriptor_digest;
 
-  assert.equal(store.replaceSpan(WARP, 1, []).ok, true);
-  assert.equal(store.replaceSpan(WARP, 0, [
-    { label: 'warp1', operator: 'warp.vector-noise.v2' },
-  ]).ok, true);
+  roundTrip();
 
   assert.equal(store.compile().descriptor_digest, digest);
   assertGreen(store);
