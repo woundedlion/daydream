@@ -7,9 +7,11 @@
  * Which pipeline stage each engine parameter of a shader effect belongs to, and
  * what a stage folder and its controls are called. Three schemas are recognized:
  * ShaderBall's selector-driven one, the versioned Fixed Shader snapshot, and the
- * composed LatticeMelt and KaleidoscopeSmooth rosters. Name classification
- * only, so the taxonomy is readable and testable apart from the panel that
- * renders it.
+ * composed LatticeMelt and KaleidoscopeSmooth rosters. The named rosters list
+ * membership only; every schema stages a parameter through the one
+ * STAGE_BY_PARAMETER table, so no two can place the same name differently. Name
+ * classification only, so the taxonomy is readable and testable apart from the
+ * panel that renders it.
  */
 
 export const STAGE_ORDER = [
@@ -128,62 +130,27 @@ const SHADERBALL_SIGNATURE = [
   'Function', 'Projection', 'Lens', 'Planar Warp 1', 'Planar Warp 2',
   'Signal Weight', 'Value Transfer', 'Coverage', 'Palette',
 ];
-const LATTICE_MELT_STAGE_BY_PARAMETER = new Map([
-  ['Camera Wander', 'Camera'],
-  ['Surface Noise Scale', 'Surface Noise'],
-  ['Surface Noise Strength', 'Surface Noise'],
-  ['Surface Noise Speed', 'Surface Noise'],
-  ['Projection Spin Speed', 'Projection Frame'],
-  ['Projection Wander', 'Projection Frame'],
-  ['Singularity Fade', 'Projection'],
-  ['Central Meridian', 'Projection'],
-  ['Lattice Cell Scale', 'Function'],
-  ['Lattice Shape', 'Function'],
-  ['Lattice Softness', 'Function'],
-  ['Lattice Radius', 'Function'],
-  ['Palette Chroma', 'Colorize'],
-  ['Palette Mapping', 'Colorize'],
-  ['Mapping Frequency', 'Colorize'],
-  ['Mapping Phase', 'Colorize'],
-  ['Phase Oscillation Depth', 'Colorize'],
-  ['Phase Oscillation Speed', 'Colorize'],
-  ['Brightness Depth', 'Colorize'],
-  ['Value Opacity Low', 'Colorize'],
-  ['Value Opacity High', 'Colorize'],
-  ['Hue Shift Amount', 'Colorize'],
-  ['Hue Noise Scale', 'Colorize'],
-  ['Hue Noise Speed', 'Colorize'],
+const LATTICE_MELT_ROSTER = new Set([
+  'Camera Wander', 'Surface Noise Scale', 'Surface Noise Strength',
+  'Surface Noise Speed', 'Projection Spin Speed', 'Projection Wander',
+  'Singularity Fade', 'Central Meridian', 'Lattice Cell Scale', 'Lattice Shape',
+  'Lattice Softness', 'Lattice Radius', 'Palette Chroma', 'Palette Mapping',
+  'Mapping Frequency', 'Mapping Phase', 'Phase Oscillation Depth',
+  'Phase Oscillation Speed', 'Brightness Depth', 'Value Opacity Low',
+  'Value Opacity High', 'Hue Shift Amount', 'Hue Noise Scale',
+  'Hue Noise Speed',
 ]);
-const KALEIDOSCOPE_SMOOTH_STAGE_BY_PARAMETER = new Map([
-  ['Camera Wander', 'Camera'],
-  ['Projection Spin Speed', 'Projection Frame'],
-  ['Projection Wander', 'Projection Frame'],
-  ['Singularity Fade', 'Projection'],
-  ['Planar Warp 2 Speed', 'Planar Warp 2'],
-  ['Planar Warp 2 Rotation', 'Planar Warp 2'],
-  ['Planar Warp 2 Cell X', 'Planar Warp 2'],
-  ['Planar Warp 2 Cell Y', 'Planar Warp 2'],
-  ['Planar Warp 2 Offset X', 'Planar Warp 2'],
-  ['Planar Warp 2 Offset Y', 'Planar Warp 2'],
-  ['Pattern Freq', 'Function'],
-  ['Speed', 'Function'],
-  ['Source Angle Speed', 'Function'],
-  ['Complexity', 'Function'],
-  ['Pattern Mix', 'Function'],
-  ['Drift', 'Function'],
-  ['Palette Chroma', 'Colorize'],
-  ['Palette Mapping', 'Colorize'],
-  ['Mapping Frequency', 'Colorize'],
-  ['Mapping Phase', 'Colorize'],
-  ['Phase Oscillation Depth', 'Colorize'],
-  ['Phase Oscillation Speed', 'Colorize'],
-  ['Value Opacity Low', 'Colorize'],
-  ['Value Opacity High', 'Colorize'],
-  ['Hue Shift Amount', 'Colorize'],
-  ['Hue Noise Scale', 'Colorize'],
-  ['Hue Noise Speed', 'Colorize'],
+const KALEIDOSCOPE_SMOOTH_ROSTER = new Set([
+  'Camera Wander', 'Projection Spin Speed', 'Projection Wander',
+  'Singularity Fade', 'Planar Warp 2 Speed', 'Planar Warp 2 Rotation',
+  'Planar Warp 2 Cell X', 'Planar Warp 2 Cell Y', 'Planar Warp 2 Offset X',
+  'Planar Warp 2 Offset Y', 'Pattern Freq', 'Speed', 'Source Angle Speed',
+  'Complexity', 'Pattern Mix', 'Drift', 'Palette Chroma', 'Palette Mapping',
+  'Mapping Frequency', 'Mapping Phase', 'Phase Oscillation Depth',
+  'Phase Oscillation Speed', 'Value Opacity Low', 'Value Opacity High',
+  'Hue Shift Amount', 'Hue Noise Scale', 'Hue Noise Speed',
 ]);
-const FIXED_SHADER_STAGE_BY_PARAMETER = new Map([
+const STAGE_BY_PARAMETER = new Map([
   ['Pattern Freq', 'Function'],
   ['Speed', 'Function'],
   ['Source Angle Speed', 'Function'],
@@ -275,11 +242,11 @@ const FIXED_SHADER_STAGE_BY_PARAMETER = new Map([
   ['Hue Noise Scale', 'Colorize'],
   ['Hue Noise Speed', 'Colorize'],
 ]);
-const FIXED_SHADER_WARP_BOUNDARIES = new Map([
+const WARP_STAGE_BOUNDARIES = new Map([
   ['Planar Warp 1 Speed', 'Planar Warp 1'],
   ['Planar Warp 2 Speed', 'Planar Warp 2'],
 ]);
-const FIXED_SHADER_WARP_PARAMETERS = new Set([
+const WARP_SLOT_PARAMETERS = new Set([
   'Affine Rotation Rate',
   'Affine Translation X',
   'Affine Translation Y',
@@ -353,18 +320,31 @@ export function shaderBallStageAssignments(params) {
 }
 
 /**
- * @param {Array<{name: string}>} params - Engine parameter definitions in stream order.
- * @param {Map<string, string>} table - Parameter name to pipeline stage.
- * @returns {Map<string, string>} The table's entries for the names present, in
- *   stream order; a name the table does not claim is absent.
+ * @param {string} name - Engine parameter name.
+ * @returns {string|undefined} The pipeline stage the shader roster gives it.
  */
-function stagesFrom(params, table) {
+function stageOf(name) {
+  return STAGE_BY_PARAMETER.get(name) ?? WARP_STAGE_BOUNDARIES.get(name);
+}
+
+/**
+ * Stage every parameter of a named fixed pipeline, recognized by exact roster
+ * match: a list carrying a name the roster does not claim, or missing one it
+ * does, is some other effect's and is left to the generic recognizer.
+ * @param {Array<{name: string}>} params - Engine parameter definitions in stream order.
+ * @param {Set<string>} roster - The pipeline's complete parameter roster.
+ * @returns {Map<string, string>|null} Parameter name to pipeline stage.
+ */
+function rosterStageAssignments(params, roster) {
+  if (params.length !== roster.size) return null;
   const assignments = new Map();
   for (const parameter of params) {
-    const stage = table.get(parameter.name);
-    if (stage) assignments.set(parameter.name, stage);
+    if (!roster.has(parameter.name)) return null;
+    const stage = stageOf(parameter.name);
+    if (!stage) return null;
+    assignments.set(parameter.name, stage);
   }
-  return assignments;
+  return assignments.size === roster.size ? assignments : null;
 }
 
 /**
@@ -372,12 +352,7 @@ function stagesFrom(params, table) {
  * @returns {Map<string, string>|null} Parameter name to fixed pipeline stage.
  */
 export function latticeMeltStageAssignments(params) {
-  const names = new Set(params.map((parameter) => parameter.name));
-  if ([...LATTICE_MELT_STAGE_BY_PARAMETER.keys()].some((name) => !names.has(name))) {
-    return null;
-  }
-  const assignments = stagesFrom(params, LATTICE_MELT_STAGE_BY_PARAMETER);
-  return assignments.size === params.length ? assignments : null;
+  return rosterStageAssignments(params, LATTICE_MELT_ROSTER);
 }
 
 /**
@@ -385,12 +360,7 @@ export function latticeMeltStageAssignments(params) {
  * @returns {Map<string, string>|null} Parameter name to fixed pipeline stage.
  */
 export function kaleidoscopeSmoothStageAssignments(params) {
-  const names = new Set(params.map((parameter) => parameter.name));
-  if ([...KALEIDOSCOPE_SMOOTH_STAGE_BY_PARAMETER.keys()].some((name) => !names.has(name))) {
-    return null;
-  }
-  const assignments = stagesFrom(params, KALEIDOSCOPE_SMOOTH_STAGE_BY_PARAMETER);
-  return assignments.size === params.length ? assignments : null;
+  return rosterStageAssignments(params, KALEIDOSCOPE_SMOOTH_ROSTER);
 }
 
 /**
@@ -407,10 +377,9 @@ export function fixedShaderStageAssignments(params) {
   const assignments = new Map();
   let warpStage = null;
   for (const parameter of params) {
-    warpStage = FIXED_SHADER_WARP_BOUNDARIES.get(parameter.name) ?? warpStage;
-    const stage = FIXED_SHADER_STAGE_BY_PARAMETER.get(parameter.name)
-      ?? FIXED_SHADER_WARP_BOUNDARIES.get(parameter.name)
-      ?? (FIXED_SHADER_WARP_PARAMETERS.has(parameter.name) ? warpStage : null);
+    warpStage = WARP_STAGE_BOUNDARIES.get(parameter.name) ?? warpStage;
+    const stage = stageOf(parameter.name)
+      ?? (WARP_SLOT_PARAMETERS.has(parameter.name) ? warpStage : null);
     if (stage) assignments.set(parameter.name, stage);
   }
   return assignments;
