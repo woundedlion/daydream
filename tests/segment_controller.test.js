@@ -608,6 +608,20 @@ function readyController(n = 2, opts = {}) {
 const flush = () => new Promise((r) => setImmediate(r));
 
 /**
+ * Publish one whole generation through the render loop, leaving it where a
+ * completed frame does: the controller's own results, which only its own
+ * scratch swap ever writes.
+ * @param {SegmentController} controller - A ready controller.
+ * @param {Array<Object>} bands - Per-segment frame overrides, in segment order.
+ * @returns {Promise<void>} Resolves once the generation is published.
+ */
+async function publishGeneration(controller, bands) {
+  controller.tick();
+  bands.forEach((band, segId) => deliverFrame(controller, segId, band));
+  await flush();
+}
+
+/**
  * @typedef {Object} FakeTimer
  * @property {Function} fn - Callback the production code scheduled.
  * @property {number} delay - Delay it was scheduled at, which names it: each
@@ -759,15 +773,15 @@ test('frame at the current generation is stored and settles the frame', async ()
   const c = makeController();
   c.create(2);
   const done = c.renderParallel();
-  assert.equal(c.pending, 2);
+  assert.equal(c.frameState.pending, 2);
 
   deliverFrame(c, 0, { x0: 0, x1: 2, y0: 0, y1: 2 });
-  assert.ok(c.scratch[0], 'matching-generation frame is staged');
-  assert.equal(c.scratch[0].x1, 2);
-  assert.equal(c.pending, 1);
+  assert.ok(c.frameState.scratch[0], 'matching-generation frame is staged');
+  assert.equal(c.frameState.scratch[0].x1, 2);
+  assert.equal(c.frameState.pending, 1);
 
   deliverFrame(c, 1, { x0: 2, x1: 4, y0: 0, y1: 2 });
-  assert.equal(c.pending, 0);
+  assert.equal(c.frameState.pending, 0);
   await done;
 });
 
@@ -775,18 +789,18 @@ test('frames delivered out of order within a generation land in their own slots'
   const c = makeController();
   c.create(2);
   const done = c.renderParallel();
-  assert.equal(c.pending, 2);
+  assert.equal(c.frameState.pending, 2);
 
   deliverFrame(c, 1, { x0: 2, x1: 4, y0: 0, y1: 2 });
-  assert.ok(c.scratch[1], 'seg-1 frame staged despite arriving first');
-  assert.equal(c.scratch[1].x1, 4);
-  assert.equal(c.scratch[0], null, 'seg-0 slot still empty');
-  assert.equal(c.pending, 1);
+  assert.ok(c.frameState.scratch[1], 'seg-1 frame staged despite arriving first');
+  assert.equal(c.frameState.scratch[1].x1, 4);
+  assert.equal(c.frameState.scratch[0], null, 'seg-0 slot still empty');
+  assert.equal(c.frameState.pending, 1);
 
   deliverFrame(c, 0, { x0: 0, x1: 2, y0: 0, y1: 2 });
-  assert.ok(c.scratch[0], 'seg-0 frame staged when it arrives');
-  assert.equal(c.scratch[0].x1, 2);
-  assert.equal(c.pending, 0);
+  assert.ok(c.frameState.scratch[0], 'seg-0 frame staged when it arrives');
+  assert.equal(c.frameState.scratch[0].x1, 2);
+  assert.equal(c.frameState.pending, 0);
   await done;
 });
 
@@ -799,15 +813,15 @@ test('the clip disposition each worker reports is published per segment', async 
   const c = makeController();
   c.create(2);
   const done = c.renderParallel();
-  assert.deepEqual(c.fullFrames, [false, false], 'a dispatch starts every segment clipped');
+  assert.deepEqual(c.frameState.fullFrames, [false, false], 'a dispatch starts every segment clipped');
 
   deliverFrame(c, 0, { x0: 0, x1: 2, y0: 0, y1: 2, fullFrame: true });
   deliverFrame(c, 1, { x0: 2, x1: 4, y0: 0, y1: 2 });
-  assert.deepEqual(c.fullFrames, [true, false]);
+  assert.deepEqual(c.frameState.fullFrames, [true, false]);
   await done;
 
   c.renderParallel();
-  assert.deepEqual(c.fullFrames, [false, false],
+  assert.deepEqual(c.frameState.fullFrames, [false, false],
     'a segment that goes silent must not keep a prior generation flag');
 });
 
@@ -820,11 +834,11 @@ test('the divergence notices each worker reports are published per segment', asy
   const c = makeController();
   c.create(2);
   const done = c.renderParallel();
-  assert.deepEqual(c.warnings, [null, null], 'a dispatch starts every segment clean');
+  assert.deepEqual(c.frameState.warnings, [null, null], 'a dispatch starts every segment clean');
 
   deliverFrame(c, 0, { x0: 0, x1: 2, y0: 0, y1: 2 });
   deliverFrame(c, 1, { x0: 2, x1: 4, y0: 0, y1: 2, warnings: ['Ghost refused'] });
-  assert.deepEqual(c.warnings, [null, ['Ghost refused']]);
+  assert.deepEqual(c.frameState.warnings, [null, ['Ghost refused']]);
   await done;
 
   /** @type {Object|null} */
@@ -835,7 +849,7 @@ test('the divergence notices each worker reports are published per segment', asy
     'the overlay payload carries them');
 
   c.renderParallel();
-  assert.deepEqual(c.warnings, [null, null],
+  assert.deepEqual(c.frameState.warnings, [null, null],
     'a segment that goes silent must not keep a prior generation notice');
 });
 
@@ -845,15 +859,15 @@ test('a frame dispatched before a resolution change is dropped but still settles
   const done = c.renderParallel();
 
   c.setResolution(8, 8);
-  assert.notEqual(c.inflightGen, c.renderGen);
+  assert.notEqual(c.frameState.inflightGen, c.frameState.renderGen);
 
   deliverFrame(c, 0);
-  assert.equal(c.scratch[0], null, 'stale-generation result is discarded');
-  assert.equal(c.pending, 1, 'but pending still decremented');
+  assert.equal(c.frameState.scratch[0], null, 'stale-generation result is discarded');
+  assert.equal(c.frameState.pending, 1, 'but pending still decremented');
 
   deliverFrame(c, 1);
-  assert.equal(c.scratch[1], null);
-  assert.equal(c.pending, 0);
+  assert.equal(c.frameState.scratch[1], null);
+  assert.equal(c.frameState.pending, 0);
   await done;
 });
 
@@ -861,15 +875,15 @@ test('destroy() bumps the generation so a stale in-flight .then cannot arm a new
   const c = makeController();
   c.create(2);
   const done = c.renderParallel();
-  const dispatchGen = c.inflightGen;
+  const dispatchGen = c.frameState.inflightGen;
 
   // Recreate the pool while a render is in flight; destroy() settles `done`.
   c.create(2);
   await done;
 
   // The stale .then's guard (inflightGen === renderGen) must fail.
-  assert.equal(c.inflightGen, dispatchGen, 'inflight snapshot is unchanged');
-  assert.notEqual(c.inflightGen, c.renderGen, 'generation moved on under it');
+  assert.equal(c.frameState.inflightGen, dispatchGen, 'inflight snapshot is unchanged');
+  assert.notEqual(c.frameState.inflightGen, c.frameState.renderGen, 'generation moved on under it');
 });
 
 // ---------------------------------------------------------------------------
@@ -990,10 +1004,10 @@ test('a doubled segment-0 frame cannot republish over the generation first frame
 
   assert.deepEqual(c.getParamValues(), [0.25, 1],
     "segment 0's first frame this generation is the only publish");
-  assert.strictEqual(c.scratch[0].pixels, firstPixels, 'the first pixels stay staged');
-  assert.equal(c.timings[0], 2, 'the first timing stays staged');
-  assert.strictEqual(c.arenas[0], firstArena, 'the first arena metrics stay staged');
-  assert.equal(c.pending, 1, 'the duplicate settles nothing');
+  assert.strictEqual(c.frameState.scratch[0].pixels, firstPixels, 'the first pixels stay staged');
+  assert.equal(c.frameState.timings[0], 2, 'the first timing stays staged');
+  assert.strictEqual(c.frameState.arenas[0], firstArena, 'the first arena metrics stay staged');
+  assert.equal(c.frameState.pending, 1, 'the duplicate settles nothing');
 
   deliverFrame(c, 1);
   await done;
@@ -1004,19 +1018,18 @@ test('a doubled segment-0 frame cannot republish over the generation first frame
 // ---------------------------------------------------------------------------
 
 test('a worker fault latches, zeroes pending, and resolves the in-flight frame', async () => {
-  const c = makeController();
-  c.create(2);
-  c.renderInFlight = true;
-  const done = c.renderParallel();
+  const c = readyController(2);
+  c.tick();
+  assert.equal(c.frameState.renderInFlight, true, 'a render is in flight');
 
   c.workers[0].onerror({ message: 'boom', filename: 'w.js', lineno: 1, colno: 2 });
 
   assert.equal(c.faulted, true);
   assert.deepEqual(c.faultInfo, { segId: 0, message: 'boom' });
-  assert.equal(c.pending, 0, 'pending zeroed so the loop cannot deadlock');
-  assert.equal(c.renderInFlight, false);
-  assert.equal(c.frameResolve, null);
-  await done;
+  assert.equal(c.frameState.pending, 0, 'pending zeroed so the loop cannot deadlock');
+  assert.equal(c.frameState.renderInFlight, false);
+  assert.equal(c.frameState.frameSettled, true);
+  await flush();
 });
 
 test('a latched fault terminates the pool so no worker heap stays resident', () => {
@@ -1065,13 +1078,13 @@ test('create() moves count and the per-segment arrays to the pool it spawned', (
   const c = readyController(4);
   assert.equal(c.count, 4);
   assert.equal(c.workers.length, 4);
-  assert.equal(c.results.length, 4);
+  assert.equal(c.frameState.results.length, 4);
 
   c.create(2);
   assert.equal(c.count, 2, 'count follows the rebuilt pool, never leads it');
   assert.equal(c.workers.length, 2);
-  assert.equal(c.results.length, 2);
-  assert.equal(c.frameSeen.length, 2);
+  assert.equal(c.frameState.results.length, 2);
+  assert.equal(c.frameState.frameSeen.length, 2);
 });
 
 test('a synchronous worker-N construction failure terminates the partial pool', () => {
@@ -1123,8 +1136,8 @@ test('a throwing render dispatch faults instead of wedging the pipeline', async 
   assert.equal(c.faulted, true, 'a mid-dispatch throw latches a fault');
   assert.equal(c.faultInfo.segId, 1);
   assert.match(c.faultInfo.message, /render dispatch to seg 1 failed: DataCloneError/);
-  assert.equal(c.renderInFlight, false, 'the in-flight latch is released');
-  assert.equal(c.pending, 0, 'the barrier cannot deadlock on the un-posted workers');
+  assert.equal(c.frameState.renderInFlight, false, 'the in-flight latch is released');
+  assert.equal(c.frameState.pending, 0, 'the barrier cannot deadlock on the un-posted workers');
 });
 
 test('a throwing broadcast faults instead of escaping to the GUI caller', () => {
@@ -1167,20 +1180,18 @@ test('a booted ping with a mismatched protocol version faults fast', () => {
 });
 
 test('a worker onmessageerror latches the fault the same way onerror does', async () => {
-  const c = makeController();
-  c.create(2);
-  c.renderInFlight = true;
-  const done = c.renderParallel();
+  const c = readyController(2);
+  c.tick();
 
   // A failed structured-clone deserialization fires onmessageerror, not onerror.
   c.workers[1].onmessageerror({ type: 'messageerror' });
 
   assert.equal(c.faulted, true);
   assert.deepEqual(c.faultInfo, { segId: 1, message: 'message deserialization failed' });
-  assert.equal(c.pending, 0, 'pending zeroed so the loop cannot deadlock');
-  assert.equal(c.renderInFlight, false);
-  assert.equal(c.frameResolve, null);
-  await done;
+  assert.equal(c.frameState.pending, 0, 'pending zeroed so the loop cannot deadlock');
+  assert.equal(c.frameState.renderInFlight, false);
+  assert.equal(c.frameState.frameSettled, true);
+  await flush();
 });
 
 test('an engineRejected worker message faults the pool with the reason and segId', () => {
@@ -1296,11 +1307,11 @@ test('a frame with a non-integer segId faults instead of stalling the barrier', 
     assert.equal(c.faultInfo.segId, 0, 'the fault names the worker that sent it');
     assert.ok(c.faultInfo.message.includes(`tagged segId ${String(segId)}`),
       `the fault names the offending id, not just a stall: ${c.faultInfo.message}`);
-    assert.deepEqual(c.scratch, [null, null],
+    assert.deepEqual(c.frameState.scratch, [null, null],
       `segId ${String(segId)} must not write a staging slot`);
-    assert.deepEqual(c.frameSeen, [false, false],
+    assert.deepEqual(c.frameState.frameSeen, [false, false],
       `segId ${String(segId)} must not mark a segment seen`);
-    assert.equal(c.pending, 0,
+    assert.equal(c.frameState.pending, 0,
       'the fault settles the frame rather than leaving it to the render watchdog');
     await done;
   }
@@ -1318,24 +1329,22 @@ test('a frame tagged with another segment id faults the pool', async () => {
   assert.equal(c.faultInfo.segId, 0, 'the fault names the worker that sent it');
   assert.ok(c.faultInfo.message.includes('tagged segId 1'),
     `the fault names the offending id: ${c.faultInfo.message}`);
-  assert.deepEqual(c.scratch, [null, null], 'no staging slot is written');
-  assert.deepEqual(c.frameSeen, [false, false], 'no segment is marked seen');
-  assert.equal(c.pending, 0);
+  assert.deepEqual(c.frameState.scratch, [null, null], 'no staging slot is written');
+  assert.deepEqual(c.frameState.frameSeen, [false, false], 'no segment is marked seen');
+  assert.equal(c.frameState.pending, 0);
   await done;
 });
 
 test('a surviving worker responding after a fault does not drive pending negative', async () => {
-  const c = makeController();
-  c.create(2);
-  c.renderInFlight = true;
-  const done = c.renderParallel();
+  const c = readyController(2);
+  c.tick();
   // The fault detaches every handler, so a post-fault report can only arrive
   // from an event already dispatched when the latch closed; hold that handler.
   const seg1 = c.workers[1].onmessage;
 
   c.workers[0].onerror({ message: 'boom', filename: 'w.js', lineno: 1, colno: 1 });
-  assert.equal(c.pending, 0);
-  await done;
+  assert.equal(c.frameState.pending, 0);
+  await flush();
 
   seg1({
     data: {
@@ -1345,8 +1354,8 @@ test('a surviving worker responding after a fault does not drive pending negativ
       elapsed: 1, arenaMetrics: null,
     },
   });
-  assert.equal(c.pending, 0, 'post-fault frame leaves pending at 0, not negative');
-  assert.equal(c.scratch[1], null, 'no result is recorded for the halted pool');
+  assert.equal(c.frameState.pending, 0, 'post-fault frame leaves pending at 0, not negative');
+  assert.equal(c.frameState.scratch[1], null, 'no result is recorded for the halted pool');
 });
 
 test('only the first fault of a session is recorded', () => {
@@ -1492,7 +1501,7 @@ test('the render watchdog faults when a worker accepts render but stops progress
   try {
     const done = c.renderParallel();
     deliverFrame(c, 0); // only seg 0 replies; seg 1 hangs
-    assert.equal(c.pending, 1, 'one segment still outstanding');
+    assert.equal(c.frameState.pending, 1, 'one segment still outstanding');
     // The re-armed watchdog fires with seg 1 still hung.
     clock.fireOnly(RENDER_WATCHDOG_MS, 'one render watchdog armed at the render deadline');
     assert.equal(c.faulted, true);
@@ -1500,7 +1509,7 @@ test('the render watchdog faults when a worker accepts render but stops progress
     assert.match(c.faultInfo.message, /1\/2 segments responded/);
     assert.equal(c.faultInfo.segId, -2,
       'render-timeout sentinel, distinct from the pool-init -1');
-    assert.equal(c.pending, 0, 'fault settles pending so the loop cannot deadlock');
+    assert.equal(c.frameState.pending, 0, 'fault settles pending so the loop cannot deadlock');
     assert.equal(c.renderWatchdog, null);
     await done; // onWorkerFault resolved the in-flight frame
   } finally {
@@ -1517,7 +1526,7 @@ test('a progress frame re-arms the render watchdog so a slow render does not fau
     const atDispatch = clock.timers[0];
     assert.equal(atDispatch.delay, RENDER_WATCHDOG_MS, 'armed at the render deadline');
     deliverFrame(c, 0); // one segment reports; the other is still rendering
-    assert.equal(c.pending, 1);
+    assert.equal(c.frameState.pending, 1);
     assert.equal(clock.timers.length, 2, 'watchdog re-armed on the progress frame');
     assert.equal(clock.isPending(atDispatch), false,
       're-arming cancels the dispatch watchdog rather than leaving two running');
@@ -1525,7 +1534,7 @@ test('a progress frame re-arms the render watchdog so a slow render does not fau
       'exactly one render watchdog is live across the re-arm');
     assert.notEqual(c.renderWatchdog, null);
     deliverFrame(c, 1); // the slow segment finally reports
-    assert.equal(c.pending, 0);
+    assert.equal(c.frameState.pending, 0);
     assert.equal(c.renderWatchdog, null, 'watchdog cleared once the frame settles');
     assert.deepEqual(clock.pendingAt(RENDER_WATCHDOG_MS), [],
       'the re-armed watchdog is cancelled too, not just dropped');
@@ -1547,7 +1556,7 @@ test('a completed render clears the render watchdog so it cannot fault later', a
     const [armed] = clock.pendingAt(RENDER_WATCHDOG_MS);
     deliverFrame(c, 0);
     deliverFrame(c, 1);
-    assert.equal(c.pending, 0);
+    assert.equal(c.frameState.pending, 0);
     assert.equal(c.renderWatchdog, null, 'watchdog cleared once the frame settles');
     // Dropping the handle is not enough: the callback must be off the timer
     // queue, or it faults a healthy pool a render deadline later.
@@ -1576,11 +1585,11 @@ test('a booted ping is handled and does not by itself make the pool ready', () =
   c.create(2);
   deliverBooted(c, 0);
   deliverBooted(c, 1);
-  assert.equal(c.ready, false, 'booted alone does not signal readiness');
+  assert.equal(c.frameState.ready, false, 'booted alone does not signal readiness');
   assert.equal(c.faulted, false, 'a clean boot does not fault');
   deliverReady(c, 0);
   deliverReady(c, 1);
-  assert.equal(c.ready, true, 'readiness still requires the ready messages');
+  assert.equal(c.frameState.ready, true, 'readiness still requires the ready messages');
 });
 
 test('destroy() clears the fault latch so a fresh pool can recover', () => {
@@ -1745,9 +1754,9 @@ test('composite() blits each quadrant to its display-buffer offset', () => {
   const c = readyController(2);
   c.showBoundaries = false;
   const quad = new Uint16Array(2 * 2 * 3).fill(111);
-  c.results = [null, { pixels: quad, x0: 2, x1: 4, y0: 0, y1: 2 }];
+  const staged = [null, { pixels: quad, x0: 2, x1: 4, y0: 0, y1: 2 }];
 
-  c.composite();
+  c.composite(staged);
 
   assert.equal(driver.pixels[idx(2, 0, 4)], 111);
   assert.equal(driver.pixels[idx(3, 1, 4)], 111);
@@ -1765,9 +1774,9 @@ test('composite() faults when the display buffer is not the driver grid', () => 
   const c = makeController();
   c.showBoundaries = false;
   const band = new Uint16Array(4 * 2 * 3).fill(222);
-  c.results = [{ pixels: band, x0: 0, x1: 4, y0: 0, y1: 2 }];
+  const staged = [{ pixels: band, x0: 0, x1: 4, y0: 0, y1: 2 }];
 
-  const blitted = c.composite();
+  const blitted = c.composite(staged);
   assert.equal(blitted, 0, 'a mis-sized display buffer blits nothing');
   assert.equal(c.faulted, true,
     'a short destination view latches a fault instead of throwing a RangeError');
@@ -1783,9 +1792,9 @@ test('composite() faults on a rectangle that overflows the current display buffe
   const c = makeController();
   c.showBoundaries = false;
   const quad = new Uint16Array(2 * 2 * 3).fill(222);
-  c.results = [{ pixels: quad, x0: 0, x1: 99, y0: 0, y1: 2 }]; // x1=99 overshoots W=4
+  const staged = [{ pixels: quad, x0: 0, x1: 99, y0: 0, y1: 2 }]; // x1=99 overshoots W=4
 
-  const blitted = c.composite();
+  const blitted = c.composite(staged);
   assert.equal(blitted, 0, 'a leading out-of-bounds rect blits nothing');
   assert.equal(c.faulted, true, 'an overflow latches a fault instead of throwing');
   assert.match(c.faultInfo.message, /out of bounds/);
@@ -1803,12 +1812,12 @@ test('composite() faults atomically when a non-leading segment overflows', () =>
   c.showBoundaries = false;
   const good = new Uint16Array(2 * 2 * 3).fill(111);
   const bad = new Uint16Array(2 * 2 * 3).fill(222);
-  c.results = [
+  const staged = [
     { pixels: good, x0: 0, x1: 2, y0: 0, y1: 2 },
     { pixels: bad, x0: 2, x1: 99, y0: 0, y1: 2 }, // x1=99 overshoots W=4
   ];
 
-  const blitted = c.composite();
+  const blitted = c.composite(staged);
   assert.equal(blitted, 0, 'a later out-of-bounds rect blits nothing');
   assert.equal(c.faulted, true);
   assert.match(c.faultInfo.message, /segment 1 .* out of bounds/);
@@ -1823,9 +1832,9 @@ test('composite() faults on an empty/inverted segment rect', () => {
   const c = makeController();
   c.showBoundaries = false;
   const quad = new Uint16Array(2 * 2 * 3).fill(123);
-  c.results = [{ pixels: quad, x0: 2, x1: 2, y0: 0, y1: 2 }]; // x1 == x0
+  const staged = [{ pixels: quad, x0: 2, x1: 2, y0: 0, y1: 2 }]; // x1 == x0
 
-  const blitted = c.composite();
+  const blitted = c.composite(staged);
   assert.equal(blitted, 0, 'an empty/inverted rect blits nothing');
   assert.equal(c.faulted, true, 'a zero-area rect latches a fault instead of masking corruption');
   assert.match(c.faultInfo.message, /empty\/inverted/);
@@ -1840,9 +1849,9 @@ test('composite() faults on a pixel buffer whose length disagrees with its rect'
   c.showBoundaries = false;
   // rect [0,0)-[2,2) expects 2 * 2 * 3 = 12 elements; supply 6.
   const short = new Uint16Array(6).fill(123);
-  c.results = [{ pixels: short, x0: 0, x1: 2, y0: 0, y1: 2 }];
+  const staged = [{ pixels: short, x0: 0, x1: 2, y0: 0, y1: 2 }];
 
-  const blitted = c.composite();
+  const blitted = c.composite(staged);
   assert.equal(blitted, 0, 'a length-mismatched buffer blits nothing');
   assert.equal(c.faulted, true, 'a rect/buffer mismatch latches a fault instead of blitting a truncated row');
   assert.match(c.faultInfo.message, /pixel buffer length/);
@@ -1860,9 +1869,9 @@ test('composite() faults on a rect that is not that segment\'s band of the layou
   c.showBoundaries = false;
   // Segment 1's band is [0,2)-[2,4); this is segment 3's, and the same size.
   const quad = new Uint16Array(2 * 2 * 3).fill(123);
-  c.results = [null, { pixels: quad, x0: 2, x1: 4, y0: 2, y1: 4 }];
+  const staged = [null, { pixels: quad, x0: 2, x1: 4, y0: 2, y1: 4 }];
 
-  const blitted = c.composite();
+  const blitted = c.composite(staged);
   assert.equal(blitted, 0, 'a misplaced band blits nothing');
   assert.equal(c.faulted, true, 'a wrong-band rect latches a fault instead of blitting');
   assert.match(c.faultInfo.message, /segment 1 .* is not its band/);
@@ -1878,9 +1887,9 @@ test('composite() faults when the layout admits no band for a segment', () => {
   const c = readyController(8);
   c.showBoundaries = false;
   const cell = new Uint16Array(1 * 1 * 3).fill(123);
-  c.results = [{ pixels: cell, x0: 0, x1: 1, y0: 0, y1: 1 }];
+  const staged = [{ pixels: cell, x0: 0, x1: 1, y0: 0, y1: 1 }];
 
-  const blitted = c.composite();
+  const blitted = c.composite(staged);
   assert.equal(blitted, 0, 'an underivable layout blits nothing');
   assert.equal(c.faulted, true, 'a throwing layout derivation latches a fault instead of escaping');
   assert.match(c.faultInfo.message, /no segment-0 band exists/);
@@ -1893,7 +1902,7 @@ test('the band table is reused until the layout moves', () => {
   const first = c.segmentBands(2, 4, 4);
   assert.equal(c.segmentBands(2, 4, 4), first, 'an unchanged layout reuses the table');
 
-  c.renderGen++;
+  c.destroy();
   const afterGen = c.segmentBands(2, 4, 4);
   assert.notEqual(afterGen, first, 'a new generation rebuilds the table');
 
@@ -1915,12 +1924,12 @@ test('composite() marks both the internal split and the x=0 wrap seam', () => {
   c.showBoundaries = true;
   const quadL = new Uint16Array(2 * 2 * 3).fill(111);
   const quadR = new Uint16Array(2 * 2 * 3).fill(222);
-  c.results = [
+  const staged = [
     { pixels: quadL, x0: 0, x1: 2, y0: 0, y1: 2 },
     { pixels: quadR, x0: 2, x1: 4, y0: 0, y1: 2 },
   ];
 
-  c.composite();
+  c.composite(staged);
 
   assert.ok(isCyan(2, 0) && isCyan(2, 1), 'internal arm split at x=2 marked');
   assert.ok(isCyan(0, 0) && isCyan(0, 1), 'wrap-seam boundary at x=0 marked');
@@ -1928,7 +1937,7 @@ test('composite() marks both the internal split and the x=0 wrap seam', () => {
   assert.equal(driver.pixels[idx(3, 0, 4)], 222, 'arm-1 interior untouched');
 });
 
-test('the boundary setter re-composites and invalidates a paused held generation', () => {
+test('the boundary setter re-composites and invalidates a paused held generation', async () => {
   driver.W = 4; driver.H = 2;
   driver.pixels = new Uint16Array(4 * 2 * 3);
 
@@ -1937,11 +1946,11 @@ test('the boundary setter re-composites and invalidates a paused held generation
   c.setAnimationsPaused(true);
   const quadL = new Uint16Array(2 * 2 * 3).fill(111);
   const quadR = new Uint16Array(2 * 2 * 3).fill(222);
-  c.results = [
+  await publishGeneration(c, [
     { pixels: quadL, x0: 0, x1: 2, y0: 0, y1: 2 },
     { pixels: quadR, x0: 2, x1: 4, y0: 0, y1: 2 },
-  ];
-  c.composite();
+  ]);
+  c.composite(c.frameState.results);
   const posted = c.workers.map((worker) => worker.posted.length);
   const uploads = driver.dotMesh.instanceColor.version;
 
@@ -1981,22 +1990,22 @@ test('the boundary setter composites nothing when the pool owns no display', () 
   assert.equal(driver.invalidations, 1, 'the repaint is still requested');
 });
 
-test('the boundary setter composites nothing over a latched pool', () => {
+test('the boundary setter composites nothing over a latched pool', async () => {
   driver.W = 4; driver.H = 2;
   driver.pixels = new Uint16Array(4 * 2 * 3).fill(77);
 
   const c = readyController(2);
   c.active = true;
-  c.results = [
+  await publishGeneration(c, [
     { pixels: new Uint16Array(2 * 2 * 3).fill(111), x0: 0, x1: 2, y0: 0, y1: 2 },
     { pixels: new Uint16Array(2 * 2 * 3).fill(222), x0: 2, x1: 4, y0: 0, y1: 2 },
-  ];
+  ]);
   c.onWorkerFault(0, 'boom');
   const invalidations = driver.invalidations;
 
   c.showBoundaries = true;
 
-  assert.equal(c.ready, true, 'the latch keeps ready for ownsDisplay');
+  assert.equal(c.frameState.ready, true, 'the latch keeps ready for ownsDisplay');
   assert.equal(driver.pixels[idx(0, 0, 4)], 77,
     'the halted pool does not repaint the frame under its fault banner');
   assert.equal(driver.invalidations, invalidations + 1,
@@ -2014,7 +2023,7 @@ test('composite() marks every internal split plus the wrap seam for an 8-segment
   c.showBoundaries = true;
   // Bands run 0, 1, 3, 2 down an arm: its southern half counts back from the pole.
   const bandYs = [[0, 2], [2, 4], [6, 8], [4, 6]];
-  c.results = Array.from({ length: 8 }, (_, s) => {
+  const staged = Array.from({ length: 8 }, (_, s) => {
     const [y0, y1] = bandYs[s % 4];
     const x0 = s < 4 ? 0 : 4;
     return {
@@ -2023,7 +2032,7 @@ test('composite() marks every internal split plus the wrap seam for an 8-segment
     };
   });
 
-  c.composite();
+  c.composite(staged);
 
   for (const x of [0, 4])
     assert.ok(isCyan(x, 0) && isCyan(x, 7), `arm boundary at x=${x} marked`);
@@ -2044,14 +2053,14 @@ test('composite() marks the horizontal seam between stacked Y-band segments', ()
   const c = readyController(4);
   c.showBoundaries = true;
   const band = (fill) => new Uint16Array(2 * 2 * 3).fill(fill);
-  c.results = [
+  const staged = [
     { pixels: band(111), x0: 0, x1: 2, y0: 0, y1: 2 },
     { pixels: band(222), x0: 0, x1: 2, y0: 2, y1: 4 },
     { pixels: band(333), x0: 2, x1: 4, y0: 0, y1: 2 },
     { pixels: band(444), x0: 2, x1: 4, y0: 2, y1: 4 },
   ];
 
-  c.composite();
+  c.composite(staged);
 
   assert.ok([0, 1, 2, 3].every((x) => isCyan(x, 2)),
     'horizontal band seam at y=2 marked across the row');
@@ -2069,13 +2078,13 @@ test('composite() marks the layout seams, not only the reported segments', () =>
   const c = readyController(4);
   c.showBoundaries = true;
   const band = (fill) => new Uint16Array(2 * 2 * 3).fill(fill);
-  c.results = [
+  const staged = [
     { pixels: band(111), x0: 0, x1: 2, y0: 0, y1: 2 },
     { pixels: band(222), x0: 0, x1: 2, y0: 2, y1: 4 },
     null, null,
   ];
 
-  c.composite();
+  c.composite(staged);
 
   assert.ok(isCyan(2, 0) && isCyan(0, 0), 'arm split at x=2 and wrap seam at x=0 marked');
   assert.ok([0, 1, 2, 3].every((x) => isCyan(x, 2)), 'the band seam is still marked');
@@ -2090,9 +2099,9 @@ test('composite() self-heals a broken display-buffer alias instead of throwing',
   const c = makeController();
   const target = new Uint16Array(4 * 2 * 3);
   c.getMemoryView = () => target;
-  c.results = [];
+  const staged = [];
 
-  assert.doesNotThrow(() => c.composite());
+  assert.doesNotThrow(() => c.composite(staged));
   assert.equal(driver.pixels, target,
     'driver.pixels re-pointed at the composite target');
   assert.equal(driver.dotMesh.instanceColor.array, target,
@@ -2109,9 +2118,9 @@ test('composite() heals a diverged mesh alias even while driver.pixels is aligne
   driver.dotMesh.instanceColor = fakeColorAttribute(new Uint16Array(4 * 2 * 3));
 
   const c = makeController();
-  c.results = [];
+  const staged = [];
 
-  c.composite();
+  c.composite(staged);
   assert.equal(driver.dotMesh.instanceColor.array, driver.pixels,
     'the mesh alias the GPU reads is re-pointed at the composite target');
   assert.equal(driver.dotMesh.instanceColor.version, 1,
@@ -2136,10 +2145,10 @@ test('composite() clears a buffer the refresh re-fetched', () => {
   };
   c.getMemoryView = () => driver.pixels;
   const band = new Uint16Array(2 * 2 * 3).fill(111);
-  c.results = [{ pixels: band, x0: 0, x1: 2, y0: 0, y1: 2 }, null];
+  const staged = [{ pixels: band, x0: 0, x1: 2, y0: 0, y1: 2 }, null];
 
   refreshed = true;
-  c.composite();
+  c.composite(staged);
 
   assert.equal(driver.pixels, fetched, 'the refresh moved both aliases with it');
   assert.equal(fetched[0], 111, 'the reported band still lands');
@@ -2187,12 +2196,12 @@ test('a controller cannot be built without an alias-divergence detector', () => 
 test('tick() is a no-op until every worker has signalled ready', () => {
   const c = makeController();
   c.create(2);
-  assert.equal(c.ready, false);
+  assert.equal(c.frameState.ready, false);
 
   c.tick();
 
-  assert.equal(c.renderInFlight, false, 'no render dispatched before ready');
-  assert.equal(c.pending, 0);
+  assert.equal(c.frameState.renderInFlight, false, 'no render dispatched before ready');
+  assert.equal(c.frameState.pending, 0);
   for (const w of c.workers)
     assert.ok(!w.posted.some((m) => m.type === 'render'),
       'no worker received a render message');
@@ -2200,13 +2209,13 @@ test('tick() is a no-op until every worker has signalled ready', () => {
 
 test('the first tick() once ready dispatches a parallel render', () => {
   const c = readyController(2);
-  assert.equal(c.ready, true);
+  assert.equal(c.frameState.ready, true);
 
   c.tick();
 
-  assert.equal(c.renderInFlight, true, 'render now in flight');
-  assert.equal(c.pending, 2, 'one outstanding response per worker');
-  assert.equal(c.pendingFrame, false, 'nothing to composite on the first tick');
+  assert.equal(c.frameState.renderInFlight, true, 'render now in flight');
+  assert.equal(c.frameState.pending, 2, 'one outstanding response per worker');
+  assert.equal(c.frameState.pendingFrame, false, 'nothing to composite on the first tick');
   for (const w of c.workers)
     assert.ok(w.posted.some((m) => m.type === 'render'),
       'every worker was told to render');
@@ -2220,9 +2229,9 @@ test('a completed render arms pendingFrame and frees the in-flight slot', async 
   deliverFrame(c, 1);
   await flush();
 
-  assert.equal(c.pending, 0);
-  assert.equal(c.pendingFrame, true, 'results are waiting to be composited');
-  assert.equal(c.renderInFlight, false, 'slot freed for the next dispatch');
+  assert.equal(c.frameState.pending, 0);
+  assert.equal(c.frameState.pendingFrame, true, 'results are waiting to be composited');
+  assert.equal(c.frameState.renderInFlight, false, 'slot freed for the next dispatch');
 });
 
 test('the next tick() composites the armed frame and dispatches the following one', async () => {
@@ -2237,15 +2246,15 @@ test('the next tick() composites the armed frame and dispatches the following on
   deliverFrame(c, 0, { pixels: quad(), x0: 0, x1: 2, y0: 0, y1: 2 });
   deliverFrame(c, 1, { pixels: quad(), x0: 2, x1: 4, y0: 0, y1: 2 });
   await flush();
-  assert.equal(c.pendingFrame, true);
+  assert.equal(c.frameState.pendingFrame, true);
 
   c.tick();
 
-  assert.equal(c.pendingFrame, false, 'pending frame was composited and cleared');
+  assert.equal(c.frameState.pendingFrame, false, 'pending frame was composited and cleared');
   assert.ok(driver.pixels.some((v) => v === 111),
     'the composited quadrants reached the display buffer');
-  assert.equal(c.renderInFlight, true, 'the following frame was dispatched');
-  assert.equal(c.pending, 2);
+  assert.equal(c.frameState.renderInFlight, true, 'the following frame was dispatched');
+  assert.equal(c.frameState.pending, 2);
 });
 
 test('each render dispatch hands the retired generation buffer back for reuse', async () => {
@@ -2281,9 +2290,9 @@ test('each render dispatch hands the retired generation buffer back for reuse', 
     assert.equal(genA[s].buffer.byteLength, 0,
       `seg ${s}'s retired buffer is detached on the controller side`);
   });
-  assert.ok(c.results.every((r) => r.pixels.byteLength > 0 && r.pixels[0] === 222),
+  assert.ok(c.frameState.results.every((r) => r.pixels.byteLength > 0 && r.pixels[0] === 222),
     'the displayed generation is still attached and untouched by the recycle');
-  assert.ok(c.scratch.every((slot) => slot === null),
+  assert.ok(c.frameState.scratch.every((slot) => slot === null),
     'every staging slot is cleared as its buffer is consumed');
 });
 
@@ -2300,8 +2309,8 @@ test('tick() re-blits the last composite when a render overruns the tick (previe
   deliverFrame(c, 1, { pixels: quad(), x0: 2, x1: 4, y0: 0, y1: 2 });
   await flush();
   c.tick(); // composite the armed frame, dispatch the next (now in flight)
-  assert.equal(c.pendingFrame, false);
-  assert.equal(c.renderInFlight, true, 'the next render is in flight and will overrun');
+  assert.equal(c.frameState.pendingFrame, false);
+  assert.equal(c.frameState.renderInFlight, true, 'the next render is in flight and will overrun');
 
   // driver.stepSimulation() clears the buffer before each tick.
   driver.pixels.fill(0);
@@ -2332,14 +2341,14 @@ test('an overrun re-blit shows one whole generation, never a half-updated mix', 
     deliverFrame(c, 1, { pixels: genA(), x0: 2, x1: 4, y0: 0, y1: 2 });
     await flush();
     c.tick(); // composite generation A, dispatch generation B (now in flight)
-    assert.equal(c.renderInFlight, true, 'generation B is in flight and will overrun');
+    assert.equal(c.frameState.renderInFlight, true, 'generation B is in flight and will overrun');
 
     // Generation B arrives only partially: seg 0 reports, seg 1 still rendering.
     deliverFrame(c, 0, { pixels: new Uint16Array(2 * 2 * 3).fill(222), x0: 0, x1: 2, y0: 0, y1: 2 });
-    assert.equal(c.pending, 1, 'generation B still has one segment outstanding');
-    assert.ok(c.scratch[0] && c.scratch[0].pixels[0] === 222,
+    assert.equal(c.frameState.pending, 1, 'generation B still has one segment outstanding');
+    assert.ok(c.frameState.scratch[0] && c.frameState.scratch[0].pixels[0] === 222,
       'the partial next generation is staged in scratch, not results');
-    assert.equal(c.renderInFlight, true, 'the swap has not run, so results is still generation A');
+    assert.equal(c.frameState.renderInFlight, true, 'the swap has not run, so results is still generation A');
 
     driver.pixels.fill(0); // driver.stepSimulation() clears before the overrun tick
     c.tick(); // overrun: no new pendingFrame, so re-blit the last whole generation
@@ -2369,7 +2378,7 @@ test('a composite short one segment is not handed to the recorder as a frame', a
 
   // The whole-array swap publishes only generations that filled every slot, so
   // an empty one stands in for that invariant breaking.
-  c.results[1] = null;
+  c.frameState.results[1] = null;
   c.tick();
 
   assert.ok(driver.pixels.some((v) => v === 111), 'the arrived segment still blits');
@@ -2406,12 +2415,12 @@ test('a faulted pool keeps tick() from dispatching another doomed render', () =>
 
   c.workers[0].onerror({ message: 'boom', filename: 'w.js', lineno: 1, colno: 1 });
   assert.equal(c.faulted, true);
-  assert.equal(c.renderInFlight, false);
+  assert.equal(c.frameState.renderInFlight, false);
 
   const before = c.workers.map((w) => w.posted.length);
   c.tick();
 
-  assert.equal(c.renderInFlight, false, 'faulted pool never re-dispatches');
+  assert.equal(c.frameState.renderInFlight, false, 'faulted pool never re-dispatches');
   c.workers.forEach((w, i) =>
     assert.equal(w.posted.length, before[i], 'no new render broadcast'));
 });
@@ -2430,14 +2439,14 @@ test('a fault latched by composite() mid-tick() does not re-dispatch a doomed re
   deliverFrame(c, 0, { x0: 0, x1: 2, y0: 0, y1: 2 });
   deliverFrame(c, 1, { x0: 2, x1: 99, y0: 0, y1: 2 }); // x1=99 overshoots W=4
   await flush();
-  assert.equal(c.pendingFrame, true);
+  assert.equal(c.frameState.pendingFrame, true);
   assert.equal(c.faulted, false, 'not yet faulted at tick() entry');
 
   const before = c.workers.map((w) => w.posted.length);
   c.tick();
 
   assert.equal(c.faulted, true, 'composite() latched the fault during tick()');
-  assert.equal(c.renderInFlight, false, 'no render dispatched to the just-faulted pool');
+  assert.equal(c.frameState.renderInFlight, false, 'no render dispatched to the just-faulted pool');
   c.workers.forEach((w, i) =>
     assert.equal(w.posted.length, before[i], 'no new render broadcast'));
 });
@@ -2455,17 +2464,17 @@ test('tick() holds the assembled generation when the display buffer is missing',
   deliverFrame(c, 1, { x0: 2, x1: 4, y0: 0, y1: 2,
                        pixels: new Uint16Array(2 * 2 * 3).fill(222) });
   await flush();
-  assert.equal(c.pendingFrame, true);
+  assert.equal(c.frameState.pendingFrame, true);
 
   c.getMemoryView = () => null;
   c.tick();
   assert.equal(c.faulted, false, 'a missing engine view is not a fault');
-  assert.equal(c.pendingFrame, true, 'the generation is held, not consumed');
+  assert.equal(c.frameState.pendingFrame, true, 'the generation is held, not consumed');
   assert.equal(c.frameComposited, false);
 
   c.getMemoryView = () => driver.pixels;
   c.tick();
-  assert.equal(c.pendingFrame, false);
+  assert.equal(c.frameState.pendingFrame, false);
   assert.equal(c.frameComposited, true, 'the held generation composited whole');
   assert.equal(driver.pixels[idx(0, 0, 4)], 111);
   assert.equal(driver.pixels[idx(2, 0, 4)], 222);
@@ -2487,7 +2496,7 @@ test('a fault latched by the overrun re-blit paints the overlay on the same tick
     c.tick(); // composite A, dispatch B (in flight, so the next tick overruns)
 
     // Corrupt the published generation so the overrun re-blit's pre-pass faults.
-    c.results[1] = { ...c.results[1], x1: 99 };
+    c.frameState.results[1] = { ...c.frameState.results[1], x1: 99 };
     let statsShown = 0;
     c.updateStats = () => { statsShown++; };
 
@@ -2505,7 +2514,7 @@ test('an init-phase fault still reaches the fault overlay (faulted checked befor
   // would return before the fault overlay ever painted.
   const c = makeController();
   c.create(2);
-  assert.equal(c.ready, false);
+  assert.equal(c.frameState.ready, false);
 
   c.workers[0].onerror({ message: 'init boom', filename: 'w.js', lineno: 1, colno: 1 });
   assert.equal(c.faulted, true);
@@ -2515,7 +2524,7 @@ test('an init-phase fault still reaches the fault overlay (faulted checked befor
   c.tick();
 
   assert.equal(statsShown, 1, 'tick() refreshed the fault overlay despite never being ready');
-  assert.equal(c.renderInFlight, false, 'no doomed render dispatched');
+  assert.equal(c.frameState.renderInFlight, false, 'no doomed render dispatched');
 });
 
 test('the fault overlay is an alert that never takes focus', () => {
@@ -2580,11 +2589,16 @@ test('a spawning pool reports the spawn and does not own the display', () => {
   c.updateStats();
   assert.equal(stats.firstElementChild, status, 'the status row is not rebuilt every frame');
 
-  c.ready = true;
+  for (let s = 0; s < 4; s++) deliverReady(c, s);
   assert.equal(c.ownsDisplay, true, 'a ready pool owns the display');
-  c.ready = false;
-  c.faulted = true;
-  assert.equal(c.ownsDisplay, true, 'a faulted pool keeps the display for its overlay');
+
+  const latched = makeController();
+  latched.active = true;
+  latched.create(4);
+  latched.onWorkerFault(0, 'boom');
+  assert.equal(latched.frameState.ready, false, 'the pool never reached ready');
+  assert.equal(latched.ownsDisplay, true,
+    'a faulted pool keeps the display for its overlay');
 });
 
 test('turning segmented mode off hands the global stat bars back', () => {
@@ -2772,9 +2786,9 @@ test('setEffect drops the outgoing effect param values so the rebuilt GUI is not
 
 test('setEffect bumps renderGen so an in-flight old-effect frame is fenced out', () => {
   const c = readyController(2);
-  const before = c.renderGen;
+  const before = c.frameState.renderGen;
   c.setEffect('NewEffect');
-  assert.equal(c.renderGen, before + 1,
+  assert.equal(c.frameState.renderGen, before + 1,
     'a stale in-flight frame now fails inflightGen === renderGen');
 });
 
@@ -2924,7 +2938,7 @@ test('create with an unknown resolution latches a pool fault', () => {
   assert.equal(c.ownsDisplay, true, 'the fault overlay owns the display');
   assert.deepEqual(c.workers, [], 'no workers were spawned');
   assert.equal(c.count, 4);
-  for (const arr of [c.results, c.scratch, c.timings, c.arenas, c.frameSeen]) {
+  for (const arr of [c.frameState.results, c.frameState.scratch, c.frameState.timings, c.frameState.arenas, c.frameState.frameSeen]) {
     assert.equal(arr.length, c.count, 'count matches the per-segment array lengths');
   }
 });
