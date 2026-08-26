@@ -510,8 +510,13 @@ export function createApplyNotice({
     // land in an already-exposed body: unhide before writing, hide before
     // clearing. Writing first leaves the unhide as the only mutation assistive
     // tech sees, which is not reliably announced.
-    body.hidden = notice === null;
-    text.textContent = notice ?? '';
+    // Written only on a change: an accepted parameter write clears the notice
+    // per pointermove across a slider drag, and an unchanged attribute or
+    // textContent still costs an invalidation.
+    const hidden = notice === null;
+    const content = notice ?? '';
+    if (body.hidden !== hidden) body.hidden = hidden;
+    if (text.textContent !== content) text.textContent = content;
     if (notice !== null) handle = schedule(() => expire(owner), timeoutMs);
   };
 

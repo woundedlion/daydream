@@ -1242,6 +1242,28 @@ test('an owner clears the notice it raised', () => {
   assert.equal(h.notice.owner(), null, 'a cleared element is owned by nobody');
 });
 
+test('clearing an already-clear notice writes neither element', () => {
+  const h = makeApplyNotice();
+  const writes = [];
+  let hidden = h.body.hidden;
+  Object.defineProperty(h.body, 'hidden', {
+    get: () => hidden,
+    set(value) { hidden = value; writes.push('hidden'); },
+  });
+  let stored = h.text.textContent;
+  Object.defineProperty(h.text, 'textContent', {
+    get: () => stored,
+    set(value) { stored = value; writes.push('text'); },
+  });
+
+  h.notice.show(null, 'param');
+  h.notice.show(null, 'param');
+
+  assert.deepEqual(writes, [],
+    'an accepted parameter write clears the notice per pointermove across a '
+    + 'slider drag, and an unchanged hidden attribute still invalidates style');
+});
+
 test('a clear on an unowned element hides it rather than crashing', () => {
   const h = makeApplyNotice();
   // A notice on screen that no owner is recorded for, as a reload of a page
