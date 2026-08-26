@@ -14,6 +14,15 @@ import {
 } from "./state.js";
 
 /**
+ * The last query string parsed per window, with its parse. A panel build reads
+ * the params once per control added and once per stored value, and persistence
+ * writes one entry per writable parameter, so re-parsing makes a build
+ * quadratic in the parameter count; copying an existing parse is not.
+ * @type {WeakMap<Window, {search: string, params: URLSearchParams}>}
+ */
+const parsedSearchCache = new WeakMap();
+
+/**
  * Reads the current URL query string into a parsed params object, then applies
  * what the URL writer has decided but not yet flushed: the keys a scheduled
  * reset will drop, and the buffered writes that will replace their query-string
@@ -24,7 +33,15 @@ import {
  * @returns {URLSearchParams} The query parameters of the current location.
  */
 const getUrlParams = (win = window) => {
-  const params = new URLSearchParams(win.location.search);
+  const search = win.location.search;
+  let cached = parsedSearchCache.get(win);
+  if (cached?.search !== search) {
+    cached = { search, params: new URLSearchParams(search) };
+    parsedSearchCache.set(win, cached);
+  }
+  // A copy per call: callers mutate what they are handed, and the pending
+  // overlay is only valid for the read it was applied to.
+  const params = new URLSearchParams(cached.params);
   const sync = getActiveURLSync();
   sync?.applyPendingReset(params);
   sync?.overlayPending(params);
