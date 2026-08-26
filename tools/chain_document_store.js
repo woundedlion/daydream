@@ -114,7 +114,7 @@ export const DEFAULT_SCRATCH_CHAIN = Object.freeze([
   { label: 'rotate', operator: 'sphere.rotate.v2' },
   { label: 'project', operator: 'project.stereographic.v2' },
   { label: 'sample', operator: 'sample.grid.v2' },
-  { label: 'colorize', operator: 'colorize.generated-palette.v2' },
+  { label: 'colorize', operator: 'colorize.generated-palette.v3' },
 ]);
 
 const SCRATCH_PRESET_ID = 'catalog-defaults';

@@ -75,7 +75,7 @@ const fieldSegment = (parameterId) =>
 /** @typedef {{document: *, descriptor_digest?: string, diagnostics?: *, status?: string}} CompiledDocument */
 
 /**
- * Maps a v2 document parameter identity (`<label>.<field>`) to the control
+ * Maps a document parameter identity (`<label>.<field>`) to the control
  * name a pre-spec promoted effect registered. Newly promoted effects register
  * label-derived names, so this alias table only serves the effects promoted
  * before the chain schema and shrinks as they are re-registered.
@@ -91,6 +91,10 @@ export function engineParameterName(parameterId) {
   if (label === 'surface') return `Surface Noise ${titleCase(field)}`;
   if (label === 'camera') return `Camera ${titleCase(field)}`;
   if (label === 'sample' && field === 'angle-speed') return 'Source Angle Speed';
+  if (label === 'colorize' && field === 'value-opacity-low')
+    return 'Opacity at Value 0';
+  if (label === 'colorize' && field === 'value-opacity-high')
+    return 'Opacity at Value 1';
   return titleCase(field);
 }
 

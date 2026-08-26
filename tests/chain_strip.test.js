@@ -210,7 +210,7 @@ test('a socket collapses an emptied band and expands back out of one', async () 
   select.dispatch('change');
   assert.deepEqual(h.store.chain().map((entry) => entry.operator),
     ['sphere.rotate.v2', 'sphere.lens.kaleidoscope.v2',
-      'sample.spherical-rings.v3', 'colorize.generated-palette.v2'],
+      'sample.spherical-rings.v3', 'colorize.generated-palette.v3'],
     'the one source replaces both crossings');
   assert.equal(bandFor(h, 'plane').querySelector('.chain-band-add'), null,
     'a skipped band has no gap to insert at');
@@ -223,7 +223,7 @@ test('a socket collapses an emptied band and expands back out of one', async () 
   select.dispatch('change');
   assert.deepEqual(h.store.chain().map((entry) => entry.operator),
     ['sphere.rotate.v2', 'sphere.lens.kaleidoscope.v2', 'project.equirectangular.v2',
-      'sample.lattice.v2', 'colorize.generated-palette.v2']);
+      'sample.lattice.v2', 'colorize.generated-palette.v3']);
   assert.ok(bandFor(h, 'plane').querySelector('.chain-band-add'),
     'the plane band and its 15-operator vocabulary are back');
   assert.equal(h.applied.length, 3);
@@ -246,7 +246,7 @@ test('a loaded plane-skipping chain reaches the plane vocabulary through Delete'
   assert.equal(paletteOf(h), null);
   assert.deepEqual(h.store.chain().map((entry) => entry.operator),
     ['sphere.rotate.v2', 'sphere.lens.kaleidoscope.v2', 'project.gnomonic.v2',
-      'sample.fractal.v2', 'colorize.generated-palette.v2']);
+      'sample.fractal.v2', 'colorize.generated-palette.v3']);
   assert.ok(bandFor(h, 'plane').querySelector('.chain-band-add'));
 });
 
@@ -1080,7 +1080,8 @@ test('deactivatedParameterIds follows the engine topology gates', () => {
     { id: 'colorize.hue-noise-scale', storage: 'binary32' },
     { id: 'colorize.hue-noise-speed', storage: 'binary32' },
     { id: 'colorize.brightness-envelope', storage: 'enum8' },
-    { id: 'colorize.brightness-depth', storage: 'binary32' },
+    { id: 'colorize.brightness-bottom', storage: 'binary32' },
+    { id: 'colorize.brightness-top', storage: 'binary32' },
   ];
   const values = {
     'sample.coverage-mode': 'weight',
@@ -1093,17 +1094,19 @@ test('deactivatedParameterIds follows the engine topology gates', () => {
     'colorize.hue-noise-scale': 1,
     'colorize.hue-noise-speed': 0,
     'colorize.brightness-envelope': 'none',
-    'colorize.brightness-depth': 1,
+    'colorize.brightness-bottom': 0,
+    'colorize.brightness-top': 1,
   };
   const chain = [
     { label: 'sample', operator: 'sample.grid.v2' },
     { label: 'warp1', operator: 'warp.wave-shear.v2' },
     { label: 'camera', operator: 'sphere.rotate.v2' },
-    { label: 'colorize', operator: 'colorize.generated-palette.v2' },
+    { label: 'colorize', operator: 'colorize.generated-palette.v3' },
   ];
   assert.deepEqual([...deactivatedParameterIds(parameters, values, chain, CATALOG)],
     ['sample.edge-width', 'colorize.hue-noise-scale',
-      'colorize.hue-noise-speed', 'colorize.brightness-depth']);
+      'colorize.hue-noise-speed', 'colorize.brightness-bottom',
+      'colorize.brightness-top']);
   assert.deepEqual([...deactivatedParameterIds(
     [{ id: 'sample.edge-width', storage: 'binary32' }],
     { 'sample.edge-width': 0.1 }, chain, CATALOG)],
@@ -1121,7 +1124,7 @@ test('deactivatedParameterIds follows the engine topology gates', () => {
     { ...values, 'sample.coverage-style': values['sample.coverage-mode'] },
     chain, renamed,
   )], ['colorize.hue-noise-scale', 'colorize.hue-noise-speed',
-    'colorize.brightness-depth'],
+    'colorize.brightness-bottom', 'colorize.brightness-top'],
   'a renamed gate field silently stops gating: the rule keys are field ids, so '
     + 'the case below pins them against the shipped catalog');
 });
@@ -1141,8 +1144,8 @@ test('every parameter gate names a live catalog field and discriminates', () => 
     }
   }
   assert.deepEqual(Object.keys(PARAMETER_GATES).sort(),
-    ['brightness-depth', 'edge-width', 'hue-noise-scale', 'hue-noise-speed',
-      'hue-shift-amount']);
+    ['brightness-bottom', 'brightness-top', 'edge-width', 'hue-noise-scale',
+      'hue-noise-speed', 'hue-shift-amount']);
   for (const [gated, rules] of Object.entries(PARAMETER_GATES)) {
     const target = fields.get(gated);
     assert.ok(target, `no catalog operator declares gated field "${gated}"`);

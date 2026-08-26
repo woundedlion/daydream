@@ -136,8 +136,8 @@ const LATTICE_MELT_ROSTER = new Set([
   'Singularity Fade', 'Central Meridian', 'Lattice Cell Scale', 'Lattice Shape',
   'Lattice Softness', 'Lattice Radius', 'Palette Chroma', 'Palette Mapping',
   'Mapping Frequency', 'Mapping Phase', 'Phase Oscillation Depth',
-  'Phase Oscillation Speed', 'Brightness Depth', 'Value Opacity Low',
-  'Value Opacity High', 'Hue Shift Amount', 'Hue Noise Scale',
+  'Phase Oscillation Speed', 'Brightness Bottom', 'Brightness Top',
+  'Opacity at Value 0', 'Opacity at Value 1', 'Hue Shift Amount', 'Hue Noise Scale',
   'Hue Noise Speed',
 ]);
 const KALEIDOSCOPE_SMOOTH_ROSTER = new Set([
@@ -147,7 +147,7 @@ const KALEIDOSCOPE_SMOOTH_ROSTER = new Set([
   'Planar Warp 2 Offset Y', 'Pattern Freq', 'Speed', 'Source Angle Speed',
   'Complexity', 'Pattern Mix', 'Drift', 'Palette Chroma', 'Palette Mapping',
   'Mapping Frequency', 'Mapping Phase', 'Phase Oscillation Depth',
-  'Phase Oscillation Speed', 'Value Opacity Low', 'Value Opacity High',
+  'Phase Oscillation Speed', 'Opacity at Value 0', 'Opacity at Value 1',
   'Hue Shift Amount', 'Hue Noise Scale', 'Hue Noise Speed',
 ]);
 const STAGE_BY_PARAMETER = new Map([
@@ -235,9 +235,10 @@ const STAGE_BY_PARAMETER = new Map([
   ['Mapping Phase', 'Colorize'],
   ['Phase Oscillation Depth', 'Colorize'],
   ['Phase Oscillation Speed', 'Colorize'],
-  ['Brightness Depth', 'Colorize'],
-  ['Value Opacity Low', 'Colorize'],
-  ['Value Opacity High', 'Colorize'],
+  ['Brightness Bottom', 'Colorize'],
+  ['Brightness Top', 'Colorize'],
+  ['Opacity at Value 0', 'Colorize'],
+  ['Opacity at Value 1', 'Colorize'],
   ['Hue Shift Amount', 'Colorize'],
   ['Hue Noise Scale', 'Colorize'],
   ['Hue Noise Speed', 'Colorize'],

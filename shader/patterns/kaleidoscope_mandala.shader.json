@@ -28,7 +28,7 @@
       },
       {
         "label": "colorize",
-        "operator": "colorize.generated-palette.v2"
+        "operator": "colorize.generated-palette.v3"
       }
     ],
     "parameters": [
@@ -376,7 +376,7 @@
         "default": 1,
         "domain": {
           "maximum": 64,
-          "minimum": 0.10000000149011612
+          "minimum": 0.009999999776482582
         },
         "id": "sample.pattern-freq",
         "interpolation": {

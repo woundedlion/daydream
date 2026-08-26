@@ -7,20 +7,16 @@
         "operator": "sphere.rotate.v2"
       },
       {
-        "label": "lens",
-        "operator": "sphere.lens.kaleidoscope.v2"
+        "label": "surface",
+        "operator": "sphere.displace.curl.v2"
       },
       {
         "label": "project",
-        "operator": "project.stereographic.v2"
-      },
-      {
-        "label": "warp2",
-        "operator": "warp.mirror-tile.v2"
+        "operator": "project.folded-sinusoidal.v2"
       },
       {
         "label": "sample",
-        "operator": "sample.twin-wave.v2"
+        "operator": "sample.grid.v2"
       },
       {
         "label": "colorize",
@@ -255,26 +251,18 @@
       },
       {
         "classification": "preset",
-        "default": "azimuthal",
+        "default": 0,
         "domain": {
-          "values": [
-            "azimuthal",
-            "tetrahedral",
-            "octahedral",
-            "dodecahedral",
-            "triangular-prism",
-            "square-prism",
-            "pentagonal-prism",
-            "hexagonal-prism",
-            "octagonal-prism"
-          ]
+          "maximum": 6.2831854820251465,
+          "minimum": 0
         },
-        "id": "lens.symmetry",
+        "id": "project.central-meridian",
         "interpolation": {
-          "kind": "MIXED_ENUM"
+          "kind": "SHORTEST_PERIODIC",
+          "period": 6.2831854820251465
         },
-        "storage": "enum8",
-        "unit": "mode"
+        "storage": "binary32",
+        "unit": "radian"
       },
       {
         "classification": "preset",
@@ -306,20 +294,6 @@
       },
       {
         "classification": "preset",
-        "default": 1,
-        "domain": {
-          "maximum": 20,
-          "minimum": 1
-        },
-        "id": "project.singularity-fade",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
         "default": 0,
         "domain": {
           "maximum": 0.05000000074505806,
@@ -334,7 +308,21 @@
       },
       {
         "classification": "preset",
-        "default": "weight-squared",
+        "default": 0,
+        "domain": {
+          "maximum": 3,
+          "minimum": 0
+        },
+        "id": "sample.complexity",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
+        "default": "weight",
         "domain": {
           "values": [
             "none",
@@ -368,10 +356,24 @@
         "classification": "preset",
         "default": 1,
         "domain": {
-          "maximum": 20,
-          "minimum": 0.10000000149011612
+          "maximum": 64,
+          "minimum": 0.009999999776482582
         },
         "id": "sample.pattern-freq",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 1,
+          "minimum": 0
+        },
+        "id": "sample.pattern-mix",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -410,40 +412,46 @@
       },
       {
         "classification": "preset",
-        "default": 1,
+        "default": "simplex",
         "domain": {
-          "maximum": 8,
-          "minimum": 0.015625
+          "values": [
+            "simplex",
+            "fbm3",
+            "ridged3"
+          ]
         },
-        "id": "warp2.cell-x",
+        "id": "surface.basis",
         "interpolation": {
-          "kind": "LOG_POSITIVE"
+          "kind": "MIXED_ENUM"
         },
-        "storage": "binary32",
-        "unit": "ratio"
+        "storage": "enum8",
+        "unit": "mode"
+      },
+      {
+        "classification": "preset",
+        "default": "euler",
+        "domain": {
+          "values": [
+            "euler",
+            "midpoint",
+            "midpoint-2x"
+          ]
+        },
+        "id": "surface.integrator",
+        "interpolation": {
+          "kind": "MIXED_ENUM"
+        },
+        "storage": "enum8",
+        "unit": "mode"
       },
       {
         "classification": "preset",
         "default": 1,
         "domain": {
-          "maximum": 8,
+          "maximum": 64,
           "minimum": 0.015625
         },
-        "id": "warp2.cell-y",
-        "interpolation": {
-          "kind": "LOG_POSITIVE"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
-        "default": 0,
-        "domain": {
-          "maximum": 8,
-          "minimum": -8
-        },
-        "id": "warp2.offset-x",
+        "id": "surface.scale",
         "interpolation": {
           "kind": "LINEAR"
         },
@@ -454,44 +462,29 @@
         "classification": "preset",
         "default": 0,
         "domain": {
-          "maximum": 8,
-          "minimum": -8
+          "maximum": 0.015625,
+          "minimum": -0.015625
         },
-        "id": "warp2.offset-y",
-        "interpolation": {
-          "kind": "LINEAR"
-        },
-        "storage": "binary32",
-        "unit": "ratio"
-      },
-      {
-        "classification": "preset",
-        "default": 0,
-        "domain": {
-          "maximum": 6.2831854820251465,
-          "minimum": 0
-        },
-        "id": "warp2.rotation",
-        "interpolation": {
-          "kind": "SHORTEST_PERIODIC",
-          "period": 6.2831854820251465
-        },
-        "storage": "binary32",
-        "unit": "radian"
-      },
-      {
-        "classification": "preset",
-        "default": 0,
-        "domain": {
-          "maximum": 0.019999999552965164,
-          "minimum": -0.019999999552965164
-        },
-        "id": "warp2.speed",
+        "id": "surface.speed",
         "interpolation": {
           "kind": "LINEAR"
         },
         "storage": "binary32",
         "unit": "turn-per-frame"
+      },
+      {
+        "classification": "preset",
+        "default": 0,
+        "domain": {
+          "maximum": 0.5,
+          "minimum": -0.5
+        },
+        "id": "surface.strength",
+        "interpolation": {
+          "kind": "LINEAR"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
       }
     ],
     "path_policies": [
@@ -517,31 +510,31 @@
         "colorize.phase-oscillation-speed",
         "colorize.value-opacity-high",
         "colorize.value-opacity-low",
-        "lens.symmetry",
+        "project.central-meridian",
         "project.projection-spin-speed",
         "project.projection-wander",
-        "project.singularity-fade",
         "sample.angle-speed",
+        "sample.complexity",
         "sample.coverage-mode",
         "sample.drift",
         "sample.pattern-freq",
+        "sample.pattern-mix",
         "sample.speed",
         "sample.weight-mode",
-        "warp2.cell-x",
-        "warp2.cell-y",
-        "warp2.offset-x",
-        "warp2.offset-y",
-        "warp2.rotation",
-        "warp2.speed"
+        "surface.basis",
+        "surface.integrator",
+        "surface.scale",
+        "surface.speed",
+        "surface.strength"
       ],
       "schema_version": 1
     }
   },
-  "document_id": "kaleidoscope-hex-soft-v1",
-  "effect_id": "kaleidoscope-hex-soft",
+  "document_id": "mermaid-skin-v1",
+  "effect_id": "mermaid-skin",
   "effect_metadata": {
-    "description": "A drifting twin wave reflected through a kaleidoscope.",
-    "display_name": "Kaleidoscope Hex Soft"
+    "description": "A high-chroma folded grid rippling through sphere-space curl noise.",
+    "display_name": "Mermaid Skin"
   },
   "preset_bank": {
     "absent_edge_fallback": {
@@ -553,49 +546,49 @@
     },
     "choreography": {
       "dwell": {
-        "twin-wave": 600
+        "mermaid-skin": 600
       },
       "generated_order": [
-        "twin-wave"
+        "mermaid-skin"
       ]
     },
     "edges": [],
     "presets": [
       {
-        "display_name": "Twin Wave",
-        "preset_id": "twin-wave",
+        "display_name": "Mermaid Skin",
+        "preset_id": "mermaid-skin",
         "values": {
           "camera.wander": 1,
           "colorize.brightness-envelope": "none",
-          "colorize.hue-noise-scale": 2.2033438682556152,
-          "colorize.hue-noise-speed": -0.00040800002170726657,
-          "colorize.hue-shift-amount": 0.27000001072883606,
+          "colorize.hue-noise-scale": 0.14453938603401184,
+          "colorize.hue-noise-speed": -0.0000010416666782475659,
+          "colorize.hue-shift-amount": 1.5958333015441895,
           "colorize.hue-shift-mode": "noise",
-          "colorize.mapping-frequency": 1,
+          "colorize.mapping-frequency": 5.375520706176758,
           "colorize.mapping-phase": 0,
-          "colorize.palette-chroma": 0.3610000014305115,
-          "colorize.palette-mapping": "linear",
-          "colorize.palette-mode": "triadic",
+          "colorize.palette-chroma": 1,
+          "colorize.palette-mapping": "cup",
+          "colorize.palette-mode": "analogous",
           "colorize.phase-oscillation-depth": 0,
           "colorize.phase-oscillation-speed": 0,
-          "colorize.value-opacity-high": 1,
+          "colorize.value-opacity-high": 0.9661458134651184,
           "colorize.value-opacity-low": 1,
-          "lens.symmetry": "azimuthal",
+          "project.central-meridian": 0,
           "project.projection-spin-speed": 0,
-          "project.projection-wander": 1,
-          "project.singularity-fade": 4.9710001945495605,
-          "sample.angle-speed": 0.05000000074505806,
-          "sample.coverage-mode": "weight-squared",
-          "sample.drift": 0.800000011920929,
-          "sample.pattern-freq": 4.975500106811523,
-          "sample.speed": 0.125,
+          "project.projection-wander": 0,
+          "sample.angle-speed": 0,
+          "sample.complexity": 0,
+          "sample.coverage-mode": "weight",
+          "sample.drift": 0,
+          "sample.pattern-freq": 0.10000000149011612,
+          "sample.pattern-mix": 0,
+          "sample.speed": 0,
           "sample.weight-mode": "projection",
-          "warp2.cell-x": 1,
-          "warp2.cell-y": 1,
-          "warp2.offset-x": 0,
-          "warp2.offset-y": 0,
-          "warp2.rotation": 0,
-          "warp2.speed": 0
+          "surface.basis": "simplex",
+          "surface.integrator": "euler",
+          "surface.scale": 4.9144287109375,
+          "surface.speed": -0.00021158854360692203,
+          "surface.strength": 0.5
         }
       }
     ],

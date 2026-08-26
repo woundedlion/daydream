@@ -632,7 +632,7 @@ test('legalSequences bridges a span with a run of crossings', async () => {
   assert.equal(store.replaceSpan(PROJECT, 1, [
     { operator: 'project.stereographic.v2' }, { operator: 'sample.grid.v2' }]).ok, true);
   assert.deepEqual(store.chain().slice(PROJECT).map((entry) => entry.operator),
-    ['project.stereographic.v2', 'sample.grid.v2', 'colorize.generated-palette.v2']);
+    ['project.stereographic.v2', 'sample.grid.v2', 'colorize.generated-palette.v3']);
   assertGreen(store);
   assert.throws(() => store.legalSequences(99, 0, 1), RangeError);
 });
@@ -701,7 +701,7 @@ test('the store bills a chain the arena bytes the validator does', () => {
       { label: 'glitch', operator: 'sphere.lens.glitch.v2' },
       { label: 'project', operator: 'project.stereographic.v2' },
       { label: 'sample', operator: 'sample.lattice.v2' },
-      { label: 'colorize', operator: 'colorize.generated-palette.v2' },
+      { label: 'colorize', operator: 'colorize.generated-palette.v3' },
     ],
   ];
   const endomorphisms = [
@@ -715,7 +715,7 @@ test('the store bills a chain the arena bytes the validator does', () => {
           (unused, index) => ({ label: `endo${index}`, operator })),
         { label: 'project', operator: 'project.stereographic.v2' },
         { label: 'sample', operator: 'sample.grid.v2' },
-        { label: 'colorize', operator: 'colorize.generated-palette.v2' },
+        { label: 'colorize', operator: 'colorize.generated-palette.v3' },
       ]);
     }
   }
@@ -802,7 +802,7 @@ test('the scratch document compiles clean against the catalog', async () => {
     { label: 'rotate', operator: 'sphere.rotate.v2' },
     { label: 'project', operator: 'project.stereographic.v2' },
     { label: 'sample', operator: 'sample.grid.v2' },
-    { label: 'colorize', operator: 'colorize.generated-palette.v2' },
+    { label: 'colorize', operator: 'colorize.generated-palette.v3' },
   ]);
   assert.equal(compiled.document.preset_bank.presets.length, 1);
   const values = compiled.document.preset_bank.presets[0].values;
