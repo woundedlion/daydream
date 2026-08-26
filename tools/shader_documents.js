@@ -116,10 +116,21 @@ export function engineParameterNames(parameterId) {
   return [primary];
 }
 
+/**
+ * A document enum8 value's comparison key. A document spells an option in the
+ * catalog's kebab case and the engine registers its own display spelling, so
+ * case and the hyphen/space split are both normalized away.
+ * @param {*} label - A document value or an engine option.
+ * @returns {string} The key.
+ */
+function optionKey(label) {
+  return String(label).toLowerCase().replace(/[\s-]+/g, ' ').trim();
+}
+
 /** @param {ParameterDefinition} definition @param {*} label */
 function optionIndex(definition, label) {
-  const wanted = String(label).toLowerCase();
-  return definition.options?.findIndex((option) => option.toLowerCase() === wanted) ?? -1;
+  const wanted = optionKey(label);
+  return definition.options?.findIndex((option) => optionKey(option) === wanted) ?? -1;
 }
 
 /**
@@ -140,9 +151,8 @@ function writeEngineValue(engine, module, definitions, name, value) {
   let stored = value;
   if (definition.options) {
     if (typeof value !== 'number') {
-      const label = name === 'Palette Mapping' ? titleCase(String(value)) : value;
-      stored = optionIndex(definition, label);
-      if (stored < 0) return `"${name}" has no option "${label}"`;
+      stored = optionIndex(definition, value);
+      if (stored < 0) return `"${name}" has no option "${value}"`;
     }
   }
   const result = engine.setParameter(name, stored);
