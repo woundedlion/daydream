@@ -62,8 +62,8 @@ export function bakedTopologyFields(operatorCatalog) {
  * `spin-speed` of its own.
  *
  * The engine's scripts/wasm_smoke_predicates.mjs holds the same set and gates
- * the promoted documents against it. It is not part of the installed bundle,
- * so the two are kept in step by hand.
+ * the promoted documents against it; that module is not installed here, so
+ * tests/wasm_provenance.test.js pins this re-implementation to it.
  */
 export const BAKED_CONSTANT_IDS = new Set(['camera.spin-speed']);
 
@@ -94,8 +94,8 @@ export function engineParameterName(parameterId) {
   return titleCase(field);
 }
 
-/** @param {string} parameterId */
-function engineParameterNames(parameterId) {
+/** @param {string} parameterId @returns {string[]} Candidates, most specific first. */
+export function engineParameterNames(parameterId) {
   const primary = engineParameterName(parameterId);
   const dot = parameterId.indexOf('.');
   if (dot < 0) return [primary];
