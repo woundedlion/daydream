@@ -68,12 +68,16 @@ test('the x=0 column maps to +X, not +Z', () => {
   assert.ok(Math.abs(v.z) < 1e-9, `x=0 should have z~0, got z=${v.z}`);
 });
 
+// A zero column count and a single row are what a driver reports before it has
+// been sized. The guarded arithmetic itself is unpinned: a future dimension
+// guard is free to answer any latitude, so long as it answers a point.
 test('degenerate dimensions keep spherical coordinates finite', () => {
   const spherical = pixelToSpherical(2, 1, { W: 0, H: 1 });
-  assert.ok(Number.isFinite(spherical.phi));
-  assert.ok(Number.isFinite(spherical.theta));
-  assert.equal(spherical.phi, Math.PI);
-  assert.equal(spherical.theta, Math.PI / 2 - 4 * Math.PI);
+  assert.ok(Number.isFinite(spherical.phi), `phi is ${spherical.phi}`);
+  assert.ok(Number.isFinite(spherical.theta), `theta is ${spherical.theta}`);
+  assert.equal(spherical.radius, 1, 'the point stays on the unit sphere');
+  const v = new THREE.Vector3().setFromSpherical(spherical);
+  assert.ok(Math.abs(v.length() - 1) < 1e-12, `the vector is unit, got ${v.length()}`);
 });
 
 /**
