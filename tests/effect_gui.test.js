@@ -1651,15 +1651,20 @@ test('a failed schema rebuild keeps the live panel and reports once per generati
   assert.deepEqual(h.container.children, [live.domElement]);
   assert.equal(h.warnings.length, 1);
   assert.match(h.warnings[0], /parameter-schema rebuild failed/);
+  assert.equal(h.guis.length, 2, 'the failed rebuild allocated one panel');
 
+  h.panel.sync();
   h.panel.sync();
 
   assert.equal(h.warnings.length, 1, 'the same failure logged again on the next frame');
+  assert.equal(h.guis.length, 2,
+    'a failure the generation has not moved past re-allocated a panel per frame');
 
   h.state.generation = 5;
   h.panel.sync();
 
   assert.equal(h.warnings.length, 2, 'a fresh generation failing went unreported');
+  assert.equal(h.guis.length, 3, 'a fresh generation never retried the rebuild');
 
   // The definitions come back: the throttle must not have latched the panel out
   // of ever rebuilding.
@@ -1670,6 +1675,7 @@ test('a failed schema rebuild keeps the live panel and reports once per generati
 
   assert.notEqual(h.panel.active().gui, live);
   assert.equal(h.gui().ctrl('Speed').getValue(), 0.4);
+  assert.equal(h.guis.length, 4);
   assert.equal(h.warnings.length, 2);
 });
 

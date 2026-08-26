@@ -1160,6 +1160,10 @@ export function createEffectGui({
     if (!previous) return false;
 
     const generation = paramGeneration();
+    // A rebuild that already failed for this schema generation fails the same
+    // way every frame, so the retry waits for a new generation rather than
+    // allocating and discarding a panel at frame rate.
+    if (rebuildFailureGeneration === generation) return false;
     const wasMounted = Boolean(previous.gui?.domElement?.parentNode);
     const captured = capturePanelFocus(previous);
     const preservedPause = engineAnimationsPaused()
@@ -1253,6 +1257,7 @@ export function createEffectGui({
     build() {
       activeEffect = createEffectRecord({ restoreAccepted: true });
       persistEffectState(activeEffect.gui);
+      rebuildFailureGeneration = undefined;
       skewLogged = false;
     },
 
