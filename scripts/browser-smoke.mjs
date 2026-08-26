@@ -11,6 +11,7 @@ import puppeteer from 'puppeteer-core';
 
 import { servedPages } from '../tests/site_pages.js';
 import { BROWSER_ARGS, resolveBrowser } from './browser.mjs';
+import { collectProblems } from './probe_harness.mjs';
 import { serveStagedSite } from './vendor-stage.mjs';
 
 const VIEWPORT = { width: 1280, height: 900 };
@@ -19,11 +20,6 @@ const READY_TIMEOUT_MS = 90_000;
 
 const NETWORK_IDLE_MS = 500;
 const NETWORK_IDLE_TIMEOUT_MS = 30_000;
-
-// Paths the served set answers with a 404 by design: Chrome's implicit icon
-// fetch on a page that declares none, and the gitignored offline font drop the
-// tool pages link behind an onerror fallback to the font CDN.
-const ABSENT_PATHS = [/^\/favicon\.ico$/, /^\/vendor\//];
 
 /**
  * Readiness a page must reach beyond a painted frame, evaluated in the page.
@@ -107,33 +103,6 @@ function installSegmentProbe() {
     if (transfer?.length > 0) window.daydreamSegmentProbe.transferPosts += 1;
     return postMessage.call(this, message, transferOrOptions);
   };
-}
-
-/**
- * @param {import('puppeteer-core').Page} tab
- * @param {string} origin
- * @param {string[]} problems
- */
-function collectProblems(tab, origin, problems) {
-  /** @param {string} [href] */
-  const absent = (href) => {
-    if (href === undefined) return false;
-    const url = new URL(href, origin);
-    return url.origin === origin && ABSENT_PATHS.some((re) => re.test(url.pathname));
-  };
-  tab.on('console', (message) => {
-    if (message.type() !== 'error' || absent(message.location()?.url)) return;
-    problems.push(`console error: ${message.text()}`);
-  });
-  tab.on('pageerror', (error) => problems.push(`uncaught: ${error.message}`));
-  tab.on('requestfailed', (request) => {
-    if (absent(request.url())) return;
-    problems.push(`request failed: ${request.url()} (${request.failure()?.errorText})`);
-  });
-  tab.on('response', (response) => {
-    if (response.status() < 400 || absent(response.url())) return;
-    problems.push(`HTTP ${response.status()}: ${response.url()}`);
-  });
 }
 
 /**
