@@ -382,6 +382,21 @@ async function probeStrip(tab) {
   check(Math.abs(stored - shown) < VALUE_TOLERANCE,
     `an inline control saves its value (${stored})`);
 
+  // A number input hands its listener the empty string for content it cannot
+  // parse; a fake DOM hands over the raw text, so only a real browser shows
+  // what an unparsable readout entry commits.
+  const readout = '.chain-chip[data-label="rotate"]'
+    + ' .chain-param[data-parameter="rotate.wander"] .chain-param-value';
+  await tab.click(readout, { count: 3 });
+  await tab.keyboard.press('Backspace');
+  const cleared = await tab.$eval(readout, (node) => node.value);
+  await tab.keyboard.press('Tab');
+  const restored = Number(await tab.$eval(readout, (node) => node.value));
+  const kept = (await savedDocument(tab)).preset_bank.presets[0].values['rotate.wander'];
+  check(cleared === '' && Math.abs(restored - stored) < VALUE_TOLERANCE
+      && Math.abs(kept - stored) < VALUE_TOLERANCE,
+  `an emptied readout restores ${restored} rather than committing ${kept}`);
+
   const animation = await tab.$eval('#shader-animation-toggle', (node) => ({
     disabled: node instanceof HTMLButtonElement ? node.disabled : true,
     text: node.textContent ?? '',
