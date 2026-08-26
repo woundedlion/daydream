@@ -297,19 +297,20 @@ test('the migrated ShaderBall URL is written only once a frame has applied it', 
     'the rename is only discoverable through the notice the release raises');
 });
 
-test('a first frame that throws still releases the migrated URL', async () => {
+test('a first frame that throws still releases the migrated URL', async (t) => {
   const app = await bootedApp({
     daydreamMode: 'shader-workbench',
     search: '?effect=ShaderBall',
     loadModule: () => Promise.resolve(fakeWasmModule({ failingFrames: 1 })),
   });
-  await settleUrl();
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS * 2);
   assert.deepEqual(app.urlWrites, [], 'the migration is suspended until a frame');
 
   // The frame guard catches and keeps the loop armed, so nothing else ever
   // revisits the suspension.
   captureConsole(() => app.driver.renderer.frame());
-  await settleUrl();
+  t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS * 2);
 
   assert.equal(app.urlWrites.length, 1,
     'a frame that throws must not strand the suspension: every later deep-link '
