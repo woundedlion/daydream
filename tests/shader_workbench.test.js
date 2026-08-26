@@ -926,6 +926,12 @@ async function editorWorkbench({
     'shader-animation-toggle', 'shader-document-save-as'];
   const elements = new Map(ids.map((id) =>
     [id, fakeElement(id.endsWith('select') ? 'select' : 'div')]));
+  // shader.html opens the source select on a blank scratch entry; without it a
+  // select with nothing selected reports the first document the page appends.
+  const scratch = fakeElement('option');
+  scratch.value = '';
+  scratch.textContent = 'Scratch shader';
+  elements.get('shader-document-select').appendChild(scratch);
   for (const mount of ['chain-strip']) {
     const element = fakeElement('section');
     element.setPointerCapture = () => {};
@@ -1063,6 +1069,23 @@ test('an effect the engine rejects leaves the loaded chain editor standing', asy
     /rejected effect "ShaderChain"/);
   assert.deepEqual(stripChips(harness).map((chip) => chip.dataset.label), before,
     'the refused load must leave the editor it would have replaced');
+});
+
+// The toolbar names the link's document only once it has loaded: a link that
+// decodes but is refused falls through to the scratch chain, and the select has
+// to fall through with it.
+test('a refused shader link leaves the source select on the scratch chain', async () => {
+  const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  document.effect_id = 'KaleidoscopeHexBright';
+  const hash = await encodeShaderStateHash({
+    document, preset: 'no-such-preset', bypassed: [], paused: false,
+  });
+  const harness = await editorWorkbench(
+    { source: null, hash, migration: HEX_MIGRATION });
+
+  assert.equal(harness.elements.get('shader-document-select').value, '');
+  assert.match(harness.elements.get('shader-document-status').textContent,
+    /shader link could not be restored/);
 });
 
 // The chain program is written last, so a refusal between the adoption and the
