@@ -42,10 +42,12 @@ export const BROWSER_ARGS = [
  * Path of the browser to drive.
  * @param {Object<string, string|undefined>} [env] - Environment to read
  *   CHROME_PATH from; the process environment by default.
+ * @param {string[]} [candidates] - Locations to search when no CHROME_PATH is
+ *   declared; the standard install paths by default.
  * @returns {string} An existing executable path.
- * @throws {Error} When neither $CHROME_PATH nor any standard location exists.
+ * @throws {Error} When neither $CHROME_PATH nor any candidate exists.
  */
-export function resolveBrowser(env = process.env) {
+export function resolveBrowser(env = process.env, candidates = BROWSER_CANDIDATES) {
   const declared = env.CHROME_PATH;
   if (declared) {
     if (!existsSync(declared)) {
@@ -53,11 +55,11 @@ export function resolveBrowser(env = process.env) {
     }
     return declared;
   }
-  const found = BROWSER_CANDIDATES.find((path) => existsSync(path));
+  const found = candidates.find((path) => existsSync(path));
   if (!found) {
     throw new Error(
       'no Chrome, Chromium or Edge found. Set CHROME_PATH, or install one at ' +
-        `${BROWSER_CANDIDATES.join(', ')}.`,
+        `${candidates.join(', ')}.`,
     );
   }
   return found;

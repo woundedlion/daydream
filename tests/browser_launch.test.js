@@ -6,7 +6,6 @@
 // zero pages and zero gestures.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
 
 import { BROWSER_ARGS, BROWSER_CANDIDATES, resolveBrowser } from '../scripts/browser.mjs';
 
@@ -21,13 +20,37 @@ test('a declared CHROME_PATH that does not exist is a refusal, not a fallback', 
     'falling back would drive a browser the caller did not ask for');
 });
 
-test('with no CHROME_PATH only the standard locations answer', () => {
-  const installed = BROWSER_CANDIDATES.filter((path) => existsSync(path));
-  if (installed.length === 0) {
-    assert.throws(() => resolveBrowser({}), /no Chrome, Chromium or Edge found/);
-  } else {
-    assert.equal(resolveBrowser({}), installed[0]);
-  }
+// Driven over a candidate list of their own, so a runner that happens to carry
+// Chrome covers the refusal this module exists for and one that does not still
+// covers the first-match walk.
+test('with no CHROME_PATH and no candidate installed, nothing is answered', () => {
+  assert.throws(
+    () => resolveBrowser({}, ['/no/such/chrome', '/no/such/edge']),
+    /no Chrome, Chromium or Edge found[\s\S]*\/no\/such\/chrome, \/no\/such\/edge/,
+    'answering nothing would report a green run over zero pages and zero gestures');
+});
+
+test('with no CHROME_PATH the first installed candidate answers', () => {
+  assert.equal(
+    resolveBrowser({}, ['/no/such/chrome', process.execPath, '/no/such/edge']),
+    process.execPath,
+    'a missing earlier candidate is skipped rather than preferred');
+});
+
+// Same result either way on any machine: installed or not, the default search
+// list is the exported one.
+test('an undeclared resolve searches the standard locations', () => {
+  const attempt = (...args) => {
+    try {
+      return resolveBrowser(...args);
+    } catch (error) {
+      return error.message;
+    }
+  };
+  assert.equal(attempt({}), attempt({}, BROWSER_CANDIDATES));
+  assert.ok(BROWSER_CANDIDATES.includes('/usr/bin/google-chrome'),
+    'the headless jobs run on Linux');
+  for (const path of BROWSER_CANDIDATES) assert.match(path, /chrome|chromium|edge/i);
 });
 
 test('the launch flags carry the runner a GPU-less rasterizer', () => {
