@@ -732,8 +732,12 @@ const canonicalValue = (value) => {
   if (value !== null && typeof value === 'object') {
     // Null-prototype: an own "__proto__" key is copied, not applied.
     const result = Object.create(null);
-    for (const key of Object.keys(value).map((key) => key.normalize('NFC')).sort(codePointCompare))
-      result[key] = canonicalValue(value[key]);
+    // Normalize alongside the member: the source object is keyed by the
+    // unnormalized spelling, so a normalized key cannot index it.
+    const entries = Object.keys(value)
+      .map((key) => [key.normalize('NFC'), value[key]])
+      .sort(([left], [right]) => codePointCompare(left, right));
+    for (const [key, member] of entries) result[key] = canonicalValue(member);
     return result;
   }
   return typeof value === 'string' ? value.normalize('NFC') : value;
