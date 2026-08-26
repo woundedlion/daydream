@@ -477,8 +477,8 @@ export async function createChainDocumentStore({
    * instances, strip removed ones, drop degenerate transition edges) and
    * commits only if the result passes the v2 validator. An entry whose label
    * survives with the same operator keeps its parameter values; a label
-   * omitted from a sequence entry is derived from the operator's family stem
-   * plus the lowest free numeric suffix. A replacement that leaves the chain
+   * omitted from a sequence entry is derived from the operator's stage
+   * segment plus the lowest free numeric suffix. A replacement that leaves the chain
    * as it stands changes nothing and pushes no undo entry.
    * @param {number} start - First chain index of the span.
    * @param {number} deleteCount - Entries the span replaces (0 = insertion).
@@ -507,7 +507,11 @@ export async function createChainDocumentStore({
           `the catalog carries no operator "${item.operator}"`);
       let label = item.label;
       if (label === undefined) {
-        const stem = item.operator.split('.')[0];
+        // The stage segment, not the carrier one: every sphere endomorphism
+        // shares the carrier, so it names none of them.
+        const segments = item.operator.split('.');
+        const stem = segments.find((segment, index) =>
+          index > 0 && LABEL_PATTERN.test(segment)) ?? segments[0];
         let suffix = 1;
         while (used.has(`${stem}${suffix}`)) suffix += 1;
         label = `${stem}${suffix}`;

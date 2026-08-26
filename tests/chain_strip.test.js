@@ -447,9 +447,9 @@ test('selecting the operator the socket carries keeps the instance', async () =>
   select.dispatch('change');
   const after = h.store.document();
   assert.deepEqual(after.descriptor.chain[PROJECT],
-    { label: 'project1', operator: 'project.bonne.v2' },
+    { label: 'bonne1', operator: 'project.bonne.v2' },
     'a different operator retires the instance and seats a fresh one');
-  assert.equal(after.preset_bank.presets[0].values['project1.singularity-fade'], 1,
+  assert.equal(after.preset_bank.presets[0].values['bonne1.singularity-fade'], 1,
     'the fresh instance opens on the catalog defaults');
   assert.equal(h.store.canUndo(), true);
 });
@@ -461,21 +461,21 @@ test('a band + appends while Insert opens the insertion palette after focus', as
   assert.equal(entries.every((entry) => entry.getAttribute('aria-disabled') === null), true);
   entries.find((entry) => entry.dataset.operator === 'sphere.lens.mobius.v2')
     .dispatch('click');
-  assert.deepEqual(labels(h).slice(0, 3), ['camera', 'lens', 'sphere1'],
+  assert.deepEqual(labels(h).slice(0, 3), ['camera', 'lens', 'lens1'],
     'the band + lands at the band\'s last gap');
-  assert.equal(h.store.selectedLabel(), 'sphere1',
+  assert.equal(h.store.selectedLabel(), 'lens1',
     'the landed stage is selected, so its controls open on the insert');
-  assert.equal(chipByLabel(h, 'sphere1').getAttribute('aria-current'), 'true');
-  assert.equal(chipByLabel(h, 'sphere1')
+  assert.equal(chipByLabel(h, 'lens1').getAttribute('aria-current'), 'true');
+  assert.equal(chipByLabel(h, 'lens1')
     .classList.contains('chain-chip--expanded'), true);
-  assert.deepEqual(h.selections, ['sphere1']);
+  assert.deepEqual(h.selections, ['lens1']);
   assert.equal(h.applied.length, 1);
 
   chipByLabel(h, 'camera').dispatch('click');
   bandFor(h, 'sphere').querySelector('.chain-band-add').dispatch('click');
   paletteEntries(h).find((entry) => entry.dataset.operator === 'sphere.lens.glitch.v2')
     .dispatch('click');
-  assert.deepEqual(labels(h).slice(0, 4), ['camera', 'lens', 'sphere1', 'sphere2'],
+  assert.deepEqual(labels(h).slice(0, 4), ['camera', 'lens', 'lens1', 'lens2'],
     'selection does not move the band + away from the last gap');
   assert.equal(h.store.chain()[3].operator, 'sphere.lens.glitch.v2');
 
@@ -876,6 +876,44 @@ test('an unparsable numeric entry restores the stored value', async () => {
   assert.equal(value.value, authored);
   assert.equal(slider.value, position);
   assert.deepEqual(h.edits, []);
+});
+
+const renameIn = (h, label) =>
+  paramsOf(h, label).querySelector('.chain-chip-rename');
+
+test('a chip renames its instance through the store', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'warp2').dispatch('click');
+  const field = renameIn(h, 'warp2');
+  assert.equal(field.value, 'warp2');
+
+  field.value = ' mirror ';
+  field.dispatch('change');
+
+  assert.equal(labels(h)[3], 'mirror');
+  assert.equal(h.store.selectedLabel(), 'mirror', 'the selection follows the rename');
+  assert.ok(h.store.document().descriptor.parameters.some(
+    (parameter) => parameter.id === 'mirror.rotation'));
+  assert.equal(h.applied.length, 1, 'the program is re-applied under the new ids');
+  assert.equal(renameIn(h, 'mirror').value, 'mirror');
+});
+
+test('a refused rename reports and restores the field', async () => {
+  const h = await makeStrip();
+  chipByLabel(h, 'warp2').dispatch('click');
+  const field = renameIn(h, 'warp2');
+
+  field.value = 'Not.Valid';
+  field.dispatch('change');
+
+  assert.equal(field.value, 'warp2');
+  assert.equal(labels(h)[3], 'warp2');
+  assert.match(lastAnnounced(h), /kebab-case/);
+
+  field.value = 'sample';
+  field.dispatch('change');
+  assert.equal(labels(h)[3], 'warp2');
+  assert.match(lastAnnounced(h), /already carries/);
 });
 
 test('an enum renders its declared values and edits by option id', async () => {

@@ -404,7 +404,8 @@
   visibility: hidden;
 }
 
-.chain-param {
+.chain-param,
+.chain-chip-rename-row {
   display: contents;
 }
 
@@ -437,6 +438,18 @@
   font: inherit;
   font-size: 0.625rem;
   accent-color: var(--accent);
+}
+
+.chain-chip-rename {
+  grid-column: 2 / span 2;
+  min-width: 0;
+  padding: 0.0625rem 0.25rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.25rem;
+  background: var(--panel-bg);
+  color: var(--panel-text);
+  font-family: monospace;
+  font-size: 0.625rem;
 }
 
 select.chain-param-control {

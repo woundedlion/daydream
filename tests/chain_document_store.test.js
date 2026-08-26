@@ -98,10 +98,10 @@ test('insertion backfills presets, fields and staggered groups atomically', asyn
   const result = store.replaceSpan(WARP, 0, [{ operator: 'warp.wave-shear.v2' }]);
   assert.equal(result.ok, true);
   assert.deepEqual(labels(store),
-    ['camera', 'lens', 'project', 'warp1', 'warp2', 'sample', 'colorize']);
+    ['camera', 'lens', 'project', 'wave-shear1', 'warp2', 'sample', 'colorize']);
   const document = store.document();
   const ids = ['speed', 'strength', 'frequency', 'field-angle', 'edge-width', 'envelope']
-    .map((field) => `warp1.${field}`);
+    .map((field) => `wave-shear1.${field}`);
   const declared = new Set(document.descriptor.parameters.map((parameter) => parameter.id));
   for (const id of ids) assert.ok(declared.has(id), `${id} is declared`);
   for (const id of ids)
@@ -109,16 +109,16 @@ test('insertion backfills presets, fields and staggered groups atomically', asyn
   const staggered = document.descriptor.path_policies.find((policy) => policy.id === 'staggered');
   for (const id of ids) assert.ok(staggered.groups.includes(id), `${id} scheduled`);
   for (const preset of document.preset_bank.presets) {
-    assert.equal(preset.values['warp1.speed'], 0);
-    assert.equal(preset.values['warp1.frequency'], 1);
-    assert.equal(preset.values['warp1.edge-width'], 0.1);
-    assert.equal(preset.values['warp1.envelope'], 'flat');
+    assert.equal(preset.values['wave-shear1.speed'], 0);
+    assert.equal(preset.values['wave-shear1.frequency'], 1);
+    assert.equal(preset.values['wave-shear1.edge-width'], 0.1);
+    assert.equal(preset.values['wave-shear1.envelope'], 'flat');
   }
   const frequency = document.descriptor.parameters.find(
-    (parameter) => parameter.id === 'warp1.frequency');
+    (parameter) => parameter.id === 'wave-shear1.frequency');
   assert.equal(frequency.interpolation.kind, 'LOG_POSITIVE');
   const angle = document.descriptor.parameters.find(
-    (parameter) => parameter.id === 'warp1.field-angle');
+    (parameter) => parameter.id === 'wave-shear1.field-angle');
   assert.equal(angle.interpolation.kind, 'SHORTEST_PERIODIC');
   assert.equal(angle.interpolation.period, angle.domain.maximum);
   assertGreen(store);
@@ -160,7 +160,7 @@ test('an operator with a snap-curve field commits', async () => {
   assert.equal(candidate.legal, true);
   assert.deepEqual(store.replaceSpan(SAMPLE, 1, [{ operator: 'sample.fractal.v2' }]), { ok: true });
   const iterations = store.document().descriptor.parameters.find(
-    (parameter) => parameter.id === 'sample1.fractal-iterations');
+    (parameter) => parameter.id === 'fractal1.fractal-iterations');
   assert.equal(iterations.interpolation.kind, 'SNAP');
   assertGreen(store);
 });
@@ -188,11 +188,11 @@ test('insertion bounds accommodate binary32 catalog defaults', async () => {
   assert.equal(result.ok, true);
   const document = store.document();
   const parameter = document.descriptor.parameters.find(
-    (entry) => entry.id === 'sphere1.strength');
+    (entry) => entry.id === 'displace1.strength');
   const stored = Math.fround(0.15);
   assert.equal(parameter.domain.maximum, stored);
   assert.equal(parameter.default, 0.15);
-  assert.equal(document.preset_bank.presets[0].values['sphere1.strength'], 0.15);
+  assert.equal(document.preset_bank.presets[0].values['displace1.strength'], 0.15);
   assert.deepEqual(validateShaderDocument(document, { catalog }), []);
 });
 
@@ -206,17 +206,19 @@ test('a shortest-turn field backfills as a period-1 periodic parameter', async (
     [{ operator: 'sphere.displace.direct.v2' }]);
   assert.equal(result.ok, true);
   const direction = store.document().descriptor.parameters.find(
-    (parameter) => parameter.id === 'sphere1.direction');
+    (parameter) => parameter.id === 'displace1.direction');
   assert.equal(direction.unit, 'turn');
   assert.deepEqual(direction.interpolation, { kind: 'SHORTEST_PERIODIC', period: 1 });
   assertGreen(store);
 });
 
-test('auto labels take the family stem with the lowest free suffix', async () => {
+test('auto labels take the operator stage segment with the lowest free suffix', async () => {
   const store = await makeStore();
   assert.equal(store.replaceSpan(WARP, 0, [{ operator: 'warp.wave-shear.v2' }]).ok, true);
+  assert.equal(store.replaceSpan(WARP, 0, [{ operator: 'warp.wave-shear.v2' }]).ok, true);
   assert.equal(store.replaceSpan(WARP, 0, [{ operator: 'warp.curl-flow.v2' }]).ok, true);
-  assert.deepEqual(labels(store).slice(3, 6), ['warp3', 'warp1', 'warp2']);
+  assert.deepEqual(labels(store).slice(3, 7),
+    ['curl-flow1', 'wave-shear2', 'wave-shear1', 'warp2']);
   assertGreen(store);
 });
 
@@ -226,7 +228,7 @@ test('auto labels reuse suffixes released by the replaced span', async () => {
   const result = store.replaceSpan(WARP, 1, [{ operator: 'warp.wave-shear.v2' }]);
 
   assert.equal(result.ok, true);
-  assert.equal(labels(store)[WARP], 'warp1');
+  assert.equal(labels(store)[WARP], 'wave-shear1');
   assertGreen(store);
 });
 
@@ -296,11 +298,11 @@ test('a crossing cannot be removed, only replaced', async () => {
   ]);
   assert.equal(replacement.ok, true);
   assert.deepEqual(labels(store),
-    ['camera', 'lens', 'project1', 'sample1', 'colorize']);
+    ['camera', 'lens', 'equirectangular1', 'grid1', 'colorize']);
   const document = store.document();
   for (const preset of document.preset_bank.presets) {
-    assert.equal(preset.values['sample1.complexity'], 0);
-    assert.equal(preset.values['project1.singularity-fade'], 1);
+    assert.equal(preset.values['grid1.complexity'], 0);
+    assert.equal(preset.values['equirectangular1.singularity-fade'], 1);
     assert.equal('warp2.rotation' in preset.values, false);
   }
   assertGreen(store);
@@ -561,7 +563,7 @@ test('another control, a structural edit, an undo or a redo ends the run', async
   assert.equal(store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 4).ok, true);
   assert.equal(store.undo(), true);
   assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'), 3);
-  assert.equal(labels(store).includes('warp1'), true,
+  assert.equal(labels(store).includes('wave-shear1'), true,
     'the structural edit opened its own entry and survives the value undo');
 
   assert.equal(store.redo(), true);
@@ -790,7 +792,7 @@ test('the store adopts the scratch document and edits it', async () => {
   assert.equal(store.replaceSpan(1, 0, [{ operator: 'sphere.lens.mobius.v2' }]).ok, true);
   assertGreen(store);
   assert.deepEqual(labels(store),
-    ['rotate', 'sphere1', 'project', 'sample', 'colorize']);
+    ['rotate', 'lens1', 'project', 'sample', 'colorize']);
 });
 
 test('the scratch builder refuses an operator the catalog lacks', () => {

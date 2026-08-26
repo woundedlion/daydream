@@ -45,6 +45,7 @@ import { createFrameScheduler } from './page_lifecycle.js';
  *   document: () => *,
  *   replaceSpan: (start: number, deleteCount: number,
  *     sequence: Array<{label?: string, operator: string}>) => EditResult,
+ *   relabel: (oldLabel: string, newLabel: string) => EditResult,
  *   undo: () => boolean, redo: () => boolean,
  *   canUndo: () => boolean, canRedo: () => boolean,
  * }} ChainStore
@@ -812,6 +813,37 @@ export function createChainStrip({
   };
 
   /**
+   * The instance label as an editable field. The label is canonical and
+   * digest-bearing — every parameter id namespaces under it — so a rename is a
+   * document edit through the store, and a refusal restores the field.
+   * @param {ChainEntry} entry - The expanded chain entry.
+   * @returns {*} The rename row.
+   */
+  const renameRow = (entry) => {
+    const row = el('div', 'chain-chip-rename-row');
+    const label = el('span', 'chain-param-name');
+    label.textContent = 'Name';
+    row.appendChild(label);
+    const field = el('input', 'chain-chip-rename');
+    field.type = 'text';
+    field.value = entry.label;
+    field.setAttribute('aria-label', `${opOf(entry).name} · ${entry.label} name`);
+    field.addEventListener('change', (/** @type {*} */ event) => {
+      const next = String(event.target.value ?? '').trim();
+      if (next === entry.label) return;
+      const result = store.relabel(entry.label, next);
+      if (!result.ok) {
+        field.value = entry.label;
+        report(result);
+        return;
+      }
+      commit(next);
+    });
+    row.appendChild(field);
+    return row;
+  };
+
+  /**
    * The expanded chip's own controls, one row per parameter the document
    * declares for the instance, labeled by the field segment alone: the chip
    * already names the instance.
@@ -824,6 +856,7 @@ export function createChainStrip({
     region.dataset.label = entry.label;
     region.setAttribute('role', 'group');
     region.setAttribute('aria-label', `${opOf(entry).name} · ${entry.label} parameters`);
+    region.appendChild(renameRow(entry));
     for (const declaration of declared) {
       const name = titleCase(fieldOf(declaration.id));
       const row = el('div', 'chain-param');
