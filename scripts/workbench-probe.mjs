@@ -4,7 +4,7 @@
  *
  *   node scripts/workbench-probe.mjs
  */
-import { boxOf, centre, checks, runProbe } from './probe_harness.mjs';
+import { boxOf, centre, checks, isMain, runProbe } from './probe_harness.mjs';
 
 const PAGE = 'tools/shader.html';
 const VIEWPORT = { width: 1674, height: 543 };
@@ -43,7 +43,7 @@ async function savedDocument(tab) {
 }
 
 /** @param {import('puppeteer-core').Page} tab */
-async function probeStrip(tab) {
+export async function probeStrip(tab) {
   const { failures, check } = checks();
 
   check(await tab.$('#gui-container > .effect-gui') === null,
@@ -428,7 +428,7 @@ async function probeParity(tab) {
   return failures;
 }
 
-await runProbe({
+if (isMain(import.meta.url)) await runProbe({
   name: 'workbench-probe',
   page: PAGE,
   timeoutMs: TIMEOUT_MS,

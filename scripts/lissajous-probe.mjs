@@ -15,7 +15,7 @@
  * on.
  */
 import { BROWSER_ARGS } from './browser.mjs';
-import { boxOf, checks, dragBetween, runProbe } from './probe_harness.mjs';
+import { boxOf, checks, dragBetween, isMain, runProbe } from './probe_harness.mjs';
 
 const PAGE = 'tools/lissajous.html';
 // Somewhere else on the origin to leave for, carrying no script of its own.
@@ -101,7 +101,7 @@ async function dragTrack(tab, selector, from, to) {
  * @param {import('puppeteer-core').Page} tab - The page.
  * @returns {Promise<string[]>} One entry per failed check.
  */
-async function probeRationalLock(tab) {
+export async function probeRationalLock(tab) {
   const { failures, check } = checks();
 
   /**
@@ -259,7 +259,7 @@ async function probeHistoryRestore(tab, origin) {
   return failures;
 }
 
-await runProbe({
+if (isMain(import.meta.url)) await runProbe({
   name: 'lissajous-probe',
   page: PAGE,
   timeoutMs: TIMEOUT_MS,

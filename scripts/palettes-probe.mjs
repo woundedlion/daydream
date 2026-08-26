@@ -13,7 +13,7 @@
  * wheel marker and requires the key it gripped to take the hue under the
  * pointer.
  */
-import { centre, checks, dragBetween, paddingBoxOf, runProbe } from './probe_harness.mjs';
+import { centre, checks, dragBetween, isMain, paddingBoxOf, runProbe } from './probe_harness.mjs';
 
 const PAGE = 'tools/palettes.html';
 const VIEWPORT = { width: 1280, height: 900 };
@@ -71,7 +71,7 @@ async function settledHueDegrees(tab) {
  * @param {import('puppeteer-core').Page} tab - The page.
  * @returns {Promise<string[]>} One entry per failed check.
  */
-async function probeColorStrip(tab) {
+export async function probeColorStrip(tab) {
   const { failures, check } = checks();
 
   await tab.$eval(STRIP, (node) => node.scrollIntoView({ block: 'center' }));
@@ -204,7 +204,7 @@ async function probeHueWheel(tab) {
   return failures;
 }
 
-await runProbe({
+if (isMain(import.meta.url)) await runProbe({
   name: 'palettes-probe',
   page: PAGE,
   timeoutMs: TIMEOUT_MS,

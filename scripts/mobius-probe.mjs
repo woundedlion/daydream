@@ -13,7 +13,7 @@
  * the pad and requires the clamped value the capture still reports, and requires
  * the press to have stopped the running preset animation.
  */
-import { boxOf, checks, runProbe, walkTo } from './probe_harness.mjs';
+import { boxOf, checks, isMain, runProbe, walkTo } from './probe_harness.mjs';
 
 const PAGE = 'tools/mobius.html';
 const VIEWPORT = { width: 1280, height: 900 };
@@ -73,7 +73,7 @@ const caption = ({ re, im }) =>
  * @param {import('puppeteer-core').Page} tab - The page.
  * @returns {Promise<string[]>} One entry per failed check.
  */
-async function probePad(tab) {
+export async function probePad(tab) {
   const { failures, check } = checks();
 
   await tab.select('#presetSelect', ANIMATED_PRESET);
@@ -135,7 +135,7 @@ async function probePad(tab) {
   return failures;
 }
 
-await runProbe({
+if (isMain(import.meta.url)) await runProbe({
   name: 'mobius-probe',
   page: PAGE,
   timeoutMs: TIMEOUT_MS,
