@@ -262,18 +262,18 @@ async function bootedApp(options) {
   }
 }
 
-/** Waits out one URL-flush debounce window. @returns {Promise<void>} */
-const settleUrl = () =>
-  new Promise((resolve) => setTimeout(resolve, URL_FLUSH_DEBOUNCE_MS * 2));
-
-test('the migrated ShaderBall URL is written only once a frame has applied it', async () => {
+test('the migrated ShaderBall URL is written only once a frame has applied it', async (t) => {
   const app = await bootedApp({
     daydreamMode: 'shader-workbench',
     search: '?effect=ShaderBall',
     loadModule: () => Promise.resolve(fakeWasmModule()),
   });
   const notice = app.elements.get('apply-notice-text');
-  await settleUrl();
+  // The URL flush is a debounce on win.setTimeout, which fake_app.js forwards to
+  // the global. Nothing is armed while the migration holds the suspension, so a
+  // mocked clock takes over from here and the window costs no wall time.
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS * 2);
 
   assert.equal(app.teardown.disposed(), false, 'the module must have booted');
   assert.deepEqual(app.urlWrites, [],
@@ -284,7 +284,7 @@ test('the migrated ShaderBall URL is written only once a frame has applied it', 
     'the notice reports a migration that has happened, not one that is pending');
 
   app.driver.renderer.frame();
-  await settleUrl();
+  t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS * 2);
 
   assert.equal(app.urlWrites.length, 1,
     'the release sits in the adapter frame callback, which is what makes the '
