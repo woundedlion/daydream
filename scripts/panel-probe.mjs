@@ -19,7 +19,7 @@
  * raise and cannot interleave a second pointer with, so only a browser says
  * whether the panel's drag latch tracks the pointer that opened it.
  */
-import { checks, runProbe } from './probe_harness.mjs';
+import { checks, isMain, runProbe } from './probe_harness.mjs';
 
 const PAGE = 'index.html';
 // Short enough that the panel's max-height cap bites and its own .lil-children
@@ -62,7 +62,7 @@ const scrollerMetrics = (tab) => tab.$eval(SCROLLER, (node) => ({
 }));
 
 /** @param {import('puppeteer-core').Page} tab */
-async function probePanel(tab) {
+export async function probePanel(tab) {
   const { failures, check } = checks();
 
   await (await tab.waitForSelector(`[data-effect="${EFFECT}"]`)).click();
@@ -472,7 +472,7 @@ async function probeWarningNote(tab, layout) {
   return failures.map((failure) => `${layout}: ${failure}`);
 }
 
-await runProbe({
+if (isMain(import.meta.url)) await runProbe({
   name: 'panel-probe',
   page: PAGE,
   timeoutMs: TIMEOUT_MS,

@@ -12,7 +12,7 @@
  * with a real mouse and again with a real finger, and requires a press that never
  * travels to leave the chain — and the row — exactly as it found them.
  */
-import { centre, checks, dragBetween, runProbe } from './probe_harness.mjs';
+import { centre, checks, dragBetween, isMain, runProbe } from './probe_harness.mjs';
 
 const PAGE = 'tools/solids.html';
 // Tall enough that a three-op chain lays out without the list scrolling, so the
@@ -80,7 +80,7 @@ const dragTo = (tab, from, y, touch) =>
   dragBetween(tab, from, { x: from.x, y }, { steps: DRAG_STEPS, touch });
 
 /** @param {import('puppeteer-core').Page} tab */
-async function probeChain(tab) {
+export async function probeChain(tab) {
   const { failures, check } = checks();
 
   const motion = await tab.$eval('#toggleRotate', (node) => ({
@@ -149,7 +149,7 @@ async function probeChain(tab) {
   return failures;
 }
 
-await runProbe({
+if (isMain(import.meta.url)) await runProbe({
   name: 'solids-probe',
   page: PAGE,
   timeoutMs: TIMEOUT_MS,
