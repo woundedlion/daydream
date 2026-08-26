@@ -62,21 +62,50 @@ test('the scene graph disposes and clears through the methods initScene calls', 
 
   scene.clear();
   assert.deepEqual(scene.children, [], 'clear() empties the scene');
+
+  // dispose() releases the GPU resource by announcing it; a dispose that stopped
+  // announcing would leak every scene the tool pages rebuild.
+  const disposed = [];
+  geometry.addEventListener('dispose', () => disposed.push('geometry'));
+  material.addEventListener('dispose', () => disposed.push('material'));
   geometry.dispose();
   material.dispose();
+  assert.deepEqual(disposed, ['geometry', 'material']);
+});
 
+// The resize path: a container that changed shape sets aspect and rebuilds the
+// projection, and a rebuild that read the old aspect would letterbox every page.
+test('updateProjectionMatrix rebuilds the projection from the new aspect', () => {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+  const square = camera.projectionMatrix.elements[0];
+  assert.ok(square > 0, `a square viewport has a positive x scale, got ${square}`);
+
   camera.aspect = 2;
   camera.updateProjectionMatrix();
+
+  assert.ok(Math.abs(camera.projectionMatrix.elements[0] - square / 2) < 1e-12,
+    `doubling the aspect halves the x scale, got ${camera.projectionMatrix.elements[0]}`);
+  assert.equal(camera.projectionMatrix.elements[5], square,
+    'the vertical field of view is what stays fixed');
 });
 
 // WebGLRenderer assigns its methods in the constructor and needs a live WebGL
 // context to construct, so its source is the only headless view of the surface.
+// Both spellings count: a constructor assignment, and the class field or method
+// an upstream conversion would write instead. A rename reads as neither.
+const declares = (method) => new RegExp(
+  `^\\s*this\\.${method}\\s*=\\s*(?:async\\s+)?function`
+    + `|^\\s*${method}\\s*`
+    + `(?:=\\s*(?:async\\s+)?(?:function|\\()|\\()`,
+  'm');
+
 test('WebGLRenderer still assigns the methods initScene calls', () => {
   const source = THREE.WebGLRenderer.toString();
   for (const method of ['setSize', 'setPixelRatio', 'render', 'dispose', 'forceContextLoss']) {
-    assert.match(source, new RegExp(`this\\.${method}\\s*=\\s*function`), `renderer.${method}`);
+    assert.match(source, declares(method), `renderer.${method}`);
   }
+  assert.doesNotMatch(source, declares('setSizeAndPixelRatio'),
+    'a method the renderer never had must not read as declared');
 });
 
 test('a fresh object sits at the origin and position.set chains, on both', () => {
