@@ -166,13 +166,18 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
       if (view.showFaces && view.showGeodesics) {
         let triCount = 0;
         let maxArc = 0;
+        // The arcs that get subdivided are the centroid fan's: each face edge
+        // and each spoke from the face centroid, which is what the geodesic
+        // path emits.
         meshData.faces.forEach(f => {
           triCount += f.length;
-          for (let i = 1; i < f.length - 1; i++) {
-            const a = meshData.vertices[f[0]];
-            const b = meshData.vertices[f[i]];
-            const c = meshData.vertices[f[i + 1]];
-            maxArc = Math.max(maxArc, a.angleTo(b), b.angleTo(c), c.angleTo(a));
+          const centroid = new THREE.Vector3();
+          f.forEach(idx => centroid.add(meshData.vertices[idx]));
+          centroid.divideScalar(f.length);
+          for (let i = 0; i < f.length; i++) {
+            const a = meshData.vertices[f[i]];
+            const b = meshData.vertices[f[(i + 1) % f.length]];
+            maxArc = Math.max(maxArc, a.angleTo(b), centroid.angleTo(a));
           }
         });
         geoN = geodesicSegments(maxArc, triCount);
