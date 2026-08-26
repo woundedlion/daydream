@@ -37,6 +37,25 @@ test('the deploy job needs every other deploy-workflow job', () => {
   );
 });
 
+// The needs list is hand-parsed, so a reformat must not read as an ungated
+// workflow: YAML spells a flow sequence with or without quoted entries.
+test('the needs reader takes a block list, a flow list and a scalar alike', () => {
+  const jobs = 'jobs:\n  build:\n    x: 1\n  browser:\n    x: 1\n  gate:\n';
+  const spellings = [
+    '    needs:\n      - build\n      - browser',
+    '    needs: [build, browser]',
+    '    needs: ["build", "browser"]',
+    "    needs: ['build', 'browser']",
+  ];
+  for (const needs of spellings) {
+    assert.deepEqual(terminalJobNeeds(jobs + needs, 'gate'), ['build', 'browser'], needs);
+    assert.deepEqual(missingTerminalDependencies(jobs + needs, 'gate'), [], needs);
+  }
+  assert.deepEqual(
+    terminalJobNeeds('jobs:\n  build:\n    x: 1\n  gate:\n    needs: build', 'gate'),
+    ['build']);
+});
+
 test('ci-green dependency check rejects an omitted job', () => {
   const incomplete = workflow.replace(/^ {6}- browser\r?\n/m, '');
   assert.notEqual(incomplete, workflow);
