@@ -877,52 +877,58 @@ export function start({
   const paramFilterRef = { current: null };
 
   const effectGui = createEffectGui({
-    createGui: () => createGui({ autoPlace: false }, 'fx'),
-    getParameterDefinitions: () => host.engine.getParameterDefinitions(),
-    paramGeneration: () => host.paramGeneration(),
-    segmentsOwnDisplay: () => segments.ownsDisplay,
-    segmentParamValues: () => segments.getParamValues(),
-    engineParamValues: () => host.engine.getParamValues(),
-    setEngineParam,
-    setWorkerParam: (name, value) => segments.setParameter(name, value),
-    setAnimationsPaused,
-    getPresetCount: () => segments.ownsDisplay
-      ? (segments.getPresetCount() ?? host.engine.getPresetCount())
-      : host.engine.getPresetCount(),
-    getPresetIndex: () => segments.ownsDisplay
-      ? (segments.getPresetIndex() ?? host.engine.getPresetIndex())
-      : host.engine.getPresetIndex(),
-    synchronizePreset: (index) => host.engine.getPresetIndex() === index
-      || host.engine.synchronizePreset(index),
-    selectPreset: (index) => {
-      if (!host.engine.selectPreset(index)) return false;
-      segments.selectPreset(index);
-      return true;
+    engine: {
+      getParameterDefinitions: () => host.engine.getParameterDefinitions(),
+      paramGeneration: () => host.paramGeneration(),
+      paramValues: () => host.engine.getParamValues(),
+      setParam: setEngineParam,
+      setAnimationsPaused,
+      animationsPaused: () => host.engine.getAnimationsPaused?.(),
+      getPresetCount: () => segments.ownsDisplay
+        ? (segments.getPresetCount() ?? host.engine.getPresetCount())
+        : host.engine.getPresetCount(),
+      getPresetIndex: () => segments.ownsDisplay
+        ? (segments.getPresetIndex() ?? host.engine.getPresetIndex())
+        : host.engine.getPresetIndex(),
+      synchronizePreset: (index) => host.engine.getPresetIndex() === index
+        || host.engine.synchronizePreset(index),
+      selectPreset: (index) => {
+        if (!host.engine.selectPreset(index)) return false;
+        segments.selectPreset(index);
+        return true;
+      },
     },
-    engineAnimationsPaused: () => host.engine.getAnimationsPaused?.(),
-    applyEffect: () => {
-      const rejected = apply.applyEffect() !== ApplyResult.APPLIED;
-      const notice = rejected
-        ? 'Effect reset was rejected. The panel still shows the current values.'
-        : null;
-      applyNotice.show(notice, SWITCH_NOTICE);
+    segments: {
+      ownsDisplay: () => segments.ownsDisplay,
+      paramValues: () => segments.getParamValues(),
+      setParam: (name, value) => segments.setParameter(name, value),
     },
-    guiContainer: () => shaderWorkbench ? null : doc.getElementById('gui-container'),
-    isMobile: () => daydream.isMobile,
-    dragTarget: win,
-    focusedElement: () => doc.activeElement,
-    paramFilter: () => paramFilterRef.current,
-    copyText: copyToClipboard,
-    usesFullConfigSnapshot,
-    getFullConfigSnapshot: () => host.engine.getFullConfigSnapshot(),
-    getFullConfigFieldDefinitions: () =>
-      host.engine.getFullConfigFieldDefinitions(),
-    restoreFullConfigSnapshot: (snapshot) =>
-      host.engine.restoreFullConfigSnapshot(snapshot),
-    fullConfigRestoreResults: () => host.module.FullConfigRestoreResult,
-    getConfigImportNotice: () => host.engine.getConfigImportNotice(),
-    clearConfigImportNotice: () => host.engine.clearConfigImportNotice(),
-    showConfigImportNotice: (message) => applyNotice.show(message, CONFIG_NOTICE),
+    config: {
+      inUse: usesFullConfigSnapshot,
+      snapshot: () => host.engine.getFullConfigSnapshot(),
+      fieldDefinitions: () => host.engine.getFullConfigFieldDefinitions(),
+      restore: (snapshot) => host.engine.restoreFullConfigSnapshot(snapshot),
+      restoreResults: () => host.module.FullConfigRestoreResult,
+      importNotice: () => host.engine.getConfigImportNotice(),
+      clearImportNotice: () => host.engine.clearConfigImportNotice(),
+      showImportNotice: (message) => applyNotice.show(message, CONFIG_NOTICE),
+    },
+    host: {
+      createGui: () => createGui({ autoPlace: false }, 'fx'),
+      container: () => shaderWorkbench ? null : doc.getElementById('gui-container'),
+      isMobile: () => daydream.isMobile,
+      copyText: copyToClipboard,
+      applyEffect: () => {
+        const rejected = apply.applyEffect() !== ApplyResult.APPLIED;
+        const notice = rejected
+          ? 'Effect reset was rejected. The panel still shows the current values.'
+          : null;
+        applyNotice.show(notice, SWITCH_NOTICE);
+      },
+      dragTarget: win,
+      focusedElement: () => doc.activeElement,
+      paramFilter: () => paramFilterRef.current,
+    },
   });
 
   const apply = createApplyPipeline({

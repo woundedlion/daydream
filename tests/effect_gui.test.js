@@ -430,72 +430,80 @@ function makeHarness({
   const engine = { paused: false };
 
   const panel = createEffectGui({
-    createGui: () => {
-      const gui = fakeGui(hydrated, acceptedStored);
-      guis.push(gui);
-      return gui;
+    engine: {
+      getParameterDefinitions: () => { paramDefinitionReads += 1; return state.params; },
+      paramGeneration: () => state.generation,
+      paramValues: () => state.engineValues,
+      setParam: (name, value) => {
+        writes.push(`engine:${name}=${value}`);
+        const p = state.params.find((d) => d.name === name);
+        if (p && pausesOnWrite(p)) engine.paused = true;
+        return onEngineParam(name, value, state) !== false;
+      },
+      setAnimationsPaused: (paused) => {
+        writes.push(`paused:${paused}`);
+        engine.paused = paused;
+      },
+      animationsPaused: () => (pauseAccessor ? engine.paused : undefined),
+      getPresetCount: () => state.presetCount,
+      getPresetIndex: () => state.presetIndex,
+      synchronizePreset: (index) => {
+        if (state.hostPresetIndex === index) return true;
+        if (!presetSyncAccepted) return false;
+        writes.push(`syncPreset:${index}`);
+        state.hostPresetIndex = index;
+        onSynchronizePreset(index, state);
+        return true;
+      },
+      selectPreset: (index) => {
+        writes.push(`preset:${index}`);
+        if (!presetSelectionAccepted) return false;
+        state.presetIndex = index;
+        state.hostPresetIndex = index;
+        engine.paused = true;
+        return true;
+      },
     },
-    getParameterDefinitions: () => { paramDefinitionReads += 1; return state.params; },
-    paramGeneration: () => state.generation,
-    segmentsOwnDisplay: () => state.ownsDisplay,
-    segmentParamValues: () => state.segmentValues,
-    engineParamValues: () => state.engineValues,
-    setEngineParam: (name, value) => {
-      writes.push(`engine:${name}=${value}`);
-      const p = state.params.find((d) => d.name === name);
-      if (p && pausesOnWrite(p)) engine.paused = true;
-      return onEngineParam(name, value, state) !== false;
+    segments: {
+      ownsDisplay: () => state.ownsDisplay,
+      paramValues: () => state.segmentValues,
+      setParam: (name, value) => writes.push(`worker:${name}=${value}`),
     },
-    setWorkerParam: (name, value) => writes.push(`worker:${name}=${value}`),
-    setAnimationsPaused: (paused) => {
-      writes.push(`paused:${paused}`);
-      engine.paused = paused;
+    config: {
+      inUse: () => fullConfig,
+      snapshot: () => state.fullConfigSnapshot,
+      fieldDefinitions: () => state.fullConfigFieldDefinitions,
+      restore: (snapshot) => {
+        restoredFullConfigs.push(snapshot);
+        return restoreFullConfigAccepted
+          ? FullConfigRestoreResult.APPLIED : FullConfigRestoreResult.INVALID_VALUE;
+      },
+      restoreResults: () => FullConfigRestoreResult,
+      importNotice: () => configImportNotice,
+      clearImportNotice: () => { configNoticeClears += 1; },
+      showImportNotice: (message) => configNotices.push(message),
     },
-    getPresetCount: () => state.presetCount,
-    getPresetIndex: () => state.presetIndex,
-    synchronizePreset: (index) => {
-      if (state.hostPresetIndex === index) return true;
-      if (!presetSyncAccepted) return false;
-      writes.push(`syncPreset:${index}`);
-      state.hostPresetIndex = index;
-      onSynchronizePreset(index, state);
-      return true;
+    host: {
+      createGui: () => {
+        const gui = fakeGui(hydrated, acceptedStored);
+        guis.push(gui);
+        return gui;
+      },
+      container: () => state.container,
+      isMobile: () => isMobile,
+      copyText: state.copyText,
+      applyEffect: () => {
+        writes.push('applyEffect');
+        if (!rebuildOnApply) return;
+        panel.destroy();
+        panel.build();
+        panel.mount();
+      },
+      dragTarget,
+      focusedElement: () => state.focused,
+      paramFilter: () => state.paramFilter,
+      logWarn: (...args) => warnings.push(args.join(' ')),
     },
-    selectPreset: (index) => {
-      writes.push(`preset:${index}`);
-      if (!presetSelectionAccepted) return false;
-      state.presetIndex = index;
-      state.hostPresetIndex = index;
-      engine.paused = true;
-      return true;
-    },
-    engineAnimationsPaused: () => (pauseAccessor ? engine.paused : undefined),
-    applyEffect: () => {
-      writes.push('applyEffect');
-      if (!rebuildOnApply) return;
-      panel.destroy();
-      panel.build();
-      panel.mount();
-    },
-    guiContainer: () => state.container,
-    isMobile: () => isMobile,
-    dragTarget,
-    focusedElement: () => state.focused,
-    paramFilter: () => state.paramFilter,
-    copyText: state.copyText,
-    usesFullConfigSnapshot: () => fullConfig,
-    getFullConfigSnapshot: () => state.fullConfigSnapshot,
-    getFullConfigFieldDefinitions: () => state.fullConfigFieldDefinitions,
-    restoreFullConfigSnapshot: (snapshot) => {
-      restoredFullConfigs.push(snapshot);
-      return restoreFullConfigAccepted
-        ? FullConfigRestoreResult.APPLIED : FullConfigRestoreResult.INVALID_VALUE;
-    },
-    fullConfigRestoreResults: () => FullConfigRestoreResult,
-    getConfigImportNotice: () => configImportNotice,
-    clearConfigImportNotice: () => { configNoticeClears += 1; },
-    showConfigImportNotice: (message) => configNotices.push(message),
-    logWarn: (...args) => warnings.push(args.join(' ')),
   });
 
   return { panel, state, writes, warnings, guis, dragTarget, container, engine,
@@ -513,6 +521,84 @@ const TELEMETRY = { name: 'Frames', value: 0, min: 0, max: 99, readonly: true };
 const pointerDown = (pointerId = 3) => ({ pointerId, isPrimary: true, button: 0 });
 /** The release of one pointer. @returns {Object} The event fields. */
 const pointerUp = (pointerId = 3) => ({ pointerId });
+
+/**
+ * A wiring createEffectGui accepts, carrying every member it demands and none
+ * of the optional config group.
+ * @returns {Object} The four collaborators.
+ */
+const wiring = () => ({
+  engine: {
+    getParameterDefinitions: () => [],
+    paramGeneration: () => 1,
+    paramValues: () => null,
+    setParam: () => true,
+    setAnimationsPaused: () => {},
+    animationsPaused: () => false,
+    getPresetCount: () => 0,
+    getPresetIndex: () => 0,
+    synchronizePreset: () => true,
+    selectPreset: () => true,
+  },
+  segments: {
+    ownsDisplay: () => false,
+    paramValues: () => null,
+    setParam: () => {},
+  },
+  host: {
+    createGui: () => fakeGui(),
+    container: () => null,
+    isMobile: () => false,
+    applyEffect: () => {},
+    dragTarget: fakeElement('window'),
+    copyText: null,
+  },
+});
+
+// The four collaborators are checked once, where the page is composed, so a
+// dropped slot cannot wait for the frame that first reaches it.
+
+test('a wiring carrying every demanded member constructs, config and all optionals absent', () => {
+  const panel = createEffectGui(wiring());
+  assert.equal(panel.active(), null);
+});
+
+test('construction names the collaborator a missing member belongs to', () => {
+  for (const [group, member] of [
+    ['engine', 'setParam'], ['engine', 'animationsPaused'],
+    ['segments', 'paramValues'], ['host', 'createGui'],
+  ]) {
+    const deps = wiring();
+    delete deps[group][member];
+    assert.throws(() => createEffectGui(deps),
+      new RegExp(`${group}\\.${member} must be a function`),
+      `a missing ${group}.${member} must be reported`);
+  }
+});
+
+test('construction rejects an uncallable member and a missing group', () => {
+  const uncallable = wiring();
+  uncallable.engine.selectPreset = true;
+  assert.throws(() => createEffectGui(uncallable), /engine\.selectPreset must be a function/);
+
+  const optional = wiring();
+  optional.host.paramFilter = 'none';
+  assert.throws(() => createEffectGui(optional), /host\.paramFilter must be a function/);
+
+  const inert = wiring();
+  inert.config = { inUse: null };
+  assert.throws(() => createEffectGui(inert), /config\.inUse must be a function/);
+
+  const dropped = wiring();
+  delete dropped.segments;
+  assert.throws(() => createEffectGui(dropped), /the segments collaborator is missing/);
+});
+
+test('construction rejects a drag target that listens to nothing', () => {
+  const deps = wiring();
+  deps.host.dragTarget = {};
+  assert.throws(() => createEffectGui(deps), /host\.dragTarget must be an event target/);
+});
 
 // addParamControl maps one engine parameter definition onto a lil-gui control.
 
