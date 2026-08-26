@@ -106,14 +106,17 @@ const SKIP_DIRS = new Set(['node_modules', 'three.js', 'vendor', 'scripts', 'tes
 
 /**
  * Collect every tracked browser-loaded source file.
- * @returns {string[]} Absolute paths of the .js/.html files found.
+ * @returns {string[]} Absolute paths of the .js/.mjs/.html files found.
  */
 function collectSources() {
   let listed;
   try {
     listed = execFileSync(
       'git',
-      ['-C', ROOT, 'ls-files', '-z', '--', ':(glob)**/*.js', ':(glob)**/*.html'],
+      [
+        '-C', ROOT, 'ls-files', '-z', '--',
+        ':(glob)**/*.js', ':(glob)**/*.mjs', ':(glob)**/*.html',
+      ],
       { encoding: 'utf8' },
     );
   } catch {

@@ -135,6 +135,20 @@ test('the addon scan pins only the addons the sources import', () => {
     'an installed but unimported addon is not pinned');
 });
 
+/** Verifies a served .mjs is scanned too: an unscanned one would ship unhashed. */
+test('the addon scan reaches .mjs sources', () => {
+  installModules();
+  mkdirSync(join(root, 'node_modules', 'three', 'examples', 'jsm', 'renderers'), { recursive: true });
+  writeFileSync(join(root, 'node_modules', 'three', 'examples', 'jsm', 'renderers', 'CSS2DRenderer.js'), '');
+  mkdirSync(join(root, 'shader'), { recursive: true });
+  writeFileSync(join(root, 'shader', 'workbench.mjs'),
+    "import 'three/addons/renderers/CSS2DRenderer.js';\n");
+  execFileSync('git', ['add', 'shader/workbench.mjs'], { cwd: root, env });
+  const out = run();
+  assert.ok(out.includes("'renderers/CSS2DRenderer.js'"),
+    'an addon a browser-loaded .mjs imports must be pinned, or it ships with no SRI hash');
+});
+
 /** Verifies ignored or otherwise untracked sources cannot steer generated entries. */
 test('the addon scan ignores untracked working-tree files', () => {
   installModules();
