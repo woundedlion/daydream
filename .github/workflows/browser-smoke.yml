@@ -24,8 +24,15 @@ jobs:
       - run: npm ci
       - name: Drive every browser probe
         shell: bash
+        env:
+          # Ceiling for one script, and for the loop as a whole. The budget sits
+          # inside timeout-minutes so a hang is reported here, against the script
+          # that hung, rather than killed by the runner with the rest unrun.
+          PROBE_TIMEOUT_S: '420'
+          PROBE_BUDGET_S: '1500'
         run: |
           status=0
+          deadline=$(( $(date +%s) + PROBE_BUDGET_S ))
           for script in \
             scripts/browser-smoke.mjs \
             scripts/workbench-probe.mjs \
@@ -36,7 +43,20 @@ jobs:
             scripts/lissajous-probe.mjs
           do
             echo "::group::$script"
-            node "$script" || status=1
+            left=$(( deadline - $(date +%s) ))
+            limit=$(( left < PROBE_TIMEOUT_S ? left : PROBE_TIMEOUT_S ))
+            if [ "$limit" -le 0 ]; then
+              echo "::error::$script never ran: the ${PROBE_BUDGET_S}s probe budget is spent"
+              status=1
+            else
+              timeout -k 10s "${limit}s" node "$script" && code=0 || code=$?
+              if [ "$code" -ne 0 ]; then
+                status=1
+                if [ "$code" -eq 124 ] || [ "$code" -eq 137 ]; then
+                  echo "::error::$script was killed after ${limit}s without finishing"
+                fi
+              fi
+            fi
             echo "::endgroup::"
           done
           exit "$status"
