@@ -447,6 +447,17 @@ test('a recorder fault reports its reason and stops offering to stop', () => {
   assert.equal(rig.button.label, '\u25cf Record');
 });
 
+test('a completed recording save failure preserves the current recording controls', () => {
+  const rig = recordingRig();
+  const recorder = rig.attach(fakeRecorder());
+  rig.button.object.record();
+  recorder.onSaveError(new Error('file commit failed'), 'previous.webm');
+  assert.match(rig.notices.at(-1), /Recording save failed for previous.webm: .*file commit failed/);
+  assert.equal(recorder.isRecording, true);
+  assert.equal(rig.canvasEl.classList.contains('recording'), true);
+  assert.equal(rig.button.label, '\u25a0 Stop');
+});
+
 test('a failed engine load disposes the app through the retained teardown', async () => {
   const app = await bootedApp({ loadModule: () => Promise.reject(new Error('no wasm')) });
 

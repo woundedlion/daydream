@@ -888,6 +888,50 @@ test('streams chunks to disk when the File System Access API is present', async 
   }
 });
 
+test('a late file close failure reports its session without stopping a new recording', async () => {
+  const restore = installRecorderEnv();
+  const captured = installConsoleCapture('error');
+  let rejectClose;
+  let filename;
+  const failure = new Error('disk commit failed');
+  globalThis.showSaveFilePicker = async (options) => {
+    filename ??= options.suggestedName;
+    return { createWritable: async () => ({
+      write: async () => {},
+      close: () => new Promise((_, reject) => { rejectClose = reject; }),
+    }) };
+  };
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    const finished = trackSinkFinish(rec);
+    const failures = [];
+    const captureFailures = [];
+    rec.onSaveError = (error, name) => failures.push({ error, name });
+    rec.onError = (error) => captureFailures.push(error);
+    rec.start('previous');
+    const previous = rec.mediaRecorder;
+    previous.ondataavailable({ data: { size: 10 } });
+    rec.stop();
+    previous.onstop();
+    await drainSink();
+    rec.start('current');
+    const current = rec.mediaRecorder;
+    rejectClose(failure);
+    await finished();
+    assert.equal(failures.length, 1);
+    assert.equal(failures[0].name, filename);
+    assert.match(filename, /^previous_/);
+    assert.equal(failures[0].error.cause, failure);
+    assert.match(failures[0].error.message, /truncated or incomplete/);
+    assert.deepEqual(captureFailures, []);
+    assert.equal(rec.mediaRecorder, current);
+    assert.equal(rec.isRecording, true);
+  } finally {
+    captured.restore();
+    restore();
+  }
+});
+
 test('the encoder is opened at the configured bitrate', () => {
   const restore = installRecorderEnv();
   try {
