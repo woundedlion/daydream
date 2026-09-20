@@ -151,11 +151,7 @@ export async function probePanel(tab) {
  * @param {import('puppeteer-core').Page} tab
  */
 export async function probeSliderDrag(tab) {
-  const failures = [];
-  const check = (ok, message) => {
-    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
-    if (!ok) failures.push(message);
-  };
+  const { failures, check } = checks();
 
   const name = await tab.$eval(PANEL_SLIDER, (slider) => {
     slider.scrollIntoView({ block: 'center' });
