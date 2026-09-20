@@ -40,7 +40,9 @@ const W = 96, H = 20;
 
 // One shared engine: the engine owns a single global arena, so a second
 // instantiation traps (the app itself only ever makes one).
+assert.equal(M.HolosphereEngine.isLive(), false);
 const engine = new M.HolosphereEngine();
+assert.equal(M.HolosphereEngine.isLive(), true);
 
 // Both non-rejections leave the requested size active; only RESIZED tears the
 // effect down. The shared engine makes either possible at most call sites.
