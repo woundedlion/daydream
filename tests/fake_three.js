@@ -221,6 +221,17 @@ export function fakeColorAttribute(array) {
   };
 }
 
+/** Matrix attribute with three.js's write-only needsUpdate/version contract. */
+export function fakeMatrixAttribute(array) {
+  let backing = array;
+  return {
+    version: 0,
+    get array() { return backing; },
+    set array(value) { backing = value; },
+    set needsUpdate(value) { if (value === true) this.version++; },
+  };
+}
+
 export class AmbientLight extends Object3D {}
 export class DirectionalLight extends Object3D {}
 export class SpotLight extends Object3D {}

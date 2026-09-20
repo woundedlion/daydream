@@ -18,11 +18,12 @@
 // the fake document carries none of the element ids for. Each is anchored on the
 // call site rather than the factory definition above it, and each says which
 // failure it stands in for.
-import { afterEach, test } from 'node:test';
+import { afterEach, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fakeElement, restoreDocumentAfterEach } from './fake_dom.js';
 import { URL_FLUSH_DEBOUNCE_MS } from '../state.js';
+import { pageWarmer } from '../module_warmer.js';
 import {
   EffectSetResult, ParamSetResult, ResolutionSetResult, unpinnedEngineMethods,
 } from './fake_engine.js';
@@ -584,18 +585,15 @@ test('a parameter write does not clear a rejected switch', async () => {
 test('a segmented-POV failure is announced and returns the toggle', async () => {
   const gui = fakeGui('view');
   const notices = [];
-  let refusals = 1;
   const segments = {
     active: false,
     count: 2,
     showBoundaries: false,
-    destroy() {
-      // A pool that refuses once: the fallback tears down again on its way
-      // through, and a second throw would escape it rather than be reported.
-      if (refusals-- > 0) throw new Error('a worker would not stop');
-    },
+    create() { throw new Error('a worker would not start'); },
+    destroy() {},
     updateStats() {},
   };
+  mock.method(pageWarmer, 'warm', async () => {});
   createSegmentedPovControls({
     gui,
     segments,
@@ -606,13 +604,13 @@ test('a segmented-POV failure is announced and returns the toggle', async () => 
   const enabled = gui.folders.find((f) => f.namespace === 'Segmented POV')
     .controllers.find((c) => c.property === 'segmented');
 
-  // The handler as lil-gui fires it, leaving `value` untouched until the
-  // fallback writes it back.
+  // lil-gui writes the bound object before firing the handler.
+  enabled.object[enabled.property] = true;
   let settled;
-  captureConsole(() => { settled = enabled.changed(false); });
+  captureConsole(() => { settled = enabled.changed(true); });
   await settled;
 
-  assert.match(notices.at(-1), /Segmented POV teardown failed:.*would not stop/,
+  assert.match(notices.at(-1), /Segmented POV enable failed:.*would not start/,
     'a console-only failure is invisible: the user sees the toggle flip back '
     + 'and cannot tell it from a mis-click, and the fault banner covers only '
     + 'latched runtime faults');

@@ -69,6 +69,12 @@ const fakeCanvas = (width = 0, height = 0) =>
 
 test('background visibility pauses recording time and remains stoppable', () => {
   const doc = new EventTarget();
+  const removed = [];
+  const removeEventListener = doc.removeEventListener.bind(doc);
+  doc.removeEventListener = (type, listener, options) => {
+    removed.push([type, listener]);
+    removeEventListener(type, listener, options);
+  };
   doc.hidden = false;
   let now = 1000;
   const rec = new VideoRecorder(fakeCanvas(), 1 / 16, () => now, doc);
@@ -96,6 +102,8 @@ test('background visibility pauses recording time and remains stoppable', () => 
   rec.stop();
   assert.equal(media.state, 'inactive');
   rec.dispose();
+  assert.deepEqual(removed, [['visibilitychange', rec.visibilityChanged]],
+    'dispose removes the document listener it installed');
 });
 
 /**

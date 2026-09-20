@@ -18,6 +18,7 @@ import {
   restoreEffectControlState,
 } from '../effect_sequencing.js';
 import { fakeElement } from './fake_dom.js';
+import { captureConsole } from './fake_console.js';
 
 // Restore globalThis.window after each test so the stub never leaks to another suite.
 const savedWindow = globalThis.window;
@@ -187,13 +188,7 @@ const RES = ['Holosphere (96x20)', 'Phantasm (288x144)'];
  * @param {Function} body - Code to run under the capture.
  * @returns {Array<string>} One joined message per console.warn call.
  */
-function captureWarnings(body) {
-  const warnings = [];
-  const stub = mock.method(console, 'warn',
-    (...args) => { warnings.push(args.map(String).join(' ')); });
-  try { body(); } finally { stub.mock.restore(); }
-  return warnings;
-}
+const captureWarnings = (body) => captureConsole(body).messages;
 
 test('rollback restores an unflushed control value to runtime sinks and URL', () => {
   let lastUrl = '/?Speed=0.1';
