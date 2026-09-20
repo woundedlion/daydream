@@ -1044,7 +1044,8 @@ export function createEffectGui({ engine, segments, config, host }) {
       }
       controller.onChange(v => {
         const value = engineParamValue(v);
-        if (setEngineParam(p.name, value) !== false) acceptedControlValue = v;
+        const accepted = setEngineParam(p.name, value) !== false;
+        if (accepted) acceptedControlValue = v;
         controller.acceptUrlValue?.(acceptedControlValue);
         const edited = { name: p.name, accepted: acceptedControlValue };
         // A drag emits one onChange per pointermove and full-config persistence
@@ -1052,7 +1053,7 @@ export function createEffectGui({ engine, segments, config, host }) {
         // release, which sees the same state the last move would have.
         if (controller.dragging) fx.persistDeferred = edited;
         else persistEffectState(fx.gui, edited);
-        setWorkerParam(p.name, value);
+        if (accepted) setWorkerParam(p.name, value);
         adoptEnginePause(pause, p);
         fx.warningsDirty = true;
       });
