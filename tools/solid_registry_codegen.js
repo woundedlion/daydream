@@ -158,9 +158,7 @@ function recipeStepCpp(step) {
 const INDENT = 4;
 
 /**
- * A doc comment wrapped the way clang-format wraps the ones already in
- * solids.h: one line where it fits, else a block comment whose text is filled
- * at the column limit.
+ * A doc comment on one line where it fits, otherwise filled at the column limit.
  * @param {string} text - The comment body, one line of words.
  * @returns {string} The comment.
  */
