@@ -20,6 +20,16 @@ test('npm test retains discovery and coverage guards', () => {
     '"tests/**/*.test.js" "tests/**/*.test.mjs" "tests/**/*.spec.js" "tests/**/*.spec.mjs"');
 });
 
+test('the reusable JavaScript suite runs all required checks', () => {
+  const suite = readFileSync(`${WORKFLOW_DIR}/js-unit-suite.yml`, 'utf8');
+  for (const command of ['npm test', 'npm run lint', 'npm run typecheck']) {
+    assert.ok(suite.split(/\r?\n/).some((line) =>
+      line.trim().replace(/^- /, '') === `run: ${command}`),
+      `${command} is absent from the reusable suite`);
+  }
+  assert.match(suite, /name: Verify committed import map\s+run: \|\s+npm run importmap\s+git diff --exit-code/);
+});
+
 // Every `node-version:` spelling under .github/workflows, tagged with its file.
 const nodePins = (dir) => readdirSync(dir)
   .filter((file) => /\.ya?ml$/.test(file))
