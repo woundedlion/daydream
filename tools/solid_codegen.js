@@ -722,7 +722,16 @@ const CHAIN_CALL = /\.(?=[A-Za-z_]\w*\()/;
 function returnRecipeCpp(recipe) {
   if (`  return ${recipe};`.length <= COLUMN_LIMIT) return `  return ${recipe};`;
   const [seed, ...calls] = recipe.split(CHAIN_CALL);
-  return [`  return ${seed}`, ...calls.map((call) => `      .${call}`)].join('\n') + ';';
+  let seedLine = `  return ${seed}`;
+  if (seedLine.length > COLUMN_LIMIT) {
+    const inner = seed.slice('SolidBuilder('.length, -', a, b)'.length);
+    const argument = `             ${inner},`;
+    seedLine = '  return SolidBuilder(\n' +
+      (argument.length <= COLUMN_LIMIT ? argument
+        : `             ${inner.slice(0, -'a, b)'.length)}\n                 a, b),`) +
+      '\n             a, b)';
+  }
+  return [seedLine, ...calls.map((call) => `      .${call}`)].join('\n') + ';';
 }
 
 /**
