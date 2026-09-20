@@ -388,6 +388,7 @@ export function createRecordingControls({
    * @returns {void}
    */
   const showRecording = (isRecording) => {
+    driver.heldCaptures = 0;
     durationSecond = null;
     recordingShown = isRecording;
     const canvasEl = doc.getElementById('canvas-container');
