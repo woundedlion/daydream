@@ -1286,7 +1286,9 @@ function renderMesh() {
 
   // Update Stats
   renderBaseSolid();
-  document.getElementById('meshStats').innerText = meshStatsLine(meshData, edgeCount);
+  const stats = document.getElementById('meshStats');
+  const statsText = meshStatsLine(meshData, edgeCount);
+  if (stats.textContent !== statsText) stats.textContent = statsText;
   document.getElementById('canvas').setAttribute('aria-label',
     meshCanvasLabel(formatSolidName(state.base), state.ops.map((o) => o.op),
       meshData, edgeCount));
