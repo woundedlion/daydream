@@ -30,9 +30,7 @@ const RECORDER_TIMESLICE_MS = 1000;
 // or non-positive.
 const DEFAULT_BITRATE_MBPS = 16;
 
-// Seconds of video the streaming sink may hold in RAM while the Save dialog is
-// still unanswered; multiplied by the latched bitrate to get the byte bound. Two
-// minutes is far past any real time-to-pick, so the bound is a runaway guard.
+// Seconds of video the streaming sink may hold pending picker, open, or writes.
 export const PICKER_GRACE_SECONDS = 120;
 
 // Bytes the in-memory fallback sink may accumulate before it ends the session.
@@ -529,7 +527,7 @@ export class VideoRecorder {
    * Builds the per-session data sink. With the File System Access API present,
    * streams each chunk straight to a user-chosen file as it arrives, so once the
    * file is open a long recording never buffers the whole video in RAM; chunks
-   * captured before the user picks a file are held in the write chain, bounded at
+   * awaiting the picker, file opening, or writes are held in the chain, bounded at
    * PICKER_GRACE_SECONDS of video at the latched bitrate — past that the session
    * stops and reports, and what was held still reaches the file if one is picked
    * later. Otherwise it accumulates chunks for a single blob download at stop,
@@ -543,7 +541,7 @@ export class VideoRecorder {
    *   streaming path leaves it empty while a file handle holds (each chunk is
    *   released after its disk write) and falls back to filling it otherwise.
    * @param {number} [bitrateMbps=DEFAULT_BITRATE_MBPS] - The session bitrate
-   *   start() latched, bounding the pre-pick backlog.
+   *   start() latched, bounding the outstanding write backlog.
    * @returns {VideoSink} The session sink; callers may ignore finish()'s promise.
    */
   openSink(recorder, effectName, chunks, bitrateMbps = DEFAULT_BITRATE_MBPS) {
@@ -570,9 +568,6 @@ export class VideoRecorder {
     let backlogBytes = 0;
     let overflowed = false;
     const maxBacklogBytes = (bitrateMbps * 1_000_000 / 8) * PICKER_GRACE_SECONDS;
-    // maxBacklogBytes only covers the pre-pick hold. Once the picker has
-    // answered without a handle, or createWritable() fails mid-session, every
-    // chunk lands in the blob buffer instead, on the fallback sink's own bound.
     const hold = this.memorySink(recorder, chunks, 'the streaming save was unavailable');
     const opened = globalThis.showSaveFilePicker({
       suggestedName: filename,
@@ -605,27 +600,22 @@ export class VideoRecorder {
     let chain = Promise.resolve();
     return {
       write: (data) => {
-        // Every chunk queued before the picker answers stays reachable from the
-        // chain. Cap that hold and end the session at the cap: a stopped
-        // recording the user is told about beats an unbounded RAM climb behind a
-        // dialog nobody answered. The chunks already queued still reach the file
-        // if it is eventually picked, so the saved video is a clean prefix.
-        if (!picked) {
-          backlogBytes += data.size;
-          if (backlogBytes > maxBacklogBytes) {
-            if (!overflowed) {
-              overflowed = true;
-              if (this.mediaRecorder === recorder) {
-                this.stop();
-                this.reportFailure(
-                  `the Save dialog was left unanswered while ${Math.round(maxBacklogBytes / 1_000_000)} MB `
-                  + `of video (${PICKER_GRACE_SECONDS}s at ${bitrateMbps} Mbps) piled up in memory; recording `
-                  + 'stopped. Choose a file to save what was captured.');
-              }
-            }
-            return;
+        if (overflowed || aborted || failed) return;
+        if (picked && !handle && backlogBytes === 0) { hold(data); return; }
+        if (backlogBytes + data.size > maxBacklogBytes) {
+          overflowed = true;
+          if (this.mediaRecorder === recorder) {
+            this.stop();
+            this.reportFailure(
+              `${picked ? 'the streaming save could not keep up' : 'the Save dialog was left unanswered'} `
+              + `while ${Math.round(maxBacklogBytes / 1_000_000)} MB of video `
+              + `(${PICKER_GRACE_SECONDS}s at ${bitrateMbps} Mbps) piled up in memory; recording stopped. `
+              + (picked ? 'Queued video will be saved if writing completes.'
+                : 'Choose a file to save what was captured.'));
           }
+          return;
         }
+        backlogBytes += data.size;
         chain = chain.then(async () => {
           await opened;
           // Save dialog cancelled: finish() discards the buffer, so drop chunks
@@ -657,7 +647,7 @@ export class VideoRecorder {
                 err);
             }
           }
-        });
+        }).finally(() => { backlogBytes -= data.size; });
       },
       finish: () => {
         return chain

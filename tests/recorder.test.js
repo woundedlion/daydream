@@ -1054,11 +1054,71 @@ test('an unanswered save dialog stops the session at the backlog bound', async (
   }
 });
 
-/**
- * Firefox and Safari take the fallback sink, which holds the whole video in RAM
- * until stop. Unbounded, a long capture OOMs the tab and the user loses every
- * frame; bounded, the session ends, says why, and downloads the prefix.
- */
+for (const stalledAt of ['opening', 'writing']) {
+  test(`streaming backlog stays bounded during stalled ${stalledAt}`, async () => {
+    const restore = installRecorderEnv();
+    const captured = installConsoleCapture('error');
+    const writes = [];
+    const releases = [];
+    let open;
+    let closed = false;
+    const writable = {
+      write: (data) => {
+        writes.push(data);
+        return stalledAt === 'writing'
+          ? new Promise((resolve) => releases.push(resolve)) : Promise.resolve();
+      },
+      close: async () => { closed = true; },
+    };
+    globalThis.showSaveFilePicker = async () => ({
+      createWritable: () => stalledAt === 'opening'
+        ? new Promise((resolve) => { open = () => resolve(writable); })
+        : Promise.resolve(writable),
+    });
+    try {
+      const rec = new VideoRecorder(recordableCanvas());
+      rec.bitrateMbps = 1;
+      const notified = [];
+      rec.onError = (error) => notified.push(error);
+      const finished = trackSinkFinish(rec);
+      rec.start('slow-file');
+      const recorder = rec.mediaRecorder;
+      const size = rec.bitrateMbps * 1_000_000 / 8 * PICKER_GRACE_SECONDS / 2;
+      const chunks = Array.from({ length: 5 }, (_, id) => ({ size, id }));
+      await drainSink();
+      recorder.ondataavailable({ data: chunks[0] });
+      await drainSink();
+      recorder.ondataavailable({ data: chunks[1] });
+      let accepted = 2;
+      if (stalledAt === 'writing') {
+        releases.shift()();
+        await drainSink();
+        recorder.ondataavailable({ data: chunks[2] });
+        accepted = 3;
+      }
+      assert.equal(rec.isRecording, true, 'settled writes release their backlog bytes');
+      recorder.ondataavailable({ data: chunks[accepted] });
+      assert.equal(rec.isRecording, false);
+      assert.equal(notified.length, 1);
+      assert.match(notified[0].message, /streaming save could not keep up/);
+      recorder.ondataavailable({ data: chunks[4] });
+      recorder.onstop();
+      if (open) open();
+      for (let i = 0; i < accepted; i++) {
+        await drainSink();
+        releases.shift()?.();
+      }
+      await finished();
+      assert.deepEqual(writes, chunks.slice(0, accepted));
+      assert.equal(closed, true);
+      assert.equal(notified.length, 1);
+    } finally {
+      captured.restore();
+      restore();
+    }
+  });
+}
+
 test('the in-memory fallback sink stops the session at its byte bound', () => {
   const restore = installRecorderEnv();
   const captured = installConsoleCapture('error');
@@ -1095,9 +1155,7 @@ test('the in-memory fallback sink stops the session at its byte bound', () => {
 /**
  * A picker rejection that is not an AbortError leaves the session running with
  * no file handle, so every chunk lands in the blob buffer for the download at
- * stop. maxBacklogBytes does not reach that path — it is consulted only before
- * the picker answers — so the fallback's own byte bound is what stands between a
- * long capture and an OOM.
+ * stop. With no queued writes remaining, the fallback uses its own byte bound.
  */
 test('a streaming session with no file handle bounds its in-memory fallback', async () => {
   const restore = installRecorderEnv();
@@ -1114,7 +1172,7 @@ test('a streaming session with no file handle bounds its in-memory fallback', as
     rec.start('handleless');
     const recorder = rec.mediaRecorder;
     // Let the picker's rejection settle, so every chunk below is past the
-    // pre-pick backlog cap and reaches the in-memory fallback.
+    // streaming backlog cap and reaches the in-memory fallback.
     await drainSink();
     const CHUNK_BYTES = 1_000_000;
     const underBound = MEMORY_BUFFER_LIMIT_BYTES / CHUNK_BYTES;
