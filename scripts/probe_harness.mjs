@@ -136,6 +136,10 @@ export async function dragBetween(tab, from, to, options = {}) {
 // fetch on a page that declares none, and the gitignored offline font drop the
 // tool pages link behind an onerror fallback to the font CDN.
 const ABSENT_PATHS = [/^\/favicon\.ico$/, /^\/vendor\/fonts\/fonts\.css$/];
+const ABSENT_ORIGINS = new Set([
+  'https://fonts.googleapis.com',
+  'https://fonts.gstatic.com',
+]);
 
 /**
  * Watches one tab for everything that went wrong on it: uncaught exceptions,
@@ -152,7 +156,8 @@ export function collectProblems(tab, origin, problems) {
   const absent = (href) => {
     if (href === undefined) return false;
     const url = new URL(href, origin);
-    return url.origin === origin && ABSENT_PATHS.some((re) => re.test(url.pathname));
+    return ABSENT_ORIGINS.has(url.origin) ||
+      (url.origin === origin && ABSENT_PATHS.some((re) => re.test(url.pathname)));
   };
   tab.on('console', (message) => {
     if (message.type() !== 'error' || absent(message.location()?.url)) return;
