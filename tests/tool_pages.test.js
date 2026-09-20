@@ -483,6 +483,8 @@ const CONTRAST_SURFACES = {
     '.move-op-btn': '.op-item',
     '.saved-item .title': '.saved-item',
     '.saved-item .details': '.saved-item',
+    '.saved-item .saved-stats, .saved-item .saved-row-label': '.saved-item',
+    '#arenaStats': ['#arenaStats', 'body'],
     '.action-btn': '.action-btn',
     '.action-btn:hover': '.action-btn:hover',
   },
