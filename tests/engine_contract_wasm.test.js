@@ -171,7 +171,7 @@ function interfaceMembers(name) {
  * @returns {Set<string>} The declared method names.
  */
 const interfaceMethods = (name) => new Set(
-  [...interfaceBody(name).matchAll(/^ {2}([A-Za-z_]\w*)\s*\(/gm)]
+  [...interfaceBody(name).matchAll(/^ {2}([A-Za-z_]\w*)\??\s*\(/gm)]
     .map((match) => match[1]));
 
 test('holosphere_wasm.d.ts declares every module function', () => {
@@ -1499,7 +1499,11 @@ test('hue wheel harmony anchors agree with the WASM palette diagnostics', () => 
 // tools' half of the boundary; embind's own prototypes are what pins them.
 test('holosphere_wasm.d.ts declares the MeshOps bridge the solids tool drives', () => {
   const statics = interfaceMethods('MeshOpsStatics');
+  const optional = new Set([...interfaceBody('MeshOpsStatics')
+    .matchAll(/^ {2}([A-Za-z_]\w*)\?\s*\(/gm)].map((match) => match[1]));
+  assert.deepEqual([...optional], ['getMaxBounds']);
   for (const name of statics) {
+    if (optional.has(name) && M.MeshOps[name] === undefined) continue;
     assert.equal(typeof M.MeshOps[name], 'function',
       `holosphere_wasm.d.ts declares MeshOps.${name}, which the module does not export`);
   }
