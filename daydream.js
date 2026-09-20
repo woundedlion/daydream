@@ -355,7 +355,7 @@ export function createRecordingControls({
 }) {
   const REC_RESOLUTIONS = { 'Native': null, '720p': 720, '1080p': 1080 };
   const REC_FORMATS = { 'Auto': 'auto', 'MP4': 'mp4', 'WebM': 'webm' };
-  const recordingSettings = createRecordingSettings({ getRecorder });
+  const recordingSettings = createRecordingSettings({ getRecorder, warn: showNotice });
   const recSettings = recordingSettings.settings;
   recordingSettings.define('recQuality', 16, 'bitrate',
     (recorder, v) => { recorder.bitrateMbps = v; });
