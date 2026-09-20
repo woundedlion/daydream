@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
 
 import { shaderWorkbenchUrl, start, WORKBENCH_EFFECTS } from '../daydream.js';
 import {
@@ -56,6 +57,31 @@ test('shader state hashes round-trip the complete authoring state', async () => 
   assert.equal(await decodeShaderStateHash('#unrelated'), null);
   await assert.rejects(decodeShaderStateHash('#shader=v1.not-gzip'),
     /invalid shader link payload/);
+});
+
+test('shader links bound the expanded UTF-8 state including its wrapper', async () => {
+  const limit = 524288;
+  const compact = { d: { metadata: '' }, p: 'night', b: [], a: false };
+  const wrapperBytes = Buffer.byteLength(JSON.stringify(compact));
+  for (const size of [limit - 1, limit, limit + 1]) {
+    const paddingBytes = size - wrapperBytes;
+    compact.d.metadata = '\u03bb'.repeat(Math.floor(paddingBytes / 2))
+      + 'x'.repeat(paddingBytes % 2);
+    assert.equal(Buffer.byteLength(JSON.stringify(compact)), size);
+    const state = {
+      document: compact.d, preset: compact.p, bypassed: compact.b, paused: compact.a,
+    };
+    if (size <= limit) {
+      const hash = await encodeShaderStateHash(state);
+      assert.ok(hash.length < 4096);
+      assert.deepEqual(await decodeShaderStateHash(hash), state);
+    } else {
+      await assert.rejects(encodeShaderStateHash(state), /shader link state is too large/);
+      const payload = gzipSync(JSON.stringify(compact)).toString('base64url');
+      await assert.rejects(decodeShaderStateHash(`#shader=v1.${payload}`),
+        /shader link state is too large/);
+    }
+  }
 });
 
 test('a deep-linked document is held to the reader string limit', async () => {
