@@ -13,6 +13,21 @@ import {
 
 restoreDocumentAfterEach();
 
+test('connected element events reach document capture and bubble listeners', () => {
+  const doc = installDocument(documentEvents());
+  const element = fakeElement('button', { connected: true });
+  const seen = [];
+  doc.addEventListener('click', () => seen.push('capture'), true);
+  doc.addEventListener('click', () => seen.push('bubble'));
+  element.addEventListener('click', () => seen.push('target'));
+  element.dispatch('click');
+  assert.deepEqual(seen, ['capture', 'target', 'bubble']);
+  seen.length = 0;
+  element.addEventListener('click', (event) => event.stopPropagation());
+  element.dispatch('click');
+  assert.deepEqual(seen, ['capture', 'target']);
+});
+
 /**
  * Builds a root > mid > leaf chain whose every listener appends to one log.
  * @returns {{root: Object, mid: Object, leaf: Object, log: Array<string>,

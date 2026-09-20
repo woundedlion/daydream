@@ -504,6 +504,8 @@ export function fakeElement(tag = 'div', options = {}) {
       // Propagation path: the dispatching node, then each ancestor.
       const path = [];
       for (let node = this; node; node = node.parentNode) path.push(node);
+      const doc = activeDocument();
+      if (this.isConnected && doc?.listeners && !path.includes(doc)) path.push(doc);
       const ancestors = path.slice(1);
 
       let stopped = false;
@@ -704,14 +706,18 @@ export function fakeElement(tag = 'div', options = {}) {
  * @returns {Object} addEventListener, removeEventListener, listenerCount and dispatch.
  */
 export function documentEvents() {
-  /** @type {Array<{type: string, handler: Function}>} */
+  /** @type {Array<{type: string, handler: Function, capture: boolean, options: any}>} */
   const listeners = [];
   return {
-    /** @param {string} type @param {Function} handler */
-    addEventListener(type, handler) { listeners.push({ type, handler }); },
-    /** @param {string} type @param {Function} handler */
-    removeEventListener(type, handler) {
-      const at = listeners.findIndex((l) => l.type === type && l.handler === handler);
+    listeners,
+    /** @param {string} type @param {Function} handler @param {any} [options] */
+    addEventListener(type, handler, options) {
+      listeners.push({ type, handler, options, capture: captureFlag(options) });
+    },
+    /** @param {string} type @param {Function} handler @param {any} [options] */
+    removeEventListener(type, handler, options) {
+      const at = listeners.findIndex((l) => l.type === type && l.handler === handler
+        && l.capture === captureFlag(options));
       if (at < 0) throw new Error(`no ${type} listener on the document to remove`);
       listeners.splice(at, 1);
     },
