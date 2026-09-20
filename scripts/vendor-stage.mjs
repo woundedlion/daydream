@@ -81,7 +81,8 @@ export function stageSite() {
     for (const entry of manifestEntries()) {
       if (entry === IMPORTMAP) continue;
       const from = join(REPO, entry);
-      if (existsSync(from)) linkInto(from, join(root, entry));
+      if (!existsSync(from)) throw new Error(`site manifest entry is missing: ${entry}`);
+      linkInto(from, join(root, entry));
     }
     for (const [from, to] of VENDORED) {
       const source = join(REPO, from);
