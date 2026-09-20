@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  errorDetail, showFatalError, bootstrapTool, reportPageFailures,
+  clearFatalError, errorDetail, showFatalError, bootstrapTool, reportPageFailures,
 } from '../tools/banner.js';
 import { captureConsole, installConsoleCapture } from './fake_console.js';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
@@ -254,4 +254,14 @@ test('bootstrapTool still banners a synchronous and an async init failure', asyn
     /^⚠ The palette tool failed to initialize/);
   assert.equal(logged.length, 1);
   assert.match(logged[0][0], /palette tool failed to initialize/);
+});
+
+test('clearing a recovered failure preserves a newer banner', () => {
+  fakeDocument();
+  showFatalError('old');
+  showFatalError('new');
+  clearFatalError('old');
+  assert.ok(document.getElementById('fatal-error-overlay'));
+  clearFatalError('new');
+  assert.equal(document.getElementById('fatal-error-overlay'), null);
 });

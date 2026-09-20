@@ -355,6 +355,7 @@ export const MODULE_TRAP_NOTICE = 'The rendering engine hit an unrecoverable'
  * @param {Object} deps - Injected collaborators.
  * @param {() => void} deps.frame - The per-frame body.
  * @param {(message: string) => void} deps.report - Renders the failure banner.
+ * @param {(message: string) => void} [deps.clearReport] - Clears a recovered failure.
  * @param {(...args: *) => void} [deps.logError] - Console sink for the throw.
  * @param {() => boolean} [deps.moduleDead] - Reads the engine module's death
  *   flag; polled once per frame, so it has to stay a cheap read.
@@ -365,11 +366,13 @@ export const MODULE_TRAP_NOTICE = 'The rendering engine hit an unrecoverable'
 export function createFrameLoopGuard({
   frame,
   report,
+  clearReport = () => {},
   logError = console.error,
   moduleDead = () => false,
   onModuleDead = () => {},
 }) {
   let reported = false;
+  let failureMessage = '';
   let clean = 0;
   let dead = false;
 
@@ -392,7 +395,8 @@ export function createFrameLoopGuard({
     if (dead) return;
     try {
       frame();
-      if (reported && ++clean >= FRAME_GUARD_REARM_FRAMES) {
+      if (reported && ++clean >= FRAME_GUARD_REARM_FRAMES && !moduleDead()) {
+        clearReport(failureMessage);
         reported = false;
         clean = 0;
       }
@@ -401,8 +405,9 @@ export function createFrameLoopGuard({
       if (!reported) {
         reported = true;
         logError('Render loop frame failed:', e);
-        report(`The render loop hit an error. ${errorDetail(e)}`
-          + ' See the browser console for details.');
+        failureMessage = `The render loop hit an error. ${errorDetail(e)}`
+          + ' See the browser console for details.';
+        report(failureMessage);
       }
     }
     checkDead();

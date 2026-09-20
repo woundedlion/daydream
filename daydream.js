@@ -43,7 +43,7 @@ import {
 } from "./segment_controller.js";
 import { pageWarmer } from "./module_warmer.js";
 import { EngineHost } from "./engine_host.js";
-import { errorDetail, reportPageFailures, showFatalError } from "./tools/banner.js";
+import { clearFatalError, errorDetail, reportPageFailures, showFatalError } from "./tools/banner.js";
 import { reportBootFailure, StaleModuleError } from "./bootstrap.js";
 import { enumConstantName } from "./param_sync.js";
 import { copyToClipboard } from "./tools/copy_text.js";
@@ -1045,6 +1045,7 @@ export function start({
       recording.tick();
     },
     report: showFatalError,
+    clearReport: clearFatalError,
     moduleDead: () => host.moduleDead(),
     onModuleDead: () => appTeardown?.dispose(),
   }));
