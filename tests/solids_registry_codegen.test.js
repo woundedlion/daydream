@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { upperSnake, opStepCpp, generateRegistryCpp, MAX_RECIPE_STEPS } =
+const { upperSnake, opStepCpp, generateRegistryCpp, MAX_RECIPE_STEPS, MAX_BUILD_STEPS } =
   await import('../tools/solid_registry_codegen.js');
 const { OP_DEFS, KNOWN_OPS, PARAMETERIZED_OPS, SIMPLE_SEEDS, DEFINED_SEED_CONSTANTS } =
   await import('../tools/solid_codegen.js');
@@ -481,9 +481,9 @@ function longOps(count) {
   return [{ op: 'hankin', params: { angle: 62 } }, ...Array(count - 1).fill('dual')];
 }
 
-test('generateRegistryCpp emits a step table at the uint8_t count ceiling', () => {
-  const code = generateRegistryCpp({ base: 'cube', ops: longOps(MAX_RECIPE_STEPS) });
-  assert.equal(code.split('{Op::').length - 1, MAX_RECIPE_STEPS);
+test('generateRegistryCpp emits a step table at the engine build ceiling', () => {
+  const code = generateRegistryCpp({ base: 'cube', ops: longOps(MAX_BUILD_STEPS) });
+  assert.equal(code.split('{Op::').length - 1, MAX_BUILD_STEPS);
 });
 
 test('generateRegistryCpp rejects a chain one step past the uint8_t count ceiling', () => {
@@ -494,12 +494,24 @@ test('generateRegistryCpp rejects a chain one step past the uint8_t count ceilin
 
 test('generateRegistryCpp counts a flattened base chain against the ceiling', () => {
   const item = { base: 'icosahedron_kis', ops: longOps(5) };
-  const baseOps = Array(MAX_RECIPE_STEPS - 5).fill(chainStep('kis'));
+  const baseOps = Array(MAX_BUILD_STEPS - 5).fill(chainStep('kis'));
   const atCeiling = { seed: 'icosahedron', ops: baseOps };
   const code = generateRegistryCpp(item, atCeiling);
-  assert.equal(code.split('{Op::').length - 1, MAX_RECIPE_STEPS);
+  assert.equal(code.split('{Op::').length - 1, MAX_BUILD_STEPS);
 
   const overCeiling = { seed: 'icosahedron', ops: [...baseOps, chainStep('kis')] };
   assert.throws(() => generateRegistryCpp(item, overCeiling),
-    /has 256 steps; a Recipe carries at most 255/);
+    /lowers to 9 primitive steps; IslamicStars supports at most 8/);
+});
+
+test('registry limits count composite operations after lowering', () => {
+  assert.doesNotThrow(() => generateRegistryCpp({
+    base: 'cube', ops: ['meta', 'meta', 'dual', 'dual'],
+  }));
+  assert.throws(() => generateRegistryCpp({
+    base: 'cube', ops: ['meta', 'meta', 'meta'],
+  }), /lowers to 9 primitive steps/);
+  assert.throws(() => generateRegistryCpp({
+    base: 'cube', ops: ['gyro', 'needle', 'zip', { op: 'bevel', params: { t: 0.3 } }, 'dual'],
+  }), /lowers to 9 primitive steps/);
 });
