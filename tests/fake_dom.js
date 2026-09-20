@@ -644,6 +644,22 @@ export function fakeElement(tag = 'div', options = {}) {
     value: fakeDataset(element),
   });
   if (DISABLEABLE_TAGS.has(element.tagName)) element.disabled = false;
+  if (element.tagName === 'INPUT') {
+    let inputValue = '';
+    let checked = false;
+    Object.defineProperties(element, {
+      value: {
+        enumerable: true, configurable: true,
+        get() { return inputValue; },
+        set(value) { inputValue = value === null ? '' : String(value); },
+      },
+      checked: {
+        enumerable: true, configurable: true,
+        get() { return checked; },
+        set(value) { checked = Boolean(value); },
+      },
+    });
+  }
   // An <option>'s value falls back to its text, as in the DOM, and `selected`
   // is the flag the owning <select>'s selection views read.
   if (element.tagName === 'OPTION') {
