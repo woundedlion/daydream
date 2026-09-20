@@ -183,7 +183,8 @@ async function init() {
     const fmt = (x) => `${formatKB(x.lifetime_high_water_mark, 0)} / ${formatKB(x.capacity, 0)}KB`;
     const statsEl = document.getElementById('arenaStats');
     if (statsEl) {
-      statsEl.innerText = `${fmt(m.tooling_arena)}`;
+      statsEl.innerText = `Live ${fmt(m.tooling_arena)} · `
+        + `Scratch A ${fmt(m.tooling_scratch_a)} · Scratch B ${fmt(m.tooling_scratch_b)}`;
     }
     arenaMetricsTimer = setTimeout(updateArenaMetrics, 500); // 2fps update is enough
   }
@@ -206,7 +207,6 @@ async function init() {
     far: 100,
     minDistance: 0,
     maxDistance: Infinity,
-    alpha: true,
     autoRotate: state.autoRotate,
     autoRotateSpeed: 2.0,
     lights: true,
@@ -571,9 +571,7 @@ function saveSolid() {
 
   const title = formatSolidName(state.base);
 
-  // Get current counts from currentMesh. Derive the edge count directly from
-  // the faces (not currentMesh.edgeCount, which is only set on a successful
-  // renderMesh pass — after a failed op chain it would be stale/0).
+  // Derive the edge count directly from the wrapper's vertices and faces.
   const vCount = currentMesh.vertices.length;
   const fCount = currentMesh.faces.length;
   const eCount = uniqueEdges(currentMesh.faces, vCount).length;
@@ -751,7 +749,7 @@ async function copyCode(index, lang, btn) {
   if (baseIsStar) {
     baseRecipe = meshOpsWasm ? meshOpsWasm.getRecipe(item.base) : null;
     if (!baseRecipe) {
-      showGateMsg(`export failed: no authored chain for "${item.base}" — `
+      showCopyFailure(btn, `export failed: no authored chain for "${item.base}" — `
         + 'its Recipe mirror cannot be generated');
       return;
     }
@@ -769,17 +767,34 @@ async function copyCode(index, lang, btn) {
       return;
     }
   } catch (e) {
-    showGateMsg(`export failed: ${e.message}`);
+    showCopyFailure(btn, `export failed: ${e.message}`);
     return;
   }
 
   try {
     const copied = await copyWithFeedback(
-      code, { element: btn, copiedClasses: ['text-green-400'] });
+      code, { element: btn, copiedClasses: ['text-green-400'],
+        failedText: 'Failed', failedClasses: ['text-red-400'] });
     if (!copied) showGateMsg('copy failed: the browser refused clipboard access');
   } catch (e) {
-    showGateMsg(`copy failed: ${e.message}`);
+    showCopyFailure(btn, `copy failed: ${e.message}`);
   }
+}
+
+/** Shows an export failure both beside its button and in the shared status line. */
+function showCopyFailure(button, message) {
+  showGateMsg(message);
+  const pending = button.copyFailure;
+  if (pending) clearTimeout(pending.timer);
+  const original = pending?.original ?? button.textContent;
+  button.textContent = 'Failed';
+  button.classList.add('text-red-400');
+  const timer = setTimeout(() => {
+    button.textContent = original;
+    button.classList.remove('text-red-400');
+    delete button.copyFailure;
+  }, 1500);
+  button.copyFailure = { timer, original };
 }
 
 function restoreSolid(item) {

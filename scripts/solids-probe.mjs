@@ -83,6 +83,12 @@ const dragTo = (tab, from, y, touch) =>
 export async function probeChain(tab) {
   const { failures, check } = checks();
 
+  check(await tab.$eval('#labels', (node) => node.getAttribute('aria-hidden')) === 'true',
+    'the visual index-label overlay stays out of the accessibility tree');
+  const arenas = await tab.$eval('#arenaStats', (node) => node.textContent ?? '');
+  check(/Live .*Scratch A .*Scratch B /.test(arenas),
+    `the memory readout names all three tooling arenas (${arenas})`);
+
   const motion = await tab.$eval('#toggleRotate', (node) => ({
     checked: node.getAttribute('aria-checked'),
     transition: getComputedStyle(node).transitionDuration,
