@@ -457,6 +457,12 @@ test('generateRecipeCpp requires a valid base namespace', () => {
 
 /** Verifies the emitted function body never calls the function it defines, which would recurse forever. */
 test('generateRecipeCpp never emits a body that calls its own function', () => {
+  const assertNonRecursive = (source, funcName) => {
+    const match = source.match(/\)\s*\{([\s\S]*)\}\s*$/);
+    assert.ok(match, `missing function body for ${funcName}`);
+    assert.ok(!new RegExp(`\\b${funcName}\\s*\\(`).test(match[1]),
+      `body of ${funcName} calls itself: ${match[1]}`);
+  };
   const chains = [
     ['dual'],
     ['kis', 'ambo'],
@@ -466,9 +472,12 @@ test('generateRecipeCpp never emits a body that calls its own function', () => {
   for (const ops of chains) {
     for (const base of ['cube', 'truncatedIcosahedron']) {
       const { funcName } = generateFuncAndRecipe({ base, ops });
-      const body = generateRecipeCpp({ base, ops }, 'Archimedean').split('\n')[2];
-      assert.ok(!body.includes(`${funcName}(`),
-        `body of ${funcName} calls itself: ${body}`);
+      const source = generateRecipeCpp({ base, ops }, 'Archimedean');
+      assertNonRecursive(source, funcName);
+      const recursive = source.replace(/^ {2}return [\s\S]*?;\s*\}/m,
+        `  return ${funcName}(a, b);\n}`);
+      assert.throws(() => assertNonRecursive(recursive, funcName),
+        /calls itself/);
     }
   }
 });
