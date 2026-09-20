@@ -1449,8 +1449,10 @@ test('a bare-Event boot fault latches once the retry budget is exhausted', () =>
 test('a message-less error after the pool is ready still latches fast', () => {
   // Post-ready there is no module to load, so a bare Event is a real worker fault.
   const c = readyController(2);
-  c.workers[0].onerror({});
+  c.workers[0].onerror({ message: '' });
   assert.equal(c.faulted, true);
+  assert.equal(c.faultInfo.message,
+    'worker failed after the pool became ready without an error message');
 });
 
 test('the startup and render deadlines hold their documented durations', () => {
