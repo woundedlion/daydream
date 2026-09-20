@@ -945,6 +945,8 @@ function drawPaletteWaveGraph() {
 function redrawForViewport() {
   drawColorStrip();
   drawPaletteWaveGraph();
+  if (activeTab === 'generative' && palette?.canonicalRecipe)
+    drawHueKeyWheel(palette.canonicalRecipe);
   updateStripView();
   updatePaletteCodeOutput();
   syncResetZoomButton();
@@ -1056,6 +1058,7 @@ function updatePalette() {
 // 256-entry LUT and redraws the wave graph (three channels reconstructed per
 // canvas column) on the main thread.
 const scheduleUpdate = createFrameScheduler(updatePalette);
+const scheduleViewportRedraw = createFrameScheduler(redrawForViewport);
 
 function engineTrapped(error) {
   return standDownIfHalted(error, wasmModule, (message) => {
@@ -1219,7 +1222,7 @@ async function init() {
 
   syncRecipeControlAvailability();
 
-  window.addEventListener('resize', scheduleUpdate);
+  window.addEventListener('resize', scheduleViewportRedraw);
 
   hueKeyDrag = createPointerDrag({
     element: hueKeyWheelCanvas,
@@ -1267,7 +1270,8 @@ async function init() {
     wasmModule = null;
     teardownExportFlyout();
     scheduleUpdate.cancel();
-    window.removeEventListener('resize', scheduleUpdate);
+    scheduleViewportRedraw.cancel();
+    window.removeEventListener('resize', scheduleViewportRedraw);
     copyRequestId += 1;
     if (copyFeedbackTimer !== null) clearTimeout(copyFeedbackTimer);
     stripDrag.remove();

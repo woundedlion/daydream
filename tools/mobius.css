@@ -139,20 +139,6 @@ body {
   outline-offset: 2px;
 }
 
-/* Off-screen but still focusable, so the pad's keyboard handles stay in the
-   tab order and in the accessibility tree. */
-.complex-plane-axis {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  border: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
 .complex-plane-inner {
   position: absolute;
   top: 0;

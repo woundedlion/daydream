@@ -156,6 +156,25 @@ export async function probeHueWheel(tab) {
   const opening = await settledHueDegrees(tab);
   check(opening.length >= 2, `the wheel publishes ${opening.length} hue keys`);
 
+  const resizeDraws = await tab.evaluate(() => new Promise((resolve) => {
+    const prototype = CanvasRenderingContext2D.prototype;
+    const putImageData = prototype.putImageData;
+    let draws = 0;
+    prototype.putImageData = function(...args) {
+      if (this.canvas.id === 'hueKeyWheelCanvas') draws += 1;
+      return putImageData.apply(this, args);
+    };
+    window.dispatchEvent(new Event('resize'));
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      prototype.putImageData = putImageData;
+      resolve(draws);
+    }));
+  }));
+  const resized = await hueDegrees(tab);
+  check(resizeDraws > 0, `resize redraws the hue wheel (${resizeDraws} draws)`);
+  check(resized.join() === opening.join(),
+    `resize preserves the authored hue keys (${resized.join(', ')})`);
+
   await tab.$eval(WHEEL, (node) => node.scrollIntoView({ block: 'center' }));
   // The wheel is drawn in its padding box too, so a marker's canvas point maps
   // back through that box rather than the bordered one.
