@@ -994,6 +994,8 @@ export function createChainStrip({
     if (isSelected) chip.setAttribute('aria-current', 'true');
     if (hasParams) chip.setAttribute('aria-expanded', String(expanded));
     chip.setAttribute('tabindex', tabLabel === entry.label ? '0' : '-1');
+    chip.setAttribute('aria-keyshortcuts',
+      'ArrowLeft ArrowRight Alt+ArrowLeft Alt+ArrowRight Enter Space b Delete Backspace Insert');
     chip.setAttribute('aria-label', `${op.name} · ${entry.label}`
       + (crossing ? `, ${op.input} to ${op.output}` : '')
       + (isBypassed ? ', bypassed' : ''));
@@ -1008,6 +1010,7 @@ export function createChainStrip({
       functionLabel.textContent = `${socketFunction.name}: `;
       const replacement = el('select', 'chain-chip-replace');
       replacement.setAttribute('tabindex', '-1');
+      replacement.setAttribute('aria-keyshortcuts', 'Delete');
       replacement.setAttribute('aria-label', socketFunction.accessibleName);
       const choices = new Map(socketChoices(index).map(
         (choice) => [choiceKey(choice.operators), choice]));
@@ -1044,6 +1047,7 @@ export function createChainStrip({
       const bypassable = bypassAvailable();
       toggle.type = 'button';
       toggle.setAttribute('tabindex', '-1');
+      toggle.setAttribute('aria-keyshortcuts', 'b');
       toggle.disabled = !bypassable;
       toggle.setAttribute('aria-pressed', String(isBypassed));
       toggle.setAttribute('aria-label', `Bypass ${op.name} · ${entry.label}`);
@@ -1057,6 +1061,7 @@ export function createChainStrip({
       const earlier = el('button', 'chain-chip-move');
       earlier.type = 'button';
       earlier.setAttribute('tabindex', '-1');
+      earlier.setAttribute('aria-keyshortcuts', 'Alt+ArrowLeft');
       earlier.textContent = '←';
       earlier.disabled = !sharesBand(index, -1);
       earlier.setAttribute('aria-label', `Move ${op.name} · ${entry.label} earlier`);
@@ -1068,6 +1073,7 @@ export function createChainStrip({
       const later = el('button', 'chain-chip-move');
       later.type = 'button';
       later.setAttribute('tabindex', '-1');
+      later.setAttribute('aria-keyshortcuts', 'Alt+ArrowRight');
       later.textContent = '→';
       later.disabled = !sharesBand(index, 1);
       later.setAttribute('aria-label', `Move ${op.name} · ${entry.label} later`);
@@ -1081,6 +1087,7 @@ export function createChainStrip({
       const remove = el('button', 'chain-chip-remove');
       remove.type = 'button';
       remove.setAttribute('tabindex', '-1');
+      remove.setAttribute('aria-keyshortcuts', 'Delete Backspace');
       remove.setAttribute('aria-label', `Remove ${op.name} · ${entry.label}`);
       remove.setAttribute('title', 'Delete');
       remove.textContent = '×';
