@@ -138,6 +138,12 @@ test('a boolean becomes 1.0/0.0', () => {
   assert.equal(engineParamValue(false), 0.0);
 });
 
+test('numeric enum labels retain engine order', () => {
+  const choices = enumChoices(['10', '2', '1']);
+  assert.deepEqual(Object.keys(choices), ['10', '2', '1']);
+  assert.deepEqual(Object.values(choices), [0, 1, 2]);
+});
+
 test('a number passes through unchanged', () => {
   assert.equal(engineParamValue(0.375), 0.375);
   assert.equal(engineParamValue(0), 0);
