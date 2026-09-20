@@ -12,6 +12,7 @@ export const workflowJobs = (source) => {
 
   const jobs = [];
   for (const line of lines.slice(start + 1)) {
+    if (/^\s*#/.test(line)) continue;
     if (/^\S/.test(line)) break;
     const match = line.match(JOB_KEY);
     if (match) jobs.push(match[1]);
