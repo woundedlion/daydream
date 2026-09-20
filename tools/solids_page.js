@@ -676,11 +676,11 @@ function renderSavedList() {
     title.className = 'title capitalize';
     title.textContent = item.title;
     const stats = document.createElement('span');
-    stats.className = 'text-[0.55rem] font-mono text-indigo-400 opacity-60';
+    stats.className = 'saved-stats text-[0.55rem] font-mono';
     stats.textContent = item.stats;
     summary.append(title, stats);
     const details = document.createElement('span');
-    details.className = 'details block uppercase opacity-70';
+    details.className = 'details block uppercase';
     details.textContent = item.desc;
     restoreButton.append(image, summary, details);
 
@@ -695,7 +695,7 @@ function renderSavedList() {
       const row = document.createElement('div');
       row.className = 'flex gap-1 justify-end';
       const rowLabel = document.createElement('span');
-      rowLabel.className = 'text-[0.5rem] uppercase text-slate-500 font-bold self-center mr-1';
+      rowLabel.className = 'saved-row-label text-[0.5rem] uppercase font-bold self-center mr-1';
       rowLabel.textContent = label;
       const copyButton = document.createElement('button');
       copyButton.type = 'button';

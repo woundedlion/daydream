@@ -369,6 +369,16 @@ body {
   margin-bottom: 0.5rem;
 }
 
+.saved-item .saved-stats,
+.saved-item .saved-row-label {
+  color: #94a3b8;
+}
+
+#arenaStats {
+  color: #94a3b8;
+  background-color: rgb(15 23 42 / 0.8);
+}
+
 .saved-actions {
   display: flex;
   justify-content: flex-end;
