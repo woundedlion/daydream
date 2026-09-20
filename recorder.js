@@ -572,6 +572,10 @@ export class VideoRecorder {
 
     const ext = this.extension(recorder);
     const filename = this.timestampedName(effectName, ext);
+    const saveFailure = (message, cause) => {
+      console.warn(`VideoRecorder: ${message}`, cause);
+      this.onSaveError?.(new Error(message, { cause }), filename);
+    };
 
     /** @type {FileSystemFileHandle|null} */
     let handle = null;
@@ -602,7 +606,7 @@ export class VideoRecorder {
             this.reportFailure('the Save dialog was cancelled, so nothing was saved.');
           }
         } else {
-          console.warn('VideoRecorder: streaming save unavailable, buffering in memory', err);
+          saveFailure('streaming save unavailable; buffering in memory for a Downloads save.', err);
         }
       })
       .finally(() => { picked = true; });
@@ -645,7 +649,7 @@ export class VideoRecorder {
             try {
               writable = await handle.createWritable();
             } catch (err) {
-              console.warn('VideoRecorder: streaming save unavailable, buffering in memory', err);
+              saveFailure('the selected file could not be opened; buffering in memory for a Downloads save.', err);
               handle = null;
               hold(data);
               return;
@@ -699,7 +703,7 @@ export class VideoRecorder {
             }
           })
           .catch((err) => {
-            console.warn('VideoRecorder: streaming save failed', err);
+            saveFailure('streaming save failed; any buffered video will be saved to Downloads.', err);
             if (chunks.length) this.download(recorder, chunks, effectName);
           });
       },
