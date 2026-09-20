@@ -413,6 +413,9 @@ class DeepLinkGUI {
     }
 
     const controller = this.gui.add(object, prop, ...args);
+    if (!controller) {
+      throw new TypeError(`DeepLinkGUI: unsupported property "${prop}"`);
+    }
 
     if (!isFunction) {
       this.urlKeys.add(key);

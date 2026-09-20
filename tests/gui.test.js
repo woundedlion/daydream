@@ -91,7 +91,10 @@ class StubGUI {
    * @param {string} prop - The property name to bind.
    * @returns {StubController} A controller bound to (object, prop).
    */
-  add(object, prop) { return new StubController(object, prop); }
+  add(object, prop) {
+    return object[prop] === null || object[prop] === undefined
+      ? undefined : new StubController(object, prop);
+  }
   /**
    * Creates a color controller bound to a target property.
    * @param {Object} object - The object whose property the controller edits.
@@ -153,6 +156,15 @@ test('DeepLinkGUI exposes and changes the wrapped panel state', () => {
   assert.equal(gui.closed, false);
   gui.open(false);
   assert.equal(gui.closed, true);
+});
+
+test('DeepLinkGUI rejects an unsupported property before registering its URL key', () => {
+  installWindow('');
+  const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
+
+  assert.throws(() => gui.add({ pending: null }, 'pending'),
+    /DeepLinkGUI: unsupported property "pending"/);
+  assert.deepEqual(gui.collectUrlKeys(), []);
 });
 
 /**
