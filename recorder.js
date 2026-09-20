@@ -256,7 +256,15 @@ export class VideoRecorder {
     const bitrateMbps = this.bitrateMbps > 0 ? this.bitrateMbps
       : DEFAULT_BITRATE_MBPS;
 
-    const mimeType = selectMimeType(this.format);
+    let mimeType;
+    try {
+      mimeType = selectMimeType(this.format);
+    } catch (err) {
+      stream.getTracks().forEach(t => t.stop());
+      this.cleanup();
+      this.reportFailure('MediaRecorder format probing failed.', err);
+      return;
+    }
 
     // An explicitly-chosen container with no supported codec means we fall back
     // to the browser default below; warn so the format choice isn't silently ignored.
