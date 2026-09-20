@@ -404,6 +404,15 @@ test('generateRecipeCpp defaults missing V/F/I counts to 0', () => {
   assert.ok(cpp.includes('star pattern (V=0, F=0, I=0).'));
 });
 
+test('generateRecipeCpp wraps a long star seed constructor argument', () => {
+  const cpp = generateRecipeCpp({
+    base: 'truncatedIcosidodecahedron_hankin62_chamfer50', ops: ['dual'],
+  }, 'IslamicStarPatterns');
+  assert.ok(cpp.includes('  return SolidBuilder(\n' +
+    '             IslamicStarPatterns::truncatedIcosidodecahedron_hankin62_chamfer50(\n' +
+    '                 a, b),\n             a, b)\n      .dual()\n      .build();'));
+});
+
 /**
  * The counts ride in from localStorage, which a user can hand-edit, and the
  * output is pasted into solid_generators.h; a count carrying a newline or a
