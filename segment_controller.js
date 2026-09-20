@@ -706,7 +706,9 @@ export class SegmentController {
         // load failure (a plain Event, not an ErrorEvent) — transient, so rebuild
         // a bounded number of times before latching. A messaged error is a real
         // worker throw and still fails fast.
-        if (!this.#ready && (e == null || e.message == null)
+        const message = typeof e?.message === 'string' && e.message
+          ? e.message : null;
+        if (!this.#ready && !message
             && this.bootAttempt < MAX_BOOT_RETRIES) {
           const next = this.bootAttempt + 1;
           console.warn(`[Segmented] seg ${i} module failed to load`
@@ -722,11 +724,12 @@ export class SegmentController {
           unrefTimer(this.retryTimer);
           return;
         }
-        const detail = e?.message
-          || `module load failed after ${MAX_BOOT_RETRIES} attempts`
+        const detail = message || (this.#ready
+          ? 'worker failed after the pool became ready without an error message'
+          : `module load failed after ${MAX_BOOT_RETRIES} attempts`
              + ` (commonly a missing or renamed holosphere_wasm.js, or a bare`
              + ` import specifier — a worker resolves its graph without the`
-             + ` page's import map)`;
+             + ` page's import map)`);
         console.error(`[Segmented] Worker seg ${i} error: ${detail}`
           + ` (${e?.filename}:${e?.lineno}:${e?.colno})`, e);
         this.onWorkerFault(i, detail);
