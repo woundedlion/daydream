@@ -892,3 +892,21 @@ test('stopping cancels the interval, and starting arms exactly one', () => {
   h.ticker.start();
   assert.equal(h.timer.handle, 2, 'a stopped ticker starts again');
 });
+
+test('a clean recovery clears its own report after the rearm window', () => {
+  let fail = true;
+  const cleared = [];
+  const reported = [];
+  const guarded = createFrameLoopGuard({
+    frame: () => { if (fail) throw new Error('transient'); },
+    report: (message) => reported.push(message),
+    clearReport: (message) => cleared.push(message),
+    logError: () => {},
+  });
+  guarded();
+  fail = false;
+  for (let i = 0; i < FRAME_GUARD_REARM_FRAMES - 1; i++) guarded();
+  assert.deepEqual(cleared, []);
+  guarded();
+  assert.deepEqual(cleared, reported);
+});

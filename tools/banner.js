@@ -70,6 +70,16 @@ function buildBanner() {
 }
 
 /**
+ * Remove only the banner carrying the recovered failure.
+ * @param {string} message - The message owned by the recovered operation.
+ * @returns {void}
+ */
+export function clearFatalError(message) {
+  const el = document.getElementById('fatal-error-overlay');
+  if (el?.querySelector('.fatal-error-message')?.textContent === `\u26a0 ${message}`) el.remove();
+}
+
+/**
  * Render a visible error banner across the top of the page. Tool pages that
  * boot a WASM engine call this from their bootstrap catch so a missing or
  * failed-to-load artifact surfaces to the user, instead of leaving a blank
