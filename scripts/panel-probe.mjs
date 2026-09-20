@@ -33,7 +33,7 @@ const SIDEBAR_VIEWPORT = { width: 480, height: 720 };
 const EFFECT = 'ShapeShifter';
 const TIMEOUT_MS = 90_000;
 // Longer than state.js's URL flush debounce, so a deferred write has landed.
-const URL_SETTLE_MS = 600;
+const URL_SETTLE_MS = 2200;
 // Bound on the wait for the query string to stop changing.
 const URL_SETTLE_POLLS = 20;
 // Long enough that a note squeezed onto the control row would be clipped.
