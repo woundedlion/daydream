@@ -514,7 +514,7 @@ export class Daydream {
       this.camera.position.copy(this.controls.target).add(orbitOffset);
     }
 
-    // Re-apply on resize so moving to a different-DPR monitor refreshes the ratio.
+    // Refresh the current DPR whenever the canvas is resized.
     this.renderer.setPixelRatio(Math.min(this.win.devicePixelRatio, 1));
     this.renderer.setSize(width, height);
     this.labelRenderer.setSize(width, height);
