@@ -366,6 +366,27 @@ export interface PaletteOps {
 }
 
 export interface HolosphereModule {
+  srgb_to_linear_float(s: number): number;
+  linear_to_srgb_float(l: number): number;
+  srgb_to_linear_interp(s: number): number;
+  linear_rgb_to_oklab(r: number, g: number, b: number): { L: number; a: number; b: number };
+  oklab_to_linear_rgb(L: number, a: number, b: number): { r: number; g: number; b: number };
+  hsv_to_rgb(h: number, s: number, v: number): { r: number; g: number; b: number };
+  procedural_palette_linear(
+    a0: number, a1: number, a2: number, b0: number, b1: number, b2: number,
+    c0: number, c1: number, c2: number, d0: number, d1: number, d2: number,
+    t: number,
+  ): { r: number; g: number; b: number };
+  named_procedural_palettes(): Array<{
+    name: string;
+    a: [number, number, number]; b: [number, number, number];
+    c: [number, number, number]; d: [number, number, number];
+  }>;
+  lissajous(m1: number, m2: number, a: number, t: number): { x: number; y: number; z: number };
+  mobius_transform(
+    x: number, y: number, z: number, ar: number, ai: number, br: number,
+    bi: number, cr: number, ci: number, dr: number, di: number,
+  ): { x: number; y: number; z: number };
   HolosphereEngine: {
     new (): HolosphereEngine;
     /** Whether the module already owns its single live engine instance. */
