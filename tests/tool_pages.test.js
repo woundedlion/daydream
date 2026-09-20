@@ -527,10 +527,30 @@ const CONTRAST_EXEMPT = {
  * @param {string} css - Stylesheet text.
  * @returns {string[][]} `[selector, declarations]` per rule, in source order.
  */
-const rules = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '').split('}')
-  .filter((chunk) => chunk.includes('{'))
-  .map((chunk) => [chunk.slice(0, chunk.indexOf('{')).replace(/\s+/g, ' ').trim(),
-    chunk.slice(chunk.indexOf('{') + 1)]);
+const rules = (css) => {
+  const source = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const found = [];
+  const collect = (start, end) => {
+    let cursor = start;
+    while (cursor < end) {
+      const open = source.indexOf('{', cursor);
+      if (open < 0 || open >= end) return;
+      let depth = 1;
+      let close = open + 1;
+      while (close < end && depth > 0) {
+        if (source[close] === '{') depth += 1;
+        else if (source[close] === '}') depth -= 1;
+        close += 1;
+      }
+      const selector = source.slice(cursor, open).replace(/\s+/g, ' ').trim();
+      if (selector.startsWith('@')) collect(open + 1, close - 1);
+      else found.push([selector, source.slice(open + 1, close - 1)]);
+      cursor = close;
+    }
+  };
+  collect(0, source.length);
+  return found;
+};
 
 /** Whether a declaration block sets `color` itself, not `background-color`. */
 const declaresColor = (declarations) => /(?:^|;)\s*color\s*:/.test(declarations);
@@ -646,6 +666,8 @@ test('CSS readers ignore comments and honor later declarations', () => {
   assert.equal(color(css, '.real', 'color'), '#222222');
   assert.deepEqual(channels('rgb(20 20 20 / 0.95)'), [20, 20, 20, 0.95]);
   assert.deepEqual(channels('#48f'), [68, 136, 255, 1]);
+  assert.deepEqual(rules('@media (width > 1px) { .nested { color: #123456; } }'),
+    [['.nested', ' color: #123456; ']]);
 });
 
 /**

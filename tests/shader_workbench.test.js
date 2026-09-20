@@ -31,6 +31,25 @@ import {
 const INDEX = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const WORKBENCH = readFileSync(new URL('../tools/shader.html', import.meta.url), 'utf8');
 const WORKBENCH_CSS = readFileSync(new URL('../tools/shader.css', import.meta.url), 'utf8');
+const TOP_LEVEL_WORKBENCH_CSS = (() => {
+  let result = '';
+  let cursor = 0;
+  while (cursor < WORKBENCH_CSS.length) {
+    const open = WORKBENCH_CSS.indexOf('{', cursor);
+    if (open < 0) break;
+    let depth = 1;
+    let close = open + 1;
+    while (close < WORKBENCH_CSS.length && depth > 0) {
+      if (WORKBENCH_CSS[close] === '{') depth += 1;
+      else if (WORKBENCH_CSS[close] === '}') depth -= 1;
+      close += 1;
+    }
+    if (!WORKBENCH_CSS.slice(cursor, open).trim().startsWith('@'))
+      result += WORKBENCH_CSS.slice(cursor, close);
+    cursor = close;
+  }
+  return result;
+})();
 const ENGINE_CATALOG = readFileSync(
   new URL('../shader/engine_catalog.json', import.meta.url), 'utf8');
 // §4.5: the document the workbench opens on, built from the same catalog the
@@ -184,7 +203,7 @@ test('closed and open cards share one header layout', () => {
 // library announce through. The global controls keep the floating panel every
 // other page mounts, inside the main area so it covers the canvas and nothing
 // else.
-test('the workbench page lays out the toolbar, pipeline and canvas', () => {
+test('the workbench page declares its desktop toolbar, pipeline and canvas layout', () => {
   // search() answers -1 for a missing match, which orders ahead of every real
   // offset: an ordering assertion whose left operand is deleted would pass.
   const region = (/** @type {RegExp} */ pattern) => {
@@ -196,7 +215,7 @@ test('the workbench page lays out the toolbar, pipeline and canvas', () => {
   assert.ok(region(/<main class="main-area"/) < region(/id="chain-strip"/)
     && region(/id="chain-strip"/) < region(/id="canvas-container"/),
   'the pipeline sits inside the main area, ahead of the canvas it overlays');
-  assert.match(WORKBENCH_CSS,
+  assert.match(TOP_LEVEL_WORKBENCH_CSS,
     /\.chain-strip-region\s*\{[^}]*position:\s*absolute[^}]*top:\s*0/,
     'anchored to that area rather than stacked above it');
   assert.ok(region(/id="canvas-container"/) < region(/<\/main>/),
@@ -204,40 +223,40 @@ test('the workbench page lays out the toolbar, pipeline and canvas', () => {
   assert.ok(region(/id="canvas-container"/) < region(/id="gui-container"/)
     && region(/id="gui-container"/) < region(/<\/main>/),
   'the global controls float inside the main area, over the canvas alone');
-  assert.ok(WORKBENCH_CSS.includes('#gui-container > .lil-gui {'),
+  assert.ok(TOP_LEVEL_WORKBENCH_CSS.includes('#gui-container > .lil-gui {'),
     'and are capped by that area rather than the viewport');
   assert.ok(region(/id="shader-toolbar"/) < region(/id="global-stats-desktop"/)
     && region(/id="global-stats-desktop"/) < region(/id="chain-strip"/),
   'the engine memory and compute stats stay in the toolbar row');
   assert.match(WORKBENCH,
     /id="shader-document-status"[^>]*role="status"[^>]*aria-live="polite"/);
-  assert.match(WORKBENCH_CSS, /\.chain-strip-viewport\s*\{[^}]*overflow-x:\s*auto/,
+  assert.match(TOP_LEVEL_WORKBENCH_CSS, /\.chain-strip-viewport\s*\{[^}]*overflow-x:\s*auto/,
     'expanded chips scroll rather than crushing the bands');
-  assert.match(WORKBENCH_CSS,
+  assert.match(TOP_LEVEL_WORKBENCH_CSS,
     /\.chain-strip-viewport::-webkit-scrollbar\s*\{[^}]*display:\s*none/,
   'the pipeline scrollbar stays hidden');
-  assert.match(WORKBENCH_CSS, /\.chain-strip\s*\{[^}]*align-items:\s*flex-start/,
+  assert.match(TOP_LEVEL_WORKBENCH_CSS, /\.chain-strip\s*\{[^}]*align-items:\s*flex-start/,
     'short domain bands do not stretch to the tallest stage');
-  assert.match(WORKBENCH_CSS, /\.chain-band\s*\{[^}]*flex:\s*0 0 auto/,
+  assert.match(TOP_LEVEL_WORKBENCH_CSS, /\.chain-band\s*\{[^}]*flex:\s*0 0 auto/,
     'domain bands size to their contents');
-  assert.match(WORKBENCH_CSS, /\.chain-chip-header\s*\{[^}]*display:\s*flex/,
+  assert.match(TOP_LEVEL_WORKBENCH_CSS, /\.chain-chip-header\s*\{[^}]*display:\s*flex/,
     'the card header lays its controls out in one row');
-  assert.match(WORKBENCH_CSS,
+  assert.match(TOP_LEVEL_WORKBENCH_CSS,
     /\.chain-chip-remove,\s*\.chain-chip-bypass,\s*\.chain-chip-move\s*\{[^}]*display:\s*inline-grid/,
   'bypass, reorder and delete size alike inside it');
-  assert.doesNotMatch(WORKBENCH_CSS,
+  assert.doesNotMatch(TOP_LEVEL_WORKBENCH_CSS,
     /\.chain-chip-params\s*\{[^}]*(?:max-height|overflow-y|scrollbar-gutter):/,
   'stage parameters remain fully visible without their own scroller');
-  assert.match(WORKBENCH_CSS,
+  assert.match(TOP_LEVEL_WORKBENCH_CSS,
     /\.chain-chip--expanded\s*\{[^}]*width:\s*max-content/,
   'expanded cards grow to fit their controls');
-  assert.doesNotMatch(WORKBENCH_CSS,
+  assert.doesNotMatch(TOP_LEVEL_WORKBENCH_CSS,
     /\.chain-chip--expanded\s*\{[^}]*max-width:/,
   'the horizontal pipeline viewport, not the card, handles narrow screens');
-  assert.match(WORKBENCH_CSS,
+  assert.match(TOP_LEVEL_WORKBENCH_CSS,
     /\.chain-chip-params\s*\{[^}]*grid-template-columns:\s*max-content 6rem 4rem/,
   'parameter labels, sliders, and numeric inputs stay inside the card');
-  assert.match(WORKBENCH_CSS, /\[data-carrier="color"\]/,
+  assert.match(TOP_LEVEL_WORKBENCH_CSS, /\[data-carrier="color"\]/,
     'each carrier domain carries its own hue');
 });
 
