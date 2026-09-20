@@ -346,6 +346,7 @@ const validateChain = (chain, catalog, report, guard) => {
     return Math.ceil(cursor / step) * step;
   };
   let arenaBytes = 0;
+  let runtimeParameters = 0;
   chain.forEach((entry, index) => {
     const path = `$.descriptor.chain[${index}]`;
     guard(() => {
@@ -366,6 +367,7 @@ const validateChain = (chain, catalog, report, guard) => {
       }
       resolved[index] = operator;
       known.set(entry.label, operator);
+      runtimeParameters += operator.params.length;
       for (const kind of ['param', 'prepared', 'state']) {
         const block = operator.blocks?.[kind] ?? { size: 0, align: 1 };
         arenaBytes = alignUp(arenaBytes, block.align) + block.size;
@@ -377,6 +379,9 @@ const validateChain = (chain, catalog, report, guard) => {
   if (arenaBytes > budgets.arena_bytes)
     report('BUDGET_EXCEEDED', '$.descriptor.chain',
       `The chain needs ${arenaBytes} arena bytes of the ${budgets.arena_bytes} budget.`);
+  if (runtimeParameters > budgets.max_params)
+    report('BUDGET_EXCEEDED', '$.descriptor.chain',
+      `The chain needs ${runtimeParameters} runtime parameters of the ${budgets.max_params} budget.`);
 
   const first = resolved[0];
   if (first && first.input !== 'sphere')
@@ -497,13 +502,10 @@ const validateParameterBinding = (parameter, path, chainOperators, report) => {
   }
 };
 
-const validateParameters = (parameters, limits, budgets, chainOperators, report, guard) => {
+const validateParameters = (parameters, limits, chainOperators, report, guard) => {
   array(parameters, '$.descriptor.parameters');
   if (parameters.length > limits.parameters)
     fail('schema', 'PARAMETER_LIMIT', '$.descriptor.parameters', 'The parameter limit was exceeded.');
-  if (parameters.length > budgets.max_params)
-    report('BUDGET_EXCEEDED', '$.descriptor.parameters',
-      `The document exceeds the ${budgets.max_params}-parameter budget.`);
   const seen = new Set();
   const groups = new Map();
   // Only a shape-validated parameter enters the map: every later pass reads
@@ -709,7 +711,7 @@ export function validateShaderDocument(document, options = {}) {
     ['chain', 'parameters', 'path_policies', 'serialization'], '$.descriptor');
   const chainOperators = validateChain(descriptor.chain, catalog, report, guard);
   const parameters = validateParameters(
-    descriptor.parameters, limits, catalog.budgets, chainOperators, report, guard);
+    descriptor.parameters, limits, chainOperators, report, guard);
   const pathPolicies = validatePathPolicies(
     descriptor.path_policies, parameters, report, guard);
   guard(() => {
@@ -1009,18 +1011,20 @@ const v1Slots = (roleNodes) => {
 
   add('camera', { operator: 'sphere.rotate.v2' });
 
-  const lens = surface.lens ?? 'identity';
-  if (lens !== 'identity')
-    add('lens', v1PolicyPick(V1_LENS_OPERATORS, lens, 'stage.surface_project.lens'));
-
   const pre = surface.pre_lens_surface ?? 'identity';
   const post = surface.post_lens_surface ?? 'identity';
   if (pre !== 'identity' && post !== 'identity')
     failV1('V1_POLICY_UNSUPPORTED', 'stage.surface_project',
       'A v1 document with two surface displacements has no chain expansion.');
-  const displacement = pre !== 'identity' ? pre : post;
-  if (displacement !== 'identity')
-    add('surface', v1PolicyPick(V1_SURFACE_OPERATORS, displacement, 'stage.surface_project'));
+  if (pre !== 'identity')
+    add('surface', v1PolicyPick(V1_SURFACE_OPERATORS, pre, 'stage.surface_project'));
+
+  const lens = surface.lens ?? 'identity';
+  if (lens !== 'identity')
+    add('lens', v1PolicyPick(V1_LENS_OPERATORS, lens, 'stage.surface_project.lens'));
+
+  if (post !== 'identity')
+    add('surface', v1PolicyPick(V1_SURFACE_OPERATORS, post, 'stage.surface_project'));
 
   if (surface.projection === undefined)
     failV1('V1_POLICY_UNSUPPORTED', 'stage.surface_project.projection',
