@@ -2996,6 +2996,8 @@ test('a refused parameter edit keeps the accepted deep-link value', () => {
   assert.equal(controller.getValue(), 0.8);
   assert.deepEqual(controller.acceptedUrlValues, [0.2]);
   assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', 0.2]]);
+  assert.deepEqual(h.writes, ['engine:Speed=0.8'],
+    'a write refused by the main engine never reaches the segment workers');
 });
 
 test('a definition with no accepted value falls back to its requested target', () => {
