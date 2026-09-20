@@ -162,6 +162,42 @@ async function smokePage(browser, origin, page) {
           `${NETWORK_IDLE_TIMEOUT_MS}ms`);
     }
     const draws = await tab.evaluate(() => window.daydreamSmokeDraws);
+    if (page === 'index.html') {
+      await tab.evaluate(async () => {
+        const { selectMimeType } = await import('/recorder.js');
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 32;
+        document.body.appendChild(canvas);
+        const context = canvas.getContext('2d');
+        const stream = canvas.captureStream(0);
+        const track = stream.getVideoTracks()[0];
+        const mimeType = selectMimeType('auto');
+        if (!mimeType) throw new Error('No supported recording codec');
+        const recorder = new MediaRecorder(stream, { mimeType });
+        const chunks = [];
+        const stopped = new Promise((resolve, reject) => {
+          recorder.ondataavailable = (event) => chunks.push(event.data);
+          recorder.onerror = reject;
+          recorder.onstop = resolve;
+        });
+        try {
+          recorder.start();
+          for (const color of ['red', 'green', 'blue', 'red', 'green', 'blue']) {
+            context.fillStyle = color;
+            context.fillRect(0, 0, 32, 32);
+            track.requestFrame();
+            await new Promise(requestAnimationFrame);
+            await new Promise((resolve) => setTimeout(resolve, 200));
+          }
+          recorder.stop();
+          await stopped;
+          if (new Blob(chunks).size === 0) throw new Error('Canvas recording produced no data');
+        } finally {
+          for (const captured of stream.getTracks()) captured.stop();
+          canvas.remove();
+        }
+      });
+    }
     console.log(`  ${page}: ${draws} draw calls`);
   } catch (error) {
     problems.push(error instanceof Error ? error.message : String(error));
