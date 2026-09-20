@@ -19,8 +19,13 @@ const engineRoot = engineCandidates.find(
 const engineMissing = `no Holosphere checkout found in ${engineCandidates.join(', ')}`;
 const engineSkip = engineRoot || process.env.HOLOSPHERE_ENGINE_REQUIRED ? false : engineMissing;
 
-const committed = (root, path) => execFileSync(
-  'git', ['-C', root, 'show', `HEAD:${path}`], { encoding: 'buffer' });
+const committed = (root, path, revision = 'HEAD') => execFileSync(
+  'git', ['-C', root, 'show', `${revision}:${path}`], { encoding: 'buffer' });
+
+const committedJsonNames = (root, directory, revision = 'HEAD') => execFileSync(
+  'git', ['-C', root, 'ls-tree', '-z', '--name-only', `${revision}:${directory}`],
+  { encoding: 'utf8' },
+).split('\0').filter((name) => name.endsWith('.json')).sort();
 
 function cppFloatConstant(source, name) {
   const match = new RegExp(
@@ -55,13 +60,25 @@ test('the toolchain record describes a release module', () => {
   assert.equal(fields.dev_bindings, 'OFF');
 });
 
-test('the committed shader modules match engine HEAD byte for byte', { skip: engineSkip }, () => {
+test('the committed shader artifacts match the pinned engine byte for byte', { skip: engineSkip }, () => {
   assert.ok(engineRoot, engineMissing);
-  for (const name of ['shader_workbench.mjs', 'sha256.mjs']) {
+  const engineRevision = text('holosphere_wasm.sha').trim();
+  for (const name of ['shader_workbench.mjs', 'sha256.mjs', 'engine_catalog.json']) {
     assert.deepEqual(
       committed('.', `shader/${name}`),
-      committed(engineRoot, `scripts/${name}`),
-      `${name} differs from engine HEAD`,
+      committed(engineRoot, `scripts/${name}`, engineRevision),
+      `${name} differs from the pinned engine`,
+    );
+  }
+  const installed = committedJsonNames('.', 'shader/patterns')
+    .filter((name) => name !== 'digest_migration.v1v2.json');
+  const authored = committedJsonNames(engineRoot, 'patterns', engineRevision);
+  assert.deepEqual(installed, authored, 'the installed pattern artifact set differs from the pinned engine');
+  for (const name of authored) {
+    assert.deepEqual(
+      committed('.', `shader/patterns/${name}`),
+      committed(engineRoot, `patterns/${name}`, engineRevision),
+      `patterns/${name} differs from the pinned engine`,
     );
   }
 });
