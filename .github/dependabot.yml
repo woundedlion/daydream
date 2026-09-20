@@ -24,3 +24,11 @@ updates:
       # red until that runs.
       browser-runtime:
         dependency-type: production
+  - package-ecosystem: pip
+    directory: /requirements
+    schedule:
+      interval: monthly
+    groups:
+      python-tooling:
+        patterns:
+          - "*"

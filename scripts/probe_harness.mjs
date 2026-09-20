@@ -17,12 +17,6 @@ import { serveStagedSite } from './vendor-stage.mjs';
 const reason = (error) => (error instanceof Error ? error.message : String(error));
 
 /**
- * A verdict sink: one console line per check, and the misses kept for the
- * probe's own report.
- * @returns {{failures: string[], check: (ok: boolean, message: string) => void}}
- *   The collected failures and the recorder that fills them.
- */
-/**
  * @param {string} url - The calling module's import.meta.url.
  * @returns {boolean} Whether node was pointed at that module.
  * @details A probe is a script and a module at once: run directly it drives a
@@ -32,6 +26,12 @@ export function isMain(url) {
   return process.argv[1] !== undefined && url === pathToFileURL(process.argv[1]).href;
 }
 
+/**
+ * A verdict sink: one console line per check, and the misses kept for the
+ * probe's own report.
+ * @returns {{failures: string[], check: (ok: boolean, message: string) => void}}
+ *   The collected failures and the recorder that fills them.
+ */
 export function checks() {
   /** @type {string[]} */
   const failures = [];
