@@ -4,6 +4,7 @@
 // on the assembly the root actually produced rather than on its source text.
 // Shared by tests/daydream_start.test.js and tests/daydream_boot.test.js.
 import { fakeElement, installDocument } from './fake_dom.js';
+import { fakeColorAttribute } from './fake_three.js';
 
 // bootstrap.js starts the app on import when a document already exists, and
 // daydream.js pulls it in for the failure overlay — so the module graph is
@@ -47,7 +48,13 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
     decimals() { return controller; },
     name(text) { controller.label = text; return controller; },
     onChange(fn) { controller.changed = fn; return controller; },
-    setValue(v) { controller.value = v; controller.changed?.(v); return controller; },
+    setValue(v) {
+      if (object[property] === v) return controller;
+      object[property] = v;
+      controller.value = v;
+      controller.changed?.(v);
+      return controller;
+    },
     // Two implementations, told apart the way lil-gui does: a controller add()
     // built from an options list is an OptionController, whose options() updates
     // its <select> in place and hands back the same controller; any other
@@ -158,7 +165,7 @@ export function fakeDriver() {
     columnFillOverlap: 1,
     recorder: null,
     pixels: null,
-    dotMesh: { instanceColor: { array: null, needsUpdate: false } },
+    dotMesh: { instanceColor: fakeColorAttribute(null) },
     renderer: { setAnimationLoop(frame) { this.frame = frame; } },
     keys: [],
     frames: 0,

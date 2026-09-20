@@ -33,11 +33,29 @@ import {
 } from '../daydream.js';
 import {
   createSegmentPoolSpawner,
+  fakeDriver,
   fakeGui,
   startApp as startUntrackedApp,
   segmentCountControl,
   SHADER_DOCUMENT_EFFECTS,
 } from './fake_app.js';
+
+test('the app doubles preserve controller and instance attribute contracts', () => {
+  const state = { amount: 1 };
+  const control = fakeGui('test').add(state, 'amount');
+  const changes = [];
+  control.onChange((value) => changes.push([value, state.amount]));
+  control.setValue(1);
+  control.setValue(2);
+  assert.deepEqual(changes, [[2, 2]]);
+  assert.equal(control.getValue(), 2);
+
+  const attribute = fakeDriver().dotMesh.instanceColor;
+  attribute.array = new Uint16Array(6);
+  attribute.needsUpdate = true;
+  assert.equal(attribute.version, 1);
+  assert.throws(() => { attribute.array = new Uint16Array(3); }, /GPU buffer is sized 6/);
+});
 
 restoreDocumentAfterEach();
 const startedApps = [];
@@ -594,9 +612,8 @@ test('a segmented-POV failure is announced and returns the toggle', async () => 
     'a console-only failure is invisible: the user sees the toggle flip back '
     + 'and cannot tell it from a mis-click, and the fault banner covers only '
     + 'latched runtime faults');
-  assert.equal(enabled.value, false,
-    'setValue (not updateDisplay) is what makes the deep-link writer drop '
-    + 'segmented=true from the URL');
+  assert.equal(enabled.object[enabled.property], false,
+    'the failed switch leaves the bound state disabled');
 });
 
 test('the segmented controls report under the switch owner tag', () => {
