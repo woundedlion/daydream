@@ -121,6 +121,8 @@ export class VideoRecorder {
     // over a dead session.
     /** @type {((err: Error) => void)|null} */
     this.onError = null;
+    /** @type {((err: Error, filename: string) => void)|null} Save failure for a completed session. */
+    this.onSaveError = null;
     // Host hook fired when an explicit format falls back to the browser's
     // default container. Receives the actual file extension.
     /** @type {((ext: string) => void)|null} */
@@ -678,6 +680,9 @@ export class VideoRecorder {
               await writable.close();
             } catch (err) {
               console.error('VideoRecorder: finalizing the streamed file failed; it may be truncated or incomplete.', err);
+              this.onSaveError?.(new Error(
+                'finalizing the file failed; it may be truncated or incomplete.',
+                { cause: err }), filename);
             }
           })
           .catch((err) => {
