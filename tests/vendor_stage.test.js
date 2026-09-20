@@ -8,13 +8,13 @@
 // which the shared inode behind a hard-linked file would quietly break.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { get as httpGet } from 'node:http';
 import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { serveStagedSite, stageSite } from '../scripts/vendor-stage.mjs';
 import { manifestEntries } from './site_pages.js';
+import { request } from './http_request.js';
 
 const staged = stageSite();
 after(() => rmSync(staged.root, { recursive: true, force: true }));
@@ -28,21 +28,6 @@ const stagedFile = (path) => readFileSync(join(staged.root, path), 'utf8');
 const scratchDirs = () => readdirSync(tmpdir())
   .filter((name) => name.startsWith('daydream-staged-site-'))
   .sort();
-
-/**
- * One request against a running site.
- * @param {string} origin - Origin the server listens on.
- * @param {string} path - Request path.
- * @returns {Promise<{status: number, body: string}>} The response.
- */
-const request = (origin, path) => new Promise((done, fail) => {
-  httpGet(`${origin}${path}`, { agent: false }, (res) => {
-    let body = '';
-    res.setEncoding('utf8');
-    res.on('data', (chunk) => { body += chunk; });
-    res.on('end', () => done({ status: res.statusCode ?? 0, body }));
-  }).on('error', fail);
-});
 
 test('the staged import map resolves both libraries locally', () => {
   const map = stagedFile('vendor-importmap.js');
