@@ -45,7 +45,7 @@ function readTsconfig() {
 // side-effect `import`, and the parenthesized form both `import()` and a JSDoc
 // `@typedef {import('./x.js').T}` use — the latter names a module whose types
 // the roster has to carry just as a static import does.
-const SPECIFIER = /\b(?:from|import)\s*\(?\s*["'](\.{1,2}\/[^"']+)["']/g;
+const SPECIFIER = /\b(?:(?:from|import)\s*\(?|new\s+Worker\s*\(\s*new\s+URL\s*\()\s*["'](\.{1,2}\/[^"']+)["']/g;
 
 /**
  * The relative-module specifiers one file imports, resolved against the

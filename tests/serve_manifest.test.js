@@ -118,6 +118,8 @@ test('nothing outside the manifest set is served', () => withSite(async (get) =>
 }));
 
 test('a path that escapes the site root is refused', () => withSite(async (get) => {
+  assert.equal((await get('/styles/%2e%2e%2fscripts/run-tests.mjs')).status, 404,
+    'encoded traversal inside the site root bypassed the manifest');
   // The URL parser resolves a plain `..` segment away before the server sees
   // it, so the traversal a served path could carry is the encoded one.
   assert.equal((await get('/styles/%2e%2e%2f%2e%2e%2foutside.txt')).status, 404,

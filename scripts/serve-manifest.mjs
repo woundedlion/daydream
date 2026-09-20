@@ -45,6 +45,9 @@ export async function serveManifest(entries, root = ROOT) {
       const requested = decodeURIComponent(
         new URL(req.url ?? '/', 'http://localhost').pathname).replace(/^\/+/, '');
       const path = requested === '' ? 'index.html' : requested;
+      if (path.split(/[\\/]/).some(part => part === '..' || part === '.')) {
+        throw new Error('non-canonical path');
+      }
       const candidate = resolve(root, path);
       if (served(path) && candidate.startsWith(`${root}${sep}`) &&
         existsSync(candidate) && statSync(candidate).isFile()) {
