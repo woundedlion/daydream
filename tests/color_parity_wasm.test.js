@@ -13,7 +13,7 @@ import createHolosphereModule from '../holosphere_wasm.js';
 import * as C from '../tools/color.js';
 import * as P from '../tools/palette_math.js';
 import {
-  defaultPaletteRecipe, maxSrgbGamutChroma, oklchLinearRgb, PaletteV4,
+  defaultPaletteRecipe, hueKeyState, maxSrgbGamutChroma, oklchLinearRgb, PaletteV4,
 } from '../tools/palette_controls.js';
 import * as L from '../tools/lissajous_math.js';
 import * as MB from '../tools/mobius_transforms.js';
@@ -494,6 +494,54 @@ test('Complementary harmony progresses once from the seed to its opposite', () =
     assert.ok(result.lut[2] > result.lut[0] && result.lut[2] > result.lut[1]);
     assert.ok(result.lut[765] > result.lut[767]);
     assert.ok(result.lut[766] > result.lut[767]);
+  } finally {
+    ops.delete();
+  }
+});
+
+test('hue control keys match the engine palette path', () => {
+  const ops = new M.PaletteOps();
+  const hueAt = (diagnostics, position) => {
+    const scaled = position * 255;
+    const left = Math.floor(scaled);
+    const right = Math.ceil(scaled);
+    const mix = scaled - left;
+    return diagnostics[left * 6 + 4] * (1 - mix) +
+      diagnostics[right * 6 + 4] * mix;
+  };
+  const assertRecipe = (recipe, name) => {
+    const state = hueKeyState(recipe);
+    const diagnostics = ops.inspectV4(recipe).diagnostics;
+    const divisor = recipe.domain === PaletteV4.domain.LOOP
+      ? state.offsets.length : state.offsets.length - 1;
+    state.offsets.forEach((offset, index) => {
+      const expected = (state.baseTurns + offset) * Math.PI * 2;
+      const actual = hueAt(diagnostics, index / divisor);
+      const delta = actual - expected;
+      assert.ok(Math.abs(delta - Math.round(delta / (Math.PI * 2)) * Math.PI * 2) < 0.005,
+        `${name} key ${index}: engine=${actual} ` +
+        `tool=${expected}`);
+    });
+  };
+
+  try {
+    for (const harmony of Object.values(PaletteV4.harmony)) {
+      for (const direction of Object.values(PaletteV4.direction)) {
+        const recipe = defaultPaletteRecipe();
+        recipe.hue.harmony = harmony;
+        recipe.hue.direction = direction;
+        recipe.domain = PaletteV4.domain.STRAIGHT;
+        recipe.easing = PaletteV4.easing.LINEAR;
+        assertRecipe(recipe, `harmony=${harmony} direction=${direction}`);
+      }
+    }
+    for (const domain of [PaletteV4.domain.STRAIGHT, PaletteV4.domain.LOOP]) {
+      const recipe = defaultPaletteRecipe();
+      recipe.hue.mode = PaletteV4.hueMode.SWEEP;
+      recipe.domain = domain;
+      recipe.easing = PaletteV4.easing.LINEAR;
+      assertRecipe(recipe, `sweep domain=${domain}`);
+    }
   } finally {
     ops.delete();
   }
