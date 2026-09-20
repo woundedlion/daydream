@@ -137,3 +137,14 @@ jobs:
           path: _site
       - id: deployment
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+      - name: Verify published engine MIME types
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          for asset in holosphere_wasm.wasm holosphere_wasm.js; do
+            mime="$(curl --fail --silent --show-error --location --retry 5 --retry-all-errors --output /dev/null --write-out '%{content_type}' "${PAGE_URL%/}/$asset")"
+            case "$asset:$mime" in
+              *.wasm:application/wasm*|*.js:text/javascript*|*.js:application/javascript*) ;;
+              *) echo "::error::$asset has unexpected Content-Type: $mime"; exit 1 ;;
+            esac
+          done
