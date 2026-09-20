@@ -210,6 +210,7 @@ async function init() {
     lights: true,
     showSphere: false,
     onAfterRender: updateLabels,
+    onAfterResize: () => { labelsNeedReproject = true; },
   });
   scene = result.scene;
   camera = result.camera;
@@ -1291,8 +1292,7 @@ function renderMesh() {
       meshData, edgeCount));
 }
 
-// Set true whenever the label set is (re)built, so updateLabels re-projects
-// it once even if the camera happens not to have moved that frame.
+// Set when labels or viewport change, even if the camera pose is unchanged.
 let labelsNeedReproject = false;
 // Cached camera transform from the last projection — lets updateLabels skip
 // the ~1000-label loop on frames where the camera is identical (autorotate
@@ -1318,9 +1318,6 @@ const labelSize = new THREE.Vector2();
 // current camera; guarded because the loop starts before init finishes.
 function updateLabels() {
   if (state.showIndices && currentMesh && labelsContainer && labelsContainer.children.length > 0) {
-    // Nothing to do when neither the camera nor the label set changed since
-    // the last projection. (A canvas resize without camera motion is the one
-    // gap; autorotate — on by default — refreshes positions within a frame.)
     const moved = labelCameraMoved();
     if (!moved && !labelsNeedReproject) return;
     labelsNeedReproject = false;
