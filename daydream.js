@@ -35,7 +35,7 @@ import { createPoleLodBinding } from "./pole_lod.js";
 import { createRecordingSettings } from "./recording_settings.js";
 import { createSegmentSpawnGuard, createSegmentedFallback } from "./segment_policy.js";
 import { AppState, URLSync, replaceUrl } from "./state.js";
-import { VideoRecorder } from "./recorder.js";
+import { VideoRecorder, MEMORY_BUFFER_LIMIT_BYTES } from "./recorder.js";
 import {
   SEGMENT_CONTROLLER_API_VERSION,
   SegmentController,
@@ -418,9 +418,13 @@ export function createRecordingControls({
     const axisWarning = isRecording && driver.labelAxes
       ? ' Axis labels are page overlays, not canvas pixels; the recording will not carry them.'
       : '';
+    const memoryNotice = isRecording && typeof globalThis.showSaveFilePicker !== 'function'
+      ? ` This browser saves up to ${MEMORY_BUFFER_LIMIT_BYTES / 1_000_000} MB per recording`
+        + ` (about ${Math.floor(MEMORY_BUFFER_LIMIT_BYTES * 8 / (recSettings.recQuality * 1_000_000))} seconds at this quality).`
+      : '';
     showNotice(
       `${isRecording ? 'Recording started.' : 'Recording stopped.'}`
-      + `${formatFallback}${axisWarning}`);
+      + `${formatFallback}${axisWarning}${memoryNotice}`);
     showRecording(isRecording);
   }};
 
