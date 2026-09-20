@@ -1246,6 +1246,28 @@ test('a shared module a worker refuses is dropped before the next spawn', async 
   c.destroy();
 });
 
+test('a refused shared compilation automatically retries without the module', () => {
+  const clock = installFakeTimers();
+  const c = makeController();
+  try {
+    c.active = true;
+    c.create(2);
+    c.workers[0].onmessage({ data: {
+      type: 'engineRejected', sharedModule: true, reason: 'LinkError',
+    } });
+    assert.equal(c.faulted, false);
+    assert.equal(c.workers.length, 0);
+    clock.fireOnly(BOOT_RETRY_DELAY_MS, 'one rebuild');
+    assert.equal(c.workers.length, 2);
+    assert.equal(c.bootAttempt, 1);
+    assert.equal(c.workers[0].posted.find((m) => m.type === 'init').wasmModule,
+      undefined);
+  } finally {
+    c.destroy();
+    clock.restore();
+  }
+});
+
 test('a rejection unrelated to the shared module keeps the compilation', async () => {
   const warmer = new ModuleWarmer();
   await warmer.warm({

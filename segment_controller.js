@@ -624,7 +624,19 @@ export class SegmentController {
           if (!booted[i]) { booted[i] = true; bootedCount++; }
           if (bootedCount === numSegments) this.clearTimers('bootWatchdog');
         } else if (msg.type === 'engineRejected') {
-          if (msg.sharedModule) this.moduleWarmer.discard();
+          if (msg.sharedModule) {
+            this.moduleWarmer.discard();
+            if (!this.#ready && this.bootAttempt < MAX_BOOT_RETRIES) {
+              const next = this.bootAttempt + 1;
+              this.destroy();
+              this.retryTimer = setTimeout(() => {
+                this.retryTimer = null;
+                if (this.active) this.create(this.count, next);
+              }, BOOT_RETRY_DELAY_MS);
+              unrefTimer(this.retryTimer);
+              return;
+            }
+          }
           this.onWorkerFault(i, `worker seg ${i} engine rejected: ${msg.reason}`);
         } else if (msg.type === 'frame') {
           // A halted pool zeroed `pending`; ignore late frames so it can't go negative.
