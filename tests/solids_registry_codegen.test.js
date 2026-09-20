@@ -168,9 +168,9 @@ test('generateRegistryCpp refuses a Catalan seed, which no Recipe can index', ()
 });
 
 /**
- * The simple_registry seeds solids.h declares no SEED_* constant for, so a
- * paste on one has to define it. Pinned here so the roster the generator
- * encodes cannot drift from solids.h unnoticed.
+ * Seeds the tool treats as lacking a reusable SEED_* constant, so its paste
+ * defines one. This is a daydream-side format roster; the engine registry is
+ * not inspected by this suite.
  */
 const SEEDS_WITHOUT_CONSTANTS = [
   'tetrahedron', 'cube', 'truncatedTetrahedron', 'cuboctahedron',
@@ -188,17 +188,17 @@ test('the encoded seed roster splits simple_registry into the two cases', () => 
   }
 });
 
-test('generateRegistryCpp names a declared SEED_* constant without redefining it', () => {
+test('generateRegistryCpp reuses constants on the tool roster', () => {
   for (const seed of DEFINED_SEED_CONSTANTS) {
     const code = generateRegistryCpp({ base: seed, ops: ['ambo'] });
     assert.match(code, new RegExp(`\\n {4}SEED_${upperSnake(seed)}, `),
       `the Recipe for "${seed}" must seed on its own constant`);
     assert.doesNotMatch(code, /inline constexpr uint8_t SEED_/,
-      `solids.h already declares SEED_${upperSnake(seed)}`);
+      `the tool roster marks SEED_${upperSnake(seed)} reusable`);
   }
 });
 
-test('generateRegistryCpp defines the SEED_* constant solids.h lacks', () => {
+test('generateRegistryCpp defines constants absent from the tool roster', () => {
   for (const seed of SEEDS_WITHOUT_CONSTANTS) {
     const code = generateRegistryCpp({ base: seed, ops: ['ambo'] });
     const constName = `SEED_${upperSnake(seed)}`;
@@ -255,7 +255,7 @@ test('generateRegistryCpp emits a step table and Recipe mirror for a hankin chai
     + '     Category::Complex, &DODECAHEDRON_HK62_AMBO_RECIPE},');
 });
 
-test('generateRegistryCpp wraps a long paste the way solids.h already carries it', () => {
+test('generateRegistryCpp wraps a long paste in the tool format', () => {
   const item = {
     base: 'truncatedIcosahedron',
     ops: [
@@ -338,10 +338,9 @@ const HEAD_SHAPE_CHAINS = [
 ];
 
 /**
- * clang-format packs a braced-init list that fits on fewer lines, so a step
- * table emitted without a trailing comma comes back reflowed and the paste
- * fails the format gate solids.h is under. The trailing comma is what holds one
- * step per line, and it moves the closing brace to column 0.
+ * The tool deliberately emits one step per line for readable pastes. Its
+ * trailing comma keeps that format stable when clang-format runs, independent
+ * of how existing engine tables happen to be packed.
  */
 test('every step table emits one step per line, last step comma-terminated', () => {
   for (const base of SIMPLE_SEEDS) {
