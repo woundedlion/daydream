@@ -2972,8 +2972,10 @@ events invalidate it, and a cached view must be tested for both:
 - **A resolution change** — the backing buffer is pre-sized to `MAX_W × MAX_H`
   and never reallocated (§10.10), so `setResolution` detaches nothing. It moves
   the *active prefix* instead: the cached view stays live at the previous
-  resolution's length, and a 96×20 view left bound to a 288×144 dot mesh renders
-  the frame wrong rather than throwing. Only a length check catches it.
+  resolution's length. Three.js r183 throws during upload if an existing
+  attribute's array byte length differs from its allocated GPU buffer. A stale
+  view initially bound to a new mesh can instead allocate the wrong-sized buffer;
+  check the view length against the active resolution before binding it.
 
 ```js
 if (wasmPixels.buffer.byteLength === 0 ||

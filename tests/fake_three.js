@@ -193,9 +193,8 @@ function uploadLengthOf(array) {
  *   so tests assert on it rather than on a readable flag.
  * - the GPU buffer is sized from the array at first upload and every later
  *   upload is a bufferSubData into it, so the array length is fixed for the
- *   attribute's lifetime. Re-pointing at a live view of another length renders
- *   the wrong frame in a browser rather than throwing (README §10.2); here it
- *   throws.
+ *   attribute's lifetime. Three throws during upload if byteLength changes;
+ *   this fake reports the mismatch earlier, when the array is assigned.
  *
  * @param {?Uint16Array} array - Backing color array.
  * @returns {Object} Attribute stub exposing array/version/needsUpdate.
