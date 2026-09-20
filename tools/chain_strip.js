@@ -1303,6 +1303,9 @@ export function createChainStrip({
    * @returns {void}
    */
   const historyKeydown = (event) => {
+    const target = event.target;
+    if (target?.isContentEditable ||
+        ['INPUT', 'SELECT', 'TEXTAREA'].includes(target?.tagName)) return;
     if (!(event.ctrlKey || event.metaKey)) return;
     const key = typeof event.key === 'string' ? event.key.toLowerCase() : '';
     if (key === 'z' && !event.shiftKey) {
