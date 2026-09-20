@@ -59,10 +59,10 @@ function enumName(type, value) {
  * @returns {Promise<{clip: string, pixels: Uint16Array}>} The clip result's
  *   name and a detached copy of the full canvas readback.
  */
-async function renderWith(effect, rect, frames) {
+async function renderWith(effect, rect, frames, width = W, height = H) {
   const M = await createHolosphereModule({ print() {}, printErr() {} });
   const engine = new M.HolosphereEngine();
-  const resolution = enumName(M.ResolutionSetResult, engine.setResolution(W, H));
+  const resolution = enumName(M.ResolutionSetResult, engine.setResolution(width, height));
   assert.ok(resolution === 'RESIZED' || resolution === 'ALREADY_ACTIVE',
     `${W}x${H} must be buildable, got ${resolution}`);
   assert.equal(enumName(M.EffectSetResult, engine.setEffect(effect)), 'INSTALLED',
@@ -85,17 +85,17 @@ async function renderWith(effect, rect, frames) {
  * @returns {Promise<{canvas: Uint16Array, clips: string[], compacts: Uint16Array[],
  *   rects: Array<Object>}>} The composited canvas and the per-segment pieces.
  */
-async function compositeSegments(effect, total, frames) {
-  const canvas = new Uint16Array(W * H * 3);
+async function compositeSegments(effect, total, frames, width = W, height = H) {
+  const canvas = new Uint16Array(width * height * 3);
   const clips = [];
   const compacts = [];
   const rects = [];
   for (let id = 0; id < total; id++) {
-    const rect = computeSegmentRange(id, total, W, H);
-    const { clip, pixels } = await renderWith(effect, rect, frames);
+    const rect = computeSegmentRange(id, total, width, height);
+    const { clip, pixels } = await renderWith(effect, rect, frames, width, height);
     const compact = new Uint16Array(rect.w * rect.h * 3);
-    extractSegment(pixels, compact, W, rect);
-    compositeSegment(canvas, compact, W, rect);
+    extractSegment(pixels, compact, width, rect);
+    compositeSegment(canvas, compact, width, rect);
     clips.push(clip);
     compacts.push(compact);
     rects.push(rect);
@@ -147,13 +147,26 @@ test('four clipped segment renders stitch into the unclipped frame', async () =>
 });
 
 test('the stitch holds at every device-backed segment count', async () => {
-  for (const total of [2, 8]) {
+  for (const total of [2, 6, 8]) {
     const { canvas, clips } = await compositeSegments(CLIPPED_EFFECT, total, FRAMES);
     assert.equal(clips.filter((c) => c === 'APPLIED').length, total,
       `every one of the ${total} bands must narrow`);
     const at = firstDifference(canvas, reference.pixels);
     assert.equal(at, -1, at < 0 ? '' : `${total} segments differ at component ${at}: `
       + `composited ${canvas[at]} vs full-frame ${reference.pixels[at]}`);
+  }
+});
+
+test('production resolution stitches at every supported segment count', async () => {
+  const width = 288, height = 144;
+  const full = await renderWith(CLIPPED_EFFECT,
+    { x0: 0, x1: width, y0: 0, y1: height }, FRAMES, width, height);
+  assert.ok(new Set(full.pixels).size > 1);
+  for (const total of [2, 4, 6, 8]) {
+    const { canvas, clips } = await compositeSegments(
+      CLIPPED_EFFECT, total, FRAMES, width, height);
+    assert.equal(clips.filter(clip => clip === 'APPLIED').length, total);
+    assert.equal(firstDifference(canvas, full.pixels), -1, `${total} segments at ${width}x${height}`);
   }
 });
 
