@@ -605,6 +605,10 @@ export class SegmentController {
 
       worker.onmessage = (e) => {
         const msg = /** @type {ControllerInboundMsg} */ (e.data);
+        if (!msg || typeof msg !== 'object' || typeof msg.type !== 'string') {
+          this.onWorkerFault(i, `worker seg ${i} sent an invalid message envelope`);
+          return;
+        }
         if (msg.type === 'ready') {
           if (!readied[i]) { readied[i] = true; readyCount++; }
           if (readyCount === numSegments) {

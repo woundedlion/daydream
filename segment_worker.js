@@ -543,6 +543,10 @@ async function handleMessage(msg) {
 let messageQueue = Promise.resolve();
 self.onmessage = (e) => {
   const msg = /** @type {WorkerInboundMsg} */ (e.data);
+  if (!msg || typeof msg !== 'object' || typeof msg.type !== 'string') {
+    post({ type: 'engineRejected', reason: 'invalid worker message envelope' });
+    return Promise.resolve();
+  }
   messageQueue = messageQueue
     .then(() => handleMessage(msg))
     .catch((err) => { setTimeout(() => { throw err; }); });
