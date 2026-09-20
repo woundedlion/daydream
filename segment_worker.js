@@ -260,6 +260,11 @@ async function handleMessage(msg) {
       // once per worker; only segment 0 logs. printErr stays live everywhere.
       if (segId !== 0) options.print = () => {};
       const compiled = msg.wasmModule;
+      let failInstantiation = () => {};
+      /** @type {Promise<null>} */
+      const instantiationFailed = new Promise((resolve) => {
+        failInstantiation = () => resolve(null);
+      });
       if (compiled) {
         // Instantiate the controller's single compilation instead of fetching and
         // compiling the 2 MB binary again here. The binary declares its own memory
@@ -269,13 +274,17 @@ async function handleMessage(msg) {
             (instance) => onInstance(instance, compiled),
             // The glue's instantiate has no rejection path, so without this the
             // await below never settles and the pool waits out its init watchdog.
-            (error) => post({ type: 'engineRejected',
-                              reason: `shared module instantiate failed: ${error}`,
-                              sharedModule: true }));
+            (error) => {
+              post({ type: 'engineRejected',
+                     reason: `shared module instantiate failed: ${error}`,
+                     sharedModule: true });
+              failInstantiation();
+            });
           return {};
         };
       }
-      const mod = await createHolosphereModule(options);
+      const mod = await Promise.race([createHolosphereModule(options), instantiationFailed]);
+      if (!mod) break;
       wasmModule = mod;
       if (mod.HolosphereEngine.isLive()) {
         post({ type: 'engineRejected',
