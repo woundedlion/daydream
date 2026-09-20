@@ -212,6 +212,18 @@ test('a shortest-turn field backfills as a period-1 periodic parameter', async (
   assertGreen(store);
 });
 
+test('an unknown catalog curve is refused instead of becoming linear', async () => {
+  const catalog = structuredClone(CATALOG);
+  const operator = catalog.operators.find(
+    (entry) => entry.id === 'sphere.displace.ripple.v2');
+  operator.params[0].curve = 'future-curve';
+  const store = await makeStore({ catalog });
+
+  assert.throws(() => store.replaceSpan(PROJECT, 0,
+    [{ operator: operator.id }]),
+  /unknown catalog curve "future-curve"/);
+});
+
 test('auto labels take the operator stage segment with the lowest free suffix', async () => {
   const store = await makeStore();
   assert.equal(store.replaceSpan(WARP, 0, [{ operator: 'warp.wave-shear.v2' }]).ok, true);
@@ -514,6 +526,21 @@ test('consecutive writes to one control coalesce into one undo step', async () =
   assert.equal(store.canUndo(), false);
   assert.equal(store.redo(), true);
   assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'), 5);
+});
+
+test('ending a value run gives the next drag its own undo entry', async () => {
+  const store = await makeStore();
+  const opening = presetValue(store, 'hex-twin-wave', 'sample.pattern-freq');
+  store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 2);
+  store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 3);
+  store.endValueRun();
+  store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 4);
+  store.setPresetValue('hex-twin-wave', 'sample.pattern-freq', 5);
+
+  assert.equal(store.undo(), true);
+  assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'), 3);
+  assert.equal(store.undo(), true);
+  assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'), opening);
 });
 
 // Every entry is a whole document clone, so an unbounded history is a session

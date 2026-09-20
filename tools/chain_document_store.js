@@ -79,12 +79,22 @@ const parameterFromField = (label, field) => {
   // their own uppercase vocabulary.
   const minimum = Math.fround(field.min);
   const maximum = Math.fround(field.max);
-  const periodic = field.curve === 'shortest-turn' ? { period: 1, unit: 'turn' }
-    : field.curve === 'shortest-periodic' ? { period: maximum, unit: 'radian' }
-      : null;
-  const kind = periodic !== null ? 'SHORTEST_PERIODIC'
-    : field.curve === 'log-positive' ? 'LOG_POSITIVE'
-      : field.curve === 'snap' ? 'SNAP' : 'LINEAR';
+  let periodic = null;
+  let kind;
+  switch (field.curve) {
+    case 'shortest-turn':
+      periodic = { period: 1, unit: 'turn' };
+      kind = 'SHORTEST_PERIODIC';
+      break;
+    case 'shortest-periodic':
+      periodic = { period: maximum, unit: 'radian' };
+      kind = 'SHORTEST_PERIODIC';
+      break;
+    case 'log-positive': kind = 'LOG_POSITIVE'; break;
+    case 'snap': kind = 'SNAP'; break;
+    case 'lerp': kind = 'LINEAR'; break;
+    default: throw new Error(`unknown catalog curve "${field.curve}" for "${field.id}"`);
+  }
   return {
     id: `${label}.${field.id}`,
     classification: 'preset',
@@ -767,6 +777,9 @@ export async function createChainDocumentStore({
     replaceSpan,
     relabel,
     setPresetValue,
+
+    /** Ends a slider's coalesced value run so its next gesture opens a new entry. */
+    endValueRun: () => { coalesceKey = null; },
 
     /** @returns {boolean} Whether a structural edit can be undone. */
     canUndo: () => undoStack.length > 0,
