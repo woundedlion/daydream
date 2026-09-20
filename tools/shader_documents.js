@@ -4,6 +4,7 @@
  */
 
 import { enumConstantName } from '../param_sync.js';
+import { errorDetail } from './banner.js';
 import { applyChainDocument } from './chain_apply.js';
 import { createChainDocumentStore, scratchChainDocument } from './chain_document_store.js';
 import { createChainStrip, titleCase } from './chain_strip.js';
@@ -825,19 +826,23 @@ export function createShaderDocumentController({
   };
 
   const onSourceChange = async () => {
-    const option = sourceSelect.selectedOptions[0];
-    if (!option?.value) {
-      await loadScratch();
+    try {
+      const option = sourceSelect.selectedOptions[0];
+      if (!option?.value) {
+        await loadScratch();
+        await flushDeepLink();
+        return;
+      }
+      const entry = catalog.get(option.value);
+      if (!entry) {
+        show(`The source catalog carries no document for "${option.value}".`, true);
+        return;
+      }
+      await loadSource(entry.source, entry.filename, entry.compiled);
       await flushDeepLink();
-      return;
+    } catch (error) {
+      show(`Could not load shader source: ${errorDetail(error)}`, true);
     }
-    const entry = catalog.get(option.value);
-    if (!entry) {
-      show(`The source catalog carries no document for "${option.value}".`, true);
-      return;
-    }
-    await loadSource(entry.source, entry.filename, entry.compiled);
-    await flushDeepLink();
   };
   const onPresetChange = () => {
     applyPreset(presetSelect.value);
@@ -846,12 +851,17 @@ export function createShaderDocumentController({
   };
   const onOpen = () => fileInput.click();
   const onFileChange = async () => {
-    const file = fileInput.files?.[0];
-    if (!file) return;
-    sourceSelect.value = '';
-    await loadSource(await file.text(), file.name);
-    await flushDeepLink();
-    fileInput.value = '';
+    try {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      sourceSelect.value = '';
+      await loadSource(await file.text(), file.name);
+      await flushDeepLink();
+    } catch (error) {
+      show(`Could not open shader document: ${errorDetail(error)}`, true);
+    } finally {
+      fileInput.value = '';
+    }
   };
   const onAnimationToggle = () => {
     const paused = getAnimationsPaused();

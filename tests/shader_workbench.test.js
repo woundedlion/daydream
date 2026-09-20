@@ -1674,3 +1674,20 @@ test('shader links reject duplicate document keys before information is lost', a
       (error) => error.cause?.code === 'DUPLICATE_KEY');
   }
 });
+
+test('a rejected file read is announced and the same file can be picked again', async () => {
+  const { controller, elements } = workbench();
+  await controller.init();
+  const input = elements.get('shader-document-file');
+  input.value = 'broken.shader.json';
+  input.files = [{ name: 'broken.shader.json', text: async () => { throw new Error('read failed'); } }];
+  await onChange(input)();
+  assert.equal(input.value, '');
+  const status = elements.get('shader-document-status');
+  assert.equal(status.dataset.status, 'error');
+  assert.match(status.textContent, /Could not open shader document.*read failed/);
+  input.value = 'broken.shader.json';
+  await onChange(input)();
+  assert.equal(input.value, '');
+  controller.dispose();
+});
