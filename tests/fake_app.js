@@ -48,6 +48,7 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
     decimals() { return controller; },
     name(text) { controller.label = text; return controller; },
     onChange(fn) { controller.changed = fn; return controller; },
+    updateDisplay() { return controller; },
     setValue(v) {
       if (object[property] === v) return controller;
       object[property] = v;

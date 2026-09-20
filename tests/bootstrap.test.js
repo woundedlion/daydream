@@ -21,8 +21,8 @@ function fakeDocument() {
     overlay,
     // The click handler returns the refresh-then-reload chain, so the caller is
     // handed it to await rather than dispatching and losing it.
-    click: (element) =>
-      element.listeners.find(({ type }) => type === 'click')?.handler(),
+    click: (element) => element.disabled ? undefined
+      : element.listeners.find(({ type }) => type === 'click')?.handler(),
   };
 }
 
@@ -185,6 +185,8 @@ test('the reload button reports the sweep and cannot be re-fired', async () => {
   assert.equal(reload.textContent, 'Reloading…');
   assert.equal(reload.disabled, true);
   assert.equal(refreshes, 1);
+  await click(reload);
+  assert.equal(refreshes, 1, 'the disabled button cannot start a second sweep');
 });
 
 test('bootstrap widens the resource-timing buffer before the module graph loads', async () => {

@@ -161,8 +161,11 @@ test('a fresh object sits at the origin and position.set chains, on both', () =>
 test('needsUpdate is write-only and only ever raises version, on both', () => {
   const real = new THREE.InstancedBufferAttribute(new Uint16Array(12), 3);
   const double = fake.fakeColorAttribute(new Uint16Array(12));
+  const matrixDouble = fake.fakeMatrixAttribute(new Float32Array(16));
 
-  for (const [label, attribute] of [['three', real], ['fake_three', double]]) {
+  for (const [label, attribute] of [
+    ['three', real], ['fake_three color', double], ['fake_three matrix', matrixDouble],
+  ]) {
     assert.equal(attribute.version, 0, `${label} starts unflagged`);
 
     attribute.needsUpdate = true;

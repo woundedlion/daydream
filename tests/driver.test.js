@@ -15,7 +15,7 @@ import {
 import { repointDisplayAliases } from '../display_aliases.js';
 import { captureConsole } from './fake_console.js';
 import { fakeElement } from './fake_dom.js';
-import { fakeColorAttribute } from './fake_three.js';
+import { fakeColorAttribute, fakeMatrixAttribute } from './fake_three.js';
 
 // ---------------------------------------------------------------------------
 // dotDetailFor
@@ -1177,7 +1177,7 @@ test('a keyboard-focused canvas rings and orbits until it loses focus', () => {
 function matricesCtx(w, h) {
   // Backed like the real attribute, the one destination the composed layout
   // is copied into.
-  const instanceMatrix = { array: new Float32Array(w * h * 16), needsUpdate: false };
+  const instanceMatrix = fakeMatrixAttribute(new Float32Array(w * h * 16));
   return {
     W: w,
     H: h,
@@ -1358,7 +1358,7 @@ test('precomputeMatrices flags both instance attributes for upload', () => {
   const ctx = matricesCtx(8, 5);
   Daydream.prototype.precomputeMatrices.call(ctx);
 
-  assert.equal(ctx.dotMesh.instanceMatrix.needsUpdate, true);
+  assert.equal(ctx.dotMesh.instanceMatrix.version, 1);
   assert.equal(ctx.dotMesh.instanceColor.version, 1);
 });
 

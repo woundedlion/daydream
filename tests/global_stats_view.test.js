@@ -4,10 +4,11 @@
 // mounted after the first frame from re-querying forever.
 //
 // Run: node --test --experimental-test-module-mocks "tests/*.test.js"
-import { test, mock } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fakeElement } from './fake_dom.js';
+import { captureConsole } from './fake_console.js';
 
 import { SLOW_FRAME_MS } from '../frame_constants.js';
 import { GlobalStatsView, STATS_CELL_IDS } from '../global_stats_view.js';
@@ -64,13 +65,7 @@ function metrics(over = {}) {
  * @param {Function} body - Code to run under the capture.
  * @returns {Array<string>} One joined message per call.
  */
-function captureWarnings(body) {
-  const messages = [];
-  const warn = mock.method(
-    console, 'warn', (...args) => messages.push(args.map(String).join(' ')));
-  try { body(); } finally { warn.mock.restore(); }
-  return messages;
-}
+const captureWarnings = (body) => captureConsole(body).messages;
 
 test('update writes the frame duration into both perf cells', () => {
   const { doc, byId } = makeDoc();
@@ -139,6 +134,10 @@ test('update lands each arena in its own row as usage|high-water|capacity KiB', 
 test('update mirrors every arena row into the mobile cells', () => {
   const { doc, byId } = makeDoc();
   new GlobalStatsView(doc).update(1, metrics());
+
+  assert.ok(Object.values(STATS_CELL_IDS)
+    .some(([desktop]) => byId[desktop].textContent !== ''),
+  'the mirrored rows must contain at least one rendered value');
 
   for (const [desktop, mobile] of Object.values(STATS_CELL_IDS)) {
     assert.equal(byId[mobile].textContent, byId[desktop].textContent);
