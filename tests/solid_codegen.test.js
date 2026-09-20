@@ -299,7 +299,7 @@ test('a parameterized op with empty params is rejected, not defaulted', () => {
     /relax param "iter" must be a positive integer/);
 });
 
-/** Verifies generateRecipeCpp emits the full FLASHMEM function source, prefixed by the V/F/I count comment, byte-for-byte. */
+/** Pins the tool's full FLASHMEM function format, including its V/F/I metadata. */
 test('generateRecipeCpp wraps the recipe in a FLASHMEM function with V/F/I comment', () => {
   const item = {
     base: 'tetrahedron',
@@ -323,8 +323,8 @@ test('generateRecipeCpp wraps the recipe in a FLASHMEM function with V/F/I comme
 });
 
 /**
- * The paste goes into solid_generators.h verbatim, which is clang-formatted at
- * 80 columns, so a line the emitter did not wrap lands as a gate violation.
+ * The tool keeps generated pastes within the target header's 80-column format.
+ * Existing Islamic-star builders do not otherwise establish this output shape.
  */
 test('generateRecipeCpp wraps a long function the way solid_generators.h carries it', () => {
   const cpp = generateRecipeCpp({
@@ -353,7 +353,7 @@ test('generateRecipeCpp wraps a long function the way solid_generators.h carries
 
 /**
  * A name too long to leave room for the first parameter moves the return type
- * to its own line instead, the shape solid_generators.h already carries.
+ * to its own line instead, a format-stable choice made by the tool.
  */
 test('generateRecipeCpp breaks after the return type when the name fills the line', () => {
   const cpp = generateRecipeCpp({
