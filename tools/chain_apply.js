@@ -45,6 +45,10 @@ export function applyChainDocument({
   engine, module, compiled, presetId, syncEffectGui, invalidate,
   programShape = null,
 }) {
+  const presets = compiled.document.preset_bank.presets;
+  const preset = presets.find(
+    (/** @type {*} */ candidate) => candidate.preset_id === presetId);
+  if (!preset) return `the document has no preset "${presetId}"`;
   const documentChain = /** @type {Array<{label: string, operator: string}>} */ (
     compiled.document.descriptor.chain);
   const chain = programShape
@@ -62,10 +66,6 @@ export function applyChainDocument({
 
   const definitions = /** @type {ParameterDefinition[]} */ (
     engine.getParameterDefinitions());
-  const presets = compiled.document.preset_bank.presets;
-  const preset = presets.find(
-    (/** @type {*} */ candidate) => candidate.preset_id === presetId)
-    ?? presets[0];
   /** @type {Array<[string, number]>} */
   const writes = [];
   for (const [parameterId, value] of Object.entries(preset?.values ?? {})) {

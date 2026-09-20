@@ -66,6 +66,12 @@ test('FakeChainEngine mocks nothing outside the pinned engine surface', () => {
   assert.deepEqual(unpinnedEngineMethods(new FakeChainEngine()), []);
 });
 
+test('unknown preset refuses before installing the chain', () => {
+  const { run, order } = harness();
+  assert.match(run(compiledDocument(), 'missing'), /no preset "missing"/);
+  assert.deepEqual(order, []);
+});
+
 test('apply runs setShaderChain, the writes, the resync and the repaint in order', () => {
   const { engine, order, run } = harness();
 
@@ -101,16 +107,12 @@ test('an enum8 value is written as its option index from the fresh definitions',
     [['sample.coverage-mode', 2], ['colorize.palette-mode', 2]]);
 });
 
-test('the named preset is the one applied, with the first as fallback', () => {
+test('the named preset is the one applied', () => {
   const first = harness();
   assert.equal(first.run(compiledDocument(
     { 'sample.speed': 0.1 }, { 'sample.speed': 0.9 }), 'dusk'), null);
   assert.deepEqual(first.engine.writes, [['sample.speed', 0.9]]);
 
-  const fallback = harness();
-  assert.equal(fallback.run(compiledDocument(
-    { 'sample.speed': 0.1 }, { 'sample.speed': 0.9 }), 'absent'), null);
-  assert.deepEqual(fallback.engine.writes, [['sample.speed', 0.1]]);
 });
 
 test('a setShaderChain refusal is surfaced verbatim and stops the apply', () => {
