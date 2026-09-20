@@ -75,11 +75,15 @@ export function engineParamValue(value) {
  * The state an interactive selector must display: the latest requested value
  * when the definition carries one, otherwise the renderer-owned value. `??`
  * rather than `||` because 0 is a valid enum index.
- * @param {{value: *, requestedValue?: *}} parameter - Engine parameter definition.
+ * @param {{value: *, requestedValue?: *, options?: string[]}} parameter - Engine parameter definition.
  * @returns {*} The value to display.
  */
 export function selectorControlValue(parameter) {
-  return parameter.requestedValue ?? parameter.value;
+  const value = parameter.requestedValue ?? parameter.value;
+  if (typeof value === 'number' && parameter.options?.length) {
+    return Math.max(0, Math.min(parameter.options.length - 1, Math.round(value)));
+  }
+  return value;
 }
 
 /**
