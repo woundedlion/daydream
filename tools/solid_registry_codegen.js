@@ -70,6 +70,9 @@ export function opStepCpp(o) {
   }
   const params = (typeof o === 'string' ? undefined : o.params) ?? {};
   if (opName === 'hankin') {
+    if (!(params.angle > 0)) {
+      throw new Error(`opStepCpp: hankin param "angle" must be positive, got ${params.angle}`);
+    }
     return `{Op::HANKIN, ${formatFloat(params.angle)} * IslamicStarPatterns::D2R}`;
   }
   if (opName === 'snub') {
@@ -124,6 +127,9 @@ function recipeStepCpp(step) {
     throw new Error(`generateRegistryCpp: base chain has unknown op "${opName}"`);
   }
   if (opName === 'hankin') {
+    if (!(step.param > 0)) {
+      throw new Error(`generateRegistryCpp: base chain hankin angle must be positive, got ${step.param}`);
+    }
     // Prefer the house `deg * D2R` product, but only where it reproduces the
     // engine's float exactly; otherwise emit the radian value itself.
     const deg = Math.round(step.param * (180 / Math.PI));

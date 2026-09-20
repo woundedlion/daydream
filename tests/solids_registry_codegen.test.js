@@ -46,6 +46,22 @@ test('opStepCpp rejects a relax with zero iterations', () => {
     /relax param "iter" must be at least 1/);
 });
 
+test('opStepCpp rejects non-positive hankin angles', () => {
+  for (const angle of [0, -0, -1]) {
+    assert.throws(() => opStepCpp({ op: 'hankin', params: { angle } }),
+      /opStepCpp: hankin param "angle" must be positive/);
+  }
+  for (const angle of [1, 90]) {
+    assert.equal(opStepCpp({ op: 'hankin', params: { angle } }),
+      `{Op::HANKIN, ${angle}.0f * IslamicStarPatterns::D2R}`);
+  }
+});
+
+test('generateRegistryCpp rejects an authored zero-angle hankin', () => {
+  const item = { base: 'icosahedron', ops: [{ op: 'hankin', params: { angle: 0 } }] };
+  assert.throws(() => generateRegistryCpp(item), /hankin param "angle"/);
+});
+
 test('opStepCpp rejects an unknown op instead of dereferencing a missing entry', () => {
   assert.throws(() => opStepCpp({ op: 'notAnOp', params: {} }), /unknown op "notAnOp"/);
   assert.throws(() => opStepCpp('notAnOp'), /unknown op "notAnOp"/);
@@ -404,11 +420,20 @@ test('generateRegistryCpp emits a base chain hankin angle no whole degree reprod
   assert.doesNotMatch(code, /\{Op::HANKIN, [0-9.]+f \* IslamicStarPatterns::D2R\}/);
 });
 
+test('generateRegistryCpp rejects non-positive base chain hankin angles', () => {
+  const item = { base: 'icosahedron_hkbad', ops: ['dual'] };
+  for (const angle of [0, -0, -0.5]) {
+    const baseRecipe = { seed: 'icosahedron', ops: [chainStep('hankin', angle)] };
+    assert.throws(() => generateRegistryCpp(item, baseRecipe),
+      /generateRegistryCpp: base chain hankin angle must be positive/);
+  }
+});
+
 test('generateRegistryCpp names the base chain hankin angle it cannot emit', () => {
   const item = { base: 'icosahedron_hkbad', ops: ['dual'] };
   const baseRecipe = { seed: 'icosahedron', ops: [chainStep('hankin', NaN)] };
   assert.throws(() => generateRegistryCpp(item, baseRecipe),
-    /generateRegistryCpp: base chain hankin angle non-finite value NaN/);
+    /generateRegistryCpp: base chain hankin angle must be positive, got NaN/);
 });
 
 test('generateRegistryCpp emits base chain params that read back as the same float32', () => {
