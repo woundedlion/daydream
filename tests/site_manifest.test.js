@@ -215,7 +215,10 @@ test('the site manifest covers every asset the served pages reference', () => {
 // Entries no served page references. The manifest exists to keep tests/,
 // scripts/ and dev tooling off Pages, so this list stays short: an entry earns a
 // place here only by being published for its own sake.
-const UNREFERENCED = ['README.md', 'docs/screenshots'];
+const UNREFERENCED = [
+  'README.md',
+  ...new Set(read('README.md').match(/docs\/screenshots\/[\w.-]+\.png/g) ?? []),
+];
 
 const PATTERNS = 'shader/patterns';
 const MIGRATION = `${PATTERNS}/shaderball_migration.json`;
