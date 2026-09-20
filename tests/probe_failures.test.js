@@ -1,3 +1,7 @@
+import { probeParity } from '../scripts/workbench-probe.mjs';
+import { probeHueWheel } from '../scripts/palettes-probe.mjs';
+import { probeHistoryRestore } from '../scripts/lissajous-probe.mjs';
+import { probeSliderDrag, probePresetName, probeMobilePanel, probeSidebar, probeWarningNote } from '../scripts/panel-probe.mjs';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
@@ -12,6 +16,18 @@ import { probePad } from '../scripts/mobius-probe.mjs';
 import { probeRationalLock } from '../scripts/lissajous-probe.mjs';
 
 const PROBES = [
+  ['workbench-probe.mjs', 'probeParity', probeParity],
+
+  ['palettes-probe.mjs', 'probeHueWheel', probeHueWheel],
+
+  ['lissajous-probe.mjs', 'probeHistoryRestore', probeHistoryRestore],
+
+  ['panel-probe.mjs', 'probeSliderDrag', probeSliderDrag],
+  ['panel-probe.mjs', 'probePresetName', probePresetName],
+  ['panel-probe.mjs', 'probeMobilePanel', probeMobilePanel],
+  ['panel-probe.mjs', 'probeSidebar', probeSidebar],
+  ['panel-probe.mjs', 'probeWarningNote', probeWarningNote],
+
   ['workbench-probe.mjs', 'probeStrip', probeStrip],
   ['panel-probe.mjs', 'probePanel', probePanel],
   ['solids-probe.mjs', 'probeChain', probeChain],
