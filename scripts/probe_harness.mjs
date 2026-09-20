@@ -135,7 +135,7 @@ export async function dragBetween(tab, from, to, options = {}) {
 // Paths the served set answers with a 404 by design: Chrome's implicit icon
 // fetch on a page that declares none, and the gitignored offline font drop the
 // tool pages link behind an onerror fallback to the font CDN.
-const ABSENT_PATHS = [/^\/favicon\.ico$/, /^\/vendor\//];
+const ABSENT_PATHS = [/^\/favicon\.ico$/, /^\/vendor\/fonts\/fonts\.css$/];
 
 /**
  * Watches one tab for everything that went wrong on it: uncaught exceptions,
