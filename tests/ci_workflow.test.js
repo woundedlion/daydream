@@ -13,6 +13,13 @@ const WORKFLOW_PATH = `${WORKFLOW_DIR}/ci.yml`;
 const DEPLOY_PATH = `${WORKFLOW_DIR}/deploy.yml`;
 const workflow = readFileSync(WORKFLOW_PATH, 'utf8');
 
+test('npm test retains discovery and coverage guards', () => {
+  const scripts = JSON.parse(readFileSync('package.json', 'utf8')).scripts;
+  assert.equal(scripts.pretest, 'node scripts/require-tests.mjs');
+  assert.equal(scripts.test, 'node scripts/run-tests.mjs --experimental-test-module-mocks ' +
+    '"tests/**/*.test.js" "tests/**/*.test.mjs" "tests/**/*.spec.js" "tests/**/*.spec.mjs"');
+});
+
 // Every `node-version:` spelling under .github/workflows, tagged with its file.
 const nodePins = (dir) => readdirSync(dir)
   .filter((file) => /\.ya?ml$/.test(file))
