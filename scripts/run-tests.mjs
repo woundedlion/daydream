@@ -33,11 +33,14 @@ const testDirs = new Set(
 
 const scratch = mkdtempSync(join(tmpdir(), 'daydream-run-tests-'));
 const loadsDir = join(scratch, 'loads');
+const reportPath = join(scratch, 'results.tap');
 const loaded = new Set();
 let status;
 try {
   mkdirSync(loadsDir);
-  const run = spawnSync(process.execPath, ['--test', ...args], {
+  const run = spawnSync(process.execPath, ['--test',
+    '--test-reporter=spec', '--test-reporter-destination=stdout',
+    '--test-reporter=tap', `--test-reporter-destination=${reportPath}`, ...args], {
     stdio: 'inherit',
     env: {
       ...process.env,
@@ -47,6 +50,10 @@ try {
   });
   if (run.error) throw run.error;
   status = run.status ?? 1;
+  if (status === 0 && !/^# tests [1-9]\d*\s*$/m.test(readFileSync(reportPath, 'utf8'))) {
+    console.error('run-tests: no tests executed; refusing an empty green run.');
+    status = 1;
+  }
   for (const entry of readdirSync(loadsDir)) {
     for (const url of JSON.parse(readFileSync(join(loadsDir, entry), 'utf8'))) {
       const key = keyOf(fileURLToPath(url.split(/[?#]/)[0]));

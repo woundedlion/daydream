@@ -43,6 +43,10 @@ test('a passing suite that loads every source module passes', () => {
   assert.match(run(PATTERN), /source modules were loaded by tests/);
 });
 
+test('an unmatched test pattern cannot report success', () => {
+  assert.match(fail('tests/no-such-test-*.js'), /no tests executed|Could not find/);
+});
+
 test('an untracked source module is outside the coverage roster', () => {
   trackFixture();
   writeFileSync(join(root, 'scratch.mjs'), 'export const scratch = true;\n');
