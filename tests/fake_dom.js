@@ -524,8 +524,7 @@ export function fakeElement(tag = 'div', options = {}) {
       /**
        * Runs one node's listeners for this event.
        * @param {Object} node - Node the event has reached.
-       * @param {boolean|null} capture - Capture flag to run, or null for the
-       *   at-target phase, which runs both flags in registration order.
+       * @param {boolean} capture - Capture flag to run.
        * @returns {void}
        */
       const fire = (node, capture) => {
@@ -535,7 +534,7 @@ export function fakeElement(tag = 'div', options = {}) {
         for (const l of [...node.listeners]) {
           if (stoppedHere) break;
           if (l.type !== type) continue;
-          if (capture !== null && l.capture !== capture) continue;
+          if (l.capture !== capture) continue;
           // Re-check membership: an earlier handler may have removed this one,
           // and the DOM skips a listener removed after the dispatch began.
           const at = node.listeners.indexOf(l);
@@ -549,7 +548,8 @@ export function fakeElement(tag = 'div', options = {}) {
         if (stopped) break;
         fire(node, true);
       }
-      if (!stopped) fire(this, null);
+      if (!stopped) fire(this, true);
+      if (!stopped) fire(this, false);
       if (dispatched.bubbles) {
         for (const node of ancestors) {
           if (stopped) break;
