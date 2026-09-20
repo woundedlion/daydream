@@ -97,6 +97,8 @@ export function selectorControlValue(parameter) {
 export function enumChoices(options) {
   /** @type {Object<string, number>} */
   const choices = {};
+  /** @type {string[]} */
+  const labels = [];
   options.forEach((label, i) => {
     // Duplicate labels would collapse to one object key, making the earlier
     // index unselectable; disambiguate rather than drop it.
@@ -105,8 +107,9 @@ export function enumChoices(options) {
     // that collides with nothing.
     while (Object.hasOwn(choices, key)) key = `${key} (${i})`;
     choices[key] = i;
+    labels.push(key);
   });
-  return choices;
+  return new Proxy(choices, { ownKeys: () => labels });
 }
 
 /**
