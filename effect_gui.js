@@ -646,8 +646,13 @@ export function createEffectGui({ engine, segments, config, host }) {
   function exportParams(fx, params, flashExport) {
     if (usesFullConfigSnapshot()) {
       const snapshot = getFullConfigSnapshot();
-      if (!snapshot || typeof copyText !== 'function') {
+      if (!snapshot) {
         logWarn('Export: Shader Workbench full-config snapshot is unavailable');
+        flashExport(EXPORT_FAILED);
+        return;
+      }
+      if (typeof copyText !== 'function') {
+        logWarn('Export: clipboard copy unavailable');
         flashExport(EXPORT_FAILED);
         return;
       }
