@@ -90,6 +90,17 @@ test('every workflow pins the Node version package.json requires', () => {
     `every setup-node pin must read ${required}`);
 });
 
+test('external workflow actions use immutable commit pins', () => {
+  for (const file of readdirSync(WORKFLOW_DIR).filter((name) => /\.ya?ml$/.test(name))) {
+    const source = readFileSync(`${WORKFLOW_DIR}/${file}`, 'utf8');
+    for (const match of source.matchAll(/^\s*(?:-\s*)?uses:\s*([^\s#]+)/gm)) {
+      const action = match[1];
+      if (action.startsWith('./')) continue;
+      assert.match(action, /^[^@]+@[0-9a-f]{40}$/, `${file}: ${action}`);
+    }
+  }
+});
+
 const needsPayload = (results) => JSON.stringify(
   Object.fromEntries(Object.entries(results).map(([name, result]) => [
     name,
