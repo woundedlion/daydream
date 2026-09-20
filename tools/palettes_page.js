@@ -1184,8 +1184,6 @@ async function init() {
           previousHueMode = nextMode;
         }
       }
-      if (id === 'gen_harmony' && el.value === 'COMPLEMENTARY')
-        document.getElementById('gen_path').value = 'OKLAB_CARTESIAN';
       syncRecipeControlAvailability();
       scheduleUpdate();
     });
