@@ -57,9 +57,9 @@ const REFRESHED_EXTENSIONS = ['.js', '.mjs', '.wasm', '.css', '.json'];
 // their sockets first.
 const REFRESH_CONCURRENCY = 6;
 
-// Resource-timing entries kept, over the 250-entry default. The buffer drops
-// every load past its size, and the dropped ones are the earliest — the modules
-// a Reload most needs to re-fetch.
+// Resource-timing entries kept, over the 250-entry default. Once full, the
+// buffer stops recording later loads, including the large WASM binary a Reload
+// most needs to re-fetch.
 const RESOURCE_TIMING_ENTRIES = 1000;
 
 // Deadline for the Reload sweep. The sweep only primes the cache; the reload
