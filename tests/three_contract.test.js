@@ -76,6 +76,20 @@ test('three still exports every class the double stands in for', () => {
   }
 });
 
+test('the driver instancing attributes accept streaming updates', () => {
+  const mesh = new THREE.InstancedMesh(new THREE.BufferGeometry(),
+    new THREE.MeshBasicMaterial(), 2);
+  const attribute = new THREE.InstancedBufferAttribute(new Float32Array(6), 3);
+  assert.equal(typeof THREE.StreamDrawUsage, 'number');
+  attribute.setUsage(THREE.StreamDrawUsage);
+  assert.equal(attribute.usage, THREE.StreamDrawUsage);
+  mesh.instanceColor = attribute;
+  assert.equal(mesh.instanceColor.count, 2);
+  mesh.geometry.dispose();
+  mesh.material.dispose();
+  mesh.dispose();
+});
+
 test('the scene graph disposes and clears through the methods initScene calls', () => {
   const scene = new THREE.Scene();
   const geometry = new THREE.SphereGeometry(1.0, 8, 4);
