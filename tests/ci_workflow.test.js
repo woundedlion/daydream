@@ -90,6 +90,13 @@ test('every workflow pins the Node version package.json requires', () => {
     `every setup-node pin must read ${required}`);
 });
 
+test('column-zero comments do not end the jobs mapping', () => {
+  const source = 'jobs:\n  build:\n    runs-on: ubuntu-latest\n# Browser gates\n'
+    + '  browser:\n    runs-on: ubuntu-latest\n  gate:\n    needs: build\n';
+  assert.deepEqual(workflowJobs(source), ['build', 'browser', 'gate']);
+  assert.deepEqual(missingTerminalDependencies(source, 'gate'), ['browser']);
+});
+
 test('external workflow actions use immutable commit pins', () => {
   for (const file of readdirSync(WORKFLOW_DIR).filter((name) => /\.ya?ml$/.test(name))) {
     const source = readFileSync(`${WORKFLOW_DIR}/${file}`, 'utf8');
