@@ -664,9 +664,36 @@ test('selectedIndex and value are the two writable views of one selection', () =
   select.value = 'missing';
   assert.deepEqual(select.options.map((option) => option.selected),
     [false, false, false], 'an unknown value selects nothing');
-  assert.deepEqual(select.selectedOptions.map((option) => option.value), ['a'],
-    'with nothing selected the first option shows again');
-  assert.equal(select.selectedIndex, 0);
+  assert.deepEqual(select.selectedOptions, []);
+  assert.equal(select.selectedIndex, -1);
+  assert.equal(select.value, '');
+});
+
+test('an explicitly empty select stays empty until selection or options change', () => {
+  const select = selectOf(['a', 'b']);
+  const seen = [];
+  const read = () => seen.push([select.value, select.selectedIndex, select.selectedOptions.length]);
+  read();
+  select.value = 'missing';
+  read();
+  select.value = 'b';
+  read();
+  select.selectedIndex = -1;
+  read();
+  const added = fakeElement('option');
+  added.value = 'c';
+  select.appendChild(added);
+  read();
+  select.selectedIndex = 8;
+  read();
+  const replacement = fakeElement('option');
+  replacement.value = 'd';
+  select.replaceChildren(replacement);
+  read();
+  assert.deepEqual(seen, [
+    ['a', 0, 1], ['', -1, 0], ['b', 1, 1], ['', -1, 0],
+    ['a', 0, 1], ['', -1, 0], ['d', 0, 1],
+  ]);
 });
 
 test('documentEvents runs the handlers of one type in registration order', () => {
