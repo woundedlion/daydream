@@ -6,9 +6,7 @@
 
 /** @typedef {(key: string, value: *, old: *) => void} StateListener */
 
-// Significant digits kept by roundUrlNumber. A lil-gui slider's implicit step is
-// a thousandth of its range, so 5 digits resolve every step of a param at any
-// magnitude, including one whose whole range is a small fraction of 1.
+// Significant digits kept by roundUrlNumber.
 const URL_SIGNIFICANT_DIGITS = 5;
 
 /**
