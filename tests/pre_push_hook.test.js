@@ -109,3 +109,19 @@ test('pre-push never reports success over a missing tool', () => {
   assert.deepEqual(lines.filter((line) => /\bexit 0\b/.test(line)), [],
     'a hook that can exit 0 early reports success over a suite it never ran');
 });
+
+test('pre-push refuses a failing unit suite even when later gates pass',
+  { skip: SKIP }, (t) => {
+    const root = fixtureRoot(t);
+    mkdirSync(join(root, 'node_modules'), { recursive: true });
+    writeFileSync(join(root, 'node_modules', '.package-lock.json'), '{}\n');
+    const run = runWithTools(root, {
+      node: 'exit 0',
+      npm: 'case "$1" in test) echo unit-suite-failed >&2; exit 7;; esac\nexit 0',
+      git: 'exit 0',
+      mktemp: 'f=./vendor-importmap.probe\n: > "$f"\necho "$f"',
+      rm: 'exit 0',
+    });
+    assert.notEqual(run.status, 0, `${run.stdout}${run.stderr}`);
+    assert.match(run.stderr, /unit-suite-failed/);
+  });
