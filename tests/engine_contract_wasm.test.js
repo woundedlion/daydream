@@ -174,6 +174,19 @@ const interfaceMethods = (name) => new Set(
   [...interfaceBody(name).matchAll(/^ {2}([A-Za-z_]\w*)\s*\(/gm)]
     .map((match) => match[1]));
 
+test('holosphere_wasm.d.ts declares every module function', () => {
+  const declared = interfaceMethods('HolosphereModule');
+  const members = interfaceMembers('HolosphereModule');
+  for (const name of declared) {
+    assert.equal(typeof M[name], 'function', `declared module function ${name} is absent`);
+  }
+  for (const name of Object.getOwnPropertyNames(M)) {
+    if (typeof M[name] !== 'function' || name === 'print' || name === 'printErr') continue;
+    assert.ok(declared.has(name) || members.has(name),
+      `module function ${name} is missing from holosphere_wasm.d.ts`);
+  }
+});
+
 /**
  * Pins one declared object shape against a value the module produced: the
  * declarations name every key the module returns, and the module returns every
