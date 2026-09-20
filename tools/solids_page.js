@@ -868,8 +868,7 @@ function reorderOp(from, to, revision) {
 // The chainIsValid verdict for each raw drop slot (getDragTargetIndex
 // value) of the op being dragged, so a blocked slot can name its reason.
 // Filled asynchronously from dragstart; slots still pending hold no entry
-// and stay droppable — the drop re-validates authoritatively before
-// committing.
+// and show no insertion preview; the drop re-validates before committing.
 let dropSlotChecks = new Map();
 let dropSlotGen = 0;
 async function precomputeDropSlots(fromIndex) {
@@ -878,6 +877,8 @@ async function precomputeDropSlots(fromIndex) {
   for (let t = 0; t <= state.ops.length; t++) {
     const to = dropTargetIndex(t, fromIndex);
     if (to === fromIndex) { dropSlotChecks.set(t, { ok: true, message: '' }); continue; }
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (gen !== dropSlotGen) return;
     const check = await chainIsValid(state.base, movedOps(state.ops, fromIndex, to));
     if (gen !== dropSlotGen) return;
     dropSlotChecks.set(t, check);
@@ -941,7 +942,7 @@ function wireRowDrag(grip, index, el, list, revision) {
 
       // An engine-invalid slot gets no insertion preview and no drop cursor.
       const targetCheck = dropSlotChecks.get(targetIndex);
-      const blocked = Boolean(targetCheck && !targetCheck.ok);
+      const blocked = !targetCheck?.ok;
       grip.classList.toggle('drop-blocked', blocked);
       if (blocked) {
         items.forEach((item, idx) => {
