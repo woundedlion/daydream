@@ -782,6 +782,11 @@ export function createEffectGui({ engine, segments, config, host }) {
         // A preset rewrites every parameter, so it raises or clears warnings
         // with no schema-generation move behind them.
         fx.warningsDirty = true;
+        if (!usesFullConfigSnapshot()) {
+          for (const parameter of getParameterDefinitions()) {
+            if (!parameter.readonly) fx.gui.writeStoredValue(parameter.name, null);
+          }
+        }
         persistEffectState(fx.gui);
         adoptPresetDisplay(fx, count, index);
         adoptPauseDisplay(fx, engineAnimationsPaused() ?? true);
