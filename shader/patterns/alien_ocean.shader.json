@@ -278,6 +278,22 @@
       },
       {
         "classification": "preset",
+        "default": "identity",
+        "domain": {
+          "values": [
+            "identity",
+            "spin-wander"
+          ]
+        },
+        "id": "project.frame",
+        "interpolation": {
+          "kind": "MIXED_ENUM"
+        },
+        "storage": "enum8",
+        "unit": "mode"
+      },
+      {
+        "classification": "preset",
         "default": "folded",
         "domain": {
           "values": [
@@ -549,6 +565,7 @@
         "colorize.value-opacity-high",
         "colorize.value-opacity-low",
         "lens.symmetry",
+        "project.frame",
         "project.hemisphere",
         "project.singularity-fade",
         "sample.angle-speed",
@@ -614,6 +631,7 @@
           "colorize.value-opacity-high": 1,
           "colorize.value-opacity-low": 1,
           "lens.symmetry": "azimuthal",
+          "project.frame": "identity",
           "project.hemisphere": "folded",
           "project.singularity-fade": 1.399999976158142,
           "sample.angle-speed": 0,
