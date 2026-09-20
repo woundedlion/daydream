@@ -376,6 +376,12 @@ export function createFrameLoopGuard({
   let clean = 0;
   let dead = false;
 
+  /** @param {string} message */
+  function reportNotice(message) {
+    try { report(message); }
+    catch (error) { console.error('Render error reporting failed:', error); }
+  }
+
   /**
    * Poll the module's death flag and, the first time it reads dead, latch it:
    * banner, release, no further frames.
@@ -387,7 +393,7 @@ export function createFrameLoopGuard({
     // loop stopped rather than resuming into a dead module.
     dead = true;
     logError('Render loop stopped: the rendering engine trapped.');
-    report(MODULE_TRAP_NOTICE);
+    reportNotice(MODULE_TRAP_NOTICE);
     onModuleDead();
   }
 
@@ -407,7 +413,7 @@ export function createFrameLoopGuard({
         logError('Render loop frame failed:', e);
         failureMessage = `The render loop hit an error. ${errorDetail(e)}`
           + ' See the browser console for details.';
-        report(failureMessage);
+        reportNotice(failureMessage);
       }
     }
     checkDead();
