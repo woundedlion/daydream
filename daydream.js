@@ -453,7 +453,7 @@ export function createRecordingControls({
       // user's chosen container for the rest of the session.
       recorder.onFormatFallback = (extension) => {
         const label = Object.keys(REC_FORMATS)
-          .find(key => REC_FORMATS[key] === extension) ?? 'Auto';
+          .find(key => REC_FORMATS[key] === extension) ?? extension.toUpperCase();
         formatFallback = ` ${recSettings.recFormat} is unsupported in this`
           + ` browser; recording as ${label}.`;
       };
