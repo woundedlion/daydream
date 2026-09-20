@@ -540,7 +540,8 @@ export class Daydream {
    * when the sim stepped, the camera moved, or invalidate() was called. Hands
    * this.recorder one frame per advanced tick the adapter reports capture-ready.
    * @param {{drawFrame: () => void, sync?: (advanced: boolean) => void,
-   *   getArenaMetrics?: () => ?Object, captureReady?: () => boolean}} adapter - Per-frame render adapter (see
+   *   getArenaMetrics?: () => ?Object, captureReady?: () => boolean,
+   *   refreshPixelView?: () => void}} adapter - Per-frame render adapter (see
    *   createRenderAdapter): drawFrame() paints the pixel buffer,
    *   sync(advanced) reconciles the effect panel and is told whether the sim
    *   stepped this frame, getArenaMetrics() feeds the stats
@@ -572,8 +573,9 @@ export class Daydream {
     // Three throws if an attribute's array byteLength differs from the size it gave
     // the GPU buffer, and a mid-frame heap growth detaches the aliased instanceColor
     // array (byteLength 0). needsUpdate only ever bumps version, so a flagged upload
-    // cannot be cancelled — hold the repaint until the next drawFrame re-points it.
+    // cannot be cancelled — refresh the alias before retrying the repaint.
     if (this.dotMesh?.instanceColor && !isViewLive(this.dotMesh.instanceColor.array)) {
+      adapter?.refreshPixelView?.();
       // The tick advanced and cannot be un-run, and the track is locked one frame
       // per tick. Capturing here would blit a canvas this task never painted (the
       // compositor already cleared it), so carry the frame to the next repaint.

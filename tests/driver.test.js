@@ -802,6 +802,22 @@ test('an idle recorder does not accrue a held capture', () => {
   assert.equal(ctx.heldCaptures, 0);
 });
 
+test('a paused detached view heals without advancing the simulation', () => {
+  const log = [];
+  const ctx = renderCtx(detachedView(), log);
+  ctx.paused = true;
+  const adapter = {
+    drawFrame: () => assert.fail('paused simulation advanced'),
+    refreshPixelView: () => {
+      ctx.dotMesh.instanceColor.array = new Uint16Array(4);
+    },
+  };
+  Daydream.prototype.render.call(ctx, adapter);
+  Daydream.prototype.render.call(ctx, adapter);
+  assert.ok(log.includes('renderMainView'));
+  assert.equal(ctx.needsRender, false);
+});
+
 test('a held tick honours captureReady before capturing', () => {
   const log = [];
   const ctx = runningCtx(renderCtx(detachedView(), log), log);

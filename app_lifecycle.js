@@ -32,7 +32,8 @@ import { displayAliasesDiverged, repointDisplayAliases } from './display_aliases
  * @param {(message: string) => void} [deps.logError] - Console sink for the
  *   once-per-page alias divergence report.
  * @returns {{drawFrame: () => void, sync: (advanced: boolean) => void,
- *   getArenaMetrics: () => Object|null, captureReady: () => boolean}} The adapter.
+ *   getArenaMetrics: () => Object|null, captureReady: () => boolean,
+ *   refreshPixelView: () => void}} The adapter.
  */
 export function createRenderAdapter({
   host,
@@ -43,6 +44,11 @@ export function createRenderAdapter({
 }) {
   let aliasDivergenceLogged = false;
   return {
+    refreshPixelView() {
+      host.refresh();
+      const view = host.view();
+      if (view !== null) repointDisplayAliases(driver, view);
+    },
     /**
      * Per-frame entry the driver calls: render (segmented or single-engine),
      * then republish the pixel view.
