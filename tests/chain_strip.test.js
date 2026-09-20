@@ -609,6 +609,12 @@ test('undo and redo revert and reapply whole edits through the same apply path',
   assert.equal(labels(h).length, 7);
   assert.equal(h.applied.length, 3);
 
+  chipByLabel(h, 'camera').querySelector('.chain-chip-rename')
+    .dispatch('keydown', { key: 'z', ctrlKey: true });
+  assert.equal(labels(h).length, 7);
+  assert.equal(h.applied.length, 3,
+    'text-field undo stays with the native input editor');
+
   // Ctrl+Z reaches the container's shortcut from any chip.
   chipByLabel(h, 'camera').dispatch('keydown', { key: 'z', ctrlKey: true });
   assert.equal(labels(h).length, 6);
