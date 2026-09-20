@@ -108,7 +108,7 @@ export const OP_DEFS = {
   truncate: { params: { t: { val: 0.33, min: 0.01, max: 0.5, step: 0.01 } } },
   chamfer: { params: { t: { val: 0.5, min: 0.01, max: 0.99, step: 0.01 } } },
   expand: { params: { t: { val: 0.5, min: 0.01, max: 0.99, step: 0.01 } } },
-  hankin: { params: { angle: { val: 54, min: 0, max: 90, step: 1 } } },
+  hankin: { params: { angle: { val: 54, min: 1, max: 90, step: 1 } } },
   relax: { params: { iter: { val: 100, min: 1, max: 500, step: 1 } } },
   meta: { params: {} },
   needle: { params: {} },

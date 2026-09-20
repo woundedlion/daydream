@@ -142,6 +142,7 @@ test('applyOp forwards each op its engine arguments', () => {
     [{ op: 'snub', params: { t: 0.5, twist: 0.28 } }, { op: 'snub', args: [0.5, 0.28] }],
     [{ op: 'relax', params: { iter: 100 } }, { op: 'relax', args: [100] }],
     [{ op: 'hankin', params: { angle: 54 } }, { op: 'hankin', args: [Math.fround(54 * D2R_F32)] }],
+    [{ op: 'hankin', params: { angle: 0 } }, { op: 'hankin', args: [0] }],
     ['dual', { op: 'dual', args: [] }],
     ['kis', { op: 'kis', args: [] }],
   ];
@@ -541,7 +542,13 @@ test('snapToStep snaps to the nearest step from min and clamps', () => {
 /** Verifies a value already on the grid is returned unchanged. */
 test('snapToStep leaves an on-grid value alone', () => {
   const def = OP_DEFS.hankin.params.angle;
-  for (const angle of [0, 17, 54, 90]) assert.equal(snapToStep(angle, def), angle);
+  for (const angle of [1, 17, 54, 90]) assert.equal(snapToStep(angle, def), angle);
+});
+
+test('hankin controls start at one degree', () => {
+  const def = OP_DEFS.hankin.params.angle;
+  assert.equal(def.min, 1);
+  assert.equal(snapToStep(0, def), 1);
 });
 
 /**
@@ -717,6 +724,7 @@ test('generateFuncAndRecipe rejects every param savedChainShapeError calls out o
     [{ op: 'expand', params: { t: 1 } }, 'expand param "t"'],
     [{ op: 'bevel', params: { t: 0.9 } }, 'bevel param "t"'],
     [{ op: 'hankin', params: { angle: 120 } }, 'hankin param "angle"'],
+    [{ op: 'hankin', params: { angle: 0 } }, 'hankin param "angle"'],
     [{ op: 'snub', params: { t: 0.5, twist: 2 } }, 'snub param "twist"'],
     [{ op: 'relax', params: { iter: 600 } }, 'relax param "iter"'],
   ];
