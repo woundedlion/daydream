@@ -1121,6 +1121,7 @@ test('a refused shader link leaves the source select on the scratch chain', asyn
 // toolbar has to keep naming that one.
 test('a link whose bypass the store refuses leaves the toolbar on the loaded document', async () => {
   const harness = await editorWorkbench();
+  const chips = stripChips(harness);
   const digest = harness.elements.get('shader-document-digest').dataset.digest;
   const presets = harness.elements.get('shader-preset-select').options.map((o) => o.value);
   const programs = harness.engine.chainCalls.length;
@@ -1138,6 +1139,7 @@ test('a link whose bypass the store refuses leaves the toolbar on the loaded doc
 
   assert.match(harness.elements.get('shader-document-status').textContent,
     /could not bypass "nosuchstage"/);
+  assert.deepEqual(stripChips(harness), chips);
   assert.equal(harness.engine.chainCalls.length, programs,
     'the refused load must not reprogram the engine');
   assert.equal(harness.elements.get('shader-document-digest').dataset.digest, digest);

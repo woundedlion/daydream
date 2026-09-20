@@ -507,13 +507,13 @@ export function createShaderDocumentController({
    * build none of them.
    * @param {*} document - The compiled (valid) v2 document to edit.
    */
-  const buildChainUi = async (document) => {
+  const buildChainUi = async (document, container) => {
     const store = /** @type {*} */ (await createChainDocumentStore({
       document, catalog: operatorCatalog, importCompiler,
     }));
     const strip = /** @type {*} */ (createChainStrip({
       doc,
-      container: stripMount,
+      container,
       store,
       catalog: operatorCatalog,
       announce,
@@ -591,8 +591,11 @@ export function createShaderDocumentController({
       show(`The preview engine rejected effect "${CHAIN_EFFECT}".`, true);
       return false;
     }
-    teardownChainUi();
     const previous = active;
+    const previousUi = chainUi;
+    const candidateMount = stripMount ? doc.createElement('div') : null;
+    if (candidateMount) candidateMount.style.display = 'contents';
+    chainUi = null;
     // The strip renders the active preset's values, so the document is adopted
     // before the editor is built.
     active = {
@@ -613,13 +616,21 @@ export function createShaderDocumentController({
     const abandon = () => {
       teardownChainUi();
       active = previous;
+      chainUi = previousUi;
+      setParamFilter(previousUi ? { external: true } : null);
+      if (previous) {
+        populatePresets(previous.compiled);
+        presetSelect.value = previous.presetId ?? '';
+        showDigest();
+        syncParity();
+      }
       if (previous?.compiledSide && previous.official)
         selectEffect(previous.official.effectId);
       return false;
     };
     if (stripMount && typeof compiler.validateShaderDocument === 'function') {
       try {
-        await buildChainUi(compiled.document);
+        await buildChainUi(compiled.document, candidateMount);
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         show(`The chain editor could not adopt the document: ${detail}`, true);
@@ -644,7 +655,10 @@ export function createShaderDocumentController({
     showDigest();
     syncParity();
     if (session) setAnimationsPaused(session.paused);
-    return applyPreset(presetId);
+    if (!applyPreset(presetId)) return abandon();
+    previousUi?.strip.destroy();
+    if (candidateMount) stripMount.replaceChildren(candidateMount);
+    return true;
   };
 
   /**
