@@ -7,6 +7,21 @@ with this repository, are Copyright 2025 Gabriel Levy. All rights reserved.
 They are not covered by the license below — no rights to use, copy, modify, or
 distribute them are granted.
 
+Engine source exceptions represented in the distributed WASM:
+
+Exceptions outside `effects/`, each carrying its own terms in its own header:
+
+- `core/engine/effects_legacy.h` — retired effect sources, All Rights Reserved
+  on the same terms as `effects/`.
+- `workbench/` — the shader workbench and chain-interpreter surfaces, All
+  Rights Reserved on the same terms as `effects/`.
+- `core/math/projections.h` — derived from PROJ; MIT, Copyright Frank
+  Warmerdam, Gerald I. Evenden, Kristian Evers, Toby C Wilkinson and the PROJ
+  contributors.
+- `core/vendor/FastNoiseLite.h` — third-party; MIT, Copyright Jordan Peck and
+  contributors. The rest of `core/vendor/` is first-party configuration for it,
+  under the terms below.
+
 # PolyForm Noncommercial License 1.0.0
 
 <https://polyformproject.org/licenses/noncommercial/1.0.0>
@@ -138,3 +153,59 @@ software under these terms.
 
 **Use** means anything you do with the software requiring one
 of your licenses.
+
+
+# Third-party notices for the distributed WASM
+
+## PROJ-derived projection code
+
+Airocean constants/transforms and Peirce coefficients derived from PROJ
+commit 71eb06bfa597ed1e6d673723fc509e7604fe72af.
+
+Copyright (c) 2000, Frank Warmerdam
+Copyright (c) 2019, 2020, 2021, 2022, 2023, 2024 PROJ contributors
+Copyright (c) 2005, 2006, 2009 Gerald I. Evenden
+Copyright (c) 2020 Kristian Evers
+Copyright (c) 2021 Toby C Wilkinson
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to
+deal in the Software without restriction, including without limitation the
+rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+IN THE SOFTWARE.
+
+## FastNoiseLite
+
+MIT License
+
+Copyright(c) 2023 Jordan Peck (jordan.me2@gmail.com)
+Copyright(c) 2023 Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files(the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and / or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions :
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
