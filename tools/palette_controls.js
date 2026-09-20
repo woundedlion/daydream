@@ -830,8 +830,6 @@ export function paletteRecipeFromControls(template, controls) {
     const { minimum, maximum } = controls[axis];
     Object.assign(recipe[axis], axisFromEndpoints(minimum, maximum));
   }
-  // A fully saturated center leaves no room to pull back into gamut.
-  if (recipe.chroma.center === 1) recipe.chroma.headroom = 1;
   // The engine canonicalizes a falloff start outside a FALLOFF domain.
   if (recipe.domain !== PaletteV4.domain.FALLOFF) recipe.falloffStart = 0.9;
   if (recipe.domain === PaletteV4.domain.LOOP &&
@@ -1015,8 +1013,7 @@ export function paletteRecipeAvailability(recipe) {
     hueTorsion: hasColor,
     colorPath: hasColor && !monochromatic,
     hueDirection: hasColor && !monochromatic && !customHue,
-    chromaHeadroom: hasColor && recipe.chroma.basis !== PaletteV4.chromaBasis.ABSOLUTE &&
-      recipe.chroma.center !== 1,
+    chromaHeadroom: hasColor && recipe.chroma.basis !== PaletteV4.chromaBasis.ABSOLUTE,
     falloffStart: recipe.domain === PaletteV4.domain.FALLOFF,
     chromaEndpoints: !customChroma,
     chromaMaximum: variedChroma && !customChroma,

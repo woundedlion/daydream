@@ -1441,6 +1441,11 @@ test('PaletteOps exposes the method surface the palette tool drives', () => {
     assert.equal(compiled.status.code, 0);
     assert.ok(compiled.lut instanceof Uint8Array);
     assert.equal(compiled.lut.length, 256 * 3);
+    recipe.chroma.center = 1;
+    recipe.chroma.headroom = 0.8;
+    const capped = ops.compileAndBakeV4(recipe);
+    assert.equal(capped.status.code, 0);
+    assert.ok(Math.abs(capped.canonicalRecipe.chroma.headroom - 0.8) < 1e-6);
     const inspected = ops.inspectV4(recipe);
     assert.equal(inspected.diagnostics.length, 256 * 6);
     assert.equal(inspected.fallback.length, 256);

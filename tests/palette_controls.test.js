@@ -401,8 +401,8 @@ test('recipe availability exposes only controls that can affect the result', () 
   assert.equal(paletteRecipeAvailability(recipe).falloffStart, false);
 
   recipe.chroma.center = 1;
-  assert.equal(paletteRecipeAvailability(recipe).chromaHeadroom, false,
-    'a fully saturated center takes the whole headroom');
+  assert.equal(paletteRecipeAvailability(recipe).chromaHeadroom, true,
+    'headroom still caps a fully saturated center');
   recipe.chroma.center = 0.62;
   recipe.chroma.basis = PaletteV4.chromaBasis.ABSOLUTE;
   assert.equal(paletteRecipeAvailability(recipe).chromaHeadroom, false);
@@ -586,12 +586,12 @@ test('custom hue turns are derived only in CUSTOM hue mode', () => {
     customHueTurns(0.25, offsets, defaultPaletteRecipe().hue.customTurns));
 });
 
-test('a fully saturated chroma center takes the full headroom', () => {
+test('a fully saturated chroma center preserves the authored headroom', () => {
   const recipe = paletteRecipeFromControls(defaultPaletteRecipe(),
     { ...CONTROL_READINGS, chroma: { minimum: 1, maximum: 1 } });
 
   assert.equal(recipe.chroma.center, 1);
-  assert.equal(recipe.chroma.headroom, 1);
+  assert.equal(recipe.chroma.headroom, CONTROL_READINGS.headroom);
 });
 
 test('marshalling never writes through to the template', () => {
