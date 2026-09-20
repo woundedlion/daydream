@@ -19,6 +19,7 @@ import {
 } from './fake_engine.js';
 import { isViewLive, refreshPixelView } from '../pixel_view.js';
 import { selectorControlValue } from '../param_sync.js';
+import { defaultPaletteRecipe, hueKeyState, PaletteV4, signedTurnDelta } from '../tools/palette_controls.js';
 import { DEFAULT_EFFECT, resolutionPresets } from '../daydream.js';
 import {
   FIXED_SHADER_MODE_FIELDS, STAGE_BOUNDARIES,
@@ -1449,6 +1450,31 @@ test('PaletteOps exposes the method surface the palette tool drives', () => {
     const inspected = ops.inspectV4(recipe);
     assert.equal(inspected.diagnostics.length, 256 * 6);
     assert.equal(inspected.fallback.length, 256);
+  } finally {
+    ops.delete();
+  }
+});
+
+test('hue wheel harmony anchors agree with the WASM palette diagnostics', () => {
+  const ops = new M.PaletteOps();
+  try {
+    for (const harmony of Object.values(PaletteV4.harmony)) {
+      for (const direction of Object.values(PaletteV4.direction)) {
+        const recipe = defaultPaletteRecipe();
+        Object.assign(recipe.hue, { harmony, direction, baseTurns: 0.9375 });
+        recipe.easing = PaletteV4.easing.LINEAR;
+        const keys = hueKeyState(recipe);
+        for (let i = 0; i < keys.offsets.length; i++) {
+          recipe.input = { offset: i / (keys.offsets.length - 1), span: 0 };
+          const result = ops.inspectV4(recipe);
+          assert.equal(result.status.code, 0);
+          const actual = result.diagnostics[4] / (2 * Math.PI);
+          const expected = keys.baseTurns + keys.offsets[i];
+          assert.ok(Math.abs(signedTurnDelta(actual - expected)) < 1e-5,
+            `harmony ${harmony}, direction ${direction}, key ${i}: ${actual} != ${expected}`);
+        }
+      }
+    }
   } finally {
     ops.delete();
   }
