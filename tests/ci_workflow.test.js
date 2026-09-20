@@ -147,3 +147,13 @@ test('the gating job hands the script every job it needs', () => {
   assert.match(step, /RESULTS: \$\{\{ toJSON\(needs\) \}\}/);
   assert.match(step, /node scripts\/verify-ci-green\.mjs/);
 });
+
+test('ci-green runs after failed dependencies while deployment requires success', () => {
+  const gate = workflow.split(/^ {2}ci-green:\s*$/m)[1]?.split(/^ {2}\S/m)[0];
+  assert.ok(gate);
+  assert.match(gate, /^ {4}if: always\(\)\s*$/m);
+  const deploy = readFileSync(DEPLOY_PATH, 'utf8')
+    .split(/^ {2}deploy:\s*$/m)[1]?.split(/^ {2}\S/m)[0];
+  assert.ok(deploy);
+  assert.doesNotMatch(deploy, /^ {4}if:.*always\(/m);
+});
