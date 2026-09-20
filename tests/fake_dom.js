@@ -647,14 +647,18 @@ export function fakeElement(tag = 'div', options = {}) {
       set(value) { optionValue = String(value); },
     });
   }
-  // A <select>'s views over its <option> children, live as in the DOM. One with
-  // nothing explicitly selected shows its first option, so a freshly populated
-  // select already has a selection, and an empty one has none.
+  // An explicit empty selection persists until the option list changes.
   if (element.tagName === 'SELECT') {
     const options = () => element.children.filter((n) => n.tagName === 'OPTION');
+    let clearedOptions = null;
     const selection = () => {
-      const chosen = options().filter((option) => option.selected);
-      return chosen.length > 0 ? chosen : options().slice(0, 1);
+      const current = options();
+      const chosen = current.filter((option) => option.selected);
+      if (chosen.length > 0) return chosen;
+      if (clearedOptions?.length === current.length
+          && current.every((option, index) => option === clearedOptions[index])) return [];
+      clearedOptions = null;
+      return current.slice(0, 1);
     };
     Object.defineProperty(element, 'options', {
       enumerable: true, configurable: true, get: options,
@@ -667,7 +671,9 @@ export function fakeElement(tag = 'div', options = {}) {
       configurable: true,
       get() { return options().indexOf(selection()[0]); },
       set(at) {
-        for (const [i, option] of options().entries()) option.selected = i === Number(at);
+        const current = options();
+        for (const [i, option] of current.entries()) option.selected = i === Number(at);
+        clearedOptions = current.some((option) => option.selected) ? null : current;
       },
     });
     Object.defineProperty(element, 'value', {
