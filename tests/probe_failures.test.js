@@ -6,7 +6,7 @@ import { boxOf, centre, checks, dragBetween, isMain, runProbe, walkTo }
   from '../scripts/probe_harness.mjs';
 import { probeStrip } from '../scripts/workbench-probe.mjs';
 import { probePanel } from '../scripts/panel-probe.mjs';
-import { probeChain } from '../scripts/solids-probe.mjs';
+import { probeChain, probeNumericInputs } from '../scripts/solids-probe.mjs';
 import { probeColorStrip } from '../scripts/palettes-probe.mjs';
 import { probePad } from '../scripts/mobius-probe.mjs';
 import { probeRationalLock } from '../scripts/lissajous-probe.mjs';
@@ -15,6 +15,7 @@ const PROBES = [
   ['workbench-probe.mjs', 'probeStrip', probeStrip],
   ['panel-probe.mjs', 'probePanel', probePanel],
   ['solids-probe.mjs', 'probeChain', probeChain],
+  ['solids-probe.mjs', 'probeNumericInputs', probeNumericInputs],
   ['palettes-probe.mjs', 'probeColorStrip', probeColorStrip],
   ['mobius-probe.mjs', 'probePad', probePad],
   ['lissajous-probe.mjs', 'probeRationalLock', probeRationalLock],
