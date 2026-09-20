@@ -563,6 +563,7 @@ function workbench({ files = { 'kaleidoscope_flowers.shader.json': shaderDocumen
     // The fixtures are compiler results already; a document object is the
     // scratch build, which the fake passes through as its own compile.
     importCompiler: async () => ({
+      DEFAULT_LIMITS,
       compileShaderDocument: (s) => typeof s === 'string'
         ? JSON.parse(s)
         : { status: 'VALID', descriptor_digest: 'digest-scratch', document: s },
@@ -1680,7 +1681,7 @@ test('a rejected file read is announced and the same file can be picked again', 
   await controller.init();
   const input = elements.get('shader-document-file');
   input.value = 'broken.shader.json';
-  input.files = [{ name: 'broken.shader.json', text: async () => { throw new Error('read failed'); } }];
+  input.files = [{ name: 'broken.shader.json', size: 100, text: async () => { throw new Error('read failed'); } }];
   await onChange(input)();
   assert.equal(input.value, '');
   const status = elements.get('shader-document-status');
@@ -1690,4 +1691,28 @@ test('a rejected file read is announced and the same file can be picked again', 
   await onChange(input)();
   assert.equal(input.value, '');
   controller.dispose();
+});
+
+
+test('an oversized file is rejected before reading and clears the picker', async () => {
+  const { controller, elements, selections } = workbench();
+  await controller.init();
+  const previousSelections = [...selections];
+  const source = elements.get('shader-document-select');
+  const previousSource = source.value;
+  const input = elements.get('shader-document-file');
+  let reads = 0;
+  input.value = 'huge.shader.json';
+  input.files = [{
+    name: 'huge.shader.json', size: DEFAULT_LIMITS.bytes + 1,
+    text: async () => { ++reads; throw new Error('must not read'); },
+  }];
+  await onChange(input)();
+  assert.equal(reads, 0);
+  assert.equal(input.value, '');
+  assert.equal(source.value, previousSource);
+  assert.deepEqual(selections, previousSelections);
+  const status = elements.get('shader-document-status');
+  assert.equal(status.dataset.status, 'error');
+  assert.match(status.textContent, /document byte limit was exceeded/);
 });

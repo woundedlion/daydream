@@ -854,6 +854,11 @@ export function createShaderDocumentController({
     try {
       const file = fileInput.files?.[0];
       if (!file) return;
+      compiler ??= await importCompiler();
+      if (file.size > compiler.DEFAULT_LIMITS.bytes) {
+        show('The document byte limit was exceeded.', true);
+        return;
+      }
       sourceSelect.value = '';
       await loadSource(await file.text(), file.name);
       await flushDeepLink();
