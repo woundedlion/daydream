@@ -177,6 +177,8 @@ function fakeWasmModule({
 } = {}) {
   let framesToFail = failingFrames;
   const pixels = new Uint16Array(288 * 144 * 3);
+  let activeWidth = 288;
+  let activeHeight = 144;
   let built = 0;
   let deleted = 0;
   const poleLod = [];
@@ -194,9 +196,11 @@ function fakeWasmModule({
       constructor() { built++; }
       static isLive() { return false; }
       static getSupportedResolutions() { return resolutions; }
-      setResolution(w) {
-        return w === refusedWidth
-          ? ResolutionSetResult.UNSUPPORTED : ResolutionSetResult.RESIZED;
+      setResolution(w, h) {
+        if (w === refusedWidth) return ResolutionSetResult.UNSUPPORTED;
+        activeWidth = w;
+        activeHeight = h;
+        return ResolutionSetResult.RESIZED;
       }
       setEffect() { return EffectSetResult.INSTALLED; }
       setParameter(name, value) {
@@ -221,8 +225,8 @@ function fakeWasmModule({
           throw new Error('engine drawFrame failed');
         }
       }
-      getPixels() { return pixels; }
-      getBufferLength() { return pixels.length; }
+      getPixels() { return pixels.subarray(0, activeWidth * activeHeight * 3); }
+      getBufferLength() { return activeWidth * activeHeight * 3; }
       delete() { deleted++; }
     },
   };
@@ -807,6 +811,9 @@ for (const optionsReplaces of [false, true]) {
       + 'OptionController updates itself in place; a discarded return value '
       + 'leaves the live dropdown writing to nothing and the muted engine '
       + 'correction updating a detached <select>');
+    app.driver.renderer.frame();
+    assert.equal(app.driver.pixels.length, 96 * 20 * 3,
+      'the display aliases are rebuilt over the resized engine buffer');
   });
 }
 
