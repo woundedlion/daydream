@@ -1769,3 +1769,26 @@ test('every hand-built context stands in only for state the driver has', () => {
       `${name} carries fields the Daydream class never assigns`);
   }
 });
+
+test('dispose during a real Three animation callback cancels the rearmed frame', async () => {
+  const { WebGLAnimation } = await import(
+    '../node_modules/three/src/renderers/webgl/WebGLAnimation.js');
+  const animation = WebGLAnimation();
+  const requests = new Map();
+  let id = 0;
+  animation.setContext({
+    requestAnimationFrame(callback) { requests.set(++id, callback); return id; },
+    cancelAnimationFrame(request) { requests.delete(request); },
+  });
+  const log = [];
+  const ctx = disposeCtx(fakeMesh(log), log);
+  ctx.renderer.setAnimationLoop = () => animation.stop();
+  animation.setAnimationLoop(() => Daydream.prototype.dispose.call(ctx));
+  animation.start();
+  const callback = requests.get(id);
+  requests.delete(id);
+  callback(0);
+  assert.equal(requests.size, 1);
+  await Promise.resolve();
+  assert.equal(requests.size, 0);
+});
