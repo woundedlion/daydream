@@ -288,6 +288,12 @@ export interface MeshHandle {
 
 /** The MeshOps class object: solid construction and tooling-arena lifetime. */
 export interface MeshOpsStatics {
+  /** Available only in builds with HS_WASM_DEV_BINDINGS enabled. */
+  getMaxBounds?(): {
+    max_v: number; v_name: string;
+    max_f: number; f_name: string;
+    max_i: number; i_name: string;
+  } | null;
   /** Builds a registered solid; null when the registry carries no such name. */
   fromSolidName(name: string): MeshHandle | null;
   /** Every registered solid, the Simple ones first in seed-index order. */
