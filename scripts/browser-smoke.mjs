@@ -67,26 +67,47 @@ const PAGE_READY = {
  */
 function installDrawProbe() {
   window.daydreamSmokeDraws = 0;
+  window.daydreamSmokeGlDraws = 0;
+  window.daydreamSmokeGlPixels = false;
   /**
    * @param {unknown} ctor - Context interface to instrument, when the browser has it.
    * @param {string[]} methods - Draw entry points on its prototype.
+   * @param {boolean} [gl] - Whether the context renders WebGL pixels.
    */
-  const probe = (ctor, methods) => {
+  const probe = (ctor, methods, gl = false) => {
     if (typeof ctor !== 'function') return;
     for (const name of methods) {
       const original = ctor.prototype[name];
       if (typeof original !== 'function') continue;
       ctor.prototype[name] = function (...args) {
         window.daydreamSmokeDraws += 1;
-        return original.apply(this, args);
+        const result = original.apply(this, args);
+        if (gl) {
+          window.daydreamSmokeGlDraws += 1;
+          if (!window.daydreamSmokeGlPixels && this.getParameter(this.FRAMEBUFFER_BINDING) === null) {
+            const width = this.drawingBufferWidth;
+            const height = this.drawingBufferHeight;
+            const pixels = new Uint8Array(width * height * 4);
+            this.readPixels(0, 0, width, height, this.RGBA, this.UNSIGNED_BYTE, pixels);
+            const colors = new Set();
+            for (let index = 0; index < pixels.length; index += 52) {
+              colors.add((pixels[index] << 16) | (pixels[index + 1] << 8) | pixels[index + 2]);
+              if (colors.size > 16) {
+                window.daydreamSmokeGlPixels = true;
+                break;
+              }
+            }
+          }
+        }
+        return result;
       };
     }
   };
   const glDraws = [
     'drawArrays', 'drawElements', 'drawArraysInstanced', 'drawElementsInstanced',
   ];
-  probe(window.WebGLRenderingContext, glDraws);
-  probe(window.WebGL2RenderingContext, glDraws);
+  probe(window.WebGLRenderingContext, glDraws, true);
+  probe(window.WebGL2RenderingContext, glDraws, true);
   probe(window.CanvasRenderingContext2D,
     ['drawImage', 'fill', 'fillRect', 'putImageData', 'stroke']);
 }
@@ -128,6 +149,10 @@ async function smokePage(browser, origin, page) {
     if (ready) await tab.waitForFunction(ready, { timeout: READY_TIMEOUT_MS });
     await tab.waitForFunction(
       () => window.daydreamSmokeDraws > 0, { timeout: READY_TIMEOUT_MS });
+    if (page !== 'tools/palettes.html') {
+      await tab.waitForFunction(() => window.daydreamSmokeGlDraws > 0 &&
+        window.daydreamSmokeGlPixels, { timeout: READY_TIMEOUT_MS });
+    }
     try {
       await tab.waitForNetworkIdle(
         { idleTime: NETWORK_IDLE_MS, timeout: NETWORK_IDLE_TIMEOUT_MS });
@@ -157,6 +182,7 @@ async function smokeSegmentedMode(browser, origin) {
   await tab.setViewport(VIEWPORT);
   collectProblems(tab, origin, problems);
   await tab.evaluateOnNewDocument(installSegmentProbe);
+  await tab.evaluateOnNewDocument(installDrawProbe);
 
   const url = new URL('/index.html', origin);
   url.searchParams.set('view.Segmented POV.segmented', 'true');
@@ -164,6 +190,8 @@ async function smokeSegmentedMode(browser, origin) {
   try {
     await tab.goto(url.href, { timeout: LOAD_TIMEOUT_MS });
     await tab.waitForFunction(enginePainted, { timeout: READY_TIMEOUT_MS });
+    await tab.waitForFunction(() => window.daydreamSmokeGlDraws > 0 &&
+      window.daydreamSmokeGlPixels, { timeout: READY_TIMEOUT_MS });
     await tab.waitForFunction(() => {
       const overlay = document.getElementById('segment-stats');
       if (!overlay) return false;
