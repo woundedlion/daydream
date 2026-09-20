@@ -5,6 +5,7 @@
 
 // @ts-check
 
+const COMPILER_URL = new URL('../shader/shader_workbench.mjs', import.meta.url).href;
 const PREFIX = '#shader=v1.';
 const MAX_PAYLOAD_CHARS = 65536;
 const MAX_STATE_BYTES = 524288;
@@ -105,7 +106,13 @@ export async function decodeShaderStateHash(hash) {
   let compact;
   try {
     const bytes = await transform(base64UrlBytes(payload), 'decompress');
-    compact = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+    const { parseShaderDocument, DEFAULT_LIMITS } =
+      await import(COMPILER_URL);
+    compact = parseShaderDocument(new TextDecoder('utf-8', { fatal: true }).decode(bytes), {
+      bytes: MAX_STATE_BYTES,
+      depth: DEFAULT_LIMITS.depth + 1,
+      stringLength: MAX_STATE_BYTES,
+    });
   } catch (error) {
     if (error instanceof Error && error.message === 'shader link state is too large')
       throw error;

@@ -53,7 +53,7 @@ test('shader state hashes round-trip the complete authoring state', async () => 
   const hash = await encodeShaderStateHash(state);
 
   assert.match(hash, /^#shader=v1\.[A-Za-z0-9_-]+$/);
-  assert.deepEqual(await decodeShaderStateHash(hash), state);
+  assert.deepEqual(JSON.parse(JSON.stringify(await decodeShaderStateHash(hash))), state);
   assert.equal(await decodeShaderStateHash('#unrelated'), null);
   await assert.rejects(decodeShaderStateHash('#shader=v1.not-gzip'),
     /invalid shader link payload/);
@@ -74,7 +74,7 @@ test('shader links bound the expanded UTF-8 state including its wrapper', async 
     if (size <= limit) {
       const hash = await encodeShaderStateHash(state);
       assert.ok(hash.length < 4096);
-      assert.deepEqual(await decodeShaderStateHash(hash), state);
+      assert.deepEqual(JSON.parse(JSON.stringify(await decodeShaderStateHash(hash))), state);
     } else {
       await assert.rejects(encodeShaderStateHash(state), /shader link state is too large/);
       const payload = gzipSync(JSON.stringify(compact)).toString('base64url');
@@ -1662,4 +1662,15 @@ test('the Ash Cloud document deep link routes the simulator to the workbench', (
   const doc = { documentElement: { dataset: {} } };
   start({ doc, win });
   assert.deepEqual(replaced, ['/daydream/tools/shader.html?effect=ash-cloud']);
+});
+
+test('shader links reject duplicate document keys before information is lost', async () => {
+  for (const source of [
+    '{"d":{"document_id":"first","document_id":"second"},"p":"p","b":[],"a":false}',
+    '{"d":{"e\\u0301":1,"\\u00e9":2},"p":"p","b":[],"a":false}',
+  ]) {
+    const payload = gzipSync(source).toString('base64url');
+    await assert.rejects(decodeShaderStateHash(`#shader=v1.${payload}`),
+      (error) => error.cause?.code === 'DUPLICATE_KEY');
+  }
 });
