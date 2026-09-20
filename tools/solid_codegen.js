@@ -672,9 +672,7 @@ function commentCount(value) {
 }
 
 /**
- * A doxygen block filled at the column limit, the way the blocks already in
- * solid_generators.h are: a continuation carries the same ` * ` prefix at the
- * same indent.
+ * A doxygen block filled at the column limit with a ` * ` continuation prefix.
  * @param {string[]} tags - One line of words per doxygen tag.
  * @returns {string} The block comment.
  */
