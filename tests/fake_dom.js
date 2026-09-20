@@ -202,6 +202,12 @@ const STYLE_VALUES = {
   gridTemplateColumns: TRACK_LIST,
   gridTemplateRows: TRACK_LIST,
   left: new RegExp(`^(?:|auto|${LENGTH})$`),
+  top: new RegExp(`^(?:|auto|${LENGTH})$`),
+  right: new RegExp(`^(?:|auto|${LENGTH})$`),
+  bottom: new RegExp(`^(?:|auto|${LENGTH})$`),
+  width: new RegExp(`^(?:|auto|min-content|max-content|fit-content|${LENGTH})$`),
+  height: new RegExp(`^(?:|auto|min-content|max-content|fit-content|${LENGTH})$`),
+  zIndex: /^(?:|auto|-?\d+)$/,
   opacity: /^(?:|0|1|0?\.\d+|\d{1,3}%)$/,
   position: /^(?:|static|relative|absolute|fixed|sticky)$/,
 };
