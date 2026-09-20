@@ -507,6 +507,7 @@ export function createShaderDocumentController({
    * parameters render on the strip's chips, so the effect GUI panel is told to
    * build none of them.
    * @param {*} document - The compiled (valid) v2 document to edit.
+   * @param {HTMLElement} container - Detached mount for the candidate editor.
    */
   const buildChainUi = async (document, container) => {
     const store = /** @type {*} */ (await createChainDocumentStore({
@@ -536,7 +537,7 @@ export function createShaderDocumentController({
       bypassAvailable: () => active?.compiledSide !== true,
     }));
     setParamFilter({ external: true });
-    chainUi = { store, strip };
+    return { store, strip };
   };
 
   /**
@@ -629,9 +630,9 @@ export function createShaderDocumentController({
         selectEffect(previous.official.effectId);
       return false;
     };
-    if (stripMount && typeof compiler.validateShaderDocument === 'function') {
+    if (candidateMount && typeof compiler.validateShaderDocument === 'function') {
       try {
-        await buildChainUi(compiled.document, candidateMount);
+        chainUi = await buildChainUi(compiled.document, candidateMount);
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         show(`The chain editor could not adopt the document: ${detail}`, true);
@@ -658,7 +659,7 @@ export function createShaderDocumentController({
     if (session) setAnimationsPaused(session.paused);
     if (!applyPreset(presetId)) return abandon();
     previousUi?.strip.destroy();
-    if (candidateMount) stripMount.replaceChildren(candidateMount);
+    if (stripMount && candidateMount) stripMount.replaceChildren(candidateMount);
     return true;
   };
 

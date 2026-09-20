@@ -580,6 +580,7 @@ export class VideoRecorder {
 
     const ext = this.extension(recorder);
     const filename = this.timestampedName(effectName, ext);
+    /** @param {string} message @param {unknown} cause */
     const saveFailure = (message, cause) => {
       console.warn(`VideoRecorder: ${message}`, cause);
       this.onSaveError?.(new Error(message, { cause }), filename);
