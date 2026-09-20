@@ -187,7 +187,9 @@ async function init() {
     }
     arenaMetricsTimer = setTimeout(updateArenaMetrics, 500); // 2fps update is enough
   }
+  const thumbnailAbort = new AbortController();
   onPageTeardown(() => {
+    thumbnailAbort.abort();
     if (arenaMetricsTimer !== null) { clearTimeout(arenaMetricsTimer); arenaMetricsTimer = null; }
   });
   updateArenaMetrics();
@@ -315,7 +317,7 @@ async function init() {
     if (btn) addOp(btn.dataset.op);
   });
 
-  generateThumbnails().catch(e => {
+  generateThumbnails(thumbnailAbort.signal).catch(e => {
     if (engineTrapped(e)) return;
     console.error('Thumbnail generation failed:', e);
   });
@@ -326,7 +328,7 @@ async function init() {
   renderBaseSolid();
 }
 
-async function generateThumbnails() {
+async function generateThumbnails(signal) {
   const footer = document.getElementById('footer');
 
   // Gather all solid names from exported lists
@@ -368,6 +370,7 @@ async function generateThumbnails() {
       // why generateThumbnails() is async and init() deliberately does not
       // await it.
       await new Promise(resolve => setTimeout(resolve));
+      if (signal.aborted) break;
 
       // Reset to just the lights; the previous iteration's mesh/lines are
       // detached here and their GPU buffers freed at the end of the loop body.
