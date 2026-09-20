@@ -290,14 +290,38 @@ const label = (value, path) => {
 // carriers, parameter schemas, enum values and budgets are consumed here, so
 // the engine-emitted replacement slots in transparently.
 const requireCatalog = (catalog) => {
+  const invalid = () => fail('semantic', 'CATALOG_REQUIRED', '$',
+    'Chain validation needs a complete operator catalog (options.catalog).');
   if (catalog === null || typeof catalog !== 'object' ||
       !Array.isArray(catalog.carriers) || !Array.isArray(catalog.operators) ||
       catalog.budgets === null || typeof catalog.budgets !== 'object')
-    fail('semantic', 'CATALOG_REQUIRED', '$',
-      'Chain validation needs the operator catalog (options.catalog).');
+    invalid();
   if (catalog.catalog_version !== OPERATOR_CATALOG_VERSION)
     fail('semantic', 'UNSUPPORTED_CATALOG_SCHEMA', '$',
       `Only operator catalog ${OPERATOR_CATALOG_VERSION} is supported.`);
+  const requiredBudgets = [
+    'arena_bytes', 'max_chain_ops', 'max_params', 'max_instance_id_length',
+    'per_op_overhead_bytes',
+  ];
+  if (requiredBudgets.some((key) =>
+    !Number.isFinite(catalog.budgets[key]) || catalog.budgets[key] < 0))
+    invalid();
+  if (catalog.budgets.per_param_name_bytes !== undefined &&
+      (!Number.isFinite(catalog.budgets.per_param_name_bytes) ||
+       catalog.budgets.per_param_name_bytes < 0))
+    invalid();
+  const invalidBlock = (block) => block !== undefined && (
+    block === null || typeof block !== 'object' ||
+    !Number.isFinite(block.size) || block.size < 0 ||
+    !Number.isFinite(block.align) || block.align <= 0);
+  if (catalog.operators.some((operator) =>
+    operator === null || typeof operator !== 'object' ||
+    typeof operator.id !== 'string' || !Array.isArray(operator.params) ||
+    (operator.blocks !== undefined &&
+     (operator.blocks === null || typeof operator.blocks !== 'object' ||
+      ['param', 'prepared', 'state'].some((kind) =>
+        invalidBlock(operator.blocks[kind]))))))
+    invalid();
   return {
     budgets: catalog.budgets,
     rank: new Map(catalog.carriers.map((carrier, index) => [carrier, index])),
@@ -1031,6 +1055,12 @@ const v1Slots = (roleNodes) => {
       'A v1 document must name its projection.');
   add('project',
     v1PolicyPick(V1_PROJECTION_OPERATORS, surface.projection, 'stage.surface_project.projection'));
+  if (surface.frame !== undefined) {
+    if (surface.frame !== 'identity' && surface.frame !== 'spin-wander')
+      failV1('V1_POLICY_UNSUPPORTED', 'stage.surface_project.frame',
+        `No projection frame expands "${surface.frame}".`);
+    slots[slots.length - 1].topology.frame = surface.frame;
+  }
 
   sequence.forEach((warp, index) => {
     if (warp === 'identity') return;
@@ -1067,7 +1097,7 @@ const v1Slots = (roleNodes) => {
     failV1('V1_POLICY_UNSUPPORTED', 'stage.color', `No colorize operator expands "${paletteKind}".`);
   add('colorize', { operator: 'colorize.generated-palette.v3' });
   const colorize = slots[slots.length - 1];
-  for (const resource of color.resources ?? [])
+  for (const resource of array(color.resources ?? [], 'stage.color.resources'))
     if (resource in V1_PALETTE_MODES)
       colorize.topology['palette-mode'] = V1_PALETTE_MODES[resource];
   if (colorPolicy.hue_mode !== undefined) {
@@ -1181,8 +1211,10 @@ export function expandV1Document(document, catalog) {
 
   // Null-prototype: rewriteId's `in` must answer for mapped ids only.
   const parameterIds = Object.create(null);
-  const parameters = array(descriptor.parameters, '$.descriptor.parameters').map((parameter) => {
-    const target = v1ParameterTarget(id(parameter.id, '$.descriptor.parameters'), slotsByLabel);
+  const parameters = array(descriptor.parameters, '$.descriptor.parameters').map((parameter, index) => {
+    const path = `$.descriptor.parameters[${index}]`;
+    object(parameter, path);
+    const target = v1ParameterTarget(id(parameter.id, `${path}.id`), slotsByLabel);
     parameterIds[parameter.id] = target;
     const { binding: droppedBinding, ...kept } = parameter;
     void droppedBinding;
@@ -1253,9 +1285,11 @@ export function expandV1Document(document, catalog) {
     parameterId === 'brightness-depth' ? 1 - value : value;
 
   const pathPolicies = array(descriptor.path_policies, '$.descriptor.path_policies')
-    .map((policy) => {
+    .map((policy, index) => {
+      const path = `$.descriptor.path_policies[${index}]`;
+      object(policy, path);
       if (policy.kind !== 'STAGGERED_ORDERED') return policy;
-      const groups = policy.groups.map((group) =>
+      const groups = array(policy.groups, `${path}.groups`).map((group) =>
         (group in parameterIds ? parameterIds[group] : group));
       // A synthesised topology parameter declares no interpolation group, so it
       // schedules under its own id, and a staggered path must name every group.
