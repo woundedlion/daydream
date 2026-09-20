@@ -88,8 +88,9 @@ export async function encodeShaderStateHash(state) {
     b: value.bypassed,
     a: value.paused,
   };
-  const compressed = await transform(
-    new TextEncoder().encode(JSON.stringify(compact)), 'compress');
+  const bytes = new TextEncoder().encode(JSON.stringify(compact));
+  if (bytes.length > MAX_STATE_BYTES) throw new Error('shader link state is too large');
+  const compressed = await transform(bytes, 'compress');
   const payload = base64Url(compressed);
   if (payload.length > MAX_PAYLOAD_CHARS) throw new Error('shader link is too large');
   return `${PREFIX}${payload}`;
