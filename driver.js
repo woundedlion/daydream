@@ -922,10 +922,8 @@ export class Daydream {
       );
       this.dotMesh.instanceColor.setUsage(THREE.StreamDrawUsage);
     }
-    // A fresh JS-owned buffer, not WASM memory; the next refreshPixelView()
-    // re-fetches the WASM view and re-points all three aliases.
     this.pixels = this.dotMesh.instanceColor.array;
-    this.pixels.fill(0);
+    if (isViewLive(this.pixels)) this.pixels.fill(0);
 
     this.dotMesh.instanceMatrix.needsUpdate = true;
     this.dotMesh.instanceColor.needsUpdate = true;

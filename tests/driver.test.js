@@ -1802,3 +1802,14 @@ test('running display frames between simulation ticks do not poll the panel', ()
   Daydream.prototype.render.call(ctx, { drawFrame() {}, sync() { syncs++; } });
   assert.equal(syncs, 0);
 });
+
+test('precomputeMatrices tolerates a reused color view detached by heap growth', () => {
+  const ctx = matricesCtx(8, 5);
+  Daydream.prototype.precomputeMatrices.call(ctx);
+  const old = ctx.pixels;
+  structuredClone(old.buffer, { transfer: [old.buffer] });
+  assert.equal(old.byteLength, 0);
+  assert.doesNotThrow(() => Daydream.prototype.precomputeMatrices.call(ctx));
+  assert.equal(ctx.pixels, old);
+  assert.equal(ctx.dotMesh.instanceColor.array, old);
+});
