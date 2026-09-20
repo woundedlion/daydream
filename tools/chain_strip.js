@@ -503,13 +503,22 @@ export function createChainStrip({
    * @returns {void}
    */
   const placePalette = (element, anchor) => {
-    const width = element.getBoundingClientRect().width;
+    const bounds = element.getBoundingClientRect();
+    const width = bounds.width;
     const viewport = doc.documentElement?.clientWidth ?? 0;
     const anchorBounds = anchor.getBoundingClientRect();
     let left = anchorBounds.left;
     if (viewport > 0) left = Math.min(left, viewport - width - PALETTE_MARGIN);
     element.style.left = `${Math.max(PALETTE_MARGIN, left)}px`;
-    element.style.top = `${anchorBounds.bottom}px`;
+    const viewportHeight = doc.documentElement?.clientHeight ?? 0;
+    let top = anchorBounds.bottom;
+    if (viewportHeight > 0) {
+      const available = Math.max(0, viewportHeight - 2 * PALETTE_MARGIN);
+      element.style.maxHeight = `${available}px`;
+      element.style.overflowY = 'auto';
+      top = Math.min(top, viewportHeight - Math.min(bounds.height, available) - PALETTE_MARGIN);
+    }
+    element.style.top = `${Math.max(PALETTE_MARGIN, top)}px`;
   };
 
   /** Removes an open palette without committing anything. */
