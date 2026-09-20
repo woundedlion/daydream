@@ -16,9 +16,10 @@ import { findSh, isolatedGitEnv } from './fixture_repo.js';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HOOK = resolve(HERE, '../.githooks/pre-commit').replace(/\\/g, '/');
 const SH = findSh();
+const MISSING_SH = 'no POSIX shell available';
 const SKIP = SH || process.env.DAYDREAM_HOOK_SH_REQUIRED
   ? false
-  : 'no POSIX shell available';
+  : MISSING_SH;
 
 test('pre-commit checks the staged tree', { skip: SKIP }, async (t) => {
   const root = mkdtempSync(join(tmpdir(), 'pre-commit-hook-'));
@@ -26,6 +27,7 @@ test('pre-commit checks the staged tree', { skip: SKIP }, async (t) => {
   const env = isolatedGitEnv();
   const git = (...args) => execFileSync('git', args, { cwd: root, env });
   const runHook = () => {
+    assert.ok(SH, MISSING_SH);
     const hookEnv = {
       ...env,
       GIT_DIR: join(root, '.git'),

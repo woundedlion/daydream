@@ -12,9 +12,10 @@ import { findSh, isolatedGitEnv } from './fixture_repo.js';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HOOK = resolve(HERE, '../.githooks/pre-push').replace(/\\/g, '/');
 const SH = findSh();
+const MISSING_SH = 'no POSIX shell available';
 const SKIP = SH || process.env.DAYDREAM_HOOK_SH_REQUIRED
   ? false
-  : 'no POSIX shell available';
+  : MISSING_SH;
 
 // PATH is emptied inside the shell rather than in the spawn environment, which
 // would also stop the shell itself from being resolved.
@@ -22,6 +23,7 @@ const WITHOUT_TOOLS = 'PATH=""; export PATH; . "$0"';
 
 test('pre-push refuses a push from a tree that cannot run the suites',
   { skip: SKIP }, (t) => {
+    assert.ok(SH, MISSING_SH);
     const root = mkdtempSync(join(tmpdir(), 'pre-push-hook-'));
     t.after(() => rmSync(root, { recursive: true, force: true }));
     const env = isolatedGitEnv();
@@ -46,6 +48,7 @@ test('pre-push refuses a push from a tree that cannot run the suites',
  * @returns {Object} The spawnSync result.
  */
 function runWithTools(root, tools) {
+  assert.ok(SH, MISSING_SH);
   const bin = join(root, 'bin');
   mkdirSync(bin, { recursive: true });
   for (const [name, body] of Object.entries(tools)) {

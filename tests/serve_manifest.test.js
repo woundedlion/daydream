@@ -6,11 +6,11 @@
 // up as a smoke failure, so both are pinned here instead.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { get as httpGet } from 'node:http';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { MIME, serveManifest } from '../scripts/serve-manifest.mjs';
+import { request } from './http_request.js';
 
 // A file entry, a binary one, a directory entry that ships recursively, and an
 // entry whose file is gone. 'styles' is also the prefix of a path outside it.
@@ -35,26 +35,6 @@ for (const [path, body] of Object.entries(FILES)) {
 }
 writeFileSync(join(TEMP, 'outside.txt'), 'above the site root\n');
 after(() => rmSync(TEMP, { recursive: true, force: true }));
-
-/**
- * One request against the fixture server. `agent: false` keeps no connection
- * alive, so close() resolves as soon as the case is done.
- * @param {string} origin - Origin the server listens on.
- * @param {string} path - Request path, sent as written.
- * @returns {Promise<{status: number, type: string|undefined, body: string}>} The response.
- */
-const request = (origin, path) => new Promise((done, fail) => {
-  httpGet(`${origin}${path}`, { agent: false }, (res) => {
-    let body = '';
-    res.setEncoding('utf8');
-    res.on('data', (chunk) => { body += chunk; });
-    res.on('end', () => done({
-      status: res.statusCode,
-      type: res.headers['content-type'],
-      body,
-    }));
-  }).on('error', fail);
-});
 
 /**
  * Runs a case against a server over the fixture root.

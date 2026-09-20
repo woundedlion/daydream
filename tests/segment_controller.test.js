@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { unpinnedEngineMethods } from './fake_engine.js';
 import { fakeElement } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
+import { FakeWorker } from './fake_worker.js';
 import { displayAliasesDiverged, repointDisplayAliases } from '../display_aliases.js';
 
 // Stand-in for the injected Daydream renderer: the grid and display buffer the
@@ -434,70 +435,6 @@ test('a device cap moves with the memory hint and the mobile layout', () => {
     }
 });
 
-// ---------------------------------------------------------------------------
-// Fakes
-// ---------------------------------------------------------------------------
-
-/**
- * Stand-in for the Web Worker the controller spawns: captures postMessage
- * payloads and exposes onmessage/onerror so tests can drive the protocol by
- * hand. Every constructed instance is recorded in the static `instances` array.
- */
-class FakeWorker {
-  /** @type {Array<FakeWorker>} Every instance constructed since the last reset. */
-  static instances = [];
-  static constructionCount = 0;
-  static failConstructionAt = -1;
-  static failInitialPostAt = -1;
-  /** @type {number} Index whose postMessage throws for `failPostType`. */
-  static failPostAt = -1;
-  /** @type {string|null} Message type postMessage throws on at `failPostAt`. */
-  static failPostType = null;
-  /**
-   * @param {string} url - Worker script URL the controller requested.
-   * @param {Object} opts - Worker options bag (e.g. `{ type: 'module' }`).
-   */
-  constructor(url, opts) {
-    this.index = FakeWorker.constructionCount++;
-    if (this.index === FakeWorker.failConstructionAt)
-      throw new DOMException('worker blocked', 'SecurityError');
-    this.url = url;
-    this.opts = opts;
-    this.posted = [];
-    /** @type {Array<Transferable[]|null>} Transfer list per posted message. */
-    this.transfers = [];
-    this.terminated = false;
-    this.onmessage = null;
-    this.onerror = null;
-    this.onmessageerror = null;
-    FakeWorker.instances.push(this);
-  }
-  /**
-   * Structured-clones the payload the way the browser does — an unclonable
-   * field throws DataCloneError, and the transfer list detaches the sender's
-   * buffers — then records the message the controller sent. `posted` holds the
-   * sender's object rather than the clone so identity across workers stays
-   * observable.
-   * @param {Object} msg - Protocol message the controller sent.
-   * @param {Transferable[]} [transfer] - Transfer list the controller supplied.
-   * @returns {void}
-   */
-  postMessage(msg, transfer) {
-    if (msg.type === 'init' && this.index === FakeWorker.failInitialPostAt)
-      throw new DOMException('message rejected', 'DataCloneError');
-    if (msg.type === FakeWorker.failPostType && this.index === FakeWorker.failPostAt)
-      throw new DOMException('message rejected', 'DataCloneError');
-    structuredClone(msg, { transfer });
-    this.posted.push(msg);
-    this.transfers.push(transfer ?? null);
-  }
-  /**
-   * Marks this fake worker as terminated.
-   * @returns {void}
-   */
-  terminate() { this.terminated = true; }
-}
-
 /**
  * Build a controller wired to fake injected host deps.
  * @param {Object} [config] - Overrides for the controller's host environment.
@@ -535,12 +472,7 @@ beforeEach(() => {
   // destroy() keeps the compilation, so a default-warmer spawn in a later
   // test would carry the module this one warmed.
   pageWarmer.discard();
-  FakeWorker.instances = [];
-  FakeWorker.constructionCount = 0;
-  FakeWorker.failConstructionAt = -1;
-  FakeWorker.failInitialPostAt = -1;
-  FakeWorker.failPostAt = -1;
-  FakeWorker.failPostType = null;
+  FakeWorker.reset();
 });
 
 const savedGlobals = { Worker: globalThis.Worker, document: globalThis.document };
@@ -1391,6 +1323,14 @@ test('only the first fault of a session is recorded', () => {
   c.workers[0].onerror({ message: 'first', filename: '', lineno: 0, colno: 0 });
   seg1({ message: 'second', filename: '', lineno: 0, colno: 0 });
   assert.deepEqual(c.faultInfo, { segId: 0, message: 'first' });
+});
+
+test('an invalid controller message envelope faults the sending worker', () => {
+  const c = makeController();
+  c.create(2);
+  c.workers[1].onmessage({ data: null });
+  assert.deepEqual(c.faultInfo,
+    { segId: 1, message: 'worker seg 1 sent an invalid message envelope' });
 });
 
 test('a bare-Event boot fault auto-rebuilds the pool instead of latching', () => {

@@ -12,6 +12,7 @@ import {
   ResolutionSetResult, EffectSetResult,
   FullConfigRestoreResult,
 } from './fake_engine.js';
+import { fakeWorkerScope } from './fake_worker.js';
 
 // ---------------------------------------------------------------------------
 // Fakes — installed BEFORE importing the worker, which binds self.postMessage
@@ -22,18 +23,7 @@ import {
 
 const posted = [];
 /** @type {{ postMessage: Function, onmessage: ?Function, onmessageerror: ?Function }} */
-const fakeSelf = {
-  // Structured-clone the payload the way the browser does: an unclonable field
-  // throws DataCloneError, and the transfer list detaches this side's buffers,
-  // so a worker that reads a posted buffer again sees an empty one. `received`
-  // is the controller's view of the message; `msg` stays the worker's own
-  // object, so identity against what the worker built is still observable.
-  postMessage(msg, transfer) {
-    posted.push({ msg, transfer, received: structuredClone(msg, { transfer }) });
-  },
-  onmessage: null,
-  onmessageerror: null,
-};
+const fakeSelf = fakeWorkerScope(posted);
 globalThis.self = fakeSelf;
 
 /**
@@ -564,6 +554,12 @@ test('an unknown message type faults instead of being silently dropped', async (
   }
   assert.equal(captured.length, 1, 'one rethrow task scheduled');
   assert.throws(() => captured[0](), /unknown message type/);
+});
+
+test('an invalid worker message envelope is rejected explicitly', async () => {
+  posted.length = 0;
+  await fakeSelf.onmessage({ data: null });
+  assert.equal(posted.at(-1).msg.reason, 'invalid worker message envelope');
 });
 
 /** Segment 0 mirrors its post-frame param values; other segments send null. */

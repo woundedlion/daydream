@@ -193,7 +193,8 @@ export class FakeChainEngine {
  * mocking one of these would pass its own tests against a method the real
  * engine never had. Walks the prototype chain up to Object.prototype, so an
  * instance is checked together with the class it came from and a per-instance
- * patch cannot slip past.
+ * patch cannot slip past. Static module APIs are pinned by the real-WASM
+ * contract suite rather than this instance-method audit.
  * @param {Object} obj - Prototype, instance, or object literal carrying a fake
  *   engine's methods.
  * @returns {Array<string>} Unpinned method names, sorted.
