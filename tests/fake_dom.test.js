@@ -59,16 +59,34 @@ test('an event runs capture root-first, then the target, then bubbles back up', 
   ]);
 });
 
-test('the target node runs both capture and bubble listeners in registration order', () => {
+test('the target node runs capture listeners before noncapture listeners', () => {
   const { leaf, log, listen } = chain();
   listen('leaf', 'second', false);
   listen('leaf', 'first', true);
 
   leaf.dispatch('click');
 
-  assert.deepEqual(log, ['second', 'first'],
-    'at the target the capture flag orders nothing, as in the DOM');
+  assert.deepEqual(log, ['first', 'second']);
 });
+
+for (const [mode, expected] of [
+  ['none', ['capture', 'capture2', 'bubble', 'ancestor']],
+  ['stopPropagation', ['capture', 'capture2']],
+  ['stopImmediatePropagation', ['capture']],
+  ['nonbubble', ['capture', 'capture2', 'bubble']],
+]) {
+  test(`target capture dispatch obeys the platform ${mode} contract`, () => {
+    const { leaf, log, listen } = chain();
+    listen('mid', 'ancestor');
+    listen('leaf', 'bubble');
+    listen('leaf', 'capture', true, (event) => {
+      if (mode.startsWith('stop')) event[mode]();
+    });
+    listen('leaf', 'capture2', true);
+    leaf.dispatch('click', { bubbles: mode !== 'nonbubble' });
+    assert.deepEqual(log, expected);
+  });
+}
 
 test('every listener sees the dispatching node as target and its own node as currentTarget', () => {
   const { root, mid, leaf } = chain();
