@@ -573,6 +573,23 @@ test('a palette near the right edge is clamped back inside the viewport', async 
     'clamped to the viewport width less the palette and its margin');
 });
 
+test('a palette near the bottom fits vertically and can scroll', async () => {
+  const h = await makeStrip();
+  measureNewElements(h, 208);
+  h.doc.documentElement.clientHeight = 300;
+  h.doc.createElement = (tag) => {
+    const node = fakeElement(tag);
+    node.getBoundingClientRect = () => ({ width: 208, height: 400 });
+    return node;
+  };
+  const add = bandFor(h, 'sphere').querySelector('.chain-band-add');
+  add.getBoundingClientRect = () => ({ left: 20, bottom: 290 });
+  add.dispatch('click');
+  assert.equal(paletteOf(h).style.top, '8px');
+  assert.equal(paletteOf(h).style.maxHeight, '284px');
+  assert.equal(paletteOf(h).style.overflowY, 'auto');
+});
+
 test('undo and redo revert and reapply whole edits through the same apply path', async () => {
   const h = await makeStrip();
   bandFor(h, 'plane').querySelector('.chain-band-add').dispatch('click');
