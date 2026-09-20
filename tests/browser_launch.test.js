@@ -8,6 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { BROWSER_ARGS, BROWSER_CANDIDATES, resolveBrowser } from '../scripts/browser.mjs';
+import { collectProblems } from '../scripts/probe_harness.mjs';
 
 test('a declared CHROME_PATH is the browser, when it exists', () => {
   assert.equal(resolveBrowser({ CHROME_PATH: process.execPath }), process.execPath);
@@ -60,9 +61,29 @@ test('the launch flags carry the runner a GPU-less rasterizer', () => {
   assert.ok(BROWSER_ARGS.includes('--enable-unsafe-swiftshader'));
 });
 
-test('the launch flags put the vendor CDN beyond every probe', () => {
-  assert.ok(BROWSER_ARGS.includes('--host-resolver-rules=MAP cdn.jsdelivr.net ~NOTFOUND'),
+test('the launch flags put external asset CDNs beyond every probe', () => {
+  assert.ok(BROWSER_ARGS.includes('--host-resolver-rules=MAP cdn.jsdelivr.net ~NOTFOUND, '
+    + 'MAP fonts.googleapis.com ~NOTFOUND, MAP fonts.gstatic.com ~NOTFOUND'),
     'the probes are served three.js and lil-gui from their own origin; a page '
       + 'that reached jsdelivr instead would hand a CDN incident the power to '
       + 'red the required gate');
+});
+
+test('font fallback failures are expected but other request failures are not', () => {
+  const listeners = new Map();
+  const tab = { on: (name, handler) => listeners.set(name, handler) };
+  const problems = [];
+  collectProblems(tab, 'http://127.0.0.1:8000', problems);
+  const failed = listeners.get('requestfailed');
+  failed({
+    url: () => 'https://fonts.googleapis.com/css2?family=Inter',
+    failure: () => ({ errorText: 'net::ERR_NAME_NOT_RESOLVED' }),
+  });
+  failed({
+    url: () => 'https://example.test/app.js',
+    failure: () => ({ errorText: 'net::ERR_NAME_NOT_RESOLVED' }),
+  });
+  assert.deepEqual(problems, [
+    'request failed: https://example.test/app.js (net::ERR_NAME_NOT_RESOLVED)',
+  ]);
 });
