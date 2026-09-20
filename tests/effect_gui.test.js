@@ -2614,6 +2614,22 @@ test('Export without a copy operation reports the failure', () => {
   assert.match(h.warnings[0], /clipboard copy unavailable/);
 });
 
+test('ShaderBall Export names a missing clipboard operation', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  const h = makeHarness({
+    params: shaderBallParams(),
+    fullConfig: true,
+    fullConfigSnapshot: { schemaVersion: 2 },
+    copyText: null,
+  });
+  h.panel.build();
+
+  h.gui().ctrl('export').object.export();
+
+  assert.equal(h.gui().ctrl('export').label, '\u2717');
+  assert.deepEqual(h.warnings, ['Export: clipboard copy unavailable']);
+});
+
 test('Export refuses a value stream that has skewed from the panel', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   const h = makeHarness({ params: [SPEED, GLOW], engineValues: [0.25] });
