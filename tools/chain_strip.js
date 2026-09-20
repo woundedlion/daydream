@@ -54,6 +54,7 @@ import { createFrameScheduler } from './page_lifecycle.js';
  *   replaceSpan: (start: number, deleteCount: number,
  *     sequence: Array<{label?: string, operator: string}>) => EditResult,
  *   relabel: (oldLabel: string, newLabel: string) => EditResult,
+ *   endValueRun: () => void,
  *   undo: () => boolean, redo: () => boolean,
  *   canUndo: () => boolean, canRedo: () => boolean,
  * }} ChainStore
@@ -503,7 +504,7 @@ export function createChainStrip({
    * @returns {void}
    */
   const placePalette = (element, anchor) => {
-    const bounds = element.getBoundingClientRect();
+    let bounds = element.getBoundingClientRect();
     const width = bounds.width;
     const viewport = doc.documentElement?.clientWidth ?? 0;
     const anchorBounds = anchor.getBoundingClientRect();
@@ -514,9 +515,13 @@ export function createChainStrip({
     let top = anchorBounds.bottom;
     if (viewportHeight > 0) {
       const available = Math.max(0, viewportHeight - 2 * PALETTE_MARGIN);
-      element.style.maxHeight = `${available}px`;
-      element.style.overflowY = 'auto';
       top = Math.min(top, viewportHeight - Math.min(bounds.height, available) - PALETTE_MARGIN);
+      top = Math.max(PALETTE_MARGIN, top);
+      const maxHeight = Math.max(0, viewportHeight - top - PALETTE_MARGIN);
+      element.style.maxHeight = `${Math.min(bounds.height, maxHeight)}px`;
+      element.style.overflowY = 'auto';
+      bounds = element.getBoundingClientRect();
+      top = Math.min(top, viewportHeight - Math.min(bounds.height, maxHeight) - PALETTE_MARGIN);
     }
     element.style.top = `${Math.max(PALETTE_MARGIN, top)}px`;
   };
@@ -866,6 +871,7 @@ export function createChainStrip({
     });
     slider.addEventListener('change', () => {
       commitSliderEdit();
+      store.endValueRun();
       onCommitParameter();
     });
     return slider;

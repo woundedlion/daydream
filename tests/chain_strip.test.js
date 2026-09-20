@@ -579,14 +579,17 @@ test('a palette near the bottom fits vertically and can scroll', async () => {
   h.doc.documentElement.clientHeight = 300;
   h.doc.createElement = (tag) => {
     const node = fakeElement(tag);
-    node.getBoundingClientRect = () => ({ width: 208, height: 400 });
+    node.getBoundingClientRect = () => ({
+      width: 208,
+      height: Math.min(400, Number.parseFloat(node.style.maxHeight) || 192),
+    });
     return node;
   };
   const add = bandFor(h, 'sphere').querySelector('.chain-band-add');
   add.getBoundingClientRect = () => ({ left: 20, bottom: 290 });
   add.dispatch('click');
-  assert.equal(paletteOf(h).style.top, '8px');
-  assert.equal(paletteOf(h).style.maxHeight, '284px');
+  assert.equal(paletteOf(h).style.top, '100px');
+  assert.equal(paletteOf(h).style.maxHeight, '192px');
   assert.equal(paletteOf(h).style.overflowY, 'auto');
 });
 
