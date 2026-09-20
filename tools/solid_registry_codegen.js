@@ -31,6 +31,13 @@ import { COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns } from './cpp_format.js';
  * 256-step table would emit a count of 0.
  */
 export const MAX_RECIPE_STEPS = 255;
+export const MAX_BUILD_STEPS = 8;
+const DOUBLE_STEP_OPS = new Set(['gyro', 'needle', 'zip', 'bevel']);
+
+/** @param {string} op @returns {number} Lowered primitive count. */
+function primitiveCount(op) {
+  return op === 'meta' ? 3 : DOUBLE_STEP_OPS.has(op) ? 2 : 1;
+}
 
 /**
  * solids.h names a recipe's tables after the generator, camelCase segments
@@ -334,6 +341,13 @@ export function generateRegistryCpp(item, baseRecipe = null) {
     throw new Error(`generateRegistryCpp: the flattened chain has ${stepList.length} `
       + `steps; a Recipe carries at most ${MAX_RECIPE_STEPS}, above which its `
       + 'uint8_t count wraps and the pasted Recipe would replay a different chain');
+  }
+  const ops = [...(baseRecipe?.ops ?? []), ...item.ops];
+  const lowered = ops.reduce((count, op) =>
+    count + primitiveCount(typeof op === 'string' ? op : op.op), 0);
+  if (lowered > MAX_BUILD_STEPS) {
+    throw new Error(`generateRegistryCpp: the flattened chain lowers to ${lowered} `
+      + `primitive steps; IslamicStars supports at most ${MAX_BUILD_STEPS}`);
   }
   // The step table's trailing comma holds clang-format to one step per line;
   // without it a table short enough to fit gets packed onto fewer lines and the
