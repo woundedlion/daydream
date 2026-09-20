@@ -447,8 +447,8 @@ export function axisControlState({ curve, minimum, maximum, label, shortLabel })
     minimumMax: constant ? '1' : String(maximum),
     maximumMin: constant ? '0' : String(minimum),
     maximumMax: '1',
-    minimumText: Number(minimum).toFixed(2),
-    maximumText: Number(maximum).toFixed(2),
+    minimumText: String(Number(minimum)),
+    maximumText: String(Number(maximum)),
   };
 }
 

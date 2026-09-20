@@ -263,7 +263,7 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
   const makeAxis = (axisId, axisLabel, keyshortcuts, vertical) => {
     const el = document.createElement('span');
     el.id = axisId;
-    el.className = 'complex-plane-axis';
+    el.className = 'visually-hidden';
     el.tabIndex = 0;
     el.setAttribute('role', 'slider');
     if (vertical) el.setAttribute('aria-orientation', 'vertical');
