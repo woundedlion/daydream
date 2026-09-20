@@ -67,6 +67,37 @@ test('returns empty string when nothing in the list is supported', () => {
 const fakeCanvas = (width = 0, height = 0) =>
   ({ width, height, getContext: () => ({ drawImage() {} }) });
 
+test('background visibility pauses recording time and remains stoppable', () => {
+  const doc = new EventTarget();
+  doc.hidden = false;
+  let now = 1000;
+  const rec = new VideoRecorder(fakeCanvas(), 1 / 16, () => now, doc);
+  const media = {
+    state: 'recording',
+    pause() { this.state = 'paused'; },
+    resume() { this.state = 'recording'; },
+    stop() { this.state = 'inactive'; },
+  };
+  rec.mediaRecorder = media;
+  rec.recordingStartedAtMs = now;
+  now = 2000;
+  doc.hidden = true;
+  doc.dispatchEvent(new Event('visibilitychange'));
+  assert.equal(media.state, 'paused');
+  assert.equal(rec.isRecording, true);
+  now = 62_000;
+  assert.equal(rec.elapsedSeconds, 1);
+  doc.hidden = false;
+  doc.dispatchEvent(new Event('visibilitychange'));
+  now = 63_000;
+  assert.equal(rec.elapsedSeconds, 2);
+  doc.hidden = true;
+  doc.dispatchEvent(new Event('visibilitychange'));
+  rec.stop();
+  assert.equal(media.state, 'inactive');
+  rec.dispose();
+});
+
 /**
  * Installs a document whose createElement yields a blank fake canvas, so the
  * offscreen-sizing paths run in Node without a DOM.
