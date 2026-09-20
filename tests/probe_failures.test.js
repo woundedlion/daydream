@@ -120,3 +120,16 @@ test('every scripts/*-probe.mjs is wired into all three probe rosters', () => {
     assert.ok(probes.includes(file), `PROBES names a missing probe "${file}"`);
   }
 });
+
+test('PROBES names every exported probe interaction and no others', async () => {
+  const files = [...new Set(PROBES.map(([file]) => file))];
+  for (const file of files) {
+    const module = await import(new URL(`../scripts/${file}`, import.meta.url));
+    const exported = Object.keys(module).filter((name) => name.startsWith('probe')).sort();
+    const listed = PROBES
+      .filter(([listedFile]) => listedFile === file)
+      .map(([, name]) => name)
+      .sort();
+    assert.deepEqual(listed, exported, `${file} probe exports and PROBES drifted`);
+  }
+});
