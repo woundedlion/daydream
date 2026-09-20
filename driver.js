@@ -557,7 +557,7 @@ export class Daydream {
     const clockReady = this.advanceFrameClock();
     const advanced =
       (clockReady || this.stepFrames !== 0) && this.stepSimulation(adapter);
-    adapter?.sync?.(advanced);
+    if (advanced || this.paused || this.needsRender) adapter?.sync?.(advanced);
 
     // Services live pointer interaction; emits 'change' (→ needsRender).
     this.controls.update();

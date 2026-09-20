@@ -1792,3 +1792,13 @@ test('dispose during a real Three animation callback cancels the rearmed frame',
   await Promise.resolve();
   assert.equal(requests.size, 0);
 });
+
+test('running display frames between simulation ticks do not poll the panel', () => {
+  const ctx = renderCtx(new Uint16Array(4), []);
+  ctx.paused = false;
+  ctx.needsRender = false;
+  ctx.advanceFrameClock = () => false;
+  let syncs = 0;
+  Daydream.prototype.render.call(ctx, { drawFrame() {}, sync() { syncs++; } });
+  assert.equal(syncs, 0);
+});
