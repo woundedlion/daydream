@@ -5,6 +5,7 @@
 // hand-rolling another one-off fake.
 //
 // Not modelled: layout and the box model, CSS, hit-testing, pointer capture.
+// Numeric-input value sanitization is checked in solids-probe.mjs.
 // So these ship green here and only a real browser catches them: zero-width or
 // overflowing chips, off-screen flyouts, scroll arrows that never appear,
 // scrollTop clamping, a renamed or deleted CSS rule, a display:none control that

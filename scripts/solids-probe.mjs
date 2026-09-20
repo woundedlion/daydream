@@ -149,11 +149,42 @@ export async function probeChain(tab) {
   return failures;
 }
 
+/** @param {import('puppeteer-core').Page} tab */
+export async function probeNumericInputs(tab) {
+  const { failures, check } = checks();
+  const values = await tab.evaluate(async () => {
+    const { buildOpRow } = await import('./solid_op_rows.js');
+    const { OP_DEFS } = await import('./solid_codegen.js');
+    return ['truncate', 'chamfer'].map((op) => {
+      const row = buildOpRow({ op, params: { t: '0.3" autofocus onfocus="alert(1)' } }, 0, {
+        opDef: OP_DEFS[op],
+        count: 1,
+        on: { wireDrag() {}, move() {}, remove() {}, setParam() {} },
+      });
+      const range = row.querySelector('input[type="range"]');
+      const number = row.querySelector('input[type="number"]');
+      return {
+        op,
+        range: range.value,
+        number: number.value,
+        injected: row.querySelector('[autofocus], [onfocus]') !== null,
+      };
+    });
+  });
+  for (const value of values) {
+    check(value.range === (value.op === 'truncate' ? '0.26' : '0.5'),
+      `${value.op}: a nonnumeric range value sanitizes to the step-aligned midpoint (${value.range})`);
+    check(value.number === '', `${value.op}: a nonnumeric number value sanitizes to empty`);
+    check(!value.injected, `${value.op}: parameter text creates no injected attributes`);
+  }
+  return failures;
+}
+
 if (isMain(import.meta.url)) await runProbe({
   name: 'solids-probe',
   page: PAGE,
   timeoutMs: TIMEOUT_MS,
-  success: 'the op chain reorders under both a mouse and a finger.',
+  success: 'the op chain reorders under both a mouse and a finger, and numeric inputs sanitize values.',
   run: async ({ open }) => {
     const failures = [];
     const tab = await open({
@@ -180,6 +211,7 @@ if (isMain(import.meta.url)) await runProbe({
       return count > 0 && performance.now() - seen.since > settle;
     }, { polling: 200 }, SETTLE_MS);
     failures.push(...await probeChain(tab));
+    failures.push(...await probeNumericInputs(tab));
     return failures;
   },
 });

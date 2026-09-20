@@ -64,14 +64,16 @@ test('an op name carrying markup lands as text, never as parsed markup', () => {
     `Move ${hostile} up`);
 });
 
-test('a parameter value carrying an attribute break lands on the input as a value', () => {
+test('a parameter value carrying an attribute break creates no injected attributes', () => {
   const hostile = '0.3" autofocus onfocus="alert(1)';
   const { el } = build({ op: 'truncate', params: { t: hostile } });
   const [row] = el.querySelectorAll('.op-param');
   const range = row.children.find((c) => c.type === 'range');
   const number = row.children.find((c) => c.type === 'number');
-  assert.equal(range.value, hostile, 'the slider lost the raw value');
-  assert.equal(number.value, 'NaN', 'a non-numeric value reached the number box verbatim');
+  for (const input of [range, number]) {
+    assert.equal(input.getAttribute('autofocus'), null);
+    assert.equal(input.getAttribute('onfocus'), null);
+  }
 });
 
 test('parameter rows carry the OP_DEFS range and the current value', () => {
