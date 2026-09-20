@@ -141,7 +141,7 @@ export async function probeColorStrip(tab) {
  * @param {import('puppeteer-core').Page} tab - The page.
  * @returns {Promise<string[]>} One entry per failed check.
  */
-async function probeHueWheel(tab) {
+export async function probeHueWheel(tab) {
   const { failures, check } = checks();
 
   await tab.click('#tab-btn-generative');

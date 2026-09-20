@@ -150,7 +150,7 @@ export async function probePanel(tab) {
  * drag's own.
  * @param {import('puppeteer-core').Page} tab
  */
-async function probeSliderDrag(tab) {
+export async function probeSliderDrag(tab) {
   const failures = [];
   const check = (ok, message) => {
     console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
@@ -231,7 +231,7 @@ async function probeSliderDrag(tab) {
  * a hidden label element still names the control.
  * @param {import('puppeteer-core').Page} tab
  */
-async function probePresetName(tab) {
+export async function probePresetName(tab) {
   const { failures, check } = checks();
 
   const cdp = await tab.createCDPSession();
@@ -254,7 +254,7 @@ async function probePresetName(tab) {
 }
 
 /** @param {import('puppeteer-core').Page} tab */
-async function probeMobilePanel(tab) {
+export async function probeMobilePanel(tab) {
   const { failures, check } = checks();
 
   await (await tab.waitForSelector(`[data-effect="${EFFECT}"]`)).click();
@@ -320,7 +320,7 @@ const scrollToEdge = (tab, edge) => tab.$eval(LIST,
  * @param {import('puppeteer-core').Page} tab - The page under probe.
  * @returns {Promise<string[]>} The failed check descriptions.
  */
-async function probeSidebar(tab) {
+export async function probeSidebar(tab) {
   const { failures, check } = checks();
 
   const grid = await tab.$eval(LIST, (list) => {
@@ -397,7 +397,7 @@ async function probeSidebar(tab) {
  * @param {string} layout - Which layout is mounted, for the check text.
  * @returns {Promise<string[]>} The failed check descriptions.
  */
-async function probeWarningNote(tab, layout) {
+export async function probeWarningNote(tab, layout) {
   const { failures, check } = checks();
 
   const note = await tab.evaluate(async (warning) => {

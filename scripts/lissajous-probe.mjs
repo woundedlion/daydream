@@ -229,7 +229,7 @@ export async function probeRationalLock(tab) {
  * @param {string} origin - The site the manifest server is on.
  * @returns {Promise<string[]>} One entry per failed check.
  */
-async function probeHistoryRestore(tab, origin) {
+export async function probeHistoryRestore(tab, origin) {
   const { failures, check } = checks();
 
   await tab.evaluateOnNewDocument(() => {

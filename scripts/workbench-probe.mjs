@@ -404,7 +404,7 @@ const PARITY_TITLE = 'Ash Cloud';
  * @param {import('puppeteer-core').Page} tab
  * @returns {Promise<string[]>} The failed checks.
  */
-async function probeParity(tab) {
+export async function probeParity(tab) {
   const { failures, check } = checks();
 
   await tab.select('#shader-document-select', PARITY_EFFECT);
