@@ -547,8 +547,8 @@ export function createShaderDocumentController({
    *   source is a catalog entry rather than an imported study.
    * @param {*|null} [session] - Deep-linked preset, bypass, and pause state.
    */
-  const loadSource = async (source, filename = 'import.shader.json',
-                            precompiled = null, session = null) => {
+  const loadSourceNow = async (source, filename = 'import.shader.json',
+                               precompiled = null, session = null) => {
     await flushDeepLink();
     linkGeneration += 1;
     compiler ??= await importCompiler();
@@ -661,6 +661,16 @@ export function createShaderDocumentController({
     previousUi?.strip.destroy();
     if (stripMount && candidateMount) stripMount.replaceChildren(candidateMount);
     return true;
+  };
+
+  /** @type {Promise<void>} */
+  let loadQueue = Promise.resolve();
+  /** @type {typeof loadSourceNow} */
+  const loadSource = (source, filename, precompiled, session) => {
+    const queued = loadQueue.then(() =>
+      loadSourceNow(source, filename, precompiled, session));
+    loadQueue = queued.then(() => undefined, () => undefined);
+    return queued;
   };
 
   /**

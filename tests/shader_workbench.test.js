@@ -746,6 +746,23 @@ test('an imported study the catalog does not carry has no parity build', async (
   assert.deepEqual(harness.ran, { gui: 2, invalidated: 2 });
 });
 
+test('overlapping loads are serialized in request order', async () => {
+  const harness = workbench();
+  await harness.controller.init();
+  const second = JSON.parse(shaderDocument({ digest: 'digest-second' }));
+  second.document.preset_bank.presets[0].values['sample.pattern-freq'] = 9;
+
+  const firstLoad = harness.controller.loadSource(
+    shaderDocument({ digest: 'digest-first' }), 'first.shader.json');
+  const secondLoad = harness.controller.loadSource(
+    JSON.stringify(second), 'second.shader.json');
+  assert.deepEqual(await Promise.all([firstLoad, secondLoad]), [true, true]);
+
+  assert.deepEqual(harness.engine.writes.at(-1), ['sample.pattern-freq', 9]);
+  assert.equal(harness.controller.save(), true);
+  assert.equal(harness.downloads.at(-1)[0], 'second.shader.json');
+});
+
 test('a setShaderChain refusal is surfaced with its code', async () => {
   const engine = workbenchEngine();
   engine.setShaderChain = (entries) => {
