@@ -91,6 +91,18 @@ export class VideoRecorder {
               doc = globalThis.document) {
     this.canvas = canvas;
     this.doc = doc;
+    this.visibilityChanged = () => {
+      const recorder = this.mediaRecorder;
+      if (!recorder) return;
+      if (this.doc.hidden && recorder.state === 'recording') {
+        this.freezeElapsed();
+        recorder.pause();
+      } else if (!this.doc.hidden && recorder.state === 'paused') {
+        recorder.resume();
+        this.recordingStartedAtMs = this.now();
+      }
+    };
+    this.doc?.addEventListener?.('visibilitychange', this.visibilityChanged);
     /** @type {MediaRecorder|null} */
     this.mediaRecorder = null;
     /** @type {Blob[]} */
@@ -142,10 +154,10 @@ export class VideoRecorder {
 
   /**
    * Whether a recording session is actively capturing.
-   * @returns {boolean} True while the MediaRecorder is in the 'recording' state.
+   * @returns {boolean} True while recording or paused in a background tab.
    */
   get isRecording() {
-    return this.mediaRecorder !== null && this.mediaRecorder.state === 'recording';
+    return this.mediaRecorder !== null && this.mediaRecorder.state !== 'inactive';
   }
 
   /**
@@ -330,6 +342,7 @@ export class VideoRecorder {
       recorder.start(RECORDER_TIMESLICE_MS);
       this.elapsedSeconds = 0;
       this.recordingStartedAtMs = this.now();
+      this.visibilityChanged();
     } catch (err) {
       recorder.ondataavailable = null;
       recorder.onstop = null;
@@ -361,7 +374,7 @@ export class VideoRecorder {
    * @returns {void}
    */
   stop() {
-    if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
       this.freezeElapsed();
       this.mediaRecorder.stop();
     }
@@ -397,7 +410,7 @@ export class VideoRecorder {
    * @returns {void}
    */
   captureFrame() {
-    if (!this.isRecording || !this.track) return;
+    if (this.mediaRecorder?.state !== 'recording' || !this.track) return;
     this.blitToOffscreen();
     // Timed-fallback tracks have no requestFrame; the stream samples on its own.
     if (typeof this.track.requestFrame === 'function') this.track.requestFrame();
@@ -784,6 +797,7 @@ export class VideoRecorder {
    * @returns {void}
    */
   dispose() {
+    this.doc?.removeEventListener?.('visibilitychange', this.visibilityChanged);
     this.stop();
     this.cleanup();
   }
