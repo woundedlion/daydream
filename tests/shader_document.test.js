@@ -35,6 +35,31 @@ import { sha256Hex } from '../shader/sha256.mjs';
 const PATTERNS = new URL('../shader/patterns/', import.meta.url);
 const FIXTURES = new URL('v1/', PATTERNS);
 const patternNames = readdirSync(PATTERNS).filter((f) => f.endsWith('.shader.json'));
+const identityProjectionPatterns = [
+  'alien_core.shader.json',
+  'alien_ocean.shader.json',
+  'cosmic_eyeball.shader.json',
+  'kaleidoscope_mandala.shader.json',
+  'kaleidoscope_stained_glass.shader.json',
+];
+const legacyV1Digests = [
+  '01b1774195e402e2e9eb4bb44bb35f81cfa4adef8d501d69ae98935f9a92d7f5',
+  '2ef28f241efe8419e1c0479878b86ae7dfe51b20259976e96b684a13381a12e7',
+  '4240fa800444a91786eb1eda594fed9b17c02004e19cb7055cdd2499123e68aa',
+  '438ff1ecb64010fe3ad681dcc17230ab6f79aa17287e61c476452851abd738d0',
+  '4b0518e3b1ff62e4a79308cca18bcb6835c7ca7a3c8ea0f6ec9f3b33de0c3ca7',
+  '50e31575d2d1321177800bae081bc19c6ec1c75ee826b14733ebc2a296ce62f4',
+  '5a7e3585c332cbd79d12980c266a7e0aca5c57fb446697add36beeddb105cd68',
+  '65d932a735dfed3ee927167cedced31939f0a3938b820b38a9ff44554733d553',
+  '722b4cca46a812b8d5faba5a7884e8d2af83bcc21bd94ed7d3a4e80e8b9a086c',
+  'a0f9493b9471c3e420cf64ea1d2f023b233681736af4fb6db93c564233c5e110',
+  'b4719815ef06422b44ba9ec217a808f77ac988ccc54450b12677f5e383469c71',
+  'c9be489d1705973480f4bc785ba5f08d7c1b38405b0c5773632b3a6534f917b7',
+  'd5fd332a75b646d7446413a97269ec6818fd11305f4fc50045ed911706022ef2',
+  'd7b004e7329e1e0bcc570371f66fddaf4401b3d2bbaca9f0e99ff5f04369ddeb',
+  'e433245bd939ce83dab2e3510742c9c81e768a2d4f372fc7a599a84de5bc8b9f',
+  'ed25629495041b434cb2d142cf0eb71ba5afee4af07ba5c6ab391f1832173349',
+];
 const CATALOG = JSON.parse(
   readFileSync(new URL('../shader/engine_catalog.json', import.meta.url), 'utf8'));
 const MIGRATION = JSON.parse(
@@ -641,18 +666,43 @@ test('expansion is deterministic and the compiler is one code path', () => {
 });
 
 /**
- * The re-export gate: the committed v2 pattern documents are by definition
- * the expansion's output, byte for byte, so the two cannot drift apart.
+ * The re-export gate: a committed v2 pattern that retains its v1 behavior is
+ * the expansion's output byte for byte. The identity-frame replacements below
+ * deliberately split from their animated v1 documents.
  */
-test('every committed v2 pattern is its v1 fixture expanded, byte-identical', () => {
+test('eleven current patterns remain byte-identical to their v1 expansion', () => {
   assert.equal(fixtureNames.length, 16);
-  for (const name of fixtureNames) {
+  const equivalentNames = fixtureNames.filter(
+    (name) => !identityProjectionPatterns.includes(name));
+  assert.equal(equivalentNames.length, 11);
+  for (const name of equivalentNames) {
     const expanded = expandV1Document(fixture(name), CATALOG).document;
     assert.equal(
       exportShaderDocumentJson(expanded),
       readPinned(new URL(name, PATTERNS)),
       `${name} drifted from its expansion`,
     );
+  }
+});
+
+test('five identity-frame replacements differ from v1 only by explicit policy', () => {
+  for (const name of identityProjectionPatterns) {
+    const historical = fixture(name);
+    const expanded = expandV1Document(historical, CATALOG).document;
+    assert.equal(expanded.descriptor.parameters.some(
+      (parameter) => parameter.id === 'project.frame'), false, name);
+
+    const replacement = structuredClone(historical);
+    const surface = replacement.descriptor.graph.nodes.find(
+      (node) => node.role === 'surface_project');
+    surface.policy.frame = 'identity';
+    const identity = expandV1Document(replacement, CATALOG).document;
+    assert.equal(exportShaderDocumentJson(identity), readPinned(new URL(name, PATTERNS)), name);
+
+    const project = expanded.descriptor.chain.find((slot) => slot.label === 'project');
+    const operator = CATALOG.operators.find(({ id }) => id === project.operator);
+    assert.equal(operator.params.find(({ id }) => id === 'frame').default,
+      'spin-wander', name);
   }
 });
 
@@ -695,6 +745,7 @@ test('the digest migration table covers exactly the v1 fixtures', () => {
   }
   assert.deepEqual(MIGRATION, Object.fromEntries(expected));
   assert.equal(Object.keys(MIGRATION).length, fixtureNames.length);
+  assert.deepEqual(Object.keys(MIGRATION).sort(), legacyV1Digests);
 });
 
 /**
