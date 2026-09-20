@@ -172,7 +172,10 @@ export function fakeDriver() {
     invalidate() { this.invalidated = true; },
     keydown(e) { this.keys.push(e); },
     setStrobeColumns(strobe) { this.strobe = strobe; },
-    updateResolution(w, h, dotSize) { this.resolution = [w, h, dotSize]; },
+    updateResolution(w, h, dotSize) {
+      this.resolution = [w, h, dotSize];
+      this.dotMesh.instanceColor = fakeColorAttribute(null);
+    },
     // The real driver's render() calls the adapter it is handed; a fake that
     // swallowed it would leave every per-frame wiring undriven.
     render(adapter) { this.frames += 1; adapter.drawFrame(); },
