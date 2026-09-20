@@ -596,6 +596,36 @@ test('a frame that throws every tick reports once', () => {
   assert.equal(logged[0][0], 'Render loop frame failed:');
 });
 
+test('a failing reporter cannot skip dead-module release', () => {
+  let released = false;
+  const guarded = createFrameLoopGuard({
+    frame() {},
+    report() { throw new Error('report unavailable'); },
+    logError() {},
+    moduleDead: () => true,
+    onModuleDead() { released = true; },
+  });
+  assert.doesNotThrow(guarded);
+  assert.equal(released, true);
+});
+
+test('a failing frame reporter preserves the recovery message', () => {
+  let failed = true;
+  let attempted = '';
+  const cleared = [];
+  const guarded = createFrameLoopGuard({
+    frame() { if (failed) throw new Error('view detached'); },
+    report(message) { attempted = message; throw new Error('report unavailable'); },
+    clearReport(message) { cleared.push(message); },
+    logError() {},
+  });
+  assert.doesNotThrow(guarded);
+  assert.match(attempted, /view detached/);
+  failed = false;
+  for (let i = 0; i < FRAME_GUARD_REARM_FRAMES; ++i) guarded();
+  assert.deepEqual(cleared, [attempted]);
+});
+
 test('a loop that recovers reports its next failure again', () => {
   let boom = true;
   const { guarded, reported, logged } = makeFrameGuard(() => {
