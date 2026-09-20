@@ -117,8 +117,8 @@ export function hitTestHueKeyMarker(x, y, points, radius) {
 
 /**
  * Fills a three-element array in place. Keeping the component writes out of
- * oklchLinearRgb's body leaves that body pure matrix arithmetic, which the
- * engine-parity test reads coefficient by coefficient.
+ * oklchLinearRgb's body leaves that body as the matrix arithmetic exercised by
+ * the output parity sweep.
  * @param {number[]} out - Destination array.
  * @param {number} r - First component.
  * @param {number} g - Second component.

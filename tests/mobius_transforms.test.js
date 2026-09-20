@@ -196,9 +196,9 @@ test('glslProjectionFunctions constants match the JS exports', () => {
 });
 
 /**
- * Absolute pin on the projection constants. WASM parity tests
- * diffs them against core/math/stereographic.h, but only where an engine
- * checkout is present; these literals hold the values where it is not.
+ * Absolute pin on the projection constants mirrored from
+ * core/math/stereographic.h. The executed Möbius parity sweep stays outside
+ * the pole cap, where the fused engine transform intentionally differs.
  */
 test('projection constants hold their engine values (absolute pin)', () => {
   assert.equal(STEREO_INF, 1e4, 'STEREO_INF is the engine sentinel');
