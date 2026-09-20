@@ -7,7 +7,7 @@
   "main.js": "index.html's entry module, whose body is `void bootstrap()`. Importing it starts the simulator, which is why bootstrap.js stays separately importable and tests/bootstrap.test.js covers it there.",
   "vendor-importmap.js": "An IIFE the page loads by script tag, not a module. tests/vendor-importmap.test.js evaluates its source in a node:vm sandbox, which is not a module load.",
   "scripts/browser-smoke.mjs": "Drives headless Chrome over every manifest-served page. The reusable browser workflow runs it, and there is no part of it a unit test could reach without a browser.",
-  "scripts/generate-shader-v2-documents.mjs": "Regenerates the committed v2 pattern documents and digest_migration.v1v2.json from the v1 fixtures on import, so a test load would rewrite the working tree. Its output is what tests/shader_document.test.js pins: the byte-identical re-export gate and the migration-table completeness case fail if the committed files drift from what a rerun would write.",
+  "scripts/generate-shader-v2-documents.mjs": "Regenerates digest_migration.v1v2.json from the v1 fixtures on import, so a test load would rewrite the working tree. The migration-table completeness case fails if the committed table drifts from what a rerun would write.",
   "scripts/run-tests.mjs": "tests/run_tests.test.js drives it as a subprocess with NODE_TEST_CONTEXT deliberately removed, so the nested test runner can execute instead of refusing recursive invocation.",
   "scripts/record-module-loads.mjs": "Loaded through NODE_OPTIONS before its own loader hook exists; a missing recorder leaves source modules uncovered and fails the roster gate."
 }

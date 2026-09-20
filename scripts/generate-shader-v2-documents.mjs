@@ -3,10 +3,9 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-// Regenerates the schema-v2 pattern documents and the frozen v1->v2 digest
-// migration table from the v1 fixtures in shader/patterns/v1/. The committed
-// v2 files are by definition this expansion's output; the byte-identical
-// re-export test in tests/shader_document.test.js holds them to it.
+// Regenerates the frozen v1->v2 digest migration table from the v1 fixtures in
+// shader/patterns/v1/. Current pattern documents are engine-owned artifacts;
+// some intentionally differ from the legacy expansion.
 //
 //   node scripts/generate-shader-v2-documents.mjs
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -15,7 +14,6 @@ import { fileURLToPath } from 'node:url';
 
 import {
   compileShaderDocument,
-  exportShaderDocumentJson,
   parseShaderDocument,
   v1DescriptorDigest,
 } from '../shader/shader_workbench.mjs';
@@ -35,7 +33,6 @@ for (const name of names) {
     console.error(`${name}:`, JSON.stringify(compiled.diagnostics, null, 2));
     process.exit(1);
   }
-  writeFileSync(resolve(PATTERNS, name), exportShaderDocumentJson(compiled.document));
   migration[v1DescriptorDigest(v1)] = compiled.descriptor_digest;
   console.log(`${name} -> ${compiled.descriptor_digest}`);
 }
@@ -43,4 +40,4 @@ for (const name of names) {
 const table = Object.fromEntries(Object.entries(migration).sort(([a], [b]) => a < b ? -1 : 1));
 writeFileSync(resolve(PATTERNS, 'digest_migration.v1v2.json'),
   `${JSON.stringify(table, null, 2)}\n`);
-console.log(`${names.length} documents, ${Object.keys(table).length} migration entries`);
+console.log(`${names.length} legacy documents, ${Object.keys(table).length} migration entries`);
