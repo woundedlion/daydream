@@ -214,7 +214,10 @@ test('initScene returns the light rig it added when lights are requested', () =>
 });
 
 test('the default resize retracks the container size and re-caps the pixel ratio', () => {
-  const s = mountScene();
+  const resized = [];
+  const s = mountScene({
+    onAfterResize: () => resized.push([s.camera.aspect, [...s.renderer.size]]),
+  });
 
   s.container.clientWidth = 1024;
   s.container.clientHeight = 256;
@@ -223,6 +226,7 @@ test('the default resize retracks the container size and re-caps the pixel ratio
   assert.equal(s.camera.aspect, 1024 / 256);
   assert.equal(s.camera.projectionUpdates, 1, 'a new aspect is inert until the matrix is rebuilt');
   assert.deepEqual(s.renderer.size, [1024, 256]);
+  assert.deepEqual(resized, [[4, [1024, 256]]]);
   assert.equal(s.renderer.pixelRatio, 0.5, 'resize must re-read devicePixelRatio');
 
   // A display that changes density mid-session, e.g. a window dragged to a

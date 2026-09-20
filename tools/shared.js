@@ -79,6 +79,7 @@ export function getCssColor(name) {
  * @param {Function} [opts.onAnimate] - Callback run every frame before controls.update()
  * @param {Function} [opts.onAfterRender] - Callback run every frame after the render
  * @param {Function} [opts.onResize] - Custom resize handler (replaces the default aspect/size update)
+ * @param {Function} [opts.onAfterResize] - Callback after the projection and renderer size update
  * @returns {{scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer, controls: OrbitControls, sphere: (THREE.Mesh|null), lights: Array<THREE.Light>, resize: Function, dispose: Function}} Scene handles, the resize callback, and a dispose() to tear the scene down.
  */
 export function initScene(containerId, canvasId, opts = {}) {
@@ -99,6 +100,7 @@ export function initScene(containerId, canvasId, opts = {}) {
     onAnimate = null,
     onAfterRender = null,
     onResize = null,
+    onAfterResize = null,
   } = opts;
 
   const container = document.getElementById(containerId);
@@ -177,9 +179,11 @@ export function initScene(containerId, canvasId, opts = {}) {
     renderer.setPixelRatio(capPixelRatio(window.devicePixelRatio));
     renderer.setSize(w, h);
   };
-  const resize = onResize
-    ? () => onResize({ scene, camera, renderer, controls })
-    : defaultResize;
+  const resize = () => {
+    if (onResize) onResize({ scene, camera, renderer, controls });
+    else defaultResize();
+    onAfterResize?.();
+  };
   window.addEventListener('resize', resize);
   const resizeObserver = typeof ResizeObserver === 'function'
     ? new ResizeObserver(resize)
