@@ -59,7 +59,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install shellcheck
-        run: pip install 'shellcheck-py==0.11.0.1'
+        run: pip install --require-hashes -r requirements/shellcheck.txt
       - name: Lint shell
         run: |
           mapfile -t FILES < <(git ls-files -- '*.sh' '.githooks/*')
