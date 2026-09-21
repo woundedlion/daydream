@@ -83,7 +83,6 @@ test('cdn variant maps three and lil-gui to the jsDelivr CDN', () => {
   assert.match(imports['three'], /^https:\/\/cdn\.jsdelivr\.net\/npm\/three@[\d.]+\/build\/three\.module\.js$/);
   assert.match(imports['three/addons/'], /^https:\/\/cdn\.jsdelivr\.net\/npm\/three@[\d.]+\/examples\/jsm\/$/);
   assert.match(imports['lil-gui'], /^https:\/\/cdn\.jsdelivr\.net\/npm\/lil-gui@[\d.]+\/dist\/lil-gui\.esm\.min\.js$/);
-  assert.equal(imports['gui'], 'https://example.test/app/gui.js');
 });
 
 test('local variant resolves three and lil-gui relative to the script path', () => {
@@ -91,12 +90,12 @@ test('local variant resolves three and lil-gui relative to the script path', () 
   assert.equal(imports['three'], 'https://example.test/app/three.js/build/three.module.js');
   assert.equal(imports['three/addons/'], 'https://example.test/app/three.js/examples/jsm/');
   assert.equal(imports['lil-gui'], 'https://example.test/app/node_modules/lil-gui/dist/lil-gui.esm.min.js');
-  assert.equal(imports['gui'], 'https://example.test/app/gui.js');
 });
 
-test('self-path detection resolves gui.js against the script directory', () => {
-  const imports = evalImportmap({ selfSrc: 'https://cdn.example/deep/tools/vendor-importmap.js' });
-  assert.equal(imports['gui'], 'https://cdn.example/deep/tools/gui.js');
+test('self-path detection resolves local vendoring against the script directory', () => {
+  const imports = evalImportmap({
+    vendor: 'local', selfSrc: 'https://cdn.example/deep/tools/vendor-importmap.js' });
+  assert.equal(imports['three'], 'https://cdn.example/deep/tools/three.js/build/three.module.js');
 });
 
 test('cdn variant pins every CDN module with a sha384 integrity entry', () => {
@@ -116,7 +115,6 @@ test('cdn variant pins every CDN module with a sha384 integrity entry', () => {
   }
   assert.equal(Object.keys(integrity).length, 2 + addonKeys.length,
     'only the CDN modules are pinned');
-  assert.equal(integrity[imports['gui']], undefined, 'same-origin gui.js is not pinned');
 });
 
 test('local variant emits no integrity map', () => {
