@@ -1010,6 +1010,33 @@ test('the numeric readout reads back as the binary32 it shows', async () => {
   assert.equal(value.value, '3.5');
 });
 
+test('the readout carries no step grid and nudges by arrow key', async () => {
+  const h = await makeStrip();
+  const row = rowFor(h, 'sample', 'sample.pattern-freq');
+  const slider = controlIn(row);
+  const value = row.querySelector('.chain-param-value');
+  const declared = declarationsFor(h, 'sample')
+    .find((parameter) => parameter.id === 'sample.pattern-freq');
+  const nudge = (declared.domain.maximum - declared.domain.minimum) / 1000;
+
+  assert.equal(value.step, 'any',
+    'a grid based at min would report stepMismatch on the stored value');
+
+  const before = Number(value.value);
+  value.dispatch('keydown', { key: 'ArrowUp', preventDefault: () => {} });
+  assert.equal(Math.fround(Number(value.value)), Math.fround(before + nudge));
+  assert.equal(Math.fround(Number(slider.value)), Math.fround(before + nudge));
+  assert.equal(h.edits.at(-1)[0], 'sample.pattern-freq');
+  assert.equal(Math.fround(h.edits.at(-1)[1]), Math.fround(before + nudge));
+
+  value.dispatch('keydown', { key: 'ArrowDown', preventDefault: () => {} });
+  assert.equal(Math.fround(Number(value.value)), Math.fround(before));
+
+  value.value = '5.5';
+  value.dispatch('keydown', { key: 'Enter', preventDefault: () => {} });
+  assert.equal(value.value, '5.5', 'other keys are left to the input');
+});
+
 test('an unparsable numeric entry restores the stored value', async () => {
   const h = await makeStrip();
   const row = rowFor(h, 'sample', 'sample.pattern-freq');
