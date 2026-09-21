@@ -363,6 +363,9 @@ export function createSwitchCoordinator({
  *   itself.
  * @param {(message: string, error?: any) => void} [deps.logError] - Console sink.
  * @param {(message: string, error?: any) => void} [deps.logWarn] - Console sink.
+ * @param {() => boolean} [deps.moduleDead] - Reads whether the engine module
+ *   trapped. A trap is terminal for the whole module, so a sidebar query that
+ *   tripped one is re-thrown rather than degraded to a warning.
  * @returns {{applyEffect: (preserveParams?: boolean) => string,
  *   applyResolution: (preserveParams?: boolean) => string}}
  */
@@ -381,6 +384,7 @@ export function createApplyPipeline({
   muteSubscription,
   logError = (...args) => console.error(...args),
   logWarn = (...args) => console.warn(...args),
+  moduleDead = () => false,
 }) {
   /**
    * Point the engine at the state's effect and mirror its strobe layout onto the
@@ -487,10 +491,16 @@ export function createApplyPipeline({
     /** @type {Record<string, number>|null} */
     let presetCounts = null;
     if (engine) {
+      // A sidebar query is cosmetic, but a trap is terminal for the module: no
+      // later call is a recovery path, so a dead module leaves through the throw.
       try { effectSizes = engine.getEffectSizes(); }
-      catch (e) { logWarn('getEffectSizes failed (sidebar sizes unavailable):', e); }
+      catch (e) {
+        if (moduleDead()) throw e;
+        logWarn('getEffectSizes failed (sidebar sizes unavailable):', e);
+      }
       try { presetCounts = engine.getEffectPresetCounts(); }
       catch (e) {
+        if (moduleDead()) throw e;
         logWarn('getEffectPresetCounts failed (sidebar preset counts unavailable):', e);
       }
     }

@@ -411,6 +411,7 @@ function makeApp({
   presetCounts = { Alpha: 3 },
   sizesFailure = null,
   presetCountsFailure = null,
+  moduleDead = false,
   noEngine = false,
   segmented = false,
   subscribeEffect = false,
@@ -497,6 +498,7 @@ function makeApp({
     },
     logError: (...args) => errors.push(args.join(' ')),
     logWarn: (...args) => warnings.push(args.join(' ')),
+    moduleDead: () => moduleDead,
   });
 
   return { pipeline, log, errors, warnings, state };
@@ -663,6 +665,30 @@ test('a failed size query still lists the effects the resolution offers', () => 
   assert.equal(app.log.includes(
     'sidebar.setEffects Alpha,Gamma sizes=null presets={"Alpha":3}'), true);
   assert.match(app.warnings[0], /getEffectSizes failed/);
+});
+
+// HS_CHECK raises the flag ahead of a __builtin_trap() that unwinds nothing, so
+// every later call runs on a permanently shortened shadow stack. Degrading the
+// query to a warning walks the rest of the apply over that.
+test('a size query that trapped the module aborts the apply instead of warning', () => {
+  const trap = new Error('unreachable');
+  const app = makeApp({ sizesFailure: trap, moduleDead: true });
+
+  assert.throws(() => app.pipeline.applyResolution(), trap);
+
+  assert.deepEqual(app.warnings, []);
+  assert.equal(app.log.some((entry) => entry.startsWith('sidebar.setEffects')), false,
+    'no call after the trap is a recovery path');
+});
+
+test('a preset-count query that trapped the module aborts the apply', () => {
+  const trap = new Error('unreachable');
+  const app = makeApp({ presetCountsFailure: trap, moduleDead: true });
+
+  assert.throws(() => app.pipeline.applyResolution(), trap);
+
+  assert.deepEqual(app.warnings, []);
+  assert.equal(app.log.some((entry) => entry.startsWith('sidebar.setEffects')), false);
 });
 
 test('a failed preset-count query still lists the effects and sizes', () => {

@@ -390,6 +390,7 @@ export function start({
         });
       } catch (err) {
         console.error('Initial resolution/effect could not be applied:', err);
+        if (abandonOnModuleDeath()) return;
         const title = 'No supported resolution and effect could be applied.';
         reportBootFailure(err, { document: doc, location: win.location, title });
         // The rejected apply has already moved the engine, pool, driver and
@@ -560,6 +561,7 @@ export function start({
     driver: daydream,
     sidebar,
     muteSubscription: (write) => switches.mute(write),
+    moduleDead: () => host.moduleDead(),
   });
 
   const switches = createSwitchCoordinator({
