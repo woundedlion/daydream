@@ -10,9 +10,9 @@
  * The capture keeps the drag bound to the element it started on, so mouse and
  * touch share one path, the move and end handlers stay on the element rather
  * than on the document, and an interrupted gesture (an OS focus steal, a touch
- * cancelled by the system) arrives as pointercancel instead of stranding the
- * drag. An element that takes a touch drag needs `touch-action: none`, which is
- * what stops the page scrolling under it.
+ * cancelled by the system) arrives as pointercancel or lostpointercapture
+ * instead of stranding the drag. An element that takes a touch drag needs
+ * `touch-action: none`, which is what stops the page scrolling under it.
  */
 
 /**
@@ -53,9 +53,9 @@ export function innerRect(element) {
  * @param {(event: ?PointerEvent) => void} [options.onEnd] - Runs on the
  *   release, after the capture is dropped.
  * @param {(event: ?PointerEvent) => void} [options.onCancel] - Runs on
- *   pointercancel and on stop(), after the capture is dropped. Defaults to
- *   onEnd, which is what a page wants when a cancelled gesture and a release
- *   unwind the same way.
+ *   pointercancel, on a capture the element lost or could not take, and on
+ *   stop(), after the capture is dropped. Defaults to onEnd, which is what a
+ *   page wants when a cancelled gesture and a release unwind the same way.
  * @returns {{stop: () => void, remove: () => void}} stop() ends a running drag
  *   as a cancel; remove() detaches the listeners without ending it.
  */
@@ -73,10 +73,13 @@ export function createPointerDrag({
   const finish = (event, handler) => {
     if (activePointerId === null) return;
     if (event && event.pointerId !== activePointerId) return;
-    if (element.hasPointerCapture(activePointerId)) {
-      element.releasePointerCapture(activePointerId);
-    }
+    // Cleared before the release, whose lostpointercapture would otherwise
+    // re-enter here and run the handler a second time.
+    const pointerId = activePointerId;
     activePointerId = null;
+    if (element.hasPointerCapture(pointerId)) {
+      element.releasePointerCapture(pointerId);
+    }
     if (handler) handler(event);
   };
 
@@ -87,8 +90,16 @@ export function createPointerDrag({
   const handleDown = (event) => {
     if (!event.isPrimary || event.button !== 0 || activePointerId !== null) return;
     if (onStart && onStart(event) === false) return;
+    try {
+      element.setPointerCapture(event.pointerId);
+    } catch {
+      // A pointer the browser has already dropped cannot be captured; onStart
+      // has run, so unwind rather than latch the element into a drag no event
+      // will ever end.
+      if (cancelHandler) cancelHandler(event);
+      return;
+    }
     activePointerId = event.pointerId;
-    element.setPointerCapture(event.pointerId);
     event.preventDefault();
   };
 
@@ -116,10 +127,20 @@ export function createPointerDrag({
    */
   const handleCancel = (event) => finish(event, cancelHandler);
 
+  /**
+   * @param {PointerEvent} event - The capture the element no longer holds.
+   * @returns {void}
+   * @details An implicit release — the element detached, the gesture taken over
+   *   by the browser — raises no pointerup on the element, so the drag would
+   *   otherwise stay latched for the rest of the session.
+   */
+  const handleLostCapture = (event) => finish(event, cancelHandler);
+
   element.addEventListener('pointerdown', /** @type {EventListener} */ (handleDown));
   element.addEventListener('pointermove', /** @type {EventListener} */ (handleMove));
   element.addEventListener('pointerup', /** @type {EventListener} */ (handleUp));
   element.addEventListener('pointercancel', /** @type {EventListener} */ (handleCancel));
+  element.addEventListener('lostpointercapture', /** @type {EventListener} */ (handleLostCapture));
 
   return {
     stop: () => finish(null, cancelHandler),
@@ -128,6 +149,7 @@ export function createPointerDrag({
       element.removeEventListener('pointermove', /** @type {EventListener} */ (handleMove));
       element.removeEventListener('pointerup', /** @type {EventListener} */ (handleUp));
       element.removeEventListener('pointercancel', /** @type {EventListener} */ (handleCancel));
+      element.removeEventListener('lostpointercapture', /** @type {EventListener} */ (handleLostCapture));
     },
   };
 }
