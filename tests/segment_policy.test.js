@@ -4,7 +4,11 @@
 // to leave the app on the single engine with the user told why.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createSegmentSpawnGuard, createSegmentedFallback } from '../segment_policy.js';
+import {
+  createSegmentSpawnGuard,
+  createSegmentedFallback,
+  maxSegmentCount,
+} from '../segment_policy.js';
 
 // The segmented spawn guard: spawning awaits a module warm-up, so a toggle burst
 // leaves several continuations in flight against one worker pool.
@@ -160,4 +164,24 @@ test('the segmented fallback reports a thrown non-Error', () => {
 
   assert.match(h.notices[0], /worker exploded/,
     'a rejection carrying a bare string must not read as "[object Object]"');
+});
+
+// The pool ceiling: every member holds a WASM heap of its own, so the slider is
+// built against what the device can carry rather than failing a spawn after it.
+test('a device cap moves with the memory hint and the mobile layout', () => {
+  assert.equal(maxSegmentCount({}, false), 8,
+    'no hint (Firefox/Safari) on a desktop layout keeps the full range');
+  assert.equal(maxSegmentCount({ deviceMemory: 8 }, false), 8);
+  assert.equal(maxSegmentCount({ deviceMemory: 4 }, false), 4);
+  assert.equal(maxSegmentCount({ deviceMemory: 0.5 }, false), 2);
+  // Without deviceMemory the narrow layout is the only phone signal there is.
+  assert.equal(maxSegmentCount({}, true), 4);
+  assert.equal(maxSegmentCount({ deviceMemory: 8 }, true), 4,
+    'the lower of the two caps wins');
+  for (const gib of [undefined, 0.25, 1, 2, 3, 4, 6, 8, 64])
+    for (const mobile of [false, true]) {
+      const cap = maxSegmentCount({ deviceMemory: gib }, mobile);
+      assert.equal(cap % 2, 0, `cap ${cap} must stay layout-legal (even)`);
+      assert.ok(cap >= 2 && cap <= 8, `cap ${cap} must stay inside the slider range`);
+    }
 });
