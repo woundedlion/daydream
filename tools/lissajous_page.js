@@ -83,8 +83,6 @@ const regenerateCurve = () => {
   }
 
   const points = [];
-  // state.Samples is already a rounded integer (set via Math.round on every
-  // slider change), so no parseInt/string round-trip is needed.
   const segments = state.Samples;
   const domain = state.Duration;
 
@@ -124,23 +122,20 @@ const snapFrequencies = (activeId, rawNewValue) => {
   const passiveId = activeId === 'C1' ? 'C2' : 'C1';
   const passiveC = state[passiveId];
 
-  // 1. Convert the raw value from the slider input event back to the real float value
   const activeConfig = config[activeId];
   const rawActiveC = rawNewValue / activeConfig.scale;
 
-  // 2-3. Snap to the closest simple rational ratio and compute the closing
+  // Snap to the closest simple rational ratio and compute the closing
   // domain. The search takes the slider's range: clamping its result
   // afterwards would reopen the curve it just closed.
   const { snappedActiveC, closingPeriod: newDomain } = snapToRationalRatio(
     rawActiveC, passiveC, MAX_RATIONAL_TERM,
     { min: activeConfig.min, max: activeConfig.max });
 
-  // 4. Update the actual state.
   state[activeId] = snappedActiveC;
 
-  // 5. Force the thumb to jump to the snapped position. The thumb can only land
-  // on the step grid, which the rational ratio misses; the readout names the
-  // frequency in effect, which is what the export emits.
+  // The thumb can only land on the step grid, which the rational ratio misses;
+  // the readout names the frequency in effect, which is what the export emits.
   sliderHandles[activeId].setValue(snappedActiveC);
   sliderHandles[activeId].setReadout(snappedActiveC);
 
@@ -157,7 +152,6 @@ const snapFrequencies = (activeId, rawNewValue) => {
   // draws, what the export emits, and what the closure warning judges.
   sliderHandles.Duration.setReadout(state.Duration);
 
-  // 6. Re-render the curve and update the code snippet
   scheduleUpdate();
 };
 
@@ -209,14 +203,11 @@ const mountSlider = (id, params) => {
   }, (rawValue) => {
     const newValue = rawValue / scale;
 
-    // 1. Update state based on input value first
     state[id] = id === 'Samples' ? Math.round(newValue) : newValue;
 
     if ((id === 'C1' || id === 'C2') && state.isRationalLocked) {
-      // 2. Call snapping logic, which will recalculate state[id], update UI (slider/span), and re-render
       snapFrequencies(id, rawValue);
     } else {
-      // 3. For unlocked controls, update UI and re-render normally.
       sliderHandles[id].setValue(state[id]);
       scheduleUpdate();
     }
@@ -225,12 +216,10 @@ const mountSlider = (id, params) => {
 
 // --- Initialization ---
 const init = () => {
-  // Setup sliders first
   Object.keys(config).forEach(id => {
     mountSlider(id, config[id]);
   });
 
-  // Set up the Rational Lock Checkbox
   const rationalLockCheckbox = document.getElementById('rational_lock');
   if (rationalLockCheckbox) {
     rationalLockCheckbox.addEventListener('change', (e) => {
@@ -240,29 +229,22 @@ const init = () => {
       const durationContainer = document.getElementById('Duration_container');
 
       if (state.isRationalLocked) {
-
-        // --- 1. Disable Domain Slider ---
-        // The domain will be *calculated* by snapFrequencies, not just set to 2π
+        // snapFrequencies computes the domain while the lock holds.
         durationSlider.disabled = true;
         durationContainer.classList.add('opacity-50');
 
-        // --- 2. Snap Frequencies (which will also set the correct domain) ---
-        // Use C1's current value as the starting point for snapping
         snapFrequencies('C1', parseFloat(document.getElementById('C1_slider').value));
 
       } else {
-        // Re-enable the slider and remove visual dimming
         durationSlider.disabled = false;
         durationContainer.classList.remove('opacity-50');
 
-        // Re-render, just in case
         scheduleUpdate();
       }
     });
   }
 
 
-  // Initialize Copy Button logic
   wireCopyBlock({
     source: document.getElementById('lissajous_code_output'),
     button: document.getElementById('copy_code_button'),

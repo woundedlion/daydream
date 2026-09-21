@@ -160,7 +160,6 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
       ctx.drawImage(gradient, 0, 0, width, height);
 
       if (selectionRange) {
-        // Ensure startX is the smaller value
         const startRaw = selectionRange.start * width;
         const endRaw = selectionRange.end * width;
         const startX = Math.min(startRaw, endRaw);
