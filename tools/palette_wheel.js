@@ -163,6 +163,21 @@ export function hueKeyLabelBoxes(points, degrees, { width, height, measure }) {
     };
   });
 
+  separateLabels(labels);
+  const bottom = Math.max(...labels.map((label) => label.y + label.height));
+  const shift = Math.max(0, bottom - height + LABEL_INSET);
+  for (const label of labels) label.y = Math.max(LABEL_INSET, label.y - shift);
+  // The lift clamps each box on its own, which can close a gap it had opened.
+  separateLabels(labels);
+  return labels;
+}
+
+/**
+ * Pushes each box below every earlier box it would overlap, top-down.
+ * @param {HueKeyLabel[]} labels - The boxes, moved in place.
+ * @returns {void}
+ */
+function separateLabels(labels) {
   const sorted = [...labels].sort((left, right) => left.y - right.y);
   for (let index = 1; index < sorted.length; index++) {
     for (let prior = 0; prior < index; prior++) {
@@ -174,11 +189,6 @@ export function hueKeyLabelBoxes(points, degrees, { width, height, measure }) {
           sorted[prior].y + sorted[prior].height + 2);
     }
   }
-
-  const bottom = Math.max(...labels.map((label) => label.y + label.height));
-  const shift = Math.max(0, bottom - height + LABEL_INSET);
-  for (const label of labels) label.y = Math.max(LABEL_INSET, label.y - shift);
-  return labels;
 }
 
 /**

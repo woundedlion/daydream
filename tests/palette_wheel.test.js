@@ -144,6 +144,19 @@ test('labels that would overlap are stacked instead of drawn on top of each othe
   assert.equal(stacked[0].x, stacked[1].x, 'only the vertical placement moves');
 });
 
+/** @param {Array<{text: string, x: number, y: number, width: number, height: number}>} labels */
+function assertNoOverlap(labels) {
+  for (let index = 0; index < labels.length; index++) {
+    for (let prior = 0; prior < index; prior++) {
+      const a = labels[prior];
+      const b = labels[index];
+      const apart = a.x + a.width <= b.x || b.x + b.width <= a.x
+        || a.y + a.height <= b.y || b.y + b.height <= a.y;
+      assert.ok(apart, `${a.text} overlaps ${b.text}`);
+    }
+  }
+}
+
 test('a stack that would run off the bottom is lifted back onto the canvas', () => {
   const bounds = { width: 256, height: 120, measure: () => 60 };
   const labels = hueKeyLabelBoxes(
@@ -153,6 +166,21 @@ test('a stack that would run off the bottom is lifted back onto the canvas', () 
   for (const label of labels)
     assert.ok(label.y >= 18 && label.y + label.height <= 120,
       'every box stays on the canvas');
+  assertNoOverlap(labels);
+});
+
+// Tetradic keys at 68°: two markers clamp to the top inset and two to the
+// bottom, so the stack the separation opens overruns the bottom and is lifted.
+test('the lift off the bottom keeps the boxes it separated apart', () => {
+  const bounds = { width: 256, height: 256, measure: (text) => text.length * 10 };
+  const state = { baseTurns: 68 / 360, offsets: [0, 1 / 12, 0.5, 0.5 + 1 / 12] };
+  const labels = hueKeyLabelBoxes(
+    hueKeyMarkerPoints(state, 256, 256), hueKeyDegrees(state), bounds);
+
+  assertNoOverlap(labels);
+  for (const label of labels)
+    assert.ok(label.y >= 18 && label.y + label.height <= 256 - 18,
+      `${label.text} stays inside the inset`);
 });
 
 test('a point on the wheel names the hue under it', () => {
