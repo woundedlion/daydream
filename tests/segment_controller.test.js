@@ -799,6 +799,42 @@ test('a frame dispatched before a resolution change is dropped but still settles
   await done;
 });
 
+test('a generation overtaken by a resolution change is never published', async () => {
+  const c = readyController(2);
+  c.tick();
+  const results = c.frameState.results;
+  const scratch = c.frameState.scratch;
+
+  c.setResolution(8, 8);
+  deliverFrame(c, 0);
+  deliverFrame(c, 1);
+  await flush();
+
+  assert.equal(c.frameState.renderInFlight, false, 'the overtaken render still settled');
+  assert.equal(c.frameState.pendingFrame, false, 'nothing is queued for the compositor');
+  assert.strictEqual(c.frameState.results, results, 'the live buffer was not swapped');
+  assert.strictEqual(c.frameState.scratch, scratch);
+
+  c.tick();
+  assert.equal(c.frameState.frameComposited, false, 'the next tick composites nothing');
+  assert.equal(c.frameState.pendingFrame, false);
+  deliverFrame(c, 0);
+  deliverFrame(c, 1);
+  await flush();
+});
+
+test('a generation cut short by a worker fault is never published', async () => {
+  const c = readyController(2);
+  c.tick();
+  const results = c.frameState.results;
+
+  c.workers[1].onerror({ message: 'boom', filename: 'w.js', lineno: 1, colno: 2 });
+  await flush();
+
+  assert.equal(c.frameState.pendingFrame, false, 'the unfinished generation stays unpublished');
+  assert.strictEqual(c.frameState.results, results, 'the live buffer was not swapped');
+});
+
 test('destroy() bumps the generation so a stale in-flight .then cannot arm a new pool', async () => {
   const c = makeController();
   c.create(2);
