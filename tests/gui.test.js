@@ -17,20 +17,17 @@ import {
   snapshotEffectControlState,
   restoreEffectControlState,
 } from '../effect_sequencing.js';
-import { fakeElement } from './fake_dom.js';
+import { fakeElement, installWindow, restoreWindowAfterEach } from './fake_dom.js';
 import { captureConsole } from './fake_console.js';
 
-// Restore globalThis.window after each test so the stub never leaks to another suite.
-const savedWindow = globalThis.window;
 // Roots created by a test; destroy() cancels the 200ms URL-write debounce so no
 // timer survives the teardown that drops the window stub.
 const liveRoots = [];
 afterEach(() => {
   while (liveRoots.length) liveRoots.pop().destroy();
   getActiveURLSync()?.dispose();
-  if (savedWindow === undefined) delete globalThis.window;
-  else globalThis.window = savedWindow;
 });
+restoreWindowAfterEach();
 
 // Minimal lil-gui stub exposing the chaining surface DeepLinkGUI relies on.
 class StubController {
@@ -135,7 +132,7 @@ class DeepLinkGUI extends BaseGUI {
 }
 
 test('DeepLinkGUI appends custom content to the wrapped controller container', () => {
-  installWindow('');
+  installWindowAt('');
   const gui = new DeepLinkGUI({ autoPlace: false });
   const element = fakeElement('div');
 
@@ -147,7 +144,7 @@ test('DeepLinkGUI appends custom content to the wrapped controller container', (
 });
 
 test('DeepLinkGUI exposes and changes the wrapped panel state', () => {
-  installWindow('');
+  installWindowAt('');
   const gui = new DeepLinkGUI({ autoPlace: false });
 
   assert.equal(gui.closed, false);
@@ -160,7 +157,7 @@ test('DeepLinkGUI exposes and changes the wrapped panel state', () => {
 });
 
 test('DeepLinkGUI rejects an unsupported property before registering its URL key', () => {
-  installWindow('');
+  installWindowAt('');
   const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
 
   assert.throws(() => gui.add({ pending: null }, 'pending'),
@@ -169,15 +166,12 @@ test('DeepLinkGUI rejects an unsupported property before registering its URL key
 });
 
 /**
- * Installs a minimal global window so gui.js can read location.search and call
- * history.replaceState during the test.
+ * Installs a window at a query string, for the cases that hydrate from a deep
+ * link and discard what is written back.
  * @param {string} search - The raw query string, including the leading '?' (e.g. '?resolution=X').
  */
-function installWindow(search) {
-  globalThis.window = {
-    location: { search, pathname: '/', hash: '' },
-    history: { replaceState() {} },
-  };
+function installWindowAt(search) {
+  installWindow({ location: { search } });
 }
 
 const RES = ['Holosphere (96x20)', 'Phantasm (288x144)'];
@@ -192,17 +186,15 @@ const captureWarnings = (body) => captureConsole(body).messages;
 
 test('rollback restores an unflushed control value to runtime sinks and URL', () => {
   let lastUrl = '/?Speed=0.1';
-  globalThis.window = {
-    location: { search: '?Speed=0.1', pathname: '/', hash: '' },
+  installWindow({
+    location: { search: '?Speed=0.1' },
     history: {
       replaceState(state, title, url) {
         lastUrl = url;
         globalThis.window.location.search = new URL(url, 'http://x').search;
       },
     },
-    setTimeout: (fn, ms) => setTimeout(fn, ms),
-    clearTimeout: (id) => clearTimeout(id),
-  };
+  });
   new URLSync(new AppState({ effect: 'Old' }), ['effect']);
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
@@ -253,7 +245,7 @@ test('rollback restores an unflushed control value to runtime sinks and URL', ()
  * spuriously re-persisting it to the URL.
  */
 test('DeepLinkGUI.add ignores an out-of-list URL value for a dropdown', () => {
-  installWindow('?resolution=GARBAGE');
+  installWindowAt('?resolution=GARBAGE');
   // Rejecting the value rewrites the URL through the 200ms debounce; drive it
   // under mock timers so the pending write can't fire after afterEach drops window.
   mock.timers.enable({ apis: ['setTimeout'] });
@@ -279,7 +271,7 @@ test('DeepLinkGUI.add ignores an out-of-list URL value for a dropdown', () => {
  * through onChange.
  */
 test('DeepLinkGUI.add adopts a valid in-list URL value for a dropdown', () => {
-  installWindow('?resolution=' + encodeURIComponent('Holosphere (96x20)'));
+  installWindowAt('?resolution=' + encodeURIComponent('Holosphere (96x20)'));
   const gui = new DeepLinkGUI({ autoPlace: false });
   const obj = { resolution: 'Phantasm (288x144)' };
   const replayed = [];
@@ -295,7 +287,7 @@ test('DeepLinkGUI.add adopts a valid in-list URL value for a dropdown', () => {
  * applies only to dropdowns.
  */
 test('DeepLinkGUI.add leaves a non-enumerated control (no option list) untouched', () => {
-  installWindow('?speed=2.5');
+  installWindowAt('?speed=2.5');
   const gui = new DeepLinkGUI({ autoPlace: false });
   const obj = { speed: 1.0 };
   gui.add(obj, 'speed', 0, 10);
@@ -307,7 +299,7 @@ test('DeepLinkGUI.add leaves a non-enumerated control (no option list) untouched
  * is kept and no applyOnLoad replay fires.
  */
 test('DeepLinkGUI.add with no matching URL param keeps the default', () => {
-  installWindow('?other=x');
+  installWindowAt('?other=x');
   const gui = new DeepLinkGUI({ autoPlace: false });
   const obj = { resolution: 'Phantasm (288x144)' };
   const replayed = [];
@@ -325,10 +317,10 @@ test('DeepLinkGUI.add with no matching URL param keeps the default', () => {
  */
 test('DeepLinkGUI.add clamps an out-of-range numeric URL value to the slider min/max', () => {
   let lastUrl = '/';
-  globalThis.window = {
-    location: { search: '?speed=99', pathname: '/', hash: '' },
+  installWindow({
+    location: { search: '?speed=99' },
     history: { replaceState(s, t, url) { lastUrl = url; } },
-  };
+  });
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const guiHi = new DeepLinkGUI({ autoPlace: false });
@@ -459,7 +451,7 @@ test('a refused hydrated value is corrected before the next reload', () => {
 
     const corrected = new URL(url.written(), 'http://x');
     assert.equal(corrected.searchParams.get('fx.Mode'), '1');
-    installWindow(corrected.search);
+    installWindowAt(corrected.search);
     const reloaded = { Mode: 0 };
     new DeepLinkGUI({ autoPlace: false }, 'fx')
       .add(reloaded, 'Mode', { Off: 0, On: 1, Invalid: 2 });
@@ -498,7 +490,7 @@ test('DeepLinkGUI.addSession keeps a session control out of the URL', () => {
  * a malformed deep link never reaches the engine as NaN.
  */
 test('DeepLinkGUI.add rejects a non-numeric URL value for a slider', () => {
-  installWindow('?speed=fast');
+  installWindowAt('?speed=fast');
   // Rejecting the value strips it from the URL through the 200ms debounce; drive
   // it under mock timers so the pending write can't fire after afterEach drops window.
   mock.timers.enable({ apis: ['setTimeout'] });
@@ -531,7 +523,7 @@ test('DeepLinkGUI.add maps boolean URL spellings for a checkbox', () => {
   try {
     const warnings = captureWarnings(() => {
       for (const truthy of ['true', '1', 'yes', 'on']) {
-        installWindow(`?glow=${truthy}`);
+        installWindowAt(`?glow=${truthy}`);
         const gui = new DeepLinkGUI({ autoPlace: false });
         const obj = { glow: false };
         const replayed = [];
@@ -540,7 +532,7 @@ test('DeepLinkGUI.add maps boolean URL spellings for a checkbox', () => {
         assert.deepEqual(replayed, [true]);
       }
       for (const falsy of ['false', '0', 'no', 'off']) {
-        installWindow(`?glow=${falsy}`);
+        installWindowAt(`?glow=${falsy}`);
         const gui = new DeepLinkGUI({ autoPlace: false });
         const obj = { glow: true };
         const replayed = [];
@@ -548,7 +540,7 @@ test('DeepLinkGUI.add maps boolean URL spellings for a checkbox', () => {
         assert.equal(obj.glow, false, `"${falsy}" adopted as false`);
         assert.deepEqual(replayed, [false]);
       }
-      installWindow('?glow=maybe');
+      installWindowAt('?glow=maybe');
       const gui = new DeepLinkGUI({ autoPlace: false });
       const obj = { glow: false };
       const replayed = [];
@@ -570,7 +562,7 @@ test('DeepLinkGUI.add maps boolean URL spellings for a checkbox', () => {
  * wiring — 'fx' root, add() then onChange() — for a slider and a checkbox.
  */
 test('a ?param=value deep link reaches the engine through the replayed handler', () => {
-  installWindow('?fx.Speed=0.7&fx.Glow=on');
+  installWindowAt('?fx.Speed=0.7&fx.Glow=on');
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
@@ -593,7 +585,7 @@ test('a ?param=value deep link reaches the engine through the replayed handler',
  * URL params instead of clobbering one another.
  */
 test('DeepLinkGUI namespaces deep-link keys per root', () => {
-  installWindow('?fx.pause=true&view.pause=false');
+  installWindowAt('?fx.pause=true&view.pause=false');
   const fx = new DeepLinkGUI({ autoPlace: false }, 'fx');
   const view = new DeepLinkGUI({ autoPlace: false }, 'view');
   const fxObj = { pause: false };
@@ -612,7 +604,7 @@ test('DeepLinkGUI namespaces deep-link keys per root', () => {
 });
 
 test('display folders do not change descendant deep-link keys', () => {
-  installWindow('?fx.Speed=4');
+  installWindowAt('?fx.Speed=4');
   const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
   const folder = gui.addDisplayFolder('Function');
   const state = { Speed: 1 };
@@ -666,7 +658,7 @@ test('readStoredNumber migrates a legacy companion key', () => {
 // The query string is parsed once per location and copied per read, so a stale
 // copy or a shared one would hydrate controls from a URL the page has left.
 test('a parsed query string is re-read when the location moves', () => {
-  installWindow('?fx.Speed=1');
+  installWindowAt('?fx.Speed=1');
   const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
 
   assert.equal(gui.urlParams().get('fx.Speed'), '1');
@@ -681,7 +673,7 @@ test('a parsed query string is re-read when the location moves', () => {
 
 test('readStoredString returns an opaque namespaced companion value', () => {
   const snapshot = '{"schemaVersion":2,"accepted":[4294967295]}';
-  installWindow(`?fx.__fullConfig=${encodeURIComponent(snapshot)}`);
+  installWindowAt(`?fx.__fullConfig=${encodeURIComponent(snapshot)}`);
   const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
 
   assert.equal(gui.readStoredString('__fullConfig'), snapshot);
@@ -711,7 +703,7 @@ test('addUnhydrated keeps the current value but still deep-links later edits', (
  * splitting the folder's deep links across two key spellings.
  */
 test('DeepLinkGUI keeps a folder key prefix stable across a later same-name sibling', () => {
-  installWindow('');
+  installWindowAt('');
   const root = new DeepLinkGUI({ autoPlace: false });
   const first = root.addFolder('Shape');
   first.add({ sides: 3 }, 'sides', 0, 10);
@@ -725,7 +717,7 @@ test('DeepLinkGUI keeps a folder key prefix stable across a later same-name sibl
 });
 
 test('a display folder does not push a later real folder off its own key', () => {
-  installWindow('');
+  installWindowAt('');
   const root = new DeepLinkGUI({ autoPlace: false });
   const display = root.addDisplayFolder('Shape');
   display.add({ sides: 3 }, 'sides', 0, 10);
@@ -745,10 +737,10 @@ test('a display folder does not push a later real folder off its own key', () =>
  */
 test('makeUrlParamWriter merges multiple keys changed within the debounce window', () => {
   let lastUrl = '/';
-  globalThis.window = {
-    location: { search: '?keep=1', pathname: '/', hash: '' },
+  installWindow({
+    location: { search: '?keep=1' },
     history: { replaceState(s, t, url) { lastUrl = url; } },
-  };
+  });
   const setUrlParam = makeUrlParamWriter();
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
@@ -771,10 +763,10 @@ test('makeUrlParamWriter merges multiple keys changed within the debounce window
  */
 test('makeUrlParamWriter preserves location.hash in the fallback commit', () => {
   let lastUrl = '/';
-  globalThis.window = {
-    location: { search: '?keep=1', pathname: '/', hash: '#section' },
+  installWindow({
+    location: { search: '?keep=1', hash: '#section' },
     history: { replaceState(s, t, url) { lastUrl = url; } },
-  };
+  });
   const setUrlParam = makeUrlParamWriter();
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
@@ -794,10 +786,10 @@ test('makeUrlParamWriter preserves location.hash in the fallback commit', () => 
  */
 test('makeUrlParamWriter serializes numbers and deletions like URLSync', () => {
   let lastUrl = '/';
-  globalThis.window = {
-    location: { search: '?keep=1&stale=9&gone=1', pathname: '/', hash: '' },
+  installWindow({
+    location: { search: '?keep=1&stale=9&gone=1' },
     history: { replaceState(s, t, url) { lastUrl = url; } },
-  };
+  });
   const write = makeUrlParamWriter();
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
@@ -825,12 +817,10 @@ test('makeUrlParamWriter serializes numbers and deletions like URLSync', () => {
  */
 function installRecordingWindow(search, hash = '') {
   let lastUrl = '/';
-  globalThis.window = {
-    location: { search, pathname: '/', hash },
+  installWindow({
+    location: { search, hash },
     history: { replaceState(state, title, url) { lastUrl = url; } },
-    setTimeout: (fn, ms) => setTimeout(fn, ms),
-    clearTimeout: (id) => clearTimeout(id),
-  };
+  });
   return { written: () => lastUrl };
 }
 

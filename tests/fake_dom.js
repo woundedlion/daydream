@@ -1,8 +1,8 @@
 //
 // Shared DOM double for the suites that run without a browser: one element
-// stand-in plus the globalThis.document install/restore helpers. Covers the
-// surface the daydream modules actually touch — extend this instead of
-// hand-rolling another one-off fake.
+// stand-in plus the globalThis.document and window install/restore helpers.
+// Covers the surface the daydream modules actually touch — extend this instead
+// of hand-rolling another one-off fake.
 //
 // Not modelled: layout and the box model, CSS, hit-testing.
 // Numeric-input value sanitization is checked in solids-probe.mjs.
@@ -798,6 +798,40 @@ export function restoreDocumentAfterEach() {
   afterEach(() => {
     if (saved === undefined) delete globalThis.document;
     else globalThis.document = saved;
+  });
+}
+
+/**
+ * Installs a fake globalThis.window: a location, a history whose replaceState
+ * is a no-op, and timers delegating to the ambient globals, so a suite's
+ * mock.timers reaches a module that arms through the window as it does one
+ * that arms through the global. Each member given in `surface` replaces the
+ * default of the same name whole, except `location`, whose fields are merged.
+ * @param {Object} [surface] - Window members the module under test reads.
+ * @returns {Object} The installed window.
+ */
+export function installWindow(surface = {}) {
+  const win = {
+    history: { replaceState() {} },
+    setTimeout: (callback, delay) => setTimeout(callback, delay),
+    clearTimeout: (handle) => clearTimeout(handle),
+    ...surface,
+    location: { search: '', pathname: '/', hash: '', ...surface.location },
+  };
+  globalThis.window = win;
+  return win;
+}
+
+/**
+ * Registers an afterEach that restores globalThis.window to its pre-suite
+ * value, so an installed stub never leaks into another test or suite.
+ * @returns {void}
+ */
+export function restoreWindowAfterEach() {
+  const saved = globalThis.window;
+  afterEach(() => {
+    if (saved === undefined) delete globalThis.window;
+    else globalThis.window = saved;
   });
 }
 
