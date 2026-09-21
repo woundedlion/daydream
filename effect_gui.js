@@ -995,6 +995,28 @@ export function createEffectGui({ engine, segments, config, host }) {
   }
 
   /**
+   * Present an engine-written telemetry control. `disabled` would take it out of
+   * the accessibility tree and the tab order, so the value the control exists to
+   * show could not be read at all; read-only leaves it reachable and inert.
+   * @param {Object} controller - The controller to present.
+   * @returns {void}
+   */
+  function presentReadonlyParam(controller) {
+    controller.domElement.classList.add('param-readonly');
+    // Capture phase, so it lands ahead of lil-gui's own keydown on the widget,
+    // which increments on an arrow key whatever attributes the widget carries.
+    controller.domElement.addEventListener('keydown', (event) => {
+      if (typeof event.key === 'string' && event.key.startsWith('Arrow')) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, true);
+    const widget = focusWidget(controller) ?? controller.domElement;
+    widget.setAttribute('aria-readonly', 'true');
+    widget.setAttribute('readonly', 'readonly');
+  }
+
+  /**
    * Label one control inside its stage folder. The folder title already carries
    * the stage, so the visible label drops it, and the truncated labels repeat
    * across folders — "Mode" once per stage — so the widget takes the parameter's
@@ -1089,7 +1111,7 @@ export function createEffectGui({ engine, segments, config, host }) {
       }
 
       if (p.readonly) {
-        if (typeof controller.disable === 'function') controller.disable();
+        presentReadonlyParam(controller);
         return;
       }
       fx.writableParamNames.push(p.name);

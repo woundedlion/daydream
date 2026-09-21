@@ -55,6 +55,10 @@ const RING_CLEARANCE = 4;
 // role each one plays inside its stage.
 const STAGE_EFFECT = 'LatticeMelt';
 const STAGE_WIDGET = '.effect-gui .lil-gui .lil-controller :is(input, select)';
+// The roster's engine-written telemetry: a value the effect clobbers every
+// frame, which the panel shows but the engine refuses to be written.
+const TELEMETRY_EFFECT = 'MindSplatter';
+const TELEMETRY_WIDGET = '.effect-gui .lil-controller input[aria-readonly="true"]';
 const PRESET_SELECT = '.preset-nav-selector select';
 const PRESET_NAME = 'Preset';
 
@@ -299,6 +303,51 @@ export async function probeStageNames(tab) {
   return failures;
 }
 
+/*
+ * Engine-written telemetry. A `disabled` control takes no focus and the
+ * accessibility tree ignores it, so the fake DOM — where focus() is a counter
+ * and there is no tree at all — cannot tell read-only from unavailable.
+ * @param {import('puppeteer-core').Page} tab
+ */
+export async function probeTelemetry(tab) {
+  const { failures, check } = checks();
+
+  await (await tab.waitForSelector(`[data-effect="${TELEMETRY_EFFECT}"]`)).click();
+  await tab.waitForSelector(TELEMETRY_WIDGET, { timeout: TIMEOUT_MS });
+
+  const reached = await tab.$eval(TELEMETRY_WIDGET, (widget) => {
+    widget.focus();
+    return {
+      name: widget.closest('.lil-controller')
+        ?.querySelector('.lil-name')?.textContent?.trim() ?? '',
+      focused: document.activeElement === widget,
+      disabled: widget.disabled,
+    };
+  });
+  check(!reached.disabled && reached.focused,
+    `the ${reached.name || 'telemetry'} readout still takes keyboard focus`);
+
+  const cdp = await tab.createCDPSession();
+  await cdp.send('Accessibility.enable');
+  const doc = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
+  const { nodeId } = await cdp.send('DOM.querySelector',
+    { nodeId: doc.root.nodeId, selector: TELEMETRY_WIDGET });
+  const tree = await cdp.send('Accessibility.getPartialAXTree',
+    { nodeId, fetchRelatives: false });
+  const ax = tree.nodes.find((node) => node.name);
+  await cdp.detach();
+  const property = (name) => ax?.properties
+    ?.find((entry) => entry.name === name)?.value?.value;
+  check(ax !== undefined && ax.ignored !== true,
+    `the readout is exposed to assistive tech (${ax?.name?.value ?? 'ignored'})`);
+  check(property('disabled') !== true,
+    'the readout is not announced as unavailable');
+  check(property('readonly') === true,
+    'the readout is announced as read-only');
+
+  return failures;
+}
+
 /** @param {import('puppeteer-core').Page} tab */
 export async function probeMobilePanel(tab) {
   const { failures, check } = checks();
@@ -524,6 +573,7 @@ if (isMain(import.meta.url)) await runProbe({
     failures.push(...await probePresetName(tab));
     failures.push(...await probeWarningNote(tab, 'desktop'));
     failures.push(...await probeStageNames(tab));
+    failures.push(...await probeTelemetry(tab));
 
     await tab.setViewport(MOBILE_VIEWPORT);
     await tab.reload({ timeout: TIMEOUT_MS });
