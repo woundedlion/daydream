@@ -47,7 +47,7 @@ import { clearFatalError, errorDetail, reportPageFailures, showFatalError } from
 import { reportBootFailure, StaleModuleError } from "./bootstrap.js";
 import { enumConstantName } from "./param_sync.js";
 import { copyToClipboard } from "./tools/copy_text.js";
-import { importLegacyShaderSelection, LEGACY_SHADER_ALIAS } from "./legacy_shader_import.js";
+import { importLegacyShaderSelection, LEGACY_SHADER_ALIASES } from "./legacy_shader_import.js";
 import { createShaderDocumentController } from "./tools/shader_documents.js";
 import {
   DEFAULT_EFFECT,
@@ -154,7 +154,7 @@ export function start({
   const knownEffects = new Set(shaderWorkbench
     ? WORKBENCH_EFFECTS
     : Object.values(resolutionPresets).flatMap((preset) => preset.favorites));
-  knownEffects.add(LEGACY_SHADER_ALIAS);
+  for (const alias of LEGACY_SHADER_ALIASES) knownEffects.add(alias);
   const appState = new AppState({
     effect: shaderWorkbench ? 'Shader' : DEFAULT_EFFECT,
     resolution: "Phantasm (288x144)",
