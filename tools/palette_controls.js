@@ -702,6 +702,9 @@ export function moveCustomHueKey(baseTurns, offsets, keyIndex, wrappedTurn) {
   return nextOffsets;
 }
 
+/** Where a FALLOFF domain begins to fade, as core/color/color.h defaults it. */
+const DEFAULT_FALLOFF_START = 0.9;
+
 /**
  * The complete V4 recipe the tool opens on: a balanced analogous palette.
  * @returns {PaletteRecipe} A fresh, detached recipe, safe to mutate.
@@ -737,7 +740,7 @@ export function defaultPaletteRecipe() {
       custom: [0, 0, 0, 0],
     },
     hueTorsion: 0,
-    falloffStart: 0.9,
+    falloffStart: DEFAULT_FALLOFF_START,
   };
 }
 
@@ -836,7 +839,8 @@ export function paletteRecipeFromControls(template, controls) {
     Object.assign(recipe[axis], axisFromEndpoints(minimum, maximum));
   }
   // The engine canonicalizes a falloff start outside a FALLOFF domain.
-  if (recipe.domain !== PaletteV4.domain.FALLOFF) recipe.falloffStart = 0.9;
+  if (recipe.domain !== PaletteV4.domain.FALLOFF)
+    recipe.falloffStart = DEFAULT_FALLOFF_START;
   if (recipe.domain === PaletteV4.domain.LOOP &&
       recipe.hue.mode === PaletteV4.hueMode.SWEEP) {
     recipe.hue.sweepTurns = loopSweepTurns(recipe.hue.sweepTurns);
