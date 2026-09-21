@@ -1292,7 +1292,7 @@ export function opTopologyKey(o) {
  * chain entry contributes to that.
  * @param {ChainValidator} validator - A createChainValidator handle.
  * @param {number} [retries=3] - Incomplete passes tolerated before probing stops. A validator that never spawns would otherwise be retried on every recompute.
- * @returns {{refresh: (base: string, ops: ChainOp[], candidates: string[]) => Promise<?OpGateVerdict>}} The gate.
+ * @returns {{refresh: (base: string, ops: ChainOp[], candidates: string[], mesh?: ?SolidMesh) => Promise<?OpGateVerdict>}} The gate.
  */
 export function createOpGate(validator, retries = 3) {
   let generation = 0;
