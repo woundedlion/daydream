@@ -4,9 +4,9 @@
  */
 
 /**
- * The segmented pool's spawn policy: the epoch that keeps a toggle burst to one
- * pool, and the fallback to the single-thread engine a failed spawn or teardown
- * runs.
+ * The segmented pool's spawn policy: the device ceiling on the pool size, the
+ * epoch that keeps a toggle burst to one pool, and the fallback to the
+ * single-thread engine a failed spawn or teardown runs.
  */
 
 import { errorDetail } from './tools/banner.js';
@@ -85,4 +85,37 @@ export function createSegmentedFallback({
     segments.updateStats();
     showToggle(false);
   };
+}
+
+/**
+ * GUI ceiling on the worker pool, and the two lower ones a constrained device
+ * gets. Every pool member holds its own WASM instance — 17.5 MB of linear memory
+ * before growth — and the main thread holds one more, so an N-segment pool costs
+ * N+1 heaps.
+ */
+export const SEGMENT_COUNT_MAX = 8;
+const SEGMENT_COUNT_CONSTRAINED = 4;
+const SEGMENT_COUNT_MIN = 2;
+
+/**
+ * Largest segment count to offer on this device. The GUI builds its slider
+ * against this rather than rejecting an oversized pool afterwards, since running
+ * the tab out of memory is a crash no fault path can report.
+ * @details `navigator.deviceMemory` is Chromium-only and reports whole GiB
+ * capped at 8; where it is missing the mobile layout is what stands in for a
+ * phone. The result is always even, so it satisfies isValidSegmentCount.
+ * @param {Navigator | {deviceMemory?: number}} [nav] - Source of the device hint.
+ * @param {boolean} [isMobile] - Whether the app is in its mobile layout.
+ * @returns {number} An even count in [2, 8].
+ */
+export function maxSegmentCount(nav = globalThis.navigator, isMobile = false) {
+  let cap = SEGMENT_COUNT_MAX;
+  // deviceMemory is not in the DOM lib: it is a Chromium extension to Navigator.
+  const gib = /** @type {{deviceMemory?: number} | undefined} */ (nav)?.deviceMemory;
+  if (typeof gib === 'number' && gib > 0) {
+    if (gib <= 2) cap = SEGMENT_COUNT_MIN;
+    else if (gib <= 4) cap = SEGMENT_COUNT_CONSTRAINED;
+  }
+  if (isMobile) cap = Math.min(cap, SEGMENT_COUNT_CONSTRAINED);
+  return Math.max(cap, SEGMENT_COUNT_MIN);
 }

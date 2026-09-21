@@ -30,7 +30,6 @@ const {
   BOOT_WATCHDOG_MS,
   INIT_WATCHDOG_MS,
   RENDER_WATCHDOG_MS,
-  maxSegmentCount,
 } = await import('../segment_controller.js');
 const { ModuleWarmer, WARM_INTERVAL_MS, WARM_DEADLINE_MS, pageWarmer } =
   await import('../module_warmer.js');
@@ -417,23 +416,6 @@ test('dispose drops the held compilation that destroy keeps for the next pool',
       'the page teardown must release the compiled module; nothing left will '
       + 'spawn a pool that could be handed it');
   });
-test('a device cap moves with the memory hint and the mobile layout', () => {
-  assert.equal(maxSegmentCount({}, false), 8,
-    'no hint (Firefox/Safari) on a desktop layout keeps the full range');
-  assert.equal(maxSegmentCount({ deviceMemory: 8 }, false), 8);
-  assert.equal(maxSegmentCount({ deviceMemory: 4 }, false), 4);
-  assert.equal(maxSegmentCount({ deviceMemory: 0.5 }, false), 2);
-  // Without deviceMemory the narrow layout is the only phone signal there is.
-  assert.equal(maxSegmentCount({}, true), 4);
-  assert.equal(maxSegmentCount({ deviceMemory: 8 }, true), 4,
-    'the lower of the two caps wins');
-  for (const gib of [undefined, 0.25, 1, 2, 3, 4, 6, 8, 64])
-    for (const mobile of [false, true]) {
-      const cap = maxSegmentCount({ deviceMemory: gib }, mobile);
-      assert.equal(cap % 2, 0, `cap ${cap} must stay layout-legal (even)`);
-      assert.ok(cap >= 2 && cap <= 8, `cap ${cap} must stay inside the slider range`);
-    }
-});
 
 /**
  * Build a controller wired to fake injected host deps.

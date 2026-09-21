@@ -9,8 +9,11 @@
  */
 
 import { pageWarmer } from "./module_warmer.js";
-import { maxSegmentCount } from "./segment_controller.js";
-import { createSegmentSpawnGuard, createSegmentedFallback } from "./segment_policy.js";
+import {
+  createSegmentSpawnGuard,
+  createSegmentedFallback,
+  maxSegmentCount,
+} from "./segment_policy.js";
 
 /**
  * Creates the worker-pool spawn callback from live layout and count state.
