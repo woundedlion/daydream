@@ -2791,7 +2791,7 @@ test('a drag registers window listeners that the pointer release drains', () => 
   controller.domElement.dispatch('pointerdown', pointerDown());
   assert.equal(controller.dragging, true);
   assert.deepEqual(h.dragTarget.listeners.map((l) => l.type),
-    ['pointerup', 'pointercancel']);
+    ['pointerup', 'pointercancel', 'blur']);
 
   h.dragTarget.dispatch('pointerup', pointerUp());
   assert.equal(controller.dragging, false);
@@ -3063,6 +3063,41 @@ test('a definition with no accepted value falls back to its requested target', (
 // A second finger landing while a slider is held must neither re-latch the
 // control nor release it: the release the panel acts on is the opening
 // pointer's alone.
+test('a drag whose release never lands ends when the window loses focus', () => {
+  const warning = 'Speed is faster than the segment stream can follow.';
+  const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
+  const h = makeHarness({
+    params: [speed],
+    engineValues: [0.1],
+    onEngineParam(_name, value, state) {
+      state.params = [value > 0.5 ? { ...speed, warning } : { ...speed }];
+    },
+  });
+  h.panel.build();
+  h.panel.mount();
+  const controller = h.gui().ctrl('Speed');
+
+  controller.domElement.dispatch('pointerdown', pointerDown());
+  controller.setValue(0.9);
+  h.panel.sync();
+  assert.equal(h.guis.length, 1, 'the latch holds the rebuild off mid-gesture');
+
+  // The release the page never sees: it lands on whatever took the focus.
+  h.dragTarget.dispatch('blur');
+
+  assert.equal(controller.dragging, false);
+  assert.deepEqual(h.dragTarget.listeners, [], 'the end listeners drain');
+  assert.equal(h.panel.active().activeDragEnds.size, 0);
+  assert.equal(h.gui().storedWrites.length > 0, true,
+    'the persistence the drag deferred still lands');
+
+  h.panel.sync();
+
+  assert.equal(h.guis.length, 2, 'the panel rebuilds again');
+  assert.equal(h.gui().ctrl('Speed').domElement
+    .querySelector('.param-warning-note').textContent, warning);
+});
+
 test('a second pointer neither re-latches a held control nor releases it', () => {
   const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
   const h = makeHarness({
@@ -3078,7 +3113,8 @@ test('a second pointer neither re-latches a held control nor releases it', () =>
   controller.domElement.dispatch('pointerdown', pointerDown(9));
 
   assert.deepEqual(h.dragTarget.listeners.map((l) => l.type),
-    ['pointerup', 'pointercancel'], 'the second pointer registers no end pair');
+    ['pointerup', 'pointercancel', 'blur'],
+    'the second pointer registers no end set of its own');
   assert.equal(h.panel.active().activeDragEnds.size, 1);
 
   h.dragTarget.dispatch('pointerup', pointerUp(9));
