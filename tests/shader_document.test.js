@@ -21,6 +21,7 @@ import {
   canonicalDescriptor,
   classifyExport,
   compileShaderDocument,
+  descriptorIdentity,
   evaluateTransition,
   expandV1Document,
   exportShaderDocumentJson,
@@ -856,6 +857,38 @@ test('an export is classified by its descriptor digest', () => {
     kind: 'REJECTED',
     diagnostics: invalid.diagnostics,
   });
+});
+
+/**
+ * Verifies a registry entry that spells the right descriptor non-canonically
+ * still matches: classifying it as a new effect would have the author create a
+ * duplicate of an effect the registry already carries.
+ */
+test('a non-canonical registry descriptor still matches its export', () => {
+  const compiled = compile(EXAMPLE);
+  const descriptor = structuredClone(compiled.descriptor);
+  descriptor.parameters.reverse();
+  descriptor.serialization.fields.reverse();
+  assert.notEqual(stableStringify(descriptorIdentity(descriptor)), compiled.descriptor_json);
+
+  const known = {
+    effect_id: 'example',
+    descriptor,
+    descriptor_digest: compiled.descriptor_digest,
+    capability_profiles: ['simulator'],
+  };
+  assert.deepEqual(classifyExport(compiled, { effects: [known] }, 'simulator'), {
+    kind: 'ADD_PRESET_CANDIDATE',
+    effect_id: 'example',
+  });
+
+  // A descriptor that differs after canonicalization is still an unknown effect.
+  const other = structuredClone(compiled.descriptor);
+  other.chain[0].label = 'renamed';
+  assert.deepEqual(
+    classifyExport(compiled, { effects: [{ ...known, descriptor: other }] }, 'simulator'),
+    { kind: 'CREATE_EFFECT_CANDIDATE', descriptor_digest: compiled.descriptor_digest },
+  );
 });
 
 /** Verifies the easing curves are clamped to the unit interval and pinned. */
