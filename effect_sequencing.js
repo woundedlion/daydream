@@ -439,7 +439,9 @@ export function createApplyPipeline({
    * @param {boolean} [preserveParams=false] - When true, keep the active effect's
    *   param URL entries through the re-apply (only if the effect is still
    *   offered; an off-list effect is corrected to the list's first entry,
-   *   dropping its effect-specific URL entries regardless).
+   *   dropping its effect-specific URL entries regardless). They are kept
+   *   regardless while no engine exists: the URL is then their only carrier,
+   *   and the initial preserving apply is what seeds them.
    * @returns {string} ApplyResult.APPLIED, else ApplyResult.REJECTED. REJECTED is
    *   not a no-op: only the two early rejections — an unknown preset name, and an
    *   engine setResolution rejection — leave everything as it was. A rejected
@@ -507,7 +509,8 @@ export function createApplyPipeline({
     }
 
     // A correction's param URL entries belong to the effect it dropped.
-    if (applyEffect(preserveParams && !effectChanged) !== ApplyResult.APPLIED) {
+    const keepParams = (preserveParams || !engine) && !effectChanged;
+    if (applyEffect(keepParams) !== ApplyResult.APPLIED) {
       return ApplyResult.REJECTED;
     }
 
