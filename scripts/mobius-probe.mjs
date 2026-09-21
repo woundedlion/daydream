@@ -92,7 +92,8 @@ export async function probePad(tab) {
   // Fractions chosen so the mapped value lands on an integer, which the pad's
   // snap then absorbs the sub-pixel remainder into.
   const press = valueAt(0.75, 0.25);
-  await tab.mouse.move(...Object.values(at(0.75, 0.25)));
+  const pressAt = at(0.75, 0.25);
+  await tab.mouse.move(pressAt.x, pressAt.y);
   await tab.mouse.down();
   const pressed = await padReading(tab);
   check(pressed.re === press.re && pressed.im === press.im,
@@ -107,7 +108,7 @@ export async function probePad(tab) {
     'the press takes the grabbing cursor');
 
   const dragged = valueAt(0.25, 0.75);
-  await walkTo(tab, at(0.75, 0.25), at(0.25, 0.75), DRAG_STEPS);
+  await walkTo(tab, pressAt, at(0.25, 0.75), DRAG_STEPS);
   const moved = await padReading(tab);
   check(moved.re === dragged.re && moved.im === dragged.im,
     `the drag tracks the pointer to ${caption(dragged)} (${caption(moved)})`);
@@ -127,7 +128,8 @@ export async function probePad(tab) {
 
   // A move with no button down is not a drag; the pad has no capture to filter
   // it against and must ignore it.
-  await tab.mouse.move(...Object.values(at(0.1, 0.9)));
+  const hoverAt = at(0.1, 0.9);
+  await tab.mouse.move(hoverAt.x, hoverAt.y);
   const hovered = await padReading(tab);
   check(hovered.re === outside.re && hovered.im === outside.im,
     `hovering the released pad moves nothing (${caption(hovered)})`);
