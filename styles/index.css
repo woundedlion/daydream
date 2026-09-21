@@ -120,6 +120,21 @@
   background: rgb(var(--bright-text-rgb) / 0.3);
 }
 
+.nav-license {
+  margin-left: auto;
+  padding: 8px 4px;
+  color: rgb(var(--bright-text-rgb) / 0.7);
+  text-decoration: none;
+  font-family: var(--nav-font);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.nav-license:hover {
+  color: var(--bright-text);
+  text-decoration: underline;
+}
+
 /* Layout */
 .layout-container {
   position: fixed;
@@ -550,6 +565,12 @@
 
   .nav-label {
     display: none;
+  }
+
+  .nav-license {
+    margin-left: 0;
+    padding: 5px 2px;
+    font-size: 10px;
   }
 
   .tab {
