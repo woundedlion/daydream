@@ -35,11 +35,11 @@ test('the installed WASM artifacts match their recorded hashes', () => {
   const entries = text('holosphere_wasm.wasm.sha256')
     .trim().split(/\r?\n/)
     .map((line) => line.match(/^([0-9a-f]{64})\s+\*?(.+)$/));
-  assert.ok(entries.length >= 2);
-  for (const entry of entries) {
-    assert.ok(entry, 'each checksum line has sha256sum syntax');
-    assert.equal(sha256(entry[2]), entry[1], entry[2]);
-  }
+  for (const entry of entries) assert.ok(entry, 'each checksum line has sha256sum syntax');
+  assert.deepEqual(entries.map((entry) => entry[2]).sort(),
+    ['holosphere_wasm.js', 'holosphere_wasm.wasm'],
+    'the manifest names the glue and the binary and nothing else');
+  for (const entry of entries) assert.equal(sha256(entry[2]), entry[1], entry[2]);
 });
 
 test('the engine pin is one clean full commit', () => {
