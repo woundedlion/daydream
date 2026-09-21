@@ -172,11 +172,20 @@ test('a segment whose engine refused a write is marked with its notices', () => 
   view.update(state);
 
   const { cell } = grid(stats);
+  // The notices describe the row header from a node outside the table, so the
+  // row's own text stays the label and a screen reader still reaches them.
+  const notice = (row) => stats.children[1].children[row - 1];
   assert.equal(cell(1, '').textContent, 'Seg 0');
   assert.equal(cell(1, '').className, 'seg-label');
+  assert.equal(notice(1).textContent, '');
   assert.equal(cell(2, '').textContent, 'Seg 1 ⚠');
   assert.equal(cell(2, '').className, 'seg-label seg-diverged');
-  assert.equal(cell(2, '').title,
+  assert.equal('title' in cell(2, ''), false,
+    'the text is on a node assistive technology reads, not behind a pointer-only tooltip');
+  assert.equal(cell(2, '').getAttribute('aria-describedby'), notice(2).id);
+  assert.equal(notice(2).id, 'seg-notice-1');
+  assert.equal(notice(2).parentNode.classList.contains('visually-hidden'), true);
+  assert.equal(notice(2).textContent,
     'setParameter(Ghost) rejected: UNKNOWN_PARAM; '
     + 'selectPreset(9) rejected: 3 presets, still on 0');
 
@@ -184,7 +193,7 @@ test('a segment whose engine refused a write is marked with its notices', () => 
   view.update(state);
   assert.equal(cell(2, '').textContent, 'Seg 1', 'a reconverged segment loses the mark');
   assert.equal(cell(2, '').className, 'seg-label');
-  assert.equal(cell(2, '').title, '');
+  assert.equal(notice(2).textContent, '');
 });
 
 // A worker sending no warnings field at all is the ordinary case and the

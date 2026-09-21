@@ -55,9 +55,11 @@ const STAT_BAR_IDS = ['global-stats-desktop', 'stats-bar'];
  */
 
 /**
- * The cells one segment's row repaint writes.
+ * The cells one segment's row repaint writes, plus the node describing its
+ * header.
  * @typedef {{
  *   label: HTMLTableCellElement,
+ *   notice: HTMLElement,
  *   range: HTMLTableCellElement,
  *   compute: HTMLTableCellElement,
  *   scrA: HTMLTableCellElement,
@@ -237,14 +239,15 @@ export class SegmentStatsView {
       const c = cells.rows[s];
 
       // A segment whose engine refused a parameter or a preset renders a
-      // configuration its peers do not; the row carries the notices verbatim.
+      // configuration its peers do not; the notices go verbatim into the node
+      // describing the row header, which a title attribute would leave behind a
+      // hover no keyboard or touch user can reach.
       const warnings = state.warnings?.[s];
       const diverged = Array.isArray(warnings) && warnings.length > 0;
       setText(c.label, diverged ? `Seg ${s} ⚠` : `Seg ${s}`);
       const labelClass = diverged ? 'seg-label seg-diverged' : 'seg-label';
       if (c.label.className !== labelClass) c.label.className = labelClass;
-      const detail = diverged ? warnings.join('; ') : '';
-      if (c.label.title !== detail) c.label.title = detail;
+      setText(c.notice, diverged ? warnings.join('; ') : '');
 
       // A needs_full_frame() effect shades the whole canvas in every worker and
       // the rectangle is only what was sliced out of it, so naming the rect
@@ -317,6 +320,10 @@ export class SegmentStatsView {
       return tr;
     };
     const spanCell = () => { const e = td(''); e.colSpan = 3; return e; };
+    // Row-header descriptions sit outside the table, so the text reaches
+    // assistive technology through aria-describedby without joining the row.
+    const notices = this.doc.createElement('div');
+    notices.className = 'visually-hidden';
 
     mkRow([colHeader(''), colHeader('Range'), colHeader('Compute'),
            colHeader('Scr A'), colHeader('Scr B'), colHeader('Persist')]);
@@ -329,8 +336,12 @@ export class SegmentStatsView {
       const scrB = td('-');
       const persist = td('-');
       const label = rowHeader(`Seg ${s}`);
+      const notice = this.doc.createElement('span');
+      notice.id = `seg-notice-${s}`;
+      notices.appendChild(notice);
+      label.setAttribute('aria-describedby', notice.id);
       mkRow([label, range, compute, scrA, scrB, persist]);
-      rows.push({ label, range, compute, scrA, scrB, persist });
+      rows.push({ label, notice, range, compute, scrA, scrB, persist });
     }
 
     const maxTime = td('', 'seg-time');
@@ -343,7 +354,7 @@ export class SegmentStatsView {
     const wallTime = td('', 'seg-time');
     mkRow([rowHeader('round-trip'), td(''), wallTime, spanCell()]);
 
-    el.replaceChildren(table);
+    el.replaceChildren(table, notices);
     this.statsTable = table;
     this.statsSegCount = numSegs;
     this.statsCells = { rows, maxTime, wallTime };
