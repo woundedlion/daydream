@@ -882,16 +882,16 @@ test('a varying axis pins each endpoint against the other so they cannot cross',
   assert.deepEqual(
     [state.minimumMin, state.minimumMax, state.maximumMin, state.maximumMax],
     ['0', '0.8', '0.2', '1']);
-  assert.deepEqual([state.minimumText, state.maximumText], ['0.2', '0.8']);
+  assert.deepEqual([state.minimumText, state.maximumText], ['0.200', '0.800']);
 });
 
-test('axis readouts preserve engine recipe precision', () => {
+test('axis readouts round to their box while the sliders keep full precision', () => {
   const state = axisControlState({
     curve: 'CONSTANT', minimum: '0.8871875', maximum: '0.8871875',
     label: 'Relative Chroma', shortLabel: 'Chroma',
   });
-  assert.equal(state.minimumText, '0.8871875');
-  assert.equal(state.maximumText, '0.8871875');
+  assert.equal(state.minimumText, '0.887');
+  assert.equal(state.maximumText, '0.887');
   for (const id of ['gen_chroma_minimum', 'gen_chroma_maximum',
     'gen_lightness_minimum', 'gen_lightness_maximum']) {
     assert.match(PALETTES_HTML,
