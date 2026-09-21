@@ -993,6 +993,21 @@ test('the encoder is opened at the configured bitrate', () => {
   }
 });
 
+// The README states these bounds as numbers; the sink cases above hold them by
+// name, so only this pin notices a bound drifting from what is documented.
+test('the documented sink bounds are the exported ones', () => {
+  const restore = installRecorderEnv();
+  try {
+    assert.equal(PICKER_GRACE_SECONDS, 120);
+    assert.equal(MEMORY_BUFFER_LIMIT_BYTES, 512_000_000);
+    const rec = new VideoRecorder(recordableCanvas());
+    assert.equal(rec.bitrateMbps * 1_000_000 / 8 * PICKER_GRACE_SECONDS, 240_000_000,
+      'the picker backlog bound at the default bitrate');
+  } finally {
+    restore();
+  }
+});
+
 test('the save picker is offered the timestamped name and the container filter', async () => {
   const restore = installRecorderEnv();
   const picked = [];
