@@ -24,6 +24,7 @@ daydream.js
 legacy_shader_import.js
 driver.js
 effect_gui.js
+effect_roster.js
 effect_sequencing.js
 engine_host.js
 frame_constants.js
