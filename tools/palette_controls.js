@@ -838,9 +838,12 @@ export function paletteRecipeFromControls(template, controls) {
     const { minimum, maximum } = controls[axis];
     Object.assign(recipe[axis], axisFromEndpoints(minimum, maximum));
   }
-  // The engine canonicalizes a falloff start outside a FALLOFF domain.
+  // The engine canonicalizes a falloff start outside a FALLOFF domain and the
+  // headroom of an ABSOLUTE chroma basis.
   if (recipe.domain !== PaletteV4.domain.FALLOFF)
     recipe.falloffStart = DEFAULT_FALLOFF_START;
+  if (recipe.chroma.basis === PaletteV4.chromaBasis.ABSOLUTE)
+    recipe.chroma.headroom = 1;
   if (recipe.domain === PaletteV4.domain.LOOP &&
       recipe.hue.mode === PaletteV4.hueMode.SWEEP) {
     recipe.hue.sweepTurns = loopSweepTurns(recipe.hue.sweepTurns);

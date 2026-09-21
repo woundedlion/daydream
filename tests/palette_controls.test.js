@@ -534,6 +534,13 @@ test('a falloff start and a loop sweep are canonicalized by domain', () => {
     { ...CONTROL_READINGS, domain: 'LOOP', hueMode: 'SWEEP' });
   assert.equal(loop.hue.sweepTurns, 3, 'a loop closes only on whole turns');
 
+  const absolute = defaultPaletteRecipe();
+  absolute.chroma.basis = PaletteV4.chromaBasis.ABSOLUTE;
+  assert.equal(paletteRecipeFromControls(absolute, CONTROL_READINGS).chroma.headroom, 1,
+    'an ABSOLUTE basis has no gamut fraction to keep back');
+  assert.equal(paletteRecipeFromControls(defaultPaletteRecipe(), CONTROL_READINGS).chroma.headroom,
+    CONTROL_READINGS.headroom, 'a gamut-relative basis carries the authored headroom');
+
   const open = paletteRecipeFromControls(defaultPaletteRecipe(),
     { ...CONTROL_READINGS, hueMode: 'SWEEP' });
   assert.equal(open.hue.sweepTurns, 2.5);
