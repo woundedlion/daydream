@@ -196,8 +196,10 @@ const STEREO_POINTS = (() => {
 
 // Numerator/divisor pairs spanning project_div's branches: ordinary quotients, a
 // numerator that saturates on the relative test, a divisor small enough that an
-// absolute-guard division would zero it out, the 0/0 indeterminate form, and
-// magnitudes whose square leaves the representable range.
+// absolute-guard division would zero it out, the 0/0 indeterminate form,
+// magnitudes whose square leaves the representable range, and a nonzero divisor
+// whose square underflows to zero, which the lift branch divides rather than
+// reads as the pole.
 const PROJECT_DIV_PAIRS = [
   [{ re: 4, im: 2 }, { re: 2, im: 0 }],
   [{ re: 1, im: -3 }, { re: -0.5, im: 0.25 }],
@@ -208,6 +210,9 @@ const PROJECT_DIV_PAIRS = [
   [{ re: 1, im: 1 }, { re: 0, im: 0 }],
   [{ re: 3e200, im: -1e200 }, { re: 1, im: 0 }],
   [{ re: 1e-200, im: 1e-200 }, { re: 1e-260, im: 0 }],
+  [{ re: 2e-170, im: -1e-170 }, { re: 1e-170, im: 0 }],
+  [{ re: 0, im: 3e-170 }, { re: 0, im: -1e-170 }],
+  [{ re: 1e-160, im: 0 }, { re: 1e-170, im: 0 }],
 ];
 
 /**

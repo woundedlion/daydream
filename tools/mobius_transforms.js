@@ -64,6 +64,13 @@ export const STEREO_POLE_EPS = 2 / (STEREO_INF * STEREO_INF);
 export const STEREO_AZIMUTH_EPS = 1e-12;
 
 /**
+ * 2^96, the factor projectDiv scales a divisor pair by when squaring the
+ * divisor underflowed to zero; exact in float, so the lifted quotient is the
+ * unlifted one.
+ */
+export const STEREO_UNDERFLOW_LIFT = 79228162514264337593543950336.0;
+
+/**
  * Stereographic projection sphere -> complex plane: pole at +y, real axis x,
  * imaginary axis z.
  * @param {{x:number, y:number, z:number}} v - Point on the unit sphere.
@@ -91,11 +98,24 @@ export function stereo(v) {
  * @details Not general complex division: the guard is relative, so a
  * near-singular divisor still yields a finite point carrying the numerator's
  * azimuth rather than a fixed constant. Only an exactly zero numerator is the
- * indeterminate 0/0 form, which returns (0,0).
+ * indeterminate 0/0 form, which returns (0,0). A nonzero divisor whose square
+ * underflows to zero is lifted by STEREO_UNDERFLOW_LIFT along with the
+ * numerator rather than read as an exact pole.
  */
 export function projectDiv(num, den) {
-  const denom = den.re * den.re + den.im * den.im;
-  const numMag = num.re * num.re + num.im * num.im;
+  let denRe = den.re;
+  let denIm = den.im;
+  let numRe = num.re;
+  let numIm = num.im;
+  let denom = denRe * denRe + denIm * denIm;
+  if (denom === 0.0 && (denRe !== 0.0 || denIm !== 0.0)) {
+    denRe *= STEREO_UNDERFLOW_LIFT;
+    denIm *= STEREO_UNDERFLOW_LIFT;
+    numRe *= STEREO_UNDERFLOW_LIFT;
+    numIm *= STEREO_UNDERFLOW_LIFT;
+    denom = denRe * denRe + denIm * denIm;
+  }
+  const numMag = numRe * numRe + numIm * numIm;
   if (numMag >= denom * (STEREO_INF * STEREO_INF)) {
     // Normalize by the peak component first: a numerator squared far above the
     // sentinel overflows to infinity and one far below it underflows to zero,
@@ -108,8 +128,8 @@ export function projectDiv(num, den) {
     return { re: re * scale, im: im * scale };
   }
   return {
-    re: (num.re * den.re + num.im * den.im) / denom,
-    im: (num.im * den.re - num.re * den.im) / denom,
+    re: (numRe * denRe + numIm * denIm) / denom,
+    im: (numIm * denRe - numRe * denIm) / denom,
   };
 }
 
@@ -120,6 +140,7 @@ export const glslProjectionFunctions = `
         const float STEREO_INF = 1e4;
         const float STEREO_POLE_EPS = 2.0 / (STEREO_INF * STEREO_INF);
         const float STEREO_AZIMUTH_EPS = 1e-12;
+        const float STEREO_UNDERFLOW_LIFT = 79228162514264337593543950336.0;
         CNum stereo(vec3 v) {
           float denom = 1.0 - v.y;
           if (denom < STEREO_POLE_EPS) {
@@ -131,8 +152,19 @@ export const glslProjectionFunctions = `
           return CNum(v.x / denom, v.z / denom);
         }
         CNum project_div(CNum num, CNum den) {
-          float denom = den.re * den.re + den.im * den.im;
-          float num_mag = num.re * num.re + num.im * num.im;
+          float den_re = den.re;
+          float den_im = den.im;
+          float num_re = num.re;
+          float num_im = num.im;
+          float denom = den_re * den_re + den_im * den_im;
+          if (denom == 0.0 && (den_re != 0.0 || den_im != 0.0)) {
+            den_re *= STEREO_UNDERFLOW_LIFT;
+            den_im *= STEREO_UNDERFLOW_LIFT;
+            num_re *= STEREO_UNDERFLOW_LIFT;
+            num_im *= STEREO_UNDERFLOW_LIFT;
+            denom = den_re * den_re + den_im * den_im;
+          }
+          float num_mag = num_re * num_re + num_im * num_im;
           if (num_mag >= denom * (STEREO_INF * STEREO_INF)) {
             float peak = max(abs(num.re), abs(num.im));
             if (peak == 0.0) return CNum(0.0, 0.0);
@@ -141,7 +173,7 @@ export const glslProjectionFunctions = `
             float scale = STEREO_INF / sqrt(re * re + im * im);
             return CNum(re * scale, im * scale);
           }
-          return CNum((num.re * den.re + num.im * den.im) / denom, (num.im * den.re - num.re * den.im) / denom);
+          return CNum((num_re * den_re + num_im * den_im) / denom, (num_im * den_re - num_re * den_im) / denom);
         }
       `;
 
