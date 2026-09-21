@@ -822,6 +822,17 @@ test('a staged schema builds an unclaimed parameter at the top level', () => {
     ['Palette Surprise'], 'every claimed parameter still reaches its stage');
   assert.deepEqual(h.warnings,
     ['Effect GUI: no pipeline stage claims Palette Surprise']);
+
+  // A rebuild over the same schema: every preset and every warning move makes
+  // one, and none of them is news.
+  h.panel.mount();
+  h.state.generation += 1;
+  h.panel.sync();
+
+  assert.equal(h.guis.length, 2, 'the panel was rebuilt');
+  assert.deepEqual(h.warnings,
+    ['Effect GUI: no pipeline stage claims Palette Surprise'],
+    'the same unclaimed set is reported once');
 });
 
 test('KaleidoscopeSmooth controls use the fixed pipeline modes as folders', () => {

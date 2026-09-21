@@ -359,6 +359,9 @@ export function createEffectGui({ engine, segments, config, host }) {
   let activeEffect = null;
   // Throttle the param/value length-skew warning to once per skew episode.
   let skewLogged = false;
+  // The unstaged-parameter set last warned about. A panel rebuilds on every
+  // warning move and every preset, all over the same schema.
+  let unstagedWarned = '';
   let rebuildFailureGeneration;
   let mountClosedOverride;
   /** Storage key for the last engine-accepted value of one parameter. */
@@ -1074,10 +1077,11 @@ export function createEffectGui({ engine, segments, config, host }) {
       ? params.filter((parameter) => !stageAssignments.has(parameter.name))
         .map((parameter) => parameter.name)
       : [];
-    if (unstagedParams.length > 0) {
-      logWarn(
-        `Effect GUI: no pipeline stage claims ${unstagedParams.join(', ')}`);
+    const unstaged = unstagedParams.join(', ');
+    if (unstaged !== '' && unstaged !== unstagedWarned) {
+      logWarn(`Effect GUI: no pipeline stage claims ${unstaged}`);
     }
+    unstagedWarned = unstaged;
     const stageFolders = new Map();
     if (stageAssignments) {
       for (const stage of stageOrder) {
