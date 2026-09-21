@@ -7,16 +7,18 @@ holosphere_wasm.toolchain  text eol=lf
 *.yml                      text eol=lf
 holosphere_wasm.wasm       binary
 
-# The segment-map golden is diffed against the engine checkout's copy on the same
-# runner, so its bytes must match the engine's LF-pinned file exactly.
+# Installed verbatim from the engine's LF-pinned golden; without this a Windows
+# install commits CRLF here and forks the copy from the bundle the deploy gate
+# verifies with sha256sum and installs.
 pov_segment_map.json       text eol=lf
 
 # The deploy staging shell reads this line by line; a trailing CR would make
 # every path miss on the runner.
 site_manifest.txt          text eol=lf
 
-# The deploy gate byte-compares these against the engine checkout's copies on
-# the same runner, so their bytes must match the engine's pinned files exactly.
+# Installed verbatim from the engine bundle the deploy gate verifies with
+# sha256sum: the README from an LF-pinned copy, the gallery as binaries. Without
+# this a Windows install commits CRLF and forks the mirror from the bundle.
 README.md                  text eol=lf
 docs/screenshots/**        binary
 
