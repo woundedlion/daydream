@@ -56,6 +56,8 @@ function enumName(type, value) {
  * @param {string} effect - Effect name to install.
  * @param {{x0:number,x1:number,y0:number,y1:number}} rect - Clip to apply.
  * @param {number} frames - Renders to draw.
+ * @param {number} [width] - Resolution width; the segmented default.
+ * @param {number} [height] - Resolution height; the segmented default.
  * @returns {Promise<{clip: string, pixels: Uint16Array}>} The clip result's
  *   name and a detached copy of the full canvas readback.
  */
@@ -64,7 +66,7 @@ async function renderWith(effect, rect, frames, width = W, height = H) {
   const engine = new M.HolosphereEngine();
   const resolution = enumName(M.ResolutionSetResult, engine.setResolution(width, height));
   assert.ok(resolution === 'RESIZED' || resolution === 'ALREADY_ACTIVE',
-    `${W}x${H} must be buildable, got ${resolution}`);
+    `${width}x${height} must be buildable, got ${resolution}`);
   assert.equal(enumName(M.EffectSetResult, engine.setEffect(effect)), 'INSTALLED',
     `${effect} must be a registered effect`);
   const clip = engine.setClip(rect.x0, rect.x1, rect.y0, rect.y1);
