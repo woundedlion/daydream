@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import {
+  GATED_WORKFLOWS,
   missingTerminalDependencies,
   requiredJobOutcomes,
   terminalJobNeeds,
@@ -65,22 +66,37 @@ const nodePins = (dir) => readdirSync(dir)
     ...readFileSync(`${dir}/${file}`, 'utf8').matchAll(/node-version:\s*'?([^'\s]+)'?/g),
   ].map((match) => `${file}: ${match[1]}`));
 
-test('ci-green needs every other workflow job', () => {
-  assert.deepEqual(missingTerminalDependencies(workflow, 'ci-green'), []);
-  assert.deepEqual(
-    terminalJobNeeds(workflow, 'ci-green').sort(),
-    workflowJobs(workflow).filter((job) => job !== 'ci-green').sort(),
-  );
+/** @param {string} source @returns {string[]} The workflow's `on:` trigger names. */
+const triggersOf = (source) => {
+  const block = source.split(/^on:\s*$/m)[1]?.split(/^\S/m)[0] ?? '';
+  return [...block.matchAll(/^ {2}([a-z_]+):/gm)].map((match) => match[1]);
+};
+
+// A workflow only workflow_call reaches is gated through its caller; every
+// other one is reachable on its own and needs a terminal job on the list.
+test('GATED_WORKFLOWS names every directly triggered workflow', () => {
+  assert.deepEqual(triggersOf(workflow), ['pull_request']);
+  const direct = readdirSync(WORKFLOW_DIR).filter((file) => /\.ya?ml$/.test(file))
+    .map((file) => `${WORKFLOW_DIR}/${file}`)
+    .filter((path) => triggersOf(readFileSync(path, 'utf8'))
+      .some((trigger) => trigger !== 'workflow_call'));
+  assert.deepEqual(GATED_WORKFLOWS.map(([path]) => path).sort(), direct.sort());
+  for (const [path, terminal] of GATED_WORKFLOWS) {
+    assert.ok(workflowJobs(readFileSync(path, 'utf8')).includes(terminal),
+      `${path} has no job ${terminal}`);
+  }
 });
 
-test('the deploy job needs every other deploy-workflow job', () => {
-  const deploy = readFileSync(DEPLOY_PATH, 'utf8');
-  assert.deepEqual(missingTerminalDependencies(deploy, 'deploy'), []);
-  assert.deepEqual(
-    terminalJobNeeds(deploy, 'deploy').sort(),
-    workflowJobs(deploy).filter((job) => job !== 'deploy').sort(),
-  );
-});
+for (const [path, terminal] of GATED_WORKFLOWS) {
+  test(`${terminal} needs every other ${path} job`, () => {
+    const source = readFileSync(path, 'utf8');
+    assert.deepEqual(missingTerminalDependencies(source, terminal), []);
+    assert.deepEqual(
+      terminalJobNeeds(source, terminal).sort(),
+      workflowJobs(source).filter((job) => job !== terminal).sort(),
+    );
+  });
+}
 
 // The needs list is hand-parsed, so a reformat must not read as an ungated
 // workflow: YAML spells a flow sequence with or without quoted entries.
