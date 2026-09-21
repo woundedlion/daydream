@@ -138,8 +138,11 @@ const snapFrequencies = (activeId, rawNewValue) => {
   // 4. Update the actual state.
   state[activeId] = snappedActiveC;
 
-  // 5. Force the thumb to jump to the snapped position
+  // 5. Force the thumb to jump to the snapped position. The thumb can only land
+  // on the step grid, which the rational ratio misses; the readout names the
+  // frequency in effect, which is what the export emits.
   sliderHandles[activeId].setValue(snappedActiveC);
+  sliderHandles[activeId].setReadout(snappedActiveC);
 
   // Update the Domain slider UI to reflect the new calculated domain. An
   // extreme ratio can put the closing period past the slider's range, and
@@ -188,8 +191,10 @@ const updateCodeSnippet = () => {
 const sliderHandles = {};
 
 const mountSlider = (id, params) => {
-  // C1/C2 show 2 decimals; A and Duration show 3; Samples is a whole count.
-  const decimals = id === 'Samples' ? 0 : (id === 'A' || id === 'Duration') ? 3 : 2;
+  // Samples is a whole count; every other readout shows 3 decimals, one order
+  // finer than its step grid, so a value the grid cannot hold still reads as
+  // the value in effect.
+  const decimals = id === 'Samples' ? 0 : 3;
   const scale = params.scale || 1;
 
   sliderHandles[id] = createSlider(`${id}_container`, {
