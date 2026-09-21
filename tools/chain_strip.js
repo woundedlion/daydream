@@ -212,8 +212,8 @@ export function deactivatedParameterIds(parameters, values, chain, catalog) {
  * @param {(parameterId: string, value: *) => void} [options.onEditParameter] -
  *   Takes every inline control edit as the document value the store stores: a
  *   number for a binary32 field, the option id for an enum8 one.
- * @param {() => void} [options.onCommitParameter] - Flushes work buffered while
- *   a range control was moving.
+ * @param {() => void} [options.onCommitParameter] - Runs once an inline control
+ *   edit completes: a slider release, a chosen option, an entered value.
  * @param {() => boolean} [options.bypassAvailable] - Whether a bypass reaches
  *   what is rendering. False disables the toggles and states why, rather than
  *   leaving a control that commits store state the render ignores.
@@ -863,8 +863,11 @@ export function createChainStrip({
       option.selected = value === values[declaration.id];
       select.appendChild(option);
     }
-    select.addEventListener('change',
-      (/** @type {*} */ event) => editParameter(declaration.id, event.target.value));
+    select.addEventListener('change', (/** @type {*} */ event) => {
+      editParameter(declaration.id, event.target.value);
+      store.endValueRun();
+      onCommitParameter();
+    });
     return select;
   };
 
@@ -984,8 +987,11 @@ export function createChainStrip({
           slider.value = String(value);
           editParameter(declaration.id, value);
         };
-        readout.addEventListener('change',
-          (/** @type {*} */ event) => enterValue(String(event.target.value ?? '')));
+        readout.addEventListener('change', (/** @type {*} */ event) => {
+          enterValue(String(event.target.value ?? ''));
+          store.endValueRun();
+          onCommitParameter();
+        });
         readout.addEventListener('keydown', (/** @type {*} */ event) => {
           const direction = event.key === 'ArrowUp' ? 1
             : event.key === 'ArrowDown' ? -1 : 0;

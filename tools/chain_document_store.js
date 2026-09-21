@@ -788,7 +788,7 @@ export async function createChainDocumentStore({
     relabel,
     setPresetValue,
 
-    /** Ends a slider's coalesced value run so its next gesture opens a new entry. */
+    /** Ends a control's coalesced value run so its next gesture opens a new entry. */
     endValueRun: () => { coalesceKey = null; },
 
     /** @returns {boolean} Whether a structural edit can be undone. */
