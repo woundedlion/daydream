@@ -90,7 +90,15 @@ test('a nested node_modules fails', () => {
   assert.match(fail(), /shadows the pinned root install/);
 });
 
+// Only a glob rooted at the repo scans the root, where the pinned install lives.
 test('the root node_modules is allowed', () => {
   mkdirSync(join(root, 'node_modules'));
+  writePkg('**/*.test.js');
   assert.match(run(), /1 files matched/);
+});
+
+test('an install outside the test directory fails under a root-reaching glob', () => {
+  mkdirSync(join(root, 'tools/node_modules'), { recursive: true });
+  writePkg('**/*.test.js');
+  assert.match(fail(), /shadows the pinned root install[\s\S]*tools\/node_modules/);
 });
