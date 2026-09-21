@@ -54,6 +54,9 @@ export const FULL_CONFIG_STORAGE_KEY = '__fullConfig';
 // functions and the preset selector is a session control, so none of those owns
 // a deep-link key; the pause toggle owns `pause`.
 const RESERVED_CONTROL_NAMES = new Set(['pause']);
+// Everything that ends a slider drag. The window's own blur covers the release
+// the page never sees, which would otherwise leave the latch set for good.
+const DRAG_END_EVENTS = ['pointerup', 'pointercancel', 'blur'];
 
 /**
  * The key one of the panel's own controls is remembered under across a rebuild,
@@ -888,10 +891,12 @@ export function createEffectGui({ engine, segments, config, host }) {
       const { pointerId } = event;
       controller.dragging = true;
       const end = (release) => {
-        if (release.pointerId !== pointerId) return;
+        // A blur carries no pointer, and is the one end the gesture's own
+        // pointer cannot report: the release that lands on another window is
+        // never delivered here.
+        if (release.type !== 'blur' && release.pointerId !== pointerId) return;
         controller.dragging = false;
-        dragTarget.removeEventListener('pointerup', end);
-        dragTarget.removeEventListener('pointercancel', end);
+        for (const type of DRAG_END_EVENTS) dragTarget.removeEventListener(type, end);
         fx.activeDragEnds.delete(end);
         const edited = fx.persistDeferred;
         if (edited === null) return;
@@ -899,8 +904,7 @@ export function createEffectGui({ engine, segments, config, host }) {
         persistEffectState(fx.gui, edited);
       };
       fx.activeDragEnds.add(end);
-      dragTarget.addEventListener('pointerup', end);
-      dragTarget.addEventListener('pointercancel', end);
+      for (const type of DRAG_END_EVENTS) dragTarget.addEventListener(type, end);
     });
   }
 
@@ -1201,8 +1205,7 @@ export function createEffectGui({ engine, segments, config, host }) {
     fx.exportFlashTimer = null;
     if (fx.activeDragEnds) {
       for (const end of fx.activeDragEnds) {
-        dragTarget.removeEventListener('pointerup', end);
-        dragTarget.removeEventListener('pointercancel', end);
+        for (const type of DRAG_END_EVENTS) dragTarget.removeEventListener(type, end);
       }
       fx.activeDragEnds.clear();
     }
