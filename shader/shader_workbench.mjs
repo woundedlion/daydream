@@ -593,6 +593,8 @@ const validatePathPolicies = (policies, parameters, report, guard) => {
       seen.add(policy.id);
       if (policy.kind !== 'PARALLEL' && policy.kind !== 'STAGGERED_ORDERED')
         fail('semantic', 'UNKNOWN_PATH_POLICY', `${path}.kind`, 'The path policy is unknown.');
+      if (policy.kind !== 'STAGGERED_ORDERED' && 'groups' in policy)
+        fail('schema', 'UNKNOWN_FIELD', `${path}.groups`, 'Only a staggered path carries groups.');
       if (policy.kind === 'STAGGERED_ORDERED') {
         const groups = array(policy.groups, `${path}.groups`);
         if (groups.length === 0)
