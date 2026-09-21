@@ -75,13 +75,12 @@
     'three': `${threeBase}build/three.module.js`,
     'three/addons/': `${threeBase}examples/jsm/`,
     'lil-gui': lilGui,
-    'gui': abs('gui.js'),
   });
 
   // Subresource Integrity for the CDN-served modules. The integrity map is keyed
   // by resolved URL, so the 'three/addons/' prefix mapping contributes one entry
   // per addon the app imports rather than a single prefix entry. Same-origin
-  // modules (local vendoring, gui.js, EXTRA) are left unpinned.
+  // modules (local vendoring, EXTRA) are left unpinned.
   const integrity = {};
   if (VENDOR.three === 'cdn') {
     integrity[imports['three']] = INTEGRITY.three;
