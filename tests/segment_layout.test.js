@@ -165,9 +165,10 @@ test('extract then composite round-trips a non-trivial rect through the shared b
 test('stampBoundaries paints only the listed seams and clips off-canvas ones', () => {
   const canvasW = 6, canvasH = 4;
   const canvas = new Uint16Array(canvasW * canvasH * 3);
-  // canvasW/canvasH are past the last valid index: a seam list cached from a
-  // larger layout must be clipped, not wrapped into the next row.
-  stampBoundaries(canvas, canvasW, canvasH, [0, 3, canvasW], [2, canvasH]);
+  // canvasW/canvasH are past the last valid index and -1 is before the first:
+  // a seam list cached from a larger or shifted layout must be clipped, not
+  // wrapped into the neighbouring row or the previous row's tail.
+  stampBoundaries(canvas, canvasW, canvasH, [-1, 0, 3, canvasW], [-1, 2, canvasH]);
 
   const wrong = [];
   for (let y = 0; y < canvasH; y++)
