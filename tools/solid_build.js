@@ -103,7 +103,18 @@ export function readbackMesh(wasmMesh, ctx) {
 export function buildBaseMesh(name, what, ctx) {
   const wasmMesh = requireMeshResult(ctx.meshOps.fromSolidName(name), what, ctx);
   if (!wasmMesh) return null;
-  const meshData = readbackMesh(wasmMesh, ctx);
+  let meshData;
+  try {
+    meshData = readbackMesh(wasmMesh, ctx);
+  } catch (e) {
+    console.error('WASM readback error:', e);
+    if (ctx.onTrap(e)) return null;
+    wasmMesh.delete();
+    ctx.meshOps.clearToolingMemory();
+    ctx.onError(`Mesh readback failed: ${
+      e instanceof Error && e.message ? e.message : String(e)}`);
+    return null;
+  }
   wasmMesh.delete();
   ctx.meshOps.clearToolingMemory();
   return meshData;

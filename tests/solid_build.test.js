@@ -326,6 +326,20 @@ test('buildBaseMesh frees the wrapper and the arenas when the readback is refuse
   assert.ok(state.cleared >= 1);
 });
 
+test('buildBaseMesh frees the wrapper and the arenas when the readback throws', () => {
+  const { Mod, state } = fakeModule({
+    onOp: (t) => { if (t === 'getFaces') throw new TypeError('marshalling'); },
+  });
+  const { ctx, errors, traps } = context(Mod);
+
+  assert.equal(quietly(() => buildBaseMesh('cube', 'Thumbnail for "cube"', ctx)), null,
+    'a thrown readback leaves no thumbnail to draw');
+  assert.deepEqual(errors, ['Mesh readback failed: marshalling']);
+  assert.equal(traps.length, 1);
+  assert.equal(state.live, 0, 'a thrown readback must not strand the wrapper');
+  assert.equal(state.cleared, 1, 'the tooling arenas must be reclaimed');
+});
+
 test('readbackMesh reports UNKNOWN when the module records no reason', () => {
   const { ctx, errors } = context({ MeshOps: {} });
   const wrapper = { getVertices: () => null };
