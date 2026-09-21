@@ -950,6 +950,39 @@ test('an in-flight frame cannot republish parameter values from before a GUI wri
   await done;
 });
 
+test('an in-flight frame cannot republish parameter values from before a preset change', async () => {
+  const c = makeController();
+  c.create(2);
+
+  let done = c.renderParallel();
+  deliverFrame(c, 0, { paramValues: [0.25] });
+  deliverFrame(c, 1);
+  await done;
+  assert.deepEqual(c.getParamValues(), [0.25]);
+
+  done = c.renderParallel();
+  const staleRevision = c.paramRevision;
+  c.presetCount = 6;
+  assert.equal(c.selectPreset(4), true);
+  assert.equal(c.getParamValues(), null,
+    'the previous snapshot is withheld until a worker acknowledges the preset');
+
+  deliverFrame(c, 0, {
+    paramValues: [0.25], paramRevision: staleRevision,
+  });
+  assert.equal(c.getParamValues(), null,
+    'a frame rendered before the preset change cannot snap the GUI back');
+  deliverFrame(c, 1, { paramRevision: staleRevision });
+  await done;
+
+  done = c.renderParallel();
+  deliverFrame(c, 0, { paramValues: [0.75] });
+  assert.deepEqual(c.getParamValues(), [0.75],
+    'the first frame at the current revision resumes GUI synchronization');
+  deliverFrame(c, 1);
+  await done;
+});
+
 test('a doubled segment-0 frame cannot republish over the generation first frame', async () => {
   const c = makeController();
   c.create(2);
@@ -2778,6 +2811,7 @@ test('setEffect broadcasts the name plus the tuned param snapshot to every worke
     { name: 'Glow', value: true },
   ]);
 
+  const before = c.paramRevision;
   c.setEffect('NewEffect');
 
   for (const w of c.workers) {
@@ -2789,7 +2823,7 @@ test('setEffect broadcasts the name plus the tuned param snapshot to every worke
       { name: 'Glow', value: 1.0 },
     ]);
     assert.equal(msgs[0].paused, false);
-    assert.equal(msgs[0].paramRevision, c.paramRevision);
+    assert.equal(msgs[0].paramRevision, before + 1);
   }
 });
 
@@ -2837,6 +2871,17 @@ test('setResolution leaves one effect rebuild to the apply pipeline', () => {
   }
 });
 
+test('setResolution opens a new parameter revision', () => {
+  const c = readyController(2);
+  c.paramValues = [1, 2];
+  const before = c.paramRevision;
+
+  c.setResolution(8, 8);
+
+  assert.equal(c.paramRevision, before + 1);
+  assert.equal(c.getParamValues(), null);
+});
+
 test('setResolution does not rebuild the effect with an empty snapshot', () => {
   const c = readyController(2, { effect: 'Ribbons' });
   c.setAnimationsPaused(true);
@@ -2877,13 +2922,14 @@ test('broadcast reports whether every worker accepted the message', () => {
 
 test('setParameter broadcasts the name/value to every worker', () => {
   const c = readyController(2);
+  const before = c.paramRevision;
   c.setParameter('Speed', 0.75);
   for (const w of c.workers) {
     const msgs = w.posted.filter((m) => m.type === 'setParameter');
     assert.equal(msgs.length, 1);
     assert.equal(msgs[0].name, 'Speed');
     assert.equal(msgs[0].value, 0.75);
-    assert.equal(msgs[0].paramRevision, c.paramRevision);
+    assert.equal(msgs[0].paramRevision, before + 1);
   }
 });
 
@@ -2905,6 +2951,7 @@ test('selectPreset broadcasts one exact index and invalidates parameter state', 
   const c = readyController(2);
   c.presetCount = 6;
   c.paramValues = [1, 2];
+  const before = c.paramRevision;
   assert.equal(c.selectPreset(4), true);
 
   assert.equal(c.getPresetIndex(), 4);
@@ -2913,7 +2960,7 @@ test('selectPreset broadcasts one exact index and invalidates parameter state', 
   for (const w of c.workers) {
     const msg = w.posted.find((m) => m.type === 'selectPreset');
     assert.equal(msg.index, 4);
-    assert.equal(msg.paramRevision, c.paramRevision);
+    assert.equal(msg.paramRevision, before + 1);
   }
 });
 
