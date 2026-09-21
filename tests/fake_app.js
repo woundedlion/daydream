@@ -168,6 +168,7 @@ export function fakeDriver() {
     pixels: null,
     dotMesh: { instanceColor: fakeColorAttribute(null) },
     renderer: { setAnimationLoop(frame) { this.frame = frame; } },
+    startFrameLoop(frame) { this.renderer.setAnimationLoop(frame); },
     keys: [],
     frames: 0,
     invalidate() { this.invalidated = true; },

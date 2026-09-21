@@ -647,7 +647,7 @@ export function start({
   // onChange, or a DOM listener that throws is otherwise console-only.
   const pageFailureListeners = reportPageFailures('simulator', win);
 
-  daydream.renderer.setAnimationLoop(createFrameLoopGuard({
+  daydream.startFrameLoop(createFrameLoopGuard({
     frame: () => {
       if (host.adapter) {
         daydream.render(host.adapter);
