@@ -593,7 +593,7 @@ function cppFloatArray(values) {
 export function generativePaletteCpp(recipe) {
   const f = (/** @type {number} */ value) => formatFloatCpp(value, 6);
   return `PaletteRecipe recipe;
-recipe.schema_version = ${recipe.schemaVersion};
+recipe.schema_version = PaletteRecipe::SCHEMA_VERSION;
 recipe.input.offset = ${f(recipe.input.offset)};
 recipe.input.span = ${f(recipe.input.span)};
 recipe.domain = PaletteDomain::${enumName('domain', recipe.domain)};
