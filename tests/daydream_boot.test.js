@@ -375,7 +375,10 @@ function recordingRig({ labelAxes = false } = {}) {
     getElementById: (id) => (id === 'canvas-container' ? canvasEl : null),
   };
   const gui = fakeGui('view');
-  const driver = { frameInterval: 62.5, labelAxes, recorder: null };
+  const driver = {
+    frameInterval: 62.5, labelAxes, recorder: null, invalidations: 0,
+    invalidate() { this.invalidations += 1; },
+  };
   const notices = [];
   let recorder = null;
   const controls = createRecordingControls({
@@ -431,6 +434,8 @@ test('the record toggle announces the session and the container it settled on', 
     + 'carry what the user can see');
   assert.equal(rig.canvasEl.classList.contains('recording'), true);
   assert.equal(rig.button.label, '\u25a0 Stop');
+  assert.equal(rig.driver.invalidations, 1,
+    'a session suppresses the PiP, so the scene must be redrawn without it');
 
   recorder.elapsedSeconds = 3.4;
   recorder.elapsedFormatted = '0:03';
@@ -446,6 +451,7 @@ test('the record toggle announces the session and the container it settled on', 
     + 'that encoded fine');
   assert.equal(rig.canvasEl.classList.contains('recording'), false);
   assert.equal(rig.button.label, '\u25cf Record');
+  assert.equal(rig.driver.invalidations, 2, 'the stop brings the PiP back');
 
   rig.controls.removeOverlay();
   assert.equal(rig.canvasEl.children.length, 0,
