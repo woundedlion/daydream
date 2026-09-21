@@ -1442,15 +1442,17 @@ test('a message-less error after the pool is ready still latches fast', () => {
     'worker failed after the pool became ready without an error message');
 });
 
-test('the startup and render deadlines hold their documented durations', () => {
+test('the deadlines and rebuild budgets hold their documented values', () => {
   assert.deepEqual(
     {
       retry: BOOT_RETRY_DELAY_MS,
       render: RENDER_WATCHDOG_MS,
       boot: BOOT_WATCHDOG_MS,
       init: INIT_WATCHDOG_MS,
+      bootRetries: MAX_BOOT_RETRIES,
+      faultedRebuilds: MAX_FAULTED_REBUILDS,
     },
-    { retry: 250, render: 5000, boot: 10000, init: 20000 },
+    { retry: 250, render: 5000, boot: 10000, init: 20000, bootRetries: 3, faultedRebuilds: 2 },
   );
   // Init covers boot plus the WASM instantiate, so it must outlast boot or a
   // slow-but-healthy load reports as an init timeout.
