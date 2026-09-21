@@ -275,6 +275,20 @@ export async function probeStrip(tab) {
     `${held.length} inline sliders hold an off-grid value unsnapped`
       + (snapped.length > 0 ? ` (${snapped.join(', ')} re-snapped)` : ''));
 
+  // Constraint validation is the browser's, so only a real browser reports
+  // whether the readouts are showing values their own control calls invalid.
+  const readouts = await tab.$$eval('.chain-param-value', (nodes) => nodes
+    .filter((node) => node instanceof HTMLInputElement)
+    .map((node) => {
+      const row = node.closest('.chain-param');
+      return { valid: node.validity.valid, mismatch: node.validity.stepMismatch,
+        parameter: row instanceof HTMLElement ? row.dataset.parameter ?? '' : '' };
+    }));
+  const invalid = readouts.filter((entry) => !entry.valid).map((entry) => entry.parameter);
+  check(readouts.length > 0 && invalid.length === 0,
+    `${readouts.length} inline readouts report their stored value valid`
+      + (invalid.length > 0 ? ` (${invalid.join(', ')} do not)` : ''));
+
   const add = '.chain-band[data-carrier="plane"] .chain-band-add';
   await (await tab.waitForSelector(add)).click();
   const choices = await tab.$$eval('.chain-palette-entry', (nodes) => nodes.map((node) => ({
@@ -382,6 +396,18 @@ export async function probeStrip(tab) {
   const stored = (await savedDocument(tab)).preset_bank.presets[0].values['rotate.wander'];
   check(Math.abs(stored - shown) < VALUE_TOLERANCE,
     `an inline control saves its value (${stored})`);
+
+  // The step grid the readout gives up to stay valid comes back as arrow keys.
+  const readout = '.chain-chip[data-label="rotate"]'
+    + ' .chain-param[data-parameter="rotate.wander"] .chain-param-value';
+  const readBefore = await tab.$eval(readout, (node) => {
+    node.focus();
+    return Number(node.value);
+  });
+  await tab.keyboard.press('ArrowUp');
+  const readAfter = await tab.$eval(readout, (node) => Number(node.value));
+  check(readAfter > readBefore && readAfter - readBefore < 0.01,
+    `an arrow key nudges the readout ${readBefore} to ${readAfter}`);
 
   const animation = await tab.$eval('#shader-animation-toggle', (node) => ({
     disabled: node instanceof HTMLButtonElement ? node.disabled : true,

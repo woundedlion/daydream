@@ -124,11 +124,11 @@ const formatNumericValue = (value) => {
 
 /**
  * @param {ParameterDeclaration} declaration - A binary32 declaration.
- * @returns {string} The increment its numeric readout's arrow keys nudge by.
+ * @returns {number} The increment its numeric readout's arrow keys nudge by.
  */
 const nudgeStep = (declaration) => {
   const span = Number(declaration.domain?.maximum) - Number(declaration.domain?.minimum);
-  return span > 0 ? String(span / READOUT_STEPS) : 'any';
+  return span > 0 ? span / READOUT_STEPS : 0;
 };
 
 /** @param {string} id @returns {string} The `<label>.<field>` id's field segment. */
@@ -964,15 +964,17 @@ export function createChainStrip({
         slider.setAttribute('aria-label', name);
         readout.min = slider.min;
         readout.max = slider.max;
-        // A number input never re-snaps, so the readout carries the finer grid
-        // its arrow keys nudge by.
-        readout.step = nudgeStep(declaration);
+        // A step grid is based at the input's min, and a stored binary32 lands
+        // on it only by accident, so any grid at all reports the readout
+        // stepMismatch. Its arrow keys carry the increment instead.
+        readout.step = 'any';
         readout.setAttribute('aria-label', `${name} value`);
-        readout.addEventListener('change', (/** @type {*} */ event) => {
+        /** @param {string} raw - The entered text. @returns {void} */
+        const enterValue = (raw) => {
           // A number input reports content it cannot parse as the empty string,
           // which Number() reads as a finite 0 rather than as no value.
-          const raw = String(event.target.value ?? '').trim();
-          const typed = raw === '' ? Number.NaN : Number(raw);
+          const trimmed = raw.trim();
+          const typed = trimmed === '' ? Number.NaN : Number(trimmed);
           const current = Number(values[declaration.id]);
           const value = Number.isFinite(typed)
             ? Math.min(Number(slider.max), Math.max(Number(slider.min), typed))
@@ -981,6 +983,17 @@ export function createChainStrip({
           if (value === current) return;
           slider.value = String(value);
           editParameter(declaration.id, value);
+        };
+        readout.addEventListener('change',
+          (/** @type {*} */ event) => enterValue(String(event.target.value ?? '')));
+        readout.addEventListener('keydown', (/** @type {*} */ event) => {
+          const direction = event.key === 'ArrowUp' ? 1
+            : event.key === 'ArrowDown' ? -1 : 0;
+          if (direction === 0) return;
+          event.preventDefault();
+          const shown = Number(readout.value);
+          const from = Number.isFinite(shown) ? shown : Number(values[declaration.id]);
+          enterValue(String(from + direction * nudgeStep(declaration)));
         });
         row.appendChild(slider);
         row.appendChild(readout);
