@@ -9,7 +9,7 @@ import {
 } from '../tools/shader_documents.js';
 import { MORPH_SWEEP } from '../tools/solid_codegen.js';
 
-const text = (path) => readFileSync(path, 'utf8');
+const text = (path) => readFileSync(path, 'utf8').replaceAll('\r\n', '\n');
 const sha256 = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
 const engineCandidates = process.env.HOLOSPHERE_ENGINE_DIR
   ? [resolve(process.env.HOLOSPHERE_ENGINE_DIR)]
@@ -22,11 +22,6 @@ const engineSkip = engineRoot || process.env.HOLOSPHERE_ENGINE_REQUIRED ? false 
 const committed = (root, path, revision = 'HEAD') => execFileSync(
   'git', ['-C', root, 'show', `${revision}:${path}`], { encoding: 'buffer' });
 
-const committedJsonNames = (root, directory, revision = 'HEAD') => execFileSync(
-  'git', ['-C', root, 'ls-tree', '-z', '--name-only', `${revision}:${directory}`],
-  { encoding: 'utf8' },
-).split('\0').filter((name) => name.endsWith('.json')).sort();
-
 function cppFloatConstant(source, name) {
   const match = new RegExp(
     `\\binline\\s+constexpr\\s+float\\s+${name}\\s*=\\s*` +
@@ -36,7 +31,7 @@ function cppFloatConstant(source, name) {
   return Number(match[1].replace(/f$/, ''));
 }
 
-test('the committed WASM artifacts match their recorded hashes', () => {
+test('the installed WASM artifacts match their recorded hashes', () => {
   const entries = text('holosphere_wasm.wasm.sha256')
     .trim().split(/\r?\n/)
     .map((line) => line.match(/^([0-9a-f]{64})\s+\*?(.+)$/));
@@ -60,42 +55,12 @@ test('the toolchain record describes a release module', () => {
   assert.equal(fields.dev_bindings, 'OFF');
 });
 
-test('the committed shader artifacts match the pinned engine byte for byte', { skip: engineSkip }, () => {
-  assert.ok(engineRoot, engineMissing);
-  const engineRevision = text('holosphere_wasm.sha').trim();
-  for (const name of ['shader_workbench.mjs', 'sha256.mjs', 'engine_catalog.json']) {
-    assert.deepEqual(
-      committed('.', `shader/${name}`),
-      committed(engineRoot, `scripts/${name}`, engineRevision),
-      `${name} differs from the pinned engine`,
-    );
-  }
-  const installed = committedJsonNames('.', 'shader/patterns')
-    .filter((name) => name !== 'digest_migration.v1v2.json');
-  const authored = committedJsonNames(engineRoot, 'patterns', engineRevision);
-  assert.deepEqual(installed, authored, 'the installed pattern artifact set differs from the pinned engine');
-  for (const name of authored) {
-    assert.deepEqual(
-      committed('.', `shader/patterns/${name}`),
-      committed(engineRoot, `patterns/${name}`, engineRevision),
-      `patterns/${name} differs from the pinned engine`,
-    );
-  }
+test('the installed operator catalog describes the installed WASM', async () => {
+  const { default: createModule } = await import('../holosphere_wasm.js');
+  const module = await createModule();
+  assert.deepEqual(JSON.parse(text('shader/engine_catalog.json')),
+    JSON.parse(module.HolosphereEngine.getShaderChainCatalog()));
 });
-
-// README.md is installed from the engine, not authored here. Only the deploy
-// gate compared the committed copy against it, which is after the merge that
-// changed it; this runs the same comparison on the pinned checkout.
-test('the committed README matches the pinned engine byte for byte',
-  { skip: engineSkip }, () => {
-    assert.ok(engineRoot, engineMissing);
-    // Compared as whole buffers: a byte diff over a document this size costs
-    // minutes to render and says no more than the verdict does.
-    const installed = committed('.', 'README.md');
-    const authored = committed(engineRoot, 'README.md', text('holosphere_wasm.sha').trim());
-    assert.ok(installed.equals(authored),
-      'README.md is an engine install; re-install it rather than editing it here');
-  });
 
 // One id per alias branch, so the comparison keeps covering the table when the
 // committed documents stop exercising a branch.
@@ -183,14 +148,15 @@ test('MORPH_SWEEP matches the engine morphability constants', { skip: engineSkip
 });
 
 test('deploy consumes one checksummed engine bundle at the module pin', () => {
-  const workflow = text('.github/workflows/deploy.yml');
+  const workflow = text('.github/workflows/engine-bundle.yml');
   assert.match(workflow, /holosphere-engine-\$PIN/);
   assert.match(workflow, /head_sha=\$PIN&branch=master&per_page=10/);
   assert.match(workflow,
     /select\(\.event == "push" or \.event == "workflow_dispatch"\)/);
   assert.match(workflow, /sha256sum -c holosphere_engine\.sha256/);
-  assert.match(workflow, /cmp -s "engine-bundle\/\$path" "\$path"/);
-  assert.doesNotMatch(workflow, /cmake --build|path: engine/);
+  assert.match(workflow, /node scripts\/install-engine-bundle\.mjs engine-bundle/);
+  assert.doesNotMatch(workflow, /cmp -s/);
+  assert.doesNotMatch(workflow, /cmake --build|path: engine\s*$/m);
 });
 
 // A served Content-Type needs a live URL, so only the assets behind it can be
@@ -207,7 +173,7 @@ test('deploy checks the engine assets it stages before it publishes them', () =>
 });
 
 test('deploy stops waiting when the pinned engine run cannot publish', () => {
-  const workflow = text('.github/workflows/deploy.yml');
+  const workflow = text('.github/workflows/engine-bundle.yml');
   assert.match(workflow, /\) \|\| true/);
   assert.match(workflow, /if \[ "\$run_status" = completed \]/);
   assert.match(workflow, /POV CI for \$PIN concluded \$run_conclusion/);

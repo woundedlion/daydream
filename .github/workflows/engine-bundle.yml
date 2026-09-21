@@ -1,0 +1,82 @@
+name: Engine package
+
+on:
+  workflow_call:
+    secrets:
+      POV_TOKEN:
+        description: Read access to the engine package.
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Verified engine bundle
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22.23.2'
+      - name: Resolve engine pin
+        id: engine
+        run: |
+          pin="$(tr -d '[:space:]' < holosphere_wasm.sha)"
+          if ! printf '%s' "$pin" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::holosphere_wasm.sha must contain one full engine commit"
+            exit 1
+          fi
+          echo "pin=$pin" >> "$GITHUB_OUTPUT"
+      - name: Download the verified engine bundle
+        env:
+          # The engine repository is public, so the run token is sufficient.
+          # POV_TOKEN remains available for a future private-repo migration.
+          GH_TOKEN: ${{ secrets.POV_TOKEN || github.token }}
+          PIN: ${{ steps.engine.outputs.pin }}
+        run: |
+          deadline=$((SECONDS + 1800))
+          while :; do
+            read -r run_id run_status run_conclusion < <(
+              gh api "repos/woundedlion/pov/actions/workflows/ci.yml/runs?head_sha=$PIN&branch=master&per_page=10" \
+                --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")][0] // empty | [.id, .status, (.conclusion // "-")] | @tsv'
+            ) || true
+            if [ -n "$run_id" ]; then
+              if [ "$run_status" = completed ]; then
+                if [ "$run_conclusion" != success ]; then
+                  echo "::error::POV CI for $PIN concluded $run_conclusion"
+                  exit 1
+                fi
+                artifact_id="$(gh api "repos/woundedlion/pov/actions/runs/$run_id/artifacts" --jq ".artifacts[] | select(.name == \"holosphere-engine-$PIN\") | .id" | head -n1)"
+                if [ -z "$artifact_id" ]; then
+                  echo "::error::successful POV CI for $PIN published no verified engine bundle"
+                  exit 1
+                fi
+                mkdir engine-bundle
+                gh api "repos/woundedlion/pov/actions/artifacts/$artifact_id/zip" > /tmp/engine-bundle.zip
+                unzip -q /tmp/engine-bundle.zip -d engine-bundle
+                break
+              fi
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::no verified engine bundle became available for $PIN"
+              exit 1
+            fi
+            echo "Waiting for the engine bundle at $PIN."
+            sleep 15
+          done
+      - name: Verify the engine package
+        run: |
+          (cd engine-bundle && sha256sum -c holosphere_engine.sha256)
+          HOLOSPHERE_BUNDLE_PIN="$(cat holosphere_wasm.sha)" node scripts/install-engine-bundle.mjs engine-bundle
+      - name: Share the verified package with tests and deployment
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: verified-engine-bundle
+          path: engine-bundle/
+          retention-days: 1

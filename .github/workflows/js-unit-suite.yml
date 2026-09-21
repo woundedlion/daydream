@@ -2,6 +2,11 @@ name: JS unit suite
 
 on:
   workflow_call:
+    inputs:
+      engine-bundle:
+        description: Install this run's verified engine package before testing.
+        type: boolean
+        default: false
     secrets:
       POV_TOKEN:
         description: Read access to woundedlion/pov while it is private.
@@ -29,9 +34,6 @@ jobs:
             exit 1
           fi
           echo "pin=$pin" >> "$GITHUB_OUTPUT"
-      # The mirrored shader modules are compared byte for byte, so the engine
-      # checkout tracks the committed pin: engine tip moves independently and
-      # would make a re-run of an unchanged commit flip verdicts.
       - name: Checkout the pinned engine
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -45,6 +47,15 @@ jobs:
         with:
           node-version: '22.23.2'
           cache: npm
+      - name: Download the engine package for this deployment
+        if: inputs.engine-bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: verified-engine-bundle
+          path: engine-bundle
+      - name: Install the verified engine package
+        if: inputs.engine-bundle
+        run: HOLOSPHERE_BUNDLE_PIN="$(cat holosphere_wasm.sha)" node scripts/install-engine-bundle.mjs engine-bundle
       - run: npm ci
       - name: Lint JavaScript
         run: npm run lint
@@ -52,7 +63,7 @@ jobs:
       - name: Verify committed import map
         run: |
           npm run importmap
-          git diff --exit-code
+          git diff --exit-code -- vendor-importmap.js
       - name: Verify CDN integrity
         run: node scripts/check-cdn-integrity.mjs
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
