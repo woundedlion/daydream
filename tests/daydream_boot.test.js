@@ -164,10 +164,11 @@ function sliceTo(at, sentinel) {
  * does against embind. The counters are what a case reads the constructions,
  * handle releases, Pole LOD replays and parameter writes off.
  * @param {{resolutions?: Array<Array<number>>, definitions?: Array<Object>,
- *   refusedWidth?: ?number, failingFrames?: number}} [options] - The resolutions
- *   the engine reports it can build, the parameter definitions the effect panel
- *   is built from, a width setResolution rejects, and a count of leading
- *   drawFrame calls that throw.
+ *   refusedWidth?: ?number, failingFrames?: number, trappingSizeQuery?: boolean}}
+ *   [options] - The resolutions the engine reports it can build, the parameter
+ *   definitions the effect panel is built from, a width setResolution rejects, a
+ *   count of leading drawFrame calls that throw, and whether the sidebar size
+ *   query trips a trap.
  * @returns {Object} The module double.
  */
 function fakeWasmModule({
@@ -175,6 +176,7 @@ function fakeWasmModule({
   definitions = [],
   refusedWidth = null,
   failingFrames = 0,
+  trappingSizeQuery = false,
 } = {}) {
   let framesToFail = failingFrames;
   const pixels = new Uint16Array(288 * 144 * 3);
@@ -184,7 +186,7 @@ function fakeWasmModule({
   let deleted = 0;
   const poleLod = [];
   const params = [];
-  return {
+  const module = {
     HS_MODULE_DEAD: false,
     EffectSetResult,
     ParamSetResult,
@@ -216,7 +218,15 @@ function fakeWasmModule({
       getParameterDefinitions() { return definitions.map((d) => ({ ...d })); }
       getParamValues() { return new Float32Array(0); }
       getParamGeneration() { return 1; }
-      getEffectSizes() { return {}; }
+      getEffectSizes() {
+        // HS_CHECK raises the flag ahead of its trap, so it is already set when
+        // the RuntimeError reaches the caller.
+        if (trappingSizeQuery) {
+          module.HS_MODULE_DEAD = true;
+          throw new WebAssembly.RuntimeError('unreachable');
+        }
+        return {};
+      }
       getEffectPresetCounts() { return {}; }
       getArenaMetrics() { return {}; }
       strobeColumns() { return false; }
@@ -231,6 +241,7 @@ function fakeWasmModule({
       delete() { deleted++; }
     },
   };
+  return module;
 }
 
 // The double every case below boots on: a method the real engine never had
@@ -525,6 +536,24 @@ test('a refused initial apply disposes the app it already moved', async () => {
     + 'panels would otherwise stay live over a blanked canvas');
   assert.deepEqual(app.listeners, [],
     'a listener that outlives the refused apply reports into a dead app');
+});
+
+test('an initial apply that trapped the module is reported as the trap', async () => {
+  const module = fakeWasmModule({ trappingSizeQuery: true });
+  const capture = installConsoleCapture('error', 'warn', 'log');
+  let app;
+  try {
+    app = startApp({ loadModule: () => Promise.resolve(module) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  } finally {
+    capture.restore();
+  }
+
+  assert.match(capture.messages.join('\n'), /Startup stopped: the rendering engine trapped/,
+    'a trapped query reported as an unsupported resolution sends the user back '
+    + 'to a dropdown that will trap again');
+  assert.equal(app.teardown.disposed(), true,
+    'a dead module is terminal, so the panels must not stay live');
 });
 
 test('the page-failure surface is the shared one, and it is torn down', () => {
