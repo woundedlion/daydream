@@ -21,9 +21,9 @@ export const FAULT_POOL = -1;
 export const FAULT_RENDER = -2;
 
 /**
- * Write a cell's text only when it moved: an unchanged textContent write
+ * Write a node's text only when it moved: an unchanged textContent write
  * dirties layout anyway, and most of these figures hold still across frames.
- * @param {HTMLTableCellElement} cell - Cell to update.
+ * @param {HTMLElement} cell - Node to update.
  * @param {string} text - Text the cell should carry.
  * @returns {void}
  */
