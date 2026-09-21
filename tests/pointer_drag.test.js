@@ -3,21 +3,6 @@ import assert from 'node:assert/strict';
 import { createPointerDrag, innerRect } from '../tools/pointer_drag.js';
 import { fakeElement } from './fake_dom.js';
 
-/**
- * The shared fake plus the pointer-capture bookkeeping it does not model: the
- * ids the element holds, with no re-routing of events to the capturing node.
- * @returns {Object} A canvas element recording its captures in `captured`.
- */
-const dragElement = () => {
-  const captured = new Set();
-  return Object.assign(fakeElement('canvas'), {
-    captured,
-    setPointerCapture(id) { captured.add(id); },
-    releasePointerCapture(id) { captured.delete(id); },
-    hasPointerCapture(id) { return captured.has(id); },
-  });
-};
-
 /** A pointerdown that passes the helper's own guard unless overridden. */
 const down = (pointerId = 7, extra = {}) => ({
   pointerId, isPrimary: true, button: 0, ...extra,
@@ -25,7 +10,7 @@ const down = (pointerId = 7, extra = {}) => ({
 
 /** A drag wired onto a fake element, with each callback's calls recorded. */
 const harness = (options = {}) => {
-  const element = dragElement();
+  const element = fakeElement('canvas');
   const calls = { start: [], move: [], hover: [], end: [], cancel: [] };
   const drag = createPointerDrag({
     element,
@@ -54,7 +39,7 @@ test('a pointerdown that is not the primary button starts nothing', () => {
     const { element, calls } = harness();
     const event = element.dispatch('pointerdown', down(7, extra));
     assert.equal(calls.start.length, 0, `${JSON.stringify(extra)} must not start a drag`);
-    assert.equal(element.captured.size, 0);
+    assert.equal(element.capturedPointers.size, 0);
     assert.equal(event.defaultPrevented, false);
   }
 });
@@ -72,7 +57,7 @@ test('onStart returning false declines the drag, leaving the default intact', ()
   const { element, calls } = harness({ declineStart: true });
   const event = element.dispatch('pointerdown', down(7));
   assert.equal(calls.start.length, 1);
-  assert.equal(element.captured.size, 0);
+  assert.equal(element.capturedPointers.size, 0);
   assert.equal(event.defaultPrevented, false);
   // Declining leaves no drag behind, so the next press is free to start one.
   element.dispatch('pointermove', { pointerId: 7 });
@@ -96,7 +81,7 @@ test('a release drops the capture and ends the drag', () => {
   const up = element.dispatch('pointerup', { pointerId: 7 });
   assert.deepEqual(calls.end, [up]);
   assert.equal(calls.cancel.length, 0);
-  assert.equal(element.captured.size, 0);
+  assert.equal(element.capturedPointers.size, 0);
 });
 
 test('another pointer cannot end the drag', () => {
@@ -123,7 +108,7 @@ test('a cancelled gesture runs onCancel rather than onEnd', () => {
   const cancel = element.dispatch('pointercancel', { pointerId: 7 });
   assert.deepEqual(calls.cancel, [cancel]);
   assert.equal(calls.end.length, 0);
-  assert.equal(element.captured.size, 0);
+  assert.equal(element.capturedPointers.size, 0);
 });
 
 test('a page with no onCancel unwinds a cancelled gesture through onEnd', () => {
@@ -139,7 +124,7 @@ test('stop() ends a running drag as a cancel, with no event', () => {
   drag.stop();
   assert.deepEqual(calls.cancel, [null]);
   assert.equal(calls.end.length, 0);
-  assert.equal(element.captured.size, 0);
+  assert.equal(element.capturedPointers.size, 0);
 });
 
 test('stop() with no drag running is a no-op', () => {
@@ -157,7 +142,7 @@ test('stop() with no drag running is a no-op', () => {
 test('a capture the element no longer holds is not released again', () => {
   const { element, calls } = harness();
   element.dispatch('pointerdown', down(7));
-  element.captured.clear();
+  element.capturedPointers.clear();
   let released = 0;
   element.releasePointerCapture = () => { released += 1; };
   element.dispatch('pointerup', { pointerId: 7 });
@@ -168,7 +153,7 @@ test('a capture the element no longer holds is not released again', () => {
 test('a capture the element lost unwinds the drag as a cancel', () => {
   const { element, calls } = harness();
   element.dispatch('pointerdown', down(7));
-  element.captured.clear();
+  element.capturedPointers.clear();
   const lost = element.dispatch('lostpointercapture', { pointerId: 7 });
   assert.deepEqual(calls.cancel, [lost]);
   assert.equal(calls.end.length, 0);
@@ -188,7 +173,7 @@ test('another pointer losing its capture does not end the drag', () => {
 test('the lostpointercapture a release raises does not unwind the drag twice', () => {
   const { element, calls } = harness();
   element.releasePointerCapture = (id) => {
-    element.captured.delete(id);
+    element.capturedPointers.delete(id);
     element.dispatch('lostpointercapture', { pointerId: id });
   };
   element.dispatch('pointerdown', down(7));
@@ -204,7 +189,7 @@ test('a capture the element refuses unwinds instead of latching it', () => {
   assert.deepEqual(calls.start, [refused]);
   assert.deepEqual(calls.cancel, [refused]);
   assert.equal(refused.defaultPrevented, false);
-  element.setPointerCapture = (id) => { element.captured.add(id); };
+  element.setPointerCapture = (id) => { element.capturedPointers.add(id); };
   element.dispatch('pointerdown', down(9));
   assert.equal(calls.start.length, 2);
   assert.ok(element.hasPointerCapture(9));
@@ -241,16 +226,16 @@ test('remove() detaches once and does not stand in for an idempotent disposal', 
 });
 
 test('a page with no callbacks at all still captures and releases', () => {
-  const element = dragElement();
+  const element = fakeElement('canvas');
   const drag = createPointerDrag({ element });
   const event = element.dispatch('pointerdown', down(7));
   assert.ok(element.hasPointerCapture(7));
   assert.equal(event.defaultPrevented, true);
   element.dispatch('pointermove', { pointerId: 7 });
   element.dispatch('pointerup', { pointerId: 7 });
-  assert.equal(element.captured.size, 0);
+  assert.equal(element.capturedPointers.size, 0);
   drag.stop();
-  assert.equal(element.captured.size, 0);
+  assert.equal(element.capturedPointers.size, 0);
 });
 
 // Tailwind's preflight gives the tool canvases a 1px border, which the border

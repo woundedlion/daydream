@@ -4,7 +4,7 @@
 // surface the daydream modules actually touch — extend this instead of
 // hand-rolling another one-off fake.
 //
-// Not modelled: layout and the box model, CSS, hit-testing, pointer capture.
+// Not modelled: layout and the box model, CSS, hit-testing.
 // Numeric-input value sanitization is checked in solids-probe.mjs.
 // So these ship green here and only a real browser catches them: zero-width or
 // overflowing chips, off-screen flyouts, scroll arrows that never appear,
@@ -373,6 +373,9 @@ export function fakeElement(tag = 'div', options = {}) {
     focusCalls: 0,
     focusOptions: undefined,
     scrollIntoViewCalls: 0,
+    // The pointer ids the element holds. Events are not re-routed to the
+    // capturing node, so only the bookkeeping is modelled.
+    capturedPointers: new Set(),
     // The box metrics, as an element no layout has measured reports them.
     // Nothing here derives one from another: a test that asserts over geometry
     // writes the numbers it is about, and everything else reads zero.
@@ -584,6 +587,9 @@ export function fakeElement(tag = 'div', options = {}) {
     },
     select() {},
     scrollIntoView() { this.scrollIntoViewCalls++; },
+    setPointerCapture(pointerId) { this.capturedPointers.add(pointerId); },
+    releasePointerCapture(pointerId) { this.capturedPointers.delete(pointerId); },
+    hasPointerCapture(pointerId) { return this.capturedPointers.has(pointerId); },
   };
   Object.defineProperty(element, 'id', {
     enumerable: true,

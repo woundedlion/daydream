@@ -997,13 +997,7 @@ async function editorWorkbench({
   scratch.value = '';
   scratch.textContent = 'Scratch shader';
   elements.get('shader-document-select').appendChild(scratch);
-  for (const mount of ['chain-strip']) {
-    const element = fakeElement('section');
-    element.setPointerCapture = () => {};
-    element.hasPointerCapture = () => true;
-    element.releasePointerCapture = () => {};
-    elements.set(mount, element);
-  }
+  elements.set('chain-strip', fakeElement('section'));
   const doc = installDocument({
     body: fakeElement('body'),
     activeElement: null,
