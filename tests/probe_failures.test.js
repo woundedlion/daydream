@@ -2,6 +2,7 @@ import { probeParity } from '../scripts/workbench-probe.mjs';
 import { probeHueWheel } from '../scripts/palettes-probe.mjs';
 import { probeHistoryRestore } from '../scripts/lissajous-probe.mjs';
 import { probeSliderDrag, probePresetName, probeMobilePanel, probeSidebar, probeWarningNote } from '../scripts/panel-probe.mjs';
+import { probeStageNames } from '../scripts/panel-probe.mjs';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
@@ -27,6 +28,7 @@ const PROBES = [
   ['panel-probe.mjs', 'probeMobilePanel', probeMobilePanel],
   ['panel-probe.mjs', 'probeSidebar', probeSidebar],
   ['panel-probe.mjs', 'probeWarningNote', probeWarningNote],
+  ['panel-probe.mjs', 'probeStageNames', probeStageNames],
 
   ['workbench-probe.mjs', 'probeStrip', probeStrip],
   ['panel-probe.mjs', 'probePanel', probePanel],

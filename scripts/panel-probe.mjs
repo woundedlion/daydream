@@ -51,6 +51,10 @@ const ARROW_RIGHT = '.scroll-arrow-right';
 // a 2px ring at a 2px offset.
 const RING_CLEARANCE = 4;
 
+// The roster's stage-folder schema: its folders truncate control labels to the
+// role each one plays inside its stage.
+const STAGE_EFFECT = 'LatticeMelt';
+const STAGE_WIDGET = '.effect-gui .lil-gui .lil-controller :is(input, select)';
 const PRESET_SELECT = '.preset-nav-selector select';
 const PRESET_NAME = 'Preset';
 
@@ -246,6 +250,52 @@ export async function probePresetName(tab) {
     `the preset dropdown computes the accessible name ${PRESET_NAME} `
       + `(${name || 'none'})`);
   await cdp.detach();
+  return failures;
+}
+
+/*
+ * A stage folder truncates each control's visible label to its role inside the
+ * folder, so "Wander", "Speed" and "Mode" all repeat across folders. lil-gui
+ * points every widget at its own .lil-name element, so only the browser's
+ * computed name says whether the repeated labels reach the accessibility tree.
+ * @param {import('puppeteer-core').Page} tab
+ */
+export async function probeStageNames(tab) {
+  const { failures, check } = checks();
+
+  await (await tab.waitForSelector(`[data-effect="${STAGE_EFFECT}"]`)).click();
+  await tab.waitForFunction(
+    (selector) => document.querySelectorAll(selector).length > 1,
+    { timeout: TIMEOUT_MS }, STAGE_WIDGET);
+
+  const visible = await tab.$$eval(STAGE_WIDGET, (widgets) => widgets.map(
+    (widget) => widget.closest('.lil-controller')
+      ?.querySelector('.lil-name')?.textContent?.trim() ?? ''));
+  const repeated = visible.filter(
+    (label, index) => visible.indexOf(label) !== index);
+  check(repeated.length > 0,
+    `stage folders repeat ${repeated.length} visible label(s) (${
+      [...new Set(repeated)].join(', ')})`);
+
+  const cdp = await tab.createCDPSession();
+  await cdp.send('Accessibility.enable');
+  const doc = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
+  const { nodeIds } = await cdp.send('DOM.querySelectorAll',
+    { nodeId: doc.root.nodeId, selector: STAGE_WIDGET });
+  const names = [];
+  for (const nodeId of nodeIds) {
+    const tree = await cdp.send('Accessibility.getPartialAXTree',
+      { nodeId, fetchRelatives: false });
+    names.push(tree.nodes.find((node) => node.name)?.name?.value ?? '');
+  }
+  await cdp.detach();
+
+  check(names.length === visible.length && !names.includes(''),
+    `every one of the ${names.length} stage controls computes a name`);
+  const distinct = new Set(names).size;
+  check(distinct === names.length,
+    `the ${names.length} stage controls compute ${distinct} distinct names`);
+
   return failures;
 }
 
@@ -473,6 +523,7 @@ if (isMain(import.meta.url)) await runProbe({
     failures.push(...await probeSliderDrag(tab));
     failures.push(...await probePresetName(tab));
     failures.push(...await probeWarningNote(tab, 'desktop'));
+    failures.push(...await probeStageNames(tab));
 
     await tab.setViewport(MOBILE_VIEWPORT);
     await tab.reload({ timeout: TIMEOUT_MS });

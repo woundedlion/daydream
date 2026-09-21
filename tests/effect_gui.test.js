@@ -726,6 +726,32 @@ test('ShaderBall builds one URL-transparent bank for every pipeline stage', () =
   assert.equal(h.gui().ctrl('Hue Shift Mode').folder, 'Colorize');
 });
 
+test('stage controls sharing a visible label keep distinct accessible names', () => {
+  const params = shaderBallParams();
+  const h = makeHarness({
+    params,
+    engineValues: params.map((parameter) => parameter.value),
+  });
+
+  h.panel.build();
+
+  const labelled = params
+    .map((p) => h.gui().ctrl(p.name))
+    .filter((c) => c.folder !== undefined);
+  const shared = labelled.filter((c) => c.label === 'Mode');
+  assert.ok(shared.length > 1, 'more than one stage selector reads "Mode"');
+  const widget = (c) => c.$select ?? c.$input ?? c.$button;
+  for (const controller of shared) {
+    assert.equal(widget(controller).getAttribute('aria-labelledby'), null,
+      'the shared visible label is not the accessible name');
+  }
+  const names = labelled.map((c) => widget(c).getAttribute('aria-label'));
+  assert.equal(new Set(names).size, names.length,
+    'every stage control has its own accessible name');
+  assert.equal(widget(h.gui().ctrl('Camera Wander')).getAttribute('aria-label'),
+    'Camera Wander');
+});
+
 test('a schema rebuild keeps the stage folders the user collapsed', () => {
   const params = shaderBallParams();
   const h = makeHarness({

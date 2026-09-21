@@ -992,6 +992,26 @@ export function createEffectGui({ engine, segments, config, host }) {
   }
 
   /**
+   * Label one control inside its stage folder. The folder title already carries
+   * the stage, so the visible label drops it, and the truncated labels repeat
+   * across folders — "Mode" once per stage — so the widget takes the parameter's
+   * own name as its accessible name instead of the shared visible one.
+   * @param {Object} controller - The stage folder's controller.
+   * @param {string} stage - The pipeline stage it was grouped under.
+   * @param {string} name - Engine parameter name.
+   * @returns {void}
+   */
+  function nameStageControl(controller, stage, name) {
+    controller.name(stageControlLabel(stage, name));
+    const widget = focusWidget(controller);
+    if (!widget) return;
+    // lil-gui points the widget at the visible label; aria-labelledby wins over
+    // aria-label, so the shared label has to go.
+    widget.removeAttribute('aria-labelledby');
+    widget.setAttribute('aria-label', name);
+  }
+
+  /**
    * Build one controller per engine parameter, recording the value-stream order.
    * A ?param=value deep link reaches the engine through the GUI's load-time
    * onChange replay.
@@ -1056,7 +1076,7 @@ export function createEffectGui({ engine, segments, config, host }) {
       const controller = addParamControl(
         controlGui, state, p, !previousParamNames?.has(p.name),
         legacyShaderBallParamNames(p.name), persistParamKeys);
-      if (stage) controller.name(stageControlLabel(stage, p.name));
+      if (stage) nameStageControl(controller, stage, p.name);
       fx.paramNames.push(p.name);
       fx.controllerByName.set(p.name, controller);
       if (controller.isEnum) fx.hasEnumControls = true;
