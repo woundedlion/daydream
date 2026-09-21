@@ -199,7 +199,8 @@ function mountHueKeyHandles(group) {
     handle.setAttribute('aria-valuemin', '0');
     handle.setAttribute('aria-valuemax', '360');
     handle.setAttribute('aria-keyshortcuts',
-      'ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight');
+      'ArrowLeft ArrowRight ArrowUp ArrowDown '
+      + 'Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown');
     handle.addEventListener('focus', () => {
       selectedHueKey = index;
       scheduleUpdate();
