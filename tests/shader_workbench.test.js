@@ -1196,14 +1196,15 @@ test('a load whose preset the engine refuses puts the program back', async () =>
   harness.engine.setParameter = (/** @type {string} */ name, /** @type {number} */ value) => {
     if (!refuse) return write(name, value);
     refuse = false;
-    return ParamSetResult.OUT_OF_RANGE;
+    return ParamSetResult.READONLY;
   };
 
   assert.equal(await harness.controller.loadSource(
     KALEIDOSCOPE_STAINED_GLASS, 'other.shader.json'), false);
 
   assert.match(harness.elements.get('shader-document-status').textContent,
-    /could not be applied/);
+    /could not be applied: .*READONLY/,
+    'the status names the refusal the engine answered');
   assert.equal(harness.elements.get('shader-document-status').dataset.status, 'error');
   assert.deepEqual(stripChips(harness), chips);
   assert.deepEqual(harness.engine.chainCalls.at(-1), program,
