@@ -30,6 +30,19 @@ test('the reusable JavaScript suite runs all required checks', () => {
   assert.match(suite, /name: Verify committed import map\s+run: \|\s+npm run importmap\s+git diff --exit-code/);
 });
 
+// No workflow is a tracked *.sh file, so the shell gate above cannot see the
+// bash inside the `run:` blocks; actionlint is what pipes it through shellcheck.
+test('the reusable suite lints the workflow YAML and the bash inside it', () => {
+  const suite = readFileSync(`${WORKFLOW_DIR}/js-unit-suite.yml`, 'utf8');
+  assert.match(suite, /pip install --require-hashes -r requirements\/actionlint\.txt/);
+  assert.match(suite, /actionlint -verbose -oneline/);
+  assert.match(suite, /Rule "shellcheck" was disabled/,
+    'a silently dropped shellcheck would leave every run: body unchecked');
+  const pin = readFileSync('requirements/actionlint.txt', 'utf8');
+  assert.match(pin, /^actionlint-py==[\d.]+/m, 'the linter is version-pinned');
+  assert.match(pin, /--hash=sha256:[0-9a-f]{64}/, 'and hash-pinned');
+});
+
 // Every `node-version:` spelling under .github/workflows, tagged with its file.
 const nodePins = (dir) => readdirSync(dir)
   .filter((file) => /\.ya?ml$/.test(file))
