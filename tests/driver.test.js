@@ -192,14 +192,14 @@ test('setCanvasSize switches to the compact layout at the breakpoint', () => {
   assert.equal(narrow.isMobile, true);
 });
 
-test('setCanvasSize anchors a square PiP to the bottom-right corner', () => {
+test('setCanvasSize anchors a square PiP to the bottom-left corner', () => {
   const ctx = sizeCtx(1200, 800);
   resize(ctx, 1200, 800);
 
   const { x, y, width, height } = ctx.pipViewport;
   assert.equal(width, height, 'the PiP viewport is not square');
   assert.equal(height, Math.floor(800 * 0.3), 'the PiP is not 30% of the smaller dimension');
-  assert.equal(x + width, 1200, 'the PiP is not flush with the right edge');
+  assert.equal(x, 0, 'the PiP is not flush with the left edge');
   assert.equal(y, 0, 'setViewport measures from the lower left, so y 0 is the bottom edge');
   assert.equal(ctx.pipCamera.aspect, 1, 'a non-square PiP camera distorts the corner view');
 });
@@ -852,7 +852,7 @@ function mainCtx(log) {
     camera: { tag: 'camera' },
     pipCamera: { tag: 'pipCamera' },
     mainViewport: { x: 0, y: 0, width: 1200, height: 800 },
-    pipViewport: { x: 960, y: 0, width: 240, height: 240 },
+    pipViewport: { x: 0, y: 0, width: 240, height: 240 },
     renderer: {
       setViewport: (...a) => log.push(`viewport:${a.join(',')}`),
       setScissor: (...a) => log.push(`scissor:${a.join(',')}`),

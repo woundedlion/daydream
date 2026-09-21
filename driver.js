@@ -483,7 +483,7 @@ export class Daydream {
     this.mainViewport.height = height;
 
     const pipSize = Math.floor(Math.min(width, height) * 0.3);
-    this.pipViewport.x = width - pipSize;
+    this.pipViewport.x = 0;
     this.pipViewport.y = 0;
     this.pipViewport.width = pipSize;
     this.pipViewport.height = pipSize;
