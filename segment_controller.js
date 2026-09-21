@@ -225,7 +225,7 @@ export class SegmentController {
    * @param {Object} deps - Host-injected dependencies.
    * @param {Object<string, {w:number, h:number}>} deps.resolutionPresets - Resolution table mapping a preset name to its pixel dimensions.
    * @param {{get: (key: string) => any}} deps.appState - Read-only view of the host's pub/sub state; reads the 'resolution' and 'effect' keys.
-   * @param {{W: number, H: number, pixels: Uint16Array|null, dotMesh: {instanceColor: {array: Uint16Array|null, needsUpdate: boolean}}, invalidate: () => void}} deps.driver - Renderer instance owning the live pixel grid (W/H), the display buffer the compositor blits into, and the dot mesh carrying the second display alias: composite() asks the injected detector about both aliases, and the heal re-points them.
+   * @param {{W: number, H: number, pixels: Uint16Array|null, dotMesh: {instanceColor: {array: Uint16Array|null, needsUpdate: boolean}}|null, invalidate: () => void}} deps.driver - Renderer instance owning the live pixel grid (W/H), the display buffer the compositor blits into, and the dot mesh carrying the second display alias: composite() asks the injected detector about both aliases, and the heal re-points them.
    * @param {() => (import('./holosphere_wasm.js').HolosphereEngine|null)} deps.getWasmEngine - Returns the current main-thread HolosphereEngine, or null when none is bound.
    * @param {() => unknown} deps.refreshPixelView - Re-fetches the (possibly detached) WASM pixel view, reporting `true` when it fetched a fresh one. A refresh re-points the display aliases itself, so without that report composite() cannot tell that the buffer it is about to blit into is one the driver never cleared.
    * @param {() => (Uint16Array|null)} deps.getMemoryView - Returns the current Uint16Array view of the display buffer.
@@ -372,8 +372,9 @@ export class SegmentController {
       this.composite(this.#results);
       // No simulation tick stands behind this composite, and Three re-uploads
       // the instance colours only on a version bump.
-      const instanceColor = this.driver.dotMesh.instanceColor;
-      if (isViewLive(instanceColor.array)) instanceColor.needsUpdate = true;
+      const instanceColor = this.driver.dotMesh?.instanceColor;
+      if (instanceColor && isViewLive(instanceColor.array))
+        instanceColor.needsUpdate = true;
     }
     this.driver.invalidate();
   }
