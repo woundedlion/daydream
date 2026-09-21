@@ -578,10 +578,13 @@ export function createEffectGui({ engine, segments, config, host }) {
     if (!activeEffect.hasParams) return;
     // One focus read for the whole pass: at most one element has focus.
     const focused = focusedElement() ?? null;
-    // getParameterDefinitions() marshals the whole definition array; requested
-    // values move only on a simulation step, so a frame that did not step reads
-    // back what the last pass already adopted.
-    if (advanced) adoptRequestedEnums(activeEffect, focused);
+    // getParameterDefinitions() marshals the whole definition array, which is
+    // the panel's one per-frame allocation. Only an engine-driven selector moves
+    // its requested value on its own; every other source of one — a control, a
+    // preset, a rebuild — re-seats the selectors itself.
+    if (advanced && activeEffect.hasAnimatedEnums) {
+      adoptRequestedEnums(activeEffect, focused);
+    }
 
     const values = liveParamValues();
     if (!values || values.length === 0) return;
@@ -1034,6 +1037,7 @@ export function createEffectGui({ engine, segments, config, host }) {
     fx.controllerByName = new Map();
     fx.hasParams = !external && params.length > 0;
     fx.hasEnumControls = false;
+    fx.hasAnimatedEnums = false;
     fx.paramWarnings = paramWarningTexts(params);
     fx.paramsExternal = external;
     const grouping = stageGrouping(params);
@@ -1079,7 +1083,10 @@ export function createEffectGui({ engine, segments, config, host }) {
       if (stage) nameStageControl(controller, stage, p.name);
       fx.paramNames.push(p.name);
       fx.controllerByName.set(p.name, controller);
-      if (controller.isEnum) fx.hasEnumControls = true;
+      if (controller.isEnum) {
+        fx.hasEnumControls = true;
+        if (p.animated) fx.hasAnimatedEnums = true;
+      }
 
       if (p.readonly) {
         if (typeof controller.disable === 'function') controller.disable();
