@@ -394,11 +394,21 @@ test('an invalid document compiles to a diagnostic rather than a digest', () => 
   assert.equal(compiled.diagnostics[0].phase, 'semantic');
 });
 
-/** Verifies compiling without the catalog is refused, not silently weakened. */
+/**
+ * Verifies compiling without the catalog is refused, not silently weakened,
+ * and that a catalog defect is pathed to the catalog rather than to the
+ * document root the editor underlines.
+ */
 test('compiling without the operator catalog is refused', () => {
   const compiled = compileShaderDocument(EXAMPLE);
   assert.equal(compiled.status, 'INVALID');
   assert.equal(compiled.diagnostics[0].code, 'CATALOG_REQUIRED');
+  assert.equal(compiled.diagnostics[0].path, 'catalog');
+
+  const stale = compileShaderDocument(EXAMPLE, { catalog: { ...CATALOG, catalog_version: 3 } });
+  assert.equal(stale.status, 'INVALID');
+  assert.equal(stale.diagnostics[0].code, 'UNSUPPORTED_CATALOG_SCHEMA');
+  assert.equal(stale.diagnostics[0].path, 'catalog.catalog_version');
 });
 
 /**
