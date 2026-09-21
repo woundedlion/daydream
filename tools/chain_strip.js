@@ -134,14 +134,18 @@ export const PARAMETER_GATES = Object.freeze({
   'hue-noise-speed': [['hue-shift-mode', (value) => value === 'noise']],
   'brightness-bottom': [['brightness-envelope', (value) => value !== 'none']],
   'brightness-top': [['brightness-envelope', (value) => value !== 'none']],
+  'brightness-depth': [['brightness-envelope', (value) => value !== 'none']],
+  'projection-spin-speed': [['frame', (value) => value === 'spin-wander']],
+  'projection-wander': [['frame', (value) => value === 'spin-wander']],
 });
 
 /**
  * The parameter ids the current topology selections deactivate. Edge widths
  * require an edge-fade mode, hue controls require their corresponding hue mode,
- * and brightness endpoints require a brightness envelope. Deactivation changes
- * what the engine reads, never what the document carries, so these controls
- * render dimmed rather than dropping out of the union schema.
+ * brightness endpoints and depth require a brightness envelope, and the
+ * projection spin and wander rates require the spin-wander frame. Deactivation
+ * changes what the engine reads, never what the document carries, so these
+ * controls render dimmed rather than dropping out of the union schema.
  * @param {ParameterDeclaration[]} parameters - The document's declarations.
  * @param {Object<string, *>} values - The active preset's values.
  * @param {ChainEntry[]} chain - The document's operator instances.
