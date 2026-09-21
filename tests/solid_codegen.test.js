@@ -10,6 +10,7 @@ const {
   PARAMETERIZED_OPS,
   applyOp,
   savedChainShapeError,
+  MAX_RECIPE_STEPS,
   SAVED_SOLIDS_MAX,
   captureSavedSolidThumbnail,
   queueSavedSolidRestore,
@@ -1329,6 +1330,20 @@ test('savedChainShapeError rejects every unrestorable stored shape', () => {
     assert.ok(typeof message === 'string' && expected.test(message),
       `expected ${expected} for ${JSON.stringify(ops)}, got ${message}`);
   }
+});
+
+/**
+ * Verifies a stored chain longer than the tool's add-op path can build is
+ * refused before it is replayed, on both the restore and the import path.
+ */
+test('savedChainShapeError refuses a chain past the op cap', () => {
+  const kis = () => ({ op: 'kis', params: {} });
+  const atCap = Array.from({ length: MAX_RECIPE_STEPS }, kis);
+  assert.equal(savedChainShapeError('cube', atCap), null, 'the cap is inclusive');
+  assert.match(savedChainShapeError('cube', [...atCap, kis()]) ?? '',
+    /at most 255/, 'one op past the cap is refused');
+  assert.match(queueSavedSolidRestore({ base: 'cube', ops: [...atCap, kis()] },
+    () => assert.fail('a refused chain must not be queued')) ?? '', /at most 255/);
 });
 
 test('a malformed saved solid is rejected before its restore is queued', () => {

@@ -169,6 +169,13 @@ export function unsweepableReason(o) {
 export const KNOWN_OPS = new Set(Object.keys(OP_DEFS));
 
 /**
+ * Longest step table a Recipe can describe: its count field is a uint8_t, so a
+ * 256-step table would emit a count of 0. The tool's add-op path stops a chain
+ * here and savedChainShapeError refuses one past it.
+ */
+export const MAX_RECIPE_STEPS = 255;
+
+/**
  * Ops that read a params object, derived from the shared op table. The
  * string|object op contract permits a bare string, but for these that leaves
  * o.params undefined, so both applyOp and generateFuncAndRecipe reject it.
@@ -229,8 +236,10 @@ function outOfRangeParam(opName, params) {
  * that is missing, non-numeric, or outside its current range reaches the WASM
  * bridge as invalid state; and a value off the param's step grid — which no
  * control can produce — splits the generated funcName from the recipe it names,
- * since the name suffix rounds where the emitted call does not. All are caught
- * here, before any state is mutated.
+ * since the name suffix rounds where the emitted call does not. A chain past
+ * MAX_RECIPE_STEPS, which no control can build, would replay every op on the
+ * main thread before the export refused it. All are caught here, before any
+ * state is mutated.
  * The tool's live chain holds {op,
  * params} objects, so a bare-string op — which applyOp accepts — is not a
  * restorable entry.
@@ -238,6 +247,9 @@ function outOfRangeParam(opName, params) {
 export function savedChainShapeError(base, ops) {
   if (typeof base !== 'string' || !base) return 'it names no base solid';
   if (!Array.isArray(ops)) return 'its op chain is not a list';
+  if (ops.length > MAX_RECIPE_STEPS) {
+    return `its op chain holds ${ops.length} ops; a chain carries at most ${MAX_RECIPE_STEPS}`;
+  }
   for (let i = 0; i < ops.length; i++) {
     const o = ops[i];
     const at = `op ${i + 1}`;

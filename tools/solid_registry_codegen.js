@@ -19,6 +19,7 @@ import {
   DEFINED_SEED_CONSTANTS,
   OP_DEFS,
   KNOWN_OPS,
+  MAX_RECIPE_STEPS,
   PARAMETERIZED_OPS,
   SIMPLE_SEEDS,
   formatFloat,
@@ -26,11 +27,7 @@ import {
 } from './solid_codegen.js';
 import { COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns } from './cpp_format.js';
 
-/**
- * Longest step table a Recipe can describe: its count field is a uint8_t, so a
- * 256-step table would emit a count of 0.
- */
-export const MAX_RECIPE_STEPS = 255;
+export { MAX_RECIPE_STEPS };
 export const MAX_BUILD_STEPS = 8;
 const DOUBLE_STEP_OPS = new Set(['gyro', 'needle', 'zip', 'bevel']);
 
