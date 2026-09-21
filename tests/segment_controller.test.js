@@ -10,6 +10,7 @@ import { unpinnedEngineMethods } from './fake_engine.js';
 import { fakeElement } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
 import { FakeWorker } from './fake_worker.js';
+import { staticModuleGraph } from './module_graph.js';
 import { displayAliasesDiverged, repointDisplayAliases } from '../display_aliases.js';
 
 // Stand-in for the injected Daydream renderer: the grid and display buffer the
@@ -82,13 +83,12 @@ test('warmModules revalidates the whole worker module graph', async () => {
     },
   });
 
-  assert.deepEqual(calls.map(([url]) => url), [
-    'http://localhost:8000/segment_worker.js',
-    'http://localhost:8000/holosphere_wasm.js',
-    'http://localhost:8000/segment_layout.js',
-    'http://localhost:8000/worker_protocol.js',
-    'http://localhost:8000/holosphere_wasm.wasm',
-  ], 'every static import of the worker, or a stale one survives the warm');
+  // Derived from the worker's own import graph plus the binary its glue
+  // streams, so a module joining the graph is one the warm must drain too.
+  const graph = [...staticModuleGraph('segment_worker.js').modules, 'holosphere_wasm.wasm'];
+  assert.deepEqual(calls.map(([url]) => url).sort(),
+    graph.map((file) => `http://localhost:8000/${file}`).sort(),
+    'every static import of the worker, or a stale one survives the warm');
   // 'reload' would re-download all 1.8 MB per call; 'no-cache' still refetches a
   // rebuilt binary because the artifacts are served unversioned.
   for (const [, options] of calls) {
