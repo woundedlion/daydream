@@ -407,6 +407,16 @@ test('setupDots sizes the rebuilt mesh from the instance grid', () => {
   assert.equal(ctx.dotGeometry.parameters.widthSegments, dotDetailFor(8 * 4));
 });
 
+test('setupDots builds outward-facing hemispheres shaded on the front side only', () => {
+  const log = [];
+  const ctx = setupCtx(fakeMesh(log), log);
+  Daydream.prototype.setupDots.call(ctx);
+
+  assert.equal(ctx.dotGeometry.parameters.phiStart, 0);
+  assert.equal(ctx.dotGeometry.parameters.phiLength, Math.PI);
+  assert.equal(ctx.dotMaterial.side, THREE.FrontSide);
+});
+
 test('setupDots builds the cull uniforms once and reuses the material', () => {
   const log = [];
   const ctx = setupCtx(fakeMesh(log), log);
