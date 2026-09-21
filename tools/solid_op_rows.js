@@ -122,7 +122,7 @@ function buildParamRow(doc, key, def, value, controlId, opName) {
   number.setAttribute('aria-label', `${opName} ${key} value`);
   // At 0.6rem on the row's --slate-800, slate-300/400 are the lightest pair that
   // keeps the value ahead of its unit and both over the 4.5:1 WCAG AA floor.
-  number.className = 'w-12 bg-transparent text-right font-mono text-slate-300 focus:outline-none focus:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
+  number.className = 'w-12 bg-transparent text-right font-mono text-slate-300 focus:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
   number.min = String(def.min);
   number.max = String(def.max);
   number.step = String(def.step);
