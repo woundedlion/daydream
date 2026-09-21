@@ -2577,6 +2577,10 @@ test('turning segmented mode off hands the global stat bars back', () => {
   };
 
   c.active = true;
+  // A ready pool: the overlay leaves the bars up until it owns the display.
+  c.create(2);
+  deliverReady(c, 0);
+  deliverReady(c, 1);
   c.updateStats();
   assert.equal(byId['global-stats-desktop'].style.display, 'none');
   assert.equal(byId['stats-bar'].style.display, 'none');

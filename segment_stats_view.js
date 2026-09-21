@@ -161,7 +161,10 @@ export class SegmentStatsView {
     }
     if (!el) return;
 
-    this.hideStatBars();
+    // Only a pool that owns the display stands in for the global bars; while one
+    // spawns the main engine is still painting and their figures are live.
+    if (state.ready || state.faulted) this.hideStatBars();
+    else this.showStatBars();
     el.classList.add('visible');
 
     if (state.faulted) {
