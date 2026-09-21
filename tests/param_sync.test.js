@@ -153,6 +153,8 @@ test('numeric enum labels retain engine order', () => {
   const choices = enumChoices(['10', '2', '1']);
   assert.deepEqual(Object.keys(choices), ['10', '2', '1']);
   assert.deepEqual(Object.values(choices), [0, 1, 2]);
+  assert.deepEqual(Object.keys(enumChoices(['Auto', '2', '10'])), ['Auto', '2', '10'],
+    'integer-like labels are not hoisted ahead of the rest');
 });
 
 test('a number passes through unchanged', () => {
