@@ -184,6 +184,22 @@ test('the reader enforces the document limits', () => {
   assert.ok(DEFAULT_LIMITS.bytes > 0 && Object.isFrozen(DEFAULT_LIMITS));
 });
 
+/**
+ * Verifies a decoded document is held to the byte limit its own text is
+ * rejected for, so a document the editor accepts is one Save can write back.
+ */
+test('a decoded document is held to the byte limit', () => {
+  const oversized = { document_id: 'study', note: 'x'.repeat(DEFAULT_LIMITS.bytes) };
+  const source = JSON.stringify(oversized);
+  assert.ok(source.length > DEFAULT_LIMITS.bytes);
+
+  const codes = (/** @type {*} */ input) =>
+    compile(input, { limits: { stringLength: source.length } })
+      .diagnostics.map((/** @type {*} */ diagnostic) => diagnostic.code);
+  assert.deepEqual(codes(source), ['BYTE_LIMIT']);
+  assert.deepEqual(codes(oversized), ['BYTE_LIMIT']);
+});
+
 /** Verifies a limits override leaves the unnamed limits at their defaults. */
 test('a limits override keeps the defaults it does not name', () => {
   assert.deepEqual(structuredClone(parseShaderDocument('{"a":{"b":1}}', { bytes: 32 })),
