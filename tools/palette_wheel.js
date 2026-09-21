@@ -220,23 +220,51 @@ export function hueKeyNudgeTurns(key, shiftKey) {
   return direction * (shiftKey ? 10 : 1) / 360;
 }
 
+/** Widest a key may miss a hue and still be read as holding it, in turns. */
+const HANDOFF_TURN_EPSILON = 1e-9;
+
 /**
- * Carries the selected and grabbed key through a resample onto a shorter key
- * set — a four-key harmony hands off to three.
- * @param {number} keyCount - How many keys the new set has.
+ * Which key of `next` holds the hue key `index` of `previous` holds.
+ * @param {HueKeyState} previous - The keys the wheel drew.
+ * @param {HueKeyState} next - The keys replacing them.
+ * @param {number} index - Index into the drawn keys.
+ * @returns {?number} The index into `next`, or null when no key kept that hue.
+ */
+function resampledHueKey(previous, next, index) {
+  if (index < 0 || index >= previous.offsets.length) return null;
+  const turn = previous.baseTurns + previous.offsets[index];
+  for (let i = 0; i < next.offsets.length; i++) {
+    if (Math.abs(next.baseTurns + next.offsets[i] - turn) <= HANDOFF_TURN_EPSILON)
+      return i;
+  }
+  return null;
+}
+
+/**
+ * Carries the selected and grabbed key through a resample onto another key set
+ * — a four-key harmony hands off to three.
+ *
+ * A key survives only where the new set still holds its hue, and it survives at
+ * that key's index rather than its own: a two-key wheel's second key becomes
+ * the third of three, and the midpoint the resample invents belongs to neither.
+ * @param {HueKeyState} previous - The keys the wheel drew.
+ * @param {HueKeyState} next - The keys replacing them.
  * @param {number} selectedKey - Index the wheel had selected.
  * @param {?number} activeKey - Index the pointer had grabbed, or null.
  * @returns {{selectedKey: number, activeKey: ?number, kept: boolean}} The
- *   surviving indices, and whether both survived. Clamping a dropped index onto
- *   its neighbour would silently act on a different key, so `kept` is false and
- *   the caller abandons the gesture rather than applying it.
+ *   surviving indices, and whether both survived. Acting on a key the resample
+ *   dropped would silently move a different one, so `kept` is false and the
+ *   caller abandons the gesture rather than applying it.
  */
-export function hueKeyHandoff(keyCount, selectedKey, activeKey) {
-  const grabKept = activeKey === null || activeKey < keyCount;
+export function hueKeyHandoff(previous, next, selectedKey, activeKey) {
+  const selected = resampledHueKey(previous, next, selectedKey);
+  const grabbed = activeKey === null
+    ? null : resampledHueKey(previous, next, activeKey);
   return {
-    selectedKey: Math.min(selectedKey, keyCount - 1),
-    activeKey: grabKept ? activeKey : null,
-    kept: grabKept && selectedKey < keyCount,
+    selectedKey: selected === null
+      ? Math.min(selectedKey, next.offsets.length - 1) : selected,
+    activeKey: grabbed,
+    kept: selected !== null && (activeKey === null || grabbed !== null),
   };
 }
 
