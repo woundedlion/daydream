@@ -1124,8 +1124,6 @@ export function createChainStrip({
         if (store.selectedLabel() === entry.label) return;
         chip.classList.toggle('chain-chip--expanded', open);
         chip.setAttribute('aria-expanded', String(open));
-        container.dataset.expanded = String(
-          container.querySelector('.chain-chip--expanded') !== null);
         if (open) markDeactivated();
       };
       chip.addEventListener('mouseenter', () => setTransientOpen(true));
@@ -1287,8 +1285,6 @@ export function createChainStrip({
     // The strip is rebuilt whole after every committed edit; the horizontal
     // offset is view state, not document state, so it outlives the rebuild.
     if (scrolled > 0) viewport.scrollLeft = scrolled;
-    container.dataset.expanded = String(
-      container.querySelector('.chain-chip--expanded') !== null);
     markDeactivated();
 
     const target = focusLabel !== null ? chipByLabel(focusLabel) : null;

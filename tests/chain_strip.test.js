@@ -826,7 +826,6 @@ const declarationsFor = (h, label) => h.store.document().descriptor.parameters
 test('stage controls open transiently on hover and pin open on click', async () => {
   const h = await makeStrip();
   assert.ok(paramsOf(h, 'sample'), 'an unselected chip carries its controls');
-  assert.equal(h.container.dataset.expanded, 'false');
 
   const chip = chipByLabel(h, 'sample');
   assert.equal(chip.getAttribute('aria-expanded'), 'false');
@@ -835,7 +834,6 @@ test('stage controls open transiently on hover and pin open on click', async () 
   chip.dispatch('mouseenter');
   assert.equal(chip.getAttribute('aria-expanded'), 'true');
   assert.equal(chip.classList.contains('chain-chip--expanded'), true);
-  assert.equal(h.container.dataset.expanded, 'true');
   chip.dispatch('mouseleave');
   assert.equal(chip.getAttribute('aria-expanded'), 'false');
   assert.equal(chip.classList.contains('chain-chip--expanded'), false);
@@ -848,7 +846,6 @@ test('stage controls open transiently on hover and pin open on click', async () 
     'mouse leave preserves a pinned card');
   pinned.dispatch('click');
   assert.equal(chipByLabel(h, 'sample').getAttribute('aria-expanded'), 'false');
-  assert.equal(h.container.dataset.expanded, 'false');
 
   const region = paramsOf(h, 'sample');
   assert.equal(region.getAttribute('role'), 'group');
@@ -892,7 +889,6 @@ test('a stage with no parameters grows no disclosure', async () => {
   assert.equal(chip.getAttribute('aria-expanded'), null,
     'a card that opens nothing offers no disclosure');
   assert.equal(paramsOf(h, label), null);
-  assert.equal(h.container.dataset.expanded, 'false');
 });
 
 test('pinning a stage closes the previously pinned stage', async () => {
