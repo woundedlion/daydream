@@ -202,7 +202,6 @@ The same step runs with `just docs-check` and before `just docs` publishes the A
 │   │   └── triangular_bitset.h     Upper-triangular unordered-pair bitset
 │   ├── engine/                 Machinery: memory, callables, rosters, effect support
 │   │   ├── engine.h                Engine API umbrella — included by every effect
-│   │   ├── effects.h               Effect roster (includes each effect + HS_EFFECT_LIST)
 │   │   ├── effects_legacy.h        Pre-engine effects (TheMatrix, Spiral, etc.)
 │   │   ├── concepts.h              FunctionRef/Fn callable wrappers, PipelineRef type erasure, Tweenable concept
 │   │   ├── memory.h / memory.cpp   Arena allocator, ScratchScope, Persist<T>, generate()
@@ -355,6 +354,7 @@ The same step runs with `just docs-check` and before `just docs` publishes the A
 │       └── gen/                    Python design/fabrication tools (`just pcb` runs `fab.py` only)
 │
 ├── targets/                    Per-target entry points
+│   ├── effects.h               Effect roster — includes every effect header + HS_EFFECT_LIST
 │   ├── Holosphere/
 │   │   └── Holosphere.ino      Holosphere entry — NUM_PIXELS=40, RPM=480
 │   ├── Phantasm/
