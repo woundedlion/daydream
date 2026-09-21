@@ -1188,6 +1188,37 @@ test('a link whose bypass the store refuses leaves the toolbar on the loaded doc
     'Save must still write the document the engine is rendering');
 });
 
+// applyPreset is itself the program write: a refusal from inside it has already
+// put the engine on the abandoned chain, so the previous program is written back.
+test('a load whose preset the engine refuses puts the program back', async () => {
+  const harness = await editorWorkbench();
+  const chips = stripChips(harness);
+  const digest = harness.elements.get('shader-document-digest').dataset.digest;
+  const presets = harness.elements.get('shader-preset-select').options.map((o) => o.value);
+  const program = harness.engine.chainCalls.at(-1);
+
+  const write = harness.engine.setParameter.bind(harness.engine);
+  let refuse = true;
+  harness.engine.setParameter = (/** @type {string} */ name, /** @type {number} */ value) => {
+    if (!refuse) return write(name, value);
+    refuse = false;
+    return ParamSetResult.OUT_OF_RANGE;
+  };
+
+  assert.equal(await harness.controller.loadSource(
+    KALEIDOSCOPE_STAINED_GLASS, 'other.shader.json'), false);
+
+  assert.match(harness.elements.get('shader-document-status').textContent,
+    /could not be applied/);
+  assert.equal(harness.elements.get('shader-document-status').dataset.status, 'error');
+  assert.deepEqual(stripChips(harness), chips);
+  assert.deepEqual(harness.engine.chainCalls.at(-1), program,
+    'the canvas must be back on the chain the toolbar names');
+  assert.equal(harness.elements.get('shader-document-digest').dataset.digest, digest);
+  assert.deepEqual(
+    harness.elements.get('shader-preset-select').options.map((o) => o.value), presets);
+});
+
 test('a shader state link restores its document, preset, bypasses, and pause', async () => {
   const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
   const preset = document.preset_bank.presets[1];

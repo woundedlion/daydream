@@ -610,12 +610,14 @@ export function createShaderDocumentController({
       referencePresetIds: official?.presetIds ?? [],
     };
     /**
-     * Puts the toolbar back on the document the engine is still rendering: the
-     * program is only written once every step below has succeeded, so a refusal
-     * before that must not leave the two describing different documents.
+     * Puts the toolbar back on the document the engine is rendering. A refusal
+     * before the program write leaves the engine untouched; applyPreset is
+     * itself the write, so a refusal from there has already moved the canvas
+     * onto the abandoned chain and the previous program is written back.
+     * @param {boolean} [written] - Whether the program write has run.
      * @returns {boolean} The load's refusal.
      */
-    const abandon = () => {
+    const abandon = (written = false) => {
       teardownChainUi();
       active = previous;
       chainUi = previousUi;
@@ -628,6 +630,11 @@ export function createShaderDocumentController({
       }
       if (previous?.compiledSide && previous.official)
         selectEffect(previous.official.effectId);
+      if (written && previous) {
+        const refusal = status.textContent;
+        applyPreset(previous.presetId ?? presetSelect.value);
+        show(refusal ?? '', true);
+      }
       return false;
     };
     if (candidateMount && typeof compiler.validateShaderDocument === 'function') {
@@ -657,7 +664,7 @@ export function createShaderDocumentController({
     showDigest();
     syncParity();
     if (session) setAnimationsPaused(session.paused);
-    if (!applyPreset(presetId)) return abandon();
+    if (!applyPreset(presetId)) return abandon(true);
     previousUi?.strip.destroy();
     if (stripMount && candidateMount) stripMount.replaceChildren(candidateMount);
     return true;
