@@ -110,6 +110,9 @@ export function enumChoices(options) {
     choices[key] = i;
     labels.push(key);
   });
+  // Object.keys hoists integer-like labels ("2", "10") ahead of the rest in
+  // numeric order, and lil-gui lists the keys it enumerates; the trap keeps
+  // engine order.
   return new Proxy(choices, { ownKeys: () => labels });
 }
 
