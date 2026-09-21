@@ -421,6 +421,9 @@ export const PALETTE_AXIS_CONTROLS = Object.freeze({
   }),
 });
 
+/** Decimals an axis endpoint's readout shows; its slider takes step="any". */
+const AXIS_READOUT_DIGITS = 3;
+
 /**
  * How an axis' endpoint sliders present themselves under the curve selected for
  * it. A CONSTANT curve has one value rather than two ends, so its minimum reads
@@ -447,8 +450,8 @@ export function axisControlState({ curve, minimum, maximum, label, shortLabel })
     minimumMax: constant ? '1' : String(maximum),
     maximumMin: constant ? '0' : String(minimum),
     maximumMax: '1',
-    minimumText: String(Number(minimum)),
-    maximumText: String(Number(maximum)),
+    minimumText: Number(minimum).toFixed(AXIS_READOUT_DIGITS),
+    maximumText: Number(maximum).toFixed(AXIS_READOUT_DIGITS),
   };
 }
 
