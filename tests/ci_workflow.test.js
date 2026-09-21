@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import {
   missingTerminalDependencies,
@@ -18,6 +19,20 @@ test('npm test retains discovery and coverage guards', () => {
   assert.equal(scripts.pretest, 'node scripts/require-tests.mjs');
   assert.equal(scripts.test, 'node scripts/run-tests.mjs --experimental-test-module-mocks ' +
     '"tests/**/*.test.js" "tests/**/*.test.mjs" "tests/**/*.spec.js" "tests/**/*.spec.mjs"');
+});
+
+// The prepare script is the only thing that points git at .githooks, and a
+// hook the index holds without its executable bit is never run.
+test('npm install points git at the tracked hooks, every one executable', () => {
+  const scripts = JSON.parse(readFileSync('package.json', 'utf8')).scripts;
+  assert.equal(scripts.prepare, 'git config core.hooksPath .githooks');
+  const hooks = execFileSync('git', ['ls-files', '-s', '--', '.githooks'], { encoding: 'utf8' })
+    .trim().split(/\r?\n/).map((line) => line.split(/\s+/));
+  const paths = hooks.map(([, , , path]) => path);
+  for (const hook of ['pre-commit', 'pre-push', 'reference-transaction']) {
+    assert.ok(paths.includes(`.githooks/${hook}`), `${hook} is tracked`);
+  }
+  for (const [mode, , , path] of hooks) assert.equal(mode, '100755', path);
 });
 
 test('the reusable JavaScript suite runs all required checks', () => {
