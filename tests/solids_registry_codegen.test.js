@@ -168,9 +168,9 @@ test('generateRegistryCpp refuses a Catalan seed, which no Recipe can index', ()
 });
 
 /**
- * Seeds the tool treats as lacking a reusable SEED_* constant, so its paste
- * defines one. This is a daydream-side format roster; the engine registry is
- * not inspected by this suite.
+ * The SIMPLE_SEEDS entries outside DEFINED_SEED_CONSTANTS: the seeds whose
+ * paste defines its own SEED_* constant. Both rosters are the tool's own;
+ * engine_source_parity.test.js pins them to solids.h.
  */
 const SEEDS_WITHOUT_CONSTANTS = [
   'tetrahedron', 'cube', 'truncatedTetrahedron', 'cuboctahedron',
@@ -178,13 +178,13 @@ const SEEDS_WITHOUT_CONSTANTS = [
   'truncatedDodecahedron', 'rhombicosidodecahedron',
 ];
 
-test('the encoded seed roster splits simple_registry into the two cases', () => {
+test('DEFINED_SEED_CONSTANTS splits SIMPLE_SEEDS into the two paste cases', () => {
   assert.equal(SIMPLE_SEEDS.length, 18);
   assert.deepEqual(SIMPLE_SEEDS.filter(s => !DEFINED_SEED_CONSTANTS.has(s)),
     SEEDS_WITHOUT_CONSTANTS);
   for (const seed of DEFINED_SEED_CONSTANTS) {
     assert.ok(SIMPLE_SEEDS.includes(seed),
-      `"${seed}" carries a SEED_* constant but is no simple_registry entry`);
+      `"${seed}" is on DEFINED_SEED_CONSTANTS but not on SIMPLE_SEEDS`);
   }
 });
 
