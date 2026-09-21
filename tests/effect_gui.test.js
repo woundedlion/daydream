@@ -2535,13 +2535,13 @@ test('effects without presets do not show preset navigation', () => {
 
 test('Export copies the live values as a C++ brace-init list', async () => {
   mock.timers.enable({ apis: ['setTimeout'] });
-  const h = makeHarness({ params: [SPEED, GLOW], engineValues: [0.25, 0.5] });
+  const h = makeHarness({ params: [SPEED, GLOW], engineValues: [0.25, 1] });
   h.panel.build();
 
   h.gui().ctrl('export').object.export();
   await Promise.resolve();
 
-  assert.deepEqual(h.state.copyText.copied, ['{ 0.25f, 0.5f }']);
+  assert.deepEqual(h.state.copyText.copied, ['{ 0.25f, true }']);
   assert.equal(h.gui().ctrl('export').label, '\u2713');
   assert.equal(h.gui().ctrl('export').$button.getAttribute('title'), EXPORT_COPIED);
   assert.equal(exportStatus(h).textContent, EXPORT_COPIED);
@@ -2602,7 +2602,7 @@ test('Export copies displayed values while a segmented snapshot is pending', asy
   h.gui().ctrl('export').object.export();
   await Promise.resolve();
 
-  assert.deepEqual(h.state.copyText.copied, ['{ 0.75f, 1.0f }']);
+  assert.deepEqual(h.state.copyText.copied, ['{ 0.75f, true }']);
   assert.equal(h.gui().ctrl('export').label, '\u2713');
 });
 
