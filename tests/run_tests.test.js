@@ -101,3 +101,26 @@ test('a redundant exemption fails', () => {
 test('no test pattern fails', () => {
   assert.match(fail('--experimental-test-module-mocks'), /pass the test file patterns/);
 });
+
+// The runner reports the floor on the spec stream rather than on stderr.
+const failOutput = (...args) => {
+  trackFixture();
+  try {
+    execFileSync(process.execPath, [SCRIPT, ...args], {
+      cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (error) {
+    return `${error.stdout}${error.stderr}`;
+  }
+  return assert.fail('the command was expected to exit non-zero');
+};
+
+// Loading a module is not executing it: the roster gate passes on a module one
+// import touches, and only the floor answers for the body that never ran.
+test('a loaded module the suite never executes fails the line floor', () => {
+  const branches = Array.from({ length: 40 },
+    (_, index) => `  if (n === ${index}) return ${index};`).join('\n');
+  writeFileSync(join(root, 'lib.mjs'),
+    `export const value = 4;\nexport function unreached(n) {\n${branches}\n  return -1;\n}\n`);
+  assert.match(failOutput(PATTERN), /line coverage does not meet threshold of 95%/);
+});

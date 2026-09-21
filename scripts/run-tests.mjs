@@ -12,6 +12,22 @@ const SKIP_DIRS = new Set([
   'node_modules', '.git', '.worktrees', 'vendor', 'three.js', 'engine',
 ]);
 
+// Execution floors over the modules the roster gate proves were loaded, set
+// under a measurement of this suite. The exclusions are the code no unit test
+// executes: the suites themselves, the engine's installed shader mirror, the
+// generated Emscripten glue, and the scripts a browser runs.
+const COVERAGE = [
+  '--experimental-test-coverage',
+  '--test-coverage-lines=95',
+  '--test-coverage-branches=90',
+  '--test-coverage-exclude=tests/**',
+  '--test-coverage-exclude=shader/**',
+  '--test-coverage-exclude=holosphere_wasm.js',
+  '--test-coverage-exclude=scripts/browser-smoke.mjs',
+  '--test-coverage-exclude=scripts/probe_harness.mjs',
+  '--test-coverage-exclude=scripts/*-probe.mjs',
+];
+
 const args = process.argv.slice(2);
 const patterns = args.filter((arg) => !arg.startsWith('-'));
 if (patterns.length === 0) {
@@ -40,7 +56,8 @@ try {
   mkdirSync(loadsDir);
   const run = spawnSync(process.execPath, ['--test',
     '--test-reporter=spec', '--test-reporter-destination=stdout',
-    '--test-reporter=tap', `--test-reporter-destination=${reportPath}`, ...args], {
+    '--test-reporter=tap', `--test-reporter-destination=${reportPath}`,
+    ...COVERAGE, ...args], {
     stdio: 'inherit',
     env: {
       ...process.env,
