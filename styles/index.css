@@ -426,21 +426,25 @@
   user-select: none;
 }
 
-/* Scrollbar styling for sidebar */
+/* Scrollbar styling for the sidebar and the mobile effect strip. Only the bar
+   itself differs — a width against a height — so each sizes its own below. */
 .effect-sidebar::-webkit-scrollbar {
   width: 8px;
 }
 
-.effect-sidebar::-webkit-scrollbar-track {
+.effect-sidebar::-webkit-scrollbar-track,
+.effect-list::-webkit-scrollbar-track {
   background: var(--scrollbar-track);
 }
 
-.effect-sidebar::-webkit-scrollbar-thumb {
+.effect-sidebar::-webkit-scrollbar-thumb,
+.effect-list::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 
-.effect-sidebar::-webkit-scrollbar-thumb:hover {
+.effect-sidebar::-webkit-scrollbar-thumb:hover,
+.effect-list::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-thumb-hover);
 }
 
@@ -678,19 +682,6 @@
     .effect-list::-webkit-scrollbar {
       display: block;
       height: 8px;
-    }
-
-    .effect-list::-webkit-scrollbar-track {
-      background: var(--scrollbar-track);
-    }
-
-    .effect-list::-webkit-scrollbar-thumb {
-      background: var(--scrollbar-thumb);
-      border-radius: 4px;
-    }
-
-    .effect-list::-webkit-scrollbar-thumb:hover {
-      background: var(--scrollbar-thumb-hover);
     }
   }
 
