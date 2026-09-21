@@ -87,3 +87,44 @@ test('font fallback failures are expected but other request failures are not', (
     'request failed: https://example.test/app.js (net::ERR_NAME_NOT_RESOLVED)',
   ]);
 });
+
+// The console predicate is what turns a swallowed page exception into a probe
+// failure, so it is driven alongside the other three listeners.
+test('console errors, uncaught exceptions and error responses are problems', () => {
+  const listeners = new Map();
+  const tab = { on: (name, handler) => listeners.set(name, handler) };
+  const problems = [];
+  const origin = 'http://127.0.0.1:8000';
+  collectProblems(tab, origin, problems);
+  assert.deepEqual([...listeners.keys()].sort(),
+    ['console', 'pageerror', 'requestfailed', 'response']);
+
+  const message = (type, text, url) =>
+    ({ type: () => type, text: () => text, location: () => url && { url } });
+  const logged = listeners.get('console');
+  logged(message('warning', 'slow frame', `${origin}/daydream.js`));
+  logged(message('error', 'Failed to load resource', `${origin}/favicon.ico`));
+  logged(message('error', 'Failed to load resource', `${origin}/vendor/fonts/fonts.css`));
+  logged(message('error', 'Failed to load resource', 'https://fonts.gstatic.com/inter.woff2'));
+  logged(message('error', 'chip render threw', `${origin}/tools/chain_strip.js`));
+  logged(message('error', 'TypeError: x is undefined', undefined));
+
+  listeners.get('pageerror')(new Error('boom'));
+
+  const response = (status, url) => ({ status: () => status, url: () => url });
+  const responded = listeners.get('response');
+  responded(response(200, `${origin}/daydream.js`));
+  responded(response(404, `${origin}/favicon.ico`));
+  responded(response(404, `${origin}/vendor/fonts/fonts.css`));
+  responded(response(404, 'https://fonts.googleapis.com/css2?family=Inter'));
+  responded(response(404, 'https://example.test/favicon.ico'));
+  responded(response(500, `${origin}/tools/shader.html`));
+
+  assert.deepEqual(problems, [
+    'console error: chip render threw',
+    'console error: TypeError: x is undefined',
+    'uncaught: boom',
+    'HTTP 404: https://example.test/favicon.ico',
+    `HTTP 500: ${origin}/tools/shader.html`,
+  ]);
+});
