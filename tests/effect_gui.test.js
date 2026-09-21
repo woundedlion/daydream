@@ -2668,6 +2668,23 @@ test('ShaderBall Export names a missing clipboard operation', () => {
   assert.deepEqual(h.warnings, ['Export: clipboard copy unavailable']);
 });
 
+test('ShaderBall Export fails visibly when the full-config snapshot is unavailable', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  const h = makeHarness({
+    params: shaderBallParams(),
+    fullConfig: true,
+    fullConfigSnapshot: null,
+  });
+  h.panel.build();
+
+  h.gui().ctrl('export').object.export();
+
+  assert.deepEqual(h.state.copyText.copied, []);
+  assert.equal(h.gui().ctrl('export').label, '\u2717');
+  assert.deepEqual(h.warnings,
+    ['Export: Shader Workbench full-config snapshot is unavailable']);
+});
+
 test('Export refuses a value stream that has skewed from the panel', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   const h = makeHarness({ params: [SPEED, GLOW], engineValues: [0.25] });
