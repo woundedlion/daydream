@@ -1339,7 +1339,7 @@ Each hardware target has its own `.ino` entry point in `targets/`:
 6. Upload.
 
 > **Headless size/layout gate — an active CI job, optional locally.** A
-> PlatformIO build (`just teensy-size`, needs `pip install platformio`) builds
+> PlatformIO build (`just teensy-size`) builds
 > the two budgeted shipping images plus the `holosphere_dma`, `phantasm8`,
 > `profile`, and `profile_o3` compile/link profiles
 > on a stock machine. It checks shipping-image size and memory-region layout
@@ -1352,7 +1352,9 @@ Each hardware target has its own `.ino` entry point in `targets/`:
 > compiled and gated in CI, and only running it on real hardware is manual.
 > Locally it coexists with VMicro (it owns `.pio/`, never `__vm/`) and asserts
 > the images *fit*, not byte-identity
-> with the bench build.
+> with the bench build. Install PlatformIO from `requirements/platformio.txt`:
+> the recipe opens with `build_pins.py --check-tool platformio` and refuses any
+> version but the pinned one.
 
 Target-specific constants live with their target rather than in a global `constants.h` — the Holosphere entry defines its own, while the Phantasm-class targets share `targets/Phantasm/phantasm_target.h` (`TOTAL_PIXELS = 288`, `RPM = 480`):
 ```cpp
@@ -1434,7 +1436,7 @@ The design specs are outside the Doxygen reference and carry their own index:
 lists each one with its status and says which spec owns which half where two
 overlap.
 
-`just docs-check` runs [`tools/docs_check.py`](https://github.com/woundedlion/pov/blob/master/tools/docs_check.py) and its own unit tests: it checks fence balance, link and anchor targets, and backticked repo paths across every tracked Markdown file. The `effects/` row of the file map above draws no subtree, so the exhaustive-tree gate cannot reach its counts; they get their own assertion instead — the header count against the tracked tree, the effect count against `HS_EFFECT_LIST`'s cardinality. The gate is **structural, not semantic**: it reads fences, targets and backticked repo paths, so a green run means the documentation's structure is intact, not that its prose is true. A wrong number in a sentence, a renamed symbol in a table, and any path written without backticks or a link are all outside what it can see; those are on the reader. `just docs` needs `doxygen` on `PATH`; it clones the pinned doxygen-awesome theme into `.doxygen-awesome/` on first run and synthesizes `Doxyfile.local` from `Doxyfile` plus [`docs/doxygen-theme.cfg`](https://github.com/woundedlion/pov/blob/master/docs/doxygen-theme.cfg) — the same combination `.github/workflows/docs.yml` publishes to <https://woundedlion.github.io/pov/>.
+`just docs-check` runs [`tools/docs_check.py`](https://github.com/woundedlion/pov/blob/master/tools/docs_check.py) and its own unit tests: it checks fence balance, link and anchor targets, and backticked repo paths across every tracked Markdown file. The `effects/` row of the file map above draws no subtree, so the exhaustive-tree gate cannot reach its counts; they get their own assertion instead — the header count against the tracked tree, the effect count against `HS_EFFECT_LIST`'s cardinality. The gate is **structural, not semantic**: it reads fences, targets and backticked repo paths, so a green run means the documentation's structure is intact, not that its prose is true. A wrong number in a sentence, a renamed symbol in a table, and any path written without backticks or a link are all outside what it can see; those are on the reader. `just docs` needs `doxygen` on `PATH` at the version `tools/build_pins.py` pins — it runs `build_pins.py --check-tool doxygen` first and refuses any other, because warning text and generated markup move between releases; it clones the pinned doxygen-awesome theme into `.doxygen-awesome/` on first run and synthesizes `Doxyfile.local` from `Doxyfile` plus [`docs/doxygen-theme.cfg`](https://github.com/woundedlion/pov/blob/master/docs/doxygen-theme.cfg) — the same combination `.github/workflows/docs.yml` publishes to <https://woundedlion.github.io/pov/>.
 
 ### Running the Simulator — daydream repo
 
