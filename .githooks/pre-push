@@ -24,7 +24,9 @@ tmp=$(mktemp ./vendor-importmap.XXXXXX) || exit 1
 trap 'rm -f "$tmp"' EXIT
 trap 'exit 130' INT TERM
 npm run importmap -- --out "$tmp" || exit 1
-if ! git show :vendor-importmap.js | git -c core.autocrlf=false diff --no-index --ignore-cr-at-eol --exit-code -- - "$tmp"; then
+# The suites above all run over the working tree, so the freshness check
+# compares the file they loaded rather than the staged copy.
+if ! git -c core.autocrlf=false diff --no-index --ignore-cr-at-eol --exit-code -- vendor-importmap.js "$tmp"; then
 	echo "pre-push: vendor-importmap.js is stale; regenerate and commit it." >&2
 	exit 1
 fi

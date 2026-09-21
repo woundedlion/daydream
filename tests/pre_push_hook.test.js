@@ -113,6 +113,15 @@ test('pre-push never reports success over a missing tool', () => {
     'a hook that can exit 0 early reports success over a suite it never ran');
 });
 
+// Every other gate in the hook loads the working tree, and the commit the push
+// sends is a third thing again: a staged copy answers for neither.
+test('pre-push measures the import map the rest of the hook runs', () => {
+  const hook = readFileSync(HOOK, 'utf8');
+  assert.doesNotMatch(hook, /git show :vendor-importmap\.js/);
+  assert.match(hook,
+    /diff --no-index .*-- vendor-importmap\.js "\$tmp"/);
+});
+
 test('pre-push refuses a failing unit suite even when later gates pass',
   { skip: SKIP }, (t) => {
     const root = fixtureRoot(t);
