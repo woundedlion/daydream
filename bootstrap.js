@@ -107,13 +107,18 @@ export async function refreshModuleCache({
 } = {}) {
   if (!origin || typeof fetchResource !== 'function') return;
   const modules = new Set();
+  const binaries = new Set();
   for (const { name } of timeline?.getEntriesByType?.('resource') ?? []) {
     if (typeof name !== 'string' || !name.startsWith(`${origin}/`)) continue;
     const path = name.split(/[?#]/)[0];
-    if (REFRESHED_EXTENSIONS.some((ext) => path.endsWith(ext))) modules.add(name);
+    if (!REFRESHED_EXTENSIONS.some((ext) => path.endsWith(ext))) continue;
+    modules.add(name);
+    if (path.endsWith('.wasm')) binaries.add(name);
   }
-  // Load order, so the queue drains the way the page pulled the graph in.
-  const queue = Array.from(modules);
+  // The binary is the slowest re-fetch and the skew the sweep exists to clear,
+  // yet the page pulls it in last, so load order alone would leave it the
+  // likeliest casualty of the deadline. It leads; the rest keep load order.
+  const queue = [...binaries, ...[...modules].filter((url) => !binaries.has(url))];
   const init = signal ? { cache: 'reload', signal } : { cache: 'reload' };
   const lanes = Array.from(
     { length: Math.min(REFRESH_CONCURRENCY, queue.length) },
