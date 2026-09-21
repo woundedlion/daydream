@@ -77,13 +77,14 @@ const DTS = readFileSync(new URL('../holosphere_wasm.d.ts', import.meta.url), 'u
 const readPinned = (url) => readFileSync(url, 'utf8').replaceAll('\r\n', '\n');
 
 /**
- * Body of a named `export interface` declaration, comments stripped.
- * @param {string} name - Interface name.
+ * Body of a named `export interface` or object-literal `export type`
+ * declaration, comments stripped.
+ * @param {string} name - Declaration name.
  * @returns {string} The declaration body.
  */
 function interfaceBody(name) {
-  const at = DTS.search(
-    new RegExp(`export interface ${name}(?: extends [A-Za-z_]\\w*)? \\{`));
+  const at = DTS.search(new RegExp(
+    `export (?:interface ${name}(?: extends [A-Za-z_]\\w*)?|type ${name} =) \\{`));
   assert.ok(at >= 0, `holosphere_wasm.d.ts must declare interface ${name}`);
   const end = DTS.indexOf('\n}', at);
   assert.ok(end > at, `interface ${name} must be closed at column 0`);
@@ -184,6 +185,21 @@ test('holosphere_wasm.d.ts declares every module function', () => {
     if (typeof M[name] !== 'function' || name === 'print' || name === 'printErr') continue;
     assert.ok(declared.has(name) || members.has(name),
       `module function ${name} is missing from holosphere_wasm.d.ts`);
+  }
+});
+
+const RESULT_ENUMS = ['ParamSetResult', 'ClipSetResult', 'ResolutionSetResult',
+  'EffectSetResult', 'FullConfigRestoreResult'];
+
+test('holosphere_wasm.d.ts declares every result enum roster the module exports', () => {
+  const moduleBody = interfaceBody('HolosphereModule');
+  for (const name of RESULT_ENUMS) {
+    const values = Object.keys(M[name]).filter((key) => M[name][key] instanceof M[name]);
+    assert.ok(values.length > 0, `the module must export enum ${name}`);
+    assert.match(moduleBody, new RegExp(`^ {2}${name}: ${name}Enum;$`, 'm'),
+      `HolosphereModule.${name} must be declared as ${name}Enum`);
+    assert.deepEqual([...interfaceMembers(`${name}Enum`).keys()].sort(), values.sort(),
+      `the declared ${name} roster must be the module enum roster`);
   }
 });
 
