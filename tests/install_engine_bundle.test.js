@@ -24,8 +24,8 @@ function fixture(t) {
   write(destination, 'docs/screenshots/notes.txt', 'notes');
   const files = Object.fromEntries([
     'README.md', 'holosphere_wasm.js', 'holosphere_wasm.wasm', 'holosphere_wasm.wasm.sha256',
-    'holosphere_wasm.toolchain', 'shader/shader_workbench.mjs', 'shader/sha256.mjs',
-    'shader/engine_catalog.json', 'shader/patterns/new.shader.json',
+    'holosphere_wasm.toolchain', 'pov_segment_map.json', 'shader/shader_workbench.mjs',
+    'shader/sha256.mjs', 'shader/engine_catalog.json', 'shader/patterns/new.shader.json',
   ].map((path) => [path, `fresh ${path}`]));
   files['holosphere_wasm.sha'] = 'b'.repeat(40);
   const manifest = Object.entries(files).map(([path, text]) => {

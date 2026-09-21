@@ -24,7 +24,8 @@ export function installEngineBundle(bundle, destination) {
   const paths = new Set(entries);
   for (const required of ['README.md', 'holosphere_wasm.js', 'holosphere_wasm.wasm',
     'holosphere_wasm.sha', 'holosphere_wasm.wasm.sha256', 'holosphere_wasm.toolchain',
-    'shader/shader_workbench.mjs', 'shader/sha256.mjs', 'shader/engine_catalog.json']) {
+    'pov_segment_map.json', 'shader/shader_workbench.mjs', 'shader/sha256.mjs',
+    'shader/engine_catalog.json']) {
     if (!paths.has(required)) throw new Error(`Engine bundle is missing ${required}`);
   }
   const installedPin = readFileSync(resolve(destination, 'holosphere_wasm.sha'), 'utf8').trim();
