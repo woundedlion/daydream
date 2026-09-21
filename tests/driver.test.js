@@ -930,14 +930,10 @@ function pipCtx(log) {
     recorder: null,
     nav: { webdriver: false },
     pipViewport: { x: 70, y: 0, width: 30, height: 30 },
-    camera: {
-      position: new THREE.Vector3(0, 40, 90),
-      quaternion: new THREE.Quaternion(0, 1, 0, 0),
-    },
-    pipCamera: {
-      position: new THREE.Vector3(),
-      quaternion: new THREE.Quaternion(),
-    },
+    camera: { position: new THREE.Vector3(0, 40, 90) },
+    pipCamera: new THREE.PerspectiveCamera(),
+    controls: { target: new THREE.Vector3() },
+    cullUniforms: { uCameraPos: { value: new THREE.Vector3() } },
     renderer: {
       setViewport: (...a) => log.push(`viewport:${a.join(',')}`),
       setScissor: (...a) => log.push(`scissor:${a.join(',')}`),
@@ -954,13 +950,25 @@ test('renderPip draws the corner view into its own scissored viewport', () => {
   assert.deepEqual(log, ['viewport:70,0,30,30', 'scissor:70,0,30,30', 'render']);
 });
 
-test('renderPip points the PiP camera at the main camera pose', () => {
+test('renderPip views the sphere from the antipode of the main camera', () => {
   const log = [];
   const ctx = pipCtx(log);
   Daydream.prototype.renderPip.call(ctx);
 
-  assert.deepEqual(ctx.pipCamera.position.toArray(), ctx.camera.position.toArray());
-  assert.deepEqual(ctx.pipCamera.quaternion.toArray(), ctx.camera.quaternion.toArray());
+  assert.deepEqual(ctx.pipCamera.position.toArray(), [0, -40, -90]);
+  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(ctx.pipCamera.quaternion);
+  const toTarget = ctx.pipCamera.position.clone().negate().normalize();
+  assert.ok(forward.distanceTo(toTarget) < 1e-6,
+    'the PiP camera does not look back at the orbit target');
+});
+
+test('renderPip re-aims the hemisphere cull at the PiP camera', () => {
+  const log = [];
+  const ctx = pipCtx(log);
+  Daydream.prototype.renderPip.call(ctx);
+
+  assert.deepEqual(ctx.cullUniforms.uCameraPos.value.toArray(),
+    ctx.pipCamera.position.toArray());
 });
 
 test('renderPip skips the second mesh pass while the toggle is off', () => {

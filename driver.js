@@ -741,7 +741,9 @@ export class Daydream {
   }
 
   /**
-   * Render the picture-in-picture corner view. Skipped while the showPip toggle
+   * Render the picture-in-picture corner view: the sphere seen from the antipode
+   * of the main camera, so the corner shows the hemisphere the main view hides.
+   * Skipped while the showPip toggle
    * is off, on mobile, under headless automation (Playwright/Puppeteer/Selenium
    * set navigator.webdriver), and while recording, so clean screenshots/videos
    * aren't obscured by the PiP corner.
@@ -764,8 +766,12 @@ export class Daydream {
       this.pipViewport.width,
       this.pipViewport.height
     );
-    this.pipCamera.position.copy(this.camera.position);
-    this.pipCamera.quaternion.copy(this.camera.quaternion);
+    const target = this.controls.target;
+    this.pipCamera.position.copy(target).sub(this.camera.position).add(target);
+    this.pipCamera.lookAt(target);
+    if (this.cullUniforms) {
+      this.cullUniforms.uCameraPos.value.copy(this.pipCamera.position);
+    }
     this.renderer.render(this.scene, this.pipCamera);
   }
 
