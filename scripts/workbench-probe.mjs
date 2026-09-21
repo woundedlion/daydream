@@ -319,6 +319,35 @@ export async function probeStrip(tab) {
   check(await tab.$eval('.chain-palette .chain-palette-entry',
     (node) => node.getAttribute('aria-selected')) === 'true',
   'the opened palette marks its focused option selected');
+
+  // A computed backgroundColor spells its alpha only when that alpha is below
+  // one, so an rgb() is exactly a surface nothing reads through.
+  const entryBox = await boxOf(tab, '.chain-palette .chain-palette-entry');
+  const painted = async () => tab.evaluate(() => {
+    const paint = (selector) => {
+      const node = document.querySelector(selector);
+      return node === null ? 'absent' : getComputedStyle(node).backgroundColor;
+    };
+    return {
+      card: paint('.chain-chip--socket'),
+      palette: paint('.chain-palette'),
+      entry: paint('.chain-palette .chain-palette-entry'),
+    };
+  });
+  const resting = await painted();
+  await tab.mouse.move(centre(entryBox).x, centre(entryBox).y);
+  const hovered = await painted();
+  const surfaces = Object.entries({
+    'transition card': resting.card,
+    palette: resting.palette,
+    'palette row': resting.entry,
+    'hovered palette row': hovered.entry,
+  });
+  check(surfaces.every(([, color]) => color.startsWith('rgb(')),
+    `the transition card and its palette paint opaque (${
+      surfaces.map(([what, color]) => `${what} ${color}`).join(', ')})`);
+  check(hovered.entry !== resting.entry,
+    `hover raises the palette row from ${resting.entry} to ${hovered.entry}`);
   const anchorBox = await boxOf(tab, add);
   const paletteBox = await boxOf(tab, '.chain-palette');
   const palettePosition = await tab.$eval('.chain-palette',
