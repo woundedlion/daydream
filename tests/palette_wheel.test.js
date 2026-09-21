@@ -184,19 +184,36 @@ test('keys the wheel does not own are left to the page', () => {
   assert.equal(hueKeyNudgeTurns('a', false), null);
 });
 
-test('a handoff onto fewer keys keeps a selection and a grab that both survive', () => {
-  assert.deepEqual(hueKeyHandoff(3, 1, null),
+const THREE_KEYS = { baseTurns: 0.1, offsets: [0, 0.2, 0.4] };
+const FOUR_KEYS = { baseTurns: 0.1, offsets: [0, 0.2, 0.3, 0.4] };
+// The three keys FOUR_KEYS resamples to: its ends, and a midpoint no key held.
+const FOUR_RESAMPLED = { baseTurns: 0.1, offsets: [0, 0.25, 0.4] };
+const TWO_KEYS = { baseTurns: 0.1, offsets: [0, 0.4] };
+
+test('a handoff onto another key set keeps a selection and a grab that both survive', () => {
+  assert.deepEqual(hueKeyHandoff(THREE_KEYS, THREE_KEYS, 1, null),
     { selectedKey: 1, activeKey: null, kept: true });
-  assert.deepEqual(hueKeyHandoff(3, 2, 2),
+  assert.deepEqual(hueKeyHandoff(THREE_KEYS, THREE_KEYS, 2, 2),
+    { selectedKey: 2, activeKey: 2, kept: true });
+});
+
+test('a handoff carries a key onto the index its own hue landed on', () => {
+  assert.deepEqual(hueKeyHandoff(TWO_KEYS, THREE_KEYS, 1, 1),
+    { selectedKey: 2, activeKey: 2, kept: true },
+    'a two-key wheel hands its end key to the last of three, not the midpoint');
+  assert.deepEqual(hueKeyHandoff(FOUR_KEYS, FOUR_RESAMPLED, 3, 3),
     { selectedKey: 2, activeKey: 2, kept: true });
 });
 
 test('a handoff that drops the key being acted on abandons the gesture', () => {
-  assert.deepEqual(hueKeyHandoff(3, 3, null),
+  assert.deepEqual(hueKeyHandoff(THREE_KEYS, THREE_KEYS, 3, null),
     { selectedKey: 2, activeKey: null, kept: false });
-  assert.deepEqual(hueKeyHandoff(3, 0, 3),
+  assert.deepEqual(hueKeyHandoff(THREE_KEYS, THREE_KEYS, 0, 3),
     { selectedKey: 0, activeKey: null, kept: false },
     'a grab on a dropped key is released rather than moved to its neighbour');
+  assert.deepEqual(hueKeyHandoff(FOUR_KEYS, FOUR_RESAMPLED, 1, 1),
+    { selectedKey: 1, activeKey: null, kept: false },
+    'an interior key the resample invents a midpoint for is not carried over');
 });
 
 /**

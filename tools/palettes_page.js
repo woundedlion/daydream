@@ -142,16 +142,15 @@ function setCustomBaseTurns(turns) {
  * Switch the controls into CUSTOM hue mode, authoring the three keys the
  * handoff starts from.
  * @param {Object} sourceRecipe - The recipe the keys are resampled from.
- * @returns {boolean} False when the resample dropped the key the user was
- *   acting on — a four-key harmony resamples to three, and clamping the
- *   grab or the selection onto a neighbour would silently move a different
- *   key.
+ * @returns {boolean} False when the resample dropped the hue the user was
+ *   acting on — a four-key harmony resamples to three — since acting on
+ *   whatever key took that index would silently move a different key.
  */
 function activateCustomHue(sourceRecipe) {
   const state = customHueKeyState(sourceRecipe);
-  customHueOffsets = state.offsets;
   const handoff = hueKeyHandoff(
-    customHueOffsets.length, selectedHueKey, activeHueKey);
+    hueKeyState(sourceRecipe), state, selectedHueKey, activeHueKey);
+  customHueOffsets = state.offsets;
   selectedHueKey = handoff.selectedKey;
   activeHueKey = handoff.activeKey;
   setCustomBaseTurns(state.baseTurns);
