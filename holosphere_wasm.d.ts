@@ -148,10 +148,25 @@ export interface HolosphereEngine {
   setPoleLod(value: number): void;
   /** Clamped value of the last setPoleLod() on this engine, else the build default. */
   getPoleLod(): number;
-  /** Restrict rendering to [x0,x1) x [y0,y1); reset by a setEffect rebuild. */
+  /**
+   * Restrict rendering to [x0,x1) x [y0,y1); reset by a setEffect rebuild.
+   * Bounds must be integral and in range, or the answer is INVALID_BOUNDS.
+   *
+   * APPLIED and FULL_FRAME_KEPT are both successes, but only APPLIED means the
+   * band is in force: an effect reporting needs_full_frame() keeps the full
+   * canvas, so a segment pool has to tell the two apart to know whether a
+   * worker rendered its band or recomputed the whole frame. NO_EFFECT is the
+   * ordinary answer between a resolution change and the setEffect that follows
+   * it, so a caller that faults on a rejection faults on INVALID_BOUNDS alone.
+   */
   setClip(x0: number, x1: number, y0: number, y1: number): EnumValue;
   drawFrame(): void;
-  /** RGB16 canvas buffer, W*H*3, as a view over the module's memory. */
+  /**
+   * RGB16 canvas buffer, W*H*3, as a view over the module's memory. A render
+   * narrowed by setClip writes the band only: every pixel outside it holds
+   * whatever the buffer last did, at whatever age, so a reader under a
+   * narrowed clip must take the band alone.
+   */
   getPixels(): Uint16Array;
   /**
    * Element count of the active getPixels() view (w*h*3). A resolution change
