@@ -31,16 +31,17 @@ import {
 import { createApplyNotice } from "./apply_notice.js";
 import { displayAliasesDiverged, repointDisplayAliases } from "./display_aliases.js";
 import { createPoleLodBinding } from "./pole_lod.js";
-import { createRecordingSettings } from "./recording_settings.js";
-import { createSegmentSpawnGuard, createSegmentedFallback } from "./segment_policy.js";
+import { createRecordingControls } from "./recording_controls.js";
+import {
+  createSegmentPoolSpawner,
+  createSegmentedPovControls,
+} from "./segmented_pov_controls.js";
 import { AppState, URLSync, replaceUrl } from "./state.js";
-import { VideoRecorder, MEMORY_BUFFER_LIMIT_BYTES } from "./recorder.js";
+import { VideoRecorder } from "./recorder.js";
 import {
   SEGMENT_CONTROLLER_API_VERSION,
   SegmentController,
-  maxSegmentCount,
 } from "./segment_controller.js";
-import { pageWarmer } from "./module_warmer.js";
 import { EngineHost } from "./engine_host.js";
 import { clearFatalError, errorDetail, reportPageFailures, showFatalError } from "./tools/banner.js";
 import { reportBootFailure, StaleModuleError } from "./bootstrap.js";
@@ -62,9 +63,16 @@ import {
 const TEST_ALL_INTERVAL_MS = 1000;
 const EXPECTED_SEGMENT_CONTROLLER_API_VERSION = 3;
 
-// The roster is a module of its own; the page stays its published entry point.
+// The roster and the two panels are modules of their own; the page stays their
+// published entry point.
 export {
-  DEFAULT_EFFECT, resolutionPresets, SHADER_DOCUMENT_EFFECTS, WORKBENCH_EFFECTS,
+  createRecordingControls,
+  createSegmentPoolSpawner,
+  createSegmentedPovControls,
+  DEFAULT_EFFECT,
+  resolutionPresets,
+  SHADER_DOCUMENT_EFFECTS,
+  WORKBENCH_EFFECTS,
 };
 
 if (SEGMENT_CONTROLLER_API_VERSION !== EXPECTED_SEGMENT_CONTROLLER_API_VERSION) {
@@ -87,296 +95,6 @@ export function shaderWorkbenchUrl(location, effect = 'Shader') {
   url.hash = current.hash;
   url.searchParams.set('effect', effect);
   return `${url.pathname}${url.search}${url.hash}`;
-}
-
-/**
- * Creates the worker-pool spawn callback from live layout and count state.
- * @param {Object} segments - Segment controller receiving the bounded count.
- * @param {() => number} requestedCount - Current GUI-requested segment count.
- * @param {Navigator | {deviceMemory?: number}} nav - Source of the device hint.
- * @param {() => boolean} isMobile - Current layout state.
- * @returns {() => void} A callback that creates the bounded pool.
- */
-export function createSegmentPoolSpawner(segments, requestedCount, nav, isMobile) {
-  return () => segments.create(
-    Math.min(requestedCount(), maxSegmentCount(nav, isMobile())));
-}
-
-/**
- * Build the Segmented POV controls: the folder, its Enabled toggle and Segments
- * slider, the spawn guard they drive, and the fallback a failed spawn or
- * teardown runs.
- *
- * @param {Object} deps - Injected app collaborators.
- * @param {{addFolder: (title: string) => *}} deps.gui - The global GUI root the
- *   folder is added under.
- * @param {*} deps.segments - The SegmentController the controls drive.
- * @param {Navigator | {deviceMemory?: number}} deps.nav - Source of the device hint.
- * @param {{isMobile: boolean}} deps.driver - The driver, read for the live layout.
- * @param {(message: string) => void} deps.showNotice - Owner-tagged sink for the
- *   fallback report.
- * @returns {ReturnType<typeof createSegmentSpawnGuard>} The spawn guard, whose
- *   strand() the page teardown runs.
- */
-export function createSegmentedPovControls({
-  gui,
-  segments,
-  nav,
-  driver,
-  showNotice,
-}) {
-  // The folder name and the segState property names are deep-link key segments
-  // (view.Segmented POV.<prop>); renaming either invalidates links already shared.
-  const segFolder = gui.addFolder('Segmented POV');
-  segFolder.close();
-  // Every pool member holds a WASM heap of its own, so the ceiling is what the
-  // device can carry. The slider is built against it, which is also what bounds a
-  // deep link — addWithHydration clamps an over-cap URL value and rewrites the URL.
-  const segMax = maxSegmentCount(nav, driver.isMobile);
-  const segState = {
-    segmented: segments.active,
-    segments: Math.min(segments.count, segMax),
-    boundaries: segments.showBoundaries,
-  };
-  // Requested size; segments.count follows the live pool and lags this across
-  // the warmModules() await.
-  let segCount = segState.segments;
-  // Assigned below, after the toggle whose deep-linked handler can reconcile it.
-  let segCountCtrl;
-  // The ceiling is re-read at every spawn, so a narrowing — a rotation into the
-  // mobile layout — bounds the pool below the requested size. setValue, not
-  // updateDisplay, so the deep-link writer re-advertises the running size.
-  const syncSegmentCount = () => {
-    const live = segments.count;
-    if (!segCountCtrl || !Number.isFinite(live) || live === segCount) return;
-    segCount = live;
-    segCountCtrl.setValue(live);
-  };
-  const segSpawn = createSegmentSpawnGuard({
-    warmModules: () => pageWarmer.warm(),
-    // segMax is the layout the page loaded in; a rotation into the mobile
-    // layout lowers what the device can carry, so the pool is bounded by the
-    // ceiling as it stands at the spawn, not the one the slider was built on.
-    spawn: createSegmentPoolSpawner(
-      segments, () => segCount, nav, () => driver.isMobile),
-    isActive: () => segments.active,
-  });
-  // Declared ahead of the fallback, and assigned before its handler is wired: a
-  // deep-linked `segmented` replays that handler synchronously at registration,
-  // and a throw there reaches the fallback's showToggle.
-  let segEnabledCtrl;
-  const segmentedFailed = createSegmentedFallback({
-    segments,
-    strand: () => segSpawn.strand(),
-    showNotice,
-    // No-ops when the toggle is already false.
-    showToggle: (on) => segEnabledCtrl.setValue(on),
-  });
-  segEnabledCtrl = segFolder.add(segState, 'segmented').name('Enabled');
-  segEnabledCtrl.onChange(async v => {
-    try {
-      segments.active = v;
-      if (v) {
-        if (await segSpawn.respawn()) syncSegmentCount();
-      } else {
-        segSpawn.strand();
-        segments.destroy();
-        segments.updateStats();
-      }
-    } catch (e) {
-      segmentedFailed(v ? 'enable' : 'teardown', e);
-    }
-  });
-  // The firmware takes a power-of-two segment count <= 8, so 6 is extra worker
-  // parallelism no hardware produces; the label says so, since the per-segment
-  // overlay otherwise names boards that cannot exist. A device cap that drops 6
-  // from the range takes the marker with it and names the cap instead.
-  const segLabel = segMax >= 6 ? 'Segments (6 = sim only)' : `Segments (max ${segMax} here)`;
-  segCountCtrl = segFolder.add(segState, 'segments', 2, segMax, 2).name(segLabel);
-  segCountCtrl.onChange(async v => {
-    // A reconcile writes the value the handler already acted on.
-    if (v === segCount) return;
-    try {
-      segCount = v;
-      if (segments.active && await segSpawn.respawn()) syncSegmentCount();
-    } catch (e) {
-      segmentedFailed('resize', e);
-    }
-  });
-  segFolder.addSession(segState, 'boundaries').name('Show Boundaries').onChange(v => {
-    segments.showBoundaries = v;
-  });
-  return segSpawn;
-}
-
-/**
- * Build the recording controls: the Recording folder and its settings, the
- * record toggle, and the duration overlay the frame loop writes.
- *
- * The recorder is constructed only once the WASM load resolves and the canvas
- * exists, so the controls are wired against one that does not exist yet and
- * attach() hands them the one the load built.
- *
- * @param {Object} deps - Injected app collaborators.
- * @param {Document} deps.doc - Document the duration overlay mounts into.
- * @param {{addFolder: (title: string) => *}} deps.gui - The global GUI root the
- *   folder is added under.
- * @param {*} deps.driver - The driver: its frame interval, its axis-label state,
- *   and the recorder handle it renders through.
- * @param {() => ?Object} deps.getRecorder - Reads the live recorder, null until
- *   the module load resolves.
- * @param {() => string} deps.getEffect - Names the effect a session records.
- * @param {(message: string) => void} deps.showNotice - Owner-tagged sink for the
- *   session and fault reports.
- * @returns {{attach: (recorder: Object) => void, tick: () => void,
- *   removeOverlay: () => void}} The post-load hookup, the per-frame duration
- *   readout, and the overlay release the page teardown runs.
- */
-export function createRecordingControls({
-  doc,
-  gui,
-  driver,
-  getRecorder,
-  getEffect,
-  showNotice,
-}) {
-  const REC_RESOLUTIONS = { 'Native': null, '720p': 720, '1080p': 1080 };
-  const REC_FORMATS = { 'Auto': 'auto', 'MP4': 'mp4', 'WebM': 'webm' };
-  const recordingSettings = createRecordingSettings({ getRecorder, warn: showNotice });
-  const recSettings = recordingSettings.settings;
-  recordingSettings.define('recQuality', 16, 'bitrate',
-    (recorder, v) => { recorder.bitrateMbps = v; });
-  recordingSettings.define('recResolution', 'Native', 'resolution',
-    (recorder, v) => { recorder.targetHeight = REC_RESOLUTIONS[v]; });
-  recordingSettings.define('recFormat', 'Auto', 'format',
-    (recorder, v) => { recorder.format = REC_FORMATS[v]; });
-
-  const durationEl = doc.createElement('div');
-  durationEl.className = 'rec-duration';
-  durationEl.style.display = 'none';
-  doc.getElementById('canvas-container')?.appendChild(durationEl);
-
-  let durationSecond = null;
-
-  // Whether the UI is currently showing a session. A failure hook runs after the
-  // recorder has already cleaned up, so its own state cannot tell a failed start
-  // from a stopped session; this can.
-  let recordingShown = false;
-
-  // Why the encoded container is not the one the Rec Format dropdown names,
-  // when the browser refused it. Written by the recorder's fallback hook during
-  // start(), consumed by the record notice raised right after.
-  let formatFallback = '';
-
-  /**
-   * Reflects the session state in the canvas styling, duration readout, and record
-   * button label.
-   * @param {boolean} isRecording - Whether a recording session is now active.
-   * @returns {void}
-   */
-  const showRecording = (isRecording) => {
-    driver.heldCaptures = 0;
-    durationSecond = null;
-    recordingShown = isRecording;
-    const canvasEl = doc.getElementById('canvas-container');
-    if (isRecording) {
-      canvasEl?.classList.add('recording');
-      durationEl.style.display = '';
-      recordCtrl.name('\u25a0 Stop');
-    } else {
-      canvasEl?.classList.remove('recording');
-      durationEl.style.display = 'none';
-      recordCtrl.name('\u25cf Record');
-    }
-  };
-
-  const recordState = { record: () => {
-    if (!getRecorder()) {
-      console.warn('Recording is unavailable until the rendering engine finishes loading.');
-      return;
-    }
-    const wasRecording = recordingShown;
-    formatFallback = '';
-    const isRecording = getRecorder().toggle(getEffect());
-    // A start that never began a session has already reported why through onError;
-    // there was no session to stop, and the same owner tag would overwrite it.
-    if (!wasRecording && !isRecording) return;
-    // The canvas tint, the duration readout, and the button label are all visual;
-    // the notice region is what carries the state change to assistive tech.
-    const axisWarning = isRecording && driver.labelAxes
-      ? ' Axis labels are page overlays, not canvas pixels; the recording will not carry them.'
-      : '';
-    const memoryNotice = isRecording && typeof globalThis.showSaveFilePicker !== 'function'
-      ? ` This browser saves up to ${MEMORY_BUFFER_LIMIT_BYTES / 1_000_000} MB per recording`
-        + ` (about ${Math.floor(MEMORY_BUFFER_LIMIT_BYTES * 8 / (recSettings.recQuality * 1_000_000))} seconds at this quality).`
-      : '';
-    showNotice(
-      `${isRecording ? 'Recording started.' : 'Recording stopped.'}`
-      + `${formatFallback}${axisWarning}${memoryNotice}`);
-    showRecording(isRecording);
-  }};
-
-  const recFolder = gui.addFolder('Recording');
-  recFolder.close();
-  recFolder.addSession(recSettings, 'recQuality', 1, 20, 1).name('Rec Quality (Mbps)');
-  recFolder.addSession(recSettings, 'recResolution', Object.keys(REC_RESOLUTIONS)).name('Rec Resolution');
-  recFolder.addSession(recSettings, 'recFormat', Object.keys(REC_FORMATS)).name('Rec Format');
-  const recordCtrl = recFolder.add(recordState, 'record').name('\u25cf Record');
-  recordCtrl.disable();
-
-  return {
-    /**
-     * Hand the controls the recorder the module load built: push the settings
-     * that accumulated while none existed, wire the fallback and fault hooks,
-     * point the driver at it, and offer the Record button.
-     * @param {Object} recorder - The freshly constructed VideoRecorder.
-     * @returns {void}
-     */
-    attach(recorder) {
-      recorder.frameInterval = driver.frameInterval;
-      recordingSettings.replay();
-      // Held for the notice the record toggle raises once toggle() returns.
-      // Re-seating the dropdown instead would fire its onChange and replace the
-      // user's chosen container for the rest of the session.
-      recorder.onFormatFallback = (extension) => {
-        const label = Object.keys(REC_FORMATS)
-          .find(key => REC_FORMATS[key] === extension) ?? extension.toUpperCase();
-        formatFallback = ` ${recSettings.recFormat} is unsupported in this`
-          + ` browser; recording as ${label}.`;
-      };
-      // A fault ends the session on its own; drop the recording UI so the button
-      // doesn't keep offering to stop a session that is already gone, and report
-      // the reason through the same notice the record toggle writes.
-      recorder.onError = (err) => {
-        const detail = errorDetail(err);
-        showNotice(recordingShown
-          ? `Recording stopped: ${detail}`
-          : `Recording failed to start: ${detail}`);
-        showRecording(false);
-      };
-      recorder.onSaveError = (err, filename) => {
-        showNotice(`Recording save failed for ${filename}: ${errorDetail(err)}`);
-      };
-      driver.recorder = recorder;
-      recordCtrl.enable();
-    },
-    /**
-     * Advance the duration readout, which changes once a second rather than
-     * once a frame.
-     * @returns {void}
-     */
-    tick() {
-      const recorder = getRecorder();
-      if (!recorder?.isRecording) return;
-      const elapsedSecond = Math.floor(recorder.elapsedSeconds);
-      if (elapsedSecond !== durationSecond) {
-        durationSecond = elapsedSecond;
-        durationEl.textContent = recorder.elapsedFormatted;
-      }
-    },
-    /** Drop the duration overlay the controls mounted. @returns {void} */
-    removeOverlay() { durationEl.remove(); },
-  };
 }
 
 /**
