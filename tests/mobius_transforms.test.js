@@ -6,6 +6,7 @@ const {
   elliptic, hyperbolic, loxodromic, parabolic, inversion, tumble, cayley,
   glslComplexFunctions, glslProjectionFunctions, mobiusCodeString,
   stereo, projectDiv, STEREO_INF, STEREO_POLE_EPS, STEREO_AZIMUTH_EPS,
+  STEREO_UNDERFLOW_LIFT,
 } = await import('../tools/mobius_transforms.js');
 
 const EPS = 1e-12;
@@ -122,7 +123,7 @@ function transpileGlslCNum(src, name, params = ['p', 'q']) {
     if (body[i] === '{') depth++;
     else if (body[i] === '}' && --depth === 0) { end = i; break; }
   }
-  // GLSL -> JS: `float` decls become `const`, the built-in math functions gain
+  // GLSL -> JS: `float` decls become `let`, the built-in math functions gain
   // their `Math.` prefix, and `CNum(re, im)` constructors become `{ re, im }`
   // objects. Constructors can nest parens, so split args by the top-level comma
   // rather than with a regex.
@@ -143,7 +144,7 @@ function transpileGlslCNum(src, name, params = ['p', 'q']) {
     return s;
   };
   const js = toObj(body.slice(open + 1, end)
-    .replace(/\bfloat\b/g, 'const')
+    .replace(/\bfloat\b/g, 'let')
     .replace(/\b(sqrt|abs|max|min)\(/g, 'Math.$1('));
   return new Function(...params, `${glslConstants(src).js}\n${js}`);
 }
@@ -193,6 +194,7 @@ test('glslProjectionFunctions constants match the JS exports', () => {
   assert.equal(values.STEREO_INF, STEREO_INF);
   assert.equal(values.STEREO_POLE_EPS, STEREO_POLE_EPS);
   assert.equal(values.STEREO_AZIMUTH_EPS, STEREO_AZIMUTH_EPS);
+  assert.equal(values.STEREO_UNDERFLOW_LIFT, STEREO_UNDERFLOW_LIFT);
 });
 
 /**
@@ -204,6 +206,7 @@ test('projection constants hold their engine values (absolute pin)', () => {
   assert.equal(STEREO_INF, 1e4, 'STEREO_INF is the engine sentinel');
   assert.equal(STEREO_POLE_EPS, 2e-8, 'STEREO_POLE_EPS value');
   assert.equal(STEREO_AZIMUTH_EPS, 1e-12, 'STEREO_AZIMUTH_EPS value');
+  assert.equal(STEREO_UNDERFLOW_LIFT, 2 ** 96, 'STEREO_UNDERFLOW_LIFT value');
 });
 
 /**
@@ -295,6 +298,23 @@ test('projectDiv keeps the direction when the squared magnitude is out of range'
     'diagonal azimuth');
 });
 
+/**
+ * A nonzero divisor whose square underflows to zero is not the pole: the pair
+ * is lifted back into range and divides to the finite quotient, where reading
+ * the zero as an exact pole would send it to the sentinel along the numerator.
+ */
+test('projectDiv lifts a divisor whose square underflows', () => {
+  const den = { re: 1e-170, im: 0 };
+  assert.equal(den.re * den.re, 0, 'the divisor squared must underflow for the case to bind');
+  assertComplex(projectDiv({ re: 2e-170, im: -1e-170 }, den), 2, -1,
+    'projectDiv lifted quotient');
+  assertComplex(projectDiv({ re: 0, im: 3e-170 }, { re: 0, im: -1e-170 }), -3, 0,
+    'projectDiv lifted imaginary divisor');
+
+  const saturated = projectDiv({ re: 1e-160, im: 0 }, den);
+  assertComplex(saturated, STEREO_INF, 0, 'a lifted quotient still saturates');
+});
+
 /** The GLSL stereo/project_div bodies agree with the JS twins the shader mirrors. */
 test('GLSL projection ops match the JS implementations', () => {
   const points = [
@@ -308,7 +328,7 @@ test('GLSL projection ops match the JS implementations', () => {
   const complexes = [
     { re: 1, im: 2 }, { re: 0, im: 0 }, { re: 1e5, im: 0 }, { re: 4e-4, im: 0 },
     { re: -2, im: 0.5 }, { re: STEREO_INF, im: 0 }, { re: 1e-6, im: 1e-6 },
-    { re: 3e200, im: -3e200 }, { re: 0, im: 3e-200 },
+    { re: 3e200, im: -3e200 }, { re: 0, im: 3e-200 }, { re: 1e-170, im: -2e-170 },
   ];
   for (const num of complexes) {
     for (const den of complexes) {
