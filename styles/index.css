@@ -855,6 +855,17 @@
   }
 }
 
+/* Engine-written telemetry: inert to the pointer, but still focusable and in
+   the accessibility tree, which a disabled control would not be. */
+.gui-container .effect-gui .lil-controller.param-readonly {
+  opacity: 0.5;
+}
+
+.gui-container .effect-gui .lil-controller.param-readonly,
+.gui-container .effect-gui .lil-controller.param-readonly * {
+  pointer-events: none;
+}
+
 .gui-container .effect-gui .lil-controller.param-warning > .lil-name::after {
   content: "\26a0";
   color: var(--warning-text);

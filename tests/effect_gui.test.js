@@ -1296,13 +1296,33 @@ test('a param named after an action button keeps the button its focus slot', () 
     'the same-named parameter took the focus slot of the Reset button');
 });
 
-test('a readonly param is disabled and excluded from the writable set', () => {
+test('a readonly param reads out as read-only and stays out of the writable set',
+  () => {
+    const h = makeHarness({ params: [SPEED, TELEMETRY] });
+    h.panel.build();
+
+    assert.deepEqual(h.panel.active().writableParamNames, ['Speed']);
+    const telemetry = h.gui().ctrl('Frames');
+    assert.equal(telemetry.$input.getAttribute('aria-readonly'), 'true');
+    assert.equal(telemetry.$input.getAttribute('readonly'), 'readonly');
+    assert.equal(telemetry.$input.getAttribute('disabled'), null,
+      'a disabled control leaves the tab order and the accessibility tree');
+    assert.equal(telemetry.disabled, false);
+    assert.equal(telemetry.domElement.classList.contains('param-readonly'), true);
+    assert.equal(h.gui().ctrl('Speed').$input.getAttribute('aria-readonly'), null);
+  });
+
+test('an arrow key never edits an engine-written telemetry control', () => {
   const h = makeHarness({ params: [SPEED, TELEMETRY] });
   h.panel.build();
+  const telemetry = h.gui().ctrl('Frames');
+  let reached = false;
+  telemetry.$input.addEventListener('keydown', () => { reached = true; });
 
-  assert.deepEqual(h.panel.active().writableParamNames, ['Speed']);
-  assert.equal(h.gui().ctrl('Frames').disabled, true);
-  assert.equal(h.gui().ctrl('Speed').disabled, false);
+  const event = telemetry.$input.dispatch('keydown', { key: 'ArrowUp' });
+
+  assert.equal(reached, false, 'the widget never sees the key');
+  assert.equal(event.defaultPrevented, true);
 });
 
 /** The engine rejects a write to a readonly param, so its control must be kept
