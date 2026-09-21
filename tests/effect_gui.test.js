@@ -1954,6 +1954,36 @@ test('a warning raised mid-drag lands on the pointer release', () => {
     .querySelector('.param-warning-note').textContent, warning);
 });
 
+test('a warning raised mid-key-repeat lands on the key release', () => {
+  const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
+  const warning = 'Speed is faster than the segment stream can follow.';
+  const h = makeHarness({
+    params: [speed],
+    engineValues: [0.1],
+    onEngineParam(_name, value, state) {
+      state.params = [value > 0.5 ? { ...speed, warning } : { ...speed }];
+    },
+  });
+  h.panel.build();
+  h.panel.mount();
+  const controller = h.gui().ctrl('Speed');
+
+  controller.$input.dispatch('keydown', { key: 'ArrowUp' });
+  controller.setValue(0.9);
+  h.panel.sync();
+
+  assert.equal(h.guis.length, 1, 'the input the key repeat lands in survives');
+  assert.equal(h.gui().ctrl('Speed').domElement.classList.contains('param-warning'),
+    false);
+
+  controller.$input.dispatch('keyup', { key: 'ArrowUp' });
+  h.panel.sync();
+
+  assert.equal(h.guis.length, 2);
+  assert.equal(h.gui().ctrl('Speed').domElement
+    .querySelector('.param-warning-note').textContent, warning);
+});
+
 test('Lens Glitch to None survives a rebuild before the renderer advances', () => {
   const lens = {
     name: 'Lens', value: 1, requestedValue: 1, acceptedValue: 1,

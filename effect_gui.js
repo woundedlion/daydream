@@ -487,13 +487,17 @@ export function createEffectGui({ engine, segments, config, host }) {
   /**
    * Whether the engine's parameter warnings have moved off the ones the panel
    * was built from. A refused write raises or clears a warning without loading
-   * an effect, so the schema generation cannot report it. Deferred while a drag
-   * is in flight: the rebuild would discard the controller under the pointer.
+   * an effect, so the schema generation cannot report it. Deferred while an
+   * edit is in flight, pointer or keyboard: the rebuild would discard the
+   * controller under the pointer, or the input a held arrow key repeats into.
    * @param {Object} fx - The active effect record.
    * @returns {boolean} True when the panel must be rebuilt to show them.
    */
   function paramWarningsStale(fx) {
-    if (!fx.warningsDirty || fx.activeDragEnds.size > 0) return false;
+    if (!fx.warningsDirty || fx.activeDragEnds.size > 0
+        || fx.activeKeyEdits.size > 0) {
+      return false;
+    }
     fx.warningsDirty = false;
     const current = paramWarningTexts(getParameterDefinitions());
     if (current.size !== fx.paramWarnings.size) return true;
@@ -898,6 +902,28 @@ export function createEffectGui({ engine, segments, config, host }) {
   }
 
   /**
+   * Flag a controller as under a keyboard edit while an arrow key is held, so a
+   * rebuild does not discard the widget the key repeat is landing in. The
+   * listeners sit on the widget itself, so they leave with the GUI DOM; a
+   * window-level key repeat interrupted by a focus change still ends on blur.
+   * @param {Object} fx - The effect record owning the controller.
+   * @param {Object} controller - The controller to track.
+   * @returns {void}
+   */
+  function trackKeyboardEdit(fx, controller) {
+    const widget = focusWidget(controller);
+    if (!widget) return;
+    widget.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        fx.activeKeyEdits.add(controller);
+      }
+    });
+    const end = () => fx.activeKeyEdits.delete(controller);
+    widget.addEventListener('keyup', end);
+    widget.addEventListener('blur', end);
+  }
+
+  /**
    * Re-seat the pause toggle on the engine's own animation state after a
    * parameter write: the engine pauses animation-driven params implicitly when
    * one of them is written. The toggle's transition carries the adopted state on
@@ -1041,6 +1067,7 @@ export function createEffectGui({ engine, segments, config, host }) {
       }
       fx.writableParamNames.push(p.name);
       if (controller.isContinuous) trackDragState(fx, controller);
+      trackKeyboardEdit(fx, controller);
 
       const kind = paramControlKind(p);
       let acceptedControlValue = acceptedParamValue(p);
@@ -1083,6 +1110,7 @@ export function createEffectGui({ engine, segments, config, host }) {
     const fx = {
       gui: createGui(),
       activeDragEnds: new Set(),
+      activeKeyEdits: new Set(),
       animationPauseApplied: false,
       persistDeferred: null,
       warningsDirty: false,
