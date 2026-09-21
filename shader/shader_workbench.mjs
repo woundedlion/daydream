@@ -222,10 +222,13 @@ export function parseShaderDocument(source, limits = DEFAULT_LIMITS) {
   return new JsonReader(source, bounded).parse();
 }
 
-// An already-decoded document skipped the reader, so the reader's depth and
-// string limits are enforced over the object graph instead.
+// An already-decoded document skipped the reader, so the reader's byte, depth
+// and string limits are enforced over the object graph instead. Bytes are
+// measured over the compact serialization, a lower bound on any text form.
 const checkDecodedDocumentLimits = (source, limits = DEFAULT_LIMITS) => {
   const bounded = { ...DEFAULT_LIMITS, ...limits };
+  if (new TextEncoder().encode(JSON.stringify(source) ?? '').length > bounded.bytes)
+    fail('parse', 'BYTE_LIMIT', '$', 'The document byte limit was exceeded.');
   const pending = [{ value: source, depth: 0, path: '$' }];
   while (pending.length > 0) {
     const { value, depth, path } = pending.pop();
