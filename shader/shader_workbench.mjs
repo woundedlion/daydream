@@ -293,14 +293,14 @@ const label = (value, path) => {
 // carriers, parameter schemas, enum values and budgets are consumed here, so
 // the engine-emitted replacement slots in transparently.
 const requireCatalog = (catalog) => {
-  const invalid = () => fail('semantic', 'CATALOG_REQUIRED', '$',
+  const invalid = () => fail('semantic', 'CATALOG_REQUIRED', 'catalog',
     'Chain validation needs a complete operator catalog (options.catalog).');
   if (catalog === null || typeof catalog !== 'object' ||
       !Array.isArray(catalog.carriers) || !Array.isArray(catalog.operators) ||
       catalog.budgets === null || typeof catalog.budgets !== 'object')
     invalid();
   if (catalog.catalog_version !== OPERATOR_CATALOG_VERSION)
-    fail('semantic', 'UNSUPPORTED_CATALOG_SCHEMA', '$',
+    fail('semantic', 'UNSUPPORTED_CATALOG_SCHEMA', 'catalog.catalog_version',
       `Only operator catalog ${OPERATOR_CATALOG_VERSION} is supported.`);
   const requiredBudgets = [
     'arena_bytes', 'max_chain_ops', 'max_params', 'max_instance_id_length',
