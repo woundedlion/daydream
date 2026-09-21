@@ -293,7 +293,7 @@ test('generativePaletteCpp serializes the complete V4 recipe', () => {
   recipe.lightness.curve = 1;
   const source = generativePaletteCpp(recipe);
 
-  assert.match(source, /recipe\.schema_version = 4;/);
+  assert.match(source, /recipe\.schema_version = PaletteRecipe::SCHEMA_VERSION;/);
   assert.doesNotMatch(source, /key_count/);
   assert.match(source, /recipe\.input\.offset = 0\.0f;/);
   assert.match(source, /recipe\.input\.span = 1\.0f;/);
