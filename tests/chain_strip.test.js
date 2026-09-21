@@ -41,12 +41,16 @@ restoreDocumentAfterEach();
 
 /**
  * A strip over a fresh store on a fresh fixture copy, plus its spies.
- * @param {{presetId?: string|null, bypassAvailable?: () => boolean}} [seams] -
- *   The preset the inline controls read, omitted the strip falls back to the
- *   document's first; and whether a bypass reaches what is rendering.
+ * @param {{presetId?: string|null, bypassAvailable?: () => boolean,
+ *   writeThrough?: boolean}} [seams] - The preset the inline controls read,
+ *   omitted the strip falls back to the document's first; whether a bypass
+ *   reaches what is rendering; and whether inline edits reach the store as the
+ *   page writes them.
  * @returns {Promise<Object>} The harness.
  */
-async function makeStrip({ presetId = null, bypassAvailable = () => true } = {}) {
+async function makeStrip({
+  presetId = null, bypassAvailable = () => true, writeThrough = false,
+} = {}) {
   const store = await createChainDocumentStore({
     document: structuredClone(BASE.document), catalog: CATALOG });
   const container = fakeElement('section');
@@ -61,6 +65,7 @@ async function makeStrip({ presetId = null, bypassAvailable = () => true } = {})
   const selections = [];
   const announced = [];
   const edits = [];
+  const commits = [];
   const strip = createChainStrip({
     doc,
     container,
@@ -70,10 +75,18 @@ async function makeStrip({ presetId = null, bypassAvailable = () => true } = {})
     onApply: () => applied.push(store.programShape().map((entry) => entry.instance)),
     onSelect: (label) => selections.push(label),
     presetId: () => presetId,
-    onEditParameter: (parameterId, value) => edits.push([parameterId, value]),
+    onEditParameter: (parameterId, value) => {
+      edits.push([parameterId, value]);
+      if (!writeThrough) return;
+      const target = presetId ?? store.document().preset_bank.presets[0].preset_id;
+      assert.equal(store.setPresetValue(target, parameterId, value).ok, true);
+    },
+    onCommitParameter: () => commits.push(edits.length),
     bypassAvailable,
   });
-  return { store, container, doc, strip, applied, selections, announced, edits };
+  return {
+    store, container, doc, strip, applied, selections, announced, edits, commits,
+  };
 }
 
 const chips = (h) => h.container.querySelectorAll('.chain-chip');
@@ -1110,6 +1123,34 @@ test('an enum renders its declared values and edits by option id', async () => {
 
   assert.deepEqual(h.edits, [['lens.symmetry', 'octahedral']],
     'the document stores the option id, never an index');
+});
+
+// The page writes every inline edit under the control's coalesce key so a
+// slider drag undoes whole; a discrete control's change is a whole gesture.
+test('a chosen option and an entered value each close the coalesced value run', async () => {
+  const h = await makeStrip({ writeThrough: true });
+  const stored = (id) => h.store.document().preset_bank.presets[0].values[id];
+
+  for (const value of ['octahedral', 'tetrahedral']) {
+    const select = controlIn(rowFor(h, 'lens', 'lens.symmetry'));
+    select.value = value;
+    select.dispatch('change');
+  }
+  assert.deepEqual(h.commits, [1, 2], 'each choice completes an edit');
+  assert.equal(h.store.undo(), true);
+  assert.equal(stored('lens.symmetry'), 'octahedral',
+    'one Undo reverts one choice, not every choice since the strip was built');
+
+  for (const value of ['5.5', '6']) {
+    const readout = rowFor(h, 'sample', 'sample.pattern-freq')
+      .querySelector('.chain-param-value');
+    readout.value = value;
+    readout.dispatch('change');
+  }
+  assert.deepEqual(h.commits, [1, 2, 3, 4]);
+  assert.equal(h.store.undo(), true);
+  assert.equal(stored('sample.pattern-freq'), 5.5,
+    'one Undo reverts one entered value');
 });
 
 // §3/§4.4: the union schema survives — a field the topology deactivates is
