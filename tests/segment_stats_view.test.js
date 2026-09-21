@@ -298,6 +298,35 @@ test('a steady-state repaint re-queries nothing and rewrites no class', () => {
   assert.equal(compute.className, 'seg-time slow');
 });
 
+// A spawning pool paints nothing: createRenderAdapter keeps stepping the main
+// engine until ownsDisplay turns true, so the global bars are still reporting
+// the frames on screen for the whole warm-and-instantiate window.
+test('the global stat bars stay up until the pool owns the display', () => {
+  const { doc, desktop, mobile } = makeDoc();
+  const view = new SegmentStatsView(doc);
+
+  view.update(readyState(2, { ready: false }));
+  assert.equal(desktop.style.display, '', 'the desktop bar is left painting');
+  assert.equal(mobile.style.display, '', 'the mobile bar is left painting');
+
+  view.update(readyState(2));
+  assert.equal(desktop.style.display, 'none');
+  assert.equal(mobile.style.display, 'none');
+});
+
+// A latched pool holds the display for its fault overlay, so the bars it stands
+// in for stay hidden.
+test('a faulted pool keeps the global stat bars hidden', () => {
+  const { doc, desktop, mobile } = makeDoc();
+  const view = new SegmentStatsView(doc);
+
+  view.update(readyState(2, {
+    ready: false, faulted: true, faultInfo: { segId: 0, message: 'boom' },
+  }));
+  assert.equal(desktop.style.display, 'none');
+  assert.equal(mobile.style.display, 'none');
+});
+
 test('an inactive pool hides the overlay and hands the stat bars back', () => {
   const { doc, stats, desktop, mobile } = makeDoc();
   const view = new SegmentStatsView(doc);
