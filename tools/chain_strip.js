@@ -69,6 +69,9 @@ import { createFrameScheduler } from './page_lifecycle.js';
 // Keeps a palette clamped inside the viewport clear of its edge.
 const PALETTE_MARGIN = 8;
 
+// Separates a palette from the control it opened from.
+const PALETTE_GAP = 4;
+
 // Increments an editable readout's arrow keys divide its declared domain into.
 const READOUT_STEPS = 1000;
 
@@ -516,7 +519,7 @@ export function createChainStrip({
     if (viewport > 0) left = Math.min(left, viewport - width - PALETTE_MARGIN);
     element.style.left = `${Math.max(PALETTE_MARGIN, left)}px`;
     const viewportHeight = doc.documentElement?.clientHeight ?? 0;
-    let top = anchorBounds.bottom;
+    let top = anchorBounds.bottom + PALETTE_GAP;
     if (viewportHeight > 0) {
       const available = Math.max(0, viewportHeight - 2 * PALETTE_MARGIN);
       top = Math.min(top, viewportHeight - Math.min(bounds.height, available) - PALETTE_MARGIN);

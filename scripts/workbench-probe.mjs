@@ -8,6 +8,8 @@ import { boxOf, centre, checks, isMain, runProbe } from './probe_harness.mjs';
 
 const PAGE = 'tools/shader.html';
 const VIEWPORT = { width: 1674, height: 543 };
+// Shorter than the anchored palette, so its vertical clamp has to engage.
+const SHORT_HEIGHT = 170;
 const TIMEOUT_MS = 90_000;
 const SLIDER_FRACTION = 0.75;
 // A fraction of a domain that lands on no round step grid.
@@ -387,6 +389,28 @@ export async function probeStrip(tab) {
       && narrowPalette.y >= narrowAnchor.y + narrowAnchor.height
       && narrowPalette.x >= 8 && narrowPalette.x + narrowPalette.width <= 692,
   'the anchored palette stays inside a narrow viewport');
+  await tab.keyboard.press('Escape');
+
+  // Short enough that the palette cannot open below its anchor at all: the
+  // vertical clamp has to lift it and cap its height, which the full-height
+  // viewport above never asks for.
+  await tab.setViewport({ width: VIEWPORT.width, height: SHORT_HEIGHT });
+  await tab.waitForFunction((height) => window.innerHeight === height, {}, SHORT_HEIGHT);
+  await (await tab.waitForSelector(add)).click();
+  const shortAnchor = await boxOf(tab, add);
+  const shortPalette = await boxOf(tab, '.chain-palette');
+  const capped = await tab.$eval('.chain-palette', (node) => ({
+    overflow: getComputedStyle(node).overflowY,
+    scrollable: node.scrollHeight > node.clientHeight,
+  }));
+  check(shortPalette.y + shortPalette.height <= SHORT_HEIGHT - 8 + 1
+      && shortPalette.y >= 8
+      && shortPalette.y < shortAnchor.y + shortAnchor.height,
+  `the palette is lifted to ${Math.round(shortPalette.y)}px and ends `
+    + `${Math.round(SHORT_HEIGHT - shortPalette.y - shortPalette.height)}px `
+    + 'above a short viewport');
+  check(capped.overflow === 'auto' && capped.scrollable,
+    'the capped palette scrolls to its remaining entries');
   await tab.keyboard.press('Escape');
   return failures;
 }
