@@ -57,8 +57,6 @@ import { wireFlyout } from './flyout.js';
 import { createFrameScheduler, onPageTeardown } from './page_lifecycle.js';
 import { createPointerDrag, innerRect } from './pointer_drag.js';
 
-// --- Palette Class and Data Structure ---
-
 // --- Tab Switcher Logic ---
 let activeTab = 'procedural';
 
@@ -606,8 +604,6 @@ const sliderDefinitions = [
   { param: 'D_G', container: 'D_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: -1, max: 2, step: 0.001, scale: 1000, group: 'D' },
   { param: 'D_B', container: 'D_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: -1, max: 2, step: 0.001, scale: 1000, group: 'D' }
 ];
-
-// --- Helper Functions ---
 
 // --- UI and Event Functions ---
 
