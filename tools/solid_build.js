@@ -10,10 +10,11 @@
  *
  * MeshOps answers a recoverable failure with null and records the reason in
  * getLastResult(); an unchecked null becomes a TypeError several calls later, or
- * a mesh built from the wrong wrapper. Every call in these sequences is routed
- * through requireMeshResult so the reason is read before the next call
- * overwrites it. The module instance, the vertex constructor and the error line
- * are injected, so the sequences run against a stand-in without a DOM.
+ * a mesh built from the wrong wrapper. Every null in these sequences has its
+ * reason read before the next call overwrites it: through requireMeshResult, or
+ * through meshOpFailure when applyOp throws on an op the bridge rejected. The
+ * module instance, the vertex constructor and the error line are injected, so
+ * the sequences run against a stand-in without a DOM.
  */
 
 import { applyOp, meshOpFailure, requireMeshResult } from './solid_codegen.js';
@@ -131,7 +132,8 @@ export function buildBaseMesh(name, what, ctx) {
  * @details Every failure the bridge foresees — unknown solid name, tooling arena
  * exhaustion, 16-bit connectivity or face-degree overflow, a non-finite or
  * out-of-domain argument — is a null with the reason in getLastResult(), which
- * requireMeshResult reports. An engine invariant trap is not recoverable: the
+ * requireMeshResult reports for the base solid and meshOpFailure for an op
+ * applyOp rejected mid-chain. An engine invariant trap is not recoverable: the
  * module is built with exceptions disabled, so it aborts and reaches the catches
  * as a WebAssembly.RuntimeError over a torn-down module, which onTrap turns
  * fatal. What is left for the catches is Embind marshalling errors.
@@ -147,8 +149,10 @@ export function buildChainMesh(base, ops, ctx) {
     return null;
   }
 
+  let failing = null;
   try {
     for (const o of ops) {
+      failing = typeof o === 'string' ? o : o.op;
       const nextMesh = applyOp(mesh, o);
       mesh.delete();
       mesh = nextMesh;
@@ -156,13 +160,20 @@ export function buildChainMesh(base, ops, ctx) {
   } catch (e) {
     console.error('WASM Op Error:', e);
     if (ctx.onTrap(e)) return null;
-    // A mid-chain op failed: the partial mesh is meaningless, so report and draw
-    // nothing rather than a half-applied solid with wrong stats. `mesh` still
-    // points at the last valid op result (the failing op threw before the swap),
-    // so it is safe to free.
+    // Read before the flush below overwrites the recorded reason. A throw that
+    // is not a bridge rejection leaves the last result OK and keeps its own
+    // message. A half-applied solid is not drawn; `mesh` is the last valid op
+    // result, since the failing op threw before the swap.
+    const failure = meshOpFailure(ctx.Mod, `Op "${failing}"`);
     if (mesh) mesh.delete();
     ctx.meshOps.clearToolingMemory();
-    ctx.onError(`Op error: ${e instanceof Error && e.message ? e.message : String(e)}`);
+    if (failure.reason === 'OK' || failure.reason === 'UNKNOWN') {
+      ctx.onError(`Op error: ${e instanceof Error && e.message ? e.message : String(e)}`);
+    } else if (failure.fatal) {
+      ctx.onFatal(failure.message);
+    } else {
+      ctx.onError(failure.message);
+    }
     return null;
   }
 
