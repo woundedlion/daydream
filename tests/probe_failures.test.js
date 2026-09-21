@@ -1,8 +1,3 @@
-import { probeParity } from '../scripts/workbench-probe.mjs';
-import { probeHueWheel } from '../scripts/palettes-probe.mjs';
-import { probeHistoryRestore } from '../scripts/lissajous-probe.mjs';
-import { probeSliderDrag, probePresetName, probeMobilePanel, probeSidebar, probeWarningNote } from '../scripts/panel-probe.mjs';
-import { probeStageNames, probeTelemetry } from '../scripts/panel-probe.mjs';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,12 +5,15 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { boxOf, centre, checks, dragBetween, isMain, runProbe, walkTo }
   from '../scripts/probe_harness.mjs';
-import { probeStrip } from '../scripts/workbench-probe.mjs';
-import { probePanel } from '../scripts/panel-probe.mjs';
+import { probeParity, probeStrip } from '../scripts/workbench-probe.mjs';
+import { probeColorStrip, probeHueWheel } from '../scripts/palettes-probe.mjs';
+import { probeHistoryRestore, probeRationalLock } from '../scripts/lissajous-probe.mjs';
+import {
+  probeMobilePanel, probePanel, probePresetName, probeSidebar, probeSliderDrag,
+  probeStageNames, probeTelemetry, probeWarningNote,
+} from '../scripts/panel-probe.mjs';
 import { probeChain, probeNumericInputs } from '../scripts/solids-probe.mjs';
-import { probeColorStrip } from '../scripts/palettes-probe.mjs';
 import { probePad } from '../scripts/mobius-probe.mjs';
-import { probeRationalLock } from '../scripts/lissajous-probe.mjs';
 
 const PROBES = [
   ['workbench-probe.mjs', 'probeParity', probeParity],
