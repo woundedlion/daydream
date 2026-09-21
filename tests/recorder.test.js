@@ -67,45 +67,6 @@ test('returns empty string when nothing in the list is supported', () => {
 const fakeCanvas = (width = 0, height = 0) =>
   ({ width, height, getContext: () => ({ drawImage() {} }) });
 
-test('background visibility pauses recording time and remains stoppable', () => {
-  const doc = new EventTarget();
-  const removed = [];
-  const removeEventListener = doc.removeEventListener.bind(doc);
-  doc.removeEventListener = (type, listener, options) => {
-    removed.push([type, listener]);
-    removeEventListener(type, listener, options);
-  };
-  doc.hidden = false;
-  let now = 1000;
-  const rec = new VideoRecorder(fakeCanvas(), 1 / 16, () => now, doc);
-  const media = {
-    state: 'recording',
-    pause() { this.state = 'paused'; },
-    resume() { this.state = 'recording'; },
-    stop() { this.state = 'inactive'; },
-  };
-  rec.mediaRecorder = media;
-  rec.recordingStartedAtMs = now;
-  now = 2000;
-  doc.hidden = true;
-  doc.dispatchEvent(new Event('visibilitychange'));
-  assert.equal(media.state, 'paused');
-  assert.equal(rec.isRecording, true);
-  now = 62_000;
-  assert.equal(rec.elapsedSeconds, 1);
-  doc.hidden = false;
-  doc.dispatchEvent(new Event('visibilitychange'));
-  now = 63_000;
-  assert.equal(rec.elapsedSeconds, 2);
-  doc.hidden = true;
-  doc.dispatchEvent(new Event('visibilitychange'));
-  rec.stop();
-  assert.equal(media.state, 'inactive');
-  rec.dispose();
-  assert.deepEqual(removed, [['visibilitychange', rec.visibilityChanged]],
-    'dispose removes the document listener it installed');
-});
-
 /**
  * Installs a document whose createElement yields a blank fake canvas, so the
  * offscreen-sizing paths run in Node without a DOM.
@@ -297,6 +258,14 @@ class FakeMediaRecorder {
       this.ondataavailable({ data: FakeMediaRecorder.startData });
     }
   }
+  pause() {
+    if (this.state !== 'recording') throw new Error(`pause() while ${this.state}`);
+    this.state = 'paused';
+  }
+  resume() {
+    if (this.state !== 'paused') throw new Error(`resume() while ${this.state}`);
+    this.state = 'recording';
+  }
   stop() {
     // Spec order: the state goes inactive at once, then whatever the encoder
     // still holds is flushed as a last dataavailable ahead of the stop event.
@@ -339,6 +308,80 @@ const installRecorderEnv = () => {
     globalThis.showSaveFilePicker = saved.showSaveFilePicker;
   };
 };
+
+/**
+ * A document that reports `hidden`, dispatches visibilitychange and creates
+ * the recorder's offscreen canvas.
+ * @param {boolean} hidden - The initial visibility.
+ */
+const visibilityDocument = (hidden) => Object.assign(new EventTarget(), {
+  hidden, createElement: () => recordableCanvas(),
+});
+
+test('background visibility pauses recording time and remains stoppable', () => {
+  const restore = installRecorderEnv();
+  try {
+    const doc = visibilityDocument(false);
+    const removed = [];
+    const removeEventListener = doc.removeEventListener.bind(doc);
+    doc.removeEventListener = (type, listener, options) => {
+      removed.push([type, listener]);
+      removeEventListener(type, listener, options);
+    };
+    let now = 1000;
+    const rec = new VideoRecorder(recordableCanvas(), 1 / 16, () => now, doc);
+    rec.download = () => {};
+    rec.start('e');
+    const media = rec.mediaRecorder;
+    assert.equal(media.state, 'recording');
+    now = 2000;
+    doc.hidden = true;
+    doc.dispatchEvent(new Event('visibilitychange'));
+    assert.equal(media.state, 'paused');
+    assert.equal(rec.isRecording, true);
+    now = 62_000;
+    assert.equal(rec.elapsedSeconds, 1);
+    doc.hidden = false;
+    doc.dispatchEvent(new Event('visibilitychange'));
+    assert.equal(media.state, 'recording');
+    now = 63_000;
+    assert.equal(rec.elapsedSeconds, 2);
+    doc.hidden = true;
+    doc.dispatchEvent(new Event('visibilitychange'));
+    rec.stop();
+    assert.equal(media.state, 'inactive');
+    rec.dispose();
+    assert.deepEqual(removed, [['visibilitychange', rec.visibilityChanged]],
+      'dispose removes the document listener it installed');
+  } finally {
+    restore();
+  }
+});
+
+test('a recording started on a hidden page begins paused', () => {
+  const restore = installRecorderEnv();
+  try {
+    const doc = visibilityDocument(true);
+    let now = 1000;
+    const rec = new VideoRecorder(recordableCanvas(), 1 / 16, () => now, doc);
+    rec.download = () => {};
+    rec.start('e');
+    const media = rec.mediaRecorder;
+    assert.equal(media.state, 'paused');
+    assert.equal(rec.isRecording, true);
+    now = 5000;
+    assert.equal(rec.elapsedSeconds, 0);
+    doc.hidden = false;
+    doc.dispatchEvent(new Event('visibilitychange'));
+    assert.equal(media.state, 'recording');
+    now = 7000;
+    assert.equal(rec.elapsedSeconds, 2);
+    rec.dispose();
+    assert.equal(media.state, 'inactive');
+  } finally {
+    restore();
+  }
+});
 
 test('isSupported answers false where the DOM globals are absent', () => {
   const saved = {
