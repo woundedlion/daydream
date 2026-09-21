@@ -539,6 +539,43 @@ function workbenchEngine() {
 }
 
 /**
+ * The shader.html toolbar mounts by id, with the blank scratch entry the
+ * source select opens on: without it a select with nothing selected reports
+ * the first document the page appends.
+ * @returns {Map<string, Object>} Element id to fake element.
+ */
+function workbenchMounts() {
+  const elements = new Map(['shader-document-select', 'shader-preset-select',
+    'shader-document-open', 'shader-document-save', 'shader-document-file',
+    'shader-document-status', 'shader-document-digest', 'shader-parity-toggle',
+    'shader-animation-toggle', 'shader-document-save-as',
+  ].map((id) => [id, fakeElement(id.endsWith('select') ? 'select' : 'div')]));
+  const scratch = fakeElement('option');
+  scratch.value = '';
+  scratch.textContent = 'Scratch shader';
+  elements.get('shader-document-select').appendChild(scratch);
+  return elements;
+}
+
+/**
+ * A fetchText seam over the pattern directory: the migration table, the
+ * engine catalog, and the given documents by file name.
+ * @param {Object<string, string>} files - Document source by file name.
+ * @param {string} [migration] - The ShaderBall migration table.
+ * @returns {(url: string) => Promise<string>} The router.
+ */
+function patternFetch(files, migration = MIGRATION) {
+  return async (url) => {
+    const name = String(url).split('/').pop();
+    if (name === 'shaderball_migration.json') return migration;
+    if (name === 'engine_catalog.json') return ENGINE_CATALOG;
+    const source = files[name];
+    if (source === undefined) throw new Error(`404 ${name}`);
+    return source;
+  };
+}
+
+/**
  * Builds the workbench document controller over the shader.html control set.
  * @param {{files?: Object, engine?: *, selectEffect?: (effect: string) => boolean,
  *   initialEffect?: string|null}} [seams]
@@ -548,14 +585,7 @@ function workbench({ files = { 'kaleidoscope_flowers.shader.json': shaderDocumen
                      engine = workbenchEngine(),
                      selectEffect = () => true,
                      initialEffect = null } = {}) {
-  const elements = new Map(['shader-document-select', 'shader-preset-select',
-    'shader-document-open', 'shader-document-save', 'shader-document-file',
-    'shader-document-status', 'shader-parity-toggle', 'shader-document-save-as',
-  ].map((id) => [id, fakeElement(id.endsWith('select') ? 'select' : 'div')]));
-  const scratch = fakeElement('option');
-  scratch.value = '';
-  scratch.textContent = 'Scratch shader';
-  elements.get('shader-document-select').appendChild(scratch);
+  const elements = workbenchMounts();
   elements.get('shader-document-save').disabled = true;
 
   const downloads = [];
@@ -571,14 +601,7 @@ function workbench({ files = { 'kaleidoscope_flowers.shader.json': shaderDocumen
     selectEffect: (effect) => { selections.push(effect); return selectEffect(effect); },
     syncEffectGui: () => { ran.gui += 1; },
     invalidate: () => { ran.invalidated += 1; },
-    fetchText: async (url) => {
-      const name = String(url).split('/').pop();
-      if (name === 'shaderball_migration.json') return MIGRATION;
-      if (name === 'engine_catalog.json') return ENGINE_CATALOG;
-      const source = files[name];
-      if (source === undefined) throw new Error(`404 ${name}`);
-      return source;
-    },
+    fetchText: patternFetch(files),
     // The fixtures are compiler results already; a document object is the
     // scratch build, which the fake passes through as its own compile.
     importCompiler: async () => ({
@@ -985,18 +1008,7 @@ async function editorWorkbench({
     return writeParameter(name, value);
   };
   let current = engine;
-  const ids = ['shader-document-select', 'shader-preset-select',
-    'shader-document-open', 'shader-document-save', 'shader-document-file',
-    'shader-document-status', 'shader-document-digest', 'shader-parity-toggle',
-    'shader-animation-toggle', 'shader-document-save-as'];
-  const elements = new Map(ids.map((id) =>
-    [id, fakeElement(id.endsWith('select') ? 'select' : 'div')]));
-  // shader.html opens the source select on a blank scratch entry; without it a
-  // select with nothing selected reports the first document the page appends.
-  const scratch = fakeElement('option');
-  scratch.value = '';
-  scratch.textContent = 'Scratch shader';
-  elements.get('shader-document-select').appendChild(scratch);
+  const elements = workbenchMounts();
   elements.set('chain-strip', fakeElement('section'));
   const doc = installDocument({
     body: fakeElement('body'),
@@ -1043,13 +1055,8 @@ async function editorWorkbench({
       animationWrites.push(paused);
     },
     setParamFilter: (filter) => filters.push(filter),
-    fetchText: async (url) => {
-      const name = String(url).split('/').pop();
-      if (name === 'shaderball_migration.json') return migration;
-      if (name === 'engine_catalog.json') return ENGINE_CATALOG;
-      if (name === 'kaleidoscope_hex_bright.shader.json') return KALEIDOSCOPE_HEX_BRIGHT;
-      throw new Error(`404 ${name}`);
-    },
+    fetchText: patternFetch(
+      { 'kaleidoscope_hex_bright.shader.json': KALEIDOSCOPE_HEX_BRIGHT }, migration),
     importCompiler: () => import('../shader/shader_workbench.mjs'),
     download: (filename, source) => downloads.push([filename, source]),
     win,
