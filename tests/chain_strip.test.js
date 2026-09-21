@@ -987,6 +987,29 @@ test('a numeric value can be typed directly and stays within its domain', async 
 
 // A browser's number input reports content it cannot parse as the empty
 // string, which is what the listener sees when an author types letters.
+test('the numeric readout reads back as the binary32 it shows', async () => {
+  const h = await makeStrip();
+  const row = rowFor(h, 'sample', 'sample.pattern-freq');
+  const slider = controlIn(row);
+  const value = row.querySelector('.chain-param-value');
+
+  // The engine stores binary32, so the readout a slider drag leaves behind is
+  // what a later arrow-key nudge or re-entry is computed from.
+  for (const authored of [3.14159274, 0.100000001, 1 / 3, 1e-7, 47.8000031]) {
+    const stored = Math.fround(
+      Math.min(Number(slider.max), Math.max(Number(slider.min), authored)));
+    slider.value = String(stored);
+    slider.dispatch('input');
+    assert.equal(Math.fround(Number(value.value)), stored,
+      `${value.value} must read back as ${stored}`);
+  }
+
+  // A value a shorter decimal already names keeps the shorter spelling.
+  slider.value = '3.5';
+  slider.dispatch('input');
+  assert.equal(value.value, '3.5');
+});
+
 test('an unparsable numeric entry restores the stored value', async () => {
   const h = await makeStrip();
   const row = rowFor(h, 'sample', 'sample.pattern-freq');
