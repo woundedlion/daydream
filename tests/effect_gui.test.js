@@ -1687,6 +1687,33 @@ test('sync marshals the definitions once for an effect with an enum control', ()
   assert.equal(h.gui().ctrl('Mode').getValue(), 1, 'the requested enum is adopted');
 });
 
+test('a selector the engine does not drive costs no per-frame marshal', () => {
+  const mode = {
+    name: 'Mode', value: 0, requestedValue: 0, options: ['Off', 'On'],
+  };
+  const h = makeHarness({ params: [mode, SPEED], engineValues: [0, 0.4] });
+  h.panel.build();
+  const before = h.paramDefinitionReads();
+
+  h.panel.sync();
+  h.panel.sync();
+
+  assert.equal(h.paramDefinitionReads(), before, 'the definitions are not marshalled');
+  assert.equal(h.gui().ctrl('Speed').getValue(), 0.4, 'the value stream still mirrors');
+
+  const driven = makeHarness({
+    params: [{ ...mode, animated: true }, SPEED],
+    engineValues: [0, 0.4],
+  });
+  driven.panel.build();
+  const drivenBefore = driven.paramDefinitionReads();
+
+  driven.panel.sync();
+
+  assert.equal(driven.paramDefinitionReads(), drivenBefore + 1,
+    'an engine-driven selector still reads its requested value each frame');
+});
+
 test('a frame that did not step the simulation skips the definition marshal', () => {
   const mode = {
     name: 'Mode', value: 0, requestedValue: 0, options: ['Off', 'On'],
