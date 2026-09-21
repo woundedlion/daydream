@@ -139,30 +139,51 @@ function optionIndex(definition, label) {
 }
 
 /**
- * Writes one engine parameter.
+ * Resolves one engine parameter write without performing it.
+ * @param {ParameterDefinition[]} definitions
+ * @param {string} name
+ * @param {*} value
+ * @returns {{name: string, stored: *}|string} The write, or the refusal reason.
+ */
+function resolveEngineValue(definitions, name, value) {
+  const definition = definitions.find((candidate) => candidate.name === name);
+  if (!definition) return `the engine has no parameter "${name}"`;
+  if (definition.readonly) return `"${name}" is read-only`;
+  if (definition.options && typeof value !== 'number') {
+    const stored = optionIndex(definition, value);
+    if (stored < 0) return `"${name}" has no option "${value}"`;
+    return { name, stored };
+  }
+  return { name, stored: value };
+}
+
+/**
+ * Performs one resolved write.
  * @param {*} engine
  * @param {*} module - The loaded WASM module, for its ParamSetResult enum.
  *   setParameter answers one of its values; every value is a truthy object, so
  *   the outcome only reads as applied against APPLIED itself.
+ * @param {{name: string, stored: *}} write
+ * @returns {string|null} Refusal reason, or null once written.
+ */
+function performEngineWrite(engine, module, { name, stored }) {
+  const result = engine.setParameter(name, stored);
+  if (result === module.ParamSetResult.APPLIED) return null;
+  return `"${name}" was refused: ${enumConstantName(module.ParamSetResult, result)}`;
+}
+
+/**
+ * Writes one engine parameter.
+ * @param {*} engine
+ * @param {*} module
  * @param {ParameterDefinition[]} definitions
  * @param {string} name
  * @param {*} value
  * @returns {string|null} Refusal reason, or null once written.
  */
 function writeEngineValue(engine, module, definitions, name, value) {
-  const definition = definitions.find((candidate) => candidate.name === name);
-  if (!definition) return `the engine has no parameter "${name}"`;
-  if (definition.readonly) return `"${name}" is read-only`;
-  let stored = value;
-  if (definition.options) {
-    if (typeof value !== 'number') {
-      stored = optionIndex(definition, value);
-      if (stored < 0) return `"${name}" has no option "${value}"`;
-    }
-  }
-  const result = engine.setParameter(name, stored);
-  if (result === module.ParamSetResult.APPLIED) return null;
-  return `"${name}" was refused: ${enumConstantName(module.ParamSetResult, result)}`;
+  const write = resolveEngineValue(definitions, name, value);
+  return typeof write === 'string' ? write : performEngineWrite(engine, module, write);
 }
 
 /**
@@ -170,12 +191,16 @@ function writeEngineValue(engine, module, definitions, name, value) {
  * @param {string} presetId
  * @param {Set<string>} baked - The topology fields the effect bakes in.
  * @returns {string|null} Refusal reason, or null once every value is written.
+ *   Every value is resolved before the first write, so an id the engine does
+ *   not register refuses without a partial write.
  */
 function applyDocumentValues(engine, module, compiled, presetId, baked) {
   const preset = compiled.document.preset_bank.presets
     .find((/** @type {*} */ candidate) => candidate.preset_id === presetId)
     ?? compiled.document.preset_bank.presets[0];
   const definitions = engine.getParameterDefinitions();
+  /** @type {Array<{name: string, stored: *}>} */
+  const writes = [];
   for (const [parameterId, value] of Object.entries(preset?.values ?? {})) {
     if (BAKED_CONSTANT_IDS.has(parameterId)) continue;
     if (baked.has(fieldSegment(parameterId))) continue;
@@ -183,7 +208,12 @@ function applyDocumentValues(engine, module, compiled, presetId, baked) {
       .find((candidate) => definitions.some(
         (/** @type {ParameterDefinition} */ definition) => definition.name === candidate));
     if (!name) return `no engine parameter matches "${parameterId}"`;
-    const refusal = writeEngineValue(engine, module, definitions, name, value);
+    const write = resolveEngineValue(definitions, name, value);
+    if (typeof write === 'string') return write;
+    writes.push(write);
+  }
+  for (const write of writes) {
+    const refusal = performEngineWrite(engine, module, write);
     if (refusal) return refusal;
   }
   return null;
