@@ -407,6 +407,28 @@ test('getBoundingClientRect reports the offset box a test writes', () => {
     { x: 40, y: 12, left: 40, top: 12, right: 240, bottom: 42, width: 200, height: 30 });
 });
 
+test('pointer capture is held per id and released one id at a time', () => {
+  const element = fakeElement('canvas');
+  assert.equal(element.hasPointerCapture(7), false);
+
+  element.setPointerCapture(7);
+  element.setPointerCapture(9);
+  assert.equal(element.hasPointerCapture(7), true);
+  assert.equal(element.hasPointerCapture(9), true);
+
+  element.releasePointerCapture(7);
+  assert.equal(element.hasPointerCapture(7), false);
+  assert.equal(element.hasPointerCapture(9), true);
+  assert.deepEqual([...element.capturedPointers], [9]);
+});
+
+test('two elements hold their captures apart', () => {
+  const first = fakeElement('canvas');
+  const second = fakeElement('canvas');
+  first.setPointerCapture(7);
+  assert.equal(second.hasPointerCapture(7), false);
+});
+
 test('style keeps only the values a browser would keep', () => {
   const el = fakeElement('div');
 
