@@ -103,6 +103,11 @@ test('a workbench-only effect deep link is handed to the workbench page', () => 
   assert.equal(legacy.teardown.disposed(), true,
     'nothing was built, but the caller reads disposed() on either path');
 
+  const workbench = startApp({ search: '?effect=ShaderWorkbench' });
+  assert.deepEqual(workbench.replaced, ['/tools/shader.html?effect=ShaderWorkbench'],
+    'the engine canonicalizes both retired spellings, so the second one must '
+    + 'travel to the workbench too rather than falling through to the default');
+
   const shipped = startApp({ search: '?effect=alien-brain' });
   assert.deepEqual(shipped.replaced, ['/tools/shader.html?effect=alien-brain'],
     'a shipped document carries no legacy identity, so its own id travels');
