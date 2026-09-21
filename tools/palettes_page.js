@@ -749,18 +749,10 @@ function handleDragStart(event) {
 function handleDragMove(event) {
   dragEndPosition = getNormalizedX(event);
 
-  // Check if the pointer is outside the canvas's Y-bounds to deactivate selection
-  if (colorStripCanvas) { // Safety check
-    const rect = colorStripCanvas.getBoundingClientRect();
+  if (colorStripCanvas) {
+    const rect = innerRect(colorStripCanvas);
     const y = event.clientY;
-
-    if (y < rect.top || y > rect.bottom) {
-      // Pointer is above or below the canvas, deactivate selection
-      isSelectionActive = false;
-    } else {
-      // Pointer is back inside, reactivate selection
-      isSelectionActive = true;
-    }
+    isSelectionActive = y >= rect.top && y <= rect.top + rect.height;
   }
 
   drawColorStrip(isSelectionActive
