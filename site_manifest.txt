@@ -122,6 +122,10 @@ shader/patterns/kaleidoscope_hex_oil.shader.json
 shader/patterns/alien_brain.shader.json
 shader/patterns/kaleidoscope_stained_glass.shader.json
 
+# The project license, carrying the notices MIT requires for the PROJ-derived
+# projection code and FastNoiseLite compiled into holosphere_wasm.wasm.
+LICENSE
+
 # Documentation the deploy gate pins to the engine checkout.
 README.md
 docs/screenshots/IslamicStars.png
