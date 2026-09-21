@@ -4,6 +4,7 @@ import { probeHistoryRestore } from '../scripts/lissajous-probe.mjs';
 import { probeSliderDrag, probePresetName, probeMobilePanel, probeSidebar, probeWarningNote } from '../scripts/panel-probe.mjs';
 import { probeStageNames, probeTelemetry } from '../scripts/panel-probe.mjs';
 import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -104,24 +105,54 @@ test('a probe module is inert until node is pointed at it', () => {
   assert.equal(isMain(import.meta.url), true);
 });
 
-test('every scripts/*-probe.mjs is wired into all three probe rosters', () => {
-  const probes = readdirSync(fileURLToPath(new URL('../scripts', import.meta.url)))
-    .filter((name) => name.endsWith('-probe.mjs'));
-  assert.ok(probes.length > 0, 'the probe glob matched nothing');
+/** @returns {Map<string, string>} Every scripts/*.mjs module, by file name. */
+function scriptModules() {
+  const directory = fileURLToPath(new URL('../scripts', import.meta.url));
+  return new Map(readdirSync(directory)
+    .filter((name) => name.endsWith('.mjs'))
+    .map((name) => [name, readFileSync(join(directory, name), 'utf8')]));
+}
+
+/**
+ * @param {Map<string, string>} modules - The scripts/ module set.
+ * @returns {string[]} The ones node is pointed at to drive a browser.
+ * @details probe_harness.mjs is the browser scaffolding, so a script that takes
+ *   it and that no other script imports is an entry point rather than a module
+ *   of its own, and the rosters have to name it.
+ */
+function browserEntryPoints(modules) {
+  const imported = new Set();
+  for (const source of modules.values()) {
+    for (const match of source.matchAll(/from '\.\/([^']+\.mjs)'/g)) imported.add(match[1]);
+  }
+  return [...modules]
+    .filter(([name, source]) =>
+      source.includes("from './probe_harness.mjs'") && !imported.has(name))
+    .map(([name]) => name);
+}
+
+test('every script that drives a browser is wired into both rosters', () => {
+  const driven = browserEntryPoints(scriptModules());
+  assert.ok(driven.includes('browser-smoke.mjs'),
+    'the page smoke reads as scaffolding rather than as a browser entry point');
+  assert.equal(driven.length, new Set(PROBES.map(([file]) => file)).size + 1,
+    `the browser entry points are ${driven.join(', ')}`);
   const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
   const workflow = read('../.github/workflows/browser-smoke.yml');
   const prePush = read('../.githooks/pre-push');
-  const listed = PROBES.map(([file]) => file);
-  for (const file of probes) {
+  for (const file of driven) {
     assert.ok(workflow.includes(`scripts/${file}`),
       `${file} is missing from .github/workflows/browser-smoke.yml`);
     assert.ok(prePush.includes(`node scripts/${file}`),
       `${file} is missing from .githooks/pre-push`);
-    assert.ok(listed.includes(file), `${file} is missing from PROBES`);
   }
-  for (const file of listed) {
-    assert.ok(probes.includes(file), `PROBES names a missing probe "${file}"`);
-  }
+});
+
+test('PROBES names every scripts/*-probe.mjs and no others', () => {
+  const probes = [...scriptModules().keys()].filter((name) => name.endsWith('-probe.mjs'));
+  assert.ok(probes.length > 0, 'the probe glob matched nothing');
+  assert.deepEqual(probes.sort(),
+    [...new Set(PROBES.map(([file]) => file))].sort());
 });
 
 test('PROBES names every exported probe interaction and no others', async () => {
