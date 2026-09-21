@@ -1403,8 +1403,8 @@ test('SIMPLE_SEEDS mirrors simple_registry, whose index a Recipe seed is', () =>
   const unseeded = [...DEFINED_SEED_CONSTANTS]
     .filter((seed) => !SIMPLE_SEEDS.includes(seed));
   assert.deepEqual(unseeded.slice(0, 5), [],
-    `solids.h defines SEED_* for ${unseeded.length} names that are no ` +
-    'simple_registry entry');
+    `DEFINED_SEED_CONSTANTS names ${unseeded.length} seeds that are no ` +
+    'SIMPLE_SEEDS entry, so none of the registry just matched');
 });
 
 // MeshOps.getRecipe has no daydream call site; it is pinned here as intended API.
