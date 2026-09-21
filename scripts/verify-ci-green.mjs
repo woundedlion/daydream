@@ -80,8 +80,11 @@ export const missingTerminalDependencies = (source, terminal) => {
   return workflowJobs(source).filter((job) => job !== terminal && !needs.has(job));
 };
 
-/** Workflows paired with the job every other job in them must feed. */
-const GATED_WORKFLOWS = [
+/**
+ * Every directly triggered workflow, paired with the job every other job in it
+ * must feed; tests/ci_workflow.test.js pins the list to the workflow directory.
+ */
+export const GATED_WORKFLOWS = [
   ['.github/workflows/ci.yml', 'ci-green'],
   ['.github/workflows/deploy.yml', 'deploy'],
 ];
