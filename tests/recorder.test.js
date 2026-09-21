@@ -1734,7 +1734,8 @@ test('the buffered save path downloads one blob through an anchor click', () => 
 /**
  * The blob type and the file extension are both derived from the container the
  * browser actually chose, so they can never disagree; an unknown or empty type
- * falls back to WebM.
+ * falls back to WebM, including a subtype that names an Object.prototype
+ * member.
  */
 test('the buffered save maps each container to its extension and blob type', () => {
   const save = installSavePath();
@@ -1746,6 +1747,8 @@ test('the buffered save maps each container to its extension and blob type', () 
       ['video/x-matroska;codecs=avc1', 'clip_20260102_030405.mkv', 'video/x-matroska'],
       ['video/ogg', 'clip_20260102_030405.ogv', 'video/ogg'],
       ['', 'clip_20260102_030405.webm', 'video/webm'],
+      ['video/quicktime', 'clip_20260102_030405.webm', 'video/webm'],
+      ['video/constructor', 'clip_20260102_030405.webm', 'video/webm'],
     ];
     const rec = new VideoRecorder(recordableCanvas());
     for (const [mimeType, filename, blobType] of cases) {

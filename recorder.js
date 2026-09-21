@@ -39,6 +39,17 @@ export const PICKER_GRACE_SECONDS = 120;
 // recording outright rather than saving its prefix.
 export const MEMORY_BUFFER_LIMIT_BYTES = 512_000_000;
 
+// Container subtype of a MediaRecorder MIME type to the file extension, and the
+// extension back to the canonical MIME type. Maps, not object literals, so a
+// subtype like `constructor` finds nothing rather than Object.prototype.
+const CONTAINER_EXTENSIONS = new Map([
+  ['mp4', 'mp4'], ['webm', 'webm'], ['x-matroska', 'mkv'], ['ogg', 'ogv'],
+]);
+const EXTENSION_MIME_TYPES = new Map([
+  ['mp4', 'video/mp4'], ['webm', 'video/webm'], ['mkv', 'video/x-matroska'],
+  ['ogv', 'video/ogg'],
+]);
+
 /**
  * Pick the best-supported MIME type for the requested output format. Codec
  * priority: MP4/H.264 > WebM/VP9 > WebM/VP8. Returns '' if nothing in the
@@ -737,9 +748,7 @@ export class VideoRecorder {
   extension(recorder = this.mediaRecorder) {
     const mime = recorder?.mimeType ?? '';
     const subtype = mime.split(';')[0].split('/')[1] ?? '';
-    /** @type {Record<string, string>} */
-    const EXT = { mp4: 'mp4', webm: 'webm', 'x-matroska': 'mkv', ogg: 'ogv' };
-    return EXT[subtype] ?? (subtype || 'webm');
+    return CONTAINER_EXTENSIONS.get(subtype) ?? 'webm';
   }
 
   /**
@@ -749,9 +758,7 @@ export class VideoRecorder {
    * @returns {string} The matching MIME type, defaulting to 'video/webm'.
    */
   mimeForExt(ext) {
-    /** @type {Record<string, string>} */
-    const MIME = { mp4: 'video/mp4', webm: 'video/webm', mkv: 'video/x-matroska', ogv: 'video/ogg' };
-    return MIME[ext] ?? 'video/webm';
+    return EXTENSION_MIME_TYPES.get(ext) ?? 'video/webm';
   }
 
   /**
