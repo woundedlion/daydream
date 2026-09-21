@@ -1012,15 +1012,32 @@ test('a latched fault terminates the pool so no worker heap stays resident', () 
   assert.deepEqual(c.faultInfo, { segId: 0, message: 'boom' });
 });
 
-test('create posts init stamped with the protocol version', () => {
-  const c = makeController();
-  c.create(2);
-  for (const w of c.workers) {
-    const init = w.posted.find((m) => m.type === 'init');
-    assert.ok(init, 'init posted');
-    assert.equal(init.version, PROTOCOL_VERSION);
-    assert.equal(init.paramRevision, c.paramRevision);
-  }
+test('create posts each worker the whole init payload', () => {
+  const c = makeController({ effect: 'Plasma', presets: { lo: { w: 6, h: 3 } } });
+  c.getWasmEngine = () => fakeEngine(
+    [{ name: 'Speed', value: 0.5, requestedValue: 0.9, acceptedValue: 0.4 }], 6, 4);
+  c.setParameter('Speed', 0.9);
+  c.setAnimationsPaused(true);
+  c.setPoleLod(1.5);
+  c.create(4);
+
+  c.workers.forEach((w, segId) => {
+    assert.deepEqual(w.posted.filter((m) => m.type === 'init'), [{
+      type: 'init',
+      version: PROTOCOL_VERSION,
+      segId,
+      totalSegs: 4,
+      w: 6,
+      h: 3,
+      effectName: 'Plasma',
+      params: [{ name: 'Speed', value: 0.9, acceptedValue: 0.4 }],
+      paused: true,
+      presetIndex: 4,
+      poleLod: 1.5,
+      paramRevision: 1,
+      wasmModule: undefined,
+    }]);
+  });
 });
 
 test('create spawns module workers from the segment worker URL', () => {
