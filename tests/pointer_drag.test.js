@@ -165,6 +165,51 @@ test('a capture the element no longer holds is not released again', () => {
   assert.equal(calls.end.length, 1);
 });
 
+test('a capture the element lost unwinds the drag as a cancel', () => {
+  const { element, calls } = harness();
+  element.dispatch('pointerdown', down(7));
+  element.captured.clear();
+  const lost = element.dispatch('lostpointercapture', { pointerId: 7 });
+  assert.deepEqual(calls.cancel, [lost]);
+  assert.equal(calls.end.length, 0);
+  // Unlatched, so the element still takes the next press.
+  element.dispatch('pointerdown', down(9));
+  assert.equal(calls.start.length, 2);
+});
+
+test('another pointer losing its capture does not end the drag', () => {
+  const { element, calls } = harness();
+  element.dispatch('pointerdown', down(7));
+  element.dispatch('lostpointercapture', { pointerId: 9 });
+  assert.equal(calls.cancel.length, 0);
+  assert.ok(element.hasPointerCapture(7));
+});
+
+test('the lostpointercapture a release raises does not unwind the drag twice', () => {
+  const { element, calls } = harness();
+  element.releasePointerCapture = (id) => {
+    element.captured.delete(id);
+    element.dispatch('lostpointercapture', { pointerId: id });
+  };
+  element.dispatch('pointerdown', down(7));
+  element.dispatch('pointerup', { pointerId: 7 });
+  assert.equal(calls.end.length, 1);
+  assert.equal(calls.cancel.length, 0);
+});
+
+test('a capture the element refuses unwinds instead of latching it', () => {
+  const { element, calls } = harness();
+  element.setPointerCapture = () => { throw new Error('InvalidPointerId'); };
+  const refused = element.dispatch('pointerdown', down(7));
+  assert.deepEqual(calls.start, [refused]);
+  assert.deepEqual(calls.cancel, [refused]);
+  assert.equal(refused.defaultPrevented, false);
+  element.setPointerCapture = (id) => { element.captured.add(id); };
+  element.dispatch('pointerdown', down(9));
+  assert.equal(calls.start.length, 2);
+  assert.ok(element.hasPointerCapture(9));
+});
+
 test('the element takes a new drag once the last one ended', () => {
   const { element, calls } = harness();
   element.dispatch('pointerdown', down(7));
@@ -179,7 +224,8 @@ test('the element takes a new drag once the last one ended', () => {
 test('remove() detaches every listener the drag wired', () => {
   const { element, calls, drag } = harness();
   assert.deepEqual(element.listeners.map((l) => l.type).sort(),
-    ['pointercancel', 'pointerdown', 'pointermove', 'pointerup']);
+    ['lostpointercapture', 'pointercancel', 'pointerdown', 'pointermove',
+      'pointerup']);
   drag.remove();
   assert.deepEqual(element.listeners, []);
   element.dispatch('pointerdown', down(7));
