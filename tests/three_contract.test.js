@@ -1,7 +1,7 @@
 //
 // Pins the three surface tests/fake_three.js stands in for, so the double the
 // scene suites run over cannot drift from the library the tool pages load.
-// Every other suite redirects `three` and its OrbitControls addon to the fake;
+// shared.test.js redirects `three` and its OrbitControls addon to the fake;
 // this one imports the real modules and drives them over tests/fake_dom.js,
 // which is enough DOM for OrbitControls to connect.
 //
