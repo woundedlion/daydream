@@ -825,6 +825,8 @@ export function paletteRecipeFromControls(template, controls) {
   if (recipe.hue.mode === PaletteV4.hueMode.CUSTOM) {
     recipe.hue.customTurns = customHueTurns(
       recipe.hue.baseTurns, controls.customHueOffsets, recipe.hue.customTurns);
+    // The keys carry the base hue; the engine canonicalizes the field away.
+    recipe.hue.baseTurns = 0;
   }
   recipe.lightness.curve = paletteEnumOrdinal('curve', controls.lightnessCurve);
   recipe.chroma.curve = paletteEnumOrdinal('curve', controls.chromaCurve);

@@ -694,8 +694,8 @@ test('an authored custom-hue recipe keeps its keys through the controls', () => 
     paletteControlReadings((id) => values[id], customHueOffsets));
 
   assertRecipeClose(back.hue.customTurns, recipe.hue.customTurns, 'customTurns');
-  assert.ok(Math.abs(back.hue.baseTurns - 0.98) < 1e-9,
-    'the base hue follows the first key the wheel edits');
+  assert.equal(back.hue.baseTurns, 0,
+    'the keys carry the base hue, so the field stays on the engine default');
 });
 
 test('the readings convert the units the controls are labelled in', () => {
