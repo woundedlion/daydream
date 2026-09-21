@@ -83,6 +83,20 @@ test('the committed shader artifacts match the pinned engine byte for byte', { s
   }
 });
 
+// README.md is installed from the engine, not authored here. Only the deploy
+// gate compared the committed copy against it, which is after the merge that
+// changed it; this runs the same comparison on the pinned checkout.
+test('the committed README matches the pinned engine byte for byte',
+  { skip: engineSkip }, () => {
+    assert.ok(engineRoot, engineMissing);
+    // Compared as whole buffers: a byte diff over a document this size costs
+    // minutes to render and says no more than the verdict does.
+    const installed = committed('.', 'README.md');
+    const authored = committed(engineRoot, 'README.md', text('holosphere_wasm.sha').trim());
+    assert.ok(installed.equals(authored),
+      'README.md is an engine install; re-install it rather than editing it here');
+  });
+
 // One id per alias branch, so the comparison keeps covering the table when the
 // committed documents stop exercising a branch.
 const ALIAS_PROBES = [
