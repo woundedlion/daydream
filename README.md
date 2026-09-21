@@ -131,7 +131,7 @@ Templating on `<W, H>` means every pixel coordinate transform, bounding box comp
 
 ### Why Arena Allocation?
 
-The Teensy heap fragments under heavy mesh subdivision. The single-block partitioned arena design (persistent + scratch A + scratch B, 298 KiB total) gives deterministic memory behavior: persistent data allocated once and kept; scratch data RAII-scoped to the function that needed it. The `configure_arenas()` function allows effects to repartition the fixed block based on their needs — mesh-heavy effects can claim more persistent space, while subdivision-heavy effects can expand their scratch pools. The geometry families take explicit `Arena&` parameters — Conway operators take `(Arena& target, Arena& temp)`, generators take `(Arena& a, Arena& b)` — so the memory layout during heavy geometric operations is explicit at every call site. The animation carriers that own arena lifetime are the exception: `MeshCarousel::compact_*` and `OpLeg` reach for the global arenas directly.
+The Teensy heap fragments under heavy mesh subdivision. The single-block partitioned arena design (persistent + scratch A + scratch B, 298 KiB total) gives deterministic memory behavior: persistent data allocated once and kept; scratch data RAII-scoped to the function that needed it. The `configure_arenas()` function allows effects to repartition the fixed block based on their needs — mesh-heavy effects can claim more persistent space, while subdivision-heavy effects can expand their scratch pools. The geometry families take explicit `Arena&` parameters — Conway operators take `(Arena& target, Arena& temp)`, generators take `(Arena& a, Arena& b)` — so the memory layout during heavy geometric operations is explicit at every call site. The exceptions are the animation carriers that own arena lifetime — `MeshCarousel::compact_*` and `OpLeg` — and `Filter::Pixel::Feedback::flush()`, whose signature is fixed by the terminal-filter contract; all three reach for the global arenas directly.
 
 ### Why the ISR Double Buffer?
 
@@ -174,7 +174,9 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 
 ## 3. Repository Map
 
-Both trees are gated against their repository's tracked file list: every row must name a path that exists, and a directory that names any of its children must name them all. A directory drawn as a single summary row names no children and so is exempt — nothing forces `effects/`, `tests/`, `docs/`, `.githooks/`, or `.github/workflows/` to enumerate their contents here. On top of that, `tools/docs_check.py` carries a short `_TREE_UNMAPPED` allowlist of tracked paths no row has to name at all: the VCS metadata files (`.gitattributes`, `.gitignore`, `hardware/phantasm/.gitignore`), this document itself, and everything under `tests/`.
+Normal CMake and PlatformIO builds automatically synchronize these maps before validating the documentation. The sync preserves descriptions for existing paths, adds new entries in expanded directories, and removes paths that no longer exist. Summary directories stay compact. Daydream is read from the pinned Git revision used by CI, without fetching or changing its checkout. If that revision is unavailable locally, its map stays unchanged and the build reports the skipped sibling checks.
+
+The same step runs with `just docs-check` and before `just docs` publishes the API reference. Generated changes remain reviewable in `git diff`; prose outside the maps is preserved, apart from source-derived roster counts. Fence balance, links, anchors, path references, and the complete generated maps are still validated.
 
 ### Holosphere (engine + firmware)
 
@@ -190,7 +192,8 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   │   ├── rng.h                   Deterministic random number generation
 │   │   ├── arduino_mocks.h         Host-side FastLED / Arduino mock surface
 │   │   ├── build_features.h        Canvas size, build-time feature and instrumentation switches
-│   │   └── constants.h             MAX_W, MAX_H, star ratio, pole-LOD tuning
+│   │   ├── constants.h             MAX_W, MAX_H, star ratio, pole-LOD tuning
+│   │   └── led.h                   LED pin constants + color-correction RAII guards (driver in hardware/pov_single.h)
 │   ├── control/                An effect's control surface (registry, params +
 │   │                            apply_if_changed, ParamHost/PresetHost, presets,
 │   │                            choreography, transition)
@@ -281,8 +284,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   │   ├── sdf.h                   SDF shapes, CSG operators and volumes: umbrella over sdf/
 │   │   ├── sdf/                    Per-family SDF headers (common, shapes, rings,
 │   │   │                            csg, face, volume)
-│   │   ├── shading.h               Fragment interpolation + mesh-topology shading helpers
-│   │   └── led.h                   LED pin constants + color-correction RAII guards (driver in hardware/pov_single.h)
+│   │   └── shading.h               Fragment interpolation + mesh-topology shading helpers
 │   ├── animation/              Timeline scheduler + the animation type families
 │   │   ├── animation.h             IAnimation/AnimationBase contract + umbrella over the fragments below
 │   │   ├── timers.h                RandomTimer / PeriodicTimer callback timers
@@ -425,12 +427,12 @@ Both trees are gated against their repository's tracked file list: every row mus
 ├── tools/                      Firmware gates, device profiling, and asset bakes
 │   ├── build_pins.py           Shared external-tool version pins for CI and `just`
 │   ├── check_coverage.py       Catastrophic llvm-cov line-floor gate, repo-wide and per core/ subtree
-│   ├── check_domain_ratchets.py  Relax-bake and death-harness coverage ratchets
 │   ├── require_test_files.sh   Non-empty guard for glob-discovered test suites (CI)
 │   ├── check_test_dir_pins.sh  Asserts every Python test-suite directory is discovered by CI and the justfile
 │   ├── ruff_selection_guard.sh / eslint_selection_guard.sh  Shared CI and `just lint` anti-vacuity probes
 │   ├── shellcheck_gate.sh      Tracked shell-file selection + shellcheck run behind `just lint`
 │   ├── clang_format_gate.sh    Tracked first-party C++ selection + clang-format run behind `just clang-format`
+│   ├── eol_gate.sh             Tracked line endings against the `eol` attribute `.gitattributes` declares, in index and working copy (CI, `just lint`)
 │   ├── teensy_gate.py          Size + memory-layout gate parser/classifier (toolchain-free)
 │   ├── teensy_gate_extra.py    PlatformIO post-build glue that runs the gate on every link
 │   ├── teensy_budgets.json     Per-env FLASH/RAM1/RAM2 budgets the gate enforces
@@ -461,7 +463,9 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── docs_check.py           Markdown fence/link/anchor/path validator (CI)
 │   ├── docs_images.py          Resolves every documented `<img>`; `--stage` copies them into the Doxygen output (CI)
 │   ├── license_check.py        Checks every tracked C/C++ source against the terms LICENSE grants it (CI)
-│   └── *_tests/                Host unit tests for the gate, build + git hooks, profile parser, bakes, build pins, docs and license checks
+│   ├── *_tests/                Host unit tests for the gate, build + git hooks, profile parser, bakes, build pins, docs and license checks
+│   ├── docs_sync.py
+│   └── engine_source_state.py
 ├── docs/                       subsystems.md and effects.md — README sections 7 and 9 — plus design specs, perf ledgers, and the docs/screenshots/ gallery
 ├── Doxyfile                    Doxygen config for the published API reference
 ├── package.json                npm entry points for the scripts/*.mjs tools (ESM; Node ≥ 22, CI pinned via tools/build_pins.py)
@@ -473,7 +477,7 @@ Both trees are gated against their repository's tracked file list: every row mus
 ├── .githooks/                  Fast staged-file pre-commit checks and a reference-transaction guard keeping master fast-forward-only
 ├── .github/dependabot.yml      Monthly grouped bump pull request for the SHA-pinned actions in those workflows
 ├── .github/workflows/          ci.yml (native, WASM, format, Teensy, provenance), docs.yml (Doxygen → Pages)
-├── .github/actions/            Composite steps both workflows run: pinned-doxygen (Doxygen install + theme)
+├── .github/actions/            Composite steps ci.yml and docs.yml run: pinned-doxygen (Doxygen install + theme)
 ├── LICENSE                     PolyForm Noncommercial 1.0.0 (engine); effects/, workbench/ and core/engine/effects_legacy.h reserved
 ├── CONTRIBUTING.md             Landing model, gates, and the tool pins a contributor has to match
 └── justfile                    Task runner: `just build` / `test` / `smoke` / `docs` / `install` (`just --list` for the rest)
@@ -503,6 +507,9 @@ Both trees are gated against their repository's tracked file list: every row mus
 ├── main.js                     index.html's entry module: starts the simulator, once
 ├── bootstrap.js                Dynamic-import boot of daydream.js + failure overlay
 ├── daydream.js                 App entry: WASM loader, state wiring, GUI/sidebar
+├── effect_roster.js            Effect/resolution roster data: shader-document and workbench lists, per-resolution favourites
+├── segmented_pov_controls.js   Segmented-POV panel: pool spawner and its controls, split out of the composition root
+├── recording_controls.js       Recording panel builder, split out of the composition root
 ├── app_lifecycle.js            Composition-root frame adapter, Test All ticker,
 │                                  module-load deadline, and teardown
 ├── engine_host.js              Owns the main-thread WASM engine + its reassignable display state
@@ -602,7 +609,8 @@ Both trees are gated against their repository's tracked file list: every row mus
 │   ├── palettes-probe.mjs      Headless pointer-level probe of the palette page's strip zoom and hue-key wheel
 │   ├── mobius-probe.mjs        Headless pointer-level probe of the Möbius page's complex-plane pads
 │   ├── lissajous-probe.mjs     Headless pointer-level probe of the Lissajous page's rational frequency lock and the domain it drives
-│   └── run-tests.mjs           `test` script: runs the suite and checks first-party module reachability
+│   ├── run-tests.mjs           `test` script: runs the suite and checks first-party module reachability
+│   └── install-engine-bundle.mjs
 │
 ├── tests/                      Node unit tests (`npm test`)
 ├── requirements/               Hash-locked ShellCheck toolchain used by CI
@@ -1171,7 +1179,7 @@ The `Daydream` class owns the entire render side. Features:
 | **Keyboard orbit** | A keyboard-focused canvas uses the arrow keys to orbit and `+`/`-` to dolly. Pointer focus does not claim those keys, preserving the paused-frame shortcut on the global handler. |
 | **On-demand repaint** | The animation loop repaints only after a simulation step, camera movement, or `invalidate()`. Any caller that changes visible scene state without either of the first two must call `invalidate()`, especially for changes that must appear while paused. |
 | **Context-loss recovery** | `webglcontextlost` stops GL work, aborts recording, and presents an accessible reload prompt; `webglcontextrestored` clears the lost state and schedules a repaint. |
-| **Picture-in-picture** | A clone of the main camera, placed at the antipode of its orbit position each frame with the hemisphere cull re-aimed to match, renders the opposite hemisphere into a square 30%-sized bottom-left viewport. Suppressed when `isMobile`, under `navigator.webdriver` (§ headless capture), and while recording. |
+| **Picture-in-picture** | A clone of the main camera, tracking its position and orientation each frame, renders the same view into a square 30%-sized bottom-right viewport. Suppressed when `isMobile`, under `navigator.webdriver` (§ headless capture), and while recording. |
 | **Axes overlay** | Three `THREE.Line`s for X/Y/Z visible on toggle, plus a `CSS2DRenderer`-backed `LabelPool` for the six axis-direction labels ("X / Y / Z" and "-X / -Y / -Z") with zero allocation per frame. |
 | **Resize observer** | `ResizeObserver` on the canvas container recomputes camera aspect, viewport, and `isMobile` (width ≤ 900). |
 | **Fixed-rate stepping** | The simulation ticks at `1/FPS` seconds independent of the actual render rate, with a time accumulator to keep effects deterministic. |
@@ -1363,7 +1371,7 @@ static constexpr int NUM_PIXELS = 40;
 static constexpr unsigned int RPM = 480;
 ```
 
-Pin assignments are in `core/render/led.h` (also included by `hardware/pov_single.h`):
+Pin assignments are in `core/platform/led.h` (also included by `hardware/pov_single.h`):
 ```cpp
 inline constexpr int PIN_DATA   = 11;
 inline constexpr int PIN_CLOCK  = 13;
@@ -1419,7 +1427,7 @@ Three layers run the same suite so a regression can't reach the live demo:
 
 - **Local pre-commit hooks** — both repositories reject staged whitespace errors and validate documentation from an isolated copy of the Git index. POV also runs clang-format over staged first-party C++, ruff/eslint over staged sources, and the fast license/build-pin checks. Daydream runs ESLint over staged JavaScript and validates the Pages manifest graph. A required tool missing for an applicable change fails the commit. Builds, typechecking, unit suites, browser probes, firmware budgets, and coverage remain pre-push or CI, keeping the normal hook near two seconds while protected-branch `CI green` remains authoritative.
 
-- **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — on master pushes and pull-request updates (a push to a branch with no open PR triggers nothing), runs the native suite on Linux (clang-22) and builds the WASM module. The Windows leg (emsdk Clang, which exercises the `lld-link` / rc.exe toolchain branch from a plain shell) runs on master pushes only, and is the one job `ci-green` accepts as `skipped` on a pull request. It then **smoke-tests the WASM at runtime** ([`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs)) and **verifies the install provenance set** consumed by Daydream, then runs Daydream's own suite over that bundle in a `daydream-consumer` job, against the daydream commit pinned in `tools/build_pins.py`. Native coverage is retained as HTML/LCOV and has a loose 70% line floor against a current baseline around 78%, so catastrophic loss fails without pinning normal refactors to an exact artistic implementation. The native suite also runs at `-O2`, under ASan + UBSan, and for concurrency modules under TSan. A `shard-coverage` job proves every registered CTest belongs to exactly one shard. Pull requests use the quick effect tier; master runs the production-resolution IEEE correctness leg and shipping fast-math smoke leg. The six lint legs check Python, JavaScript, shell, the GitHub workflows, the `justfile`, and the profiling roster with defect-oriented rules.
+- **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — on master pushes and pull-request updates (a push to a branch with no open PR triggers nothing), runs the native suite on Linux (clang-22) and builds the WASM module. The Windows leg (emsdk Clang, which exercises the `lld-link` / rc.exe toolchain branch from a plain shell) runs on master pushes only, and is the one job `ci-green` accepts as `skipped` on a pull request. It then **smoke-tests the WASM at runtime** ([`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs)) and **verifies the install provenance set** consumed by Daydream, then runs Daydream's own suite over that bundle in a `daydream-consumer` job, against the daydream commit pinned in `tools/build_pins.py`. Native coverage is retained as HTML/LCOV and has a loose 70% line floor against a current baseline around 78%, so catastrophic loss fails without pinning normal refactors to an exact artistic implementation. The native suite also runs at `-O2`, under ASan + UBSan, and for concurrency modules under TSan. A `shard-coverage` job proves every registered CTest belongs to exactly one shard. Pull requests use the quick effect tier; master runs the production-resolution IEEE correctness leg and shipping fast-math smoke leg. The seven lint legs check line endings, Python, JavaScript, shell, the GitHub workflows, the `justfile`, and the profiling roster with defect-oriented rules.
 - **Gated deploy** (`.github/workflows/deploy.yml`, **daydream repo**) — daydream's GitHub Pages source is *GitHub Actions*. On a push to daydream's `master` (or manual dispatch), the engine's native unit suite runs as a **gate** (checking out the engine repo) alongside daydream's own JS suite and its headless-Chrome job (`browser-smoke.yml`, which drives seven probes in one runner: the page smoke over every `site_manifest.txt` entry, `workbench-probe.mjs` driving the workbench's pipeline strip with a real mouse, `panel-probe.mjs` scrolling the effect panel and requiring the offset to survive a rebuild, `solids-probe.mjs` dragging the solids page's op-chain rows into a new order, `palettes-probe.mjs` sweeping the palette strip's zoom and hue-key wheel, `mobius-probe.mjs` pressing the Möbius page's complex-plane pads, and `lissajous-probe.mjs` driving the Lissajous page's rational frequency lock). Those seven are the only checks that resolve the import map, instantiate the WASM module under a page's CSP and measure where an element actually lands — the unit suite runs over `daydream/tests/fake_dom.js`, which has neither layout nor pointer capture. `deploy` `needs: [gate, js-tests, browser-smoke]`, so only if all three pass does the workflow publish the simulator to Pages. The engine's WASM is whatever is committed in daydream (built + installed from Holosphere). If the engine repo is private, add a `POV_TOKEN` secret (a read-access PAT) for the gate's checkout.
 
 The simulator's JavaScript lives in the daydream repo and carries its own suite there: `tests/*.test.js`, run by `npm test` (`node --test`), covering the driver and clock, the sidebar and GUI, the segment workers and layout, param marshaling, color/palette math, and the geometry tools' math modules. Its anti-vacuity checks reject an empty glob, unreachable test files, shadow dependency installs, and unexplained first-party modules without pinning file, case, or assertion totals. On every pull request, [Daydream CI](https://github.com/woundedlion/daydream/blob/master/.github/workflows/ci.yml) runs the reusable static/unit suite and all seven real-browser probes, then reports one required `CI green` status. The deploy workflow calls the same suites before publishing.
@@ -1436,7 +1444,7 @@ The design specs are outside the Doxygen reference and carry their own index:
 lists each one with its status and says which spec owns which half where two
 overlap.
 
-`just docs-check` runs [`tools/docs_check.py`](https://github.com/woundedlion/pov/blob/master/tools/docs_check.py) and its own unit tests: it checks fence balance, link and anchor targets, and backticked repo paths across every tracked Markdown file. The `effects/` row of the file map above draws no subtree, so the exhaustive-tree gate cannot reach its counts; they get their own assertion instead — the header count against the tracked tree, the effect count against `HS_EFFECT_LIST`'s cardinality. The gate is **structural, not semantic**: it reads fences, targets and backticked repo paths, so a green run means the documentation's structure is intact, not that its prose is true. A wrong number in a sentence, a renamed symbol in a table, and any path written without backticks or a link are all outside what it can see; those are on the reader. `just docs` needs `doxygen` on `PATH` at the version `tools/build_pins.py` pins — it runs `build_pins.py --check-tool doxygen` first and refuses any other, because warning text and generated markup move between releases; it clones the pinned doxygen-awesome theme into `.doxygen-awesome/` on first run and synthesizes `Doxyfile.local` from `Doxyfile` plus [`docs/doxygen-theme.cfg`](https://github.com/woundedlion/pov/blob/master/docs/doxygen-theme.cfg) — the same combination `.github/workflows/docs.yml` publishes to <https://woundedlion.github.io/pov/>.
+`just docs-check` synchronizes the repository maps and source-derived counts, then runs [`tools/docs_check.py`](https://github.com/woundedlion/pov/blob/master/tools/docs_check.py) and its own unit tests: it checks fence balance, link and anchor targets, and backticked repo paths across every tracked Markdown file. The `effects/` row of the file map above draws no subtree, so the exhaustive-tree gate cannot reach its counts; they get their own assertion instead — the header count against the tracked tree, the effect count against `HS_EFFECT_LIST`'s cardinality. The gate is **structural, not semantic**: it reads fences, targets and backticked repo paths, so a green run means the documentation's structure is intact, not that its prose is true. A wrong number in a sentence, a renamed symbol in a table, and any path written without backticks or a link are all outside what it can see; those are on the reader. `just docs` needs `doxygen` on `PATH` at the version `tools/build_pins.py` pins — it runs `build_pins.py --check-tool doxygen` first and refuses any other, because warning text and generated markup move between releases; it clones the pinned doxygen-awesome theme into `.doxygen-awesome/` on first run and synthesizes `Doxyfile.local` from `Doxyfile` plus [`docs/doxygen-theme.cfg`](https://github.com/woundedlion/pov/blob/master/docs/doxygen-theme.cfg) — the same combination `.github/workflows/docs.yml` publishes to <https://woundedlion.github.io/pov/>.
 
 ### Running the Simulator — daydream repo
 
