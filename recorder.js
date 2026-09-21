@@ -675,6 +675,13 @@ export class VideoRecorder {
                 err);
             }
           }
+        }).catch((err) => {
+          // A link that throws past its own handling — a host hook raising from
+          // stop()/onSaveError — would otherwise reject `chain` for good and
+          // drop every later chunk without a word.
+          console.error(
+            'VideoRecorder: a streaming write link failed; the recording continues.',
+            err);
         }).finally(() => { backlogBytes -= data.size; });
       },
       finish: () => {

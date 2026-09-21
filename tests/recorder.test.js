@@ -1081,6 +1081,57 @@ test('a mid-stream streaming write failure stops the session and reports truncat
 });
 
 /**
+ * The write chain is serialized, so a link that rejects rejects every link
+ * queued behind it and finish()'s close along with them. A host hook is the one
+ * thing in a link the sink does not control, so it is what proves the chain
+ * survives its own diagnostics.
+ */
+test('a host hook that throws does not poison the streaming write chain', async () => {
+  const restore = installRecorderEnv();
+  const writes = [];
+  let closed = false;
+  let writeCount = 0;
+  const writable = {
+    write: async (d) => {
+      writeCount++;
+      if (writeCount === 2) throw new Error('disk full');
+      writes.push(d);
+    },
+    close: async () => { closed = true; },
+  };
+  globalThis.showSaveFilePicker = async () => ({ createWritable: async () => writable });
+  const captured = installConsoleCapture('error', 'warn');
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    const sinkFinished = trackSinkFinish(rec);
+    let downloaded = false;
+    rec.download = () => { downloaded = true; };
+    rec.onError = () => { throw new Error('host hook exploded'); };
+
+    rec.start('stream');
+    const recorder = rec.mediaRecorder;
+    recorder.ondataavailable({ data: { size: 10 } });
+    recorder.ondataavailable({ data: { size: 20 } }); // this write throws
+    await drainSink();
+    recorder.onstop();
+
+    await sinkFinished();
+
+    assert.deepEqual(writes, [{ size: 10 }], 'the pre-failure chunk reached disk');
+    assert.equal(closed, true,
+      'the on-disk prefix is still flushed, not stranded behind a rejected chain');
+    assert.equal(downloaded, false, 'no blob download of the post-failure tail');
+    assert.ok(captured.messages.some((e) => /host hook exploded/.test(e)),
+      'the swallowed host failure is reported');
+    assert.ok(captured.messages.some((e) => /truncated/.test(e)),
+      'the truncation is still reported to the user');
+  } finally {
+    captured.restore();
+    restore();
+  }
+});
+
+/**
  * A Save dialog nobody answers holds every chunk in the write chain. The sink
  * bounds that hold at 120 s of video at the latched bitrate (15 MB at 1 Mbps
  * here) and ends the session there, telling the host; the chunks queued under
