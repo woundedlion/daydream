@@ -4,8 +4,10 @@
  */
 
 // Regenerates the frozen v1->v2 digest migration table from the v1 fixtures in
-// shader/patterns/v1/. Current pattern documents are engine-owned artifacts;
-// some intentionally differ from the legacy expansion.
+// shader/patterns/v1/. Each entry maps a v1 descriptor digest onto the digest
+// of the committed document of the same name. Current pattern documents are
+// engine-owned artifacts; some intentionally differ from the legacy expansion,
+// so the expansion's own digest is not an identity anything ships.
 //
 //   node scripts/generate-shader-v2-documents.mjs
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -26,15 +28,15 @@ const catalog = JSON.parse(readFileSync(resolve(REPO, 'shader/engine_catalog.jso
 const migration = {};
 const names = readdirSync(FIXTURES).filter((name) => name.endsWith('.shader.json')).sort();
 for (const name of names) {
-  const source = readFileSync(resolve(FIXTURES, name), 'utf8');
-  const v1 = parseShaderDocument(source);
-  const compiled = compileShaderDocument(v1, { catalog });
-  if (compiled.status !== 'VALID') {
-    console.error(`${name}:`, JSON.stringify(compiled.diagnostics, null, 2));
+  const v1 = parseShaderDocument(readFileSync(resolve(FIXTURES, name), 'utf8'));
+  const successor = compileShaderDocument(
+    readFileSync(resolve(PATTERNS, name), 'utf8'), { catalog });
+  if (successor.status !== 'VALID') {
+    console.error(`${name}:`, JSON.stringify(successor.diagnostics, null, 2));
     process.exit(1);
   }
-  migration[v1DescriptorDigest(v1)] = compiled.descriptor_digest;
-  console.log(`${name} -> ${compiled.descriptor_digest}`);
+  migration[v1DescriptorDigest(v1)] = successor.descriptor_digest;
+  console.log(`${name} -> ${successor.descriptor_digest}`);
 }
 
 const table = Object.fromEntries(Object.entries(migration).sort(([a], [b]) => a < b ? -1 : 1));

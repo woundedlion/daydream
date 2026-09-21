@@ -731,21 +731,34 @@ test('every committed pattern document is its own canonical re-export', () => {
 });
 
 /**
- * The frozen migration table: every v1 descriptor digest maps to the digest
- * of its expanded v2 document, with no extra or missing entries, so digest
- * consumers can follow a v1 identity onto its v2 identity.
+ * The frozen migration table: every v1 descriptor digest maps to the digest of
+ * the committed document of the same name, with no extra or missing entries,
+ * so digest consumers can follow a v1 identity onto its v2 identity. The five
+ * identity-frame replacements differ from their expansion, whose digest no
+ * committed document carries, so the successor is read off the shipped file.
  */
 test('the digest migration table covers exactly the v1 fixtures', () => {
   const expected = new Map();
   for (const name of fixtureNames) {
-    const v1 = fixture(name);
-    const compiled = compile(v1);
-    assert.equal(compiled.status, 'VALID', name);
-    expected.set(v1DescriptorDigest(v1), compiled.descriptor_digest);
+    const successor = compile(readFileSync(new URL(name, PATTERNS), 'utf8'));
+    assert.equal(successor.status, 'VALID', name);
+    expected.set(v1DescriptorDigest(fixture(name)), successor.descriptor_digest);
   }
   assert.deepEqual(MIGRATION, Object.fromEntries(expected));
   assert.equal(Object.keys(MIGRATION).length, fixtureNames.length);
   assert.deepEqual(Object.keys(MIGRATION).sort(), legacyV1Digests);
+});
+
+/** Verifies every migration target names a document the repository ships. */
+test('every digest migration target resolves to a committed document', () => {
+  const shipped = new Map();
+  for (const name of patternNames) {
+    const compiled = compile(readFileSync(new URL(name, PATTERNS), 'utf8'));
+    assert.equal(compiled.status, 'VALID', name);
+    shipped.set(compiled.descriptor_digest, name);
+  }
+  for (const [legacy, successor] of Object.entries(MIGRATION))
+    assert.ok(shipped.has(successor), `${legacy} maps to unshipped digest ${successor}`);
 });
 
 /**
