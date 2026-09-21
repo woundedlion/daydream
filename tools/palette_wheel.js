@@ -34,8 +34,12 @@ import { maxSrgbGamutChroma, oklchLinearRgb, wrapTurns } from './palette_control
 /** Key captions, in key order. */
 export const HUE_KEY_NAMES = Object.freeze(['A', 'B', 'C', 'D']);
 
-/** Grab radius around a key marker, in canvas pixels. */
-export const HUE_KEY_GRAB_RADIUS = 16;
+/**
+ * Grab radius around a key marker, in canvas pixels. The 256 px canvas is drawn
+ * at 8.5rem (tools/palettes.css), where this clears the 24 CSS-px pointer
+ * target WCAG 2.2 asks for.
+ */
+export const HUE_KEY_GRAB_RADIUS = 23;
 
 // Slate-900, so the region outside the gamut reads as a boundary rather than as
 // the canvas edge.
