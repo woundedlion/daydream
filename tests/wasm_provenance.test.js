@@ -188,6 +188,21 @@ test('the engine checkout can fetch a pin after master advances', () => {
   assert.match(checkout, /fetch-depth: 0/);
 });
 
+// The engine-parity cases above and the hook cases skip without their flag, so
+// the workflow's declaration of the flags is what keeps a run that lost its
+// engine checkout or its shell from passing on nothing.
+test('the JS unit suite arms the engine-parity and hook cases', () => {
+  const workflow = text('.github/workflows/js-unit-suite.yml');
+  const checkout = workflow.match(
+    /- name: Checkout the pinned engine\n[\s\S]*?(?=\n\s{6}- )/,
+  )?.[0] ?? '';
+  assert.match(checkout, /^\s+path: engine$/m);
+  const step = workflow.match(/- name: Test\n[\s\S]*?(?=\n\s{6}- |\s*$)/)?.[0] ?? '';
+  assert.match(step, /^\s+HOLOSPHERE_ENGINE_REQUIRED: '1'$/m);
+  assert.match(step, /^\s+DAYDREAM_HOOK_SH_REQUIRED: '1'$/m);
+  assert.match(step, /^\s+run: npm test$/m);
+});
+
 test('pre-push verifies the working-tree artifacts', () => {
   assert.match(text('.githooks/pre-push'),
     /node --test tests\/wasm_provenance\.test\.js/);
