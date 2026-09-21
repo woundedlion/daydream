@@ -190,7 +190,6 @@ const WAVE_COLORS = ['#EF4444', '#22C55E', '#3B82F6'];
 export function drawWaveGraph({ canvas, ctx, palette }) {
   if (!ctx) return;
   const { width, height } = fitCanvasToDisplay(canvas, ctx);
-  ctx.clearRect(0, 0, width, height);
 
   // toY() is the single place the value-to-canvas-y mapping lives; every
   // wave and overlay draw below goes through it or the band edges.
