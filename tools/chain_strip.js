@@ -106,9 +106,21 @@ export const titleCase = (value) => value.split('-')
   .map((word) => (word.length === 0 ? word : word[0].toUpperCase() + word.slice(1)))
   .join(' ');
 
-/** @param {number} value @returns {string} A binary32-useful editable value. */
-const formatNumericValue = (value) =>
-  String(Number(Number(value).toPrecision(7)));
+// Nine significant digits round-trip every binary32; seven do not.
+const READOUT_DIGITS = 9;
+
+/**
+ * @param {number} value - A stored parameter value.
+ * @returns {string} The shortest decimal that reads back as the same binary32.
+ */
+const formatNumericValue = (value) => {
+  const stored = Math.fround(Number(value));
+  for (let digits = 1; digits < READOUT_DIGITS; digits += 1) {
+    const text = String(Number(Number(value).toPrecision(digits)));
+    if (Math.fround(Number(text)) === stored) return text;
+  }
+  return String(Number(Number(value).toPrecision(READOUT_DIGITS)));
+};
 
 /**
  * @param {ParameterDeclaration} declaration - A binary32 declaration.
