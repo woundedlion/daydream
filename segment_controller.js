@@ -1114,12 +1114,14 @@ export class SegmentController {
    * @param {number} h
    */
   setResolution(w, h) {
-    // A faulted pool is broken until re-created; recovery is a rebuild (active) or
-    // the next create() (inactive), both of which re-read the size from appState.
+    // A faulted pool is broken until re-created. The rebuild is left to the
+    // setEffect() the apply pipeline runs next, which reads appState after the
+    // pipeline has corrected an effect this resolution does not offer; spawning
+    // here would seed every worker with the outgoing effect. The budget is
+    // cleared rather than spent, so the resolution change stays the unbounded
+    // restart path the fault banner names.
     if (this.faulted) {
-      if (this.active) {
-        this.create(this.count);
-      }
+      this.faultedRebuilds = 0;
       return;
     }
     // Open a new generation: in-flight and settled results were sized to the old

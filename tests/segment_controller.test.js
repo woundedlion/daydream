@@ -1101,6 +1101,7 @@ test('a startup abort with nothing constructed still recovers on a rebuild', () 
 
   FakeWorker.failConstructionAt = -1;
   c.setResolution(4, 4);
+  c.setEffect('AfterResize');
   assert.equal(c.faulted, false, 'recreating the pool cleared the fault latch');
   assert.equal(c.workers.length, 2, 'a fresh pool of workers was built');
 });
@@ -1569,7 +1570,11 @@ test('destroy() clears the fault latch so a fresh pool can recover', () => {
   assert.equal(c.faultInfo, null);
 });
 
-test('setResolution on a faulted active pool rebuilds it and clears the fault', () => {
+// applyResolution() corrects an effect the new resolution does not offer after
+// it has told the pool the new size, so a pool spawned inside setResolution
+// would build every worker on the outgoing effect and refault before the
+// correction reached it.
+test('a faulted setResolution leaves the rebuild to the apply pipeline', () => {
   const c = makeController();
   c.active = true;
   c.create(2);
@@ -1578,6 +1583,10 @@ test('setResolution on a faulted active pool rebuilds it and clears the fault', 
   assert.equal(c.faulted, true);
 
   c.setResolution(8, 8);
+  assert.equal(c.faulted, true, 'the latch is held until the effect is settled');
+  assert.equal(FakeWorker.instances.length, beforeCount, 'no pool was spawned');
+
+  c.setEffect('NewEffect');
   assert.equal(c.faulted, false, 'recreating the pool cleared the fault latch');
   assert.equal(c.workers.length, 2, 'a fresh pool of workers was built');
   assert.equal(FakeWorker.instances.length, beforeCount + 2, 'new workers were spawned');
@@ -1636,8 +1645,10 @@ test('a pool that reaches ready restores the faulted effect-switch budget', () =
   }
   assert.equal(c.faulted, true, 'the budget is spent');
 
-  // A resolution change is user-driven and stays unbounded, as the fault banner says.
+  // A resolution change is user-driven and stays unbounded, as the fault banner
+  // says: it restores the budget the setEffect behind it then spends.
   c.setResolution(8, 8);
+  c.setEffect('AfterResize');
   assert.equal(c.faulted, false, 'the resolution change rebuilt the latched pool');
   deliverReady(c, 0);
   deliverReady(c, 1);
@@ -1682,6 +1693,7 @@ test('a pause toggled on a faulted pool is carried into the rebuilt one', () => 
 
   c.setAnimationsPaused(true);
   c.setResolution(8, 8);
+  c.setEffect('AfterResize');
 
   for (const w of c.workers) {
     const init = w.posted.find((m) => m.type === 'init');
