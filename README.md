@@ -1397,8 +1397,11 @@ The unit suite is a native (non-WASM) Clang build with asserts enabled, also dri
 ```bash
 cmake --preset tests          # configure (cmake/toolchain-native-clang.cmake)
 cmake --build --preset tests  # build the run_tests executable
-ctest --preset tests          # run the suite (or: just test)
+ctest --preset tests          # run the suite at the 8-frame default window
+just test                     # the same suite at CI's 120-frame window
 ```
+
+The per-effect smoke and determinism window is `HS_SMOKE_FRAMES`, 8 frames by default. At 8 frames no preset transition arms, so the pause, slot-reuse and FIFO-expiry paths never execute; `just test` and every CI leg raise it to 120, and `run_tests` refuses a shallower window when `CI` is set.
 
 The suite must use Clang — the engine relies on GCC/Clang `__attribute__` extensions MSVC rejects. The native toolchain file ([`cmake/toolchain-native-clang.cmake`](https://github.com/woundedlion/pov/blob/master/cmake/toolchain-native-clang.cmake)) locates Clang via `EMSDK` (or a sibling `../emsdk`) and, on Windows, transparently handles the resource compiler and `lld-link` so no Visual Studio Developer Prompt is required. Reusable CMake interface targets select test capabilities and widen the host-only budgets: the inline type-erased animation slot (the 64-bit host inflates every embedded pointer past the 32-bit device footprint) and, most significantly, `GLOBAL_ARENA_SIZE` — **8 MiB for host effect harnesses against the device's 298 KiB**, so the effect smoke harness can render every effect without OOMing mid-run. The firmware/WASM footprint is unchanged: the real budget stays available as `DEVICE_GLOBAL_ARENA_SIZE`, which the device-budget `static_assert`s check even in the host suite. A high-water mark measured in the native suite is therefore *not* a device figure — it is a 64-bit measurement against an inflated ceiling.
 
