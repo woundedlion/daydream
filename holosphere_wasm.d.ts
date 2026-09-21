@@ -177,11 +177,11 @@ export interface HolosphereEngine {
    * this beside a snapshot and rebuild the definitions when it moves.
    */
   getParamGeneration(): number;
-  /** Complete ShaderBall state, independent of the visible parameter schema. */
+  /** Complete Shader workbench state, independent of the visible parameter schema. */
   getFullConfigSnapshot(): FullConfigSnapshot | null;
   /** Atomically restore accepted, requested, pending, and optional runtime state. */
   restoreFullConfigSnapshot(snapshot: FullConfigSnapshot): EnumValue;
-  /** Stable field ids and names in ConfigFieldId order; null with no ShaderBall loaded. */
+  /** Stable field ids and names in ConfigFieldId order; null with no Shader workbench loaded. */
   getFullConfigFieldDefinitions(): FullConfigFieldDefinition[] | null;
   getConfigImportNotice(): string;
   clearConfigImportNotice(): void;
