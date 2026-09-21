@@ -179,6 +179,19 @@ test('deploy consumes one checksummed engine bundle at the module pin', () => {
   assert.doesNotMatch(workflow, /cmake --build|path: engine/);
 });
 
+// A served Content-Type needs a live URL, so only the assets behind it can be
+// checked ahead of the deployment; the presence check is that half.
+test('deploy checks the engine assets it stages before it publishes them', () => {
+  const workflow = text('.github/workflows/deploy.yml');
+  const staged = workflow.indexOf('name: Verify the staged engine assets');
+  const published = workflow.indexOf('uses: actions/deploy-pages@');
+  const served = workflow.indexOf('name: Verify published engine MIME types');
+  assert.ok(staged >= 0 && published >= 0 && served >= 0,
+    `staged ${staged}, published ${published}, served ${served}`);
+  assert.ok(staged < published, 'the staged assets are checked before publication');
+  assert.ok(published < served, 'a served Content-Type exists only once published');
+});
+
 test('deploy stops waiting when the pinned engine run cannot publish', () => {
   const workflow = text('.github/workflows/deploy.yml');
   assert.match(workflow, /\) \|\| true/);

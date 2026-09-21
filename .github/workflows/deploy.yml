@@ -112,6 +112,10 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      # The engine pair the browser instantiates, staged and then served. Both
+      # steps below read this list, so neither can check a different set.
+      ENGINE_ASSETS: holosphere_wasm.wasm holosphere_wasm.js
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -132,16 +136,36 @@ jobs:
             cp -r "$path" "_site/$(dirname "$path")/"
           done < site_manifest.txt
           exit $status
+      # Pages derives a Content-Type from the served path, so an asset missing
+      # from the staged tree is served as a 404 page under the engine's name.
+      # That is the half of the check below that can be made before publishing,
+      # and it runs here rather than against the live site.
+      - name: Verify the staged engine assets
+        run: |
+          status=0
+          for asset in $ENGINE_ASSETS; do
+            case "$asset" in
+              *.wasm|*.js) ;;
+              *) echo "::error::$asset has no Content-Type this workflow knows"; status=1 ;;
+            esac
+            if [ ! -s "_site/$asset" ]; then
+              echo "::error::_site/$asset is missing or empty; Pages would serve a 404 for it"
+              status=1
+            fi
+          done
+          exit $status
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: _site
       - id: deployment
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+      # A served Content-Type exists only once the site is published, so this
+      # confirms what the step above could only predict.
       - name: Verify published engine MIME types
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
-          for asset in holosphere_wasm.wasm holosphere_wasm.js; do
+          for asset in $ENGINE_ASSETS; do
             mime="$(curl --fail --silent --show-error --location --retry 5 --retry-all-errors --output /dev/null --write-out '%{content_type}' "${PAGE_URL%/}/$asset")"
             case "$asset:$mime" in
               *.wasm:application/wasm*|*.js:text/javascript*|*.js:application/javascript*) ;;
