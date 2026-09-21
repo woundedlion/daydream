@@ -209,6 +209,18 @@ test('a socket names the function by the carrier its crossing produces', async (
     'the sphere to field crossing is a source, not a second Color socket');
 });
 
+test('a carrier the chain passes over has no band', async () => {
+  const h = await makeStrip();
+  assert.equal(h.store.replaceSpan(PROJECT, 3,
+    [{ operator: 'sample.spherical-noise.v3' }]).ok, true);
+  h.strip.render();
+
+  assert.deepEqual(
+    h.container.querySelectorAll('.chain-band').map((band) => band.dataset.carrier),
+    ['sphere', 'field'],
+    'a framed, titled plane band would hold no gap, chip or socket');
+});
+
 test('a socket collapses an emptied band and expands back out of one', async () => {
   const h = await makeStrip();
   chipByLabel(h, 'warp2').dispatch('keydown', { key: 'Delete' });
@@ -225,8 +237,8 @@ test('a socket collapses an emptied band and expands back out of one', async () 
     ['sphere.rotate.v2', 'sphere.lens.kaleidoscope.v2',
       'sample.spherical-rings.v3', 'colorize.generated-palette.v3'],
     'the one source replaces both crossings');
-  assert.equal(bandFor(h, 'plane').querySelector('.chain-band-add'), null,
-    'a skipped band has no gap to insert at');
+  assert.equal(bandFor(h, 'plane') === undefined, true,
+    'a skipped band has no gap to insert at, so it is not drawn');
 
   select = h.container.querySelectorAll('.chain-chip--socket')[0]
     .querySelector('.chain-chip-replace');
