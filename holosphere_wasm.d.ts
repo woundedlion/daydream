@@ -324,6 +324,48 @@ export interface MeshOpsStatics {
   getArenaMetrics(): MeshArenaMetrics;
 }
 
+/** What setClip() answers, compared by identity against the member. */
+export type ClipSetResultEnum = {
+  APPLIED: EnumValue;
+  NO_EFFECT: EnumValue;
+  INVALID_BOUNDS: EnumValue;
+  FULL_FRAME_KEPT: EnumValue;
+};
+
+/** What setParameter() answers, compared by identity against the member. */
+export type ParamSetResultEnum = {
+  APPLIED: EnumValue;
+  NO_EFFECT: EnumValue;
+  UNKNOWN_PARAM: EnumValue;
+  READONLY: EnumValue;
+  NON_FINITE: EnumValue;
+};
+
+/** What restoreFullConfigSnapshot() answers, compared by identity against the member. */
+export type FullConfigRestoreResultEnum = {
+  APPLIED: EnumValue;
+  NOT_SHADER_WORKBENCH: EnumValue;
+  UNSUPPORTED_VERSION: EnumValue;
+  INVALID_LENGTH: EnumValue;
+  INVALID_VALUE: EnumValue;
+  INVALID_ACCEPTED: EnumValue;
+  INVALID_PENDING: EnumValue;
+};
+
+/** What setResolution() answers, compared by identity against the member. */
+export type ResolutionSetResultEnum = {
+  RESIZED: EnumValue;
+  ALREADY_ACTIVE: EnumValue;
+  UNSUPPORTED: EnumValue;
+};
+
+/** What setEffect() answers, compared by identity against the member. */
+export type EffectSetResultEnum = {
+  INSTALLED: EnumValue;
+  UNKNOWN_EFFECT: EnumValue;
+  UNSUPPORTED_RESOLUTION: EnumValue;
+};
+
 /** Why a MeshOps call answered null, compared by identity against the member. */
 export interface MeshOpResultEnum {
   OK: EnumValue;
@@ -420,38 +462,11 @@ export interface HolosphereModule {
      */
     getShaderChainCatalog(): string;
   };
-  ClipSetResult: {
-    APPLIED: EnumValue;
-    NO_EFFECT: EnumValue;
-    INVALID_BOUNDS: EnumValue;
-    FULL_FRAME_KEPT: EnumValue;
-  };
-  ParamSetResult: {
-    APPLIED: EnumValue;
-    NO_EFFECT: EnumValue;
-    UNKNOWN_PARAM: EnumValue;
-    READONLY: EnumValue;
-    NON_FINITE: EnumValue;
-  };
-  FullConfigRestoreResult: {
-    APPLIED: EnumValue;
-    NOT_SHADER_WORKBENCH: EnumValue;
-    UNSUPPORTED_VERSION: EnumValue;
-    INVALID_LENGTH: EnumValue;
-    INVALID_VALUE: EnumValue;
-    INVALID_ACCEPTED: EnumValue;
-    INVALID_PENDING: EnumValue;
-  };
-  ResolutionSetResult: {
-    RESIZED: EnumValue;
-    ALREADY_ACTIVE: EnumValue;
-    UNSUPPORTED: EnumValue;
-  };
-  EffectSetResult: {
-    INSTALLED: EnumValue;
-    UNKNOWN_EFFECT: EnumValue;
-    UNSUPPORTED_RESOLUTION: EnumValue;
-  };
+  ClipSetResult: ClipSetResultEnum;
+  ParamSetResult: ParamSetResultEnum;
+  FullConfigRestoreResult: FullConfigRestoreResultEnum;
+  ResolutionSetResult: ResolutionSetResultEnum;
+  EffectSetResult: EffectSetResultEnum;
   MeshOps: MeshOpsStatics;
   MeshOpResult: MeshOpResultEnum;
   PaletteOps: { new (): PaletteOps };
