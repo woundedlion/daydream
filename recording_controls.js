@@ -25,7 +25,8 @@ import { errorDetail } from "./tools/banner.js";
  * @param {{addFolder: (title: string) => *}} deps.gui - The global GUI root the
  *   folder is added under.
  * @param {*} deps.driver - The driver: its frame interval, its axis-label state,
- *   and the recorder handle it renders through.
+ *   the recorder handle it renders through, and the invalidate that redraws the
+ *   PiP a session suppresses.
  * @param {() => ?Object} deps.getRecorder - Reads the live recorder, null until
  *   the module load resolves.
  * @param {() => string} deps.getEffect - Names the effect a session records.
@@ -91,6 +92,7 @@ export function createRecordingControls({
       durationEl.style.display = 'none';
       recordCtrl.name('\u25cf Record');
     }
+    driver.invalidate();
   };
 
   const recordState = { record: () => {
