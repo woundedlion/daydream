@@ -116,7 +116,12 @@ export class ModuleWarmer {
           }),
         () => { publish(null); }),
       ]).then(() => {});
-    } catch {
+    } catch (error) {
+      // Reported like the compile and deadline failures below; the dedupe
+      // window stays shut, since nothing was warmed for a later caller to be
+      // handed.
+      console.warn('[Segmented] module warm could not be started; each worker '
+        + 'will fetch and compile its own', error);
       return Promise.resolve();
     }
     warm = warmWithDeadline(warm, deadlineMs, timers, () => {

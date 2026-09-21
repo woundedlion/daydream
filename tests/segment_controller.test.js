@@ -211,10 +211,21 @@ test('the dedupe window covers one base URL, not every caller in it', async () =
 test('a warm whose fetch throws synchronously does not claim the window', async () => {
   const baseUrl = 'http://localhost:8000/offline/segment_controller.js';
   const warmer = new ModuleWarmer();
-  await warmer.warm({
-    baseUrl, minIntervalMs: WARM_INTERVAL_MS, now: () => 0,
-    fetch: () => { throw new TypeError('network down'); },
-  });
+  const warned = [];
+  const stub = mock.method(console, 'warn', (...args) => { warned.push(args); });
+  try {
+    await warmer.warm({
+      baseUrl, minIntervalMs: WARM_INTERVAL_MS, now: () => 0,
+      fetch: () => { throw new TypeError('network down'); },
+    });
+  } finally {
+    stub.mock.restore();
+  }
+  // Silent here alone, where every other warm failure reports itself, a pool
+  // that spawned with no shared compilation leaves nothing to explain why.
+  assert.equal(warned.length, 1, 'the refused warm is reported');
+  assert.match(String(warned[0][0]), /module warm could not be started/);
+  assert.match(String(warned[0][1]), /network down/);
 
   let calls = 0;
   await warmer.warm({
