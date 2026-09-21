@@ -52,8 +52,8 @@ export async function probeStrip(tab) {
     'the local effect panel is absent');
   check(await tab.$('#gui-container > .global-gui') !== null,
     'global controls remain mounted');
-  // The band + palette replaced a stage library panel and drag-and-drop
-  // insertion, so the strip is the only chain region the page mounts.
+  // The strip is the only chain region the page mounts: no stage library
+  // panel and no drag-and-drop insertion.
   const regions = await tab.$$eval('.main-area > *',
     (nodes) => nodes.map((node) => node.id).join());
   const draggable = await tab.$('#chain-strip [draggable="true"]');
@@ -398,8 +398,8 @@ export async function probeStrip(tab) {
   check(sphereAfter.join() === [...sphereBefore].reverse().join(),
     `reorder buttons move stages (${sphereAfter.join(', ')})`);
 
-  // The retired drag reorder was pointer-driven, so only a real press over a
-  // second stage in the same band shows whether a drop target survived it.
+  // Reorder is button-driven only; a real press dragged over a second stage in
+  // the same band is how a drop target would show itself.
   const sphereLabels = await tab.$$eval('.chain-band[data-carrier="sphere"] .chain-chip',
     (nodes) => nodes.map((node) => (node instanceof HTMLElement ? node.dataset.label ?? '' : '')));
   const dragged = await boxOf(tab,
