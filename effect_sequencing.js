@@ -442,11 +442,11 @@ export function createApplyPipeline({
    *   dropping its effect-specific URL entries regardless).
    * @returns {string} ApplyResult.APPLIED, else ApplyResult.REJECTED. REJECTED is
    *   not a no-op: only the two early rejections — an unknown preset name, and an
-   *   engine setResolution rejection — leave everything as it was. A refused
-   *   effect correction or a rejected applyEffect returns REJECTED after the
-   *   engine, worker pool, driver and sidebar have already moved to the new
-   *   resolution, so recovery is the caller's rollback re-apply, not a return
-   *   here; reverting appState alone leaves those mutations standing.
+   *   engine setResolution rejection — leave everything as it was. A rejected
+   *   applyEffect returns REJECTED after the engine, worker pool, driver and
+   *   sidebar have already moved to the new resolution, so recovery is the
+   *   caller's rollback re-apply, not a return here; reverting appState alone
+   *   leaves those mutations standing.
    */
   function applyResolution(preserveParams = false) {
     const resolution = appState.get('resolution');
@@ -504,7 +504,6 @@ export function createApplyPipeline({
       // and so fails, reporting the unrecoverable banner. The resolution
       // transaction's own rollback recovers instead.
       muteSubscription(() => appState.set('effect', nextEffect));
-      if (appState.get('effect') !== nextEffect) return ApplyResult.REJECTED;
     }
 
     // A correction's param URL entries belong to the effect it dropped.

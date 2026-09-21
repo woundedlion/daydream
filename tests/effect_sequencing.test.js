@@ -413,7 +413,6 @@ function makeApp({
   presetCountsFailure = null,
   noEngine = false,
   segmented = false,
-  refuseEffectSet = false,
   subscribeEffect = false,
 } = {}) {
   const log = [];
@@ -428,7 +427,6 @@ function makeApp({
     get: (key) => state[key],
     set: (key, value) => {
       log.push(`state.set ${key}=${value}`);
-      if (refuseEffectSet && key === 'effect') return;
       state[key] = value;
       // The app applies an effect change through its appState subscription,
       // which a muted write suppresses.
@@ -722,14 +720,6 @@ test('a preserving apply that keeps the effect keeps its param URL entries', () 
   app.pipeline.applyResolution(true);
 
   assert.equal(app.log.includes('clearEffectParamUrl'), false);
-});
-
-test('a refused effect correction rejects the resolution change', () => {
-  const app = makeApp({ resolution: 'Lo', effect: 'Gamma', refuseEffectSet: true });
-
-  assert.equal(app.pipeline.applyResolution(), ApplyResult.REJECTED);
-
-  assert.equal(app.log.includes('driver.invalidate'), false);
 });
 
 test('an effect the resized engine rejects rejects the resolution change', () => {
