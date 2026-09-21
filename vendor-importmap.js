@@ -5,9 +5,8 @@
  * per-page configuration.
  *
  * The local-vs-CDN decision is BAKED AT BUILD TIME into the VENDOR block
- * below (no runtime probing — the old synchronous-XHR HEAD probes blocked the
- * main thread and 404'd on the CDN-only Pages deploy). The committed default
- * is CDN, which is what the deploy and a fresh checkout serve.
+ * below; nothing is probed at runtime. The committed default is CDN, which is
+ * what the deploy and a fresh checkout serve.
  *
  *   For offline / local dev with vendored libraries:
  *       npm run importmap:local   # detects three.js/ + node_modules/ and rewrites VENDOR
