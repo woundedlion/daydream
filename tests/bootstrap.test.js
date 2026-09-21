@@ -328,19 +328,22 @@ test('refreshModuleCache re-fetches same-origin scripts past the cache', async (
       'http://localhost:8000/shader/shader_workbench.mjs',
       'http://localhost:8000/shader/sha256.mjs',
       // Glue and binary are bound by content hash, so a cached binary against
-      // fresh glue is exactly the skew Reload exists to clear.
-      'http://localhost:8000/holosphere_wasm.wasm',
+      // fresh glue is exactly the skew Reload exists to clear. The glue appends
+      // that hash as a query, which the extension test has to look past.
+      'http://localhost:8000/holosphere_wasm.wasm?v=fd73baf',
     ),
     fetch: (url, options) => { calls.push([url, options]); return Promise.resolve(); },
   });
 
+  // The binary leads: it is the slowest re-fetch and the skew the sweep exists
+  // to clear, and the page loads it last. The rest keep load order.
   assert.deepEqual(calls.map(([url]) => url), [
+    'http://localhost:8000/holosphere_wasm.wasm?v=fd73baf',
     'http://localhost:8000/daydream.js',
     'http://localhost:8000/effect_sequencing.js',
     'http://localhost:8000/tools/shared.js?v=2',
     'http://localhost:8000/shader/shader_workbench.mjs',
     'http://localhost:8000/shader/sha256.mjs',
-    'http://localhost:8000/holosphere_wasm.wasm',
   ]);
   for (const [, options] of calls) assert.deepEqual(options, { cache: 'reload' });
 });
