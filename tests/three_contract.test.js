@@ -17,13 +17,16 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import * as fake from './fake_three.js';
 import { fakeElement } from './fake_dom.js';
 
-// Classes tools/shared.js constructs, and so the double must carry.
-const STOOD_IN = [
-  'Object3D', 'Scene', 'Color', 'SphereGeometry', 'MeshBasicMaterial', 'Mesh',
-  'PerspectiveCamera', 'WebGLRenderer', 'AmbientLight', 'DirectionalLight',
-  'SpotLight', 'Vector3', 'BufferGeometry', 'Float32BufferAttribute', 'Points',
-  'LineSegments',
-];
+// A class declaration's prototype is non-writable, which is what separates the
+// double's classes from the attribute factories it also exports.
+const isClass = (value) => typeof value === 'function'
+  && Object.getOwnPropertyDescriptor(value, 'prototype')?.writable === false;
+
+// Derived from the double, so a class added to it is pinned with no edit here.
+const STOOD_IN = Object.keys(fake).filter((name) => isClass(fake[name]));
+
+// The one class the double stands in for that three itself does not export.
+const ADDONS = { OrbitControls };
 
 /**
  * The vector arithmetic tools/solid_render.js emits its positions with, run
@@ -70,9 +73,9 @@ function realControls() {
 }
 
 test('three still exports every class the double stands in for', () => {
+  assert.ok(STOOD_IN.length > 10, `the double's classes read as ${STOOD_IN}`);
   for (const name of STOOD_IN) {
-    assert.equal(typeof THREE[name], 'function', `three.${name}`);
-    assert.equal(typeof fake[name], 'function', `fake_three.${name}`);
+    assert.equal(typeof (ADDONS[name] ?? THREE[name]), 'function', `three.${name}`);
   }
 });
 
