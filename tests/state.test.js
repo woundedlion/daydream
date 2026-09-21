@@ -1,6 +1,7 @@
 import { test, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { captureConsole, installConsoleCapture } from './fake_console.js';
+import { installWindow, restoreWindowAfterEach } from './fake_dom.js';
 import {
   AppState,
   URLSync,
@@ -16,13 +17,11 @@ import {
 
 // Dispose the active URLSync before restoring window: a debounced flush() would
 // otherwise fire into a deleted window after teardown.
-const savedWindow = globalThis.window;
 afterEach(() => {
   const sync = getActiveURLSync();
   if (sync) sync.dispose();
-  if (savedWindow === undefined) delete globalThis.window;
-  else globalThis.window = savedWindow;
 });
+restoreWindowAfterEach();
 
 test('AppState.get returns defaults and set updates', () => {
   const s = new AppState({ a: 1, b: 'x' });
@@ -207,24 +206,20 @@ test('the documented URL-write limits are the exported ones', () => {
 // --- URLSync (needs a minimal window stub) ---
 
 /**
- * Installs a minimal global `window` stub so URLSync can read location.search
- * and so history.replaceState writes can be captured for assertions.
+ * Installs a window whose history.replaceState records each URL it is handed,
+ * so URLSync's writes can be asserted.
  * @param {string} [search] - The location.search query string (e.g. '?effect=Voronoi').
  * @param {string} [pathname] - The location.pathname the stub reports.
  * @param {string} [hash] - The location.hash the stub reports (always a string in a
  *   real browser; '' when no fragment).
  * @returns {Array<string>} A live array that collects each URL passed to history.replaceState.
  */
-function installWindow(search = '', pathname = '/', hash = '') {
+function installRecordingWindow(search = '', pathname = '/', hash = '') {
   const calls = [];
-  globalThis.window = {
+  installWindow({
     location: { search, pathname, hash },
-    history: {
-      replaceState: (state, title, url) => { calls.push(url); },
-    },
-    setTimeout: (fn, ms) => setTimeout(fn, ms),
-    clearTimeout: (id) => clearTimeout(id),
-  };
+    history: { replaceState: (state, title, url) => { calls.push(url); } },
+  });
   return calls;
 }
 
@@ -257,19 +252,19 @@ function fakeUrlTimer() {
 }
 
 test('writeUrl assembles pathname, query and hash', () => {
-  const calls = installWindow('', '/sim', '#frag');
+  const calls = installRecordingWindow('', '/sim', '#frag');
   writeUrl(new URLSearchParams('effect=Voronoi&speed=2'));
   assert.deepEqual(calls, ['/sim?effect=Voronoi&speed=2#frag']);
 });
 
 test('writeUrl drops the query separator when no params survive', () => {
-  const calls = installWindow('?effect=Voronoi', '/sim', '#frag');
+  const calls = installRecordingWindow('?effect=Voronoi', '/sim', '#frag');
   writeUrl(new URLSearchParams());
   assert.deepEqual(calls, ['/sim#frag']);
 });
 
 test('the URL layer reads and writes the window it was handed', () => {
-  const globalCalls = installWindow('?effect=Global', '/global', '');
+  const globalCalls = installRecordingWindow('?effect=Global', '/global', '');
   const injectedCalls = [];
   const injected = {
     location: { search: '?effect=Injected', pathname: '/injected', hash: '' },
@@ -291,7 +286,7 @@ test('the URL layer reads and writes the window it was handed', () => {
  * ambient one, and dispose() must take it back down.
  */
 test('URLSync arms and cancels its debounce on the window it was handed', () => {
-  installWindow('?effect=Global', '/global', '');
+  installRecordingWindow('?effect=Global', '/global', '');
   const timer = fakeUrlTimer();
   const injected = {
     location: { search: '', pathname: '/injected', hash: '' },
@@ -313,7 +308,7 @@ test('URLSync arms and cancels its debounce on the window it was handed', () => 
 });
 
 test('URLSync.reset leaves a bare path when nothing survives', () => {
-  const calls = installWindow('?effect=Voronoi&speed=2', '/sim', '#frag');
+  const calls = installRecordingWindow('?effect=Voronoi&speed=2', '/sim', '#frag');
   const sync = new URLSync(new AppState({ effect: 'Voronoi' }), []);
 
   sync.reset();
@@ -328,12 +323,10 @@ test('URLSync.reset leaves a bare path when nothing survives', () => {
  * all inside a switch rollback, where it would be read as unrecoverable state.
  */
 test('a refused history write does not propagate out of the URL layer', () => {
-  globalThis.window = {
-    location: { search: '', pathname: '/sim', hash: '' },
+  installWindow({
+    location: { pathname: '/sim' },
     history: { replaceState() { throw new Error('rate limit'); } },
-    setTimeout: (fn, ms) => setTimeout(fn, ms),
-    clearTimeout: (id) => clearTimeout(id),
-  };
+  });
   const captured = installConsoleCapture('warn');
   try {
     assert.doesNotThrow(() => replaceUrl('/sim?effect=Voronoi'));
@@ -358,8 +351,8 @@ test('URLSync holds its ad-hoc buffer through a refused history write', () => {
   let refuse = true;
   const timer = fakeUrlTimer();
   const captured = installConsoleCapture('warn');
-  globalThis.window = {
-    location: { search: '', pathname: '/sim', hash: '' },
+  installWindow({
+    location: { pathname: '/sim' },
     history: {
       replaceState: (state, title, url) => {
         if (refuse) throw new Error('rate limit');
@@ -368,7 +361,7 @@ test('URLSync holds its ad-hoc buffer through a refused history write', () => {
     },
     setTimeout: timer.setTimeout,
     clearTimeout: timer.clearTimeout,
-  };
+  });
   try {
     const sync = new URLSync(new AppState({ effect: 'Voronoi' }), ['effect']);
     sync.setParam('scale', 3);
@@ -401,8 +394,8 @@ test('URLSync bounds its retries of a refused history write', () => {
   let refuse = true;
   const timer = fakeUrlTimer();
   const captured = installConsoleCapture('warn');
-  globalThis.window = {
-    location: { search: '', pathname: '/sim', hash: '' },
+  installWindow({
+    location: { pathname: '/sim' },
     history: {
       replaceState: (state, title, url) => {
         if (refuse) throw new Error('SecurityError');
@@ -411,7 +404,7 @@ test('URLSync bounds its retries of a refused history write', () => {
     },
     setTimeout: timer.setTimeout,
     clearTimeout: timer.clearTimeout,
-  };
+  });
   try {
     const sync = new URLSync(new AppState({ effect: 'Voronoi' }), ['effect']);
     sync.setParam('scale', 3);
@@ -445,8 +438,8 @@ test('URLSync will not let a concurrent write shorten an armed retry', () => {
   const timer = fakeUrlTimer();
   const warn = console.warn;
   console.warn = () => {};
-  globalThis.window = {
-    location: { search: '', pathname: '/sim', hash: '' },
+  installWindow({
+    location: { pathname: '/sim' },
     history: {
       replaceState: (state, title, url) => {
         if (refuse) throw new Error('rate limit');
@@ -455,7 +448,7 @@ test('URLSync will not let a concurrent write shorten an armed retry', () => {
     },
     setTimeout: timer.setTimeout,
     clearTimeout: timer.clearTimeout,
-  };
+  });
   try {
     const state = new AppState({ effect: 'Voronoi' });
     const sync = new URLSync(state, ['effect']);
@@ -481,7 +474,7 @@ test('URLSync will not let a concurrent write shorten an armed retry', () => {
 });
 
 test('URLSync reads initial tracked keys from the URL into state', () => {
-  installWindow('?effect=Voronoi&res=high&untracked=1');
+  installRecordingWindow('?effect=Voronoi&res=high&untracked=1');
   const s = new AppState({ effect: 'Moire', res: 'low' });
   new URLSync(s, ['effect', 'res']);
   assert.equal(s.get('effect'), 'Voronoi');
@@ -491,7 +484,7 @@ test('URLSync reads initial tracked keys from the URL into state', () => {
 test('URLSync defers a tracked identity rewrite until resume', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const calls = installWindow('?effect=ShaderBall', '/sim');
+    const calls = installRecordingWindow('?effect=ShaderBall', '/sim');
     const state = new AppState({ effect: 'ShaderBall' });
     const sync = new URLSync(state, ['effect']);
     sync.suspend();
@@ -512,7 +505,7 @@ test('URLSync defers a tracked identity rewrite until resume', () => {
 test('URLSync counts nested suspensions and writes on the outermost resume', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const calls = installWindow('?effect=ShaderBall', '/sim');
+    const calls = installRecordingWindow('?effect=ShaderBall', '/sim');
     const state = new AppState({ effect: 'ShaderBall' });
     const sync = new URLSync(state, ['effect']);
     sync.suspend();
@@ -537,7 +530,7 @@ test('URLSync counts nested suspensions and writes on the outermost resume', () 
 test('URLSync ignores a resume with no suspension outstanding', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const calls = installWindow('?effect=ShaderBall', '/sim');
+    const calls = installRecordingWindow('?effect=ShaderBall', '/sim');
     const state = new AppState({ effect: 'ShaderBall' });
     const sync = new URLSync(state, ['effect']);
 
@@ -563,7 +556,7 @@ test('URLSync ignores a resume with no suspension outstanding', () => {
 test('URLSync suspend disarms the flush the constructor already armed', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const calls = installWindow('?effect=bogus', '/sim');
+    const calls = installRecordingWindow('?effect=bogus', '/sim');
     const state = new AppState({ effect: 'ShaderBall' });
     // Rejected by the validator, so the constructor arms a canonicalizing flush.
     const sync = new URLSync(state, ['effect'], { effect: (v) => v === 'Shader' });
@@ -587,7 +580,7 @@ test('URLSync resume keeps a suspended retry at the ladder delay', () => {
   const warn = console.warn;
   console.warn = () => {};
   try {
-    installWindow('?effect=bogus', '/sim');
+    installRecordingWindow('?effect=bogus', '/sim');
     globalThis.window.history.replaceState = () => { throw new Error('rate limited'); };
     const state = new AppState({ effect: 'ShaderBall' });
     const sync = new URLSync(state, ['effect'], { effect: (v) => v === 'Shader' });
@@ -605,7 +598,7 @@ test('URLSync resume keeps a suspended retry at the ladder delay', () => {
 });
 
 test('URLSync validator rejects an invalid URL value and keeps the default', () => {
-  installWindow('?effect=Voronoi&res=bogus');
+  installRecordingWindow('?effect=Voronoi&res=bogus');
   const s = new AppState({ effect: 'Moire', res: 'low' });
   new URLSync(s, ['effect', 'res'], { res: (v) => v === 'high' || v === 'low' });
   assert.equal(s.get('effect'), 'Voronoi');
@@ -613,7 +606,7 @@ test('URLSync validator rejects an invalid URL value and keeps the default', () 
 });
 
 test('URLSync validates against its own validators, not inherited members', () => {
-  installWindow('?propertyIsEnumerable=high');
+  installRecordingWindow('?propertyIsEnumerable=high');
   const s = new AppState({ propertyIsEnumerable: 'low' });
   // Object.prototype.propertyIsEnumerable called on the validator map answers
   // false for every raw value, so an inherited hit would reject the whole key.
@@ -622,21 +615,21 @@ test('URLSync validates against its own validators, not inherited members', () =
 });
 
 test('URLSync coerces a URL value to a numeric default key', () => {
-  installWindow('?count=42');
+  installRecordingWindow('?count=42');
   const s = new AppState({ count: 0 });
   new URLSync(s, ['count']);
   assert.strictEqual(s.get('count'), 42);
 });
 
 test('URLSync keeps a numeric default when the URL value is non-finite', () => {
-  installWindow('?count=abc');
+  installRecordingWindow('?count=abc');
   const s = new AppState({ count: 7 });
   new URLSync(s, ['count']);
   assert.strictEqual(s.get('count'), 7);
 });
 
 test('URLSync keeps a numeric default for an empty URL value', () => {
-  installWindow('?count=');
+  installRecordingWindow('?count=');
   const s = new AppState({ count: 5 });
   new URLSync(s, ['count']);
   assert.strictEqual(s.get('count'), 5);
@@ -644,7 +637,7 @@ test('URLSync keeps a numeric default for an empty URL value', () => {
 
 test('URLSync keeps a numeric default when the URL value has trailing garbage', () => {
   for (const raw of ['42abc', '0x10', '1,5', '4 2', 'Infinity', '1.2.3']) {
-    installWindow(`?count=${encodeURIComponent(raw)}`);
+    installRecordingWindow(`?count=${encodeURIComponent(raw)}`);
     const s = new AppState({ count: 7 });
     new URLSync(s, ['count']);
     assert.strictEqual(s.get('count'), 7, `"${raw}" is rejected whole`);
@@ -654,7 +647,7 @@ test('URLSync keeps a numeric default when the URL value has trailing garbage', 
 
 test('URLSync coerces well-formed numeric URL values', () => {
   for (const [raw, want] of [['42', 42], ['-3.5', -3.5], ['.25', 0.25], ['1e3', 1000], [' 8 ', 8]]) {
-    installWindow(`?count=${encodeURIComponent(raw)}`);
+    installRecordingWindow(`?count=${encodeURIComponent(raw)}`);
     const s = new AppState({ count: 7 });
     new URLSync(s, ['count']);
     assert.strictEqual(s.get('count'), want, `"${raw}" coerces to ${want}`);
@@ -664,7 +657,7 @@ test('URLSync coerces well-formed numeric URL values', () => {
 
 test('URLSync coerces a boolean default tracked key from truthy URL tokens', () => {
   for (const raw of ['true', '1', 'yes', 'on', 'TRUE', ' On ']) {
-    installWindow(`?flag=${encodeURIComponent(raw)}`);
+    installRecordingWindow(`?flag=${encodeURIComponent(raw)}`);
     const s = new AppState({ flag: false });
     new URLSync(s, ['flag']);
     assert.strictEqual(s.get('flag'), true, `"${raw}" coerces to true`);
@@ -674,7 +667,7 @@ test('URLSync coerces a boolean default tracked key from truthy URL tokens', () 
 
 test('URLSync coerces a boolean default tracked key from falsy URL tokens', () => {
   for (const raw of ['false', '0', 'no', 'off', 'OFF']) {
-    installWindow(`?flag=${encodeURIComponent(raw)}`);
+    installRecordingWindow(`?flag=${encodeURIComponent(raw)}`);
     const s = new AppState({ flag: true });
     new URLSync(s, ['flag']);
     assert.strictEqual(s.get('flag'), false, `"${raw}" coerces to false`);
@@ -683,14 +676,14 @@ test('URLSync coerces a boolean default tracked key from falsy URL tokens', () =
 });
 
 test('URLSync keeps a boolean default for an unrecognized URL token', () => {
-  installWindow('?flag=maybe');
+  installRecordingWindow('?flag=maybe');
   const s = new AppState({ flag: true });
   new URLSync(s, ['flag']);
   assert.strictEqual(s.get('flag'), true, 'a garbage token keeps the default');
 });
 
 test('URLSync skips an unseeded tracked key rather than seeding the raw string', () => {
-  installWindow('?flag=false');
+  installRecordingWindow('?flag=false');
   const errors = mock.method(console, 'error', () => {});
   try {
     const s = new AppState({});
@@ -725,14 +718,14 @@ test('overlayUrlParam rounds numbers and deletes values with no URL form', () =>
 });
 
 test('URLSync validator admits a valid URL value', () => {
-  installWindow('?res=high');
+  installRecordingWindow('?res=high');
   const s = new AppState({ res: 'low' });
   new URLSync(s, ['res'], { res: (v) => v === 'high' || v === 'low' });
   assert.equal(s.get('res'), 'high');
 });
 
 test('URLSync registers itself as the active URL writer', () => {
-  installWindow('');
+  installRecordingWindow('');
   const s = new AppState({});
   const sync = new URLSync(s, ['effect']);
   assert.equal(getActiveURLSync(), sync);
@@ -741,7 +734,7 @@ test('URLSync registers itself as the active URL writer', () => {
 test('URLSync construction disposes the previous writer', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const calls = installWindow('?effect=Voronoi', '/sim');
+    const calls = installRecordingWindow('?effect=Voronoi', '/sim');
     const s = new AppState({ effect: 'Voronoi' });
     const first = new URLSync(s, ['effect']);
     const second = new URLSync(s, ['effect']);
@@ -760,7 +753,7 @@ test('URLSync construction disposes the previous writer', () => {
 test('URLSync.dispose stops a later setParam from re-arming the flush', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const calls = installWindow('?effect=Voronoi', '/sim');
+    const calls = installRecordingWindow('?effect=Voronoi', '/sim');
     const s = new AppState({ effect: 'Voronoi' });
     const sync = new URLSync(s, ['effect']);
 
@@ -776,7 +769,7 @@ test('URLSync.dispose stops a later setParam from re-arming the flush', () => {
 });
 
 test('URLSync.flush writes tracked state and ad-hoc params to the URL', () => {
-  const calls = installWindow('', '/sim');
+  const calls = installRecordingWindow('', '/sim');
   const s = new AppState({ effect: 'Voronoi' });
   const sync = new URLSync(s, ['effect']);
 
@@ -791,7 +784,7 @@ test('URLSync.flush writes tracked state and ad-hoc params to the URL', () => {
 });
 
 test('URLSync.flush preserves an existing location.hash', () => {
-  const calls = installWindow('', '/sim', '#frag');
+  const calls = installRecordingWindow('', '/sim', '#frag');
   const s = new AppState({ effect: 'Voronoi' });
   const sync = new URLSync(s, ['effect']);
 
@@ -803,7 +796,7 @@ test('URLSync.flush preserves an existing location.hash', () => {
 });
 
 test('URLSync.setParam cannot override a tracked key with a stale value', () => {
-  const calls = installWindow('', '/sim');
+  const calls = installRecordingWindow('', '/sim');
   const s = new AppState({ resolution: 'low' });
   const sync = new URLSync(s, ['resolution']);
 
@@ -825,7 +818,7 @@ test('URLSync.setParam cannot override a tracked key with a stale value', () => 
  * advertises, since nothing schedules a correction after the flush.
  */
 test('a re-asserted tracked value does not survive a later switch in the same window', () => {
-  const calls = installWindow('?resolution=low', '/sim');
+  const calls = installRecordingWindow('?resolution=low', '/sim');
   const s = new AppState({ resolution: 'low' });
   const sync = new URLSync(s, ['resolution']);
 
@@ -842,7 +835,7 @@ test('a re-asserted tracked value does not survive a later switch in the same wi
 });
 
 test('URLSync.reset re-asserts tracked state over an ad-hoc write of the same key', () => {
-  const calls = installWindow('?speed=2', '/sim');
+  const calls = installRecordingWindow('?speed=2', '/sim');
   const s = new AppState({ resolution: 'high' });
   const sync = new URLSync(s, ['resolution']);
 
@@ -856,7 +849,7 @@ test('URLSync.reset re-asserts tracked state over an ad-hoc write of the same ke
 });
 
 test('URLSync.reset carries an excluded ad-hoc write over the value it replaces', () => {
-  const calls = installWindow('?speed=2&junk=1', '/sim');
+  const calls = installRecordingWindow('?speed=2&junk=1', '/sim');
   const s = new AppState({ resolution: 'high' });
   const sync = new URLSync(s, ['resolution']);
 
@@ -877,7 +870,7 @@ test('URLSync.reset carries an excluded ad-hoc write over the value it replaces'
  * there, and would hydrate it from the outgoing effect's values.
  */
 test('URLSync.applyPendingReset hides the params a scheduled reset will clear', () => {
-  installWindow('?speed=2&keep=1', '/sim');
+  installRecordingWindow('?speed=2&keep=1', '/sim');
   const sync = new URLSync(new AppState({ resolution: 'high' }), ['resolution']);
 
   const before = new URLSearchParams('speed=2&keep=1');
@@ -902,7 +895,7 @@ test('URLSync.applyPendingReset hides the params a scheduled reset will clear', 
  * buffered value, not the query-string one it is about to replace.
  */
 test('URLSync.overlayPending applies the writes buffered for the next flush', () => {
-  installWindow('?speed=2&drop=1', '/sim');
+  installRecordingWindow('?speed=2&drop=1', '/sim');
   const sync = new URLSync(new AppState({ resolution: 'high' }), ['resolution']);
 
   const before = new URLSearchParams('speed=2&drop=1');
@@ -923,7 +916,7 @@ test('URLSync.overlayPending applies the writes buffered for the next flush', ()
 });
 
 test('URLSync.setParam(k, null) drops the key from the URL on flush', () => {
-  const calls = installWindow('?keep=1', '/sim');
+  const calls = installRecordingWindow('?keep=1', '/sim');
   const s = new AppState({});
   const sync = new URLSync(s, []);
 
@@ -940,7 +933,7 @@ test('URLSync.setParam(k, null) drops the key from the URL on flush', () => {
 });
 
 test('URLSync.setParam(k, NaN) drops the key from the URL on flush', () => {
-  const calls = installWindow('?keep=1', '/sim');
+  const calls = installRecordingWindow('?keep=1', '/sim');
   const s = new AppState({});
   const sync = new URLSync(s, []);
 
@@ -957,7 +950,7 @@ test('URLSync.setParam(k, NaN) drops the key from the URL on flush', () => {
 });
 
 test('URLSync.setParam keeps a small non-zero value instead of collapsing it to 0', () => {
-  const calls = installWindow('?keep=1', '/sim');
+  const calls = installRecordingWindow('?keep=1', '/sim');
   const s = new AppState({});
   const sync = new URLSync(s, []);
 
@@ -997,7 +990,7 @@ test('roundUrlNumber is a fixed point under re-serialization', () => {
 });
 
 test('URLSync serializes an exact zero rather than dropping it', () => {
-  const calls = installWindow('', '/sim');
+  const calls = installRecordingWindow('', '/sim');
   const s = new AppState({ speed: 0 });
   const sync = new URLSync(s, ['speed']);
 
@@ -1007,7 +1000,7 @@ test('URLSync serializes an exact zero rather than dropping it', () => {
 });
 
 test('URLSync.flush drops a tracked key cleared to null', () => {
-  const calls = installWindow('?effect=Voronoi&keep=1', '/sim');
+  const calls = installRecordingWindow('?effect=Voronoi&keep=1', '/sim');
   const s = new AppState({ effect: 'Voronoi' });
   const sync = new URLSync(s, ['effect']);
 
@@ -1020,7 +1013,7 @@ test('URLSync.flush drops a tracked key cleared to null', () => {
 });
 
 test('URLSync.reset preserves the excluded keys and clears the rest', () => {
-  const calls = installWindow('?effect=Voronoi&speed=2&junk=x', '/sim');
+  const calls = installRecordingWindow('?effect=Voronoi&speed=2&junk=x', '/sim');
   const s = new AppState({ effect: 'Voronoi' });
   const sync = new URLSync(s, ['effect']);
 
@@ -1037,7 +1030,7 @@ test('URLSync.reset preserves the excluded keys and clears the rest', () => {
 test('URLSync auto-flushes a tracked-key change once after the debounce', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const calls = installWindow('?effect=Voronoi', '/sim');
+    const calls = installRecordingWindow('?effect=Voronoi', '/sim');
     const s = new AppState({ effect: 'Voronoi' });
     new URLSync(s, ['effect']);
 
@@ -1057,7 +1050,7 @@ test('URLSync auto-flushes a tracked-key change once after the debounce', () => 
 test('URLSync corrects a URL advertising a rejected value, and converges', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const calls = installWindow('?effect=Bogus&keep=1', '/sim');
+    const calls = installRecordingWindow('?effect=Bogus&keep=1', '/sim');
     const s = new AppState({ effect: 'Voronoi' });
     new URLSync(s, ['effect'], { effect: (v) => v === 'Voronoi' });
 
@@ -1070,7 +1063,7 @@ test('URLSync corrects a URL advertising a rejected value, and converges', () =>
     assert.equal(params.get('keep'), '1', 'unrelated params survive');
 
     getActiveURLSync().dispose();
-    const reloaded = installWindow(search, '/sim');
+    const reloaded = installRecordingWindow(search, '/sim');
     new URLSync(new AppState({ effect: 'Voronoi' }), ['effect'], { effect: (v) => v === 'Voronoi' });
     mock.timers.tick(200);
     assert.equal(reloaded.length, 0, 'the corrected URL rewrites nothing on reload');
@@ -1082,7 +1075,7 @@ test('URLSync corrects a URL advertising a rejected value, and converges', () =>
 test('URLSync rewrites a URL value it accepted in a non-canonical form', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const calls = installWindow('?flag=on&count=%208%20', '/sim');
+    const calls = installRecordingWindow('?flag=on&count=%208%20', '/sim');
     const s = new AppState({ flag: false, count: 0 });
     new URLSync(s, ['flag', 'count']);
 
@@ -1099,7 +1092,7 @@ test('URLSync rewrites a URL value it accepted in a non-canonical form', () => {
 test('URLSync writes nothing when the URL already matches state', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const calls = installWindow('?effect=Voronoi&count=8&untracked=x', '/sim');
+    const calls = installRecordingWindow('?effect=Voronoi&count=8&untracked=x', '/sim');
     const s = new AppState({ effect: 'Voronoi', count: 0 });
     new URLSync(s, ['effect', 'count']);
 
@@ -1113,7 +1106,7 @@ test('URLSync writes nothing when the URL already matches state', () => {
 test('URLSync.reset collapses into the pending debounced flush', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const calls = installWindow('?effect=Voronoi&speed=2', '/sim');
+    const calls = installRecordingWindow('?effect=Voronoi&speed=2', '/sim');
     const s = new AppState({ effect: 'Voronoi' });
     const sync = new URLSync(s, ['effect']);
 
@@ -1139,7 +1132,7 @@ test('URLSync.reset collapses into the pending debounced flush', () => {
 test('a burst of resets costs a single URL write', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const calls = installWindow('?effect=Voronoi&fx.speed=2', '/sim');
+    const calls = installRecordingWindow('?effect=Voronoi&fx.speed=2', '/sim');
     const s = new AppState({ effect: 'Voronoi' });
     const sync = new URLSync(s, ['effect']);
 
