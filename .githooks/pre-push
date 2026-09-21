@@ -2,6 +2,10 @@
 # Local counterpart of the required JavaScript and browser CI suites. A tree
 # that cannot run them refuses the push; `git push --no-verify` is the escape.
 
+for name in $(git rev-parse --local-env-vars); do
+	unset "$name"
+done
+
 if ! command -v node >/dev/null 2>&1; then
 	echo "pre-push: node not found; install Node.js to run the required suites." >&2
 	exit 1
