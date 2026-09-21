@@ -674,7 +674,9 @@ test('an enumerated param becomes a dropdown of labels to engine indices', () =>
   const controller = addParamControl(gui, { Mode: 0 },
     { name: 'Mode', value: 0, options: ['Off', 'On', 'Auto'] });
 
-  assert.deepEqual(controller.args, [{ Off: 0, On: 1, Auto: 2 }]);
+  // The choices table carries a null prototype, so it is spread to compare.
+  assert.equal(controller.args.length, 1);
+  assert.deepEqual({ ...controller.args[0] }, { Off: 0, On: 1, Auto: 2 });
   assert.equal(controller.isBoolean, false);
   assert.equal(controller.isContinuous, false);
 });
@@ -2378,7 +2380,7 @@ test('preset effects expose one-based labels and zero-indexed navigation', () =>
   h.panel.build();
 
   assert.equal(h.gui().ctrl('presetIndex').getValue(), 0);
-  assert.deepEqual(h.gui().ctrl('presetIndex').args, [{ 1: 0, 2: 1, 3: 2 }]);
+  assert.deepEqual({ ...h.gui().ctrl('presetIndex').args[0] }, { 1: 0, 2: 1, 3: 2 });
   assert.equal(h.gui().ctrl('presetIndex').disabled, false);
   assert.equal(h.gui().ctrl('presetIndex').session, true);
 
@@ -2500,7 +2502,7 @@ test('a preset rebuild adopts the post-sync preset range and index', () => {
 
   const preset = h.gui().ctrl('presetIndex');
   assert.equal(oldGui.destroyed, 1);
-  assert.deepEqual(preset.args, [{ 1: 0 }]);
+  assert.deepEqual({ ...preset.args[0] }, { 1: 0 });
   assert.equal(preset.getValue(), 0);
   assert.deepEqual(h.writes, ['syncPreset:2']);
 });

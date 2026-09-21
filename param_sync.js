@@ -92,19 +92,20 @@ export function selectorControlValue(parameter) {
  *
  * @param {string[]} options - Option labels from the parameter definition,
  *   indexed by the engine-side option value.
- * @returns {Object<string, number>} Choices object for lil-gui's add().
+ * @returns {Object<string, number>} Choices object for lil-gui's add(), with a
+ *   null prototype.
  */
 export function enumChoices(options) {
+  // Null prototype: `choices.__proto__ = i` on a plain object reassigns the
+  // prototype instead of adding a key, so that option would vanish silently.
   /** @type {Object<string, number>} */
-  const choices = {};
+  const choices = Object.create(null);
   /** @type {string[]} */
   const labels = [];
   options.forEach((label, i) => {
     // Duplicate labels would collapse to one object key, making the earlier
     // index unselectable; disambiguate rather than drop it.
     let key = label;
-    // `in` would also see Object.prototype, renaming a label like `toString`
-    // that collides with nothing.
     while (Object.hasOwn(choices, key)) key = `${key} (${i})`;
     choices[key] = i;
     labels.push(key);

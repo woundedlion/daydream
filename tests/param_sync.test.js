@@ -66,10 +66,11 @@ test('boolean: a NaN engine value never flips the toggle', () => {
 });
 
 // enumChoices maps engine enum labels to the lil-gui choices object whose
-// values are the option indices setParameter expects.
+// values are the option indices setParameter expects. It carries a null
+// prototype, so the expected tables below are spread into plain objects.
 
 test('enum: labels map to their option indices in order', () => {
-  assert.deepEqual(enumChoices(['None', 'Warp', 'Sparkle']),
+  assert.deepEqual({ ...enumChoices(['None', 'Warp', 'Sparkle']) },
     { None: 0, Warp: 1, Sparkle: 2 });
 });
 
@@ -79,7 +80,7 @@ test('selector state follows a request before the rendered value advances', () =
 });
 
 test('enum: a single option still yields a valid choices object', () => {
-  assert.deepEqual(enumChoices(['Only']), { Only: 0 });
+  assert.deepEqual({ ...enumChoices(['Only']) }, { Only: 0 });
 });
 
 test('enum: duplicate labels are disambiguated, never dropped', () => {
@@ -92,8 +93,18 @@ test('enum: duplicate labels are disambiguated, never dropped', () => {
 
 test('enum: a label matching an Object.prototype member keeps its own name', () => {
   const choices = enumChoices(['toString', 'Warp', 'valueOf']);
-  assert.deepEqual(choices, { toString: 0, Warp: 1, valueOf: 2 });
+  assert.deepEqual({ ...choices }, { toString: 0, Warp: 1, valueOf: 2 });
   assert.deepEqual(Object.keys(choices), ['toString', 'Warp', 'valueOf']);
+});
+
+// On a plain object `choices.__proto__ = i` reassigns the prototype instead of
+// adding a key, so the option disappears from both the table and the dropdown.
+test('enum: a __proto__ label is an option like any other', () => {
+  const choices = enumChoices(['Warp', '__proto__', 'Sparkle']);
+  assert.deepEqual(Object.keys(choices), ['Warp', '__proto__', 'Sparkle']);
+  assert.deepEqual(Object.values(choices), [0, 1, 2]);
+  assert.equal(Object.getPrototypeOf(choices), null,
+    'the label must not have been taken for a prototype assignment');
 });
 
 // paramControlKind picks the lil-gui control the effect GUI builds for one
