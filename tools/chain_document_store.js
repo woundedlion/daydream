@@ -229,6 +229,21 @@ export async function createChainDocumentStore({
   const budgets = catalog.budgets;
   const entryCarrier = catalog.carriers[0];
   const exitCarrier = catalog.carriers[catalog.carriers.length - 1];
+  const carriers = new Set(catalog.carriers);
+
+  /**
+   * The label a shipped document gives an instance of an operator: its
+   * family segment, or the stage segment under it when the family is a
+   * carrier every one of its operators shares.
+   * @param {string} operator - A catalog operator id.
+   * @returns {string} The unnumbered label stem.
+   */
+  const labelStem = (operator) => {
+    const segments = operator.split('.');
+    const from = carriers.has(segments[0]) ? 1 : 0;
+    return segments.find((segment, index) =>
+      index >= from && LABEL_PATTERN.test(segment)) ?? segments[0];
+  };
 
   /** @param {*} candidate */
   const diagnosticsOf = (candidate) => {
@@ -542,8 +557,8 @@ export async function createChainDocumentStore({
    * instances, strip removed ones, drop degenerate transition edges) and
    * commits only if the result passes the v2 validator. An entry whose label
    * survives with the same operator keeps its parameter values; a label
-   * omitted from a sequence entry is derived from the operator's stage
-   * segment plus the lowest free numeric suffix. A replacement that leaves the chain
+   * omitted from a sequence entry takes the operator's stem, numbered from
+   * 1 only where the stem is taken. A replacement that leaves the chain
    * as it stands changes nothing and pushes no undo entry.
    * @param {number} start - First chain index of the span.
    * @param {number} deleteCount - Entries the span replaces (0 = insertion).
@@ -572,14 +587,9 @@ export async function createChainDocumentStore({
           `the catalog carries no operator "${item.operator}"`);
       let label = item.label;
       if (label === undefined) {
-        // The stage segment, not the carrier one: every sphere endomorphism
-        // shares the carrier, so it names none of them.
-        const segments = item.operator.split('.');
-        const stem = segments.find((segment, index) =>
-          index > 0 && LABEL_PATTERN.test(segment)) ?? segments[0];
-        let suffix = 1;
-        while (used.has(`${stem}${suffix}`)) suffix += 1;
-        label = `${stem}${suffix}`;
+        const stem = labelStem(item.operator);
+        label = stem;
+        for (let suffix = 1; used.has(label); suffix += 1) label = `${stem}${suffix}`;
       }
       used.add(label);
       entries.push({ label, operator: item.operator });
