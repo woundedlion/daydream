@@ -1,8 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const JOB_KEY = /^ {2}([A-Za-z0-9_-]+):\s*$/;
-const NEED = /^ {6}-\s+([A-Za-z0-9_-]+)\s*$/;
+// A job id is a plain identifier, which YAML may spell quoted or bare.
+const JOB_KEY = /^ {2}(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+)):\s*(?:#.*)?$/;
+const NEED = /^ {6}-\s+(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+))\s*$/;
+
+/** @param {string} line @returns {string|null} The job it keys, if it keys one. */
+const jobKeyOf = (line) => {
+  const match = line.match(JOB_KEY);
+  return match ? match[1] ?? match[2] ?? match[3] : null;
+};
 
 /** @param {string} source @returns {string[]} Top-level workflow job IDs. */
 export const workflowJobs = (source) => {
@@ -14,8 +21,12 @@ export const workflowJobs = (source) => {
   for (const line of lines.slice(start + 1)) {
     if (/^\s*#/.test(line)) continue;
     if (/^\S/.test(line)) break;
-    const match = line.match(JOB_KEY);
-    if (match) jobs.push(match[1]);
+    // Only the job keys sit at this depth; anything else here is a spelling the
+    // scan cannot classify, and dropping it would report the job as gated.
+    if (!/^ {2}\S/.test(line)) continue;
+    const job = jobKeyOf(line);
+    if (job === null) throw new Error(`workflow job key is unreadable: ${line.trim()}`);
+    jobs.push(job);
   }
   if (jobs.length === 0) throw new Error('workflow jobs mapping is empty');
   return jobs;
@@ -27,8 +38,7 @@ export const workflowJobs = (source) => {
  */
 export const terminalJobNeeds = (source, terminal) => {
   const lines = source.split(/\r?\n/);
-  const jobKey = new RegExp(`^ {2}${terminal}:\\s*$`);
-  const start = lines.findIndex((line) => jobKey.test(line));
+  const start = lines.findIndex((line) => jobKeyOf(line) === terminal);
   if (start < 0) throw new Error(`workflow has no ${terminal} job`);
 
   const endOffset = lines.slice(start + 1).findIndex((line) => JOB_KEY.test(line));
@@ -52,7 +62,7 @@ export const terminalJobNeeds = (source, terminal) => {
   for (const line of block.slice(needsAt + 1)) {
     const match = line.match(NEED);
     if (match) {
-      needs.push(match[1]);
+      needs.push(match[1] ?? match[2] ?? match[3]);
     } else if (/^ {4}\S/.test(line)) {
       break;
     }

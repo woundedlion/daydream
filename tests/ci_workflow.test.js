@@ -97,6 +97,20 @@ test('column-zero comments do not end the jobs mapping', () => {
   assert.deepEqual(missingTerminalDependencies(source, 'gate'), ['browser']);
 });
 
+// A quoted key is valid YAML and a valid Actions job, so a scan that skipped it
+// would leave the job out of the ungated-job report entirely.
+test('the job scan reads a quoted key and refuses a spelling it cannot', () => {
+  const quoted = 'jobs:\n  "build":\n    x: 1\n  \'browser\':\n    x: 1\n'
+    + '  gate:\n    needs: [build]\n';
+  assert.deepEqual(workflowJobs(quoted), ['build', 'browser', 'gate']);
+  assert.deepEqual(missingTerminalDependencies(quoted, 'gate'), ['browser']);
+  assert.deepEqual(terminalJobNeeds(
+    'jobs:\n  build:\n    x: 1\n  "gate":\n    needs:\n      - "build"\n', 'gate'), ['build']);
+  assert.throws(
+    () => workflowJobs('jobs:\n  build:\n    x: 1\n  browser!:\n    x: 1\n'),
+    /workflow job key is unreadable: browser!:/);
+});
+
 test('external workflow actions use immutable commit pins', () => {
   for (const file of readdirSync(WORKFLOW_DIR).filter((name) => /\.ya?ml$/.test(name))) {
     const source = readFileSync(`${WORKFLOW_DIR}/${file}`, 'utf8');
