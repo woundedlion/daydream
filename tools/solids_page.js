@@ -385,7 +385,7 @@ async function generateThumbnails(signal) {
       // why generateThumbnails() is async and init() deliberately does not
       // await it.
       await new Promise(resolve => setTimeout(resolve));
-      if (signal.aborted) break;
+      if (signal.aborted || !meshOpsWasm) break;
 
       // Reset to just the lights; the previous iteration's mesh/lines are
       // detached here and their GPU buffers freed at the end of the loop body.
@@ -760,6 +760,7 @@ function renderSavedList() {
     const restoreButton = document.createElement('button');
     restoreButton.type = 'button';
     restoreButton.className = 'saved-restore';
+    restoreButton.disabled = !wasmModule;
     const image = document.createElement('img');
     image.src = item.thumb;
     image.alt = '';
@@ -1193,7 +1194,11 @@ function updateOpParam(index, key, value) {
   scheduleUpdate();
 }
 
-const queueCommit = createCommitQueue();
+const commitQueue = createCommitQueue();
+// Every chain mutation lands through here; once the page has stood down no
+// module remains to draw the result, so a commit still queued is dropped.
+const queueCommit = (/** @type {() => any} */ fn) =>
+  commitQueue(() => (wasmModule ? fn() : undefined));
 
 // Bumped whenever the op list's membership or order changes. Row handlers close
 // over the revision that built them, and a commit queued ahead of one of them
@@ -1302,7 +1307,8 @@ async function refreshOpGating() {
   const buttons = [...document.querySelectorAll('#addOpGrid [data-op]')];
   const probe = await opGate.refresh(state.base, state.ops,
     buttons.map((btn) => btn.dataset.op), currentMesh);
-  if (!probe) return;
+  // A pass landing after the page stood down would re-enable the frozen grid.
+  if (!probe || !wasmModule) return;
 
   if (probe.abandoned) {
     openOpGate('the validator module will not start');
@@ -1322,11 +1328,24 @@ async function refreshOpGating() {
 
 // Drops the module handles and puts the page in its terminal state: every
 // gate reads them, so nothing calls the engine again, and the banner stays up
-// rather than being overwritten by the next recompute.
+// rather than being overwritten by the next recompute. The editing surface
+// freezes with the preview: a chain edit could still validate and land, but
+// no module remains to draw it.
 function standDown(message) {
   meshOpsWasm = null;
   wasmModule = null;
+  scheduleUpdate.cancel();
+  freezeEditing();
   showFatalError(message);
+}
+
+// Disables every control that mutates or restores the chain: the op rows, the
+// add-op grid and clear button, the base thumbnails, the saved-card restores
+// and the save button. Export, delete and copy read saved data and stay live.
+function freezeEditing() {
+  const controls = document.querySelectorAll(
+    '#sidebar button, #sidebar input, #footer .thumb-btn, #savedList .saved-restore, #saveBtn');
+  for (const el of controls) el.disabled = true;
 }
 
 // The live module is unrecoverable after an engine trap (see update()); if
