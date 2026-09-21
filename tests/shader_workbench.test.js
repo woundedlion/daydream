@@ -368,6 +368,21 @@ test('a preset the effect does not carry falls back to its first reference', () 
   assert.deepEqual(engine.writes, [['Pattern Freq', 2]]);
 });
 
+// Every id is resolved before the first write: a refusal after one write would
+// leave the engine on a state that is neither the reference preset nor the
+// document's, and the parity toggle would show neither build's answer.
+test('an unmatched id refuses the fixed apply before any value is written', () => {
+  const engine = fixedEngine(() => true);
+  const values = { 'sample.pattern-freq': 3, 'sample.no-such-field': 1 };
+  const presets = [{ preset_id: 'noon', values }];
+
+  assert.equal(applyFixedShaderDocument(
+    engine, MODULE, { document: { preset_bank: { presets } } },
+    'noon', ['noon'], BAKED),
+  'no engine parameter matches "sample.no-such-field"');
+  assert.deepEqual(engine.writes, []);
+});
+
 test('an effect with no reference preset is refused before any engine write', () => {
   const engine = fixedEngine(() => true);
 
