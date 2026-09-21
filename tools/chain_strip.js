@@ -22,7 +22,8 @@ import { createFrameScheduler } from './page_lifecycle.js';
  *
  * Every chip carries its stage's controls inline, built from the document's
  * parameter declarations over the active preset's values, so a stage is tuned
- * where it sits in the pipeline.
+ * where it sits in the pipeline. A chip discloses them transiently under the
+ * pointer and under keyboard focus alike, and pinned open by selection.
  */
 
 /** @typedef {{id: string, topology?: boolean, values?: string[]}} CatalogParameter */
@@ -218,6 +219,9 @@ export function createChainStrip({
 
   /** @type {string|null} Roving-tabindex position, by instance label. */
   let focusedLabel = null;
+  // A rebuild puts the focus back where it was; that is not a disclosure
+  // gesture, so it must not open the chip it lands on.
+  let restoringFocus = false;
   /** @type {string|null} The last selection onSelect was told about. */
   let notifiedSelection = null;
   /** @type {{element: *, anchor: *}|null} */
@@ -1128,6 +1132,14 @@ export function createChainStrip({
       };
       chip.addEventListener('mouseenter', () => setTransientOpen(true));
       chip.addEventListener('mouseleave', () => setTransientOpen(false));
+      chip.addEventListener('focusin', () => {
+        if (!restoringFocus) setTransientOpen(true);
+      });
+      chip.addEventListener('focusout', (/** @type {*} */ event) => {
+        const next = event.relatedTarget ?? null;
+        if (next !== null && chip.contains(next)) return;
+        setTransientOpen(false);
+      });
     }
     chip.addEventListener('keydown',
       (/** @type {*} */ event) => chipKeydown(event, index, entry, crossing, chip));
@@ -1288,20 +1300,25 @@ export function createChainStrip({
     markDeactivated();
 
     const target = focusLabel !== null ? chipByLabel(focusLabel) : null;
-    if (target) {
-      focusedLabel = focusLabel;
-      if (focusBypass) {
-        const toggle = target.querySelector('.chain-chip-bypass');
-        (toggle ?? target).focus();
-      } else {
-        target.focus();
+    restoringFocus = true;
+    try {
+      if (target) {
+        focusedLabel = focusLabel;
+        if (focusBypass) {
+          const toggle = target.querySelector('.chain-chip-bypass');
+          (toggle ?? target).focus();
+        } else {
+          target.focus();
+        }
+      } else if (hadFocus || focusLabel !== null) {
+        const fallback = tabLabel !== null ? chipByLabel(tabLabel) : null;
+        if (fallback) {
+          focusedLabel = tabLabel;
+          fallback.focus();
+        }
       }
-    } else if (hadFocus || focusLabel !== null) {
-      const fallback = tabLabel !== null ? chipByLabel(tabLabel) : null;
-      if (fallback) {
-        focusedLabel = tabLabel;
-        fallback.focus();
-      }
+    } finally {
+      restoringFocus = false;
     }
   };
 
