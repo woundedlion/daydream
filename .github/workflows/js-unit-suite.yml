@@ -68,6 +68,33 @@ jobs:
             exit 1
           fi
           shellcheck --exclude=SC2015,SC2317 "${FILES[@]}"
+      # actionlint-py is the PyPI distribution of the same binary, pinned like
+      # shellcheck above.
+      - name: Install actionlint
+        run: pip install --require-hashes -r requirements/actionlint.txt
+      # The deploy gate, the engine-bundle wait and the probe budget are shell
+      # inside `run:` blocks, which the step above cannot reach: no workflow is
+      # a tracked *.sh file. actionlint checks the workflow itself (expression
+      # syntax, the `needs` graph, event and matrix keys) and pipes every
+      # `run:` body through shellcheck. The file list comes from the index, so a
+      # new workflow is linted with no edit here and an empty list is a broken
+      # path list.
+      # actionlint drops its shellcheck integration silently when the binary is
+      # not on PATH, which would leave every run body unchecked behind a green
+      # step; -verbose reports the drop, so it is captured and made fatal.
+      - name: Lint workflows
+        run: |
+          mapfile -t FILES < <(git ls-files -- '.github/workflows/*.yml')
+          if [ "${#FILES[@]}" -eq 0 ]; then
+            echo "::error::no workflow files selected"
+            exit 1
+          fi
+          actionlint -verbose -oneline "${FILES[@]}" 2> /tmp/actionlint-verbose.txt
+          if grep -q 'Rule "shellcheck" was disabled' /tmp/actionlint-verbose.txt; then
+            echo "::error::actionlint ran without shellcheck — the run: bodies went unchecked"
+            exit 1
+          fi
+          echo "actionlint clean: ${#FILES[@]} workflows linted."
       - name: Test
         env:
           DAYDREAM_HOOK_SH_REQUIRED: '1'
