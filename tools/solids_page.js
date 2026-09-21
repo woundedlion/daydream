@@ -17,6 +17,7 @@ import {
   SAVED_SOLIDS_MAX,
   captureSavedSolidThumbnail,
   queueSavedSolidRestore,
+  savedChainShapeError,
   CATALAN_BASES,
   formatSolidName,
   generateFuncAndRecipe,
@@ -311,6 +312,18 @@ async function init() {
   // (closest() so a click on a tooltip span still resolves the button).
   document.getElementById('clearOpsBtn').addEventListener('click', resetOps);
   document.getElementById('exportSavedBtn').addEventListener('click', exportSavedSolids);
+  const importFile = document.getElementById('importSavedFile');
+  document.getElementById('importSavedBtn').addEventListener('click', () => importFile.click());
+  importFile.addEventListener('change', async () => {
+    const file = importFile.files?.[0];
+    try {
+      if (file) importSavedSolids(await file.text());
+    } catch (error) {
+      showGateMsg(`import failed: ${error.message}`);
+    } finally {
+      importFile.value = '';
+    }
+  });
   document.getElementById('clearSavedBtn').addEventListener('click', clearSavedSolids);
   document.getElementById('addOpGrid').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-op]');
@@ -530,6 +543,86 @@ function exportSavedSolids() {
     type: 'application/json',
   });
   downloadBlob(document, blob, 'daydream-solids.json');
+}
+
+/** Flags a saved card carries, each absent from a card saved before it existed. */
+const SAVED_FLAGS = ['geodesics', 'faces', 'colorize', 'vertices', 'normals', 'indices'];
+
+/**
+ * Rebuilds one imported entry as a saved card, field by field.
+ * @param {Object} entry - A shape-checked entry from an exported file.
+ * @returns {Object} The card to hold in the saved list.
+ * @details Only the fields the card and the C++ export read are carried across,
+ * and a flag the entry does not hold is left absent so applyRestore lands it on
+ * the page default rather than off. A thumbnail is taken only as a data image,
+ * so the card's img never points at a URL the file chose.
+ */
+function importedSavedSolid(entry) {
+  const text = (value) => (typeof value === 'string' ? value : '');
+  const item = {
+    base: entry.base,
+    ops: structuredClone(entry.ops),
+    thumb: text(entry.thumb).startsWith('data:image/') ? entry.thumb : '',
+    title: text(entry.title) || formatSolidName(entry.base),
+    desc: text(entry.desc),
+    stats: text(entry.stats),
+  };
+  for (const flag of SAVED_FLAGS) {
+    if (typeof entry[flag] === 'boolean') item[flag] = entry[flag];
+  }
+  for (const count of ['vCount', 'fCount', 'iCount']) {
+    if (Number.isFinite(entry[count])) item[count] = entry[count];
+  }
+  return item;
+}
+
+/**
+ * Merges an exported saved-solids file into the list.
+ * @param {string} text - The file's contents.
+ * @returns {void}
+ * @details An exported file is as user-writable as localStorage and outlives
+ * any op-table change, so every entry goes through savedChainShapeError — the
+ * same check a restore passes — and a refused one is counted, not imported.
+ */
+function importSavedSolids(text) {
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    showGateMsg(`import rejected: ${error.message}`);
+    return;
+  }
+  if (!Array.isArray(parsed)) {
+    showGateMsg('import rejected: the file holds no list of saved solids');
+    return;
+  }
+
+  let refused = 0;
+  let full = 0;
+  const before = savedSolids.length;
+  for (const entry of parsed) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)
+      || savedChainShapeError(entry.base, entry.ops)) {
+      refused++;
+      continue;
+    }
+    if (savedSolids.length >= SAVED_SOLIDS_MAX) {
+      full++;
+      continue;
+    }
+    savedSolids.push(importedSavedSolid(entry));
+  }
+
+  const added = savedSolids.length - before;
+  if (added > 0) {
+    persistSavedSolids();
+    renderSavedList();
+  }
+  const skipped = [];
+  if (refused > 0) skipped.push(`${refused} the op table does not recognize`);
+  if (full > 0) skipped.push(`${full} past the ${SAVED_SOLIDS_MAX}-card limit`);
+  showGateMsg(`imported ${added} solid${added === 1 ? '' : 's'}`
+    + (skipped.length > 0 ? ` — skipped ${skipped.join(' and ')}` : ''));
 }
 
 function captureSavedThumbnail() {

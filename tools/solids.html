@@ -137,6 +137,10 @@
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-bold text-white">Saved Solids</h2>
       <div class="flex gap-3">
+        <button type="button" id="importSavedBtn"
+          class="text-xs text-indigo-300 hover:text-white uppercase font-bold tracking-wider">Import JSON</button>
+        <input id="importSavedFile" type="file" accept=".json,application/json"
+          aria-label="Saved solids JSON to import" hidden>
         <button type="button" id="exportSavedBtn"
           class="text-xs text-indigo-300 hover:text-white uppercase font-bold tracking-wider">Export JSON</button>
         <button type="button" id="clearSavedBtn"
