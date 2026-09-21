@@ -44,6 +44,7 @@ const PANEL_TITLE = '.effect-gui > .lil-title';
 const RESET = '.effect-action-reset button';
 const LIST = '.effect-list';
 const OPTION = '.effect-button';
+const SORT_STATUS = '.sort-controls [role="status"]';
 const ARROW_LEFT = '.scroll-arrow-left';
 const ARROW_RIGHT = '.scroll-arrow-right';
 
@@ -417,6 +418,23 @@ const scrollToEdge = (tab, edge) => tab.$eval(LIST,
  */
 export async function probeSidebar(tab) {
   const { failures, check } = checks();
+
+  // The sort announcement carries .visually-hidden; only a browser resolves the
+  // class against the stylesheet the page actually loaded.
+  const announcement = await tab.$eval(SORT_STATUS, (status) => {
+    const style = getComputedStyle(status);
+    const box = status.getBoundingClientRect();
+    return {
+      position: style.position,
+      nowrap: style.whiteSpace,
+      width: box.width,
+      height: box.height,
+    };
+  });
+  check(announcement.position === 'absolute' && announcement.nowrap === 'nowrap'
+      && announcement.width <= 1 && announcement.height <= 1,
+    `the sort announcement is clipped out of the layout (${announcement.position}, `
+      + `${announcement.nowrap}, ${announcement.width}x${announcement.height})`);
 
   const grid = await tab.$eval(LIST, (list) => {
     const style = getComputedStyle(list);

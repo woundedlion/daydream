@@ -68,10 +68,7 @@ export class EffectSidebar {
     this.sortRow.className = 'sort-controls';
     this.sortStatus = this.doc.createElement('span');
     this.sortStatus.setAttribute('role', 'status');
-    Object.assign(this.sortStatus.style, {
-      position: 'absolute', width: '1px', height: '1px', overflow: 'hidden',
-      clipPath: 'inset(50%)',
-    });
+    this.sortStatus.className = 'visually-hidden';
     this.sortRow.appendChild(this.sortStatus);
 
     this.nameBtn = this.createSortBtn('name', 'Name');
