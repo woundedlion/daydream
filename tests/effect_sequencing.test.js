@@ -722,6 +722,25 @@ test('a preserving apply that keeps the effect keeps its param URL entries', () 
   assert.equal(app.log.includes('clearEffectParamUrl'), false);
 });
 
+// The global GUI is live through the module load, so a resolution can change
+// before the engine that consumes the deep link's values exists.
+test('a resolution change before the engine exists keeps the effect param URL entries', () => {
+  const app = makeApp({ noEngine: true });
+
+  assert.equal(app.pipeline.applyResolution(), ApplyResult.APPLIED);
+
+  assert.equal(app.log.includes('clearEffectParamUrl'), false,
+    'the URL is the only carrier of those values until the initial apply seeds them');
+});
+
+test('an effect change before the engine exists drops the outgoing entries', () => {
+  const app = makeApp({ noEngine: true });
+
+  assert.equal(app.pipeline.applyEffect(), ApplyResult.APPLIED);
+
+  assert.equal(app.log.includes('clearEffectParamUrl'), true);
+});
+
 test('an effect the resized engine rejects rejects the resolution change', () => {
   const app = makeApp({ rejectEffects: ['Alpha'] });
 
