@@ -896,12 +896,13 @@ div.label {
   font-size: 10px;
 }
 
-/* Per-segment stats overlay; the view adds .visible while the pool is active. */
+/* Per-segment stats overlay, in the corner opposite the PiP viewport; the view
+   adds .visible while the pool is active. */
 .segment-stats {
   display: none;
   position: absolute;
   bottom: 8px;
-  left: 8px;
+  right: 8px;
   z-index: 150;
   pointer-events: none;
   background: rgb(var(--page-bg-rgb) / 0.75);
