@@ -34,11 +34,11 @@ test('formatExportParams: skips a middle readonly param', () => {
 
 test('formatExportParams: skips params excluded from presets', () => {
   const params = [
-    { name: 'Shape', options: ['Star', 'Heart'] },
+    { name: 'Shape', options: ['Star', 'Heart'], step: 1 },
     { name: 'Global Alpha', preset: false },
     { name: 'Scale' },
   ];
-  assert.equal(formatExportParams(params, [1, 0.75, 2]), '{ 1.0f, 2.0f }');
+  assert.equal(formatExportParams(params, [1, 0.75, 2]), '{ 1, 2.0f }');
 });
 
 test('formatExportParams: emits the selected enum symbol exactly', () => {
@@ -56,9 +56,30 @@ test('formatExportParams: rejects an enum index with no export symbol', () => {
     /No export option for Shape index 1/);
 });
 
-test('formatExportParams: preserves float output without enum export metadata', () => {
-  const params = [{ name: 'Shape', options: ['Star', 'Heart'] }];
-  assert.equal(formatExportParams(params, [1]), '{ 1.0f }');
+/** A float-backed enum names no C++ enum type, so it exports its index. */
+test('formatExportParams: emits the index when an enum carries no export metadata', () => {
+  const params = [{ name: 'Shape', options: ['Star', 'Heart'], step: 1 }];
+  assert.equal(formatExportParams(params, [1]), '{ 1 }');
+});
+
+/** A float literal into a uint8_t brace-init member is a narrowing error. */
+test('formatExportParams: emits a whole-number param as an integer literal', () => {
+  const params = [{ name: 'Burst', step: 1, min: 1, max: 32 }];
+  assert.equal(formatExportParams(params, [18]), '{ 18 }');
+});
+
+/** Only a float-backed enum can hold a fraction under a step of 1, and its
+ *  target is a float. */
+test('formatExportParams: keeps a fractional stepped value a float literal', () => {
+  const params = [{ name: 'Shape', options: ['Star', 'Heart'], step: 1 }];
+  assert.equal(formatExportParams(params, [0.5]), '{ 0.5f }');
+});
+
+/** The engine streams a toggle as 0/1; a float literal into a bool brace-init
+ *  member is a narrowing error. */
+test('formatExportParams: emits a toggle as a C++ bool literal', () => {
+  const params = [{ name: 'Debug BB', value: false }, { name: 'Trails', value: true }];
+  assert.equal(formatExportParams(params, [0, 1]), '{ false, true }');
 });
 
 /** An all-readonly param set yields empty braces rather than a malformed list. */
