@@ -560,7 +560,7 @@ test('a palette opens anchored to the control that opened it', async () => {
   add.getBoundingClientRect = () => ({ left: 298, bottom: 52, width: 20 });
   add.dispatch('click');
   assert.equal(paletteOf(h).style.left, '298px');
-  assert.equal(paletteOf(h).style.top, '52px');
+  assert.equal(paletteOf(h).style.top, '56px');
 });
 
 test('a palette near the right edge is clamped back inside the viewport', async () => {
@@ -573,23 +573,48 @@ test('a palette near the right edge is clamped back inside the viewport', async 
     'clamped to the viewport width less the palette and its margin');
 });
 
-test('a palette near the bottom fits vertically and can scroll', async () => {
-  const h = await makeStrip();
-  measureNewElements(h, 208);
-  h.doc.documentElement.clientHeight = 300;
-  h.doc.createElement = (tag) => {
+/**
+ * Measures every created element at one unconstrained height, capped by the
+ * max-height the strip writes: a max-height only ever shrinks a box.
+ * @param {Object} h - A strip harness.
+ * @param {number} height - The unconstrained height.
+ * @returns {void}
+ */
+const measureNewHeights = (h, height) => {
+  h.doc.createElement = (/** @type {string} */ tag) => {
     const node = fakeElement(tag);
     node.getBoundingClientRect = () => ({
       width: 208,
-      height: Math.min(400, Number.parseFloat(node.style.maxHeight) || 192),
+      height: Math.min(height, Number.parseFloat(node.style.maxHeight) || height),
     });
     return node;
   };
+};
+
+test('a palette near the bottom is lifted back inside the viewport', async () => {
+  const h = await makeStrip();
+  measureNewElements(h, 208);
+  h.doc.documentElement.clientHeight = 300;
+  measureNewHeights(h, 192);
   const add = bandFor(h, 'sphere').querySelector('.chain-band-add');
   add.getBoundingClientRect = () => ({ left: 20, bottom: 290 });
   add.dispatch('click');
   assert.equal(paletteOf(h).style.top, '100px');
   assert.equal(paletteOf(h).style.maxHeight, '192px');
+  assert.equal(paletteOf(h).style.overflowY, 'auto');
+});
+
+test('a palette taller than the viewport is capped and scrolls', async () => {
+  const h = await makeStrip();
+  measureNewElements(h, 208);
+  h.doc.documentElement.clientHeight = 300;
+  measureNewHeights(h, 400);
+  const add = bandFor(h, 'sphere').querySelector('.chain-band-add');
+  add.getBoundingClientRect = () => ({ left: 20, bottom: 290 });
+  add.dispatch('click');
+  assert.equal(paletteOf(h).style.top, '8px');
+  assert.equal(paletteOf(h).style.maxHeight, '284px',
+    'the viewport height less both margins');
   assert.equal(paletteOf(h).style.overflowY, 'auto');
 });
 

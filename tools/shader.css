@@ -484,7 +484,6 @@ select.chain-param-control {
   min-width: 13rem;
   max-height: 12rem;
   overflow-y: auto;
-  margin-top: 0.25rem;
   padding: 0.25rem;
   border: 1px solid var(--accent);
   border-radius: 0.25rem;
