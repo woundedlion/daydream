@@ -228,10 +228,43 @@ test('a soft-rejected op ends the chain, freeing the mesh and flushing the arena
   assert.equal(quietly(() => buildChainMesh('cube', ['dual', 'kis', 'ambo'], ctx)), null,
     'a half-applied solid must not be drawn with wrong stats');
   assert.equal(errors.length, 1);
-  assert.match(errors[0], /^Op error: .*"kis"/, 'the failing op must be named');
+  assert.match(errors[0], /^Op "kis" failed: /, 'the failing op must be named');
+  assert.match(errors[0], /tooling arena is full/,
+    'the reason must be read back before the flush overwrites it');
   assert.ok(!state.calls.includes('ambo'), 'the chain must stop at the rejection');
   assert.equal(state.live, 0, 'the last valid wrapper must be freed');
   assert.equal(state.cleared, 1, 'the arenas must be reclaimed after a mid-chain failure');
+});
+
+test('a mid-chain rejection carries the remedy its recorded reason calls for', () => {
+  for (const [reason, remedy] of [
+    ['CONNECTIVITY_OVERFLOW', /16-bit element ceiling/],
+    ['FACE_DEGREE_OVERFLOW', /more sides than the engine allows/],
+    ['ANGLE_OUT_OF_DOMAIN', /outside its op domain/],
+  ]) {
+    const { Mod, state } = fakeModule({ rejects: new Set(['kis']), reason });
+    const { ctx, errors, fatals } = context(Mod);
+
+    assert.equal(quietly(() => buildChainMesh('cube', ['dual', 'kis'], ctx)), null, reason);
+    assert.deepEqual(fatals, [], reason);
+    assert.equal(errors.length, 1, reason);
+    assert.match(errors[0], /^Op "kis" failed: /, reason);
+    assert.match(errors[0], remedy, `${reason} must reach the message, not a generic failure`);
+    assert.equal(state.live, 0, reason);
+  }
+});
+
+test('an unreservable tooling block mid-chain stands the tool down instead of reporting', () => {
+  const { Mod, state } = fakeModule({ rejects: new Set(['kis']), reason: 'ARENA_UNAVAILABLE' });
+  const { ctx, errors, fatals } = context(Mod);
+
+  assert.equal(quietly(() => buildChainMesh('cube', ['dual', 'kis'], ctx)), null);
+  assert.deepEqual(errors, [],
+    'no later call can succeed, so the failure must not go to the line the next recompute overwrites');
+  assert.equal(fatals.length, 1);
+  assert.match(fatals[0], /^Op "kis" failed: /);
+  assert.match(fatals[0], /reload the page$/);
+  assert.equal(state.live, 0);
 });
 
 test('an op that throws is reported rather than escaping the build', () => {
