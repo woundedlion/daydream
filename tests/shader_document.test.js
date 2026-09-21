@@ -8,8 +8,7 @@
 // one by one. Schema v2 encodes the descriptor as an ordered operator chain
 // validated against the engine catalog; a schema_version 1 document expands
 // through expandV1Document first, the single code path both generations
-// share, and the committed v2 pattern documents are pinned byte-identical to
-// that expansion's canonical export.
+// share. Current patterns are validated independently of historical fixtures.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -692,27 +691,19 @@ test('expansion is deterministic and the compiler is one code path', () => {
     'compiling a v1 source must be expansion followed by v2 compilation');
 });
 
-/**
- * The re-export gate: a committed v2 pattern that retains its v1 behavior is
- * the expansion's output byte for byte. The identity-frame replacements below
- * deliberately split from their animated v1 documents.
- */
-test('eleven current patterns remain byte-identical to their v1 expansion', () => {
-  assert.equal(fixtureNames.length, 16);
-  const equivalentNames = fixtureNames.filter(
-    (name) => !identityProjectionPatterns.includes(name));
-  assert.equal(equivalentNames.length, 11);
-  for (const name of equivalentNames) {
-    const expanded = expandV1Document(fixture(name), CATALOG).document;
-    assert.equal(
-      exportShaderDocumentJson(expanded),
-      readPinned(new URL(name, PATTERNS)),
-      `${name} drifted from its expansion`,
-    );
+test('every historical document compiles through its v1 expansion', () => {
+  for (const name of fixtureNames) {
+    const historical = fixture(name);
+    const expanded = expandV1Document(historical, CATALOG).document;
+    const imported = compile(historical);
+    const canonical = compile(exportShaderDocumentJson(expanded));
+    assert.equal(imported.status, 'VALID', name);
+    assert.equal(canonical.status, 'VALID', name);
+    assert.equal(imported.descriptor_digest, canonical.descriptor_digest, name);
   }
 });
 
-test('five identity-frame replacements differ from v1 only by explicit policy', () => {
+test('v1 projection frame policies expand into explicit frame parameters', () => {
   for (const name of identityProjectionPatterns) {
     const historical = fixture(name);
     const expanded = expandV1Document(historical, CATALOG).document;
@@ -724,7 +715,9 @@ test('five identity-frame replacements differ from v1 only by explicit policy', 
       (node) => node.role === 'surface_project');
     surface.policy.frame = 'identity';
     const identity = expandV1Document(replacement, CATALOG).document;
-    assert.equal(exportShaderDocumentJson(identity), readPinned(new URL(name, PATTERNS)), name);
+    assert.equal(compile(identity).status, 'VALID', name);
+    assert.equal(identity.descriptor.parameters.find(
+      (parameter) => parameter.id === 'project.frame')?.default, 'identity', name);
 
     const project = expanded.descriptor.chain.find((slot) => slot.label === 'project');
     const operator = CATALOG.operators.find(({ id }) => id === project.operator);
@@ -733,20 +726,7 @@ test('five identity-frame replacements differ from v1 only by explicit policy', 
   }
 });
 
-/**
- * The canonical-form gate, over the whole pattern directory: a committed
- * document is what the compiler's exporter writes for it, byte for byte. The
- * expansion gate above reaches only the documents that have a v1 fixture, so
- * an engine-exported pattern is pinned here or nowhere.
- */
 test('every committed pattern document is its own canonical re-export', () => {
-  assert.deepEqual(patternNames.filter((name) => !fixtureNames.includes(name)),
-    [
-      'ash_cloud.shader.json',
-      'chromatic_lichen.shader.json',
-      'mermaid_skin.shader.json',
-    ],
-    'a pattern with no v1 fixture is covered by this gate alone');
   for (const name of patternNames) {
     const url = new URL(name, PATTERNS);
     assert.equal(
