@@ -15,6 +15,8 @@ export const DEFAULT_LIMITS = Object.freeze({
   parameters: 512,
 });
 
+// Tick counts land in the engine's uint16_t frame counters.
+const MAX_TICK_COUNT = 65535;
 const ID_PATTERN = /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/;
 const LABEL_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const CLASSIFICATIONS = new Set([
@@ -666,8 +668,9 @@ const validatePresetBank = (bank, parameters, pathPolicies, report, guard) => {
         fail('semantic', 'UNKNOWN_EDGE_PATH', `${path}.path_policy`, 'The transition edge names an unknown path policy.');
       if (!EASING_KINDS.has(edge.easing))
         fail('semantic', 'UNKNOWN_EASING', `${path}.easing`, 'The transition easing is unknown.');
-      if (!Number.isInteger(edge.duration) || edge.duration <= 0)
-        fail('semantic', 'INVALID_DURATION', `${path}.duration`, 'Transition duration must be a positive tick count.');
+      if (!Number.isInteger(edge.duration) || edge.duration <= 0 || edge.duration > MAX_TICK_COUNT)
+        fail('semantic', 'INVALID_DURATION', `${path}.duration`,
+          `Transition duration must be a tick count in [1, ${MAX_TICK_COUNT}].`);
     });
   });
 
@@ -687,8 +690,9 @@ const validatePresetBank = (bank, parameters, pathPolicies, report, guard) => {
           Object.keys(dwell).some((presetId) => !presetIds.has(presetId)))
         fail('semantic', 'INVALID_DWELL', '$.preset_bank.choreography.dwell', 'Dwell must contain every preset exactly once.');
       for (const [presetId, duration] of Object.entries(dwell))
-        if (!Number.isInteger(duration) || duration <= 0)
-          fail('semantic', 'INVALID_DWELL', `$.preset_bank.choreography.dwell.${presetId}`, 'Dwell must be a positive tick count.');
+        if (!Number.isInteger(duration) || duration <= 0 || duration > MAX_TICK_COUNT)
+          fail('semantic', 'INVALID_DWELL', `$.preset_bank.choreography.dwell.${presetId}`,
+            `Dwell must be a tick count in [1, ${MAX_TICK_COUNT}].`);
     }
   });
 };
@@ -774,8 +778,24 @@ const canonicalValue = (value) => {
   return typeof value === 'string' ? value.normalize('NFC') : value;
 };
 
+// Hand-serialized: JSON.stringify emits integer-like keys first in numeric
+// order, whatever the object's own key order.
+const stableJson = (value) => {
+  if (Array.isArray(value))
+    return `[${value.map((member) => stableJson(member) ?? 'null').join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    const members = Object.keys(value)
+      .map((key) => [key.normalize('NFC'), stableJson(value[key])])
+      .filter(([, json]) => json !== undefined)
+      .sort(([left], [right]) => codePointCompare(left, right))
+      .map(([key, json]) => `${JSON.stringify(key)}:${json}`);
+    return `{${members.join(',')}}`;
+  }
+  return JSON.stringify(typeof value === 'string' ? value.normalize('NFC') : value);
+};
+
 export function stableStringify(value) {
-  return JSON.stringify(canonicalValue(value));
+  return stableJson(value);
 }
 
 const quantizeParameter = (parameter) => {
@@ -1028,8 +1048,12 @@ const v1Slots = (roleNodes) => {
   const color = roleNodes.get('color');
   const colorPolicy = color.policy ?? {};
   const warpPolicy = roleNodes.get('planar_warp').policy ?? {};
-  const sequence = warpPolicy.sequence ??
-    [warpPolicy.outer ?? 'identity', warpPolicy.inner ?? 'identity'];
+  const sequence = warpPolicy.sequence === undefined
+    ? [warpPolicy.outer ?? 'identity', warpPolicy.inner ?? 'identity']
+    : array(warpPolicy.sequence, 'stage.planar_warp.sequence');
+  if (sequence.length > 2)
+    failV1('V1_POLICY_UNSUPPORTED', 'stage.planar_warp.sequence',
+      'A v1 document carries at most two planar warps.');
 
   const slots = [];
   const add = (slotLabel, picked) => slots.push({
@@ -1209,6 +1233,13 @@ export function expandV1Document(document, catalog) {
   for (const role of V1_STAGE_ROLES)
     if (!roleNodes.has(role))
       failV1('MISSING_STAGE_ROLE', '$.descriptor.graph.nodes', `Missing stage role "${role}".`);
+  array(graph.edges, '$.descriptor.graph.edges').forEach((edge, index) =>
+    object(edge, `$.descriptor.graph.edges[${index}]`));
+  for (const field of ['clocks', 'preparation', 'resources', 'approximation'])
+    array(descriptor[field], `$.descriptor.${field}`).forEach((entry, index) => {
+      const path = `$.descriptor.${field}[${index}]`;
+      id(object(entry, path).id, `${path}.id`);
+    });
 
   const slots = v1Slots(roleNodes);
   const slotsByLabel = new Map(slots.map((slot) => [slot.label, slot]));

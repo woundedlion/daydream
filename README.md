@@ -466,7 +466,7 @@ The same step runs with `just docs-check` and before `just docs` publishes the A
 │   ├── *_tests/                Host unit tests for the gate, build + git hooks, profile parser, bakes, build pins, docs and license checks
 │   ├── docs_sync.py
 │   └── engine_source_state.py
-├── docs/                       subsystems.md and effects.md — README sections 7 and 9 — plus design specs, perf ledgers, and the docs/screenshots/ gallery
+├── docs/                       subsystems.md and effects.md — README sections 7 and 9 — plus design specs (docs/specs/), the ITCM and device/host divergence ledgers (docs/ledgers/), on-device profiles (docs/profiles/), and the docs/screenshots/ gallery
 ├── Doxyfile                    Doxygen config for the published API reference
 ├── package.json                npm entry points for the scripts/*.mjs tools (ESM; Node ≥ 22, CI pinned via tools/build_pins.py)
 ├── package-lock.json           Pinned dependency set behind those entry points
@@ -553,7 +553,7 @@ The same step runs with `just docs-check` and before `just docs` publishes the A
 │   ├── shader.html             Pullback Shader authoring workbench
 │   ├── shader.css              Shader workbench layout and control styling
 │   ├── shader_documents.js     Document loading, validation, matching, and engine application
-│   ├── shader_deeplink.js       Encodes and restores the workbench's complete state in the page URL
+│   ├── shader_deeplink.js      Encodes the document, preset, bypass set and pause flag in the page URL hash and restores them
 │   ├── chain_apply.js          Applies a compiled chain document: setShaderChain, then the preset values
 │   ├── chain_document_store.js v2 chain document store: span replacement, legality, reconciliation, undo
 │   ├── chain_strip.js          Pipeline strip: the chain as stage chips banded by carrier
@@ -690,6 +690,8 @@ The `platform.h` header abstracts all target-specific differences:
 | `CRGB`, `CHSV` | FastLED types | Struct mocks |
 
 The host-side mock implementations — the `CRGB`/`CHSV` structs plus the rest of the emulated Arduino/FastLED surface (`random8`, `beatsin8`, `SerialMock`, …) — live in `platform/arduino_mocks.h`, included from `platform.h`'s non-Arduino branch.
+
+The few places the engine's behaviour forks on a device-only constant (the `H_OFFSET` sub-pole rows among them) are inventoried in [`docs/ledgers/device_host_divergence_ledger.md`](docs/ledgers/device_host_divergence_ledger.md), which records which device-value test build reaches each fork.
 
 ---
 
@@ -1104,7 +1106,7 @@ A trap is terminal for the whole module, not just for the call that tripped it. 
 | `getPoleLod()` → `float` | Current decimation aggressiveness |
 | `getParameterDefinitions()` | Return the parameter list; each entry is `{name, value, requestedValue, acceptedValue, animated, readonly, preset}`, and float params additionally carry `{min, max}` (bool params omit `min`/`max` and return values as JS booleans). `value` is the displayed/rendered state and `requestedValue` is the writable target copied to another renderer. `acceptedValue` is the last value the effect admitted for rendering, which is the writable target for every effect except the Shader workbench, which vets slots and params as one configuration: there a refused request leaves `requestedValue` and `acceptedValue` apart, and the accepted one is what a segment worker or URL restore must replay. An entry whose requested value cannot safely render also carries an actionable `warning` string; other valid edits continue to apply while that value stays requested. Whole-number targets — enum and integer params — additionally carry `step: 1`, absent on a float one, so the GUI knows which controls admit only whole values. `preset` is a bool, `false` only for a param the effect excluded from preset exports (`mark_global`), so an export tool skips those alongside the readonly ones. Enum params (registered with option labels) also carry `options`, an array of label strings indexed by the param's value, which the GUI renders as a dropdown; an enum registered with export literals carries `exportOptions` as well — the C++ enum literals indexed the same way, which the export formatter emits in place of a numeric literal. `exportOptions` is absent on an enum registered without them, and on every non-enum param |
 | `getParamValues()` | Return current parameter values (including animation-driven updates), as raw floats in definition order, as a zero-copy view over WASM linear memory on the same lifetime contract as `getPixels()`: consume it before the next call into the module, since heap growth detaches it. A bool param streams as `0.0`/`1.0` here even though `getParameterDefinitions()` reports its `value` as a JS boolean, so a consumer reads the type off the definition and thresholds this stream at 0.5 rather than testing `typeof` on it |
-| `getParamGeneration()` → `int` | Generation identifying which loaded-effect or no-effect state the definition and value streams describe. Pin it beside a `getParameterDefinitions()` snapshot and re-read it with each `getParamValues()` call; a changed value means the snapshot is stale (parameter counts repeat across the roster, so a length check alone cannot detect the switch or teardown) |
+| `getParamGeneration()` → `uint32` | Generation identifying which loaded-effect or no-effect state the definition and value streams describe. Pin it beside a `getParameterDefinitions()` snapshot and re-read it with each `getParamValues()` call; a changed value means the snapshot is stale (parameter counts repeat across the roster, so a length check alone cannot detect the switch or teardown) |
 | `getArenaMetrics()` | Memory usage stats for the three engine arenas, plus the stack high-water mark (see below). Read once per frame by the HUD, so it omits the tooling arenas an engine instance never moves; `MeshOps.getArenaMetrics()` reports all six on demand. Each arena entry carries two peaks: `high_water_mark` covers only the window since that arena's last reset or re-split (an effect that re-splits mid-run, like IslamicStars on every shape spawn, restarts it), while `lifetime_high_water_mark` folds every discarded window in and is the figure to size a budget against. Only the windowed mark is bounded by `capacity` — a re-split moves the boundary — so an overrun check reads that one |
 | `getEffectSizes()` | Return `sizeof` for every registered effect at the current resolution |
 | `getSupportedResolutions()` → `[[w, h], …]` | *(static)* List the resolutions the build supports, as `[width, height]` pairs |
@@ -1128,7 +1130,7 @@ The bridge also exposes a `PaletteOps` class with versioned `compileAndBakeV4(re
 
 It likewise exports the engine's color, procedural-palette, and geometry math as free functions so JavaScript tools can cross-check the real implementation: `srgb_to_linear_float`, `linear_to_srgb_float`, `srgb_to_linear_interp`, `linear_rgb_to_oklab`, `oklab_to_linear_rgb`, `hsv_to_rgb`, `procedural_palette_linear`, `named_procedural_palettes`, `lissajous`, and `mobius_transform`.
 
-The WASM bridge includes stack high-water-mark instrumentation: `stack_paint_canary()` fills the stack with a known pattern at init time, and `stack_high_water_mark()` scans for the deepest overwrite. Every effect switch repaints the canary, so the live reading only ever describes the render path; the construction + `init()` depth measured just before that repaint is latched separately and reported as `getArenaMetrics().stack.init_high_water_mark`. `wasm_smoke.mjs` gates both against the same creep budget, so a stack-hungry template instantiation reds CI instead of only printing a number.
+The WASM bridge includes stack high-water-mark instrumentation: `stack_paint_canary()` fills the stack with a known pattern at init time, and `stack_high_water_mark()` scans for the deepest overwrite. Every effect switch repaints the canary, so the live reading only ever describes the render path; the construction + `init()` depth measured just before that repaint is latched separately and reported as `getArenaMetrics().stack.init_high_water_mark`. `wasm_smoke.mjs` gates the live mark after every effect and the latched init peak once after the sweep, both against the creep budget, so a stack-hungry template instantiation reds CI instead of only printing a number.
 
 Pixel data is 16-bit linear light (`uint16_t` per channel). The zero-copy `Uint16Array` view is bound directly as the instanced dot-mesh's `instanceColor` attribute, declared `normalized` so Three.js scales 0–65535 → 0–1 linear **on the GPU** — there is no per-pixel divide or float copy in JavaScript (Three.js expects linear color when `THREE.ColorManagement.enabled = true`):
 
@@ -1213,7 +1215,7 @@ The left-edge effect list is a small custom widget:
 
 - **Preset count in the label**: each button reads `Name (N)`, where N is the effect's authored preset count from the engine's `getEffectPresetCounts()` — the registry's `preset_count`, which is `PRESET_IDS.size()` when the effect names its presets and `authored_preset_count()` (the `PRESETS` table's length) otherwise. The displayed value is floored at 1, so an effect with no preset table still shows `(1)`; if the call fails the counts are dropped and every button falls back to that floor.
 - **Persistent button references**: re-sorting by name or size (live `sizeof` from `getEffectSizes()`) re-appends the existing button nodes in the new order without recreating them; `setEffects()` itself rebuilds the list from scratch.
-- **Keyboard navigation**: arrow keys move the focused button (wrapping at the ends), Home and End jump to the first and last; Enter or Space selects.
+- **Keyboard navigation**: Up/Down move the focused button one entry, wrapping at the ends; Left/Right move one column — the row count of the mobile column-flow grid, so they wrap within the row, or 1 in the desktop single-column list, where every arrow steps one entry (`navTargetIndex`, `sidebar_logic.js`). Home and End jump to the first and last; Enter or Space selects.
 - **Mobile horizontal scroll**: when laid out as a horizontal strip, scroll arrows fade in/out based on scroll position via a `ResizeObserver` + scroll listener.
 - **Per-resolution filtering**: each resolution has its own curated effect list, shown in the sidebar. An effect that is not in the active resolution's list — including one hydrated from a `?effect=…` link — is replaced with that list's first effect, so only curated effects load at a given resolution.
 
