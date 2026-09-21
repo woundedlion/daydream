@@ -246,7 +246,7 @@ test('the wave graph fits its backing buffer to the displayed size and pixel den
 
   assert.deepEqual([canvas.width, canvas.height], [800, 240]);
   assert.deepEqual(ctx.ops[0], ['setTransform', 2, 0, 0, 2, 0, 0]);
-  assert.deepEqual(ctx.ops[1], ['clearRect', 0, 0, 400, 120]);
+  assert.deepEqual(ctx.ops[1], ['fillRect', 0, 0, 400, 120]);
   assert.equal(palette.channelCalls, 400);
 });
 
@@ -266,7 +266,7 @@ test('repeated wave-graph draws leave an unlaid-out canvas its own size', () => 
 
   assert.deepEqual([canvas.width, canvas.height], [2048, 512],
     'the backing store must not compound the pixel ratio on every draw');
-  assert.deepEqual(ctx.ops[1], ['clearRect', 0, 0, 1024, 256],
+  assert.deepEqual(ctx.ops[1], ['fillRect', 0, 0, 1024, 256],
     'the drawn area is the backing store read back in CSS pixels');
 });
 
@@ -276,7 +276,8 @@ test('the wave graph draws the band edges and the three channels without clamp o
   drawWaveGraph({ canvas, ctx, palette: fakePalette() });
 
   const { yTop, yBottom } = waveGraphBand(100);
-  assert.deepEqual(ctx.ops[0], ['clearRect', 0, 0, 16, 100]);
+  assert.deepEqual(ctx.ops[0], ['fillRect', 0, 0, 16, 100],
+    'the opaque background is the first paint; nothing clears ahead of it');
 
   const moves = ctx.ops.filter(([n]) => n === 'moveTo').map(([, x, y]) => [x, y]);
   assert.ok(moves.some(([x, y]) => x === 0 && y === yTop), 'the value band top edge is missing');
