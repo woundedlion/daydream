@@ -275,16 +275,18 @@ async function init() {
   });
 
   // Canvas taps mirror the visible switch; orbit drags and secondary pointers
-  // leave it unchanged.
+  // leave it unchanged. isPrimary names the pointer, not the button, so the
+  // left button is required as well — a right-click carries isPrimary.
   const canvasEl = document.getElementById('canvas');
+  const primaryTap = (e) => e.isPrimary && e.button === 0;
   let pointerDownX = 0, pointerDownY = 0;
   canvasEl.addEventListener('pointerdown', (e) => {
-    if (!e.isPrimary) return;
+    if (!primaryTap(e)) return;
     pointerDownX = e.clientX;
     pointerDownY = e.clientY;
   });
   canvasEl.addEventListener('pointerup', (e) => {
-    if (!e.isPrimary) return;
+    if (!primaryTap(e)) return;
     if (Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY) < 5) {
       setAutoRotate(!state.autoRotate);
     }
