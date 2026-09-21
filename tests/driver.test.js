@@ -454,6 +454,17 @@ test('dispose releases the observer, listeners, and GPU resources', () => {
     'the drawing context was released before the renderer freed its objects');
 });
 
+// The loop's stop is dispose()'s; its start belongs to the same owner, so the
+// page never reaches past the driver for the renderer.
+test('startFrameLoop drives the callback through the renderer', () => {
+  const loops = [];
+  const ctx = { renderer: { setAnimationLoop: (frame) => loops.push(frame) } };
+  const frame = () => {};
+
+  Daydream.prototype.startFrameLoop.call(ctx, frame);
+  assert.deepEqual(loops, [frame]);
+});
+
 test('dispose hands the canvas back without the keyboard-orbit latch', () => {
   const log = [];
   const ctx = disposeCtx(fakeMesh(log), log);

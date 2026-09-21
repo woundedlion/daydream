@@ -960,6 +960,15 @@ export class Daydream {
   }
 
   /**
+   * Drive `frame` once per animation frame, until dispose() stops the loop.
+   * @param {() => void} frame - Per-frame callback.
+   * @returns {void}
+   */
+  startFrameLoop(frame) {
+    this.renderer.setAnimationLoop(frame);
+  }
+
+  /**
    * Release everything this instance owns and undo what it put on the page: the
    * animation loop, the ResizeObserver, the simulation timer, the context-loss
    * and canvas-keyboard listeners, the WebGL program/geometry/material
