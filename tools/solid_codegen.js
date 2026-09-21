@@ -733,11 +733,11 @@ function returnRecipeCpp(recipe) {
 }
 
 /**
- * Emits the full FLASHMEM C++ function for a solid, led by the doxygen block
- * every solid_generators.h generator carries, whose brief records the solid's
- * vertex/face/index counts. Output is pasted verbatim into the engine and must
- * clear its clang-format gate, so the exact text and wrapping are
- * byte-for-byte significant.
+ * Emits the full FLASHMEM C++ function for a solid, led by a doxygen block in
+ * the form of the Platonic generators' in solid_generators.h, whose briefs
+ * record the solid's vertex/face/index counts. Output is pasted verbatim into
+ * the engine and must clear its clang-format gate, so the exact text and
+ * wrapping are byte-for-byte significant.
  * @param {SolidSpec} item - The solid spec (see generateFuncAndRecipe), optionally with vCount, fCount, and iCount counts.
  * @param {string} baseNamespace - Namespace qualifying the seed call (e.g. "Archimedean"); required, since the emitted function is pasted where the seed is not visible unqualified.
  * @returns {string} The complete C++ function source including its doc comment.
