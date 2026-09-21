@@ -276,7 +276,8 @@ export function createChainStrip({
    * is the chain indices whose carrier is that band's, and the crossing that
    * leaves the band sits after it. The catalog's terminal carrier is the output
    * type and has no band.
-   * @returns {BandLayout[]} One entry per editable carrier, in catalog order.
+   * @returns {BandLayout[]} One entry per editable carrier the chain stops in,
+   *   in catalog order; a carrier it passes over has no band.
    */
   const bandLayout = () => {
     const chain = store.chain();
@@ -303,6 +304,7 @@ export function createChainStrip({
         socket = index;
         index += 1;
       }
+      if (gaps.length === 0 && socket === null) continue;
       bands.push({ carrier, gaps, chips, socket });
     }
     return bands;
