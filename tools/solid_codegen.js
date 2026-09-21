@@ -1318,17 +1318,32 @@ export function createOpGate(validator, retries = 3) {
       /** @type {Set<string>} */
       const bad = new Set();
       if (!Mod) return { bad, complete: false };
-      const build = (/** @type {WasmModule} */ M) => {
+      /**
+       * Replays the standing chain on a validator instance.
+       * @param {WasmModule} M - The live validator instance.
+       * @returns {MeshWrapper} The chain's mesh.
+       * @throws {Error} When the base or an op is rejected. Unless the instance
+       *   halted, the mesh the op was applied to and the arenas are freed first,
+       *   as chainIsValid's rejection path frees them.
+       */
+      const build = (M) => {
         let mesh = M.MeshOps.fromSolidName(base);
         if (!mesh) {
           const failure = meshOpFailure(M, `Base solid "${base}"`);
           if (failure.flush) M.MeshOps.clearToolingMemory();
           throw new Error(failure.message);
         }
-        for (const o of ops) {
-          const next = applyOp(mesh, o);
-          mesh.delete();
-          mesh = next;
+        try {
+          for (const o of ops) {
+            const next = applyOp(mesh, o);
+            mesh.delete();
+            mesh = next;
+          }
+        } catch (e) {
+          if (!engineHalted(e, M)) {
+            try { mesh.delete(); M.MeshOps.clearToolingMemory(); } catch { /* best effort */ }
+          }
+          throw e;
         }
         return mesh;
       };
