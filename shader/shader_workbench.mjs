@@ -1425,12 +1425,23 @@ const requireRegistry = (registry) => {
   return registry.effects;
 };
 
+// A hand-maintained entry may spell the same program non-canonically, so the
+// match canonicalizes it the way the compiled side was canonicalized. An entry
+// too loose to canonicalize is compared as it stands.
+const registryDescriptorIdentity = (descriptor) => {
+  try {
+    return stableStringify(descriptorIdentity(canonicalDescriptor({ descriptor })));
+  } catch {
+    return stableStringify(descriptorIdentity(descriptor));
+  }
+};
+
 export function classifyExport(compiled, registry, capabilityProfile) {
   if (compiled.status !== 'VALID')
     return { kind: 'REJECTED', diagnostics: compiled.diagnostics };
   const matches = requireRegistry(registry).filter((effect) =>
     effect.descriptor_digest === compiled.descriptor_digest &&
-    stableStringify(descriptorIdentity(effect.descriptor)) === compiled.descriptor_json);
+    registryDescriptorIdentity(effect.descriptor) === compiled.descriptor_json);
   if (matches.length > 1)
     return {
       kind: 'REJECTED',
