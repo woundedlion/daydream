@@ -101,9 +101,9 @@ const SEGMENT_COUNT_MIN = 2;
  * Largest segment count to offer on this device. The GUI builds its slider
  * against this rather than rejecting an oversized pool afterwards, since running
  * the tab out of memory is a crash no fault path can report.
- * @details `navigator.deviceMemory` is Chromium-only and reports whole GiB
- * capped at 8; where it is missing the mobile layout is what stands in for a
- * phone. The result is always even, so it satisfies isValidSegmentCount.
+ * @details `navigator.deviceMemory` is Chromium-only and reports a power of two
+ * clamped to [0.25, 8] GiB; where it is missing the mobile layout is what stands
+ * in for a phone. The result is always even, so it satisfies isValidSegmentCount.
  * @param {Navigator | {deviceMemory?: number}} [nav] - Source of the device hint.
  * @param {boolean} [isMobile] - Whether the app is in its mobile layout.
  * @returns {number} An even count in [2, 8].
