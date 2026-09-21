@@ -115,8 +115,8 @@ export async function probeStrip(tab) {
     + `/${Math.round(closedGeometry.transition.height)}px tall`);
   check(closedGeometry.frameTop >= 0,
     'domain frames begin inside the vertical clipping boundary');
-  check(await tab.$('.chain-band[data-carrier="color"] .chain-band-add') === null,
-    'a domain with no valid stages has no inert + button');
+  check(await tab.$('.chain-band[data-carrier="color"]') === null,
+    'the terminal color carrier renders no band');
 
   const hoverHeader = '.chain-chip[data-label="project"] .chain-chip-header';
   const closedCard = await boxOf(tab, '.chain-chip[data-label="project"]');
@@ -485,6 +485,21 @@ export async function probeStrip(tab) {
   check(capped.overflow === 'auto' && capped.scrollable,
     'the capped palette scrolls to its remaining entries');
   await tab.keyboard.press('Escape');
+
+  // A source that reads the sphere directly skips the plane band, which then
+  // renders with no gap to insert at; only an empty band offers the swap.
+  await (await tab.waitForSelector(
+    '.chain-band[data-carrier="plane"] .chain-chip .chain-chip-remove')).click();
+  await tab.waitForFunction(() => document.querySelector(
+    '.chain-band[data-carrier="plane"] .chain-chip') === null);
+  await tab.select(source, 'sample.spherical-rings.v3');
+  const skipped = await tab.evaluate(() => ({
+    source: document.querySelector('.chain-chip-replace[aria-label="Source function"]')?.value,
+    band: document.querySelector('.chain-band[data-carrier="plane"]') !== null,
+    add: document.querySelector('.chain-band[data-carrier="plane"] .chain-band-add') !== null,
+  }));
+  check(skipped.source === 'sample.spherical-rings.v3' && skipped.band && !skipped.add,
+    'a band the chain skips renders without an inert + button');
   return failures;
 }
 
