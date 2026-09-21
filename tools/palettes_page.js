@@ -917,6 +917,7 @@ function syncResetZoomButton() {
 }
 
 function drawColorStrip(selectionRange = null) {
+  if (!palette) return;
   const viewport = activeTab === 'procedural' ? paletteViewport.value : fullViewport;
   colorStripPainter?.draw(palette, selectionRange, viewport);
 }
@@ -937,6 +938,7 @@ function drawPaletteWaveGraph() {
       [view.C_R, view.C_G, view.C_B],
       [view.D_R, view.D_G, view.D_B]);
   }
+  if (!plotted) return;
   drawWaveGraph({ canvas: waveGraphCanvas, ctx: waveGraphCtx, palette: plotted });
   waveGraphCanvas.setAttribute('aria-label', waveGraphLabel(visiblePhaseRange()));
 }
