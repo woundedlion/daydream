@@ -1170,8 +1170,9 @@ test('every parameter gate names a live catalog field and discriminates', () => 
     }
   }
   assert.deepEqual(Object.keys(PARAMETER_GATES).sort(),
-    ['brightness-bottom', 'brightness-top', 'edge-width', 'hue-noise-scale',
-      'hue-noise-speed', 'hue-shift-amount']);
+    ['brightness-bottom', 'brightness-depth', 'brightness-top', 'edge-width',
+      'hue-noise-scale', 'hue-noise-speed', 'hue-shift-amount',
+      'projection-spin-speed', 'projection-wander']);
   for (const [gated, rules] of Object.entries(PARAMETER_GATES)) {
     const target = fields.get(gated);
     assert.ok(target, `no catalog operator declares gated field "${gated}"`);
@@ -1191,5 +1192,6 @@ test('every parameter gate names a live catalog field and discriminates', () => 
   }
   assert.deepEqual([...new Set(Object.values(PARAMETER_GATES)
     .flat().map(([gateField]) => gateField))].sort(),
-  ['brightness-envelope', 'coverage-mode', 'envelope', 'hue-shift-mode']);
+  ['brightness-envelope', 'coverage-mode', 'envelope', 'frame',
+    'hue-shift-mode']);
 });
