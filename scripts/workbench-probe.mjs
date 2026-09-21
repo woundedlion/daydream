@@ -143,6 +143,24 @@ export async function probeStrip(tab) {
     (node) => node.getAttribute('aria-expanded') === 'false'),
   'mouse leave closes a transient stage card');
 
+  // The pointer is parked off the strip, so only the keyboard can be opening
+  // the card here.
+  await tab.$eval('.chain-chip[data-label="rotate"]', (node) => node.focus());
+  const focusOpened = await tab.$eval('.chain-chip[data-label="rotate"]', (node) => ({
+    expanded: node.getAttribute('aria-expanded'),
+    controlsHeight: node.querySelector('.chain-chip-params').getBoundingClientRect().height,
+    controlsVisibility: getComputedStyle(node.querySelector('.chain-chip-params')).visibility,
+  }));
+  check(focusOpened.expanded === 'true' && focusOpened.controlsHeight > 0
+      && focusOpened.controlsVisibility === 'visible',
+  `keyboard focus discloses ${Math.round(focusOpened.controlsHeight)}px of controls`);
+  await tab.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  });
+  check(await tab.$eval('.chain-chip[data-label="rotate"]',
+    (node) => node.getAttribute('aria-expanded') === 'false'),
+  'losing focus closes the card again');
+
   await tab.mouse.click(closedCard.x + 2, closedCard.y + closedCard.height / 2);
   await tab.mouse.move(0, 0);
   check(await tab.$eval('.chain-chip[data-label="project"]',

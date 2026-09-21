@@ -875,6 +875,30 @@ test('stage controls open transiently on hover and pin open on click', async () 
   assert.equal(rowsOf(h, 'camera').length, 1);
 });
 
+test('stage controls open under keyboard focus as they do under the pointer', async () => {
+  const h = await makeStrip();
+  const chip = chipByLabel(h, 'sample');
+  assert.equal(chip.getAttribute('aria-expanded'), 'false');
+
+  chip.dispatch('focusin');
+  assert.equal(chip.getAttribute('aria-expanded'), 'true');
+  assert.equal(chip.classList.contains('chain-chip--expanded'), true);
+
+  const inside = paramsOf(h, 'sample').querySelector('.chain-param-control');
+  chip.dispatch('focusout', { relatedTarget: inside });
+  assert.equal(chip.getAttribute('aria-expanded'), 'true',
+    'focus moving into the controls keeps them open');
+
+  chip.dispatch('focusout', { relatedTarget: chipByLabel(h, 'camera') });
+  assert.equal(chip.getAttribute('aria-expanded'), 'false');
+  assert.equal(chip.classList.contains('chain-chip--expanded'), false);
+
+  chip.dispatch('click');
+  chipByLabel(h, 'sample').dispatch('focusout', { relatedTarget: null });
+  assert.equal(chipByLabel(h, 'sample').getAttribute('aria-expanded'), 'true',
+    'losing focus preserves a pinned card');
+});
+
 test('a stage with no parameters grows no disclosure', async () => {
   const h = await makeStrip();
   bandFor(h, 'sphere').querySelector('.chain-band-add').dispatch('click');
