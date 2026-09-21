@@ -5,6 +5,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expectFailure, fixtureRepo, isolatedGitEnv } from './fixture_repo.js';
+import { COVERAGE } from '../scripts/run-tests.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = resolve(HERE, '../scripts/run-tests.mjs');
@@ -123,4 +124,31 @@ test('a loaded module the suite never executes fails the line floor', () => {
   writeFileSync(join(root, 'lib.mjs'),
     `export const value = 4;\nexport function unreached(n) {\n${branches}\n  return -1;\n}\n`);
   assert.match(failOutput(PATTERN), /line coverage does not meet threshold of 95%/);
+});
+
+// Every guard line runs, so the line floor holds while forty consequents never do.
+test('a loaded module whose branches the suite never takes fails the branch floor', () => {
+  const guards = Array.from({ length: 40 },
+    (_, index) => `  if (n === ${index}) return ${index};`).join('\n');
+  writeFileSync(join(root, 'lib.mjs'),
+    `export const value = 4;\nexport function pick(n) {\n${guards}\n  return -1;\n}\npick(-1);\n`);
+  const output = failOutput(PATTERN);
+  assert.doesNotMatch(output, /line coverage does not meet/);
+  assert.match(output, /branch coverage does not meet threshold of 90%/);
+});
+
+// Both floors and every exclusion are the gate; a new exclusion would ship
+// green without this pin.
+test('the coverage floors exclude only the code no unit test executes', () => {
+  assert.deepEqual(COVERAGE, [
+    '--experimental-test-coverage',
+    '--test-coverage-lines=95',
+    '--test-coverage-branches=90',
+    '--test-coverage-exclude=tests/**',
+    '--test-coverage-exclude=shader/**',
+    '--test-coverage-exclude=holosphere_wasm.js',
+    '--test-coverage-exclude=scripts/browser-smoke.mjs',
+    '--test-coverage-exclude=scripts/probe_harness.mjs',
+    '--test-coverage-exclude=scripts/*-probe.mjs',
+  ]);
 });
