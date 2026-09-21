@@ -543,12 +543,14 @@ test('a band + appends while Insert opens the insertion palette after focus', as
  * @param {Object} h - A strip harness.
  * @param {number} width - Width every created element reports.
  * @returns {void}
+ * @details Written as the box metrics the fake derives its whole rect from, so
+ *   a measurement the module starts taking is answered rather than undefined.
  */
 const measureNewElements = (h, width) => {
   h.doc.documentElement = { clientWidth: 1280 };
   h.doc.createElement = (/** @type {string} */ tag) => {
     const node = fakeElement(tag);
-    node.getBoundingClientRect = () => ({ left: 0, width });
+    node.offsetWidth = width;
     return node;
   };
 };
@@ -557,7 +559,7 @@ test('a palette opens anchored to the control that opened it', async () => {
   const h = await makeStrip();
   measureNewElements(h, 208);
   const add = bandFor(h, 'sphere').querySelector('.chain-band-add');
-  add.getBoundingClientRect = () => ({ left: 298, bottom: 52, width: 20 });
+  Object.assign(add, { offsetLeft: 298, offsetTop: 32, offsetWidth: 20, offsetHeight: 20 });
   add.dispatch('click');
   assert.equal(paletteOf(h).style.left, '298px');
   assert.equal(paletteOf(h).style.top, '56px');
@@ -567,7 +569,7 @@ test('a palette near the right edge is clamped back inside the viewport', async 
   const h = await makeStrip();
   measureNewElements(h, 208);
   const add = bandFor(h, 'sphere').querySelector('.chain-band-add');
-  add.getBoundingClientRect = () => ({ left: 1250, bottom: 52, width: 40 });
+  Object.assign(add, { offsetLeft: 1250, offsetTop: 32, offsetWidth: 40, offsetHeight: 20 });
   add.dispatch('click');
   assert.equal(paletteOf(h).style.left, '1064px',
     'clamped to the viewport width less the palette and its margin');
@@ -583,9 +585,9 @@ test('a palette near the right edge is clamped back inside the viewport', async 
 const measureNewHeights = (h, height) => {
   h.doc.createElement = (/** @type {string} */ tag) => {
     const node = fakeElement(tag);
-    node.getBoundingClientRect = () => ({
-      width: 208,
-      height: Math.min(height, Number.parseFloat(node.style.maxHeight) || height),
+    node.offsetWidth = 208;
+    Object.defineProperty(node, 'offsetHeight', {
+      get: () => Math.min(height, Number.parseFloat(node.style.maxHeight) || height),
     });
     return node;
   };
@@ -597,7 +599,7 @@ test('a palette near the bottom is lifted back inside the viewport', async () =>
   h.doc.documentElement.clientHeight = 300;
   measureNewHeights(h, 192);
   const add = bandFor(h, 'sphere').querySelector('.chain-band-add');
-  add.getBoundingClientRect = () => ({ left: 20, bottom: 290 });
+  Object.assign(add, { offsetLeft: 20, offsetTop: 270, offsetHeight: 20 });
   add.dispatch('click');
   assert.equal(paletteOf(h).style.top, '100px');
   assert.equal(paletteOf(h).style.maxHeight, '192px');
@@ -610,7 +612,7 @@ test('a palette taller than the viewport is capped and scrolls', async () => {
   h.doc.documentElement.clientHeight = 300;
   measureNewHeights(h, 400);
   const add = bandFor(h, 'sphere').querySelector('.chain-band-add');
-  add.getBoundingClientRect = () => ({ left: 20, bottom: 290 });
+  Object.assign(add, { offsetLeft: 20, offsetTop: 270, offsetHeight: 20 });
   add.dispatch('click');
   assert.equal(paletteOf(h).style.top, '8px');
   assert.equal(paletteOf(h).style.maxHeight, '284px',
