@@ -246,7 +246,7 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
           // Every emitted vertex sits on the unit sphere, so its normal IS its
           // position; computeVertexNormals on this non-indexed geometry would
           // yield per-triangle normals and shade the tessellation as facets.
-          geometry.setAttribute('normal', new THREE.Float32BufferAttribute([...vertices], 3));
+          geometry.setAttribute('normal', new THREE.Float32BufferAttribute(vertices, 3));
         } else {
           geometry.computeVertexNormals();
         }
