@@ -437,6 +437,7 @@ export class URLSync {
     if (this.disposed) return;
     if (this.suspendDepth > 0) {
       this.suspendedDirty = true;
+      this.suspendedDelayMs = Math.max(this.suspendedDelayMs, delayMs);
       return;
     }
     if (this.timer !== null) {
