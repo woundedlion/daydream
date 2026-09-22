@@ -289,7 +289,7 @@ async function bootedApp(options) {
   const capture = installConsoleCapture('error', 'warn', 'log');
   try {
     const app = startApp(options);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setImmediate(resolve));
     return app;
   } finally {
     capture.restore();
@@ -297,6 +297,7 @@ async function bootedApp(options) {
 }
 
 test('the migrated ShaderBall URL is written only once a frame has applied it', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   const app = await bootedApp({
     daydreamMode: 'shader-workbench',
     search: '?effect=ShaderBall',
@@ -306,7 +307,6 @@ test('the migrated ShaderBall URL is written only once a frame has applied it', 
   // The URL flush is a debounce on win.setTimeout, which fake_app.js forwards to
   // the global. Nothing is armed while the migration holds the suspension, so a
   // mocked clock takes over from here and the window costs no wall time.
-  t.mock.timers.enable({ apis: ['setTimeout'] });
   t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS * 2);
 
   assert.equal(app.teardown.disposed(), false, 'the module must have booted');
@@ -332,12 +332,12 @@ test('the migrated ShaderBall URL is written only once a frame has applied it', 
 });
 
 test('a first frame that throws still releases the migrated URL', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   const app = await bootedApp({
     daydreamMode: 'shader-workbench',
     search: '?effect=ShaderBall',
     loadModule: () => Promise.resolve(fakeWasmModule({ failingFrames: 1 })),
   });
-  t.mock.timers.enable({ apis: ['setTimeout'] });
   t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS * 2);
   assert.deepEqual(app.urlWrites, [], 'the migration is suspended until a frame');
 
