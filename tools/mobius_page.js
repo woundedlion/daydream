@@ -31,7 +31,7 @@ let animationTime = 0;
 // flow speed is independent of the display refresh rate.
 let lastAnimTime = 0;
 
-let scene, sphereMesh, wireMesh;
+let scene, sphereMesh;
 
 const vertexShader = `
     varying vec3 vPosition;
@@ -419,7 +419,8 @@ const initThree = () => {
   const result = initScene('canvasContainer', 'threeCanvas', {
     cameraPosition: [2.5, 2.5, 4],
     maxDistance: 15,
-    showSphere: false,
+    sphereRadius: 1.48,
+    sphereOpacity: 0.05,
     onAnimate: () => {
       if (isAnimating && activePreset && activePreset.update) {
         const now = performance.now();
@@ -461,15 +462,9 @@ const initThree = () => {
   sphereMesh = new THREE.Mesh(geometry, material);
   scene.add(sphereMesh);
 
-  const wireGeo = new THREE.SphereGeometry(1.48, 32, 16);
-  const wireMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.05 });
-  // Keep a reference so the decorative wireframe can be disposed on teardown.
-  wireMesh = new THREE.Mesh(wireGeo, wireMat);
-  scene.add(wireMesh);
-
   updateMobiusUniforms();
   return () => {
-    for (const m of [sphereMesh, wireMesh]) {
+    for (const m of [sphereMesh]) {
       if (!m) continue;
       m.geometry.dispose();
       m.material.dispose();
