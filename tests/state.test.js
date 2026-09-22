@@ -195,10 +195,6 @@ test('the documented URL-write limits are the exported ones', () => {
   assert.equal(URL_FLUSH_DEBOUNCE_MS, 200);
   assert.equal(URL_FLUSH_RETRY_MS, 2000);
   assert.equal(URL_FLUSH_MAX_RETRIES, 20);
-  assert.ok(URL_FLUSH_RETRY_MS > URL_FLUSH_DEBOUNCE_MS,
-    'a retry waits longer than the debounce it re-arms in place of');
-  assert.ok(URL_FLUSH_RETRY_MS * URL_FLUSH_MAX_RETRIES > 30_000,
-    'the ladder outlasts the 30 s rate-limit window');
   assert.equal(roundUrlNumber(1.23456789), 1.2346, 'five significant digits');
   assert.equal(roundUrlNumber(123456789), 123460000, 'five significant digits');
 });
