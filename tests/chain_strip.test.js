@@ -12,9 +12,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { createChainDocumentStore } from '../tools/chain_document_store.js';
-import {
-  createChainStrip, deactivatedParameterIds,
-} from '../tools/chain_strip.js';
+import { createChainStrip } from '../tools/chain_strip.js';
+import { deactivatedParameterIds } from '../tools/chain_presentation.js';
 import { compileShaderDocument } from '../shader/shader_workbench.mjs';
 import {
   documentEvents, fakeElement, installAnimationFrames, installDocument,

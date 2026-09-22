@@ -504,6 +504,62 @@ export async function probeStrip(tab) {
   return failures;
 }
 
+/**
+ * Keyboard edits cross rebuilt DOM nodes while keeping the selected instance.
+ * @param {import('puppeteer-core').Page} tab
+ * @returns {Promise<string[]>} The failed checks.
+ */
+export async function probeStripHistory(tab) {
+  const { failures, check } = checks();
+  await tab.select('#shader-document-select', 'kaleidoscope-hex-bright');
+  await tab.waitForSelector('.chain-chip[data-label="camera"]');
+  await tab.waitForSelector('.chain-chip[data-label="lens"]');
+  const labels = () => tab.$$eval('.chain-chip', nodes => nodes.map(node => node.dataset.label));
+  const before = await labels();
+  const first = before[0];
+  const second = before[1];
+  await tab.$eval('.chain-chip', node => node.focus());
+  await tab.keyboard.down('Alt');
+  await tab.keyboard.press('ArrowRight');
+  await tab.keyboard.up('Alt');
+  const reordered = await labels();
+  check(reordered[0] === second && reordered[1] === first,
+    'Alt+Arrow commits a same-band reorder through the live DOM');
+  check(await tab.evaluate(label => document.activeElement?.dataset.label === label, first),
+    'reorder restores focus to the moved instance after rebuilding');
+
+  await tab.keyboard.press('Delete');
+  check(!(await labels()).includes(first), 'Delete removes the focused instance');
+  check(await tab.evaluate(() => document.activeElement?.classList.contains('chain-chip')),
+    'removal leaves focus on a surviving chip');
+  await tab.keyboard.down('Control');
+  await tab.keyboard.press('z');
+  await tab.keyboard.up('Control');
+  check(JSON.stringify(await labels()) === JSON.stringify(reordered),
+    'the history shortcut bubbles from the replacement chip and restores the removed instance');
+  await tab.keyboard.down('Control');
+  await tab.keyboard.press('z');
+  await tab.keyboard.up('Control');
+  check(JSON.stringify(await labels()) === JSON.stringify(before),
+    'a second undo restores the original order');
+  check(await tab.$$eval('.chain-chip[tabindex="0"]', nodes => nodes.length === 1),
+    'the rebuilt strip retains one roving tab stop');
+
+  const crossing = '.chain-chip[data-label="project"]';
+  await tab.$eval(crossing, node => node.focus());
+  await tab.keyboard.press('Delete');
+  await tab.waitForSelector('.chain-palette');
+  check(await tab.evaluate(() => Boolean(document.activeElement?.closest('.chain-palette'))),
+    'a crossing replacement palette receives keyboard focus');
+  await tab.keyboard.press('Escape');
+  check(await tab.$('.chain-palette') === null
+    && await tab.evaluate(() => document.activeElement?.dataset.label === 'project'),
+  'Escape removes the palette and restores its anchor focus');
+  check(JSON.stringify(await labels()) === JSON.stringify(before),
+    'dismissing a replacement palette leaves the chain intact');
+  return failures;
+}
+
 // The promoted document that carries a value its compiled build holds as a
 // constant, so the apply has to skip that id rather than refuse the preset.
 const PARITY_EFFECT = 'ash-cloud';
@@ -554,6 +610,9 @@ if (isMain(import.meta.url)) await runProbe({
       await tab.waitForSelector('.chain-chip');
       return tab;
     };
+    const historyTab = await openWorkbench();
+    failures.push(...await probeStripHistory(historyTab));
+    await historyTab.close();
     const tab = await openWorkbench();
     failures.push(...await probeStrip(tab));
     // A separate page: the strip probe's structural edits disarm the toggle.

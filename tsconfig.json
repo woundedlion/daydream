@@ -76,6 +76,8 @@
     "tools/chain_apply.js",
     "tools/chain_document_store.js",
     "tools/chain_strip.js",
+    "tools/chain_presentation.js",
+    "tools/labels.js",
     "tools/clipboard.js",
     "tools/color.js",
     "tools/copy_text.js",
