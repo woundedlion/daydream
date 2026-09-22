@@ -483,6 +483,7 @@ function syncRecipeControlAvailability() {
     const field = document.getElementById(fieldId);
     const control = document.getElementById(controlId);
     field.classList.toggle('is-disabled', !enabled);
+    field.setAttribute('role', 'group');
     field.setAttribute('aria-disabled', String(!enabled));
     control.disabled = !enabled;
   }

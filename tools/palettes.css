@@ -315,7 +315,6 @@ body {
   transition: opacity 0.15s, transform 0.15s, visibility 0.15s;
 }
 
-.export-flyout:hover .export-panel,
 .export-flyout.is-open .export-panel {
   opacity: 1;
   visibility: visible;
