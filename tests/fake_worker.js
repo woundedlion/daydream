@@ -34,6 +34,7 @@ export class FakeWorker {
   }
 
   postMessage(msg, transfer) {
+    if (this.terminated) return;
     if (msg.type === 'init' && this.index === FakeWorker.failInitialPostAt)
       throw new DOMException('message rejected', 'DataCloneError');
     if (msg.type === FakeWorker.failPostType && this.index === FakeWorker.failPostAt)
