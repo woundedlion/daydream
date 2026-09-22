@@ -64,6 +64,12 @@ export function applyChainDocument({
     return `the engine refused the chain: ${code}${at}`;
   }
 
+  /** @param {string} message */
+  const refuse = (message) => {
+    syncEffectGui();
+    invalidate();
+    return message;
+  };
   const definitions = /** @type {ParameterDefinition[]} */ (
     engine.getParameterDefinitions());
   /** @type {Array<[string, number]>} */
@@ -73,16 +79,16 @@ export function applyChainDocument({
     if (dot > 0 && bypassed.has(parameterId.slice(0, dot))) continue;
     const definition = definitions.find(
       (candidate) => candidate.name === parameterId);
-    if (!definition) return `the chain registered no parameter "${parameterId}"`;
-    if (definition.readonly) return `"${parameterId}" is read-only`;
+    if (!definition) return refuse(`the chain registered no parameter "${parameterId}"`);
+    if (definition.readonly) return refuse(`"${parameterId}" is read-only`);
     let stored = value;
     if (typeof value === 'string') {
       const index = definition.options?.indexOf(value) ?? -1;
-      if (index < 0) return `"${parameterId}" has no option "${value}"`;
+      if (index < 0) return refuse(`"${parameterId}" has no option "${value}"`);
       stored = index;
     }
     if (typeof stored !== 'number' || !Number.isFinite(stored))
-      return `"${parameterId}" has no numeric value`;
+      return refuse(`"${parameterId}" has no numeric value`);
     writes.push([parameterId, stored]);
   }
 

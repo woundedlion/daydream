@@ -138,13 +138,13 @@ test('an entry-level refusal names the offending chain entry', () => {
   assert.match(refusal, /chain entry 1/);
 });
 
-test('a value the chain never registered refuses before the resync', () => {
+test('a value the chain never registered still resyncs rebuilt definitions', () => {
   const { order, run } = harness();
 
   const refusal = run(compiledDocument({ 'ghost.speed': 0.5 }));
   assert.match(refusal, /no parameter "ghost\.speed"/);
-  assert.ok(!order.includes('syncEffectGui'));
-  assert.ok(!order.includes('invalidate'));
+  assert.ok(order.includes('syncEffectGui'));
+  assert.ok(order.includes('invalidate'));
 });
 
 test('an enum value outside the option roster is refused by name', () => {
