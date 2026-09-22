@@ -892,7 +892,7 @@ div.label {
   pointer-events: none;
   background-color: transparent;
   color: var(--bright-text);
-  font-family: Arial;
+  font-family: var(--nav-font);
   font-size: 10px;
 }
 
