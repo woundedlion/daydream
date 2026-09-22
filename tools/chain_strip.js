@@ -26,11 +26,10 @@ import { createFrameScheduler } from './page_lifecycle.js';
  * pointer and under keyboard focus alike, and pinned open by selection.
  */
 
-/** @typedef {{id: string, topology?: boolean, values?: string[]}} CatalogParameter */
+/** @typedef {{id: string, topology?: boolean, values?: string[], gated_by?: {field: string, values: string[]}}} CatalogParameter */
 /** @typedef {{id: string, name: string, input: string, output: string, params: CatalogParameter[]}} CatalogOperator */
 /** @typedef {{carriers: string[], operators: CatalogOperator[]}} OperatorCatalog */
 /** @typedef {{label: string, operator: string}} ChainEntry */
-/** @typedef {[string, (value: *) => boolean]} GateRule */
 /** @typedef {{operator: CatalogOperator, legal: boolean, reason?: string}} LegalityEntry */
 /** @typedef {{operators: CatalogOperator[]}} SequenceEntry */
 /**
@@ -135,27 +134,6 @@ const nudgeStep = (declaration) => {
 const fieldOf = (id) => id.slice(id.indexOf('.') + 1);
 
 /**
- * Which catalog field each gated field is gated on, and the option values that
- * keep it active. Keyed by field id, not by parameter id, so the rule covers
- * every instance of every operator declaring that field.
- * @type {Record<string, GateRule[]>}
- */
-export const PARAMETER_GATES = Object.freeze({
-  'edge-width': [
-    ['coverage-mode', (value) => value === 'edge-fade'],
-    ['envelope', (value) => value === 'edge-fade'],
-  ],
-  'hue-shift-amount': [['hue-shift-mode', (value) => value !== 'none']],
-  'hue-noise-scale': [['hue-shift-mode', (value) => value === 'noise']],
-  'hue-noise-speed': [['hue-shift-mode', (value) => value === 'noise']],
-  'brightness-bottom': [['brightness-envelope', (value) => value !== 'none']],
-  'brightness-top': [['brightness-envelope', (value) => value !== 'none']],
-  'brightness-depth': [['brightness-envelope', (value) => value !== 'none']],
-  'projection-spin-speed': [['frame', (value) => value === 'spin-wander']],
-  'projection-wander': [['frame', (value) => value === 'spin-wander']],
-});
-
-/**
  * The parameter ids the current topology selections deactivate. Edge widths
  * require an edge-fade mode, hue controls require their corresponding hue mode,
  * brightness endpoints and depth require a brightness envelope, and the
@@ -176,18 +154,14 @@ export function deactivatedParameterIds(parameters, values, chain, catalog) {
   for (const parameter of parameters) {
     if (!parameter.id.includes('.')) continue;
     const field = fieldOf(parameter.id);
-    const rules = PARAMETER_GATES[field];
-    if (!rules) continue;
     const label = parameter.id.slice(0, parameter.id.indexOf('.'));
     const operator = operatorByLabel.get(label);
-    for (const [gateField, active] of rules) {
-      const schema = operator?.params.find((candidate) => candidate.id === gateField);
-      const value = values[`${label}.${gateField}`];
-      if (schema?.topology === true && value !== undefined && !active(value)) {
-        deactivated.add(parameter.id);
-        break;
-      }
-    }
+    const gate = operator?.params.find((candidate) => candidate.id === field)?.gated_by;
+    if (!gate) continue;
+    const schema = operator.params.find((candidate) => candidate.id === gate.field);
+    const value = values[`${label}.${gate.field}`];
+    if (schema?.topology === true && value !== undefined && !gate.values.includes(value))
+      deactivated.add(parameter.id);
   }
   return deactivated;
 }
