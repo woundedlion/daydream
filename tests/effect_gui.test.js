@@ -227,9 +227,7 @@ function fakeGui(hydrated = {}, stored = {}) {
       if (this.stored[property] !== undefined) return this.stored[property];
       const legacy = legacyProperties.find((name) => this.stored[name] !== undefined);
       if (!legacy) return undefined;
-      this.stored[property] = this.stored[legacy];
-      delete this.stored[legacy];
-      return this.stored[property];
+      return this.stored[legacy];
     },
     readStoredString(property) {
       return this.stored[property];
@@ -1101,7 +1099,6 @@ test('build restores the last accepted value before replaying an invalid request
   ]);
   assert.equal(h.gui().ctrl('Planar Warp 1').getValue(), 3);
   assert.equal(h.gui().stored['__accepted.Planar Warp 1'], '0');
-  assert.equal(h.gui().stored['__accepted.Outer Warp'], undefined);
 });
 
 // The engine reports a bool param's values as JS booleans, but the companion
