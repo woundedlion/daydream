@@ -383,6 +383,10 @@ export function compilePaletteRecipe(recipe, inspect = true) {
   const result = inspect
     ? paletteOps.inspectV4(recipe)
     : paletteOps.compileAndBakeV4(recipe);
+  for (const view of [result.lut, result.diagnostics, result.fallback]) {
+    if (ArrayBuffer.isView(view) && view.buffer.byteLength === 0)
+      throw new Error('PaletteOps returned a detached buffer');
+  }
   /** @type {PaletteCompileResult} */
   const copied = { status: { ...result.status } };
   if (result.canonicalRecipe)
