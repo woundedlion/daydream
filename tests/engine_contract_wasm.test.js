@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import createHolosphereModule from '../holosphere_wasm.js';
+import { Daydream } from '../driver.js';
 import {
   KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, SIMPLE_SEEDS,
   DEFINED_SEED_CONSTANTS, applyOp, meshOpFailure, MESH_OP_RESULT_NAMES,
@@ -1639,4 +1640,8 @@ test('the glue honours instantiateWasm, and shared-module instances stay isolate
   } finally {
     for (const e of engines) e.delete();
   }
+});
+
+test('simulator virtual rows match the WASM geometry offset', () => {
+  assert.equal(M.H_OFFSET, Daydream.H_OFFSET);
 });
