@@ -1194,7 +1194,10 @@ function updateOpParam(index, key, value) {
   scheduleUpdate();
 }
 
-const commitQueue = createCommitQueue();
+const commitQueue = createCommitQueue((error) => {
+  console.error(error);
+  showGateMsg(`Operation failed: ${error instanceof Error ? error.message : error}`);
+});
 // Every chain mutation lands through here; once the page has stood down no
 // module remains to draw the result, so a commit still queued is dropped.
 const queueCommit = (/** @type {() => any} */ fn) =>
