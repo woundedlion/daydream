@@ -499,7 +499,7 @@ export function mapValue(value, fromMin, fromMax, toMin, toMax) {
  * visible rather than flattening against the top or bottom of the canvas.
  * @type {{min: number, max: number}}
  */
-export const WAVE_GRAPH_VALUE_RANGE = { min: -0.5, max: 1.5 };
+export const WAVE_GRAPH_VALUE_RANGE = { min: -1, max: 2 };
 
 /**
  * Maps WAVE_GRAPH_VALUE_RANGE onto a wave-graph canvas of the given height: the
