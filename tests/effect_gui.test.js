@@ -1,3 +1,4 @@
+import { FULL_CONFIG_STORAGE_KEY } from '../effect_persistence.js';
 import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement } from './fake_dom.js';
@@ -7,7 +8,6 @@ import {
   sliderDecimals,
   EXPORT_COPIED,
   EXPORT_FAILED,
-  FULL_CONFIG_STORAGE_KEY,
   FLASH_MS,
 } from '../effect_gui.js';
 import {
@@ -2824,7 +2824,7 @@ test('a drag registers window listeners that the pointer release drains', () => 
   h.dragTarget.dispatch('pointerup', pointerUp());
   assert.equal(controller.dragging, false);
   assert.deepEqual(h.dragTarget.listeners, []);
-  assert.equal(h.panel.active().activeDragEnds.size, 0);
+  assert.equal(h.panel.active().edits.activeDragEnds.size, 0);
 });
 
 test('destroy drains the drag listeners of a panel torn down mid-drag', () => {
@@ -3115,7 +3115,7 @@ test('a drag whose release never lands ends when the window loses focus', () => 
 
   assert.equal(controller.dragging, false);
   assert.deepEqual(h.dragTarget.listeners, [], 'the end listeners drain');
-  assert.equal(h.panel.active().activeDragEnds.size, 0);
+  assert.equal(h.panel.active().edits.activeDragEnds.size, 0);
   assert.equal(h.gui().storedWrites.length > 0, true,
     'the persistence the drag deferred still lands');
 
@@ -3143,7 +3143,7 @@ test('a second pointer neither re-latches a held control nor releases it', () =>
   assert.deepEqual(h.dragTarget.listeners.map((l) => l.type),
     ['pointerup', 'pointercancel', 'blur'],
     'the second pointer registers no end set of its own');
-  assert.equal(h.panel.active().activeDragEnds.size, 1);
+  assert.equal(h.panel.active().edits.activeDragEnds.size, 1);
 
   h.dragTarget.dispatch('pointerup', pointerUp(9));
 
