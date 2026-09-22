@@ -429,6 +429,7 @@ export interface PaletteOps {
 }
 
 export interface HolosphereModule {
+  H_OFFSET: number;
   srgb_to_linear_float(s: number): number;
   linear_to_srgb_float(l: number): number;
   srgb_to_linear_interp(s: number): number;
