@@ -65,6 +65,7 @@ export function getCssColor(name) {
  * @param {number} [opts.background] - Scene background color; defaults to the
  *        --slate-900 token, or 0x0f172a where that token is unset
  * @param {number} [opts.sphereOpacity=0.2] - Opacity of reference sphere wireframe
+ * @param {number} [opts.sphereRadius=1] - Radius of the reference sphere
  * @param {boolean} [opts.showSphere=true] - Whether to show a reference sphere
  * @param {number} [opts.cameraDistance=3] - Initial camera distance (ignored if cameraPosition is set)
  * @param {number[]} [opts.cameraPosition] - Explicit initial camera position [x, y, z]
@@ -86,6 +87,7 @@ export function initScene(containerId, canvasId, opts = {}) {
   const {
     background = getCssColor('--slate-900') ?? 0x0f172a,
     sphereOpacity = 0.2,
+    sphereRadius = 1,
     showSphere = true,
     cameraDistance = 3,
     cameraPosition = null,
@@ -142,7 +144,7 @@ export function initScene(containerId, canvasId, opts = {}) {
 
   let sphere = null;
   if (showSphere) {
-    const geo = new THREE.SphereGeometry(1.0, 64, 32);
+    const geo = new THREE.SphereGeometry(sphereRadius, 64, 32);
     const mat = new THREE.MeshBasicMaterial({
       color: 0x334155,
       wireframe: true,
