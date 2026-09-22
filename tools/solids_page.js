@@ -829,6 +829,10 @@ function deleteSolid(index) {
 
 async function copyCode(index, lang, btn) {
   const item = savedSolids[index];
+  if (!registrySolidNames.has(item.base)) {
+    showCopyFailure(btn, `export failed: unknown base solid ${item.base}`);
+    return;
+  }
   const baseIsStar = islamicStarPatterns.includes(item.base);
 
   // Namespace of the seed, which the emitted recipe calls. Archimedean and
