@@ -193,7 +193,9 @@ export function refreshWithDeadline(refresh, {
 export function bootRemedy(error) {
   const detail = errorDetail(error);
   if (error instanceof StaleModuleError) return STALE_MODULE_REMEDY;
-  if (detail.startsWith('SyntaxError')) return STALE_MODULE_REMEDY;
+  if (detail.startsWith('SyntaxError')
+      || error instanceof WebAssembly.LinkError
+      || error instanceof WebAssembly.CompileError) return STALE_MODULE_REMEDY;
   if (MODULE_FETCH_FAILURE.test(detail)) return VENDOR_REMEDY;
   return '';
 }
