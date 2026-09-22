@@ -425,7 +425,19 @@ async function generateThumbnails(signal) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = `thumb-btn ${state.base === key ? 'active' : ''}`;
-      btn.setAttribute('aria-pressed', state.base === key ? 'true' : 'false');
+      btn.setAttribute('role', 'radio');
+      btn.setAttribute('aria-checked', state.base === key ? 'true' : 'false');
+      btn.tabIndex = state.base === key ? 0 : -1;
+      btn.addEventListener('keydown', (event) => {
+        const delta = ['ArrowRight', 'ArrowDown'].includes(event.key) ? 1
+          : ['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 0;
+        if (!delta) return;
+        event.preventDefault();
+        const choices = [...document.querySelectorAll('.thumb-btn')];
+        const next = choices[(choices.indexOf(btn) + delta + choices.length) % choices.length];
+        next.focus();
+        next.click();
+      });
       btn.dataset.solid = key; // identify the base so restoreSolid can re-highlight it
       btn.addEventListener('click', () => {
         queueCommit(async () => {
@@ -445,7 +457,8 @@ async function generateThumbnails(signal) {
           document.querySelectorAll('.thumb-btn').forEach(b => {
             const selected = b === btn;
             b.classList.toggle('active', selected);
-            b.setAttribute('aria-pressed', selected ? 'true' : 'false');
+            b.setAttribute('aria-checked', selected ? 'true' : 'false');
+            b.tabIndex = selected ? 0 : -1;
           });
         });
       });
@@ -944,7 +957,8 @@ function applyRestore(item) {
   document.querySelectorAll('.thumb-btn').forEach(b => {
     const selected = b.dataset.solid === state.base;
     b.classList.toggle('active', selected);
-    b.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    b.setAttribute('aria-checked', selected ? 'true' : 'false');
+            b.tabIndex = selected ? 0 : -1;
   });
 
   update();
@@ -1329,8 +1343,13 @@ async function refreshOpGating() {
     // op it does not name stays where the last complete pass left it.
     if (!blocked && !probe.complete) continue;
     btn.disabled = blocked;
-    if (blocked) btn.title = 'Would exceed an engine mesh limit on the current solid';
-    else btn.removeAttribute('title');
+    if (blocked) {
+      btn.title = 'Would exceed an engine mesh limit on the current solid';
+      btn.setAttribute('aria-description', btn.title);
+    } else {
+      btn.removeAttribute('aria-description');
+      btn.removeAttribute('title');
+    }
   }
 }
 
