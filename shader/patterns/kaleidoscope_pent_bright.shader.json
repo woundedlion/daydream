@@ -636,7 +636,7 @@
           "project.projection-wander": 1,
           "project.singularity-fade": 2.2730000019073486,
           "sample.coverage-mode": "weight-squared",
-          "sample.lattice-cell-scale": 0.7741405963897705,
+          "sample.lattice-cell-scale": 0.7957746982574463,
           "sample.lattice-radius": 0.2907625138759613,
           "sample.lattice-shape": 1,
           "sample.lattice-softness": 0.37760838866233826,
