@@ -22,6 +22,7 @@ export const COVERAGE = [
   '--test-coverage-lines=95',
   '--test-coverage-branches=90',
   '--test-coverage-exclude=tests/**',
+  `--test-coverage-exclude=${fileURLToPath(new URL('./record-module-loads.mjs', import.meta.url))}`,
   '--test-coverage-exclude=shader/**',
   '--test-coverage-exclude=holosphere_wasm.js',
   '--test-coverage-exclude=scripts/browser-smoke.mjs',

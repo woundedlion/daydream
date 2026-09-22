@@ -66,7 +66,7 @@ test('a failing test fails the run', () => {
     join(root, 'tests/sample.test.js'),
     "import { test } from 'node:test';\ntest('fails', () => { throw new Error('boom'); });\n",
   );
-  fail(PATTERN);
+  assert.match(failOutput(PATTERN), /boom/);
 });
 
 test('a source module no test loads fails', () => {
@@ -145,10 +145,17 @@ test('the coverage floors exclude only the code no unit test executes', () => {
     '--test-coverage-lines=95',
     '--test-coverage-branches=90',
     '--test-coverage-exclude=tests/**',
+  `--test-coverage-exclude=${fileURLToPath(new URL('../scripts/record-module-loads.mjs', import.meta.url))}`,
     '--test-coverage-exclude=shader/**',
     '--test-coverage-exclude=holosphere_wasm.js',
     '--test-coverage-exclude=scripts/browser-smoke.mjs',
     '--test-coverage-exclude=scripts/probe_harness.mjs',
     '--test-coverage-exclude=scripts/*-probe.mjs',
   ]);
+});
+
+test('a case that executes no assertion fails', () => {
+  writeFileSync(join(root, 'tests/sample.test.js'),
+    "import { test } from 'node:test';\nimport '../lib.mjs';\ntest('empty', () => {});\n");
+  assert.match(failOutput(PATTERN), /Every test case must execute an assertion/);
 });
