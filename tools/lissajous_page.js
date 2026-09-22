@@ -163,18 +163,18 @@ const updateCodeSnippet = () => {
   if (!codeOutput) return;
 
   // Pure string building lives in lissajous_math.js; this stays DOM-only.
-  codeOutput.textContent =
-    lissajousCodeString(state.C1, state.C2, state.A, state.Duration);
+  const code = lissajousCodeString(state.C1, state.C2, state.A, state.Duration);
+  if (codeOutput.textContent !== code) codeOutput.textContent = code;
 
   const warning = document.getElementById('domain_closure_warning');
   if (!warning) return;
   const text = domainClosureWarning(state.C2, state.Duration);
   if (text === null) {
-    warning.textContent = '';
+    if (warning.textContent !== '') warning.textContent = '';
     warning.classList.add('hidden');
   } else {
     warning.classList.remove('hidden');
-    warning.textContent = text;
+    if (warning.textContent !== text) warning.textContent = text;
   }
 };
 
