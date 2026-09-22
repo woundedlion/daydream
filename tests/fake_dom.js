@@ -517,6 +517,7 @@ export function fakeElement(tag = 'div', options = {}) {
       if (this.isConnected && doc?.listeners && !path.includes(doc)) path.push(doc);
       const ancestors = path.slice(1);
 
+      let passive = false;
       let stopped = false;
       let stoppedHere = false;
       // The type and the propagation/default controls belong to the event, so
@@ -530,7 +531,7 @@ export function fakeElement(tag = 'div', options = {}) {
         defaultPrevented: false,
         stopPropagation() { stopped = true; },
         stopImmediatePropagation() { stopped = true; stoppedHere = true; },
-        preventDefault() { dispatched.defaultPrevented = true; },
+        preventDefault() { if (!passive) dispatched.defaultPrevented = true; },
       };
 
       /**
@@ -552,7 +553,8 @@ export function fakeElement(tag = 'div', options = {}) {
           const at = node.listeners.indexOf(l);
           if (at < 0) continue;
           if (l.options && l.options.once) node.listeners.splice(at, 1);
-          l.handler(dispatched);
+          passive = Boolean(l.options?.passive);
+          try { l.handler(dispatched); } finally { passive = false; }
         }
       };
 
