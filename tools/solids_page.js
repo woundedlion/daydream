@@ -979,24 +979,19 @@ function reorderOp(from, to, revision) {
   });
 }
 
-// The chainIsValid verdict for each raw drop slot (getDragTargetIndex
-// value) of the op being dragged, so a blocked slot can name its reason.
-// Filled asynchronously from dragstart; slots still pending hold no entry
-// and show no insertion preview; the drop re-validates before committing.
 let dropSlotChecks = new Map();
 let dropSlotGen = 0;
-async function precomputeDropSlots(fromIndex) {
-  const gen = ++dropSlotGen;
-  dropSlotChecks = new Map();
-  for (let t = 0; t <= state.ops.length; t++) {
-    const to = dropTargetIndex(t, fromIndex);
-    if (to === fromIndex) { dropSlotChecks.set(t, { ok: true, message: '' }); continue; }
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    if (gen !== dropSlotGen) return;
-    const check = await chainIsValid(state.base, movedOps(state.ops, fromIndex, to));
-    if (gen !== dropSlotGen) return;
-    dropSlotChecks.set(t, check);
+async function checkDropSlot(fromIndex, target) {
+  if (dropSlotChecks.has(target)) return;
+  const gen = dropSlotGen;
+  dropSlotChecks.set(target, null);
+  const to = dropTargetIndex(target, fromIndex);
+  if (to === fromIndex) {
+    dropSlotChecks.set(target, { ok: true, message: '' });
+    return;
   }
+  const check = await chainIsValid(state.base, movedOps(state.ops, fromIndex, to));
+  if (gen === dropSlotGen) dropSlotChecks.set(target, check);
 }
 
 // Pointer y in the list's own coordinate space, which dropSlotIndex compares
@@ -1046,17 +1041,19 @@ function wireRowDrag(grip, index, el, list, revision) {
         if (Math.abs(e.clientY - originY) < DRAG_SLOP_PX) return;
         dragging = true;
         el.classList.add('dragging');
-        precomputeDropSlots(index).catch(console.error);
+        dropSlotGen += 1;
+        dropSlotChecks = new Map();
       }
 
       const targetIndex = getDragTargetIndex(e, list);
+      void checkDropSlot(index, targetIndex).catch(console.error);
       const items = [...list.children];
       const draggingItem = items[index];
       if (!draggingItem) return;
 
       // An engine-invalid slot gets no insertion preview and no drop cursor.
       const targetCheck = dropSlotChecks.get(targetIndex);
-      const blocked = !targetCheck?.ok;
+      const blocked = targetCheck?.ok === false;
       grip.classList.toggle('drop-blocked', blocked);
       if (blocked) {
         items.forEach((item, idx) => {
