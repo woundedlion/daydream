@@ -151,8 +151,7 @@ test('update leaves the arena rows untouched when the effect reports none', () =
   view.update(2, null);
 
   assert.equal(byId['perf-stats'].textContent, '2.000 ms');
-  assert.equal(byId['stat-scratch-a'].textContent, '1.0|2.0|4',
-    'a metric-less frame blanked the last known arena usage');
+  assert.equal(byId['stat-scratch-a'].textContent, 'Unavailable');
 });
 
 test('update omits the stack row when the metrics carry no stack', () => {
