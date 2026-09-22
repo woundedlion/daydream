@@ -1009,8 +1009,9 @@ function updatePalette() {
     try {
       palette = new GenerativePalette(readPaletteRecipe());
       const adjusted = paletteAdjustmentSummary(palette.status);
-      document.getElementById('gen_status').textContent =
-        adjusted ? `Recipe valid — ${adjusted}` : 'Recipe valid';
+      const status = document.getElementById('gen_status');
+      const message = adjusted ? `Recipe valid — ${adjusted}` : 'Recipe valid';
+      if (status.textContent !== message) status.textContent = message;
     } catch (error) {
       if (engineTrapped(error)) return;
       document.getElementById('gen_status').textContent = error.message;
