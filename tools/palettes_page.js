@@ -1061,7 +1061,7 @@ async function init() {
     setPaletteOps(paletteOps);
     effectPalettePresets = Array.from(paletteOps.effectPresetsV4());
   } catch (e) {
-    if (engineTrapped(e)) return;
+    if (wasmModule && engineTrapped(e)) return;
     setPaletteOps(null);
     paletteOps?.delete();
     paletteOps = null;
