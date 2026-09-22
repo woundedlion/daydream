@@ -141,7 +141,8 @@ const declares = (method) => new RegExp(
 
 test('WebGLRenderer still assigns the methods initScene calls', () => {
   const source = THREE.WebGLRenderer.toString();
-  for (const method of ['setSize', 'setPixelRatio', 'render', 'dispose', 'forceContextLoss']) {
+  for (const method of ['setSize', 'setPixelRatio', 'render', 'dispose', 'forceContextLoss',
+    'setScissorTest', 'setViewport', 'setScissor', 'setAnimationLoop']) {
     assert.match(source, declares(method), `renderer.${method}`);
   }
   assert.doesNotMatch(source, declares('setSizeAndPixelRatio'),
