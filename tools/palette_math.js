@@ -96,10 +96,10 @@ export class ProceduralPalette {
    * @param {number[]} d - [r, g, b] vec3 of D (phase) coefficients.
    */
   constructor(a, b, c, d) {
-    this.a = a;
-    this.b = b;
-    this.c = c;
-    this.d = d;
+    this.a = [...a];
+    this.b = [...b];
+    this.c = [...c];
+    this.d = [...d];
   }
 
   /**
@@ -179,6 +179,11 @@ export const NAMED_PROCEDURAL_PALETTES = [
   { name: 'CORAL_BLUE', a: [0.4, 0.347, 0.801], b: [0.5, 0.303, 0.5], c: [0.75363518, -0.20031623, 0.0110030736], d: [0.9144297, -0.16868377, 0.40006184] },
   { name: 'BRUISED_MANGO', a: [0.385, 0.470, 0.171], b: [1.000, 0.518, 0.000], c: [0.191, 0.191, 5.000], d: [0.619, -0.427, 0.887] },
 ];
+for (const entry of NAMED_PROCEDURAL_PALETTES) {
+  for (const coefficients of [entry.a, entry.b, entry.c, entry.d]) Object.freeze(coefficients);
+  Object.freeze(entry);
+}
+Object.freeze(NAMED_PROCEDURAL_PALETTES);
 
 /**
  * Flattens a palette's a/b/c/d coefficient vec3s into the tool's 12-key
@@ -561,6 +566,7 @@ export const ENUM_NAMES = Object.freeze({
   curve: ['CONSTANT', 'ASCENDING', 'DESCENDING', 'BELL', 'CUP', 'CUSTOM'],
   chromaBasis: ['LOCAL_GAMUT', 'PATH_MINIMUM', 'ABSOLUTE'],
 });
+for (const names of Object.values(ENUM_NAMES)) Object.freeze(names);
 
 /**
  * @param {keyof typeof ENUM_NAMES} group - Which enum the value belongs to.
