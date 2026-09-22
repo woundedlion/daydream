@@ -764,6 +764,11 @@ test('shader_stages.js mirrors ShaderBall stage option labels exactly', () => {
     [...STAGE_BOUNDARIES].map(([name, stage]) => [stage, name]));
 
   for (const [stage, [field, labels]] of FIXED_SHADER_MODE_FIELDS) {
+    const snapshot = engine.getFullConfigSnapshot();
+    const fieldId = engine.getFullConfigFieldDefinitions().find((entry) => entry.name === field)?.id;
+    const value = snapshot.accepted[fieldId];
+    assert.ok(Number.isInteger(value) && value >= 0 && value < labels.length,
+      `${field} must resolve to a valid mode in the native snapshot`);
     const name = parameterForStage.get(stage);
     assert.ok(name, `STAGE_BOUNDARIES must claim stage ${stage}`);
     const definition = definitions.find((entry) => entry.name === name);
