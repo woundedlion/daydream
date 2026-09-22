@@ -222,7 +222,7 @@ test('colorizing emits one class color per emitted vertex and swaps the material
   // three distinct classes take three distinct hues.
   const hues = geometry.attributes.color.array.filter((_, i) => i % 3 === 0);
   const perFace = [hues[0], hues[3], hues[6], hues[9]];
-  assert.deepEqual(perFace, [0, 0.618034, 0.618034, (2 * 0.618034) % 1]);
+  assert.deepEqual(perFace, [0, 0.618034, 0.618034, (2 * 0.618034) % 1].map(Math.fround));
 });
 
 test('colorize is ignored while faces are hidden', () => {

@@ -121,7 +121,7 @@ export class BufferGeometry {
 // suite comparing two emitted attributes compares the values the page computed.
 export class Float32BufferAttribute {
   /** @param {Array<number>} array @param {number} itemSize */
-  constructor(array, itemSize) { this.array = array; this.itemSize = itemSize; }
+  constructor(array, itemSize) { this.array = new Float32Array(array); this.itemSize = itemSize; }
 }
 
 export class MeshBasicMaterial {
