@@ -339,17 +339,16 @@ export class VideoRecorder {
 
     recorder.onstop = endSession;
 
-    // A fatal encoder fault ends the session without a guaranteed stop event, so
-    // finalize here rather than leaving a dead recorder installed.
     recorder.onerror = (e) => {
       const live = this.mediaRecorder === recorder;
       const cause = e?.error ?? e;
       const error = cause instanceof Error
         ? cause
         : new Error('recording failed; the saved file may be truncated or incomplete.');
-      recorder.ondataavailable = null;
-      if (recorder.state !== 'inactive') recorder.stop();
-      endSession();
+      if (recorder.state !== 'inactive') {
+        recorder.stop();
+        endSession();
+      }
       console.error('VideoRecorder: recording failed; the saved file may be truncated or incomplete.',
         cause);
       if (live) this.onError?.(error);

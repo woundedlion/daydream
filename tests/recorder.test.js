@@ -755,10 +755,14 @@ test('an encoder error finalizes the session, reports it, and clears the recorde
     recorder.ondataavailable({ data: { size: 10 } });
 
     const failure = new Error('encoder died');
+    recorder.state = 'inactive';
     recorder.onerror({ error: failure });
+    assert.equal(downloads.length, 0, 'wait for the final data event');
+    recorder.ondataavailable({ data: { size: 7 } });
+    recorder.onstop();
 
     assert.equal(downloads.length, 1, 'the partial capture is still finalized');
-    assert.deepEqual(downloads[0].chunks, [{ size: 10 }]);
+    assert.deepEqual(downloads[0].chunks, [{ size: 10 }, { size: 7 }]);
     assert.equal(recorder.state, 'inactive', 'the faulted recorder is stopped');
     assert.equal(stream.track.stopped, true, 'the capture track is released');
     assert.equal(rec.mediaRecorder, null);
@@ -828,6 +832,7 @@ test('a stale session error does not clobber the session that replaced it', () =
     recorderB.ondataavailable({ data: { size: 20 } });
 
     recorderA.onerror({ error: new Error('late encoder fault') });
+    recorderA.onstop();
 
     assert.equal(downloads.length, 1);
     assert.equal(downloads[0].name, 'first');
