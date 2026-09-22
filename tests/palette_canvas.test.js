@@ -341,3 +341,13 @@ test('neither painter touches a canvas it has no context for', () => {
   drawWaveGraph({ canvas: { width: 8, height: 4 }, ctx: null, palette });
   assert.equal(palette.channelCalls, 0);
 });
+
+test('a partly laid-out strip retains both backing dimensions', () => {
+  for (const [clientWidth, clientHeight] of [[120, 0], [0, 80]]) {
+    const h = stripSetup(8, 4);
+    Object.assign(h.canvas, { clientWidth, clientHeight });
+    h.painter.draw(h.palette);
+    assert.deepEqual([h.canvas.width, h.canvas.height], [8, 4]);
+    assert.equal(h.palette.getCalls, 8);
+  }
+});
