@@ -22,8 +22,10 @@ import {
   paramGenerationStale,
   paramValueSkew,
   selectorControlValue,
-  enumConstantName,
 } from "./param_sync.js";
+import { createEffectPersistence, acceptedParamValue } from './effect_persistence.js';
+import { createEffectPanelView, focusWidget } from './effect_panel_view.js';
+import { EffectPanelEdits } from './effect_panel_edits.js';
 import { formatExportParams } from "./tools/export_params.js";
 import {
   LATTICE_MELT_STAGE_ORDER,
@@ -49,35 +51,10 @@ const EXPORT_ICON = '\u29c9';
 const RESET_ICON = '\u21ba';
 const PREVIOUS_ICON = '\u25c0';
 const NEXT_ICON = '\u25b6';
-export const FULL_CONFIG_STORAGE_KEY = '__fullConfig';
 // Panel control names an engine parameter cannot reuse. The action buttons are
 // functions and the preset selector is a session control, so none of those owns
 // a deep-link key; the pause toggle owns `pause`.
 const RESERVED_CONTROL_NAMES = new Set(['pause']);
-// Everything that ends a slider drag. The window's own blur covers the release
-// the page never sees, which would otherwise leave the latch set for good.
-const DRAG_END_EVENTS = ['pointerup', 'pointercancel', 'blur'];
-
-/**
- * The key one of the panel's own controls is remembered under across a rebuild,
- * outside the namespace the engine parameter names occupy.
- * @param {string} property - The control's bound property name.
- * @returns {string} The namespaced key.
- */
-function panelControlKey(property) {
-  return `panel.${property}`;
-}
-
-/**
- * The focusable widget a lil-gui controller built: a dropdown's select, an
- * input, or a button, whichever its control kind owns.
- * @param {Object|undefined} controller - A controller from an effect record.
- * @returns {Object|null} The element that takes focus, or null.
- */
-function focusWidget(controller) {
-  return controller?.$select ?? controller?.$input
-    ?? controller?.$button ?? null;
-}
 
 /**
  * The id one parameter's warning text is published under, for the control's
@@ -96,19 +73,6 @@ function paramWarningId(name) {
  */
 function paramWarningTexts(params) {
   return new Map(params.filter((p) => p.warning).map((p) => [p.name, p.warning]));
-}
-
-/**
- * The value the engine last took for one parameter: what it admitted for
- * rendering, else the writable target it holds, else the value it renders. A
- * definition that carries no accepted value still names a target, which is what
- * a replay writes back; the rendered value is an animation frame.
- * @param {{acceptedValue?: *, requestedValue?: *, value: *}} parameter - Engine
- *   parameter definition.
- * @returns {*} The accepted value, in the definition's own type.
- */
-function acceptedParamValue(parameter) {
-  return parameter.acceptedValue ?? parameter.requestedValue ?? parameter.value;
 }
 
 /**
@@ -363,106 +327,10 @@ export function createEffectGui({ engine, segments, config, host }) {
   // warning move and every preset, all over the same schema.
   let unstagedWarned = '';
   let rebuildFailureGeneration;
-  let mountClosedOverride;
-  /** Storage key for the last engine-accepted value of one parameter. */
-  const acceptedStorageKey = (name) => `__accepted.${name}`;
-
-  /**
-   * Persist the active effect through its snapshot or accepted-value surface.
-   * @param {Object} gui - The effect GUI holding the stored values.
-   * @param {{name: string, accepted: *}} [edited] - The one parameter an edit
-   *   moved, carrying the value the write settled on. Narrowing to it keeps a
-   *   per-keystroke persist off the whole-definition marshal.
-   * @returns {void}
-   */
-  function persistEffectState(gui, edited = undefined) {
-    if (!usesFullConfigSnapshot()) {
-      if (edited === undefined) persistAcceptedParams(gui);
-      else persistAcceptedParam(gui, edited.name, edited.accepted);
-      return;
-    }
-    const snapshot = getFullConfigSnapshot();
-    if (!snapshot) return;
-    gui.writeStoredValue(FULL_CONFIG_STORAGE_KEY, JSON.stringify(snapshot));
-  }
-
-  /** Restore the active effect through its snapshot or accepted-value surface. */
-  function restoreEffectState(gui) {
-    if (!usesFullConfigSnapshot()) {
-      restoreAcceptedParams(gui);
-      return;
-    }
-    const text = gui.readStoredString(FULL_CONFIG_STORAGE_KEY);
-    if (text === undefined) return;
-    let snapshot;
-    try {
-      snapshot = JSON.parse(text);
-      if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
-        throw new TypeError('snapshot must be an object');
-      }
-      if (!Object.hasOwn(snapshot, 'schemaVersion')) snapshot.schemaVersion = 1;
-    } catch (error) {
-      logWarn('Shader Workbench: ignoring invalid full-config snapshot', error);
-      return;
-    }
-    const results = fullConfigRestoreResults();
-    const outcome = restoreFullConfigSnapshot(snapshot);
-    if (outcome !== results.APPLIED) {
-      logWarn('Shader Workbench: full-config snapshot was rejected: '
-        + enumConstantName(results, outcome));
-      return;
-    }
-    const notice = getConfigImportNotice();
-    clearConfigImportNotice();
-    showConfigImportNotice(notice || null);
-  }
-
-  /** Store one parameter's engine-accepted value. */
-  function persistAcceptedParam(gui, name, accepted) {
-    // The float form, not the raw value: restoreAcceptedParams() reads the
-    // companion key back through the URL number grammar, which rejects a bool.
-    gui.writeStoredValue(acceptedStorageKey(name), String(engineParamValue(accepted)));
-  }
-
-  /** Store every writable parameter's engine-accepted value. */
-  function persistAcceptedParams(gui) {
-    for (const parameter of getParameterDefinitions()) {
-      if (parameter.readonly) continue;
-      persistAcceptedParam(gui, parameter.name, acceptedParamValue(parameter));
-    }
-  }
-
-  /**
-   * Replay the stored accepted values into the engine. The definition list is
-   * re-read after every write because a write can change it — a ShaderBall
-   * selector swaps in the controls of the stage it selects — so parameters that
-   * did not exist a write ago still get their stored value. Nothing in the loop
-   * writes the stored values it reads, so one probe per name settles it and the
-   * rescan costs a set lookup rather than a URL read.
-   * @param {Object} gui - The effect GUI holding the stored values.
-   * @returns {void}
-   */
-  function restoreAcceptedParams(gui) {
-    const probed = new Set();
-    for (;;) {
-      let parameter;
-      let value;
-      for (const candidate of getParameterDefinitions()) {
-        if (candidate.readonly || probed.has(candidate.name)) continue;
-        probed.add(candidate.name);
-        const stored = gui.readStoredNumber(
-          acceptedStorageKey(candidate.name),
-          legacyShaderBallParamNames(candidate.name).map(acceptedStorageKey));
-        if (stored === undefined) continue;
-        parameter = candidate;
-        value = stored;
-        break;
-      }
-      if (!parameter) return;
-      setEngineParam(parameter.name, value);
-    }
-  }
-
+  const persistence = createEffectPersistence({
+    getParameterDefinitions, setEngineParam, usesFullConfigSnapshot, getFullConfigSnapshot, restoreFullConfigSnapshot, fullConfigRestoreResults, getConfigImportNotice, clearConfigImportNotice, showConfigImportNotice, logWarn
+  });
+  const view = createEffectPanelView({ focusedElement, guiContainer, isMobile });
   /**
    * Live per-frame parameter values for the active effect. Once the worker pool
    * owns the display the main engine is no longer stepped, so its values are
@@ -500,8 +368,7 @@ export function createEffectGui({ engine, segments, config, host }) {
    * @returns {boolean} True when the panel must be rebuilt to show them.
    */
   function paramWarningsStale(fx) {
-    if (!fx.warningsDirty || fx.activeDragEnds.size > 0
-        || fx.activeKeyEdits.size > 0) {
+    if (!fx.warningsDirty || fx.edits.active) {
       return false;
     }
     fx.warningsDirty = false;
@@ -763,14 +630,9 @@ export function createEffectGui({ engine, segments, config, host }) {
        * @returns {void}
        */
       reset() {
-        const captured = capturePanelFocus(fx);
-        mountClosedOverride = captured.closed;
-        try {
-          applyEffect();
-        } finally {
-          mountClosedOverride = undefined;
-        }
-        restorePanelFocus(activeEffect, captured);
+        const captured = view.capture(fx);
+        view.rebuild(captured.closed, applyEffect);
+        view.restore(activeEffect, captured);
       },
       /**
        * Copy the current parameter values to the clipboard as a C++ brace-init
@@ -805,7 +667,7 @@ export function createEffectGui({ engine, segments, config, host }) {
             if (!parameter.readonly) fx.gui.writeStoredValue(parameter.name, null);
           }
         }
-        persistEffectState(fx.gui);
+        persistence.persist(fx.gui);
         adoptPresetDisplay(fx, count, index);
         adoptPauseDisplay(fx, engineAnimationsPaused() ?? true);
         // The preset writes requested enum values with no simulation step behind
@@ -872,65 +734,6 @@ export function createEffectGui({ engine, segments, config, host }) {
       controller.onChange(transitionPaused);
     }
     return { animationState, controller, setPaused };
-  }
-
-  /**
-   * Flag a controller as dragging until the pointer that opened the gesture is
-   * released, so sync()'s value stream doesn't fight the drag. The drag-end
-   * listeners live on the drag target, so they join the effect record's set for
-   * a GUI destroyed mid-drag to drain. Releasing the pointer also runs the
-   * persistence the drag deferred.
-   *
-   * lil-gui runs the gesture itself on mouse and touch events, so the latch only
-   * observes it: a pointer capture through tools/pointer_drag.js would suppress
-   * the compatibility mousedown the slider drag starts on.
-   * @param {Object} fx - The effect record owning the controller.
-   * @param {Object} controller - The controller to track.
-   * @returns {void}
-   */
-  function trackDragState(fx, controller) {
-    controller.domElement.addEventListener('pointerdown', (event) => {
-      if (!event.isPrimary || event.button !== 0 || controller.dragging) return;
-      const { pointerId } = event;
-      controller.dragging = true;
-      const end = (release) => {
-        // A blur carries no pointer, and is the one end the gesture's own
-        // pointer cannot report: the release that lands on another window is
-        // never delivered here.
-        if (release.type !== 'blur' && release.pointerId !== pointerId) return;
-        controller.dragging = false;
-        for (const type of DRAG_END_EVENTS) dragTarget.removeEventListener(type, end);
-        fx.activeDragEnds.delete(end);
-        const edited = fx.persistDeferred;
-        if (edited === null) return;
-        fx.persistDeferred = null;
-        persistEffectState(fx.gui, edited);
-      };
-      fx.activeDragEnds.add(end);
-      for (const type of DRAG_END_EVENTS) dragTarget.addEventListener(type, end);
-    });
-  }
-
-  /**
-   * Flag a controller as under a keyboard edit while an arrow key is held, so a
-   * rebuild does not discard the widget the key repeat is landing in. The
-   * listeners sit on the widget itself, so they leave with the GUI DOM; a
-   * window-level key repeat interrupted by a focus change still ends on blur.
-   * @param {Object} fx - The effect record owning the controller.
-   * @param {Object} controller - The controller to track.
-   * @returns {void}
-   */
-  function trackKeyboardEdit(fx, controller) {
-    const widget = focusWidget(controller);
-    if (!widget) return;
-    widget.addEventListener('keydown', (event) => {
-      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-        fx.activeKeyEdits.add(controller);
-      }
-    });
-    const end = () => fx.activeKeyEdits.delete(controller);
-    widget.addEventListener('keyup', end);
-    widget.addEventListener('blur', end);
   }
 
   /**
@@ -1128,8 +931,8 @@ export function createEffectGui({ engine, segments, config, host }) {
         return;
       }
       fx.writableParamNames.push(p.name);
-      if (controller.isContinuous) trackDragState(fx, controller);
-      trackKeyboardEdit(fx, controller);
+      if (controller.isContinuous) fx.edits.trackDrag(controller);
+      fx.edits.trackKeyboard(controller);
 
       const kind = paramControlKind(p);
       let acceptedControlValue = acceptedParamValue(p);
@@ -1142,11 +945,7 @@ export function createEffectGui({ engine, segments, config, host }) {
         if (accepted) acceptedControlValue = v;
         controller.acceptUrlValue?.(acceptedControlValue);
         const edited = { name: p.name, accepted: acceptedControlValue };
-        // A drag emits one onChange per pointermove and full-config persistence
-        // marshals and serializes the whole snapshot, so it waits for the pointer
-        // release, which sees the same state the last move would have.
-        if (controller.dragging) fx.persistDeferred = edited;
-        else persistEffectState(fx.gui, edited);
+        fx.edits.persist(controller, edited);
         if (accepted) setWorkerParam(p.name, value);
         adoptEnginePause(pause, p);
         fx.warningsDirty = true;
@@ -1171,15 +970,14 @@ export function createEffectGui({ engine, segments, config, host }) {
   } = {}) {
     const fx = {
       gui: createGui(),
-      activeDragEnds: new Set(),
-      activeKeyEdits: new Set(),
       animationPauseApplied: false,
-      persistDeferred: null,
       warningsDirty: false,
     };
 
+    fx.edits = new EffectPanelEdits(dragTarget, (edited) => persistence.persist(fx.gui, edited));
+
     try {
-      if (restoreAccepted) restoreEffectState(fx.gui);
+      if (restoreAccepted) persistence.restore(fx.gui);
       const params = getParameterDefinitions();
       const reservedParams = params
         .filter((p) => RESERVED_CONTROL_NAMES.has(p.name))
@@ -1212,18 +1010,7 @@ export function createEffectGui({ engine, segments, config, host }) {
     if (!fx?.gui) return;
     clearTimeout(fx.exportFlashTimer);
     fx.exportFlashTimer = null;
-    if (fx.activeDragEnds) {
-      for (const end of fx.activeDragEnds) {
-        for (const type of DRAG_END_EVENTS) dragTarget.removeEventListener(type, end);
-      }
-      fx.activeDragEnds.clear();
-    }
-    // Draining those listeners drops the pointer release that would have run
-    // the persistence a drag deferred, so run it here. A release that already
-    // ran cleared the slot, so this never writes twice.
-    const deferred = fx.persistDeferred ?? null;
-    fx.persistDeferred = null;
-    if (deferred !== null) persistEffectState(fx.gui, deferred);
+    fx.edits.dispose();
     const dom = fx.gui.domElement;
     if (dom?.parentNode) dom.parentNode.removeChild(dom);
     // Controller.destroy() removes each domElement from the GUI's own children
@@ -1242,95 +1029,6 @@ export function createEffectGui({ engine, segments, config, host }) {
     }
   }
 
-  /** Return the element that owns a GUI panel's vertical scroll offset. */
-  function scrollElement(gui) {
-    return gui?.domElement?.querySelector?.('.lil-children') ?? null;
-  }
-
-  /**
-   * Every controller a rebuilt panel can hand keyboard focus back to, keyed by
-   * the property it binds: the parameters, the pause toggle, the preset
-   * selector, then the action row's buttons.
-   * @param {Object|null} fx - An effect record, or null.
-   * @returns {Array<[string, Object]>} Property/controller pairs.
-   */
-  function panelControllers(fx) {
-    if (!fx) return [];
-    const pairs = [...(fx.controllerByName ?? [])];
-    if (fx.pause.controller) pairs.push([panelControlKey('pause'), fx.pause.controller]);
-    for (const controller of fx.actionControllers ?? []) {
-      pairs.push([panelControlKey(controller.property), controller]);
-    }
-    return pairs;
-  }
-
-  /**
-   * Which control holds keyboard focus. Discarding the focused control drops
-   * focus to <body>, so a rebuild that renames nothing can still cost a full
-   * document re-traverse to get back to the panel.
-   * @param {Object|null} fx - The effect record about to be replaced.
-   * @returns {string|null} The bound property, or null when focus is elsewhere.
-   */
-  function focusedControlProperty(fx) {
-    const focused = focusedElement() ?? null;
-    if (focused === null) return null;
-    for (const [property, controller] of panelControllers(fx)) {
-      if (controller.domElement?.contains(focused) === true) return property;
-    }
-    return null;
-  }
-
-  /**
-   * Capture the panel's scroll offset, focused control, and per-stage folder
-   * collapse state ahead of a rebuild.
-   * @param {Object|null} fx - The effect record about to be replaced.
-   * @returns {{scrollTop: number, property: string|null, closed: boolean,
-   *   stagesClosed: Map<string, boolean>}} The captured state.
-   */
-  function capturePanelFocus(fx) {
-    const stagesClosed = new Map();
-    for (const [stage, folder] of fx?.stageFolders ?? []) {
-      stagesClosed.set(stage, Boolean(folder.closed));
-    }
-    return {
-      scrollTop: scrollElement(fx?.gui)?.scrollTop ?? 0,
-      property: focusedControlProperty(fx),
-      closed: Boolean(fx?.gui?.closed),
-      stagesClosed,
-    };
-  }
-
-  /**
-   * Re-seat a captured scroll offset and keyboard focus on the record that
-   * replaced the captured one. A detached element cannot hold focus, so the
-   * replacement must already be mounted.
-   * @param {Object|null} fx - The record now published.
-   * @param {{scrollTop: number, property: string|null, closed: boolean,
-   *   stagesClosed: Map<string, boolean>}} captured - The state
-   *   capturePanelFocus() returned. A stage the replacement does not carry is
-   *   dropped; one it gained opens.
-   * @returns {void}
-   */
-  function restorePanelFocus(fx, captured) {
-    fx?.gui?.open?.(!captured.closed);
-    for (const [stage, folder] of fx?.stageFolders ?? []) {
-      const closed = captured.stagesClosed?.get(stage);
-      if (closed !== undefined) folder.open?.(!closed);
-    }
-    const scroller = scrollElement(fx?.gui);
-    if (captured.property !== null) {
-      for (const [property, controller] of panelControllers(fx)) {
-        if (property !== captured.property) continue;
-        // A rebuilt panel's control heights differ, so the default
-        // scroll-into-view would land the panel somewhere else.
-        focusWidget(controller)?.focus?.({ preventScroll: true });
-        break;
-      }
-    }
-    // Last, so a host that ignores preventScroll is still overridden.
-    if (scroller) scroller.scrollTop = captured.scrollTop;
-  }
-
   /**
    * Replace a stale parameter schema without reloading the effect. Definitions
    * always come from the main engine; segmented workers only supply live values.
@@ -1346,7 +1044,7 @@ export function createEffectGui({ engine, segments, config, host }) {
     // allocating and discarding a panel at frame rate.
     if (rebuildFailureGeneration === generation) return false;
     const wasMounted = Boolean(previous.gui?.domElement?.parentNode);
-    const captured = capturePanelFocus(previous);
+    const captured = view.capture(previous);
     const preservedPause = engineAnimationsPaused()
       ?? Boolean(previous.pause.animationState.pause);
     let next;
@@ -1376,28 +1074,10 @@ export function createEffectGui({ engine, segments, config, host }) {
     rebuildFailureGeneration = undefined;
     skewLogged = false;
     if (wasMounted) {
-      mountEffect(next, captured.closed);
-      restorePanelFocus(next, captured);
+      view.mount(next, captured.closed);
+      view.restore(next, captured);
     }
     return true;
-  }
-
-  /**
-   * Mount one effect record in the current GUI container.
-   * @param {Object} fx - Record to mount.
-   * @param {boolean} [closed] - Initial panel state; defaults to a pending
-   *   rebuild state or the mobile layout default.
-   * @returns {void}
-   */
-  function mountEffect(fx, closed = mountClosedOverride ?? isMobile()) {
-    if (!fx?.gui) return;
-    if (closed) fx.gui.close();
-    else fx.gui.open();
-    const container = guiContainer();
-    if (!container) return;
-    const dom = fx.gui.domElement;
-    dom.classList.add('effect-gui');
-    container.appendChild(dom);
   }
 
   return {
@@ -1444,7 +1124,7 @@ export function createEffectGui({ engine, segments, config, host }) {
         showConfigImportNotice('Effect controls could not be built.');
         return;
       }
-      persistEffectState(activeEffect.gui);
+      persistence.persist(activeEffect.gui);
       rebuildFailureGeneration = undefined;
       skewLogged = false;
     },
@@ -1454,7 +1134,7 @@ export function createEffectGui({ engine, segments, config, host }) {
      * @returns {void}
      */
     mount() {
-      mountEffect(activeEffect);
+      view.mount(activeEffect);
     },
 
     /**
