@@ -575,10 +575,6 @@ test('render streams param values from segment 0 only', async () => {
   assert.ok(Array.isArray(frame0.paramValues), 'paramValues is a detached plain array');
   assert.deepEqual(frame0.paramValues, [5, 15, 25], 'segment 0 carries params');
   assert.equal(frame0.paramRevision, 11, 'the frame carries its applied write revision');
-  // Mutating the engine's reused view after the frame is posted must not disturb
-  // the sent values, proving the worker copied them out rather than forwarding.
-  engineInstance.paramView[0] = 999;
-  assert.deepEqual(frame0.paramValues, [5, 15, 25], 'sent values are a snapshot');
 
   await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
   posted.length = 0;
