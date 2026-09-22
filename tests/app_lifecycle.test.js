@@ -938,5 +938,6 @@ test('a clean recovery clears its own report after the rearm window', () => {
   for (let i = 0; i < FRAME_GUARD_REARM_FRAMES - 1; i++) guarded();
   assert.deepEqual(cleared, []);
   guarded();
+  assert.equal(reported.length, 1);
   assert.deepEqual(cleared, reported);
 });
