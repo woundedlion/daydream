@@ -239,6 +239,8 @@ function applyPreset(index, method = 'selectPreset') {
 async function handleMessage(msg) {
   switch (msg.type) {
     case 'init': {
+      paramRejectedKey = '';
+      divergenceWarnings.clear();
       // A version mismatch means a stale-cached worker or controller: fault before
       // reading any other field, so nothing from a message shape the worker does not
       // understand is latched, and before touching WASM so the controller stops
