@@ -56,7 +56,12 @@ export class GlobalStatsView {
       if (el.className !== perfClass) el.className = perfClass;
     }
 
-    if (!metrics) return;
+    if (!metrics) {
+      for (const row of [cells.scratchA, cells.scratchB, cells.persist, cells.stack]) {
+        for (const el of row) if (el && el.textContent !== 'Unavailable') el.textContent = 'Unavailable';
+      }
+      return;
+    }
 
     /** @param {ArenaUsage} x */
     const fmt = (x) => `${formatKB(x.usage)}|${formatKB(x.high_water_mark)}|${formatKB(x.capacity, 0)}`;
