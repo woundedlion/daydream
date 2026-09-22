@@ -1609,6 +1609,7 @@ test('an add menu omits stages that are invalid at its gap', async () => {
   plane.querySelector('.chain-band-add').dispatch('click');
   const entries = harness.elements.get('chain-strip')
     .querySelectorAll('.chain-palette-entry');
+  assert.ok(entries.length > 0, 'the gap offers valid stages');
   assert.equal(entries.some((entry) => entry.dataset.operator === 'sphere.rotate.v2'),
     false);
   assert.equal(entries.every((entry) => entry.getAttribute('aria-disabled') === null),
