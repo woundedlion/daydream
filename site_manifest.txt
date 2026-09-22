@@ -38,6 +38,7 @@ param_sync.js
 pixel_view.js
 recorder.js
 segment_controller.js
+segment_compositor.js
 segment_layout.js
 segment_stats_view.js
 segment_worker.js
