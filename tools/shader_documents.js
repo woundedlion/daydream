@@ -7,7 +7,8 @@ import { enumConstantName } from '../param_sync.js';
 import { errorDetail } from './banner.js';
 import { applyChainDocument } from './chain_apply.js';
 import { createChainDocumentStore, scratchChainDocument } from './chain_document_store.js';
-import { createChainStrip, titleCase } from './chain_strip.js';
+import { createChainStrip } from './chain_strip.js';
+import { titleCase } from './labels.js';
 import { copyToClipboard } from './copy_text.js';
 import { downloadBlob } from './download_file.js';
 import {
