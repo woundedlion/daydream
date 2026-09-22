@@ -1013,10 +1013,15 @@ export function createEffectGui({ engine, segments, config, host }) {
     // Capture phase, so it lands ahead of lil-gui's own keydown on the widget,
     // which increments on an arrow key whatever attributes the widget carries.
     controller.domElement.addEventListener('keydown', (event) => {
-      if (typeof event.key === 'string' && event.key.startsWith('Arrow')) {
+      if (typeof event.key === 'string' && (event.key.startsWith('Arrow')
+          || [' ', 'Enter', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key))) {
         event.preventDefault();
         event.stopPropagation();
       }
+    }, true);
+    controller.domElement.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
     }, true);
     const widget = focusWidget(controller) ?? controller.domElement;
     widget.setAttribute('aria-readonly', 'true');
