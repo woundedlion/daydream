@@ -880,17 +880,18 @@ async function copyCode(index, lang, btn) {
 /** Shows an export failure both beside its button and in the shared status line. */
 function showCopyFailure(button, message) {
   showGateMsg(message);
-  const pending = button.copyFailure;
+  const pending = button.copyFeedback;
   if (pending) clearTimeout(pending.timer);
   const original = pending?.original ?? button.textContent;
   button.textContent = 'Failed';
+  button.classList.remove('text-green-400');
   button.classList.add('text-red-400');
   const timer = setTimeout(() => {
     button.textContent = original;
     button.classList.remove('text-red-400');
-    delete button.copyFailure;
+    delete button.copyFeedback;
   }, 1500);
-  button.copyFailure = { timer, original };
+  button.copyFeedback = { timer, original };
 }
 
 function restoreSolid(item) {
