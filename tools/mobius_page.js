@@ -335,7 +335,7 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
     // box getBoundingClientRect() reports.
     const rect = innerRect(planeElement);
     if (rect.width <= 0 || rect.height <= 0) return;
-    if (isAnimating) stopAnimation();
+    if (activePreset) stopAnimation();
 
     const width = rect.width;
     const height = rect.height;
@@ -387,7 +387,7 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
       default: return;
     }
     e.preventDefault();
-    if (isAnimating) stopAnimation();
+    if (activePreset) stopAnimation();
     const home = e.key === 'Home';
     let re = home ? 0 : paramObj.re + (axis === 're' ? delta : 0);
     let im = home ? 0 : paramObj.im + (axis === 'im' ? delta : 0);
