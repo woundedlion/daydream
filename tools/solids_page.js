@@ -762,7 +762,7 @@ function renderSavedList() {
     restoreButton.className = 'saved-restore';
     restoreButton.disabled = !wasmModule;
     const image = document.createElement('img');
-    image.src = item.thumb;
+    if (typeof item.thumb === 'string' && item.thumb.startsWith('data:image/')) image.src = item.thumb;
     image.alt = '';
     const summary = document.createElement('span');
     summary.className = 'flex justify-between items-start mt-1';
