@@ -75,6 +75,7 @@ const divergenceWarnings = new Set();
 // engine has nothing to shade, so a render faults instead of shipping a black
 // band. An ALREADY_ACTIVE resize tears nothing down and does not latch it.
 let awaitingEffect = false;
+let engineDead = false;
 
 /**
  * Name an engine enum value for a fault message. The fallback keeps the raw
@@ -237,6 +238,7 @@ function applyPreset(index, method = 'selectPreset') {
  * @returns {Promise<void>} Resolves once the message has been fully handled.
  */
 async function handleMessage(msg) {
+  if (engineDead) return;
   switch (msg.type) {
     case 'init': {
       paramRejectedKey = '';
@@ -551,7 +553,10 @@ self.onmessage = (e) => {
   }
   messageQueue = messageQueue
     .then(() => handleMessage(msg))
-    .catch((err) => { setTimeout(() => { throw err; }); });
+    .catch((err) => {
+      if (err instanceof WebAssembly.RuntimeError) engineDead = true;
+      setTimeout(() => { throw err; });
+    });
   // The DOM worker ignores this; test harnesses await it to track the real
   // settle point of the serialized queue.
   return messageQueue;
