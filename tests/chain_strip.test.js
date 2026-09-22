@@ -58,7 +58,6 @@ async function makeStrip({
     body: fakeElement('body'),
     activeElement: null,
     createElement: (/** @type {string} */ tag) => fakeElement(tag),
-    elementFromPoint: () => null,
     ...documentEvents(),
   });
   const applied = [];
@@ -801,7 +800,6 @@ test('a strip whose first render throws binds nothing to the mount', async () =>
       if (failing && tag === 'button') throw new Error('render failed');
       return fakeElement(tag);
     },
-    elementFromPoint: () => null,
     ...documentEvents(),
   });
   const build = () => createChainStrip({
