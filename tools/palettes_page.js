@@ -145,8 +145,9 @@ function activateCustomHue(sourceRecipe) {
   const state = customHueKeyState(sourceRecipe);
   const handoff = hueKeyHandoff(
     hueKeyState(sourceRecipe), state, selectedHueKey, activeHueKey);
-  customHueOffsets = state.offsets;
   selectedHueKey = handoff.selectedKey;
+  if (!handoff.kept) return false;
+  customHueOffsets = state.offsets;
   activeHueKey = handoff.activeKey;
   setCustomBaseTurns(state.baseTurns);
   document.getElementById('gen_hue_mode').value = 'CUSTOM';
