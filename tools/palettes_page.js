@@ -391,6 +391,8 @@ function syncAxisEndpointControls(axisName) {
   minimum.max = state.minimumMax;
   maximum.min = state.maximumMin;
   maximum.max = state.maximumMax;
+  minimum.setAttribute('aria-valuetext', state.minimumText);
+  maximum.setAttribute('aria-valuetext', state.maximumText);
   minimumValue.textContent = state.minimumText;
   maximumValue.textContent = state.maximumText;
 }
