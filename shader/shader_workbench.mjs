@@ -780,16 +780,23 @@ const canonicalValue = (value) => {
 
 // Hand-serialized: JSON.stringify emits integer-like keys first in numeric
 // order, whatever the object's own key order.
-const stableJson = (value) => {
+const stableJson = (value, space = '', depth = 0) => {
+  const serialize = (member) => stableJson(member, space, depth + 1);
+  const join = (members, open, close) => {
+    if (members.length === 0) return `${open}${close}`;
+    if (!space) return `${open}${members.join(',')}${close}`;
+    const indent = space.repeat(depth + 1);
+    return `${open}\n${indent}${members.join(`,\n${indent}`)}\n${space.repeat(depth)}${close}`;
+  };
   if (Array.isArray(value))
-    return `[${value.map((member) => stableJson(member) ?? 'null').join(',')}]`;
+    return join(value.map((member) => serialize(member) ?? 'null'), '[', ']');
   if (value !== null && typeof value === 'object') {
     const members = Object.keys(value)
-      .map((key) => [key.normalize('NFC'), stableJson(value[key])])
+      .map((key) => [key.normalize('NFC'), serialize(value[key])])
       .filter(([, json]) => json !== undefined)
       .sort(([left], [right]) => codePointCompare(left, right))
-      .map(([key, json]) => `${JSON.stringify(key)}:${json}`);
-    return `{${members.join(',')}}`;
+      .map(([key, json]) => `${JSON.stringify(key)}:${space ? ' ' : ''}${json}`);
+    return join(members, '{', '}');
   }
   return JSON.stringify(typeof value === 'string' ? value.normalize('NFC') : value);
 };
@@ -893,7 +900,7 @@ export function canonicalShaderDocument(document) {
 
 /** The canonical on-disk serialization; expansion re-export is pinned to it. */
 export function exportShaderDocumentJson(document) {
-  return `${JSON.stringify(canonicalShaderDocument(document), null, 2)}\n`;
+  return `${stableJson(canonicalShaderDocument(document), '  ')}\n`;
 }
 
 // ---------------------------------------------------------------------------

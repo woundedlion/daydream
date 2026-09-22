@@ -936,3 +936,11 @@ test('a transition evaluates between its two presets', () => {
     'ABSENT_EDGE',
   );
 });
+
+test('export orders numeric-like metadata keys lexically', () => {
+  const source = parseShaderDocument(readFileSync(new URL(patternNames[0], PATTERNS), 'utf8'));
+  source.metadata = { '2': 'two', '10': 'ten' };
+  const exported = exportShaderDocumentJson(source);
+  assert.ok(exported.indexOf('"10"') < exported.indexOf('"2"'));
+  assert.equal(exported, exportShaderDocumentJson({ ...source, metadata: { '10': 'ten', '2': 'two' } }));
+});
