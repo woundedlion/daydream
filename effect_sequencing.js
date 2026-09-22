@@ -415,7 +415,7 @@ export function createApplyPipeline({
    *   (the caller must revert appState so UI/URL don't advertise an unapplied
    *   effect), else ApplyResult.APPLIED.
    */
-  function applyEffect(preserveParams = false) {
+  function applyEffect(preserveParams = false, broadcast = true) {
     // A rejected effect leaves the engine unchanged, so return before the worker
     // broadcast below: sending the rejected name would diverge them from main.
     if (getEngine() && !selectEngineEffect()) return ApplyResult.REJECTED;
@@ -427,7 +427,7 @@ export function createApplyPipeline({
 
     // Gated on segmented mode, not on a live pool: a faulted pool can hold no
     // workers, and setEffect() is the trigger that rebuilds it from appState.
-    if (segments.active) {
+    if (broadcast && segments.active) {
       segments.setEffect(appState.get('effect'));
     }
 
@@ -476,12 +476,6 @@ export function createApplyPipeline({
       invalidateEngineView();
     }
 
-    // Gated on segmented mode, not on a live pool: a faulted pool can hold no
-    // workers, and setResolution() is the trigger that rebuilds it from appState.
-    if (segments.active) {
-      segments.setResolution(p.w, p.h);
-    }
-
     const offered = availableEffects(resolution);
 
     driver.updateResolution(p.w, p.h, p.dotSize);
@@ -520,10 +514,14 @@ export function createApplyPipeline({
 
     // A correction's param URL entries belong to the effect it dropped.
     const keepParams = (preserveParams || !engine) && !effectChanged;
-    if (applyEffect(keepParams) !== ApplyResult.APPLIED) {
+    if (applyEffect(keepParams, false) !== ApplyResult.APPLIED) {
       return ApplyResult.REJECTED;
     }
 
+    if (segments.active) {
+      segments.setResolution(p.w, p.h);
+      segments.setEffect(appState.get('effect'));
+    }
     driver.invalidate();
     return ApplyResult.APPLIED;
   }

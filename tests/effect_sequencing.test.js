@@ -599,7 +599,7 @@ test('an engine that has not loaded yet still gets a sidebar and a mount point',
   ]);
 });
 
-test('a resolution change resizes every renderer before re-applying the effect', () => {
+test('a resolution change waits for main acceptance before resizing workers', () => {
   const app = makeApp({ segmented: true });
 
   assert.equal(app.pipeline.applyResolution(), ApplyResult.APPLIED);
@@ -607,7 +607,6 @@ test('a resolution change resizes every renderer before re-applying the effect',
   assert.deepEqual(app.log, [
     'engine.setResolution 288x144',
     'host.invalidateView',
-    'segments.setResolution 288x144',
     'driver.updateResolution 288x144@0.25',
     'engine.getEffectSizes',
     'engine.getEffectPresetCounts',
@@ -618,9 +617,10 @@ test('a resolution change resizes every renderer before re-applying the effect',
     'clearEffectParamUrl',
     'effectGui.build',
     'effectGui.mount',
-    'segments.setEffect Alpha',
     'effectGui.applyAnimationPause',
     'sidebar.setActive Alpha',
+    'segments.setResolution 288x144',
+    'segments.setEffect Alpha',
     'driver.invalidate',
   ]);
 });
