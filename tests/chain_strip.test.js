@@ -1305,3 +1305,19 @@ test('deactivatedParameterIds follows the engine topology gates', () => {
     + 'the case below pins them against the shipped catalog');
 });
 
+test('parameter gate predicates match every catalog live value', () => {
+  const gates = CATALOG.operators.flatMap(operator => operator.params
+    .filter(parameter => parameter.gated_by)
+    .map(parameter => ({ operator, parameter })));
+  assert.ok(gates.length > 0);
+  for (const { operator, parameter } of gates) {
+    const gate = parameter.gated_by;
+    const choices = operator.params.find(candidate => candidate.id === gate.field).values;
+    for (const value of choices) {
+      const result = deactivatedParameterIds([{ id: `stage.${parameter.id}` }],
+        { [`stage.${gate.field}`]: value }, [{ label: 'stage', operator: operator.id }], CATALOG);
+      assert.equal(result.has(`stage.${parameter.id}`), !gate.values.includes(value),
+        `${operator.id}.${parameter.id} at ${value}`);
+    }
+  }
+});
