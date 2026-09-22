@@ -622,7 +622,9 @@ test('legality lists every operator with reasons for the illegal', async () => {
 
 test('legality agrees with replaceSpan', async () => {
   const store = await makeStore();
-  for (const entry of store.legalInsertions(WARP)) {
+  const entries = store.legalInsertions(WARP);
+  assert.ok(entries.length > 0);
+  for (const entry of entries) {
     const probe = await makeStore();
     const result = probe.replaceSpan(WARP, 0, [{ operator: entry.operator.id }]);
     assert.equal(result.ok, entry.legal, entry.operator.id);
