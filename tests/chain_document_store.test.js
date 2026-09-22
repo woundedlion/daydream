@@ -607,7 +607,7 @@ test('legality lists every operator with reasons for the illegal', async () => {
   assert.equal(gap.length, CATALOG.operators.length);
   const byId = new Map(gap.map((entry) => [entry.operator.id, entry]));
   assert.deepEqual(byId.get('warp.wave-shear.v2'),
-    { operator: byId.get('warp.wave-shear.v2').operator, legal: true });
+    { operator: CATALOG.operators.find((operator) => operator.id === 'warp.wave-shear.v2'), legal: true });
   assert.equal(byId.get('sphere.rotate.v2').legal, false);
   assert.match(byId.get('sphere.rotate.v2').reason, /consumes the sphere carrier/);
   assert.equal(byId.get('sample.grid.v2').legal, false);
