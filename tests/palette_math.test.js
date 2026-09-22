@@ -481,5 +481,5 @@ test('a single-stop gradient samples the start rather than dividing by zero', ()
   const flat = paletteGradientCss(
     { a: [0.5, 0.5, 0.5], b: [0, 0, 0], c: [1, 1, 1], d: [0, 0, 0] }, 1);
 
-  assert.match(flat, /^linear-gradient\(to right, #[0-9a-f]{6}\)$/i);
+  assert.match(flat, /^linear-gradient\(to right, (#[0-9a-f]{6}), \1\)$/i);
 });
