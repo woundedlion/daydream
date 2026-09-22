@@ -17,7 +17,7 @@ import {
 
 /**
  * Creates the worker-pool spawn callback from live layout and count state.
- * @param {Object} segments - Segment controller receiving the bounded count.
+ * @param {Pick<import('./segment_controller.js').SegmentController, 'create'>} segments - Segment controller receiving the bounded count.
  * @param {() => number} requestedCount - Current GUI-requested segment count.
  * @param {Navigator | {deviceMemory?: number}} nav - Source of the device hint.
  * @param {() => boolean} isMobile - Current layout state.
@@ -36,7 +36,7 @@ export function createSegmentPoolSpawner(segments, requestedCount, nav, isMobile
  * @param {Object} deps - Injected app collaborators.
  * @param {{addFolder: (title: string) => *}} deps.gui - The global GUI root the
  *   folder is added under.
- * @param {*} deps.segments - The SegmentController the controls drive.
+ * @param {import('./segment_controller.js').SegmentController} deps.segments - The SegmentController the controls drive.
  * @param {Navigator | {deviceMemory?: number}} deps.nav - Source of the device hint.
  * @param {{isMobile: boolean}} deps.driver - The driver, read for the live layout.
  * @param {(message: string) => void} deps.showNotice - Owner-tagged sink for the
@@ -68,6 +68,7 @@ export function createSegmentedPovControls({
   // the warmModules() await.
   let segCount = segState.segments;
   // Assigned below, after the toggle whose deep-linked handler can reconcile it.
+  /** @type {{updateDisplay: () => void, setValue: (value: number) => void, onChange: Function}} */
   let segCountCtrl;
   // The ceiling is re-read at every spawn, so a narrowing — a rotation into the
   // mobile layout — bounds the pool below the requested size. setValue, not
@@ -90,6 +91,7 @@ export function createSegmentedPovControls({
   // Declared ahead of the fallback, and assigned before its handler is wired: a
   // deep-linked `segmented` replays that handler synchronously at registration,
   // and a throw there reaches the fallback's showToggle.
+  /** @type {{setValue: (value: boolean) => void, onChange: Function}} */
   let segEnabledCtrl;
   const segmentedFailed = createSegmentedFallback({
     segments,
@@ -99,7 +101,7 @@ export function createSegmentedPovControls({
     showToggle: (on) => segEnabledCtrl.setValue(on),
   });
   segEnabledCtrl = segFolder.add(segState, 'segmented').name('Enabled');
-  segEnabledCtrl.onChange(async v => {
+  segEnabledCtrl.onChange(async (/** @type {boolean} */ v) => {
     try {
       segments.active = v;
       if (v) {
@@ -119,7 +121,7 @@ export function createSegmentedPovControls({
   // from the range takes the marker with it and names the cap instead.
   const segLabel = segMax >= 6 ? 'Segments (6 = sim only)' : `Segments (max ${segMax} here)`;
   segCountCtrl = segFolder.add(segState, 'segments', 2, segMax, 2).name(segLabel);
-  segCountCtrl.onChange(async v => {
+  segCountCtrl.onChange(async (/** @type {number} */ v) => {
     // A reconcile writes the value the handler already acted on.
     if (v === segCount) return;
     try {
@@ -129,7 +131,7 @@ export function createSegmentedPovControls({
       segmentedFailed('resize', e);
     }
   });
-  segFolder.addSession(segState, 'boundaries').name('Show Boundaries').onChange(v => {
+  segFolder.addSession(segState, 'boundaries').name('Show Boundaries').onChange((/** @type {boolean} */ v) => {
     segments.showBoundaries = v;
   });
   return segSpawn;

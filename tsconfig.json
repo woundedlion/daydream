@@ -65,6 +65,7 @@
     "effect_sequencing.js",
     "worker_protocol.js",
     "module_warmer.js",
+    "segmented_pov_controls.js",
     "segment_controller.js",
     "segment_layout.js",
     "segment_stats_view.js",
