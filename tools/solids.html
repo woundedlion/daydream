@@ -24,7 +24,7 @@
 
 <body>
 
-  <div id="sidebar" class="p-4 space-y-6">
+  <div role="complementary" aria-label="Solid operations" id="sidebar" class="p-4 space-y-6">
     <div>
       <h1 class="text-xl font-bold text-white mb-1">Solids Generator</h1>
       <p class="text-xs text-indigo-300">Conway Mesh Operators</p>
@@ -105,7 +105,7 @@
     </div>
   </div>
 
-  <div id="main">
+  <div id="main" role="main">
     <div id="canvas-container">
       <!-- Index Labels Overlay -->
       <div id="labels" class="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true"></div>
@@ -128,12 +128,12 @@
       <canvas id="canvas" class="w-full h-full block" role="img" aria-label="Real-time 3D preview of the polyhedral solid"></canvas>
     </div>
 
-    <div id="footer" role="group" aria-label="Base solids">
+    <div id="footer" role="radiogroup" aria-label="Base solids">
       <!-- Dynamic Thumbnails -->
     </div>
   </div>
 
-  <div id="right-sidebar">
+  <div id="right-sidebar" role="complementary" aria-label="Saved solids">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-bold text-white">Saved Solids</h2>
       <div class="flex gap-3">
