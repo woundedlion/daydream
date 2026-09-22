@@ -1431,7 +1431,14 @@ export function createEffectGui({ engine, segments, config, host }) {
      * @returns {void}
      */
     build() {
-      activeEffect = createEffectRecord({ restoreAccepted: true });
+      try {
+        activeEffect = createEffectRecord({ restoreAccepted: true });
+      } catch (error) {
+        activeEffect = null;
+        logWarn('Effect GUI: panel construction failed', error);
+        showConfigImportNotice('Effect controls could not be built.');
+        return;
+      }
       persistEffectState(activeEffect.gui);
       rebuildFailureGeneration = undefined;
       skewLogged = false;
