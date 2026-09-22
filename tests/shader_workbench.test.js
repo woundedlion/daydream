@@ -28,6 +28,12 @@ import {
   restoreDocumentAfterEach,
 } from './fake_dom.js';
 
+const ownedEditors = new Set();
+afterEach(() => {
+  for (const controller of ownedEditors) controller.dispose();
+  ownedEditors.clear();
+});
+
 const INDEX = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const WORKBENCH = readFileSync(new URL('../tools/shader.html', import.meta.url), 'utf8');
 const WORKBENCH_CSS = readFileSync(new URL('../tools/shader.css', import.meta.url), 'utf8');
@@ -1078,6 +1084,7 @@ async function editorWorkbench({
     download: (filename, source) => downloads.push([filename, source]),
     win,
   });
+  ownedEditors.add(controller);
   assert.equal(await controller.init(), true);
   if (source !== null)
     assert.equal(await controller.loadSource(source, 'study.shader.json'), true);
