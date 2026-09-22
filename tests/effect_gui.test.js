@@ -1100,7 +1100,7 @@ test('build restores the last accepted value before replaying an invalid request
     'worker:Planar Warp 1=3',
   ]);
   assert.equal(h.gui().ctrl('Planar Warp 1').getValue(), 3);
-  assert.equal(h.gui().stored['__accepted.Planar Warp 1'], 0);
+  assert.equal(h.gui().stored['__accepted.Planar Warp 1'], '0');
   assert.equal(h.gui().stored['__accepted.Outer Warp'], undefined);
 });
 
@@ -1123,8 +1123,8 @@ test('a bool parameter stores its accepted value as a float', () => {
   h.panel.build();
   h.gui().ctrl('Glow').setValue(true);
 
-  assert.equal(h.gui().stored['__accepted.Glow'], 1);
-  const nonNumeric = h.gui().storedWrites.filter(([, v]) => typeof v !== 'number');
+  assert.equal(h.gui().stored['__accepted.Glow'], '1');
+  const nonNumeric = h.gui().storedWrites.filter(([, v]) => !Number.isFinite(Number(v)));
   assert.deepEqual(nonNumeric, []);
 });
 
@@ -2859,7 +2859,7 @@ test('a slider drag defers persistence to the pointer release', () => {
 
   h.dragTarget.dispatch('pointerup', pointerUp());
 
-  assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', 0.3]]);
+  assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', '0.3']]);
 });
 
 test('a ShaderBall drag writes one full-config snapshot, at the release', () => {
@@ -2920,7 +2920,7 @@ test('a schema rebuild mid-drag still lands the write the drag deferred', () => 
   h.panel.sync();
 
   assert.equal(h.guis.length, 2, 'the schema rebuilt under the drag');
-  assert.deepEqual(dragged.storedWrites, [['__accepted.Speed', 0.75]]);
+  assert.deepEqual(dragged.storedWrites, [['__accepted.Speed', '0.75']]);
   assert.deepEqual(h.dragTarget.listeners, []);
 });
 
@@ -2974,7 +2974,7 @@ test('a teardown mid-drag persists the deferred write, and a release only once',
     torn.gui().ctrl('Speed').setValue(0.4);
     torn.panel.destroy();
 
-    assert.deepEqual(torn.gui().storedWrites, [['__accepted.Speed', 0.4]]);
+    assert.deepEqual(torn.gui().storedWrites, [['__accepted.Speed', '0.4']]);
 
     const released = harness();
     released.panel.build();
@@ -2984,7 +2984,7 @@ test('a teardown mid-drag persists the deferred write, and a release only once',
     released.dragTarget.dispatch('pointerup', pointerUp());
     released.panel.destroy();
 
-    assert.deepEqual(released.gui().storedWrites, [['__accepted.Speed', 0.6]],
+    assert.deepEqual(released.gui().storedWrites, [['__accepted.Speed', '0.6']],
       'the release cleared the slot the teardown would have flushed');
   });
 
@@ -3010,7 +3010,7 @@ test('a toggle persists without waiting for a pointer release', () => {
 
   h.gui().ctrl('Glow').setValue(true);
 
-  assert.deepEqual(h.gui().storedWrites, [['__accepted.Glow', 1]]);
+  assert.deepEqual(h.gui().storedWrites, [['__accepted.Glow', '1']]);
 });
 
 test('a parameter edit persists only that parameter\'s accepted value', () => {
@@ -3028,7 +3028,7 @@ test('a parameter edit persists only that parameter\'s accepted value', () => {
   h.gui().ctrl('Speed').setValue(0.4);
 
   assert.deepEqual(h.gui().ctrl('Speed').acceptedUrlValues, [0.4]);
-  assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', 0.4]]);
+  assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', '0.4']]);
 });
 
 test('a per-keystroke persist re-reads no parameter definitions', () => {
@@ -3047,7 +3047,7 @@ test('a per-keystroke persist re-reads no parameter definitions', () => {
 
   assert.equal(h.paramDefinitionReads(), before);
   assert.deepEqual(h.gui().storedWrites.slice(-2),
-    [['__accepted.Speed', 0.4], ['__accepted.Speed', 0.5]]);
+    [['__accepted.Speed', '0.4'], ['__accepted.Speed', '0.5']]);
 });
 
 test('a refused parameter edit keeps the accepted deep-link value', () => {
@@ -3067,7 +3067,7 @@ test('a refused parameter edit keeps the accepted deep-link value', () => {
 
   assert.equal(controller.getValue(), 0.8);
   assert.deepEqual(controller.acceptedUrlValues, [0.2]);
-  assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', 0.2]]);
+  assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', '0.2']]);
   assert.deepEqual(h.writes, ['engine:Speed=0.8'],
     'a write refused by the main engine never reaches the segment workers');
 });
@@ -3087,7 +3087,7 @@ test('a definition with no accepted value falls back to its requested target', (
 
   assert.deepEqual(controller.acceptedUrlValues, [0.2],
     'the writable target survives a refused write, not the animation frame');
-  assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', 0.2]],
+  assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', '0.2']],
     'the rung the whole-list persist writes');
 });
 
@@ -3157,7 +3157,7 @@ test('a second pointer neither re-latches a held control nor releases it', () =>
 
   assert.equal(controller.dragging, false);
   assert.deepEqual(h.dragTarget.listeners, []);
-  assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', 0.4]]);
+  assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', '0.4']]);
 });
 
 test('a non-primary or secondary-button pointerdown starts no drag', () => {

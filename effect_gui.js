@@ -421,7 +421,7 @@ export function createEffectGui({ engine, segments, config, host }) {
   function persistAcceptedParam(gui, name, accepted) {
     // The float form, not the raw value: restoreAcceptedParams() reads the
     // companion key back through the URL number grammar, which rejects a bool.
-    gui.writeStoredValue(acceptedStorageKey(name), engineParamValue(accepted));
+    gui.writeStoredValue(acceptedStorageKey(name), String(engineParamValue(accepted)));
   }
 
   /** Store every writable parameter's engine-accepted value. */
