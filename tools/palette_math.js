@@ -225,6 +225,8 @@ const GRADIENT_STOPS = 96;
  * @returns {string} A `linear-gradient(...)` value for the swatch background.
  */
 export function paletteGradientCss(entry, stopCount = GRADIENT_STOPS) {
+  if (!Number.isFinite(stopCount)) throw new RangeError('Gradient stop count must be finite');
+  stopCount = Math.max(2, Math.floor(stopCount));
   const preview = new ProceduralPalette(entry.a, entry.b, entry.c, entry.d);
   const stops = [];
   for (let i = 0; i < stopCount; i++) {
