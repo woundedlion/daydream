@@ -322,6 +322,8 @@ export function createShaderDocumentController({
   let active = null;
   /** @type {Map<string, *>} */
   let catalog = new Map();
+  /** @type {Record<string, string>} */
+  let digestMigration = {};
   /** @type {*|null} */
   let operatorCatalog = null;
   /** @type {Set<string>} The catalog's topology fields, once it has loaded. */
@@ -617,8 +619,12 @@ export function createShaderDocumentController({
     // Every load previews through the interpreter, so a shipped pattern opens
     // as editable as a scratch chain; a digest match only arms the toolbar's
     // parity toggle to the promoted build.
+    const imported = typeof source === 'string' ? JSON.parse(source) : source;
+    const promotedDigest = imported.schema_version === 1
+      ? digestMigration[compiler.v1DescriptorDigest(imported)] : undefined;
     const official = [...catalog.values()].find((candidate) =>
-      candidate.descriptorDigest === compiled.descriptor_digest) ?? null;
+      candidate.descriptorDigest === compiled.descriptor_digest
+      || candidate.descriptorDigest === promotedDigest) ?? null;
     // Ahead of the teardown: a refusal here must leave the editor it would
     // have replaced standing.
     if (!selectEffect(CHAIN_EFFECT)) {
@@ -812,6 +818,7 @@ export function createShaderDocumentController({
       compiler = await importCompiler();
       operatorCatalog = JSON.parse(await fetchText(CATALOG_URL));
       bakedFields = bakedTopologyFields(operatorCatalog);
+      digestMigration = JSON.parse(await fetchText('../shader/patterns/digest_migration.v1v2.json'));
       const migration = JSON.parse(await fetchText(MIGRATION_URL));
       const entries = await Promise.all(Object.entries(migration.source_documents)
         .map(async ([effectId, filename]) => {
