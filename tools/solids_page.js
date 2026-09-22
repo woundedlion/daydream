@@ -1299,6 +1299,7 @@ function showGateMsg(text) {
  * @returns {void}
  */
 function openOpGate(reason) {
+  if (!wasmModule) return;
   for (const btn of document.querySelectorAll('#addOpGrid [data-op]')) {
     btn.disabled = false;
     btn.removeAttribute('title');
