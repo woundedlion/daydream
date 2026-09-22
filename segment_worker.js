@@ -146,6 +146,10 @@ function applyClip() {
     // The engine kept its previous clip, so the latch keeps describing it.
     return false;
   }
+  if (result === wasmModule.ClipSetResult.NO_EFFECT) {
+    awaitingEffect = true;
+    return true;
+  }
   clipFullFrame = result === wasmModule.ClipSetResult.FULL_FRAME_KEPT;
   return true;
 }
