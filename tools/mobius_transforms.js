@@ -254,14 +254,14 @@ export function loxodromic(t) {
 }
 
 /**
- * Parabolic (Drift) preset: continuous translation along the Real axis.
+ * Parabolic (Drift) preset: translation wrapped to the accepted coefficient range.
  * @param {number} t - Elapsed time in seconds.
  * @returns {{A:{re:number,im:number}, B:{re:number,im:number}, C:{re:number,im:number}, D:{re:number,im:number}}} The Mobius coefficients {A, B, C, D}.
  */
 export function parabolic(t) {
   return {
     A: { re: 1, im: 0 },
-    B: { re: t * 0.8, im: 0 },
+    B: { re: ((t * 0.8 + 4) % 8 + 8) % 8 - 4, im: 0 },
     C: { re: 0, im: 0 },
     D: { re: 1, im: 0 },
   };
