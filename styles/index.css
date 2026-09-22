@@ -779,7 +779,7 @@
     align-items: flex-start;
     flex-wrap: wrap;
     width: auto;
-    right: 0;
+    right: 72px;
     top: 0;
     bottom: auto;
     pointer-events: none;
