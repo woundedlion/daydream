@@ -727,6 +727,7 @@ test('v1 projection frame policies expand into explicit frame parameters', () =>
 });
 
 test('every committed pattern document is its own canonical re-export', () => {
+  assert.ok(patternNames.length > 0);
   for (const name of patternNames) {
     const url = new URL(name, PATTERNS);
     assert.equal(
