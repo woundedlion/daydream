@@ -18,7 +18,7 @@
 // the fake document carries none of the element ids for. Each is anchored on the
 // call site rather than the factory definition above it, and each says which
 // failure it stands in for.
-import { afterEach, mock, test } from 'node:test';
+import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fakeElement, restoreDocumentAfterEach } from './fake_dom.js';
@@ -617,7 +617,7 @@ test('a parameter write does not clear a rejected switch', async () => {
     + 'switch rejection');
 });
 
-test('a segmented-POV failure is announced and returns the toggle', async () => {
+test('a segmented-POV failure is announced and returns the toggle', async (t) => {
   const gui = fakeGui('view');
   const notices = [];
   const segments = {
@@ -628,7 +628,7 @@ test('a segmented-POV failure is announced and returns the toggle', async () => 
     destroy() {},
     updateStats() {},
   };
-  mock.method(pageWarmer, 'warm', async () => {});
+  t.mock.method(pageWarmer, 'warm', async () => {});
   createSegmentedPovControls({
     gui,
     segments,
