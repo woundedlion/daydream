@@ -729,3 +729,18 @@ test('mobius golden images (absolute pin)', () => {
       `1/z mapped (${x},${y},${z}) to (${inv.x},${inv.y},${inv.z}), want (${x},${-y},${-z})`);
   }
 });
+
+test('every named procedural palette evaluates within one linear LSB', () => {
+  assert.ok(P.NAMED_PROCEDURAL_PALETTES.length > 0);
+  for (const { name, a, b, c, d } of P.NAMED_PROCEDURAL_PALETTES) {
+    const palette = new P.ProceduralPalette(a, b, c, d);
+    for (const t of [-1, 0, 0.25, 0.5, 0.75, 1, 2]) {
+      const color = M.procedural_palette_linear(...a, ...b, ...c, ...d, t);
+      for (const [channel, expected] of [color.r, color.g, color.b].entries()) {
+        const srgb = Math.max(0, Math.min(1, palette.getChannelValue(t, channel)));
+        assert.ok(Math.abs(M.srgb_to_linear_interp(srgb) - expected) <= 1,
+          `${name} t=${t} channel=${channel}`);
+      }
+    }
+  }
+});
