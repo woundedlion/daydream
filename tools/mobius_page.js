@@ -89,14 +89,14 @@ const fragmentShader = `
   `;
 
 const updateMobiusUniforms = () => {
+  updateDegenerateWarning();
+  updateCodeSnippet();
   if (!sphereMesh || !sphereMesh.material.uniforms) return;
   const u = sphereMesh.material.uniforms;
   u.u_a.value.re = config.A.re; u.u_a.value.im = config.A.im;
   u.u_b.value.re = config.B.re; u.u_b.value.im = config.B.im;
   u.u_c.value.re = config.C.re; u.u_c.value.im = config.C.im;
   u.u_d.value.re = config.D.re; u.u_d.value.im = config.D.im;
-  updateDegenerateWarning();
-  updateCodeSnippet();
 };
 
 // Cached so an animating preset (which re-enters every frame) only writes
