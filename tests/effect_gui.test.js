@@ -252,6 +252,7 @@ function fakeGui(hydrated = {}, stored = {}) {
       }
     },
     add(object, property, ...args) {
+      if (object[property] === undefined) throw new Error(`Undefined GUI property: ${property}`);
       const replayOnChange = Object.hasOwn(hydrated, property);
       if (replayOnChange) object[property] = hydrated[property];
       const controller = fakeController(object, property, args);
@@ -866,7 +867,7 @@ test('promoted Shader controls use their accepted structural modes as folders', 
     'Camera Wander', 'Projection Spin Speed', 'Singularity Fade',
     'Planar Warp 1 Translation X', 'Pattern Freq', 'Edge Fade Width',
     'Palette Chroma', 'Mapping Frequency',
-  ].map((name) => ({ name }));
+  ].map((name) => ({ name, value: 0 }));
   const assignments = fixedShaderStageAssignments(params);
   const { snapshot, fields } = fixedShaderConfig();
   const titles = fixedShaderStageTitles(snapshot, fields);
