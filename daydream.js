@@ -426,7 +426,7 @@ export function start({
   // names plus the panel's own 'pause' toggle, 'view' the app's own controls.
   const guiInstance = createGui({ autoPlace: false }, 'view');
   guiInstance.domElement.classList.add('global-gui');
-  if (daydream.isMobile) {
+  if (win.matchMedia?.('(max-width: 900px)').matches ?? false) {
     guiInstance.close();
   }
   const guiContainer = doc.getElementById('gui-container');
@@ -533,7 +533,7 @@ export function start({
     host: {
       createGui: () => createGui({ autoPlace: false }, 'fx'),
       container: () => shaderWorkbench ? null : doc.getElementById('gui-container'),
-      isMobile: () => daydream.isMobile,
+      isMobile: () => win.matchMedia?.('(max-width: 900px)').matches ?? false,
       copyText: copyToClipboard,
       applyEffect: () => {
         const rejected = apply.applyEffect() !== ApplyResult.APPLIED;
