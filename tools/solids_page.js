@@ -677,7 +677,9 @@ function saveSolid() {
   const opsSummary = state.ops.map(o => {
     if (o.op === 'truncate') return `Tr(${o.params.t})`;
     if (o.op === 'hankin') return `Hk(${o.params.angle.toFixed(2)})`;
-    return o.op.charAt(0).toUpperCase() + o.op.slice(1);
+    const name = o.op.charAt(0).toUpperCase() + o.op.slice(1);
+    const params = Object.entries(o.params ?? {}).map(([key, value]) => `${key}=${value}`);
+    return params.length ? `${name}(${params.join(', ')})` : name;
   }).join(', ');
 
   const item = {
