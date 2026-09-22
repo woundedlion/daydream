@@ -25,6 +25,7 @@ export class FakeWorker {
     this.url = url;
     this.opts = opts;
     this.posted = [];
+    this.sent = [];
     this.transfers = [];
     this.terminated = false;
     this.onmessage = null;
@@ -39,8 +40,8 @@ export class FakeWorker {
       throw new DOMException('message rejected', 'DataCloneError');
     if (msg.type === FakeWorker.failPostType && this.index === FakeWorker.failPostAt)
       throw new DOMException('message rejected', 'DataCloneError');
-    structuredClone(msg, { transfer });
-    this.posted.push(msg);
+    this.sent.push(msg);
+    this.posted.push(structuredClone(msg, { transfer }));
     this.transfers.push(transfer ?? null);
   }
 

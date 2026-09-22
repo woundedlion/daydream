@@ -256,7 +256,7 @@ test('a warmed binary is compiled once and handed to every worker', async () => 
   const c = makeController();
   c.create(2);
   const modules = FakeWorker.instances
-    .map((w) => w.posted.find((m) => m.type === 'init').wasmModule);
+    .map((w) => w.sent.find((m) => m.type === 'init').wasmModule);
   for (const compiled of modules) {
     assert.ok(compiled instanceof WebAssembly.Module,
       'each worker gets the compilation instead of fetching and compiling its own');
@@ -2344,7 +2344,8 @@ test('each render dispatch hands the retired generation buffer back for reuse', 
   c.tick(); // composite B, dispatch C carrying generation A's retired buffers
 
   c.workers.forEach((w, s) => {
-    assert.equal(lastRender(w).recycle, genA[s], `seg ${s} gets its own retired buffer back`);
+    assert.deepEqual(lastRender(w).recycle, new Uint16Array(12).fill(111),
+      `seg ${s} receives the retired pixel values`);
     assert.deepEqual(w.transfers.at(-1), [genA[s].buffer],
       'the buffer is transferred, not structured-cloned');
     assert.equal(genA[s].buffer.byteLength, 0,
