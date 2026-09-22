@@ -10,7 +10,7 @@
 // object[prop]` and returns undefined for anything it has no controller for,
 // after logging. A double that hands back a controller for every property turns
 // a browser-side `TypeError: … reading 'onChange'` into a green run.
-import { test, mock, afterEach } from 'node:test';
+import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
 
@@ -60,10 +60,10 @@ test('add() dispatches on the seeded value type', async () => {
   assert.equal(gui.add(params, 'count', [1, 2, 3]).constructor.name, 'OptionController');
 });
 
-test('add() returns undefined for a value type it has no controller for', async () => {
+test('add() returns undefined for a value type it has no controller for', async (t) => {
   const gui = await realGUI();
   const params = { missing: undefined, nested: null };
-  const logged = mock.method(console, 'error', () => {});
+  const logged = t.mock.method(console, 'error', () => {});
 
   assert.equal(gui.add(params, 'missing'), undefined,
     'an unseeded property yields no controller to chain onChange off');
