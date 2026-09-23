@@ -326,12 +326,12 @@ export function cayley(t) {
  * @param {{re:number, im:number}} b - Coefficient b.
  * @param {{re:number, im:number}} c - Coefficient c.
  * @param {{re:number, im:number}} d - Coefficient d.
- * @returns {string} e.g. "MobiusParams{1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f}".
+ * @returns {string} e.g. "math::MobiusParams{1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f}".
  */
 export function mobiusCodeString(a, b, c, d) {
   const parts = [];
   for (const z of [a, b, c, d]) {
     parts.push(formatFloatCpp(z.re), formatFloatCpp(z.im));
   }
-  return `MobiusParams{${parts.join(', ')}}`;
+  return `math::MobiusParams{${parts.join(', ')}}`;
 }

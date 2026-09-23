@@ -32,6 +32,7 @@ const engineMissing = `no Holosphere checkout found in ${engineCandidates.join('
 const engineSkip = engineRoot || process.env.HOLOSPHERE_ENGINE_REQUIRED ? false : engineMissing;
 
 const STEREO_H = 'core/math/stereographic.h';
+const MOBIUS_H = 'core/math/mobius.h';
 const PALETTE_RECIPE_H = 'core/color/palette_recipe.h';
 const SOLIDS_H = 'core/mesh/solids.h';
 const ISLAMIC_STARS_H = 'effects/IslamicStars.h';
@@ -115,7 +116,7 @@ test('glslProjectionFunctions constants match core/math/stereographic.h', { skip
   }
 });
 
-// The core/math/stereographic.h spellings an engine Complex body uses, paired
+// The spellings an engine projection or Mobius Complex body uses, paired
 // with the JS the mobius_transforms port writes them as. Comments are stripped
 // first so a `//` cannot swallow a later substitution.
 const ENGINE_CPP_TO_JS = [
@@ -124,6 +125,9 @@ const ENGINE_CPP_TO_JS = [
   [/\bfloat\b/g, 'let'],
   [/\bstd::(max|min|abs)\(/g, 'Math.$1('],
   [/\bsqrtf\(/g, 'Math.sqrt('],
+  [/\bmath::Complex\b/g, 'Complex'],
+  [/\b(?:projections::)?stereographic_detail::radial_scale\b/g, 'radial_scale'],
+  [/\bprojections::(STEREO_[A-Z_]+)\b/g, '$1'],
   [/(\d)f\b/g, '$1'],
 ];
 
@@ -159,22 +163,23 @@ function complexToObject(text) {
  * the comparison runs the header's own arithmetic rather than a second
  * transcription of it. Both sides then evaluate in doubles, which makes the
  * agreement exact rather than approximate.
- * @param {string} src - core/math/stereographic.h text.
+ * @param {string} src - The header defining this function.
  * @param {string} name - The function's C++ name.
  * @param {string[]} params - JS parameter names, in signature order.
- * @param {Object<string, number>} constants - Engine constants the body names.
+ * @param {Object<string, number|Function>} bindings - Engine constants and
+ *   source-transpiled helpers the body names.
  * @returns {(...args: any[]) => {re: number, im: number}} The transpiled function.
  */
-function transpileEngineComplex(src, name, params, constants) {
+function transpileEngineComplex(src, name, params, bindings) {
   let body = functionBody(src, name);
   for (const [pattern, replacement] of ENGINE_CPP_TO_JS) {
     body = body.replace(pattern, /** @type {string} */ (replacement));
   }
   body = complexToObject(body);
-  assert.doesNotMatch(body, /std::|sqrtf|\bfloat\b|\bComplex\b/,
+  assert.doesNotMatch(body, /::|sqrtf|\bfloat\b|\bComplex\b/,
     `${name} still holds C++ this reader cannot translate: ${body}`);
-  const preamble = Object.entries(constants).map(([k, v]) => `const ${k} = ${v};`).join('\n');
-  return /** @type {any} */ (Function(...params, `${preamble}\n${body}`));
+  return Function(...Object.keys(bindings),
+    `return function(${params.join(', ')}) { ${body} };`)(...Object.values(bindings));
 }
 
 // Sphere points the projection is compared over: the equator, a generic point,
@@ -217,14 +222,14 @@ const PROJECT_DIV_PAIRS = [
 
 /**
  * Pins mobius_transforms.js's stereo and projectDiv to the bodies of stereo and
- * project_div in core/math/stereographic.h. The constants above are pinned
+ * project_div in stereographic.h and mobius.h. The constants above are pinned
  * separately, but these two functions are what mobius.html's shader actually
  * runs, and the WASM bridge reaches only the engine's fused mobius_transform —
  * which never calls either in isolation, so no export can separate them.
  * Comparing the header's own body, transpiled, catches a reordered guard or a
  * changed fallback that matching constants would hide.
  */
-test('stereo and projectDiv match core/math/stereographic.h', { skip: engineSkip }, () => {
+test('stereo and projectDiv match their engine projection and Mobius headers', { skip: engineSkip }, () => {
   const src = header(STEREO_H);
   const inf = engineConstant(src, 'STEREO_INF', STEREO_H);
   const constants = {
@@ -232,8 +237,12 @@ test('stereo and projectDiv match core/math/stereographic.h', { skip: engineSkip
     STEREO_POLE_EPS: engineConstant(src, 'STEREO_POLE_EPS', STEREO_H, { STEREO_INF: inf }),
     STEREO_AZIMUTH_EPS: engineConstant(src, 'STEREO_AZIMUTH_EPS', STEREO_H),
   };
-  const engineStereo = transpileEngineComplex(src, 'stereo', ['v'], constants);
-  const engineProjectDiv = transpileEngineComplex(src, 'project_div', ['num', 'den'], constants);
+  const radial_scale = transpileEngineComplex(
+    src, 'radial_scale', ['direction', 'length', 'radius'], {});
+  const bindings = { ...constants, radial_scale };
+  const engineStereo = transpileEngineComplex(src, 'stereo', ['v'], bindings);
+  const engineProjectDiv = transpileEngineComplex(
+    header(MOBIUS_H), 'project_div', ['num', 'den'], bindings);
 
   for (const v of STEREO_POINTS) {
     const want = engineStereo(v);
