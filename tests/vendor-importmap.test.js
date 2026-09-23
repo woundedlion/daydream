@@ -26,6 +26,7 @@ const generateLocalSrc = () => {
   mkdirSync(join(FIXTURE, 'scripts'), { recursive: true });
   copyFileSync(join(REPO, 'scripts', 'generate-importmap.mjs'),
     join(FIXTURE, 'scripts', 'generate-importmap.mjs'));
+  copyFileSync(join(REPO, 'scripts', 'vendor-imports.mjs'), join(FIXTURE, 'scripts', 'vendor-imports.mjs'));
   copyFileSync(join(REPO, 'package.json'), join(FIXTURE, 'package.json'));
   copyFileSync(join(REPO, 'vendor-importmap.js'), join(FIXTURE, 'vendor-importmap.js'));
   // --local resolves a library locally only where its vendored entry point exists.

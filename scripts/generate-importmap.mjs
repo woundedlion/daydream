@@ -31,7 +31,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { parse } from 'espree';
+import { vendorAddonsFromSource } from './vendor-imports.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE = resolve(ROOT, 'vendor-importmap.js');
@@ -147,46 +147,7 @@ function usedThreeAddons() {
   const found = new Set();
   for (const file of collectSources()) {
     const src = readFileSync(file, 'utf8');
-    const sources = file.endsWith('.html')
-      ? [...src.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
-        .filter((match) => !/type\s*=\s*['"](?:importmap|application\/json)['"]/i.test(match[1]))
-        .map((match) => match[2])
-      : [src];
-    let localUrls;
-    const visit = (node) => {
-      if (!node || typeof node !== 'object') return;
-      if (['ImportExpression', 'ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration'].includes(node.type)
-          && node.source) {
-        if (node.source.type === 'Identifier' && localUrls.has(node.source.name)) return;
-        if (node.source.type !== 'Literal' || typeof node.source.value !== 'string')
-          fail(`${file}: module imports must use literal specifiers so vendor integrity is complete`);
-        const name = node.source.value;
-        if (name.startsWith('three/addons/')) found.add(name.slice('three/addons/'.length));
-      }
-      for (const value of Object.values(node)) {
-        if (Array.isArray(value)) value.forEach(visit);
-        else if (value && typeof value === 'object') visit(value);
-      }
-    };
-    for (const body of sources) {
-      const ast = parse(body, { ecmaVersion: 'latest', sourceType: 'module' });
-      localUrls = new Set();
-      for (const node of ast.body) {
-        if (node.type !== 'VariableDeclaration' || node.kind !== 'const') continue;
-        for (const declaration of node.declarations) {
-          const member = declaration.init;
-          const call = member?.object;
-          if (declaration.id.type === 'Identifier' && member?.type === 'MemberExpression'
-              && member.property.name === 'href' && call?.type === 'NewExpression'
-              && call.callee.name === 'URL' && call.arguments[0]?.type === 'Literal'
-              && /^\.\.?\//.test(call.arguments[0].value)
-              && call.arguments[1]?.type === 'MemberExpression'
-              && call.arguments[1].object.type === 'MetaProperty'
-              && call.arguments[1].property.name === 'url') localUrls.add(declaration.id.name);
-        }
-      }
-      visit(ast);
-    }
+    for (const addon of vendorAddonsFromSource(src, file)) found.add(addon);
   }
   return [...found].sort();
 }
