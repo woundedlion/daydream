@@ -443,8 +443,10 @@ export function createEffectGui({ engine, segments, config, host }) {
     // mode is compared against the one the panel was built with.
     const filterStale =
       (paramFilter() !== null) !== (activeEffect.paramsExternal === true);
+    const warningsStale = paramWarningsStale(activeEffect);
+    if (warningsStale) rebuildFailureGeneration = undefined;
     if (paramGenerationStale(activeEffect.paramGeneration, paramGeneration())
-        || paramWarningsStale(activeEffect) || filterStale) {
+        || warningsStale || filterStale) {
       if (!rebuildSchema()) return;
     }
     if (!presetSynced) return;
@@ -1041,7 +1043,7 @@ export function createEffectGui({ engine, segments, config, host }) {
     const previous = activeEffect;
     if (!previous) return false;
 
-    const generation = paramGeneration();
+    const generation = `${paramGeneration()}:${paramFilter() !== null}`;
     // A rebuild that already failed for this schema generation fails the same
     // way every frame, so the retry waits for a new generation rather than
     // allocating and discarding a panel at frame rate.
@@ -1060,6 +1062,7 @@ export function createEffectGui({ engine, segments, config, host }) {
     } catch (error) {
       if (rebuildFailureGeneration !== generation) {
         logWarn('Effect GUI: parameter-schema rebuild failed', error);
+        showConfigImportNotice('Effect controls could not be rebuilt.');
         rebuildFailureGeneration = generation;
       }
       return false;
