@@ -520,14 +520,14 @@ export function createShaderDocumentController({
    * the source of truth and the engine write is its side effect.
    * @param {string} parameterId - The edited parameter's id.
    * @param {*} value - The document value: a number, or an enum8 option id.
-   * @returns {void}
+   * @returns {boolean|void}
    */
   const writeStageEdit = (parameterId, value) => {
     if (chainUi === null || active === null || active.presetId === null) return;
     const result = chainUi.store.setPresetValue(active.presetId, parameterId, value);
     if (!result.ok) {
       announce(`"${parameterId}" was refused: ${result.diagnostics[0].message}`);
-      return;
+      return false;
     }
     chainUi.strip.syncHistory();
     scheduleDeepLink();
@@ -544,11 +544,9 @@ export function createShaderDocumentController({
       syncEffectGui();
     }
     showAnimationState();
-    if (refusal) {
-      announce(refusal);
-      return;
-    }
     invalidate();
+    if (refusal) announce(refusal);
+    return true;
   };
 
   /**
