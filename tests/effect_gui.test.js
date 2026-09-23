@@ -3276,3 +3276,16 @@ test('a filter change rebuilds the panel on the next sync', () => {
   assert.equal(h.panel.active().controllerByName.has('camera.wander'), true,
     'clearing the filter restores the unfiltered panel');
 });
+
+
+test('readonly enum type-ahead cannot move the visible selection', () => {
+  const h = makeHarness({ params: [{ name: 'Mode', value: 0,
+    options: ['Off', 'On', 'Auto'], readonly: true }] });
+  h.panel.build();
+  const control = h.gui().ctrl('Mode');
+  for (const key of ['a', 'O', '1', ' ']) {
+    assert.equal(control.$select.dispatch('keydown', { key }).defaultPrevented, true);
+  }
+  assert.equal(control.$select.dispatch('keydown', { key: 'Tab' }).defaultPrevented, false);
+  assert.equal(control.getValue(), 0);
+});
