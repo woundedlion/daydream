@@ -72,7 +72,8 @@ export function installSegmentWorker() {
   // as long as the divergence. Cleared on every effect install, as
   // paramRejectedKey is.
   /** @type {Set<string>} */
-  const divergenceWarnings = new Set();
+  /** @type {string[]} */
+  let divergenceWarnings = [];
   // Latched by a RESIZED setResolution, which tears the effect and its clip down.
   // The controller follows with a setEffect that reinstalls both; until then the
   // engine has nothing to shade, so a render faults instead of shipping a black
@@ -170,7 +171,8 @@ export function installSegmentWorker() {
     if (!wasmModule) return;
     const outcome = enumConstantName(wasmModule.ParamSetResult, result);
     const key = `${name}:${outcome}`;
-    divergenceWarnings.add(`setParameter(${name}) rejected: ${outcome}`);
+    const detail = `setParameter(${name}) rejected: ${outcome}`;
+    if (!divergenceWarnings.includes(detail)) divergenceWarnings = divergenceWarnings.concat(detail);
     if (key === paramRejectedKey) return;
     paramRejectedKey = key;
     console.error(
@@ -228,7 +230,7 @@ export function installSegmentWorker() {
     if (engine.getPresetIndex() === index) return;
     const detail = `${method}(${index}) rejected: ${engine.getPresetCount()} `
       + `presets, still on ${engine.getPresetIndex()}`;
-    divergenceWarnings.add(detail);
+    if (!divergenceWarnings.includes(detail)) divergenceWarnings = divergenceWarnings.concat(detail);
     console.error(`segment_worker: segment ${segId} ${detail}`);
   }
 
@@ -254,7 +256,7 @@ export function installSegmentWorker() {
     switch (msg.type) {
       case 'init': {
         paramRejectedKey = '';
-        divergenceWarnings.clear();
+        divergenceWarnings = [];
         // A version mismatch means a stale-cached worker or controller: fault before
         // reading any other field, so nothing from a message shape the worker does not
         // understand is latched, and before touching WASM so the controller stops
@@ -358,7 +360,7 @@ export function installSegmentWorker() {
             break;
           }
           paramRejectedKey = '';
-          divergenceWarnings.clear();
+          divergenceWarnings = [];
           arenaMetricsWarned = false;
           awaitingEffect = false;
           // Mirrors the engine-driven index without the pause, as in 'init'.
@@ -544,8 +546,7 @@ export function installSegmentWorker() {
           presetCount,
           presetIndex,
           fullFrame: clipFullFrame,
-          warnings: divergenceWarnings.size > 0
-            ? [...divergenceWarnings] : undefined,
+          warnings: divergenceWarnings.length > 0 ? divergenceWarnings : undefined,
         }, [pixelsCopy.buffer]);
         break;
       }

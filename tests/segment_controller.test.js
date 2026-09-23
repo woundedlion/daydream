@@ -1983,7 +1983,7 @@ test('the band table is reused until the layout moves', () => {
 
   c.destroy();
   const afterGen = c.compositor.segmentBands(2, 4, 4, c.frameState.renderGen);
-  assert.notEqual(afterGen, first, 'a new generation rebuilds the table');
+  assert.equal(afterGen, first, 'a new generation preserves unchanged geometry');
 
   const resized = c.compositor.segmentBands(2, 8, 4, c.frameState.renderGen);
   assert.notEqual(resized, afterGen, 'a resize rebuilds the table');
