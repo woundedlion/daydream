@@ -96,6 +96,24 @@ export async function probeColorStrip(tab) {
   check(delta !== 0 && after.every((value, i) => Math.abs(value - before[i] - delta) < 1e-6),
     'locking RGB moves all channels by the same amount');
   await tab.click('#lock_A');
+  await tab.evaluate(() => {
+    window.paletteCopied = '';
+    Object.defineProperty(navigator, 'clipboard', { configurable: true,
+      value: { writeText: async (text) => { window.paletteCopied = text; } } });
+  });
+  const click = centre(box);
+  await tab.mouse.click(click.x, click.y);
+  await tab.waitForFunction(() => /^#[0-9a-f]{6}$/i.test(window.paletteCopied));
+  const feedback = await tab.$eval('.palette-copy-feedback', (node) => ({
+    visible: node.classList.contains('is-visible'),
+    hex: node.querySelector('code')?.textContent,
+    left: node.getBoundingClientRect().left,
+    top: node.getBoundingClientRect().top,
+  }));
+  check(feedback.visible && feedback.hex === await tab.evaluate(() => window.paletteCopied),
+    'a short strip click copies a hex color and displays matching feedback');
+  check(Math.abs(feedback.left - click.x) < 250 && Math.abs(feedback.top - click.y) < 100,
+    'copy feedback is positioned beside the viewport click');
   const opening = await headingRange(tab);
   check(opening.start === 0 && opening.end === 1,
     `the strip opens on the whole palette (${opening.start}, ${opening.end})`);
@@ -165,18 +183,6 @@ export async function probeHueWheel(tab) {
   await tab.waitForFunction(
     (selector) => document.querySelectorAll(selector).length >= 2, {}, HANDLES);
 
-  await tab.click('#lock_A');
-  const values = () => tab.$$eval('[id^="A_"][id$="_slider"]',
-    (nodes) => nodes.map((node) => Number(node.value)));
-  const before = await values();
-  const slider = await tab.$('#A_R_slider');
-  await slider.focus();
-  await tab.keyboard.press('ArrowRight');
-  const after = await values();
-  const delta = after[0] - before[0];
-  check(delta !== 0 && after.every((value, i) => Math.abs(value - before[i] - delta) < 1e-6),
-    'locking RGB moves all channels by the same amount');
-  await tab.click('#lock_A');
   const opening = await settledHueDegrees(tab);
   check(opening.length >= 2, `the wheel publishes ${opening.length} hue keys`);
 
