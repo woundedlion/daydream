@@ -334,10 +334,7 @@ async function init() {
     }
   });
   document.getElementById('clearSavedBtn').addEventListener('click', clearSavedSolids);
-  document.getElementById('addOpGrid').addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-op]');
-    if (btn) addOp(btn.dataset.op);
-  });
+  document.getElementById('addOpGrid').addEventListener('click', activateAddOp);
 
   generateThumbnails(thumbnailAbort.signal).catch(e => {
     if (engineTrapped(e)) return;
@@ -1277,6 +1274,16 @@ function removeOp(index, revision) {
   });
 }
 
+function activateAddOp(event) {
+  const button = event.target.closest('[data-op]');
+  if (!button) return;
+  if (button.getAttribute('aria-disabled') === 'true') {
+    showGateMsg(button.title);
+    return;
+  }
+  addOp(button.dataset.op);
+}
+
 function addOp(opName) {
   // A star base contributes its own authored steps on export, so this only
   // bounds the tool's share of the flattened chain; generateRegistryCpp
@@ -1340,7 +1347,8 @@ function showGateMsg(text) {
 function openOpGate(reason) {
   if (!wasmModule) return;
   for (const btn of document.querySelectorAll('#addOpGrid [data-op]')) {
-    btn.disabled = false;
+    btn.removeAttribute('aria-disabled');
+    btn.removeAttribute('aria-describedby');
     btn.removeAttribute('title');
   }
   showGateMsg(`op availability is no longer checked: ${reason}`);
@@ -1365,12 +1373,12 @@ async function refreshOpGating() {
     // An incomplete pass names only a lower bound on what would trap, so an
     // op it does not name stays where the last complete pass left it.
     if (!blocked && !probe.complete) continue;
-    btn.disabled = blocked;
+    btn.setAttribute('aria-disabled', String(blocked));
     if (blocked) {
       btn.title = 'Would exceed an engine mesh limit on the current solid';
-      btn.setAttribute('aria-description', btn.title);
+      btn.setAttribute('aria-describedby', 'opGateMsg');
     } else {
-      btn.removeAttribute('aria-description');
+      btn.removeAttribute('aria-describedby');
       btn.removeAttribute('title');
     }
   }
