@@ -44,13 +44,13 @@ jobs:
           deadline=$((SECONDS + 1800))
           while :; do
             run="$(gh api "repos/woundedlion/pov/actions/workflows/ci.yml/runs?head_sha=$PIN&branch=master&per_page=10" \
-              --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")][0] // empty | [.id, .status, (.conclusion // "-")] | @tsv')" || {
+              --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")][0] // empty | [.id, .status, (.conclusion // "-"), .head_commit.timestamp] | @tsv')" || {
               echo "::error::Cannot query engine CI; check token access to woundedlion/pov Actions."
               exit 1
             }
-            run_id='' run_status='' run_conclusion=''
+            run_id='' run_status='' run_conclusion='' pin_date=''
             if [ -n "$run" ]; then
-              read -r run_id run_status run_conclusion <<< "$run"
+              read -r run_id run_status run_conclusion pin_date <<< "$run"
             fi
             if [ -n "$run_id" ]; then
               if [ "$run_status" = completed ]; then
@@ -58,10 +58,23 @@ jobs:
                   echo "::error::POV CI for $PIN concluded $run_conclusion"
                   exit 1
                 fi
-                artifact_id="$(gh api "repos/woundedlion/pov/actions/runs/$run_id/artifacts" --jq ".artifacts[] | select(.name == \"holosphere-engine-$PIN\") | .id" | head -n1)"
-                if [ -z "$artifact_id" ]; then
-                  echo "::error::successful POV CI for $PIN published no verified engine bundle"
+                pin_age_days=$(( ($(date +%s) - $(date -d "$pin_date" +%s)) / 86400 ))
+                if [ "$pin_age_days" -ge 60 ]; then
+                  echo "::warning::Engine pin $PIN is $pin_age_days days old; retained bundles can expire."
+                fi
+                artifact="$(gh api "repos/woundedlion/pov/actions/runs/$run_id/artifacts" --jq ".artifacts | map(select(.name == \"holosphere-engine-$PIN\")) | .[0] // empty | [.id, .expired, .expires_at] | @tsv")"
+                if [ -z "$artifact" ]; then
+                  echo "::error::successful POV CI for $PIN published no verified engine bundle, or it expired. Rerun: gh run rerun $run_id --repo woundedlion/pov"
                   exit 1
+                fi
+                read -r artifact_id expired expires_at <<< "$artifact"
+                if [ "$expired" = true ]; then
+                  echo "::error::Engine bundle expired. Rerun: gh run rerun $run_id --repo woundedlion/pov"
+                  exit 1
+                fi
+                remaining_days=$(( ($(date -d "$expires_at" +%s) - $(date +%s)) / 86400 ))
+                if [ "$remaining_days" -le 14 ]; then
+                  echo "::warning::Engine bundle expires in $remaining_days days. Renew it with: gh run rerun $run_id --repo woundedlion/pov"
                 fi
                 gh api "repos/woundedlion/pov/actions/artifacts/$artifact_id/zip" > /tmp/engine-bundle.zip
                 python3 scripts/extract-engine-bundle.py /tmp/engine-bundle.zip engine-bundle
@@ -69,7 +82,7 @@ jobs:
               fi
             fi
             if [ "$SECONDS" -ge "$deadline" ]; then
-              echo "::error::no verified engine bundle became available for $PIN"
+              echo "::error::no verified engine bundle became available for $PIN. Run POV CI at this commit, then retry this workflow."
               exit 1
             fi
             echo "Waiting for the engine bundle at $PIN."
