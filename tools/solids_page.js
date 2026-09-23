@@ -1153,7 +1153,7 @@ function renderOps() {
         wireDrag: (grip, row) => wireRowDrag(grip, i, row, list, revision),
         move: (from, to) => reorderOp(from, to, revision),
         remove: (at) => removeOp(at, revision),
-        setParam: updateOpParam,
+        setParam: (index, key, value) => updateOpParam(index, key, value, revision),
       },
     });
 
@@ -1161,7 +1161,8 @@ function renderOps() {
   });
 }
 
-function updateOpParam(index, key, value) {
+function updateOpParam(index, key, value, revision) {
+  if (revision !== opsRevision || !state.ops[index]) return;
   // Snap onto the op's step grid (which also clamps to its range) and reject
   // non-numeric input before it reaches state — the number box carries
   // neither bounds nor grid, and the WASM mesh boundary is deliberately
