@@ -123,17 +123,17 @@ export const OP_DEFS = {
  * wasm_provenance.test.js covers every entry against those headers. An empty
  * object is an op that always sweeps,
  * `null` an op with no leg kind at all, and a parameter entry the band the leg
- * covers. The composite ops (bevel, gyro, meta, needle, zip) are absent because
+ * covers, with any excluded topology transitions. The composite ops (bevel, gyro, meta, needle, zip) are absent because
  * they lower to primitives before the check, and over the ranges this tool
  * offers every primitive they lower to sweeps.
- * @type {Object<string, ?Object<string, {min: number, max: number}>>}
+ * @type {Object<string, ?Object<string, {min: number, max: number, excluded?: number[]}>>}
  */
 export const MORPH_SWEEP = {
   kis: {},
   ambo: {},
   snub: {},
   dual: {},
-  truncate: { t: { min: 0.002, max: 0.995 } },
+  truncate: { t: { min: 0.002, max: 0.995, excluded: [0.5] } },
   chamfer: { t: { min: 0.02, max: 0.63 } },
   expand: null,
   hankin: {},
@@ -156,9 +156,15 @@ export function unsweepableReason(o) {
     return `${opName} has no morph leg: a shape using it is generated whole `
       + 'rather than built on screen.';
   }
-  for (const [key, { min, max }] of Object.entries(band)) {
+  for (const [key, { min, max, excluded }] of Object.entries(band)) {
     const value = typeof o === 'string' ? NaN : Number(o?.params?.[key]);
-    if (!Number.isFinite(value) || (value >= min && value <= max)) continue;
+    if (!Number.isFinite(value)) continue;
+    const engineValue = Math.fround(value);
+    if (excluded?.includes(engineValue)) {
+      return `${opName} cannot sweep ${key} at ${engineValue}: the shape is `
+        + 'generated whole rather than built on screen.';
+    }
+    if (value >= min && value <= max) continue;
     return `${opName} sweeps ${key} only over ${min} to ${max}: at ${value} the `
       + 'shape is generated whole rather than built on screen.';
   }
