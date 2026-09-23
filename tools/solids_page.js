@@ -767,6 +767,13 @@ function renderSavedList() {
         : `Exports as ${funcName}, which another saved solid also exports`;
     }
 
+    if (el.classList.contains('name-clash')) {
+      const warning = document.createElement('span');
+      warning.textContent = '!';
+      warning.setAttribute('role', 'img');
+      warning.setAttribute('aria-label', el.title);
+      el.appendChild(warning);
+    }
     const deleteButton = document.createElement('button');
     deleteButton.type = 'button';
     deleteButton.className = 'action-btn del-btn absolute top-2 right-2 flex items-center justify-center w-5 h-5 text-sm';
