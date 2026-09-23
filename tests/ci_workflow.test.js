@@ -243,3 +243,13 @@ test('PR suites consume the provenance-gated bundle before CI can pass', () => {
   }
   assert.ok(terminalJobNeeds(workflow, 'ci-green').includes('gate'));
 });
+
+test('the reusable suite verifies CDN integrity and lints tracked shell hooks', () => {
+  const suite = readFileSync(`${WORKFLOW_DIR}/js-unit-suite.yml`, 'utf8');
+  assert.match(suite, /name: Verify CDN integrity\s+run: node scripts\/check-cdn-integrity\.mjs/);
+  assert.match(suite, /run: pip install --require-hashes -r requirements\/shellcheck\.txt/);
+  const shell = suite.split('- name: Lint shell')[1]?.split(/\n {6}- /)[0] ?? '';
+  assert.ok(shell.includes("git ls-files -- '*.sh' '.githooks/*'"));
+  assert.ok(shell.includes('no shell files selected'));
+  assert.match(shell, /shellcheck --exclude=SC2015,SC2317 "\$\{FILES\[@\]\}"/);
+});
