@@ -836,7 +836,6 @@ export function createChainStrip({
       functionLabel.textContent = `${socketFunction.name}: `;
       const replacement = el('select', 'chain-chip-replace');
       replacement.setAttribute('tabindex', '0');
-      replacement.setAttribute('aria-keyshortcuts', 'Delete');
       replacement.setAttribute('aria-label', socketFunction.accessibleName);
       const choices = new Map(socketChoices(index).map(
         (choice) => [choiceKey(choice.operators), choice]));
