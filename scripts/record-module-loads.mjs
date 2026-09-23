@@ -37,7 +37,7 @@ if (dir && process.env.NODE_TEST_CONTEXT) {
       const callbackIndex = args.findLastIndex((arg) => typeof arg === 'function');
       if (callbackIndex >= 0) {
         const callback = args[callbackIndex];
-        args[callbackIndex] = (...parameters) => assertions.run({ calls: 0, parent: assertions.getStore() }, async () => {
+        const instrument = (parameters, run) => assertions.run({ calls: 0, parent: assertions.getStore() }, () => {
           const counter = assertions.getStore();
           const context = parameters[0];
           if (context && typeof context.test === 'function') {
@@ -52,9 +52,26 @@ if (dir && process.env.NODE_TEST_CONTEXT) {
               },
             });
           }
-          await callback(...parameters);
-          assert.ok(counter.calls > 0, 'Every test case must execute an assertion');
+          return run(counter, parameters);
         });
+        const verify = (counter) => assert.ok(counter.calls > 0, 'Every test case must execute an assertion');
+        args[callbackIndex] = callback.length > 1
+          ? function (context, done) {
+            return instrument([context], (counter, parameters) => callback(...parameters, (error) => {
+              try {
+                if (error) throw error;
+                verify(counter);
+              } catch (failure) {
+                done(failure);
+                return;
+              }
+              done();
+            }));
+          }
+          : (...parameters) => instrument(parameters, async (counter, wrapped) => {
+            await callback(...wrapped);
+            verify(counter);
+          });
       }
       return Reflect.apply(target, receiver, args);
     },
