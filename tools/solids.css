@@ -59,7 +59,7 @@ body {
 
 /* Scrollbar styling for footer */
 #footer::-webkit-scrollbar {
-  height: 8px;
+  width: 8px;
 }
 
 #footer::-webkit-scrollbar-track {
