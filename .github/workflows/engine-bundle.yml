@@ -74,6 +74,7 @@ jobs:
         run: |
           (cd engine-bundle && sha256sum -c holosphere_engine.sha256)
           HOLOSPHERE_BUNDLE_PIN="$(cat holosphere_wasm.sha)" node scripts/install-engine-bundle.mjs engine-bundle
+          git diff --exit-code
       - name: Share the verified package with tests and deployment
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
