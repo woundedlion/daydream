@@ -20,11 +20,6 @@
   <style>
     /* Layout shell (.tool-stage / .tool-panel / .param-group) and its mobile
        collapse live in tools.css. */
-    body {
-      overflow: hidden;
-      /* Prevent scrolling */
-    }
-
     /* Allow scrolling once the panel becomes a bottom sheet on mobile. */
     @media (max-width: 640px) {
       body {
@@ -36,7 +31,7 @@
   <link rel="stylesheet" href="tailwind.css">
 </head>
 
-<body>
+<body class="tool-fixed-page">
   <div id="canvasContainer" class="tool-stage">
     <canvas id="threeCanvas" class="w-full h-full" role="img" aria-label="Real-time 3D preview of the Lissajous curve"></canvas>
   </div>

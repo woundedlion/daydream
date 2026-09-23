@@ -3,11 +3,6 @@
   --sidebar-width: 240px;
 }
 
-body {
-  overflow: hidden;
-  margin: 0;
-}
-
 #canvasContainer {
   position: fixed;
   top: 0;
@@ -18,18 +13,10 @@ body {
 }
 
 #presetSidebar {
-  position: fixed;
-  top: 0;
-  right: 0;
   width: var(--sidebar-width);
   height: calc(100vh - var(--panel-height));
   background-color: color-mix(in srgb, var(--slate-900) 80%, transparent);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-left: 1px solid var(--slate-700);
   z-index: 15;
-  padding: 1.5rem;
-  overflow-y: auto;
 }
 
 /* Mobile-only presets dropdown; the sidebar list is shown on desktop. */
