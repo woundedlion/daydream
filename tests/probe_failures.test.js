@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { boxOf, centre, checks, dragBetween, isMain, runProbe, walkTo }
   from '../scripts/probe_harness.mjs';
-import { probeParity, probeStrip, probeStripHistory } from '../scripts/workbench-probe.mjs';
+import { probeDocumentActions, probeParity, probeStrip, probeStripHistory } from '../scripts/workbench-probe.mjs';
 import { probeColorStrip, probeHueWheel } from '../scripts/palettes-probe.mjs';
 import { probeHistoryRestore, probeRationalLock } from '../scripts/lissajous-probe.mjs';
 import {
@@ -16,6 +16,7 @@ import { probeChain, probeNumericInputs } from '../scripts/solids-probe.mjs';
 import { probePad } from '../scripts/mobius-probe.mjs';
 
 const PROBES = [
+  ['workbench-probe.mjs', 'probeDocumentActions', probeDocumentActions],
   ['workbench-probe.mjs', 'probeParity', probeParity],
   ['workbench-probe.mjs', 'probeStripHistory', probeStripHistory],
 
