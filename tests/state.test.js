@@ -214,7 +214,11 @@ function installRecordingWindow(search = '', pathname = '/', hash = '') {
   const calls = [];
   installWindow({
     location: { search, pathname, hash },
-    history: { replaceState: (state, title, url) => { calls.push(url); } },
+    history: { replaceState: (state, title, url) => {
+      calls.push(url);
+      const target = new URL(url, 'https://example.test');
+      Object.assign(globalThis.window.location, { pathname: target.pathname, search: target.search, hash: target.hash });
+    } },
   });
   return calls;
 }
@@ -497,6 +501,7 @@ test('URLSync defers a tracked identity rewrite until resume', () => {
     mock.timers.tick(1000);
     assert.equal(calls.length, 1);
     assert.match(calls[0], /effect=Shader/u);
+    assert.equal(globalThis.window.location.search, '?effect=Shader');
   } finally {
     mock.timers.reset();
   }
@@ -522,6 +527,7 @@ test('URLSync counts nested suspensions and writes on the outermost resume', () 
     mock.timers.tick(1000);
     assert.equal(calls.length, 1);
     assert.match(calls[0], /effect=Shader/u);
+    assert.equal(globalThis.window.location.search, '?effect=Shader');
   } finally {
     mock.timers.reset();
   }
@@ -570,6 +576,7 @@ test('URLSync suspend disarms the flush the constructor already armed', () => {
     mock.timers.tick(1000);
     assert.equal(calls.length, 1);
     assert.match(calls[0], /effect=Shader/u);
+    assert.equal(globalThis.window.location.search, '?effect=Shader');
   } finally {
     mock.timers.reset();
   }
