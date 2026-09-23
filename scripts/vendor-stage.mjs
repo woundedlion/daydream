@@ -106,7 +106,7 @@ export function stageSite() {
 
 /**
  * Serves the staged site, the way serveManifest serves the repository.
- * @returns {Promise<{origin: string, close: () => Promise<void>}>} The listening
+ * @returns {Promise<{root: string, origin: string, close: () => Promise<void>}>} The listening
  *   origin and a shutdown that also removes the staged tree.
  */
 export async function serveStagedSite() {
@@ -119,6 +119,7 @@ export async function serveStagedSite() {
     throw error;
   }
   return {
+    root: staged.root,
     origin: site.origin,
     close: async () => {
       await site.close();

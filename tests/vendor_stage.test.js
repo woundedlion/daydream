@@ -8,8 +8,7 @@
 // which the shared inode behind a hard-linked file would quietly break.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { serveStagedSite, stageSite } from '../scripts/vendor-stage.mjs';
@@ -20,14 +19,6 @@ const staged = stageSite();
 after(() => rmSync(staged.root, { recursive: true, force: true }));
 
 const stagedFile = (path) => readFileSync(join(staged.root, path), 'utf8');
-
-/**
- * The scratch trees staging has left behind.
- * @returns {string[]} Their names under the temp directory, sorted.
- */
-const scratchDirs = () => readdirSync(tmpdir())
-  .filter((name) => name.startsWith('daydream-staged-site-'))
-  .sort();
 
 test('the staged import map resolves both libraries locally', () => {
   const map = stagedFile('vendor-importmap.js');
@@ -66,11 +57,10 @@ test('the served set covers the vendored trees as well as the manifest', () => {
 });
 
 test('the staged site serves the libraries, and drops its tree on close', async () => {
-  const before = scratchDirs();
   const site = await serveStagedSite();
-  assert.equal(scratchDirs().length, before.length + 1,
-    'serving stages exactly one scratch tree');
   try {
+    assert.ok(existsSync(site.root), 'the served staging directory exists');
+    assert.notEqual(site.root, staged.root, 'each staging operation owns its directory');
     const map = await request(site.origin, '/vendor-importmap.js');
     assert.equal(map.status, 200);
     assert.match(map.body, /three: 'local'/);
@@ -88,5 +78,6 @@ test('the staged site serves the libraries, and drops its tree on close', async 
   } finally {
     await site.close();
   }
-  assert.deepEqual(scratchDirs(), before, 'the scratch tree outlived its server');
+  assert.equal(existsSync(site.root), false, 'the scratch tree outlived its server');
+  assert.ok(existsSync(staged.root), 'closing the server preserves another staged tree');
 });
