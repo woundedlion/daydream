@@ -217,8 +217,11 @@ export async function probeStrip(tab) {
         bottom: rect.bottom, width: rect.width, height: rect.height };
     };
     const chipBoxes = [...document.querySelectorAll('.chain-chip')].map(box);
-    const contained = [...document.querySelectorAll('.chain-band > .chain-chip')]
-      .every((chip) => {
+    const bandChips = [...document.querySelectorAll('.chain-band > .chain-chip--stage')];
+    const sockets = document.querySelectorAll('.chain-strip > .chain-chip--socket');
+    const contained = bandChips.length > 0
+      && bandChips.length + sockets.length === chipBoxes.length
+      && bandChips.every((chip) => {
         const child = chip.getBoundingClientRect();
         const parent = chip.parentElement.getBoundingClientRect();
         return child.left >= parent.left && child.right <= parent.right;
