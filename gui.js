@@ -90,7 +90,7 @@ const makeUrlParamWriter = (win = null) => {
       // Flush any writes buffered before the sync registered mid-debounce so
       // they funnel through the same authority instead of being stranded.
       if (pendingUrlWrites.size) {
-        clearTimeout(urlTimer);
+        (win ?? window).clearTimeout(urlTimer);
         urlTimer = null;
         for (const [k, v] of pendingUrlWrites) sync.setParam(k, v);
         pendingUrlWrites.clear();
@@ -99,12 +99,12 @@ const makeUrlParamWriter = (win = null) => {
       return;
     }
     pendingUrlWrites.set(key, value);
-    clearTimeout(urlTimer);
-    urlTimer = setTimeout(commit, URL_FLUSH_DEBOUNCE_MS);
+    (win ?? window).clearTimeout(urlTimer);
+    urlTimer = (win ?? window).setTimeout(commit, URL_FLUSH_DEBOUNCE_MS);
   };
   // Symmetric with URLSync.dispose(): a discarded GUI must not leave the
   // debounced timer firing history.replaceState into a dead page.
-  writer.cancel = () => { clearTimeout(urlTimer); urlTimer = null; pendingUrlWrites.clear(); };
+  writer.cancel = () => { (win ?? window).clearTimeout(urlTimer); urlTimer = null; pendingUrlWrites.clear(); };
   return writer;
 };
 
