@@ -53,3 +53,25 @@ test('arena polling retries ordinary failures and stops cleanly on an engine hal
   assert.equal(scheduled.length, 1);
   assert.equal(context.arenaMetricsTimer, null);
 });
+
+test('copying a star recipe contains bridge errors and reports engine halts', async () => {
+  const error = new Error('recipe unavailable');
+  const failures = [];
+  const traps = [];
+  let halted = false;
+  const copyCode = handler('copyCode', {
+    savedSolids: [{ base: 'star' }],
+    registrySolidNames: new Set(['star']),
+    islamicStarPatterns: ['star'],
+    meshOpsWasm: { getRecipe() { throw error; } },
+    engineTrapped: (caught) => { traps.push(caught); return halted; },
+    showCopyFailure: (_button, message) => failures.push(message),
+  });
+  await copyCode(0, 'registry', {});
+  assert.deepEqual(failures, ['export failed: recipe unavailable']);
+  assert.deepEqual(traps, [error]);
+  halted = true;
+  await copyCode(0, 'registry', {});
+  assert.equal(failures.length, 1);
+  assert.equal(traps.length, 2);
+});
