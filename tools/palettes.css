@@ -110,6 +110,11 @@ body {
 }
 
 .tab-content {
+  display: none;
+  background-color: var(--slate-800);
+  border: 1px solid var(--slate-600);
+  border-radius: 0 0.5rem 0.5rem 0.5rem;
+  padding: 1rem;
   min-width: 0;
 }
 
@@ -597,14 +602,6 @@ input[type=checkbox] {
   background-color: var(--slate-800);
   color: var(--blue-400);
   border-color: var(--slate-600);
-}
-
-.tab-content {
-  display: none;
-  background-color: var(--slate-800);
-  border: 1px solid var(--slate-600);
-  border-radius: 0 0.5rem 0.5rem 0.5rem;
-  padding: 1rem;
 }
 
 .tab-content.active {
