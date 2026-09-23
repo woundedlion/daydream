@@ -80,7 +80,7 @@ jobs:
             echo "::error::no shell files selected"
             exit 1
           fi
-          shellcheck --exclude=SC2015,SC2317 "${FILES[@]}"
+          shellcheck "${FILES[@]}"
       # actionlint-py is the PyPI distribution of the same binary, pinned like
       # shellcheck above.
       - name: Install actionlint
