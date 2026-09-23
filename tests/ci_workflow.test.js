@@ -281,3 +281,9 @@ test('engine bundle API failures stop the gate instead of entering its poll time
   assert.match(gate, /Cannot query engine CI; check token access[^\n]+\n\s+exit 1/);
   assert.match(gate, /actions: read/);
 });
+
+
+test('actionlint enumerates both workflow extensions', () => {
+  const suite = readFileSync(`${WORKFLOW_DIR}/js-unit-suite.yml`, 'utf8');
+  assert.ok(suite.includes("git ls-files -- '.github/workflows/*.yml' '.github/workflows/*.yaml'"));
+});

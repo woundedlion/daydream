@@ -97,7 +97,7 @@ jobs:
       # step; -verbose reports the drop, so it is captured and made fatal.
       - name: Lint workflows
         run: |
-          mapfile -t FILES < <(git ls-files -- '.github/workflows/*.yml')
+          mapfile -t FILES < <(git ls-files -- '.github/workflows/*.yml' '.github/workflows/*.yaml')
           if [ "${#FILES[@]}" -eq 0 ]; then
             echo "::error::no workflow files selected"
             exit 1
