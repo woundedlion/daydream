@@ -5,7 +5,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expectFailure, fixtureRepo, isolatedGitEnv } from './fixture_repo.js';
-import { COVERAGE } from '../scripts/run-tests.mjs';
+import { COVERAGE, lineCoverage } from '../scripts/run-tests.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = resolve(HERE, '../scripts/run-tests.mjs');
@@ -158,4 +158,64 @@ test('a case that executes no assertion fails', () => {
   writeFileSync(join(root, 'tests/sample.test.js'),
     "import { test } from 'node:test';\nimport '../lib.mjs';\ntest('empty', () => {});\n");
   assert.match(failOutput(PATTERN), /Every test case must execute an assertion/);
+});
+
+const dilutedCoverage = () => {
+  writeFileSync(join(root, 'lib.mjs'),
+    'export function unused() {\n  return 1;\n}\nexport const value = 4;\n');
+  writeFileSync(join(root, 'padding.mjs'),
+    Array.from({ length: 2000 }, (_, i) => `export const value${i} = ${i};`).join('\n'));
+  writeFileSync(join(root, 'tests/sample.test.js'),
+    "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\n"
+    + "import '../lib.mjs';\nimport '../padding.mjs';\ntest('works', () => assert.ok(true));\n");
+};
+
+test('aggregate coverage cannot hide an under-covered first-party file', () => {
+  dilutedCoverage();
+  assert.match(failOutput(PATTERN), /lib\.mjs line coverage .* below its 95% floor/);
+});
+
+test('reasoned coverage baselines still reject a per-file drop', () => {
+  dilutedCoverage();
+  writeFileSync(join(root, EXEMPT), JSON.stringify({
+    'lib.mjs': { lines: 1, reason: 'Fixture exercises the measured baseline.' },
+  }));
+  assert.match(run(PATTERN), /source modules were loaded/);
+  writeFileSync(join(root, EXEMPT), JSON.stringify({
+    'lib.mjs': { lines: 90, reason: 'Fixture exercises the measured baseline.' },
+  }));
+  assert.match(failOutput(PATTERN), /lib\.mjs line coverage .* below its 90% floor/);
+});
+
+test('a coverage baseline cannot exempt an unloaded module', () => {
+  writeFileSync(join(root, 'unused.mjs'), 'export const unused = true;\n');
+  writeFileSync(join(root, EXEMPT), JSON.stringify({
+    'unused.mjs': { lines: 80, reason: 'No longer measured.' },
+  }));
+  assert.match(failOutput(PATTERN), /coverage baseline but no measured file row/);
+});
+
+test('improved coverage makes a lower baseline redundant', () => {
+  writeFileSync(join(root, EXEMPT), JSON.stringify({
+    'lib.mjs': { lines: 80, reason: 'No longer needed.' },
+  }));
+  assert.match(failOutput(PATTERN), /covered after all/);
+});
+
+test('coverage parser preserves nested paths and rejects a missing table', () => {
+  assert.deepEqual([...lineCoverage([
+    '# start of coverage report',
+    '# root.js | 99.00 | 90 | 90 |',
+    '# tools | | | |',
+    '#  nested | | | |',
+    '#   library.js | 80.50 | 90 | 90 |',
+    '#  helper.js | 98.00 | 90 | 90 |',
+    '# next.js | 100.00 | 90 | 90 |',
+    '# all files | 97.00 | 90 | 90 |',
+    '# end of coverage report',
+  ].join('\n'))], [
+    ['root.js', 99], ['tools/nested/library.js', 80.5],
+    ['tools/helper.js', 98], ['next.js', 100],
+  ]);
+  assert.throws(() => lineCoverage(''), /no file rows/);
 });
