@@ -975,7 +975,9 @@ function applyRestore(item) {
 function renderBaseSolid() {
   const thumb = baseThumbnails[state.base];
   const title = formatSolidName(state.base);
-  document.getElementById('baseThumb').src = thumb || '';
+  const image = document.getElementById('baseThumb');
+  if (thumb) image.src = thumb;
+  else image.removeAttribute('src');
   const titleEl = document.getElementById('baseTitle');
   titleEl.innerText = title;
   titleEl.title = title;
