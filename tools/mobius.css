@@ -23,7 +23,7 @@ body {
   right: 0;
   width: var(--sidebar-width);
   height: calc(100vh - var(--panel-height));
-  background-color: rgba(15, 23, 42, 0.8);
+  background-color: color-mix(in srgb, var(--slate-900) 80%, transparent);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-left: 1px solid var(--slate-700);
@@ -45,7 +45,7 @@ body {
   width: 100vw;
   height: var(--panel-height);
   z-index: 20;
-  background-color: rgba(30, 41, 59, 0.95);
+  background-color: color-mix(in srgb, var(--slate-800) 95%, transparent);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.4);
@@ -75,7 +75,7 @@ body {
 }
 
 .preset-btn.active {
-  background-color: rgba(59, 130, 246, 0.2);
+  background-color: color-mix(in srgb, var(--blue-500) 20%, transparent);
   border-color: var(--blue-500);
   color: white;
 }
@@ -161,7 +161,7 @@ body {
   border: 2px solid #ffffff;
   pointer-events: none;
   transform: translate(-50%, -50%);
-  box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--blue-500) 60%, transparent);
   z-index: 10;
 }
 
