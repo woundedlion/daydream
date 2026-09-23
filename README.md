@@ -1,8 +1,8 @@
 # Holosphere
 
-### [▶ Play with the live WebAssembly simulator](https://woundedlion.github.io/daydream/)
+[▶ Play with the live WebAssembly simulator](https://woundedlion.github.io/daydream/)
 
-### [📖 API documentation (Doxygen)](https://woundedlion.github.io/pov/)
+[📖 API documentation (Doxygen)](https://woundedlion.github.io/pov/)
 
 ---
 
@@ -22,6 +22,23 @@ The project spans **two repositories** that ship as one product:
 Building the WASM target in Holosphere installs the `.js`/`.wasm` module and its SHA/hash/toolchain provenance triple, `hardware/pov_segment_map.json`, the shader workbench helpers, generated operator catalog, shader documents, this README, and `docs/screenshots/` into the sibling `daydream/` checkout. The live demo is daydream served from GitHub Pages.
 
 ---
+
+## Quickstart
+
+To explore effects, open the [live simulator](https://woundedlion.github.io/daydream/).
+
+For local development, clone Holosphere and daydream as sibling directories. Install CMake, Ninja and Emscripten, then activate `emsdk_env` and run from Holosphere:
+
+```bash
+cmake --preset wasm-release
+cmake --build --preset wasm-release-install
+```
+
+In daydream, run `npm ci`, then `python -m http.server 8000` and open <http://localhost:8000>. See [Building](#11-building) for native tests, toolchain requirements and firmware uploads.
+
+If configuration cannot find Emscripten, activate its environment in the same shell and check `EMSDK`. If the simulator reports a bundle mismatch, rebuild the install preset to refresh the engine and provenance together. A missing pinned sibling revision during documentation checks requires the daydream checkout and its pinned commit; see `tools/build_pins.py`.
+
+Design decisions are indexed under [Engineering Philosophies](#2-engineering-philosophies), with detailed constraints in [Core Subsystems](docs/subsystems.md) and the [pullback design record](docs/specs/pullback_pipeline_spec.md).
 
 ## Table of Contents
 
@@ -113,7 +130,7 @@ Two physical targets share the same rendering engine:
 | Synchronization | 1-wire: count-coded sync symbols from segment 0 discipline a per-board flywheel timebase (`hardware/pov_sync.h`) |
 | Pin assignments | ID: pins 21–22 at N=4, plus pin 23 at N=8; Sync: pin 3 (shared — master drives, downstream receive), master-enable: pin 5, SPI: pins 11 + 13 |
 
-The POV effect works because each revolution takes ~125 ms and a new column is painted every `1,000,000 / (RPM/60) / width` microseconds (on Holosphere the IntervalTimer ISR advances one column per fire; on Phantasm each board's flywheel ISR derives the column from the CPU cycle counter — see §7.10). The LED strip is mounted on both sides of a rotating arm: the top half of the strip handles one hemisphere and the bottom half handles the opposite hemisphere, and the two arms sit half a turn apart in azimuth, so half a revolution paints a complete sphere and each revolution delivers two frames — one per side.
+The POV effect works because each revolution takes ~125 ms and a new column is painted every `1,000,000 / (RPM/60) / width` microseconds (on Holosphere the IntervalTimer ISR advances one column per fire; on Phantasm each board's flywheel ISR derives the column from the CPU cycle counter — see [Hardware Drivers](docs/subsystems.md#710-hardware-drivers-dma_ledh-pov_singleh-pov_segmentedh)). The LED strip is mounted on both sides of a rotating arm: the top half of the strip handles one hemisphere and the bottom half handles the opposite hemisphere, and the two arms sit half a turn apart in azimuth, so half a revolution paints a complete sphere and each revolution delivers two frames — one per side.
 
 ---
 
@@ -174,7 +191,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 
 ## 3. Repository Map
 
-Normal CMake and PlatformIO builds automatically synchronize these maps before validating the documentation. The sync preserves descriptions for existing paths, adds new entries in expanded directories, and removes paths that no longer exist. Summary directories stay compact. Daydream is read from the pinned Git revision used by CI, without fetching or changing its checkout. If that revision is unavailable locally, its map stays unchanged and the build reports the skipped sibling checks.
+Run `just docs-sync` to refresh repository maps and source-derived counts. Existing descriptions are preserved; new paths need an author-written description. `just docs-check` validates without editing files. Documentation changes are separate from CMake and PlatformIO builds. Sibling checks use the pinned Daydream revision and fail when it is unavailable.
 
 The same step runs with `just docs-check` and before `just docs` publishes the API reference. Generated changes remain reviewable in `git diff`; prose outside the maps is preserved, apart from source-derived roster counts. Fence balance, links, anchors, path references, and the complete generated maps are still validated.
 
@@ -443,7 +460,7 @@ files define line-ending policy and working-artifact exclusions.
 │   ├── build_pins.py           Shared external-tool version pins for CI and `just`
 │   ├── check_coverage.py       Catastrophic llvm-cov line-floor gate, repo-wide and per core/ subtree
 │   ├── require_test_files.sh   Non-empty guard for glob-discovered test suites (CI)
-│   ├── check_test_dir_pins.sh  Asserts every Python test-suite directory is discovered by CI and the justfile
+│   ├── run_python_tests.py    Discovers and runs every tracked Python suite; rejects empty suites
 │   ├── ruff_selection_guard.sh / eslint_selection_guard.sh  Shared CI and `just lint` anti-vacuity probes
 │   ├── shellcheck_gate.sh      Tracked shell-file selection + shellcheck run behind `just lint`
 │   ├── clang_format_gate.sh    Tracked first-party C++ selection + clang-format run behind `just clang-format`
@@ -479,9 +496,11 @@ files define line-ending policy and working-artifact exclusions.
 │   ├── docs_images.py          Resolves every documented `<img>`; `--stage` copies them into the Doxygen output (CI)
 │   ├── license_check.py        Checks every tracked C/C++ source against the terms LICENSE grants it (CI)
 │   ├── *_tests/                Host unit tests for the gate, build + git hooks, profile parser, bakes, build pins, docs and license checks
-│   ├── docs_sync.py
-│   └── engine_source_state.py
-├── docs/                       subsystems.md and effects.md — README sections 7 and 9 — plus design specs (docs/specs/), the ITCM and device/host divergence ledgers (docs/ledgers/), on-device profiles (docs/profiles/), and the docs/screenshots/ gallery
+│   ├── docs_sync.py          Refreshes repository maps and source-derived documentation counts
+│   ├── engine_source_state.py Hashes tracked and working engine source for build provenance
+│   ├── teensy_flash.sh       Uploads firmware to the USB location of the locked board
+│   └── upload_one.sh         Builds and flashes one image under the per-board lock
+├── docs/                       subsystems.md and effects.md — README sections 7 and 9 — plus agent_workflow.md, phantasm_circuit.svg, design specs (docs/specs/), the ITCM and device/host divergence ledgers (docs/ledgers/), on-device profiles (docs/profiles/), and the docs/screenshots/ gallery
 ├── Doxyfile                    Doxygen config for the published API reference
 ├── package.json                npm entry points for the scripts/*.mjs tools (ESM; Node ≥ 22, CI pinned via tools/build_pins.py)
 ├── package-lock.json           Pinned dependency set behind those entry points
@@ -828,7 +847,7 @@ The filter pipeline operates across three stage domains. Each filter declares it
     ◂── pixel_to_vector()
 ```
 
-**World → Screen**: `vector_to_pixel()` projects a 3D unit-sphere vector to fractional pixel coordinates near `(theta / 2π * W, phi / π * H)`, deriving `theta`/`phi` with the approximate `fast_atan2`/`fast_acos`. The approximation makes the projection sub-pixel inexact, so `vector → pixel → vector` does not exactly invert the exact-trig `pixel_to_vector()`.
+**World → Screen**: `vector_to_pixel()` projects a 3D unit-sphere vector to fractional pixel coordinates near `(theta / 2π * W, phi / π * (H + H_OFFSET - 1))`, deriving `theta`/`phi` with the approximate `fast_atan2`/`fast_acos`. The approximation makes the projection sub-pixel inexact, so `vector → pixel → vector` does not exactly invert the exact-trig `pixel_to_vector()`.
 
 **Screen → Pixel**: no coordinate conversion — a `Pixel::` stage takes the same `float x, y` a `Screen::` stage does, and the stage's `domain_rank` only fixes its position in the chain. What lands the coordinate on pixel centers is `AntiAlias`, which distributes it to its 4 nearest integer pixels as a `quintic_kernel`-eased 2×2 splat.
 
@@ -938,9 +957,9 @@ The Filter auto-syncs from the Style every frame — when the Style lerps betwee
 | `Style::MeltingHi()` | Higher-amplitude downward melt with slow drift and pronounced hue rotation. |
 | `Style::MeltingLo()` | Lower-amplitude downward melt with slow drift and pronounced hue rotation. |
 | `Style::Miasma()` | Drifting toxic haze — medium turbulence with slow drift and strong per-frame hue cycling. |
-| `Style::LooseWormhole()` | Static high-amplitude twist over a medium scale — a loose swirling tunnel, no drift. |
-| `Style::TightWormhole()` | Static high-amplitude twist over a tight scale — a tight swirling tunnel, no drift. |
-| `Style::WigglingWormhole()` | Static twist over a broad scale — a wide wormhole with wandering arms, no drift. |
+| `Style::LooseWormhole()` | Static high-amplitude twist at spatial frequency 11.25 — a loose swirling tunnel, no drift. |
+| `Style::TightWormhole()` | Static high-amplitude twist at spatial frequency 6.42 — a tight swirling tunnel, no drift. |
+| `Style::WigglingWormhole()` | Static twist at spatial frequency 7.11 — a wide wormhole with wandering arms, no drift. |
 
 Available transform functions:
 
@@ -985,6 +1004,8 @@ The shader interface, the SDF/scan and curve rasterizers, the animation system, 
 ---
 
 ## 8. The Effect System
+
+Phantasm limits each effect object to **3,584 bytes** (`HS_PHANTASM_EFFECT_HEAP_BYTES` in `targets/Phantasm/phantasm_target.h`). A compile-time assertion checks `sizeof` against this ceiling; arena allocations have separate budgets.
 
 Every visual effect inherits from `Effect`:
 
@@ -1054,7 +1075,7 @@ Every host-side operation the graph needs is a pure virtual on `EffectTransition
 
 Every effect — screenshot, description and parameter list — plus the shader authoring workbench and the legacy roster is documented in [`docs/effects.md`](https://github.com/woundedlion/pov/blob/master/docs/effects.md).
 
-The compile-time roster and tests carry 41 firmware-capable effects. Native and WASM builds add two simulator-only registry entries, the `Shader` workbench and the `ShaderChain` chain interpreter, for 43. The simulator sidebar exposes 37 effects at 288×144 and 36 at 96×20 (§10.5); both stay out of the card lists because they open through the standalone tool. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `targets/Phantasm/phantasm_playlist.h`) contains 38 effects, including all eighteen promoted composed effects and excluding the three Holosphere-96×20-only effects: Dynamo, MobiusRings, and Thrusters. Each entry carries its own on-air duration, from 38 s to 240 s across the 38-entry roster. Full-cycle Teensy measurements for that playlist are indexed in the [on-device effect profiles](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md).
+The compile-time roster and tests carry 41 firmware-capable effects. Native and WASM builds add two simulator-only registry entries, the `Shader` workbench and the `ShaderChain` chain interpreter, for 43. The simulator sidebar exposes resolution-specific effect lists (§10.5); both stay out of the card lists because they open through the standalone tool. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `targets/Phantasm/phantasm_playlist.h`) contains 38 effects, including all promoted composed effects and excluding the three Holosphere-96×20-only effects: Dynamo, MobiusRings, and Thrusters. Each entry carries its own on-air duration, as specified alongside its name in the 38-entry roster. Full-cycle Teensy measurements for that playlist are indexed in the [on-device effect profiles](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md).
 
 ---
 
@@ -1348,6 +1369,13 @@ The four Three.js pages reuse `vendor-importmap.js`, so they resolve from the CD
 
 ---
 
+### Adding an effect
+
+1. Add the effect header under `effects/` and register its class in `HS_EFFECT_LIST` in `targets/effects.h`. The native roster and include tests check registration; `just docs-check` updates the repository map and counts.
+2. Add the effect to `HS_PHANTASM_EFFECT_LIST`, or explicitly exclude it with `HS_PHANTASM_EXCLUDED_EFFECTS`, in `targets/Phantasm/phantasm_playlist.h`. Compile-time roster assertions check the partition.
+3. Add a capture offset to `scripts/screenshot_capture_config.mjs`, capture its PNG with `scripts/capture_screenshots.mjs`, and add its section to `docs/effects.md`. The screenshot and documentation gates check gallery membership, image validity, and documentation structure.
+4. Build Phantasm to check the effect object size budget, then run the native tests and `just teensy-size` to check firmware budgets. Add behavior tests appropriate to the effect.
+
 ## 11. Building
 
 The two repos should be checked out as siblings so the WASM install step can write directly into the simulator tree:
@@ -1388,6 +1416,11 @@ Each hardware target has its own `.ino` entry point in `targets/`:
 > with the bench build. Install PlatformIO from `requirements/platformio.txt`:
 > the recipe opens with `build_pins.py --check-tool platformio` and refuses any
 > version but the pinned one.
+
+The `bench` environment runs the stationary colour diagnostic. `just bench` builds
+and uploads it under the per-board device lock; set `HS_TEENSY_PORT=COMn` to
+select a board when several are attached. It is a diagnostic image without a
+shipping resource budget.
 
 Target-specific constants live with their target rather than in a global `constants.h` — the Holosphere entry defines its own, while the Phantasm-class targets share `targets/Phantasm/phantasm_target.h` (`TOTAL_PIXELS = 288`, `RPM = 480`):
 ```cpp
@@ -1440,7 +1473,7 @@ The per-effect smoke and determinism window is `HS_SMOKE_FRAMES`, 8 frames by de
 
 The suite must use Clang — the engine relies on GCC/Clang `__attribute__` extensions MSVC rejects. The native toolchain file ([`cmake/toolchain-native-clang.cmake`](https://github.com/woundedlion/pov/blob/master/cmake/toolchain-native-clang.cmake)) locates Clang via `EMSDK` (or a sibling `../emsdk`) and, on Windows, transparently handles the resource compiler and `lld-link` so no Visual Studio Developer Prompt is required. Reusable CMake interface targets select test capabilities and widen the host-only budgets: the inline type-erased animation slot (the 64-bit host inflates every embedded pointer past the 32-bit device footprint) and, most significantly, `GLOBAL_ARENA_SIZE` — **8 MiB for host effect harnesses against the device's 298 KiB**, so the effect smoke harness can render every effect without OOMing mid-run. The firmware/WASM footprint is unchanged: the real budget stays available as `DEVICE_GLOBAL_ARENA_SIZE`, which the device-budget `static_assert`s check even in the host suite. A high-water mark measured in the native suite is therefore *not* a device figure — it is a 64-bit measurement against an inflated ceiling.
 
-Coverage spans the math/geometry/memory core, color, easing/waves, the reaction-diffusion graph integrity, filters, the plot samplers and the Scan/mesh rasterizer, solids-registry invariants, the Conway/Hankin mesh operators, and animation. Beyond those unit checks the suite also runs: an effect smoke harness that constructs and renders every effect with asserts on, plus a cross-run determinism pass that re-renders each effect under a fixed clock and diffs the frames — at the small-aspect 96×20 simulator/test resolution by default (the only firmware image that renders 96×20 is Holosphere — the `holosphere`/`holosphere_dma` PlatformIO envs build `-DCANVAS_W=96 -DCANVAS_H=20` and the sketch shows a single effect; the Phantasm image and every other env are 288×144), and additionally at the production 288×144 alongside a white-box correctness block when `HS_EFFECTS_FULL=1` is set. Pull requests use the quick tier; every master push runs the full IEEE correctness leg and the shipping fast-math smoke leg. The suite also includes a death harness that spawns subprocesses to confirm `HS_CHECK` invariants trap — its cases pin a subset of the guard sites the generated census counts, and the remaining sites are recorded per file in `GUARD_GAP_ALLOW`, so the harness is a pinned sample of the fail-fast surface rather than full coverage; the Phantasm multi-board sync core (`hardware/pov_sync.h`, spec §12); the HD107S SPI wire-format and color-correction tests; the POV driver tiling proofs (each LED write covers the canvas exactly once); and the WASM param-marshaling coverage (the JS definition/value streams stay index-aligned). `tests/run_tests.cpp` is the driver. Extending it with a `tests/test_<module>.h` takes three edits, each pinned by its own CTest case:
+Coverage spans the math/geometry/memory core, color, easing/waves, the reaction-diffusion graph integrity, filters, the plot samplers and the Scan/mesh rasterizer, solids-registry invariants, the Conway/Hankin mesh operators, and animation. Beyond those unit checks the suite also runs: an effect smoke harness that constructs and renders every effect with asserts on, plus a cross-run determinism pass that re-renders each effect under a fixed clock and diffs the frames — at the small-aspect 96×20 simulator/test resolution by default (the only firmware image that renders 96×20 is Holosphere — the `holosphere`/`holosphere_dma` PlatformIO envs build `-DCANVAS_W=96 -DCANVAS_H=20` and the sketch shows a single effect; the Phantasm image and every other env are 288×144), and additionally at the production 288×144 alongside a white-box correctness block when `HS_EFFECTS_FULL=1` is set. Pull requests and master pushes both run the full IEEE correctness leg and the shipping fast-math smoke leg. The suite also includes a death harness that spawns subprocesses to confirm `HS_CHECK` invariants trap — its cases pin a subset of the guard sites the generated census counts, and the remaining sites are recorded per file in `GUARD_GAP_ALLOW`, so the harness is a pinned sample of the fail-fast surface rather than full coverage; the Phantasm multi-board sync core (`hardware/pov_sync.h`, [frame-sync test plan](docs/specs/phantasm_frame_sync_spec.md#12-test-plan-host-testable-where-possible)); the HD107S SPI wire-format and color-correction tests; the POV driver tiling proofs (each LED write covers the canvas exactly once); and the WASM param-marshaling coverage (the JS definition/value streams stay index-aligned). `tests/run_tests.cpp` is the driver. Extending it with a `tests/test_<module>.h` takes three edits, each pinned by its own CTest case:
 
 1. `#include` the header in `run_tests.cpp`'s include block. The `unit_module_includes` test balances that block's size against the roster row count and requires every header in `tests/` outside a small non-module list to be included by name — so neither an orphaned include nor a test file nothing compiles survives.
 2. Add an `X(name, entry_point)` row to `HS_TEST_MODULE_LIST`, the X-macro that expands into `MODULES[]`. `end_module()` rejects a module that runs no assertions, while the `unit_case_calls` CTest scans every column-0 `void test_*(` / `check_*` / `case_*` / `verify_*` / `expect_*` free-function definition in `tests/` and requires it to be reachable from its module's `run_*_tests()` — through a call chain or a file-scope reference such as a dispatch table; off-roster helpers and the named cross-file sweep drivers resolve against the shared corpus instead. An indented member case, such as a WhiteBox `check_*` static, is outside the scan and is reached only by its hand-written call. There are no measured assertion floors or exact case-count pins to update when a test changes.
@@ -1452,7 +1485,7 @@ Three layers run the same suite so a regression can't reach the live demo:
 
 - **Local pre-commit hooks** — both repositories reject staged whitespace errors and validate documentation from an isolated copy of the Git index. POV also runs clang-format over staged first-party C++, ruff/eslint over staged sources, and the fast license/build-pin checks. Daydream runs ESLint over staged JavaScript and validates the Pages manifest graph. A required tool missing for an applicable change fails the commit. Builds, typechecking, unit suites, browser probes, firmware budgets, and coverage remain pre-push or CI, keeping the normal hook near two seconds while protected-branch `CI green` remains authoritative.
 
-- **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — on master pushes and pull-request updates (a push to a branch with no open PR triggers nothing), runs the native suite on Linux (clang-22) and builds the WASM module. The Windows leg (emsdk Clang, which exercises the `lld-link` / rc.exe toolchain branch from a plain shell) runs on master pushes only, and is the one job `ci-green` accepts as `skipped` on a pull request. It then **smoke-tests the WASM at runtime** ([`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs)) and **verifies the install provenance set** consumed by Daydream, then runs Daydream's own suite over that bundle in a `daydream-consumer` job, against the daydream commit pinned in `tools/build_pins.py`. Native coverage is retained as HTML/LCOV and has a loose 70% line floor against a current baseline around 78%, so catastrophic loss fails without pinning normal refactors to an exact artistic implementation. The native suite also runs at `-O2`, under ASan + UBSan, and for concurrency modules under TSan. A `shard-coverage` job proves every registered CTest belongs to exactly one shard. Pull requests use the quick effect tier; master runs the production-resolution IEEE correctness leg and shipping fast-math smoke leg. The seven lint legs check line endings, Python, JavaScript, shell, the GitHub workflows, the `justfile`, and the profiling roster with defect-oriented rules.
+- **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — on master pushes and pull-request updates (a push to a branch with no open PR triggers nothing), runs the native suite on Linux (clang-22) and builds the WASM module. The Windows leg (emsdk Clang, which exercises the `lld-link` / rc.exe toolchain branch from a plain shell) runs on both master pushes and pull requests; `ci-green` requires every job to complete successfully. It then **smoke-tests the WASM at runtime** ([`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs)) and **verifies the install provenance set** consumed by Daydream, then runs Daydream's own suite over that bundle in a `daydream-consumer` job, against the daydream commit pinned in `tools/build_pins.py`. Native coverage is retained as HTML/LCOV and has a loose 70% line floor against a current baseline around 78%, so catastrophic loss fails without pinning normal refactors to an exact artistic implementation. The native suite also runs at `-O2`, under ASan + UBSan, and for concurrency modules under TSan. A `shard-coverage` job proves every registered CTest belongs to exactly one shard. Both pull requests and master pushes run the production-resolution IEEE correctness leg and shipping fast-math smoke leg. The seven lint legs check line endings, Python, JavaScript, shell, the GitHub workflows, the `justfile`, and the profiling roster with defect-oriented rules.
 - **Gated deploy** (`.github/workflows/deploy.yml`, **daydream repo**) — daydream's GitHub Pages source is *GitHub Actions*. On a push to daydream's `master` (or manual dispatch), the **gate** (`engine-bundle.yml`) reads the engine pin from `holosphere_wasm.sha`, polls this repo's `ci.yml` run for that commit until it completes, requires it to have succeeded, downloads its `holosphere-engine-<pin>` artifact, verifies it with `sha256sum -c`, installs it over the committed engine files with `daydream/scripts/install-engine-bundle.mjs` and shares the verified bundle as a run artifact; it runs no engine build and checks out no engine tree. daydream's own JS suite and its headless-Chrome job each `needs: gate` and install that bundle before they run (`browser-smoke.yml` drives seven probes in one runner: the page smoke over every `site_manifest.txt` entry, `workbench-probe.mjs` driving the workbench's pipeline strip with a real mouse, `panel-probe.mjs` scrolling the effect panel and requiring the offset to survive a rebuild, `solids-probe.mjs` dragging the solids page's op-chain rows into a new order, `palettes-probe.mjs` sweeping the palette strip's zoom and hue-key wheel, `mobius-probe.mjs` pressing the Möbius page's complex-plane pads, and `lissajous-probe.mjs` driving the Lissajous page's rational frequency lock). Those seven are the only checks that resolve the import map, instantiate the WASM module under a page's CSP and measure where an element actually lands — the unit suite runs over `daydream/tests/fake_dom.js`, which has neither layout nor pointer capture. `deploy` `needs: [gate, js-tests, browser-smoke]`, so only if all three pass does the workflow install the bundle once more, stage the site from `site_manifest.txt` and publish it to Pages; the served WASM is the verified bundle for the pinned commit, not the blob committed in daydream, and a post-deploy step checks the served engine assets' Content-Types. `POV_TOKEN` is optional: the gate's `gh api` calls and the JS suite's checkout of the pinned engine use it when set and fall back to the run token, which suffices while the engine repo is public.
 
 The simulator's JavaScript lives in the daydream repo and carries its own suite there: `tests/*.test.js`, run by `npm test` (`node --test`), covering the driver and clock, the sidebar and GUI, the segment workers and layout, param marshaling, color/palette math, and the geometry tools' math modules. Its anti-vacuity checks reject an empty glob, unreachable test files, shadow dependency installs, and unexplained first-party modules without pinning file, case, or assertion totals. On every pull request, [Daydream CI](https://github.com/woundedlion/daydream/blob/master/.github/workflows/ci.yml) runs the reusable static/unit suite and all seven real-browser probes, then reports one required `CI green` status. The deploy workflow calls the same suites before publishing.
@@ -1469,7 +1502,7 @@ The design specs are outside the Doxygen reference and carry their own index:
 lists each one with its status and says which spec owns which half where two
 overlap.
 
-`just docs-check` synchronizes the repository maps and source-derived counts, then runs [`tools/docs_check.py`](https://github.com/woundedlion/pov/blob/master/tools/docs_check.py) and its own unit tests: it checks fence balance, link and anchor targets, and backticked repo paths across every tracked Markdown file. The `effects/` row of the file map above draws no subtree, so the exhaustive-tree gate cannot reach its counts; they get their own assertion instead — the header count against the tracked tree, the effect count against `HS_EFFECT_LIST`'s cardinality. The ci.yml docs-markdown job, `docs.yml` and the pre-commit hook run the checker without `--sync`, so a map row or a count that has drifted from the tree fails there; only `just docs-check`, the `docs_sync` CMake target and the PlatformIO pre-build action repair it. The gate is **structural, not semantic**: it reads fences, targets and backticked repo paths, so a green run means the documentation's structure is intact, not that its prose is true. A wrong number in a sentence, a renamed symbol in a table, and any path written without backticks or a link are all outside what it can see; those are on the reader. `just docs` needs `doxygen` on `PATH` at the version `tools/build_pins.py` pins — it runs `build_pins.py --check-tool doxygen` first and refuses any other, because warning text and generated markup move between releases; it clones the pinned doxygen-awesome theme into `.doxygen-awesome/` on first run and synthesizes `Doxyfile.local` from `Doxyfile` plus [`docs/doxygen-theme.cfg`](https://github.com/woundedlion/pov/blob/master/docs/doxygen-theme.cfg) — the same combination `.github/workflows/docs.yml` publishes to <https://woundedlion.github.io/pov/>.
+`just docs-check` runs [`tools/docs_check.py`](https://github.com/woundedlion/pov/blob/master/tools/docs_check.py) and its unit tests. CI and pre-commit also validate fences, links, repository paths, maps and source-derived counts without rewriting documentation. Run `just docs-sync` explicitly to refresh generated maps and counts; prose still needs review. `just docs` needs `doxygen` on `PATH` at the version `tools/build_pins.py` pins — it runs `build_pins.py --check-tool doxygen` first and refuses any other, because warning text and generated markup move between releases; it clones the pinned doxygen-awesome theme into `.doxygen-awesome/` on first run and synthesizes `Doxyfile.local` from `Doxyfile` plus [`docs/doxygen-theme.cfg`](https://github.com/woundedlion/pov/blob/master/docs/doxygen-theme.cfg) — the same combination `.github/workflows/docs.yml` publishes to <https://woundedlion.github.io/pov/>.
 
 ### Running the Simulator — daydream repo
 

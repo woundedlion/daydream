@@ -432,6 +432,20 @@
       },
       {
         "classification": "preset",
+        "default": 1,
+        "domain": {
+          "maximum": 64,
+          "minimum": 0.125
+        },
+        "id": "warp1.lattice-period",
+        "interpolation": {
+          "kind": "LOG_POSITIVE"
+        },
+        "storage": "binary32",
+        "unit": "ratio"
+      },
+      {
+        "classification": "preset",
         "default": 0,
         "domain": {
           "maximum": 6.2831854820251465,
@@ -564,6 +578,7 @@
         "sample.weight-mode",
         "transfer.iso-level",
         "transfer.iso-width",
+        "warp1.lattice-period",
         "warp1.rotation-rate",
         "warp1.scale-x",
         "warp1.scale-y",
@@ -630,6 +645,7 @@
           "sample.weight-mode": "projection",
           "transfer.iso-level": 0.1379999965429306,
           "transfer.iso-width": 0.22703418135643005,
+          "warp1.lattice-period": 0.813504159450531,
           "warp1.rotation-rate": 0,
           "warp1.scale-x": 1,
           "warp1.scale-y": 1,
