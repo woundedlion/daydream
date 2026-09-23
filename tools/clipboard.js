@@ -40,6 +40,18 @@ export { copyToClipboard };
  * @returns {Promise<boolean>} Whether the copy succeeded.
  */
 export async function copyWithFeedback(text, opts = {}) {
+  const success = await copyToClipboard(text);
+  showCopyFeedback(success, opts);
+  return success;
+}
+
+/**
+ * Flash a clipboard outcome, including failures before clipboard access.
+ * @param {boolean} success - Whether the export succeeded.
+ * @param {Parameters<typeof copyWithFeedback>[1]} [opts] - Feedback options.
+ * @returns {void}
+ */
+export function showCopyFeedback(success, opts = {}) {
   const {
     element,
     copiedText = 'Copied!',
@@ -51,7 +63,6 @@ export async function copyWithFeedback(text, opts = {}) {
     idleClasses = [],
   } = opts;
 
-  const success = await copyToClipboard(text);
   // Flash on both outcomes: a silent failure (the label never flipping) leaves
   // the user unsure whether the copy happened.
   if (element) {
@@ -75,7 +86,6 @@ export async function copyWithFeedback(text, opts = {}) {
     }, revertMs);
     element.copyFeedback = { timer, original };
   }
-  return success;
 }
 
 /**
