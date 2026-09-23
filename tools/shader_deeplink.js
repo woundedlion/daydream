@@ -99,7 +99,10 @@ export async function encodeShaderStateHash(state) {
 
 /** @param {string} hash @returns {Promise<*|null>} */
 export async function decodeShaderStateHash(hash) {
-  if (!hash.startsWith(PREFIX)) return null;
+  if (!hash.startsWith(PREFIX)) {
+    if (hash.startsWith('#shader=')) throw new Error('unsupported shader link version');
+    return null;
+  }
   const payload = hash.slice(PREFIX.length);
   if (payload.length === 0 || payload.length > MAX_PAYLOAD_CHARS)
     throw new Error('invalid shader link payload');
