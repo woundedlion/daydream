@@ -42,6 +42,8 @@ function warmWithDeadline(work, ms, timers, abandon) {
  */
 export class ModuleWarmer {
   constructor() {
+    /** @type {AbortController|null} */
+    this.controller = null;
     this.lastWarmAt = -Infinity;
     this.warmEpoch = 0;
     /** @type {string | null} */
@@ -84,7 +86,9 @@ export class ModuleWarmer {
     if (probe.href === this.lastWarmKey && now - this.lastWarmAt < minIntervalMs) {
       return this.lastWarm;
     }
+    this.controller?.abort();
     const controller = new AbortController();
+    this.controller = controller;
     const drain = (/** @type {string} */ u) =>
       fetchResource(new URL(u, baseUrl), { cache: 'no-cache', signal: controller.signal })
         .then((r) => r.arrayBuffer());
