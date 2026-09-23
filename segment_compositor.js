@@ -158,7 +158,7 @@ export class SegmentCompositor {
         return 0;
       }
       const expectedLen = (r.x1 - r.x0) * (r.y1 - r.y0) * 3;
-      if (r.pixels.length !== expectedLen) {
+      if (!(r.pixels instanceof Uint16Array) || r.pixels.length !== expectedLen) {
         this.onFault(s,
           `SegmentController.composite: segment ${s} pixel buffer length ` +
           `${r.pixels.length} != expected ${expectedLen} for rect ` +
