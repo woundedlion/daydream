@@ -107,7 +107,7 @@ export function shaderWorkbenchUrl(location, effect = 'Shader') {
  * @param {() => Daydream} [dependencies.createDriver] - Builds the three.js driver.
  * @param {(options: Object, namespace: string) => GUI} [dependencies.createGui] - Builds a namespaced GUI root.
  * @param {() => Promise<Object>} [dependencies.loadModule] - Resolves the WASM module.
- * @returns {Object} The teardown handle, so a caller can release the app it built.
+ * @returns {Object} The teardown handle; ready settles after module startup or failure reporting.
  */
 export function start({
   doc = globalThis.document,
@@ -135,6 +135,7 @@ export function start({
       dispose() { redirectDisposed = true; },
       onPageHide() {},
       disposed: () => redirectDisposed,
+      ready: Promise.resolve(),
     };
   }
 
@@ -693,8 +694,8 @@ export function start({
   // this and the import, so the binary's fetch still starts in the same task.
   // Deadlined: a stalled fetch reports through the same failure UI (overlay,
   // detail, Reload) rather than leaving the loading overlay spinning.
-  loadWithDeadline(loadModule)
+  const ready = loadWithDeadline(loadModule)
     .then(moduleLoad.onModuleReady).catch(moduleLoad.onModuleFailed);
 
-  return appTeardown;
+  return Object.assign(appTeardown, { ready });
 }

@@ -289,7 +289,7 @@ async function bootedApp(options) {
   const capture = installConsoleCapture('error', 'warn', 'log');
   try {
     const app = startApp(options);
-    await new Promise((resolve) => setImmediate(resolve));
+    await app.teardown.ready;
     return app;
   } finally {
     capture.restore();
@@ -535,7 +535,7 @@ test('a module that lands after the page was discarded builds no engine', async 
   try {
     app.teardown.dispose();
     deliver(module);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await app.teardown.ready;
   } finally {
     capture.restore();
   }
@@ -563,7 +563,7 @@ test('an initial apply that trapped the module is reported as the trap', async (
   let app;
   try {
     app = startApp({ loadModule: () => Promise.resolve(module) });
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await app.teardown.ready;
   } finally {
     capture.restore();
   }
@@ -859,7 +859,7 @@ test('the late-bound engine controls are re-applied once the engine exists', asy
   try {
     app.guis[0].controllers.find((c) => c.property === 'poleLod').setValue(1.5);
     deliver(module);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await app.teardown.ready;
   } finally {
     capture.restore();
   }
