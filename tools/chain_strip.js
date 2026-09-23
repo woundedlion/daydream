@@ -776,6 +776,8 @@ export function createChainStrip({
           const shown = Number(readout.value);
           const from = Number.isFinite(shown) ? shown : Number(values[declaration.id]);
           enterValue(String(from + direction * nudgeStep(declaration)));
+          store.endValueRun();
+          onCommitParameter();
         });
         row.appendChild(slider);
         row.appendChild(readout);
