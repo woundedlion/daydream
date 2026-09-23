@@ -207,3 +207,12 @@ test('pre-push verifies the working-tree artifacts', () => {
   assert.match(text('.githooks/pre-push'),
     /node --test tests\/wasm_provenance\.test\.js/);
 });
+
+for (const name of ['shader_workbench.mjs', 'sha256.mjs']) {
+  test(`shader mirror ${name} matches the pinned engine`, { skip: engineSkip }, () => {
+    assert.ok(engineRoot, engineMissing);
+    const pin = text('holosphere_wasm.sha').trim();
+    assert.equal(text(`shader/${name}`),
+      committed(engineRoot, `scripts/${name}`, pin).toString('utf8').replaceAll('\r\n', '\n'));
+  });
+}
