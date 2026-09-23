@@ -2958,11 +2958,13 @@ test('a schema rebuild mid-drag lands the whole workbench snapshot', () => {
 
 test('a teardown mid-drag persists the deferred write, and a release only once',
   () => {
-    const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
-    const harness = () => makeHarness({
-      params: [speed],
-      onEngineParam: (_name, value) => { speed.value = value; },
-    });
+    const harness = () => {
+      const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
+      return makeHarness({
+        params: [speed],
+        onEngineParam: (_name, value) => { speed.value = value; },
+      });
+    };
 
     const torn = harness();
     torn.panel.build();
