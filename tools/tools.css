@@ -227,3 +227,7 @@ input[type=range]:disabled::-webkit-slider-thumb {
     width: 100vw;
   }
 }
+
+.text-blue-300 { color: #93c5fd; }
+.text-red-300 { color: #fca5a5; }
+.text-purple-300 { color: #d8b4fe; }

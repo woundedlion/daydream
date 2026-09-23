@@ -424,6 +424,9 @@ const CONTRAST_SURFACES = {
   'tools.css': {
     'body': 'body',
     '.slider-label': '.param-group',
+    '.text-blue-300': '.param-group',
+    '.text-red-300': '.param-group',
+    '.text-purple-300': '.param-group',
     '.btn-primary': '.btn-primary',
     '.btn-secondary': '.btn-secondary',
   },
