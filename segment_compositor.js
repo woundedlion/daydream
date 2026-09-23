@@ -37,8 +37,6 @@ export class SegmentCompositor {
   /** @type {import('./segment_layout.js').SegRange[] | null} */
   #bands = null;
 
-  #bandGen = -1;
-
   #bandCount = 0;
 
   #bandW = 0;
@@ -133,7 +131,7 @@ export class SegmentCompositor {
     // not results.length, so the two can't drift after a teardown reset.
     const n = count;
 
-    const bands = this.segmentBands(n, w, h, generation);
+    const bands = this.segmentBands(n, w, h);
     if (!bands) return 0;
 
     // Pre-pass: validate every result before blitting any, so a bad segment faults
@@ -203,20 +201,15 @@ export class SegmentCompositor {
   }
 
   /**
-   * The `n` band rectangles of the current layout, cached across frames: segment
-   * geometry is fixed within a generation, and renderGen bumps on every change
-   * that can move it (resolution, teardown, and the create() a count change runs
-   * through). The dimensions are in the key too, so a driver resize that reaches
-   * composite() before the fence cannot be served a stale table.
-   * @param {number} generation - Published generation.
+   * The current layout's band rectangles, cached by segment count and dimensions.
    * @param {number} n - Segment count.
    * @param {number} w - Display buffer width.
    * @param {number} h - Display buffer height.
    * @returns {import('./segment_layout.js').SegRange[] | null} The bands, or
    *   null when the layout admits none, having latched a fault.
    */
-  segmentBands(n, w, h, generation) {
-    if (this.#bands && this.#bandGen === generation && this.#bandCount === n
+  segmentBands(n, w, h) {
+    if (this.#bands && this.#bandCount === n
         && this.#bandW === w && this.#bandH === h) {
       return this.#bands;
     }
@@ -232,7 +225,6 @@ export class SegmentCompositor {
       }
     }
     this.#bands = bands;
-    this.#bandGen = generation;
     this.#bandCount = n;
     this.#bandW = w;
     this.#bandH = h;

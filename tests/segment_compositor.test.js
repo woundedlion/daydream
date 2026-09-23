@@ -38,7 +38,8 @@ test('overlay changes reuse the published pixels and layout cache', () => {
   assert.equal(compositor.composite(frame, 2, 1, false), 2);
   assert.deepEqual(pixels, plain);
   assert.equal(compositor.segmentBands(2, 4, 4, 1), bands);
-  assert.notEqual(compositor.segmentBands(2, 4, 4, 2), bands);
+  assert.equal(compositor.segmentBands(2, 4, 4, 2), bands);
+  assert.notEqual(compositor.segmentBands(2, 8, 4), bands);
   assert.deepEqual(faults, []);
 });
 
