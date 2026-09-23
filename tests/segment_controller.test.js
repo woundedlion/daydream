@@ -3056,3 +3056,16 @@ test('create with a layout-illegal or oversized segment count latches a pool fau
     assert.match(c.faultInfo.message, /a rebuild will use 6/);
   }
 });
+
+test('display aliases reject a mesh-size mismatch without changing either alias', () => {
+  const original = new Uint16Array(6);
+  const driver = { pixels: original, dotMesh: { count: 2,
+    instanceColor: fakeColorAttribute(original) } };
+  assert.throws(() => repointDisplayAliases(driver, new Uint16Array(9)), RangeError);
+  assert.equal(driver.pixels, original);
+  assert.equal(driver.dotMesh.instanceColor.array, original);
+  const next = new Uint16Array(6);
+  structuredClone(original.buffer, { transfer: [original.buffer] });
+  repointDisplayAliases(driver, next);
+  assert.equal(driver.pixels, next);
+});
