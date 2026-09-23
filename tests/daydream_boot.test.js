@@ -768,7 +768,7 @@ test('the segment-count slider carries the device cap as its own maximum', () =>
     + "the max passed to add(), and the pool's memory cost is what it bounds");
 
   const tight = segmentCountControl(startApp({ nav: { deviceMemory: 2 } }));
-  assert.deepEqual(tight.args, [2, 2, 2],
+  assert.deepEqual(tight.args, [[2]],
     'the cap must read the device hints, not a constant');
   assert.ok(tight.object.segments <= 2,
     'the initial value must sit inside the range, or a capped device opens the '
