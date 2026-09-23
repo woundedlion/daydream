@@ -155,3 +155,17 @@ test('thumbnail build errors stay in the thumbnail status area', () => {
   show('Thumbnail for cube failed');
   assert.equal(status.textContent, 'Thumbnail for cube failed');
 });
+
+
+test('index cap notice changes only on entry and exit without touching gate feedback', () => {
+  let value = '';
+  const writes = [];
+  const notice = { get textContent() { return value; },
+    set textContent(text) { writes.push(text); value = text; } };
+  const update = handler('updateIndexLabelNotice', { MAX_INDEX_LABELS: 1000,
+    document: { getElementById: (id) => { assert.equal(id, 'indexLabelNotice'); return notice; } } });
+  update(true);
+  update(true);
+  update(false);
+  assert.deepEqual(writes, ['Vertex indices require fewer than 1000 vertices.', '']);
+});
