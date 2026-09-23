@@ -16,7 +16,7 @@
 import { centre, checks, dragBetween, isMain, paddingBoxOf, runProbe } from './probe_harness.mjs';
 
 const PAGE = 'tools/palettes.html';
-const VIEWPORT = { width: 1280, height: 900 };
+const VIEWPORT = { width: 1280, height: 900, deviceScaleFactor: 2 };
 const TIMEOUT_MS = 90_000;
 const STRIP = '#colorStripCanvas';
 const HEADING = '#palette_range_heading';
@@ -183,6 +183,10 @@ export async function probeHueWheel(tab) {
   await tab.waitForFunction(
     (selector) => document.querySelectorAll(selector).length >= 2, {}, HANDLES);
 
+  const density = await tab.$eval(WHEEL, (node) => ({
+    width: node.width, expected: Math.round(node.clientWidth * Math.min(2, devicePixelRatio)),
+  }));
+  check(density.width === density.expected, `the wheel raster matches capped device density (${density.width}px)`);
   const opening = await settledHueDegrees(tab);
   check(opening.length >= 2, `the wheel publishes ${opening.length} hue keys`);
 
