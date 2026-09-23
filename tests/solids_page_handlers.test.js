@@ -30,3 +30,26 @@ test('parameter changes from removed or reordered rows cannot edit the replaceme
   assert.equal(state.ops[0].params.t, 0.1);
   assert.doesNotThrow(() => updateOpParam(3, 't', '0.5', 2));
 });
+
+test('arena polling retries ordinary failures and stops cleanly on an engine halt', () => {
+  const error = new Error('bridge refused');
+  const scheduled = [];
+  const warnings = [];
+  let halted = false;
+  const context = {
+    arenaMetricsTimer: 5,
+    meshOpsWasm: { getArenaMetrics() { throw error; } },
+    engineTrapped: (caught) => { assert.equal(caught, error); return halted; },
+    console: { warn: (...args) => warnings.push(args) },
+    setTimeout: (callback, delay) => { scheduled.push([callback, delay]); return 6; },
+  };
+  const poll = handler('updateArenaMetrics', context);
+  assert.doesNotThrow(poll);
+  assert.equal(scheduled.length, 1);
+  assert.equal(scheduled[0][1], 500);
+  assert.equal(warnings.length, 1);
+  halted = true;
+  assert.doesNotThrow(poll);
+  assert.equal(scheduled.length, 1);
+  assert.equal(context.arenaMetricsTimer, null);
+});

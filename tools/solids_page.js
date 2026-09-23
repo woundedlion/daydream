@@ -178,14 +178,20 @@ async function init() {
   function updateArenaMetrics() {
     // The engine nulls meshOpsWasm on halt; stop rather than reschedule forever.
     if (!meshOpsWasm) return;
-    const m = meshOpsWasm.getArenaMetrics();
-    // Peak over the module's life: every build ends in clearToolingMemory(),
-    // which zeroes the windowed high_water_mark before the next poll reads it.
-    const fmt = (x) => `${formatKB(x.lifetime_high_water_mark, 0)} / ${formatKB(x.capacity, 0)}KB`;
-    const statsEl = document.getElementById('arenaStats');
-    if (statsEl) {
-      statsEl.innerText = `Live ${fmt(m.tooling_arena)} · `
-        + `Scratch A ${fmt(m.tooling_scratch_a)} · Scratch B ${fmt(m.tooling_scratch_b)}`;
+    arenaMetricsTimer = null;
+    try {
+      const m = meshOpsWasm.getArenaMetrics();
+      // Peak over the module's life: every build ends in clearToolingMemory(),
+      // which zeroes the windowed high_water_mark before the next poll reads it.
+      const fmt = (x) => `${formatKB(x.lifetime_high_water_mark, 0)} / ${formatKB(x.capacity, 0)}KB`;
+      const statsEl = document.getElementById('arenaStats');
+      if (statsEl) {
+        statsEl.innerText = `Live ${fmt(m.tooling_arena)} · `
+          + `Scratch A ${fmt(m.tooling_scratch_a)} · Scratch B ${fmt(m.tooling_scratch_b)}`;
+      }
+    } catch (error) {
+      if (engineTrapped(error)) return;
+      console.warn('Arena metrics unavailable:', error);
     }
     arenaMetricsTimer = setTimeout(updateArenaMetrics, 500); // 2fps update is enough
   }
@@ -195,6 +201,7 @@ async function init() {
     if (arenaMetricsTimer !== null) { clearTimeout(arenaMetricsTimer); arenaMetricsTimer = null; }
   });
   updateArenaMetrics();
+  if (!wasmModule) return;
 
   // Initialize Three.js. The shared scaffold supplies the renderer / camera /
   // OrbitControls / resize / animation loop; the solids-specific bits (auto-
