@@ -27,7 +27,12 @@ Building the WASM target in Holosphere installs the `.js`/`.wasm` module and its
 
 To explore effects, open the [live simulator](https://woundedlion.github.io/daydream/).
 
-For local development, clone Holosphere and daydream as sibling directories. Install CMake, Ninja and Emscripten, then activate `emsdk_env` and run from Holosphere:
+For local development, clone Holosphere and daydream as sibling directories.
+Install Python with pip, Node.js with npm, CMake, Ninja and Emscripten.
+`tools/build_pins.py` records the CI tool versions; each repository's
+`package.json` declares its Node requirement. Install the pinned `just` command
+with `python -m pip install --require-hashes -r requirements/just.txt`.
+Then activate `emsdk_env` and run from Holosphere:
 
 ```bash
 cmake --preset wasm-release
@@ -68,7 +73,7 @@ Design decisions are indexed under [Engineering Philosophies](#2-engineering-phi
      - [World-Space Filters](#world-space-filters)
      - [Screen-Space Filters](#screen-space-filters)
      - [Pixel-Space Filters](#pixel-space-filters)
-     - [Feedback Styles](#feedback-styles-stylesh)
+     - [Feedback Styles](#feedback-styles-feedback_styleh)
      - [Combining Filters](#combining-filters)
 7. [Core Subsystems](#7-core-subsystems)
 8. [The Effect System](#8-the-effect-system)
@@ -76,6 +81,7 @@ Design decisions are indexed under [Engineering Philosophies](#2-engineering-phi
    - [Parameter Registration](#parameter-registration)
    - [The `EffectConfig` Flags](#the-effectconfig-flags)
    - [Fenced Effect-to-Effect Transition](#fenced-effect-to-effect-transition-controltransitionh)
+   - [Adding an effect](#adding-an-effect)
 9. [Effects Reference](#9-effects-reference)
 10. [The Web Simulator (Daydream)](#10-the-web-simulator-daydream)
     - [10.1 Process and Threading Model](#101-process-and-threading-model)
@@ -152,7 +158,7 @@ The Teensy heap fragments under heavy mesh subdivision. The single-block partiti
 
 ### Why the ISR Double Buffer?
 
-POV display requires pixel data to be ready before each column interval fires — roughly 434 µs to 1.3 ms depending on resolution at 480 RPM (the per-column period is `1,000,000 / (RPM/60) / W` µs, i.e. ~434 µs for Phantasm's 288 columns and ~1302 µs for Holosphere's 96). A naive approach (rendering in the ISR) would block the main loop. Instead, the main loop renders freely into a back buffer while the ISR reads from a separate front buffer. `queue_frame()` / `advance_display()` synchronize with minimal interrupt-disabled critical sections.
+POV display requires pixel data to be ready before each column interval fires — roughly 434 µs to 1.3 ms depending on resolution at 480 RPM (the per-column period is `1,000,000 / (RPM/60) / W` µs, i.e. ~434 µs for Phantasm's 288 columns and ~1302 µs for Holosphere's 96). A naive approach (rendering in the ISR) would block the main loop. Instead, the main loop renders freely into a back buffer while the ISR reads from a separate front buffer. `queue_frame()` publishes the next buffer inside a short interrupt-disabled critical section; the ISR calls `advance_display()` to adopt it.
 
 ### Why Fail-Fast (`HS_CHECK`)?
 
@@ -226,7 +232,6 @@ files define line-ending policy and working-artifact exclusions.
 │   │   ├── concepts.h              FunctionRef/Fn callable wrappers, PipelineRef type erasure, Tweenable concept
 │   │   ├── memory.h / memory.cpp   Arena allocator, ScratchScope, Persist<T>, generate()
 │   │   ├── static_storage.cpp      Definitions of the framebuffer/timeline statics (DMAMEM placement)
-│   │   └── styles.h                Feedback::Style named presets + space/color transform functions
 │   ├── math/                   Vector/quaternion math and scalar curves
 │   │   ├── 3dmath.h                Vector, Quaternion, Spherical, Complex primitives, fast-math approximations, value noise, Snorm3
 │   │   ├── 4dmath.h                Vec4 / Mat4 four-dimensional primitives + coordinate-plane rotation
@@ -253,8 +258,10 @@ files define line-ending policy and working-artifact exclusions.
 │   │   ├── recipe_types.h          Op / OpStep / Recipe: the authored op-chain model
 │   │   ├── recipe.h                Recipe lowering to primitive Conway steps + replay
 │   │   ├── hankin.h                Hankin pattern compilation and update system
+│   │   ├── base_mesh.h              Base mesh identities, bounds, and authoring labels
 │   │   ├── solid_generators.h     Platonic vertex/face tables, SolidBuilder, and the named solid generators
 │   │   ├── solids.h                Solid registries, Recipe mirrors, and the name/index lookups
+│   │   ├── relax_bake.h             Relax payload and source identity checks
 │   │   └── relax_bakes_generated.h Baked relaxed-mesh vertices (from tools/relax_bakes.py)
 │   ├── spatial/                Spatial indexing and spherical graph structures
 │   │   ├── kd_tree.h               KDTree k-nearest-neighbor search
@@ -303,7 +310,7 @@ files define line-ending policy and working-artifact exclusions.
 │   │   ├── filter.h                Composable render pipeline + all Filter::World/Screen/Pixel:
 │   │   │                            umbrella over filter/
 │   │   ├── filter/                 Pipeline composition (pipeline) and the shared splat
-│   │   │                            helper (splat), plus one header per stage
+│   │   │                            helper (splat), feedback presets (feedback_style), and stages
 │   │   │                            (world_orient, world_orient_slice, world_hole,
 │   │   │                            world_replicate, world_vertex_replicate, world_mobius,
 │   │   │                            world_trails, screen_anti_alias,
@@ -312,6 +319,7 @@ files define line-ending policy and working-artifact exclusions.
 │   │   ├── sdf.h                   SDF shapes, CSG operators and volumes: umbrella over sdf/
 │   │   ├── sdf/                    Per-family SDF headers (common, shapes, rings,
 │   │   │                            csg, face, volume)
+│   │   ├── render_policy.h         Shape ratios and pole shading policy
 │   │   └── shading.h               Fragment interpolation + mesh-topology shading helpers
 │   ├── animation/              Timeline scheduler + the animation type families
 │   │   ├── animation.h             IAnimation/AnimationBase contract + umbrella over the fragments below
@@ -434,7 +442,7 @@ files define line-ending policy and working-artifact exclusions.
 │   ├── generate_promoted_shader_documents.mjs Generates canonical promoted-effect documents
 │   ├── promoted_digests.test.mjs Pins each promoted header's descriptor/preset-bank digest to its document
 │   ├── engine_catalog.json     wasm32 operator ABI catalog the browser workbench budgets against
-│   ├── export_engine_catalog.mjs Exports the installed WASM module's operator catalog
+│   ├── export_engine_catalog.mjs / export_engine_catalog.test.mjs  Exports and validates the WASM operator catalog; CLI failure fixtures
 │   ├── sha256.mjs              Shared SHA-256 implementation for shader documents
 │   ├── engine_bindings_contract.test.mjs Node contract tests for WASM engine binding invariants
 │   ├── wasm_smoke.mjs          Runtime WASM smoke: drives every effect at both resolutions (CI)
@@ -453,6 +461,7 @@ files define line-ending policy and working-artifact exclusions.
 │   ├── check_profiles.mjs      Validates indexed timing reports against their rosters and document contract (CI)
 │   ├── check_profiles.test.mjs Node regression tests for timing report structure and set discovery
 │   ├── run_tests.mjs           `npm test`: runs the .test.mjs suite and rejects empty cases/files
+│   ├── module_roster.mjs       Checks first-party module loads and reasoned exemptions
 │   ├── run_tests.test.mjs      Node regression test for the empty-case rejection
 │   ├── count_assertions.mjs    NODE_OPTIONS shim counting node:assert calls and zero-delta cases
 │   └── report_cases.mjs        node:test reporter tallying per-file case counts
@@ -486,6 +495,7 @@ files define line-ending policy and working-artifact exclusions.
 │   ├── pullback_crosscheck.py  Isolated base/candidate pullback capture runner and comparator
 │   ├── device_lock.sh          Host-global per-board lock every device path takes
 │   ├── device_lock_guard.py    OS file-lock guard for claim creation and removal
+│   ├── noise_golden_export.cpp    Native noise golden grid capture tool
 │   ├── pov_segment_map_export.cpp  Generator for the committed segment-map golden
 │   ├── relax_bakes.py / relax_bake_harness.cpp  Relaxed-mesh bake generator of record
 │   ├── gen_gamut_lut.py        sRGB gamut-boundary generator of record (emits core/color/gamut_lut.h)
@@ -497,10 +507,10 @@ files define line-ending policy and working-artifact exclusions.
 │   ├── license_check.py        Checks every tracked C/C++ source against the terms LICENSE grants it (CI)
 │   ├── *_tests/                Host unit tests for the gate, build + git hooks, profile parser, bakes, build pins, docs and license checks
 │   ├── docs_sync.py          Refreshes repository maps and source-derived documentation counts
-│   ├── engine_source_state.py Hashes tracked and working engine source for build provenance
+│   ├── engine_source_state.py Reports tracked source edits, excluding reproducible generated documentation
 │   ├── teensy_flash.sh       Uploads firmware to the USB location of the locked board
 │   └── upload_one.sh         Builds and flashes one image under the per-board lock
-├── docs/                       subsystems.md and effects.md — README sections 7 and 9 — plus agent_workflow.md, phantasm_circuit.svg, design specs (docs/specs/), the ITCM and device/host divergence ledgers (docs/ledgers/), on-device profiles (docs/profiles/), and the docs/screenshots/ gallery
+├── docs/                       subsystems.md and effects.md — README sections 7 and 9 — plus agent_workflow.md, phantasm_circuit.svg, design specs (docs/specs/), the ITCM and device/host divergence ledgers (docs/ledgers/), on-device profiles (docs/profiles/), the docs/screenshots/ gallery, and Doxygen theme inputs (doxygen-theme.cfg and doxygen-custom.css)
 ├── Doxyfile                    Doxygen config for the published API reference
 ├── package.json                npm entry points for the scripts/*.mjs tools (ESM; Node ≥ 22, CI pinned via tools/build_pins.py)
 ├── package-lock.json           Pinned dependency set behind those entry points
@@ -636,6 +646,8 @@ files define line-ending policy and working-artifact exclusions.
 │   ├── probe_harness.mjs       Manifest server, browser, console/network collector and pointer helpers every probe runs on
 │   ├── browser.mjs             Browser resolution (CHROME_PATH, else the standard Chrome locations) and the launch flags the headless scripts share
 │   ├── generate-importmap.mjs  Bakes the local-vs-CDN decision into vendor-importmap.js
+│   ├── vendor-imports.mjs      Parses module imports for the vendor integrity inventory
+│   ├── extract-engine-bundle.py  Validates archive paths before extracting the engine bundle
 │   ├── generate-shader-v2-documents.mjs  Regenerates the v2 pattern documents and digest-migration table from the v1 fixtures
 │   ├── record-module-loads.mjs NODE_OPTIONS shim recording loaded test modules
 │   ├── require-tests.mjs       `pretest` guard against empty globs, unreachable tests, and shadow installs
@@ -649,14 +661,14 @@ files define line-ending policy and working-artifact exclusions.
 │   ├── mobius-probe.mjs        Headless pointer-level probe of the Möbius page's complex-plane pads
 │   ├── lissajous-probe.mjs     Headless pointer-level probe of the Lissajous page's rational frequency lock and the domain it drives
 │   ├── run-tests.mjs           `test` script: runs the suite and checks first-party module reachability
-│   └── install-engine-bundle.mjs
+│   └── install-engine-bundle.mjs  Validates and installs the verified engine artifact
 │
 ├── tests/                      Node unit tests (`npm test`)
-├── requirements/               Hash-locked ShellCheck toolchain used by CI
+├── requirements/               Hash-locked ShellCheck and actionlint toolchains used by CI
 ├── tsconfig.json               checkJs settings for the worker-protocol module set
 ├── eslint.config.mjs           JavaScript lint rules (recommended set) — the js-unit-suite.yml lint step
 ├── .githooks/                  staged pre-commit checks, a pre-push mirror of the JS/browser suites, and the master fast-forward guard
-├── .github/workflows/          ci.yml (PR aggregate), deploy.yml (engine gate → Pages), js-unit-suite.yml + browser-smoke.yml (reusable suites)
+├── .github/workflows/          ci.yml (PR aggregate), engine-bundle.yml (verified engine gate), deploy.yml (engine gate → Pages), js-unit-suite.yml + browser-smoke.yml (reusable suites)
 ├── .github/dependabot.yml      Monthly grouped bump pull requests for the SHA-pinned actions and the locked Node dependencies
 │
 ├── three.js/                   Optional vendored Three.js checkout
@@ -664,6 +676,7 @@ files define line-ending policy and working-artifact exclusions.
 ├── node_modules/lil-gui/       Optional local lil-gui (npm install)
 ├── package.json
 ├── package-lock.json           Committed dependency pin (the optional trees above are gitignored)
+├── .nvmrc                      Exact Node runtime used by simulator CI
 ├── .gitattributes              Text and generated-binary attribute rules
 └── .gitignore                  Local dependency, build, and installed-engine exclusions
 ```
@@ -930,9 +943,9 @@ The tables below are the library surface, deliberately wider than the set of sta
 | Filter | Effect |
 |---|---|
 | `Pixel::Feedback<W, H>` | Style-driven full-screen feedback loop. It is a *replacing* terminal, so a pipeline containing it exposes neither `plot()` nor `flush(Canvas&, float)`: the effect calls `filters.begin_frame(canvas, alpha)` once at the top of the frame and plots the frame through the `PreparedTerminalFrame&` it returns. `begin_frame()` runs the feedback pass first — at `alpha >= 1` it writes every pixel, so plotting before it would be erased — and the state it returns has no flush of its own, so the pass cannot be re-run mid-frame. That pass iterates the full canvas, samples the previous frame from the Canvas front buffer with bilinear interpolation, applies the bound `Feedback::Style`'s spatial transform and color transform with fade, then blends into the back buffer. Frames come from Canvas double-buffering, so the filter holds no frame storage of its own, but it does keep a persistent warp cache: call `init_storage(Arena&)` from the effect's `init()` to reserve `STORAGE_BYTES` from the persistent arena — without it every frame rebuilds the whole control field. The spatial transform is evaluated on a spherical control lattice — latitude rings spaced `DS = style.downsample` rows apart, each carrying a `sin(φ)`-scaled sample count (`W/DS` at the equator) — except in the pole infill bands, the first `DS` rows and the last `max(DS - H_OFFSET, 0)`, which take one ring per row at the full `W/DS` count; ring count and `STORAGE_BYTES` (sized from rings × `W/DS`) therefore sit above what a flat `(W/DS)×(H/DS)` grid would need, while `sample_count()` sits below it at 288×144 (2209 samples at `H_OFFSET` 0, 2028 at `H_OFFSET` 3, against a flat 2592): the `sin(φ)` thinning removes more than the infill adds. Only at 96×20 do all three exceed the flat figure. The lattice is then expanded by longitude interpolation into a `W/DS`-column offset field, one row per ring, and bilinearly upsampled while compositing. See `Feedback::Style` below for preset selection. |
-| `Pixel::ChromaticShift<W, Spread>` | Emits four taps to simulate chromatic aberration: the unmodified source pixel at its sub-pixel `x`, plus single-channel R, G and B copies offset by `Spread`, `2*Spread` and `3*Spread` columns (`Spread` defaults to 1). Roughly doubles emitted energy — the source tap is kept, not replaced. The three fringe taps are snapped to the rounded integer column while the source tap keeps its sub-pixel `x`. The fringe subtends `3*Spread/W` of a turn, so raising `Spread` with `W` holds its angular width across resolutions. Requires `W > 3*Spread`. |
+| `Pixel::ChromaticShift<W, Spread>` | Emits four taps to simulate chromatic aberration: the unmodified source pixel at its sub-pixel `x`, plus single-channel R, G and B copies offset by `Spread`, `2*Spread` and `3*Spread` columns (`Spread` defaults to 1). Fringe taps use one quarter of the source alpha, preserving three quarters of a lit destination at full source alpha. Over black, non-overlapping taps emit 1.25 times the source energy. The three fringe taps are snapped to the rounded integer column while the source tap keeps its sub-pixel `x`. The fringe subtends `3*Spread/W` of a turn, so raising `Spread` with `W` holds its angular width across resolutions. Requires `W > 3*Spread`. |
 
-#### Feedback Styles (`styles.h`)
+#### Feedback Styles (`feedback_style.h`)
 
 `Feedback::Style` bundles spatial transform, color transform, and scalar parameters into a single POD-copyable struct with named presets. `Filter::Pixel::Feedback<W,H>` (see Pixel-Space Filters above) takes a `Style&` directly — no template parameters for transform types, no adapter boilerplate.
 
@@ -1053,7 +1066,7 @@ register_readonly_param("Particles", &params.active_count, 0.0f, 1024.0f);  // e
 
 The enum overload takes an array of option labels that must outlive the effect (string literals). `register_animated_param` marks the param as written by the animation system, so the GUI renders it as an auto-pausing slider that engages "Pause Animation" when touched; `register_readonly_param` marks it engine-written, so the GUI shows the live value but disables editing. The readonly flag can also be applied to an already-registered param via `mark_readonly(name)`, and `mark_global(name)` marks an already-registered param a global control rather than part of the effect's look, clearing the `preset` flag so preset exports skip it.
 
-The parameter list (`ParamList`) is accessible via `getParameters()`, and `updateParameter(name, float)` sets values at runtime. Its default storage is a fixed `std::array<ParamDef, 32>`; an effect needing more calls `use_parameter_storage()` to swap in an arena-allocated array, as the Shader workbench does at 80 (both are fixed-capacity — the no-realloc memory-view invariant the WASM bridge depends on). Each `ParamDef` holds a plain `void *` target tagged by a `TargetType`: `FLOAT`, `BOOL`, or one of six integer widths (`INT_I8`/`INT_U8`/`INT_I16`/`INT_U16`/`INT_I32`/`INT_U32`). Every write arrives as a float and is converted on store, with automatic bool threshold at 0.5. The animation system can also write to these parameters, allowing effects to animate their own exposed controls.
+The parameter list (`ParamList`) is accessible via `getParameters()`, and `updateParameter(name, float)` sets values at runtime. Its default storage is a fixed `std::array<ParamDef, HS_INLINE_PARAM_CAPACITY>` (16 entries on device, 32 on host); an effect needing more calls `use_parameter_storage()` to swap in an arena-allocated array, as the Shader workbench does at 80 (both are fixed-capacity — the no-realloc memory-view invariant the WASM bridge depends on). Each `ParamDef` holds a plain `void *` target tagged by a `TargetType`: `FLOAT`, `BOOL`, or one of six integer widths (`INT_I8`/`INT_U8`/`INT_I16`/`INT_U16`/`INT_I32`/`INT_U32`). Every write arrives as a float and is converted on store, with automatic bool threshold at 0.5. The animation system can also write to these parameters, allowing effects to animate their own exposed controls.
 
 ### The `EffectConfig` Flags
 
@@ -1070,6 +1083,13 @@ With `{.persist = true}`, `Canvas` copies the previous frame's buffer into the n
 Every host-side operation the graph needs is a pure virtual on `EffectTransitionAdapter` — envelope, presentation fence, construct/destroy, handoff import, frame prepare/publish, identity commit, restore and fail-safe. The engine ships no implementation of it: today's effect swaps are unfenced, and the only adapter in the tree is the recording fixture in `tests/test_canvas.h` that drives every edge and failure branch. The header is kept as the design of record for a fenced swap, not as live machinery.
 
 ---
+
+### Adding an effect
+
+1. Add the effect header under `effects/` and register its class in `HS_EFFECT_LIST` in `targets/effects.h`. The native roster and include tests check registration; `just docs-sync` updates the repository map and counts.
+2. Add the effect to `HS_PHANTASM_EFFECT_LIST`, or explicitly exclude it with `HS_PHANTASM_EXCLUDED_EFFECTS`, in `targets/Phantasm/phantasm_playlist.h`. Compile-time roster assertions check the partition.
+3. Add a capture offset to `scripts/screenshot_capture_config.mjs`, capture its PNG with `scripts/capture_screenshots.mjs`, and add its section to `docs/effects.md`. The screenshot and documentation gates check gallery membership, image validity, and documentation structure.
+4. Build Phantasm to check the effect object size budget, then run the native tests and `just teensy-size` to check firmware budgets. Add behavior tests appropriate to the effect.
 
 ## 9. Effects Reference
 
@@ -1188,7 +1208,7 @@ The view aliases WASM linear memory and is **not** bound once. Two independent
 events invalidate it, and a cached view must be tested for both:
 
 - **Heap growth** — with `ALLOW_MEMORY_GROWTH` (e.g. the lazy 16 MB MeshOps
-  allocation) any later growth detaches the `ArrayBuffer` and leaves the cached
+  allocation or the first factory-table lookup at a resolution) any later growth detaches the `ArrayBuffer` and leaves the cached
   view zero-length (`wasmPixels.buffer.byteLength === 0`).
 - **A resolution change** — the backing buffer is pre-sized to `MAX_W × MAX_H`
   and never reallocated (§10.10), so `setResolution` detaches nothing. It moves
@@ -1369,13 +1389,6 @@ The four Three.js pages reuse `vendor-importmap.js`, so they resolve from the CD
 
 ---
 
-### Adding an effect
-
-1. Add the effect header under `effects/` and register its class in `HS_EFFECT_LIST` in `targets/effects.h`. The native roster and include tests check registration; `just docs-check` updates the repository map and counts.
-2. Add the effect to `HS_PHANTASM_EFFECT_LIST`, or explicitly exclude it with `HS_PHANTASM_EXCLUDED_EFFECTS`, in `targets/Phantasm/phantasm_playlist.h`. Compile-time roster assertions check the partition.
-3. Add a capture offset to `scripts/screenshot_capture_config.mjs`, capture its PNG with `scripts/capture_screenshots.mjs`, and add its section to `docs/effects.md`. The screenshot and documentation gates check gallery membership, image validity, and documentation structure.
-4. Build Phantasm to check the effect object size budget, then run the native tests and `just teensy-size` to check firmware budgets. Add behavior tests appropriate to the effect.
-
 ## 11. Building
 
 The two repos should be checked out as siblings so the WASM install step can write directly into the simulator tree:
@@ -1485,8 +1498,10 @@ Three layers run the same suite so a regression can't reach the live demo:
 
 - **Local pre-commit hooks** — both repositories reject staged whitespace errors and validate documentation from an isolated copy of the Git index. POV also runs clang-format over staged first-party C++, ruff/eslint over staged sources, and the fast license/build-pin checks. Daydream runs ESLint over staged JavaScript and validates the Pages manifest graph. A required tool missing for an applicable change fails the commit. Builds, typechecking, unit suites, browser probes, firmware budgets, and coverage remain pre-push or CI, keeping the normal hook near two seconds while protected-branch `CI green` remains authoritative.
 
-- **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — on master pushes and pull-request updates (a push to a branch with no open PR triggers nothing), runs the native suite on Linux (clang-22) and builds the WASM module. The Windows leg (emsdk Clang, which exercises the `lld-link` / rc.exe toolchain branch from a plain shell) runs on both master pushes and pull requests; `ci-green` requires every job to complete successfully. It then **smoke-tests the WASM at runtime** ([`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs)) and **verifies the install provenance set** consumed by Daydream, then runs Daydream's own suite over that bundle in a `daydream-consumer` job, against the daydream commit pinned in `tools/build_pins.py`. Native coverage is retained as HTML/LCOV and has a loose 70% line floor against a current baseline around 78%, so catastrophic loss fails without pinning normal refactors to an exact artistic implementation. The native suite also runs at `-O2`, under ASan + UBSan, and for concurrency modules under TSan. A `shard-coverage` job proves every registered CTest belongs to exactly one shard. Both pull requests and master pushes run the production-resolution IEEE correctness leg and shipping fast-math smoke leg. The seven lint legs check line endings, Python, JavaScript, shell, the GitHub workflows, the `justfile`, and the profiling roster with defect-oriented rules.
+- **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — on master pushes and pull-request updates (a push to a branch with no open PR triggers nothing), runs the native suite on Linux (clang-22) and builds the WASM module. The Windows leg (emsdk Clang, which exercises the `lld-link` / rc.exe toolchain branch from a plain shell) runs on both master pushes and pull requests; `ci-green` requires every job to complete successfully. It then **smoke-tests the WASM at runtime** ([`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs)) and **verifies the install provenance set** consumed by Daydream, then runs Daydream's own suite over that bundle in a `daydream-consumer` job, against the daydream commit pinned in `tools/build_pins.py`. Native coverage is retained as HTML/LCOV and has a loose 70% line floor against a current baseline around 78%, so catastrophic loss fails without pinning normal refactors to an exact artistic implementation. Coverage also enforces directory line floors: animation 90%, color 85%, control 90%, engine 85%, math 95%, mesh 80%, and render 90%. The 1% directory thresholds for `core/spatial`, `core/platform`, `hardware`, and `targets` are presence checks, not measured coverage-regression floors; the other directory thresholds gate measured coverage. The native suite also runs at `-O2`, under ASan + UBSan, and for concurrency modules under TSan. A `shard-coverage` job proves every registered CTest belongs to exactly one shard. Both pull requests and master pushes run the production-resolution IEEE correctness leg and shipping fast-math smoke leg. The seven lint legs check line endings, Python, JavaScript, shell, the GitHub workflows, the `justfile`, and the profiling roster with defect-oriented rules.
 - **Gated deploy** (`.github/workflows/deploy.yml`, **daydream repo**) — daydream's GitHub Pages source is *GitHub Actions*. On a push to daydream's `master` (or manual dispatch), the **gate** (`engine-bundle.yml`) reads the engine pin from `holosphere_wasm.sha`, polls this repo's `ci.yml` run for that commit until it completes, requires it to have succeeded, downloads its `holosphere-engine-<pin>` artifact, verifies it with `sha256sum -c`, installs it over the committed engine files with `daydream/scripts/install-engine-bundle.mjs` and shares the verified bundle as a run artifact; it runs no engine build and checks out no engine tree. daydream's own JS suite and its headless-Chrome job each `needs: gate` and install that bundle before they run (`browser-smoke.yml` drives seven probes in one runner: the page smoke over every `site_manifest.txt` entry, `workbench-probe.mjs` driving the workbench's pipeline strip with a real mouse, `panel-probe.mjs` scrolling the effect panel and requiring the offset to survive a rebuild, `solids-probe.mjs` dragging the solids page's op-chain rows into a new order, `palettes-probe.mjs` sweeping the palette strip's zoom and hue-key wheel, `mobius-probe.mjs` pressing the Möbius page's complex-plane pads, and `lissajous-probe.mjs` driving the Lissajous page's rational frequency lock). Those seven are the only checks that resolve the import map, instantiate the WASM module under a page's CSP and measure where an element actually lands — the unit suite runs over `daydream/tests/fake_dom.js`, which has neither layout nor pointer capture. `deploy` `needs: [gate, js-tests, browser-smoke]`, so only if all three pass does the workflow install the bundle once more, stage the site from `site_manifest.txt` and publish it to Pages; the served WASM is the verified bundle for the pinned commit, not the blob committed in daydream, and a post-deploy step checks the served engine assets' Content-Types. `POV_TOKEN` is optional: the gate's `gh api` calls and the JS suite's checkout of the pinned engine use it when set and fall back to the run token, which suffices while the engine repo is public.
+
+Verified engine bundles are retained for 90 days. If the bundle for the pinned engine commit expires, re-run that commit's Holosphere CI workflow to recreate it, or update daydream to a newer verified engine pin. The consumer gate must pass before deployment.
 
 The simulator's JavaScript lives in the daydream repo and carries its own suite there: `tests/*.test.js`, run by `npm test` (`node --test`), covering the driver and clock, the sidebar and GUI, the segment workers and layout, param marshaling, color/palette math, and the geometry tools' math modules. Its anti-vacuity checks reject an empty glob, unreachable test files, shadow dependency installs, and unexplained first-party modules without pinning file, case, or assertion totals. On every pull request, [Daydream CI](https://github.com/woundedlion/daydream/blob/master/.github/workflows/ci.yml) runs the reusable static/unit suite and all seven real-browser probes, then reports one required `CI green` status. The deploy workflow calls the same suites before publishing.
 
@@ -1502,15 +1517,15 @@ The design specs are outside the Doxygen reference and carry their own index:
 lists each one with its status and says which spec owns which half where two
 overlap.
 
-`just docs-check` runs [`tools/docs_check.py`](https://github.com/woundedlion/pov/blob/master/tools/docs_check.py) and its unit tests. CI and pre-commit also validate fences, links, repository paths, maps and source-derived counts without rewriting documentation. Run `just docs-sync` explicitly to refresh generated maps and counts; prose still needs review. `just docs` needs `doxygen` on `PATH` at the version `tools/build_pins.py` pins — it runs `build_pins.py --check-tool doxygen` first and refuses any other, because warning text and generated markup move between releases; it clones the pinned doxygen-awesome theme into `.doxygen-awesome/` on first run and synthesizes `Doxyfile.local` from `Doxyfile` plus [`docs/doxygen-theme.cfg`](https://github.com/woundedlion/pov/blob/master/docs/doxygen-theme.cfg) — the same combination `.github/workflows/docs.yml` publishes to <https://woundedlion.github.io/pov/>.
+`just docs-check` runs [`tools/docs_check.py`](https://github.com/woundedlion/pov/blob/master/tools/docs_check.py); `just python-test` runs its unit tests. CI and pre-commit also validate fences, links, repository paths, maps and source-derived counts without rewriting documentation. Run `just docs-sync` explicitly to refresh generated maps and counts; prose still needs review. `just docs` needs `doxygen` on `PATH` at the version `tools/build_pins.py` pins — it runs `build_pins.py --check-tool doxygen` first and refuses any other, because warning text and generated markup move between releases; it clones the pinned doxygen-awesome theme into `.doxygen-awesome/` on first run and synthesizes `Doxyfile.local` from `Doxyfile` plus [`docs/doxygen-theme.cfg`](https://github.com/woundedlion/pov/blob/master/docs/doxygen-theme.cfg) — the same combination `.github/workflows/docs.yml` publishes to <https://woundedlion.github.io/pov/>.
 
 ### Running the Simulator — daydream repo
 
 The simulator is a static web app. Serve the daydream directory from any HTTP server:
 
 ```bash
-python3 -m http.server 8080
-# open http://localhost:8080
+python3 -m http.server 8000
+# open http://localhost:8000
 ```
 
 URL parameters control the initial state (mirrored back by `URLSync`, §10.4):
