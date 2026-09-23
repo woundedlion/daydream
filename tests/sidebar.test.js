@@ -118,6 +118,8 @@ test('setEffects builds one button per name with its preset count and optional s
   assert.equal(sidebar.buttons.get('Comets').children.length, 1);
   assert.equal(sidebar.buttons.get('Voronoi').children[0].textContent, 'Voronoi (1)');
   assert.equal(sidebar.buttons.get('Comets').children[0].textContent, 'Comets (12)');
+  assert.match(sidebar.buttons.get('Voronoi').getAttribute('aria-label'), /^Voronoi, 1 preset,/);
+  assert.equal(sidebar.buttons.get('Comets').getAttribute('aria-label'), 'Comets, 12 presets');
   // No active effect yet: roving tab stop falls to the first option.
   assert.equal(sidebar.tabbableBtn, sidebar.listEl.children[0]);
   assert.equal(sidebar.tabbableBtn.tabIndex, 0);
