@@ -288,3 +288,12 @@ test('actionlint enumerates both workflow extensions', () => {
   const suite = readFileSync(`${WORKFLOW_DIR}/js-unit-suite.yml`, 'utf8');
   assert.ok(suite.includes("git ls-files -- '.github/workflows/*.yml' '.github/workflows/*.yaml'"));
 });
+
+
+test('old engine pins warn and expired bundles explain the producing-run remedy', () => {
+  const gate = readFileSync(`${WORKFLOW_DIR}/engine-bundle.yml`, 'utf8');
+  assert.match(gate, /::warning::Engine pin/);
+  assert.match(gate, /::warning::Engine bundle expires/);
+  assert.match(gate, /if \[ "\$expired" = true \]/);
+  assert.match(gate, /gh run rerun \$run_id --repo woundedlion\/pov/);
+});
