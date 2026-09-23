@@ -30,6 +30,30 @@ export const COVERAGE = [
   '--test-coverage-exclude=scripts/*-probe.mjs',
 ];
 
+export function lineCoverage(report) {
+  const files = new Map();
+  const directories = [];
+  let active = false;
+  for (const line of report.split(/\r?\n/)) {
+    if (line === '# start of coverage report') { active = true; continue; }
+    if (line === '# end of coverage report') break;
+    if (!active) continue;
+    const row = /^# (\s*)([^|]+?)\s*\|\s*([\d.]*)\s*\|/.exec(line);
+    if (!row || ['file', 'all files'].includes(row[2].trim())) continue;
+    const [, padding, name, percent] = row;
+    while (directories.length && directories.at(-1).depth >= padding.length)
+      directories.pop();
+    if (percent === '') {
+      directories.push({ depth: padding.length, name: name.trim() });
+    } else {
+      files.set([...directories.map((entry) => entry.name), name.trim()].join('/'),
+        Number(percent));
+    }
+  }
+  if (files.size === 0) throw new Error('run-tests: coverage report has no file rows');
+  return files;
+}
+
 const main = () => {
   const args = process.argv.slice(2);
   const patterns = args.filter((arg) => !arg.startsWith('-'));
@@ -55,6 +79,7 @@ const main = () => {
   const reportPath = join(scratch, 'results.tap');
   const loaded = new Set();
   let status;
+  let coverage;
   try {
     mkdirSync(loadsDir);
     const run = spawnSync(process.execPath, ['--test',
@@ -79,6 +104,7 @@ const main = () => {
       console.error('run-tests: CI must execute every test without skips.');
       status = 1;
     }
+    coverage = lineCoverage(readFileSync(reportPath, 'utf8'));
     for (const entry of readdirSync(loadsDir)) {
       for (const url of JSON.parse(readFileSync(join(loadsDir, entry), 'utf8'))) {
         const key = keyOf(fileURLToPath(url.split(/[?#]/)[0]));
@@ -117,17 +143,33 @@ const main = () => {
     }
   }
   const unreasoned = Object.entries(exempt)
-    .filter(([, reason]) => typeof reason !== 'string' || reason.trim() === '')
+    .filter(([, entry]) => {
+      const reason = typeof entry === 'string' ? entry : entry?.reason;
+      return typeof reason !== 'string' || reason.trim() === ''
+        || (typeof entry !== 'string'
+          && (!Number.isFinite(entry?.lines) || entry.lines <= 0 || entry.lines >= 95));
+    })
     .map(([file]) => file)
     .sort();
-  const uncovered = roster.filter((file) => !loaded.has(file) && !(file in exempt));
+  const uncovered = roster.filter((file) => !loaded.has(file) && typeof exempt[file] !== 'string');
   const stale = Object.keys(exempt).filter((file) => !roster.includes(file)).sort();
-  const redundant = Object.keys(exempt).filter((file) => loaded.has(file)).sort();
+  const redundant = Object.keys(exempt).filter((file) =>
+    typeof exempt[file] === 'string' ? loaded.has(file) : coverage.get(file) >= 95).sort();
   const failures = [];
+  for (const [file, lines] of coverage) {
+    if (!roster.includes(file)) continue;
+    const floor = exempt[file]?.lines ?? 95;
+    if (lines < floor)
+      failures.push(`run-tests: ${file} line coverage ${lines}% is below its ${floor}% floor.`);
+  }
+  for (const [file, entry] of Object.entries(exempt)) {
+    if (typeof entry !== 'string' && !coverage.has(file))
+      failures.push(`run-tests: ${file} has a coverage baseline but no measured file row.`);
+  }
   const block = (heading, files, remedy) =>
     `run-tests: ${heading}:\n${files.map((file) => `  ${file}`).join('\n')}\n${remedy}`;
   if (unreasoned.length > 0) failures.push(block(
-    `every ${EXEMPT_PATH} entry must explain why the module cannot be covered`,
+    `every ${EXEMPT_PATH} entry must explain why coverage is limited and use a valid floor`,
     unreasoned,
     'Add a concrete reason or delete the exemption.',
   ));
@@ -148,7 +190,7 @@ const main = () => {
   }
 
   console.log(
-    `run-tests: ${roster.length - Object.keys(exempt).length} of ${roster.length} ` +
+    `run-tests: ${roster.filter((file) => loaded.has(file)).length} of ${roster.length} ` +
       `source modules were loaded by tests; the rest have reasoned exemptions in ${EXEMPT_PATH}.`,
   );
 };

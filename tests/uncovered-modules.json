@@ -8,5 +8,37 @@
   "vendor-importmap.js": "An IIFE the page loads by script tag, not a module. tests/vendor-importmap.test.js evaluates its source in a node:vm sandbox, which is not a module load.",
   "scripts/browser-smoke.mjs": "Drives headless Chrome over every manifest-served page. The reusable browser workflow runs it, and there is no part of it a unit test could reach without a browser.",
   "scripts/generate-shader-v2-documents.mjs": "Regenerates digest_migration.v1v2.json from the v1 fixtures on import, so a test load would rewrite the working tree. The migration-table completeness case fails if the committed table drifts from what a rerun would write.",
-  "scripts/record-module-loads.mjs": "Loaded through NODE_OPTIONS before its own loader hook exists; a missing recorder leaves source modules uncovered and fails the roster gate."
+  "scripts/record-module-loads.mjs": "Loaded through NODE_OPTIONS before its own loader hook exists; a missing recorder leaves source modules uncovered and fails the roster gate.",
+  "driver.js": {
+    "lines": 80.8,
+    "reason": "The WebGL constructor and renderer event wiring require browser coverage; unit tests exercise sizing, draw, and teardown paths through the prototype. scripts/browser-smoke.mjs and the interaction probes exercise construction in Chrome."
+  },
+  "daydream.js": {
+    "lines": 94.29,
+    "reason": "Composition-root GUI callbacks and late lifecycle error paths are only partially driven by the fake application tests; browser probes exercise the live controls."
+  },
+  "scripts/check-cdn-integrity.mjs": {
+    "lines": 91.18,
+    "reason": "The command-line exit path is outside imported-helper tests; CI invokes the command against the pinned CDN resources."
+  },
+  "scripts/generate-importmap.mjs": {
+    "lines": 66.17,
+    "reason": "Network fetching and command-line regeneration write the import map and require live CDN access; unit tests cover map rendering and consistency."
+  },
+  "scripts/install-engine-bundle.mjs": {
+    "lines": 91.58,
+    "reason": "Filesystem rollback failure and the command-line entry are outside the fixture installer tests; CI runs the CLI on the verified bundle."
+  },
+  "scripts/vendor-stage.mjs": {
+    "lines": 91.47,
+    "reason": "Server startup and filesystem cleanup error paths require infrastructure failures; fixture tests exercise staging and normal shutdown."
+  },
+  "scripts/verify-ci-green.mjs": {
+    "lines": 79.5,
+    "reason": "The CLI poll loop talks to GitHub; fixture tests cover its API and verdict helpers without a live repository or token."
+  },
+  "tools/slider.js": {
+    "lines": 93.85,
+    "reason": "The touch-to-mouse suppression handlers require browser event synthesis; panel and palette probes drive pointer interactions in Chrome."
+  }
 }
