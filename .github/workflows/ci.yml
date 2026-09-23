@@ -13,6 +13,9 @@ concurrency:
 jobs:
   gate:
     name: Verified engine bundle
+    permissions:
+      contents: read
+      actions: read
     uses: ./.github/workflows/engine-bundle.yml
     secrets:
       POV_TOKEN: ${{ secrets.POV_TOKEN }}
