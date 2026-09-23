@@ -50,6 +50,7 @@ import { createMeshRenderer, meshStatsLine, meshCanvasLabel, MAX_INDEX_LABELS }
 import {
   createFrameScheduler, onPageTeardown, watchMediaMatch,
 } from './page_lifecycle.js';
+import { showCopyFeedback } from './clipboard.js';
 import { createPointerDrag } from './pointer_drag.js';
 import { downloadBlob } from './download_file.js';
 
@@ -915,18 +916,8 @@ async function copyCode(index, lang, btn) {
 /** Shows an export failure both beside its button and in the shared status line. */
 function showCopyFailure(button, message) {
   showGateMsg(message);
-  const pending = button.copyFeedback;
-  if (pending) clearTimeout(pending.timer);
-  const original = pending?.original ?? button.textContent;
-  button.textContent = 'Failed';
-  button.classList.remove('text-green-400');
-  button.classList.add('text-red-400');
-  const timer = setTimeout(() => {
-    button.textContent = original;
-    button.classList.remove('text-red-400');
-    delete button.copyFeedback;
-  }, 1500);
-  button.copyFeedback = { timer, original };
+  showCopyFeedback(false, { element: button, failedText: 'Failed',
+    copiedClasses: ['text-green-400'], failedClasses: ['text-red-400'] });
 }
 
 function restoreSolid(item) {
