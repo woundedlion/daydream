@@ -9,7 +9,7 @@
 // functions (tools/color.js, which mirrors core/color/color.h's).
 import { copyToClipboard, wireCopyBlock } from './clipboard.js';
 // Labelled range slider + readout, shared with the other tool pages.
-import { createSlider } from './slider.js';
+import { createSlider, createSliderProxy } from './slider.js';
 // Fatal-error banner and load bootstrap from the THREE-free banner module
 // (not shared.js, which pulls in three.js — a dependency this tool
 // otherwise doesn't have).
@@ -188,17 +188,10 @@ function drawHueKeyWheel(recipe) {
  */
 function mountHueKeyHandles(group) {
   hueKeyHandles = HUE_KEY_NAMES.map((name, index) => {
-    const handle = document.createElement('span');
-    handle.className = 'visually-hidden';
-    handle.tabIndex = 0;
+    const handle = createSliderProxy({ label: `Hue key ${name}`, min: 0, max: 360,
+      keys: 'ArrowLeft ArrowRight ArrowUp ArrowDown '
+        + 'Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown' });
     handle.hidden = true;
-    handle.setAttribute('role', 'slider');
-    handle.setAttribute('aria-label', `Hue key ${name}`);
-    handle.setAttribute('aria-valuemin', '0');
-    handle.setAttribute('aria-valuemax', '360');
-    handle.setAttribute('aria-keyshortcuts',
-      'ArrowLeft ArrowRight ArrowUp ArrowDown '
-      + 'Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown');
     handle.addEventListener('focus', () => {
       selectedHueKey = index;
       scheduleUpdate();

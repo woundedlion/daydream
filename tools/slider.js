@@ -168,3 +168,28 @@ export function createSlider(containerId, cfg, onInput) {
 
   return { slider, valueSpan, setValue, setReadout };
 }
+
+/**
+ * @param {object} cfg
+ * @param {string} cfg.label
+ * @param {number} cfg.min
+ * @param {number} cfg.max
+ * @param {string} cfg.keys
+ * @param {string} [cfg.id]
+ * @param {'horizontal'|'vertical'} [cfg.orientation]
+ * @param {Document} [doc]
+ * @returns {HTMLSpanElement} Keyboard-focusable proxy for a painted slider.
+ */
+export function createSliderProxy({ label, min, max, keys, id = '', orientation = 'horizontal' }, doc = document) {
+  const handle = doc.createElement('span');
+  if (id) handle.id = id;
+  handle.className = 'visually-hidden';
+  handle.tabIndex = 0;
+  handle.setAttribute('role', 'slider');
+  handle.setAttribute('aria-label', label);
+  handle.setAttribute('aria-valuemin', String(min));
+  handle.setAttribute('aria-valuemax', String(max));
+  handle.setAttribute('aria-orientation', orientation);
+  handle.setAttribute('aria-keyshortcuts', keys);
+  return handle;
+}
