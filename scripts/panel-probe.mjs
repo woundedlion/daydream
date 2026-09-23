@@ -64,6 +64,18 @@ const PRESET_SELECT = '.preset-nav-selector select';
 const PRESET_NAME = 'Preset';
 
 /** @param {import('puppeteer-core').Page} tab */
+async function settleUrl(tab) {
+  let last = null;
+  for (let poll = 0; poll < URL_SETTLE_POLLS; poll += 1) {
+    const search = await tab.evaluate(() => location.search);
+    if (search === last) return;
+    last = search;
+    await new Promise((resolve) => setTimeout(resolve, URL_SETTLE_MS));
+  }
+  throw new Error('The URL did not settle before the probe baseline');
+}
+
+/** @param {import('puppeteer-core').Page} tab */
 const scrollerMetrics = (tab) => tab.$eval(SCROLLER, (node) => ({
   scrollTop: node.scrollTop,
   scrollHeight: node.scrollHeight,
@@ -178,19 +190,8 @@ export async function probeSliderDrag(tab) {
   const accepted = () => tab.evaluate((param) => new URLSearchParams(location.search)
     .get(`fx.__accepted.${param}`), name);
 
-  // Waits out the write the panel rebuild above still owes: the baseline the
-  // drag is judged against must not be one landing under it.
-  const settleUrl = async () => {
-    let last = null;
-    for (let poll = 0; poll < URL_SETTLE_POLLS; poll += 1) {
-      const search = await tab.evaluate(() => location.search);
-      if (search === last) return;
-      last = search;
-      await new Promise((resolve) => setTimeout(resolve, URL_SETTLE_MS));
-    }
-  };
 
-  await settleUrl();
+  await settleUrl(tab);
   const before = await valueOf();
   const acceptedBefore = await accepted();
   const y = box.y + box.height / 2;
@@ -239,7 +240,7 @@ export async function probeTouchSlider(tab) {
     slider.scrollIntoView({ block: 'center', behavior: 'instant' });
     return slider.closest('.lil-controller').querySelector('.lil-name').textContent.trim();
   });
-  await new Promise(resolve => setTimeout(resolve, URL_SETTLE_MS));
+  await settleUrl(tab);
   const read = () => tab.$eval(PANEL_SLIDER, (slider, param) => ({
     value: Number(slider.closest('.lil-controller').querySelector('input[type=number]').value),
     accepted: new URLSearchParams(location.search).get(`fx.__accepted.${param}`),
