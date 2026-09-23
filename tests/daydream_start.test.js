@@ -157,7 +157,7 @@ test('a failed engine load reports and disarms the Test All ticker', async () =>
   let app;
   try {
     app = startApp({ loadModule: () => Promise.reject(new Error('no wasm')) });
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await app.teardown.ready;
   } finally {
     captured.restore();
   }
