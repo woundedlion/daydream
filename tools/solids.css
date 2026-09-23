@@ -154,7 +154,8 @@ body {
 
 /* Ops the validator proved would trap an engine invariant on the current
    mesh (see chainIsValid). */
-#addOpGrid .btn:disabled {
+#addOpGrid .btn:disabled,
+#addOpGrid .btn[aria-disabled="true"] {
   opacity: 0.35;
   cursor: not-allowed;
 }

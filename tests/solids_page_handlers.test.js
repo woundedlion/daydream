@@ -118,3 +118,32 @@ test('deleting saved solids preserves focus in reverse display order or on save'
   deleteSolid(0);
   assert.equal(focused, 'save');
 });
+
+test('blocked add-op buttons remain focusable and explain their refusal on activation', async () => {
+  const attributes = new Map();
+  const button = {
+    dataset: { op: 'ambo' }, disabled: false,
+    setAttribute: (key, value) => attributes.set(key, value),
+    getAttribute: (key) => attributes.get(key),
+    removeAttribute: (key) => attributes.delete(key),
+  };
+  const messages = [];
+  const added = [];
+  const context = {
+    wasmModule: {}, state: { base: 'cube', ops: [] }, currentMesh: {},
+    document: { querySelectorAll: () => [button] },
+    opGate: { refresh: async () => ({ blocked: new Set(['ambo']), complete: true }) },
+    showGateMsg: (message) => messages.push(message), addOp: (op) => added.push(op),
+  };
+  await handler('refreshOpGating', context)();
+  assert.equal(button.disabled, false);
+  assert.equal(attributes.get('aria-disabled'), 'true');
+  handler('activateAddOp', context)({ target: { closest: () => button } });
+  assert.equal(added.length, 0);
+  assert.match(messages[0], /exceed an engine mesh limit/);
+  handler('openOpGate', context)('validator unavailable');
+  assert.equal(attributes.has('aria-disabled'), false);
+  assert.equal(attributes.has('aria-describedby'), false);
+  handler('activateAddOp', context)({ target: { closest: () => button } });
+  assert.deepEqual(added, ['ambo']);
+});
