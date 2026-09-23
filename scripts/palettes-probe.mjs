@@ -75,6 +75,17 @@ export function rgbMovedTogether(before, after) {
 }
 
 /**
+ * @param {{left: number, top: number, width: number, height: number, gap: number}} box - Feedback bounds.
+ * @param {{x: number, y: number}} click - Click location.
+ * @returns {boolean} Whether the feedback is centered immediately above the click.
+ */
+export function feedbackAtClick(box, click) {
+  return box.width > 0 && box.height > 0
+    && Math.abs(box.left + box.width / 2 - click.x) <= 1
+    && Math.abs(box.top + box.height + box.gap - click.y) <= 1;
+}
+
+/**
  * @param {import('puppeteer-core').Page} tab - The page.
  * @returns {Promise<string[]>} One entry per failed check.
  */
@@ -110,15 +121,20 @@ export async function probeColorStrip(tab) {
   const click = centre(box);
   await tab.mouse.click(click.x, click.y);
   await tab.waitForFunction(() => /^#[0-9a-f]{6}$/i.test(window.paletteCopied));
+  await tab.waitForFunction(() => document.querySelector('.palette-copy-feedback')
+    ?.getAnimations().every((animation) => animation.playState === 'finished'));
   const feedback = await tab.$eval('.palette-copy-feedback', (node) => ({
     visible: node.classList.contains('is-visible'),
     hex: node.querySelector('code')?.textContent,
     left: node.getBoundingClientRect().left,
     top: node.getBoundingClientRect().top,
+    width: node.getBoundingClientRect().width,
+    height: node.getBoundingClientRect().height,
+    gap: Number.parseFloat(getComputedStyle(document.documentElement).fontSize) * 0.75,
   }));
   check(feedback.visible && feedback.hex === await tab.evaluate(() => window.paletteCopied),
     'a short strip click copies a hex color and displays matching feedback');
-  check(Math.abs(feedback.left - click.x) < 250 && Math.abs(feedback.top - click.y) < 100,
+  check(feedbackAtClick(feedback, click),
     'copy feedback is positioned beside the viewport click');
   const opening = await headingRange(tab);
   check(opening.start === 0 && opening.end === 1,

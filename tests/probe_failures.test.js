@@ -1,3 +1,4 @@
+import { feedbackAtClick } from '../scripts/palettes-probe.mjs';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -223,4 +224,13 @@ test('RGB lock checks reject missing, incomplete, nonfinite, and unmoved channel
     [[1, 2, 3], [1, 2, 3]], [[1, 2, 3], [2, 4, 4]],
   ]) assert.equal(rgbMovedTogether(before, after), false);
   assert.equal(rgbMovedTogether([1, 2, 3], [2, 3, 4]), true);
+});
+
+test('copy feedback geometry rejects shifts and missing bounds', () => {
+  const box = { left: 450, top: 248, width: 100, height: 40, gap: 12 };
+  const click = { x: 500, y: 300 };
+  assert.equal(feedbackAtClick(box, click), true);
+  for (const wrong of [{ left: 460 }, { top: 258 }, { width: 0 }, { height: 0 }, { left: NaN }]) {
+    assert.equal(feedbackAtClick({ ...box, ...wrong }, click), false);
+  }
 });
