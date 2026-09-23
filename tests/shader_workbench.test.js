@@ -486,6 +486,59 @@ test('every ash-cloud preset value reaches its compiled build', () => {
   assert.equal(engine.writes.length, definitions.length);
 });
 
+const derivedPeriodDocument = (period, scale = 2) => ({ document: {
+  descriptor: { chain: [
+    { label: 'warp1', operator: 'warp.affine.v2' },
+    { label: 'cells', operator: 'sample.lattice.v2' },
+  ] },
+  preset_bank: { presets: [{ preset_id: 'noon', values: {
+    'cells.lattice-cell-scale': scale,
+    'warp1.lattice-period': period,
+  } }] },
+} });
+
+test('a fixed affine period is applied through its lattice source control', () => {
+  const engine = fixedEngine(() => true);
+  engine.getParameterDefinitions = () => [{ name: 'Lattice Cell Scale' }];
+  assert.equal(applyFixedShaderDocument(engine, MODULE, derivedPeriodDocument(0.5),
+    'noon', ['noon'], BAKED), null);
+  assert.deepEqual(engine.selected, ['noon']);
+  assert.deepEqual(engine.writes, [['Lattice Cell Scale', 2]]);
+});
+
+test('an independent affine period refuses before reference selection or parameter writes', () => {
+  const engine = fixedEngine(() => true);
+  engine.getParameterDefinitions = () => [{ name: 'Lattice Cell Scale' }];
+  assert.match(applyFixedShaderDocument(engine, MODULE, derivedPeriodDocument(0.75),
+    'noon', ['noon'], BAKED), /warp1\.lattice-period.*derived value/);
+  assert.deepEqual(engine.selected, []);
+  assert.deepEqual(engine.writes, []);
+});
+
+test('a derived affine period still requires its source control to be writable', () => {
+  for (const definitions of [[], [{ name: 'Lattice Cell Scale', readonly: true }]]) {
+    const engine = fixedEngine(() => true);
+    engine.getParameterDefinitions = () => definitions;
+    assert.match(applyFixedShaderDocument(engine, MODULE, derivedPeriodDocument(0.5),
+      'noon', ['noon'], BAKED), /no engine parameter matches|read-only/);
+    assert.deepEqual(engine.writes, []);
+  }
+});
+
+test('a fixed period without a lattice source must equal the fixed unit period', () => {
+  for (const [period, accepted] of [[1, true], [0.5, false]]) {
+    const compiled = derivedPeriodDocument(period);
+    compiled.document.descriptor.chain.pop();
+    delete compiled.document.preset_bank.presets[0].values['cells.lattice-cell-scale'];
+    const engine = fixedEngine(() => true);
+    const refusal = applyFixedShaderDocument(engine, MODULE, compiled,
+      'noon', ['noon'], BAKED);
+    assert.equal(refusal === null, accepted);
+    assert.deepEqual(engine.writes, []);
+    assert.deepEqual(engine.selected, accepted ? ['noon'] : []);
+  }
+});
+
 // A stale exemption would silently cover an id that has since become
 // registrable, so it only holds while a promoted document still carries it.
 test('every baked-constant exemption is still carried by a promoted document', () => {

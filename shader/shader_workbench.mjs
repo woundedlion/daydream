@@ -525,7 +525,10 @@ const validateParameterBinding = (parameter, path, chainOperators, report) => {
         Math.fround(domain.maximum) !== Math.fround(field.max))
       report('SCALAR_DOMAIN_MISMATCH', `${path}.domain`,
         `Field "${parameter.id}" must carry the catalog's numeric domain.`);
-    if (scalarCurve(parameter) !== field.curve)
+    if (parameter.interpolation.kind === 'NORMALIZED_LINEAR')
+      report('UNSUPPORTED_NORMALIZED_GROUP', `${path}.interpolation`,
+        'The operator catalog does not expose normalized interpolation groups.');
+    else if (parameter.interpolation.kind !== 'SNAP' && scalarCurve(parameter) !== field.curve)
       report('SCALAR_DOMAIN_MISMATCH', `${path}.interpolation`,
         `Field "${parameter.id}" must use the catalog's "${field.curve}" curve.`);
   }
@@ -1405,6 +1408,33 @@ const canonicalV1Descriptor = (document) => {
   return canonicalValue(descriptor);
 };
 
+/**
+ * Resolves an affine period supplied by a fixed effect's source parameters.
+ * @param {object} descriptor Validated chain descriptor.
+ * @param {string} parameterId Chain parameter id.
+ * @param {object} values Selected preset values.
+ * @returns {{sourceId: string|null, valid: boolean, expected: number}|null}
+ */
+export function fixedDerivedBinding(descriptor, parameterId, values) {
+  const suffix = '.lattice-period';
+  if (!parameterId.endsWith(suffix)) return null;
+  const label = parameterId.slice(0, -suffix.length);
+  if (!descriptor?.chain?.some((slot) =>
+    slot.label === label && slot.operator === 'warp.affine.v2')) return null;
+  const source = descriptor.chain.find((slot) => slot.operator === 'sample.lattice.v2');
+  const sourceId = source ? `${source.label}.lattice-cell-scale` : null;
+  const scale = sourceId === null ? 1 : Math.fround(values[sourceId]);
+  const period = Math.fround(values[parameterId]);
+  const expected = Math.fround(1 / scale);
+  // Authoring may round the reciprocal before rounding its source to float32.
+  const tolerance = Math.abs(expected) * 2 ** -23;
+  return {
+    sourceId, expected,
+    valid: Number.isFinite(period) && period > 0 && Number.isFinite(scale) && scale > 0 &&
+      Number.isFinite(expected) && Math.abs(period - expected) <= tolerance,
+  };
+}
+
 /** The digest a schema_version 1 document had under the version-1 compiler. */
 export function v1DescriptorDigest(document) {
   return sha256Hex(stableStringify(canonicalV1Descriptor(document)));
@@ -1471,7 +1501,8 @@ const requireRegistry = (registry) => {
 const registryDescriptorIdentity = (descriptor) => {
   try {
     return stableStringify(descriptorIdentity(canonicalDescriptor({ descriptor })));
-  } catch {
+  } catch (error) {
+    if (!(error instanceof ShaderDocumentError)) throw error;
     return stableStringify(descriptorIdentity(descriptor));
   }
 };
@@ -1591,6 +1622,10 @@ export function evaluateTransition(descriptor, bank, fromId, toId, evaluation) {
   };
   const values = {};
   for (const [group, parameters] of parameterGroups) {
+    if (parameters.some(parameter => parameter.interpolation.kind === 'NORMALIZED_LINEAR') &&
+        parameters.some(parameter => parameter.interpolation.kind !== 'NORMALIZED_LINEAR'))
+      fail('transition', 'MIXED_INTERPOLATION_GROUP', '$.descriptor.parameters',
+        `Group "${group}" mixes normalized and scalar interpolation.`);
     const progress = progressFor(group);
     if (parameters[0].interpolation.kind === 'NORMALIZED_LINEAR')
       Object.assign(values, interpolateNormalizedGroup(parameters, from, to, progress));

@@ -18,6 +18,7 @@ import {
 const MIGRATION_URL = '../shader/patterns/shaderball_migration.json';
 const CATALOG_URL = '../shader/engine_catalog.json';
 const COMPILER_URL = new URL('../shader/shader_workbench.mjs', import.meta.url).href;
+const { fixedDerivedBinding } = await import(COMPILER_URL);
 
 // The effect the dynamic path previews on: the engine's chain interpreter,
 // programmed through setShaderChain.
@@ -191,11 +192,12 @@ function writeEngineValue(engine, module, definitions, name, value) {
  * @param {*} engine @param {*} module @param {CompiledDocument} compiled
  * @param {string} presetId
  * @param {Set<string>} baked - The topology fields the effect bakes in.
+ * @param {Set<string>} derived - Validated fields computed by the fixed effect.
  * @returns {string|null} Refusal reason, or null once every value is written.
  *   Every value is resolved before the first write, so an id the engine does
  *   not register refuses without a partial write.
  */
-function applyDocumentValues(engine, module, compiled, presetId, baked) {
+function applyDocumentValues(engine, module, compiled, presetId, baked, derived) {
   const preset = compiled.document.preset_bank.presets
     .find((/** @type {*} */ candidate) => candidate.preset_id === presetId)
     ?? compiled.document.preset_bank.presets[0];
@@ -203,6 +205,7 @@ function applyDocumentValues(engine, module, compiled, presetId, baked) {
   /** @type {Array<{name: string, stored: *}>} */
   const writes = [];
   for (const [parameterId, value] of Object.entries(preset?.values ?? {})) {
+    if (derived.has(parameterId)) continue;
     if (BAKED_CONSTANT_IDS.has(parameterId)) continue;
     if (baked.has(fieldSegment(parameterId))) continue;
     const name = engineParameterNames(parameterId)
@@ -236,9 +239,21 @@ export function applyFixedShaderDocument(engine, module, compiled, presetId,
   const referenceId = referencePresetIds.includes(presetId)
     ? presetId : referencePresetIds[0];
   if (typeof referenceId !== 'string') return 'the effect has no reference preset';
+  const preset = compiled.document.preset_bank.presets
+    .find((/** @type {*} */ candidate) => candidate.preset_id === presetId)
+    ?? compiled.document.preset_bank.presets[0];
+  const values = preset?.values ?? {};
+  const derived = new Set();
+  for (const parameterId of Object.keys(values)) {
+    const binding = fixedDerivedBinding(compiled.document.descriptor, parameterId, values);
+    if (!binding) continue;
+    if (!binding.valid)
+      return `"${parameterId}" must match the fixed build's derived value ${binding.expected}`;
+    derived.add(parameterId);
+  }
   if (engine.selectPresetById?.(referenceId) !== true)
     return `the engine refused reference preset "${referenceId}"`;
-  return applyDocumentValues(engine, module, compiled, presetId, baked);
+  return applyDocumentValues(engine, module, compiled, presetId, baked, derived);
 }
 
 /**
