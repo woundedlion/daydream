@@ -219,3 +219,27 @@ test('coverage parser preserves nested paths and rejects a missing table', () =>
   ]);
   assert.throws(() => lineCoverage(''), /no file rows/);
 });
+
+test('CI rejects skipped cases even when another test passes', () => {
+  writeFileSync(join(root, 'tests/skipped.test.js'),
+    "import { test } from 'node:test';\ntest.skip('skipped', () => {});\n");
+  trackFixture();
+  assert.match(expectFailure(process.execPath, [SCRIPT, PATTERN], {
+    cwd: root, env: { ...env, CI: 'true' },
+  }), /CI must execute every test without skips/);
+});
+
+test('a missing git executable rejects source enumeration', () => {
+  trackFixture();
+  const withoutPath = Object.fromEntries(Object.entries(env)
+    .filter(([key]) => key.toLowerCase() !== 'path'));
+  withoutPath.PATH = join(root, 'no-executables');
+  assert.match(expectFailure(process.execPath, [SCRIPT, PATTERN], {
+    cwd: root, env: withoutPath,
+  }), /git ls-files failed while enumerating source modules/);
+});
+
+test('malformed exemption JSON fails instead of waiving the roster', () => {
+  writeFileSync(join(root, EXEMPT), '{broken');
+  assert.match(fail(PATTERN), /uncovered-modules\.json is unreadable/);
+});
