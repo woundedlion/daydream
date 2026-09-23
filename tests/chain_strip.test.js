@@ -1323,3 +1323,20 @@ test('parameter gate predicates match every catalog live value', () => {
     }
   }
 });
+
+
+test('arrow nudges finish independent undo entries', async () => {
+  const h = await makeStrip({ writeThrough: true });
+  const stored = () => h.store.document().preset_bank.presets[0].values['sample.pattern-freq'];
+  const initial = stored();
+  const readout = () => rowFor(h, 'sample', 'sample.pattern-freq').querySelector('.chain-param-value');
+  readout().dispatch('keydown', { key: 'ArrowUp' });
+  const once = stored();
+  readout().dispatch('keydown', { key: 'ArrowUp' });
+  assert.notEqual(stored(), once);
+  assert.equal(h.store.undo(), true);
+  assert.equal(stored(), once);
+  assert.equal(h.store.undo(), true);
+  assert.equal(stored(), initial);
+  assert.deepEqual(h.commits, [1, 2]);
+});
