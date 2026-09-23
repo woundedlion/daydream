@@ -219,6 +219,7 @@ export async function probeNumericInputs(tab) {
 
 if (isMain(import.meta.url)) await runProbe({
   name: 'solids-probe',
+  minimumChecks: 18,
   page: PAGE,
   timeoutMs: TIMEOUT_MS,
   success: 'the op chain reorders under both a mouse and a finger, and numeric inputs sanitize values.',

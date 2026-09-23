@@ -151,6 +151,7 @@ export async function probePad(tab) {
 
 if (isMain(import.meta.url)) await runProbe({
   name: 'mobius-probe',
+  minimumChecks: 13,
   page: PAGE,
   timeoutMs: TIMEOUT_MS,
   success: 'the complex-plane pad tracks a real pointer on and off itself.',

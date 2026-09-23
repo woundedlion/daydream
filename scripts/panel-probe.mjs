@@ -633,6 +633,7 @@ export async function probeWarningNote(tab, layout) {
 
 if (isMain(import.meta.url)) await runProbe({
   name: 'panel-probe',
+  minimumChecks: 53,
   page: PAGE,
   timeoutMs: TIMEOUT_MS,
   success: 'the effect panel restored what it captured, and the sidebar measured '
