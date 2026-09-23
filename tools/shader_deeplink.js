@@ -16,7 +16,7 @@ function normalizedState(value) {
       || value.document === null || typeof value.document !== 'object'
       || Array.isArray(value.document) || typeof value.preset !== 'string'
       || value.preset.length === 0 || !Array.isArray(value.bypassed)
-      || value.bypassed.length > 32
+      || value.bypassed.length > (value.document.descriptor?.chain?.length ?? 0)
       || value.bypassed.some((/** @type {*} */ label) => typeof label !== 'string')
       || new Set(value.bypassed).size !== value.bypassed.length
       || typeof value.paused !== 'boolean') {
