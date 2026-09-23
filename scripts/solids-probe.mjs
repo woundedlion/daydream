@@ -45,7 +45,10 @@ const chainNames = (tab) => tab.$$eval('#opsList .op-item .font-bold',
  */
 async function addOp(tab, op, rows) {
   await tab.waitForSelector(`#addOpGrid [data-op="${op}"]:not([disabled])`);
+  const before = await tab.$eval('#meshStats', (node) => node.textContent);
   await tab.click(`#addOpGrid [data-op="${op}"]`);
+  await tab.waitForFunction((previous) =>
+    document.getElementById('meshStats').textContent !== previous, {}, before);
   await tab.waitForFunction(
     (count) => document.querySelectorAll('#opsList .op-item').length === count, {}, rows);
 }
@@ -65,6 +68,14 @@ async function settledNames(tab, expected) {
         .map((node) => (node.textContent ?? '').replace(/^\d+\.\s*/, '')).join() === want,
       { timeout: 5_000 }, expected.join());
   } catch { /* a mismatch is the failure; the caller reports what it settled on. */ }
+  const label = await tab.$eval('#canvas-container canvas',
+    (node) => node.getAttribute('aria-label')?.toLowerCase() ?? '');
+  let offset = -1;
+  for (const op of expected) {
+    const next = label.indexOf(op.toLowerCase(), offset + 1);
+    if (next <= offset) throw new Error(`Canvas chain order differs: ${label}`);
+    offset = next;
+  }
   return chainNames(tab);
 }
 
