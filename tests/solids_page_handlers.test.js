@@ -147,3 +147,11 @@ test('blocked add-op buttons remain focusable and explain their refusal on activ
   handler('activateAddOp', context)({ target: { closest: () => button } });
   assert.deepEqual(added, ['ambo']);
 });
+
+test('thumbnail build errors stay in the thumbnail status area', () => {
+  const status = { textContent: '' };
+  const show = handler('showThumbnailError', { console: { error() {} },
+    document: { getElementById: (id) => { assert.equal(id, 'thumbnailStatus'); return status; } } });
+  show('Thumbnail for cube failed');
+  assert.equal(status.textContent, 'Thumbnail for cube failed');
+});

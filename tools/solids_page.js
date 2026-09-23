@@ -397,7 +397,7 @@ async function generateThumbnails(signal) {
       offScene.add(light);
       offScene.add(ambient);
 
-      const meshData = buildBaseMesh(key, `Thumbnail for "${key}"`, buildContext());
+      const meshData = buildBaseMesh(key, `Thumbnail for "${key}"`, buildContext(showThumbnailError));
       if (!meshData) continue;
 
       // Triangulate
@@ -1421,14 +1421,20 @@ function showMeshError(message) {
   if (statsEl) statsEl.textContent = message;
 }
 
+function showThumbnailError(message) {
+  console.error(message);
+  const status = document.getElementById('thumbnailStatus');
+  if (status) status.textContent = message;
+}
+
 // The live wiring one build runs against, assembled per call: an engine halt
 // nulls the module handles, so a context must not outlive a build.
-function buildContext() {
+function buildContext(onError = showMeshError) {
   return {
     Mod: wasmModule,
     meshOps: meshOpsWasm,
     vector: (x, y, z) => new THREE.Vector3(x, y, z),
-    onError: showMeshError,
+    onError,
     onFatal: standDown,
     onTrap: engineTrapped,
   };
