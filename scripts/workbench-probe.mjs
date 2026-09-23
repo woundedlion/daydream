@@ -116,6 +116,9 @@ export async function probeStrip(tab) {
     + `/${Math.round(closedGeometry.transition.height)}px tall`);
   check(closedGeometry.frameTop >= 0,
     'domain frames begin inside the vertical clipping boundary');
+  check(await tab.$('.chain-band[data-carrier="sphere"]') !== null
+      && await tab.$('.chain-band[data-carrier="plane"]') !== null,
+    'sphere and plane carriers render bands');
   check(await tab.$('.chain-band[data-carrier="color"]') === null,
     'the terminal color carrier renders no band');
 
