@@ -373,8 +373,10 @@ export function createShaderDocumentController({
 
   /** @param {string} message @param {boolean} [error] */
   const show = (message, error = false) => {
-    status.textContent = message;
+    status.setAttribute('role', error ? 'alert' : 'status');
+    status.setAttribute('aria-live', error ? 'assertive' : 'polite');
     status.dataset.status = error ? 'error' : 'ok';
+    status.textContent = message;
   };
 
   // The one shared live region: the page and the strip both report through it,
