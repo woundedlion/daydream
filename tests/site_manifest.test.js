@@ -309,3 +309,11 @@ test('the deploy workflow stages the site from the committed manifest', () => {
   assert.doesNotMatch(workflow, /^\s*cp\b.*\*/m,
     'deploy.yml stages a wildcard set, which the manifest cannot constrain');
 });
+
+
+test('deploy manifest entries cannot recursively publish untracked files', () => {
+  const workflow = read('.github/workflows/deploy.yml');
+  assert.match(workflow, /if \[ ! -f "\$path" \]/);
+  assert.match(workflow, /git ls-files --error-unmatch -- "\$path"/);
+  assert.doesNotMatch(workflow, /cp -r/);
+});
