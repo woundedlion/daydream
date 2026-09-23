@@ -730,14 +730,14 @@ test('a bypass unavailable to the render is disabled, with the reason in text', 
   assert.deepEqual(h.store.bypassedLabels(), ['lens']);
 });
 
-test('the toolbar keeps one tab stop: chip controls rove, they do not tab', async () => {
+test('the toolbar roves between chips and exposes their controls to Tab', async () => {
   const h = await makeStrip();
   const strip = h.container.querySelector('.chain-strip');
   const headerControls = strip.querySelectorAll(
     '.chain-chip-bypass, .chain-chip-move, .chain-chip-remove, .chain-chip-replace');
   assert.ok(headerControls.length >= 12);
   assert.deepEqual(
-    [...new Set(headerControls.map((node) => node.getAttribute('tabindex')))], ['-1'],
+    [...new Set(headerControls.map((node) => node.getAttribute('tabindex')))], ['0'],
     'every chip header control is roved to, never tabbed to');
   assert.deepEqual(
     strip.querySelectorAll('.chain-chip').map((chip) => chip.getAttribute('tabindex'))
