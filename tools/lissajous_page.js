@@ -222,7 +222,7 @@ const init = () => {
 
   const rationalLockCheckbox = document.getElementById('rational_lock');
   if (rationalLockCheckbox) {
-    rationalLockCheckbox.addEventListener('change', (e) => {
+    const onRationalLockChange = (e) => {
       state.isRationalLocked = e.target.checked;
 
       const durationSlider = document.getElementById('Duration_slider');
@@ -242,7 +242,9 @@ const init = () => {
 
         scheduleUpdate();
       }
-    });
+    };
+    rationalLockCheckbox.addEventListener('change', onRationalLockChange);
+    onPageTeardown(() => rationalLockCheckbox.removeEventListener('change', onRationalLockChange));
   }
 
 
