@@ -175,3 +175,30 @@ test('the typecheck roster stays inside its stated scope', () => {
       `tsconfig.json "files" lists ${file}, which is a generated install output`);
   }
 });
+
+const ROOT_EXEMPTIONS = {
+  'bootstrap.js': 'Imports daydream.js and its untyped Three.js and lil-gui dependencies.',
+  'daydream.js': 'Application composition depends on driver.js and gui.js, whose third-party types are unavailable under noResolve.',
+  'driver.js': 'Imports Three.js and its renderer addons, whose types are unavailable under noResolve.',
+  'effect_gui.js': 'Builds lil-gui controls through gui.js; the control surface has no declarations.',
+  'effect_panel_edits.js': 'Edit callbacks use dynamic lil-gui controllers and effect parameter schemas without declared types.',
+  'effect_panel_view.js': 'Renders dynamic effect schemas through lil-gui folder and controller objects without declarations.',
+  'effect_roster.js': 'Consumes dynamically shaped engine catalog entries and effect instances without a declared common interface.',
+  'geometry.js': 'Imports Three.js, whose types are unavailable under noResolve.',
+  'gui.js': 'Imports lil-gui, whose declarations are unavailable under noResolve.',
+  'holosphere_wasm.js': 'Generated Emscripten glue is represented by holosphere_wasm.d.ts.',
+  'main.js': 'Imports bootstrap.js, which reaches the untyped application composition.',
+  'recording_controls.js': 'Builds dynamic lil-gui controls and consumes a driver whose declarations are unavailable.',
+  'vendor-importmap.js': 'Generated script-tag IIFE; its source and generated variants are checked by vendor-importmap.test.js.',
+};
+
+test('every root module is typechecked or has a written exemption', () => {
+  const roster = readTsconfig().files;
+  const unrostered = readdirSync(ROOT, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && /\.js$/.test(entry.name))
+    .map((entry) => entry.name)
+    .filter((file) => !roster.includes(file)).sort();
+  assert.deepEqual(unrostered, Object.keys(ROOT_EXEMPTIONS).sort(),
+    'add each root module to tsconfig.json or explain its exemption; remove stale exemptions');
+  for (const reason of Object.values(ROOT_EXEMPTIONS)) assert.ok(reason.trim().length > 0);
+});
