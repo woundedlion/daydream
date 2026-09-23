@@ -25,7 +25,7 @@ const M = await createHolosphereModule({ print() {}, printErr() {} });
 test('WASM parity module is present with the exports this suite pins', () => {
   for (const name of [
     'srgb_to_linear_float', 'linear_to_srgb_float', 'srgb_to_linear_interp',
-    'linear_rgb_to_oklab', 'oklab_to_linear_rgb', 'hsv_to_rgb',
+    'linear_rgb_to_oklab', 'oklab_to_linear_rgb', 'hsv_to_rgb', 'gamut_max_chroma',
     'procedural_palette_linear', 'named_procedural_palettes',
     'lissajous', 'mobius_transform',
     'PaletteOps',
@@ -98,28 +98,17 @@ test('OKLCh transform parity (oklab_to_linear_rgb)', () => {
   }
 });
 
-test('widest sRGB gamut chroma matches the engine transform', () => {
-  const wasmMaximum = (lightness) => {
+test('widest sRGB gamut chroma tracks the engine boundary solver', () => {
+  for (const lightness of [0, 0.01, 0.05, 0.15, 0.3, 0.5, 0.7, 0.85, 0.95, 0.99, 1]) {
     let maximum = 0;
     for (let hue = 0; hue < 360; hue++) {
       const angle = hue / 360 * Math.PI * 2;
-      let low = 0;
-      let high = 0.5;
-      for (let iteration = 0; iteration < 12; iteration++) {
-        const chroma = (low + high) * 0.5;
-        const rgb = M.oklab_to_linear_rgb(
-          lightness, chroma * Math.cos(angle), chroma * Math.sin(angle));
-        if (rgb.r >= 0 && rgb.r <= 1 && rgb.g >= 0 && rgb.g <= 1
-            && rgb.b >= 0 && rgb.b <= 1) low = chroma;
-        else high = chroma;
-      }
-      maximum = Math.max(maximum, low);
+      maximum = Math.max(maximum,
+        M.gamut_max_chroma(lightness, Math.cos(angle), Math.sin(angle)));
     }
-    return maximum;
-  };
-
-  for (const lightness of [0.15, 0.5, 0.85]) {
-    assert.equal(maxSrgbGamutChroma(lightness), wasmMaximum(lightness));
+    // The engine refines a quantized LUT bracket; the wheel bisects a fixed interval.
+    assert.ok(near(maxSrgbGamutChroma(lightness), maximum, 0.001),
+      `gamut boundary at lightness ${lightness}: wheel=${maxSrgbGamutChroma(lightness)}, engine=${maximum}`);
   }
 });
 
