@@ -249,7 +249,7 @@ export class SegmentStatsView {
       if (c.label.className !== labelClass) c.label.className = labelClass;
       setText(c.notice, diverged ? warnings.join('; ') : '');
 
-      // A needs_full_frame() effect shades the whole canvas in every worker and
+      // A needs_full_frame() || persists_pixels() effect shades the whole canvas in every worker and
       // the rectangle is only what was sliced out of it, so naming the rect
       // there would claim a segmented render the pool never did.
       setText(c.range, !(state.frameSeen[s] && r) ? '?'

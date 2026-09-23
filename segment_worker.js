@@ -52,7 +52,7 @@ let paramRevision = 0;
 /** @type {SegRange | null} */
 let segRange = null;
 // Disposition of the last applyClip: true once the engine kept the full-canvas
-// clip for a needs_full_frame() effect, so every 'frame' reports what this
+// clip for a needs_full_frame() || persists_pixels() effect, so every 'frame' reports what this
 // worker actually shaded rather than the rectangle it sliced out.
 let clipFullFrame = false;
 // Whether getArenaMetrics has already reported a failure, so a persistent fault
@@ -123,7 +123,7 @@ function restoreFullConfig(snapshot) {
  * @details setClip answers a Module.ClipSetResult enum value; compare against
  * the enum, never by truthiness (every enum value is a truthy object). Two
  * values are successes: APPLIED installs the band, and FULL_FRAME_KEPT means
- * the effect reports needs_full_frame() so the clip stays at the full canvas
+ * the effect reports needs_full_frame() || persists_pixels() so the clip stays at the full canvas
  * and this worker renders the whole frame. Only INVALID_BOUNDS faults the pool:
  * NO_EFFECT is the ordinary answer when no effect is installed to receive the
  * clip, and the controller follows with a setEffect that re-applies it. The
