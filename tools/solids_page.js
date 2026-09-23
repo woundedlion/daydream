@@ -874,19 +874,17 @@ async function copyCode(index, lang, btn) {
 
   // A star-pattern base is not in simple_registry, so the emitted Recipe
   // has to flatten against the base's own authored chain.
-  let baseRecipe = null;
-  if (baseIsStar) {
-    baseRecipe = meshOpsWasm ? meshOpsWasm.getRecipe(item.base) : null;
-    if (!baseRecipe) {
-      showCopyFailure(btn, `export failed: no authored chain for "${item.base}" — `
-        + 'its Recipe mirror cannot be generated');
-      return;
-    }
-  }
-
   let code;
-
   try {
+    let baseRecipe = null;
+    if (baseIsStar) {
+      baseRecipe = meshOpsWasm ? meshOpsWasm.getRecipe(item.base) : null;
+      if (!baseRecipe) {
+        showCopyFailure(btn, `export failed: no authored chain for "${item.base}" — `
+          + 'its Recipe mirror cannot be generated');
+        return;
+      }
+    }
     if (lang === 'recipe_cpp') {
       code = generateRecipeCpp(item, seedNs);
     } else if (lang === 'registry') {
@@ -896,6 +894,7 @@ async function copyCode(index, lang, btn) {
       return;
     }
   } catch (e) {
+    if (engineTrapped(e)) return;
     showCopyFailure(btn, `export failed: ${e.message}`);
     return;
   }
