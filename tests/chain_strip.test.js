@@ -529,7 +529,9 @@ test('selecting the operator the socket carries keeps the instance', async () =>
   assert.deepEqual(after.descriptor.chain[PROJECT],
     { label: 'project', operator: 'project.bonne.v2' },
     'a different operator retires the instance and seats a fresh one');
-  assert.equal(after.preset_bank.presets[0].values['project.singularity-fade'], 1,
+  assert.equal('project.singularity-fade' in after.preset_bank.presets[0].values, false,
+    'the old instance parameter is removed');
+  assert.equal(after.preset_bank.presets[0].values['project.central-meridian'], 0,
     'the fresh instance opens on the catalog defaults');
   assert.equal(h.store.canUndo(), true);
 });
