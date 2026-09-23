@@ -1209,6 +1209,7 @@ export function createChainValidator(createModule) {
    * assert.
    */
   function chainIsValid(base, ops) {
+    const candidate = structuredClone(ops);
     return withValidator((Mod) => {
       if (!Mod) return { ok: true, message: '' };
       const Ops = Mod.MeshOps;
@@ -1244,7 +1245,7 @@ export function createChainValidator(createModule) {
         // names it), so the chain is not safe for the live module either.
         mesh = Ops.fromSolidName(base);
         if (!mesh) return rejected();
-        for (const o of ops) {
+        for (const o of candidate) {
           what = `Op "${typeof o === 'string' ? o : o.op}"`;
           const next = applyOp(mesh, o);
           // Read before any other bridge call — every MeshOps entry point clears

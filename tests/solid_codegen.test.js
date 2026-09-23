@@ -1696,3 +1696,19 @@ test('seedOpParams handles parameterless, ordinary and missing-mesh seeds', () =
   assert.deepEqual(seedOpParams('truncate', null), { t: OP_DEFS.truncate.params.t.val });
   assert.deepEqual(seedOpParams('hankin', null), { angle: OP_DEFS.hankin.params.angle.val });
 });
+
+
+test('queued chain validation snapshots array membership and nested parameters', async () => {
+  const calls = [];
+  const mesh = stubMesh(calls);
+  const validator = createChainValidator(async () => ({
+    MeshOps: { fromSolidName: () => mesh, clearToolingMemory() {} },
+  }));
+  const ops = [{ op: 'truncate', params: { t: 0.3 } }];
+  const pending = validator.chainIsValid('cube', ops);
+  ops[0].params.t = 0.5;
+  ops.push('dual');
+  assert.equal((await pending).ok, true);
+  assert.deepEqual(calls.filter(({ op }) => op === 'truncate' || op === 'dual'),
+    [{ op: 'truncate', args: [0.3] }]);
+});
