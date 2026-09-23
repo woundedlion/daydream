@@ -17,6 +17,7 @@ import {
 } from './shader_deeplink.js';
 
 const MIGRATION_URL = '../shader/patterns/shaderball_migration.json';
+const DIGEST_MIGRATION_URL = '../shader/patterns/digest_migration.v1v2.json';
 const CATALOG_URL = '../shader/engine_catalog.json';
 const COMPILER_URL = new URL('../shader/shader_workbench.mjs', import.meta.url).href;
 const { fixedDerivedBinding } = await import(COMPILER_URL);
@@ -858,7 +859,7 @@ export function createShaderDocumentController({
       compiler = await importCompiler();
       operatorCatalog = JSON.parse(await fetchText(CATALOG_URL));
       bakedFields = bakedTopologyFields(operatorCatalog);
-      digestMigration = JSON.parse(await fetchText('../shader/patterns/digest_migration.v1v2.json'));
+      digestMigration = JSON.parse(await fetchText(DIGEST_MIGRATION_URL));
       const migration = JSON.parse(await fetchText(MIGRATION_URL));
       const entries = await Promise.all(Object.entries(migration.source_documents)
         .map(async ([effectId, filename]) => {
