@@ -67,6 +67,13 @@ async function settledHueDegrees(tab) {
   return hueDegrees(tab);
 }
 
+export function rgbMovedTogether(before, after) {
+  const delta = after[0] - before[0];
+  return before.length === 3 && after.length === 3
+    && Number.isFinite(delta) && delta !== 0
+    && after.every((value, i) => Math.abs(value - before[i] - delta) < 1e-6);
+}
+
 /**
  * @param {import('puppeteer-core').Page} tab - The page.
  * @returns {Promise<string[]>} One entry per failed check.
@@ -92,8 +99,7 @@ export async function probeColorStrip(tab) {
   await slider.focus();
   await tab.keyboard.press('ArrowRight');
   const after = await values();
-  const delta = after[0] - before[0];
-  check(delta !== 0 && after.every((value, i) => Math.abs(value - before[i] - delta) < 1e-6),
+  check(rgbMovedTogether(before, after),
     'locking RGB moves all channels by the same amount');
   await tab.click('#lock_A');
   await tab.evaluate(() => {
