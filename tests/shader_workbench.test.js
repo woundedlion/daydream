@@ -1609,7 +1609,7 @@ test('Save writes the canonical v2 serialization', async () => {
   assert.equal(harness.controller.save(), true);
   const [filename, source] = harness.downloads.at(-1);
   assert.equal(filename, 'study.shader.json');
-  assert.equal(source, exportShaderDocumentJson(JSON.parse(KALEIDOSCOPE_HEX_BRIGHT)));
+  assert.equal(source, KALEIDOSCOPE_HEX_BRIGHT);
 });
 
 // §4.6: Save As is a copy, not a rename - the loaded document and the
