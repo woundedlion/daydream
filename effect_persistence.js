@@ -21,16 +21,19 @@ export function acceptedParamValue(parameter) {
   return parameter.acceptedValue ?? parameter.requestedValue ?? parameter.value;
 }
 
-/** URL storage and replay of engine-accepted effect state. */
+/**
+ * URL storage and replay of engine-accepted effect state.
+ * @param {{getParameterDefinitions: () => Array<{name: string, readonly?: boolean, value: *, acceptedValue?: *, requestedValue?: *}>, setEngineParam: (name: string, value: number) => *, usesFullConfigSnapshot: () => boolean, getFullConfigSnapshot: () => *, restoreFullConfigSnapshot: (snapshot: *) => *, fullConfigRestoreResults: () => *, getConfigImportNotice: () => string, clearConfigImportNotice: () => void, showConfigImportNotice: (message: string|null) => void, logWarn: (...args: *) => void}} dependencies
+ */
 export function createEffectPersistence({
   getParameterDefinitions, setEngineParam, usesFullConfigSnapshot, getFullConfigSnapshot, restoreFullConfigSnapshot, fullConfigRestoreResults, getConfigImportNotice, clearConfigImportNotice, showConfigImportNotice, logWarn
 }) {
-  /** Storage key for the last engine-accepted value of one parameter. */
+  /** @param {string} name @returns {string} */
   const acceptedStorageKey = (name) => `__accepted.${name}`;
 
   /**
    * Persist the active effect through its snapshot or accepted-value surface.
-   * @param {Object} gui - The effect GUI holding the stored values.
+   * @param {*} gui - The effect GUI holding the stored values.
    * @param {{name: string, accepted: *}} [edited] - The one parameter an edit
    *   moved, carrying the value the write settled on. Narrowing to it keeps a
    *   per-keystroke persist off the whole-definition marshal.
@@ -47,7 +50,7 @@ export function createEffectPersistence({
     gui.writeStoredValue(FULL_CONFIG_STORAGE_KEY, JSON.stringify(snapshot));
   }
 
-  /** Restore the active effect through its snapshot or accepted-value surface. */
+  /** @param {*} gui */
   function restoreEffectState(gui) {
     if (!usesFullConfigSnapshot()) {
       restoreAcceptedParams(gui);
@@ -78,14 +81,14 @@ export function createEffectPersistence({
     showConfigImportNotice(notice || null);
   }
 
-  /** Store one parameter's engine-accepted value. */
+  /** @param {*} gui @param {string} name @param {*} accepted */
   function persistAcceptedParam(gui, name, accepted) {
     // The float form, not the raw value: restoreAcceptedParams() reads the
     // companion key back through the URL number grammar, which rejects a bool.
     gui.writeStoredValue(acceptedStorageKey(name), String(engineParamValue(accepted)));
   }
 
-  /** Store every writable parameter's engine-accepted value. */
+  /** @param {*} gui */
   function persistAcceptedParams(gui) {
     for (const parameter of getParameterDefinitions()) {
       if (parameter.readonly) continue;
@@ -100,7 +103,7 @@ export function createEffectPersistence({
    * did not exist a write ago still get their stored value. Nothing in the loop
    * writes the stored values it reads, so one probe per name settles it and the
    * rescan costs a set lookup rather than a URL read.
-   * @param {Object} gui - The effect GUI holding the stored values.
+   * @param {*} gui - The effect GUI holding the stored values.
    * @returns {void}
    */
   function restoreAcceptedParams(gui) {

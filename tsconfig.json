@@ -63,6 +63,7 @@
     "sidebar.js",
     "recorder.js",
     "effect_sequencing.js",
+    "effect_persistence.js",
     "worker_protocol.js",
     "module_warmer.js",
     "segmented_pov_controls.js",
