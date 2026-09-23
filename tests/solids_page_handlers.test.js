@@ -208,3 +208,21 @@ test('canvas tap cancels interrupted gestures and detaches on teardown', () => {
   teardown();
   assert.deepEqual(canvas.listeners, []);
 });
+
+test('clearing saved solids requires confirmation and preserves cancelled cards', () => {
+  const savedSolids = [{ title: 'one' }, { title: 'two' }];
+  let confirmed = false;
+  const calls = [];
+  const clear = handler('clearSavedSolids', { savedSolids,
+    window: { confirm: (message) => { calls.push(message); return confirmed; } },
+    persistSavedSolids: () => calls.push('persist'), renderSavedList: () => calls.push('render') });
+  clear();
+  assert.equal(savedSolids.length, 2);
+  assert.equal(calls.length, 1);
+  confirmed = true;
+  clear();
+  assert.equal(savedSolids.length, 0);
+  assert.deepEqual(calls.slice(-2), ['persist', 'render']);
+  clear();
+  assert.equal(calls.length, 4);
+});

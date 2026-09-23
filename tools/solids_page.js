@@ -1308,6 +1308,8 @@ function resetOps() {
 }
 
 function clearSavedSolids() {
+  if (savedSolids.length === 0 || !window.confirm(
+    `Delete all ${savedSolids.length} saved solids? This cannot be undone.`)) return;
   savedSolids.length = 0;
   persistSavedSolids();
   renderSavedList();
