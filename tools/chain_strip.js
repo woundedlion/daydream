@@ -1077,8 +1077,7 @@ export function createChainStrip({
     viewport.setAttribute('aria-label', 'Scrollable shader chain');
     viewport.appendChild(strip);
     viewport.addEventListener('wheel', (/** @type {*} */ event) => {
-      const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
-        ? event.deltaX : event.deltaY;
+      const delta = event.shiftKey ? event.deltaY : event.deltaX;
       if (delta === 0) return;
       const width = Number(viewport.clientWidth ?? 0);
       const overflow = Number(viewport.scrollWidth ?? 0) - width;

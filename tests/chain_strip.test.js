@@ -286,7 +286,10 @@ test('pipeline arrows, wheel and background arrow keys scroll the viewport', asy
   buttons[0].dispatch('click');
   assert.equal(viewport.scrollLeft, 0);
 
-  const wheel = viewport.dispatch('wheel', { deltaX: 0, deltaY: 120 });
+  const vertical = viewport.dispatch('wheel', { deltaX: 0, deltaY: 120 });
+  assert.equal(viewport.scrollLeft, 0);
+  assert.equal(vertical.defaultPrevented, false);
+  const wheel = viewport.dispatch('wheel', { deltaX: 120, deltaY: 0 });
   assert.equal(viewport.scrollLeft, 120);
   assert.equal(wheel.defaultPrevented, true);
 
@@ -304,18 +307,18 @@ test('the wheel reads deltaMode and yields when the strip cannot scroll', async 
   viewport.scrollWidth = 1600;
   viewport.scrollLeft = 0;
 
-  viewport.dispatch('wheel', { deltaX: 0, deltaY: 3, deltaMode: 1 });
+  viewport.dispatch('wheel', { deltaX: 3, deltaY: 0, deltaMode: 1 });
   assert.equal(viewport.scrollLeft, 48, 'a line-mode notch is not 3 pixels');
   viewport.scrollLeft = 0;
-  viewport.dispatch('wheel', { deltaX: 0, deltaY: 1, deltaMode: 2 });
+  viewport.dispatch('wheel', { deltaX: 1, deltaY: 0, deltaMode: 2 });
   assert.equal(viewport.scrollLeft, 400, 'a page-mode notch is one viewport');
 
-  viewport.dispatch('wheel', { deltaX: 0, deltaY: 5000 });
+  viewport.dispatch('wheel', { deltaX: 5000, deltaY: 0 });
   assert.equal(viewport.scrollLeft, 1200, 'the offset stops at the content edge');
 
   viewport.scrollWidth = 400;
   viewport.scrollLeft = 0;
-  const idle = viewport.dispatch('wheel', { deltaX: 0, deltaY: 120 });
+  const idle = viewport.dispatch('wheel', { deltaX: 120, deltaY: 0 });
   assert.equal(viewport.scrollLeft, 0);
   assert.equal(idle.defaultPrevented, false,
     'a strip with nothing to scroll leaves the wheel to the page');
