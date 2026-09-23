@@ -216,11 +216,10 @@ test('wireCopyBlock wires the button and block triggers', async () => {
   });
   const clickable = () => {
     const element = fakeElement('button');
-    let click;
-    element.addEventListener = (type, listener) => {
-      if (type === 'click') click = listener;
-    };
-    element.click = () => click?.();
+    const handlers = new Map();
+    element.addEventListener = (type, listener) => handlers.set(type, listener);
+    element.click = () => handlers.get('click')?.();
+    element.keydown = (event) => handlers.get('keydown')?.(event);
     return element;
   };
   const source = fakeElement('code');
@@ -236,7 +235,16 @@ test('wireCopyBlock wires the button and block triggers', async () => {
     block.click();
     await Promise.resolve();
 
-    assert.deepEqual(writes, ['generated output', 'generated output']);
+    assert.equal(block.tabIndex, 0);
+    assert.equal(block.getAttribute('role'), 'button');
+    assert.equal(block.getAttribute('aria-label'), 'Copy code');
+    let prevented = 0;
+    for (const key of ['Enter', ' ', 'Tab']) {
+      block.keydown({ key, preventDefault: () => { prevented++; } });
+      await Promise.resolve();
+    }
+    assert.equal(prevented, 2);
+    assert.deepEqual(writes, Array(4).fill('generated output'));
     assert.equal(prompt.textContent, 'Copied!');
   } finally {
     Object.defineProperty(globalThis, 'navigator', restore);
