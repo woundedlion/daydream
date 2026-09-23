@@ -131,13 +131,13 @@ export async function walkTo(tab, from, to, steps = 12) {
  * @param {import('puppeteer-core').Page} tab - The page.
  * @param {{x: number, y: number}} from - Where the press lands.
  * @param {{x: number, y: number}} to - Where the release lands.
- * @param {{steps?: number, touch?: boolean, pressed?: () => Promise<void>}} [options] -
+ * @param {{steps?: number, touch?: boolean, pressed?: () => Promise<void>, moved?: () => Promise<void>}} [options] -
  *   Path resolution, whether to drive the touchscreen rather than the mouse, and
  *   a hook that runs with the pointer still down at `from`.
  * @returns {Promise<void>}
  */
 export async function dragBetween(tab, from, to, options = {}) {
-  const { steps = 12, touch = false, pressed } = options;
+  const { steps = 12, touch = false, pressed, moved } = options;
   if (touch) {
     const finger = await tab.touchscreen.touchStart(from.x, from.y);
     if (pressed) await pressed();
@@ -145,6 +145,7 @@ export async function dragBetween(tab, from, to, options = {}) {
       await finger.move(from.x + ((to.x - from.x) * i) / steps,
         from.y + ((to.y - from.y) * i) / steps);
     }
+    if (moved) await moved();
     await finger.end();
     return;
   }
@@ -152,6 +153,7 @@ export async function dragBetween(tab, from, to, options = {}) {
   await tab.mouse.down();
   if (pressed) await pressed();
   await walkTo(tab, from, to, steps);
+  if (moved) await moved();
   await tab.mouse.up();
 }
 

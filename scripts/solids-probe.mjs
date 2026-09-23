@@ -85,10 +85,11 @@ async function settledNames(tab, expected) {
  * @param {{x: number, y: number}} from - Where the gesture starts.
  * @param {number} y - Where it ends.
  * @param {boolean} touch - Drive the touchscreen rather than the mouse.
+ * @param {() => Promise<void>} [moved] - Runs before release after movement.
  * @returns {Promise<void>}
  */
-const dragTo = (tab, from, y, touch) =>
-  dragBetween(tab, from, { x: from.x, y }, { steps: DRAG_STEPS, touch });
+const dragTo = (tab, from, y, touch, moved) =>
+  dragBetween(tab, from, { x: from.x, y }, { steps: DRAG_STEPS, touch, moved });
 
 /** @param {import('puppeteer-core').Page} tab */
 export async function probeChain(tab) {
@@ -145,7 +146,10 @@ export async function probeChain(tab) {
     'a press on the grip leaves no row stuck mid-drag');
 
   const mouseWant = [built[1], built[2], built[0]];
-  await dragTo(tab, first, below, false);
+  await dragTo(tab, first, below, false, async () => {
+    check(await tab.$('#opsList .op-item.dragging') !== null,
+      'the moving row carries drag styling before release');
+  });
   const afterMouse = await settledNames(tab, mouseWant);
   check(afterMouse.join() === mouseWant.join(),
     `a mouse drag moves the op it grips (${afterMouse.join(', ')})`);
