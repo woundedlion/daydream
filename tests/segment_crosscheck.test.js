@@ -222,3 +222,19 @@ test('firmware columns wrap correctly at every half-turn boundary', () => {
     }
   }
 });
+
+test('firmware clip rectangles match web bands for both half-turn orientations', () => {
+  for (const config of golden.configs) {
+    for (const [id, segment] of config.segments.entries()) {
+      assert.deepEqual(segment.clips.map((clip) => [clip.width, clip.first_half]),
+        [8, 96, 288].flatMap((width) => [[width, false], [width, true]]));
+      for (const clip of segment.clips) {
+        const rect = computeSegmentRange(id, config.segment_count, clip.width, config.rows);
+        const x0 = clip.first_half ? rect.x0 : (rect.x0 + clip.width / 2) % clip.width;
+        assert.deepEqual([clip.x0, clip.x1, clip.y0, clip.y1],
+          [x0, x0 + rect.w, rect.y0, rect.y1],
+          `clip S=${config.leds} N=${config.segment_count} id=${id} width=${clip.width} first=${clip.first_half}`);
+      }
+    }
+  }
+});
