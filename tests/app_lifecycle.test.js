@@ -954,3 +954,16 @@ test('refreshPixelView heals both detached display aliases without advancing the
   assert.strictEqual(a.driver.pixels, a.view);
   assert.strictEqual(a.driver.dotMesh.instanceColor.array, a.view);
 });
+
+
+test('focused links and their children retain Space and arrow keys', () => {
+  const h = makeKeydownHandler();
+  const link = fakeElement('a');
+  link.setAttribute('href', '/tools/');
+  const label = fakeElement('span');
+  link.appendChild(label);
+  for (const target of [link, label]) {
+    for (const key of [' ', 'ArrowLeft', 'ArrowRight']) h.handler({ key, target });
+  }
+  assert.deepEqual(h.keys, []);
+});

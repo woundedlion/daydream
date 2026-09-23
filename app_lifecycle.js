@@ -236,7 +236,7 @@ export function createAppTeardown({
 // Elements that own their keystrokes: a key landing inside one belongs to that
 // control, not to the global shortcuts.
 export const INTERACTIVE_KEY_TARGET =
-  'input, textarea, select, button, [contenteditable], .lil-gui, .effect-sidebar';
+  'input, textarea, select, button, a[href], [contenteditable], .lil-gui, .effect-sidebar';
 
 /**
  * Build the window keydown handler for the global playback shortcuts.
