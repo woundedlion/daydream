@@ -344,8 +344,12 @@ input[type=checkbox] {
   background: #22C55E; /* Green */
 }
 
-.b-thumb::-webkit-slider-thumb {
-  background: var(--blue-500); /* Blue */
+.r-thumb::-moz-range-thumb {
+  background: #EF4444;
+}
+
+.g-thumb::-moz-range-thumb {
+  background: #22C55E;
 }
 
 /* Canvas Styles */
