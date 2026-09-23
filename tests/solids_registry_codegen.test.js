@@ -529,9 +529,11 @@ test('generateRegistryCpp counts a flattened base chain against the ceiling', ()
 });
 
 test('registry limits count composite operations after lowering', () => {
-  assert.doesNotThrow(() => generateRegistryCpp({
+  const code = generateRegistryCpp({
     base: 'cube', ops: ['meta', 'meta', 'dual', 'dual'],
-  }));
+  });
+  assert.deepEqual([...code.matchAll(/\{Op::([A-Z]+)\}/g)].map((match) => match[1]),
+    ['META', 'META', 'DUAL', 'DUAL']);
   assert.throws(() => generateRegistryCpp({
     base: 'cube', ops: ['meta', 'meta', 'meta'],
   }), /lowers to 9 primitive steps/);
