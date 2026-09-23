@@ -549,11 +549,13 @@ function loadSavedSolids() {
 const savedSolids = loadSavedSolids();
 
 function persistSavedSolids() {
+  const status = document.getElementById('savedStorageStatus');
   try {
     localStorage.setItem(SAVED_SOLIDS_KEY, JSON.stringify(savedSolids));
+    if (status) status.textContent = '';
   } catch (error) {
     console.warn('Could not persist saved solids:', error);
-    showGateMsg('saved for this session only: browser storage refused the write');
+    if (status) status.textContent = 'Changes apply to this session only: browser storage refused the write.';
   }
 }
 
