@@ -332,18 +332,8 @@ body {
   background: var(--slate-900);
 }
 
-/* Custom checkbox style */
 input[type=checkbox] {
-  background-color: var(--slate-600);
-  /* Slate 600 */
-  border-color: var(--slate-500);
-  /* Slate 500 */
-}
-
-input[type=checkbox]:checked {
-  background-color: var(--blue-500);
-  /* Blue 500 */
-  border-color: var(--blue-500);
+  accent-color: var(--blue-500);
 }
 
 .r-thumb::-webkit-slider-thumb {
