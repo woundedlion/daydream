@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { parse } from 'espree';
+import { createPointerDrag } from '../tools/pointer_drag.js';
+import { fakeElement } from './fake_dom.js';
 
 const source = readFileSync(new URL('../tools/solids_page.js', import.meta.url), 'utf8');
 const parsed = parse(source, { ecmaVersion: 'latest', sourceType: 'module', range: true });
@@ -182,4 +184,27 @@ test('persistence failure retains collision feedback and clears after a later su
   failing = false;
   persist();
   assert.equal(status.textContent, '');
+});
+
+
+test('canvas tap cancels interrupted gestures and detaches on teardown', () => {
+  const canvas = fakeElement('canvas');
+  let teardown;
+  let toggles = 0;
+  handler('wireCanvasTap', { createPointerDrag, state: { autoRotate: false },
+    setAutoRotate: () => toggles++, onPageTeardown: (fn) => { teardown = fn; } })(canvas);
+  const pointer = { pointerId: 1, isPrimary: true, button: 0, clientX: 10, clientY: 10 };
+  canvas.dispatch('pointerdown', pointer);
+  canvas.dispatch('pointercancel', pointer);
+  canvas.dispatch('pointerup', pointer);
+  assert.equal(toggles, 0);
+  canvas.dispatch('pointerdown', pointer);
+  canvas.dispatch('pointermove', { ...pointer, clientX: 30 });
+  canvas.dispatch('pointerup', pointer);
+  assert.equal(toggles, 0);
+  canvas.dispatch('pointerdown', pointer);
+  canvas.dispatch('pointerup', pointer);
+  assert.equal(toggles, 1);
+  teardown();
+  assert.deepEqual(canvas.listeners, []);
 });

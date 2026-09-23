@@ -282,23 +282,7 @@ async function init() {
     renderMesh();
   });
 
-  // Canvas taps mirror the visible switch; orbit drags and secondary pointers
-  // leave it unchanged. isPrimary names the pointer, not the button, so the
-  // left button is required as well — a right-click carries isPrimary.
-  const canvasEl = document.getElementById('canvas');
-  const primaryTap = (e) => e.isPrimary && e.button === 0;
-  let pointerDownX = 0, pointerDownY = 0;
-  canvasEl.addEventListener('pointerdown', (e) => {
-    if (!primaryTap(e)) return;
-    pointerDownX = e.clientX;
-    pointerDownY = e.clientY;
-  });
-  canvasEl.addEventListener('pointerup', (e) => {
-    if (!primaryTap(e)) return;
-    if (Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY) < 5) {
-      setAutoRotate(!state.autoRotate);
-    }
-  });
+  wireCanvasTap(document.getElementById('canvas'));
 
   labelsContainer = document.getElementById('labels');
   meshRenderer = createMeshRenderer({
@@ -532,6 +516,21 @@ function setAutoRotate(on) {
   state.autoRotate = on;
   controls.autoRotate = on;
   updateToggles();
+}
+
+function wireCanvasTap(canvasEl) {
+  let x = 0, y = 0, moved = false;
+  const tap = createPointerDrag({
+    element: canvasEl,
+    onStart: (event) => { x = event.clientX; y = event.clientY; moved = false; },
+    onMove: (event) => { moved ||= Math.hypot(event.clientX - x, event.clientY - y) >= 5; },
+    onEnd: (event) => {
+      if (!moved && event && Math.hypot(event.clientX - x, event.clientY - y) < 5)
+        setAutoRotate(!state.autoRotate);
+    },
+    onCancel: () => {},
+  });
+  onPageTeardown(() => { tap.stop(); tap.remove(); });
 }
 
 // --- SAVED ITEMS ---
