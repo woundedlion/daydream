@@ -755,7 +755,6 @@ test('an encoder error finalizes the session, reports it, and clears the recorde
     recorder.ondataavailable({ data: { size: 10 } });
 
     const failure = new Error('encoder died');
-    recorder.state = 'inactive';
     recorder.onerror({ error: failure });
     assert.equal(downloads.length, 0, 'wait for the final data event');
     recorder.ondataavailable({ data: { size: 7 } });

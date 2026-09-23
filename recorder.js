@@ -347,7 +347,6 @@ export class VideoRecorder {
         : new Error('recording failed; the saved file may be truncated or incomplete.');
       if (recorder.state !== 'inactive') {
         recorder.stop();
-        endSession();
       }
       console.error('VideoRecorder: recording failed; the saved file may be truncated or incomplete.',
         cause);
