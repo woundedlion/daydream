@@ -110,7 +110,7 @@ const SOCKET_FUNCTIONS = {
  *   selected instance changes, which is also what expands the chip's controls.
  * @param {() => string|null} [options.presetId] - The preset the inline stage
  *   controls read and write; null falls back to the document's first.
- * @param {(parameterId: string, value: *) => void} [options.onEditParameter] -
+ * @param {(parameterId: string, value: *) => boolean|void} [options.onEditParameter] -
  *   Takes every inline control edit as the document value the store stores: a
  *   number for a binary32 field, the option id for an enum8 one.
  * @param {() => void} [options.onCommitParameter] - Runs once an inline control
@@ -601,12 +601,16 @@ export function createChainStrip({
    * selection deactivates.
    * @param {string} parameterId - The edited parameter.
    * @param {*} value - The document value.
-   * @returns {void}
+   * @returns {boolean}
    */
   const editParameter = (parameterId, value) => {
+    if (onEditParameter(parameterId, value) === false) {
+      render();
+      return false;
+    }
     values[parameterId] = value;
-    onEditParameter(parameterId, value);
     markDeactivated();
+    return true;
   };
   /** @type {{parameterId: string, value: number}|null} */
   let pendingSliderEdit = null;
@@ -636,7 +640,8 @@ export function createChainStrip({
       select.appendChild(option);
     }
     select.addEventListener('change', (/** @type {*} */ event) => {
-      editParameter(declaration.id, event.target.value);
+      if (!editParameter(declaration.id, event.target.value))
+        select.value = values[declaration.id];
       store.endValueRun();
       onCommitParameter();
     });
@@ -663,7 +668,6 @@ export function createChainStrip({
     slider.addEventListener('input', (/** @type {*} */ event) => {
       const value = Number(event.target.value);
       readout.value = formatNumericValue(value);
-      values[declaration.id] = value;
       pendingSliderEdit = { parameterId: declaration.id, value };
       scheduleSliderEdit();
     });
