@@ -284,6 +284,24 @@ test('render before a completed init faults instead of dropping the reply', asyn
   assert.throws(() => captured[0](), /render before a completed init/);
 });
 
+test('state-changing messages before init explicitly reject instead of disappearing', async () => {
+  const messages = [
+    { type: 'setEffect', name: 'Plasma' },
+    { type: 'setResolution', w: 8, h: 4 },
+    { type: 'setParameter', name: 'speed', value: 2 },
+    { type: 'setAnimationsPaused', paused: true },
+    { type: 'selectPreset', index: 1 },
+    { type: 'setPoleLod', value: 0.5 },
+  ];
+  for (const message of messages) {
+    posted.length = 0;
+    await dispatch(message);
+    assert.equal(posted.length, 1);
+    assert.equal(posted[0].msg.type, 'engineRejected');
+    assert.equal(posted[0].msg.reason, `${message.type} before a completed init`);
+  }
+});
+
 /** Header-only module: valid, imports nothing, so it instantiates against `{}`. */
 const EMPTY_WASM = Uint8Array.of(0, 0x61, 0x73, 0x6d, 1, 0, 0, 0);
 

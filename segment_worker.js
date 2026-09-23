@@ -230,6 +230,11 @@ function applyPreset(index, method = 'selectPreset') {
   console.error(`segment_worker: segment ${segId} ${detail}`);
 }
 
+/** @param {string} type - State-changing message received without an engine. */
+function rejectBeforeInit(type) {
+  post({ type: 'engineRejected', reason: `${type} before a completed init` });
+}
+
 /**
  * Process one protocol message. Only ever invoked through the serialized
  * queue in self.onmessage below, so 'init''s long await of the WASM
@@ -366,6 +371,8 @@ async function handleMessage(msg) {
         paramRevision = msg.paramRevision;
         // A rejected clip leaves no usable render geometry, as in 'init'.
         if (!applyClip()) break;
+      } else {
+        rejectBeforeInit(msg.type);
       }
       break;
     }
@@ -389,6 +396,8 @@ async function handleMessage(msg) {
         canvasH = msg.h;
         arenaMetricsWarned = false;
         segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
+      } else {
+        rejectBeforeInit(msg.type);
       }
       break;
     }
@@ -397,28 +406,36 @@ async function handleMessage(msg) {
       if (engine && wasmModule) {
         applyParam(msg.name, msg.value);
         paramRevision = msg.paramRevision;
+      } else {
+        rejectBeforeInit(msg.type);
       }
       break;
     }
 
     case 'setAnimationsPaused': {
-      if (engine) {
+      if (engine && wasmModule) {
         engine.setAnimationsPaused(msg.paused);
+      } else {
+        rejectBeforeInit(msg.type);
       }
       break;
     }
 
     case 'selectPreset': {
-      if (engine) {
+      if (engine && wasmModule) {
         applyPreset(msg.index);
         paramRevision = msg.paramRevision;
+      } else {
+        rejectBeforeInit(msg.type);
       }
       break;
     }
 
     case 'setPoleLod': {
-      if (engine) {
+      if (engine && wasmModule) {
         engine.setPoleLod(msg.value);
+      } else {
+        rejectBeforeInit(msg.type);
       }
       break;
     }
