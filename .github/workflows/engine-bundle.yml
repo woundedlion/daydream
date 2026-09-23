@@ -63,9 +63,8 @@ jobs:
                   echo "::error::successful POV CI for $PIN published no verified engine bundle"
                   exit 1
                 fi
-                mkdir engine-bundle
                 gh api "repos/woundedlion/pov/actions/artifacts/$artifact_id/zip" > /tmp/engine-bundle.zip
-                unzip -q /tmp/engine-bundle.zip -d engine-bundle
+                python3 scripts/extract-engine-bundle.py /tmp/engine-bundle.zip engine-bundle
                 break
               fi
             fi
