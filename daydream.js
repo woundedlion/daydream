@@ -591,7 +591,7 @@ export function start({
     },
     syncEffectGui: () => effectGui.sync(),
     invalidate: () => daydream.invalidate(),
-    getAnimationsPaused: () => host.engine.getAnimationsPaused?.() ?? null,
+    getAnimationsPaused: () => host.engine?.getAnimationsPaused?.() ?? null,
     setAnimationsPaused,
     setParamFilter: (filter) => { paramFilterRef.current = filter; },
     initialEffect: requestedSelection.effect,

@@ -1,3 +1,4 @@
+import { engineHalted } from './engine_halt.js';
 /*
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
@@ -288,12 +289,12 @@ function defaultDownload(doc, filename, source) {
  */
 export function createShaderDocumentController({
   doc,
-  getEngine,
+  getEngine: readEngine,
   getModule,
-  selectEffect,
+  selectEffect: readSelectEffect,
   syncEffectGui,
   invalidate,
-  getAnimationsPaused = () => null,
+  getAnimationsPaused: readAnimationsPaused = () => null,
   setAnimationsPaused = () => {},
   setParamFilter = () => {},
   fetchText = async (url) => {
@@ -306,6 +307,17 @@ export function createShaderDocumentController({
   initialEffect = null,
   win = globalThis,
 }) {
+  const selectEffect = (/** @type {string} */ effect) => {
+    const module = getModule();
+    if (module?.HS_MODULE_DEAD) return false;
+    try { return readSelectEffect(effect); }
+    catch (error) {
+      if (module && engineHalted(error, module)) module.HS_MODULE_DEAD = true;
+      throw error;
+    }
+  };
+  const getEngine = () => getModule()?.HS_MODULE_DEAD ? null : readEngine();
+  const getAnimationsPaused = () => getModule()?.HS_MODULE_DEAD ? null : readAnimationsPaused();
   const sourceSelect = /** @type {HTMLSelectElement|null} */ (
     doc.getElementById('shader-document-select'));
   const presetSelect = /** @type {HTMLSelectElement|null} */ (
@@ -441,52 +453,59 @@ export function createShaderDocumentController({
 
   /** @param {string} presetId */
   const applyPreset = (presetId) => {
-    const engine = getEngine();
-    const module = getModule();
-    if (!engine || !module || !active) {
-      show('The preview engine is not ready.', true);
+    try {
+      const engine = getEngine();
+      const module = getModule();
+      if (!engine || !module || !active) {
+        show('The preview engine is not ready.', true);
+        return false;
+      }
+      // applyChainDocument owns the GUI resync and repaint (its apply order is
+      // fixed); the fixed path runs them here. With the editor live, the store's
+      // document is the authority (the imported compile goes stale on the first
+      // structural edit) and its program shape carries the session bypasses.
+      const store = chainUi?.store ?? null;
+      const paused = getAnimationsPaused();
+      const refusal = active.compiledSide
+        ? applyFixedShaderDocument(
+          engine, module, store ? { document: store.document() } : active.compiled,
+          presetId, active.referencePresetIds, bakedFields)
+        : applyChainDocument({
+          engine, module,
+          compiled: store ? { document: store.document() } : active.compiled,
+          programShape: store ? store.programShape() : null,
+          presetId, syncEffectGui, invalidate,
+        });
+      if (paused !== null) {
+        setAnimationsPaused(paused);
+        syncEffectGui();
+      }
+      showAnimationState();
+      if (refusal) {
+        show(`Preset "${presetId}" could not be applied: ${refusal}`, true);
+        return false;
+      }
+      if (active.compiledSide) {
+        syncEffectGui();
+        invalidate();
+      }
+      active.presetId = presetId;
+      const title = active.compiled.document.effect_metadata?.display_name
+        ?? active.compiled.document.document_id;
+      const preset = presetSelect.selectedOptions[0]?.textContent ?? presetId;
+      // Only an armed toggle leaves which build is rendering in question.
+      const side = !parityArmed() ? ''
+        : active.compiledSide ? ' · compiled build' : ' · interpreter';
+      show(`${title} · ${preset}${side}`);
+      showDigest();
+      scheduleDeepLink();
+      return true;
+    } catch (error) {
+      const module = getModule();
+      if (module && engineHalted(error, module)) module.HS_MODULE_DEAD = true;
+      show(`The preview edit failed: ${errorDetail(error)}`, true);
       return false;
     }
-    // applyChainDocument owns the GUI resync and repaint (its apply order is
-    // fixed); the fixed path runs them here. With the editor live, the store's
-    // document is the authority (the imported compile goes stale on the first
-    // structural edit) and its program shape carries the session bypasses.
-    const store = chainUi?.store ?? null;
-    const paused = getAnimationsPaused();
-    const refusal = active.compiledSide
-      ? applyFixedShaderDocument(
-        engine, module, store ? { document: store.document() } : active.compiled,
-        presetId, active.referencePresetIds, bakedFields)
-      : applyChainDocument({
-        engine, module,
-        compiled: store ? { document: store.document() } : active.compiled,
-        programShape: store ? store.programShape() : null,
-        presetId, syncEffectGui, invalidate,
-      });
-    if (paused !== null) {
-      setAnimationsPaused(paused);
-      syncEffectGui();
-    }
-    showAnimationState();
-    if (refusal) {
-      show(`Preset "${presetId}" could not be applied: ${refusal}`, true);
-      return false;
-    }
-    if (active.compiledSide) {
-      syncEffectGui();
-      invalidate();
-    }
-    active.presetId = presetId;
-    const title = active.compiled.document.effect_metadata?.display_name
-      ?? active.compiled.document.document_id;
-    const preset = presetSelect.selectedOptions[0]?.textContent ?? presetId;
-    // Only an armed toggle leaves which build is rendering in question.
-    const side = !parityArmed() ? ''
-      : active.compiledSide ? ' · compiled build' : ' · interpreter';
-    show(`${title} · ${preset}${side}`);
-    showDigest();
-    scheduleDeepLink();
-    return true;
   };
 
   const teardownChainUi = () => {
@@ -523,30 +542,37 @@ export function createShaderDocumentController({
    * @returns {boolean|void}
    */
   const writeStageEdit = (parameterId, value) => {
-    if (chainUi === null || active === null || active.presetId === null) return;
-    const result = chainUi.store.setPresetValue(active.presetId, parameterId, value);
-    if (!result.ok) {
-      announce(`"${parameterId}" was refused: ${result.diagnostics[0].message}`);
+    try {
+      if (chainUi === null || active === null || active.presetId === null) return;
+      const result = chainUi.store.setPresetValue(active.presetId, parameterId, value);
+      if (!result.ok) {
+        announce(`"${parameterId}" was refused: ${result.diagnostics[0].message}`);
+        return false;
+      }
+      chainUi.strip.syncHistory();
+      scheduleDeepLink();
+      const engine = getEngine();
+      const module = getModule();
+      if (!engine || !module) return;
+      const definitions = engine.getParameterDefinitions();
+      const name = engineControlName(parameterId, definitions);
+      const paused = getAnimationsPaused();
+      const refusal = name === null ? null
+        : writeEngineValue(engine, module, definitions, name, value);
+      if (paused !== null) {
+        setAnimationsPaused(paused);
+        syncEffectGui();
+      }
+      showAnimationState();
+      invalidate();
+      if (refusal) announce(refusal);
+      return true;
+    } catch (error) {
+      const module = getModule();
+      if (module && engineHalted(error, module)) module.HS_MODULE_DEAD = true;
+      show(`The preview edit failed: ${errorDetail(error)}`, true);
       return false;
     }
-    chainUi.strip.syncHistory();
-    scheduleDeepLink();
-    const engine = getEngine();
-    const module = getModule();
-    if (!engine || !module) return;
-    const definitions = engine.getParameterDefinitions();
-    const name = engineControlName(parameterId, definitions);
-    const paused = getAnimationsPaused();
-    const refusal = name === null ? null
-      : writeEngineValue(engine, module, definitions, name, value);
-    if (paused !== null) {
-      setAnimationsPaused(paused);
-      syncEffectGui();
-    }
-    showAnimationState();
-    invalidate();
-    if (refusal) announce(refusal);
-    return true;
   };
 
   /**
