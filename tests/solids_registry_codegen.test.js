@@ -317,7 +317,7 @@ test('no paste line exceeds the column limit solids.h is formatted at', () => {
         // clang-format cannot break a line that offers no break: an identifier
         // long enough to overflow on its own overflows there too.
         const atom = line.replace(/^\s*(\* )?/, '');
-        assert.ok(!atom.includes(' '),
+        assert.ok(!atom.includes(' ') && (line.trimStart().startsWith('*') || !atom.includes('::')),
           `"${line}" is ${line.length} columns for base "${base}"`);
       }
     }
