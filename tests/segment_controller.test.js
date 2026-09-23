@@ -32,9 +32,25 @@ const {
   INIT_WATCHDOG_MS,
   RENDER_WATCHDOG_MS,
 } = await import('../segment_controller.js');
-const { ModuleWarmer, WARM_INTERVAL_MS, WARM_DEADLINE_MS, pageWarmer } =
+const { ModuleWarmer: RealModuleWarmer, WARM_INTERVAL_MS, WARM_DEADLINE_MS, pageWarmer } =
   await import('../module_warmer.js');
-const warmModules = (dependencies) => pageWarmer.warm(dependencies);
+const GLUE = new TextEncoder().encode('new URL("holosphere_wasm.wasm?v=abc123", import.meta.url)');
+function withGlue(dependencies) {
+  if (!dependencies?.fetch) return dependencies;
+  const fetch = dependencies.fetch;
+  return { ...dependencies, fetch: (url, options) => {
+    const response = fetch(url, options);
+    if (!url.pathname.endsWith('/holosphere_wasm.js')) return response;
+    return response.then((value) => ({ ...value, arrayBuffer: async () => {
+      await value.arrayBuffer();
+      return GLUE.buffer;
+    } }));
+  } };
+}
+class ModuleWarmer extends RealModuleWarmer {
+  warm(dependencies) { return super.warm(withGlue(dependencies)); }
+}
+const warmModules = (dependencies) => pageWarmer.warm(withGlue(dependencies));
 const { PROTOCOL_VERSION } = await import('../worker_protocol.js');
 
 const EXPECTED_CONSOLE_MESSAGES = {
@@ -85,7 +101,7 @@ test('warmModules revalidates the whole worker module graph', async () => {
 
   // Derived from the worker's own import graph plus the binary its glue
   // streams, so a module joining the graph is one the warm must drain too.
-  const graph = [...staticModuleGraph('segment_worker.js').modules, 'holosphere_wasm.wasm'];
+  const graph = [...staticModuleGraph('segment_worker.js').modules, 'holosphere_wasm.wasm?v=abc123'];
   assert.deepEqual(calls.map(([url]) => url).sort(),
     graph.map((file) => `http://localhost:8000/${file}`).sort(),
     'every static import of the worker, or a stale one survives the warm');
@@ -140,7 +156,7 @@ test('a stalled warm is abandoned on its deadline so the spawn still runs',
     expire[0]();
     await warm;
 
-    assert.equal(aborted, 5, 'every stalled re-fetch was aborted');
+    assert.equal(aborted, 4, 'every stalled re-fetch was aborted');
     assert.equal(warmer.module, null,
       'the abandoned warm hands the pool a module it never revalidated');
   });
@@ -197,7 +213,7 @@ test('the dedupe window covers one base URL, not every caller in it', async () =
     'http://localhost:8000/second/holosphere_wasm.js',
     'http://localhost:8000/second/segment_layout.js',
     'http://localhost:8000/second/worker_protocol.js',
-    'http://localhost:8000/second/holosphere_wasm.wasm',
+    'http://localhost:8000/second/holosphere_wasm.wasm?v=abc123',
   ], 'a second base URL inside the window warms its own module graph');
 
   seen.length = 0;
@@ -249,7 +265,7 @@ test('a warmed binary is compiled once and handed to every worker', async () => 
     minIntervalMs: 0,
     fetch: (url) => Promise.resolve({
       arrayBuffer: () => Promise.resolve(
-        url.href.endsWith('.wasm') ? EMPTY_WASM.buffer : new ArrayBuffer(0)),
+        url.pathname.endsWith('.wasm') ? EMPTY_WASM.buffer : new ArrayBuffer(0)),
     }),
   });
 
@@ -273,7 +289,7 @@ test('a binary the engine refuses is reported, not left to the spawn to discover
       baseUrl: 'http://localhost:8000/corrupt/segment_controller.js',
       minIntervalMs: 0,
       fetch: (url) => Promise.resolve({
-        arrayBuffer: () => Promise.resolve(url.href.endsWith('.wasm')
+        arrayBuffer: () => Promise.resolve(url.pathname.endsWith('.wasm')
           ? Uint8Array.of(0, 0x61, 0x73, 0x6d, 9, 9, 9, 9).buffer
           : new ArrayBuffer(0)),
       }),
@@ -298,7 +314,7 @@ test('a compile failure drops the module the previous warm left', async () => {
     minIntervalMs: 0,
     fetch: (url) => Promise.resolve({
       arrayBuffer: () => Promise.resolve(
-        url.href.endsWith('.wasm') ? bytes.buffer : new ArrayBuffer(0)),
+        url.pathname.endsWith('.wasm') ? bytes.buffer : new ArrayBuffer(0)),
     }),
   });
 
@@ -329,7 +345,7 @@ test('a failed binary re-fetch drops the module the previous warm left', async (
   const serve = (binaryResponse) => ({
     baseUrl: 'http://localhost:8000/redeployed/segment_controller.js',
     minIntervalMs: 0,
-    fetch: (url) => (url.href.endsWith('.wasm')
+    fetch: (url) => (url.pathname.endsWith('.wasm')
       ? binaryResponse()
       : Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) })),
   });
@@ -359,7 +375,7 @@ test('a warm that settles behind a newer one leaves its module alone', async () 
     baseUrl: `http://localhost:8000/${path}/segment_controller.js`,
     minIntervalMs: 0,
     fetch: (url) => Promise.resolve({
-      arrayBuffer: () => (url.href.endsWith('.wasm')
+      arrayBuffer: () => (url.pathname.endsWith('.wasm')
         ? binary()
         : Promise.resolve(new ArrayBuffer(0))),
     }),
@@ -390,7 +406,7 @@ test('a warm in flight when a worker refuses the module does not restore it', as
     baseUrl: 'http://localhost:8000/refused/segment_controller.js',
     minIntervalMs: 0,
     fetch: (url) => Promise.resolve({
-      arrayBuffer: () => (url.href.endsWith('.wasm')
+      arrayBuffer: () => (url.pathname.endsWith('.wasm')
         ? binary
         : Promise.resolve(new ArrayBuffer(0))),
     }),
@@ -1235,7 +1251,7 @@ test('a shared module a worker refuses is dropped before the next spawn', async 
     minIntervalMs: 0,
     fetch: (url) => Promise.resolve({
       arrayBuffer: () => Promise.resolve(
-        url.href.endsWith('.wasm') ? EMPTY_WASM.buffer : new ArrayBuffer(0)),
+        url.pathname.endsWith('.wasm') ? EMPTY_WASM.buffer : new ArrayBuffer(0)),
     }),
   });
   const c = makeController({ moduleWarmer: warmer });
@@ -1287,7 +1303,7 @@ test('a rejection unrelated to the shared module keeps the compilation', async (
     minIntervalMs: 0,
     fetch: (url) => Promise.resolve({
       arrayBuffer: () => Promise.resolve(
-        url.href.endsWith('.wasm') ? EMPTY_WASM.buffer : new ArrayBuffer(0)),
+        url.pathname.endsWith('.wasm') ? EMPTY_WASM.buffer : new ArrayBuffer(0)),
     }),
   });
   const c = makeController({ moduleWarmer: warmer });

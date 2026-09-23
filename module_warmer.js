@@ -100,7 +100,12 @@ export class ModuleWarmer {
       const glueJs = drain('./holosphere_wasm.js');
       const layoutJs = drain('./segment_layout.js');
       const protocolJs = drain('./worker_protocol.js');
-      const binary = drain('./holosphere_wasm.wasm');
+      const binary = glueJs.then((bytes) => {
+        const source = new TextDecoder().decode(bytes);
+        const path = source.match(/new URL\(["'](holosphere_wasm\.wasm\?v=[a-f0-9]+)["']/)?.[1];
+        if (!path) throw new Error('WASM glue has no versioned binary URL');
+        return drain(`./${path}`);
+      });
       warm = Promise.allSettled([
         workerJs,
         glueJs,
