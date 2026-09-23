@@ -1,3 +1,4 @@
+import { installFakeTimers } from './fake_timers.js';
 //
 // SegmentController — unit coverage for the generation-fence drop, the
 // worker-fault deadlock-break latch, and the quadrant compositor. Driven by a
@@ -21,6 +22,13 @@ const driver = {
   invalidations: 0,
   invalidate() { this.invalidations++; },
 };
+
+
+/** @param {number} width - Columns. @param {number} height - Rows. */
+function setDisplayGrid(width, height) {
+  driver.W = width; driver.H = height;
+  driver.pixels = new Uint16Array(width * height * 3);
+}
 
 
 const {
@@ -567,67 +575,6 @@ async function publishGeneration(controller, bands) {
   await flush();
 }
 
-/**
- * @typedef {Object} FakeTimer
- * @property {Function} fn - Callback the production code scheduled.
- * @property {number} delay - Delay it was scheduled at, which names it: each
- *   deadline in segment_controller.js has a distinct one.
- * @property {object} handle - Token setTimeout returned, keyed on by clearTimeout.
- */
-
-/**
- * Swap in a setTimeout/clearTimeout pair that records timers instead of
- * scheduling them, so a test drives the watchdogs and boot backoff by hand and
- * can see a cancellation. A cleared or fired timer leaves the pending set but
- * stays in `timers`, which holds every arm in order.
- * @returns {{timers: Array<FakeTimer>, pendingAt: (delay: number) => Array<FakeTimer>,
- *   isPending: (timer: FakeTimer) => boolean, fire: (timer: FakeTimer) => void,
- *   fireOnly: (delay: number, message: string) => void, restore: () => void}}
- */
-const installFakeTimers = () => {
-  const realSetTimeout = globalThis.setTimeout;
-  const realClearTimeout = globalThis.clearTimeout;
-  /** @type {Array<FakeTimer>} */
-  const timers = [];
-  /** @type {Map<object, FakeTimer>} */
-  const pending = new Map();
-  globalThis.setTimeout = (fn, delay) => {
-    const handle = { unref() {} };
-    const timer = { fn, delay, handle };
-    timers.push(timer);
-    pending.set(handle, timer);
-    return handle;
-  };
-  // A handle armed before the swap belongs to the real timer queue, so hand it
-  // back rather than silently dropping the cancellation.
-  globalThis.clearTimeout = (handle) => {
-    if (pending.delete(handle)) return;
-    realClearTimeout(handle);
-  };
-  const isPending = (timer) => pending.has(timer.handle);
-  const fire = (timer) => {
-    pending.delete(timer.handle);
-    timer.fn();
-  };
-  const pendingAt = (delay) =>
-    [...pending.values()].filter((timer) => timer.delay === delay);
-  const fireOnly = (delay, message) => {
-    const matches = pendingAt(delay);
-    assert.equal(matches.length, 1, message);
-    fire(matches[0]);
-  };
-  return {
-    timers,
-    pendingAt,
-    isPending,
-    fire,
-    fireOnly,
-    restore: () => {
-      globalThis.setTimeout = realSetTimeout;
-      globalThis.clearTimeout = realClearTimeout;
-    },
-  };
-};
 
 /**
  * Deliver a worker->controller 'frame' message to segment `segId`.
@@ -1827,8 +1774,7 @@ const isCyan = (x, y) => {
 };
 
 test('composite() blits each quadrant to its display-buffer offset', () => {
-  driver.W = 4; driver.H = 2;
-  driver.pixels = new Uint16Array(4 * 2 * 3);
+  setDisplayGrid(4, 2);
 
   const c = readyController(2);
   c.showBoundaries = false;
@@ -1865,8 +1811,7 @@ test('composite() faults when the display buffer is not the driver grid', () => 
 });
 
 test('composite() faults on a rectangle that overflows the current display buffer', () => {
-  driver.W = 4; driver.H = 2;
-  driver.pixels = new Uint16Array(4 * 2 * 3);
+  setDisplayGrid(4, 2);
 
   const c = makeController();
   c.showBoundaries = false;
@@ -1884,8 +1829,7 @@ test('composite() faults on a rectangle that overflows the current display buffe
 test('composite() faults atomically when a non-leading segment overflows', () => {
   // The bounds pre-pass validates every result before any blit, so a good
   // segment ahead of the overflowing one is never composited — no partial frame.
-  driver.W = 4; driver.H = 2;
-  driver.pixels = new Uint16Array(4 * 2 * 3);
+  setDisplayGrid(4, 2);
 
   const c = readyController(2);
   c.showBoundaries = false;
@@ -1905,8 +1849,7 @@ test('composite() faults atomically when a non-leading segment overflows', () =>
 });
 
 test('composite() faults on an empty/inverted segment rect', () => {
-  driver.W = 4; driver.H = 2;
-  driver.pixels = new Uint16Array(4 * 2 * 3);
+  setDisplayGrid(4, 2);
 
   const c = makeController();
   c.showBoundaries = false;
@@ -1921,8 +1864,7 @@ test('composite() faults on an empty/inverted segment rect', () => {
 });
 
 test('composite() faults on a pixel buffer whose length disagrees with its rect', () => {
-  driver.W = 4; driver.H = 2;
-  driver.pixels = new Uint16Array(4 * 2 * 3);
+  setDisplayGrid(4, 2);
 
   const c = makeController();
   c.showBoundaries = false;
@@ -1941,8 +1883,7 @@ test('composite() faults on a rect that is not that segment\'s band of the layou
   // A worker that missed a resolution change answers under the current generation
   // with a rect that is in bounds and matches its own buffer, so only re-deriving
   // the band catches it before it blits into another segment's rows.
-  driver.W = 4; driver.H = 4;
-  driver.pixels = new Uint16Array(4 * 4 * 3);
+  setDisplayGrid(4, 4);
 
   const c = readyController(4);
   c.showBoundaries = false;
@@ -1960,8 +1901,7 @@ test('composite() faults on a rect that is not that segment\'s band of the layou
 test('composite() faults when the layout admits no band for a segment', () => {
   // A count create() accepts, over a display buffer that later shrank under it:
   // 2x2 leaves no y-band per arm for an 8-segment split.
-  driver.W = 2; driver.H = 2;
-  driver.pixels = new Uint16Array(2 * 2 * 3);
+  setDisplayGrid(2, 2);
 
   const c = readyController(8);
   c.showBoundaries = false;
@@ -1996,8 +1936,7 @@ test('the band table is reused until the layout moves', () => {
 test('composite() marks both the internal split and the x=0 wrap seam', () => {
   // On the wrapped cylinder a 2-arm split has two boundaries: the internal split
   // at x=2 and the wrap seam at x=0 where arm 1 meets arm 0.
-  driver.W = 4; driver.H = 2;
-  driver.pixels = new Uint16Array(4 * 2 * 3);
+  setDisplayGrid(4, 2);
 
   const c = readyController(2);
   c.showBoundaries = true;
@@ -2017,8 +1956,7 @@ test('composite() marks both the internal split and the x=0 wrap seam', () => {
 });
 
 test('the boundary setter re-composites and invalidates a paused held generation', async () => {
-  driver.W = 4; driver.H = 2;
-  driver.pixels = new Uint16Array(4 * 2 * 3);
+  setDisplayGrid(4, 2);
 
   const c = readyController(2);
   c.active = true; // the app sets this before create(); the setter checks it
@@ -2095,8 +2033,7 @@ test('composite() marks every internal split plus the wrap seam for an 8-segment
   // Eight segments are two arms of four Y-bands each: internal boundaries at
   // x=4 and y=2,4,6 plus the wrap seam at x=0. The >2-segment case exercises
   // production row-seam handling the 2-segment test cannot.
-  driver.W = 8; driver.H = 8;
-  driver.pixels = new Uint16Array(8 * 8 * 3);
+  setDisplayGrid(8, 8);
 
   const c = readyController(8);
   c.showBoundaries = true;
@@ -2126,8 +2063,7 @@ test('composite() marks every internal split plus the wrap seam for an 8-segment
 test('composite() marks the horizontal seam between stacked Y-band segments', () => {
   // Four segments split each arm in Y (top band y[0,2), bottom band y[2,4)), so
   // the horizontal boundary at y=2 runs the full width across both arms.
-  driver.W = 4; driver.H = 4;
-  driver.pixels = new Uint16Array(4 * 4 * 3);
+  setDisplayGrid(4, 4);
 
   const c = readyController(4);
   c.showBoundaries = true;
@@ -2151,8 +2087,7 @@ test('composite() marks the horizontal seam between stacked Y-band segments', ()
 test('composite() marks the layout seams, not only the reported segments', () => {
   // The seams describe the layout, so a frame that only two of the four segments
   // reported carries the same overlay as a complete one.
-  driver.W = 4; driver.H = 4;
-  driver.pixels = new Uint16Array(4 * 4 * 3);
+  setDisplayGrid(4, 4);
 
   const c = readyController(4);
   c.showBoundaries = true;
@@ -2172,8 +2107,7 @@ test('composite() marks the layout seams, not only the reported segments', () =>
 });
 
 test('composite() self-heals a broken display-buffer alias instead of throwing', () => {
-  driver.W = 4; driver.H = 2;
-  driver.pixels = new Uint16Array(4 * 2 * 3);
+  setDisplayGrid(4, 2);
 
   const c = makeController();
   const target = new Uint16Array(4 * 2 * 3);
@@ -2190,8 +2124,7 @@ test('composite() self-heals a broken display-buffer alias instead of throwing',
 });
 
 test('composite() heals a diverged mesh alias even while driver.pixels is aligned', () => {
-  driver.W = 4; driver.H = 2;
-  driver.pixels = new Uint16Array(4 * 2 * 3);
+  setDisplayGrid(4, 2);
   // Split the alias pair: the GPU-side attribute reads a stale buffer while
   // driver.pixels still matches the composite target.
   driver.dotMesh.instanceColor = fakeColorAttribute(new Uint16Array(4 * 2 * 3));
@@ -2210,8 +2143,7 @@ test('composite() heals a diverged mesh alias even while driver.pixels is aligne
 // refresh that re-fetched moves the aliases onto a buffer the driver never
 // cleared, so the divergence check sees nothing and only the report is left.
 test('composite() clears a buffer the refresh re-fetched', () => {
-  driver.W = 4; driver.H = 2;
-  driver.pixels = new Uint16Array(4 * 2 * 3);
+  setDisplayGrid(4, 2);
 
   const c = readyController(2);
   // The fresh view carries the engine's last frame, not the driver's clear.
@@ -2314,8 +2246,7 @@ test('a completed render arms pendingFrame and frees the in-flight slot', async 
 });
 
 test('the next tick() composites the armed frame and dispatches the following one', async () => {
-  driver.W = 4; driver.H = 2;
-  driver.pixels = new Uint16Array(4 * 2 * 3);
+  setDisplayGrid(4, 2);
 
   const c = readyController(2);
   c.showBoundaries = false;
@@ -2337,8 +2268,7 @@ test('the next tick() composites the armed frame and dispatches the following on
 });
 
 test('each render dispatch hands the retired generation buffer back for reuse', async () => {
-  driver.W = 4; driver.H = 2;
-  driver.pixels = new Uint16Array(4 * 2 * 3);
+  setDisplayGrid(4, 2);
 
   const c = readyController(2);
   c.showBoundaries = false;
@@ -2377,8 +2307,7 @@ test('each render dispatch hands the retired generation buffer back for reuse', 
 });
 
 test('tick() re-blits the last composite when a render overruns the tick (preview holds, not black)', async () => {
-  driver.W = 4; driver.H = 2;
-  driver.pixels = new Uint16Array(4 * 2 * 3);
+  setDisplayGrid(4, 2);
 
   const c = readyController(2);
   c.showBoundaries = false;
@@ -2407,8 +2336,7 @@ test('an overrun re-blit shows one whole generation, never a half-updated mix', 
   // While the next generation is only partially in, its quadrants live in
   // `scratch`; an overrun re-blit must composite the last WHOLE generation from
   // `results`, never a mix of the two.
-  driver.W = 4; driver.H = 2;
-  driver.pixels = new Uint16Array(4 * 2 * 3);
+  setDisplayGrid(4, 2);
 
   const { restore } = installFakeTimers(); // the render watchdog never fires
   try {
@@ -2444,8 +2372,7 @@ test('an overrun re-blit shows one whole generation, never a half-updated mix', 
 });
 
 test('a composite short one segment is not handed to the recorder as a frame', async () => {
-  driver.W = 4; driver.H = 2;
-  driver.pixels = new Uint16Array(4 * 2 * 3);
+  setDisplayGrid(4, 2);
 
   const c = readyController(2);
   c.showBoundaries = false;
@@ -2468,8 +2395,7 @@ test('a composite short one segment is not handed to the recorder as a frame', a
 });
 
 test('destroy() clears frameComposited so a respawning pool cannot capture black frames', async () => {
-  driver.W = 4; driver.H = 2;
-  driver.pixels = new Uint16Array(4 * 2 * 3);
+  setDisplayGrid(4, 2);
 
   const c = readyController(2);
   c.showBoundaries = false;
@@ -2509,8 +2435,7 @@ test('a fault latched by composite() mid-tick() does not re-dispatch a doomed re
   // The fence-escaping out-of-bounds result faults inside composite(), so the pool
   // is clean at tick() entry and only latches partway through — the post-composite
   // faulted re-check is what stops the second render.
-  driver.W = 4; driver.H = 2;
-  driver.pixels = new Uint16Array(4 * 2 * 3);
+  setDisplayGrid(4, 2);
 
   const c = readyController(2);
   c.showBoundaries = false;
@@ -2532,8 +2457,7 @@ test('a fault latched by composite() mid-tick() does not re-dispatch a doomed re
 });
 
 test('tick() holds the assembled generation when the display buffer is missing', async () => {
-  driver.W = 4; driver.H = 2;
-  driver.pixels = new Uint16Array(4 * 2 * 3);
+  setDisplayGrid(4, 2);
 
   const c = readyController(2);
   c.showBoundaries = false;
@@ -2561,8 +2485,7 @@ test('tick() holds the assembled generation when the display buffer is missing',
 });
 
 test('a fault latched by the overrun re-blit paints the overlay on the same tick', async () => {
-  driver.W = 4; driver.H = 2;
-  driver.pixels = new Uint16Array(4 * 2 * 3);
+  setDisplayGrid(4, 2);
 
   const { restore } = installFakeTimers(); // the render watchdog never fires
   try {

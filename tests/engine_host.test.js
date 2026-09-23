@@ -1,3 +1,4 @@
+import { detachedView } from './fake_buffer.js';
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { EngineHost } from '../engine_host.js';
@@ -297,8 +298,7 @@ test('moduleDead() stays dead once observed, dispose() included', () => {
 });
 
 test('refresh() re-fetches and re-notifies when the held view has detached', () => {
-  const stale = new Uint16Array(4);
-  stale.buffer.transfer(); // Emscripten heap growth detaches the backing buffer in place
+  const stale = detachedView(8);
   const fresh = new Uint16Array(4);
   let notified = null;
   const host = new EngineHost((view) => { notified = view; });

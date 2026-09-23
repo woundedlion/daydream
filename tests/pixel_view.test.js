@@ -1,20 +1,9 @@
+import { detachedView } from './fake_buffer.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isViewLive, refreshPixelView } from '../pixel_view.js';
 
-/**
- * Builds a typed-array view whose backing ArrayBuffer has been detached, exactly
- * as Emscripten heap growth leaves a previously-fetched pixel view: byteLength 0
- * while the view object itself is still truthy.
- * @returns {Uint16Array} A view over a detached buffer.
- */
-const detachedView = () => {
-  const buf = new ArrayBuffer(8);
-  const view = new Uint16Array(buf);
-  buf.transfer();           // detaches buf in place; view.buffer.byteLength -> 0
-  assert.equal(view.buffer.byteLength, 0, 'the fixture buffer was not detached');
-  return view;
-};
+
 
 test('isViewLive: null/undefined are not live', () => {
   assert.equal(isViewLive(null), false, 'a null view was reported live');

@@ -1,3 +1,4 @@
+import { detachedView } from './fake_buffer.js';
 //
 // fake_three.js's upload semantics and teardown sink, pinned on their own.
 // app_lifecycle.test.js, driver.test.js and segment_controller.test.js all
@@ -17,18 +18,7 @@ import {
   SphereGeometry,
 } from './fake_three.js';
 
-/**
- * A typed array whose ArrayBuffer has been detached, as a WASM heap growth
- * leaves every view onto the old memory.
- * @param {number} bytes - Size of the buffer before it is transferred away.
- * @returns {Uint16Array} The detached view: length 0 over a 0-byte buffer.
- */
-function detachedView(bytes) {
-  const buffer = new ArrayBuffer(bytes);
-  const view = new Uint16Array(buffer);
-  structuredClone(buffer, { transfer: [buffer] });
-  return view;
-}
+
 
 test('a null-backed attribute takes its size from the first array it binds', () => {
   const attribute = fakeColorAttribute(null);

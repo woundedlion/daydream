@@ -1,3 +1,4 @@
+import { detachedView } from './fake_buffer.js';
 //
 // driver.js's three.js lifecycle: the DOM-free sizing/LOD helpers, plus the
 // rebuild (setupDots) and teardown (dispose) paths driven over a fake mesh via
@@ -510,17 +511,7 @@ test('dispose leaves no dangling mesh or pixel buffer', () => {
 // stepSimulation / render: the detached-pixel-view contract
 // ---------------------------------------------------------------------------
 
-/**
- * Builds a typed-array view whose backing ArrayBuffer has been detached, as
- * Emscripten heap growth leaves a previously-fetched pixel view.
- * @returns {Uint16Array} A view over a detached buffer.
- */
-function detachedView() {
-  const buf = new ArrayBuffer(8);
-  const view = new Uint16Array(buf);
-  buf.transfer();
-  return view;
-}
+
 
 /** Minimal `this` for stepSimulation: a running sim over the given color array.
  * @param {Uint16Array} colors - Array the dot mesh's instanceColor aliases.
