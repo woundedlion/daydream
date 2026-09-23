@@ -233,3 +233,13 @@ test('ci-green runs after failed dependencies while deployment requires success'
   assert.ok(deploy);
   assert.doesNotMatch(deploy, /^ {4}if:.*always\(/m);
 });
+
+test('PR suites consume the provenance-gated bundle before CI can pass', () => {
+  assert.match(workflow, /uses: \.\/\.github\/workflows\/engine-bundle\.yml/);
+  for (const suite of ['js-tests', 'browser']) {
+    const block = workflow.split(`  ${suite}:`)[1].split(/^ {2}[^ ]/m)[0];
+    assert.match(block, /needs: gate/);
+    assert.match(block, /engine-bundle: true/);
+  }
+  assert.ok(terminalJobNeeds(workflow, 'ci-green').includes('gate'));
+});
