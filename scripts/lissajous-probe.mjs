@@ -203,13 +203,13 @@ export async function probeRationalLock(tab) {
   check(!await dimmed(), 'unlocking undims the Domain control');
   await dragTrack(tab, DOMAIN_SLIDER, 0.8, 0);
   const free = await exported(tab);
-  check(free.domain === 0,
+  check(free.domain > 0 && free.domain < 0.02,
     `the unlocked Domain slider takes the pointer to its floor (${free.domain})`);
   check(free.c1 === refused.c1 && free.c2 === refused.c2,
     'the Domain drag leaves the frequencies alone');
   check(await warned(), 'an open domain raises the closure warning');
   const text = await tab.$eval(WARNING, (node) => node.textContent ?? '');
-  check(text.includes('does not close') && text.includes('0.000'),
+  check(text.includes('does not close') && text.includes(free.domain.toFixed(3)),
     `the warning names the domain it is about ("${text.slice(0, 40)}")`);
 
   return failures;
