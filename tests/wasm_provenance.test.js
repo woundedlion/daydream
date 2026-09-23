@@ -181,7 +181,7 @@ test('deploy checks the engine assets it stages before it publishes them', () =>
 
 test('deploy stops waiting when the pinned engine run cannot publish', () => {
   const workflow = text('.github/workflows/engine-bundle.yml');
-  assert.match(workflow, /\) \|\| true/);
+  assert.doesNotMatch(workflow, /\|\| true/);
   assert.match(workflow, /if \[ "\$run_status" = completed \]/);
   assert.match(workflow, /POV CI for \$PIN concluded \$run_conclusion/);
   assert.match(workflow, /published no verified engine bundle/);

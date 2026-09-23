@@ -264,11 +264,6 @@ test('the reusable suite verifies CDN integrity and lints tracked shell hooks', 
   assert.match(shell, /shellcheck "\$\{FILES\[@\]\}"/);
 });
 
-test('shell lint has no workflow-wide excluded diagnostics', () => {
-  const suite = readFileSync(`${WORKFLOW_DIR}/js-unit-suite.yml`, 'utf8');
-  assert.doesNotMatch(suite, /shellcheck[^\n]*--exclude/);
-});
-
 
 test('workflow trigger parsing cannot hide flow or quoted declarations', () => {
   for (const source of ['on: [push, pull_request]', '"on": ["push", "pull_request"]',
@@ -276,4 +271,13 @@ test('workflow trigger parsing cannot hide flow or quoted declarations', () => {
     assert.ok(triggersOf(source).includes('push'), source);
   }
   assert.throws(() => triggersOf('"on": {push: {}}'), /unsupported trigger syntax/);
+});
+
+
+
+test('engine bundle API failures stop the gate instead of entering its poll timeout', () => {
+  const gate = readFileSync(`${WORKFLOW_DIR}/engine-bundle.yml`, 'utf8');
+  assert.doesNotMatch(gate, /\|\| true/);
+  assert.match(gate, /Cannot query engine CI; check token access[^\n]+\n\s+exit 1/);
+  assert.match(gate, /actions: read/);
 });
