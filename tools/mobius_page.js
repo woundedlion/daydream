@@ -100,12 +100,15 @@ const updateMobiusUniforms = () => {
   u.u_d.value.re = config.D.re; u.u_d.value.im = config.D.im;
 };
 
-// Cached so an animating preset (which re-enters every frame) only writes
-// the DOM when the formatted snippet actually changes.
 let lastCode = null;
+let codeOutput = null;
+let lastCodeTime = -Infinity;
 const updateCodeSnippet = () => {
-  const codeOutput = document.getElementById('mobius_code_output');
+  const now = performance.now();
+  if (isAnimating && now - lastCodeTime < 100) return;
+  codeOutput ??= document.getElementById('mobius_code_output');
   if (!codeOutput) return;
+  lastCodeTime = now;
   const code = mobiusCodeString(config.A, config.B, config.C, config.D);
   if (code === lastCode) return;
   codeOutput.textContent = code;
@@ -207,6 +210,7 @@ const presets = [
 
 const stopAnimation = () => {
   isAnimating = false;
+  updateCodeSnippet();
   activePreset = null;
   document.querySelectorAll('.preset-btn').forEach(b => {
     b.classList.remove('active');
