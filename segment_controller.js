@@ -401,9 +401,9 @@ export class SegmentController {
    * @details A postMessage that throws (an unclonable payload, a worker the agent
    * already tore down) latches a fault instead of escaping to the GUI handler that
    * triggered the broadcast, which would leave the pool half-updated and unreported.
-   * A caller sequencing a second broadcast must gate it on the returned flag: the
-   * fault has already terminated the pool, so the follow-up would post into dead
-   * workers and report nothing.
+   * Returns false after terminating the faulted pool. Direct broadcast callers
+   * can use the flag to stop a sequence; public setters inspect the fault latch
+   * themselves and either skip the post or rebuild the pool.
    * @param {WorkerInboundMsg} msg
    * @returns {boolean} True when every worker accepted the message.
    */
