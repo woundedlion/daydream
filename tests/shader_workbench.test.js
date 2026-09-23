@@ -29,8 +29,8 @@ import {
 } from './fake_dom.js';
 
 const ownedEditors = new Set();
-afterEach(() => {
-  for (const controller of ownedEditors) controller.dispose();
+afterEach(async () => {
+  for (const controller of ownedEditors) await controller.dispose();
   ownedEditors.clear();
 });
 
@@ -693,6 +693,7 @@ function workbench({ files = { 'kaleidoscope_flowers.shader.json': shaderDocumen
     download: (filename, source) => downloads.push([filename, source]),
     initialEffect,
   });
+  ownedEditors.add(controller);
   return { controller, elements, downloads, selections, engine, ran };
 }
 
@@ -1837,7 +1838,6 @@ test('a rejected file read is announced and the same file can be picked again', 
   input.value = 'broken.shader.json';
   await onChange(input)();
   assert.equal(input.value, '');
-  controller.dispose();
 });
 
 
