@@ -180,6 +180,9 @@ The same step runs with `just docs-check` and before `just docs` publishes the A
 
 ### Holosphere (engine + firmware)
 
+The generated engine map omits `.gitattributes` and `.gitignore`; these tracked
+files define line-ending policy and working-artifact exclusions.
+
 <!-- docs-check: tree exhaustive -->
 ```
 ├── core/                       Rendering engine
@@ -215,8 +218,10 @@ The same step runs with `just docs-check` and before `just docs` publishes the A
 │   │   ├── spherical_field.h       Latitude-ring field layout + bilinear sphere sampling
 │   │   ├── spherical_harmonics.h   Real spherical harmonics in Cartesian form on the unit sphere
 │   │   ├── noise_field.h           Shared scalar/vector noise-field sampling kernels
-│   │   ├── projections.h           Bonne / Peirce quincuncial / Airocean / stereographic / gnomonic sphere → plane kernels (Airocean uses PROJ-derived code, MIT)
-│   │   ├── stereographic.h         Stereographic / gnomonic / Möbius sphere ↔ plane maps, pole attenuation, pattern normalization
+│   │   ├── projections.h           Bonne / Peirce quincuncial / Airocean / folded sinusoidal / equirectangular sphere → plane kernels (Airocean uses PROJ-derived code, MIT)
+│   │   ├── stereographic.h         Stereographic / gnomonic forward and inverse projection kernels
+│   │   ├── mobius.h                Fractional-linear complex transforms and sphere mappings
+│   │   ├── projection_patterns.h   Pole attenuation and bounded pattern coordinates
 │   │   ├── lenses.h                Glitch fold, twist, kaleidoscope and polyhedral reflection-group sphere lenses
 │   │   ├── easing.h                Easing functions (cubic, sine, elastic, expo, etc.)
 │   │   ├── interpolate.h           Per-domain interpolators: scalar, positive scale, periodic angle, unit vector
@@ -238,14 +243,21 @@ The same step runs with `just docs-check` and before `just docs` publishes the A
 │   │   ├── kd_tree.h               KDTree k-nearest-neighbor search
 │   │   └── reaction_graph.h / reaction_graph.cpp  Precomputed Fibonacci-lattice K-NN graph (90 KiB / 92,160-byte table)
 │   ├── color/                  Color math and palettes
-│   │   ├── color.h                 Pixel (16-bit linear), Color4, blend helpers, palettes
-│   │   ├── composition.h           Palette modifiers + StaticPalette composition (via color.h)
+│   │   ├── color.h                 Color and palette umbrella
+│   │   ├── pixel.h                 Linear pixels, alpha, and integer sRGB conversion
+│   │   ├── color_space.h           Perceptual color spaces and gamut mapping
+│   │   ├── palette.h               Palette interface and source traits
+│   │   ├── palette_recipe.h        Palette authoring recipes and diagnostics
+│   │   ├── palette_sources.h       Gradient and procedural palette implementations
+│   │   ├── baked_palette.h         Arena-backed LUTs and palette crossfades
+│   │   ├── palette_wipe.h          Snapshot transitions and rebake windows
+│   │   ├── composition.h           Palette modifiers + StaticPalette composition
 │   │   ├── layer_composite.h       LayerComposite: front-to-back "over" accumulator for layered coverage
 │   │   ├── color_luts.h            Precomputed sRGB ↔ linear LUTs
 │   │   ├── srgb_decode.h           Branchless linear16 → sRGB8 encode from DTCM split tables
 │   │   ├── srgb_decode_lut.h       Generated split-decode tables behind srgb_decode.h
 │   │   ├── gamut_lut.h             Generated sRGB gamut-boundary chroma table for OKLab clipping
-│   │   ├── generative_palette.h    GenerativePalette + PaletteRecipe compilation (via color.h)
+│   │   ├── generative_palette.h    GenerativePalette + PaletteRecipe compilation
 │   │   ├── noise_hue_palette.h     Sphere-noise hue LUTs + reusable NoiseHuePalette wrapper
 │   │   ├── palette_cycler.h        PaletteCycler: dwell-and-fade display LUT over a palette sequence
 │   │   ├── effect_palette_recipes.h Per-effect authored PaletteRecipe constructors
@@ -308,8 +320,8 @@ The same step runs with `just docs-check` and before `just docs` publishes the A
 │
 ├── workbench/                  Simulator-only shader authoring surfaces, outside the firmware
 │                                roster; their HS_ENABLE_* gates #error under ARDUINO — see §9
-│   └── shader/                 The shader authoring workbench; everything independent of
-│                                canvas resolution lives in namespace Workbench
+│   └── shader/                 The shader authoring workbench; reusable policies live in
+│                                namespace Workbench; ShaderWorkbench is a global host template
 │       ├── shader_host.h       Slot-configured shader with dynamic dispatch: registered as Shader
 │       ├── chain_host.h        Effect host for a compiled operator chain: registered as ShaderChain
 │       ├── config.h            Slot enums, per-stage parameter families, and the Config they compose
@@ -517,6 +529,9 @@ The same step runs with `just docs-check` and before `just docs` publishes the A
 ├── display_aliases.js          The display-buffer aliases every renderer writes through, healed together
 ├── segment_policy.js           Segmented spawn epoch plus the single-engine fallback a failed spawn runs
 ├── effect_gui.js               Effect panel lifecycle: build, mount, value sync, Export, teardown
+├── effect_panel_edits.js      Slider edit lifetime and deferred persistence
+├── effect_panel_view.js       Panel mounting and focus restoration
+├── effect_persistence.js      Effect URL state, presets, and replay
 ├── shader_stages.js            DOM-free shader stage taxonomy: schema detection, stage assignment, control labels
 ├── legacy_shader_import.js     ShaderWorkbench URL/save-state migration importer
 ├── effect_sequencing.js        DOM-free effect/resolution apply-order and resolution-preset rules
@@ -535,8 +550,8 @@ The same step runs with `just docs-check` and before `just docs` publishes the A
 ├── pole_lod.js                 Pole LOD binding, held until the engine the module load builds exists
 ├── global_stats_view.js        Single-engine stats bar: frame draw duration and per-arena usage
 ├── module_warmer.js            Epoch-fenced shared-WASM compilation and warm-cache state
-├── segment_controller.js       Orchestrates the segmented-POV worker pool:
-│                                  dispatch, generation fence, and compositing
+├── segment_controller.js       Worker lifecycle, protocol dispatch, and generation fence
+├── segment_compositor.js      Frame compositing, band caches, and boundary overlays
 ├── segment_worker.js           Web Worker that hosts one WASM instance per
 │                                  Phantasm hardware segment (parallel render)
 ├── segment_layout.js           Pure segment-layout math (Node-unit-testable, no WASM/Worker)
@@ -557,6 +572,7 @@ The same step runs with `just docs-check` and before `just docs` publishes the A
 │   ├── chain_apply.js          Applies a compiled chain document: setShaderChain, then the preset values
 │   ├── chain_document_store.js v2 chain document store: span replacement, legality, reconciliation, undo
 │   ├── chain_strip.js          Pipeline strip: the chain as stage chips banded by carrier
+│   ├── chain_presentation.js  Catalog-backed chain labels and carrier presentation
 │   ├── solids.html             Conway operator playground (uses MeshOps bridge)
 │   ├── solids.css              Solids page layout and control styling
 │   ├── shared.js               Three.js scene boilerplate for the 3D tool pages
@@ -571,6 +587,7 @@ The same step runs with `just docs-check` and before `just docs` publishes the A
 │   ├── export_params.js        Formatter behind the GUI's Export action
 │   ├── flyout.js               Button-controlled flyout with outside-click and Escape dismissal
 │   ├── kb_format.js            Dependency-free kilobyte formatter shared by the stat readouts
+│   ├── labels.js              Shared display-label formatting
 │   ├── lissajous_math.js       Pure Lissajous curve math from lissajous.html
 │   ├── lissajous_page.js       Page module extracted from lissajous.html's inline script
 │   ├── mobius_page.js          Controller for the Möbius tool page
@@ -790,7 +807,7 @@ A typical effect frame follows a four-stage pipeline. Not every effect uses ever
 
 ### Pipeline Domain Transitions
 
-The filter pipeline operates across three stage domains. Each filter declares its domain; the pipeline converts world to screen coordinates at compile time and orders the stages by domain:
+The filter pipeline operates across three stage domains. Each filter declares its domain; the pipeline selects world-to-screen conversion at compile time and requires stages in nondecreasing domain order, rejecting misordered stages with a static assertion:
 
 ```
           World Space                Screen Space             Pixel Space
@@ -814,7 +831,7 @@ The filter pipeline operates across three stage domains. Each filter declares it
 
 **Pixel → Canvas**: The base `Pipeline<W,H>` (the identity terminal) rounds the coordinate to the nearest pixel, wraps the column into `[0, W)`, and composites the final color into `canvas(x, y)` with straight-alpha (`src * α + dst * (1-α)`) in linear light.
 
-**World filters** operate on the 3D vector before projection — they can rotate, replicate, or warp geometry in spherical coordinates without loss. **Screen filters** operate after projection but before integer snapping — they distribute sub-pixel energy for anti-aliasing and blur. **Pixel filters** operate per-frame on the full canvas — feedback and chromatic aberration read from the previous frame buffer.
+**World filters** operate on the 3D vector before projection — they can rotate, replicate, or warp geometry in spherical coordinates without loss. **Screen filters** operate after projection but before integer snapping — they distribute sub-pixel energy for anti-aliasing and blur. **Pixel filters** follow screen stages and receive the same fractional coordinates. `ChromaticShift` offsets color-channel taps; `Feedback` maintains framebuffer history and composites it when flushed.
 
 ### The Canvas
 
@@ -1024,7 +1041,7 @@ With `{.persist = true}`, `Canvas` copies the previous frame's buffer into the n
 
 ### Fenced Effect-to-Effect Transition (`control/transition.h`)
 
-**Reserved surface — no shipping consumer.** `EffectTransitionController` sequences one effect out and the next one in behind a display fence, so no frame ever shows a half-built effect: fade the output to dark, publish and wait out a clear frame, destroy the outgoing effect, construct the incoming one and render its first frame while the envelope is still 0, wait out that hidden frame, commit the identity, then fade back in. Any failure while constructing or preparing the incoming effect destroys it and rolls back through the outgoing effect's restore token; a rollback that itself fails, or one whose token declares no restorable state, lands in `CLEAR_FAILSAFE` — dark output, nothing installed — which only a fresh `request()` leaves. The controller holds no effect and renders nothing: `request()` arms a destination and each `tick()` advances through immediately available edges until it reaches an external wait.
+**Reserved surface — no shipping consumer.** `EffectTransitionController` sequences one effect out and the next one in behind a display fence, so no frame ever shows a half-built effect: fade the output to dark, publish and wait out a clear frame, destroy the outgoing effect, construct the incoming one and render its first frame while the envelope is still 0, wait out that hidden frame, commit the identity, then fade back in. Any failure while constructing or preparing the incoming effect destroys it and rolls back through the outgoing effect's restore token; a rollback that itself fails, or one whose token declares no restorable state, lands in `CLEAR_FAILSAFE` — dark output, nothing installed — which only a fresh `request()` leaves. The controller holds no effect and renders nothing: `request()` arms a destination and each `tick()` advances at most one state edge; the host must keep ticking through intermediate states as well as external waits.
 
 Every host-side operation the graph needs is a pure virtual on `EffectTransitionAdapter` — envelope, presentation fence, construct/destroy, handoff import, frame prepare/publish, identity commit, restore and fail-safe. The engine ships no implementation of it: today's effect swaps are unfenced, and the only adapter in the tree is the recording fixture in `tests/test_canvas.h` that drives every edge and failure branch. The header is kept as the design of record for a fenced swap, not as live machinery.
 
@@ -1230,7 +1247,7 @@ params.forEach(p => {
 });
 ```
 
-`getParamValues()` is polled after simulation steps and on invalidated frames to sync the GUI with parameter values that the animation system has changed autonomously. While paused, the panel continues reconciling on each animation frame. The sync skips any control the user is currently interacting with to avoid fighting the slider. A per-effect **Reset** rebuilds the GUI from defaults, and **Export** copies the current `{ name, value }` set as a C++-formatted initializer suitable for `PRESETS` tables. If a segmented-render parameter snapshot is temporarily unavailable after an edit, Export uses the values displayed by the current parameter schema. An effect that persists through the exhaustive versioned snapshot API instead of per-parameter values — the Shader workbench, which the engine answers `getFullConfigSnapshot()` for — takes the other branch: Export copies that snapshot as pretty-printed JSON, and fails visibly rather than falling back to an initializer when the snapshot is unavailable. An effect that reports presets also gets a **Preset** dropdown over the zero-indexed live index — a live control, not a readout: choosing an entry selects that preset — flanked by **Previous Preset** / **Next Preset** buttons that step it, and each sync first mirrors the live preset into the engine that owns the definitions, skipping the rest of the update when that mirror fails.
+`getParamValues()` is polled after simulation steps and on invalidated frames to sync the GUI with parameter values that the animation system has changed autonomously. While paused, the panel continues reconciling on each animation frame. The sync skips any control the user is currently interacting with to avoid fighting the slider. A per-effect **Reset** rebuilds the GUI from defaults, and **Export** copies the current `{ name, value }` set as a C++-formatted initializer suitable for `PRESETS` tables. If a segmented-render parameter snapshot is temporarily unavailable after an edit, Export uses the values displayed by the current parameter schema. An effect that persists through the exhaustive versioned snapshot API instead of per-parameter values — the Shader workbench, which the engine answers `getFullConfigSnapshot()` for — takes the other branch: Export copies that snapshot as pretty-printed JSON, and fails visibly rather than falling back to an initializer when the snapshot is unavailable. An effect that reports presets also gets a **Preset** dropdown over the zero-indexed live index — a live control, not a readout: choosing an entry selects that preset — flanked by **Previous Preset** / **Next Preset** buttons that step it, and each sync reconciles the schema before mirroring the live preset into the engine that owns the definitions. A failed mirror skips subsequent value synchronization.
 
 Three behaviours the definitions loop above does not show. **Stage folders**: pullback-shaded effects are grouped rather than listed flat — the panel matches the registered names against a per-effect stage assignment and builds one folder per pipeline stage, in pullback order; a parameter no stage claims is still built, at the panel's top level, and the orphan is logged. **Warnings**: a definition carrying a `warning` — the engine's answer to a value it accepted as a request but will not render — renders that text into a node beside the control (a node, not a `title` attribute, which would be mouse-only), and the panel re-reads the warning set after each edit and rebuilds once the engine's warnings have moved off the ones it was built from. **Persistence**: the panel restores itself across a reload, storing accepted parameter values for an ordinary effect and, for one on the full-config path, `getFullConfigSnapshot()` as JSON — replayed through `restoreFullConfigSnapshot()`, which is atomic, so a snapshot that fails to parse or that the engine rejects is dropped rather than half-applied.
 
@@ -1314,7 +1331,7 @@ Switching presets does a full WASM reset: `setResolution(w, h)` updates the acti
 
 ### 10.11 Standalone Design Tools (`daydream/tools/`)
 
-Five standalone HTML pages. Four render with Three.js; `palettes.html` renders with 2D canvas contexts. Three are backed by the engine's WASM build so their math stays identical to the C++ engine — `shader.html` through the authoring-only `Shader` effect, `solids.html` via the `MeshOps` class, and `palettes.html` via `PaletteOps` — and all three hard-require it: a failed module load raises a fatal banner instead of falling back. `lissajous.html` and `mobius.html` implement their geometry math directly in JavaScript:
+Five standalone HTML pages. Four render with Three.js; `palettes.html` renders with 2D canvas contexts. Three are backed by the engine's WASM build so their math stays identical to the C++ engine — `shader.html` through the authoring-only `ShaderChain` effect, `solids.html` via the `MeshOps` class, and `palettes.html` via `PaletteOps` — and all three hard-require it: a failed module load raises a fatal banner instead of falling back. `lissajous.html` and `mobius.html` implement their geometry math directly in JavaScript:
 
 | Tool | What it does |
 |---|---|
