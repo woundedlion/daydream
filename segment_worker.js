@@ -14,6 +14,7 @@
 import createHolosphereModule from "./holosphere_wasm.js";
 import { computeSegmentRange, extractSegment } from "./segment_layout.js";
 import { PROTOCOL_VERSION } from "./worker_protocol.js";
+import { engineHalted } from "./tools/engine_halt.js";
 
 /** @typedef {import('./worker_protocol.js').WorkerInboundMsg} WorkerInboundMsg */
 /** @typedef {import('./worker_protocol.js').ControllerInboundMsg} ControllerInboundMsg */
@@ -504,7 +505,7 @@ async function handleMessage(msg) {
           },
         };
       } catch (e) {
-        if (wasmModule?.HS_MODULE_DEAD === true) throw e;
+        if (engineHalted(e, wasmModule)) throw e;
         if (!arenaMetricsWarned) {
           console.warn('segment_worker: getArenaMetrics failed:', e);
           arenaMetricsWarned = true;
@@ -558,7 +559,7 @@ self.onmessage = (e) => {
   messageQueue = messageQueue
     .then(() => handleMessage(msg))
     .catch((err) => {
-      if (err instanceof WebAssembly.RuntimeError) engineDead = true;
+      if (engineHalted(err, wasmModule)) engineDead = true;
       setTimeout(() => { throw err; });
     });
   // The DOM worker ignores this; test harnesses await it to track the real
