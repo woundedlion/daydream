@@ -263,7 +263,7 @@ export function start({
   function abandonOnModuleDeath() {
     if (!host.moduleDead()) return false;
     console.error('Startup stopped: the rendering engine trapped.');
-    reportBootFailure(new Error(MODULE_TRAP_NOTICE), { document: doc, location: win.location });
+    reportBootFailure(MODULE_TRAP_NOTICE, { document: doc, location: win.location });
     appTeardown?.dispose();
     return true;
   }
