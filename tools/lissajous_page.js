@@ -227,6 +227,7 @@ const init = () => {
 
       const durationSlider = document.getElementById('Duration_slider');
       const durationContainer = document.getElementById('Duration_container');
+      if (!durationSlider || !durationContainer) return;
 
       if (state.isRationalLocked) {
         // snapFrequencies computes the domain while the lock holds.
