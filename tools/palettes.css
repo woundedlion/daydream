@@ -423,7 +423,7 @@ input[type=checkbox]:checked {
   padding-right: 0.25rem;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1024px) and (min-height: 700px) {
   html,
   body {
     height: 100%;
