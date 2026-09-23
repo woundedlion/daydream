@@ -32,7 +32,7 @@ const engineMissing = `no Holosphere checkout found in ${engineCandidates.join('
 const engineSkip = engineRoot || process.env.HOLOSPHERE_ENGINE_REQUIRED ? false : engineMissing;
 
 const STEREO_H = 'core/math/stereographic.h';
-const COLOR_H = 'core/color/color.h';
+const PALETTE_RECIPE_H = 'core/color/palette_recipe.h';
 const SOLIDS_H = 'core/mesh/solids.h';
 const ISLAMIC_STARS_H = 'effects/IslamicStars.h';
 
@@ -254,14 +254,14 @@ test('stereo and projectDiv match core/math/stereographic.h', { skip: engineSkip
  * The enumerators of an `enum class` whose members may carry explicit values,
  * keyed by the value each one is pinned to. A trailing unvalued COUNT is the
  * roster's size rather than a member of it.
- * @param {string} source - core/color/color.h text.
+ * @param {string} source - core/color/palette_recipe.h text.
  * @param {string} name - The enum's C++ name.
  * @returns {{roster: Map<number, string>, count: ?number}} Value -> enumerator
  *   name, and the COUNT sentinel's value when the enum declares one.
  */
 function engineValuedEnumerators(source, name) {
   const m = source.match(new RegExp(`enum class ${name}\\s*:\\s*uint8_t\\s*\\{([^}]*)\\}`));
-  assert.ok(m, `enum class ${name} not found in ${COLOR_H} — the reader is out of date`);
+  assert.ok(m, `enum class ${name} not found in ${PALETTE_RECIPE_H} — the reader is out of date`);
   const roster = new Map();
   let count = null;
   let next = 0;
@@ -283,7 +283,7 @@ function engineValuedEnumerators(source, name) {
 }
 
 // The two status enums a failed compile is reported through, as palette_math.js
-// names its rosters and as core/color/color.h declares them.
+// names its rosters and as core/color/palette_recipe.h declares them.
 const STATUS_ENUMS = [
   ['COMPILE_CODE_NAMES', 'PaletteCompileCode'],
   ['RECIPE_FIELD_NAMES', 'PaletteRecipeField'],
@@ -296,8 +296,8 @@ const STATUS_ENUMS = [
  * inserted or renumbered in the engine would otherwise re-label every message
  * silently and point the blame at the wrong recipe field.
  */
-test('the compile-status rosters match core/color/color.h', { skip: engineSkip }, () => {
-  const cpp = header(COLOR_H);
+test('the compile-status rosters match core/color/palette_recipe.h', { skip: engineSkip }, () => {
+  const cpp = header(PALETTE_RECIPE_H);
   for (const [roster, cppName] of STATUS_ENUMS) {
     const { roster: want, count } = engineValuedEnumerators(cpp, cppName);
     assert.ok(want.size > 0, `${cppName} yielded no enumerators — the reader is out of date`);
@@ -312,13 +312,13 @@ test('the compile-status rosters match core/color/color.h', { skip: engineSkip }
 
 /**
  * The non-static data members of a plain struct, in declaration order.
- * @param {string} source - core/color/color.h text.
+ * @param {string} source - core/color/palette_recipe.h text.
  * @param {string} name - The struct's C++ name.
  * @returns {{type: string, field: string}[]} Each member's declared type and name.
  */
 function engineStructFields(source, name) {
   const m = source.match(new RegExp(`struct ${name} \\{([\\s\\S]*?)\\n\\};`));
-  assert.ok(m, `struct ${name} not found in ${COLOR_H} — the reader is out of date`);
+  assert.ok(m, `struct ${name} not found in ${PALETTE_RECIPE_H} — the reader is out of date`);
   const fields = [];
   for (const decl of m[1].split(';')) {
     const text = decl.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '').trim();
@@ -333,7 +333,7 @@ function engineStructFields(source, name) {
 /**
  * Every leaf field below a struct, keyed by the dotted path a C++ assignment
  * reaches it through.
- * @param {string} source - core/color/color.h text.
+ * @param {string} source - core/color/palette_recipe.h text.
  * @param {string} name - The root struct's C++ name.
  * @returns {Map<string, string>} Path -> the leaf's declared C++ type.
  */
@@ -360,8 +360,8 @@ function engineLeafFields(source, name) {
  * suite green. The declared type is checked too, so an enum field emitted under
  * the wrong enum name — which does compile, as the wrong constant — fails here.
  */
-test('generativePaletteCpp assigns the fields core/color/color.h declares', { skip: engineSkip }, () => {
-  const cpp = header(COLOR_H);
+test('generativePaletteCpp assigns the fields core/color/palette_recipe.h declares', { skip: engineSkip }, () => {
+  const cpp = header(PALETTE_RECIPE_H);
   const js = readFileSync('tools/palette_math.js', 'utf8');
   const want = engineLeafFields(cpp, 'PaletteRecipe');
   assert.ok(want.size >= 20, `read only ${want.size} recipe fields — the reader is out of date`);
