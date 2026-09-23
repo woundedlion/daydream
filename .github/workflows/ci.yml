@@ -11,19 +11,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  gate:
+    name: Verified engine bundle
+    uses: ./.github/workflows/engine-bundle.yml
+    secrets:
+      POV_TOKEN: ${{ secrets.POV_TOKEN }}
+
   js-tests:
+    needs: gate
     name: Static and unit tests
     uses: ./.github/workflows/js-unit-suite.yml
+    with:
+      engine-bundle: true
     secrets:
       POV_TOKEN: ${{ secrets.POV_TOKEN }}
 
   browser:
+    needs: gate
     name: Browser tests
     uses: ./.github/workflows/browser-smoke.yml
+    with:
+      engine-bundle: true
 
   ci-green:
     name: CI green
     needs:
+      - gate
       - js-tests
       - browser
     if: always()
