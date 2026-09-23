@@ -454,7 +454,9 @@ export interface HolosphereModule {
   srgb_to_linear_interp(s: number): number;
   linear_rgb_to_oklab(r: number, g: number, b: number): { L: number; a: number; b: number };
   oklab_to_linear_rgb(L: number, a: number, b: number): { r: number; g: number; b: number };
+  /** Returns sRGB channels in the 8-bit range [0, 255]. */
   hsv_to_rgb(h: number, s: number, v: number): { r: number; g: number; b: number };
+  /** Returns linear RGB channels in the 16-bit range [0, 65535]. */
   procedural_palette_linear(
     a0: number, a1: number, a2: number, b0: number, b1: number, b2: number,
     c0: number, c1: number, c2: number, d0: number, d1: number, d2: number,
