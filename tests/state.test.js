@@ -414,9 +414,13 @@ test('URLSync bounds its retries of a refused history write', () => {
     assert.equal(captured.messages.filter((m) => m.startsWith('URLSync:')).length, 1,
       'the exhaustion is reported once, not once per refused write');
 
+    sync.setParam('speed', 7);
+    timer.fire();
+    assert.equal(sync.retries, 1, 'a later refused edit starts a fresh retry budget');
+    assert.equal(timer.delays.at(-1), URL_FLUSH_RETRY_MS);
     refuse = false;
-    sync.flush();
-    assert.deepEqual(written, ['/sim?effect=Voronoi'],
+    timer.fire();
+    assert.deepEqual(written, ['/sim?effect=Voronoi&speed=7'],
       'a tracked key is re-read from state, but the abandoned ad-hoc param is gone');
   } finally {
     captured.restore();
