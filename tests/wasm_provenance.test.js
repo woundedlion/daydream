@@ -21,7 +21,8 @@ const engineRoot = engineCandidates.find(
 const engineMissing = `no Holosphere checkout found in ${engineCandidates.join(', ')}`;
 const engineSkip = engineRoot || process.env.HOLOSPHERE_ENGINE_REQUIRED ? false : engineMissing;
 
-const committed = (root, path, revision = 'HEAD') => execFileSync(
+const enginePin = text('holosphere_wasm.sha').trim();
+const committed = (root, path, revision = enginePin) => execFileSync(
   'git', ['-C', root, 'show', `${revision}:${path}`], { encoding: 'buffer' });
 
 function cppFloatConstant(source, name) {
@@ -86,11 +87,10 @@ const controlNameCorpus = () => {
 // predicates for the browser: the live topology field, the baked topology set,
 // the baked-constant exemption and the control-name alias table. That module is
 // not installed here, so the two are pinned by behaviour rather than by bytes.
-test('the browser promoted-binding predicates agree with engine HEAD',
+test('the browser promoted-binding predicates agree with the installed engine pin',
   { skip: engineSkip }, async (t) => {
     assert.ok(engineRoot, engineMissing);
-    const revision = execFileSync('git', ['-C', engineRoot, 'rev-parse', 'HEAD'],
-      { encoding: 'utf8' }).trim();
+    const revision = enginePin;
     const snapshot = mkdtempSync(resolve(tmpdir(), 'daydream-engine-predicates-'));
     t.after(() => rmSync(snapshot, { recursive: true, force: true }));
     for (const name of ['wasm_smoke_predicates.mjs', 'shader_workbench.mjs', 'sha256.mjs'])
@@ -100,18 +100,18 @@ test('the browser promoted-binding predicates agree with engine HEAD',
     assert.deepEqual(
       [...bakedTopologyFields(catalog)].sort(),
       [...predicates.bakedTopologyFields(catalog)].sort(),
-      'the baked topology fields drifted from engine HEAD',
+      'the baked topology fields drifted from the installed engine pin',
     );
     assert.deepEqual(
       [...BAKED_CONSTANT_IDS].sort(),
       [...predicates.BAKED_CONSTANT_IDS].sort(),
-      'the baked-constant exemption drifted from engine HEAD',
+      'the baked-constant exemption drifted from the installed engine pin',
     );
     for (const parameterId of controlNameCorpus()) {
       assert.deepEqual(
         engineParameterNames(parameterId),
         predicates.engineControlNames(parameterId),
-        `the control names for "${parameterId}" drifted from engine HEAD`,
+        `the control names for "${parameterId}" drifted from the installed engine pin`,
       );
     }
   });
@@ -150,7 +150,7 @@ test('MORPH_SWEEP matches the engine morphability constants', { skip: engineSkip
       truncate: { min: truncateMin, max: 1 - amboEpsilon, excluded: [Number(truncate[1])] },
       chamfer: { min: chamferMin, max: chamferMax },
     },
-    'tools/solid_codegen.js MORPH_SWEEP drifted from engine HEAD',
+    'tools/solid_codegen.js MORPH_SWEEP drifted from the installed engine pin',
   );
 });
 

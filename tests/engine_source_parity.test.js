@@ -7,7 +7,7 @@
 // binary was built from (holosphere_wasm.sha). Reading the headers covers the
 // values no export reaches — the projection constants, the compile-status
 // rosters, the recipe field paths, the seed constants and the build-step cap —
-// and sees an edit at engine HEAD before a rebuild.
+// at the engine revision recorded alongside the installed WASM.
 //
 // The engine is a separate repository. The JS unit suite checks it out and sets
 // HOLOSPHERE_ENGINE_REQUIRED, under which a missing tree fails instead of
@@ -15,6 +15,7 @@
 // skip is why the workflow's own declaration of the flag is pinned from
 // tests/wasm_provenance.test.js, which never skips.
 import { test } from 'node:test';
+import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -31,6 +32,8 @@ const engineRoot = engineCandidates.find(
 const engineMissing = `no Holosphere checkout found in ${engineCandidates.join(', ')}`;
 const engineSkip = engineRoot || process.env.HOLOSPHERE_ENGINE_REQUIRED ? false : engineMissing;
 
+const enginePin = readFileSync(new URL('../holosphere_wasm.sha', import.meta.url), 'utf8').trim();
+
 const STEREO_H = 'core/math/stereographic.h';
 const MOBIUS_H = 'core/math/mobius.h';
 const PALETTE_RECIPE_H = 'core/color/palette_recipe.h';
@@ -38,13 +41,14 @@ const SOLIDS_H = 'core/mesh/solids.h';
 const ISLAMIC_STARS_H = 'effects/IslamicStars.h';
 
 /**
- * Reads an engine header from the checkout's working tree.
+ * Reads an engine header from the installed module's source revision.
  * @param {string} path - Path below the engine root.
  * @returns {string} The file's text.
  */
 const header = (path) => {
   assert.ok(engineRoot, engineMissing);
-  return readFileSync(resolve(engineRoot, path), 'utf8');
+  return execFileSync('git', ['-C', engineRoot, 'show', `${enginePin}:${path}`],
+    { encoding: 'utf8' });
 };
 
 /**
