@@ -488,6 +488,23 @@ test('a recorder fault reports its reason and stops offering to stop', () => {
   assert.equal(rig.button.label, '\u25cf Record');
 });
 
+test('recording memory notices follow the selected bitrate', () => {
+  const rig = recordingRig();
+  rig.attach(fakeRecorder());
+  rig.settings.recQuality = 10;
+  rig.button.object.record();
+  const first = rig.notices.at(-1).match(/up to ([\d.]+) MB.*about (\d+) seconds/);
+  assert.ok(first, rig.notices.at(-1));
+  assert.ok(Number(first[1]) > 0);
+  rig.button.object.record();
+  rig.settings.recQuality = 20;
+  rig.button.object.record();
+  const second = rig.notices.at(-1).match(/up to ([\d.]+) MB.*about (\d+) seconds/);
+  assert.ok(second, rig.notices.at(-1));
+  assert.equal(second[1], first[1]);
+  assert.equal(Number(second[2]), Math.floor(Number(first[2]) / 2));
+});
+
 test('a completed recording save failure preserves the current recording controls', () => {
   const rig = recordingRig();
   const recorder = rig.attach(fakeRecorder());
@@ -652,6 +669,46 @@ test('a segmented-POV failure is announced and returns the toggle', async (t) =>
     + 'latched runtime faults');
   assert.equal(enabled.object[enabled.property], false,
     'the failed switch leaves the bound state disabled');
+});
+
+test('segmented controls reconcile a mobile spawn and resize without a second pool', async (t) => {
+  const gui = fakeGui('view');
+  const created = [];
+  const driver = { isMobile: false };
+  const segments = {
+    active: false, count: 8, showBoundaries: false,
+    destroyed: 0, stats: 0,
+    create(count) { this.count = count; created.push(count); },
+    destroy() { this.destroyed += 1; },
+    updateStats() { this.stats += 1; },
+  };
+  let finishWarm;
+  t.mock.method(pageWarmer, 'warm', () => new Promise(resolve => { finishWarm = resolve; }));
+  const notices = [];
+  createSegmentedPovControls({ gui, segments, nav: { hardwareConcurrency: 8 }, driver,
+    showNotice: message => notices.push(message) });
+  const controls = gui.folders[0].controllers;
+  const enabled = controls.find(control => control.property === 'segmented');
+  const count = controls.find(control => control.property === 'segments');
+  enabled.object.segmented = true;
+  const start = enabled.changed(true);
+  driver.isMobile = true;
+  finishWarm();
+  await start;
+  assert.deepEqual(created, [4]);
+  assert.equal(count.object.segments, 4);
+  assert.equal(segments.active, true);
+  t.mock.method(pageWarmer, 'warm', async () => {});
+  count.object.segments = 2;
+  await count.changed(2);
+  assert.deepEqual(created, [4, 2]);
+  assert.equal(count.object.segments, 2);
+  enabled.object.segmented = false;
+  await enabled.changed(false);
+  assert.equal(segments.active, false);
+  assert.equal(segments.destroyed, 1);
+  assert.equal(segments.stats, 1);
+  assert.deepEqual(notices, []);
 });
 
 test('the segmented controls report under the switch owner tag', () => {
