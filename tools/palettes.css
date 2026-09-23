@@ -83,7 +83,7 @@ body {
   border: 1px solid var(--slate-600);
   border-radius: 0.375rem;
   background: var(--slate-700);
-  color: #CBD5E1;
+  color: var(--slate-300);
   font-size: 0.75rem;
   cursor: pointer;
 }
@@ -99,7 +99,7 @@ body {
   border: 1px solid var(--slate-600);
   border-radius: 0.375rem;
   background: var(--slate-700);
-  color: #CBD5E1;
+  color: var(--slate-300);
   font-size: 0.75rem;
 }
 
@@ -191,7 +191,7 @@ body {
 }
 
 .recipe-field > label {
-  color: #CBD5E1;
+  color: var(--slate-300);
   font-size: 0.75rem;
   font-weight: 600;
   line-height: 1rem;
@@ -241,7 +241,7 @@ body {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.25rem 0.625rem;
-  color: #CBD5E1;
+  color: var(--slate-300);
   font-size: 0.6875rem;
   line-height: 0.875rem;
 }
@@ -588,7 +588,7 @@ input[type=checkbox] {
   align-self: center;
   padding: 0.5rem 0.625rem;
   font-size: 0.8125rem;
-  color: #CBD5E1;
+  color: var(--slate-300);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
