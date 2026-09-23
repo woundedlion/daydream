@@ -690,11 +690,18 @@ function mountSlider(def) {
   slider.addEventListener('mousedown', seedLockedDrag);
   slider.addEventListener('touchstart', seedLockedDrag, { passive: true });
   slider.addEventListener('keydown', seedLockedDrag);
+  slider.addEventListener('wheel', seedLockedDrag, { passive: true });
 
   slider.addEventListener('mouseup', () => {
     lockedDragStartValues = {};
   });
   slider.addEventListener('touchend', () => {
+    lockedDragStartValues = {};
+  });
+  slider.addEventListener('keyup', () => {
+    lockedDragStartValues = {};
+  });
+  slider.addEventListener('blur', () => {
     lockedDragStartValues = {};
   });
 }
