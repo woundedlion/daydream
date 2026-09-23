@@ -389,6 +389,7 @@ function recordingRig({ labelAxes = false } = {}) {
   const driver = {
     frameInterval: 62.5, labelAxes, recorder: null, invalidations: 0,
     invalidate() { this.invalidations += 1; },
+    stepOnce() { this.invalidations += 1; },
   };
   const notices = [];
   let recorder = null;

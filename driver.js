@@ -522,6 +522,11 @@ export class Daydream {
     this.needsRender = true;
   }
 
+  stepOnce() {
+    this.stepFrames = Math.max(1, this.stepFrames);
+    this.invalidate();
+  }
+
   /**
    * Request a repaint on the next animation frame. For on-demand rendering:
    * callers that mutate the visible scene without advancing the simulation or
