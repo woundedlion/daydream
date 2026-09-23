@@ -1645,18 +1645,35 @@ test('unsweepableReason names the ops the engine morph path declines', () => {
     'the slider also reaches below it');
 });
 
+test('truncate reports the topology pinch after conversion to engine float precision', () => {
+  for (const t of [0.5, 0.5 - 2 ** -26, 0.5 + 2 ** -26]) {
+    assert.match(unsweepableReason({ op: 'truncate', params: { t } }),
+      /^truncate cannot sweep t at 0\.5:/, `${t} becomes the engine pinch`);
+  }
+  for (const t of [0.5 - 2 ** -25, 0.5 + 2 ** -24]) {
+    assert.equal(unsweepableReason({ op: 'truncate', params: { t } }), null,
+      `${t} remains outside the pinch`);
+  }
+  assert.equal(unsweepableReason({ op: 'bevel', params: { t: 0.5 } }), null,
+    'bevel lowers its pinch to AMBO before morphability is checked');
+});
+
 test('a slider reaching past its swept band is reported rather than silent', () => {
   const overreaching = [];
   for (const [op, band] of Object.entries(MORPH_SWEEP)) {
     if (!band) continue;
-    for (const [key, { min, max }] of Object.entries(band)) {
+    for (const [key, { min, max, excluded = [] }] of Object.entries(band)) {
       const def = OP_DEFS[op].params[key];
       assert.ok(def, `MORPH_SWEEP bounds ${op}.${key}, which OP_DEFS does not declare`);
       if (def.min >= min && def.max <= max) {
-        assert.equal(unsweepableReason({ op, params: { [key]: def.min } }), null,
-          `${op} keeps ${key} inside its band, so no slider position is reported`);
-        assert.equal(unsweepableReason({ op, params: { [key]: def.max } }), null,
-          `${op} keeps ${key} inside its band, so no slider position is reported`);
+        for (const endpoint of [def.min, def.max]) {
+          const reason = unsweepableReason({ op, params: { [key]: endpoint } });
+          if (excluded.includes(Math.fround(endpoint))) {
+            assert.match(reason, new RegExp(`^${op} cannot sweep ${key}`));
+          } else {
+            assert.equal(reason, null, `${op}.${key}=${endpoint} remains inside its band`);
+          }
+        }
         continue;
       }
       overreaching.push(`${op}.${key}`);
