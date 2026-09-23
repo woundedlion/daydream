@@ -70,7 +70,7 @@ afterEach(() => { animationFrames.restore(); });
 
 test('shader state hashes round-trip the complete authoring state', async () => {
   const state = {
-    document: { document_id: 'study-λ', descriptor: { chain: [] } },
+    document: { document_id: 'study-λ', descriptor: { chain: [{ label: 'camera' }, { label: 'warp1' }] } },
     preset: 'night',
     bypassed: ['camera', 'warp1'],
     paused: true,
