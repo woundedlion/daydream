@@ -32,11 +32,11 @@
 </head>
 
 <body class="tool-fixed-page">
-  <div id="canvasContainer" class="tool-stage">
+  <div id="canvasContainer" class="tool-stage" role="main" aria-label="Curve preview">
     <canvas id="threeCanvas" class="w-full h-full" role="img" aria-label="Real-time 3D preview of the Lissajous curve"></canvas>
   </div>
 
-  <div id="controls" class="tool-panel space-y-6">
+  <div id="controls" class="tool-panel space-y-6" role="complementary" aria-label="Curve controls">
     <h1 class="text-3xl font-bold text-white text-center">Lissajous Visualizer</h1>
     <p class="text-sm text-gray-400 text-center">
       Spherical Lissajous Curve (on unit sphere): F(t) = (R sin(C₂t) cos(C₁t - A), R cos(C₂t), R sin(C₂t) sin(C₁t

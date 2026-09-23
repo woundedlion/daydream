@@ -24,11 +24,11 @@
 
 <body class="tool-fixed-page">
   <h1 class="visually-hidden">Mobius Transformation Visualizer</h1>
-  <div id="canvasContainer">
+  <div id="canvasContainer" role="main" aria-label="Transformation preview">
     <canvas id="threeCanvas" class="w-full h-full" role="img" aria-label="Real-time 3D preview of the Möbius transformation"></canvas>
   </div>
 
-  <div id="presetSidebar">
+  <div id="presetSidebar" role="complementary" aria-label="Presets">
     <h2 class="text-lg font-bold text-white mb-4 border-b border-slate-700 pb-2">Presets</h2>
     <div id="presetList"></div>
     <div class="mt-4 p-3 bg-slate-800 rounded border border-slate-700">
@@ -38,7 +38,7 @@
     </div>
   </div>
 
-  <div id="controls">
+  <div id="controls" role="region" aria-label="Transformation controls">
     <div class="flex justify-between items-center mb-2 px-2 w-full max-w-7xl mx-auto">
       <div class="flex flex-col">
         <h2 class="text-lg font-bold text-white leading-tight">Mobius Visualizer</h2>
