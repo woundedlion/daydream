@@ -435,6 +435,8 @@ export function createEffectGui({ engine, segments, config, host }) {
     // Mirroring the preset can itself load a new schema, so the rebuild follows
     // it — but a refusal must not gate the rebuild, which is what clears the
     // stale schema a refusal comes from.
+    const presetAdvanced = activeEffect.preset
+      && activeEffect.preset.state.presetIndex !== presetIndex;
     const presetSynced = synchronizePreset(presetIndex);
     // Where the parameters render is external state: adopting a document moves
     // them onto the pipeline strip without moving the schema generation, so the
@@ -455,7 +457,8 @@ export function createEffectGui({ engine, segments, config, host }) {
     // the panel's one per-frame allocation. Only an engine-driven selector moves
     // its requested value on its own; every other source of one — a control, a
     // preset, a rebuild — re-seats the selectors itself.
-    if (advanced && activeEffect.hasAnimatedEnums) {
+    if (advanced && activeEffect.hasEnumControls
+        && (activeEffect.hasAnimatedEnums || presetAdvanced)) {
       adoptRequestedEnums(activeEffect, focused);
     }
 
