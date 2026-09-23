@@ -1863,3 +1863,42 @@ test('an oversized file is rejected before reading and clears the picker', async
   assert.equal(status.dataset.status, 'error');
   assert.match(status.textContent, /document byte limit was exceeded/);
 });
+
+test('disposing a document controller flushes edits and releases its whole UI', async () => {
+  const harness = await editorWorkbench({ source: null });
+  const events = [
+    ['shader-document-select', 'change'], ['shader-preset-select', 'change'],
+    ['shader-document-open', 'click'], ['shader-document-file', 'change'],
+    ['shader-document-save', 'click'], ['shader-document-save-as', 'click'],
+    ['shader-animation-toggle', 'click'], ['shader-parity-toggle', 'click'],
+    ['shader-document-digest', 'click'],
+  ];
+  for (const [id, type] of events)
+    assert.equal(harness.elements.get(id).listeners.filter((entry) => entry.type === type).length, 1, id);
+  const lateAnimation = harness.elements.get('shader-animation-toggle').listeners
+    .find((entry) => entry.type === 'click').handler;
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    harness.urls.length = 0;
+    const slider = sampleFrequencySlider(harness);
+    slider.value = '8';
+    slider.dispatch('input');
+    await harness.controller.dispose();
+    ownedEditors.delete(harness.controller);
+    assert.equal(harness.urls.length, 1);
+    const linked = await decodeShaderStateHash(harness.win.location.hash);
+    assert.equal(linked.document.preset_bank.presets[0].values['sample.pattern-freq'], 8);
+    for (const [id, type] of events)
+      assert.equal(harness.elements.get(id).listeners.filter((entry) => entry.type === type).length, 0, id);
+    assert.equal(harness.elements.get('chain-strip').querySelectorAll('.chain-chip').length, 0);
+    assert.equal(harness.elements.get('chain-strip').children[0].listeners.length, 0);
+    assert.equal(harness.filters.at(-1), null);
+    lateAnimation();
+    const reads = harness.pausedReads();
+    mock.timers.tick(SHADER_LINK_MAX_WAIT_MS * 2);
+    assert.equal(harness.pausedReads(), reads, 'a disposed link writer schedules no later writes');
+    assert.equal(harness.urls.length, 1);
+  } finally {
+    mock.timers.reset();
+  }
+});
