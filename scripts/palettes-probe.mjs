@@ -84,6 +84,18 @@ export async function probeColorStrip(tab) {
   const at = (position) => ({
     x: box.x + box.width * position, y: box.y + box.height / 2,
   });
+  await tab.click('#lock_A');
+  const values = () => tab.$$eval('[id^="A_"][id$="_slider"]',
+    (nodes) => nodes.map((node) => Number(node.value)));
+  const before = await values();
+  const slider = await tab.$('#A_R_slider');
+  await slider.focus();
+  await tab.keyboard.press('ArrowRight');
+  const after = await values();
+  const delta = after[0] - before[0];
+  check(delta !== 0 && after.every((value, i) => Math.abs(value - before[i] - delta) < 1e-6),
+    'locking RGB moves all channels by the same amount');
+  await tab.click('#lock_A');
   const opening = await headingRange(tab);
   check(opening.start === 0 && opening.end === 1,
     `the strip opens on the whole palette (${opening.start}, ${opening.end})`);
@@ -153,6 +165,18 @@ export async function probeHueWheel(tab) {
   await tab.waitForFunction(
     (selector) => document.querySelectorAll(selector).length >= 2, {}, HANDLES);
 
+  await tab.click('#lock_A');
+  const values = () => tab.$$eval('[id^="A_"][id$="_slider"]',
+    (nodes) => nodes.map((node) => Number(node.value)));
+  const before = await values();
+  const slider = await tab.$('#A_R_slider');
+  await slider.focus();
+  await tab.keyboard.press('ArrowRight');
+  const after = await values();
+  const delta = after[0] - before[0];
+  check(delta !== 0 && after.every((value, i) => Math.abs(value - before[i] - delta) < 1e-6),
+    'locking RGB moves all channels by the same amount');
+  await tab.click('#lock_A');
   const opening = await settledHueDegrees(tab);
   check(opening.length >= 2, `the wheel publishes ${opening.length} hue keys`);
 
