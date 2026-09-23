@@ -484,7 +484,8 @@ function makeApp({
       setStrobeColumns: (n) => log.push(`driver.setStrobeColumns ${n}`),
       updateResolution: (w, h, dot) =>
         log.push(`driver.updateResolution ${w}x${h}@${dot}`),
-      invalidate: () => log.push('driver.invalidate'),
+      invalidate: () => log.push('driver.stepOnce'),
+      stepOnce: () => log.push('driver.stepOnce'),
     },
     sidebar: {
       setActive: (name) => log.push(`sidebar.setActive ${name}`),
@@ -518,6 +519,7 @@ test('applying an effect points the engine at it and rebuilds the panel', () => 
     'effectGui.mount',
     'effectGui.applyAnimationPause',
     'sidebar.setActive Alpha',
+    'driver.stepOnce',
   ]);
 });
 
@@ -543,10 +545,11 @@ test('a segmented pool is told which effect to render', () => {
 
   app.pipeline.applyEffect();
 
-  assert.deepEqual(app.log.slice(-3), [
+  assert.deepEqual(app.log.slice(-4), [
     'segments.setEffect Alpha',
     'effectGui.applyAnimationPause',
     'sidebar.setActive Alpha',
+    'driver.stepOnce',
   ]);
 });
 
@@ -565,6 +568,7 @@ test('a segmented switch rebuilds the worker effect after the panel', () => {
     'segments.setEffect Alpha',
     'effectGui.applyAnimationPause',
     'sidebar.setActive Alpha',
+    'driver.stepOnce',
   ]);
 });
 
@@ -582,6 +586,7 @@ test('a preserved pause is committed after the segmented effect rebuild', () => 
     'segments.setEffect Alpha',
     'effectGui.applyAnimationPause',
     'sidebar.setActive Alpha',
+    'driver.stepOnce',
   ]);
 });
 
@@ -596,6 +601,7 @@ test('an engine that has not loaded yet still gets a sidebar and a mount point',
     'effectGui.mount',
     'effectGui.applyAnimationPause',
     'sidebar.setActive Alpha',
+    'driver.stepOnce',
   ]);
 });
 
@@ -619,9 +625,9 @@ test('a resolution change waits for main acceptance before resizing workers', ()
     'effectGui.mount',
     'effectGui.applyAnimationPause',
     'sidebar.setActive Alpha',
+    'driver.stepOnce',
     'segments.setResolution 288x144',
     'segments.setEffect Alpha',
-    'driver.invalidate',
   ]);
 });
 
@@ -709,7 +715,7 @@ test('an off-list effect is corrected and applied exactly once', () => {
   assert.equal(app.state.effect, 'Alpha');
   assert.deepEqual(app.log.filter((entry) => entry === 'effectGui.build'),
     ['effectGui.build'], 'the correction applied the effect exactly once');
-  assert.deepEqual(app.log.slice(-2), ['sidebar.setActive Alpha', 'driver.invalidate']);
+  assert.deepEqual(app.log.slice(-2), ['sidebar.setActive Alpha', 'driver.stepOnce']);
 });
 
 /**
@@ -728,7 +734,7 @@ test('a correction the engine refuses does not re-enter the subscription', () =>
 
   assert.deepEqual(app.log.filter((entry) => entry === 'engine.setEffect Alpha'),
     ['engine.setEffect Alpha'], 'the subscription re-applied the correction');
-  assert.equal(app.log.includes('driver.invalidate'), false);
+  assert.equal(app.log.includes('driver.stepOnce'), false);
 });
 
 test('a correction drops the outgoing effect param URL entries', () => {
@@ -772,5 +778,5 @@ test('an effect the resized engine rejects rejects the resolution change', () =>
 
   assert.equal(app.pipeline.applyResolution(), ApplyResult.REJECTED);
 
-  assert.equal(app.log.includes('driver.invalidate'), false);
+  assert.equal(app.log.includes('driver.stepOnce'), false);
 });

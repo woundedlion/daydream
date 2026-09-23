@@ -351,7 +351,7 @@ export function createSwitchCoordinator({
  *   param URL entries.
  * @param {{active: boolean, setEffect: (effect: string) => void,
  *   setResolution: (w: number, h: number) => void}} deps.segments - The SegmentController.
- * @param {{setStrobeColumns: (strobe: boolean) => void, invalidate: () => void,
+ * @param {{setStrobeColumns: (strobe: boolean) => void, invalidate: () => void, stepOnce: () => void,
  *   updateResolution: (w: number, h: number, dotSize: number) => void}} deps.driver -
  *   The Daydream driver.
  * @param {{setActive: (effect: string) => void,
@@ -434,6 +434,7 @@ export function createApplyPipeline({
     effectGui.applyAnimationPause();
 
     sidebar.setActive(appState.get('effect'));
+    driver.stepOnce();
     return ApplyResult.APPLIED;
   }
 
@@ -522,7 +523,6 @@ export function createApplyPipeline({
       segments.setResolution(p.w, p.h);
       segments.setEffect(appState.get('effect'));
     }
-    driver.invalidate();
     return ApplyResult.APPLIED;
   }
 

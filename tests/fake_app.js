@@ -172,6 +172,7 @@ export function fakeDriver() {
     keys: [],
     frames: 0,
     invalidate() { this.invalidated = true; },
+    stepOnce() { this.invalidated = true; },
     keydown(e) { this.keys.push(e); },
     setStrobeColumns(strobe) { this.strobe = strobe; },
     updateResolution(w, h, dotSize) {
