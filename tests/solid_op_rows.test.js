@@ -90,7 +90,8 @@ test('parameter rows carry the OP_DEFS range and the current value', () => {
   assert.equal(range(tRow).step, '0.01');
   assert.equal(range(tRow).value, '0.5');
   assert.equal(number(twistRow).value, '0.28');
-  assert.equal(number(twistRow).getAttribute('aria-label'), 'snub twist value');
+  assert.equal(number(twistRow).getAttribute('aria-label'), 'snub twist (radians) value');
+  assert.equal(twistRow.children.at(-1).textContent, 'rad');
   assert.equal(tRow.children[0].htmlFor, range(tRow).id);
 });
 
@@ -98,7 +99,8 @@ test('every op parameter control is named by its op, not by the bare key', () =>
   const { el } = build({ op: 'snub', params: { t: 0.5, twist: 0.28 } });
   for (const row of el.querySelectorAll('.op-param')) {
     const range = row.children.find((c) => c.type === 'range');
-    assert.equal(range.getAttribute('aria-label'), `snub ${row.dataset.key}`,
+    assert.equal(range.getAttribute('aria-label'),
+      row.dataset.key === 'twist' ? 'snub twist (radians)' : 'snub t',
       'a chain of truncate + chamfer + bevel otherwise announces three sliders '
       + 'all called "t"');
   }

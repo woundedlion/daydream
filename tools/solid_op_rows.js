@@ -99,6 +99,8 @@ function buildParamRow(doc, key, def, value, controlId, opName) {
   const row = doc.createElement('div');
   row.className = 'op-param flex items-center text-[0.6rem] space-x-1';
   row.dataset.key = key;
+  const unitText = key === 'angle' ? 'degrees' : key === 'twist' ? 'radians' : '';
+  const accessibleName = `${opName} ${key}${unitText ? ` (${unitText})` : ''}`;
 
   const name = doc.createElement('label');
   name.className = 'w-12 text-slate-400 capitalize truncate';
@@ -110,7 +112,7 @@ function buildParamRow(doc, key, def, value, controlId, opName) {
   range.id = `${controlId}-range`;
   // The visible label is the bare key, which repeats across the chain; the
   // aria-label overrides it so each op's slider is named by its own op.
-  range.setAttribute('aria-label', `${opName} ${key}`);
+  range.setAttribute('aria-label', accessibleName);
   range.className = 'flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer min-w-0';
   range.min = String(def.min);
   range.max = String(def.max);
@@ -119,7 +121,7 @@ function buildParamRow(doc, key, def, value, controlId, opName) {
 
   const number = doc.createElement('input');
   number.type = 'number';
-  number.setAttribute('aria-label', `${opName} ${key} value`);
+  number.setAttribute('aria-label', `${accessibleName} value`);
   // At 0.6rem on the row's --slate-800, slate-300/400 are the lightest pair that
   // keeps the value ahead of its unit and both over the 4.5:1 WCAG AA floor.
   number.className = 'w-12 bg-transparent text-right font-mono text-slate-300 focus:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
@@ -131,7 +133,7 @@ function buildParamRow(doc, key, def, value, controlId, opName) {
   const unit = doc.createElement('span');
   unit.className = 'text-[0.5rem] text-slate-400 ml-0.5';
   unit.setAttribute('aria-hidden', 'true');
-  unit.textContent = key === 'angle' ? 'deg' : '';
+  unit.textContent = key === 'angle' ? 'deg' : key === 'twist' ? 'rad' : '';
 
   row.append(name, range, number, unit);
   return { row, range, number };
