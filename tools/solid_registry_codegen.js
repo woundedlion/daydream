@@ -32,7 +32,7 @@ export const MAX_BUILD_STEPS = 8;
 const DOUBLE_STEP_OPS = new Set(['gyro', 'needle', 'zip', 'bevel']);
 
 /** @param {string} op @returns {number} Lowered primitive count. */
-function primitiveCount(op) {
+export function primitiveCount(op) {
   return op === 'meta' ? 3 : DOUBLE_STEP_OPS.has(op) ? 2 : 1;
 }
 
