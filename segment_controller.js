@@ -602,11 +602,11 @@ export class SegmentController {
             // Mirror segment 0's live params for GUI sync, inside the fence so a
             // stale-generation frame can't publish params against a new descriptor
             // list.
-            if (msg.segId === 0 && msg.paramValues
-                && msg.paramRevision === this.paramRevision) {
-              this.paramValues = msg.paramValues;
+            if (msg.segId === 0) {
               this.presetCount = msg.presetCount ?? null;
               this.presetIndex = msg.presetIndex ?? null;
+              if (msg.paramValues && msg.paramRevision === this.paramRevision)
+                this.paramValues = msg.paramValues;
             }
             this.#scratch[msg.segId] = {
               pixels: msg.pixels,

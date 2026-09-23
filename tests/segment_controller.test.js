@@ -953,10 +953,12 @@ test('an in-flight frame cannot republish parameter values from before a GUI wri
     'the previous snapshot is withheld until a worker acknowledges the write');
 
   deliverFrame(c, 0, {
-    paramValues: [0.25], paramRevision: staleRevision,
+    paramValues: [0.25], paramRevision: staleRevision, presetCount: 4, presetIndex: 3,
   });
   assert.equal(c.getParamValues(), null,
     'a frame rendered before the write cannot move the slider back');
+  assert.equal(c.presetCount, 4);
+  assert.equal(c.presetIndex, 3, 'preset mirroring continues while slider revisions advance');
   deliverFrame(c, 1, { paramRevision: staleRevision });
   await done;
 
