@@ -48,6 +48,7 @@ const buildRoot = () => {
   mkdirSync(join(root, 'node_modules'), { recursive: true });
   symlinkSync(resolve(HERE, '../node_modules/espree'), join(root, 'node_modules/espree'), 'junction');
   copyFileSync(SCRIPT_SRC, join(root, 'scripts', 'generate-importmap.mjs'));
+  copyFileSync(resolve(HERE, '../scripts/vendor-imports.mjs'), join(root, 'scripts/vendor-imports.mjs'));
   writeFileSync(join(root, 'package.json'), PKG);
   writeFileSync(join(root, 'vendor-importmap.js'), IMPORTMAP);
   execFileSync('git', ['init', '-q'], { cwd: root, env });
