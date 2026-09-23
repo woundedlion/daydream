@@ -410,7 +410,7 @@ body {
 
 /* Small screens: the three side-by-side columns don't fit, so stack them
    (canvas, then controls, then saved solids) and let the page scroll. */
-@media (max-width: 640px) {
+@media (max-width: 900px) {
   body {
     flex-direction: column;
     height: auto;
