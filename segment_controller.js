@@ -134,7 +134,7 @@ export class SegmentController {
 
   /**
    * Per-segment clip disposition of the last reported frame: true when that
-   * worker's effect reports needs_full_frame() and it shaded the whole canvas
+   * worker's effect reports needs_full_frame() || persists_pixels() and it shaded the whole canvas
    * instead of its band. The pool is only N-way parallel where this is false.
    * @type {boolean[]}
    */

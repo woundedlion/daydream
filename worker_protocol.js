@@ -181,7 +181,7 @@ export const PROTOCOL_VERSION = 9;
  *
  * `fullFrame` is the disposition of the worker's last setClip: false when the
  * band was installed (`APPLIED`) and the engine shaded only the rectangle, true
- * when the effect reports `needs_full_frame()` (`FULL_FRAME_KEPT`) and the
+ * when the effect reports `needs_full_frame() || persists_pixels()` (`FULL_FRAME_KEPT`) and the
  * engine shaded the whole canvas for the rectangle to be sliced out of. Carrying
  * it is what lets the pool tell an N-way parallel speedup from N workers each
  * computing the same full frame; `elapsed` alone cannot.
