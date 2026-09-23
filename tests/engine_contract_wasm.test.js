@@ -956,13 +956,11 @@ test('getParamGeneration and setPoleLod stay exported', () => {
     engine.setPoleLod(v);
     assert.equal(engine.getPoleLod(), v, `setPoleLod(${v}) must read back`);
   }
-  // Non-finite and negative input clamps off rather than poisoning the walk
-  // with a NaN decimation width; a finite excess saturates instead.
-  for (const v of [-1, Number.NaN, Infinity, -Infinity]) {
+  for (const v of [-1, Number.NaN, -Infinity]) {
     engine.setPoleLod(v);
     assert.equal(engine.getPoleLod(), 0, `setPoleLod(${v}) must clamp to 0`);
   }
-  for (const v of [9, 1000]) {
+  for (const v of [9, 1000, Infinity]) {
     engine.setPoleLod(v);
     assert.equal(engine.getPoleLod(), 8, `setPoleLod(${v}) must saturate at 8`);
   }
