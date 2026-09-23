@@ -134,10 +134,7 @@ body {
 }
 
 /* Visible keyboard-focus ring for the pad's per-axis slider handles. */
-.complex-plane-control:focus-within {
-  outline: 2px solid var(--blue-500);
-  outline-offset: 2px;
-}
+
 
 .complex-plane-control:has([aria-orientation="horizontal"]:focus-visible) .axis-h,
 .complex-plane-control:has([aria-orientation="vertical"]:focus-visible) .axis-v {

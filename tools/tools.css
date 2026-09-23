@@ -134,10 +134,6 @@ input[type=range]:disabled::-webkit-slider-thumb {
   transition: background-color 0.2s;
 }
 
-.toggle-switch:focus-visible {
-  outline: 2px solid var(--blue-500);
-  outline-offset: 2px;
-}
 
 .toggle-switch.is-on {
   background-color: var(--blue-500);
@@ -231,3 +227,17 @@ input[type=range]:disabled::-webkit-slider-thumb {
 .text-blue-300 { color: #93c5fd; }
 .text-red-300 { color: #fca5a5; }
 .text-purple-300 { color: #d8b4fe; }
+
+.complex-plane-control:focus-within,
+.key-wheel-canvas-wrap:focus-within #hueKeyWheelCanvas,
+.recipe-preset:focus-visible,
+.export-trigger:focus-visible,
+#colorStripCanvas:focus-visible,
+.palette-swatch:focus-visible,
+.thumb-btn:focus-visible,
+.saved-restore:focus-visible,
+.move-op-btn:focus-visible,
+.toggle-switch:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}

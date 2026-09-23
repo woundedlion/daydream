@@ -102,12 +102,6 @@ body {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--blue-500) 30%, transparent);
 }
 
-.thumb-btn:focus-visible,
-.saved-restore:focus-visible,
-.move-op-btn:focus-visible {
-  outline: 2px solid var(--blue-500);
-  outline-offset: 2px;
-}
 
 .thumb-btn img {
   height: 60%;
