@@ -1466,20 +1466,20 @@ function update() {
 // recompute; presentation-only toggles (faces/verts/normals/indices/
 // colorize/geodesics) call it directly so they don't pay for the chain
 // (relax alone runs up to 500 iterations) when only the view changed.
+function updateIndexLabelNotice(capped) {
+  const notice = document.getElementById('indexLabelNotice');
+  const text = capped ? `Vertex indices require fewer than ${MAX_INDEX_LABELS} vertices.` : '';
+  if (notice && notice.textContent !== text) notice.textContent = text;
+}
+
 function renderMesh() {
   const meshData = currentMesh;
   if (!meshData || !meshRenderer) return;
 
   const { edgeCount, labelsBuilt } = meshRenderer.render(
     meshData, state, currentFaceClasses);
-  // Flag the freshly-created labels for re-projection so updateLabels
-  // positions them on the next frame. The toggle stays engaged when the
-  // mesh is past the label cap, so say why nothing appeared.
   if (labelsBuilt) labelsNeedReproject = true;
-  else if (state.showIndices && meshData.vertices.length >= MAX_INDEX_LABELS) {
-    showGateMsg(`Vertex indices are off past ${MAX_INDEX_LABELS} vertices; `
-      + `this mesh has ${meshData.vertices.length}.`);
-  }
+  updateIndexLabelNotice(state.showIndices && meshData.vertices.length >= MAX_INDEX_LABELS);
 
   // Update Stats
   renderBaseSolid();
