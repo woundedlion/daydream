@@ -176,10 +176,7 @@ body {
 }
 
 /* Visible keyboard-focus ring for the wheel's per-key slider handles. */
-.key-wheel-canvas-wrap:focus-within #hueKeyWheelCanvas {
-  outline: 2px solid var(--blue-500);
-  outline-offset: 2px;
-}
+
 
 .recipe-field {
   display: grid;
@@ -291,11 +288,6 @@ body {
   border-color: var(--blue-500);
 }
 
-.recipe-preset:focus-visible,
-.export-trigger:focus-visible {
-  outline: 2px solid var(--blue-500);
-  outline-offset: 2px;
-}
 
 .export-panel {
   position: fixed;
@@ -364,10 +356,7 @@ input[type=checkbox] {
 }
 
 /* Visible keyboard-focus ring for the now-focusable (tabindex) strip. */
-#colorStripCanvas:focus-visible {
-  outline: 2px solid var(--blue-500);
-  outline-offset: 2px;
-}
+
 
 #waveGraphCanvas {
   border: 1px solid var(--slate-600);
@@ -572,10 +561,6 @@ input[type=checkbox] {
   transform: scale(0.98);
 }
 
-.palette-swatch:focus-visible {
-  outline: 2px solid var(--blue-500);
-  outline-offset: 2px;
-}
 
 .palette-swatch-strip {
   flex-shrink: 0;
