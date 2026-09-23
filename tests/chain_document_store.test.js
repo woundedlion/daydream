@@ -890,3 +890,14 @@ test('an injected compiler isolates the store from its default compiler module',
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('renaming a bypassed stage carries its bypass onto the new label', async () => {
+  const store = await makeStore();
+  assert.equal(store.setBypassed('lens', true).ok, true);
+  assert.equal(store.relabel('lens', 'mirror').ok, true);
+  assert.deepEqual(store.bypassedLabels(), ['mirror']);
+  assert.ok(store.chain().some((entry) => entry.label === 'mirror'));
+  assert.ok(store.programShape().every((entry) => entry.instance !== 'mirror'));
+  assert.equal(store.setBypassed('mirror', false).ok, true);
+  assert.ok(store.programShape().some((entry) => entry.instance === 'mirror'));
+});
