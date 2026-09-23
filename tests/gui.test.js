@@ -930,3 +930,20 @@ test('a control added inside a scheduled reset ignores the params it drops', () 
   new DeepLinkGUI({ autoPlace: false }, 'view').add(global, 'poleLod', 0, 2);
   assert.equal(global.poleLod, 1.5, 'an excluded key still hydrates');
 });
+
+
+test('URL writer owns its injected window timer and cancels it on disposal', () => {
+  const pending = new Map();
+  let next = 0;
+  const win = installWindow({
+    setTimeout: (fn) => { pending.set(++next, fn); return next; },
+    clearTimeout: (id) => pending.delete(id),
+  });
+  const write = makeUrlParamWriter(win);
+  write('x', 1);
+  assert.equal(pending.size, 1);
+  write('x', 2);
+  assert.deepEqual([...pending.keys()], [2]);
+  write.cancel();
+  assert.equal(pending.size, 0);
+});
