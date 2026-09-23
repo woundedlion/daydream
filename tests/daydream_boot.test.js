@@ -971,3 +971,15 @@ test('the driver double distinguishes redraws from simulation steps', () => {
   driver.stepOnce();
   assert.equal(driver.stepFrames, 1);
 });
+
+
+test('stopping and restarting recording clears deferred captures between frames', () => {
+  const rig = recordingRig();
+  rig.attach(fakeRecorder());
+  rig.button.object.record();
+  rig.driver.heldCaptures = 3;
+  rig.button.object.record();
+  assert.equal(rig.driver.heldCaptures, 0);
+  rig.button.object.record();
+  assert.equal(rig.driver.heldCaptures, 0);
+});
