@@ -189,7 +189,7 @@ test('holosphere_wasm.d.ts declares every module function', () => {
   }
 });
 
-const RESULT_ENUMS = ['ParamSetResult', 'ClipSetResult', 'ResolutionSetResult',
+const RESULT_ENUMS = ['ChainStatus', 'ParamSetResult', 'ClipSetResult', 'ResolutionSetResult',
   'EffectSetResult', 'FullConfigRestoreResult'];
 
 test('holosphere_wasm.d.ts declares every result enum roster the module exports', () => {
@@ -287,6 +287,7 @@ test('setShaderChain applies a chain, registers label.field params and bumps the
 
   const before = engine.getParamGeneration();
   const applied = engine.setShaderChain(DEFAULT_CHAIN);
+  assert.equal(applied.status, M.ChainStatus.OK);
   assert.equal(applied.code, 'APPLIED', 'the default chain must compile');
   assert.equal(applied.entryIndex, -1, 'APPLIED blames no entry');
   assert.notEqual(engine.getParamGeneration(), before,
@@ -330,6 +331,7 @@ test('setShaderChain refuses transactionally and names the offending entry', () 
     { instance: 'sample', operator: 'sample.grid.v2' },
     { instance: 'colorize', operator: 'colorize.generated-palette.v3' },
   ]);
+  assert.equal(unknown.status, M.ChainStatus.UNKNOWN_OPERATOR);
   assert.equal(unknown.code, 'UNKNOWN_OPERATOR');
   assert.equal(unknown.entryIndex, 1,
     'the refusal must name the entry that failed the lookup');
@@ -338,6 +340,7 @@ test('setShaderChain refuses transactionally and names the offending entry', () 
   assert.deepEqual(Array.from(engine.getParameterDefinitions(), (d) => d.name),
     names, 'a refused chain must leave the active program registered');
 
+  assert.equal(engine.setShaderChain('nonsense').status, M.ChainStatus.MALFORMED_PAYLOAD);
   assert.equal(engine.setShaderChain('nonsense').code, 'MALFORMED_PAYLOAD',
     'a non-array payload is refused at the boundary, never a trap');
 });

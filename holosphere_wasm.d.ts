@@ -211,6 +211,7 @@ export interface HolosphereEngine {
   /** Effect name to authored preset count at the active resolution. */
   getEffectPresetCounts(): Record<string, number>;
   /**
+   * The status compares by identity against HolosphereModule.ChainStatus.
    * Programs the ShaderChain effect with an ordered operator chain. APPLIED
    * rebuilds the parameter definitions (named `instance.field`) and bumps the
    * param generation before returning; any other code refuses transactionally,
@@ -218,7 +219,7 @@ export interface HolosphereEngine {
    */
   setShaderChain(
     entries: Array<{ instance: string; operator: string }>,
-  ): { code: string; entryIndex: number };
+  ): { status: EnumValue; code: string; entryIndex: number };
   /** Embind destructor: releases the C++ instance the handle points at. */
   delete(): void;
 }
@@ -323,6 +324,24 @@ export interface MeshOpsStatics {
   clearToolingMemory(): void;
   getArenaMetrics(): MeshArenaMetrics;
 }
+
+/** What setShaderChain().status answers, compared by identity against the member. */
+export type ChainStatusEnum = {
+  OK: EnumValue;
+  NOT_CHAIN_EFFECT: EnumValue;
+  MALFORMED_PAYLOAD: EnumValue;
+  EMPTY: EnumValue;
+  TOO_LONG: EnumValue;
+  UNKNOWN_OPERATOR: EnumValue;
+  DUPLICATE_INSTANCE: EnumValue;
+  MALFORMED_INSTANCE: EnumValue;
+  ENTRY_FAMILY: EnumValue;
+  EXIT_FAMILY: EnumValue;
+  CARRIER_MISMATCH: EnumValue;
+  ARENA_OVERFLOW: EnumValue;
+  PARAM_OVERFLOW: EnumValue;
+  MIGRATE_FAILED: EnumValue;
+};
 
 /** What setClip() answers, compared by identity against the member. */
 export type ClipSetResultEnum = {
@@ -463,6 +482,7 @@ export interface HolosphereModule {
      */
     getShaderChainCatalog(): string;
   };
+  ChainStatus: ChainStatusEnum;
   ClipSetResult: ClipSetResultEnum;
   ParamSetResult: ParamSetResultEnum;
   FullConfigRestoreResult: FullConfigRestoreResultEnum;
