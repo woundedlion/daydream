@@ -11,7 +11,7 @@
 
 /**
  * @typedef {Object} DisplayDriver
- * @property {{instanceColor: {array: Uint16Array|null, needsUpdate: boolean}}} dotMesh
+ * @property {{count?: number, instanceColor: {array: Uint16Array|null, needsUpdate: boolean}}} dotMesh
  * @property {Uint16Array|null} pixels
  */
 
@@ -25,6 +25,11 @@
  * @returns {void}
  */
 export function repointDisplayAliases(driver, view) {
+  const previous = driver.dotMesh.instanceColor.array;
+  const expected = driver.dotMesh.count === undefined
+    ? previous?.length : driver.dotMesh.count * 3;
+  if (expected && expected !== view.length)
+    throw new RangeError('Display buffer size differs from the mesh color attribute');
   driver.dotMesh.instanceColor.array = view;
   driver.dotMesh.instanceColor.needsUpdate = true;
   driver.pixels = view;
