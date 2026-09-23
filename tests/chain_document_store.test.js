@@ -901,3 +901,16 @@ test('renaming a bypassed stage carries its bypass onto the new label', async ()
   assert.equal(store.setBypassed('mirror', false).ok, true);
   assert.ok(store.programShape().some((entry) => entry.instance === 'mirror'));
 });
+
+test('a refused structural edit preserves the redo document', async () => {
+  const store = await makeStore();
+  assert.equal(store.replaceSpan(WARP, 0, [{ operator: 'warp.wave-shear.v2' }]).ok, true);
+  const edited = store.document();
+  assert.equal(store.undo(), true);
+  const undone = store.document();
+  assert.equal(store.replaceSpan(PROJECT, 1, []).ok, false);
+  assert.deepEqual(store.document(), undone);
+  assert.equal(store.canRedo(), true);
+  assert.equal(store.redo(), true);
+  assert.deepEqual(store.document(), edited);
+});
