@@ -35,6 +35,12 @@ export class GlobalStatsView {
     this.missLogged = false;
   }
 
+  clear() {
+    for (const row of Object.values(this.resolveCells())) {
+      for (const cell of row) if (cell) cell.textContent = 'Unavailable';
+    }
+  }
+
   /**
    * Repaint both stat bars from one frame's measurements.
    * @param {number} duration - Frame draw time in milliseconds.

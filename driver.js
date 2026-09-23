@@ -990,6 +990,7 @@ export class Daydream {
    * requires a new canvas because this method deliberately loses the old context.
    */
   dispose() {
+    this.statsView?.clear();
     // Stop the rAF callback first so it never fires into the nulled dotMesh /
     // disposed renderer on a real page discard.
     const renderer = this.renderer;
