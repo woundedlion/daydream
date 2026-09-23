@@ -59,6 +59,7 @@ const EXPECTED_CONSOLE_MESSAGES = {
     /^\[Segmented\] All \d+ workers ready$/,
   ],
   warn: [
+    /^\[Segmented\] module warm failed/,
     /^\[Segmented\] seg \d+ module failed to load \(attempt \d+\/\d+\); rebuilding pool$/,
     /^\[Segmented\] additional worker fault \(seg -?\d+\): /,
     /^\[Segmented\] pool faulted on \d+ consecutive effect-switch rebuilds; /,

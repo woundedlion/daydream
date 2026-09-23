@@ -91,7 +91,10 @@ export class ModuleWarmer {
     this.controller = controller;
     const drain = (/** @type {string} */ u) =>
       fetchResource(new URL(u, baseUrl), { cache: 'no-cache', signal: controller.signal })
-        .then((r) => r.arrayBuffer());
+        .then((r) => {
+          if (r.ok === false) throw new Error(`Module fetch failed: ${r.status} ${u}`);
+          return r.arrayBuffer();
+        });
     const epoch = this.warmEpoch + 1;
     /** @param {WebAssembly.Module | null} compiled */
     const publish = (compiled) => {
@@ -126,7 +129,14 @@ export class ModuleWarmer {
             publish(null);
           }),
         () => { publish(null); }),
-      ]).then(() => {});
+      ]).then((results) => {
+        const failed = results.find((result) => result.status === 'rejected');
+        if (failed && this.warmEpoch === epoch) {
+          this.lastWarmAt = -Infinity;
+          publish(null);
+          console.warn('[Segmented] module warm failed', failed.reason);
+        }
+      });
     } catch (error) {
       // Reported like the compile and deadline failures below; the dedupe
       // window stays shut, since nothing was warmed for a later caller to be
