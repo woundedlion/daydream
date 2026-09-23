@@ -180,7 +180,12 @@ function docCommentCpp(text) {
  * @returns {string} The filled text.
  */
 function fillCpp(tokens, first, rest) {
-  return fillColumns(tokens, ' '.repeat(first), ' '.repeat(rest)).join('\n');
+  return fillColumns(tokens, ' '.repeat(first), ' '.repeat(rest)).map((line) => {
+    if (line.length <= COLUMN_LIMIT || !line.includes('::')) return line;
+    const split = line.lastIndexOf('::', COLUMN_LIMIT - 2) + 2;
+    if (split < 2) return line;
+    return `${line.slice(0, split)}\n${' '.repeat(rest + INDENT)}${line.slice(split)}`;
+  }).join('\n');
 }
 
 /**
