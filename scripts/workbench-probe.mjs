@@ -597,6 +597,58 @@ export async function probeParity(tab) {
   return failures;
 }
 
+/** @param {import('puppeteer-core').Page} tab */
+export async function probeDocumentActions(tab) {
+  const { failures, check } = checks();
+  const chip = '.chain-chip[data-label="rotate"]';
+  const toggle = `${chip} .chain-chip-bypass`;
+  await tab.click(toggle);
+  check(await tab.$eval(toggle, (node) => node.getAttribute('aria-pressed')) === 'true',
+    'the bypass button bypasses the stage');
+  await tab.focus(chip);
+  await tab.keyboard.press('b');
+  check(await tab.$eval(toggle, (node) => node.getAttribute('aria-pressed')) === 'false',
+    'the b shortcut restores the stage');
+  await tab.$eval(`${chip} .chain-chip-rename`, (node) => {
+    node.value = 'camera-rotate';
+    node.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await tab.waitForSelector('.chain-chip[data-label="camera-rotate"]');
+  await tab.click('.chain-undo');
+  check(await tab.$(chip) !== null, 'undo restores the original stage name');
+  await tab.click('.chain-redo');
+  check(await tab.$('.chain-chip[data-label="camera-rotate"]') !== null,
+    'redo restores the renamed stage');
+  const topology = await tab.$eval('select.chain-param-control', (node) => ({
+    id: node.closest('.chain-param').dataset.parameter,
+    value: [...node.options].find((option) => option.value !== node.value).value,
+  }));
+  await tab.select(`[data-parameter="${topology.id}"] select`, topology.value);
+  const exported = await savedDocument(tab);
+  check(exported.descriptor.chain[0].label === 'camera-rotate', 'rename reaches the saved chain');
+  check(exported.preset_bank.presets[0].values[topology.id] === topology.value,
+    'a topology select edit reaches the saved preset');
+  await tab.click('#shader-document-save-as');
+  const copy = await tab.evaluate(async () => JSON.parse((await Promise.all(window.exported)).at(-1)));
+  check(copy.document_id !== exported.document_id, 'Save As creates a distinct document id');
+  await tab.evaluate(() => {
+    window.copiedDigest = '';
+    Object.defineProperty(navigator, 'clipboard', { configurable: true,
+      value: { writeText: async (text) => { window.copiedDigest = text; } } });
+  });
+  await tab.click('#shader-document-digest');
+  check(await tab.evaluate(() => /^[a-f0-9]{64}$/.test(window.copiedDigest)),
+    'the digest button copies the full descriptor digest');
+  await tab.waitForFunction(() => location.hash.startsWith('#shader=v1.'));
+  const linked = await tab.evaluate(async () => {
+    const { decodeShaderStateHash } = await import('./shader_deeplink.js');
+    return decodeShaderStateHash(location.hash);
+  });
+  check(linked.document.descriptor.chain[0].label === 'camera-rotate' && linked.bypassed.length === 0,
+    'the live location hash preserves the edited chain and bypass state');
+  return failures;
+}
+
 if (isMain(import.meta.url)) await runProbe({
   name: 'workbench-probe',
   page: PAGE,
@@ -610,6 +662,9 @@ if (isMain(import.meta.url)) await runProbe({
       await tab.waitForSelector('.chain-chip');
       return tab;
     };
+    const actionsTab = await openWorkbench();
+    failures.push(...await probeDocumentActions(actionsTab));
+    await actionsTab.close();
     const historyTab = await openWorkbench();
     failures.push(...await probeStripHistory(historyTab));
     await historyTab.close();
