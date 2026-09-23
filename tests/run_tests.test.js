@@ -243,3 +243,18 @@ test('malformed exemption JSON fails instead of waiving the roster', () => {
   writeFileSync(join(root, EXEMPT), '{broken');
   assert.match(fail(PATTERN), /uncovered-modules\.json is unreadable/);
 });
+
+
+test('assertion accounting preserves callback-style asynchronous tests', () => {
+  writeFileSync(join(root, 'tests/sample.test.js'),
+    "import { test } from 'node:test'; import assert from 'node:assert/strict'; import '../lib.mjs';\n"
+    + "test('callback', (t, done) => { setImmediate(() => { assert.equal(2+2, 4); done(); }); });\n");
+  assert.match(run(PATTERN), /source modules were loaded by tests/);
+});
+
+test('callback-style tests still require an assertion before done', () => {
+  writeFileSync(join(root, 'tests/sample.test.js'),
+    "import { test } from 'node:test'; import '../lib.mjs';\n"
+    + "test('empty callback', (t, done) => { setImmediate(done); });\n");
+  assert.match(failOutput(PATTERN), /Every test case must execute an assertion/);
+});
