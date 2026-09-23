@@ -3071,3 +3071,38 @@ test('display aliases reject a mesh-size mismatch without changing either alias'
   repointDisplayAliases(driver, next);
   assert.equal(driver.pixels, next);
 });
+
+test('the last boot ping clears the boot watchdog before readiness', () => {
+  const clock = installFakeTimers();
+  const c = makeController();
+  try {
+    c.create(2);
+    assert.equal(clock.pendingAt(BOOT_WATCHDOG_MS).length, 1);
+    deliverBooted(c, 0);
+    assert.equal(clock.pendingAt(BOOT_WATCHDOG_MS).length, 1);
+    deliverBooted(c, 1);
+    assert.deepEqual(clock.pendingAt(BOOT_WATCHDOG_MS), []);
+    assert.equal(c.frameState.ready, false);
+    assert.equal(clock.pendingAt(INIT_WATCHDOG_MS).length, 1);
+  } finally {
+    c.destroy();
+    clock.restore();
+  }
+});
+
+test('rendering an empty pool resolves without arming a watchdog', async () => {
+  const clock = installFakeTimers();
+  const c = makeController();
+  try {
+    let settled = false;
+    const render = c.renderParallel().then(() => { settled = true; });
+    await flush();
+    assert.equal(settled, true);
+    await render;
+    assert.equal(c.frameState.pending, 0);
+    assert.deepEqual(clock.pendingAt(RENDER_WATCHDOG_MS), []);
+  } finally {
+    c.destroy();
+    clock.restore();
+  }
+});
