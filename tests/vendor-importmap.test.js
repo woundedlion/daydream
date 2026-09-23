@@ -1,6 +1,6 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -33,6 +33,8 @@ const generateLocalSrc = () => {
   writeFileSync(join(FIXTURE, 'three.js', 'build', 'three.module.js'), '');
   mkdirSync(join(FIXTURE, 'node_modules', 'lil-gui', 'dist'), { recursive: true });
   writeFileSync(join(FIXTURE, 'node_modules', 'lil-gui', 'dist', 'lil-gui.esm.min.js'), '');
+  symlinkSync(join(REPO, 'node_modules', 'espree'),
+    join(FIXTURE, 'node_modules', 'espree'), 'junction');
   execFileSync(process.execPath, [join(FIXTURE, 'scripts', 'generate-importmap.mjs'), '--local'],
     { stdio: ['ignore', 'ignore', 'inherit'] });
   return readFileSync(join(FIXTURE, 'vendor-importmap.js'), 'utf8');
