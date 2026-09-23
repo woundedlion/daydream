@@ -302,3 +302,14 @@ test('old engine pins warn and expired bundles explain the producing-run remedy'
   assert.match(gate, /if \[ "\$expired" = true \]/);
   assert.match(gate, /gh run rerun \$run_id --repo woundedlion\/pov/);
 });
+
+test('engine bundle callers grant Actions read only to the bundle gate', () => {
+  for (const path of [WORKFLOW_PATH, DEPLOY_PATH]) {
+    const source = readFileSync(path, 'utf8');
+    const gate = source.split(/^ {2}gate:\s*$/m)[1]?.split(/^ {2}\S/m)[0];
+    assert.ok(gate, `${path} has an engine gate`);
+    assert.match(gate, /^ {4}permissions:\s*\n {6}contents: read\s*\n {6}actions: read\s*$/m, path);
+    assert.match(gate, /uses: \.\/\.github\/workflows\/engine-bundle\.yml/, path);
+    assert.doesNotMatch(source.split(/^jobs:/m)[0], /actions:/, path);
+  }
+});
