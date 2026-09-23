@@ -635,7 +635,7 @@ export function createChainStrip({
     for (const value of declaration.domain?.values ?? []) {
       const option = el('option', 'chain-param-option');
       option.value = value;
-      option.textContent = value;
+      option.textContent = titleCase(value);
       option.selected = value === values[declaration.id];
       select.appendChild(option);
     }
