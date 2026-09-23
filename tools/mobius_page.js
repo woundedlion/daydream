@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { initScene, bootstrapTool, wireCopyBlock } from './shared.js';
 import { onPageTeardown } from './page_lifecycle.js';
 import { createPointerDrag, innerRect } from './pointer_drag.js';
+import { createSliderProxy } from './slider.js';
 import {
   elliptic, hyperbolic, loxodromic, parabolic,
   inversion, tumble, cayley, snapComplex,
@@ -261,17 +262,9 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
   // the announced value in aria-valuenow/aria-valuetext, which a screen
   // reader re-reads on every change.
   const makeAxis = (axisId, axisLabel, keyshortcuts, vertical) => {
-    const el = document.createElement('span');
-    el.id = axisId;
-    el.className = 'visually-hidden';
-    el.tabIndex = 0;
-    el.setAttribute('role', 'slider');
-    if (vertical) el.setAttribute('aria-orientation', 'vertical');
-    el.setAttribute('aria-label', axisLabel);
-    el.setAttribute('aria-valuemin', String(-maxExtent));
-    el.setAttribute('aria-valuemax', String(maxExtent));
-    el.setAttribute('aria-keyshortcuts', keyshortcuts);
-    return el;
+    return createSliderProxy({ id: axisId, label: axisLabel,
+      min: -maxExtent, max: maxExtent, keys: keyshortcuts,
+      orientation: vertical ? 'vertical' : 'horizontal' });
   };
 
   const planeElement = makeDiv('complex-plane-control', controlId);
