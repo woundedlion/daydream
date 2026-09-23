@@ -25,7 +25,7 @@ const PAGE = 'index.html';
 // Short enough that the panel's max-height cap bites and its own .lil-children
 // becomes the scroller, which is what effect_gui.js writes the offset onto.
 const VIEWPORT = { width: 1280, height: 240 };
-const MOBILE_VIEWPORT = { width: 800, height: 720 };
+const MOBILE_VIEWPORT = { width: 800, height: 720, hasTouch: true };
 // Narrow enough that the column-flow effect list overruns its track and the
 // scroll arrows have something to report; 800px lays the whole roster out.
 const SIDEBAR_VIEWPORT = { width: 480, height: 720 };
@@ -226,6 +226,64 @@ export async function probeSliderDrag(tab) {
     'the value stream leaves the released value alone');
   await tab.mouse.move(0, 0);
 
+  return failures;
+}
+
+/** @param {import('puppeteer-core').Page} tab */
+export async function probeTouchSlider(tab) {
+  const { failures, check } = checks();
+  const viewport = tab.viewport();
+  await tab.setViewport({ ...VIEWPORT, hasTouch: true });
+  await tab.evaluate(() => document.activeElement?.blur());
+  const name = await tab.$eval(PANEL_SLIDER, slider => {
+    slider.scrollIntoView({ block: 'center', behavior: 'instant' });
+    return slider.closest('.lil-controller').querySelector('.lil-name').textContent.trim();
+  });
+  await new Promise(resolve => setTimeout(resolve, URL_SETTLE_MS));
+  const read = () => tab.$eval(PANEL_SLIDER, (slider, param) => ({
+    value: Number(slider.closest('.lil-controller').querySelector('input[type=number]').value),
+    accepted: new URLSearchParams(location.search).get(`fx.__accepted.${param}`),
+  }), name);
+  const before = await read();
+  await tab.evaluate(() => {
+    window.probeTouchCancels = 0;
+    window.addEventListener('pointercancel', () => { window.probeTouchCancels += 1; }, { once: true });
+  });
+  const cdp = await tab.createCDPSession();
+  const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', {
+    type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }],
+  });
+  try {
+    let box = await (await tab.$(PANEL_SLIDER)).boundingBox();
+    if (!box) throw new Error('Touch slider has no layout box');
+    const x = box.x + box.width * 0.5;
+    const y = box.y + box.height * 0.5;
+    check(await tab.evaluate((px, py) => Boolean(document.elementFromPoint(px, py)?.closest('.lil-slider')), x, y),
+      `the touch starts on the slider (${x}, ${y})`);
+    await touch('touchStart', x, y);
+    for (let step = 1; step <= 6; step += 1) await touch('touchMove', x, y - step * 8);
+    await touch('touchEnd');
+    check(await tab.evaluate(() => window.probeTouchCancels) === 1,
+      'a vertical touch scroll cancels the slider pointer');
+    check((await read()).value === before.value, 'scrolling over the slider leaves its value unchanged');
+
+    await tab.$eval(PANEL_SLIDER, slider => slider.scrollIntoView({ block: 'center', behavior: 'instant' }));
+    box = await (await tab.$(PANEL_SLIDER)).boundingBox();
+    if (!box) throw new Error('Touch slider has no layout box after scrolling');
+    await touch('touchStart', box.x + box.width * 0.8, box.y + box.height * 0.5);
+    for (let step = 1; step <= 6; step += 1)
+      await touch('touchMove', box.x + box.width * (0.8 - step * 0.1), box.y + box.height * 0.5);
+    const held = await read();
+    check(held.value !== before.value, 'the next horizontal touch gesture moves the slider');
+    check(held.accepted === before.accepted, 'the touch drag defers the accepted-value write');
+    await touch('touchEnd');
+    await tab.waitForFunction((param, value) => Number(new URLSearchParams(location.search)
+      .get(`fx.__accepted.${param}`)) === value, { timeout: TIMEOUT_MS }, name, held.value);
+    check(Number((await read()).accepted) === held.value, 'touch release persists after the cancelled scroll');
+  } finally {
+    await cdp.detach();
+    await tab.setViewport(viewport);
+  }
   return failures;
 }
 
@@ -598,6 +656,7 @@ if (isMain(import.meta.url)) await runProbe({
     await painted();
     await tab.waitForSelector('.effect-gui');
     failures.push(...await probeMobilePanel(tab));
+    failures.push(...await probeTouchSlider(tab));
     failures.push(...await probeWarningNote(tab, 'mobile'));
 
     await tab.setViewport(SIDEBAR_VIEWPORT);
