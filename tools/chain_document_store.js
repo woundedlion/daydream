@@ -33,28 +33,8 @@ const refusal = (code, path, message) => ({
   diagnostics: [{ severity: 'error', phase: 'edit', code, path, message }],
 });
 
-/**
- * The arena a chain lays out to, in the validator's cursor form
- * (shader/shader_workbench.mjs, itself the engine's plan_layout): every block
- * aligns one running cursor, so a block's padding depends on everything ahead
- * of it, per-operator overhead and parameter names included.
- * @param {CatalogOperator[]} ops - Operators of a chain, in chain order.
- * @param {*} budgets - The catalog's budgets object.
- * @returns {number} Arena bytes the chain needs.
- */
-export const chainArenaBytes = (ops, budgets) => {
-  let cursor = 0;
-  for (const op of ops) {
-    for (const kind of ['param', 'prepared', 'state']) {
-      const block = op.blocks?.[kind] ?? { size: 0, align: 1 };
-      const step = Math.max(1, block.align);
-      cursor = Math.ceil(cursor / step) * step + block.size;
-    }
-    cursor += (budgets.per_op_overhead_bytes ?? 0)
-      + (budgets.per_param_name_bytes ?? 0) * op.params.length;
-  }
-  return cursor;
-};
+const { chainArenaBytes } = await import(COMPILER_URL);
+export { chainArenaBytes };
 
 /**
  * The document parameter declaration a catalog field backfills as: the
