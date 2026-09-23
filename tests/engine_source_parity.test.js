@@ -21,8 +21,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as MB from '../tools/mobius_transforms.js';
 import * as P from '../tools/palette_math.js';
-import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS } from '../tools/solid_codegen.js';
-import { MAX_BUILD_STEPS, upperSnake } from '../tools/solid_registry_codegen.js';
+import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS } from '../tools/solid_codegen.js';
+import { MAX_BUILD_STEPS, upperSnake, primitiveCount } from '../tools/solid_registry_codegen.js';
 
 const engineCandidates = process.env.HOLOSPHERE_ENGINE_DIR
   ? [resolve(process.env.HOLOSPHERE_ENGINE_DIR)]
@@ -447,4 +447,18 @@ test('MAX_BUILD_STEPS matches effects/IslamicStars.h', { skip: engineSkip }, () 
   assert.ok(m, `MAX_BUILD_STEPS not found in ${ISLAMIC_STARS_H} — the reader is out of date`);
   assert.equal(MAX_BUILD_STEPS, Number(m[1]),
     "MAX_BUILD_STEPS drifted from the effect's build-step cap");
+});
+
+
+test('every operator primitive count matches the installed engine lowering', { skip: engineSkip }, () => {
+  const body = functionBody(header('core/mesh/recipe.h'), 'lowered_step_count');
+  const counts = new Map();
+  for (const group of body.matchAll(/((?:\s*case Op::[A-Z_]+:)+)\s*n \+= (\d+);\s*break;/g)) {
+    for (const entry of group[1].matchAll(/case Op::([A-Z_]+):/g)) {
+      counts.set(entry[1].toLowerCase(), Number(group[2]));
+    }
+  }
+  assert.deepEqual([...counts.keys()].sort(), [...KNOWN_OPS].sort(),
+    'the lowering reader must account for every operator');
+  for (const [op, count] of counts) assert.equal(primitiveCount(op), count, op);
 });
