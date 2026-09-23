@@ -85,7 +85,8 @@ export async function copyWithFeedback(text, opts = {}) {
  */
 export const COPY_FEEDBACK = {
   copiedClasses: ['text-green-400'],
-  idleClasses: ['text-gray-500'],
+  failedClasses: ['text-amber-400'],
+  idleClasses: ['text-gray-300'],
 };
 
 /**
