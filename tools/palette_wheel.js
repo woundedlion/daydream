@@ -290,10 +290,12 @@ export function hueKeyHandoff(previous, next, selectedKey, activeKey) {
  * @param {object} opts - Painter context.
  * @param {HTMLCanvasElement} opts.canvas - The wheel canvas.
  * @param {CanvasRenderingContext2D} opts.ctx - Its 2D context.
- * @returns {{draw: (view: {lightness: number, state: HueKeyState, activeKey: ?number, selectedKey: number}) => {points: Array<{x: number, y: number}>, degrees: number[]}}}
+ * @returns {{draw: (view: {lightness: number, state: HueKeyState, activeKey: ?number, selectedKey: number}) => {points: Array<{x: number, y: number}>, degrees: number[], scale: number}}}
  *   The painter; draw reports the markers it drew and the hues it labelled them with.
  */
 export function createHueKeyWheelPainter({ canvas, ctx }) {
+  const logicalWidth = canvas.width;
+  const logicalHeight = canvas.height;
   /** @type {ImageData?} */
   let raster = null;
   /** @type {number?} */
@@ -318,14 +320,28 @@ export function createHueKeyWheelPainter({ canvas, ctx }) {
 
   return {
     draw({ lightness, state, activeKey, selectedKey }) {
-      const { width, height } = canvas;
+      const ratio = Math.min(2, Math.max(1, globalThis.devicePixelRatio || 1));
+      if (canvas.clientWidth && canvas.clientHeight) {
+        const width = Math.round(canvas.clientWidth * ratio);
+        const height = Math.round(canvas.clientHeight * ratio);
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+          raster = null;
+        }
+      }
+      const width = logicalWidth;
+      const height = logicalHeight;
+      const scaleX = canvas.width / width;
+      const scaleY = canvas.height / height;
       const quantized = Math.round(lightness * LIGHTNESS_STEPS) / LIGHTNESS_STEPS;
       if (!raster || rasterLightness !== quantized) {
-        raster = ctx.createImageData(width, height);
-        paintHueWheelRaster(raster.data, width, height, quantized);
+        raster = ctx.createImageData(canvas.width, canvas.height);
+        paintHueWheelRaster(raster.data, canvas.width, canvas.height, quantized);
         rasterLightness = quantized;
       }
       ctx.putImageData(raster, 0, 0);
+      ctx.setTransform?.(scaleX, 0, 0, scaleY, 0, 0);
 
       const points = hueKeyMarkerPoints(state, width, height);
       const selected = Math.min(selectedKey, points.length - 1);
@@ -354,7 +370,8 @@ export function createHueKeyWheelPainter({ canvas, ctx }) {
       });
       labels.forEach(drawLabel);
 
-      return { points, degrees };
+      return { points: points.map(({ x, y }) => ({ x: x * scaleX, y: y * scaleY })),
+        degrees, scale: Math.max(scaleX, scaleY) };
     },
   };
 }

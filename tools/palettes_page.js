@@ -106,6 +106,7 @@ const paletteViewport = createPaletteViewport();
 
 let hueKeyWheelCanvas, hueKeyWheelCtx;
 let hueKeyWheelPainter = null;
+let hueKeyWheelScale = 1;
 // Marker positions of the last wheel actually painted. The wheel draws the
 // canonical recipe, which clamps and rounds what the controls hold, and a
 // recipe that failed to compile leaves the previous wheel on screen — so a
@@ -165,13 +166,14 @@ function currentHueKeyState(recipe) {
 
 function drawHueKeyWheel(recipe) {
   if (!hueKeyWheelPainter) return;
-  const { points, degrees } = hueKeyWheelPainter.draw({
+  const { points, degrees, scale } = hueKeyWheelPainter.draw({
     lightness: recipe.lightness.center,
     state: currentHueKeyState(recipe),
     activeKey: activeHueKey,
     selectedKey: selectedHueKey,
   });
   hueKeyWheelDrawnPoints = points;
+  hueKeyWheelScale = scale;
   selectedHueKey = Math.min(selectedHueKey, points.length - 1);
   syncHueKeyHandles(degrees);
 }
@@ -248,7 +250,7 @@ function updateHueKeyFromPointer(event) {
 function handleHueWheelPointerDown(event) {
   const position = wheelPointerPosition(event);
   activeHueKey = hitTestHueKeyMarker(position.x, position.y,
-    hueKeyWheelDrawnPoints, HUE_KEY_GRAB_RADIUS);
+    hueKeyWheelDrawnPoints, HUE_KEY_GRAB_RADIUS * hueKeyWheelScale);
   if (activeHueKey === null) return false;
   selectedHueKey = activeHueKey;
   hueKeyWheelCanvas.style.cursor = 'grabbing';
@@ -268,7 +270,7 @@ function handleHueWheelPointerMove(event) {
 function handleHueWheelPointerHover(event) {
   const position = wheelPointerPosition(event);
   const marker = hitTestHueKeyMarker(position.x, position.y,
-    hueKeyWheelDrawnPoints, HUE_KEY_GRAB_RADIUS);
+    hueKeyWheelDrawnPoints, HUE_KEY_GRAB_RADIUS * hueKeyWheelScale);
   hueKeyWheelCanvas.style.cursor = marker === null ? 'default' : 'grab';
 }
 

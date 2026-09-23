@@ -336,3 +336,23 @@ test('a selection past the end of a shorter key set highlights its last key', ()
   const widths = ctx.ops.filter(([name]) => name === 'stroke').map((op) => op[2]);
   assert.deepEqual(widths, [2, 2, 4], 'no marker is left unhighlighted by a stale selection');
 });
+
+test('the wheel caps display density at two and caches the resized raster', (t) => {
+  const previous = globalThis.devicePixelRatio;
+  t.after(() => { globalThis.devicePixelRatio = previous; });
+  globalThis.devicePixelRatio = 3;
+  const { painter, canvas, ctx } = wheelSetup(256);
+  canvas.clientWidth = 136;
+  canvas.clientHeight = 136;
+  const view = { lightness: 0.62, state: STATE, activeKey: null, selectedKey: 0 };
+  const first = painter.draw(view);
+  assert.equal(canvas.width, 272);
+  assert.equal(canvas.height, 272);
+  assert.equal(first.scale, 272 / 256);
+  painter.draw({ ...view, selectedKey: 1 });
+  assert.equal(ctx.rasters, 1);
+  canvas.clientWidth = canvas.clientHeight = 160;
+  painter.draw(view);
+  assert.equal(canvas.width, 320);
+  assert.equal(ctx.rasters, 2);
+});
