@@ -640,8 +640,7 @@ export function createChainStrip({
       select.appendChild(option);
     }
     select.addEventListener('change', (/** @type {*} */ event) => {
-      if (!editParameter(declaration.id, event.target.value))
-        select.value = values[declaration.id];
+      editParameter(declaration.id, event.target.value);
       store.endValueRun();
       onCommitParameter();
     });
