@@ -320,7 +320,7 @@ export const RECIPE_FIELD_NAMES = Object.freeze([
 ]);
 
 /**
- * Describes a failed compile the way core/color/color.h names it.
+ * Describes a failed compile the way core/color/palette_recipe.h names it.
  * @param {{code: number, field: number}} status - The compiler's status.
  * @returns {string} The reason and the field it points at, each with its ordinal;
  *   a value neither roster covers reads as an unnamed ordinal.
@@ -551,7 +551,7 @@ export function proceduralPaletteCpp(parameters) {
 /**
  * The C++ enumerator each V4 recipe enum value serializes as, indexed by value.
  * The inverse of palette_controls.js's PaletteV4; WASM parity tests
- * pins both to the `enum class` rosters in core/color/color.h.
+ * pins both to the `enum class` rosters in core/color/palette_recipe.h.
  */
 export const ENUM_NAMES = Object.freeze({
   domain: ['STRAIGHT', 'MIRROR', 'VIGNETTE', 'FALLOFF', 'LOOP'],
