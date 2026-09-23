@@ -152,6 +152,26 @@ export async function probeChain(tab) {
   check(afterTouch.join() === touchWant.join(),
     `a touch drag moves the op it grips (${afterTouch.join(', ')})`);
 
+  await tab.evaluate(() => {
+    window.solidsCopied = [];
+    Object.defineProperty(navigator, 'clipboard', { configurable: true,
+      value: { writeText: async (text) => { window.solidsCopied.push(text); } } });
+  });
+  await tab.click('#saveBtn');
+  await tab.waitForSelector('#savedList [data-copy="recipe_cpp"]');
+  const expected = await tab.evaluate(async () => {
+    const { generateRecipeCpp } = await import('./solid_codegen.js');
+    const { generateRegistryCpp } = await import('./solid_registry_codegen.js');
+    const item = JSON.parse(localStorage.getItem('daydream.savedSolids.v1')).at(-1);
+    return [generateRecipeCpp(item, 'Archimedean'), generateRegistryCpp(item)];
+  });
+  for (const [index, kind] of ['recipe_cpp', 'registry'].entries()) {
+    await tab.click(`#savedList [data-copy="${kind}"]`);
+    await tab.waitForFunction((count) => window.solidsCopied.length === count, {}, index + 1);
+    const copied = await tab.evaluate(() => window.solidsCopied.at(-1));
+    check(copied === expected[index], `${kind} copies the saved solid's C++`);
+  }
+
   return failures;
 }
 
