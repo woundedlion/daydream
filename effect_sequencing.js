@@ -411,6 +411,7 @@ export function createApplyPipeline({
    * @param {boolean} [preserveParams=false] - When true, keep the existing
    *   per-effect param URL entries (used during initial hydration); when false,
    *   clear them since they don't apply to the newly selected effect.
+   * @param {boolean} [broadcast=true] - Publish the accepted effect to workers.
    * @returns {string} ApplyResult.REJECTED when the engine rejected the effect
    *   (the caller must revert appState so UI/URL don't advertise an unapplied
    *   effect), else ApplyResult.APPLIED.
