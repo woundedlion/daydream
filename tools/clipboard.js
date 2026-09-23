@@ -119,14 +119,5 @@ export function wireCopyBlock({ source, button, prompt, block }) {
   };
   button?.addEventListener('click', handleCopy);
   block?.addEventListener('click', handleCopy);
-  if (block) {
-    block.tabIndex = 0;
-    block.setAttribute('role', 'button');
-    block.setAttribute('aria-label', 'Copy code');
-    block.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault();
-      handleCopy();
-    });
-  }
+
 }

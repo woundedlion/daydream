@@ -214,8 +214,8 @@ test('wireCopyBlock wires the button and block triggers', async () => {
     value: { clipboard: { writeText: async (text) => { writes.push(text); } } },
     configurable: true,
   });
-  const clickable = () => {
-    const element = fakeElement('button');
+  const clickable = (tag = 'button') => {
+    const element = fakeElement(tag);
     const handlers = new Map();
     element.addEventListener = (type, listener) => handlers.set(type, listener);
     element.click = () => handlers.get('click')?.();
@@ -225,7 +225,7 @@ test('wireCopyBlock wires the button and block triggers', async () => {
   const source = fakeElement('code');
   source.textContent = 'generated output';
   const button = clickable();
-  const block = clickable();
+  const block = clickable('pre');
   const prompt = fakeElement('span');
 
   try {
@@ -235,16 +235,16 @@ test('wireCopyBlock wires the button and block triggers', async () => {
     block.click();
     await Promise.resolve();
 
-    assert.equal(block.tabIndex, 0);
-    assert.equal(block.getAttribute('role'), 'button');
-    assert.equal(block.getAttribute('aria-label'), 'Copy code');
+    assert.equal(block.tabIndex, -1);
+    assert.equal(block.getAttribute('role'), null);
+    assert.equal(block.getAttribute('aria-label'), null);
     let prevented = 0;
     for (const key of ['Enter', ' ', 'Tab']) {
       block.keydown({ key, preventDefault: () => { prevented++; } });
       await Promise.resolve();
     }
-    assert.equal(prevented, 2);
-    assert.deepEqual(writes, Array(4).fill('generated output'));
+    assert.equal(prevented, 0);
+    assert.deepEqual(writes, Array(2).fill('generated output'));
     assert.equal(prompt.textContent, 'Copied!');
   } finally {
     Object.defineProperty(globalThis, 'navigator', restore);
