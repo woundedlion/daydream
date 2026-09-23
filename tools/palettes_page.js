@@ -584,23 +584,23 @@ function sliderAriaLabel(def) {
 
 const sliderDefinitions = [
   // A (Base): Range [0, 1]
-  { param: 'A_R', container: 'A_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'A' },
+  { param: 'A_R', container: 'A_R_container', label: 'R', color: 'red-300', thumb: 'r-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'A' },
   { param: 'A_G', container: 'A_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'A' },
-  { param: 'A_B', container: 'A_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'A' },
+  { param: 'A_B', container: 'A_B_container', label: 'B', color: 'blue-300', thumb: 'b-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'A' },
   // B (Amplitude): Range [0, 1]
-  { param: 'B_R', container: 'B_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'B' },
+  { param: 'B_R', container: 'B_R_container', label: 'R', color: 'red-300', thumb: 'r-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'B' },
   { param: 'B_G', container: 'B_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'B' },
-  { param: 'B_B', container: 'B_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'B' },
+  { param: 'B_B', container: 'B_B_container', label: 'B', color: 'blue-300', thumb: 'b-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'B' },
   // C (Frequency): Range [-5, 5] — engine palettes run the cosine backwards
   // with negative frequencies.
-  { param: 'C_R', container: 'C_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: -5, max: 5, step: 0.001, scale: 1000, group: 'C' },
+  { param: 'C_R', container: 'C_R_container', label: 'R', color: 'red-300', thumb: 'r-thumb', min: -5, max: 5, step: 0.001, scale: 1000, group: 'C' },
   { param: 'C_G', container: 'C_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: -5, max: 5, step: 0.001, scale: 1000, group: 'C' },
-  { param: 'C_B', container: 'C_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: -5, max: 5, step: 0.001, scale: 1000, group: 'C' },
+  { param: 'C_B', container: 'C_B_container', label: 'B', color: 'blue-300', thumb: 'b-thumb', min: -5, max: 5, step: 0.001, scale: 1000, group: 'C' },
   // D (Phase): Range [-1, 2] — a full period either side of [0, 1], so an
   // engine phase past 1 (or a zoom-derived negative one) stays representable.
-  { param: 'D_R', container: 'D_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: -1, max: 2, step: 0.001, scale: 1000, group: 'D' },
+  { param: 'D_R', container: 'D_R_container', label: 'R', color: 'red-300', thumb: 'r-thumb', min: -1, max: 2, step: 0.001, scale: 1000, group: 'D' },
   { param: 'D_G', container: 'D_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: -1, max: 2, step: 0.001, scale: 1000, group: 'D' },
-  { param: 'D_B', container: 'D_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: -1, max: 2, step: 0.001, scale: 1000, group: 'D' }
+  { param: 'D_B', container: 'D_B_container', label: 'B', color: 'blue-300', thumb: 'b-thumb', min: -1, max: 2, step: 0.001, scale: 1000, group: 'D' }
 ];
 
 // --- UI and Event Functions ---
