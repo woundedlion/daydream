@@ -78,13 +78,13 @@ jobs:
           status=0
           while read -r path || [ -n "$path" ]; do
             case "$path" in ''|'#'*) continue ;; esac
-            if [ ! -e "$path" ]; then
-              echo "::error::site_manifest.txt lists missing path $path"
+            if [ ! -f "$path" ] || [ -L "$path" ] || ! git ls-files --error-unmatch -- "$path" > /dev/null 2>&1; then
+              echo "::error::site_manifest.txt must list tracked regular files: $path"
               status=1
               continue
             fi
             mkdir -p "_site/$(dirname "$path")"
-            cp -r "$path" "_site/$(dirname "$path")/"
+            cp "$path" "_site/$(dirname "$path")/"
           done < site_manifest.txt
           exit $status
       # Pages derives a Content-Type from the served path, so an asset missing
