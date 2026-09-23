@@ -1,3 +1,4 @@
+import { fakeTimers } from './fake_timers.js';
 //
 // gui.js — DeepLinkGUI URL hydration (dropdown, slider, checkbox), per-root key
 // namespacing, and the debounced URL writer, against a stubbed lil-gui.
@@ -933,11 +934,11 @@ test('a control added inside a scheduled reset ignores the params it drops', () 
 
 
 test('URL writer owns its injected window timer and cancels it on disposal', () => {
-  const pending = new Map();
-  let next = 0;
+  const timers = fakeTimers();
+  const { pending } = timers;
   const win = installWindow({
-    setTimeout: (fn) => { pending.set(++next, fn); return next; },
-    clearTimeout: (id) => pending.delete(id),
+    setTimeout: timers.setTimeout.bind(timers),
+    clearTimeout: timers.clearTimeout.bind(timers),
   });
   const write = makeUrlParamWriter(win);
   write('x', 1);

@@ -1,3 +1,4 @@
+import { fakeUrlTimer } from './fake_timers.js';
 import { test, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { captureConsole, installConsoleCapture } from './fake_console.js';
@@ -223,33 +224,7 @@ function installRecordingWindow(search = '', pathname = '/', hash = '') {
   return calls;
 }
 
-/**
- * A one-slot timer source a URLSync case fires by hand, shaped to sit on a
- * window stub as the timer surface URLSync arms against.
- * @returns {Object} The stand-in and its scheduled delays.
- */
-function fakeUrlTimer() {
-  const delays = [];
-  let pending = null;
-  return {
-    delays,
-    setTimeout(fn, ms) {
-      pending = fn;
-      delays.push(ms);
-      return 0;
-    },
-    clearTimeout() { pending = null; },
-    /** @returns {boolean} Whether a timer is currently armed. */
-    armed() { return pending !== null; },
-    /** Runs the pending timer. @returns {void} */
-    fire() {
-      const fn = pending;
-      pending = null;
-      assert.ok(fn, 'a timer is pending');
-      fn();
-    },
-  };
-}
+
 
 test('writeUrl assembles pathname, query and hash', () => {
   const calls = installRecordingWindow('', '/sim', '#frag');

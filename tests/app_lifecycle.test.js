@@ -1,3 +1,4 @@
+import { fakeTimers } from './fake_timers.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement } from './fake_dom.js';
@@ -451,33 +452,7 @@ test('both handlers tolerate a module evaluation that never built the teardown',
   assert.deepEqual(failed.log, ['reportFailure fetch blocked']);
 });
 
-/**
- * A timer source a case fires by hand.
- * @returns {Object} The stand-in, plus the pending timers and the clears seen.
- */
-function fakeTimers() {
-  const pending = new Map();
-  let next = 1;
-  return {
-    pending,
-    cleared: [],
-    setTimeout(fn, ms) {
-      const id = next++;
-      pending.set(id, { fn, ms });
-      return id;
-    },
-    clearTimeout(id) {
-      this.cleared.push(id);
-      pending.delete(id);
-    },
-    /** Runs the one pending timer. @returns {void} */
-    fire() {
-      const [id, { fn }] = [...pending][0];
-      pending.delete(id);
-      fn();
-    },
-  };
-}
+
 
 test('a load that beats the deadline resolves and cancels the timer', async () => {
   const timers = fakeTimers();

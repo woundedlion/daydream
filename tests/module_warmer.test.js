@@ -1,3 +1,4 @@
+import { installFakeTimers } from './fake_timers.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -17,22 +18,12 @@ test('default warm uses its served module URL, global fetch, and clears its dead
     },
   });
   const requested = [];
-  const timers = new Map();
-  const cleared = [];
+  const clock = installFakeTimers();
   t.mock.method(globalThis, 'fetch', async (url) => {
     requested.push(url.href);
     const bytes = url.pathname.endsWith('.wasm') ? EMPTY_WASM
       : new TextEncoder().encode('new URL("holosphere_wasm.wasm?v=abc123", import.meta.url)');
     return { ok: true, arrayBuffer: async () => bytes.buffer };
-  });
-  t.mock.method(globalThis, 'setTimeout', (callback, delay) => {
-    const token = { delay };
-    timers.set(token, callback);
-    return token;
-  });
-  t.mock.method(globalThis, 'clearTimeout', (token) => {
-    cleared.push(token);
-    timers.delete(token);
   });
   try {
     const { ModuleWarmer, WARM_DEADLINE_MS } = await import(moduleUrl);
@@ -42,9 +33,11 @@ test('default warm uses its served module URL, global fetch, and clears its dead
     assert.equal(requested.length, 6);
     assert.ok(requested.every((url) => url.startsWith('https://daydream.test/nested/')));
     assert.ok(requested.includes('https://daydream.test/nested/holosphere_wasm.wasm?v=abc123'));
-    assert.equal(timers.size, 0);
-    assert.deepEqual(cleared, [{ delay: WARM_DEADLINE_MS }]);
+    assert.equal(clock.timers.length, 1);
+    assert.equal(clock.timers[0].delay, WARM_DEADLINE_MS);
+    assert.equal(clock.isPending(clock.timers[0]), false);
   } finally {
     hooks.deregister();
+    clock.restore();
   }
 });

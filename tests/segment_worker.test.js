@@ -1,3 +1,5 @@
+import { captureTimeouts } from './fake_timers.js';
+import { installConsoleCapture } from './fake_console.js';
 //
 // Run: node --test --experimental-test-module-mocks "tests/*.test.js"
 import { test, mock, beforeEach } from 'node:test';
@@ -271,14 +273,9 @@ test('init faults on a protocol version mismatch', async () => {
 
 /** A render before init faults rather than replying with nothing and stalling the fence. */
 test('render before a completed init faults instead of dropping the reply', async () => {
-  const captured = [];
-  const realSetTimeout = globalThis.setTimeout;
-  globalThis.setTimeout = (fn) => { captured.push(fn); return 0; };
-  try {
+  const captured = await captureTimeouts(async () => {
     await dispatch({ type: 'render' });
-  } finally {
-    globalThis.setTimeout = realSetTimeout;
-  }
+  });
   assert.equal(engineInstance, null, 'no engine was ever built for this dispatch');
   assert.equal(posted.length, 0, 'nothing was posted back');
   assert.equal(captured.length, 1, 'one rethrow task scheduled');
@@ -529,28 +526,18 @@ test('render still posts a frame when getArenaMetrics throws', async () => {
 test('render faults on a pixel buffer of the wrong length', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
   engineInstance.getPixels = () => new Uint16Array(8 * 4 * 3 - 3); // one pixel short
-  const captured = [];
-  const realSetTimeout = globalThis.setTimeout;
-  globalThis.setTimeout = (fn) => { captured.push(fn); return 0; };
-  try {
+  const captured = await captureTimeouts(async () => {
     await dispatch({ type: 'render' });
-  } finally {
-    globalThis.setTimeout = realSetTimeout;
-  }
+  });
   assert.equal(captured.length, 1, 'one rethrow task scheduled');
   assert.throws(() => captured[0](), /pixel buffer length/);
 });
 
 /** A protocol-drift message type fails fast (rethrown to onerror) instead of being silently dropped. */
 test('an unknown message type faults instead of being silently dropped', async () => {
-  const captured = [];
-  const realSetTimeout = globalThis.setTimeout;
-  globalThis.setTimeout = (fn) => { captured.push(fn); return 0; };
-  try {
+  const captured = await captureTimeouts(async () => {
     await dispatch({ type: 'bogusProtocolDrift' });
-  } finally {
-    globalThis.setTimeout = realSetTimeout;
-  }
+  });
   assert.equal(captured.length, 1, 'one rethrow task scheduled');
   assert.throws(() => captured[0](), /unknown message type/);
 });
@@ -803,15 +790,10 @@ test('a frame reports whether the whole canvas was shaded', async () => {
  * rather than vanishing as an unhandled rejection.
  */
 test('a throwing message is isolated and rethrown on a fresh task', async () => {
-  const captured = [];
-  const realSetTimeout = globalThis.setTimeout;
-  globalThis.setTimeout = (fn) => { captured.push(fn); return 0; };
-  try {
+  const captured = await captureTimeouts(async () => {
     // An odd totalSegs makes computeSegmentRange throw inside handleMessage.
     await dispatch({ type: 'init', segId: 0, totalSegs: 3, w: 8, h: 4 });
-  } finally {
-    globalThis.setTimeout = realSetTimeout;
-  }
+  });
   assert.equal(captured.length, 1, 'one rethrow task scheduled');
   assert.throws(() => captured[0](), /positive even number/);
 
@@ -1005,15 +987,14 @@ test('a rejected setParameter is logged once per outcome', async () => {
   await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
   engineInstance.paramResult = ParamSetResult.UNKNOWN_PARAM;
 
-  const original = console.error;
-  const logged = [];
-  console.error = (...args) => logged.push(args.join(' '));
+  const capture = installConsoleCapture('error');
+  const logged = capture.messages;
   try {
     await dispatch({ type: 'setParameter', name: 'Ghost', value: 0.5 });
     await dispatch({ type: 'setParameter', name: 'Ghost', value: 0.6 });
     await dispatch({ type: 'setParameter', name: 'Phantom', value: 0.7 });
   } finally {
-    console.error = original;
+    capture.restore();
   }
 
   assert.equal(logged.length, 2, 'the repeat of an already-reported outcome stays quiet');
@@ -1027,15 +1008,14 @@ test('an effect switch clears the rejected-parameter latch', async () => {
   await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
   engineInstance.paramResult = ParamSetResult.UNKNOWN_PARAM;
 
-  const original = console.error;
-  const logged = [];
-  console.error = (...args) => logged.push(args.join(' '));
+  const capture = installConsoleCapture('error');
+  const logged = capture.messages;
   try {
     await dispatch({ type: 'setParameter', name: 'Ghost', value: 0.5 });
     await dispatch({ type: 'setEffect', name: 'Waves' });
     await dispatch({ type: 'setParameter', name: 'Ghost', value: 0.5 });
   } finally {
-    console.error = original;
+    capture.restore();
   }
 
   assert.equal(logged.length, 2, 'the same rejection under a new effect logs again');
@@ -1045,13 +1025,12 @@ test('an effect switch clears the rejected-parameter latch', async () => {
 test('an applied setParameter logs nothing', async () => {
   await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
 
-  const original = console.error;
-  const logged = [];
-  console.error = (...args) => logged.push(args.join(' '));
+  const capture = installConsoleCapture('error');
+  const logged = capture.messages;
   try {
     await dispatch({ type: 'setParameter', name: 'Speed', value: 0.5 });
   } finally {
-    console.error = original;
+    capture.restore();
   }
 
   assert.deepEqual(logged, [], 'the ordinary tuning path is silent');
@@ -1085,13 +1064,12 @@ test('a preset index the engine refuses is logged', async () => {
   await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4,
     effectName: 'Plasma' });
 
-  const original = console.error;
-  const logged = [];
-  console.error = (...args) => logged.push(args.join(' '));
+  const capture = installConsoleCapture('error');
+  const logged = capture.messages;
   try {
     await dispatch({ type: 'selectPreset', index: 9, paramRevision: 14 });
   } finally {
-    console.error = original;
+    capture.restore();
   }
 
   assert.equal(engineInstance.presetIndex, 0, 'a refused index moves nothing');
@@ -1106,14 +1084,13 @@ test('the index a presetless effect refuses is not logged', async () => {
   await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4 });
   engineInstance.presetCount = 0;
 
-  const original = console.error;
-  const logged = [];
-  console.error = (...args) => logged.push(args.join(' '));
+  const capture = installConsoleCapture('error');
+  const logged = capture.messages;
   try {
     await dispatch({ type: 'setEffect', name: 'Plasma', presetIndex: 0,
       paramRevision: 15 });
   } finally {
-    console.error = original;
+    capture.restore();
   }
 
   assert.deepEqual(logged, [], 'the ordinary effect-switch path is silent');
@@ -1130,13 +1107,12 @@ test('a refused parameter marks every later frame until the effect changes', asy
     'a converged worker sends no warnings field');
 
   engineInstance.paramResult = ParamSetResult.UNKNOWN_PARAM;
-  const original = console.error;
-  console.error = () => {};
+  const capture = installConsoleCapture('error');
   try {
     await dispatch({ type: 'setParameter', name: 'Ghost', value: 0.5 });
     await dispatch({ type: 'setParameter', name: 'Ghost', value: 0.6 });
   } finally {
-    console.error = original;
+    capture.restore();
   }
 
   posted.length = 0;
@@ -1162,12 +1138,11 @@ test('a refused preset index reaches the frame as a warning', async () => {
   await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4,
     effectName: 'Plasma' });
 
-  const original = console.error;
-  console.error = () => {};
+  const capture = installConsoleCapture('error');
   try {
     await dispatch({ type: 'selectPreset', index: 9, paramRevision: 14 });
   } finally {
-    console.error = original;
+    capture.restore();
   }
 
   posted.length = 0;
@@ -1259,14 +1234,9 @@ test('render faults when getArenaMetrics traps the module', async () => {
   engineInstance.metricsThrows = true;
   wasmModuleInstance.HS_MODULE_DEAD = true;
   posted.length = 0;
-  const captured = [];
-  const realSetTimeout = globalThis.setTimeout;
-  globalThis.setTimeout = (fn) => { captured.push(fn); return 0; };
-  try {
+  const captured = await captureTimeouts(async () => {
     await dispatch({ type: 'render' });
-  } finally {
-    globalThis.setTimeout = realSetTimeout;
-  }
+  });
 
   assert.equal(posted.find((p) => p.msg.type === 'frame'), undefined,
     'pixels from a trapped module must not reach the composite');
