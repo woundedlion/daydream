@@ -555,3 +555,8 @@ select.chain-param-control {
     max-width: none;
   }
 }
+
+.chain-chip:focus-visible {
+  outline: 3px solid var(--bright-text);
+  outline-offset: 3px;
+}
