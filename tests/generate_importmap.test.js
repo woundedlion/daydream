@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, readFileSync, rmSync, copyFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, rmSync, copyFileSync, symlinkSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -45,6 +45,8 @@ const sri = (body) => `sha384-${createHash('sha384').update(body).digest('base64
 const buildRoot = () => {
   rmSync(root, { recursive: true, force: true });
   mkdirSync(join(root, 'scripts'), { recursive: true });
+  mkdirSync(join(root, 'node_modules'), { recursive: true });
+  symlinkSync(resolve(HERE, '../node_modules/espree'), join(root, 'node_modules/espree'), 'junction');
   copyFileSync(SCRIPT_SRC, join(root, 'scripts', 'generate-importmap.mjs'));
   writeFileSync(join(root, 'package.json'), PKG);
   writeFileSync(join(root, 'vendor-importmap.js'), IMPORTMAP);
@@ -208,4 +210,19 @@ test('--out without a path fails', () => {
   installModules();
   assert.match(runExpectingFailure('--out'), /--out requires a path/);
   assert.match(runExpectingFailure('--out', '--local'), /--out requires a path/);
+});
+
+
+test('computed addon imports cannot bypass the integrity inventory', () => {
+  installModules();
+  writeFileSync(join(root, 'computed.js'), "const base = 'three/addons/'; import(base + 'controls/OrbitControls.js');");
+  execFileSync('git', ['add', 'computed.js'], { cwd: root, env });
+  assert.match(runExpectingFailure(), /module imports must use literal specifiers/);
+});
+
+test('escaped literal addon specifiers are included in the integrity inventory', () => {
+  installModules();
+  writeFileSync(join(root, 'escaped.js'), "import('three/addons/controls/OrbitControls\\u002ejs');");
+  execFileSync('git', ['add', 'escaped.js'], { cwd: root, env });
+  assert.ok(run().includes("'controls/OrbitControls.js'"));
 });
