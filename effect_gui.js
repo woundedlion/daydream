@@ -706,6 +706,8 @@ export function createEffectGui({ engine, segments, config, host }) {
    * multiple presets available for manual selection.
    * @param {Object} fx - The effect record being built.
    * @param {Array<Object>} params - The engine's parameter definitions.
+   * @param {boolean} [initialPause=false] - Initial pause state.
+   * @param {boolean} [hydrate=true] - Read the stored pause value while constructing the toggle.
    * @returns {{animationState: {pause: boolean}, controller: Object|null,
    *   setPaused: (v: boolean) => void}} The toggle's state, its controller (null
    *   when neither animation surface is available), and its state transition.
@@ -865,6 +867,7 @@ export function createEffectGui({ engine, segments, config, host }) {
    * @param {Array<Object>} params - The engine's parameter definitions.
    * @param {{animationState: Object, controller: Object|null, setPaused: Function}}
    *   pause - The effect's pause toggle.
+   * @param {Set<string>|null} [previousParamNames=null] - Names present before a schema rebuild.
    * @returns {void}
    */
   function addParamControllers(fx, params, pause, previousParamNames = null) {
