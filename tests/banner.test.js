@@ -217,7 +217,7 @@ test('bootstrapTool installs the post-boot surface alongside the load handler', 
   const { bodyEl } = fakeDocument();
   const target = fakeTarget();
   bootstrapTool(() => { }, 'Möbius tool', target);
-  assert.deepEqual(target.types().sort(), ['error', 'load', 'unhandledrejection']);
+  assert.deepEqual(target.types().sort(), ['error', 'load', 'pagehide', 'unhandledrejection']);
 
   // The boot path still reports through the same banner.
   captureConsole(() => {
@@ -264,4 +264,18 @@ test('clearing a recovered failure preserves a newer banner', () => {
   assert.ok(document.getElementById('fatal-error-overlay'));
   clearFatalError('new');
   assert.equal(document.getElementById('fatal-error-overlay'), null);
+});
+
+
+test('tool bootstrap retains handlers for bfcache and detaches on page discard', () => {
+  const target = fakeTarget();
+  let starts = 0;
+  bootstrapTool(() => { starts++; }, 'test tool', target);
+  target.dispatch('pagehide', { persisted: true });
+  target.dispatch('load');
+  assert.equal(starts, 1);
+  target.dispatch('pagehide', { persisted: false });
+  assert.deepEqual(target.types(), []);
+  target.dispatch('load');
+  assert.equal(starts, 1);
 });

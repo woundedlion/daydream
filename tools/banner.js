@@ -161,8 +161,8 @@ export function reportPageFailures(label, target = window) {
  * @returns {void}
  */
 export function bootstrapTool(init, label, target = window) {
-  reportPageFailures(label, target);
-  target.addEventListener('load', () => {
+  const failures = reportPageFailures(label, target);
+  const onLoad = () => {
     /**
      * @param {any} e - The thrown value or rejection reason.
      * @returns {void}
@@ -177,5 +177,13 @@ export function bootstrapTool(init, label, target = window) {
     } catch (e) {
       fail(e);
     }
-  });
+  };
+  const onPageHide = (/** @type {Event} */ event) => {
+    if ((/** @type {PageTransitionEvent} */ (event)).persisted) return;
+    target.removeEventListener('load', onLoad);
+    target.removeEventListener('pagehide', onPageHide);
+    for (const [type, listener] of failures) target.removeEventListener(type, listener);
+  };
+  target.addEventListener('load', onLoad);
+  target.addEventListener('pagehide', onPageHide);
 }
