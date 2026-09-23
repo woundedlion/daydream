@@ -312,11 +312,11 @@ export interface MeshOpsStatics {
   } | null;
   /** Builds a registered solid; null when the registry carries no such name. */
   fromSolidName(name: string): MeshHandle | null;
-  /** Every registered solid, the Simple ones first in seed-index order. */
+  /** Every registered solid, the Simple ones first in seed-index order. Preserves the last result and adjustment flags. */
   getRegistry(): SolidRegistryEntry[];
   /** A Complex solid's chain; null for a name that carries none. */
   getRecipe(name: string): SolidRecipe | null;
-  /** Why the last call answered null. */
+  /** Result of the last mesh operation; getRegistry() preserves the previous result. */
   getLastResult(): EnumValue;
   /** Whether the last call clamped an out-of-domain argument. */
   getLastAdjusted(): boolean;
