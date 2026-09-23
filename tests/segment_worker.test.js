@@ -506,28 +506,7 @@ test('render still posts a frame when getArenaMetrics throws', async () => {
   assert.equal(frame.msg.arenaMetrics, null);
 });
 
-/** A metrics call that trapped the module faults the worker instead of posting its pixels. */
-test('render faults when getArenaMetrics traps the module', async () => {
-  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
-  engineInstance.metricsThrows = true;
-  wasmModuleInstance.HS_MODULE_DEAD = true;
-  posted.length = 0;
-  const captured = [];
-  const realSetTimeout = globalThis.setTimeout;
-  globalThis.setTimeout = (fn) => { captured.push(fn); return 0; };
-  try {
-    await dispatch({ type: 'render' });
-  } finally {
-    globalThis.setTimeout = realSetTimeout;
-  }
 
-  assert.equal(posted.find((p) => p.msg.type === 'frame'), undefined,
-    'pixels from a trapped module must not reach the composite');
-  assert.equal(captured.length, 1, 'one rethrow task scheduled');
-  assert.throws(() => captured[0](), /binding gone/);
-});
-
-/** A pixel buffer whose length disagrees with the canvas faults instead of zero-filling the tail. */
 test('render faults on a pixel buffer of the wrong length', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
   engineInstance.getPixels = () => new Uint16Array(8 * 4 * 3 - 3); // one pixel short
@@ -1203,6 +1182,7 @@ test('the worker module graph carries no specifier an import map would resolve',
     'holosphere_wasm.js',
     'segment_layout.js',
     'segment_worker.js',
+    'tools/engine_halt.js',
     'worker_protocol.js',
   ]);
 });
@@ -1253,3 +1233,26 @@ test('a reshaped protocol message forces a PROTOCOL_VERSION bump', () => {
   assert.equal(PROTOCOL_VERSION, PROTOCOL_SHAPE_PIN.version,
     'PROTOCOL_SHAPE_PIN.version tracks PROTOCOL_VERSION; re-pin both together');
 });
+
+/** A metrics call that trapped the module faults the worker instead of posting its pixels. */
+test('render faults when getArenaMetrics traps the module', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  engineInstance.metricsThrows = true;
+  wasmModuleInstance.HS_MODULE_DEAD = true;
+  posted.length = 0;
+  const captured = [];
+  const realSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = (fn) => { captured.push(fn); return 0; };
+  try {
+    await dispatch({ type: 'render' });
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
+
+  assert.equal(posted.find((p) => p.msg.type === 'frame'), undefined,
+    'pixels from a trapped module must not reach the composite');
+  assert.equal(captured.length, 1, 'one rethrow task scheduled');
+  assert.throws(() => captured[0](), /binding gone/);
+});
+
+/** A pixel buffer whose length disagrees with the canvas faults instead of zero-filling the tail. */
