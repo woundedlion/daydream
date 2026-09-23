@@ -219,9 +219,11 @@ test('an unknown catalog curve is refused instead of becoming linear', async () 
   operator.params[0].curve = 'future-curve';
   const store = await makeStore({ catalog });
 
-  assert.throws(() => store.replaceSpan(PROJECT, 0,
-    [{ operator: operator.id }]),
-  /unknown catalog curve "future-curve"/);
+  const before = store.document();
+  const result = store.replaceSpan(PROJECT, 0, [{ operator: operator.id }]);
+  assert.equal(result.ok, false);
+  assert.match(result.diagnostics[0].message, /unknown catalog curve "future-curve"/);
+  assert.deepEqual(store.document(), before);
 });
 
 test('auto labels take the operator stem, numbered only where it is taken', async () => {

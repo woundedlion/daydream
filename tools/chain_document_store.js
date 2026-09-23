@@ -603,7 +603,12 @@ export async function createChainDocumentStore({
     const candidate = structuredClone(doc);
     candidate.descriptor.chain = newChain;
     if (removed.length > 0) removeInstances(candidate, removed);
-    for (const entry of added) addInstance(candidate, entry);
+    try {
+      for (const entry of added) addInstance(candidate, entry);
+    } catch (error) {
+      return refusal('INVALID_CATALOG_FIELD', '$.descriptor.chain',
+        error instanceof Error ? error.message : String(error));
+    }
     if (removed.length > 0) dropDegenerateEdges(candidate);
     return commit(candidate);
   };
