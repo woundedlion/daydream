@@ -1200,7 +1200,8 @@ test('a host hook that throws does not poison the streaming write chain', async 
  * the bound still reach the file when it is finally picked, so what is saved is
  * a contiguous prefix rather than a recording missing its middle.
  */
-test('an unanswered save dialog stops the session at the backlog bound', async () => {
+for (const bitrate of [1, 0]) {
+test(`an unanswered save dialog bounds backlog with configured bitrate ${bitrate}`, async () => {
   const restore = installRecorderEnv();
   const writes = [];
   let closed = false;
@@ -1213,7 +1214,7 @@ test('an unanswered save dialog stops the session at the backlog bound', async (
   try {
     const rec = new VideoRecorder(recordableCanvas());
     const sinkFinished = trackSinkFinish(rec);
-    rec.bitrateMbps = 1;
+    rec.bitrateMbps = bitrate;
     let downloaded = false;
     rec.download = () => { downloaded = true; };
     const notified = [];
@@ -1221,8 +1222,10 @@ test('an unanswered save dialog stops the session at the backlog bound', async (
 
     rec.start('unanswered');
     const recorder = rec.mediaRecorder;
+    const expectedBitrate = (bitrate || 16) * 1_000_000;
+    assert.equal(recorder.options.videoBitsPerSecond, expectedBitrate);
     const sessionChunks = rec.chunks;
-    const held = (rec.bitrateMbps * 1_000_000 / 8) * PICKER_GRACE_SECONDS - 1_000_000;
+    const held = (expectedBitrate / 8) * PICKER_GRACE_SECONDS - 1_000_000;
     recorder.ondataavailable({ data: { size: held } });
     assert.equal(rec.isRecording, true, 'a backlog under the bound keeps recording');
 
@@ -1249,6 +1252,7 @@ test('an unanswered save dialog stops the session at the backlog bound', async (
     restore();
   }
 });
+}
 
 for (const stalledAt of ['opening', 'writing']) {
   test(`streaming backlog stays bounded during stalled ${stalledAt}`, async () => {
