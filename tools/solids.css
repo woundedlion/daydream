@@ -120,7 +120,7 @@ body {
   font-size: clamp(0.55rem, (100vw - 474px) * 0.008, 0.85rem);
   text-align: center;
   line-height: 1.1;
-  color: #cbd5e1;
+  color: var(--slate-300);
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -359,7 +359,7 @@ body {
 .saved-item .title {
   font-size: 0.8rem;
   font-weight: 500;
-  color: #cbd5e1;
+  color: var(--slate-300);
   margin-bottom: 0.1rem;
 }
 
@@ -391,7 +391,7 @@ body {
   padding: 0.2rem 0.4rem;
   border-radius: 0.2rem;
   background-color: var(--slate-700);
-  color: #cbd5e1;
+  color: var(--slate-300);
   border: 1px solid var(--slate-600);
   transition: all 0.2s;
   font-weight: 600;
