@@ -367,6 +367,9 @@ files define line-ending policy and working-artifact exclusions.
 │
 ├── targets/                    Per-target entry points
 │   ├── effects.h               Effect roster — includes every effect header + HS_EFFECT_LIST
+│   ├── Bench/
+│   │   ├── Bench.ino           Stationary bench test image — single-entry playlist over the Phantasm rig
+│   │   └── bench_pattern.h     BenchPattern — whole-canvas colour cycle holding on the primaries and white
 │   ├── Holosphere/
 │   │   └── Holosphere.ino      Holosphere entry — NUM_PIXELS=40, RPM=480
 │   ├── Phantasm/
