@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import { boxOf, centre, checks, dragBetween, isMain, measureChecks, runProbe, walkTo }
   from '../scripts/probe_harness.mjs';
 import { probeDocumentActions, probeParity, probeStrip, probeStripHistory } from '../scripts/workbench-probe.mjs';
-import { probeColorStrip, probeHueWheel } from '../scripts/palettes-probe.mjs';
+import { probeColorStrip, probeHueWheel, rgbMovedTogether } from '../scripts/palettes-probe.mjs';
 import { probeHistoryRestore, probeRationalLock } from '../scripts/lissajous-probe.mjs';
 import {
   probeMobilePanel, probePanel, probePresetName, probeSidebar, probeSliderDrag,
@@ -214,4 +214,13 @@ test('the pad probe rejects wrong geometry and a pointer that never moves its va
   assert.ok(failures.some((message) => /pad lays out 0x0/.test(message)));
   assert.ok(failures.some((message) => /the press reads/.test(message)));
   assert.ok(failures.some((message) => /the drag tracks/.test(message)));
+});
+
+test('RGB lock checks reject missing, incomplete, nonfinite, and unmoved channels', () => {
+  for (const [before, after] of [
+    [[], []], [[1], [2]], [[1, 2, 3], []], [[1, 2, 3], [2, 3]],
+    [[NaN, 2, 3], [2, 3, 4]], [[1, 2, 3], [Infinity, 3, 4]],
+    [[1, 2, 3], [1, 2, 3]], [[1, 2, 3], [2, 4, 4]],
+  ]) assert.equal(rgbMovedTogether(before, after), false);
+  assert.equal(rgbMovedTogether([1, 2, 3], [2, 3, 4]), true);
 });
