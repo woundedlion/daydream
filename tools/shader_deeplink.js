@@ -130,6 +130,11 @@ export async function decodeShaderStateHash(hash) {
 export function replaceShaderStateHash(hash, win = globalThis) {
   if (!win.location || !win.history?.replaceState) return false;
   const path = `${win.location.pathname}${win.location.search}${hash}`;
-  win.history.replaceState({}, '', path);
-  return true;
+  try {
+    win.history.replaceState({}, '', path);
+    return true;
+  } catch (error) {
+    console.warn('Unable to update shader link', error);
+    return false;
+  }
 }
