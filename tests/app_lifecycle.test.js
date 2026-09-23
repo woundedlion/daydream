@@ -941,3 +941,16 @@ test('a clean recovery clears its own report after the rearm window', () => {
   assert.equal(reported.length, 1);
   assert.deepEqual(cleared, reported);
 });
+
+test('refreshPixelView heals both detached display aliases without advancing the engine', () => {
+  const a = makeAdapter();
+  const stale = new Uint16Array(a.view.length);
+  repointDisplayAliases(a.driver, stale);
+  structuredClone(stale.buffer, { transfer: [stale.buffer] });
+  assert.equal(a.driver.pixels.byteLength, 0);
+  a.host.refresh = () => { a.calls.push('host.refresh'); return true; };
+  a.adapter.refreshPixelView();
+  assert.deepEqual(a.calls, ['host.refresh']);
+  assert.strictEqual(a.driver.pixels, a.view);
+  assert.strictEqual(a.driver.dotMesh.instanceColor.array, a.view);
+});
