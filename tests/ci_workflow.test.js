@@ -276,6 +276,11 @@ test('workflow trigger parsing cannot hide flow or quoted declarations', () => {
 
 
 
+test('shell lint has no workflow-wide excluded diagnostics', () => {
+  const suite = readFileSync(`${WORKFLOW_DIR}/js-unit-suite.yml`, 'utf8');
+  assert.doesNotMatch(suite, /shellcheck[^\n]*--exclude/);
+});
+
 test('engine bundle API failures stop the gate instead of entering its poll timeout', () => {
   const gate = readFileSync(`${WORKFLOW_DIR}/engine-bundle.yml`, 'utf8');
   assert.doesNotMatch(gate, /\|\| true/);
