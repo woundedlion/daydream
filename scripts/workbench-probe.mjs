@@ -39,6 +39,7 @@ async function savedDocument(tab) {
     };
   });
   await (await tab.waitForSelector('#shader-document-save')).click();
+  await tab.waitForFunction(() => window.exported.length > 0);
   const source = await tab.evaluate(async () => (await Promise.all(window.exported)).at(-1));
   if (typeof source !== 'string') throw new Error('Save exported no document');
   return JSON.parse(source);
@@ -294,6 +295,7 @@ export async function probeStrip(tab) {
 
   const add = '.chain-band[data-carrier="plane"] .chain-band-add';
   await (await tab.waitForSelector(add)).click();
+  await tab.waitForSelector('.chain-palette-entry');
   const choices = await tab.$$eval('.chain-palette-entry', (nodes) => nodes.map((node) => ({
     operator: node instanceof HTMLElement ? node.dataset.operator ?? '' : '',
     disabled: node.getAttribute('aria-disabled'),
@@ -304,6 +306,8 @@ export async function probeStrip(tab) {
     'the plane + menu omits an invalid sphere stage');
   await (await tab.waitForSelector(
     '.chain-palette-entry[data-operator="warp.wave-shear.v2"]')).click();
+  await tab.waitForFunction(() => [...document.querySelectorAll('.chain-chip-name')]
+    .some((node) => node.textContent === 'Wave Shear'));
   check((await bandChipNames(tab, 'plane')).includes('Wave Shear'),
     'the + menu inserts its selected stage');
   const planeChips = await tab.$$eval('.chain-band[data-carrier="plane"] .chain-chip',
@@ -319,6 +323,7 @@ export async function probeStrip(tab) {
   // A palette that survives a press elsewhere outlives the chain it was opened
   // over; the fake DOM models neither the press nor the focus move.
   await (await tab.waitForSelector(add)).click();
+  await tab.waitForSelector('.chain-palette-entry');
   check(await tab.$eval('.chain-palette .chain-palette-entry',
     (node) => node.getAttribute('aria-selected')) === 'true',
   'the opened palette marks its focused option selected');
@@ -390,6 +395,8 @@ export async function probeStrip(tab) {
     '.chain-band[data-carrier="sphere"] .chain-band-add')).click();
   await (await tab.waitForSelector(
     '.chain-palette-entry[data-operator="sphere.lens.twist.v2"]')).click();
+  await tab.waitForFunction(() => document.querySelectorAll(
+    '.chain-band[data-carrier="sphere"] .chain-chip').length === 2);
   const sphereBandAfter = await boxOf(tab, '.chain-band[data-carrier="sphere"]');
   check(sphereBandAfter.width > sphereBandBefore.width,
     `adding a stage widens its domain (${Math.round(sphereBandBefore.width)}px → ${Math.round(sphereBandAfter.width)}px)`);
@@ -397,6 +404,9 @@ export async function probeStrip(tab) {
   const moveLater = '.chain-band[data-carrier="sphere"]'
     + ' .chain-chip-move[aria-label$="later"]:not(:disabled)';
   await (await tab.waitForSelector(moveLater)).click();
+  await tab.waitForFunction((previous) => [...document.querySelectorAll(
+    '.chain-band[data-carrier="sphere"] .chain-chip-name')].map((node) => node.textContent).join()
+      !== previous, {}, sphereBefore.join());
   const sphereAfter = await bandChipNames(tab, 'sphere');
   check(sphereAfter.join() === [...sphereBefore].reverse().join(),
     `reorder buttons move stages (${sphereAfter.join(', ')})`);
@@ -457,6 +467,7 @@ export async function probeStrip(tab) {
   await tab.setViewport({ width: 700, height: VIEWPORT.height });
   await tab.waitForFunction(() => window.innerWidth === 700);
   await (await tab.waitForSelector(add)).click();
+  await tab.waitForSelector('.chain-palette-entry');
   const narrowAnchor = await boxOf(tab, add);
   const narrowPalette = await boxOf(tab, '.chain-palette');
   const narrowLeft = Math.max(8,
@@ -473,6 +484,7 @@ export async function probeStrip(tab) {
   await tab.setViewport({ width: VIEWPORT.width, height: SHORT_HEIGHT });
   await tab.waitForFunction((height) => window.innerHeight === height, {}, SHORT_HEIGHT);
   await (await tab.waitForSelector(add)).click();
+  await tab.waitForSelector('.chain-palette-entry');
   const shortAnchor = await boxOf(tab, add);
   const shortPalette = await boxOf(tab, '.chain-palette');
   const capped = await tab.$eval('.chain-palette', (node) => ({
@@ -496,6 +508,7 @@ export async function probeStrip(tab) {
   await tab.waitForFunction(() => document.querySelector(
     '.chain-band[data-carrier="plane"] .chain-chip') === null);
   await tab.select(source, 'sample.spherical-rings.v3');
+  await tab.waitForFunction(() => document.querySelector('.chain-band[data-carrier="plane"]') === null);
   const skipped = await tab.evaluate(() => ({
     source: document.querySelector('.chain-chip-replace[aria-label="Source function"]')?.value,
     carriers: [...document.querySelectorAll('.chain-band')].map(
@@ -525,6 +538,7 @@ export async function probeStripHistory(tab) {
   await tab.keyboard.down('Alt');
   await tab.keyboard.press('ArrowRight');
   await tab.keyboard.up('Alt');
+  await tab.waitForFunction((label) => document.querySelector('.chain-chip')?.dataset.label === label, {}, second);
   const reordered = await labels();
   check(reordered[0] === second && reordered[1] === first,
     'Alt+Arrow commits a same-band reorder through the live DOM');
@@ -532,17 +546,23 @@ export async function probeStripHistory(tab) {
     'reorder restores focus to the moved instance after rebuilding');
 
   await tab.keyboard.press('Delete');
+  await tab.waitForFunction((label) => ![...document.querySelectorAll('.chain-chip')]
+    .some((node) => node.dataset.label === label), {}, first);
   check(!(await labels()).includes(first), 'Delete removes the focused instance');
   check(await tab.evaluate(() => document.activeElement?.classList.contains('chain-chip')),
     'removal leaves focus on a surviving chip');
   await tab.keyboard.down('Control');
   await tab.keyboard.press('z');
   await tab.keyboard.up('Control');
+  await tab.waitForFunction((wanted) => JSON.stringify([...document.querySelectorAll('.chain-chip')]
+    .map((node) => node.dataset.label)) === wanted, {}, JSON.stringify(reordered));
   check(JSON.stringify(await labels()) === JSON.stringify(reordered),
     'the history shortcut bubbles from the replacement chip and restores the removed instance');
   await tab.keyboard.down('Control');
   await tab.keyboard.press('z');
   await tab.keyboard.up('Control');
+  await tab.waitForFunction((wanted) => JSON.stringify([...document.querySelectorAll('.chain-chip')]
+    .map((node) => node.dataset.label)) === wanted, {}, JSON.stringify(before));
   check(JSON.stringify(await labels()) === JSON.stringify(before),
     'a second undo restores the original order');
   check(await tab.$$eval('.chain-chip[tabindex="0"]', nodes => nodes.length === 1),
@@ -591,6 +611,8 @@ export async function probeParity(tab) {
     `the parity toggle arms on the loaded ${PARITY_EFFECT} document`);
 
   await (await tab.waitForSelector('#shader-parity-toggle')).click();
+  await tab.waitForFunction(() => document.getElementById('shader-document-status')
+    ?.textContent.endsWith('compiled build'));
   const applied = await tab.$eval('#shader-document-status', (node) => ({
     text: node.textContent ?? '',
     status: node instanceof HTMLElement ? node.dataset.status : 'error',
@@ -606,10 +628,12 @@ export async function probeDocumentActions(tab) {
   const chip = '.chain-chip[data-label="rotate"]';
   const toggle = `${chip} .chain-chip-bypass`;
   await tab.click(toggle);
+  await tab.waitForFunction((selector) => document.querySelector(selector)?.getAttribute('aria-pressed') === 'true', {}, toggle);
   check(await tab.$eval(toggle, (node) => node.getAttribute('aria-pressed')) === 'true',
     'the bypass button bypasses the stage');
   await tab.focus(chip);
   await tab.keyboard.press('b');
+  await tab.waitForFunction((selector) => document.querySelector(selector)?.getAttribute('aria-pressed') === 'false', {}, toggle);
   check(await tab.$eval(toggle, (node) => node.getAttribute('aria-pressed')) === 'false',
     'the b shortcut restores the stage');
   await tab.$eval(`${chip} .chain-chip-rename`, (node) => {
@@ -618,8 +642,10 @@ export async function probeDocumentActions(tab) {
   });
   await tab.waitForSelector('.chain-chip[data-label="camera-rotate"]');
   await tab.click('.chain-undo');
+  await tab.waitForSelector(chip);
   check(await tab.$(chip) !== null, 'undo restores the original stage name');
   await tab.click('.chain-redo');
+  await tab.waitForSelector('.chain-chip[data-label="camera-rotate"]');
   check(await tab.$('.chain-chip[data-label="camera-rotate"]') !== null,
     'redo restores the renamed stage');
   const topology = await tab.$eval('select.chain-param-control', (node) => ({
@@ -631,7 +657,9 @@ export async function probeDocumentActions(tab) {
   check(exported.descriptor.chain[0].label === 'camera-rotate', 'rename reaches the saved chain');
   check(exported.preset_bank.presets[0].values[topology.id] === topology.value,
     'a topology select edit reaches the saved preset');
+  const exportsBefore = await tab.evaluate(() => window.exported.length);
   await tab.click('#shader-document-save-as');
+  await tab.waitForFunction((count) => window.exported.length > count, {}, exportsBefore);
   const copy = await tab.evaluate(async () => JSON.parse((await Promise.all(window.exported)).at(-1)));
   check(copy.document_id !== exported.document_id, 'Save As creates a distinct document id');
   await tab.evaluate(() => {
@@ -640,6 +668,7 @@ export async function probeDocumentActions(tab) {
       value: { writeText: async (text) => { window.copiedDigest = text; } } });
   });
   await tab.click('#shader-document-digest');
+  await tab.waitForFunction(() => /^[a-f0-9]{64}$/.test(window.copiedDigest));
   check(await tab.evaluate(() => /^[a-f0-9]{64}$/.test(window.copiedDigest)),
     'the digest button copies the full descriptor digest');
   await tab.waitForFunction(() => location.hash.startsWith('#shader=v1.'));
