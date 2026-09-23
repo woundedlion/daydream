@@ -169,3 +169,17 @@ test('index cap notice changes only on entry and exit without touching gate feed
   update(false);
   assert.deepEqual(writes, ['Vertex indices require fewer than 1000 vertices.', '']);
 });
+
+
+test('persistence failure retains collision feedback and clears after a later successful write', () => {
+  const status = { textContent: '' };
+  let failing = true;
+  const persist = handler('persistSavedSolids', { savedSolids: [], SAVED_SOLIDS_KEY: 'saved',
+    console: { warn() {} }, document: { getElementById: () => status },
+    localStorage: { setItem() { if (failing) throw new Error('quota'); } } });
+  persist();
+  assert.match(status.textContent, /Changes apply to this session only/);
+  failing = false;
+  persist();
+  assert.equal(status.textContent, '');
+});
