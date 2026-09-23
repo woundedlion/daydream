@@ -102,3 +102,8 @@ test('an install outside the test directory fails under a root-reaching glob', (
   writePkg('**/*.test.js');
   assert.match(fail(), /shadows the pinned root install[\s\S]*tools\/node_modules/);
 });
+
+test('a runner command without a test glob is rejected', () => {
+  writePkg('');
+  assert.match(fail(), /no.*glob|glob.*found/i);
+});
