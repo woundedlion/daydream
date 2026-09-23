@@ -23,6 +23,7 @@ const {
   SIMPLE_SEEDS,
   computeInternalAngle,
   snapToStep,
+  seedOpParams,
   isConvexFace,
   fanTriangulateFace,
   uniqueEdges,
@@ -573,7 +574,7 @@ test('a seeded hankin angle agrees across the control, the funcName and the reci
   assert.ok(Math.abs(derived - 54.7356) < 1e-3);
   assert.notEqual(derived, Math.round(derived)); // the seed is off the control's grid
 
-  const angle = snapToStep(derived, def);
+  const { angle } = seedOpParams('hankin', mesh);
   assert.equal(angle, 55);
 
   // The range input: exactly on the step grid, so the thumb reads the state value.
@@ -1688,4 +1689,10 @@ test('a slider reaching past its swept band is reported rather than silent', () 
   // The rows the marker case exists for; pinned so narrowing a slider retires
   // the row rather than leaving this sweep with nothing to assert.
   assert.deepEqual(overreaching, ['chamfer.t']);
+});
+
+test('seedOpParams handles parameterless, ordinary and missing-mesh seeds', () => {
+  assert.deepEqual(seedOpParams('dual', null), {});
+  assert.deepEqual(seedOpParams('truncate', null), { t: OP_DEFS.truncate.params.t.val });
+  assert.deepEqual(seedOpParams('hankin', null), { angle: OP_DEFS.hankin.params.angle.val });
 });
