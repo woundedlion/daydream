@@ -829,7 +829,7 @@ export function createChainStrip({
       };
       functionLabel.textContent = `${socketFunction.name}: `;
       const replacement = el('select', 'chain-chip-replace');
-      replacement.setAttribute('tabindex', '-1');
+      replacement.setAttribute('tabindex', '0');
       replacement.setAttribute('aria-keyshortcuts', 'Delete');
       replacement.setAttribute('aria-label', socketFunction.accessibleName);
       const choices = new Map(socketChoices(index).map(
@@ -866,7 +866,7 @@ export function createChainStrip({
       const toggle = el('button', 'chain-chip-bypass');
       const bypassable = bypassAvailable();
       toggle.type = 'button';
-      toggle.setAttribute('tabindex', '-1');
+      toggle.setAttribute('tabindex', '0');
       toggle.setAttribute('aria-keyshortcuts', 'b');
       toggle.disabled = !bypassable;
       toggle.setAttribute('aria-pressed', String(isBypassed));
@@ -880,7 +880,7 @@ export function createChainStrip({
       header.appendChild(toggle);
       const earlier = el('button', 'chain-chip-move');
       earlier.type = 'button';
-      earlier.setAttribute('tabindex', '-1');
+      earlier.setAttribute('tabindex', '0');
       earlier.setAttribute('aria-keyshortcuts', 'Alt+ArrowLeft');
       earlier.textContent = '←';
       earlier.disabled = !sharesBand(index, -1);
@@ -892,7 +892,7 @@ export function createChainStrip({
       });
       const later = el('button', 'chain-chip-move');
       later.type = 'button';
-      later.setAttribute('tabindex', '-1');
+      later.setAttribute('tabindex', '0');
       later.setAttribute('aria-keyshortcuts', 'Alt+ArrowRight');
       later.textContent = '→';
       later.disabled = !sharesBand(index, 1);
@@ -906,7 +906,7 @@ export function createChainStrip({
       header.appendChild(later);
       const remove = el('button', 'chain-chip-remove');
       remove.type = 'button';
-      remove.setAttribute('tabindex', '-1');
+      remove.setAttribute('tabindex', '0');
       remove.setAttribute('aria-keyshortcuts', 'Delete Backspace');
       remove.setAttribute('aria-label', `Remove ${op.name} · ${entry.label}`);
       remove.setAttribute('title', 'Delete');
