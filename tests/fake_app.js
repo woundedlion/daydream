@@ -171,8 +171,9 @@ export function fakeDriver() {
     startFrameLoop(frame) { this.renderer.setAnimationLoop(frame); },
     keys: [],
     frames: 0,
+    stepFrames: 0,
     invalidate() { this.invalidated = true; },
-    stepOnce() { this.invalidated = true; },
+    stepOnce() { this.invalidated = true; this.stepFrames = 1; },
     keydown(e) { this.keys.push(e); },
     setStrobeColumns(strobe) { this.strobe = strobe; },
     updateResolution(w, h, dotSize) {
