@@ -91,7 +91,7 @@
         </main>
         <section id="gui-container" class="gui-container" aria-label="Controls"></section>
     </div>
-    <script type="module" src="main.js"></script>
+    <script type="module" src="main.js" onerror="const overlay = document.getElementById('loading-overlay'); overlay.classList.add('error'); overlay.setAttribute('role', 'alert'); overlay.textContent = 'Unable to load the application. Reload the page to try again.';"></script>
 </body>
 
 </html>
