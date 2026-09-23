@@ -120,7 +120,9 @@ export function createSegmentedPovControls({
   // overlay otherwise names boards that cannot exist. A device cap that drops 6
   // from the range takes the marker with it and names the cap instead.
   const segLabel = segMax >= 6 ? 'Segments (6 = sim only)' : `Segments (max ${segMax} here)`;
-  segCountCtrl = segFolder.add(segState, 'segments', 2, segMax, 2).name(segLabel);
+  segCountCtrl = (segMax === 2
+    ? segFolder.add(segState, 'segments', [2])
+    : segFolder.add(segState, 'segments', 2, segMax, 2)).name(segLabel);
   segCountCtrl.onChange(async (/** @type {number} */ v) => {
     // A reconcile writes the value the handler already acted on.
     if (v === segCount) return;
