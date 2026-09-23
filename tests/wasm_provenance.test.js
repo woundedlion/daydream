@@ -2,7 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import {
   BAKED_CONSTANT_IDS, bakedTopologyFields, engineParameterNames,
@@ -85,10 +87,15 @@ const controlNameCorpus = () => {
 // the baked-constant exemption and the control-name alias table. That module is
 // not installed here, so the two are pinned by behaviour rather than by bytes.
 test('the browser promoted-binding predicates agree with engine HEAD',
-  { skip: engineSkip }, async () => {
+  { skip: engineSkip }, async (t) => {
     assert.ok(engineRoot, engineMissing);
-    const predicates = await import('data:text/javascript;base64,'
-      + committed(engineRoot, 'scripts/wasm_smoke_predicates.mjs').toString('base64'));
+    const revision = execFileSync('git', ['-C', engineRoot, 'rev-parse', 'HEAD'],
+      { encoding: 'utf8' }).trim();
+    const snapshot = mkdtempSync(resolve(tmpdir(), 'daydream-engine-predicates-'));
+    t.after(() => rmSync(snapshot, { recursive: true, force: true }));
+    for (const name of ['wasm_smoke_predicates.mjs', 'shader_workbench.mjs', 'sha256.mjs'])
+      writeFileSync(resolve(snapshot, name), committed(engineRoot, `scripts/${name}`, revision));
+    const predicates = await import(pathToFileURL(resolve(snapshot, 'wasm_smoke_predicates.mjs')).href);
     const catalog = JSON.parse(text('shader/engine_catalog.json'));
     assert.deepEqual(
       [...bakedTopologyFields(catalog)].sort(),
