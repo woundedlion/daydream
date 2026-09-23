@@ -262,6 +262,7 @@ export async function probeHistoryRestore(tab, origin) {
 
 if (isMain(import.meta.url)) await runProbe({
   name: 'lissajous-probe',
+  minimumChecks: 25,
   page: PAGE,
   timeoutMs: TIMEOUT_MS,
   // Without the bfcache, going back always re-runs the page's modules, which is

@@ -651,6 +651,7 @@ export async function probeDocumentActions(tab) {
 
 if (isMain(import.meta.url)) await runProbe({
   name: 'workbench-probe',
+  minimumChecks: 60,
   page: PAGE,
   timeoutMs: TIMEOUT_MS,
   success: 'every pipeline control behaved.',

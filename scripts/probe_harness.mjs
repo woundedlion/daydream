@@ -3,6 +3,7 @@
  * browser one probe drives, the collector every tab is watched through, and the
  * pointer helpers the gestures are made of.
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { pathToFileURL } from 'node:url';
 
 import puppeteer from 'puppeteer-core';
@@ -29,19 +30,41 @@ export function isMain(url) {
 /**
  * A verdict sink: one console line per check, and the misses kept for the
  * probe's own report.
- * @returns {{failures: string[], check: (ok: boolean, message: string) => void}}
+ * @returns {{failures: string[], count: number, check: (ok: boolean, message: string) => void}}
  *   The collected failures and the recorder that fills them.
  */
+const checkRuns = new AsyncLocalStorage();
+
 export function checks() {
+  let count = 0;
   /** @type {string[]} */
   const failures = [];
   return {
     failures,
+    get count() { return count; },
     check(ok, message) {
+      count += 1;
+      const run = checkRuns.getStore();
+      if (run) run.count += 1;
       console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${message}`);
       if (!ok) failures.push(message);
     },
   };
+}
+
+/**
+ * @param {() => Promise<string[]>} run - Probe interactions.
+ * @param {number} minimumChecks - Required number of executed checks.
+ * @returns {Promise<{failures: string[], count: number}>} The measured verdict.
+ */
+export async function measureChecks(run, minimumChecks) {
+  if (!Number.isInteger(minimumChecks) || minimumChecks < 1)
+    throw new Error('minimumChecks must be a positive integer');
+  const measurement = { count: 0 };
+  const failures = await checkRuns.run(measurement, run);
+  if (measurement.count < minimumChecks)
+    failures.push(`only ${measurement.count} checks executed; expected at least ${minimumChecks}`);
+  return { failures, count: measurement.count };
 }
 
 /**
@@ -182,6 +205,7 @@ export function collectProblems(tab, origin, problems) {
  * @param {string} probe.page - Repo-relative page the probe opens by default.
  * @param {number} probe.timeoutMs - Ceiling every wait and navigation is held to.
  * @param {string[]} [probe.args] - Browser flags; the shared set by default.
+ * @param {number} probe.minimumChecks - Minimum number of executed checks.
  * @param {string} probe.success - What the run proved, printed when nothing failed.
  * @param {(context: {origin: string, open: (options?: {viewport?: Object,
  *   page?: string, prepare?: (tab: import('puppeteer-core').Page) => Promise<void>}) =>
@@ -189,7 +213,7 @@ export function collectProblems(tab, origin, problems) {
  *   Drives the page and returns one entry per failed check.
  * @returns {Promise<void>} Resolves only on a clean run; a failed one exits 1.
  */
-export async function runProbe({ name, page, timeoutMs, args = BROWSER_ARGS, success, run }) {
+export async function runProbe({ name, page, timeoutMs, args = BROWSER_ARGS, success, minimumChecks, run }) {
   let executablePath;
   try {
     executablePath = resolveBrowser();
@@ -215,7 +239,9 @@ export async function runProbe({ name, page, timeoutMs, args = BROWSER_ARGS, suc
       await tab.goto(`${origin}/${path}`, { timeout: timeoutMs });
       return tab;
     };
-    failures.push(...await run({ origin, open }));
+    const result = await measureChecks(() => run({ origin, open }), minimumChecks);
+    failures.push(...result.failures);
+    console.log(`${name}: ${result.count} checks executed`);
   } catch (error) {
     failures.push(reason(error));
   } finally {

@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { boxOf, centre, checks, dragBetween, isMain, runProbe, walkTo }
+import { boxOf, centre, checks, dragBetween, isMain, measureChecks, runProbe, walkTo }
   from '../scripts/probe_harness.mjs';
 import { probeDocumentActions, probeParity, probeStrip, probeStripHistory } from '../scripts/workbench-probe.mjs';
 import { probeColorStrip, probeHueWheel } from '../scripts/palettes-probe.mjs';
@@ -167,4 +167,25 @@ test('PROBES names every exported probe interaction and no others', async () => 
       .sort();
     assert.deepEqual(listed, exported, `${file} probe exports and PROBES drifted`);
   }
+});
+
+test('probe counts include passes and failures and enforce a nonzero floor', async () => {
+  const empty = await measureChecks(async () => [], 2);
+  assert.equal(empty.count, 0);
+  assert.match(empty.failures[0], /only 0 checks executed/);
+  const measured = await measureChecks(async () => {
+    const verdict = checks();
+    verdict.check(true, 'pass');
+    verdict.check(false, 'failure');
+    assert.equal(verdict.count, 2);
+    return verdict.failures;
+  }, 2);
+  assert.deepEqual(measured, { count: 2, failures: ['failure'] });
+  const partial = await measureChecks(async () => {
+    const verdict = checks();
+    verdict.check(true, 'pass');
+    return verdict.failures;
+  }, 2);
+  assert.match(partial.failures[0], /only 1 checks executed/);
+  await assert.rejects(() => measureChecks(async () => [], 0), /positive integer/);
 });

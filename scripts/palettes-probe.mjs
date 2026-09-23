@@ -259,6 +259,7 @@ export async function probeHueWheel(tab) {
 
 if (isMain(import.meta.url)) await runProbe({
   name: 'palettes-probe',
+  minimumChecks: 23,
   page: PAGE,
   timeoutMs: TIMEOUT_MS,
   success: 'the strip zooms and the hue keys drag under a real pointer.',
