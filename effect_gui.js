@@ -726,7 +726,7 @@ export function createEffectGui({ engine, segments, config, host }) {
         transitionPaused(paused);
       }
     };
-    if (params.some(p => p.animated) || getPresetCount() > 1) {
+    if (params.some(p => p.animated) || getPresetCount() > 0) {
       const add = hydrate
         ? (...args) => fx.gui.add(...args)
         : (...args) => fx.gui.addUnhydrated(...args);
