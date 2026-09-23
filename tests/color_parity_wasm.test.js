@@ -671,7 +671,7 @@ function mobiusSphereJs([x, y, z], { A, B, C, D }) {
  * @returns {number[]} The eight floats, in emission order.
  */
 function mobiusArgs({ A, B, C, D }) {
-  const body = MB.mobiusCodeString(A, B, C, D).replace(/^MobiusParams\{|\}$/g, '');
+  const body = MB.mobiusCodeString(A, B, C, D).replace(/^math::MobiusParams\{|\}$/g, '');
   const floats = body.split(',').map((s) => parseFloat(s));
   assert.equal(floats.length, 8, `mobiusCodeString emitted ${floats.length} floats, want 8`);
   for (const f of floats) assert.ok(Number.isFinite(f), `mobiusCodeString emitted ${body}`);

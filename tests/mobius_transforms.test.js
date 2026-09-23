@@ -459,7 +459,7 @@ test('mobiusCodeString emits the identity as a C++ MobiusParams initializer', ()
   const z = (re, im) => ({ re, im });
   assert.equal(
     mobiusCodeString(z(1, 0), z(0, 0), z(0, 0), z(1, 0)),
-    'MobiusParams{1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f}');
+    'math::MobiusParams{1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f}');
 });
 
 /** Coefficients are emitted as real/imaginary pairs in a,b,c,d order. */
@@ -467,7 +467,7 @@ test('mobiusCodeString orders the eight floats as re/im per coefficient', () => 
   const z = (re, im) => ({ re, im });
   assert.equal(
     mobiusCodeString(z(1, 2), z(3, 4), z(5, 6), z(7, 8)),
-    'MobiusParams{1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f}');
+    'math::MobiusParams{1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f}');
 });
 
 /** A live preset sample round-trips through the float formatter. */
@@ -475,7 +475,7 @@ test('mobiusCodeString formats fractional preset coefficients', () => {
   const c = cayley(1);
   assert.equal(
     mobiusCodeString(c.A, c.B, c.C, c.D),
-    'MobiusParams{1.0f, 0.0f, 0.0f, -0.5f, 0.5f, 0.0f, 0.5f, 0.5f}');
+    'math::MobiusParams{1.0f, 0.0f, 0.0f, -0.5f, 0.5f, 0.0f, 0.5f, 0.5f}');
 });
 
 /**
