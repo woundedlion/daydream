@@ -457,10 +457,9 @@ const initThree = () => {
 
   updateMobiusUniforms();
   return () => {
-    for (const m of [sphereMesh]) {
-      if (!m) continue;
-      m.geometry.dispose();
-      m.material.dispose();
+    if (sphereMesh) {
+      sphereMesh.geometry.dispose();
+      sphereMesh.material.dispose();
     }
     result.dispose();
   };
