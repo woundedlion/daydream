@@ -251,5 +251,10 @@ test('the reusable suite verifies CDN integrity and lints tracked shell hooks', 
   const shell = suite.split('- name: Lint shell')[1]?.split(/\n {6}- /)[0] ?? '';
   assert.ok(shell.includes("git ls-files -- '*.sh' '.githooks/*'"));
   assert.ok(shell.includes('no shell files selected'));
-  assert.match(shell, /shellcheck --exclude=SC2015,SC2317 "\$\{FILES\[@\]\}"/);
+  assert.match(shell, /shellcheck "\$\{FILES\[@\]\}"/);
+});
+
+test('shell lint has no workflow-wide excluded diagnostics', () => {
+  const suite = readFileSync(`${WORKFLOW_DIR}/js-unit-suite.yml`, 'utf8');
+  assert.doesNotMatch(suite, /shellcheck[^\n]*--exclude/);
 });
