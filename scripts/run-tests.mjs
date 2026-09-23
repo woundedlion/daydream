@@ -74,6 +74,11 @@ const main = () => {
       console.error('run-tests: no tests executed; refusing an empty green run.');
       status = 1;
     }
+    if (status === 0 && process.env.CI
+        && !/^# skipped 0\s*$/m.test(readFileSync(reportPath, 'utf8'))) {
+      console.error('run-tests: CI must execute every test without skips.');
+      status = 1;
+    }
     for (const entry of readdirSync(loadsDir)) {
       for (const url of JSON.parse(readFileSync(join(loadsDir, entry), 'utf8'))) {
         const key = keyOf(fileURLToPath(url.split(/[?#]/)[0]));
