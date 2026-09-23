@@ -387,9 +387,9 @@ function recordingRig({ labelAxes = false } = {}) {
   };
   const gui = fakeGui('view');
   const driver = {
-    frameInterval: 62.5, labelAxes, recorder: null, invalidations: 0,
+    frameInterval: 62.5, labelAxes, recorder: null, invalidations: 0, steps: 0,
     invalidate() { this.invalidations += 1; },
-    stepOnce() { this.invalidations += 1; },
+    stepOnce() { this.steps += 1; },
   };
   const notices = [];
   let recorder = null;
@@ -464,6 +464,7 @@ test('the record toggle announces the session and the container it settled on', 
   assert.equal(rig.canvasEl.classList.contains('recording'), false);
   assert.equal(rig.button.label, '\u25cf Record');
   assert.equal(rig.driver.invalidations, 2, 'the stop brings the PiP back');
+  assert.equal(rig.driver.steps, 0, 'recording controls redraw without advancing the effect');
 
   rig.controls.removeOverlay();
   assert.equal(rig.canvasEl.children.length, 0,
@@ -960,4 +961,13 @@ test('a failed workbench init reports without the page-failure banner', () => {
     /workbench could not be initialized: \$\{[^}]+\}`,\s*$/,
     'the workbench half must report through the shader config notice, the '
     + 'owner tag its other messages carry');
+});
+
+test('the driver double distinguishes redraws from simulation steps', () => {
+  const driver = fakeDriver();
+  driver.invalidate();
+  assert.equal(driver.invalidated, true);
+  assert.equal(driver.stepFrames, 0);
+  driver.stepOnce();
+  assert.equal(driver.stepFrames, 1);
 });

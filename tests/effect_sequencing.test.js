@@ -484,7 +484,7 @@ function makeApp({
       setStrobeColumns: (n) => log.push(`driver.setStrobeColumns ${n}`),
       updateResolution: (w, h, dot) =>
         log.push(`driver.updateResolution ${w}x${h}@${dot}`),
-      invalidate: () => log.push('driver.stepOnce'),
+      invalidate: () => log.push('driver.invalidate'),
       stepOnce: () => log.push('driver.stepOnce'),
     },
     sidebar: {
