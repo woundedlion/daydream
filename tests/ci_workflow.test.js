@@ -135,9 +135,10 @@ test('ci-green dependency check rejects an omitted job', () => {
 
 test('every workflow pins the Node version package.json requires', () => {
   const required = JSON.parse(readFileSync('package.json', 'utf8')).engines.node
-    .replace(/^>=/, '');
+;
   assert.match(required, /^\d+\.\d+\.\d+$/,
     'package.json engines.node names one full version');
+  assert.equal(readFileSync('.nvmrc', 'utf8').trim(), required);
   const pins = nodePins(WORKFLOW_DIR);
   assert.ok(pins.length >= 3, 'the workflows still pin the Node version themselves');
   assert.deepEqual(pins.filter((pin) => !pin.endsWith(`: ${required}`)), [],
