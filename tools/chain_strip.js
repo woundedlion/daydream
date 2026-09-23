@@ -325,6 +325,7 @@ export function createChainStrip({
   const closePalette = () => {
     if (palette === null) return;
     const element = palette.element;
+    if (palette.anchor.getAttribute('aria-haspopup') !== null) palette.anchor.setAttribute('aria-expanded', 'false');
     palette = null;
     element.remove();
   };
@@ -475,6 +476,7 @@ export function createChainStrip({
     parent.insertBefore(element, parent.childNodes[at + 1] ?? null);
     placePalette(element, anchor);
     palette = { element, anchor };
+    if (anchor.getAttribute('aria-haspopup') !== null) anchor.setAttribute('aria-expanded', 'true');
     const first = options[0];
     if (first) focusOption(first);
   };
@@ -965,6 +967,7 @@ export function createChainStrip({
     const add = el('button', 'chain-band-add');
     add.type = 'button';
     add.setAttribute('aria-haspopup', 'listbox');
+    add.setAttribute('aria-expanded', 'false');
     add.setAttribute('aria-label', `Add a ${title} stage`);
     add.textContent = '+';
     add.addEventListener('click',

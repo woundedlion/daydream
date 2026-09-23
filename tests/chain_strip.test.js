@@ -1340,3 +1340,14 @@ test('arrow nudges finish independent undo entries', async () => {
   assert.equal(stored(), initial);
   assert.deepEqual(h.commits, [1, 2]);
 });
+
+
+test('band insertion buttons expose the open palette state', async () => {
+  const h = await makeStrip();
+  const add = h.container.querySelector('.chain-band-add');
+  assert.equal(add.getAttribute('aria-expanded'), 'false');
+  add.dispatch('click');
+  assert.equal(add.getAttribute('aria-expanded'), 'true');
+  h.doc.activeElement.dispatch('keydown', { key: 'Escape' });
+  assert.equal(add.getAttribute('aria-expanded'), 'false');
+});
