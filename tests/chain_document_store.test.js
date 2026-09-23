@@ -9,16 +9,20 @@
 // compiled against the pinned engine catalog.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import * as compiler from '../shader/shader_workbench.mjs';
 
 import {
   DEFAULT_SCRATCH_CHAIN,
   UNDO_DEPTH,
-  chainArenaBytes,
   createChainDocumentStore,
   scratchChainDocument,
 } from '../tools/chain_document_store.js';
 import {
+  chainArenaBytes,
   compileShaderDocument,
   validateShaderDocument,
 } from '../shader/shader_workbench.mjs';
@@ -867,4 +871,22 @@ test('the scratch builder refuses an operator the catalog lacks', () => {
   assert.throws(() => scratchChainDocument(CATALOG,
     [...DEFAULT_SCRATCH_CHAIN, { label: 'ghost', operator: 'warp.nope.v2' }]),
   /carries no operator "warp\.nope\.v2"/);
+});
+
+test('an injected compiler isolates the store from its default compiler module', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'chain-store-isolation-'));
+  try {
+    const path = join(directory, 'store.mjs');
+    writeFileSync(path, readFileSync(new URL('../tools/chain_document_store.js', import.meta.url)));
+    const isolated = await import(pathToFileURL(path).href);
+    let imports = 0;
+    const store = await isolated.createChainDocumentStore({
+      document: structuredClone(BASE.document), catalog: CATALOG,
+      importCompiler: async () => { imports++; return compiler; },
+    });
+    assert.equal(imports, 1);
+    assertGreen(store);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

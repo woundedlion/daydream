@@ -33,9 +33,6 @@ const refusal = (code, path, message) => ({
   diagnostics: [{ severity: 'error', phase: 'edit', code, path, message }],
 });
 
-const { chainArenaBytes } = await import(COMPILER_URL);
-export { chainArenaBytes };
-
 /**
  * The document parameter declaration a catalog field backfills as: the
  * catalog's domain and default under the interpolation trait its curve names.
@@ -329,7 +326,7 @@ export async function createChainDocumentStore({
    * @returns {{arenaBytes: number, paramCount: number}} Totals.
    */
   const chainCost = (ops) => ({
-    arenaBytes: chainArenaBytes(ops, budgets),
+    arenaBytes: compiler.chainArenaBytes(ops, budgets),
     paramCount: ops.reduce((total, op) => total + op.params.length, 0),
   });
 
