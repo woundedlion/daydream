@@ -134,6 +134,18 @@ export async function probePad(tab) {
   check(hovered.re === outside.re && hovered.im === outside.im,
     `hovering the released pad moves nothing (${caption(hovered)})`);
 
+  for (const key of ['A', 'B', 'C', 'D']) {
+    const plane = await boxOf(tab, `#${key}_plane`);
+    await tab.mouse.click(plane.x + plane.width / 2, plane.y + plane.height / 2);
+  }
+  check(await tab.$eval('#degenerateWarning', (node) => !node.classList.contains('hidden')),
+    'a zero determinant displays the degenerate warning');
+  for (const key of ['A', 'D']) {
+    const plane = await boxOf(tab, `#${key}_plane`);
+    await tab.mouse.click(plane.x + plane.width * 0.75, plane.y + plane.height / 2);
+  }
+  check(await tab.$eval('#degenerateWarning', (node) => node.classList.contains('hidden')),
+    'a nonsingular map clears the degenerate warning');
   return failures;
 }
 
