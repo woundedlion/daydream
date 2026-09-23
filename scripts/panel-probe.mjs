@@ -36,8 +36,6 @@ const TIMEOUT_MS = 90_000;
 const URL_SETTLE_MS = 2200;
 // Bound on the wait for the query string to stop changing.
 const URL_SETTLE_POLLS = 20;
-// Long enough that a note squeezed onto the control row would be clipped.
-const WARNING = 'Legacy Stereo Noise requires Projection = Stereographic.';
 const SCROLLER = '.effect-gui .lil-children';
 const PANEL_SLIDER = '.effect-gui .lil-controller.lil-number .lil-slider';
 const PANEL_TITLE = '.effect-gui > .lil-title';
@@ -572,48 +570,75 @@ export async function probeSidebar(tab) {
 export async function probeWarningNote(tab, layout) {
   const { failures, check } = checks();
 
-  const note = await tab.evaluate(async (warning) => {
-    const { addParamControl } = await import('/effect_gui.js');
-    const { GUI } = await import('lil-gui');
-    const container = document.querySelector('.gui-container');
-    const gui = new GUI({ container, title: 'Warning Probe', autoPlace: false });
-    gui.domElement.classList.add('effect-gui');
-    try {
-      const controller = addParamControl(gui, { Speed: 0.5 },
-        { name: 'Speed', value: 0.5, min: 0, max: 1, warning });
-      const element = controller.domElement.querySelector('.param-warning-note');
-      if (!element) {
-        return { missing: true, title: controller.domElement.getAttribute('title') };
-      }
-      const style = getComputedStyle(element);
-      const box = element.getBoundingClientRect();
-      const widget = controller.domElement.querySelector('.lil-widget')
-        .getBoundingClientRect();
-      const panel = gui.domElement.getBoundingClientRect();
-      return {
-        missing: false,
-        title: controller.domElement.getAttribute('title'),
-        text: element.textContent,
-        width: Math.round(box.width),
-        height: Math.round(box.height),
-        rects: element.getClientRects().length,
-        visibility: style.visibility,
-        display: style.display,
-        opacity: Number(style.opacity),
-        ownLine: box.top >= widget.bottom - 1,
-        inside: box.left >= panel.left - 1 && box.right <= panel.right + 1,
-        clippedX: element.scrollWidth - element.clientWidth,
-        clippedY: element.scrollHeight - element.clientHeight,
-      };
-    } finally {
-      gui.destroy();
-      gui.domElement.remove();
-    }
-  }, WARNING);
+  await tab.evaluate(async () => {
+    const [{ default: loadEngine }, { createEffectGui }, { GUI }] = await Promise.all([
+      import('./holosphere_wasm.js'), import('./effect_gui.js'), import('./gui.js'),
+    ]);
+    const module = await loadEngine();
+    const engine = new module.HolosphereEngine();
+    engine.setResolution(8, 4);
+    engine.setEffect('Shader');
+    const choose = (name, label) => {
+      const definition = engine.getParameterDefinitions().find((param) => param.name === name);
+      const value = definition.options.indexOf(label);
+      if (value < 0) throw new Error(`${name} has no ${label} option`);
+      engine.setParameter(name, value);
+    };
+    choose('Planar Warp 1', 'Mirror Tile');
+    choose('Function', 'Noise Contour (Sphere)');
+    const container = document.getElementById('gui-container');
+    const previous = [...container.children];
+    previous.forEach((node) => { node.hidden = true; });
+    const panel = createEffectGui({
+      engine: {
+        getParameterDefinitions: () => engine.getParameterDefinitions(),
+        paramGeneration: () => 0, paramValues: () => engine.getParamValues(),
+        setParam: (name, value) => engine.setParameter(name, value) === module.ParamSetResult.APPLIED,
+        setAnimationsPaused: (value) => engine.setAnimationsPaused(value),
+        animationsPaused: () => engine.getAnimationsPaused(),
+        getPresetCount: () => engine.getPresetCount(), getPresetIndex: () => engine.getPresetIndex(),
+        synchronizePreset: (index) => engine.synchronizePreset(index),
+        selectPreset: (index) => engine.selectPreset(index),
+      },
+      segments: { ownsDisplay: () => false, paramValues: () => null, setParam: () => {} },
+      host: {
+        createGui: () => new GUI({ autoPlace: false }, 'warning-probe'),
+        container: () => container, isMobile: () => matchMedia('(max-width: 900px)').matches,
+        applyEffect: () => {}, dragTarget: window,
+      },
+    });
+    panel.build();
+    panel.mount();
+    panel.active().gui.open();
+    window.disposeWarningProbe = () => {
+      panel.destroy(); engine.delete(); previous.forEach((node) => { node.hidden = false; });
+    };
+  });
+  const element = await tab.waitForSelector('.effect-gui .param-warning-note');
+  await element.evaluate((node) => node.scrollIntoView({ block: 'center' }));
+  const note = await element.evaluate((element) => {
+    const controller = element.closest('.lil-controller');
+    const style = getComputedStyle(element);
+    const box = element.getBoundingClientRect();
+    const widget = controller.querySelector('.lil-widget').getBoundingClientRect();
+    const panel = element.closest('.effect-gui').getBoundingClientRect();
+    return {
+      missing: false,
+      title: controller.getAttribute('title'),
+      text: element.textContent,
+      width: Math.round(box.width), height: Math.round(box.height),
+      rects: element.getClientRects().length,
+      visibility: style.visibility, display: style.display, opacity: Number(style.opacity),
+      ownLine: box.top >= widget.bottom - 1,
+      inside: box.left >= panel.left - 1 && box.right <= panel.right + 1,
+      clippedX: element.scrollWidth - element.clientWidth,
+      clippedY: element.scrollHeight - element.clientHeight,
+    };
+  });
 
   check(!note.missing, 'the warned control carries a note node');
   if (note.missing) return failures.map((failure) => `${layout}: ${failure}`);
-  check(note.text === WARNING,
+  check(note.text.includes('Planar Warp 1') && note.text.includes('Mirror Tile'),
     `the note carries the warning text (${note.text})`);
   check(note.title === null,
     `the control publishes no pointer-only tooltip (${note.title})`);
@@ -629,6 +654,7 @@ export async function probeWarningNote(tab, layout) {
     `the text is not clipped (${note.clippedX}px wide, ${note.clippedY}px tall `
       + 'past the box)');
 
+  await tab.evaluate(() => { window.disposeWarningProbe(); delete window.disposeWarningProbe; });
   return failures.map((failure) => `${layout}: ${failure}`);
 }
 
