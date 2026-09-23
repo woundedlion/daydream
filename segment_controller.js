@@ -1246,13 +1246,14 @@ export class SegmentController {
 
     if (!this.#renderInFlight) {
       this.#renderInFlight = true;
+      const generation = this.#renderGen;
       this.renderParallel().then(() => {
         // Publish the fully-assembled generation only if it is still current: a
         // mid-render setResolution() bumps renderGen, and publishing anyway would
         // composite a black or stale-sized frame next tick. The swap makes the
         // completed staging buffer the live one atomically between ticks; the
         // old buffer becomes next generation's scratch.
-        if (this.#inflightGen === this.#renderGen) {
+        if (generation === this.#renderGen) {
           const done = this.#scratch;
           this.#scratch = this.#results;
           this.#results = done;
