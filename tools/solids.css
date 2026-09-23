@@ -16,7 +16,7 @@ body {
   width: var(--sidebar-width);
   flex-shrink: 0;
   height: 100vh;
-  background-color: rgba(15, 23, 42, 0.95);
+  background-color: color-mix(in srgb, var(--slate-900) 95%, transparent);
   border-right: 1px solid var(--slate-700);
   display: flex;
   flex-direction: column;
@@ -98,8 +98,8 @@ body {
 
 .thumb-btn.active {
   border-color: var(--blue-500);
-  background-color: rgba(59, 130, 246, 0.15);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+  background-color: color-mix(in srgb, var(--blue-500) 15%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--blue-500) 30%, transparent);
 }
 
 .thumb-btn:focus-visible,
@@ -138,7 +138,7 @@ body {
   justify-content: center;
   text-align: center;
   padding: 0.3rem;
-  background: rgba(15, 23, 42, 0.92);
+  background: color-mix(in srgb, var(--slate-900) 92%, transparent);
   border-radius: 0.6rem;
   font-size: clamp(0.65rem, (100vw - 474px) * 0.01, 0.9rem);
   line-height: 1.25;
@@ -250,7 +250,7 @@ body {
   width: 3rem;
   height: 3rem;
   border-radius: 50%;
-  background-color: rgba(15, 23, 42, 0.8);
+  background-color: color-mix(in srgb, var(--slate-900) 80%, transparent);
   border: 2px solid var(--slate-700);
   display: flex;
   align-items: center;
@@ -279,7 +279,7 @@ body {
 }
 
 #meshStats {
-  background-color: rgba(15, 23, 42, 0.8);
+  background-color: color-mix(in srgb, var(--slate-900) 80%, transparent);
   border: 1px solid var(--slate-700);
   border-radius: 0.5rem;
   padding: 0.4rem 0.8rem;
@@ -311,7 +311,7 @@ body {
   width: var(--right-sidebar-width);
   flex-shrink: 0;
   height: 100vh;
-  background-color: rgba(15, 23, 42, 0.95);
+  background-color: color-mix(in srgb, var(--slate-900) 95%, transparent);
   border-left: 1px solid var(--slate-700);
   display: flex;
   flex-direction: column;

@@ -609,6 +609,8 @@ const fill = (css, selector) => color(css, selector,
  */
 function channels(value) {
   const literal = value.trim() === 'white' ? '#ffffff' : value.trim();
+  const mixed = literal.match(/^color-mix\(in srgb, (#[0-9a-f]{6}) ([\d.]+)%, transparent\)$/i);
+  if (mixed) return [...channels(mixed[1]).slice(0, 3), Number(mixed[2]) / 100];
   const hex = literal.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i)?.[1];
   if (hex) {
     const pairs = hex.length === 3 ? [...hex].map((c) => c + c) : hex.match(/../g);
@@ -669,6 +671,7 @@ test('CSS readers ignore comments and honor later declarations', () => {
   assert.equal(color(css, '.real', 'color'), '#222222');
   assert.deepEqual(channels('rgb(20 20 20 / 0.95)'), [20, 20, 20, 0.95]);
   assert.deepEqual(channels('#48f'), [68, 136, 255, 1]);
+  assert.deepEqual(channels('color-mix(in srgb, #0f172a 92%, transparent)'), [15, 23, 42, 0.92]);
   assert.deepEqual(rules('@media (width > 1px) { .nested { color: #123456; } }'),
     [['.nested', ' color: #123456; ']]);
 });
