@@ -106,6 +106,8 @@ function captureFlag(options) {
  * @returns {boolean} True when the node matches.
  */
 function matchesOne(node, selector) {
+  const tagAttribute = /^([a-z][\w-]*)(\[[\w-]+\])$/i.exec(selector);
+  if (tagAttribute) return matchesOne(node, tagAttribute[1]) && matchesOne(node, tagAttribute[2]);
   if (!/^(?:\.[\w-]+|\[[\w-]+\]|[a-z][\w-]*)$/i.test(selector)) {
     throw new Error(`unsupported selector: ${selector}`);
   }
