@@ -53,11 +53,11 @@ async function exported(tab) {
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
   }));
   const text = await tab.$eval(CODE, (node) => node.textContent ?? '');
-  const body = /^LissajousParams\{(.*)\}$/.exec(text)?.[1];
+  const body = /^math::LissajousParams\{(.*)\}$/.exec(text)?.[1];
   if (body === undefined) throw new Error(`the export snippet reads "${text}"`);
   const [c1, c2, a, domain] = body.split(',').map((field) => {
     // An exact multiple of the period is emitted against PI_F, not as a decimal.
-    const multiple = /^\s*(-?\d+) \* PI_F\s*$/.exec(field);
+    const multiple = /^\s*(-?\d+) \* math::PI_F\s*$/.exec(field);
     return multiple ? Number(multiple[1]) * Math.PI : parseFloat(field);
   });
   return { c1, c2, a, domain };

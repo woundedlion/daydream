@@ -277,24 +277,24 @@ test('lissajous: point lies on the unit sphere (R = 1) for several t', () => {
  * with phase in radians, and a non-2π domain as a plain float literal.
  */
 test('lissajousCodeString emits a C++ LissajousParams initializer', () => {
-  // Matches Fishbowl's built-in config{12.0f, 5.0f, 0, 2 * PI_F}.
+  // Matches Fishbowl's built-in config{12.0f, 5.0f, 0, 2 * math::PI_F}.
   assert.equal(
     lissajousCodeString(12, 5, 0, TWO_PI),
-    'LissajousParams{12.0f, 5.0f, 0.0f, 2 * PI_F}');
+    'math::LissajousParams{12.0f, 5.0f, 0.0f, 2 * math::PI_F}');
 
   assert.equal(
     lissajousCodeString(3, 2, 1.5708, 2 * TWO_PI),
-    'LissajousParams{3.0f, 2.0f, 1.5708f, 4 * PI_F}');
+    'math::LissajousParams{3.0f, 2.0f, 1.5708f, 4 * math::PI_F}');
 
   assert.equal(
     lissajousCodeString(1.06, 1.06, 0, 5.909),
-    'LissajousParams{1.06f, 1.06f, 0.0f, 5.909f}');
+    'math::LissajousParams{1.06f, 1.06f, 0.0f, 5.909f}');
 
   // An 8/7 rational lock has no exact short decimal; the frequencies keep full
   // precision so the exported curve still closes.
   assert.equal(
     lissajousCodeString(5 * (8 / 7), 5, 0, 7 * TWO_PI),
-    'LissajousParams{5.714286f, 5.0f, 0.0f, 14 * PI_F}');
+    'math::LissajousParams{5.714286f, 5.0f, 0.0f, 14 * math::PI_F}');
 });
 
 /**

@@ -214,7 +214,7 @@ export const domainClosureWarning = (c2, domain, tol = 1e-4) => {
  * @param {number} c2 - Frequency C₂ (m2).
  * @param {number} a - Phase shift A (radians).
  * @param {number} domain - The curve domain (duration).
- * @returns {string} A `LissajousParams{...}` initializer.
+ * @returns {string} A `math::LissajousParams{...}` initializer.
  */
 export const lissajousCodeString = (c1, c2, a, domain) => {
   const f = formatFloatCpp;
@@ -229,10 +229,10 @@ export const lissajousCodeString = (c1, c2, a, domain) => {
   let domainStr;
   const multiple = domain / TWO_PI;
   if (Math.abs(multiple - Math.round(multiple)) < 0.001 && Math.round(multiple) > 0) {
-    domainStr = `${2 * Math.round(multiple)} * PI_F`;
+    domainStr = `${2 * Math.round(multiple)} * math::PI_F`;
   } else {
     domainStr = f(domain, 3);
   }
 
-  return `LissajousParams{${c1Str}, ${c2Str}, ${aStr}, ${domainStr}}`;
+  return `math::LissajousParams{${c1Str}, ${c2Str}, ${aStr}, ${domainStr}}`;
 };
