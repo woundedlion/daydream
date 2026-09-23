@@ -68,8 +68,18 @@ const nodePins = (dir) => readdirSync(dir)
 
 /** @param {string} source @returns {string[]} The workflow's `on:` trigger names. */
 const triggersOf = (source) => {
-  const block = source.split(/^on:\s*$/m)[1]?.split(/^\S/m)[0] ?? '';
-  return [...block.matchAll(/^ {2}([a-z_]+):/gm)].map((match) => match[1]);
+  const header = /^(?:on|'on'|"on"):[ \t]*([^\n]*)$/m.exec(source);
+  assert.ok(header, 'workflow must declare its triggers');
+  const inline = header[1].replace(/\s+#.*$/, '').trim();
+  if (inline) {
+    assert.match(inline, /^(?:[a-z_]+|\[(?:[\w'", \t]*)\])$/,
+      'unsupported trigger syntax must not bypass the aggregate');
+    return inline.match(/[a-z_]+/g) ?? [];
+  }
+  const block = source.slice(header.index + header[0].length).split(/^\S/m)[0];
+  const names = [...block.matchAll(/^ {2}['"]?([a-z_]+)['"]?:/gm)].map((match) => match[1]);
+  assert.ok(names.length, 'workflow trigger block must not be empty');
+  return names;
 };
 
 // A workflow only workflow_call reaches is gated through its caller; every
@@ -257,4 +267,13 @@ test('the reusable suite verifies CDN integrity and lints tracked shell hooks', 
 test('shell lint has no workflow-wide excluded diagnostics', () => {
   const suite = readFileSync(`${WORKFLOW_DIR}/js-unit-suite.yml`, 'utf8');
   assert.doesNotMatch(suite, /shellcheck[^\n]*--exclude/);
+});
+
+
+test('workflow trigger parsing cannot hide flow or quoted declarations', () => {
+  for (const source of ['on: [push, pull_request]', '"on": ["push", "pull_request"]',
+    "'on':\n  push:\n  pull_request:\n", 'on: push']) {
+    assert.ok(triggersOf(source).includes('push'), source);
+  }
+  assert.throws(() => triggersOf('"on": {push: {}}'), /unsupported trigger syntax/);
 });
