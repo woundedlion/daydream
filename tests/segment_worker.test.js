@@ -198,7 +198,7 @@ mock.module('../holosphere_wasm.js', {
   },
 });
 
-await import('../segment_worker.js');
+const { installSegmentWorker } = await import('../segment_worker.js');
 
 // 'booted' is posted once at module-eval time, before any beforeEach clears `posted`.
 const bootedAtLoad = posted.filter((p) => p.msg.type === 'booted');
@@ -241,6 +241,7 @@ async function until(probe, turns = 1000) {
 }
 
 beforeEach(() => {
+  installSegmentWorker();
   posted.length = 0;
   engineInstance = null;
   moduleOptions = null;
@@ -1274,3 +1275,10 @@ test('render faults when getArenaMetrics traps the module', async () => {
 });
 
 /** A pixel buffer whose length disagrees with the canvas faults instead of zero-filling the tail. */
+
+test('a fresh worker still initializes and renders after a preceding module trap', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  assert.ok(posted.some(({ msg }) => msg.type === 'ready'));
+  await dispatch({ type: 'render' });
+  assert.ok(posted.some(({ msg }) => msg.type === 'frame'));
+});
