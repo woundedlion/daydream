@@ -853,19 +853,18 @@ test('a generation cut short by a worker fault is never published', async () => 
   assert.strictEqual(c.frameState.results, results, 'the live buffer was not swapped');
 });
 
-test('destroy() bumps the generation so a stale in-flight .then cannot arm a new pool', async () => {
-  const c = makeController();
+test('destroyed generations cannot publish into a recreated pool', async () => {
+  const c = readyController(2);
+  c.tick();
+  assert.equal(c.frameState.renderInFlight, true);
   c.create(2);
-  const done = c.renderParallel();
-  const dispatchGen = c.frameState.inflightGen;
-
-  // Recreate the pool while a render is in flight; destroy() settles `done`.
-  c.create(2);
-  await done;
-
-  // The stale .then's guard (inflightGen === renderGen) must fail.
-  assert.equal(c.frameState.inflightGen, dispatchGen, 'inflight snapshot is unchanged');
-  assert.notEqual(c.frameState.inflightGen, c.frameState.renderGen, 'generation moved on under it');
+  const results = c.frameState.results;
+  const scratch = c.frameState.scratch;
+  await flush();
+  assert.equal(c.frameState.renderInFlight, false);
+  assert.equal(c.frameState.pendingFrame, false);
+  assert.strictEqual(c.frameState.results, results);
+  assert.strictEqual(c.frameState.scratch, scratch);
 });
 
 // ---------------------------------------------------------------------------
