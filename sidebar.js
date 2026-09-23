@@ -192,7 +192,7 @@ export class EffectSidebar {
       if (size > 0) {
         const sizeSpan = this.doc.createElement('span');
         sizeSpan.className = 'effect-size';
-        sizeSpan.textContent = `${formatKB(size)} KB`;
+        sizeSpan.textContent = `${formatKB(size)} KiB`;
         btn.appendChild(sizeSpan);
       }
 
