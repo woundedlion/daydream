@@ -110,3 +110,15 @@ test('a destination without daydream.js is not a checkout', (t) => {
   rmSync(join(destination, 'daydream.js'));
   assert.throws(() => installEngineBundle(bundle, destination), /not a Daydream checkout/);
 });
+
+test('a publication failure restores the complete previous installation', (t) => {
+  const { bundle, destination, write } = fixture(t, (files) => {
+    files['blocked/new.bin'] = 'new';
+  });
+  write(destination, 'blocked', 'consumer-owned');
+  assert.throws(() => installEngineBundle(bundle, destination));
+  assert.equal(readFileSync(join(destination, 'holosphere_wasm.sha'), 'utf8'), 'a'.repeat(40));
+  assert.equal(readFileSync(join(destination, 'shader/patterns/obsolete.shader.json'), 'utf8'), 'obsolete');
+  assert.equal(readFileSync(join(destination, 'blocked'), 'utf8'), 'consumer-owned');
+  assert.equal(existsSync(join(destination, 'holosphere_wasm.js')), false);
+});
