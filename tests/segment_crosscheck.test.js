@@ -208,3 +208,17 @@ test('segment layout ↔ pov_segment_map: correspondence holds across configs', 
   crossCheck(/*S=*/8, /*N=*/4, /*w=*/8);
   crossCheck(/*S=*/8, /*N=*/8, /*w=*/8);
 });
+
+test('firmware columns wrap correctly at every half-turn boundary', () => {
+  assert.deepEqual(golden.x_cols.map((entry) => entry.width), [8, 96, 288]);
+  for (const { width, samples } of golden.x_cols) {
+    assert.deepEqual(samples.map((sample) => sample.x),
+      [0, width / 2 - 1, width / 2, width - 1]);
+    const armA = computeSegmentRange(0, 2, width, 8);
+    const armB = computeSegmentRange(1, 2, width, 8);
+    for (const sample of samples) {
+      assert.equal(sample.arm_a, (armA.x0 + sample.x) % width);
+      assert.equal(sample.arm_b, (armB.x0 + sample.x) % width);
+    }
+  }
+});
