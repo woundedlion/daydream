@@ -851,9 +851,13 @@ function renderSavedList() {
 // generated markup needs them (saved-solids cards and op-chain rows), so no
 // function is pinned to window. Keep new handlers wired the same way.
 function deleteSolid(index) {
+  const position = savedSolids.length - index - 1;
   savedSolids.splice(index, 1);
   persistSavedSolids();
   renderSavedList();
+  const rows = document.getElementById('savedList').children;
+  (rows[Math.min(position, rows.length - 1)]?.querySelector('.del-btn')
+    ?? document.getElementById('saveBtn'))?.focus();
 }
 
 async function copyCode(index, lang, btn) {
@@ -1267,6 +1271,9 @@ function removeOp(index, revision) {
     setOps(candidate);
     renderOps();
     update();
+    const rows = document.getElementById('opsList').children;
+    (rows[Math.min(index, rows.length - 1)]?.querySelector('.remove-op-btn')
+      ?? document.querySelector('#addOpGrid [data-op]:not(:disabled)'))?.focus();
   });
 }
 

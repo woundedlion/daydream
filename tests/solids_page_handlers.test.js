@@ -75,3 +75,46 @@ test('copying a star recipe contains bridge errors and reports engine halts', as
   assert.equal(failures.length, 1);
   assert.equal(traps.length, 2);
 });
+
+for (const [count, index, expected] of [[3, 1, 1], [3, 2, 1], [1, 0, 'add']]) {
+  test(`removing op ${index} of ${count} restores keyboard focus`, async () => {
+    const state = { ops: Array.from({ length: count }, () => ({ op: 'ambo', params: {} })) };
+    let pending;
+    let focused;
+    const rows = () => state.ops.map((_op, i) => ({
+      querySelector: () => ({ focus: () => { focused = i; } }),
+    }));
+    const removeOp = handler('removeOp', {
+      state, opsRevision: 1, queueCommit: (fn) => { pending = fn(); },
+      chainIsValid: async () => ({ ok: true }), setOps: (ops) => { state.ops = ops; },
+      renderOps() {}, update() {},
+      document: {
+        getElementById: () => ({ children: rows() }),
+        querySelector: () => ({ focus: () => { focused = 'add'; } }),
+      },
+    });
+    removeOp(index, 1);
+    await pending;
+    assert.equal(state.ops.length, count - 1);
+    assert.equal(focused, expected);
+  });
+}
+
+test('deleting saved solids preserves focus in reverse display order or on save', () => {
+  const savedSolids = [{}, {}, {}];
+  let focused;
+  const deleteSolid = handler('deleteSolid', {
+    savedSolids, persistSavedSolids() {}, renderSavedList() {},
+    document: { getElementById: (id) => id === 'saveBtn'
+      ? { focus: () => { focused = 'save'; } }
+      : { children: savedSolids.map((_item, i) => ({
+        querySelector: () => ({ focus: () => { focused = i; } }),
+      })) } },
+  });
+  deleteSolid(2);
+  assert.equal(focused, 0);
+  deleteSolid(0);
+  assert.equal(focused, 0);
+  deleteSolid(0);
+  assert.equal(focused, 'save');
+});
