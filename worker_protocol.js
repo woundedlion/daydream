@@ -25,7 +25,7 @@
  * same-named but reshaped message. Bump on any breaking change to the messages below.
  * @type {number}
  */
-export const PROTOCOL_VERSION = 9;
+export const PROTOCOL_VERSION = 10;
 
 /**
  * One tuned effect parameter, flattened for structured-clone transport. Booleans
@@ -79,7 +79,7 @@ export const PROTOCOL_VERSION = 9;
  * @typedef {{
  *   type: 'init', version: number, segId: number, totalSegs: number,
  *   w: number, h: number,
- *   effectName?: string, params?: SegParam[],
+ *   effectName: string, params?: SegParam[],
  *   fullConfigSnapshot?: FullConfigSnapshot, paused?: boolean,
  *   presetIndex?: number|undefined,
  *   poleLod?: number, paramRevision: number,

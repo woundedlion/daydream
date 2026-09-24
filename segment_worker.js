@@ -267,6 +267,11 @@ export function installSegmentWorker() {
           break;
         }
 
+        if (typeof msg.effectName !== 'string' || !msg.effectName.trim()) {
+          post({ type: 'engineRejected', reason: 'init requires an effect name' });
+          break;
+        }
+
         segId = msg.segId;
         totalSegs = msg.totalSegs;
         paramRevision = msg.paramRevision;
