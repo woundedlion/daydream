@@ -246,3 +246,20 @@ test('probe teardown preserves failures and attempts every close', async () => {
   assert.deepEqual(failures, ['the slider did not move',
     'browser teardown: Target closed', 'site teardown: site close failed']);
 });
+
+test('the preset name probe detaches on a missing control and on CDP failure', async () => {
+  for (const reject of [false, true]) {
+    let detached = 0;
+    const tab = { createCDPSession: async () => ({
+      send: async (method) => {
+        if (reject) throw new Error('CDP failed');
+        if (method === 'DOM.getDocument') return { root: { nodeId: 1 } };
+        if (method === 'DOM.querySelector') return { nodeId: 0 };
+      },
+      detach: async () => { detached++; },
+    }) };
+    if (reject) await assert.rejects(() => probePresetName(tab), /CDP failed/);
+    else assert.equal((await probePresetName(tab)).length, 1);
+    assert.equal(detached, 1);
+  }
+});

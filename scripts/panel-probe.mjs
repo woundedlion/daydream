@@ -297,22 +297,25 @@ export async function probePresetName(tab) {
   const { failures, check } = checks();
 
   const cdp = await tab.createCDPSession();
-  await cdp.send('Accessibility.enable');
-  const doc = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
-  const { nodeId } = await cdp.send('DOM.querySelector',
-    { nodeId: doc.root.nodeId, selector: PRESET_SELECT });
-  check(nodeId !== 0, 'the preset dropdown is mounted');
-  if (nodeId === 0) return failures;
+  try {
+    await cdp.send('Accessibility.enable');
+    const doc = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
+    const { nodeId } = await cdp.send('DOM.querySelector',
+      { nodeId: doc.root.nodeId, selector: PRESET_SELECT });
+    check(nodeId !== 0, 'the preset dropdown is mounted');
+    if (nodeId === 0) return failures;
 
-  const tree = await cdp.send('Accessibility.getPartialAXTree',
-    { nodeId, fetchRelatives: false });
-  const ax = tree.nodes.find((node) => node.role?.value === 'combobox');
-  const name = ax?.name?.value ?? '';
-  check(name === PRESET_NAME,
-    `the preset dropdown computes the accessible name ${PRESET_NAME} `
-      + `(${name || 'none'})`);
-  await cdp.detach();
-  return failures;
+    const tree = await cdp.send('Accessibility.getPartialAXTree',
+      { nodeId, fetchRelatives: false });
+    const ax = tree.nodes.find((node) => node.role?.value === 'combobox');
+    const name = ax?.name?.value ?? '';
+    check(name === PRESET_NAME,
+      `the preset dropdown computes the accessible name ${PRESET_NAME} `
+        + `(${name || 'none'})`);
+    return failures;
+  } finally {
+    await cdp.detach();
+  }
 }
 
 /*
@@ -340,25 +343,28 @@ export async function probeStageNames(tab) {
       [...new Set(repeated)].join(', ')})`);
 
   const cdp = await tab.createCDPSession();
-  await cdp.send('Accessibility.enable');
-  const doc = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
-  const { nodeIds } = await cdp.send('DOM.querySelectorAll',
-    { nodeId: doc.root.nodeId, selector: STAGE_WIDGET });
-  const names = [];
-  for (const nodeId of nodeIds) {
-    const tree = await cdp.send('Accessibility.getPartialAXTree',
-      { nodeId, fetchRelatives: false });
-    names.push(tree.nodes.find((node) => node.name)?.name?.value ?? '');
+  try {
+    await cdp.send('Accessibility.enable');
+    const doc = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
+    const { nodeIds } = await cdp.send('DOM.querySelectorAll',
+      { nodeId: doc.root.nodeId, selector: STAGE_WIDGET });
+    const names = [];
+    for (const nodeId of nodeIds) {
+      const tree = await cdp.send('Accessibility.getPartialAXTree',
+        { nodeId, fetchRelatives: false });
+      names.push(tree.nodes.find((node) => node.name)?.name?.value ?? '');
+    }
+
+    check(names.length === visible.length && !names.includes(''),
+      `every one of the ${names.length} stage controls computes a name`);
+    const distinct = new Set(names).size;
+    check(distinct === names.length,
+      `the ${names.length} stage controls compute ${distinct} distinct names`);
+
+    return failures;
+  } finally {
+    await cdp.detach();
   }
-  await cdp.detach();
-
-  check(names.length === visible.length && !names.includes(''),
-    `every one of the ${names.length} stage controls computes a name`);
-  const distinct = new Set(names).size;
-  check(distinct === names.length,
-    `the ${names.length} stage controls compute ${distinct} distinct names`);
-
-  return failures;
 }
 
 /*
@@ -386,24 +392,27 @@ export async function probeTelemetry(tab) {
     `the ${reached.name || 'telemetry'} readout still takes keyboard focus`);
 
   const cdp = await tab.createCDPSession();
-  await cdp.send('Accessibility.enable');
-  const doc = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
-  const { nodeId } = await cdp.send('DOM.querySelector',
-    { nodeId: doc.root.nodeId, selector: TELEMETRY_WIDGET });
-  const tree = await cdp.send('Accessibility.getPartialAXTree',
-    { nodeId, fetchRelatives: false });
-  const ax = tree.nodes.find((node) => node.name);
-  await cdp.detach();
-  const property = (name) => ax?.properties
-    ?.find((entry) => entry.name === name)?.value?.value;
-  check(ax !== undefined && ax.ignored !== true,
-    `the readout is exposed to assistive tech (${ax?.name?.value ?? 'ignored'})`);
-  check(property('disabled') !== true,
-    'the readout is not announced as unavailable');
-  check(property('readonly') === true,
-    'the readout is announced as read-only');
+  try {
+    await cdp.send('Accessibility.enable');
+    const doc = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
+    const { nodeId } = await cdp.send('DOM.querySelector',
+      { nodeId: doc.root.nodeId, selector: TELEMETRY_WIDGET });
+    const tree = await cdp.send('Accessibility.getPartialAXTree',
+      { nodeId, fetchRelatives: false });
+    const ax = tree.nodes.find((node) => node.name);
+    const property = (name) => ax?.properties
+      ?.find((entry) => entry.name === name)?.value?.value;
+    check(ax !== undefined && ax.ignored !== true,
+      `the readout is exposed to assistive tech (${ax?.name?.value ?? 'ignored'})`);
+    check(property('disabled') !== true,
+      'the readout is not announced as unavailable');
+    check(property('readonly') === true,
+      'the readout is announced as read-only');
 
-  return failures;
+    return failures;
+  } finally {
+    await cdp.detach();
+  }
 }
 
 /** @param {import('puppeteer-core').Page} tab */
