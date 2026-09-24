@@ -478,7 +478,6 @@ const CONTRAST_SURFACES = {
     '.chain-param-value': '.chain-param-value',
     '.chain-palette-entry:hover, .chain-palette-entry:focus-visible':
       '.chain-palette-entry:hover, .chain-palette-entry:focus-visible',
-    '.chain-palette-entry--remove': '.chain-palette-entry',
   },
   'solids.css': {
     '.thumb-btn .thumb-label': '.thumb-btn',
