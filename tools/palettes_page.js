@@ -1258,6 +1258,8 @@ function handleHueModeChange(el) {
       sourceRecipe.hue.sweepTurns =
         loopSweepTurns(sourceRecipe.hue.sweepTurns);
     }
+    selectedHueKey = 0;
+    activeHueKey = null;
     if (!activateCustomHue(sourceRecipe))
       el.value = Object.keys(PaletteV4.hueMode).find((name) => PaletteV4.hueMode[name] === previousHueMode);
   } else {
