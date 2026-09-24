@@ -313,3 +313,10 @@ test('engine bundle callers grant Actions read only to the bundle gate', () => {
     assert.doesNotMatch(source.split(/^jobs:/m)[0], /actions:/, path);
   }
 });
+
+test('bundle installation checks additions as well as tracked changes', () => {
+  for (const name of ['engine-bundle', 'js-unit-suite', 'deploy']) {
+    const source = readFileSync(`${WORKFLOW_DIR}/${name}.yml`, 'utf8');
+    assert.ok(source.includes('test -z "$(git status --porcelain)"'), name);
+  }
+});
