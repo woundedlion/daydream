@@ -116,7 +116,8 @@ test('a publication failure restores the complete previous installation', (t) =>
     files['blocked/new.bin'] = 'new';
   });
   write(destination, 'blocked', 'consumer-owned');
-  assert.throws(() => installEngineBundle(bundle, destination));
+  assert.throws(() => installEngineBundle(bundle, destination),
+    { code: 'EEXIST', syscall: 'mkdir', path: join(destination, 'blocked') });
   assert.equal(readFileSync(join(destination, 'holosphere_wasm.sha'), 'utf8'), 'a'.repeat(40));
   assert.equal(readFileSync(join(destination, 'shader/patterns/obsolete.shader.json'), 'utf8'), 'obsolete');
   assert.equal(readFileSync(join(destination, 'blocked'), 'utf8'), 'consumer-owned');
