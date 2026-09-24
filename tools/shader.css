@@ -506,12 +506,6 @@ select.chain-param-control {
   color: var(--bright-text);
 }
 
-.chain-palette-entry--remove {
-  border-bottom: 1px solid var(--panel-border);
-  border-radius: 0.25rem 0.25rem 0 0;
-  color: var(--bright-text);
-}
-
 .chain-palette-name {
   white-space: nowrap;
 }

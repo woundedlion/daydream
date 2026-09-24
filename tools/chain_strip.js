@@ -342,8 +342,7 @@ export function createChainStrip({
   };
 
   /**
-   * Opens the one palette with only the operators valid at this position, plus
-   * a leading Remove entry where the empty replacement is legal.
+   * Opens the palette with only the operators valid at this position.
    * @param {Object} options - What the palette replaces.
    * @param {'insert'|'replace'} options.kind - Insertion at a gap or replacement
    *   of one chip.
@@ -374,8 +373,7 @@ export function createChainStrip({
      * @returns {void}
      */
     const activate = (entry) => {
-      const choice = choices.get(
-        entry.dataset.remove === 'true' ? '' : entry.dataset.operator);
+      const choice = choices.get(entry.dataset.operator);
       if (choice === undefined) return;
       const result = store.replaceSpan(choice.start, choice.deleteCount,
         choiceEntries(choice));
@@ -420,13 +418,6 @@ export function createChainStrip({
     };
 
     for (const [key, choice] of choices) {
-      if (choice.operators.length === 0) {
-        const remove = el('div', 'chain-palette-entry chain-palette-entry--remove');
-        remove.dataset.remove = 'true';
-        remove.textContent = 'Remove';
-        addOption(remove);
-        continue;
-      }
       const option = el('div', 'chain-palette-entry');
       option.dataset.operator = key;
       const name = el('span', 'chain-palette-name');
