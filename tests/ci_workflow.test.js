@@ -345,3 +345,13 @@ test('the CI gate executes through a linked checkout path', () => {
     rmSync(scratch, { recursive: true, force: true });
   }
 });
+
+test('pre-push bounds browser probes and owns their scratch directory', () => {
+  const hook = readFileSync('.githooks/pre-push', 'utf8');
+  assert.match(hook, /probe_deadline=\$\(\( \$\(date \+%s\) \+ 1500 \)\)/);
+  assert.match(hook, /left < 420 \? left : 420/);
+  assert.ok(hook.includes('timeout -k 10s "${limit}s" "$@"'));
+  assert.ok(hook.includes('export TMPDIR="$probe_tmp" TMP="$probe_tmp" TEMP="$probe_tmp"'));
+  assert.ok(hook.includes('rm -rf "$probe_tmp"'));
+  assert.match(hook, /resolveBrowser\(\)\)\.catch/);
+});
