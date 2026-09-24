@@ -928,3 +928,17 @@ test('chain labels use the compiler grammar', () => {
   assert.deepEqual(grammar('../tools/chain_document_store.js'),
     grammar('../shader/shader_workbench.mjs'));
 });
+
+test('radian periodicity is independent of a catalog field bound', () => {
+  const catalog = structuredClone(CATALOG);
+  const rotate = catalog.operators.find((operator) => operator.id === 'project.peirce.v2');
+  const field = rotate.params.find((parameter) => parameter.curve === 'shortest-periodic');
+  assert.ok(field);
+  field.max = Math.PI;
+  const document = scratchChainDocument(catalog, DEFAULT_SCRATCH_CHAIN.map((entry) =>
+    entry.label === 'project' ? { ...entry, operator: 'project.peirce.v2' } : entry));
+  const parameter = document.descriptor.parameters.find((entry) => entry.id === `project.${field.id}`);
+  assert.equal(parameter.domain.maximum, Math.fround(Math.PI));
+  assert.equal(parameter.interpolation.period, Math.fround(2 * Math.PI));
+  assert.deepEqual(validateShaderDocument(document, { catalog }), []);
+});
