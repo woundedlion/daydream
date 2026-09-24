@@ -226,3 +226,21 @@ test('clearing saved solids requires confirmation and preserves cancelled cards'
   clear();
   assert.equal(calls.length, 4);
 });
+
+test('a refused topology tick repaints the restored chain', async () => {
+  let queued;
+  const painted = [];
+  const state = { base: 'cube', ops: [{ op: 'truncate', params: { t: 0.4 } }] };
+  const context = {
+    state, opsRevision: 1, OP_DEFS: {},
+    document: { getElementById: () => ({ children: [] }) },
+    opTopologyKey: (entry) => entry.params.t === 0.5,
+    scheduleUpdate: { cancel() {} }, queueCommit: (fn) => { queued = fn; },
+    chainIsValid: async () => ({ ok: false, message: 'too large' }),
+    showGateMsg() {}, renderOps() {}, update: () => painted.push(state.ops[0].params.t),
+  };
+  handler('updateOpParam', context)(0, 't', '0.5', 1);
+  await queued();
+  assert.equal(state.ops[0].params.t, 0.4);
+  assert.deepEqual(painted, [0.4]);
+});
