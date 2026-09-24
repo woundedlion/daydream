@@ -195,6 +195,7 @@ export class SegmentController {
    * @param {() => (Uint16Array|null)} deps.getMemoryView - Returns the current Uint16Array view of the display buffer.
    * @param {(view: Uint16Array) => void} deps.repointDisplayAliases - Re-points BOTH display aliases (Three.js instanceColor.array + driver.pixels) at the given view. Required: only the host knows the mesh, and an implementation that moves one alias leaves the composite in a buffer the GPU never reads.
    * @param {(view: Uint16Array) => boolean} deps.displayAliasesDiverged - Reports whether either display alias has stopped referencing the given view. Required, and the twin of repointDisplayAliases: the host owns both halves of the alias pair, so the detector and the heal must be supplied together rather than half injected and half reached for.
+   * @param {(message: string) => void} [deps.onFault] - Reports the first latched pool fault.
    * @param {Document} [deps.statsDoc] - DOM document the stats overlay renders into; defaults to the global `document`.
    * @param {import('./module_warmer.js').ModuleWarmer} [deps.moduleWarmer] - Warmer whose compilation the spawn hands to its workers; defaults to the page's, so every pool on a page shares one compile.
    * @throws {TypeError} When repointDisplayAliases or displayAliasesDiverged is
@@ -202,7 +203,7 @@ export class SegmentController {
    */
   constructor({ resolutionPresets, appState, driver, getWasmEngine, refreshPixelView,
                 getMemoryView, repointDisplayAliases, displayAliasesDiverged,
-                statsDoc, moduleWarmer = pageWarmer }) {
+                statsDoc, moduleWarmer = pageWarmer, onFault = () => {} }) {
     if (typeof repointDisplayAliases !== 'function') {
       throw new TypeError('SegmentController: repointDisplayAliases is required '
         + 'and must be a function that re-points both display aliases');
@@ -220,6 +221,7 @@ export class SegmentController {
       onFault: (segment, message) => this.onWorkerFault(segment, message),
     });
     this.moduleWarmer = moduleWarmer;
+    this.onFault = onFault;
     /** @type {SegmentStatsView} */
     this.statsView = new SegmentStatsView(statsDoc);
 
@@ -857,6 +859,7 @@ export class SegmentController {
    */
   onWorkerFault(segId, message) {
     this.clearTimers(...ALL_TIMERS);
+    const firstFault = !this.faulted;
     if (!this.faulted) {
       // No auto-restart by design: stay latched until a user-driven resolution/mode
       // change rebuilds the pool, rather than retrying a deterministically-faulting render.
@@ -881,6 +884,7 @@ export class SegmentController {
     // tick() is unreachable while the host is paused and never ran at all for a
     // create()-time fault, so the overlay is painted here rather than left to it.
     this.updateStats();
+    if (firstFault) this.onFault(message);
   }
 
   /**
