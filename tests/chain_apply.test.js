@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import { applyChainDocument } from '../tools/chain_apply.js';
 import {
-  FakeChainEngine, ParamSetResult, unpinnedEngineMethods,
+  FakeChainEngine, ChainStatus, ParamSetResult, unpinnedEngineMethods,
 } from './fake_engine.js';
 
 const MODULE = { ParamSetResult };
@@ -223,6 +223,16 @@ test('an inadmissible preset is submitted together and reports native refusal', 
   assert.match(run(compiledDocument(values)), /preset: INADMISSIBLE/);
   assert.deepEqual(engine.writes, []);
   assert.deepEqual(order.slice(-2), ['syncEffectGui', 'invalidate']);
+});
+
+test('the fake chain engine exposes status identities on every return path', () => {
+  const engine = new FakeChainEngine();
+  assert.equal(engine.setShaderChain(null).status, ChainStatus.MALFORMED_PAYLOAD);
+  assert.equal(engine.setShaderChain([{ instance: 'x', operator: 'unknown' }]).status,
+    ChainStatus.UNKNOWN_OPERATOR);
+  engine.nextChainResult = { code: 'ARENA_OVERFLOW', entryIndex: -1 };
+  assert.equal(engine.setShaderChain([]).status, ChainStatus.ARENA_OVERFLOW);
+  assert.equal(engine.setShaderChain([]).status, ChainStatus.OK);
 });
 
 test('fake parameter batches distinguish malformed and oversized payloads', () => {

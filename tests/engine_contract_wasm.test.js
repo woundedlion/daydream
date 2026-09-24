@@ -17,7 +17,7 @@ import {
 } from '../tools/solid_codegen.js';
 import {
   ENGINE_METHODS, ENGINE_OPTIONAL_METHODS, ParamSetResult, ClipSetResult,
-  ResolutionSetResult, EffectSetResult, FullConfigRestoreResult,
+  ResolutionSetResult, EffectSetResult, FullConfigRestoreResult, ChainStatus,
 } from './fake_engine.js';
 import { isViewLive, refreshPixelView } from '../pixel_view.js';
 import { selectorControlValue } from '../param_sync.js';
@@ -396,9 +396,9 @@ test('setShaderChain refuses transactionally and names the offending entry', () 
     'a non-array payload is refused at the boundary, never a trap');
 });
 
-const RESULT_MIRRORS = { ParamSetResult, ClipSetResult, ResolutionSetResult,
+const RESULT_MIRRORS = { ChainStatus, ParamSetResult, ClipSetResult, ResolutionSetResult,
   EffectSetResult, FullConfigRestoreResult };
-for (const name of RESULT_ENUMS.filter((name) => name in RESULT_MIRRORS)) {
+for (const name of RESULT_ENUMS) {
   test(`the module ${name} enum matches the fake_engine.js mirror`, () => {
     const actual = M[name];
     const mirror = RESULT_MIRRORS[name];

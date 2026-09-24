@@ -84,6 +84,23 @@ export const EffectSetResult = Object.freeze({
   UNSUPPORTED_RESOLUTION: Object.freeze({ value: 2 }),
 });
 
+export const ChainStatus = Object.freeze({
+  OK: Object.freeze({ value: 0 }),
+  NOT_CHAIN_EFFECT: Object.freeze({ value: 1 }),
+  MALFORMED_PAYLOAD: Object.freeze({ value: 2 }),
+  EMPTY: Object.freeze({ value: 3 }),
+  TOO_LONG: Object.freeze({ value: 4 }),
+  UNKNOWN_OPERATOR: Object.freeze({ value: 5 }),
+  DUPLICATE_INSTANCE: Object.freeze({ value: 6 }),
+  MALFORMED_INSTANCE: Object.freeze({ value: 7 }),
+  ENTRY_FAMILY: Object.freeze({ value: 8 }),
+  EXIT_FAMILY: Object.freeze({ value: 9 }),
+  CARRIER_MISMATCH: Object.freeze({ value: 10 }),
+  ARENA_OVERFLOW: Object.freeze({ value: 11 }),
+  PARAM_OVERFLOW: Object.freeze({ value: 12 }),
+  MIGRATE_FAILED: Object.freeze({ value: 13 }),
+});
+
 export const FullConfigRestoreResult = Object.freeze({
   APPLIED: Object.freeze({ value: 0 }),
   NOT_SHADER_WORKBENCH: Object.freeze({ value: 1 }),
@@ -136,7 +153,7 @@ export class FakeChainEngine {
 
   setShaderChain(entries) {
     this.chainCalls.push(entries);
-    const malformed = { code: 'MALFORMED_PAYLOAD', entryIndex: -1 };
+    const malformed = { status: ChainStatus.MALFORMED_PAYLOAD, code: 'MALFORMED_PAYLOAD', entryIndex: -1 };
     if (!Array.isArray(entries)) return malformed;
     for (const entry of entries) {
       if (entry === null || typeof entry !== 'object'
@@ -146,13 +163,13 @@ export class FakeChainEngine {
     if (this.nextChainResult !== null) {
       const injected = this.nextChainResult;
       this.nextChainResult = null;
-      return injected;
+      return { ...injected, status: ChainStatus[injected.code === 'APPLIED' ? 'OK' : injected.code] };
     }
     const operators = new Map(this.catalog.operators.map((op) => [op.id, op]));
     const definitions = [];
     for (const [index, entry] of entries.entries()) {
       const operator = operators.get(entry.operator);
-      if (!operator) return { code: 'UNKNOWN_OPERATOR', entryIndex: index };
+      if (!operator) return { status: ChainStatus.UNKNOWN_OPERATOR, code: 'UNKNOWN_OPERATOR', entryIndex: index };
       for (const field of operator.params) {
         const base = {
           name: `${entry.instance}.${field.id}`,
@@ -166,7 +183,7 @@ export class FakeChainEngine {
     }
     this.definitions = definitions;
     this.generation += 1;
-    return { code: 'APPLIED', entryIndex: -1 };
+    return { status: ChainStatus.OK, code: 'APPLIED', entryIndex: -1 };
   }
 
   getParameterDefinitions() {
