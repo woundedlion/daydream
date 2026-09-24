@@ -8,8 +8,8 @@
  * file is what the typecheck sees for the module. It covers the surface the
  * segment pipeline drives plus the MeshOps and PaletteOps bridges the
  * standalone tools run on; tests/fake_engine.js pins that method roster and all
- * five result enums — ParamSetResult, ClipSetResult, ResolutionSetResult,
- * EffectSetResult, FullConfigRestoreResult — against the real module, and
+ * six result enums — ParamSetResult, ClipSetResult, ResolutionSetResult,
+ * EffectSetResult, FullConfigRestoreResult, ChainStatus — against the real module, and
  * tests/engine_contract_wasm.test.js pins the declarations below against both.
  */
 
