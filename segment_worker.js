@@ -71,7 +71,6 @@ export function installSegmentWorker() {
   // edges. Every 'frame' carries the whole set, so the controller's marker lasts
   // as long as the divergence. Cleared on every effect install, as
   // paramRejectedKey is.
-  /** @type {Set<string>} */
   /** @type {string[]} */
   let divergenceWarnings = [];
   // Latched by a RESIZED setResolution, which tears the effect and its clip down.
