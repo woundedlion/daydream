@@ -10,9 +10,9 @@ def extract_bundle(archive, destination):
     with zipfile.ZipFile(archive) as bundle:
         names = set()
         for entry in bundle.infolist():
-            name = entry.orig_filename
+            name = entry.filename
             parts = PurePosixPath(name).parts
-            if (not parts or name.startswith("/") or "\\" in name or ":" in name
+            if (entry.orig_filename != name or not parts or name.startswith("/") or "\\" in name or ":" in name
                     or ".." in parts or name in names
                     or stat.S_ISLNK(entry.external_attr >> 16)):
                 raise ValueError(f"unsafe bundle entry: {name!r}")
