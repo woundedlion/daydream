@@ -13,7 +13,7 @@ import { register } from 'node:module';
 import {
   log, Mesh, PerspectiveCamera, Scene, WebGLRenderer, OrbitControls,
 } from './fake_three.js';
-import { fakeElement } from './fake_dom.js';
+import { fakeElement, installDocument } from './fake_dom.js';
 
 /**
  * A container element reporting the box the scene is sized against.
@@ -54,10 +54,10 @@ afterEach(() => {
 
 /** Stub document.getElementById against a fixed id->element map. */
 function stubDocument(byId) {
-  globalThis.document = {
+  installDocument({
     documentElement: {},
     getElementById: (id) => byId[id] || null,
-  };
+  });
 }
 
 /** Stub getComputedStyle over a fixed custom-property map. */

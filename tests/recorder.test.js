@@ -1,7 +1,7 @@
 import { mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { installConsoleCapture } from './fake_console.js';
-import { fakeElement } from './fake_dom.js';
+import { fakeElement, installDocument } from './fake_dom.js';
 import {
   MEMORY_BUFFER_LIMIT_BYTES, PICKER_GRACE_SECONDS, selectMimeType, VideoRecorder,
 } from '../recorder.js';
@@ -74,7 +74,7 @@ const fakeCanvas = (width = 0, height = 0) =>
  */
 const installFakeDocument = () => {
   const savedDocument = globalThis.document;
-  globalThis.document = { createElement: () => fakeCanvas() };
+  installDocument({ createElement: () => fakeCanvas() });
   return () => { globalThis.document = savedDocument; };
 };
 
@@ -299,7 +299,7 @@ const installRecorderEnv = () => {
   FakeMediaRecorder.isTypeSupported = () => true;
   globalThis.MediaRecorder = FakeMediaRecorder;
   globalThis.HTMLCanvasElement = class { captureStream() {} };
-  globalThis.document = { createElement: () => recordableCanvas() };
+  installDocument({ createElement: () => recordableCanvas() });
   delete globalThis.showSaveFilePicker;
   return () => {
     globalThis.MediaRecorder = saved.MediaRecorder;
@@ -1571,7 +1571,7 @@ test('start does not blit; the timed fallback fills the offscreen on captureFram
         getTracks: () => [timedTrack],
       }),
     };
-    globalThis.document = { createElement: () => offscreen };
+    installDocument({ createElement: () => offscreen });
 
     const rec = new VideoRecorder(recordableCanvas(64, 32));
     rec.download = () => {};
@@ -1710,7 +1710,7 @@ const installSavePath = () => {
   const body = fakeElement('body');
   const createOther = savedDocument?.createElement?.bind(savedDocument);
   spy.body = body;
-  globalThis.document = /** @type {any} */ ({
+  installDocument({
     body,
     createElement: (tag) => {
       if (tag !== 'a') {
@@ -1855,7 +1855,7 @@ const startAborted = (offscreen) => {
   const restore = installRecorderEnv();
   const captured = installConsoleCapture('error');
   try {
-    globalThis.document = /** @type {any} */ ({ createElement: () => offscreen });
+    installDocument({ createElement: () => offscreen });
     const rec = new VideoRecorder(/** @type {any} */ (recordableCanvas()));
     /** @type {Error[]} */
     const notified = [];

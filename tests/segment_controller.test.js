@@ -8,7 +8,7 @@ import { installFakeTimers } from './fake_timers.js';
 import { test, mock, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { unpinnedEngineMethods } from './fake_engine.js';
-import { fakeElement } from './fake_dom.js';
+import { fakeElement, installDocument } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
 import { FakeWorker } from './fake_worker.js';
 import { staticModuleGraph } from './module_graph.js';
@@ -520,7 +520,7 @@ after(() => {
 globalThis.Worker = FakeWorker;
 
 // getElementById -> null makes updateStats() early-return, keeping tick() tests DOM-free.
-globalThis.document = { getElementById: () => null };
+installDocument({ getElementById: () => null });
 
 /**
  * Drive a worker's 'ready' message; once all arrive the controller is ready.
