@@ -1214,6 +1214,7 @@ function updateOpParam(index, key, value, revision) {
       if (state.ops[index]?.params?.[key] === val) {
         state.ops[index].params[key] = previous;
         renderOps();
+        update();
       }
     });
     return;
