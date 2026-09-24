@@ -30,3 +30,15 @@ test('bundle extraction retains valid nested files', () => {
     assert.equal(readFileSync(join(dir, 'out/nested/file'), 'utf8'), 'ok');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('bundle extraction rejects a NUL-truncated filename before writing', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bundle-path-'));
+  try {
+    const archive = join(dir, 'bundle.zip');
+    execFileSync(python, ['-c', 'import zipfile,sys,pathlib; p=pathlib.Path(sys.argv[1]); z=zipfile.ZipFile(p,"w"); z.writestr("safeXtail","data"); z.close(); p.write_bytes(p.read_bytes().replace(b"safeXtail", b"safe"+bytes([0])+b"tail"))', archive]);
+    const result = spawnSync(python, [script, archive, join(dir, 'out')], { encoding: 'utf8' });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /unsafe bundle entry/);
+    assert.equal(existsSync(join(dir, 'out')), false);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
