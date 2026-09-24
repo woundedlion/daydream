@@ -69,9 +69,7 @@ const scanInstalls = (current) => {
     }
   }
 };
-for (const dir of new Set(globSpecs.map((spec) => spec.dir))) {
-  if (existsSync(dir)) scanInstalls(dir);
-}
+scanInstalls('.');
 
 if (files.length === 0) {
   console.error(
@@ -89,7 +87,7 @@ if (unreachable.length > 0) {
 }
 if (strays.length > 0) {
   console.error(
-    'require-tests: node_modules under the test roots shadows the pinned ' +
+    'require-tests: nested node_modules shadows the pinned ' +
       'root install:\n' +
       `${strays.map((path) => `  ${path}`).join('\n')}\n` +
       'Delete it and run `npm ci` at the repo root.',
