@@ -340,8 +340,9 @@ function engineStructFields(source, name) {
   const m = source.match(new RegExp(`struct ${name} \\{([\\s\\S]*?)\\n\\};`));
   assert.ok(m, `struct ${name} not found in ${PALETTE_RECIPE_H} — the reader is out of date`);
   const fields = [];
-  for (const decl of m[1].split(';')) {
-    const text = decl.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '').trim();
+  const body = m[1].replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  for (const decl of body.split(';')) {
+    const text = decl.trim();
     if (!text || text.startsWith('static')) continue;
     const member = text.match(/^(std::array<[^>]+>|[\w:]+)\s+(\w+)\s*(?:=[\s\S]+|\{\s*\})?$/);
     assert.ok(member, `unreadable member "${text}" in struct ${name} — the reader is out of date`);
@@ -478,4 +479,16 @@ test('Lissajous initializer follows the engine aggregate member order', { skip: 
   assert.deepEqual(members, ['m1', 'm2', 'a', 'domain']);
   const emitted = lissajousCodeString(2, 3, 0.25, 1.5);
   assert.equal(emitted, 'math::LissajousParams{2.0f, 3.0f, 0.25f, 1.5f}');
+});
+
+test('engine struct reader ignores semicolons inside member comments', () => {
+  const source = `struct Controls {
+    /** Three active keys; the fourth is reserved. */
+    float value = 1.0f;
+    // Second field; still one declaration.
+    float other = 2.0f;
+};`;
+  assert.deepEqual(engineStructFields(source, 'Controls'), [
+    { type: 'float', field: 'value' }, { type: 'float', field: 'other' },
+  ]);
 });
