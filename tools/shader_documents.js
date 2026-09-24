@@ -350,7 +350,7 @@ export function createShaderDocumentController({
   /** @type {*|null} */
   let active = null;
   /** @type {Map<string, *>} */
-  let catalog = new Map();
+  let sourceCatalog = new Map();
   /** @type {Record<string, string>} */
   let digestMigration = {};
   /** @type {*|null} */
@@ -665,7 +665,7 @@ export function createShaderDocumentController({
     const imported = typeof source === 'string' ? JSON.parse(source) : source;
     const promotedDigest = imported.schema_version === 1
       ? digestMigration[compiler.v1DescriptorDigest(imported)] : undefined;
-    const official = [...catalog.values()].find((candidate) =>
+    const official = [...sourceCatalog.values()].find((candidate) =>
       candidate.descriptorDigest === compiled.descriptor_digest
       || candidate.descriptorDigest === promotedDigest) ?? null;
     // Ahead of the teardown: a refusal here must leave the editor it would
@@ -875,7 +875,7 @@ export function createShaderDocumentController({
             throw new Error(`${filename}: ${diagnosticText(compiled)}`);
           return [effectId, filename, source, compiled];
         }));
-      catalog = new Map(entries.map(([effectId, filename, source, compiled]) =>
+      sourceCatalog = new Map(entries.map(([effectId, filename, source, compiled]) =>
         [effectId, {
           effectId,
           filename,
@@ -912,12 +912,12 @@ export function createShaderDocumentController({
       // Named only once the load stands: a refused link falls through to the
       // requested effect or the scratch chain, which name themselves.
       if (await loadSource(linked.document, filename, null, linked)) {
-        sourceSelect.value = catalog.has(effectId) ? effectId : '';
+        sourceSelect.value = sourceCatalog.has(effectId) ? effectId : '';
         return true;
       }
       linkError = status.textContent || 'the linked state was refused';
     }
-    const requested = catalog.get(initialEffect ?? '');
+    const requested = sourceCatalog.get(initialEffect ?? '');
     let loaded;
     if (requested === undefined) loaded = await loadScratch();
     else {
@@ -936,7 +936,7 @@ export function createShaderDocumentController({
         await flushDeepLink();
         return;
       }
-      const entry = catalog.get(option.value);
+      const entry = sourceCatalog.get(option.value);
       if (!entry) {
         show(`The source catalog carries no document for "${option.value}".`, true);
         return;
