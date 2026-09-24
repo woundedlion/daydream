@@ -1048,7 +1048,7 @@ test('the full-config accessors answer as the workbench panel assumes', () => {
   // needs no rollback — which is why the panel only logs and returns.
   for (const [outcome, bad] of [
     [M.FullConfigRestoreResult.UNSUPPORTED_VERSION,
-      { ...snapshot, schemaVersion: snapshot.schemaVersion - 1 }],
+      { ...snapshot, schemaVersion: 9 }],
     [M.FullConfigRestoreResult.INVALID_LENGTH,
       { ...snapshot, accepted: snapshot.accepted.slice(1) }],
     [M.FullConfigRestoreResult.INVALID_PENDING,
@@ -1062,6 +1062,40 @@ test('the full-config accessors answer as the workbench panel assumes', () => {
   engine.clearConfigImportNotice();
   assert.equal(engine.getConfigImportNotice(), '',
     'the notice must be consumed by the clear the panel pairs with it');
+});
+
+test('schema 10 snapshots migrate the rendered palette mapping and discard its duplicate', () => {
+  assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
+  assert.equal(engine.setParameter('Palette Mapping', 3), M.ParamSetResult.APPLIED);
+  const current = engine.getFullConfigSnapshot();
+  assert.equal(current.schemaVersion, 11);
+  assert.equal(current.accepted.length, 152);
+  const mappings = engine.getFullConfigFieldDefinitions()
+    .filter((field) => field.name.endsWith('.palette_mapping'));
+  assert.deepEqual(mappings, [{ id: 22, name: 'slots.palette_mapping' }]);
+  assert.equal(current.accepted[22], 3);
+
+  const legacy = {
+    ...structuredClone(current), schemaVersion: 10,
+    accepted: [...current.accepted, 0],
+    requested: [...current.requested, 1],
+    pendingFieldIds: [...current.pendingFieldIds, 152],
+  };
+  assert.equal(engine.setParameter('Palette Mapping', 2), M.ParamSetResult.APPLIED);
+  assert.equal(engine.restoreFullConfigSnapshot(legacy), M.FullConfigRestoreResult.APPLIED);
+  assert.deepEqual(engine.getFullConfigSnapshot(), current);
+  assert.equal(engine.getParameterDefinitions()
+    .find((parameter) => parameter.name === 'Palette Mapping').acceptedValue, 3);
+
+  for (const [bad, outcome] of [
+    [{ ...legacy, accepted: [...current.accepted, 4] }, M.FullConfigRestoreResult.INVALID_VALUE],
+    [{ ...legacy, pendingFieldIds: [] }, M.FullConfigRestoreResult.INVALID_PENDING],
+    [{ ...legacy, pendingFieldIds: [152, 152] }, M.FullConfigRestoreResult.INVALID_PENDING],
+    [{ ...legacy, accepted: current.accepted }, M.FullConfigRestoreResult.INVALID_LENGTH],
+  ]) {
+    assert.equal(engine.restoreFullConfigSnapshot(bad), outcome);
+    assert.deepEqual(engine.getFullConfigSnapshot(), current);
+  }
 });
 
 // daydream.js reads the pause indicator through an optional-call guard
