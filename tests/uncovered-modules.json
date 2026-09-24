@@ -39,7 +39,7 @@
   },
   "scripts/verify-ci-green.mjs": {
     "lines": 79.5,
-    "reason": "The CLI reads the workflow and needs-result JSON from local files; tests/verify_ci_green.test.js covers imported parsers and verdicts, while the CLI file-reading and exit paths run in CI.",
+    "reason": "The CLI reads the workflow and needs-result JSON from local files; tests/ci_workflow.test.js covers imported parsers and verdicts, while the CLI file-reading and exit paths run in CI.",
     "branches": 87.5
   },
   "tools/shader_documents.js": {
