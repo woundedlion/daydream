@@ -1,9 +1,9 @@
-import { engineHalted } from './engine_halt.js';
 /*
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import { engineHalted } from './engine_halt.js';
 import { enumConstantName } from '../param_sync.js';
 import { errorDetail } from './banner.js';
 import { applyChainDocument } from './chain_apply.js';
@@ -20,7 +20,6 @@ const MIGRATION_URL = '../shader/patterns/shaderball_migration.json';
 const DIGEST_MIGRATION_URL = '../shader/patterns/digest_migration.v1v2.json';
 const CATALOG_URL = '../shader/engine_catalog.json';
 const COMPILER_URL = new URL('../shader/shader_workbench.mjs', import.meta.url).href;
-const { fixedDerivedBinding } = await import(COMPILER_URL);
 
 // The effect the dynamic path previews on: the engine's chain interpreter,
 // programmed through setShaderChain.
@@ -234,10 +233,11 @@ function applyDocumentValues(engine, module, compiled, presetId, baked, derived)
  * @param {string[]} referencePresetIds
  * @param {Set<string>} baked - The topology fields the effect bakes in, from
  *   bakedTopologyFields.
+ * @param {(descriptor: *, parameterId: string, values: *) => *} deriveBinding - Compiler binding resolver.
  * @returns {string|null} Refusal reason, or null once applied.
  */
 export function applyFixedShaderDocument(engine, module, compiled, presetId,
-                                         referencePresetIds, baked) {
+                                         referencePresetIds, baked, deriveBinding) {
   const referenceId = referencePresetIds.includes(presetId)
     ? presetId : referencePresetIds[0];
   if (typeof referenceId !== 'string') return 'the effect has no reference preset';
@@ -247,7 +247,7 @@ export function applyFixedShaderDocument(engine, module, compiled, presetId,
   const values = preset?.values ?? {};
   const derived = new Set();
   for (const parameterId of Object.keys(values)) {
-    const binding = fixedDerivedBinding(compiled.document.descriptor, parameterId, values);
+    const binding = deriveBinding(compiled.document.descriptor, parameterId, values);
     if (!binding) continue;
     if (!binding.valid)
       return `"${parameterId}" must match the fixed build's derived value ${binding.expected}`;
@@ -472,7 +472,7 @@ export function createShaderDocumentController({
       const refusal = active.compiledSide
         ? applyFixedShaderDocument(
           engine, module, store ? { document: store.document() } : active.compiled,
-          presetId, active.referencePresetIds, bakedFields)
+          presetId, active.referencePresetIds, bakedFields, compiler.fixedDerivedBinding)
         : applyChainDocument({
           engine, module,
           compiled: store ? { document: store.document() } : active.compiled,
