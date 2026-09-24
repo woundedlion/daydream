@@ -696,21 +696,15 @@ test('worker reports inbound message deserialization failures', () => {
   });
 });
 
-/**
- * An init carrying no effectName leaves the engine effectless, so its trailing
- * applyClip can only answer NO_EFFECT. That is the ordinary state the following
- * setEffect resolves — faulting on it would latch the whole pool with nothing
- * actually wrong.
- */
-test('an init without an effect name does not fault the pool', async () => {
-  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4 });
-
-  assert.ok(engineInstance, 'engine constructed');
-  assert.equal(engineInstance.effect, null, 'no effect installed');
-  assert.equal(engineInstance.clip, null, 'an effectless engine takes no clip');
-  assert.equal(posted.find((p) => p.msg.type === 'engineRejected'), undefined,
-    'NO_EFFECT must not post engineRejected');
-  assert.ok(posted.some((p) => p.msg.type === 'ready'), 'ready posted');
+test('init rejects a missing or empty effect before creating an engine', async () => {
+  for (const effectName of [undefined, '', ' ']) {
+    posted.length = 0;
+    await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName });
+    assert.equal(engineInstance, null);
+    assert.ok(posted.some((p) => p.msg.type === 'engineRejected'
+      && p.msg.reason === 'init requires an effect name'));
+    assert.ok(!posted.some((p) => p.msg.type === 'ready'));
+  }
 });
 
 /** A clip rejection is surfaced immediately instead of rendering full-canvas. */
@@ -792,7 +786,7 @@ test('a frame reports whether the whole canvas was shaded', async () => {
 test('a throwing message is isolated and rethrown on a fresh task', async () => {
   const captured = await captureTimeouts(async () => {
     // An odd totalSegs makes computeSegmentRange throw inside handleMessage.
-    await dispatch({ type: 'init', segId: 0, totalSegs: 3, w: 8, h: 4 });
+    await dispatch({ type: 'init', segId: 0, totalSegs: 3, w: 8, h: 4, effectName: 'Plasma' });
   });
   assert.equal(captured.length, 1, 'one rethrow task scheduled');
   assert.throws(() => captured[0](), /positive even number/);
@@ -1081,7 +1075,7 @@ test('a preset index the engine refuses is logged', async () => {
 // The controller carries the fresh-effect index 0 for every effect, and an
 // effect with no presets refuses it; that answer moves nothing and is routine.
 test('the index a presetless effect refuses is not logged', async () => {
-  await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4 });
+  await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
   engineInstance.presetCount = 0;
 
   const capture = installConsoleCapture('error');
@@ -1213,8 +1207,8 @@ function typedefShapes(source) {
 // what makes a reshaped message fault instead, and only this pin ties the two
 // together.
 const PROTOCOL_SHAPE_PIN = {
-  version: 9,
-  sha256: 'f5920699d3a447add39a12585551fb603041fce6564a390a8b5b8be05599ecc7',
+  version: 10,
+  sha256: '6c4c0243e7d48c251c338afaa2556ae0d196392551f968ea1386444015e742a4',
 };
 
 test('a reshaped protocol message forces a PROTOCOL_VERSION bump', () => {
