@@ -622,12 +622,12 @@ recipe.lightness.curve = AxisCurve::${enumName('curve', recipe.lightness.curve)}
 recipe.lightness.center = ${f(recipe.lightness.center)};
 recipe.lightness.range = ${f(recipe.lightness.range)};
 recipe.lightness.custom = ${cppFloatArray(recipe.lightness.custom)};
-recipe.chroma.curve = AxisCurve::${enumName('curve', recipe.chroma.curve)};
+recipe.chroma.axis.curve = AxisCurve::${enumName('curve', recipe.chroma.curve)};
 recipe.chroma.basis = ChromaBasis::${enumName('chromaBasis', recipe.chroma.basis)};
-recipe.chroma.center = ${f(recipe.chroma.center)};
-recipe.chroma.range = ${f(recipe.chroma.range)};
+recipe.chroma.axis.center = ${f(recipe.chroma.center)};
+recipe.chroma.axis.range = ${f(recipe.chroma.range)};
 recipe.chroma.headroom = ${f(recipe.chroma.headroom)};
-recipe.chroma.custom = ${cppFloatArray(recipe.chroma.custom)};
+recipe.chroma.axis.custom = ${cppFloatArray(recipe.chroma.custom)};
 recipe.hue_torsion = ${f(recipe.hueTorsion)};
 recipe.falloff_start = ${f(recipe.falloffStart)};
 GenerativePalette palette;

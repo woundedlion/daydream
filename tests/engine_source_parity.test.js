@@ -471,7 +471,7 @@ test('every operator primitive count matches the installed engine lowering', { s
 });
 
 test('Lissajous initializer follows the engine aggregate member order', { skip: engineSkip }, () => {
-  const source = header('core/math/geometry.h');
+  const source = header('core/math/spherical.h');
   const body = source.match(/struct LissajousParams\s*\{([\s\S]*?)\};/);
   assert.ok(body, 'LissajousParams aggregate exists');
   const members = [...body[1].matchAll(/\bfloat\s+(\w+)\s*;/g)].map((match) => match[1]);
