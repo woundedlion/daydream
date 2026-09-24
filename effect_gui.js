@@ -431,13 +431,13 @@ export function createEffectGui({ engine, segments, config, host }) {
    */
   function sync(advanced = true) {
     if (!activeEffect || !activeEffect.controllerByName) return;
-    const presetIndex = getPresetIndex();
+    const presetIndex = activeEffect.preset ? getPresetIndex() : null;
     // Mirroring the preset can itself load a new schema, so the rebuild follows
     // it — but a refusal must not gate the rebuild, which is what clears the
     // stale schema a refusal comes from.
     const presetAdvanced = activeEffect.preset
       && activeEffect.preset.state.presetIndex !== presetIndex;
-    const presetSynced = synchronizePreset(presetIndex);
+    const presetSynced = !activeEffect.preset || synchronizePreset(presetIndex);
     // Where the parameters render is external state: adopting a document moves
     // them onto the pipeline strip without moving the schema generation, so the
     // mode is compared against the one the panel was built with.
@@ -451,7 +451,7 @@ export function createEffectGui({ engine, segments, config, host }) {
     }
     if (!presetSynced) return;
     adoptPauseDisplay(activeEffect, engineAnimationsPaused());
-    adoptPresetDisplay(activeEffect, getPresetCount(), getPresetIndex());
+    if (activeEffect.preset) adoptPresetDisplay(activeEffect, getPresetCount(), getPresetIndex());
     if (!activeEffect.hasParams) return;
     // One focus read for the whole pass: at most one element has focus.
     const focused = focusedElement() ?? null;
