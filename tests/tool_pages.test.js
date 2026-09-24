@@ -408,7 +408,7 @@ test('every tools/ module that builds an element can render on a served page', (
 
 test('tailwind.css keeps its upstream license banner', () => {
   assert.match(read('tools', 'tailwind.css'),
-    /! tailwindcss v\d+\.\d+\.\d+ \| MIT License/);
+    /! tailwindcss v3\.4\.17 \| MIT License/);
 });
 
 // WCAG 2.1 SC 1.4.3, normal-size text: anything under 18.66px, or under 24px
