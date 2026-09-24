@@ -5,7 +5,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
 
-const { createSlider } = await import('../tools/slider.js');
+const { createSlider, createSliderProxy } = await import('../tools/slider.js');
 
 restoreDocumentAfterEach();
 
@@ -238,4 +238,20 @@ test('ariaLabel names the input and leaves the visible label short', () => {
 test('an empty ariaLabel sets no attribute', () => {
   const { slider } = createSlider('c', { ...base, ariaLabel: '' }, null);
   assert.equal(slider.getAttribute('aria-label'), null);
+});
+
+test('slider proxies expose label, bounds, orientation and shortcuts', () => {
+  const config = { label: 'Hue', min: 0, max: 360, keys: 'ArrowLeft ArrowRight' };
+  const proxy = createSliderProxy(config);
+  assert.equal(proxy.tabIndex, 0);
+  assert.equal(proxy.getAttribute('role'), 'slider');
+  assert.equal(proxy.getAttribute('aria-label'), 'Hue');
+  assert.equal(proxy.getAttribute('aria-valuemin'), '0');
+  assert.equal(proxy.getAttribute('aria-valuemax'), '360');
+  assert.equal(proxy.getAttribute('aria-orientation'), 'horizontal');
+  assert.equal(proxy.getAttribute('aria-keyshortcuts'), config.keys);
+  const vertical = createSliderProxy({ ...config, id: 'hue', orientation: 'vertical' },
+    { createElement: fakeElement });
+  assert.equal(vertical.id, 'hue');
+  assert.equal(vertical.getAttribute('aria-orientation'), 'vertical');
 });
