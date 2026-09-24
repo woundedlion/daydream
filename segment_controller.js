@@ -239,6 +239,7 @@ export class SegmentController {
     /** @type {number[] | null} */
     this.paramValues = null;  // segment 0's latest param values, for GUI sync
     this.paramRevision = 0;
+    this.presetRevision = 0;
     /** @type {number | null} */
     this.presetCount = null;
     /** @type {number | null} */
@@ -604,7 +605,8 @@ export class SegmentController {
             // list.
             if (msg.segId === 0) {
               this.presetCount = msg.presetCount ?? null;
-              this.presetIndex = msg.presetIndex ?? null;
+              if (msg.paramRevision >= this.presetRevision)
+                this.presetIndex = msg.presetIndex ?? null;
               if (msg.paramValues && msg.paramRevision === this.paramRevision)
                 this.paramValues = msg.paramValues;
             }
@@ -1021,6 +1023,7 @@ export class SegmentController {
         || index < 0 || index >= this.presetCount) return false;
     this.paramValues = null;
     this.paramRevision++;
+    this.presetRevision = this.paramRevision;
     this.presetIndex = index;
     this.animationsPaused = true;
     if (this.faulted) return true;

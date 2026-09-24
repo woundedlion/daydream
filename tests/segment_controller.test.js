@@ -3029,3 +3029,21 @@ test('rendering an empty pool resolves without arming a watchdog', async () => {
     clock.restore();
   }
 });
+
+test('an in-flight frame cannot revert a selected preset', async () => {
+  const c = makeController();
+  c.create(2);
+  c.presetCount = 6;
+  const pending = c.renderParallel();
+  const revision = c.paramRevision;
+  assert.equal(c.selectPreset(4), true);
+  deliverFrame(c, 0, { presetCount: 6, presetIndex: 1, paramRevision: revision });
+  deliverFrame(c, 1, { paramRevision: revision });
+  await pending;
+  assert.equal(c.getPresetIndex(), 4);
+  const next = c.renderParallel();
+  deliverFrame(c, 0, { presetCount: 6, presetIndex: 5 });
+  deliverFrame(c, 1);
+  await next;
+  assert.equal(c.getPresetIndex(), 5);
+});
