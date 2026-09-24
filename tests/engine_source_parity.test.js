@@ -19,6 +19,7 @@ import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { lissajousCodeString } from '../tools/lissajous_math.js';
 import * as MB from '../tools/mobius_transforms.js';
 import * as P from '../tools/palette_math.js';
 import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS } from '../tools/solid_codegen.js';
@@ -467,4 +468,14 @@ test('every operator primitive count matches the installed engine lowering', { s
   assert.deepEqual([...counts.keys()].sort(), [...KNOWN_OPS].sort(),
     'the lowering reader must account for every operator');
   for (const [op, count] of counts) assert.equal(primitiveCount(op), count, op);
+});
+
+test('Lissajous initializer follows the engine aggregate member order', { skip: engineSkip }, () => {
+  const source = header('core/math/geometry.h');
+  const body = source.match(/struct LissajousParams\s*\{([\s\S]*?)\};/);
+  assert.ok(body, 'LissajousParams aggregate exists');
+  const members = [...body[1].matchAll(/\bfloat\s+(\w+)\s*;/g)].map((match) => match[1]);
+  assert.deepEqual(members, ['m1', 'm2', 'a', 'domain']);
+  const emitted = lissajousCodeString(2, 3, 0.25, 1.5);
+  assert.equal(emitted, 'math::LissajousParams{2.0f, 3.0f, 0.25f, 1.5f}');
 });
