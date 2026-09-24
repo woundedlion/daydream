@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 // A job id is a plain identifier, which YAML may spell quoted or bare.
@@ -158,4 +158,4 @@ const main = () => {
   console.log(`CI green: ${outcomes.total} required jobs succeeded.`);
 };
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) main();
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) main();

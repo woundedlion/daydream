@@ -1,6 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { pathToFileURL } from 'node:url';
 
@@ -39,7 +39,7 @@ export async function checkCdnIntegrity(source, fetchModule = fetch, wait = dela
   return entries.length;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const source = readFileSync(new URL('../vendor-importmap.js', import.meta.url), 'utf8');
   console.log(`CDN integrity: ${await checkCdnIntegrity(source)} modules verified`);
 }

@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, mkdtempSync, symlinkSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import {
   GATED_WORKFLOWS,
   missingTerminalDependencies,
@@ -326,5 +329,19 @@ test('pre-push requires lint and typecheck to succeed', () => {
   for (const command of ['npm run lint', 'npm run typecheck']) {
     assert.ok(hook.split(/\r?\n/).some((line) => line.trim() === `${command} || exit 1`),
       `${command} must refuse the push on failure`);
+  }
+});
+
+test('the CI gate executes through a linked checkout path', () => {
+  const scratch = mkdtempSync(join(tmpdir(), 'daydream-cli-link-'));
+  try {
+    const linked = join(scratch, 'checkout');
+    symlinkSync(resolve('.'), linked, process.platform === 'win32' ? 'junction' : 'dir');
+    const result = spawnSync(process.execPath, [join(linked, 'scripts/verify-ci-green.mjs')],
+      { encoding: 'utf8', cwd: scratch });
+    assert.equal(result.status, 1);
+    assert.ok(result.stderr.length > 0, 'missing inputs must be reported');
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
   }
 });
