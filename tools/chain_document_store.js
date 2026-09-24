@@ -64,7 +64,7 @@ const parameterFromField = (label, field) => {
       kind = 'SHORTEST_PERIODIC';
       break;
     case 'shortest-periodic':
-      periodic = { period: maximum, unit: 'radian' };
+      periodic = { period: Math.fround(2 * Math.PI), unit: 'radian' };
       kind = 'SHORTEST_PERIODIC';
       break;
     case 'log-positive': kind = 'LOG_POSITIVE'; break;
