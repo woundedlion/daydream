@@ -223,3 +223,16 @@ for (const name of ['shader_workbench.mjs', 'sha256.mjs']) {
       committed(engineRoot, `scripts/${name}`, pin).toString('utf8').replaceAll('\r\n', '\n'));
   });
 }
+
+test('pattern mirrors match the pinned engine in both content and membership', { skip: engineSkip }, () => {
+  assert.ok(engineRoot, engineMissing);
+  const mirrored = (name) => name.endsWith('.shader.json') || name === 'shaderball_migration.json';
+  const expected = execFileSync('git', ['-C', engineRoot, 'ls-tree', '--name-only',
+    `${enginePin}:patterns`], { encoding: 'utf8' }).trim().split('\n').filter(mirrored).sort();
+  const actual = readdirSync('shader/patterns').filter(mirrored).sort();
+  assert.deepEqual(actual, expected);
+  for (const name of expected) {
+    assert.equal(text(`shader/patterns/${name}`),
+      committed(engineRoot, `patterns/${name}`).toString('utf8').replaceAll('\r\n', '\n'), name);
+  }
+});
