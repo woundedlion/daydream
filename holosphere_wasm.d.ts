@@ -220,6 +220,8 @@ export interface HolosphereEngine {
   setShaderChain(
     entries: Array<{ instance: string; operator: string }>,
   ): { status: EnumValue; code: string; entryIndex: number };
+  /** Atomically admits chain parameter values; returns a ParamSetResult member. */
+  setShaderChainParameters(entries: Array<{ name: string; value: number }>): EnumValue;
   /** Embind destructor: releases the C++ instance the handle points at. */
   delete(): void;
 }
@@ -358,6 +360,7 @@ export type ParamSetResultEnum = {
   UNKNOWN_PARAM: EnumValue;
   READONLY: EnumValue;
   NON_FINITE: EnumValue;
+  INADMISSIBLE: EnumValue;
 };
 
 /** What restoreFullConfigSnapshot() answers, compared by identity against the member. */
