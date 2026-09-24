@@ -455,7 +455,11 @@ class DeepLinkGUI {
    * @returns {Object} The created lil-gui controller.
    */
   addSession(object, prop, ...args) {
-    return this.gui.add(object, prop, ...args);
+    const controller = this.gui.add(object, prop, ...args);
+    if (!controller) {
+      throw new TypeError(`DeepLinkGUI: unsupported property "${prop}"`);
+    }
+    return controller;
   }
 
   /**

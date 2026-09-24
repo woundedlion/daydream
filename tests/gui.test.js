@@ -948,3 +948,11 @@ test('URL writer owns its injected window timer and cancels it on disposal', () 
   write.cancel();
   assert.equal(pending.size, 0);
 });
+
+test('DeepLinkGUI names unsupported session properties', () => {
+  installWindowAt('');
+  const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
+  assert.throws(() => gui.addSession({ pending: null }, 'pending'),
+    /DeepLinkGUI: unsupported property "pending"/);
+  assert.deepEqual(gui.collectUrlKeys(), []);
+});
