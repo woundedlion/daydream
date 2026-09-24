@@ -36,6 +36,7 @@ const enginePin = readFileSync(new URL('../holosphere_wasm.sha', import.meta.url
 
 const STEREO_H = 'core/math/stereographic.h';
 const MOBIUS_H = 'core/math/mobius.h';
+const MATH_H = 'core/math/3dmath.h';
 const PALETTE_RECIPE_H = 'core/color/palette_recipe.h';
 const SOLIDS_H = 'core/mesh/solids.h';
 const ISLAMIC_STARS_H = 'effects/IslamicStars.h';
@@ -75,7 +76,10 @@ function functionBody(source, name) {
 function engineConstant(source, name, path, scope = {}) {
   const m = source.match(new RegExp(`inline constexpr float ${name}\\s*=\\s*([^;]+);`));
   assert.ok(m, `${name} not found in ${path} — the parity reader is out of date`);
-  const expr = m[1].replace(/\s+/g, ' ').replace(/(\d)f\b/g, '$1');
+  const expr = m[1].replace(/\s+/g, ' ')
+    .replace(/0x([0-9a-f]+)p([+-]?\d+)f?\b/gi,
+      (_, significand, exponent) => String(parseInt(significand, 16) * 2 ** Number(exponent)))
+    .replace(/(\d)f\b/g, '$1');
   // Guards the eval below: arithmetic over the named constants, nothing else.
   assert.match(expr, /^[\w\s.+\-*/()]+$/, `${name} = ${expr} is not a plain arithmetic expression`);
   const names = Object.keys(scope);
@@ -243,7 +247,9 @@ test('stereo and projectDiv match their engine projection and Mobius headers', {
   };
   const radial_scale = transpileEngineComplex(
     src, 'radial_scale', ['direction', 'length', 'radius'], {});
-  const bindings = { ...constants, radial_scale };
+  const lift = engineConstant(header(MATH_H), 'COMPLEX_UNDERFLOW_LIFT', MATH_H);
+  assert.equal(MB.STEREO_UNDERFLOW_LIFT, lift);
+  const bindings = { ...constants, radial_scale, COMPLEX_UNDERFLOW_LIFT: lift };
   const engineStereo = transpileEngineComplex(src, 'stereo', ['v'], bindings);
   const engineProjectDiv = transpileEngineComplex(
     header(MOBIUS_H), 'project_div', ['num', 'den'], bindings);
