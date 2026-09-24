@@ -441,6 +441,11 @@ function recipeSliderValue(id) {
 }
 
 function syncRecipeSliderLabels() {
+  const sweep = document.getElementById('gen_sweep');
+  const loopSweep = document.getElementById('gen_shape').value === 'LOOP'
+    && document.getElementById('gen_hue_mode').value === 'SWEEP';
+  sweep.step = loopSweep ? '1' : '0.5';
+  if (loopSweep) sweep.value = String(loopSweepTurns(Number(sweep.value)));
   for (const { id, digits, suffix } of recipeSliderDefinitions) {
     document.getElementById(`${id}_value`).textContent =
       `${recipeSliderValue(id).toFixed(digits)}${suffix}`;
@@ -455,6 +460,7 @@ function readPaletteRecipe() {
 }
 
 function syncRecipeControlAvailability() {
+  syncRecipeSliderLabels();
   const recipe = readPaletteRecipe();
   const availability = paletteRecipeAvailability(recipe);
   const controls = [
