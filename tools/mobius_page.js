@@ -129,7 +129,7 @@ const updateDegenerateWarning = () => {
   // det = a*d - b*c (complex multiplication).
   const detRe = (A.re * D.re - A.im * D.im) - (B.re * C.re - B.im * C.im);
   const detIm = (A.re * D.im + A.im * D.re) - (B.re * C.im + B.im * C.re);
-  const degenerate = Math.hypot(detRe, detIm) < 1e-4;
+  const degenerate = Math.hypot(detRe, detIm) < 1e-3;
   if (degenerate) {
     el.classList.remove('hidden');
     if (el.textContent !== DEGENERATE_WARNING)
