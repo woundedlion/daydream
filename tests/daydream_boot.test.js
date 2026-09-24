@@ -945,7 +945,7 @@ test('a trapped resolution query stops the startup instead of booting on', async
 test('a workbench init that trapped the module releases the app', () => {
   const at = SOURCE.indexOf('shaderDocuments?.init().catch(');
   assert.ok(at >= 0, 'the workbench init rejection must stay handled');
-  assert.match(sliceTo(at, 'CONFIG_NOTICE);'), /abandonOnModuleDeath\(\)/,
+  assert.match(sliceTo(at, 'WORKBENCH_NOTICE);'), /abandonOnModuleDeath\(\)/,
     'a trap is terminal for the whole module, not for the call that tripped it: '
     + 'without the death read the rejection is reported as an ordinary workbench '
     + 'failure and the simulator keeps calling into a shortened shadow stack');
@@ -957,7 +957,7 @@ test('a failed workbench init reports without the page-failure banner', () => {
     'init() is async and the surrounding catch only sees a synchronous throw, '
     + 'so a dropped rejection reaches the page-failure listener and covers a '
     + 'running simulator with the fatal banner');
-  assert.match(sliceTo(at, 'CONFIG_NOTICE);'),
+  assert.match(sliceTo(at, 'WORKBENCH_NOTICE);'),
     /workbench could not be initialized: \$\{[^}]+\}`,\s*$/,
     'the workbench half must report through the shader config notice, the '
     + 'owner tag its other messages carry');

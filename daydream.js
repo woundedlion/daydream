@@ -206,6 +206,7 @@ export function start({
   const SEGMENT_NOTICE = 'segments';
   const RECORD_NOTICE = 'record';
   const CONFIG_NOTICE = 'config';
+  const WORKBENCH_NOTICE = 'workbench';
 
   /**
    * Write one parameter value to the main engine. setParameter returns a
@@ -387,7 +388,7 @@ export function start({
           if (abandonOnModuleDeath()) return;
           applyNotice.show(
             `The shader workbench could not be initialized: ${errorDetail(err)}`,
-            CONFIG_NOTICE);
+            WORKBENCH_NOTICE);
         });
       } catch (err) {
         console.error('Initial resolution/effect could not be applied:', err);
