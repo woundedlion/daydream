@@ -13,6 +13,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { parse } from 'espree';
 import * as compiler from '../shader/shader_workbench.mjs';
 
 import {
@@ -913,4 +914,17 @@ test('a refused structural edit preserves the redo document', async () => {
   assert.equal(store.canRedo(), true);
   assert.equal(store.redo(), true);
   assert.deepEqual(store.document(), edited);
+});
+
+test('chain labels use the compiler grammar', () => {
+  const grammar = (path) => {
+    const ast = parse(readFileSync(new URL(path, import.meta.url), 'utf8'),
+      { ecmaVersion: 'latest', sourceType: 'module' });
+    const declaration = ast.body.flatMap((node) => node.declarations ?? [])
+      .find((node) => node.id.name === 'LABEL_PATTERN');
+    assert.ok(declaration?.init.regex);
+    return declaration.init.regex;
+  };
+  assert.deepEqual(grammar('../tools/chain_document_store.js'),
+    grammar('../shader/shader_workbench.mjs'));
 });
