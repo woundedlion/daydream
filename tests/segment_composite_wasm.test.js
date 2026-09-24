@@ -148,7 +148,7 @@ test('four clipped segment renders stitch into the unclipped frame', async () =>
     'segments rotated between rectangles still matched the full frame');
 });
 
-test('the stitch holds at every device-backed segment count', async () => {
+test('the stitch holds at device-backed and simulator-only segment counts', async () => {
   for (const total of [2, 6, 8]) {
     const { canvas, clips } = await compositeSegments(CLIPPED_EFFECT, total, FRAMES);
     assert.equal(clips.filter((c) => c === 'APPLIED').length, total,
