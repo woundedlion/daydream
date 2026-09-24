@@ -512,12 +512,12 @@ const init = () => {
     applyConfig({ A: { re: 1, im: 0 }, B: { re: 0, im: 0 }, C: { re: 0, im: 0 }, D: { re: 1, im: 0 } });
   });
 
-  wireCopyBlock({
+  onPageTeardown(wireCopyBlock({
     source: document.getElementById('mobius_code_output'),
     button: document.getElementById('copy_code_button'),
     prompt: document.getElementById('copy_code_prompt'),
     block: document.getElementById('code_pre_block'),
-  });
+  }));
 
   updateCodeSnippet();
   const teardownThree = initThree();

@@ -109,15 +109,18 @@ export const COPY_FEEDBACK = {
  * @param {HTMLElement} [opts.button] - Button that triggers the copy.
  * @param {FeedbackElement} [opts.prompt] - Element whose label flashes on copy.
  * @param {HTMLElement} [opts.block] - Element (e.g. the <pre>) that also copies on click.
- * @returns {void}
+ * @returns {() => void} Removes the copy listeners.
  */
 export function wireCopyBlock({ source, button, prompt, block }) {
-  if (!source) return;
+  if (!source) return () => {};
   const handleCopy = () => {
     copyWithFeedback(source.textContent ?? '',
       { element: prompt, revertText: '', ...COPY_FEEDBACK });
   };
   button?.addEventListener('click', handleCopy);
   block?.addEventListener('click', handleCopy);
-
+  return () => {
+    button?.removeEventListener('click', handleCopy);
+    block?.removeEventListener('click', handleCopy);
+  };
 }
