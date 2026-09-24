@@ -361,6 +361,8 @@ export type ParamSetResultEnum = {
   READONLY: EnumValue;
   NON_FINITE: EnumValue;
   INADMISSIBLE: EnumValue;
+  MALFORMED_PAYLOAD: EnumValue;
+  TOO_LONG: EnumValue;
 };
 
 /** What restoreFullConfigSnapshot() answers, compared by identity against the member. */
