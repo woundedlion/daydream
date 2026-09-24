@@ -320,3 +320,11 @@ test('bundle installation checks additions as well as tracked changes', () => {
     assert.ok(source.includes('test -z "$(git status --porcelain)"'), name);
   }
 });
+
+test('pre-push requires lint and typecheck to succeed', () => {
+  const hook = readFileSync('.githooks/pre-push', 'utf8');
+  for (const command of ['npm run lint', 'npm run typecheck']) {
+    assert.ok(hook.split(/\r?\n/).some((line) => line.trim() === `${command} || exit 1`),
+      `${command} must refuse the push on failure`);
+  }
+});
