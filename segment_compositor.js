@@ -79,13 +79,12 @@ export class SegmentCompositor {
    *   was read or written and the caller must keep the generation pending. The
    *   caller uses this to avoid marking a black buffer as a real composited frame.
    * @param {number} count
-   * @param {number} generation
    * @param {boolean} showBoundaries
    * @param {Array<FrameResult | null>} results - One whole generation, indexed
    *   by segment. Only the published generation is ever coherent: a staging
    *   buffer mid-fill composites a half-updated mix.
    */
-  composite(results, count, generation, showBoundaries) {
+  composite(results, count, showBoundaries) {
     const refreshed = this.refreshPixelView() === true;
     const dst = this.getMemoryView();
     // Not a fault: the view is absent only while there is no engine to fetch it
