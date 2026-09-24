@@ -1148,23 +1148,7 @@ async function init() {
     const el = document.getElementById(id);
     el?.addEventListener('change', () => {
       if (id === 'gen_hue_mode') {
-        const nextMode = paletteEnumOrdinal('hueMode', el.value);
-        if (nextMode === PaletteV4.hueMode.CUSTOM &&
-            previousHueMode !== PaletteV4.hueMode.CUSTOM) {
-          const sourceRecipe = readPaletteRecipe();
-          sourceRecipe.hue.mode = previousHueMode;
-          sourceRecipe.hue.baseTurns = customBaseTurns();
-          // readPaletteRecipe() saw the dropdown already on CUSTOM, so the loop
-          // sweep it leaves behind is still the raw slider reading.
-          if (sourceRecipe.domain === PaletteV4.domain.LOOP &&
-              previousHueMode === PaletteV4.hueMode.SWEEP) {
-            sourceRecipe.hue.sweepTurns =
-              loopSweepTurns(sourceRecipe.hue.sweepTurns);
-          }
-          activateCustomHue(sourceRecipe);
-        } else {
-          previousHueMode = nextMode;
-        }
+        handleHueModeChange(el);
       }
       syncRecipeControlAvailability();
       scheduleUpdate();
@@ -1259,3 +1243,24 @@ async function init() {
 }
 
 bootstrapTool(init, 'palette tool');
+
+function handleHueModeChange(el) {
+  const nextMode = paletteEnumOrdinal('hueMode', el.value);
+  if (nextMode === PaletteV4.hueMode.CUSTOM &&
+      previousHueMode !== PaletteV4.hueMode.CUSTOM) {
+    const sourceRecipe = readPaletteRecipe();
+    sourceRecipe.hue.mode = previousHueMode;
+    sourceRecipe.hue.baseTurns = customBaseTurns();
+    // readPaletteRecipe() saw the dropdown already on CUSTOM, so the loop
+    // sweep it leaves behind is still the raw slider reading.
+    if (sourceRecipe.domain === PaletteV4.domain.LOOP &&
+        previousHueMode === PaletteV4.hueMode.SWEEP) {
+      sourceRecipe.hue.sweepTurns =
+        loopSweepTurns(sourceRecipe.hue.sweepTurns);
+    }
+    if (!activateCustomHue(sourceRecipe))
+      el.value = Object.keys(PaletteV4.hueMode).find((name) => PaletteV4.hueMode[name] === previousHueMode);
+  } else {
+    previousHueMode = nextMode;
+  }
+}

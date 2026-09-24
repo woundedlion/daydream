@@ -95,3 +95,16 @@ test('a dropped hue selection is redrawn without nudging its replacement', () =>
   assert.equal(prevented, 1);
   assert.equal(context.selectedHueKey, 2);
 });
+
+test('the hue dropdown restores its previous mode after a refused handoff', () => {
+  const select = { value: 'CUSTOM' };
+  const context = {
+    PaletteV4: { hueMode: { HARMONY: 0, CUSTOM: 1, SWEEP: 2 }, domain: { LOOP: 1 } },
+    previousHueMode: 0, paletteEnumOrdinal: () => 1,
+    readPaletteRecipe: () => ({ hue: {}, domain: 0 }), customBaseTurns: () => 0,
+    activateCustomHue: () => false,
+  };
+  handler('handleHueModeChange', context)(select);
+  assert.equal(select.value, 'HARMONY');
+  assert.equal(context.previousHueMode, 0);
+});
