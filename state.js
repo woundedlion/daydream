@@ -552,10 +552,8 @@ export class URLSync {
         this.schedule(URL_FLUSH_RETRY_MS);
         return;
       }
-      if (this.retries === URL_FLUSH_MAX_RETRIES) {
-        console.warn(`URLSync: ${URL_FLUSH_MAX_RETRIES} consecutive refused URL `
-          + 'writes; dropping the buffered params and leaving the URL as it is.');
-      }
+      console.warn(`URLSync: ${URL_FLUSH_MAX_RETRIES} consecutive refused URL `
+        + 'writes; dropping the buffered params and leaving the URL as it is.');
       this.retries = 0;
       this.pendingReset = null;
       this.adhoc.clear();
