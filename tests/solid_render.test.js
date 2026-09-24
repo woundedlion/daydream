@@ -237,6 +237,7 @@ test('a re-render disposes the previous objects and leaves one set in the scene'
   const { renderer, scene } = setup();
   renderer.render(tetrahedron(), view({ showVertices: true, showNormals: true }), null);
   const first = [...scene.children];
+  assert.deepEqual(kinds(scene), ['Mesh', 'Points', 'LineSegments', 'LineSegments']);
 
   renderer.render(tetrahedron(), view(), null);
   for (const object of first) {
