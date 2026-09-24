@@ -90,6 +90,9 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
  *   base Controller.options() behaviour instead of the OptionController one.
  * @returns {Object} The GUI double.
  */
+const supportedProperty = (target, property, choices) =>
+  Object(choices) === choices || ['number', 'boolean', 'string', 'function'].includes(typeof target[property]);
+
 export function fakeGui(namespace, optionsReplaces = false) {
   const gui = {
     namespace,
@@ -99,12 +102,14 @@ export function fakeGui(namespace, optionsReplaces = false) {
     stored: new Map(),
     destroyed: false,
     add(target, property, ...args) {
+      if (!supportedProperty(target, property, args[0])) throw new TypeError(`Unsupported GUI property: ${property}`);
       const c = fakeController(gui, target, property, args, optionsReplaces);
       gui.controllers.push(c);
       return c;
     },
     // Session controls carry no deep link, so the two are told apart here.
     addSession(target, property, ...args) {
+      if (!supportedProperty(target, property, args[0])) return undefined;
       const c = fakeController(gui, target, property, args, optionsReplaces);
       c.session = true;
       gui.controllers.push(c);

@@ -1,3 +1,4 @@
+import { fakeGui } from './fake_app.js';
 //
 // Pins the behaviour of the lil-gui build package.json pins, so the doubles the
 // GUI suites run over cannot drift from the library the browser loads. Every
@@ -254,4 +255,14 @@ test('addColor and addFolder hand back the shapes the GUI layer wraps', async ()
 
   gui.destroy();
   assert.deepEqual(gui.children, [], 'destroy() empties the panel');
+});
+
+test('the shared app GUI rejects unsupported properties like DeepLinkGUI', () => {
+  const gui = fakeGui('test');
+  for (const object of [{}, { value: null }, { value: undefined }, { value: {} }]) {
+    assert.throws(() => gui.add(object, 'value'), TypeError);
+    assert.equal(gui.addSession(object, 'value'), undefined);
+  }
+  assert.ok(gui.add({}, 'value', ['a', 'b']));
+  assert.equal(gui.controllers.length, 1);
 });
