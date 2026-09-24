@@ -886,7 +886,7 @@ export function createEffectGui({ engine, segments, config, host }) {
     fx.hasAnimatedEnums = false;
     fx.paramWarnings = paramWarningTexts(params);
     fx.paramsExternal = external;
-    const grouping = stageGrouping(params);
+    const grouping = external ? null : stageGrouping(params);
     const stageAssignments = grouping?.assignments ?? null;
     const stageTitles = grouping?.titles ?? null;
     const stageOrder = grouping?.order ?? [];

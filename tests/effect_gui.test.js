@@ -3291,3 +3291,12 @@ test('readonly enum type-ahead cannot move the visible selection', () => {
   assert.equal(control.$select.dispatch('keydown', { key: 'Tab' }).defaultPrevented, false);
   assert.equal(control.getValue(), 0);
 });
+
+test('externally rendered stage parameters build no stage folders', () => {
+  const params = latticeMeltParams();
+  const h = makeHarness({ params, engineValues: params.map((parameter) => parameter.value) });
+  h.state.paramFilter = { external: true };
+  h.panel.build();
+  assert.equal(h.panel.active().stageFolders.size, 0);
+  assert.deepEqual(h.panel.active().paramNames, params.map((parameter) => parameter.name));
+});
