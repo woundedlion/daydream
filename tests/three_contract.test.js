@@ -304,3 +304,7 @@ test('listenToKeyEvents records the target under the same name on both', () => {
   assert.equal(double._domElementKeyEvents, null, 'the double kept the key-events target');
   assert.deepEqual(target.listeners, [], 'dispose() gives the keyboard route back');
 });
+
+test('the basic material exposes the dot shader injection chunk exactly once', () => {
+  assert.equal(THREE.ShaderLib.basic.vertexShader.split('#include <begin_vertex>').length, 2);
+});

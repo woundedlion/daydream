@@ -1832,3 +1832,15 @@ test('precomputeMatrices tolerates a reused color view detached by heap growth',
   assert.equal(ctx.pixels, old);
   assert.equal(ctx.dotMesh.instanceColor.array, old);
 });
+
+test('dot shader injection uses the current Three chunk and refuses a missing one', () => {
+  const ctx = setupCtx(null, []);
+  Daydream.prototype.setupDots.call(ctx);
+  const shader = { uniforms: {}, vertexShader: THREE.ShaderLib.basic.vertexShader };
+  ctx.dotMaterial.onBeforeCompile(shader);
+  assert.equal(shader.uniforms.uCameraPos, ctx.cullUniforms.uCameraPos);
+  assert.match(shader.vertexShader, /uColumnFillArc/);
+  assert.match(shader.vertexShader, /instanceColor/);
+  assert.throws(() => ctx.dotMaterial.onBeforeCompile({ uniforms: {}, vertexShader: 'void main() {}' }),
+    /missing the begin_vertex chunk/);
+});
