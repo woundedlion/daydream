@@ -9,7 +9,7 @@ import { resolve } from 'node:path';
 import {
   BAKED_CONSTANT_IDS, bakedTopologyFields, engineParameterNames,
 } from '../tools/shader_documents.js';
-import { MORPH_SWEEP } from '../tools/solid_codegen.js';
+import { MORPH_SWEEP, OP_DEFS } from '../tools/solid_codegen.js';
 
 const text = (path) => readFileSync(path, 'utf8').replaceAll('\r\n', '\n');
 const sha256 = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
@@ -235,4 +235,24 @@ test('pattern mirrors match the pinned engine in both content and membership', {
     assert.equal(text(`shader/patterns/${name}`),
       committed(engineRoot, `patterns/${name}`).toString('utf8').replaceAll('\r\n', '\n'), name);
   }
+});
+
+test('composite sweep exemptions stay inside the engine primitive bands', { skip: engineSkip }, () => {
+  assert.ok(engineRoot, engineMissing);
+  const recipe = committed(engineRoot, 'core/mesh/recipe.h').toString('utf8');
+  const expansion = recipe.slice(recipe.indexOf('size_t expand_to_primitives'));
+  for (const [name, expected] of Object.entries({
+    GYRO: ['SNUB', 'DUAL'], META: ['AMBO', 'DUAL', 'KIS'],
+    NEEDLE: ['DUAL', 'KIS'], ZIP: ['KIS', 'DUAL'], BEVEL: ['AMBO', 'AMBO', 'TRUNCATE'],
+  })) {
+    const body = expansion.match(new RegExp(`case Op::${name}:([\\s\\S]*?)break;`))?.[1];
+    assert.ok(body, name);
+    assert.deepEqual([...body.matchAll(/emit\(\{Op::(\w+)/g)].map((match) => match[1]), expected);
+  }
+  const graph = committed(engineRoot, 'core/mesh/conway_graph.h').toString('utf8');
+  assert.ok(OP_DEFS.bevel.params.t.min >= cppFloatConstant(graph, 'T_TRUNCATE_ARRIVAL_MIN'));
+  assert.ok(OP_DEFS.bevel.params.t.max <= 1 - cppFloatConstant(graph, 'T_EPS_AMBO'));
+  assert.match(expansion, /if \(step\.param == 0\.5f\)\s*emit\(\{Op::AMBO\}\);/);
+  const conway = committed(engineRoot, 'core/mesh/conway.h').toString('utf8');
+  assert.ok(cppFloatConstant(conway, 'SNUB_DEFAULT_T') > 0);
 });
