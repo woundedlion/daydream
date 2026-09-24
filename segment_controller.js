@@ -663,7 +663,7 @@ export class SegmentController {
         }
         const detail = message || (this.#ready
           ? 'worker failed after the pool became ready without an error message'
-          : `module load failed after ${MAX_BOOT_RETRIES} attempts`
+          : `module load failed after ${MAX_BOOT_RETRIES + 1} attempts`
              + ` (commonly a missing or renamed holosphere_wasm.js, or a bare`
              + ` import specifier — a worker resolves its graph without the`
              + ` page's import map)`);
