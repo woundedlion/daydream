@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { fakeElement } from './fake_dom.js';
+import { fakeElement, installDocument } from './fake_dom.js';
 import { captureConsole } from './fake_console.js';
 
 import { SLOW_FRAME_MS } from '../frame_constants.js';
@@ -215,7 +215,7 @@ test('a cell that mounts later is picked up and latched', () => {
 test('the view reads only the injected document', () => {
   const { doc, byId } = makeDoc();
   const saved = globalThis.document;
-  globalThis.document = { getElementById: () => { throw new Error('global document read'); } };
+  installDocument({ getElementById: () => { throw new Error('global document read'); } });
   try {
     new GlobalStatsView(doc).update(1, null);
   } finally {

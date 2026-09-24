@@ -1,3 +1,4 @@
+import { fakeContext } from './fake_canvas.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -5,32 +6,6 @@ import {
 } from '../tools/palette_canvas.js';
 import { waveGraphBand } from '../tools/palette_math.js';
 import { linearToSrgbFloat } from '../tools/color.js';
-
-/**
- * Recording stand-in for a CanvasRenderingContext2D. Every drawing call lands in
- * `ops` in order, and every state assignment is a plain property, so a test can
- * assert both what was drawn and the state it was drawn under.
- * @returns {Object} The context double.
- */
-function fakeContext() {
-  const ops = [];
-  return {
-    ops,
-    canvasFor: null,
-    clearRect: (...a) => ops.push(['clearRect', ...a]),
-    fillRect: (...a) => ops.push(['fillRect', ...a]),
-    strokeRect: (...a) => ops.push(['strokeRect', ...a]),
-    beginPath: () => ops.push(['beginPath']),
-    moveTo: (...a) => ops.push(['moveTo', ...a]),
-    lineTo: (...a) => ops.push(['lineTo', ...a]),
-    stroke: function stroke() { ops.push(['stroke', this.strokeStyle, this.lineWidth]); },
-    setLineDash: (a) => ops.push(['setLineDash', a.join(',')]),
-    drawImage: (...a) => ops.push(['drawImage', ...a]),
-    createImageData: (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }),
-    putImageData: function putImageData(image) { this.painted = image; },
-    fillText: (...a) => ops.push(['fillText', ...a]),
-  };
-}
 
 /**
  * Document double whose createElement('canvas') yields an offscreen canvas
