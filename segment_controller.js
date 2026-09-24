@@ -517,8 +517,7 @@ export class SegmentController {
     // never reported, not just a count.
     const booted = new Array(numSegments).fill(false);
     const readied = new Array(numSegments).fill(false);
-    let readyCount = 0;
-    let bootedCount = 0;
+    const pool = { booted, readied, numSegments, readyCount: 0, bootedCount: 0 };
     /**
      * @param {boolean[]} state - Per-index boot or ready flags.
      * @returns {number[]} Indices still false.
@@ -541,143 +540,7 @@ export class SegmentController {
         return;
       }
 
-      worker.onmessage = (e) => {
-        const msg = /** @type {ControllerInboundMsg} */ (e.data);
-        if (!msg || typeof msg !== 'object' || typeof msg.type !== 'string') {
-          this.onWorkerFault(i, `worker seg ${i} sent an invalid message envelope`);
-          return;
-        }
-        if (msg.type === 'ready') {
-          if (!readied[i]) { readied[i] = true; readyCount++; }
-          if (readyCount === numSegments) {
-            this.#ready = true;
-            // A live pool ends the faulted-rebuild run, so the next fault gets a
-            // fresh budget.
-            this.faultedRebuilds = 0;
-            this.clearTimers('bootWatchdog', 'initWatchdog');
-            console.log(`[Segmented] All ${numSegments} workers ready`);
-          }
-        } else if (msg.type === 'booted') {
-          if (msg.version !== PROTOCOL_VERSION) {
-            this.onWorkerFault(i, `worker seg ${i} protocol version ${msg.version}`
-              + ` != controller ${PROTOCOL_VERSION} (stale cached worker or glue)`);
-            return;
-          }
-          if (!booted[i]) { booted[i] = true; bootedCount++; }
-          if (bootedCount === numSegments) this.clearTimers('bootWatchdog');
-        } else if (msg.type === 'engineRejected') {
-          if (msg.sharedModule) {
-            this.moduleWarmer.discard();
-            if (!this.#ready && this.bootAttempt < MAX_BOOT_RETRIES) {
-              const next = this.bootAttempt + 1;
-              this.destroy();
-              this.retryTimer = setTimeout(() => {
-                this.retryTimer = null;
-                if (this.active) this.create(this.count, next);
-              }, BOOT_RETRY_DELAY_MS);
-              unrefTimer(this.retryTimer);
-              return;
-            }
-          }
-          this.onWorkerFault(i, `worker seg ${i} engine rejected: ${msg.reason}`);
-        } else if (msg.type === 'frame') {
-          // A halted pool zeroed `pending`; ignore late frames so it can't go negative.
-          if (this.faulted) return;
-          // This handler belongs to worker `i`, so its frame must carry segId i.
-          // The identity check subsumes a range check and rejects NaN/undefined,
-          // which would otherwise index `scratch`/`frameSeen` by string key and
-          // settle the barrier with a segment absent — publishing a torn frame
-          // the recorder counts as real. Staging it is unsafe and dropping it
-          // leaves `pending` short until the render watchdog reports a stall
-          // that names neither this worker nor the id it sent, so the protocol
-          // violation faults here with both.
-          if (msg.segId !== i) {
-            this.onWorkerFault(i, `worker seg ${i} reported a frame tagged segId `
-              + `${String(msg.segId)}; a frame the pool cannot attribute is a `
-              + 'protocol violation (stale cached worker or glue)');
-            return;
-          }
-          // Count and stage only the first message from each segment.
-          if (this.#frameSeen[msg.segId]) return;
-          // Generation fence: keep only results from the current resolution; still
-          // settle the frame either way.
-          if (this.#inflightGen === this.#renderGen) {
-            // Mirror segment 0's live params for GUI sync, inside the fence so a
-            // stale-generation frame can't publish params against a new descriptor
-            // list.
-            if (msg.segId === 0) {
-              this.presetCount = msg.presetCount ?? null;
-              if (msg.paramRevision >= this.presetRevision)
-                this.presetIndex = msg.presetIndex ?? null;
-              if (msg.paramValues && msg.paramRevision === this.paramRevision)
-                this.paramValues = msg.paramValues;
-            }
-            this.#scratch[msg.segId] = {
-              pixels: msg.pixels,
-              x0: msg.x0, x1: msg.x1,
-              y0: msg.y0, y1: msg.y1,
-            };
-            this.#timings[msg.segId] = msg.elapsed;
-            this.#arenas[msg.segId] = msg.arenaMetrics;
-            this.#fullFrames[msg.segId] = msg.fullFrame === true;
-            this.#warnings[msg.segId] = msg.warnings ?? null;
-          }
-          this.#frameSeen[msg.segId] = true;
-          this.#pending--;
-          if (this.#pending === 0 && this.#frameResolve) {
-            this.#frameResolve();
-            this.#frameResolve = null;
-          } else if (this.#pending > 0) {
-            this.armRenderWatchdog();
-          }
-        } else {
-          // The `never` binding makes an unhandled ControllerInboundMsg member a
-          // typecheck error rather than a runtime-only fault.
-          /** @type {never} */
-          const unhandled = msg;
-          this.onWorkerFault(i, `worker seg ${i} sent unknown message type `
-            + `${String((/** @type {{type?: unknown}} */ (unhandled)).type)}`);
-        }
-      };
-
-      worker.onerror = (e) => {
-        // A message-less error Event before the pool is ready is a module-graph
-        // load failure (a plain Event, not an ErrorEvent) — transient, so rebuild
-        // a bounded number of times before latching. A messaged error is a real
-        // worker throw and still fails fast.
-        const message = typeof e?.message === 'string' && e.message
-          ? e.message : null;
-        if (!this.#ready && !message
-            && this.bootAttempt < MAX_BOOT_RETRIES) {
-          const next = this.bootAttempt + 1;
-          console.warn(`[Segmented] seg ${i} module failed to load`
-            + ` (attempt ${next}/${MAX_BOOT_RETRIES}); rebuilding pool`);
-          // Tear the failing pool down before the backoff window rather than
-          // leaving its survivors instantiating WASM and able to re-enter this
-          // path; create() re-destroying is idempotent.
-          this.destroy();
-          this.retryTimer = setTimeout(() => {
-            this.retryTimer = null;
-            if (this.active) this.create(this.count, next);
-          }, BOOT_RETRY_DELAY_MS);
-          unrefTimer(this.retryTimer);
-          return;
-        }
-        const detail = message || (this.#ready
-          ? 'worker failed after the pool became ready without an error message'
-          : `module load failed after ${MAX_BOOT_RETRIES + 1} attempts`
-             + ` (commonly a missing or renamed holosphere_wasm.js, or a bare`
-             + ` import specifier — a worker resolves its graph without the`
-             + ` page's import map)`);
-        console.error(`[Segmented] Worker seg ${i} error: ${detail}`
-          + ` (${e?.filename}:${e?.lineno}:${e?.colno})`, e);
-        this.onWorkerFault(i, detail);
-      };
-      worker.onmessageerror = (e) => {
-        console.error(`[Segmented] Worker seg ${i} message deserialization`
-          + ` failed`, e);
-        this.onWorkerFault(i, 'message deserialization failed');
-      };
+      this.#installWorkerHandlers(worker, i, pool);
 
       this.workers.push(worker);
       try {
@@ -709,7 +572,7 @@ export class SegmentController {
         const stuck = missing(booted);
         this.onWorkerFault(stuck.length === 1 ? stuck[0] : FAULT_POOL,
           `worker module load timed out after ${BOOT_WATCHDOG_MS} ms `
-          + `(${bootedCount}/${numSegments} booted; never booted: `
+          + `(${pool.bootedCount}/${numSegments} booted; never booted: `
           + `${stuck.join(', ')}) — a worker module likely `
           + `failed to load (commonly a missing or renamed holosphere_wasm.js)`);
       }
@@ -723,13 +586,165 @@ export class SegmentController {
         const stuck = missing(readied);
         this.onWorkerFault(stuck.length === 1 ? stuck[0] : FAULT_POOL,
           `worker init timed out after ${INIT_WATCHDOG_MS} ms `
-          + `(${readyCount}/${numSegments} ready; never ready: ${stuck.join(', ')}) `
+          + `(${pool.readyCount}/${numSegments} ready; never ready: ${stuck.join(', ')}) `
           + `— a WASM module likely failed to load without throwing`);
       }
     }, INIT_WATCHDOG_MS);
     unrefTimer(this.initWatchdog);
 
     console.log(`[Segmented] Spawning ${numSegments} workers...`);
+  }
+
+  /**
+   * @param {Worker} worker
+   * @param {number} i
+   * @param {{booted: boolean[], readied: boolean[], readyCount: number,
+   *   bootedCount: number, numSegments: number}} pool
+   */
+  #installWorkerHandlers(worker, i, pool) {
+    const { booted, readied, numSegments } = pool;
+  worker.onmessage = (e) => {
+    const msg = /** @type {ControllerInboundMsg} */ (e.data);
+    if (!msg || typeof msg !== 'object' || typeof msg.type !== 'string') {
+      this.onWorkerFault(i, `worker seg ${i} sent an invalid message envelope`);
+      return;
+    }
+    if (msg.type === 'ready') {
+      if (!readied[i]) { readied[i] = true; pool.readyCount++; }
+      if (pool.readyCount === numSegments) {
+        this.#ready = true;
+        // A live pool ends the faulted-rebuild run, so the next fault gets a
+        // fresh budget.
+        this.faultedRebuilds = 0;
+        this.clearTimers('bootWatchdog', 'initWatchdog');
+        console.log(`[Segmented] All ${numSegments} workers ready`);
+      }
+    } else if (msg.type === 'booted') {
+      if (msg.version !== PROTOCOL_VERSION) {
+        this.onWorkerFault(i, `worker seg ${i} protocol version ${msg.version}`
+          + ` != controller ${PROTOCOL_VERSION} (stale cached worker or glue)`);
+        return;
+      }
+      if (!booted[i]) { booted[i] = true; pool.bootedCount++; }
+      if (pool.bootedCount === numSegments) this.clearTimers('bootWatchdog');
+    } else if (msg.type === 'engineRejected') {
+      if (msg.sharedModule) {
+        this.moduleWarmer.discard();
+        if (!this.#ready && this.bootAttempt < MAX_BOOT_RETRIES) {
+          const next = this.bootAttempt + 1;
+          this.destroy();
+          this.retryTimer = setTimeout(() => {
+            this.retryTimer = null;
+            if (this.active) this.create(this.count, next);
+          }, BOOT_RETRY_DELAY_MS);
+          unrefTimer(this.retryTimer);
+          return;
+        }
+      }
+      this.onWorkerFault(i, `worker seg ${i} engine rejected: ${msg.reason}`);
+    } else if (msg.type === 'frame') {
+      this.#onSegmentFrame(i, msg);
+    } else {
+      // The `never` binding makes an unhandled ControllerInboundMsg member a
+      // typecheck error rather than a runtime-only fault.
+      /** @type {never} */
+      const unhandled = msg;
+      this.onWorkerFault(i, `worker seg ${i} sent unknown message type `
+        + `${String((/** @type {{type?: unknown}} */ (unhandled)).type)}`);
+    }
+  };
+
+  worker.onerror = (e) => {
+    // A message-less error Event before the pool is ready is a module-graph
+    // load failure (a plain Event, not an ErrorEvent) — transient, so rebuild
+    // a bounded number of times before latching. A messaged error is a real
+    // worker throw and still fails fast.
+    const message = typeof e?.message === 'string' && e.message
+      ? e.message : null;
+    if (!this.#ready && !message
+        && this.bootAttempt < MAX_BOOT_RETRIES) {
+      const next = this.bootAttempt + 1;
+      console.warn(`[Segmented] seg ${i} module failed to load`
+        + ` (attempt ${next}/${MAX_BOOT_RETRIES}); rebuilding pool`);
+      // Tear the failing pool down before the backoff window rather than
+      // leaving its survivors instantiating WASM and able to re-enter this
+      // path; create() re-destroying is idempotent.
+      this.destroy();
+      this.retryTimer = setTimeout(() => {
+        this.retryTimer = null;
+        if (this.active) this.create(this.count, next);
+      }, BOOT_RETRY_DELAY_MS);
+      unrefTimer(this.retryTimer);
+      return;
+    }
+    const detail = message || (this.#ready
+      ? 'worker failed after the pool became ready without an error message'
+      : `module load failed after ${MAX_BOOT_RETRIES + 1} attempts`
+         + ` (commonly a missing or renamed holosphere_wasm.js, or a bare`
+         + ` import specifier — a worker resolves its graph without the`
+         + ` page's import map)`);
+    console.error(`[Segmented] Worker seg ${i} error: ${detail}`
+      + ` (${e?.filename}:${e?.lineno}:${e?.colno})`, e);
+    this.onWorkerFault(i, detail);
+  };
+  worker.onmessageerror = (e) => {
+    console.error(`[Segmented] Worker seg ${i} message deserialization`
+      + ` failed`, e);
+    this.onWorkerFault(i, 'message deserialization failed');
+  };
+  }
+
+  /** @param {number} i @param {Extract<ControllerInboundMsg, {type: "frame"}>} msg */
+  #onSegmentFrame(i, msg) {
+  // A halted pool zeroed `pending`; ignore late frames so it can't go negative.
+  if (this.faulted) return;
+  // This handler belongs to worker `i`, so its frame must carry segId i.
+  // The identity check subsumes a range check and rejects NaN/undefined,
+  // which would otherwise index `scratch`/`frameSeen` by string key and
+  // settle the barrier with a segment absent — publishing a torn frame
+  // the recorder counts as real. Staging it is unsafe and dropping it
+  // leaves `pending` short until the render watchdog reports a stall
+  // that names neither this worker nor the id it sent, so the protocol
+  // violation faults here with both.
+  if (msg.segId !== i) {
+    this.onWorkerFault(i, `worker seg ${i} reported a frame tagged segId `
+      + `${String(msg.segId)}; a frame the pool cannot attribute is a `
+      + 'protocol violation (stale cached worker or glue)');
+    return;
+  }
+  // Count and stage only the first message from each segment.
+  if (this.#frameSeen[msg.segId]) return;
+  // Generation fence: keep only results from the current resolution; still
+  // settle the frame either way.
+  if (this.#inflightGen === this.#renderGen) {
+    // Mirror segment 0's live params for GUI sync, inside the fence so a
+    // stale-generation frame can't publish params against a new descriptor
+    // list.
+    if (msg.segId === 0) {
+      this.presetCount = msg.presetCount ?? null;
+      if (msg.paramRevision >= this.presetRevision)
+        this.presetIndex = msg.presetIndex ?? null;
+      if (msg.paramValues && msg.paramRevision === this.paramRevision)
+        this.paramValues = msg.paramValues;
+    }
+    this.#scratch[msg.segId] = {
+      pixels: msg.pixels,
+      x0: msg.x0, x1: msg.x1,
+      y0: msg.y0, y1: msg.y1,
+    };
+    this.#timings[msg.segId] = msg.elapsed;
+    this.#arenas[msg.segId] = msg.arenaMetrics;
+    this.#fullFrames[msg.segId] = msg.fullFrame === true;
+    this.#warnings[msg.segId] = msg.warnings ?? null;
+  }
+  this.#frameSeen[msg.segId] = true;
+  this.#pending--;
+  if (this.#pending === 0 && this.#frameResolve) {
+    this.#frameResolve();
+    this.#frameResolve = null;
+  } else if (this.#pending > 0) {
+    this.armRenderWatchdog();
+  }
   }
 
   /**
