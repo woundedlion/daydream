@@ -12,7 +12,7 @@ export const ENGINE_METHODS = [
   'setPoleLod', 'setClip', 'drawFrame', 'getPixels', 'getArenaMetrics',
   'getParameterDefinitions', 'getParamValues', 'getBufferLength',
   'getParamGeneration', 'getEffectSizes', 'getEffectPresetCounts',
-  'strobeColumns', 'setShaderChain',
+  'strobeColumns', 'setShaderChain', 'setShaderChainParameters',
 ];
 
 /**
@@ -42,6 +42,7 @@ export const ParamSetResult = Object.freeze({
   UNKNOWN_PARAM: Object.freeze({ value: 2 }),
   READONLY: Object.freeze({ value: 3 }),
   NON_FINITE: Object.freeze({ value: 4 }),
+  INADMISSIBLE: Object.freeze({ value: 5 }),
 });
 
 /**
@@ -180,6 +181,20 @@ export class FakeChainEngine {
       return ParamSetResult.NON_FINITE;
     definition.value = value;
     this.writes.push([name, value]);
+    return ParamSetResult.APPLIED;
+  }
+
+  setShaderChainParameters(writes) {
+    for (const { name, value } of writes) {
+      if (!this.definitions.some((definition) => definition.name === name))
+        return ParamSetResult.UNKNOWN_PARAM;
+      if (typeof value !== 'number' || !Number.isFinite(value))
+        return ParamSetResult.NON_FINITE;
+    }
+    for (const { name, value } of writes) {
+      this.definitions.find((definition) => definition.name === name).value = value;
+      this.writes.push([name, value]);
+    }
     return ParamSetResult.APPLIED;
   }
 

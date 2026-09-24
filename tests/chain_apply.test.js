@@ -46,10 +46,10 @@ function harness() {
     order.push('setShaderChain');
     return originalChain(entries);
   };
-  const originalWrite = engine.setParameter.bind(engine);
-  engine.setParameter = (name, value) => {
-    order.push(`setParameter ${name}`);
-    return originalWrite(name, value);
+  const originalWrite = engine.setShaderChainParameters.bind(engine);
+  engine.setShaderChainParameters = (writes) => {
+    order.push('setShaderChainParameters');
+    return originalWrite(writes);
   };
   const run = (compiled, presetId = 'noon') => applyChainDocument({
     engine,
@@ -81,8 +81,7 @@ test('apply runs setShaderChain, the writes, the resync and the repaint in order
   })), null);
   assert.deepEqual(order, [
     'setShaderChain',
-    'setParameter sample.pattern-freq',
-    'setParameter camera.wander',
+    'setShaderChainParameters',
     'syncEffectGui',
     'invalidate',
   ]);
@@ -212,14 +211,16 @@ test('every APPLIED bumps the generation and refreshes the definitions', () => {
     'a re-chain bumps the generation again');
 });
 
-test('a refused setParameter surfaces the module result name', () => {
+test('an inadmissible preset is submitted together and reports native refusal', () => {
   const { engine, order, run } = harness();
-  const original = engine.setParameter.bind(engine);
-  engine.setParameter = (name, value) =>
-    (name === 'sample.speed' ? ParamSetResult.NON_FINITE : original(name, value));
+  const values = { 'sample.speed': 0.5, 'camera.wander': 0.75 };
+  engine.setShaderChainParameters = (writes) => {
+    assert.deepEqual(writes, Object.entries(values).map(([name, value]) => ({ name, value })));
+    return ParamSetResult.INADMISSIBLE;
+  };
+  engine.setParameter = () => { throw new Error('preset fields must be admitted together'); };
 
-  const refusal = run(compiledDocument({ 'sample.speed': 0.5 }));
-  assert.match(refusal, /"sample\.speed" was refused: NON_FINITE/);
-  assert.deepEqual(order.slice(-2), ['syncEffectGui', 'invalidate'],
-    'the landed chain still gets the resync and the repaint');
+  assert.match(run(compiledDocument(values)), /preset: INADMISSIBLE/);
+  assert.deepEqual(engine.writes, []);
+  assert.deepEqual(order.slice(-2), ['syncEffectGui', 'invalidate']);
 });
