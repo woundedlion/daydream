@@ -658,9 +658,98 @@ export async function probeWarningNote(tab, layout) {
   return failures.map((failure) => `${layout}: ${failure}`);
 }
 
+/** @param {import('puppeteer-core').Page} tab */
+export async function probeKeyboardEdits(tab) {
+  const { failures, check } = checks();
+  await tab.evaluate(async () => {
+    const [{ createEffectGui }, { GUI }] = await Promise.all([
+      import('./effect_gui.js'), import('./gui.js'),
+    ]);
+    const container = document.createElement('div');
+    container.id = 'keyboard-edit-probe';
+    container.style.cssText = 'position:fixed;top:0;left:0;z-index:99999;background:black';
+    document.body.appendChild(container);
+    const state = { value: 1, warning: '', warnOnWrite: false };
+    const panel = createEffectGui({
+      engine: {
+        getParameterDefinitions: () => [{ name: 'Probe', value: state.value,
+          min: 0, max: 10, warning: state.warning, animated: true }],
+        paramGeneration: () => 0, paramValues: () => [state.value],
+        setParam: (_name, value) => {
+          state.value = value;
+          if (state.warnOnWrite) state.warning = 'Keyboard edit warning';
+          return true;
+        },
+        setAnimationsPaused: () => {}, animationsPaused: () => false,
+        getPresetCount: () => 0, getPresetIndex: () => 0,
+        synchronizePreset: () => true, selectPreset: () => false,
+      },
+      segments: { ownsDisplay: () => false, paramValues: () => null, setParam: () => {} },
+      host: {
+        createGui: () => new GUI({ autoPlace: false }, 'keyboard-probe'),
+        container: () => container, isMobile: () => false, applyEffect: () => {},
+        focusedElement: () => document.activeElement, dragTarget: window,
+      },
+    });
+    panel.build(); panel.mount(); panel.active().gui.open();
+    window.keyboardEditProbe = { state, panel, container };
+  });
+  const selector = '#keyboard-edit-probe .lil-number input';
+  try {
+    await tab.focus(selector);
+    await tab.keyboard.down('Control');
+    await tab.keyboard.press('KeyA');
+    await tab.keyboard.up('Control');
+    await tab.keyboard.type('1.2');
+    const focused = await tab.evaluate(() => {
+      const { state, panel, container } = window.keyboardEditProbe;
+      const widget = container.querySelector('.lil-number input');
+      state.value = 7;
+      panel.sync();
+      return { focused: document.activeElement === widget, value: widget.value };
+    });
+    check(focused.focused && Number(focused.value) === 1.2,
+      'frame synchronization preserves the focused numeric input');
+    const blurred = await tab.evaluate(() => {
+      const { panel, container } = window.keyboardEditProbe;
+      document.activeElement.blur(); panel.sync();
+      return container.querySelector('.lil-number input').value;
+    });
+    check(Number(blurred) === 7, 'blurred numeric input resumes engine synchronization');
+    await tab.focus(selector);
+    await tab.evaluate(() => { window.keyboardEditProbe.state.warnOnWrite = true; });
+    await tab.keyboard.down('ArrowUp');
+    const held = await tab.evaluate(() => {
+      const { panel, container, state } = window.keyboardEditProbe;
+      const widget = container.querySelector('.lil-number input');
+      panel.sync();
+      return { active: panel.active().edits.active, connected: widget.isConnected,
+        warning: Boolean(container.querySelector('.param-warning-note')), value: state.value };
+    });
+    check(held.value > 7, 'lil-gui handles the real ArrowUp key on its numeric input');
+    check(held.active && held.connected && !held.warning,
+      'a held arrow defers the warning rebuild without replacing its input');
+    await tab.keyboard.up('ArrowUp');
+    const released = await tab.evaluate(() => {
+      const { panel, container } = window.keyboardEditProbe;
+      panel.sync();
+      return { active: panel.active().edits.active,
+        warning: container.querySelector('.param-warning-note')?.textContent };
+    });
+    check(!released.active && released.warning === 'Keyboard edit warning',
+      'arrow release lets the deferred warning rebuild complete');
+  } finally {
+    await tab.evaluate(() => {
+      const { panel, container } = window.keyboardEditProbe;
+      panel.destroy(); container.remove(); delete window.keyboardEditProbe;
+    });
+  }
+  return failures;
+}
+
 if (isMain(import.meta.url)) await runProbe({
   name: 'panel-probe',
-  minimumChecks: 53,
+  minimumChecks: 58,
   page: PAGE,
   timeoutMs: TIMEOUT_MS,
   success: 'the effect panel restored what it captured, and the sidebar measured '
@@ -675,6 +764,7 @@ if (isMain(import.meta.url)) await runProbe({
     failures.push(...await probePanel(tab));
     failures.push(...await probeSliderDrag(tab));
     failures.push(...await probePresetName(tab));
+    failures.push(...await probeKeyboardEdits(tab));
     failures.push(...await probeWarningNote(tab, 'desktop'));
     failures.push(...await probeStageNames(tab));
     failures.push(...await probeTelemetry(tab));
