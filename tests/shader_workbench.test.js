@@ -1,3 +1,4 @@
+import { fixedDerivedBinding } from '../shader/shader_workbench.mjs';
 import { afterEach, beforeEach, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -357,7 +358,7 @@ test('a fixed-pipeline preset is staged on the engine preset it names', () => {
   const engine = fixedEngine(() => true);
 
   assert.equal(applyFixedShaderDocument(
-    engine, MODULE, fixedDocument(), 'dusk', ['noon', 'dusk'], BAKED), null);
+    engine, MODULE, fixedDocument(), 'dusk', ['noon', 'dusk'], BAKED, fixedDerivedBinding), null);
   assert.deepEqual(engine.selected, ['dusk']);
   assert.deepEqual(engine.writes, [['Pattern Freq', 5]]);
 });
@@ -369,7 +370,7 @@ test('a preset the effect does not carry falls back to its first reference', () 
   const engine = fixedEngine(() => true);
 
   assert.equal(applyFixedShaderDocument(
-    engine, MODULE, fixedDocument(), 'study', ['noon'], BAKED), null);
+    engine, MODULE, fixedDocument(), 'study', ['noon'], BAKED, fixedDerivedBinding), null);
   assert.deepEqual(engine.selected, ['noon']);
   assert.deepEqual(engine.writes, [['Pattern Freq', 2]]);
 });
@@ -384,7 +385,7 @@ test('an unmatched id refuses the fixed apply before any value is written', () =
 
   assert.equal(applyFixedShaderDocument(
     engine, MODULE, { document: { preset_bank: { presets } } },
-    'noon', ['noon'], BAKED),
+    'noon', ['noon'], BAKED, fixedDerivedBinding),
   'no engine parameter matches "sample.no-such-field"');
   assert.deepEqual(engine.writes, []);
 });
@@ -393,7 +394,7 @@ test('an effect with no reference preset is refused before any engine write', ()
   const engine = fixedEngine(() => true);
 
   assert.equal(
-    applyFixedShaderDocument(engine, MODULE, fixedDocument(), 'noon', [], BAKED),
+    applyFixedShaderDocument(engine, MODULE, fixedDocument(), 'noon', [], BAKED, fixedDerivedBinding),
     'the effect has no reference preset');
   assert.deepEqual(engine.selected, []);
   assert.deepEqual(engine.writes, []);
@@ -403,7 +404,7 @@ test('a refused reference preset names the preset the engine rejected', () => {
   const engine = fixedEngine(() => false);
 
   assert.equal(
-    applyFixedShaderDocument(engine, MODULE, fixedDocument(), 'noon', ['noon'], BAKED),
+    applyFixedShaderDocument(engine, MODULE, fixedDocument(), 'noon', ['noon'], BAKED, fixedDerivedBinding),
     'the engine refused reference preset "noon"');
   assert.deepEqual(engine.writes, []);
 });
@@ -417,7 +418,7 @@ test('an engine without selectPresetById is refused, not written through', () =>
 
   assert.match(
     String(applyFixedShaderDocument(
-      engine, MODULE, fixedDocument(), 'noon', ['noon'], BAKED)),
+      engine, MODULE, fixedDocument(), 'noon', ['noon'], BAKED, fixedDerivedBinding)),
     /refused reference preset "noon"/);
   assert.deepEqual(engine.writes, []);
 });
@@ -439,7 +440,7 @@ test('the fixed path skips every topology field the catalog flags', () => {
   assert.ok(Object.keys(values).length > 0, 'the catalog flags topology fields');
   assert.equal(applyFixedShaderDocument(
     engine, MODULE, { document: { preset_bank: { presets } } },
-    'noon', ['noon'], BAKED), null);
+    'noon', ['noon'], BAKED, fixedDerivedBinding), null);
   assert.deepEqual(engine.writes, []);
   assert.ok(flagged.some((/** @type {*} */ parameter) =>
     parameter.id === 'palette-mapping'));
@@ -462,7 +463,7 @@ test('the fixed path skips the ids the compiled build bakes in as constants', ()
   assert.ok(BAKED_CONSTANT_IDS.has('camera.spin-speed'));
   assert.equal(applyFixedShaderDocument(
     engine, MODULE, { document: { preset_bank: { presets } } },
-    'noon', ['noon'], BAKED), null);
+    'noon', ['noon'], BAKED, fixedDerivedBinding), null);
   assert.deepEqual(engine.writes, [['Pattern Freq', 3]]);
 });
 
@@ -481,7 +482,7 @@ test('every ash-cloud preset value reaches its compiled build', () => {
 
   assert.ok(ids.includes('camera.spin-speed'));
   assert.equal(applyFixedShaderDocument(
-    engine, MODULE, { document: ashCloud }, 'ash-cloud', ['ash-cloud'], BAKED), null);
+    engine, MODULE, { document: ashCloud }, 'ash-cloud', ['ash-cloud'], BAKED, fixedDerivedBinding), null);
   assert.equal(engine.writes.some(([name]) => name === 'Camera Spin Speed'), false);
   assert.equal(engine.writes.length, definitions.length);
 });
@@ -501,7 +502,7 @@ test('a fixed affine period is applied through its lattice source control', () =
   const engine = fixedEngine(() => true);
   engine.getParameterDefinitions = () => [{ name: 'Lattice Cell Scale' }];
   assert.equal(applyFixedShaderDocument(engine, MODULE, derivedPeriodDocument(0.5),
-    'noon', ['noon'], BAKED), null);
+    'noon', ['noon'], BAKED, fixedDerivedBinding), null);
   assert.deepEqual(engine.selected, ['noon']);
   assert.deepEqual(engine.writes, [['Lattice Cell Scale', 2]]);
 });
@@ -510,7 +511,7 @@ test('an independent affine period refuses before reference selection or paramet
   const engine = fixedEngine(() => true);
   engine.getParameterDefinitions = () => [{ name: 'Lattice Cell Scale' }];
   assert.match(applyFixedShaderDocument(engine, MODULE, derivedPeriodDocument(0.75),
-    'noon', ['noon'], BAKED), /warp1\.lattice-period.*derived value/);
+    'noon', ['noon'], BAKED, fixedDerivedBinding), /warp1\.lattice-period.*derived value/);
   assert.deepEqual(engine.selected, []);
   assert.deepEqual(engine.writes, []);
 });
@@ -520,7 +521,7 @@ test('a derived affine period still requires its source control to be writable',
     const engine = fixedEngine(() => true);
     engine.getParameterDefinitions = () => definitions;
     assert.match(applyFixedShaderDocument(engine, MODULE, derivedPeriodDocument(0.5),
-      'noon', ['noon'], BAKED), /no engine parameter matches|read-only/);
+      'noon', ['noon'], BAKED, fixedDerivedBinding), /no engine parameter matches|read-only/);
     assert.deepEqual(engine.writes, []);
   }
 });
@@ -532,7 +533,7 @@ test('a fixed period without a lattice source must equal the fixed unit period',
     delete compiled.document.preset_bank.presets[0].values['cells.lattice-cell-scale'];
     const engine = fixedEngine(() => true);
     const refusal = applyFixedShaderDocument(engine, MODULE, compiled,
-      'noon', ['noon'], BAKED);
+      'noon', ['noon'], BAKED, fixedDerivedBinding);
     assert.equal(refusal === null, accepted);
     assert.deepEqual(engine.writes, []);
     assert.deepEqual(engine.selected, accepted ? ['noon'] : []);
@@ -682,6 +683,7 @@ function workbench({ files = { 'kaleidoscope_flowers.shader.json': shaderDocumen
     // scratch build, which the fake passes through as its own compile.
     importCompiler: async () => ({
       DEFAULT_LIMITS,
+      fixedDerivedBinding: () => null,
       compileShaderDocument: (s) => typeof s === 'string'
         ? JSON.parse(s)
         : { status: 'VALID', descriptor_digest: 'digest-scratch', document: s },
