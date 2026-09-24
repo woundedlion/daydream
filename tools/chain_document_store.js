@@ -301,13 +301,16 @@ export async function createChainDocumentStore({
    * @param {string|null} [coalesce] - Control key consecutive commits share one
    *   undo entry under, so a slider drag's stream of writes is undone whole.
    *   Null for a structural edit, which also ends any open run.
+   * @param {(() => EditResult)|null} [admit] - Admission after document validation.
    * @returns {EditResult} The outcome.
    * @details History past UNDO_DEPTH entries is dropped oldest first. Redo
    * entries only ever come off the undo stack, so the pair stays within it.
    */
-  const commit = (candidate, coalesce = null) => {
+  const commit = (candidate, coalesce = null, admit = null) => {
     const diagnostics = diagnosticsOf(candidate);
     if (diagnostics.length > 0) return { ok: false, diagnostics };
+    const admission = admit?.();
+    if (admission && !admission.ok) return admission;
     if (coalesce === null || coalesce !== coalesceKey) {
       undoStack.push(doc);
       if (undoStack.length > UNDO_DEPTH) undoStack.shift();
@@ -672,9 +675,10 @@ export async function createChainDocumentStore({
    * @param {string} presetId - The preset the value belongs to.
    * @param {string} parameterId - A declared `<label>.<field>` parameter id.
    * @param {*} value - The value to store; an enum8 takes its option id.
+   * @param {(() => EditResult)|null} [admit] - Admission before changing document or history.
    * @returns {EditResult} The outcome; a refusal leaves the store untouched.
    */
-  const setPresetValue = (presetId, parameterId, value) => {
+  const setPresetValue = (presetId, parameterId, value, admit = null) => {
     const index = doc.preset_bank.presets.findIndex(
       (/** @type {{preset_id: string}} */ preset) => preset.preset_id === presetId);
     if (index < 0)
@@ -686,7 +690,7 @@ export async function createChainDocumentStore({
         `the document declares no parameter "${parameterId}"`);
     const candidate = structuredClone(doc);
     candidate.preset_bank.presets[index].values[parameterId] = value;
-    return commit(candidate, `${presetId} ${parameterId}`);
+    return commit(candidate, `${presetId} ${parameterId}`, admit);
   };
 
   return {

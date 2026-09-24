@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import createHolosphereModule from '../holosphere_wasm.js';
 import { Daydream } from '../driver.js';
+import { applyChainDocument } from '../tools/chain_apply.js';
 import {
   KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, SIMPLE_SEEDS,
   DEFINED_SEED_CONSTANTS, applyOp, meshOpFailure, MESH_OP_RESULT_NAMES,
@@ -316,6 +317,36 @@ test('setShaderChain applies a chain, registers label.field params and bumps the
   engine.drawFrame();
   assert.ok(engine.getPixels().some((v) => v !== 0),
     'the applied chain must render a nonzero frame');
+});
+
+test('chain preset batches restore cross-field values and refuse singular edits without storing them', () => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)));
+  assert.equal(engine.setEffect('ShaderChain'), M.EffectSetResult.INSTALLED);
+  const chain = [DEFAULT_CHAIN[0],
+    { instance: 'lens', operator: 'sphere.lens.mobius.v2' }, ...DEFAULT_CHAIN.slice(1)];
+  const values = Object.fromEntries(['a', 'b', 'c', 'd'].flatMap((part) => [
+    [`lens.mobius-${part}-re`, part === 'b' || part === 'c' ? 1 : 0],
+    [`lens.mobius-${part}-im`, 0],
+  ]));
+  const compiled = { document: {
+    descriptor: { chain: chain.map(({ instance, operator }) => ({ label: instance, operator })) },
+    preset_bank: { presets: [{ preset_id: 'swap', values }] },
+  } };
+  const apply = () => applyChainDocument({ engine, module: M, compiled, presetId: 'swap',
+    syncEffectGui() {}, invalidate() {} });
+  assert.equal(apply(), null);
+  const snapshot = () => Object.fromEntries(engine.getParameterDefinitions()
+    .filter(({ name }) => name.startsWith('lens.')).map(({ name, value }) => [name, value]));
+  assert.deepEqual(snapshot(), values);
+  assert.equal(engine.setParameter('lens.mobius-b-re', 0), M.ParamSetResult.INADMISSIBLE);
+  assert.deepEqual(snapshot(), values);
+  assert.equal(engine.setShaderChainParameters([
+    { name: 'lens.mobius-a-re', value: 2 },
+    { name: 'lens.mobius-b-re', value: 0 },
+  ]), M.ParamSetResult.INADMISSIBLE);
+  assert.deepEqual(snapshot(), values);
+  assert.equal(apply(), null);
+  assert.deepEqual(snapshot(), values);
 });
 
 test('setShaderChain refuses transactionally and names the offending entry', () => {

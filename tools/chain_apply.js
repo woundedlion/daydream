@@ -29,9 +29,8 @@ import { enumConstantName } from '../param_sync.js';
  * skipped rather than refused — the document still carries them, which is what
  * keeps a bypass an A/B toggle instead of a document edit.
  *
- * A refusal from the write loop runs the resync and the repaint before it
- * returns: the earlier writes have landed, so the GUI and the frame have to
- * read the engine rather than the superseded preset.
+ * Preset values are admitted atomically so cross-field constraints see the
+ * complete candidate. A refusal still resyncs the newly installed chain.
  *
  * @param {{engine: *, module: *, compiled: CompiledDocument, presetId: string,
  *   syncEffectGui: () => void, invalidate: () => void,
@@ -72,7 +71,7 @@ export function applyChainDocument({
   };
   const definitions = /** @type {ParameterDefinition[]} */ (
     engine.getParameterDefinitions());
-  /** @type {Array<[string, number]>} */
+  /** @type {Array<{name: string, value: number}>} */
   const writes = [];
   for (const [parameterId, value] of Object.entries(preset?.values ?? {})) {
     const dot = parameterId.indexOf('.');
@@ -89,17 +88,12 @@ export function applyChainDocument({
     }
     if (typeof stored !== 'number' || !Number.isFinite(stored))
       return refuse(`"${parameterId}" has no numeric value`);
-    writes.push([parameterId, stored]);
+    writes.push({ name: parameterId, value: stored });
   }
 
-  for (const [parameterId, stored] of writes) {
-    const written = engine.setParameter(parameterId, stored);
-    if (written === module.ParamSetResult.APPLIED) continue;
-    syncEffectGui();
-    invalidate();
-    return `"${parameterId}" was refused: `
-      + `${enumConstantName(module.ParamSetResult, written)}`;
-  }
+  const written = engine.setShaderChainParameters(writes);
+  if (written !== module.ParamSetResult.APPLIED)
+    return refuse(`the engine refused the preset: ${enumConstantName(module.ParamSetResult, written)}`);
 
   syncEffectGui();
   invalidate();

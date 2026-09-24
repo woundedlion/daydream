@@ -547,28 +547,34 @@ export function createShaderDocumentController({
   const writeStageEdit = (parameterId, value) => {
     try {
       if (chainUi === null || active === null || active.presetId === null) return;
-      const result = chainUi.store.setPresetValue(active.presetId, parameterId, value);
+      const result = chainUi.store.setPresetValue(active.presetId, parameterId, value, () => {
+        const engine = getEngine();
+        const module = getModule();
+        if (!engine || !module) return { ok: true };
+        const definitions = engine.getParameterDefinitions();
+        const name = engineControlName(parameterId, definitions);
+        const paused = getAnimationsPaused();
+        const refusal = name === null ? null
+          : writeEngineValue(engine, module, definitions, name, value);
+        if (paused !== null) {
+          setAnimationsPaused(paused);
+          syncEffectGui();
+        }
+        showAnimationState();
+        invalidate();
+        return refusal ? { ok: false, diagnostics: [{
+          severity: 'error', phase: 'apply', code: 'ENGINE_REFUSAL',
+          path: parameterId, message: refusal,
+        }] } : { ok: true };
+      });
       if (!result.ok) {
-        announce(`"${parameterId}" was refused: ${result.diagnostics[0].message}`);
+        const diagnostic = result.diagnostics[0];
+        announce(diagnostic.code === 'ENGINE_REFUSAL' ? diagnostic.message
+          : `"${parameterId}" was refused: ${diagnostic.message}`);
         return false;
       }
       chainUi.strip.syncHistory();
       scheduleDeepLink();
-      const engine = getEngine();
-      const module = getModule();
-      if (!engine || !module) return;
-      const definitions = engine.getParameterDefinitions();
-      const name = engineControlName(parameterId, definitions);
-      const paused = getAnimationsPaused();
-      const refusal = name === null ? null
-        : writeEngineValue(engine, module, definitions, name, value);
-      if (paused !== null) {
-        setAnimationsPaused(paused);
-        syncEffectGui();
-      }
-      showAnimationState();
-      invalidate();
-      if (refusal) announce(refusal);
       return true;
     } catch (error) {
       const module = getModule();

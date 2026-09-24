@@ -604,6 +604,14 @@ function workbenchEngine() {
     },
     getParamGeneration: () => chained.length,
     getParameterDefinitions: () => definitions,
+    setShaderChainParameters: (batch) => {
+      for (const { name, value } of batch) {
+        writes.push([name, value]);
+        const definition = definitions.find((candidate) => candidate.name === name);
+        if (definition) definition.value = value;
+      }
+      return ParamSetResult.APPLIED;
+    },
     setParameter: (name, value) => {
       writes.push([name, value]);
       const definition = definitions.find((candidate) => candidate.name === name);
@@ -1278,10 +1286,10 @@ test('a load whose preset the engine refuses puts the program back', async () =>
   const presets = harness.elements.get('shader-preset-select').options.map((o) => o.value);
   const program = harness.engine.chainCalls.at(-1);
 
-  const write = harness.engine.setParameter.bind(harness.engine);
+  const write = harness.engine.setShaderChainParameters.bind(harness.engine);
   let refuse = true;
-  harness.engine.setParameter = (/** @type {string} */ name, /** @type {number} */ value) => {
-    if (!refuse) return write(name, value);
+  harness.engine.setShaderChainParameters = (writes) => {
+    if (!refuse) return write(writes);
     refuse = false;
     return ParamSetResult.READONLY;
   };
@@ -1765,6 +1773,27 @@ test('a chip control edit outside the parameter domain is announced, not stored'
 
 // One history: the strip's Undo covers a chip control's edit, and a drag's
 // stream of writes is one step in it.
+test('a native refusal preserves saved values, links and coalesced undo history', async () => {
+  const harness = await editorWorkbench();
+  const before = savedValues(harness)['sample.pattern-freq'];
+  const edit = stageEditor(harness, 'sample');
+  edit('sample.pattern-freq', 6);
+  const original = harness.engine.setParameter.bind(harness.engine);
+  harness.engine.setParameter = (name, value) => value === 7
+    ? ParamSetResult.INADMISSIBLE : original(name, value);
+
+  edit('sample.pattern-freq', 7);
+
+  assert.match(harness.elements.get('shader-document-status').textContent, /INADMISSIBLE/);
+  assert.equal(savedValues(harness)['sample.pattern-freq'], 6);
+  assert.equal(Number(displayedParameter(harness, 'sample', 'sample.pattern-freq')), 6);
+  await harness.controller.flushDeepLink();
+  const shared = await decodeShaderStateHash(harness.win.location.hash);
+  assert.equal(shared.document.preset_bank.presets[0].values['sample.pattern-freq'], 6);
+  harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
+  assert.equal(savedValues(harness)['sample.pattern-freq'], before);
+});
+
 test('a chip control edit joins the structural history and coalesces per control', async () => {
   const harness = await editorWorkbench();
   const strip = harness.elements.get('chain-strip');
