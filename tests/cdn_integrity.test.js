@@ -18,3 +18,21 @@ test('CDN bytes must match the committed integrity value', async () => {
   await assert.rejects(checkCdnIntegrity('document.head.appendChild({textContent: "{}"})'),
     /empty/);
 });
+
+test('transient requests retry with bounded backoff and mismatches do not retry', async () => {
+  let attempts = 0;
+  const waits = [];
+  assert.equal(await checkCdnIntegrity(source, async () => {
+    attempts++;
+    if (attempts === 1) throw new Error('DNS unavailable');
+    return new Response(bytes, { status: attempts === 2 ? 503 : 200 });
+  }, async (ms) => { waits.push(ms); }), 1);
+  assert.equal(attempts, 3);
+  assert.deepEqual(waits, [250, 500]);
+  attempts = 0;
+  await assert.rejects(checkCdnIntegrity(source, async () => {
+    attempts++;
+    return new Response('wrong');
+  }), /integrity mismatch/);
+  assert.equal(attempts, 1);
+});

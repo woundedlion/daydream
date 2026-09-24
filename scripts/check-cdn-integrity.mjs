@@ -1,9 +1,10 @@
+import { setTimeout as delay } from 'node:timers/promises';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { pathToFileURL } from 'node:url';
 
-export async function checkCdnIntegrity(source, fetchModule = fetch) {
+export async function checkCdnIntegrity(source, fetchModule = fetch, wait = delay) {
   let map;
   runInNewContext(source, {
     URL,
@@ -19,10 +20,20 @@ export async function checkCdnIntegrity(source, fetchModule = fetch) {
   for (const [url, expected] of entries) {
     if (!url.startsWith('https://cdn.jsdelivr.net/npm/'))
       throw new Error(`Unexpected CDN URL: ${url}`);
-    const response = await fetchModule(url, { signal: AbortSignal.timeout(30_000) });
-    if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+    let bytes;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const response = await fetchModule(url, { signal: AbortSignal.timeout(30_000) });
+        if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+        bytes = Buffer.from(await response.arrayBuffer());
+        break;
+      } catch (error) {
+        if (attempt === 2) throw error;
+        await wait(250 * 2 ** attempt);
+      }
+    }
     const actual = `sha384-${createHash('sha384')
-      .update(Buffer.from(await response.arrayBuffer())).digest('base64')}`;
+      .update(bytes).digest('base64')}`;
     if (actual !== expected) throw new Error(`${url}: integrity mismatch`);
   }
   return entries.length;
