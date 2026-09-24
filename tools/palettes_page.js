@@ -930,6 +930,7 @@ function drawPaletteWaveGraph() {
 
 /** Redraws every view of the palette after its viewport moved. */
 function redrawForViewport() {
+  if (engineHalted) return;
   drawColorStrip();
   drawPaletteWaveGraph();
   if (activeTab === 'generative' && palette?.canonicalRecipe)
@@ -1004,6 +1005,7 @@ function buildPaletteGallery() {
  * Main update function: reads parameters, initializes palette, and redraws visualizations.
  */
 function updatePalette() {
+  if (engineHalted) return;
   if (activeTab === 'procedural') {
     const A = [parameters.A_R, parameters.A_G, parameters.A_B];
     const B = [parameters.B_R, parameters.B_G, parameters.B_B];
@@ -1043,8 +1045,16 @@ function updatePalette() {
 const scheduleUpdate = createFrameScheduler(updatePalette);
 const scheduleViewportRedraw = createFrameScheduler(redrawForViewport);
 
+let engineHalted = false;
+
 function engineTrapped(error) {
+  if (engineHalted) return true;
   return standDownIfHalted(error, wasmModule, (message) => {
+    engineHalted = true;
+    scheduleUpdate.cancel();
+    scheduleViewportRedraw.cancel();
+    for (const control of document.querySelectorAll('input, select, button, textarea'))
+      control.disabled = true;
     setPaletteOps(null);
     paletteOps = null;
     wasmModule = null;
