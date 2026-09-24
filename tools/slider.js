@@ -187,6 +187,7 @@ export function createSliderProxy({ label, min, max, keys, id = '', orientation 
   handle.tabIndex = 0;
   handle.setAttribute('role', 'slider');
   handle.setAttribute('aria-label', label);
+  handle.setAttribute('aria-valuenow', String(min));
   handle.setAttribute('aria-valuemin', String(min));
   handle.setAttribute('aria-valuemax', String(max));
   handle.setAttribute('aria-orientation', orientation);
