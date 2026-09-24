@@ -712,12 +712,12 @@ test('segmented controls reconcile a mobile spawn and resize without a second po
   assert.deepEqual(notices, []);
 });
 
-test('the segmented controls report under the switch owner tag', () => {
+test('the segmented controls have their own notice owner', () => {
   // The call site, not the definition above it: the owner tag is the root's.
   const at = SOURCE.lastIndexOf('createSegmentedPovControls(');
   assert.ok(at >= 0, 'the segmented controls must stay wired to their factory');
   assert.match(sliceTo(at, '\n  });'),
-    /showNotice:\s*\(message\)\s*=>\s*applyNotice\.show\(message, SWITCH_NOTICE\)/,
+    /showNotice:\s*\(message\)\s*=>\s*applyNotice\.show\(message, SEGMENT_NOTICE\)/,
     'the owner tag is what keeps a parameter write from clearing the fallback '
     + 'notice, and only a real worker pool could raise one through a booted '
     + 'app, so the fakes cannot reach this');

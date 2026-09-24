@@ -203,6 +203,7 @@ export function start({
   // own message, leaving a switch rejection standing.
   const PARAM_NOTICE = 'param';
   const SWITCH_NOTICE = 'switch';
+  const SEGMENT_NOTICE = 'segments';
   const RECORD_NOTICE = 'record';
   const CONFIG_NOTICE = 'config';
 
@@ -629,7 +630,7 @@ export function start({
     segments,
     nav,
     driver: daydream,
-    showNotice: (message) => applyNotice.show(message, SWITCH_NOTICE),
+    showNotice: (message) => applyNotice.show(message, SEGMENT_NOTICE),
   });
 
   const recording = createRecordingControls({
