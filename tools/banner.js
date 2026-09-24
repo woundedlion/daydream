@@ -118,7 +118,7 @@ export function reportPageFailures(label, target = window) {
    */
   const surface = (kind, detail) => {
     console.error(`${label} ${kind}:`, detail);
-    const reason = detail?.message ?? String(detail ?? 'unknown error');
+    const reason = errorDetail(detail ?? 'unknown error');
     showFatalError(`The ${label} hit an error — ${reason} — see the browser console for details.`);
   };
   /**

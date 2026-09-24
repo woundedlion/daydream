@@ -180,7 +180,7 @@ test('a post-boot uncaught error raises the banner, not just a console line', ()
 
   assert.equal(bodyEl.children.length, 1, 'no banner for a post-boot error');
   assert.match(messageOf(bodyEl.children[0]),
-    /^⚠ The solids tool hit an error — renderOps blew up —/);
+    /^⚠ The solids tool hit an error — Error: renderOps blew up —/);
   assert.equal(logged.length, 1);
 });
 
@@ -225,7 +225,7 @@ test('bootstrapTool installs the post-boot surface alongside the load handler', 
     assert.equal(bodyEl.children.length, 0, 'a clean init opened a banner');
     target.dispatch('error', { error: new Error('after boot') });
   });
-  assert.match(messageOf(bodyEl.children[0]), /Möbius tool hit an error — after boot/);
+  assert.match(messageOf(bodyEl.children[0]), /Möbius tool hit an error — Error: after boot/);
 });
 
 test('bootstrapTool still banners a synchronous and an async init failure', async () => {
