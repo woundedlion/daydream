@@ -435,11 +435,12 @@ export async function probeStrip(tab) {
     + ' .chain-param[data-parameter="rotate.wander"] .chain-param-control';
   await (await tab.waitForSelector(
     '.chain-chip[data-label="rotate"] .chain-chip-name')).click();
+  const before = Number(await tab.$eval(track, (node) => node.value));
   const slider = await boxOf(tab, track);
   await tab.mouse.click(slider.x + slider.width * SLIDER_FRACTION, centre(slider).y);
   const shown = Number(await tab.$eval(track, (node) => node.value));
   const stored = (await savedDocument(tab)).preset_bank.presets[0].values['rotate.wander'];
-  check(Math.abs(stored - shown) < VALUE_TOLERANCE,
+  check(shown !== before && Math.abs(stored - shown) < VALUE_TOLERANCE,
     `an inline control saves its value (${stored})`);
 
   // The step grid the readout gives up to stay valid comes back as arrow keys.
