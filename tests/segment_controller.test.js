@@ -465,10 +465,11 @@ test('dispose drops the held compilation that destroy keeps for the next pool',
  */
 function makeController({ resolution = 'lo', effect = 'TestEffect',
                          presets = { lo: { w: 4, h: 4 } },
-                         moduleWarmer } = {}) {
+                         moduleWarmer, onFault } = {}) {
   const state = { resolution, effect };
   return new SegmentController({
     moduleWarmer,
+    onFault,
     resolutionPresets: presets,
     appState: { get: (k) => state[k], set: (k, v) => { state[k] = v; } },
     driver,
@@ -3046,4 +3047,16 @@ test('an in-flight frame cannot revert a selected preset', async () => {
   deliverFrame(c, 1);
   await next;
   assert.equal(c.getPresetIndex(), 5);
+});
+
+test('a pool fault notifies the host once after workers stop', () => {
+  const faults = [];
+  const controller = makeController({ onFault: (message) => {
+    assert.equal(controller.faulted, true);
+    faults.push(message);
+  } });
+  controller.onWorkerFault(0, 'render failed');
+  controller.onWorkerFault(1, 'another failure');
+  assert.deepEqual(faults, ['render failed']);
+  controller.destroy();
 });

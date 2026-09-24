@@ -183,6 +183,8 @@ export function start({
     repointDisplayAliases: (view) => repointDisplayAliases(daydream, view),
     displayAliasesDiverged: (view) => displayAliasesDiverged(daydream, view),
     statsDoc: doc,
+    onFault: () => host.recorder?.abort(
+      "Recording stopped because the segmented rendering engine failed."),
   });
 
   ///////////////////////////////////////////////////////////////////////////////
