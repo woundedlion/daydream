@@ -1,4 +1,4 @@
-* text=auto
+* text=auto eol=lf
 vendor-importmap.js text eol=lf
 
 # The deploy gate reads these on a Linux runner; CRLF would make sha256sum -c
