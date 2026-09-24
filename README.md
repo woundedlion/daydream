@@ -41,7 +41,7 @@ cmake --build --preset wasm-release-install
 
 In daydream, run `npm ci`, then `python -m http.server 8000` and open <http://localhost:8000>. See [Building](#11-building) for native tests, toolchain requirements and firmware uploads.
 
-If configuration cannot find Emscripten, activate its environment in the same shell and check `EMSDK`. If the simulator reports a bundle mismatch, rebuild the install preset to refresh the engine and provenance together. A missing pinned sibling revision during documentation checks requires the daydream checkout and its pinned commit; see `tools/build_pins.py`.
+If configuration cannot find Emscripten, activate its environment in the same shell and check `EMSDK`. If daydream’s provenance test or pre-push hook reports a bundle mismatch, rebuild the install preset to refresh the engine and provenance together. A missing pinned sibling revision during documentation checks requires the daydream checkout and its pinned commit; see `tools/build_pins.py`.
 
 Design decisions are indexed under [Engineering Philosophies](#2-engineering-philosophies), with detailed constraints in [Core Subsystems](https://github.com/woundedlion/pov/blob/master/docs/subsystems.md) and the [pullback design record](https://github.com/woundedlion/pov/blob/master/docs/specs/pullback_pipeline_spec.md).
 
@@ -172,7 +172,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 - **Spherical**: `theta` = azimuth (longitude), `phi` = polar angle from +Y (co-latitude)
 - **Pixel mapping**: `x ∈ [0, W)` → `theta ∈ [0, 2π)`, `y ∈ [0, H)` → `phi = y·π / (H + H_OFFSET − 1)`
 - **`hs::H_OFFSET`** (`platform.h`): virtual rows below the physical LED ring. It is 3 on device, so the bottom physical row lands short of π without stretching the geometric mapping, and 0 on the host/sim build, which maps the full `[0, π]`. Antialias samples at `y >= H` are discarded; samples at `H-1 <= y < H` fold the off-edge neighbor's weight onto the last physical row, conserving their full input alpha. Callers pass the logical `H`; `y_to_phi<H>()` / `phi_to_y<H>()` add the offset internally. `tests/h_offset_renorm_check.cpp` recompiles the engine with the hardware value so the device path is exercised on host
-- **SDF distances**: in radians on the unit sphere (matching `angle_between()`)
+- **SDF distances**: in radians on the unit sphere (matching `angle_between()`), except small `SDF::Face` shapes (inradius < 0.2), whose distances and `size` use gnomonic tangent-plane units
 - All geometry LUTs (`PhiLUT<H>`, `TrigLUT<W,H>`) are pre-computed eagerly via `init_geometry_luts()` at engine setup
 
 ```
@@ -218,7 +218,7 @@ files define line-ending policy and working-artifact exclusions.
 │   │   ├── rng.h                   Deterministic random number generation
 │   │   ├── arduino_mocks.h         Host-side FastLED / Arduino mock surface
 │   │   ├── build_features.h        Canvas size, build-time feature and instrumentation switches
-│   │   ├── constants.h             MAX_W, MAX_H, star ratio, pole-LOD tuning
+│   │   ├── constants.h             MAX_W, MAX_H canvas bounds
 │   │   └── led.h                   LED pin constants + color-correction RAII guards (driver in hardware/pov_single.h)
 │   ├── control/                An effect's control surface (registry, params +
 │   │                            apply_if_changed, ParamHost/PresetHost, presets,
@@ -743,7 +743,7 @@ The `platform.h` header abstracts all target-specific differences:
 
 The host-side mock implementations — the `CRGB`/`CHSV` structs plus the rest of the emulated Arduino/FastLED surface (`random8`, `beatsin8`, `SerialMock`, …) — live in `platform/arduino_mocks.h`, included from `platform.h`'s non-Arduino branch.
 
-The few places the engine's behaviour forks on a device-only constant (the `H_OFFSET` sub-pole rows among them) are inventoried in [`docs/ledgers/device_host_divergence_ledger.md`](docs/ledgers/device_host_divergence_ledger.md), which records which device-value test build reaches each fork.
+The few places the engine's behaviour forks on a device-only constant (the `H_OFFSET` sub-pole rows among them) are inventoried in [`docs/ledgers/device_host_divergence_ledger.md`](https://github.com/woundedlion/pov/blob/master/docs/ledgers/device_host_divergence_ledger.md), which records which device-value test build reaches each fork.
 
 ---
 
@@ -970,9 +970,9 @@ The Filter auto-syncs from the Style every frame — when the Style lerps betwee
 | `Style::MeltingHi()` | Higher-amplitude downward melt with slow drift and pronounced hue rotation. |
 | `Style::MeltingLo()` | Lower-amplitude downward melt with slow drift and pronounced hue rotation. |
 | `Style::Miasma()` | Drifting toxic haze — medium turbulence with slow drift and strong per-frame hue cycling. |
-| `Style::LooseWormhole()` | Static high-amplitude twist at spatial frequency 11.25 — a loose swirling tunnel, no drift. |
-| `Style::TightWormhole()` | Static high-amplitude twist at spatial frequency 6.42 — a tight swirling tunnel, no drift. |
-| `Style::WigglingWormhole()` | Static twist at spatial frequency 7.11 — a wide wormhole with wandering arms, no drift. |
+| `Style::LooseWormhole()` | Static high-amplitude twist at amplitude 11.25 — a loose swirling tunnel, no drift. |
+| `Style::TightWormhole()` | Static high-amplitude twist at amplitude 6.42 — a tight swirling tunnel, no drift. |
+| `Style::WigglingWormhole()` | Static twist at amplitude 7.11 — a wide wormhole with wandering arms, no drift. |
 
 Available transform functions:
 
