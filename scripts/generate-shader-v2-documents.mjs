@@ -27,6 +27,9 @@ const catalog = JSON.parse(readFileSync(resolve(REPO, 'shader/engine_catalog.jso
 
 const migration = {};
 const names = readdirSync(FIXTURES).filter((name) => name.endsWith('.shader.json')).sort();
+if (names.length === 0) {
+  throw new Error('No legacy shader fixtures found; migration table was not written.');
+}
 for (const name of names) {
   const v1 = parseShaderDocument(readFileSync(resolve(FIXTURES, name), 'utf8'));
   const successor = compileShaderDocument(
