@@ -813,6 +813,8 @@ export class Daydream {
       };
 
       this.dotMaterial.onBeforeCompile = (shader) => {
+        if (!shader.vertexShader.includes('#include <begin_vertex>'))
+          throw new Error('Dot shader is missing the begin_vertex chunk');
         shader.uniforms.uCameraPos = this.cullUniforms.uCameraPos;
         shader.uniforms.uCullThreshold = this.cullUniforms.uCullThreshold;
         shader.uniforms.uColumnFillArc = this.cullUniforms.uColumnFillArc;
