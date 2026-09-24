@@ -246,6 +246,7 @@ test('slider proxies expose label, bounds, orientation and shortcuts', () => {
   assert.equal(proxy.tabIndex, 0);
   assert.equal(proxy.getAttribute('role'), 'slider');
   assert.equal(proxy.getAttribute('aria-label'), 'Hue');
+  assert.equal(proxy.getAttribute('aria-valuenow'), '0');
   assert.equal(proxy.getAttribute('aria-valuemin'), '0');
   assert.equal(proxy.getAttribute('aria-valuemax'), '360');
   assert.equal(proxy.getAttribute('aria-orientation'), 'horizontal');
