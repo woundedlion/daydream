@@ -271,7 +271,7 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
       orientation: vertical ? 'vertical' : 'horizontal' });
   };
 
-  const planeElement = makeDiv('complex-plane-control', controlId);
+  const planeElement = makeDiv('complex-plane-control focus-ring-within', controlId);
   planeElement.setAttribute('role', 'group');
   planeElement.setAttribute('aria-label', `Parameter ${id} complex value`);
 
