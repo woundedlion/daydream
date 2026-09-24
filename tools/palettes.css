@@ -180,9 +180,6 @@ body {
   touch-action: none;
 }
 
-/* Visible keyboard-focus ring for the wheel's per-key slider handles. */
-
-
 .recipe-field {
   display: grid;
   grid-template-columns: minmax(4.75rem, 0.7fr) minmax(0, 1.3fr);
@@ -359,9 +356,6 @@ input[type=checkbox] {
   touch-action: none;
   /* Indicate it's clickable */
 }
-
-/* Visible keyboard-focus ring for the now-focusable (tabindex) strip. */
-
 
 #waveGraphCanvas {
   border: 1px solid var(--slate-600);
