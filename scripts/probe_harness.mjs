@@ -247,8 +247,7 @@ export async function runProbe({ name, page, timeoutMs, args = BROWSER_ARGS, suc
   } catch (error) {
     failures.push(reason(error));
   } finally {
-    await browser?.close();
-    await site?.close();
+    await closeProbeResources(browser, site, failures);
   }
 
   if (failures.length > 0) {
@@ -257,4 +256,20 @@ export async function runProbe({ name, page, timeoutMs, args = BROWSER_ARGS, suc
     process.exit(1);
   }
   console.log(`${name}: ${success}`);
+}
+
+/**
+ * @param {{close: () => Promise<void>}|null} browser
+ * @param {{close: () => Promise<void>}|null} site
+ * @param {string[]} failures
+ * @returns {Promise<void>}
+ */
+export async function closeProbeResources(browser, site, failures) {
+  for (const [name, resource] of [['browser', browser], ['site', site]]) {
+    try {
+      await resource?.close();
+    } catch (error) {
+      failures.push(`${name} teardown: ${reason(error)}`);
+    }
+  }
 }
