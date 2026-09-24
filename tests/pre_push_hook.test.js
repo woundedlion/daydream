@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
-  chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
+  chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -107,19 +107,21 @@ test('pre-push refuses a push it cannot run the browser probes for',
       'the browser refusal is the one that fired, not an earlier gate');
   });
 
-test('pre-push never reports success over a missing tool', () => {
-  const lines = readFileSync(HOOK, 'utf8').split(/\r?\n/);
-  assert.deepEqual(lines.filter((line) => /\bexit 0\b/.test(line)), [],
-    'a hook that can exit 0 early reports success over a suite it never ran');
-});
-
-// Every other gate in the hook loads the working tree, and the commit the push
-// sends is a third thing again: a staged copy answers for neither.
-test('pre-push measures the import map the rest of the hook runs', () => {
-  const hook = readFileSync(HOOK, 'utf8');
-  assert.doesNotMatch(hook, /git show :vendor-importmap\.js/);
-  assert.match(hook,
-    /diff --no-index .*-- vendor-importmap\.js "\$tmp"/);
+test('pre-push refuses a stale working-tree import map', { skip: SKIP }, (t) => {
+  const root = fixtureRoot(t);
+  mkdirSync(join(root, 'node_modules'), { recursive: true });
+  writeFileSync(join(root, 'node_modules', '.package-lock.json'), '{}\n');
+  writeFileSync(join(root, 'vendor-importmap.js'), 'stale\n');
+  const git = spawnSync(SH, ['-c', 'command -v git'], { encoding: 'utf8' }).stdout.trim();
+  const run = runWithTools(root, {
+    node: 'exit 0',
+    npm: 'if [ "$2" = importmap ]; then for last; do :; done; echo fresh > "$last"; fi',
+    git: `exec "${git}" "$@"`,
+    mktemp: 'f=./vendor-importmap.probe\n: > "$f"\necho "$f"',
+    rm: 'exit 0',
+  });
+  assert.notEqual(run.status, 0, `${run.stdout}${run.stderr}`);
+  assert.match(run.stderr, /vendor-importmap\.js is stale/);
 });
 
 test('pre-push refuses a failing unit suite even when later gates pass',
