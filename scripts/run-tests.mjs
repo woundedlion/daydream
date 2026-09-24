@@ -30,7 +30,7 @@ export const COVERAGE = [
   '--test-coverage-exclude=scripts/*-probe.mjs',
 ];
 
-export function lineCoverage(report) {
+export function lineCoverage(report, column = 0) {
   const files = new Map();
   const directories = [];
   let active = false;
@@ -38,7 +38,7 @@ export function lineCoverage(report) {
     if (line === '# start of coverage report') { active = true; continue; }
     if (line === '# end of coverage report') break;
     if (!active) continue;
-    const row = /^# (\s*)([^|]+?)\s*\|\s*([\d.]*)\s*\|/.exec(line);
+    const row = /^# (\s*)([^|]+?)\s*\|\s*([\d.]*)\s*\|\s*([\d.]*)\s*\|/.exec(line);
     if (!row || ['file', 'all files'].includes(row[2].trim())) continue;
     const [, padding, name, percent] = row;
     while (directories.length && directories.at(-1).depth >= padding.length)
@@ -47,7 +47,7 @@ export function lineCoverage(report) {
       directories.push({ depth: padding.length, name: name.trim() });
     } else {
       files.set([...directories.map((entry) => entry.name), name.trim()].join('/'),
-        Number(percent));
+        Number(row[3 + column]));
     }
   }
   if (files.size === 0) throw new Error('run-tests: coverage report has no file rows');
@@ -80,6 +80,7 @@ const main = () => {
   const loaded = new Set();
   let status;
   let coverage;
+  let branches;
   try {
     mkdirSync(loadsDir);
     const run = spawnSync(process.execPath, ['--test',
@@ -105,6 +106,7 @@ const main = () => {
       status = 1;
     }
     coverage = lineCoverage(readFileSync(reportPath, 'utf8'));
+    branches = lineCoverage(readFileSync(reportPath, 'utf8'), 1);
     for (const entry of readdirSync(loadsDir)) {
       for (const url of JSON.parse(readFileSync(join(loadsDir, entry), 'utf8'))) {
         const key = keyOf(fileURLToPath(url.split(/[?#]/)[0]));
@@ -147,20 +149,28 @@ const main = () => {
       const reason = typeof entry === 'string' ? entry : entry?.reason;
       return typeof reason !== 'string' || reason.trim() === ''
         || (typeof entry !== 'string'
-          && (!Number.isFinite(entry?.lines) || entry.lines <= 0 || entry.lines >= 95));
+          && ((!('lines' in entry) && !('branches' in entry))
+            || Object.entries({ lines: 95, branches: 90 }).some(([metric, limit]) =>
+              metric in entry && (!Number.isFinite(entry[metric])
+                || entry[metric] <= 0 || entry[metric] >= limit))));
     })
     .map(([file]) => file)
     .sort();
   const uncovered = roster.filter((file) => !loaded.has(file) && typeof exempt[file] !== 'string');
   const stale = Object.keys(exempt).filter((file) => !roster.includes(file)).sort();
   const redundant = Object.keys(exempt).filter((file) =>
-    typeof exempt[file] === 'string' ? loaded.has(file) : coverage.get(file) >= 95).sort();
+    typeof exempt[file] === 'string' ? loaded.has(file)
+      : Object.keys(exempt[file]).filter((key) => key !== 'reason').some((key) =>
+        (key === 'lines' ? coverage.get(file) >= 95 : branches.get(file) >= 90))).sort();
   const failures = [];
   for (const [file, lines] of coverage) {
     if (!roster.includes(file)) continue;
     const floor = exempt[file]?.lines ?? 95;
     if (lines < floor)
       failures.push(`run-tests: ${file} line coverage ${lines}% is below its ${floor}% floor.`);
+    const branchFloor = exempt[file]?.branches ?? 90;
+    if (branches.get(file) < branchFloor)
+      failures.push(`run-tests: ${file} branch coverage ${branches.get(file)}% is below its ${branchFloor}% floor.`);
   }
   for (const [file, entry] of Object.entries(exempt)) {
     if (typeof entry !== 'string' && !coverage.has(file))
