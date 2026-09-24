@@ -25,7 +25,7 @@
   },
   "scripts/generate-importmap.mjs": {
     "lines": 66.17,
-    "reason": "Network fetching and command-line regeneration write the import map and require live CDN access; unit tests cover map rendering and consistency.",
+    "reason": "The CLI reads installed dependency files, computes local hashes and rewrites the generated import-map block; tests/vendor-importmap.test.js covers the rendered map, and tests/vendor_stage.test.js exercises CLI staging in a child process.",
     "branches": 23.53
   },
   "scripts/install-engine-bundle.mjs": {
@@ -39,12 +39,8 @@
   },
   "scripts/verify-ci-green.mjs": {
     "lines": 79.5,
-    "reason": "The CLI poll loop talks to GitHub; fixture tests cover its API and verdict helpers without a live repository or token.",
+    "reason": "The CLI reads the workflow and needs-result JSON from local files; tests/verify_ci_green.test.js covers imported parsers and verdicts, while the CLI file-reading and exit paths run in CI.",
     "branches": 87.5
-  },
-  "tools/slider.js": {
-    "lines": 93.85,
-    "reason": "The touch-to-mouse suppression handlers require browser event synthesis; panel and palette probes drive pointer interactions in Chrome."
   },
   "tools/shader_documents.js": {
     "reason": "Unit coverage baseline; browser probes exercise live page and browser lifecycle branches.",
