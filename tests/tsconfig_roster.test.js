@@ -148,14 +148,30 @@ test('every not-checked module has a declaration file on the roster', () => {
   }
 });
 
-test('every library module under tools is on the typecheck roster', () => {
+const TOOL_PAGE_EXEMPTIONS = {
+  'tools/lissajous_page.js': 'Imports Three.js and builds a dynamic DOM controller without declared element types.',
+  'tools/mobius_page.js': 'Imports Three.js and builds a dynamic DOM controller without declared element types.',
+  'tools/palettes_page.js': 'DOM element narrowing and callback parameter annotations are incomplete; it has no third-party import exemption.',
+  'tools/solids_page.js': 'Imports Three.js and builds dynamic mesh-editing controls without declared element types.',
+};
+
+test('tool page exemptions name existing unrostered modules with reasons', () => {
+  const roster = readTsconfig().files;
+  for (const [file, reason] of Object.entries(TOOL_PAGE_EXEMPTIONS)) {
+    assert.ok(existsSync(new URL(file, ROOT)), `${file} must exist`);
+    assert.ok(!roster.includes(file), `${file} exemption is stale`);
+    assert.ok(reason.trim().length > 0, `${file} needs a reason`);
+  }
+});
+
+test('every library module under tools is on the typecheck roster' , () => {
   const roster = readTsconfig().files;
   const unreachable = [];
   for (const entry of readdirSync(new URL('tools/', ROOT), { withFileTypes: true })) {
     if (!entry.isFile() || !/\.m?js$/.test(entry.name)) continue;
     const path = `tools/${entry.name}`;
     if (roster.includes(path)) continue;
-    if (/_page\.js$/.test(entry.name)) continue;
+    if (Object.hasOwn(TOOL_PAGE_EXEMPTIONS, path)) continue;
     const source = readFileSync(new URL(path, ROOT), 'utf8');
     // A bare specifier resolves to a package this program does not contain, and
     // noResolve cannot pull its typings in, so the module cannot check clean.
