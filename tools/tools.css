@@ -237,16 +237,9 @@ input[type=range]:disabled::-webkit-slider-thumb {
 .text-red-300 { color: #fca5a5; }
 .text-purple-300 { color: #d8b4fe; }
 
-.complex-plane-control:focus-within,
-.key-wheel-canvas-wrap:focus-within #hueKeyWheelCanvas,
-.recipe-preset:focus-visible,
-.export-trigger:focus-visible,
-#colorStripCanvas:focus-visible,
-.palette-swatch:focus-visible,
-.thumb-btn:focus-visible,
-.saved-restore:focus-visible,
-.move-op-btn:focus-visible,
-.toggle-switch:focus-visible {
+:focus-visible,
+.focus-ring-within:focus-within,
+.focus-ring-group:focus-within .focus-ring-target {
   outline: 2px solid var(--blue-500);
   outline-offset: 2px;
 }
