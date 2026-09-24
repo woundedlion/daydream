@@ -1226,11 +1226,11 @@ async function init() {
     resetZoomButton.addEventListener('click', handleResetZoom);
   }
 
-  wireCopyBlock({
+  onPageTeardown(wireCopyBlock({
     source: document.getElementById('palette_code_output'),
     button: document.getElementById('copy_code_button'),
     prompt: document.getElementById('copy_code_prompt'),
-  });
+  }));
   const teardownExportFlyout = wireFlyout({
     root: document.getElementById('export_flyout'),
     trigger: document.getElementById('export_toggle'),
