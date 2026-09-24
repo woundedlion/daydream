@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync } from 'node:fs';
 import { dirname, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -88,7 +88,7 @@ export function installEngineBundle(bundle, destination) {
   console.log(`Installed ${entries.length} engine assets (${installedPin} -> ${bundlePin})`);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const [bundle, destination = '.'] = process.argv.slice(2);
   if (!bundle) throw new Error('Usage: install-engine-bundle.mjs <bundle> [daydream]');
   installEngineBundle(bundle, destination);
