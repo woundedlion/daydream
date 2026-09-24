@@ -10,7 +10,7 @@ import { probeDocumentActions, probeParity, probeStrip, probeStripHistory } from
 import { probeColorStrip, probeHueWheel, rgbMovedTogether } from '../scripts/palettes-probe.mjs';
 import { probeHistoryRestore, probeRationalLock } from '../scripts/lissajous-probe.mjs';
 import {
-  probeMobilePanel, probePanel, probePresetName, probeSidebar, probeSliderDrag,
+  probeKeyboardEdits, probeMobilePanel, probePanel, probePresetName, probeSidebar, probeSliderDrag,
   probeStageNames, probeTelemetry, probeTouchSlider, probeWarningNote,
 } from '../scripts/panel-probe.mjs';
 import { probeChain, probeNumericInputs } from '../scripts/solids-probe.mjs';
@@ -26,6 +26,7 @@ const PROBES = [
   ['lissajous-probe.mjs', 'probeHistoryRestore', probeHistoryRestore],
 
   ['panel-probe.mjs', 'probeSliderDrag', probeSliderDrag],
+  ['panel-probe.mjs', 'probeKeyboardEdits', probeKeyboardEdits],
   ['panel-probe.mjs', 'probeTouchSlider', probeTouchSlider],
   ['panel-probe.mjs', 'probePresetName', probePresetName],
   ['panel-probe.mjs', 'probeMobilePanel', probeMobilePanel],
