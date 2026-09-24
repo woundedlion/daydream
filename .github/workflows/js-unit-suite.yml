@@ -57,7 +57,7 @@ jobs:
         if: inputs.engine-bundle
         run: |
           HOLOSPHERE_BUNDLE_PIN="$(cat holosphere_wasm.sha)" node scripts/install-engine-bundle.mjs engine-bundle
-          git diff --exit-code
+          test -z "$(git status --porcelain)"
       - run: npm ci
       - name: Lint JavaScript
         run: npm run lint

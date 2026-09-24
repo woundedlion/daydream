@@ -73,7 +73,7 @@ jobs:
       - name: Install the verified engine package
         run: |
           HOLOSPHERE_BUNDLE_PIN="$(cat holosphere_wasm.sha)" node scripts/install-engine-bundle.mjs engine-bundle
-          git diff --exit-code
+          test -z "$(git status --porcelain)"
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - name: Stage site from the committed manifest
         run: |
