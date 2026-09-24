@@ -224,3 +224,20 @@ test('an inadmissible preset is submitted together and reports native refusal', 
   assert.deepEqual(engine.writes, []);
   assert.deepEqual(order.slice(-2), ['syncEffectGui', 'invalidate']);
 });
+
+test('fake parameter batches distinguish malformed and oversized payloads', () => {
+  const engine = new FakeChainEngine();
+  engine.setShaderChain(CHAIN.map(({ label, operator }) => ({ instance: label, operator })));
+  const before = engine.getParameterDefinitions();
+  for (const payload of [null, undefined, {}, [null], [undefined],
+    [{ name: 1, value: 0 }], [{ name: 'camera.wander' }],
+    [{ name: 'camera.wander', value: '0.5' }]]) {
+    assert.equal(engine.setShaderChainParameters(payload), ParamSetResult.MALFORMED_PAYLOAD);
+  }
+  assert.equal(engine.setShaderChainParameters(
+    Array(engine.catalog.budgets.max_params + 1).fill({ name: 'camera.wander', value: 0 })),
+  ParamSetResult.TOO_LONG);
+  assert.equal(engine.setShaderChainParameters([{ name: 'camera.wander', value: NaN }]),
+    ParamSetResult.NON_FINITE);
+  assert.deepEqual(engine.getParameterDefinitions(), before);
+});

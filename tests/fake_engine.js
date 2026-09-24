@@ -43,6 +43,8 @@ export const ParamSetResult = Object.freeze({
   READONLY: Object.freeze({ value: 3 }),
   NON_FINITE: Object.freeze({ value: 4 }),
   INADMISSIBLE: Object.freeze({ value: 5 }),
+  MALFORMED_PAYLOAD: Object.freeze({ value: 6 }),
+  TOO_LONG: Object.freeze({ value: 7 }),
 });
 
 /**
@@ -185,6 +187,13 @@ export class FakeChainEngine {
   }
 
   setShaderChainParameters(writes) {
+    if (!Array.isArray(writes)) return ParamSetResult.MALFORMED_PAYLOAD;
+    if (writes.length > this.catalog.budgets.max_params) return ParamSetResult.TOO_LONG;
+    for (const entry of writes) {
+      if (entry === null || typeof entry !== 'object'
+          || typeof entry.name !== 'string' || typeof entry.value !== 'number')
+        return ParamSetResult.MALFORMED_PAYLOAD;
+    }
     for (const { name, value } of writes) {
       if (!this.definitions.some((definition) => definition.name === name))
         return ParamSetResult.UNKNOWN_PARAM;

@@ -349,6 +349,26 @@ test('chain preset batches restore cross-field values and refuse singular edits 
   assert.deepEqual(snapshot(), values);
 });
 
+test('chain parameter batch boundary reports malformed and oversized payloads', () => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)));
+  assert.equal(engine.setEffect('ShaderChain'), M.EffectSetResult.INSTALLED);
+  assert.equal(engine.setShaderChain(DEFAULT_CHAIN).code, 'APPLIED');
+  const before = engine.getParameterDefinitions();
+  const name = before[0].name;
+  for (const payload of [null, undefined, {}, [null], [undefined],
+    [{ name: 1, value: 0 }], [{ name }], [{ name, value: '0.5' }]]) {
+    assert.equal(engine.setShaderChainParameters(payload), M.ParamSetResult.MALFORMED_PAYLOAD);
+  }
+  const catalog = JSON.parse(M.HolosphereEngine.getShaderChainCatalog());
+  assert.equal(engine.setShaderChainParameters(
+    Array(catalog.budgets.max_params + 1).fill({ name, value: 0 })),
+  M.ParamSetResult.TOO_LONG);
+  for (const value of [NaN, Infinity, -Infinity]) {
+    assert.equal(engine.setShaderChainParameters([{ name, value }]), M.ParamSetResult.NON_FINITE);
+  }
+  assert.deepEqual(engine.getParameterDefinitions(), before);
+});
+
 test('setShaderChain refuses transactionally and names the offending entry', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('ShaderChain'), M.EffectSetResult.INSTALLED);
