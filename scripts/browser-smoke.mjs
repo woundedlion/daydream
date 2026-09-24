@@ -11,7 +11,7 @@ import puppeteer from 'puppeteer-core';
 
 import { servedPages } from '../tests/site_pages.js';
 import { BROWSER_ARGS, resolveBrowser } from './browser.mjs';
-import { collectProblems } from './probe_harness.mjs';
+import { collectProblems, closeProbeResources } from './probe_harness.mjs';
 import { serveStagedSite } from './vendor-stage.mjs';
 
 const VIEWPORT = { width: 1280, height: 900 };
@@ -297,8 +297,7 @@ try {
 } catch (error) {
   failures.push(error instanceof Error ? error.message : String(error));
 } finally {
-  await browser?.close();
-  await site?.close();
+  await closeProbeResources(browser, site, failures);
 }
 
 if (failures.length > 0) {

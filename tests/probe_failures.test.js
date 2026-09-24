@@ -1,3 +1,4 @@
+import { closeProbeResources } from '../scripts/probe_harness.mjs';
 import { feedbackAtClick } from '../scripts/palettes-probe.mjs';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -234,4 +235,14 @@ test('copy feedback geometry rejects shifts and missing bounds', () => {
   for (const wrong of [{ left: 460 }, { top: 258 }, { width: 0 }, { height: 0 }, { left: NaN }]) {
     assert.equal(feedbackAtClick({ ...box, ...wrong }, click), false);
   }
+});
+
+test('probe teardown preserves failures and attempts every close', async () => {
+  const failures = ['the slider did not move'];
+  let closedSite = false;
+  await closeProbeResources({ close: async () => { throw new Error('Target closed'); } },
+    { close: async () => { closedSite = true; throw new Error('site close failed'); } }, failures);
+  assert.equal(closedSite, true);
+  assert.deepEqual(failures, ['the slider did not move',
+    'browser teardown: Target closed', 'site teardown: site close failed']);
 });
