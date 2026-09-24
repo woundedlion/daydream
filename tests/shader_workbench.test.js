@@ -317,7 +317,7 @@ test('the alias table keys stay frozen to the pre-spec promoted labels', () => {
     ['camera', 'colorize', 'sample', 'surface', 'warp1', 'warp2']);
 });
 
-const MODULE = { ParamSetResult };
+const MODULE = { ParamSetResult, HolosphereEngine: { getShaderChainCatalog: () => ENGINE_CATALOG } };
 const BAKED = bakedTopologyFields(JSON.parse(ENGINE_CATALOG));
 
 const fixedDocument = () => ({ document: {
@@ -1900,5 +1900,18 @@ test('disposing a document controller flushes edits and releases its whole UI', 
     assert.equal(harness.urls.length, 1);
   } finally {
     mock.timers.reset();
+  }
+});
+
+test('catalog skew refuses initialization before any chain is applied', async () => {
+  const original = MODULE.HolosphereEngine.getShaderChainCatalog;
+  MODULE.HolosphereEngine.getShaderChainCatalog = () => '{}';
+  try {
+    const page = workbench();
+    assert.equal(await page.controller.init(), false);
+    assert.match(page.elements.get('shader-document-status').textContent, /does not match/);
+    assert.equal(page.engine.chained.length, 0);
+  } finally {
+    MODULE.HolosphereEngine.getShaderChainCatalog = original;
   }
 });

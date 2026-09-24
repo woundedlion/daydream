@@ -860,6 +860,9 @@ export function createShaderDocumentController({
     try {
       compiler = await importCompiler();
       operatorCatalog = JSON.parse(await fetchText(CATALOG_URL));
+      const runningCatalog = JSON.parse(getModule().HolosphereEngine.getShaderChainCatalog());
+      if (JSON.stringify(operatorCatalog) !== JSON.stringify(runningCatalog))
+        throw new Error('Operator catalog does not match the loaded engine');
       bakedFields = bakedTopologyFields(operatorCatalog);
       digestMigration = JSON.parse(await fetchText(DIGEST_MIGRATION_URL));
       const migration = JSON.parse(await fetchText(MIGRATION_URL));
