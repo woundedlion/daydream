@@ -30,13 +30,13 @@ export const MIME = {
 
 /**
  * Serves the manifest set out of a directory.
- * @param {string[]} entries - site_manifest.txt's entries; a directory entry serves recursively.
+ * @param {string[]} entries - site_manifest.txt's regular-file entries.
  * @param {string} [root] - Directory the entries are relative to; the repository by default.
  * @returns {Promise<{origin: string, close: () => Promise<void>}>} The listening origin and its shutdown.
  */
 export async function serveManifest(entries, root = ROOT) {
   const served = (path) =>
-    entries.some((entry) => path === entry || path.startsWith(`${entry}/`));
+    entries.includes(path);
 
   const server = createServer((req, res) => {
     /** @type {?string} */
