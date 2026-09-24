@@ -1142,7 +1142,7 @@ export class SegmentController {
 
   /** @param {Array<FrameResult|null>} results @returns {number} */
   composite(results) {
-    return this.compositor.composite(results, this.count, this.#renderGen, this.showBoundaries);
+    return this.compositor.composite(results, this.count, this.showBoundaries);
   }
 
   /**
