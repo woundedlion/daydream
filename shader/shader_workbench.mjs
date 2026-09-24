@@ -1269,6 +1269,16 @@ export function expandV1Document(document, catalog) {
     void droppedBinding;
     if (parameter.id === 'brightness-depth')
       kept.default = 1 - kept.default;
+    if (target === 'surface.scale') {
+      const schema = operatorField(operators.get(slotsByLabel.get('surface')?.operator), 'scale');
+      if (schema.curve === 'log-positive')
+        kept.interpolation = { ...kept.interpolation, kind: 'LOG_POSITIVE' };
+    }
+    if (target.startsWith('lens.mobius-')) {
+      const schema = operatorField(operators.get('sphere.lens.mobius.v2'), target.slice(5));
+      if (schema.curve === 'snap')
+        kept.interpolation = { ...kept.interpolation, kind: 'SNAP' };
+    }
     if (target === 'sample.pattern-freq' &&
         slotsByLabel.get('sample')?.operator === 'sample.grid.v2') {
       const schema = operatorField(operators.get('sample.grid.v2'), 'pattern-freq');

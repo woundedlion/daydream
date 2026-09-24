@@ -945,3 +945,28 @@ test('export orders numeric-like metadata keys lexically', () => {
   assert.ok(exported.indexOf('"10"') < exported.indexOf('"2"'));
   assert.equal(exported, exportShaderDocumentJson({ ...source, metadata: { '10': 'ten', '2': 'two' } }));
 });
+
+test('v1 noise scale adopts the current logarithmic catalog curve', () => {
+  const catalog = structuredClone(CATALOG);
+  for (const id of ['sphere.displace.curl.v2', 'sphere.displace.direct.v2']) {
+    catalog.operators.find((operator) => operator.id === id)
+      .params.find((field) => field.id === 'scale').curve = 'log-positive';
+  }
+  for (const name of ['kaleidoscope_hex_oil.shader.json', 'lattice_melt.shader.json']) {
+    const expanded = expandV1Document(fixture(name), catalog).document;
+    assert.equal(expanded.descriptor.parameters.find((parameter) => parameter.id === 'surface.scale')
+      .interpolation.kind, 'LOG_POSITIVE');
+    assert.equal(compileShaderDocument(expanded, { catalog }).status, 'VALID');
+  }
+});
+
+test('v1 Mobius coefficients adopt the current snap catalog curve', () => {
+  const catalog = structuredClone(CATALOG);
+  for (const field of catalog.operators.find((operator) => operator.id === 'sphere.lens.mobius.v2').params)
+    if (field.id.startsWith('mobius-')) field.curve = 'snap';
+  const expanded = expandV1Document(fixture('mobius_grid.shader.json'), catalog).document;
+  const coefficients = expanded.descriptor.parameters.filter((parameter) => parameter.id.startsWith('lens.mobius-'));
+  assert.equal(coefficients.length, 8);
+  assert.ok(coefficients.every((parameter) => parameter.interpolation.kind === 'SNAP'));
+  assert.equal(compileShaderDocument(expanded, { catalog }).status, 'VALID');
+});
