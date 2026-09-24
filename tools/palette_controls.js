@@ -780,6 +780,28 @@ export function loopSweepTurns(turns) {
 }
 
 /**
+ * @typedef {Object} PaletteControlReadings
+ * @property {{offset: number, span: number}} window - Input window (offset, span).
+ * @property {string} domain - PaletteV4.domain member name.
+ * @property {string} colorPath - PaletteV4.colorPath member name.
+ * @property {string} hueMode - PaletteV4.hueMode member name.
+ * @property {string} harmony - PaletteV4.harmony member name.
+ * @property {string} direction - PaletteV4.direction member name.
+ * @property {number} baseTurns - Base hue, in turns.
+ * @property {number[]} customHueOffsets - Per-key hue offsets, used only in CUSTOM hue mode.
+ * @property {string} lightnessCurve - PaletteV4.curve member name.
+ * @property {string} chromaCurve - PaletteV4.curve member name.
+ * @property {{minimum: number, maximum: number}} lightness - Lightness endpoints.
+ * @property {{minimum: number, maximum: number}} chroma - Chroma endpoints.
+ * @property {string} easing - PaletteV4.easing member name.
+ * @property {number} spreadTurns - Angular spread between a harmony's anchors, in turns.
+ * @property {number} sweepTurns - Total travel of a SWEEP, in turns.
+ * @property {number} headroom - Fraction of the local gamut the chroma may reach.
+ * @property {number} hueTorsion - Hue drift per unit lightness, in radians.
+ * @property {number} falloffStart - Where a FALLOFF domain begins to fade.
+ */
+
+/**
  * Marshals the generative tab's control readings into a V4 recipe.
  *
  * Every C++ recipe export and every preview repaint goes through this, and the
@@ -791,25 +813,7 @@ export function loopSweepTurns(turns) {
  * A CUSTOM-curve axis keeps the template's own custom points, so its endpoint
  * readings are ignored rather than overwriting them.
  * @param {PaletteRecipe} template - Recipe the reading is applied over; deep-cloned, never mutated.
- * @param {Object} controls - The control readings.
- * @param {{offset: number, span: number}} controls.window - Input window (offset, span).
- * @param {string} controls.domain - PaletteV4.domain member name.
- * @param {string} controls.colorPath - PaletteV4.colorPath member name.
- * @param {string} controls.hueMode - PaletteV4.hueMode member name.
- * @param {string} controls.harmony - PaletteV4.harmony member name.
- * @param {string} controls.direction - PaletteV4.direction member name.
- * @param {number} controls.baseTurns - Base hue, in turns.
- * @param {number[]} controls.customHueOffsets - Per-key hue offsets, used only in CUSTOM hue mode.
- * @param {string} controls.lightnessCurve - PaletteV4.curve member name.
- * @param {string} controls.chromaCurve - PaletteV4.curve member name.
- * @param {{minimum: number, maximum: number}} controls.lightness - Lightness endpoints.
- * @param {{minimum: number, maximum: number}} controls.chroma - Chroma endpoints.
- * @param {string} controls.easing - PaletteV4.easing member name.
- * @param {number} controls.spreadTurns - Angular spread between a harmony's anchors, in turns.
- * @param {number} controls.sweepTurns - Total travel of a SWEEP, in turns.
- * @param {number} controls.headroom - Fraction of the local gamut the chroma may reach.
- * @param {number} controls.hueTorsion - Hue drift per unit lightness, in radians.
- * @param {number} controls.falloffStart - Where a FALLOFF domain begins to fade.
+ * @param {PaletteControlReadings} controls - The control readings.
  * @returns {PaletteRecipe} The recipe.
  * @throws {RangeError} When a reading names no PaletteV4 member of its group.
  */
@@ -888,7 +892,7 @@ export const PALETTE_CONTROL_IDS = Object.freeze({
  * units the controls are labelled in (degrees) to the recipe's own (turns).
  * @param {(id: string) => (string|undefined)} readControl - Reads one control's value by element id.
  * @param {number[]} customHueOffsets - The wheel's per-key hue offsets, which no control holds.
- * @returns {Object} The readings.
+ * @returns {PaletteControlReadings} The readings.
  * @throws {RangeError} When a control the recipe needs is not on the page, which
  *   would otherwise marshal as a NaN or an undefined enum the engine rejects.
  */
@@ -964,7 +968,7 @@ export function paletteEnumName(group, value) {
  * from the recipe's own hue mode — so loading a harmony leaves the wheel on the
  * keys that harmony draws, ready for a handoff into CUSTOM.
  * @param {PaletteRecipe} recipe - The recipe to load.
- * @returns {Object} The readings, in paletteRecipeFromControls' own shape.
+ * @returns {PaletteControlReadings} The readings, in paletteRecipeFromControls' own shape.
  * @throws {RangeError} When a field holds an ordinal PaletteV4 has no member for.
  */
 export function paletteControlsFromRecipe(recipe) {
