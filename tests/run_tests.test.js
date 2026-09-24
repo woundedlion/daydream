@@ -258,3 +258,12 @@ test('callback-style tests still require an assertion before done', () => {
     + "test('empty callback', (t, done) => { setImmediate(done); });\n");
   assert.match(failOutput(PATTERN), /Every test case must execute an assertion/);
 });
+
+test('aggregate coverage cannot hide a file with unexecuted branches', () => {
+  dilutedCoverage();
+  writeFileSync(join(root, 'lib.mjs'),
+    'export const value = 4;\nexport function pick(n) { return n ? 1 : 2; }\npick(true);\n');
+  writeFileSync(join(root, 'padding.mjs'),
+    Array.from({ length: 30 }, (_, i) => `function f${i}() { return 1; } f${i}();`).join('\n'));
+  assert.match(failOutput(PATTERN), /lib\.mjs branch coverage .* below its 90% floor/);
+});

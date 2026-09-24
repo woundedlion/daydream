@@ -15,15 +15,18 @@
   },
   "daydream.js": {
     "lines": 94.29,
-    "reason": "Composition-root GUI callbacks and late lifecycle error paths are only partially driven by the fake application tests; browser probes exercise the live controls."
+    "reason": "Composition-root GUI callbacks and late lifecycle error paths are only partially driven by the fake application tests; browser probes exercise the live controls.",
+    "branches": 85
   },
   "scripts/check-cdn-integrity.mjs": {
     "lines": 91.18,
-    "reason": "The command-line exit path is outside imported-helper tests; CI invokes the command against the pinned CDN resources."
+    "reason": "The command-line exit path is outside imported-helper tests; CI invokes the command against the pinned CDN resources.",
+    "branches": 83.33
   },
   "scripts/generate-importmap.mjs": {
     "lines": 66.17,
-    "reason": "Network fetching and command-line regeneration write the import map and require live CDN access; unit tests cover map rendering and consistency."
+    "reason": "Network fetching and command-line regeneration write the import map and require live CDN access; unit tests cover map rendering and consistency.",
+    "branches": 23.53
   },
   "scripts/install-engine-bundle.mjs": {
     "lines": 91.58,
@@ -31,14 +34,52 @@
   },
   "scripts/vendor-stage.mjs": {
     "lines": 91.47,
-    "reason": "Server startup and filesystem cleanup error paths require infrastructure failures; fixture tests exercise staging and normal shutdown."
+    "reason": "Server startup and filesystem cleanup error paths require infrastructure failures; fixture tests exercise staging and normal shutdown.",
+    "branches": 72.22
   },
   "scripts/verify-ci-green.mjs": {
     "lines": 79.5,
-    "reason": "The CLI poll loop talks to GitHub; fixture tests cover its API and verdict helpers without a live repository or token."
+    "reason": "The CLI poll loop talks to GitHub; fixture tests cover its API and verdict helpers without a live repository or token.",
+    "branches": 87.5
   },
   "tools/slider.js": {
     "lines": 93.85,
     "reason": "The touch-to-mouse suppression handlers require browser event synthesis; panel and palette probes drive pointer interactions in Chrome."
+  },
+  "tools/shader_documents.js": {
+    "reason": "Unit coverage baseline; browser probes exercise live page and browser lifecycle branches.",
+    "branches": 82.73
+  },
+  "tools/chain_strip.js": {
+    "reason": "Unit coverage baseline; browser probes exercise live page and browser lifecycle branches.",
+    "branches": 84.59
+  },
+  "tools/shader_deeplink.js": {
+    "reason": "Unit coverage baseline; browser probes exercise live page and browser lifecycle branches.",
+    "branches": 87.23
+  },
+  "scripts/browser.mjs": {
+    "reason": "Unit coverage baseline; browser probes exercise live page and browser lifecycle branches.",
+    "branches": 88.89
+  },
+  "tools/shared.js": {
+    "reason": "Unit coverage baseline; browser probes exercise live page and browser lifecycle branches.",
+    "branches": 89.19
+  },
+  "effect_panel_view.js": {
+    "reason": "Browser probes exercise focused controller DOM paths.",
+    "branches": 81.82
+  },
+  "effect_roster.js": {
+    "reason": "Malformed engine roster error paths are not all exercised by fixture modules.",
+    "branches": 66.67
+  },
+  "module_warmer.js": {
+    "reason": "Browser module preload fallback paths are partially exercised by unit fixtures.",
+    "branches": 81.82
+  },
+  "scripts/run-tests.mjs": {
+    "reason": "Coverage-gate filesystem and child-process failures are only partially exercised by fixture runs.",
+    "branches": 89.83
   }
 }
