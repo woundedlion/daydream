@@ -345,73 +345,19 @@ test('setShaderChain refuses transactionally and names the offending entry', () 
     'a non-array payload is refused at the boundary, never a trap');
 });
 
-test('the module ParamSetResult enum matches the fake_engine.js mirror', () => {
-  assert.ok(M.ParamSetResult, 'the module must export ParamSetResult');
-  // Embind exposes the enum as a constructor whose value names sit beside
-  // plumbing properties (values, argCount); the values themselves are the
-  // instanceof-filtered keys.
-  const moduleNames = Object.keys(M.ParamSetResult)
-    .filter((k) => M.ParamSetResult[k] instanceof M.ParamSetResult);
-  assert.deepEqual(moduleNames.sort(), Object.keys(ParamSetResult).sort(),
-    'fake_engine.js ParamSetResult must mirror the module enum roster');
-  for (const name of Object.keys(ParamSetResult)) {
-    assert.equal(M.ParamSetResult[name].value, ParamSetResult[name].value,
-      `fake_engine.js ParamSetResult.${name}.value must match the module`);
-  }
-});
-
-test('the module ClipSetResult enum matches the fake_engine.js mirror', () => {
-  assert.ok(M.ClipSetResult, 'the module must export ClipSetResult');
-  const moduleNames = Object.keys(M.ClipSetResult)
-    .filter((k) => M.ClipSetResult[k] instanceof M.ClipSetResult);
-  assert.deepEqual(moduleNames.sort(), Object.keys(ClipSetResult).sort(),
-    'fake_engine.js ClipSetResult must mirror the module enum roster');
-  for (const name of Object.keys(ClipSetResult)) {
-    assert.equal(M.ClipSetResult[name].value, ClipSetResult[name].value,
-      `fake_engine.js ClipSetResult.${name}.value must match the module`);
-  }
-});
-
-test('the module ResolutionSetResult enum matches the fake_engine.js mirror', () => {
-  assert.ok(M.ResolutionSetResult, 'the module must export ResolutionSetResult');
-  const moduleNames = Object.keys(M.ResolutionSetResult)
-    .filter((k) => M.ResolutionSetResult[k] instanceof M.ResolutionSetResult);
-  assert.deepEqual(moduleNames.sort(), Object.keys(ResolutionSetResult).sort(),
-    'fake_engine.js ResolutionSetResult must mirror the module enum roster');
-  for (const name of Object.keys(ResolutionSetResult)) {
-    assert.equal(M.ResolutionSetResult[name].value, ResolutionSetResult[name].value,
-      `fake_engine.js ResolutionSetResult.${name}.value must match the module`);
-  }
-});
-
-test('the module EffectSetResult enum matches the fake_engine.js mirror', () => {
-  assert.ok(M.EffectSetResult, 'the module must export EffectSetResult');
-  const moduleNames = Object.keys(M.EffectSetResult)
-    .filter((k) => M.EffectSetResult[k] instanceof M.EffectSetResult);
-  assert.deepEqual(moduleNames.sort(), Object.keys(EffectSetResult).sort(),
-    'fake_engine.js EffectSetResult must mirror the module enum roster');
-  for (const name of Object.keys(EffectSetResult)) {
-    assert.equal(M.EffectSetResult[name].value, EffectSetResult[name].value,
-      `fake_engine.js EffectSetResult.${name}.value must match the module`);
-  }
-});
-
-// The effect panel compares restoreFullConfigSnapshot's return against
-// module.FullConfigRestoreResult.APPLIED and segment_worker.js reads the whole
-// roster off the module through an optional chain: a renumbered or dropped
-// value reads as a silent restore failure at those call sites.
-test('the module FullConfigRestoreResult enum matches the fake_engine.js mirror', () => {
-  assert.ok(M.FullConfigRestoreResult, 'the module must export FullConfigRestoreResult');
-  const moduleNames = Object.keys(M.FullConfigRestoreResult)
-    .filter((k) => M.FullConfigRestoreResult[k] instanceof M.FullConfigRestoreResult);
-  assert.deepEqual(moduleNames.sort(), Object.keys(FullConfigRestoreResult).sort(),
-    'fake_engine.js FullConfigRestoreResult must mirror the module enum roster');
-  for (const name of Object.keys(FullConfigRestoreResult)) {
-    assert.equal(M.FullConfigRestoreResult[name].value,
-      FullConfigRestoreResult[name].value,
-      `fake_engine.js FullConfigRestoreResult.${name}.value must match the module`);
-  }
-});
+const RESULT_MIRRORS = { ParamSetResult, ClipSetResult, ResolutionSetResult,
+  EffectSetResult, FullConfigRestoreResult };
+for (const name of RESULT_ENUMS.filter((name) => name in RESULT_MIRRORS)) {
+  test(`the module ${name} enum matches the fake_engine.js mirror`, () => {
+    const actual = M[name];
+    const mirror = RESULT_MIRRORS[name];
+    assert.ok(actual, `the module must export ${name}`);
+    const moduleNames = Object.keys(actual).filter((key) => actual[key] instanceof actual);
+    assert.deepEqual(moduleNames.sort(), Object.keys(mirror).sort());
+    for (const key of Object.keys(mirror))
+      assert.equal(actual[key].value, mirror[key].value, `${name}.${key}`);
+  });
+}
 
 test('getSupportedResolutions reports buildable [w, h] rows', () => {
   const rows = M.HolosphereEngine.getSupportedResolutions();
