@@ -484,13 +484,13 @@ export function createShaderDocumentController({
         syncEffectGui();
       }
       showAnimationState();
-      if (refusal) {
-        show(`Preset "${presetId}" could not be applied: ${refusal}`, true);
-        return false;
-      }
       if (active.compiledSide) {
         syncEffectGui();
         invalidate();
+      }
+      if (refusal) {
+        show(`Preset "${presetId}" could not be applied: ${refusal}`, true);
+        return false;
       }
       active.presetId = presetId;
       const title = active.compiled.document.effect_metadata?.display_name
