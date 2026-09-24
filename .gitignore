@@ -35,3 +35,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Recoverable scratch files from interrupted engine installs.
+/.hs-tmp-*/
