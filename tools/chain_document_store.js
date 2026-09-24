@@ -366,6 +366,7 @@ export async function createChainDocumentStore({
    * @param {number} start - First chain index of the span.
    * @param {number} deleteCount - Entries the span covers (0 = insertion).
    * @returns {LegalityEntry[]} One entry per catalog operator, in catalog order.
+   * @throws {RangeError} If the span bounds are not integer positions inside the chain.
    */
   const spanLegality = (start, deleteCount) => {
     const error = spanError(start, deleteCount);
@@ -402,6 +403,7 @@ export async function createChainDocumentStore({
    * @param {number} deleteCount - Entries the span covers (0 = insertion).
    * @param {number} maxLength - Longest sequence to enumerate.
    * @returns {SequenceEntry[]} The legal sequences.
+   * @throws {RangeError} If the span bounds are not integer positions inside the chain.
    */
   const legalSequences = (start, deleteCount, maxLength) => {
     const error = spanError(start, deleteCount);
@@ -754,6 +756,7 @@ export async function createChainDocumentStore({
     /**
      * @param {number} index - Gap position, 0..chain length.
      * @returns {LegalityEntry[]} Every operator's insertion legality at the gap.
+     * @throws {RangeError} If the gap is not an integer position inside the chain.
      */
     legalInsertions: (index) => spanLegality(index, 0),
 
@@ -762,6 +765,7 @@ export async function createChainDocumentStore({
      * @param {number} deleteCount - Entries the span covers.
      * @returns {LegalityEntry[]} Every operator's legality as a one-operator
      *   replacement of the span.
+     * @throws {RangeError} If the span bounds are not integer positions inside the chain.
      */
     legalReplacements: (start, deleteCount) => spanLegality(start, deleteCount),
 

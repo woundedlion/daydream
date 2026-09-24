@@ -43,7 +43,8 @@ import { createFrameScheduler } from './page_lifecycle.js';
 /** @typedef {{severity: string, phase: string, code: string, path: string, message: string}} Diagnostic */
 /** @typedef {{ok: true}|{ok: false, diagnostics: Diagnostic[]}} EditResult */
 /**
- * The document-store surface the strip drives.
+ * The document-store surface the strip drives. Legality queries throw RangeError
+ * for invalid indices; mutation methods return EditResult refusals.
  * @typedef {{
  *   chain: () => ChainEntry[],
  *   selectedLabel: () => string|null,
