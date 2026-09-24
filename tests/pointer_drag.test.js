@@ -267,3 +267,14 @@ test('innerRect leaves an unbordered element its own rect', () => {
 
   assert.deepEqual(innerRect(element), { left: 5, top: 6, width: 300, height: 100 });
 });
+
+test('removing a live drag releases capture and cancels it once', () => {
+  const { element, calls, drag } = harness();
+  element.dispatch('pointerdown', down(7));
+  drag.remove();
+  assert.equal(element.hasPointerCapture(7), false);
+  assert.deepEqual(calls.cancel, [null]);
+  assert.equal(element.listeners.length, 0);
+  drag.stop();
+  assert.equal(calls.cancel.length, 1);
+});
