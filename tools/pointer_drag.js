@@ -57,7 +57,7 @@ export function innerRect(element) {
  *   stop(), after the capture is dropped. Defaults to onEnd, which is what a
  *   page wants when a cancelled gesture and a release unwind the same way.
  * @returns {{stop: () => void, remove: () => void}} stop() ends a running drag
- *   as a cancel; remove() detaches the listeners without ending it.
+ *   as a cancel; remove() cancels it and detaches the listeners.
  */
 export function createPointerDrag({
   element, onStart, onMove, onHover, onEnd, onCancel,
@@ -145,6 +145,7 @@ export function createPointerDrag({
   return {
     stop: () => finish(null, cancelHandler),
     remove: () => {
+      finish(null, cancelHandler);
       element.removeEventListener('pointerdown', /** @type {EventListener} */ (handleDown));
       element.removeEventListener('pointermove', /** @type {EventListener} */ (handleMove));
       element.removeEventListener('pointerup', /** @type {EventListener} */ (handleUp));
