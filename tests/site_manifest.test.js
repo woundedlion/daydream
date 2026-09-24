@@ -5,7 +5,7 @@
 // asset the served pages reach is covered by an entry.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { dirname, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -108,8 +108,8 @@ test('every site manifest entry is tracked and present', () => {
   const untracked = [];
   for (const entry of entries) {
     if (/^[./]|\\|\/$/.test(entry)) malformed.push(entry);
-    if (!existsSync(resolve(REPO, entry))) absent.push(entry);
-    if (!tracked.some((f) => f === entry || f.startsWith(`${entry}/`)))
+    if (!existsSync(resolve(REPO, entry)) || !lstatSync(resolve(REPO, entry)).isFile()) absent.push(entry);
+    if (!tracked.includes(entry))
       untracked.push(entry);
   }
   assert.deepEqual(malformed.slice(0, 5), [],
@@ -123,12 +123,10 @@ test('every site manifest entry is tracked and present', () => {
 test('the derived page roster names every served page', () => {
   const entries = manifestEntries();
   const covered = (path) =>
-    entries.some((entry) => entry === path || path.startsWith(`${entry}/`));
+    entries.includes(path);
 
   const pages = new Set(PAGES);
   assert.ok(pages.size > 0, `${MANIFEST} publishes no page`);
-  // A manifest entry may name a directory, which ships recursively; a page under
-  // one is served without appearing as an entry of its own.
   const unlisted = [...trackedFiles()].filter(
     (file) => file.endsWith('.html') && covered(file) && !pages.has(file));
   assert.deepEqual(unlisted.slice(0, 5), [],
@@ -151,7 +149,7 @@ test('engine-backed pages declare the browser-smoke readiness overlay', () => {
 const walkFromPages = () => {
   const entries = manifestEntries();
   const covered = (path) =>
-    entries.some((entry) => entry === path || path.startsWith(`${entry}/`));
+    entries.includes(path);
 
   const tracked = trackedFiles();
   const seen = new Set();
@@ -272,7 +270,7 @@ test('the site manifest publishes nothing the served pages do not reach', () => 
   const { seen } = pageWalk();
   const served = servedPatterns();
   const reached = (entry) =>
-    seen.has(entry) || [...seen].some((path) => path.startsWith(`${entry}/`));
+    seen.has(entry);
   const unreached = entries.filter(
     (entry) => !UNREFERENCED.includes(entry) && !served.has(entry) && !reached(entry));
   assert.deepEqual(unreached.slice(0, 5), [],

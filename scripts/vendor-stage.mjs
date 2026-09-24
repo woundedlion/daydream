@@ -19,7 +19,7 @@ import {
   rmSync, statSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { manifestEntries } from '../tests/site_pages.js';
@@ -101,7 +101,11 @@ export function stageSite() {
     rmSync(root, { recursive: true, force: true });
     throw error;
   }
-  return { root, entries: [...manifestEntries(), ...VENDOR_ENTRIES] };
+  const vendorFiles = VENDOR_ENTRIES.flatMap((directory) =>
+    readdirSync(join(root, directory), { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => relative(root, join(entry.parentPath, entry.name)).replaceAll('\\', '/')));
+  return { root, entries: [...manifestEntries(), ...vendorFiles] };
 }
 
 /**

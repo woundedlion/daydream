@@ -51,7 +51,7 @@ test('the staged tree carries the manifest set', () => {
 });
 
 test('the served set covers the vendored trees as well as the manifest', () => {
-  for (const entry of [...manifestEntries(), 'three.js', 'node_modules']) {
+  for (const entry of [...manifestEntries(), 'three.js/build/three.module.js', 'node_modules/lil-gui/dist/lil-gui.esm.min.js']) {
     assert.ok(staged.entries.includes(entry), `${entry} is not served`);
   }
 });

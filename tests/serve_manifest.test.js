@@ -12,9 +12,7 @@ import { dirname, join } from 'node:path';
 import { MIME, serveManifest } from '../scripts/serve-manifest.mjs';
 import { request } from './http_request.js';
 
-// A file entry, a binary one, a directory entry that ships recursively, and an
-// entry whose file is gone. 'styles' is also the prefix of a path outside it.
-const ENTRIES = ['index.html', 'engine.wasm', 'styles', 'gone.js'];
+const ENTRIES = ['index.html', 'engine.wasm', 'styles/index.css', 'styles/fonts/pin.woff2', 'gone.js'];
 
 const FILES = {
   'index.html': '<!doctype html>\n',
@@ -62,7 +60,7 @@ test('serves the manifest set, and the bare root as index.html', () => withSite(
   assert.equal(page.body, FILES['index.html']);
 }));
 
-test('a directory entry serves recursively', () => withSite(async (get) => {
+test('explicit nested file entries are served', () => withSite(async (get) => {
   const css = await get('/styles/index.css');
   assert.equal(css.status, 200);
   assert.equal(css.body, FILES['styles/index.css']);
