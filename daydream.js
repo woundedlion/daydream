@@ -5,7 +5,7 @@
 
 
 import createHolosphereModule from "./holosphere_wasm.js";
-import { Daydream } from "./driver.js";
+import { Daydream, MOBILE_BREAKPOINT_PX } from "./driver.js";
 import { GUI, resetGUI } from "./gui.js";
 import { EffectSidebar } from "./sidebar.js";
 import {
@@ -428,7 +428,7 @@ export function start({
   // names plus the panel's own 'pause' toggle, 'view' the app's own controls.
   const guiInstance = createGui({ autoPlace: false }, 'view');
   guiInstance.domElement.classList.add('global-gui');
-  if (win.matchMedia?.('(max-width: 900px)').matches ?? false) {
+  if (win.matchMedia?.(`(max-width: ${MOBILE_BREAKPOINT_PX}px)`).matches ?? false) {
     guiInstance.close();
   }
   const guiContainer = doc.getElementById('gui-container');
@@ -535,7 +535,7 @@ export function start({
     host: {
       createGui: () => createGui({ autoPlace: false }, 'fx'),
       container: () => shaderWorkbench ? null : doc.getElementById('gui-container'),
-      isMobile: () => win.matchMedia?.('(max-width: 900px)').matches ?? false,
+      isMobile: () => win.matchMedia?.(`(max-width: ${MOBILE_BREAKPOINT_PX}px)`).matches ?? false,
       copyText: copyToClipboard,
       applyEffect: () => {
         const rejected = apply.applyEffect() !== ApplyResult.APPLIED;
