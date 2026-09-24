@@ -283,9 +283,7 @@ export function installSegmentWorker() {
           failInstantiation = () => resolve(null);
         });
         if (compiled) {
-          // Instantiate the controller's single compilation instead of fetching and
-          // compiling the 2 MB binary again here. The binary declares its own memory
-          // rather than importing one, so this instance still gets a private heap.
+          // Each instance of the shared compilation owns a private heap.
           options.instantiateWasm = (imports, onInstance) => {
             WebAssembly.instantiate(compiled, imports).then(
               (instance) => onInstance(instance, compiled),
