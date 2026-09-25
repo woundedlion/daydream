@@ -9,6 +9,7 @@ import { resolve } from 'node:path';
 import {
   BAKED_CONSTANT_IDS, bakedTopologyFields, engineParameterNames,
 } from '../tools/shader_documents.js';
+import * as MB from '../tools/mobius_transforms.js';
 import { MORPH_SWEEP, OP_DEFS } from '../tools/solid_codegen.js';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
@@ -258,4 +259,17 @@ test('composite sweep exemptions stay inside the engine primitive bands', { skip
   assert.match(expansion, /if \(step\.param == 0\.5f\)\s*emit\(\{Op::AMBO\}\);/);
   const conway = committed(engineRoot, 'core/mesh/conway.h').toString('utf8');
   assert.ok(cppFloatConstant(conway, 'SNUB_DEFAULT_T') > 0);
+});
+
+test('Mobius projection constants match the pinned engine sources', { skip: engineSkip }, () => {
+  assert.ok(engineRoot, engineMissing);
+  const stereo = committed(engineRoot, 'core/math/stereographic.h').toString();
+  const math = committed(engineRoot, 'core/math/3dmath.h').toString();
+  assert.equal(MB.STEREO_INF, cppFloatConstant(stereo, 'STEREO_INF'));
+  assert.equal(MB.STEREO_AZIMUTH_EPS, cppFloatConstant(stereo, 'STEREO_AZIMUTH_EPS'));
+  assert.match(stereo, /STEREO_POLE_EPS\s*=\s*2\.0f\s*\/\s*\(STEREO_INF\s*\*\s*STEREO_INF\)/);
+  assert.equal(MB.STEREO_POLE_EPS, 2 / MB.STEREO_INF ** 2);
+  const lift = /COMPLEX_UNDERFLOW_LIFT\s*=\s*0x1p(\d+)f/.exec(math);
+  assert.ok(lift);
+  assert.equal(MB.STEREO_UNDERFLOW_LIFT, 2 ** Number(lift[1]));
 });
