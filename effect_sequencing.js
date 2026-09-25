@@ -14,8 +14,8 @@
 
 import { resolveActiveEffect } from "./sidebar_logic.js";
 
-/** @typedef {import('./holosphere_wasm.js').HolosphereEngine} HolosphereEngine */
-/** @typedef {import('./holosphere_wasm.js').HolosphereModule} HolosphereModule */
+/** @typedef {import('./generated/holosphere_wasm.js').HolosphereEngine} HolosphereEngine */
+/** @typedef {import('./generated/holosphere_wasm.js').HolosphereModule} HolosphereModule */
 
 /** One lil-gui control, as the effect panel hands it out. @typedef {{getValue: () => any, setValue: (value: any) => void}} ParamController */
 

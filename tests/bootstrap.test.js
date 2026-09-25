@@ -330,7 +330,7 @@ test('refreshModuleCache re-fetches same-origin scripts past the cache', async (
       // Glue and binary are bound by content hash, so a cached binary against
       // fresh glue is exactly the skew Reload exists to clear. The glue appends
       // that hash as a query, which the extension test has to look past.
-      'http://localhost:8000/holosphere_wasm.wasm?v=fd73baf',
+      'http://localhost:8000/generated/holosphere_wasm.wasm?v=fd73baf',
     ),
     fetch: (url, options) => { calls.push([url, options]); return Promise.resolve(); },
   });
@@ -338,7 +338,7 @@ test('refreshModuleCache re-fetches same-origin scripts past the cache', async (
   // The binary leads: it is the slowest re-fetch and the skew the sweep exists
   // to clear, and the page loads it last. The rest keep load order.
   assert.deepEqual(calls.map(([url]) => url), [
-    'http://localhost:8000/holosphere_wasm.wasm?v=fd73baf',
+    'http://localhost:8000/generated/holosphere_wasm.wasm?v=fd73baf',
     'http://localhost:8000/daydream.js',
     'http://localhost:8000/effect_sequencing.js',
     'http://localhost:8000/tools/shared.js?v=2',
@@ -404,7 +404,7 @@ function fakeBody(chunks, gate = Promise.resolve()) {
 test('refreshModuleCache reads every re-fetched body to completion', async () => {
   const bodies = new Map([
     ['http://localhost:8000/daydream.js', fakeBody(1)],
-    ['http://localhost:8000/holosphere_wasm.wasm', fakeBody(4)],
+    ['http://localhost:8000/generated/holosphere_wasm.wasm', fakeBody(4)],
   ]);
 
   await refreshModuleCache({
@@ -438,7 +438,7 @@ test('the reload waits for the re-fetched binary to finish streaming', async () 
     location: { reload() { order.push('reload'); } },
     refresh: () => refreshModuleCache({
       origin: 'http://localhost:8000',
-      performance: fakeTimeline('http://localhost:8000/holosphere_wasm.wasm'),
+      performance: fakeTimeline('http://localhost:8000/generated/holosphere_wasm.wasm'),
       fetch: async () => body.response,
     }),
   });
@@ -486,7 +486,7 @@ test('refreshModuleCache skips cross-origin and unrelated resources', async () =
       'http://localhost:8000/favicon.svg',
       'http://localhost:8000/image.png',
       'http://localhost:8000/styles/index.css',
-      'http://localhost:8000/pov_segment_map.json',
+      'http://localhost:8000/generated/pov_segment_map.json',
       'http://localhost:8000/bootstrap.js',
     ),
     fetch: (url) => { calls.push(url); return Promise.resolve(); },
@@ -494,7 +494,7 @@ test('refreshModuleCache skips cross-origin and unrelated resources', async () =
 
   assert.deepEqual(calls, [
     'http://localhost:8000/styles/index.css',
-    'http://localhost:8000/pov_segment_map.json',
+    'http://localhost:8000/generated/pov_segment_map.json',
     'http://localhost:8000/bootstrap.js',
   ]);
 });

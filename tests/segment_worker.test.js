@@ -178,7 +178,7 @@ let nextLive = false;
 let moduleOptions = null;
 /** Module object returned by the mocked factory. */
 let wasmModuleInstance = null;
-mock.module('../holosphere_wasm.js', {
+mock.module('../generated/holosphere_wasm.js', {
   defaultExport: async (options) => {
     moduleOptions = options;
     wasmModuleInstance = {
@@ -1174,7 +1174,7 @@ test('the worker module graph carries no specifier an import map would resolve',
   // Pinned, not just counted: a module joining the graph is a module the worker
   // now fetches on every spawn, and one leaving it takes its own gate with it.
   assert.deepEqual(modules, [
-    'holosphere_wasm.js',
+    'generated/holosphere_wasm.js',
     'segment_layout.js',
     'segment_worker.js',
     'tools/engine_halt.js',
@@ -1215,7 +1215,7 @@ function typedefShapes(source) {
 // together.
 const PROTOCOL_SHAPE_PIN = {
   version: 10,
-  sha256: '2826c2e2a6599287682cc3da6db91aa5e0eeff4e749e79ccac4383a90f897f9c',
+  sha256: 'ba9254fd2cb21f2ae624244e109d3dc876e83cc82dec44b3a86d6025a5a92441',
 };
 
 test('a reshaped protocol message forces a PROTOCOL_VERSION bump', () => {

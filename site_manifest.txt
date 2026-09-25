@@ -53,8 +53,8 @@ state.js
 worker_protocol.js
 
 # Engine module: Emscripten glue plus the binary it loads by name.
-holosphere_wasm.js
-holosphere_wasm.wasm
+generated/holosphere_wasm.js
+generated/holosphere_wasm.wasm
 
 # Tool pages and their shared modules.
 tools/lissajous.html
@@ -108,32 +108,32 @@ tools/solids_page.js
 # Shader workbench: the document compiler, the operator catalog, and the
 # pattern documents the source catalog fetches by name at runtime. Listed file
 # by file so the v1 expansion fixtures under shader/patterns/v1/ do not ship.
-shader/sha256.mjs
-shader/shader_workbench.mjs
-shader/engine_catalog.json
-shader/patterns/shaderball_migration.json
+generated/shader/sha256.mjs
+generated/shader/shader_workbench.mjs
+generated/shader/engine_catalog.json
+generated/shader/patterns/shaderball_migration.json
 shader/patterns/digest_migration.v1v2.json
-shader/patterns/alien_ocean.shader.json
-shader/patterns/grid_space.shader.json
-shader/patterns/cosmic_eyeball.shader.json
-shader/patterns/ash_cloud.shader.json
-shader/patterns/lattice_melt.shader.json
-shader/patterns/chromatic_lichen.shader.json
-shader/patterns/mermaid_skin.shader.json
-shader/patterns/kaleidoscope_flowers.shader.json
-shader/patterns/kaleidoscope_smooth.shader.json
-shader/patterns/kaleidoscope_mandala.shader.json
-shader/patterns/alien_core.shader.json
-shader/patterns/kaleidoscope_hex_bright.shader.json
-shader/patterns/kaleidoscope_hex_soft.shader.json
-shader/patterns/mobius_grid.shader.json
-shader/patterns/kaleidoscope_pent_bright.shader.json
-shader/patterns/kaleidoscope_hex_oil.shader.json
-shader/patterns/alien_brain.shader.json
-shader/patterns/kaleidoscope_stained_glass.shader.json
+generated/shader/patterns/alien_ocean.shader.json
+generated/shader/patterns/grid_space.shader.json
+generated/shader/patterns/cosmic_eyeball.shader.json
+generated/shader/patterns/ash_cloud.shader.json
+generated/shader/patterns/lattice_melt.shader.json
+generated/shader/patterns/chromatic_lichen.shader.json
+generated/shader/patterns/mermaid_skin.shader.json
+generated/shader/patterns/kaleidoscope_flowers.shader.json
+generated/shader/patterns/kaleidoscope_smooth.shader.json
+generated/shader/patterns/kaleidoscope_mandala.shader.json
+generated/shader/patterns/alien_core.shader.json
+generated/shader/patterns/kaleidoscope_hex_bright.shader.json
+generated/shader/patterns/kaleidoscope_hex_soft.shader.json
+generated/shader/patterns/mobius_grid.shader.json
+generated/shader/patterns/kaleidoscope_pent_bright.shader.json
+generated/shader/patterns/kaleidoscope_hex_oil.shader.json
+generated/shader/patterns/alien_brain.shader.json
+generated/shader/patterns/kaleidoscope_stained_glass.shader.json
 
 # The project license, carrying the notices MIT requires for the PROJ-derived
-# projection code and FastNoiseLite compiled into holosphere_wasm.wasm.
+# projection code and FastNoiseLite compiled into generated/holosphere_wasm.wasm.
 LICENSE
 
 # Documentation the deploy gate pins to the engine checkout.

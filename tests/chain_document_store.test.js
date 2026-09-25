@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parse } from 'espree';
-import * as compiler from '../shader/shader_workbench.mjs';
+import * as compiler from '../generated/shader/shader_workbench.mjs';
 
 import {
   DEFAULT_SCRATCH_CHAIN,
@@ -26,16 +26,16 @@ import {
   chainArenaBytes,
   compileShaderDocument,
   validateShaderDocument,
-} from '../shader/shader_workbench.mjs';
+} from '../generated/shader/shader_workbench.mjs';
 
 const CATALOG = JSON.parse(readFileSync(
-  new URL('../shader/engine_catalog.json', import.meta.url), 'utf8'));
+  new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
 const BASE = compileShaderDocument(readFileSync(
-  new URL('../shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8'),
+  new URL('../generated/shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8'),
 { catalog: CATALOG });
 assert.equal(BASE.status, 'VALID');
 const STAINED_GLASS = compileShaderDocument(readFileSync(
-  new URL('../shader/patterns/kaleidoscope_stained_glass.shader.json', import.meta.url), 'utf8'),
+  new URL('../generated/shader/patterns/kaleidoscope_stained_glass.shader.json', import.meta.url), 'utf8'),
 { catalog: CATALOG });
 assert.equal(STAINED_GLASS.status, 'VALID');
 
@@ -926,7 +926,7 @@ test('chain labels use the compiler grammar', () => {
     return declaration.init.regex;
   };
   assert.deepEqual(grammar('../tools/chain_document_store.js'),
-    grammar('../shader/shader_workbench.mjs'));
+    grammar('../generated/shader/shader_workbench.mjs'));
 });
 
 test('radian periodicity is independent of a catalog field bound', () => {

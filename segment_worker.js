@@ -11,7 +11,7 @@
  * share arrives with `init` when the controller has one.
  */
 
-import createHolosphereModule from "./holosphere_wasm.js";
+import createHolosphereModule from "./generated/holosphere_wasm.js";
 import { computeSegmentRange, extractSegment } from "./segment_layout.js";
 import { PROTOCOL_VERSION } from "./worker_protocol.js";
 import { engineHalted } from "./tools/engine_halt.js";
@@ -20,8 +20,8 @@ import { engineHalted } from "./tools/engine_halt.js";
 /** @typedef {import('./worker_protocol.js').ControllerInboundMsg} ControllerInboundMsg */
 /** @typedef {import('./worker_protocol.js').SegArenaMetrics} SegArenaMetrics */
 /** @typedef {import('./segment_layout.js').SegRange} SegRange */
-/** @typedef {import('./holosphere_wasm.js').HolosphereModule} HolosphereModule */
-/** @typedef {import('./holosphere_wasm.js').HolosphereEngine} HolosphereEngine */
+/** @typedef {import('./generated/holosphere_wasm.js').HolosphereModule} HolosphereModule */
+/** @typedef {import('./generated/holosphere_wasm.js').HolosphereEngine} HolosphereEngine */
 
 /**
  * Send a protocol message back to the controller. The dedicated-worker global's

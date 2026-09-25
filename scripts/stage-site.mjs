@@ -25,7 +25,7 @@ export function sitePaths(root, bundle) {
   const screenshots = new Set(readFileSync(resolve(root, 'README.md'), 'utf8')
     .match(/docs\/screenshots\/[\w.-]+\.png/g) ?? []);
   const published = verified.filter((path) => entries.includes(path) || screenshots.has(path)
-    || (path.startsWith('shader/patterns/') && path !== 'shader/patterns/example.shader.json'));
+    || (path.startsWith('generated/shader/patterns/') && path !== 'generated/shader/patterns/example.shader.json'));
   return [...new Set([...entries.filter((path) => !ownedPath(path)), ...published])];
 }
 
@@ -34,7 +34,7 @@ export function stageSite(root, bundle, destination, pair) {
   if (!bundle) throw new Error('A verified engine bundle is required');
   root = resolve(root);
   const head = execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-  if (head !== pair.daydream || readFileSync(resolve(root, 'holosphere_wasm.sha'), 'utf8').trim() !== pair.holosphere)
+  if (head !== pair.daydream || readFileSync(resolve(root, 'generated/holosphere_wasm.sha'), 'utf8').trim() !== pair.holosphere)
     throw new Error('Deployment pair differs from the selected sources');
   destination = resolve(destination);
   const committed = (path) => execFileSync('git', ['-C', root, 'show', `HEAD:${path}`]);

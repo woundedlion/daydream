@@ -1,4 +1,4 @@
-import { fixedDerivedBinding, compileShaderDocument, DEFAULT_LIMITS, exportShaderDocumentJson, validateShaderDocument } from '../shader/shader_workbench.mjs';
+import { fixedDerivedBinding, compileShaderDocument, DEFAULT_LIMITS, exportShaderDocumentJson, validateShaderDocument } from '../generated/shader/shader_workbench.mjs';
 import { afterEach, beforeEach, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -56,7 +56,7 @@ const TOP_LEVEL_WORKBENCH_CSS = (() => {
   return result;
 })();
 const ENGINE_CATALOG = readFileSync(
-  new URL('../shader/engine_catalog.json', import.meta.url), 'utf8');
+  new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8');
 // §4.5: the document the workbench opens on, built from the same catalog the
 // page fetches, so the fakes register exactly what the scratch chain would.
 const SCRATCH = scratchChainDocument(JSON.parse(ENGINE_CATALOG));
@@ -299,11 +299,11 @@ test('labels outside the alias table need no entry', () => {
 // label showing up here means an alias entry crept in for a post-spec effect.
 test('the alias table keys stay frozen to the pre-spec promoted labels', () => {
   const migration = JSON.parse(readFileSync(
-    new URL('../shader/patterns/shaderball_migration.json', import.meta.url), 'utf8'));
+    new URL('../generated/shader/patterns/shaderball_migration.json', import.meta.url), 'utf8'));
   const aliased = new Set();
   for (const filename of Object.values(migration.source_documents)) {
     const doc = JSON.parse(readFileSync(
-      new URL(`../shader/patterns/${filename}`, import.meta.url), 'utf8'));
+      new URL(`../generated/shader/patterns/${filename}`, import.meta.url), 'utf8'));
     for (const preset of doc.preset_bank.presets) {
       for (const id of Object.keys(preset.values ?? {})) {
         const dot = id.indexOf('.');
@@ -476,7 +476,7 @@ test('the fixed path skips every topology field the catalog flags', () => {
   assert.equal(BAKED.has('palette-mapping'), false);
 });
 
-const PATTERNS = new URL('../shader/patterns/', import.meta.url);
+const PATTERNS = new URL('../generated/shader/patterns/', import.meta.url);
 /** @param {string} filename */
 const promotedDocument = (filename) =>
   JSON.parse(readFileSync(new URL(filename, PATTERNS), 'utf8'));
@@ -1058,9 +1058,9 @@ test('returning to the scratch source reopens the default chain', async () => {
 // ── The pipeline strip over the real store, compiler and engine catalog ────
 
 const KALEIDOSCOPE_HEX_BRIGHT = readFileSync(
-  new URL('../shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8');
+  new URL('../generated/shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8');
 const KALEIDOSCOPE_STAINED_GLASS = readFileSync(
-  new URL('../shader/patterns/kaleidoscope_stained_glass.shader.json', import.meta.url), 'utf8');
+  new URL('../generated/shader/patterns/kaleidoscope_stained_glass.shader.json', import.meta.url), 'utf8');
 // No source documents: every load misses the fixed-effect digest catalog and
 // routes onto the chain engine, where the strip mounts.
 const EMPTY_MIGRATION = JSON.stringify({
@@ -1177,7 +1177,7 @@ async function editorWorkbench({
     setParamFilter: (filter) => filters.push(filter),
     fetchText: patternFetch(
       { 'kaleidoscope_hex_bright.shader.json': KALEIDOSCOPE_HEX_BRIGHT }, migration),
-    importCompiler: () => import('../shader/shader_workbench.mjs'),
+    importCompiler: () => import('../generated/shader/shader_workbench.mjs'),
     download: (filename, source) => downloads.push([filename, source]),
     win,
   });

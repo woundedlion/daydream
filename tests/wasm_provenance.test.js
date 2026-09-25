@@ -23,7 +23,7 @@ const engineRoot = engineCandidates.find(
 const engineMissing = `no Holosphere checkout found in ${engineCandidates.join(', ')}`;
 const engineSkip = engineRoot || process.env.HOLOSPHERE_ENGINE_REQUIRED ? false : engineMissing;
 
-const enginePin = text('holosphere_wasm.sha').trim();
+const enginePin = text('generated/holosphere_wasm.sha').trim();
 const committed = (root, path, revision = enginePin) => execFileSync(
   'git', ['-C', root, 'show', `${revision}:${path}`], { encoding: 'buffer' });
 
@@ -37,23 +37,23 @@ function cppFloatConstant(source, name) {
 }
 
 test('the installed WASM artifacts match their recorded hashes', () => {
-  const entries = text('holosphere_wasm.wasm.sha256')
+  const entries = text('generated/holosphere_wasm.wasm.sha256')
     .trim().split(/\r?\n/)
     .map((line) => line.match(/^([0-9a-f]{64})\s+\*?(.+)$/));
   for (const entry of entries) assert.ok(entry, 'each checksum line has sha256sum syntax');
   assert.deepEqual(entries.map((entry) => entry[2]).sort(),
     ['holosphere_wasm.js', 'holosphere_wasm.wasm'],
     'the manifest names the glue and the binary and nothing else');
-  for (const entry of entries) assert.equal(sha256(entry[2]), entry[1], entry[2]);
+  for (const entry of entries) assert.equal(sha256(`generated/${entry[2]}`), entry[1], entry[2]);
 });
 
 test('the engine pin is one clean full commit', () => {
-  assert.match(text('holosphere_wasm.sha').trim(), /^[0-9a-f]{40}$/);
+  assert.match(text('generated/holosphere_wasm.sha').trim(), /^[0-9a-f]{40}$/);
 });
 
 test('the toolchain record describes a release module', () => {
   const fields = Object.fromEntries(
-    text('holosphere_wasm.toolchain').trim().split(/\r?\n/).map((line) => line.split(/\s+/, 2)),
+    text('generated/holosphere_wasm.toolchain').trim().split(/\r?\n/).map((line) => line.split(/\s+/, 2)),
   );
   assert.match(fields.emsdk, /^\d+\.\d+\.\d+$/);
   assert.equal(fields.build_type, 'Release');
@@ -61,9 +61,9 @@ test('the toolchain record describes a release module', () => {
 });
 
 test('the installed operator catalog describes the installed WASM', async () => {
-  const { default: createModule } = await import('../holosphere_wasm.js');
+  const { default: createModule } = await import('../generated/holosphere_wasm.js');
   const module = await createModule();
-  assert.deepEqual(JSON.parse(text('shader/engine_catalog.json')),
+  assert.deepEqual(JSON.parse(text('generated/shader/engine_catalog.json')),
     JSON.parse(module.HolosphereEngine.getShaderChainCatalog()));
 });
 
@@ -77,9 +77,9 @@ const ALIAS_PROBES = [
 
 const controlNameCorpus = () => {
   const ids = new Set(ALIAS_PROBES);
-  for (const name of readdirSync(resolve(REPO, 'shader/patterns'))) {
+  for (const name of readdirSync(resolve(REPO, 'generated/shader/patterns'))) {
     if (!name.endsWith('.shader.json')) continue;
-    for (const parameter of JSON.parse(text(`shader/patterns/${name}`))
+    for (const parameter of JSON.parse(text(`generated/shader/patterns/${name}`))
       .descriptor?.parameters ?? []) ids.add(parameter.id);
   }
   return [...ids].sort();
@@ -98,7 +98,7 @@ test('the browser promoted-binding predicates agree with the installed engine pi
     for (const name of ['wasm_smoke_predicates.mjs', 'shader_workbench.mjs', 'sha256.mjs'])
       writeFileSync(resolve(snapshot, name), committed(engineRoot, `scripts/${name}`, revision));
     const predicates = await import(pathToFileURL(resolve(snapshot, 'wasm_smoke_predicates.mjs')).href);
-    const catalog = JSON.parse(text('shader/engine_catalog.json'));
+    const catalog = JSON.parse(text('generated/shader/engine_catalog.json'));
     assert.deepEqual(
       [...bakedTopologyFields(catalog)].sort(),
       [...predicates.bakedTopologyFields(catalog)].sort(),
@@ -222,8 +222,8 @@ test('CI checks source parity after installing the selected runtime', () => {
 for (const name of ['shader_workbench.mjs', 'sha256.mjs']) {
   test(`shader mirror ${name} matches the pinned engine`, { skip: engineSkip }, () => {
     assert.ok(engineRoot, engineMissing);
-    const pin = text('holosphere_wasm.sha').trim();
-    assert.equal(text(`shader/${name}`),
+    const pin = text('generated/holosphere_wasm.sha').trim();
+    assert.equal(text(`generated/shader/${name}`),
       committed(engineRoot, `scripts/${name}`, pin).toString('utf8').replaceAll('\r\n', '\n'));
   });
 }
@@ -233,10 +233,10 @@ test('pattern mirrors match the pinned engine in both content and membership', {
   const mirrored = (name) => name.endsWith('.shader.json') || name === 'shaderball_migration.json';
   const expected = execFileSync('git', ['-C', engineRoot, 'ls-tree', '--name-only',
     `${enginePin}:patterns`], { encoding: 'utf8' }).trim().split('\n').filter(mirrored).sort();
-  const actual = readdirSync(resolve(REPO, 'shader/patterns')).filter(mirrored).sort();
+  const actual = readdirSync(resolve(REPO, 'generated/shader/patterns')).filter(mirrored).sort();
   assert.deepEqual(actual, expected);
   for (const name of expected) {
-    assert.equal(text(`shader/patterns/${name}`),
+    assert.equal(text(`generated/shader/patterns/${name}`),
       committed(engineRoot, `patterns/${name}`).toString('utf8').replaceAll('\r\n', '\n'), name);
   }
 });

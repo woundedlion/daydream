@@ -33,11 +33,11 @@ export const PROTOCOL_VERSION = 10;
  * @typedef {{ name: string, value: number, acceptedValue?: number }} SegParam
  */
 
-/** @typedef {import('./holosphere_wasm.js').FullConfigSnapshot} FullConfigSnapshot */
+/** @typedef {import('./generated/holosphere_wasm.js').FullConfigSnapshot} FullConfigSnapshot */
 
 /**
  * Usage snapshot of a single arena (bytes).
- * @typedef {Pick<import('./holosphere_wasm.js').ArenaUsage,
+ * @typedef {Pick<import('./generated/holosphere_wasm.js').ArenaUsage,
  * 'usage'|'high_water_mark'|'capacity'>} SegArenaUsage
  */
 
@@ -142,7 +142,7 @@ export const PROTOCOL_VERSION = 10;
  *   sharedModule?: boolean }} EngineRejectedMsg */
 
 /** Worker module body started executing — its static imports (incl. the WASM
- * glue ./holosphere_wasm.js) all resolved. Sent before the WASM instantiate so
+ * glue ./generated/holosphere_wasm.js) all resolved. Sent before the WASM instantiate so
  * the controller can detect a missing/renamed glue file fast, ahead of the
  * slower init watchdog. Carries no segId: the controller maps it to the worker
  * via the per-worker message handler. Carries the protocol version so the

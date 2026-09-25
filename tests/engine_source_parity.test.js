@@ -35,7 +35,7 @@ const engineRoot = engineCandidates.find(
 const engineMissing = `no Holosphere checkout found in ${engineCandidates.join(', ')}`;
 const engineSkip = engineRoot || process.env.HOLOSPHERE_ENGINE_REQUIRED ? false : engineMissing;
 
-const enginePin = readFileSync(new URL('../holosphere_wasm.sha', import.meta.url), 'utf8').trim();
+const enginePin = readFileSync(new URL('../generated/holosphere_wasm.sha', import.meta.url), 'utf8').trim();
 
 const STEREO_H = 'core/math/stereographic.h';
 const MOBIUS_H = 'core/math/mobius.h';

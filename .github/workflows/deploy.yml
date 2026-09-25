@@ -109,7 +109,7 @@ jobs:
     env:
       # The engine pair the browser instantiates, staged and then served. Both
       # steps below read this list, so neither can check a different set.
-      ENGINE_ASSETS: holosphere_wasm.wasm holosphere_wasm.js
+      ENGINE_ASSETS: generated/holosphere_wasm.wasm generated/holosphere_wasm.js
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

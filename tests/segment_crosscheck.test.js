@@ -41,7 +41,7 @@ import { computeSegmentRange } from '../segment_layout.js';
  *   segments: GoldenSegment[] }} GoldenConfig
  */
 
-const GOLDEN_URL = new URL('../pov_segment_map.json', import.meta.url);
+const GOLDEN_URL = new URL('../generated/pov_segment_map.json', import.meta.url);
 const REGENERATE =
   'regenerate it in the engine checkout (cmake --build --preset tests --target '
   + 'pov_segment_map_gen) and re-run the WASM install';

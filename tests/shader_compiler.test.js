@@ -10,11 +10,11 @@ import {
   exportShaderDocumentJson,
   parseShaderDocument,
   v1DescriptorDigest,
-} from '../shader/shader_workbench.mjs';
-import { sha256Hex } from '../shader/sha256.mjs';
+} from '../generated/shader/shader_workbench.mjs';
+import { sha256Hex } from '../generated/shader/sha256.mjs';
 
-const PATTERNS = new URL('../shader/patterns/', import.meta.url);
-const FIXTURES = new URL('v1/', PATTERNS);
+const PATTERNS = new URL('../generated/shader/patterns/', import.meta.url);
+const FIXTURES = new URL('../shader/patterns/v1/', import.meta.url);
 const patternNames = readdirSync(PATTERNS).filter((f) => f.endsWith('.shader.json'));
 const identityProjectionPatterns = [
   'alien_core.shader.json',
@@ -42,9 +42,9 @@ const legacyV1Digests = [
   'ed25629495041b434cb2d142cf0eb71ba5afee4af07ba5c6ab391f1832173349',
 ];
 const CATALOG = JSON.parse(
-  readFileSync(new URL('../shader/engine_catalog.json', import.meta.url), 'utf8'));
+  readFileSync(new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
 const MIGRATION = JSON.parse(
-  readFileSync(new URL('digest_migration.v1v2.json', PATTERNS), 'utf8'));
+  readFileSync(new URL('../shader/patterns/digest_migration.v1v2.json', import.meta.url), 'utf8'));
 
 /**
  * Reads a file the canonical LF export is pinned against. A CRLF working-tree

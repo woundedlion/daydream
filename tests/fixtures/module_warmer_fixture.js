@@ -8,7 +8,7 @@ function withGlue(dependencies) {
   const fetch = dependencies.fetch;
   return { ...dependencies, fetch: (url, options) => {
     const response = fetch(url, options);
-    if (!url.pathname.endsWith('/holosphere_wasm.js')) return response;
+    if (!url.pathname.endsWith('/generated/holosphere_wasm.js')) return response;
     return response.then((value) => ({ ...value, arrayBuffer: async () => {
       await value.arrayBuffer();
       return GLUE.buffer;

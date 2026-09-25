@@ -42,3 +42,12 @@ consumer commit. Modified frontend files and provenance mismatches fail staging.
 Manual deployments accept `force` to republish an unchanged successful pair.
 The pre-push hook checks each pushed commit in a temporary checkout; unrelated
 working-tree edits do not substitute for the source being pushed.
+
+## Installed engine assets
+
+The engine bundle installs runtime binaries, provenance, the segment map, and
+shader modules and patterns under `generated/`. Its WASM checksum manifest uses
+filenames relative to that directory. Handwritten TypeScript declarations are
+tracked beside their generated modules for module resolution; runtime files are
+ignored. Legacy shader fixtures and digest migrations remain consumer-owned.
+The engine still mirrors `README.md` and `docs/screenshots/` at their public paths.
