@@ -981,3 +981,19 @@ test('stopping and restarting recording clears deferred captures between frames'
   rig.button.object.record();
   assert.equal(rig.driver.heldCaptures, 0);
 });
+
+test('a refused parameter write reports its reason and a later accepted edit clears it', async () => {
+  const module = fakeWasmModule({
+    definitions: [{ name: 'Speed', value: 1, min: 0, max: 2 }],
+  });
+  const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
+  const speed = app.guis.at(-1).controllers.find((c) => c.property === 'Speed');
+  const accepted = module.HolosphereEngine.prototype.setParameter;
+  module.HolosphereEngine.prototype.setParameter = () => ParamSetResult.INADMISSIBLE;
+  captureConsole(() => speed.setValue(1.5));
+  assert.match(noticeText(app), /Parameter "Speed" was rejected: INADMISSIBLE/);
+  module.HolosphereEngine.prototype.setParameter = accepted;
+  captureConsole(() => speed.setValue(1.25));
+  assert.equal(noticeText(app), '');
+  assert.deepEqual(module.params.at(-1), ['Speed', 1.25]);
+});
