@@ -93,8 +93,8 @@ const parameterFromField = (label, field) => {
 export const UNDO_DEPTH = 100;
 
 /**
- * The default chain a scratch document opens on: the minimal legal chain over
- * the shipped crossings, with the camera in front.
+ * The default scratch chain uses a camera and plane-space sampling.
+ * The minimal legal chain is SampleSphere followed by Colorize.
  * @type {ReadonlyArray<ChainEntry>}
  */
 export const DEFAULT_SCRATCH_CHAIN = Object.freeze([
