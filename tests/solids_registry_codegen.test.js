@@ -104,9 +104,7 @@ test('generateRegistryCpp emits a Recipe mirror for a hankin-free chain too', ()
     + '\n'
     + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
     + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
-    + '// fail; the README registry table counts the entry too. A chain that\n'
-    + '// lowers to more than IslamicStars::MAX_BUILD_STEPS primitive steps\n'
-    + "// fails that effect's static_assert as well.\n"
+    + '// fail; the README registry table counts the entry too.\n'
     + '    {"cube_truncate33", IslamicStarPatterns::cube_truncate33, '
     + 'Category::Complex,\n'
     + '     &CUBE_TRUNCATE33_RECIPE},');
@@ -124,9 +122,7 @@ test('generateRegistryCpp packs a short Recipe body onto one continuation line',
 
 /**
  * Adding the entry grows islamic_registry, which fails its size static_assert
- * and the NUM_ENTRIES sum until ISLAMIC_COUNT is raised to match, and a chain
- * past IslamicStars::MAX_BUILD_STEPS lowered steps fails that effect's own
- * static_assert; nothing else in the paste names either.
+ * and the NUM_ENTRIES sum until ISLAMIC_COUNT is raised to match.
  */
 test('every paste names the static_asserts a new entry breaks', () => {
   const chains = [
@@ -138,8 +134,6 @@ test('every paste names the static_asserts a new entry breaks', () => {
   for (const [item, baseRecipe] of chains) {
     assert.match(generateRegistryCpp(item, baseRecipe), /raise ISLAMIC_COUNT by one/,
       `${item.base} pastes without the ISLAMIC_COUNT bump`);
-    assert.match(generateRegistryCpp(item, baseRecipe), /MAX_BUILD_STEPS/,
-      `${item.base} pastes without the lowered-step ceiling`);
   }
 });
 
@@ -248,9 +242,7 @@ test('generateRegistryCpp emits a step table and Recipe mirror for a hankin chai
     + '\n'
     + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
     + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
-    + '// fail; the README registry table counts the entry too. A chain that\n'
-    + '// lowers to more than IslamicStars::MAX_BUILD_STEPS primitive steps\n'
-    + "// fails that effect's static_assert as well.\n"
+    + '// fail; the README registry table counts the entry too.\n'
     + '    {"dodecahedron_hk62_ambo", IslamicStarPatterns::dodecahedron_hk62_ambo,\n'
     + '     Category::Complex, &DODECAHEDRON_HK62_AMBO_RECIPE},');
 });
@@ -291,9 +283,7 @@ test('generateRegistryCpp wraps a long paste in the tool format', () => {
     + '\n'
     + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
     + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
-    + '// fail; the README registry table counts the entry too. A chain that\n'
-    + '// lowers to more than IslamicStars::MAX_BUILD_STEPS primitive steps\n'
-    + "// fails that effect's static_assert as well.\n"
+    + '// fail; the README registry table counts the entry too.\n'
     + '    {"truncatedIcosahedron_ambo_relax100_truncate01_hk59",\n'
     + '     IslamicStarPatterns::truncatedIcosahedron_ambo_relax100_truncate01_hk59,\n'
     + '     Category::Complex,\n'
@@ -385,9 +375,7 @@ test('generateRegistryCpp flattens a star-pattern base onto its own seed', () =>
     + '\n'
     + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
     + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
-    + '// fail; the README registry table counts the entry too. A chain that\n'
-    + '// lowers to more than IslamicStars::MAX_BUILD_STEPS primitive steps\n'
-    + "// fails that effect's static_assert as well.\n"
+    + '// fail; the README registry table counts the entry too.\n'
     + '    {"icosahedron_kis_gyro_hk54",\n'
     + '     IslamicStarPatterns::icosahedron_kis_gyro_hk54, Category::Complex,\n'
     + '     &ICOSAHEDRON_KIS_GYRO_HK54_RECIPE},');
