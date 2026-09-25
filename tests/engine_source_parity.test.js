@@ -19,15 +19,17 @@ import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { lissajousCodeString } from '../tools/lissajous_math.js';
 import * as MB from '../tools/mobius_transforms.js';
 import * as P from '../tools/palette_math.js';
 import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS } from '../tools/solid_codegen.js';
 import { MAX_BUILD_STEPS, upperSnake, primitiveCount } from '../tools/solid_registry_codegen.js';
 
+const REPO = fileURLToPath(new URL('..', import.meta.url));
 const engineCandidates = process.env.HOLOSPHERE_ENGINE_DIR
-  ? [resolve(process.env.HOLOSPHERE_ENGINE_DIR)]
-  : ['engine', '../Holosphere', '../pov'].map((path) => resolve(path));
+  ? [resolve(REPO, process.env.HOLOSPHERE_ENGINE_DIR)]
+  : ['engine', '../Holosphere', '../pov'].map((path) => resolve(REPO, path));
 const engineRoot = engineCandidates.find(
   (path) => existsSync(resolve(path, 'scripts/shader_workbench.mjs')));
 const engineMissing = `no Holosphere checkout found in ${engineCandidates.join(', ')}`;
@@ -397,7 +399,7 @@ function engineLeafFields(source, name) {
  */
 test('generativePaletteCpp assigns the fields core/color/palette_recipe.h declares', { skip: engineSkip }, () => {
   const cpp = header(PALETTE_RECIPE_H);
-  const js = readFileSync('tools/palette_math.js', 'utf8');
+  const js = readFileSync(resolve(REPO, 'tools/palette_math.js'), 'utf8');
   const want = engineLeafFields(cpp, 'PaletteRecipe');
   assert.ok(want.size >= 20, `read only ${want.size} recipe fields — the reader is out of date`);
 
