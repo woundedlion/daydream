@@ -154,7 +154,8 @@ test('every script that drives a browser is wired into the paired CI suite', () 
   const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
   const workflow = read('../.github/workflows/browser-smoke.yml');
   for (const file of driven) {
-    assert.ok(workflow.includes(`scripts/${file}`),
+    assert.ok(workflow.includes(`scripts/${file}`)
+      || (file.endsWith('-probe.mjs') && workflow.includes('scripts/*-probe.mjs')),
       `${file} is missing from .github/workflows/browser-smoke.yml`);
   }
 });

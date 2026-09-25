@@ -66,14 +66,7 @@ jobs:
         run: |
           status=0
           deadline=$(( $(date +%s) + PROBE_BUDGET_S ))
-          for script in \
-            scripts/browser-smoke.mjs \
-            scripts/workbench-probe.mjs \
-            scripts/panel-probe.mjs \
-            scripts/solids-probe.mjs \
-            scripts/palettes-probe.mjs \
-            scripts/mobius-probe.mjs \
-            scripts/lissajous-probe.mjs
+          for script in scripts/browser-smoke.mjs scripts/*-probe.mjs
           do
             echo "::group::$script"
             left=$(( deadline - $(date +%s) ))

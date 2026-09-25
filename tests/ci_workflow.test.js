@@ -354,8 +354,7 @@ test('local pushes check source while paired browser coverage remains mandatory 
   assert.doesNotMatch(hook, /wasm_provenance|npm test|run_probe|resolveBrowser/);
   assert.match(hook, /node --test tests\/ci_workflow\.test\.js tests\/deployment_pair\.test\.js tests\/stage_site\.test\.js/);
   const browser = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/browser-smoke.yml`), 'utf8');
-  for (const probe of ['browser-smoke', 'workbench-probe', 'panel-probe', 'solids-probe', 'palettes-probe', 'mobius-probe', 'lissajous-probe'])
-    assert.ok(browser.includes(`scripts/${probe}.mjs`));
+  assert.ok(browser.includes('for script in scripts/browser-smoke.mjs scripts/*-probe.mjs'));
   assert.match(browser, /timeout -k 10s/);
 });
 
@@ -424,4 +423,9 @@ test('reusable suites require the independently selected engine pin', () => {
   const gate = readFileSync(resolve(REPO, WORKFLOW_DIR, 'engine-bundle.yml'), 'utf8');
   assert.ok(gate.includes('value: ${{ jobs.gate.outputs.pin }}'));
   assert.ok(gate.includes('pin: ${{ steps.engine.outputs.pin }}'));
+});
+
+test('the browser suite discovers every probe script', () => {
+  const suite = readFileSync(resolve(REPO, WORKFLOW_DIR, 'browser-smoke.yml'), 'utf8');
+  assert.match(suite, /for script in scripts\/browser-smoke\.mjs scripts\/\*-probe\.mjs/);
 });
