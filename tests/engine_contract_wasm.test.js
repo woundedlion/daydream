@@ -1079,6 +1079,24 @@ test('the full-config accessors answer as the workbench panel assumes', () => {
   assert.deepEqual(engine.getFullConfigSnapshot(), snapshot,
     'a refused restore changed the effect');
 
+  for (const malformed of [
+    { ...snapshot, accepted: undefined },
+    { ...snapshot, accepted: 'x' },
+    ...[{}, 'x', -1, 0.5, 1e300].map((value) => ({
+      ...snapshot, accepted: [value, ...snapshot.accepted.slice(1)],
+    })),
+    { ...snapshot, hasRuntime: 'yes' },
+    { ...snapshot, runtime: null },
+    { ...snapshot, schemaVersion: String(snapshot.schemaVersion) },
+    { ...snapshot, pendingFieldIds: 'x' },
+  ]) {
+    let result;
+    assert.doesNotThrow(() => { result = engine.restoreFullConfigSnapshot(malformed); });
+    assert.notEqual(result, M.FullConfigRestoreResult.APPLIED);
+    assert.deepEqual(engine.getFullConfigSnapshot(), snapshot,
+      'a mistyped restore changed the effect');
+  }
+
   engine.clearConfigImportNotice();
   assert.equal(engine.getConfigImportNotice(), '',
     'the notice must be consumed by the clear the panel pairs with it');
