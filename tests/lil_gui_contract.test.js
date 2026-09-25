@@ -257,8 +257,9 @@ test('addColor and addFolder hand back the shapes the GUI layer wraps', async ()
   assert.deepEqual(gui.children, [], 'destroy() empties the panel');
 });
 
-test('the shared app GUI rejects unsupported properties like DeepLinkGUI', () => {
-  const gui = fakeGui('test');
+for (const namespace of ['test', {}]) {
+test('the shared GUI rejects unsupported properties like DeepLinkGUI', () => {
+  const gui = fakeGui(namespace);
   for (const object of [{}, { value: null }, { value: undefined }, { value: {} }]) {
     assert.throws(() => gui.add(object, 'value'), TypeError);
     assert.throws(() => gui.addSession(object, 'value'), /DeepLinkGUI: unsupported property/);
@@ -266,3 +267,4 @@ test('the shared app GUI rejects unsupported properties like DeepLinkGUI', () =>
   assert.ok(gui.add({}, 'value', ['a', 'b']));
   assert.equal(gui.controllers.length, 1);
 });
+}
