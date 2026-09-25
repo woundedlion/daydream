@@ -100,6 +100,12 @@ const main = () => {
       console.error('run-tests: no tests executed; refusing an empty green run.');
       status = 1;
     }
+    if (status === 0 && patterns.some((pattern) => pattern.includes('**'))
+        && !/^ok \d+ - recursive test discovery reaches nested Node modules\s*$/m
+          .test(readFileSync(reportPath, 'utf8'))) {
+      console.error('run-tests: recursive discovery canary did not run.');
+      status = 1;
+    }
     if (status === 0 && process.env.CI
         && !/^# skipped 0\s*$/m.test(readFileSync(reportPath, 'utf8'))) {
       console.error('run-tests: CI must execute every test without skips.');
