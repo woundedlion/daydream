@@ -1,4 +1,4 @@
-// site_manifest.txt is the served set: deploy.yml stages exactly its entries.
+// The published set combines site_manifest.txt with verified engine assets.
 // A wildcard `cp` allowlist would publish any future root-level dev script and
 // still miss a runtime asset placed in a new directory, so the manifest is
 // checked from both sides here — every source entry is tracked and present, and every

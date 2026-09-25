@@ -1,12 +1,9 @@
-# The set published to GitHub Pages, one regular file per line.
-# Paths are repo-relative. deploy.yml stages
-# exactly these, and tests/site_manifest.test.js checks that every asset the
-# served pages reference is listed and comes from tracked source or the
-# verified engine bundle.
-#
-# Anything absent from this list is not served: dev tooling, tests/, scripts/,
-# the engine source pin and its hash manifest. three.js and lil-gui load from
-# their CDNs via vendor-importmap.js, so no vendored dirs appear here.
+# Source-owned GitHub Pages assets, one repo-relative regular file per line.
+# Deployment also publishes the verified engine bundle's pattern documents,
+# README, and every screenshot that README references. Runtime entries below
+# identify required assets; the verified bundle supplies their bytes.
+# Tests and development scripts are excluded. Third-party libraries load
+# through vendor-importmap.js.
 
 # Simulator page and its module graph.
 index.html
@@ -106,8 +103,8 @@ src/workbench/solids/solid_render.js
 src/workbench/solids/solids_page.js
 
 # Shader workbench: the document compiler, the operator catalog, and the
-# pattern documents the source catalog fetches by name at runtime. Listed file
-# by file so the v1 expansion fixtures under src/workbench/shader/patterns/v1/ do not ship.
+# required pattern documents. Deployment includes all bundle patterns; the
+# local v1 expansion fixtures under src/workbench/shader/patterns/v1/ do not ship.
 generated/shader/sha256.mjs
 generated/shader/shader_workbench.mjs
 generated/shader/engine_catalog.json
@@ -136,6 +133,6 @@ generated/shader/patterns/kaleidoscope_stained_glass.shader.json
 # projection code and FastNoiseLite compiled into generated/holosphere_wasm.wasm.
 LICENSE
 
-# Documentation the deploy gate pins to the engine checkout.
+# Documentation supplied by the verified engine bundle.
 README.md
 docs/screenshots/IslamicStars.png

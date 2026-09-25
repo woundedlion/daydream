@@ -1,4 +1,4 @@
-// The served set, read from site_manifest.txt. The CSP, stylesheet and
+// Source entries plus verified engine assets. The CSP, stylesheet and
 // module-reachability cases all run over this roster, so a page added to the
 // manifest is gated by them without a second list to keep in step.
 import { dirname, resolve } from 'node:path';
@@ -8,7 +8,7 @@ import { sitePaths } from '../../scripts/stage-site.mjs';
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 /**
- * site_manifest.txt's entries.
+ * Source manifest entries plus assets from the verified engine bundle.
  * @returns {string[]} Repo-relative paths, comments and blank lines dropped.
  */
 export function manifestEntries() {
