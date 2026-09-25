@@ -29,3 +29,13 @@ test('vendor scanner rejects computed imports except fixed relative URL constant
     "const COMPILER_URL = new URL('../compiler.js', import.meta.url).href; await import(COMPILER_URL)",
     'app.js'), []);
 });
+
+test('relative URL exemptions apply only to the top-level binding', () => {
+  const prefix = "const U = new URL('./local.js', import.meta.url).href; ";
+  assert.deepEqual(vendorAddonsFromSource(prefix + 'async function load() { await import(U); }', 'app.js'), []);
+  for (const body of [
+    "function load() { const U = 'three/addons/a.js'; return import(U); }",
+    'function load(U) { return import(U); }',
+    "{ const U = 'three/addons/a.js'; import(U); }",
+  ]) assert.throws(() => vendorAddonsFromSource(prefix + body, 'app.js'), /literal specifiers/);
+});
