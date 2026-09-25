@@ -116,8 +116,10 @@ test('cdn variant pins every CDN module with a sha384 integrity entry', () => {
   for (const url of [imports['three'], imports['lil-gui'], ...addonKeys]) {
     assert.match(integrity[url], /^sha384-[A-Za-z0-9+/]+=*$/, `${url} carries a sha384 hash`);
   }
-  assert.equal(Object.keys(integrity).length, 2 + addonKeys.length,
-    'only the CDN modules are pinned');
+  const coreUrl = new URL('./three.core.js', imports.three).href;
+  assert.match(integrity[coreUrl], /^sha384-[A-Za-z0-9+/]+=*$/);
+  assert.equal(Object.keys(integrity).length, 3 + addonKeys.length,
+    'the complete static CDN graph is pinned');
 });
 
 test('local variant emits no integrity map', () => {
