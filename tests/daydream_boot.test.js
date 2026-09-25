@@ -357,7 +357,7 @@ test('a first frame that throws still releases the migrated URL', async (t) => {
  * A MediaRecorder stand-in as VideoRecorder presents one: a toggle that flips
  * the session, the settings the controls push, and the two hooks they wire.
  * @param {?string} [refusedAs] - Container extension the browser substitutes,
- *   reported through onFormatFallback from inside the start toggle.
+ *   reported through onFormatFallback after the start toggle.
  * @returns {Object} The recorder double.
  */
 function fakeRecorder(refusedAs = null) {
@@ -368,7 +368,7 @@ function fakeRecorder(refusedAs = null) {
     toggle(effect) {
       this.effect = effect;
       this.isRecording = !this.isRecording;
-      if (this.isRecording && refusedAs) this.onFormatFallback(refusedAs);
+      if (this.isRecording && refusedAs) queueMicrotask(() => this.onFormatFallback(refusedAs));
       return this.isRecording;
     },
   };
@@ -417,7 +417,7 @@ function recordingRig({ labelAxes = false } = {}) {
   };
 }
 
-test('the record toggle announces the session and the container it settled on', () => {
+test('the record toggle announces the session and the container it settled on', async () => {
   const rig = recordingRig({ labelAxes: true });
   assert.equal(rig.button.enabled, false,
     'there is no recorder to start until the module load builds one');
@@ -434,6 +434,7 @@ test('the record toggle announces the session and the container it settled on', 
     'the driver captures through the recorder, so it must be handed it');
 
   rig.button.object.record();
+  await Promise.resolve();
 
   assert.match(rig.notices.at(-1), /^Recording started\./,
     'the tint, the readout and the label are visual; the notice is what a '
@@ -733,8 +734,9 @@ test('a recording report reaches the shared notice element', async () => {
   const recorder = app.driver.recorder;
   assert.ok(recorder, 'the load must have handed the controls a recorder');
 
-  recorder.toggle = () => { recorder.onFormatFallback('webm'); return true; };
+  recorder.toggle = () => { queueMicrotask(() => recorder.onFormatFallback('webm')); return true; };
   captureConsole(() => record.object.record());
+  await Promise.resolve();
   const started = noticeText(app);
 
   assert.match(started, /^Recording started\..*recording as WebM\./,

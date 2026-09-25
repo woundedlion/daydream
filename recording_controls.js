@@ -67,10 +67,7 @@ export function createRecordingControls({
   // from a stopped session; this can.
   let recordingShown = false;
 
-  // Why the encoded container is not the one the Rec Format dropdown names,
-  // when the browser refused it. Written by the recorder's fallback hook during
-  // start(), consumed by the record notice raised right after.
-  let formatFallback = '';
+  let startNotice = '';
 
   /**
    * Reflects the session state in the canvas styling, duration readout, and record
@@ -101,7 +98,6 @@ export function createRecordingControls({
       return;
     }
     const wasRecording = recordingShown;
-    formatFallback = '';
     const isRecording = getRecorder().toggle(getEffect());
     // A start that never began a session has already reported why through onError;
     // there was no session to stop, and the same owner tag would overwrite it.
@@ -115,9 +111,9 @@ export function createRecordingControls({
       ? ` This browser saves up to ${MEMORY_BUFFER_LIMIT_BYTES / 1_000_000} MB per recording`
         + ` (about ${Math.floor(MEMORY_BUFFER_LIMIT_BYTES * 8 / (recSettings.recQuality * 1_000_000))} seconds at this quality).`
       : '';
-    showNotice(
-      `${isRecording ? 'Recording started.' : 'Recording stopped.'}`
-      + `${formatFallback}${axisWarning}${memoryNotice}`);
+    startNotice = `${isRecording ? 'Recording started.' : 'Recording stopped.'}`
+      + `${axisWarning}${memoryNotice}`;
+    showNotice(startNotice);
     showRecording(isRecording);
   }};
 
@@ -140,14 +136,13 @@ export function createRecordingControls({
     attach(recorder) {
       recorder.frameInterval = driver.frameInterval;
       recordingSettings.replay();
-      // Held for the notice the record toggle raises once toggle() returns.
-      // Re-seating the dropdown instead would fire its onChange and replace the
-      // user's chosen container for the rest of the session.
       recorder.onFormatFallback = (extension) => {
         const label = Object.keys(REC_FORMATS)
           .find(key => REC_FORMATS[key] === extension) ?? extension.toUpperCase();
-        formatFallback = ` ${recSettings.recFormat} is unsupported in this`
-          + ` browser; recording as ${label}.`;
+        const filenameNote = typeof globalThis.showSaveFilePicker === 'function'
+          ? ` If the saved filename ends in .video, rename it to .${extension}.` : '';
+        showNotice(`${startNotice} ${recSettings.recFormat} is unsupported in this`
+          + ` browser; recording as ${label}.${filenameNote}`);
       };
       // A fault ends the session on its own; drop the recording UI so the button
       // doesn't keep offering to stop a session that is already gone, and report
