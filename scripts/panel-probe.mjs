@@ -684,7 +684,7 @@ export async function probeKeyboardEdits(tab) {
         getParameterDefinitions: () => [{ name: 'Probe', value: state.value,
           min: 0, max: 10, warning: state.warning, animated: true }],
         paramGeneration: () => 0, paramValues: () => [state.value],
-        setParam: (_name, value) => {
+        setParam: (name, value) => {
           state.value = value;
           if (state.warnOnWrite) state.warning = 'Keyboard edit warning';
           return true;
