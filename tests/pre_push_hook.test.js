@@ -86,25 +86,20 @@ test('pre-push refuses a push from a tree that cannot install the suites',
     assert.match(run.stderr, /npm not found/);
   });
 
-test('pre-push refuses a push it cannot run the browser probes for',
+test('pre-push permits a source push without an installed engine or browser',
   { skip: SKIP }, (t) => {
     const root = fixtureRoot(t);
     mkdirSync(join(root, 'node_modules'), { recursive: true });
     writeFileSync(join(root, 'node_modules', '.package-lock.json'), '{}\n');
-    // Every gate before the browser check answers; only `node -e`, which the
-    // hook resolves the browser through, refuses.
     const run = runWithTools(root, {
-      node: 'case "$1" in -e) exit 1;; esac\nexit 0',
+      node: 'case "$*" in *wasm_provenance*|*-e*) exit 1;; esac\nexit 0',
       npm: 'exit 0',
       git: 'exit 0',
       mktemp: 'f=./vendor-importmap.probe\n: > "$f"\necho "$f"',
       rm: 'exit 0',
     });
 
-    assert.notEqual(run.status, 0, `${run.stdout}${run.stderr}`);
-    assert.match(run.stderr, /no browser found/);
-    assert.doesNotMatch(run.stderr, /vendor-importmap\.js is stale/,
-      'the browser refusal is the one that fired, not an earlier gate');
+    assert.equal(run.status, 0, `${run.stdout}${run.stderr}`);
   });
 
 test('pre-push refuses a stale working-tree import map', { skip: SKIP }, (t) => {
@@ -124,14 +119,14 @@ test('pre-push refuses a stale working-tree import map', { skip: SKIP }, (t) => 
   assert.match(run.stderr, /vendor-importmap\.js is stale/);
 });
 
-test('pre-push refuses a failing unit suite even when later gates pass',
+test('pre-push refuses a failing source workflow suite',
   { skip: SKIP }, (t) => {
     const root = fixtureRoot(t);
     mkdirSync(join(root, 'node_modules'), { recursive: true });
     writeFileSync(join(root, 'node_modules', '.package-lock.json'), '{}\n');
     const run = runWithTools(root, {
-      node: 'exit 0',
-      npm: 'case "$1" in test) echo unit-suite-failed >&2; exit 7;; esac\nexit 0',
+      node: 'echo unit-suite-failed >&2; exit 7',
+      npm: 'exit 0',
       git: 'exit 0',
       mktemp: 'f=./vendor-importmap.probe\n: > "$f"\necho "$f"',
       rm: 'exit 0',

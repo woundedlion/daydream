@@ -1,9 +1,9 @@
 // The served set, read from site_manifest.txt. The CSP, stylesheet and
 // module-reachability cases all run over this roster, so a page added to the
 // manifest is gated by them without a second list to keep in step.
-import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { sitePaths } from '../scripts/stage-site.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -12,10 +12,7 @@ const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
  * @returns {string[]} Repo-relative paths, comments and blank lines dropped.
  */
 export function manifestEntries() {
-  return readFileSync(resolve(REPO, 'site_manifest.txt'), 'utf8')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line !== '' && !line.startsWith('#'));
+  return sitePaths(REPO, process.env.ENGINE_BUNDLE_DIR);
 }
 
 /**

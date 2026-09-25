@@ -320,12 +320,11 @@ test('engine bundle callers grant Actions read only to the bundle gate', () => {
   }
 });
 
-test('bundle installation checks additions as well as tracked changes', () => {
-  assert.equal(execFileSync('git', ['-C', REPO, 'check-ignore',
-    'engine-bundle/README.md'], { encoding: 'utf8' }).trim(), 'engine-bundle/README.md');
-  for (const name of ['engine-bundle', 'js-unit-suite', 'deploy']) {
+test('verified engine overlays do not require committed generated assets', () => {
+  for (const name of ['engine-bundle', 'js-unit-suite', 'browser-smoke', 'deploy']) {
     const source = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/${name}.yml`), 'utf8');
-    assert.ok(source.includes('test -z "$(git status --porcelain)"'), name);
+    assert.doesNotMatch(source, /git status --porcelain/);
+    assert.match(source, /node scripts\/install-engine-bundle\.mjs engine-bundle/);
   }
 });
 
@@ -351,12 +350,12 @@ test('the CI gate executes through a linked checkout path', () => {
   }
 });
 
-test('pre-push bounds browser probes and owns their scratch directory', () => {
+test('local pushes check source while paired browser coverage remains mandatory in CI', () => {
   const hook = readFileSync(resolve(REPO, '.githooks/pre-push'), 'utf8');
-  assert.match(hook, /probe_deadline=\$\(\( \$\(date \+%s\) \+ 1500 \)\)/);
-  assert.match(hook, /left < 420 \? left : 420/);
-  assert.ok(hook.includes('timeout -k 10s "${limit}s" "$@"'));
-  assert.ok(hook.includes('export TMPDIR="$probe_tmp" TMP="$probe_tmp" TEMP="$probe_tmp"'));
-  assert.ok(hook.includes('rm -rf "$probe_tmp"'));
-  assert.match(hook, /resolveBrowser\(\)\)\.catch/);
+  assert.doesNotMatch(hook, /wasm_provenance|npm test|run_probe|resolveBrowser/);
+  assert.match(hook, /node --test tests\/ci_workflow\.test\.js tests\/deployment_pair\.test\.js tests\/stage_site\.test\.js/);
+  const browser = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/browser-smoke.yml`), 'utf8');
+  for (const probe of ['browser-smoke', 'workbench-probe', 'panel-probe', 'solids-probe', 'palettes-probe', 'mobius-probe', 'lissajous-probe'])
+    assert.ok(browser.includes(`scripts/${probe}.mjs`));
+  assert.match(browser, /timeout -k 10s/);
 });

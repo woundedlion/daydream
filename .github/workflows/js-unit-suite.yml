@@ -3,6 +3,12 @@ name: JS unit suite
 on:
   workflow_call:
     inputs:
+      daydream-sha:
+        type: string
+        default: ''
+      engine-sha:
+        type: string
+        default: ''
       engine-bundle:
         description: Install this run's verified engine package before testing.
         type: boolean
@@ -24,7 +30,25 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          ref: ${{ inputs.daydream-sha || github.sha }}
           persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22.23.2'
+          cache: npm
+      - name: Download the engine package for this deployment
+        if: inputs.engine-bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: verified-engine-bundle
+          path: engine-bundle
+      - name: Install the verified engine package
+        if: inputs.engine-bundle
+        env:
+          SELECTED_PIN: ${{ inputs.engine-sha }}
+        run: |
+          HOLOSPHERE_BUNDLE_PIN="${SELECTED_PIN:-$(cat engine-bundle/holosphere_wasm.sha)}" node scripts/install-engine-bundle.mjs engine-bundle
+          echo "ENGINE_BUNDLE_DIR=$GITHUB_WORKSPACE/engine-bundle" >> "$GITHUB_ENV"
       - name: Resolve engine pin
         id: engine
         run: |
@@ -43,21 +67,6 @@ jobs:
           path: engine
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '22.23.2'
-          cache: npm
-      - name: Download the engine package for this deployment
-        if: inputs.engine-bundle
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: verified-engine-bundle
-          path: engine-bundle
-      - name: Install the verified engine package
-        if: inputs.engine-bundle
-        run: |
-          HOLOSPHERE_BUNDLE_PIN="$(cat holosphere_wasm.sha)" node scripts/install-engine-bundle.mjs engine-bundle
-          test -z "$(git status --porcelain)"
       - run: npm ci
       - name: Lint JavaScript
         run: npm run lint

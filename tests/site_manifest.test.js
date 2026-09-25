@@ -10,6 +10,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { dirname, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { manifestEntries, servedPages } from './site_pages.js';
+import { verifiedEnginePaths } from '../scripts/stage-site.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MANIFEST = 'site_manifest.txt';
@@ -19,14 +20,15 @@ const read = (path) => readFileSync(resolve(REPO, path), 'utf8');
 
 /** @returns {Set<string>} Every path git tracks, repo-relative. */
 const trackedFiles = () =>
-  new Set(
-    execFileSync('git', ['-C', REPO, 'ls-files'], {
+  new Set([
+    ...execFileSync('git', ['-C', REPO, 'ls-files'], {
       encoding: 'utf8',
       maxBuffer: 64 * 1024 * 1024,
     })
       .split('\n')
       .filter(Boolean),
-  );
+    ...(process.env.ENGINE_BUNDLE_DIR ? verifiedEnginePaths(REPO, process.env.ENGINE_BUNDLE_DIR) : []),
+  ]);
 
 /**
  * True when git ignores a path. The tool pages reference offline-only drops
@@ -311,7 +313,6 @@ test('the deploy workflow stages the site from the committed manifest', () => {
 
 test('deploy manifest entries cannot recursively publish untracked files', () => {
   const workflow = read('.github/workflows/deploy.yml');
-  assert.match(workflow, /if \[ ! -f "\$path" \]/);
-  assert.match(workflow, /git ls-files --error-unmatch -- "\$path"/);
+  assert.match(workflow, /node scripts\/stage-site\.mjs engine-bundle _site deployment-pair\.json/);
   assert.doesNotMatch(workflow, /cp -r/);
 });

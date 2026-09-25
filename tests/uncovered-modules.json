@@ -28,10 +28,6 @@
     "reason": "Tracked CLI fixture suites cover dependency reads, hashing, addon scans and import-map rewriting. Remaining gaps include malformed package metadata and filesystem/tool failures.",
     "branches": 65
   },
-  "scripts/install-engine-bundle.mjs": {
-    "lines": 91.58,
-    "reason": "Filesystem rollback failure and the command-line entry are outside the fixture installer tests; CI runs the CLI on the verified bundle."
-  },
   "scripts/vendor-stage.mjs": {
     "lines": 91.47,
     "reason": "Server startup and filesystem cleanup error paths require infrastructure failures; fixture tests exercise staging and normal shutdown.",

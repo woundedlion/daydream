@@ -210,9 +210,11 @@ test('the JS unit suite arms the engine-parity and hook cases', () => {
   assert.match(step, /^\s+run: npm test$/m);
 });
 
-test('pre-push verifies the working-tree artifacts', () => {
-  assert.match(text('.githooks/pre-push'),
-    /node --test tests\/wasm_provenance\.test\.js/);
+test('CI checks source parity after installing the selected runtime', () => {
+  const suite = text('.github/workflows/js-unit-suite.yml');
+  assert.ok(suite.indexOf('name: Install the verified engine package') < suite.indexOf('name: Resolve engine pin'));
+  assert.ok(suite.indexOf('name: Resolve engine pin') < suite.indexOf('name: Checkout the pinned engine'));
+  assert.match(suite, /HOLOSPHERE_ENGINE_REQUIRED: '1'/);
 });
 
 for (const name of ['shader_workbench.mjs', 'sha256.mjs']) {
