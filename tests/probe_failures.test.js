@@ -68,7 +68,7 @@ function throwingTab() {
   /** @type {string[]} */
   const calls = [];
   const tab = new Proxy({}, {
-    get(_target, property) {
+    get(target, property) {
       if (property === 'then') return undefined; // not a thenable
       if (property === 'mouse' || property === 'keyboard') return tab;
       return () => {

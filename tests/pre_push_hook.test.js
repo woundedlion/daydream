@@ -60,7 +60,7 @@ function runWithTools(root, tools, input = '') {
   delete env.NODE_TEST_CONTEXT;
   // MSYS reads PATH as POSIX, so a drive letter would split on its colon.
   const posixBin = bin.replace(/\\/g, '/')
-    .replace(/^([A-Za-z]):/, (_all, drive) => `/${drive.toLowerCase()}`);
+    .replace(/^([A-Za-z]):/, (all, drive) => `/${drive.toLowerCase()}`);
   return spawnSync(SH, ['-c', `PATH="${posixBin}"; export PATH; . "$0"`, HOOK], {
     cwd: root,
     env,

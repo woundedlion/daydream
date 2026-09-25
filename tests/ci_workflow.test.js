@@ -61,7 +61,6 @@ test('the reusable suite lints the workflow YAML and the bash inside it', () => 
   assert.match(suite, /actionlint -verbose -oneline/);
   assert.match(suite, /Rule "shellcheck" was disabled/,
     'a silently dropped shellcheck would leave every run: body unchecked');
-
 });
 
 // Every `node-version:` spelling under .github/workflows, tagged with its file.
@@ -139,8 +138,7 @@ test('ci-green dependency check rejects an omitted job', () => {
 });
 
 test('every workflow pins the Node version package.json requires', () => {
-  const required = JSON.parse(readFileSync(resolve(REPO, 'package.json'), 'utf8')).engines.node
-;
+  const required = JSON.parse(readFileSync(resolve(REPO, 'package.json'), 'utf8')).engines.node;
   assert.match(required, /^\d+\.\d+\.\d+$/,
     'package.json engines.node names one full version');
   assert.equal(readFileSync(resolve(REPO, '.nvmrc'), 'utf8').trim(), required);
@@ -287,7 +285,6 @@ test('the reusable suite verifies CDN integrity and lints tracked shell hooks', 
   assert.match(shell, /shellcheck "\$\{FILES\[@\]\}"/);
 });
 
-
 test('workflow trigger parsing cannot hide flow or quoted declarations', () => {
   for (const source of ['on: [push, pull_request]', '"on": ["push", "pull_request"]',
     "'on':\n  push:\n  pull_request:\n", 'on: push']) {
@@ -295,8 +292,6 @@ test('workflow trigger parsing cannot hide flow or quoted declarations', () => {
   }
   assert.throws(() => triggersOf('"on": {push: {}}'), /unsupported trigger syntax/);
 });
-
-
 
 test('shell lint has no workflow-wide excluded diagnostics', () => {
   const suite = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/js-unit-suite.yml`), 'utf8');
@@ -310,12 +305,10 @@ test('engine bundle API failures stop the gate instead of entering its poll time
   assert.match(gate, /actions: read/);
 });
 
-
 test('actionlint enumerates both workflow extensions', () => {
   const suite = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/js-unit-suite.yml`), 'utf8');
   assert.ok(suite.includes("git ls-files -- '.github/workflows/*.yml' '.github/workflows/*.yaml'"));
 });
-
 
 test('old engine pins warn and expired bundles explain the producing-run remedy', () => {
   const gate = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/engine-bundle.yml`), 'utf8');

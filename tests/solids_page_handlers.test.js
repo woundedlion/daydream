@@ -50,7 +50,7 @@ test('copying a star recipe contains bridge errors and reports engine halts', as
     islamicStarPatterns: ['star'],
     meshOpsWasm: { getRecipe() { throw error; } },
     engineTrapped: (caught) => { traps.push(caught); return halted; },
-    showCopyFailure: (_button, message) => failures.push(message),
+    showCopyFailure: (button, message) => failures.push(message),
   });
   await copyCode(0, 'registry', {});
   assert.deepEqual(failures, ['export failed: recipe unavailable']);
@@ -66,7 +66,7 @@ for (const [count, index, expected] of [[3, 1, 1], [3, 2, 1], [1, 0, 'add']]) {
     const state = { ops: Array.from({ length: count }, () => ({ op: 'ambo', params: {} })) };
     let pending;
     let focused;
-    const rows = () => state.ops.map((_op, i) => ({
+    const rows = () => state.ops.map((op, i) => ({
       querySelector: () => ({ focus: () => { focused = i; } }),
     }));
     const removeOp = handler('removeOp', {
@@ -92,7 +92,7 @@ test('deleting saved solids preserves focus in reverse display order or on save'
     savedSolids, persistSavedSolids() {}, renderSavedList() {},
     document: { getElementById: (id) => id === 'saveBtn'
       ? { focus: () => { focused = 'save'; } }
-      : { children: savedSolids.map((_item, i) => ({
+      : { children: savedSolids.map((item, i) => ({
         querySelector: () => ({ focus: () => { focused = i; } }),
       })) } },
   });
@@ -239,7 +239,7 @@ test('an accepted topology tick publishes only after validation', async () => {
     document: { getElementById: () => ({ children: [] }) },
     opTopologyKey: (entry) => entry.params.t === 0.5,
     scheduleUpdate: { cancel() {} }, queueCommit: (fn) => { queued = fn; },
-    chainIsValid: async (_base, ops) => {
+    chainIsValid: async (base, ops) => {
       assert.equal(ops[0].params.t, 0.5);
       return new Promise((resolve) => { resolveCheck = resolve; });
     },

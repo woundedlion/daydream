@@ -21,7 +21,7 @@ test('preset values survive URL reload after flushed or pending parameter edits'
       setTimeout,
       clearTimeout,
       history: {
-        replaceState(_state, _title, url) { win.location = new URL(url, win.location); },
+        replaceState(state, title, url) { win.location = new URL(url, win.location); },
       },
     };
     const sync = new URLSync(new AppState({ effect: 'AlienBrain' }), ['effect'], {}, win);
