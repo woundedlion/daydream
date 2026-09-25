@@ -44,6 +44,16 @@ test('a passing suite that loads every source module passes', () => {
   assert.match(run(PATTERN), /source modules were loaded by tests/);
 });
 
+test('recursive patterns require the live discovery canary', () => {
+  assert.match(fail('tests/**/*.test.js'), /recursive discovery canary did not run/);
+  mkdirSync(join(root, 'tests/discovery'), { recursive: true });
+  writeFileSync(join(root, 'tests/discovery/nested.test.js'),
+    "import { test } from 'node:test';\n" +
+    "import assert from 'node:assert/strict';\n" +
+    "test('recursive test discovery reaches nested Node modules', () => assert.match(import.meta.url, /discovery/));\n");
+  assert.match(run('tests/**/*.test.js'), /source modules were loaded by tests/);
+});
+
 test('an unmatched test pattern cannot report success', () => {
   assert.match(fail('tests/no-such-test-*.js'), /no tests executed|Could not find/);
 });
