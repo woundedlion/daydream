@@ -255,7 +255,7 @@ test('PR suites consume the provenance-gated bundle before CI can pass', () => {
   for (const suite of ['js-tests', 'browser']) {
     const block = workflow.split(`  ${suite}:`)[1].split(/^ {2}[^ ]/m)[0];
     assert.match(block, /needs: gate/);
-    assert.match(block, /engine-bundle: true/);
+    assert.match(block, /engine-sha: \$\{\{ needs\.gate\.outputs\.pin \}\}/);
   }
   assert.ok(terminalJobNeeds(workflow, 'ci-green').includes('gate'));
 });
@@ -412,4 +412,16 @@ test('required suite steps execute their complete bodies without suppression', (
       : run.split('\n')[0];
     assert.equal(actual, body, name);
   }
+});
+
+test('reusable suites require the independently selected engine pin', () => {
+  for (const file of ['js-unit-suite.yml', 'browser-smoke.yml']) {
+    const suite = readFileSync(resolve(REPO, WORKFLOW_DIR, file), 'utf8');
+    assert.doesNotMatch(suite, /inputs\.engine-bundle|SELECTED_PIN:-/);
+    assert.ok(suite.includes('test -n "$SELECTED_PIN" || { echo "::error::Selected engine pin is empty"; exit 1; }'));
+    assert.ok(suite.includes('HOLOSPHERE_BUNDLE_PIN="$SELECTED_PIN" node scripts/install-engine-bundle.mjs engine-bundle'));
+  }
+  const gate = readFileSync(resolve(REPO, WORKFLOW_DIR, 'engine-bundle.yml'), 'utf8');
+  assert.ok(gate.includes('value: ${{ jobs.gate.outputs.pin }}'));
+  assert.ok(gate.includes('pin: ${{ steps.engine.outputs.pin }}'));
 });

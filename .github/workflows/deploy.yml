@@ -76,7 +76,6 @@ jobs:
       contents: read
     uses: ./.github/workflows/js-unit-suite.yml
     with:
-      engine-bundle: true
       daydream-sha: ${{ needs.resolve.outputs.daydream }}
       engine-sha: ${{ needs.resolve.outputs.holosphere }}
     secrets:
@@ -89,7 +88,6 @@ jobs:
       contents: read
     uses: ./.github/workflows/browser-smoke.yml
     with:
-      engine-bundle: true
       daydream-sha: ${{ needs.resolve.outputs.daydream }}
       engine-sha: ${{ needs.resolve.outputs.holosphere }}
 

@@ -25,7 +25,7 @@ jobs:
     name: Static and unit tests
     uses: ./.github/workflows/js-unit-suite.yml
     with:
-      engine-bundle: true
+      engine-sha: ${{ needs.gate.outputs.pin }}
     secrets:
       POV_TOKEN: ${{ secrets.POV_TOKEN }}
 
@@ -34,7 +34,7 @@ jobs:
     name: Browser tests
     uses: ./.github/workflows/browser-smoke.yml
     with:
-      engine-bundle: true
+      engine-sha: ${{ needs.gate.outputs.pin }}
 
   ci-green:
     name: CI green
