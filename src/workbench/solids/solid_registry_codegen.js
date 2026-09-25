@@ -29,6 +29,7 @@ import { COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns } from '../../shared/cpp_form
 
 export { MAX_RECIPE_STEPS };
 export const MAX_BUILD_STEPS = 8;
+export const MAX_BUILD_FACES = 1152;
 const DOUBLE_STEP_OPS = new Set(['gyro', 'needle', 'zip', 'bevel']);
 
 /** @param {string} op @returns {number} Lowered primitive count. */
@@ -297,6 +298,9 @@ function seedConstantCpp(seedName) {
  */
 export function generateRegistryCpp(item, baseRecipe = null) {
   const { funcName } = generateFuncAndRecipe(item);
+  if ((item.fCount ?? 0) > MAX_BUILD_FACES) {
+    throw new Error(`generateRegistryCpp: mesh has ${item.fCount} faces; IslamicStars supports at most ${MAX_BUILD_FACES}`);
+  }
 
   if (baseRecipe != null) {
     if (typeof baseRecipe.seed !== 'string' || !CPP_IDENTIFIER.test(baseRecipe.seed)) {

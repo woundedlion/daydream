@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { lissajousCodeString } from '../src/workbench/lissajous/lissajous_math.js';
 import * as MB from '../src/workbench/mobius/mobius_transforms.js';
 import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS } from '../src/workbench/solids/solid_codegen.js';
-import { MAX_BUILD_STEPS, upperSnake, primitiveCount } from '../src/workbench/solids/solid_registry_codegen.js';
+import { MAX_BUILD_FACES, MAX_BUILD_STEPS, upperSnake, primitiveCount } from '../src/workbench/solids/solid_registry_codegen.js';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const engineCandidates = process.env.HOLOSPHERE_ENGINE_DIR
@@ -507,4 +507,10 @@ test('engine struct reader ignores semicolons inside member comments', () => {
   assert.deepEqual(engineStructFields(source, 'Controls'), [
     { type: 'float', field: 'value' }, { type: 'float', field: 'other' },
   ]);
+});
+
+test('MAX_BUILD_FACES matches the pinned effect budget', { skip: engineSkip }, () => {
+  const match = /static constexpr size_t MAX_BUILD_FACES\s*=\s*(\d+);/.exec(header(ISLAMIC_STARS_H));
+  assert.ok(match);
+  assert.equal(MAX_BUILD_FACES, Number(match[1]));
 });
