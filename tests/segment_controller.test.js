@@ -2457,13 +2457,13 @@ test('snapshotParams() is empty when no engine is bound', () => {
   assert.deepEqual(c.snapshotParams(), []);
 });
 
-test('Shader rebuild state uses the exhaustive full-config snapshot', () => {
+test('snapshot-capable effects rebuild from their exhaustive state', () => {
   const snapshot = {
     schemaVersion: 2,
     accepted: [1, 2, 3], requested: [1, 9, 3], pendingFieldIds: [1],
     hasRuntime: true, runtime: [0.25],
   };
-  const c = makeController({ effect: 'Shader' });
+  const c = makeController({ effect: 'SnapshotEffect' });
   c.getWasmEngine = () => ({
     getFullConfigSnapshot: () => snapshot,
     getParameterDefinitions: () => {
@@ -2477,9 +2477,7 @@ test('an effect outside the Shader workbench rebuilds from its params', () => {
   const c = makeController({ effect: 'alien-brain' });
   c.getWasmEngine = () => ({
     ...fakeEngine([{ name: 'Speed', value: 0.5 }]),
-    getFullConfigSnapshot: () => {
-      throw new Error('the full-config path is Shader-only');
-    },
+    getFullConfigSnapshot: () => null,
   });
   assert.deepEqual(c.snapshotEffectState(), {
     params: [{ name: 'Speed', value: 0.5 }],
