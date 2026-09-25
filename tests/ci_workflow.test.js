@@ -53,13 +53,14 @@ test('the reusable JavaScript suite runs all required checks', () => {
 // bash inside the `run:` blocks; actionlint is what pipes it through shellcheck.
 test('the reusable suite lints the workflow YAML and the bash inside it', () => {
   const suite = readFileSync(`${WORKFLOW_DIR}/js-unit-suite.yml`, 'utf8');
-  assert.match(suite, /pip install --require-hashes -r requirements\/actionlint\.txt/);
+  assert.match(suite, /https:\/\/github\.com\/rhysd\/actionlint\/releases\/download\/v1\.7\.12\/actionlint_1\.7\.12_linux_amd64\.tar\.gz/);
+  assert.match(suite, /8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8.*sha256sum --check --strict/);
+  assert.ok(suite.indexOf('sha256sum --check --strict') < suite.indexOf('tar -xzf'));
+  assert.doesNotMatch(suite, /pip install[^\n]*actionlint/);
   assert.match(suite, /actionlint -verbose -oneline/);
   assert.match(suite, /Rule "shellcheck" was disabled/,
     'a silently dropped shellcheck would leave every run: body unchecked');
-  const pin = readFileSync('requirements/actionlint.txt', 'utf8');
-  assert.match(pin, /^actionlint-py==[\d.]+/m, 'the linter is version-pinned');
-  assert.match(pin, /--hash=sha256:[0-9a-f]{64}/, 'and hash-pinned');
+
 });
 
 // Every `node-version:` spelling under .github/workflows, tagged with its file.

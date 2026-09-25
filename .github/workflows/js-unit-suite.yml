@@ -81,10 +81,15 @@ jobs:
             exit 1
           fi
           shellcheck "${FILES[@]}"
-      # actionlint-py is the PyPI distribution of the same binary, pinned like
-      # shellcheck above.
       - name: Install actionlint
-        run: pip install --require-hashes -r requirements/actionlint.txt
+        run: |
+          curl --fail --location --retry 3 \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
+            -o "$RUNNER_TEMP/actionlint.tar.gz"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check --strict
+          mkdir -p "$RUNNER_TEMP/bin"
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP/bin" actionlint
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       # The deploy gate, the engine-bundle wait and the probe budget are shell
       # inside `run:` blocks, which the step above cannot reach: no workflow is
       # a tracked *.sh file. actionlint checks the workflow itself (expression

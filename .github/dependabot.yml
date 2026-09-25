@@ -29,6 +29,6 @@ updates:
     schedule:
       interval: monthly
     groups:
-      python-tooling:
+      shellcheck:
         patterns:
-          - "*"
+          - "shellcheck-py"
