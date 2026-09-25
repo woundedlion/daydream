@@ -22,7 +22,7 @@ import {
 import { isViewLive, refreshPixelView } from '../pixel_view.js';
 import { selectorControlValue } from '../param_sync.js';
 import { defaultPaletteRecipe, hueKeyState, PaletteV4, signedTurnDelta } from '../tools/palette_controls.js';
-import { DEFAULT_EFFECT, resolutionPresets } from '../daydream.js';
+import { DEFAULT_EFFECT, resolutionPresets } from '../effect_roster.js';
 import {
   FIXED_SHADER_MODE_FIELDS, STAGE_BOUNDARIES,
   kaleidoscopeSmoothStageAssignments, latticeMeltStageAssignments,

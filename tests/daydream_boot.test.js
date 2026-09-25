@@ -28,10 +28,8 @@ import {
   EffectSetResult, ParamSetResult, ResolutionSetResult, unpinnedEngineMethods,
 } from './fake_engine.js';
 import { captureConsole, installConsoleCapture } from './fake_console.js';
-import {
-  createRecordingControls,
-  createSegmentedPovControls,
-} from '../daydream.js';
+import { createRecordingControls } from '../recording_controls.js';
+import { createSegmentedPovControls } from '../segmented_pov_controls.js';
 import {
   createSegmentPoolSpawner,
   fakeDriver,

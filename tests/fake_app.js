@@ -6,7 +6,9 @@
 import { fakeElement, installDocument } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
 
-import { start, createSegmentPoolSpawner, SHADER_DOCUMENT_EFFECTS } from '../daydream.js';
+import { start } from '../daydream.js';
+import { createSegmentPoolSpawner } from '../segmented_pov_controls.js';
+import { SHADER_DOCUMENT_EFFECTS } from '../effect_roster.js';
 
 export { createSegmentPoolSpawner, SHADER_DOCUMENT_EFFECTS };
 
