@@ -6,7 +6,7 @@ import {
   navTargetIndex,
   scrollArrowState,
   resolveActiveEffect,
-} from '../sidebar_logic.js';
+} from '../src/ui/sidebar_logic.js';
 
 const items = () => [
   { name: 'Voronoi', size: 3000 },

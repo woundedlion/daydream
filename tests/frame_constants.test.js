@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { FPS, SLOW_FRAME_MS } from '../frame_constants.js';
+import { FPS, SLOW_FRAME_MS } from '../src/renderer/frame_constants.js';
 
 const README = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
 

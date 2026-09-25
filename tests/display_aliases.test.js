@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeColorAttribute } from './helpers/fake_three.js';
-import { displayAliasesDiverged, repointDisplayAliases } from '../display_aliases.js';
+import { displayAliasesDiverged, repointDisplayAliases } from '../src/engine/display_aliases.js';
 
 /**
  * Driver double carrying the two display aliases.

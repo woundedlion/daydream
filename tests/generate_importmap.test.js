@@ -89,9 +89,10 @@ const installModules = ({ threeVersion = '0.183.1', lilGuiVersion = '0.21.0' } =
   writeFileSync(join(lil, 'package.json'), JSON.stringify({ version: lilGuiVersion }));
   writeFileSync(join(lil, 'dist', 'lil-gui.esm.min.js'), LIL_BODY);
 
-  writeFileSync(join(root, 'driver.js'),
+  mkdirSync(join(root, 'src/renderer'), { recursive: true });
+  writeFileSync(join(root, 'src/renderer/driver.js'),
     "import { OrbitControls } from 'three/addons/controls/OrbitControls.js';\n");
-  execFileSync('git', ['add', 'driver.js'], { cwd: root, env });
+  execFileSync('git', ['add', 'src/renderer/driver.js'], { cwd: root, env });
 };
 
 /** Places the vendored entry points the --local probes require under ROOT. */

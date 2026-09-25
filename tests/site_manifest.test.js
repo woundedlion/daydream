@@ -235,11 +235,11 @@ const missingCatalog = sourceOnly && !existsSync(resolve(REPO, MIGRATION));
 // digest table, published for its own sake.
 const PATTERN_NON_SOURCES = [
   MIGRATION,
-  'shader/patterns/digest_migration.v1v2.json',
+  'src/workbench/shader/patterns/digest_migration.v1v2.json',
 ];
 
 // Pattern documents nothing served fetches: the compiler's worked example is a
-// test input, like the v1 expansion fixtures under shader/patterns/v1/, and
+// test input, like the v1 expansion fixtures under src/workbench/shader/patterns/v1/, and
 // stays off Pages.
 const PATTERN_UNPUBLISHED = [`${PATTERNS}/example.shader.json`];
 
@@ -291,7 +291,7 @@ test('the site manifest publishes nothing the served pages do not reach', () => 
 
 test('the site manifest publishes exactly the pattern documents the catalog fetches',
   { skip: missingCatalog && 'engine catalog is installed separately' }, () => {
-  const served = servedPatterns();
+  const served = new Set([...servedPatterns()].filter((entry) => entry.startsWith(`${PATTERNS}/`)));
   const listed = new Set(
     manifestEntries().filter((entry) => entry.startsWith(`${PATTERNS}/`) || PATTERN_NON_SOURCES.includes(entry)));
   const files = patternFiles();

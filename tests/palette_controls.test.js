@@ -20,7 +20,7 @@ const {
   hitTestHueKeyMarker, oklchLinearRgb, maxSrgbGamutChroma,
   hueKeyState, customHueKeyState, customHueTurns, moveCustomHueKey,
 } =
-  await import('../tools/palette_controls.js');
+  await import('../src/workbench/palettes/palette_controls.js');
 
 test('palette tab deep links select only known tabs', () => {
   assert.equal(paletteTabFromSearch('?tab=generative'), 'generative');

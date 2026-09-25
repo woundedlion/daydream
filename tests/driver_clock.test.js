@@ -6,7 +6,7 @@
 // backlog cap, so it runs standalone via prototype.call over a stubbed `this`.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Daydream } from '../driver.js';
+import { Daydream } from '../src/renderer/driver.js';
 
 const FRAME_INTERVAL = 1 / Daydream.FPS;
 const MAX_BACKLOG = Daydream.MAX_FRAME_BACKLOG_SECONDS;

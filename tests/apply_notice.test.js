@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fakeElement } from './helpers/fake_dom.js';
 import { fakeScheduler } from './helpers/fake_timers.js';
-import { createApplyNotice } from '../apply_notice.js';
+import { createApplyNotice } from '../src/ui/apply_notice.js';
 
 // The shared notice element: the parameter writer and the switch coordinator
 // both announce through it, so ownership decides whose message a clear drops.

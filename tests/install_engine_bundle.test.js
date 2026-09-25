@@ -27,11 +27,11 @@ function fixture(t, shape = () => {}) {
     mkdirSync(dirname(join(base, path)), { recursive: true });
     writeFileSync(join(base, path), text);
   };
-  write(destination, 'daydream.js', 'application');
+  write(destination, 'src/app/daydream.js', 'application');
   write(destination, 'generated/holosphere_wasm.sha', 'a'.repeat(40));
   write(destination, 'generated/shader/patterns/obsolete.shader.json', 'obsolete');
-  write(destination, 'shader/patterns/v1/legacy.shader.json', 'legacy');
-  write(destination, 'shader/patterns/digest_migration.v1v2.json', 'migration');
+  write(destination, 'src/workbench/shader/patterns/v1/legacy.shader.json', 'legacy');
+  write(destination, 'src/workbench/shader/patterns/digest_migration.v1v2.json', 'migration');
   write(destination, 'docs/screenshots/nested/obsolete.png', 'obsolete');
   write(destination, 'docs/screenshots/notes.txt', 'notes');
   const files = Object.fromEntries([
@@ -56,8 +56,8 @@ test('install replaces stale assets and preserves consumer-owned files', (t) => 
     'fresh generated/holosphere_wasm.js');
   assert.equal(existsSync(join(destination, 'generated/shader/patterns/obsolete.shader.json')), false);
   assert.equal(existsSync(join(destination, 'docs/screenshots/nested/obsolete.png')), false);
-  for (const path of ['shader/patterns/v1/legacy.shader.json',
-    'shader/patterns/digest_migration.v1v2.json', 'docs/screenshots/notes.txt'])
+  for (const path of ['src/workbench/shader/patterns/v1/legacy.shader.json',
+    'src/workbench/shader/patterns/digest_migration.v1v2.json', 'docs/screenshots/notes.txt'])
     assert.equal(existsSync(join(destination, path)), true, path);
 });
 
@@ -70,8 +70,8 @@ test('corrupted generated documentation is rejected before any destination chang
 });
 
 test('bundle paths cannot overwrite assets outside the engine install set', (t) => {
-  for (const path of ['shader/patterns/digest_migration.v1v2.json',
-    'shader/patterns/v1/example.shader.json', '.git/config', 'engine/scripts/shader_workbench.mjs']) {
+  for (const path of ['src/workbench/shader/patterns/digest_migration.v1v2.json',
+    'src/workbench/shader/patterns/v1/example.shader.json', '.git/config', 'engine/scripts/shader_workbench.mjs']) {
     const { bundle, destination } = fixture(t, (files) => { files[path] = 'unexpected'; });
     assert.throws(() => installEngineBundle(bundle, destination), /Engine bundle carries unexpected path/);
     assert.equal(readFileSync(join(destination, 'generated/holosphere_wasm.sha'), 'utf8'), 'a'.repeat(40));
@@ -122,7 +122,7 @@ test('a bundle missing a required asset is refused before any destination change
 
 test('a destination without daydream.js is not a checkout', (t) => {
   const { bundle, destination } = fixture(t);
-  rmSync(join(destination, 'daydream.js'));
+  rmSync(join(destination, 'src/app/daydream.js'));
   assert.throws(() => installEngineBundle(bundle, destination), /not a Daydream checkout/);
 });
 
@@ -154,6 +154,6 @@ test('runtime mirrors exclude Daydream declarations, legacy fixtures and documen
     'generated/shader/patterns/shaderball_migration.json']) assert.equal(runtimePath(path), true, path);
   for (const path of ['README.md', 'docs/screenshots/example.png',
     'generated/shader/shader_workbench.d.mts', 'generated/holosphere_wasm.d.ts',
-    'shader/patterns/v1/example.shader.json', 'shader/patterns/digest_migration.v1v2.json',
-    'tools/shader_documents.js']) assert.equal(runtimePath(path), false, path);
+    'src/workbench/shader/patterns/v1/example.shader.json', 'src/workbench/shader/patterns/digest_migration.v1v2.json',
+    'src/workbench/shader/shader_documents.js']) assert.equal(runtimePath(path), false, path);
 });

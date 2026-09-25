@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildOpRow, formatParamValue, syncSweepWarning } from '../tools/solid_op_rows.js';
-import { OP_DEFS } from '../tools/solid_codegen.js';
+import { buildOpRow, formatParamValue, syncSweepWarning } from '../src/workbench/solids/solid_op_rows.js';
+import { OP_DEFS } from '../src/workbench/solids/solid_codegen.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
 // fakeElement throws on any non-empty innerHTML assignment, so every assertion

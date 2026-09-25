@@ -10,9 +10,9 @@ const {
   NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
   paletteCompileError, paletteAdjustmentSummary,
   prettyPaletteName, paletteGradientCss,
-} = await import('../tools/palette_math.js');
-const { defaultPaletteRecipe, PaletteV4 } = await import('../tools/palette_controls.js');
-const { linearRgbToHex } = await import('../tools/color.js');
+} = await import('../src/workbench/palettes/palette_math.js');
+const { defaultPaletteRecipe, PaletteV4 } = await import('../src/workbench/palettes/palette_controls.js');
+const { linearRgbToHex } = await import('../src/shared/color.js');
 
 /** A ramp standing in for a compiled LUT: it exercises indexing, not the compiler. */
 function mockBakeLut() {

@@ -361,7 +361,7 @@ const CLASS_EXEMPTIONS = new Set([
 // daydream.js loads the shader-document graph on both simulator pages, but it
 // creates the chain strip only in the shader-workbench mode.
 const NON_RENDERING_CLASS_SOURCES = new Map([
-  ['index.html', new Set(['tools/chain_strip.js'])],
+  ['index.html', new Set(['src/workbench/shader/chain_strip.js'])],
 ]);
 
 const classSourcesFor = ({ page, scripts }) => scripts
@@ -396,10 +396,14 @@ test('every served page\'s stylesheets define every class it uses', () => {
 // of zero instead would excuse exactly the modules whose classes are unreadable.
 const BUILDS_ELEMENTS = /\bcreateElement\(|\.className\b|\.classList\b/;
 
-test('every tools/ module that builds an element can render on a served page', () => {
+test('every shared or workbench module that builds an element can render on a served page', () => {
   const gated = new Set(SERVED_PAGES.flatMap(classSourcesFor));
-  for (const file of readdirSync(join(REPO, 'tools')).filter((f) => f.endsWith('.js'))) {
-    const path = `tools/${file}`;
+  const files = ['src/shared', 'src/workbench'].flatMap((directory) =>
+    readdirSync(join(REPO, directory), { recursive: true })
+      .filter((file) => file.endsWith('.js'))
+      .map((file) => `${directory}/${file.replaceAll('\\', '/')}`));
+  assert.ok(files.length > 0);
+  for (const path of files) {
     if (!BUILDS_ELEMENTS.test(read(path))) continue;
     assert.ok(gated.has(path),
       `${path} builds elements but no served page renders it, so nothing gates its classes`);

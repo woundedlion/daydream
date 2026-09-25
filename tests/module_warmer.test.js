@@ -8,12 +8,12 @@ import { ModuleWarmer, warmModules, pageWarmer, GRAPH, WARM_INTERVAL_MS, WARM_DE
 beforeEach(() => pageWarmer.discard());
 
 test('default warm uses its served module URL, global fetch, and clears its deadline', async (t) => {
-  const moduleUrl = 'https://daydream.test/nested/module_warmer.js';
+  const moduleUrl = 'https://daydream.test/nested/src/segments/module_warmer.js';
   const hooks = registerHooks({
     load(url, context, nextLoad) {
       if (url === moduleUrl) return {
         format: 'module', shortCircuit: true,
-        source: readFileSync(new URL('../module_warmer.js', import.meta.url), 'utf8'),
+        source: readFileSync(new URL('../src/segments/module_warmer.js', import.meta.url), 'utf8'),
       };
       return nextLoad(url, context);
     },
@@ -48,7 +48,7 @@ test('warmModules revalidates the whole worker module graph', async () => {
   const calls = [];
   const response = { arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) };
   await warmModules({
-    baseUrl: 'http://localhost:8000/segment_controller.js',
+    baseUrl: 'http://localhost:8000/src/segments/segment_controller.js',
     minIntervalMs: 0,
     fetch: (url, options) => {
       calls.push([url.href, options]);
@@ -77,7 +77,7 @@ test('a stalled warm is abandoned on its deadline so the spawn still runs',
   async () => {
     const warmer = new ModuleWarmer();
     await warmer.warm({
-      baseUrl: 'http://localhost:8000/stalled/segment_controller.js',
+      baseUrl: 'http://localhost:8000/stalled/src/segments/segment_controller.js',
       minIntervalMs: 0,
       fetch: () => Promise.resolve({
         arrayBuffer: () => Promise.resolve(EMPTY_WASM.buffer),
@@ -89,7 +89,7 @@ test('a stalled warm is abandoned on its deadline so the spawn still runs',
     const expire = [];
     let aborted = 0;
     const warm = warmer.warm({
-      baseUrl: 'http://localhost:8000/stalled/segment_controller.js',
+      baseUrl: 'http://localhost:8000/stalled/src/segments/segment_controller.js',
       minIntervalMs: 0,
       timers: {
         setTimeout: (/** @type {() => void} */ fn, /** @type {number} */ ms) => {
@@ -120,7 +120,7 @@ test('a re-warm inside the dedupe window is skipped', async () => {
   let now = 0;
   const response = { arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) };
   const deps = {
-    baseUrl: 'http://localhost:8000/segment_controller.js',
+    baseUrl: 'http://localhost:8000/src/segments/segment_controller.js',
     minIntervalMs: WARM_INTERVAL_MS,
     fetch: () => { calls++; return Promise.resolve(response); },
     now: () => now,
@@ -149,7 +149,7 @@ test('the dedupe window covers one base URL, not every caller in it', async () =
   const warmer = new ModuleWarmer();
   await warmer.warm({
     ...deps,
-    baseUrl: 'http://localhost:8000/first/segment_controller.js',
+    baseUrl: 'http://localhost:8000/first/src/segments/segment_controller.js',
   });
   seen.length = 0;
 
@@ -157,7 +157,7 @@ test('the dedupe window covers one base URL, not every caller in it', async () =
   // promise would report a warm of files it never fetched.
   await warmer.warm({
     ...deps,
-    baseUrl: 'http://localhost:8000/second/segment_controller.js',
+    baseUrl: 'http://localhost:8000/second/src/segments/segment_controller.js',
   });
   assert.deepEqual(seen.slice().sort(),
     [...GRAPH, 'generated/holosphere_wasm.wasm?v=abc123']
@@ -167,13 +167,13 @@ test('the dedupe window covers one base URL, not every caller in it', async () =
   seen.length = 0;
   await warmer.warm({
     ...deps,
-    baseUrl: 'http://localhost:8000/second/segment_controller.js',
+    baseUrl: 'http://localhost:8000/second/src/segments/segment_controller.js',
   });
   assert.deepEqual(seen, [], 'a repeat of that base URL still dedupes');
 });
 
 test('a warm whose fetch throws synchronously does not claim the window', async () => {
-  const baseUrl = 'http://localhost:8000/offline/segment_controller.js';
+  const baseUrl = 'http://localhost:8000/offline/src/segments/segment_controller.js';
   const warmer = new ModuleWarmer();
   const warned = [];
   const stub = mock.method(console, 'warn', (...args) => { warned.push(args); });
@@ -208,7 +208,7 @@ test('a binary the engine refuses is reported, not left to the spawn to discover
   const stub = mock.method(console, 'warn', (...args) => { warned.push(args); });
   try {
     await warmModules({
-      baseUrl: 'http://localhost:8000/corrupt/segment_controller.js',
+      baseUrl: 'http://localhost:8000/corrupt/src/segments/segment_controller.js',
       minIntervalMs: 0,
       fetch: (url) => Promise.resolve({
         arrayBuffer: () => Promise.resolve(url.pathname.endsWith('.wasm')
@@ -232,7 +232,7 @@ test('a warm that settles behind a newer one leaves its module alone', async () 
   let releaseStale = () => {};
   const stale = new Promise((resolve) => { releaseStale = resolve; });
   const serve = (path, binary) => ({
-    baseUrl: `http://localhost:8000/${path}/segment_controller.js`,
+    baseUrl: `http://localhost:8000/${path}/src/segments/segment_controller.js`,
     minIntervalMs: 0,
     fetch: (url) => Promise.resolve({
       arrayBuffer: () => (url.pathname.endsWith('.wasm')
@@ -263,7 +263,7 @@ test('a warm in flight when a worker refuses the module does not restore it', as
   let releaseBinary = () => {};
   const binary = new Promise((resolve) => { releaseBinary = resolve; });
   const warm = warmer.warm({
-    baseUrl: 'http://localhost:8000/refused/segment_controller.js',
+    baseUrl: 'http://localhost:8000/refused/src/segments/segment_controller.js',
     minIntervalMs: 0,
     fetch: (url) => Promise.resolve({
       arrayBuffer: () => (url.pathname.endsWith('.wasm')

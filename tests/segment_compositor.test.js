@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SegmentCompositor } from '../segment_compositor.js';
+import { SegmentCompositor } from '../src/segments/segment_compositor.js';
 
 function fixture() {
   const pixels = new Uint16Array(4 * 4 * 3);

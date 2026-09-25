@@ -9,26 +9,26 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import createHolosphereModule from '../generated/holosphere_wasm.js';
-import { Daydream } from '../driver.js';
-import { applyChainDocument } from '../tools/chain_apply.js';
+import { Daydream } from '../src/renderer/driver.js';
+import { applyChainDocument } from '../src/workbench/shader/chain_apply.js';
 import {
   KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, SIMPLE_SEEDS,
   DEFINED_SEED_CONSTANTS, applyOp, meshOpFailure, MESH_OP_RESULT_NAMES,
-} from '../tools/solid_codegen.js';
+} from '../src/workbench/solids/solid_codegen.js';
 import {
   ENGINE_METHODS, ENGINE_OPTIONAL_METHODS, ParamSetResult, ClipSetResult,
   ResolutionSetResult, EffectSetResult, FullConfigRestoreResult, ChainStatus,
 } from './helpers/fake_engine.js';
-import { isViewLive, refreshPixelView } from '../pixel_view.js';
+import { isViewLive, refreshPixelView } from '../src/renderer/pixel_view.js';
 import { PaletteCompileCode, PaletteRecipeField } from './helpers/fake_palette.js';
-import { selectorControlValue } from '../param_sync.js';
-import { defaultPaletteRecipe, hueKeyState, PaletteV4, signedTurnDelta } from '../tools/palette_controls.js';
-import { DEFAULT_EFFECT, resolutionPresets } from '../effect_roster.js';
+import { selectorControlValue } from '../src/effects/param_sync.js';
+import { defaultPaletteRecipe, hueKeyState, PaletteV4, signedTurnDelta } from '../src/workbench/palettes/palette_controls.js';
+import { DEFAULT_EFFECT, resolutionPresets } from '../src/effects/effect_roster.js';
 import {
   FIXED_SHADER_MODE_FIELDS, STAGE_BOUNDARIES,
   kaleidoscopeSmoothStageAssignments, latticeMeltStageAssignments,
   fixedShaderStageAssignments, shaderStageAssignments,
-} from '../shader_stages.js';
+} from '../src/effects/shader_stages.js';
 
 // The module's stdout, captured rather than dropped: the WASM bridge answers an
 // out-of-domain op argument by clamping it and logging, so this is the only

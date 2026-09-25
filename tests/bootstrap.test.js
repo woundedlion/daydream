@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   bootstrap, refreshModuleCache, refreshWithDeadline, showBootstrapFailure,
   StaleModuleError, STALE_MODULE_REMEDY, VENDOR_REMEDY,
-} from '../bootstrap.js';
+} from '../src/app/bootstrap.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
 function fakeDocument() {
@@ -561,9 +561,9 @@ test('bootstrap leaves the fatal banner alone when the overlay renders', async (
 test('index boots through the entry module and bootstrap.js stays importable', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /<link href="\.\/favicon\.svg" rel="icon"/);
-  assert.match(html, /<script type="module" src="main\.js"[^>]*><\/script>/);
+  assert.match(html, /<script type="module" src="src\/app\/main\.js"[^>]*><\/script>/);
   assert.doesNotMatch(html, /<script type="module" src="daydream\.js"><\/script>/);
-  const source = readFileSync(new URL('../bootstrap.js', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/app/bootstrap.js', import.meta.url), 'utf8');
   const body = source.replace(/export\s+async\s+function\s+bootstrap\s*\(/, 'function(');
   const invocation = /\bbootstrap\s*(?:\?\.\s*)?(?:\(|\.(?:call|apply)\s*\()|\(\s*bootstrap\s*\)\s*\(/;
   assert.doesNotMatch(body, invocation);

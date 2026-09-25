@@ -5,7 +5,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
-const { createSlider, createSliderProxy } = await import('../tools/slider.js');
+const { createSlider, createSliderProxy } = await import('../src/shared/slider.js');
 
 restoreDocumentAfterEach();
 

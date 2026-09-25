@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "importmap": "node scripts/generate-importmap.mjs",
     "importmap:local": "node scripts/generate-importmap.mjs --local",
-    "generate:tailwind": "tailwindcss --input styles/tailwind.input.css --content \"./tools/*.{html,js}\" --output tools/tailwind.css --minify"
+    "generate:tailwind": "tailwindcss --input styles/tailwind.input.css --content \"./tools/*.html,./src/**/*.js\" --output tools/tailwind.css --minify"
   },
   "dependencies": {
     "lil-gui": "0.21.0",

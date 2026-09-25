@@ -10,13 +10,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import createHolosphereModule from '../generated/holosphere_wasm.js';
-import * as C from '../tools/color.js';
-import * as P from '../tools/palette_math.js';
+import * as C from '../src/shared/color.js';
+import * as P from '../src/workbench/palettes/palette_math.js';
 import {
   defaultPaletteRecipe, hueKeyState, maxSrgbGamutChroma, oklchLinearRgb, PaletteV4,
-} from '../tools/palette_controls.js';
-import * as L from '../tools/lissajous_math.js';
-import * as MB from '../tools/mobius_transforms.js';
+} from '../src/workbench/palettes/palette_controls.js';
+import * as L from '../src/workbench/lissajous/lissajous_math.js';
+import * as MB from '../src/workbench/mobius/mobius_transforms.js';
 
 // Top-level await fails this file loudly if the module can't instantiate,
 // rather than silently skipping the parity checks.

@@ -3,9 +3,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createColorStripPainter, drawWaveGraph,
-} from '../tools/palette_canvas.js';
-import { waveGraphBand } from '../tools/palette_math.js';
-import { linearToSrgbFloat } from '../tools/color.js';
+} from '../src/workbench/palettes/palette_canvas.js';
+import { waveGraphBand } from '../src/workbench/palettes/palette_math.js';
+import { linearToSrgbFloat } from '../src/shared/color.js';
 
 /**
  * Document double whose createElement('canvas') yields an offscreen canvas

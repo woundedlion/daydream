@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 const {
   srgbToLinearFloat, linearToSrgbFloat,
   linearRgbToHex,
-} = await import('../tools/color.js');
+} = await import('../src/shared/color.js');
 
 /**
  * Asserts that two numbers are equal within an absolute tolerance, for

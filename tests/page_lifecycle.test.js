@@ -4,7 +4,7 @@ import { installAnimationFrames } from './helpers/fake_dom.js';
 
 const {
   createFrameScheduler, onPageTeardown, watchMediaMatch,
-} = await import('../tools/page_lifecycle.js');
+} = await import('../src/shared/page_lifecycle.js');
 
 // The frame queue every case runs against, plus the globalThis.window slot
 // fakeWindow() writes into: installed fresh per case and restored after, so no

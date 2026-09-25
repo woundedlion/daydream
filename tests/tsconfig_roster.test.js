@@ -90,7 +90,7 @@ function pragmaFilesUnder(dir) {
   for (const entry of readdirSync(new URL(dir, ROOT), { withFileTypes: true })) {
     const path = `${dir}${entry.name}`;
     if (entry.isDirectory()) {
-      if (!SKIP_DIRS.has(entry.name)) found.push(...pragmaFilesUnder(`${path}/`));
+      if (dir !== '' || !SKIP_DIRS.has(entry.name)) found.push(...pragmaFilesUnder(`${path}/`));
     } else if (/\.m?js$/.test(entry.name) && !NOT_CHECKED.has(path)) {
       if (/^\s*\/\/\s*@ts-check\s*$/m.test(readFileSync(new URL(path, ROOT), 'utf8'))) {
         found.push(path);
@@ -150,10 +150,10 @@ test('every not-checked module has a declaration file on the roster', () => {
 });
 
 const TOOL_PAGE_EXEMPTIONS = {
-  'tools/lissajous_page.js': 'Imports Three.js and builds a dynamic DOM controller without declared element types.',
-  'tools/mobius_page.js': 'Imports Three.js and builds a dynamic DOM controller without declared element types.',
-  'tools/palettes_page.js': 'DOM element narrowing and callback parameter annotations are incomplete; it has no third-party import exemption.',
-  'tools/solids_page.js': 'Imports Three.js and builds dynamic mesh-editing controls without declared element types.',
+  'src/workbench/lissajous/lissajous_page.js': 'Imports Three.js and builds a dynamic DOM controller without declared element types.',
+  'src/workbench/mobius/mobius_page.js': 'Imports Three.js and builds a dynamic DOM controller without declared element types.',
+  'src/workbench/palettes/palettes_page.js': 'DOM element narrowing and callback parameter annotations are incomplete; it has no third-party import exemption.',
+  'src/workbench/solids/solids_page.js': 'Imports Three.js and builds dynamic mesh-editing controls without declared element types.',
 };
 
 test('tool page exemptions name existing unrostered modules with reasons', () => {
@@ -163,25 +163,6 @@ test('tool page exemptions name existing unrostered modules with reasons', () =>
     assert.ok(!roster.includes(file), `${file} exemption is stale`);
     assert.ok(reason.trim().length > 0, `${file} needs a reason`);
   }
-});
-
-test('every library module under tools is on the typecheck roster' , () => {
-  const roster = readTsconfig().files;
-  const unreachable = [];
-  for (const entry of readdirSync(new URL('tools/', ROOT), { withFileTypes: true })) {
-    if (!entry.isFile() || !/\.m?js$/.test(entry.name)) continue;
-    const path = `tools/${entry.name}`;
-    if (roster.includes(path)) continue;
-    if (Object.hasOwn(TOOL_PAGE_EXEMPTIONS, path)) continue;
-    const source = readFileSync(new URL(path, ROOT), 'utf8');
-    // A bare specifier resolves to a package this program does not contain, and
-    // noResolve cannot pull its typings in, so the module cannot check clean.
-    if (!/\bfrom\s*["'][^.'"]/.test(source)) unreachable.push(path);
-  }
-
-  assert.deepEqual(unreachable, [],
-    'a tools/ module with no third-party import has nothing stopping it from '
-    + 'being checked — add it to tsconfig.json "files"');
 });
 
 test('the typecheck roster stays inside its stated scope', () => {
@@ -194,27 +175,38 @@ test('the typecheck roster stays inside its stated scope', () => {
 });
 
 const ROOT_EXEMPTIONS = {
-  'bootstrap.js': 'Imports daydream.js and its untyped Three.js and lil-gui dependencies.',
-  'daydream.js': 'Application composition depends on driver.js and gui.js, whose third-party types are unavailable under noResolve.',
-  'driver.js': 'Imports Three.js and its renderer addons, whose types are unavailable under noResolve.',
-  'effect_gui.js': 'Builds lil-gui controls through gui.js; the control surface has no declarations.',
-  'effect_panel_edits.js': 'Edit callbacks use dynamic lil-gui controllers and effect parameter schemas without declared types.',
-  'effect_panel_view.js': 'Renders dynamic effect schemas through lil-gui folder and controller objects without declarations.',
-  'effect_roster.js': 'Consumes dynamically shaped engine catalog entries and effect instances without a declared common interface.',
-  'geometry.js': 'Imports Three.js, whose types are unavailable under noResolve.',
-  'gui.js': 'Imports lil-gui, whose declarations are unavailable under noResolve.',
-  'main.js': 'Imports bootstrap.js, which reaches the untyped application composition.',
-  'recording_controls.js': 'Builds dynamic lil-gui controls and consumes a driver whose declarations are unavailable.',
+  'src/app/bootstrap.js': 'Imports daydream.js and its untyped Three.js and lil-gui dependencies.',
+  'src/app/daydream.js': 'Application composition depends on driver.js and gui.js, whose third-party types are unavailable under noResolve.',
+  'src/renderer/driver.js': 'Imports Three.js and its renderer addons, whose types are unavailable under noResolve.',
+  'src/ui/effect_gui.js': 'Builds lil-gui controls through gui.js; the control surface has no declarations.',
+  'src/ui/effect_panel_edits.js': 'Edit callbacks use dynamic lil-gui controllers and effect parameter schemas without declared types.',
+  'src/ui/effect_panel_view.js': 'Renders dynamic effect schemas through lil-gui folder and controller objects without declarations.',
+  'src/effects/effect_roster.js': 'Consumes dynamically shaped engine catalog entries and effect instances without a declared common interface.',
+  'src/renderer/geometry.js': 'Imports Three.js, whose types are unavailable under noResolve.',
+  'src/ui/gui.js': 'Imports lil-gui, whose declarations are unavailable under noResolve.',
+  'src/app/main.js': 'Imports bootstrap.js, which reaches the untyped application composition.',
+  'src/recording/recording_controls.js': 'Builds dynamic lil-gui controls and consumes a driver whose declarations are unavailable.',
   'vendor-importmap.js': 'Generated script-tag IIFE; its source and generated variants are checked by vendor-importmap.test.js.',
 };
 
-test('every root module is typechecked or has a written exemption', () => {
+test('every source module is typechecked or has a written exemption', () => {
   const roster = readTsconfig().files;
-  const unrostered = readdirSync(ROOT, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && /\.js$/.test(entry.name))
-    .map((entry) => entry.name)
-    .filter((file) => !roster.includes(file)).sort();
-  assert.deepEqual(unrostered, Object.keys(ROOT_EXEMPTIONS).sort(),
-    'add each root module to tsconfig.json or explain its exemption; remove stale exemptions');
-  for (const reason of Object.values(ROOT_EXEMPTIONS)) assert.ok(reason.trim().length > 0);
+  const modules = readdirSync(ROOT, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && /\.m?js$/.test(entry.name) && entry.name !== 'eslint.config.mjs')
+    .map((entry) => entry.name);
+  const collect = (directory) => {
+    for (const entry of readdirSync(new URL(directory, ROOT), { withFileTypes: true })) {
+      const path = `${directory}${entry.name}`;
+      if (entry.isDirectory()) collect(`${path}/`);
+      else if (/\.m?js$/.test(entry.name)) modules.push(path);
+    }
+  };
+  collect('src/');
+  const exemptions = { ...ROOT_EXEMPTIONS, ...TOOL_PAGE_EXEMPTIONS,
+    'src/workbench/shared.js': 'Imports Three.js and its renderer addons, whose types are unavailable under noResolve.',
+  };
+  assert.deepEqual(modules.filter((file) => !roster.includes(file)).sort(),
+    Object.keys(exemptions).sort(),
+    'add each source module to tsconfig.json or explain its exemption; remove stale exemptions');
+  for (const reason of Object.values(exemptions)) assert.ok(reason.trim().length > 0);
 });

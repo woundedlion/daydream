@@ -6,7 +6,7 @@
 // a passing test.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildBaseMesh, buildChainMesh, readbackMesh } from '../tools/solid_build.js';
+import { buildBaseMesh, buildChainMesh, readbackMesh } from '../src/workbench/solids/solid_build.js';
 import { fakeModule } from './helpers/fake_meshops.js';
 import { installConsoleCapture } from './helpers/fake_console.js';
 

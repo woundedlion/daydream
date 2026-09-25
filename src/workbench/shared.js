@@ -1,0 +1,220 @@
+/*
+ * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
+ * Licensed under the Polyform Noncommercial License 1.0.0
+ */
+
+/**
+ * Shared Three.js scene setup for tool pages.
+ *
+ * Centralizes the common boilerplate: renderer, camera, OrbitControls,
+ * optional reference sphere / light rig, resize handling, and animation loop.
+ *
+ * Usage:
+ *   import { initScene } from './shared.js';
+ *   const { scene, camera, renderer, controls } = initScene('canvasContainer', 'threeCanvas', {
+ *     sphereOpacity: 0.2,
+ *   });
+ */
+
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// Re-exported from their dependency-free modules for scene-based pages.
+export { copyToClipboard, copyWithFeedback, COPY_FEEDBACK, wireCopyBlock } from '../shared/clipboard.js';
+export { formatFloatCpp } from '../shared/cpp_format.js';
+export { formatKB } from '../shared/kb_format.js';
+export { showFatalError, bootstrapTool, reportPageFailures } from '../shared/banner.js';
+
+/**
+ * Caps a WebGL renderer's device-pixel ratio at CSS resolution: the tool scenes
+ * are fill-bound, so a HiDPI backing store costs fill rate without adding
+ * visible detail. driver.js caps the simulator the same way. The 2D painters in
+ * palette_canvas.js are not fill-bound and keep the display's full density.
+ *
+ * @param {number} ratio - The display's devicePixelRatio.
+ * @returns {number} The ratio to hand setPixelRatio, never above 1.
+ */
+export function capPixelRatio(ratio) {
+  return Math.min(ratio, 1);
+}
+
+/**
+ * Read a design token off the document root as a numeric color.
+ *
+ * @param {string} name - Custom property name, e.g. '--slate-900'
+ * @returns {number|undefined} The color, or undefined when the property is
+ *          unset, malformed, or there is no styled document to read it from.
+ */
+export function getCssColor(name) {
+  const root = typeof document === 'undefined' ? null : document.documentElement;
+  if (!root || typeof getComputedStyle !== 'function') return undefined;
+  const value = getComputedStyle(root).getPropertyValue(name).trim();
+  const match = /^#?([0-9a-f]{6})$/i.exec(value);
+  return match ? parseInt(match[1], 16) : undefined;
+}
+
+/**
+ * Build a ready-to-run Three.js scene (renderer, perspective camera,
+ * OrbitControls, optional reference sphere / light rig) wired into the given
+ * DOM elements, then start the animation loop. Returns handles plus a dispose()
+ * to tear it back down.
+ *
+ * @param {string} containerId - ID of the parent container div
+ * @param {string} canvasId - ID of the canvas element
+ * @param {object} [opts] - Optional configuration
+ * @param {number} [opts.background] - Scene background color; defaults to the
+ *        --slate-900 token, or 0x0f172a where that token is unset
+ * @param {number} [opts.sphereOpacity=0.2] - Opacity of reference sphere wireframe
+ * @param {number} [opts.sphereRadius=1] - Radius of the reference sphere
+ * @param {boolean} [opts.showSphere=true] - Whether to show a reference sphere
+ * @param {number} [opts.cameraDistance=3] - Initial camera distance (ignored if cameraPosition is set)
+ * @param {number[]} [opts.cameraPosition] - Explicit initial camera position [x, y, z]
+ * @param {number} [opts.near=0.1] - Camera near plane
+ * @param {number} [opts.far=1000] - Camera far plane
+ * @param {number} [opts.minDistance=2] - OrbitControls minimum distance
+ * @param {number} [opts.maxDistance=10] - OrbitControls maximum distance
+ * @param {boolean} [opts.alpha=false] - Whether the renderer keeps a transparent buffer
+ * @param {boolean} [opts.autoRotate=false] - OrbitControls auto-rotation
+ * @param {number} [opts.autoRotateSpeed=2.0] - Auto-rotation speed
+ * @param {boolean} [opts.lights=false] - Add the standard ambient + directional + rim light rig
+ * @param {Function} [opts.onAnimate] - Callback run every frame before controls.update()
+ * @param {Function} [opts.onAfterRender] - Callback run every frame after the render
+ * @param {Function} [opts.onResize] - Custom resize handler (replaces the default aspect/size update)
+ * @param {Function} [opts.onAfterResize] - Callback after the projection and renderer size update
+ * @returns {{scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer, controls: OrbitControls, sphere: (THREE.Mesh|null), lights: Array<THREE.Light>, resize: Function, dispose: Function}} Scene handles, the resize callback, and a dispose() to tear the scene down.
+ */
+export function initScene(containerId, canvasId, opts = {}) {
+  const {
+    background = getCssColor('--slate-900') ?? 0x0f172a,
+    sphereOpacity = 0.2,
+    sphereRadius = 1,
+    showSphere = true,
+    cameraDistance = 3,
+    cameraPosition = null,
+    near = 0.1,
+    far = 1000,
+    minDistance = 2,
+    maxDistance = 10,
+    alpha = false,
+    autoRotate = false,
+    autoRotateSpeed = 2.0,
+    lights = false,
+    onAnimate = null,
+    onAfterRender = null,
+    onResize = null,
+    onAfterResize = null,
+  } = opts;
+
+  const container = document.getElementById(containerId);
+  const canvas = document.getElementById(canvasId);
+  if (!container) {
+    throw new Error(`initScene: container element #${containerId} not found`);
+  }
+  if (!canvas) {
+    throw new Error(`initScene: canvas element #${canvasId} not found`);
+  }
+  const width = container.clientWidth;
+  const height = container.clientHeight;
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(background);
+
+  // max(1, ...): a collapsed/hidden container reporting a 0 dimension would make
+  // the aspect 0/Infinity and the projection matrix non-finite.
+  const camera = new THREE.PerspectiveCamera(45, Math.max(1, width) / Math.max(1, height), near, far);
+  if (cameraPosition) {
+    camera.position.set(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+  } else {
+    camera.position.set(cameraDistance * 0.5, cameraDistance * 0.5, cameraDistance);
+  }
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha });
+  renderer.setSize(width, height);
+  renderer.setPixelRatio(capPixelRatio(window.devicePixelRatio));
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  canvas.tabIndex = 0;
+  controls.listenToKeyEvents(canvas);
+  controls.minDistance = minDistance;
+  controls.maxDistance = maxDistance;
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.05;
+  controls.autoRotate = autoRotate;
+  controls.autoRotateSpeed = autoRotateSpeed;
+
+  let sphere = null;
+  if (showSphere) {
+    const geo = new THREE.SphereGeometry(sphereRadius, 64, 32);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x334155,
+      wireframe: true,
+      transparent: true,
+      opacity: sphereOpacity,
+    });
+    sphere = new THREE.Mesh(geo, mat);
+    sphere.renderOrder = 0;
+    scene.add(sphere);
+  }
+
+  const lightRig = [];
+  if (lights) {
+    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambient);
+    lightRig.push(ambient);
+
+    const directional = new THREE.DirectionalLight(0xffffff, 1);
+    directional.position.set(5, 10, 7);
+    scene.add(directional);
+    lightRig.push(directional);
+
+    const rim = new THREE.SpotLight(0x3b82f6, 5);
+    rim.position.set(-5, 0, -5);
+    scene.add(rim);
+    lightRig.push(rim);
+  }
+
+  const defaultResize = () => {
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    camera.aspect = Math.max(1, w) / Math.max(1, h);
+    camera.updateProjectionMatrix();
+    renderer.setPixelRatio(capPixelRatio(window.devicePixelRatio));
+    renderer.setSize(w, h);
+  };
+  const resize = () => {
+    if (onResize) onResize({ scene, camera, renderer, controls });
+    else defaultResize();
+    onAfterResize?.();
+  };
+  window.addEventListener('resize', resize);
+  const resizeObserver = typeof ResizeObserver === 'function'
+    ? new ResizeObserver(resize)
+    : null;
+  resizeObserver?.observe(container);
+
+  let rafId = 0;
+  const animate = () => {
+    rafId = requestAnimationFrame(animate);
+    if (onAnimate) onAnimate();
+    controls.update();
+    renderer.render(scene, camera);
+    if (onAfterRender) onAfterRender();
+  };
+  animate();
+
+  const dispose = () => {
+    cancelAnimationFrame(rafId);
+    window.removeEventListener('resize', resize);
+    resizeObserver?.disconnect();
+    controls.dispose();
+    renderer.dispose();
+    // dispose() frees Three's own objects but leaves the WebGL context live,
+    // and a browser allows only a handful at a time.
+    renderer.forceContextLoss();
+    sphere?.geometry.dispose();
+    sphere?.material.dispose();
+    scene.clear();
+  };
+
+  return { scene, camera, renderer, controls, sphere, lights: lightRig, resize, dispose };
+}

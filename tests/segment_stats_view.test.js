@@ -9,10 +9,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fakeElement } from './helpers/fake_dom.js';
 
-import { SLOW_FRAME_MS } from '../frame_constants.js';
+import { SLOW_FRAME_MS } from '../src/renderer/frame_constants.js';
 
 const { SegmentStatsView, FAULT_POOL, FAULT_RENDER } =
-  await import('../segment_stats_view.js');
+  await import('../src/ui/segment_stats_view.js');
 
 test('index provides every container the stats view resolves', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');

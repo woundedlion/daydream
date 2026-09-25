@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { formatKB } = await import('../tools/kb_format.js');
+const { formatKB } = await import('../src/shared/kb_format.js');
 
 /** The stat bars read bytes; the divisor is 1024, not 1000. */
 test('formatKB: divides bytes by 1024', () => {

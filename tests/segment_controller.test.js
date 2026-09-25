@@ -11,7 +11,7 @@ import { unpinnedEngineMethods } from './helpers/fake_engine.js';
 import { fakeElement, installDocument } from './helpers/fake_dom.js';
 import { fakeColorAttribute } from './helpers/fake_three.js';
 import { FakeWorker } from './helpers/fake_worker.js';
-import { displayAliasesDiverged, repointDisplayAliases } from '../display_aliases.js';
+import { displayAliasesDiverged, repointDisplayAliases } from '../src/engine/display_aliases.js';
 
 // Stand-in for the injected Daydream renderer: the grid and display buffer the
 // compositor reads, plus the dot mesh the second display alias lives on.
@@ -38,9 +38,9 @@ const {
   BOOT_WATCHDOG_MS,
   INIT_WATCHDOG_MS,
   RENDER_WATCHDOG_MS,
-} = await import('../segment_controller.js');
+} = await import('../src/segments/segment_controller.js');
 import { ModuleWarmer, warmModules, pageWarmer, EMPTY_WASM } from './fixtures/module_warmer_fixture.js';
-const { PROTOCOL_VERSION } = await import('../worker_protocol.js');
+const { PROTOCOL_VERSION } = await import('../src/segments/worker_protocol.js');
 
 const EXPECTED_CONSOLE_MESSAGES = {
   log: [

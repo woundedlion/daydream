@@ -8,9 +8,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import {
   BAKED_CONSTANT_IDS, bakedTopologyFields, engineParameterNames,
-} from '../tools/shader_documents.js';
-import * as MB from '../tools/mobius_transforms.js';
-import { MORPH_SWEEP, OP_DEFS } from '../tools/solid_codegen.js';
+} from '../src/workbench/shader/shader_documents.js';
+import * as MB from '../src/workbench/mobius/mobius_transforms.js';
+import { MORPH_SWEEP, OP_DEFS } from '../src/workbench/solids/solid_codegen.js';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const text = (path) => readFileSync(resolve(REPO, path), 'utf8').replaceAll('\r\n', '\n');

@@ -9,9 +9,9 @@ import {
   canvasPoint, createHueKeyWheelPainter, hueKeyDegrees, hueKeyHandoff,
   hueKeyLabelBoxes, hueKeyMarkerPoints, hueKeyNudgeTurns, paintHueWheelRaster,
   wheelTurnAt,
-} from '../tools/palette_wheel.js';
-import { hitTestHueKeyMarker, oklchLinearRgb } from '../tools/palette_controls.js';
-import { linearToSrgbFloat } from '../tools/color.js';
+} from '../src/workbench/palettes/palette_wheel.js';
+import { hitTestHueKeyMarker, oklchLinearRgb } from '../src/workbench/palettes/palette_controls.js';
+import { linearToSrgbFloat } from '../src/shared/color.js';
 
 // Slate-900: what the raster paints outside the gamut.
 const BACKDROP = [15, 23, 42];

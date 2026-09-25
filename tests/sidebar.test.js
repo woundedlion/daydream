@@ -1,6 +1,6 @@
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { EffectSidebar } from '../sidebar.js';
+import { EffectSidebar } from '../src/ui/sidebar.js';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
 // EffectSidebar's DOM-lifecycle methods (constructor, setEffects, applySortOrder,

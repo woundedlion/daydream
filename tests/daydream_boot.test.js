@@ -22,14 +22,14 @@ import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
-import { URL_FLUSH_DEBOUNCE_MS } from '../state.js';
-import { pageWarmer } from '../module_warmer.js';
+import { URL_FLUSH_DEBOUNCE_MS } from '../src/app/state.js';
+import { pageWarmer } from '../src/segments/module_warmer.js';
 import {
   EffectSetResult, ParamSetResult, ResolutionSetResult, unpinnedEngineMethods,
 } from './helpers/fake_engine.js';
 import { captureConsole, installConsoleCapture } from './helpers/fake_console.js';
-import { createRecordingControls } from '../recording_controls.js';
-import { createSegmentedPovControls } from '../segmented_pov_controls.js';
+import { createRecordingControls } from '../src/recording/recording_controls.js';
+import { createSegmentedPovControls } from '../src/ui/segmented_pov_controls.js';
 import {
   createSegmentPoolSpawner,
   fakeDriver,
@@ -106,7 +106,7 @@ function withoutComments(src) {
 }
 
 const SOURCE = withoutComments(
-  readFileSync(new URL('../daydream.js', import.meta.url), 'utf8'));
+  readFileSync(new URL('../src/app/daydream.js', import.meta.url), 'utf8'));
 
 // The two simulator presets, as the driver is told to size itself to them.
 const PHANTASM = [288, 144, 0.25];

@@ -1,5 +1,5 @@
 import { fakeGui } from './helpers/fake_app.js';
-import { FULL_CONFIG_STORAGE_KEY } from '../effect_persistence.js';
+import { FULL_CONFIG_STORAGE_KEY } from '../src/effects/effect_persistence.js';
 import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement } from './helpers/fake_dom.js';
@@ -10,7 +10,7 @@ import {
   EXPORT_COPIED,
   EXPORT_FAILED,
   FLASH_MS,
-} from '../effect_gui.js';
+} from '../src/ui/effect_gui.js';
 import {
   LATTICE_MELT_STAGE_ORDER,
   KALEIDOSCOPE_SMOOTH_STAGE_ORDER,
@@ -22,7 +22,7 @@ import {
   isShaderSchema,
   legacyShaderBallParamNames,
   shaderStageAssignments,
-} from '../shader_stages.js';
+} from '../src/effects/shader_stages.js';
 import { FullConfigRestoreResult } from './helpers/fake_engine.js';
 
 // createEffectGui owns the effect panel: which control an engine parameter maps

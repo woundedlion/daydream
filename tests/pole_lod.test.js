@@ -3,7 +3,7 @@
 // the module load builds exists to take it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createPoleLodBinding } from '../pole_lod.js';
+import { createPoleLodBinding } from '../src/renderer/pole_lod.js';
 
 // The Pole LOD control is registered during module evaluation and DeepLinkGUI
 // replays a URL-hydrated value's onChange right there, while the engine is

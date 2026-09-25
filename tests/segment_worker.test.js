@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PROTOCOL_VERSION } from '../worker_protocol.js';
+import { PROTOCOL_VERSION } from '../src/segments/worker_protocol.js';
 import {
   unpinnedEngineMethods, ParamSetResult, ClipSetResult,
   ResolutionSetResult, EffectSetResult,
@@ -204,7 +204,7 @@ mock.module('../generated/holosphere_wasm.js', {
   },
 });
 
-const { installSegmentWorker } = await import('../segment_worker.js');
+const { installSegmentWorker } = await import('../src/segments/segment_worker.js');
 
 // 'booted' is posted once at module-eval time, before any beforeEach clears `posted`.
 const bootedAtLoad = posted.filter((p) => p.msg.type === 'booted');
@@ -1164,7 +1164,7 @@ const REPO = fileURLToPath(new URL('..', import.meta.url));
 // transient fetch race it usually is, burning every boot retry on a failure
 // that will never resolve.
 test('the worker module graph carries no specifier an import map would resolve', () => {
-  const { modules, edges } = staticModuleGraph('segment_worker.js');
+  const { modules, edges } = staticModuleGraph('src/segments/segment_worker.js');
   for (const { from, specifier } of edges) {
     assert.ok(specifier.startsWith('./') || specifier.startsWith('../'),
       `${from} statically imports "${specifier}"; import maps do not apply to `
@@ -1175,10 +1175,10 @@ test('the worker module graph carries no specifier an import map would resolve',
   // now fetches on every spawn, and one leaving it takes its own gate with it.
   assert.deepEqual(modules, [
     'generated/holosphere_wasm.js',
-    'segment_layout.js',
-    'segment_worker.js',
-    'tools/engine_halt.js',
-    'worker_protocol.js',
+    'src/segments/segment_layout.js',
+    'src/segments/segment_worker.js',
+    'src/segments/worker_protocol.js',
+    'src/shared/engine_halt.js',
   ]);
 });
 
@@ -1215,11 +1215,11 @@ function typedefShapes(source) {
 // together.
 const PROTOCOL_SHAPE_PIN = {
   version: 10,
-  sha256: 'ba9254fd2cb21f2ae624244e109d3dc876e83cc82dec44b3a86d6025a5a92441',
+  sha256: '1f84522ce82d5abf3fb90fb67ec9be49aa6933aa21f606f797c6fc2c68d6fd8f',
 };
 
 test('a reshaped protocol message forces a PROTOCOL_VERSION bump', () => {
-  const shapes = typedefShapes(readFileSync(join(REPO, 'worker_protocol.js'), 'utf8'));
+  const shapes = typedefShapes(readFileSync(join(REPO, 'src/segments/worker_protocol.js'), 'utf8'));
   assert.ok(shapes.length >= 12, 'every protocol message is a @typedef in that file');
   const digest = createHash('sha256').update(shapes.join('\n')).digest('hex');
   assert.equal(digest, PROTOCOL_SHAPE_PIN.sha256,

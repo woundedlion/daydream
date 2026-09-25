@@ -54,7 +54,7 @@ export function verifyEngineBundle(bundle, destination = bundle) {
 export function installEngineBundle(bundle, destination) {
   bundle = resolve(bundle);
   destination = resolve(destination);
-  if (!existsSync(resolve(destination, 'daydream.js')))
+  if (!existsSync(resolve(destination, 'src/app/daydream.js')))
     throw new Error('Destination is not a Daydream checkout');
   const { entries, bundlePin } = verifyEngineBundle(bundle, destination);
   const paths = new Set(entries);

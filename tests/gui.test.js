@@ -12,12 +12,12 @@ import {
   URLSync,
   URL_FLUSH_DEBOUNCE_MS,
   getActiveURLSync,
-} from '../state.js';
-import { engineParamValue } from '../param_sync.js';
+} from '../src/app/state.js';
+import { engineParamValue } from '../src/effects/param_sync.js';
 import {
   snapshotEffectControlState,
   restoreEffectControlState,
-} from '../effect_sequencing.js';
+} from '../src/effects/effect_sequencing.js';
 import { fakeElement, installWindow, restoreWindowAfterEach } from './helpers/fake_dom.js';
 import { captureConsole } from './helpers/fake_console.js';
 
@@ -119,7 +119,7 @@ class StubGUI {
 
 mock.module('lil-gui', { namedExports: { GUI: StubGUI } });
 
-const { GUI: BaseGUI, makeUrlParamWriter, resetGUI } = await import('../gui.js');
+const { GUI: BaseGUI, makeUrlParamWriter, resetGUI } = await import('../src/ui/gui.js');
 
 // GUI root that registers itself for teardown in afterEach.
 class DeepLinkGUI extends BaseGUI {
