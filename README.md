@@ -539,7 +539,12 @@ The tracked tree below retains the authored JavaScript, shader sources, and
 `holosphere_wasm.d.ts` declarations. Local installs also produce ignored outputs:
 `holosphere_wasm.js`, `holosphere_wasm.wasm`, `holosphere_wasm.sha`,
 `holosphere_wasm.wasm.sha256`, `holosphere_wasm.toolchain`, and
-`shader/engine_catalog.json`. Build and install them with the Quickstart commands;
+`shader/engine_catalog.json`, `pov_segment_map.json`, the helpers
+`shader/shader_workbench.mjs` and `shader/sha256.mjs`, top-level
+`shader/patterns/*.shader.json`, and `shader/patterns/shaderball_migration.json`.
+Their canonical sources live in Holosphere. Daydream tracks its `shader/patterns/v1/`
+fixtures, `digest_migration.v1v2.json`, and the hand-written type declarations.
+Build and install the runtime assets with the Quickstart commands;
 CI installs the verified engine bundle before testing and deploying the simulator.
 
 <!-- docs-check: tree daydream exhaustive -->
@@ -551,10 +556,9 @@ CI installs the verified engine bundle before testing and deploying the simulato
 ├── vendor-importmap.js         CDN-by-default importmap helper, local opt-in
 ├── holosphere_wasm.d.ts        Hand-written declarations for the installed glue — what the typecheck sees
 ├── file_system_access.d.ts     Save-picker declarations lib.dom omits, for recorder.js's streaming sink
-├── pov_segment_map.json        Firmware segment→canvas golden, installed from Holosphere — read by the segment cross-check
 ├── README.md                   Installed from Holosphere (this file)
 ├── docs/screenshots/           Installed from Holosphere
-├── shader/                     Engine-installed documents/validator plus daydream-owned patterns/v1 and digest migration
+├── shader/                     Daydream-owned declarations, patterns/v1 fixtures, and digest migration
 │
 ├── main.js                     index.html's entry module: starts the simulator, once
 ├── bootstrap.js                Dynamic-import boot of daydream.js + failure overlay

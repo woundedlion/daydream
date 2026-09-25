@@ -5,12 +5,12 @@ import { appendFileSync, copyFileSync, mkdtempSync, rmSync, writeFileSync } from
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GENERATED_PATHS } from '../scripts/install-engine-bundle.mjs';
+import { RUNTIME_PATHS, runtimePath } from '../scripts/install-engine-bundle.mjs';
 import { isolatedGitEnv } from './fixture_repo.js';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 
-test('source manifest checks accept absent generated assets but reject untracked frontend', (t) => {
+test('source manifest checks accept absent installed assets but reject untracked frontend', (t) => {
   const root = mkdtempSync(join(tmpdir(), 'daydream-source-manifest-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const env = isolatedGitEnv();
@@ -21,8 +21,9 @@ test('source manifest checks accept absent generated assets but reject untracked
   git('-c', 'core.hooksPath=/dev/null', 'checkout', '--quiet', '--detach', 'HEAD');
   for (const path of ['tests/site_manifest.test.js', 'scripts/install-engine-bundle.mjs'])
     copyFileSync(join(REPO, path), join(root, path));
-  git('rm', '--cached', '--ignore-unmatch', '--', ...GENERATED_PATHS);
-  for (const path of GENERATED_PATHS) rmSync(join(root, path), { force: true });
+  const installed = new Set([...RUNTIME_PATHS, ...git('ls-files').toString().trim().split('\n').filter(runtimePath)]);
+  git('rm', '--cached', '--ignore-unmatch', '--', ...installed);
+  for (const path of installed) rmSync(join(root, path), { force: true });
   const run = () => spawnSync(process.execPath, ['--test', 'tests/site_manifest.test.js'], {
     cwd: root, env, encoding: 'utf8',
   });

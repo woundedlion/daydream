@@ -10,14 +10,14 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { dirname, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { manifestEntries, servedPages } from './site_pages.js';
-import { GENERATED_PATHS } from '../scripts/install-engine-bundle.mjs';
+import { runtimePath } from '../scripts/install-engine-bundle.mjs';
 import { verifiedEnginePaths } from '../scripts/stage-site.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MANIFEST = 'site_manifest.txt';
 const PAGES = servedPages();
 const sourceOnly = !process.env.ENGINE_BUNDLE_DIR;
-const generated = (path) => sourceOnly && GENERATED_PATHS.has(path);
+const generated = (path) => sourceOnly && runtimePath(path);
 
 const read = (path) => readFileSync(resolve(REPO, path), 'utf8');
 
@@ -228,6 +228,7 @@ const UNREFERENCED = [
 
 const PATTERNS = 'shader/patterns';
 const MIGRATION = `${PATTERNS}/shaderball_migration.json`;
+const missingCatalog = sourceOnly && !existsSync(resolve(REPO, MIGRATION));
 
 // Documents in the pattern directory that are not source documents: the
 // migration listing, which the source catalog fetches by URL, and the v1-to-v2
@@ -249,7 +250,7 @@ const PATTERN_UNPUBLISHED = [`${PATTERNS}/example.shader.json`];
  * @returns {Set<string>} Repo-relative pattern document paths.
  */
 const servedPatterns = () => new Set([
-  ...Object.values(JSON.parse(read(MIGRATION)).source_documents).map(
+  ...Object.values(missingCatalog ? {} : JSON.parse(read(MIGRATION)).source_documents).map(
     (/** @type {*} */ filename) => `${PATTERNS}/${filename}`),
   ...PATTERN_NON_SOURCES,
 ]);
@@ -260,7 +261,8 @@ const patternFiles = () =>
     .filter((name) => name.endsWith('.json'))
     .map((name) => `${PATTERNS}/${name}`);
 
-test('the site manifest publishes every source catalog document', () => {
+test('the site manifest publishes every source catalog document',
+  { skip: missingCatalog && 'engine catalog is installed separately' }, () => {
   const migration = JSON.parse(read('shader/patterns/shaderball_migration.json'));
   const entries = new Set(manifestEntries());
   const missing = Object.values(migration.source_documents)
@@ -287,7 +289,8 @@ test('the site manifest publishes nothing the served pages do not reach', () => 
       'thing keeping dev tooling off Pages');
 });
 
-test('the site manifest publishes exactly the pattern documents the catalog fetches', () => {
+test('the site manifest publishes exactly the pattern documents the catalog fetches',
+  { skip: missingCatalog && 'engine catalog is installed separately' }, () => {
   const served = servedPatterns();
   const listed = new Set(
     manifestEntries().filter((entry) => entry.startsWith(`${PATTERNS}/`)));
