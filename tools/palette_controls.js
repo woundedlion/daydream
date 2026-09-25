@@ -1031,7 +1031,8 @@ export function paletteRecipeAvailability(recipe) {
     hueSweep: hasColor && recipe.hue.mode === PaletteV4.hueMode.SWEEP,
     hueTorsion: hasColor,
     colorPath: hasColor && !monochromatic,
-    hueDirection: hasColor && !monochromatic && !customHue,
+    hueDirection: hasColor && !monochromatic &&
+      (!customHue || recipe.domain === PaletteV4.domain.LOOP),
     chromaHeadroom: hasColor && recipe.chroma.basis !== PaletteV4.chromaBasis.ABSOLUTE,
     falloffStart: recipe.domain === PaletteV4.domain.FALLOFF,
     chromaEndpoints: !customChroma,

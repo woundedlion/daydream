@@ -430,6 +430,8 @@ test('recipe availability exposes only controls that can affect the result', () 
   assert.equal(availability.hueDirection, false);
   assert.equal(availability.lightnessEndpoints, false);
   assert.equal(availability.chromaEndpoints, false);
+  recipe.domain = PaletteV4.domain.LOOP;
+  assert.equal(paletteRecipeAvailability(recipe).hueDirection, true);
 });
 
 // A full set of control readings, as the generative tab reads them.
