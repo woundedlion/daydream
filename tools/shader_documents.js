@@ -349,6 +349,7 @@ export function createShaderDocumentController({
   let compiler;
   /** @type {*|null} */
   let active = null;
+  let selectedSource = '';
   /** @type {Map<string, *>} */
   let sourceCatalog = new Map();
   /** @type {Record<string, string>} */
@@ -753,6 +754,7 @@ export function createShaderDocumentController({
     syncParity();
     if (session) setAnimationsPaused(session.paused);
     if (!applyPreset(presetId)) return abandon(true);
+    active.savedDocument = JSON.stringify(currentDocument());
     previousUi?.strip.destroy();
     if (stripMount && candidateMount) stripMount.replaceChildren(candidateMount);
     return true;
@@ -828,6 +830,7 @@ export function createShaderDocumentController({
    */
   const exportDocument = (document, filename) => {
     download(filename, compiler.exportShaderDocumentJson(document));
+    active.savedDocument = JSON.stringify(currentDocument());
     show(`Saved ${filename}.`);
     return true;
   };
@@ -920,6 +923,7 @@ export function createShaderDocumentController({
       // requested effect or the scratch chain, which name themselves.
       if (await loadSource(linked.document, filename, null, linked)) {
         sourceSelect.value = sourceCatalog.has(effectId) ? effectId : '';
+        selectedSource = sourceSelect.value;
         return true;
       }
       linkError = status.textContent || 'the linked state was refused';
@@ -931,15 +935,27 @@ export function createShaderDocumentController({
       loaded = await loadSource(requested.source, requested.filename, requested.compiled);
       if (loaded) sourceSelect.value = requested.effectId;
     }
+    selectedSource = sourceSelect.value;
     if (linkError) show(`The shader link could not be restored: ${linkError}.`, true);
     return loaded;
   };
 
+  const allowSourceChange = () => {
+    chainUi?.strip.flushParameterEdit();
+    return !active || JSON.stringify(currentDocument()) === active.savedDocument
+      || win.confirm('Discard unsaved shader edits?');
+  };
+
   const onSourceChange = async () => {
+    if (!allowSourceChange()) {
+      sourceSelect.value = selectedSource;
+      return;
+    }
     try {
       const option = sourceSelect.selectedOptions[0];
       if (!option?.value) {
-        await loadScratch();
+        if (await loadScratch()) selectedSource = sourceSelect.value;
+        else sourceSelect.value = selectedSource;
         await flushDeepLink();
         return;
       }
@@ -948,7 +964,9 @@ export function createShaderDocumentController({
         show(`The source catalog carries no document for "${option.value}".`, true);
         return;
       }
-      await loadSource(entry.source, entry.filename, entry.compiled);
+      if (await loadSource(entry.source, entry.filename, entry.compiled))
+        selectedSource = sourceSelect.value;
+      else sourceSelect.value = selectedSource;
       await flushDeepLink();
     } catch (error) {
       show(`Could not load shader source: ${errorDetail(error)}`, true);
@@ -972,8 +990,11 @@ export function createShaderDocumentController({
         show('The document byte limit was exceeded.', true);
         return;
       }
-      sourceSelect.value = '';
-      await loadSource(await file.text(), file.name);
+      if (!allowSourceChange()) return;
+      if (await loadSource(await file.text(), file.name)) {
+        sourceSelect.value = '';
+        selectedSource = '';
+      }
       await flushDeepLink();
     } catch (error) {
       show(`Could not open shader document: ${errorDetail(error)}`, true);
