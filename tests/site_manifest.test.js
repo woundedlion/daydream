@@ -9,7 +9,7 @@ import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { dirname, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { manifestEntries, servedPages } from './site_pages.js';
+import { manifestEntries, servedPages } from './helpers/site_pages.js';
 import { runtimePath } from '../scripts/install-engine-bundle.mjs';
 import { verifiedEnginePaths } from '../scripts/stage-site.mjs';
 

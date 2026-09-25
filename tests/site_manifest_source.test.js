@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RUNTIME_PATHS, runtimePath } from '../scripts/install-engine-bundle.mjs';
-import { isolatedGitEnv } from './fixture_repo.js';
+import { isolatedGitEnv } from './helpers/fixture_repo.js';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 

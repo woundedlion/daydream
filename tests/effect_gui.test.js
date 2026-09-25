@@ -1,8 +1,8 @@
-import { fakeGui } from './fake_app.js';
+import { fakeGui } from './helpers/fake_app.js';
 import { FULL_CONFIG_STORAGE_KEY } from '../effect_persistence.js';
 import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { fakeElement } from './fake_dom.js';
+import { fakeElement } from './helpers/fake_dom.js';
 import {
   createEffectGui,
   addParamControl,
@@ -23,7 +23,7 @@ import {
   legacyShaderBallParamNames,
   shaderStageAssignments,
 } from '../shader_stages.js';
-import { FullConfigRestoreResult } from './fake_engine.js';
+import { FullConfigRestoreResult } from './helpers/fake_engine.js';
 
 // createEffectGui owns the effect panel: which control an engine parameter maps
 // to, which value stream feeds the sliders each frame, what an Export may copy,

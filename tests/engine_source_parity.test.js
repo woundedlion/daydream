@@ -14,7 +14,7 @@
 // skipping; only a local run without a checkout skips. That every case here can
 // skip is why the workflow's own declaration of the flag is pinned from
 // tests/wasm_provenance.test.js, which never skips.
-import * as paletteEnums from './fake_palette.js';
+import * as paletteEnums from './helpers/fake_palette.js';
 import { test } from 'node:test';
 import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';

@@ -13,7 +13,7 @@ import {
   resolutionEffects,
   switchFailureReport,
 } from '../effect_sequencing.js';
-import { EffectSetResult, ResolutionSetResult } from './fake_engine.js';
+import { EffectSetResult, ResolutionSetResult } from './helpers/fake_engine.js';
 
 function makeEffectControls(values, paused = false, sinks = null) {
   const state = { ...values };

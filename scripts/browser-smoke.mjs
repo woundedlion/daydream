@@ -9,7 +9,7 @@
  */
 import puppeteer from 'puppeteer-core';
 
-import { servedPages } from '../tests/site_pages.js';
+import { servedPages } from '../tests/helpers/site_pages.js';
 import { BROWSER_ARGS, resolveBrowser } from './browser.mjs';
 import { collectProblems, closeProbeResources } from './probe_harness.mjs';
 import { serveStagedSite } from './vendor-stage.mjs';

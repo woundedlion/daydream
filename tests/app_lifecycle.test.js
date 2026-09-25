@@ -1,8 +1,8 @@
-import { fakeTimers, fakeScheduler } from './fake_timers.js';
+import { fakeTimers, fakeScheduler } from './helpers/fake_timers.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fakeElement } from './fake_dom.js';
-import { fakeColorAttribute } from './fake_three.js';
+import { fakeElement } from './helpers/fake_dom.js';
+import { fakeColorAttribute } from './helpers/fake_three.js';
 import { repointDisplayAliases } from '../display_aliases.js';
 import {
   createRenderAdapter,

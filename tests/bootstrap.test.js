@@ -5,7 +5,7 @@ import {
   bootstrap, refreshModuleCache, refreshWithDeadline, showBootstrapFailure,
   StaleModuleError, STALE_MODULE_REMEDY, VENDOR_REMEDY,
 } from '../bootstrap.js';
-import { fakeElement } from './fake_dom.js';
+import { fakeElement } from './helpers/fake_dom.js';
 
 function fakeDocument() {
   const overlay = fakeElement('div');

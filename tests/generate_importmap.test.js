@@ -13,7 +13,7 @@ import {
   fixtureRepo,
   expectFailure,
   isolatedGitEnv,
-} from './fixture_repo.js';
+} from './helpers/fixture_repo.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT_SRC = resolve(HERE, '../scripts/generate-importmap.mjs');

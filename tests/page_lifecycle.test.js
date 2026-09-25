@@ -1,6 +1,6 @@
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { installAnimationFrames } from './fake_dom.js';
+import { installAnimationFrames } from './helpers/fake_dom.js';
 
 const {
   createFrameScheduler, onPageTeardown, watchMediaMatch,

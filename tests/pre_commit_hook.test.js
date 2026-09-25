@@ -11,7 +11,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findSh, isolatedGitEnv } from './fixture_repo.js';
+import { findSh, isolatedGitEnv } from './helpers/fixture_repo.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HOOK = resolve(HERE, '../.githooks/pre-commit').replace(/\\/g, '/');

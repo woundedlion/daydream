@@ -12,8 +12,8 @@ import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { serveStagedSite, stageSite } from '../scripts/vendor-stage.mjs';
-import { manifestEntries } from './site_pages.js';
-import { request } from './http_request.js';
+import { manifestEntries } from './helpers/site_pages.js';
+import { request } from './helpers/http_request.js';
 
 const staged = stageSite();
 after(() => rmSync(staged.root, { recursive: true, force: true }));

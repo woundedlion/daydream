@@ -1,7 +1,7 @@
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { EffectSidebar } from '../sidebar.js';
-import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
+import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
 // EffectSidebar's DOM-lifecycle methods (constructor, setEffects, applySortOrder,
 // setActive, updateScrollArrows, dispose) touch the DOM only through a narrow set

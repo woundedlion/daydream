@@ -5,7 +5,7 @@
 // accepted a re-point no GPU buffer can take, or a version that stopped
 // counting, would read there as an assertion about the module under test rather
 // than about the harness.
-import { detachedView } from './fake_buffer.js';
+import { detachedView } from './helpers/fake_buffer.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -16,7 +16,7 @@ import {
   Object3D,
   Scene,
   SphereGeometry,
-} from './fake_three.js';
+} from './helpers/fake_three.js';
 
 
 

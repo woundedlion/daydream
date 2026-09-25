@@ -8,7 +8,7 @@ import {
   expectFailure,
   fixtureRepo,
   isolatedGitEnv,
-} from './fixture_repo.js';
+} from './helpers/fixture_repo.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = resolve(HERE, '../scripts/require-tests.mjs');

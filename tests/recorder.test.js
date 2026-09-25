@@ -1,7 +1,7 @@
 import { mock, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { installConsoleCapture } from './fake_console.js';
-import { fakeElement, installDocument } from './fake_dom.js';
+import { installConsoleCapture } from './helpers/fake_console.js';
+import { fakeElement, installDocument } from './helpers/fake_dom.js';
 import {
   MEMORY_BUFFER_LIMIT_BYTES, PICKER_GRACE_SECONDS, selectMimeType, VideoRecorder,
 } from '../recorder.js';

@@ -21,11 +21,11 @@ import {
 } from '../tools/shader_documents.js';
 import {
   FakeChainEngine, ParamSetResult, unpinnedEngineMethods,
-} from './fake_engine.js';
+} from './helpers/fake_engine.js';
 import {
   documentEvents, fakeElement, installAnimationFrames, installDocument,
   restoreDocumentAfterEach,
-} from './fake_dom.js';
+} from './helpers/fake_dom.js';
 
 const ownedEditors = new Set();
 afterEach(async () => {

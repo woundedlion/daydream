@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { createEffectGui } from '../effect_gui.js';
 import { GUI } from '../gui.js';
 import { AppState, URLSync } from '../state.js';
-import { fakeGui } from './fake_app.js';
-import { fakeElement } from './fake_dom.js';
+import { fakeGui } from './helpers/fake_app.js';
+import { fakeElement } from './helpers/fake_dom.js';
 
 function widgets() {
   const root = fakeGui('widgets');

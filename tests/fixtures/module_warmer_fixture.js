@@ -1,6 +1,6 @@
-import { staticModuleGraph } from './module_graph.js';
+import { staticModuleGraph } from '../helpers/module_graph.js';
 const { ModuleWarmer: RealModuleWarmer, WARM_INTERVAL_MS, WARM_DEADLINE_MS, pageWarmer } =
-  await import('../module_warmer.js');
+  await import('../../module_warmer.js');
 const GRAPH = staticModuleGraph('segment_worker.js').modules;
 const GLUE = new TextEncoder().encode('new URL("holosphere_wasm.wasm?v=abc123", import.meta.url)');
 function withGlue(dependencies) {

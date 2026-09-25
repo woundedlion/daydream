@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMeshRenderer, meshStatsLine, meshCanvasLabel } from '../tools/solid_render.js';
-import { fakeElement } from './fake_dom.js';
+import { fakeElement } from './helpers/fake_dom.js';
 import {
   BufferGeometry,
   Color,
@@ -11,7 +11,7 @@ import {
   Points,
   Scene,
   Vector3,
-} from './fake_three.js';
+} from './helpers/fake_three.js';
 
 const THREE = {
   Vector3, Color, BufferGeometry, Float32BufferAttribute, Mesh, Points, LineSegments,

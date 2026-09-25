@@ -1,8 +1,8 @@
-import { fakeUrlTimer } from './fake_timers.js';
+import { fakeUrlTimer } from './helpers/fake_timers.js';
 import { test, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { captureConsole, installConsoleCapture } from './fake_console.js';
-import { installWindow, restoreWindowAfterEach } from './fake_dom.js';
+import { captureConsole, installConsoleCapture } from './helpers/fake_console.js';
+import { installWindow, restoreWindowAfterEach } from './helpers/fake_dom.js';
 import {
   AppState,
   URLSync,

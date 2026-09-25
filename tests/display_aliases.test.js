@@ -4,7 +4,7 @@
 // shows the previous buffer.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fakeColorAttribute } from './fake_three.js';
+import { fakeColorAttribute } from './helpers/fake_three.js';
 import { displayAliasesDiverged, repointDisplayAliases } from '../display_aliases.js';
 
 /**

@@ -3,7 +3,7 @@
 // revertMs must not latch the element on "Copied!".
 import { test, mock, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
+import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
 const {
   copyToClipboard,

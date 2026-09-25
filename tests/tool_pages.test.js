@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { servedPages } from './site_pages.js';
+import { servedPages } from './helpers/site_pages.js';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PAGES = servedPages()
