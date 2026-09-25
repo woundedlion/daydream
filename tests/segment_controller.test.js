@@ -1702,6 +1702,25 @@ test('composite() marks both the internal split and the x=0 wrap seam', () => {
   assert.equal(driver.pixels[idx(3, 0, 4)], 222, 'arm-1 interior untouched');
 });
 
+test('a generation published while paused composites without another tick', async () => {
+  setDisplayGrid(4, 2);
+  const c = readyController(2);
+  c.active = true;
+  driver.paused = true;
+  try {
+    await publishGeneration(c, [
+      { pixels: new Uint16Array(12).fill(111), x0: 0, x1: 2, y0: 0, y1: 2 },
+      { pixels: new Uint16Array(12).fill(222), x0: 2, x1: 4, y0: 0, y1: 2 },
+    ]);
+    assert.equal(driver.pixels[idx(1, 0, 4)], 111);
+    assert.equal(driver.pixels[idx(3, 0, 4)], 222);
+    assert.equal(driver.invalidations, 1);
+    assert.equal(c.frameState.pendingFrame, false);
+  } finally {
+    driver.paused = false;
+  }
+});
+
 test('the boundary setter re-composites and invalidates a paused held generation', async () => {
   setDisplayGrid(4, 2);
 
