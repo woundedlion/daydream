@@ -42,6 +42,7 @@ const {
 } = await import('../segment_controller.js');
 const { ModuleWarmer: RealModuleWarmer, WARM_INTERVAL_MS, WARM_DEADLINE_MS, pageWarmer } =
   await import('../module_warmer.js');
+const GRAPH = staticModuleGraph('segment_worker.js').modules;
 const GLUE = new TextEncoder().encode('new URL("holosphere_wasm.wasm?v=abc123", import.meta.url)');
 function withGlue(dependencies) {
   if (!dependencies?.fetch) return dependencies;
@@ -110,7 +111,7 @@ test('warmModules revalidates the whole worker module graph', async () => {
 
   // Derived from the worker's own import graph plus the binary its glue
   // streams, so a module joining the graph is one the warm must drain too.
-  const graph = [...staticModuleGraph('segment_worker.js').modules, 'holosphere_wasm.wasm?v=abc123'];
+  const graph = [...GRAPH, 'holosphere_wasm.wasm?v=abc123'];
   assert.deepEqual(calls.map(([url]) => url).sort(),
     graph.map((file) => `http://localhost:8000/${file}`).sort(),
     'every static import of the worker, or a stale one survives the warm');
@@ -165,7 +166,7 @@ test('a stalled warm is abandoned on its deadline so the spawn still runs',
     expire[0]();
     await warm;
 
-    assert.equal(aborted, 5, 'every stalled re-fetch was aborted');
+    assert.equal(aborted, GRAPH.length, 'every stalled re-fetch was aborted');
     assert.equal(warmer.module, null,
       'the abandoned warm hands the pool a module it never revalidated');
   });
@@ -185,15 +186,15 @@ test('a re-warm inside the dedupe window is skipped', async () => {
   };
   const warmer = new ModuleWarmer();
   await warmer.warm(deps);
-  assert.equal(calls, 6, 'a first warm fetches the whole module graph');
+  assert.equal(calls, GRAPH.length + 1, 'a first warm fetches the whole module graph');
 
   now += WARM_INTERVAL_MS - 1;
   await warmer.warm(deps);
-  assert.equal(calls, 6, 'a slider-drag re-warm reuses the previous warm');
+  assert.equal(calls, GRAPH.length + 1, 'a slider-drag re-warm reuses the previous warm');
 
   now += 1;
   await warmer.warm(deps);
-  assert.equal(calls, 12, 'a warm on the window boundary fetches again');
+  assert.equal(calls, 2 * (GRAPH.length + 1), 'a warm on the window boundary fetches again');
 });
 
 test('the dedupe window covers one base URL, not every caller in it', async () => {
@@ -217,14 +218,10 @@ test('the dedupe window covers one base URL, not every caller in it', async () =
     ...deps,
     baseUrl: 'http://localhost:8000/second/segment_controller.js',
   });
-  assert.deepEqual(seen, [
-    'http://localhost:8000/second/segment_worker.js',
-    'http://localhost:8000/second/holosphere_wasm.js',
-    'http://localhost:8000/second/segment_layout.js',
-    'http://localhost:8000/second/worker_protocol.js',
-    'http://localhost:8000/second/tools/engine_halt.js',
-    'http://localhost:8000/second/holosphere_wasm.wasm?v=abc123',
-  ], 'a second base URL inside the window warms its own module graph');
+  assert.deepEqual(seen.slice().sort(),
+    [...GRAPH, 'holosphere_wasm.wasm?v=abc123']
+      .map((file) => `http://localhost:8000/second/${file}`).sort(),
+    'a second base URL inside the window warms its own module graph');
 
   seen.length = 0;
   await warmer.warm({
@@ -261,7 +258,7 @@ test('a warm whose fetch throws synchronously does not claim the window', async 
       return Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) });
     },
   });
-  assert.equal(calls, 6,
+  assert.equal(calls, GRAPH.length + 1,
     'the throw warmed nothing, so the next call must not be handed a settled promise');
 });
 
