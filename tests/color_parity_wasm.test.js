@@ -306,8 +306,8 @@ function setPaletteEnum(recipe, group, ordinal) {
 }
 
 function paletteResultFingerprint(result) {
-  if (result.status.code !== 0) {
-    return `error:${result.status.code}:${result.status.field}`;
+  if (result.status.code !== M.PaletteCompileCode.OK) {
+    return `error:${result.status.code.value}:${result.status.field.value}`;
   }
   return createHash('sha256')
     .update(Uint8Array.from(result.lut))
@@ -339,7 +339,7 @@ test('Palette V4 enum spellings and ordinals match the shipped engine', () => {
       const rejectedRecipe = paletteEnumProbeRecipe();
       setPaletteEnum(rejectedRecipe, group, members.length);
       const rejected = ops.compileAndBakeV4(rejectedRecipe);
-      assert.deepEqual([rejected.status.code, rejected.status.field], [3, field],
+      assert.deepEqual([rejected.status.code.value, rejected.status.field.value], [3, field],
         `${group} engine roster length`);
     }
   } finally {
@@ -384,7 +384,7 @@ test('PaletteOps publishes every effect-owned GenerativePalette recipe', () => {
     ]);
     for (const preset of presets) {
       assert.equal(preset.recipe.schemaVersion, 4);
-      assert.equal(ops.inspectV4(preset.recipe).status.code, 0, preset.name);
+      assert.equal(ops.inspectV4(preset.recipe).status.code, M.PaletteCompileCode.OK, preset.name);
     }
     assert.equal(presets[0].recipe.hue.mode, PaletteV4.hueMode.CUSTOM);
     assert.equal(presets[7].recipe.lightness.curve, PaletteV4.curve.CUSTOM);
@@ -399,7 +399,7 @@ test('PaletteOps compiles deterministic V4 recipe LUTs', () => {
   try {
     const first = ops.compileAndBakeV4(recipe);
     const second = ops.compileAndBakeV4(recipe);
-    assert.equal(first.status.code, 0);
+    assert.equal(first.status.code, M.PaletteCompileCode.OK);
     assert.equal(first.canonicalRecipe.schemaVersion, 4);
     assert.equal('keyCount' in first.canonicalRecipe, false);
     assert.deepEqual(sampleLut(Uint8Array.from(first.lut)),
@@ -565,7 +565,7 @@ test('recipe window crops every axis before the domain is applied', () => {
 
 test('browser GenerativePalette owns the real bridge result', () => {
   const ops = new M.PaletteOps();
-  P.setPaletteOps(ops);
+  P.setPaletteOps(ops, M);
   try {
     const recipe = defaultPaletteRecipe();
     recipe.hue.baseTurns = 0.37;
@@ -587,7 +587,7 @@ test('PATH_MINIMUM is rejected until its certified solver is available', () => {
   recipe.chroma.basis = PaletteV4.chromaBasis.PATH_MINIMUM;
   try {
     const result = ops.compileAndBakeV4(recipe);
-    assert.notEqual(result.status.code, 0);
+    assert.notEqual(result.status.code, M.PaletteCompileCode.OK);
     assert.equal(result.lut, undefined);
   } finally {
     ops.delete();

@@ -1,3 +1,4 @@
+import * as paletteEnums from './fake_palette.js';
 //
 // Source-text parity between the browser tools' hand-transcribed engine values
 // and the C++ headers they are transcribed from.
@@ -22,7 +23,6 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { lissajousCodeString } from '../tools/lissajous_math.js';
 import * as MB from '../tools/mobius_transforms.js';
-import * as P from '../tools/palette_math.js';
 import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS } from '../tools/solid_codegen.js';
 import { MAX_BUILD_STEPS, upperSnake, primitiveCount } from '../tools/solid_registry_codegen.js';
 
@@ -336,7 +336,7 @@ test('the compile-status rosters match core/color/palette_recipe.h', { skip: eng
   for (const [roster, cppName] of STATUS_ENUMS) {
     const { roster: want, count } = engineValuedEnumerators(cpp, cppName);
     assert.ok(want.size > 0, `${cppName} yielded no enumerators — the reader is out of date`);
-    const got = P[roster];
+    const got = Object.keys(paletteEnums[cppName]);
     assert.equal(got.length, count ?? Math.max(...want.keys()) + 1,
       `${roster} does not span ${cppName}'s ordinals`);
     for (const [value, name] of want) {

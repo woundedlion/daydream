@@ -21,8 +21,8 @@ import { formatFloatCpp } from './cpp_format.js';
 
 /**
  * @typedef {object} PaletteCompileStatus
- * @property {number} code - 0 on success, otherwise the compiler's error code.
- * @property {number} field - Which recipe field the error names.
+ * @property {{value: number}} code - The compiler result enum.
+ * @property {{value: number}} field - Which recipe field the error names.
  * @property {number} wrappedFields - Bitmask over PaletteRecipeField of the fields the compiler wrapped into range.
  * @property {number} clampedFields - The fields it clamped, in the same bit positions.
  * @property {number} canonicalizedFields - The fields it rewrote into canonical form, in the same bit positions.
@@ -78,10 +78,15 @@ let paletteOps = null;
  * call compiles through. The page installs it once the WASM module is up, and
  * passes null to drop it.
  * @param {PaletteOps?} ops - The engine bridge, or null to clear it.
+ * @param {{PaletteCompileCode: Record<string, {value: number}>, PaletteRecipeField: Record<string, {value: number}>}|null} [enums] - Module enum exports.
  * @returns {void}
  */
-export function setPaletteOps(ops) {
+export function setPaletteOps(ops, enums = null) {
   paletteOps = ops;
+  if (enums) {
+    compileCodes = enums.PaletteCompileCode;
+    recipeFields = enums.PaletteRecipeField;
+  }
 }
 
 /**
@@ -260,76 +265,25 @@ export function proceduralParamsForViewport(parameters, viewport) {
 
 // --- Generative Palette V4 --------------------------------------------------
 
-/**
- * The C++ enumerator each PaletteCompileCode value carries, indexed by value.
- * Mirrors the `enum class` in the engine color contract.
- * @type {readonly string[]}
- */
-export const COMPILE_CODE_NAMES = Object.freeze([
-  'OK',
-  'INVALID_SCHEMA',
-  'NON_FINITE',
-  'INVALID_ENUM',
-  'HUE_LIMIT',
-  'NON_INTEGER_LOOP_SWEEP',
-  'INVALID_FALLOFF_START',
-  'INCOMPATIBLE_OPTIONS',
-]);
-
-/**
- * The C++ enumerator each PaletteRecipeField value carries, indexed by value.
- * Mirrors the values of the engine color contract.
- * @type {readonly string[]}
- */
-export const RECIPE_FIELD_NAMES = Object.freeze([
-  'NONE',
-  'PALETTE_DOMAIN',
-  'EASING',
-  'COLOR_PATH',
-  'HUE_MODE',
-  'HARMONY',
-  'HUE_DIRECTION',
-  'BASE_TURNS',
-  'SPREAD_TURNS',
-  'SWEEP_TURNS',
-  'CUSTOM_TURNS_0',
-  'CUSTOM_TURNS_1',
-  'CUSTOM_TURNS_2',
-  'CUSTOM_TURNS_3',
-  'LIGHTNESS_CURVE',
-  'LIGHTNESS_CENTER',
-  'LIGHTNESS_RANGE',
-  'LIGHTNESS_CUSTOM_0',
-  'LIGHTNESS_CUSTOM_1',
-  'LIGHTNESS_CUSTOM_2',
-  'LIGHTNESS_CUSTOM_3',
-  'CHROMA_CURVE',
-  'CHROMA_BASIS',
-  'CHROMA_CENTER',
-  'CHROMA_RANGE',
-  'CHROMA_CUSTOM_0',
-  'CHROMA_CUSTOM_1',
-  'CHROMA_CUSTOM_2',
-  'CHROMA_CUSTOM_3',
-  'CHROMA_HEADROOM',
-  'HUE_TORSION',
-  'FALLOFF_START',
-  'SCHEMA_VERSION',
-  'INPUT_OFFSET',
-  'INPUT_SPAN',
-]);
+/** @type {Record<string, {value: number}>} */
+let compileCodes = {};
+/** @type {Record<string, {value: number}>} */
+let recipeFields = {};
 
 /**
  * Describes a failed compile the way core/color/palette_recipe.h names it.
- * @param {{code: number, field: number}} status - The compiler's status.
+ * @param {{code: {value: number}, field: {value: number}}} status - The compiler's status.
  * @returns {string} The reason and the field it points at, each with its ordinal;
  *   a value neither roster covers reads as an unnamed ordinal.
  */
 export function paletteCompileError(status) {
-  const named = (/** @type {readonly string[]} */ roster, /** @type {number} */ value) =>
-    (roster[value] ? `${roster[value]} (${value})` : `unnamed ${value}`);
-  return `Palette recipe error ${named(COMPILE_CODE_NAMES, status.code)} `
-    + `at field ${named(RECIPE_FIELD_NAMES, status.field)}`;
+  const named = (/** @type {Record<string, {value: number}>} */ roster,
+    /** @type {{value: number}} */ value) => {
+    const name = Object.keys(roster).find((key) => roster[key]?.value === value.value);
+    return name ? `${name} (${value.value})` : `unnamed ${value.value}`;
+  };
+  return `Palette recipe error ${named(compileCodes, status.code)} `
+    + `at field ${named(recipeFields, status.field)}`;
 }
 
 /**
@@ -344,7 +298,8 @@ function adjustedFieldNames(mask) {
   // double: the bitwise operators would truncate it to 32 bits.
   for (let field = 0; 2 ** field <= mask; field += 1) {
     if (Math.floor(mask / 2 ** field) % 2 !== 1) continue;
-    names.push(RECIPE_FIELD_NAMES[field] ?? `unnamed ${field}`);
+    names.push(Object.keys(recipeFields).find((name) => recipeFields[name]?.value === field)
+      ?? `unnamed ${field}`);
   }
   return names;
 }
@@ -375,7 +330,7 @@ export function paletteAdjustmentSummary(status) {
  * results are copied out before they can be overwritten.
  * @param {PaletteRecipe} recipe - A V4 palette recipe.
  * @param {boolean} [inspect=true] - Whether to also bake the per-sample diagnostics the tool plots; false bakes the LUT alone.
- * @returns {PaletteCompileResult} The detached compile result; `status.code` is 0 on success.
+ * @returns {PaletteCompileResult} The detached compile result; `status.code` is PaletteCompileCode.OK on success.
  * @throws {Error} When no PaletteOps bridge has been installed.
  */
 export function compilePaletteRecipe(recipe, inspect = true) {
@@ -413,7 +368,7 @@ export class GenerativePalette {
    */
   constructor(recipe) {
     const result = compilePaletteRecipe(recipe, true);
-    if (result.status.code !== 0) throw new Error(paletteCompileError(result.status));
+    if (result.status.code !== compileCodes.OK) throw new Error(paletteCompileError(result.status));
     this.canonicalRecipe = result.canonicalRecipe;
     this.status = result.status;
     // A successful inspect bake always carries all three buffers.

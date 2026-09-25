@@ -1082,7 +1082,7 @@ async function init() {
     const wasm = await createHolosphereModule();
     wasmModule = wasm;
     paletteOps = new wasm.PaletteOps();
-    setPaletteOps(paletteOps);
+    setPaletteOps(paletteOps, wasm);
     effectPalettePresets = Array.from(paletteOps.effectPresetsV4());
   } catch (e) {
     if (wasmModule && engineTrapped(e)) return;
