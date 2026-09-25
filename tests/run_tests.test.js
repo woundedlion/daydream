@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expectFailure, fixtureRepo, isolatedGitEnv } from './helpers/fixture_repo.js';
@@ -41,6 +41,18 @@ const fail = (...args) => {
 };
 
 test('a passing suite that loads every source module passes', () => {
+  assert.match(run(PATTERN), /source modules were loaded by tests/);
+});
+
+test('the engine checkout is excluded without hiding application engine modules', () => {
+  mkdirSync(join(root, 'engine'), { recursive: true });
+  mkdirSync(join(root, 'src/engine'), { recursive: true });
+  writeFileSync(join(root, 'engine/runtime.mjs'), 'export const runtime = true;\n');
+  writeFileSync(join(root, 'src/engine/host.mjs'), 'export const host = true;\n');
+  const failure = fail(PATTERN);
+  assert.match(failure, /src\/engine\/host\.mjs/);
+  assert.doesNotMatch(failure, /engine\/runtime\.mjs/);
+  appendFileSync(join(root, 'tests/sample.test.js'), "import '../src/engine/host.mjs';\n");
   assert.match(run(PATTERN), /source modules were loaded by tests/);
 });
 
