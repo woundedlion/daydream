@@ -23,10 +23,10 @@ export function acceptedParamValue(parameter) {
 
 /**
  * URL storage and replay of engine-accepted effect state.
- * @param {{getParameterDefinitions: () => Array<{name: string, readonly?: boolean, value: *, acceptedValue?: *, requestedValue?: *}>, setEngineParam: (name: string, value: number) => *, usesFullConfigSnapshot: () => boolean, getFullConfigSnapshot: () => *, restoreFullConfigSnapshot: (snapshot: *) => *, fullConfigRestoreResults: () => *, getConfigImportNotice: () => string, clearConfigImportNotice: () => void, showConfigImportNotice: (message: string|null) => void, logWarn: (...args: *) => void}} dependencies
+ * @param {{getParameterDefinitions: () => Array<{name: string, readonly?: boolean, value: *, acceptedValue?: *, requestedValue?: *}>, setEngineParam: (name: string, value: number) => *, usesFullConfigSnapshot: () => boolean, getFullConfigSnapshot: () => *, restoreFullConfigSnapshot: (snapshot: *) => *, fullConfigRestoreResults: () => *, showConfigImportNotice: (message: string|null) => void, logWarn: (...args: *) => void}} dependencies
  */
 export function createEffectPersistence({
-  getParameterDefinitions, setEngineParam, usesFullConfigSnapshot, getFullConfigSnapshot, restoreFullConfigSnapshot, fullConfigRestoreResults, getConfigImportNotice, clearConfigImportNotice, showConfigImportNotice, logWarn
+  getParameterDefinitions, setEngineParam, usesFullConfigSnapshot, getFullConfigSnapshot, restoreFullConfigSnapshot, fullConfigRestoreResults, showConfigImportNotice, logWarn
 }) {
   /** @param {string} name @returns {string} */
   const acceptedStorageKey = (name) => `__accepted.${name}`;
@@ -76,9 +76,7 @@ export function createEffectPersistence({
         + enumConstantName(results, outcome));
       return;
     }
-    const notice = getConfigImportNotice();
-    clearConfigImportNotice();
-    showConfigImportNotice(notice || null);
+    showConfigImportNotice(null);
   }
 
   /** @param {*} gui @param {string} name @param {*} accepted */
