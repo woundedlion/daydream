@@ -240,7 +240,7 @@ export async function probeHueWheel(tab) {
   // than a copy of the formula.
   const viewportPointOf = async (degrees) => {
     const point = await tab.evaluate(async (hue) => {
-      const { hueKeyMarkerPoints } = await import('./palette_wheel.js');
+      const { hueKeyMarkerPoints } = await import('../src/workbench/palettes/palette_wheel.js');
       const canvas = document.getElementById('hueKeyWheelCanvas');
       const [marker] = hueKeyMarkerPoints(
         { baseTurns: hue / 360, offsets: [0] }, canvas.width, canvas.height);

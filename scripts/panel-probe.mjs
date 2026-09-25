@@ -581,7 +581,7 @@ export async function probeWarningNote(tab, layout) {
 
   await tab.evaluate(async () => {
     const [{ default: loadEngine }, { createEffectGui }, { GUI }] = await Promise.all([
-      import('./generated/holosphere_wasm.js'), import('./effect_gui.js'), import('./gui.js'),
+      import('./generated/holosphere_wasm.js'), import('./src/ui/effect_gui.js'), import('./src/ui/gui.js'),
     ]);
     const module = await loadEngine();
     const engine = new module.HolosphereEngine();
@@ -672,7 +672,7 @@ export async function probeKeyboardEdits(tab) {
   const { failures, check } = checks();
   await tab.evaluate(async () => {
     const [{ createEffectGui }, { GUI }] = await Promise.all([
-      import('./effect_gui.js'), import('./gui.js'),
+      import('./src/ui/effect_gui.js'), import('./src/ui/gui.js'),
     ]);
     const container = document.createElement('div');
     container.id = 'keyboard-edit-probe';
