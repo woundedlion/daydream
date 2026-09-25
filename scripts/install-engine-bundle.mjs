@@ -3,6 +3,16 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdir
 import { dirname, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+const REQUIRED_PATHS = new Set(['README.md', 'holosphere_wasm.js', 'holosphere_wasm.wasm',
+  'holosphere_wasm.sha', 'holosphere_wasm.wasm.sha256', 'holosphere_wasm.toolchain',
+  'pov_segment_map.json', 'shader/shader_workbench.mjs', 'shader/sha256.mjs',
+  'shader/engine_catalog.json']);
+
+const ownedPath = (path) => REQUIRED_PATHS.has(path)
+  || /^shader\/patterns\/[^/]+\.shader\.json$/.test(path)
+  || path === 'shader/patterns/shaderball_migration.json'
+  || /^docs\/screenshots\/.+\.png$/.test(path);
+
 export function installEngineBundle(bundle, destination) {
   bundle = resolve(bundle);
   destination = resolve(destination);
@@ -16,16 +26,14 @@ export function installEngineBundle(bundle, destination) {
     if (path.includes('\\') || path.split('/').some((part) => part === '..' || part === '')
         || !resolve(destination, path).startsWith(destination + sep))
       throw new Error(`Invalid engine bundle path: ${path}`);
+    if (!ownedPath(path)) throw new Error(`Engine bundle carries unexpected path: ${path}`);
     const bytes = readFileSync(resolve(bundle, path));
     if (createHash('sha256').update(bytes).digest('hex') !== hash)
       throw new Error(`Engine bundle checksum mismatch: ${path}`);
     return path;
   });
   const paths = new Set(entries);
-  for (const required of ['README.md', 'holosphere_wasm.js', 'holosphere_wasm.wasm',
-    'holosphere_wasm.sha', 'holosphere_wasm.wasm.sha256', 'holosphere_wasm.toolchain',
-    'pov_segment_map.json', 'shader/shader_workbench.mjs', 'shader/sha256.mjs',
-    'shader/engine_catalog.json']) {
+  for (const required of REQUIRED_PATHS) {
     if (!paths.has(required)) throw new Error(`Engine bundle is missing ${required}`);
   }
   const installedPin = readFileSync(resolve(destination, 'holosphere_wasm.sha'), 'utf8').trim();
@@ -34,16 +42,12 @@ export function installEngineBundle(bundle, destination) {
   if (process.env.HOLOSPHERE_BUNDLE_PIN && bundlePin !== process.env.HOLOSPHERE_BUNDLE_PIN)
     throw new Error(`Engine bundle source pin differs from ${process.env.HOLOSPHERE_BUNDLE_PIN}`);
   const stale = [];
-  for (const [directory, owned] of [
-    ['shader/patterns', (name) => name.endsWith('.shader.json') || name === 'shaderball_migration.json'],
-    ['docs/screenshots', (name) => name.endsWith('.png')],
-  ]) {
+  for (const directory of ['shader/patterns', 'docs/screenshots']) {
     const root = resolve(destination, directory);
     if (!existsSync(root)) continue;
     for (const entry of readdirSync(root, { recursive: true, withFileTypes: true })) {
       const relative = resolve(entry.parentPath, entry.name).slice(root.length + 1).replaceAll('\\', '/');
-      if (entry.isFile() && owned(relative)
-          && (directory !== 'shader/patterns' || !relative.includes('/'))
+      if (entry.isFile() && ownedPath(`${directory}/${relative}`)
           && !paths.has(`${directory}/${relative}`))
         stale.push(`${directory}/${relative}`);
     }

@@ -62,6 +62,15 @@ test('corrupted generated documentation is rejected before any destination chang
   assert.equal(existsSync(join(destination, 'shader/patterns/obsolete.shader.json')), true);
 });
 
+test('bundle paths cannot overwrite assets outside the engine install set', (t) => {
+  for (const path of ['shader/patterns/digest_migration.v1v2.json',
+    'shader/patterns/v1/example.shader.json', '.git/config', 'engine/scripts/shader_workbench.mjs']) {
+    const { bundle, destination } = fixture(t, (files) => { files[path] = 'unexpected'; });
+    assert.throws(() => installEngineBundle(bundle, destination), /Engine bundle carries unexpected path/);
+    assert.equal(readFileSync(join(destination, 'holosphere_wasm.sha'), 'utf8'), 'a'.repeat(40));
+  }
+});
+
 test('bundle paths cannot escape the destination', (t) => {
   const { bundle, destination, write } = fixture(t);
   write(bundle, 'holosphere_engine.sha256', `${'a'.repeat(64)}  ../escape\n`);
@@ -113,13 +122,13 @@ test('a destination without daydream.js is not a checkout', (t) => {
 
 test('a publication failure restores the complete previous installation', (t) => {
   const { bundle, destination, write } = fixture(t, (files) => {
-    files['blocked/new.bin'] = 'new';
+    files['docs/screenshots/blocked/new.png'] = 'new';
   });
-  write(destination, 'blocked', 'consumer-owned');
+  write(destination, 'docs/screenshots/blocked', 'consumer-owned');
   assert.throws(() => installEngineBundle(bundle, destination),
-    { code: 'EEXIST', syscall: 'mkdir', path: join(destination, 'blocked') });
+    { code: 'EEXIST', syscall: 'mkdir', path: join(destination, 'docs/screenshots/blocked') });
   assert.equal(readFileSync(join(destination, 'holosphere_wasm.sha'), 'utf8'), 'a'.repeat(40));
   assert.equal(readFileSync(join(destination, 'shader/patterns/obsolete.shader.json'), 'utf8'), 'obsolete');
-  assert.equal(readFileSync(join(destination, 'blocked'), 'utf8'), 'consumer-owned');
+  assert.equal(readFileSync(join(destination, 'docs/screenshots/blocked'), 'utf8'), 'consumer-owned');
   assert.equal(existsSync(join(destination, 'holosphere_wasm.js')), false);
 });
