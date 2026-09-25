@@ -489,9 +489,9 @@ export function lockedGroupMove(rawDelta, members) {
 
 /**
  * The V4 recipe enumerants. The ordinals are what a recipe carries across the
- * WASM boundary, so they mirror the `enum class` rosters in core/color/color.h
- * in declaration order. palette_math.js's ENUM_NAMES is the inverse;
- * Both values mirror the engine's palette contract.
+ * WASM boundary, so they mirror the `enum class` rosters in core/color/palette_recipe.h
+ * in declaration order; palette_math.js's ENUM_NAMES is the inverse, and the
+ * WASM parity tests pin both to the engine.
  * @type {Object<string, Object<string, number>>}
  */
 export const PaletteV4 = Object.freeze({
@@ -705,7 +705,7 @@ export function moveCustomHueKey(baseTurns, offsets, keyIndex, wrappedTurn) {
   return nextOffsets;
 }
 
-/** Where a FALLOFF domain begins to fade, as core/color/color.h defaults it. */
+/** Where a FALLOFF domain begins to fade, as core/color/palette_recipe.h defaults it. */
 const DEFAULT_FALLOFF_START = 0.9;
 
 /**

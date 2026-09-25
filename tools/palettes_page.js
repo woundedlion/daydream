@@ -6,7 +6,7 @@
  */
 // Shared primitives, imported rather than re-implemented inline: the
 // clipboard copy (tools/clipboard.js) and the sRGB/linear-RGB transfer
-// functions (tools/color.js, which mirrors core/color/color.h's).
+// functions (tools/color.js, which mirrors core/color/color_space.h's).
 import { copyToClipboard, wireCopyBlock } from './clipboard.js';
 // Labelled range slider + readout, shared with the other tool pages.
 import { createSlider, createSliderProxy } from './slider.js';

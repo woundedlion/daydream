@@ -52,7 +52,7 @@ const closingRatio = (ratio, maxTerm, tol = 1e-9) => {
 
 /**
  * The spherical Lissajous parametric curve (on the unit sphere, R = 1).
- * Argument order mirrors the engine's lissajous(m1, m2, a, t) (core/math/geometry.h)
+ * Argument order mirrors the engine's lissajous(m1, m2, a, t) (core/math/spherical.h)
  * so the preview, the exported snippet, and the engine all agree on which
  * slider maps to which parameter. t is last in every case.
  * @param {number} m1 - Axial frequency C₁.
@@ -206,7 +206,7 @@ export const domainClosureWarning = (c2, domain, tol = 1e-4) => {
  *
  * The snippet is a C++ `LissajousParams` aggregate initializer — the form the
  * engine's Lissajous effects (Fishbowl, Comets) actually consume
- * (core/math/geometry.h: `struct LissajousParams { float m1, m2, a, domain; }`).
+ * (core/math/spherical.h: `struct LissajousParams { float m1, m2, a, domain; }`).
  * Phase A is emitted in radians and fed to the engine as-is: the tool's
  * radians-labelled slider matches `lissajous()`'s phase with no π scaling.
  * C₁/C₂ map to m1/m2.
