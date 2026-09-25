@@ -9,7 +9,7 @@ on:
         default: false
     secrets:
       POV_TOKEN:
-        description: Read access to woundedlion/pov while it is private.
+        description: Optional read access for a future private engine repository; the public repository uses the run token.
         required: false
 
 permissions:
