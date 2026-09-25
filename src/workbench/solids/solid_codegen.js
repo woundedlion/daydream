@@ -741,11 +741,30 @@ function returnRecipeCpp(recipe) {
   let seedLine = `  return ${seed}`;
   if (seedLine.length > COLUMN_LIMIT) {
     const inner = seed.slice('SolidBuilder('.length, -', a, b)'.length);
-    const argument = `             ${inner},`;
-    seedLine = '  return SolidBuilder(\n' +
-      (argument.length <= COLUMN_LIMIT ? argument
-        : `             ${inner.slice(0, -'a, b)'.length)}\n                 a, b),`) +
-      '\n             a, b)';
+    const prefix = '  return SolidBuilder(';
+    if (prefix.length + inner.length + 1 <= COLUMN_LIMIT) {
+      seedLine = fillColumns([`${inner},`, 'a,', 'b)'], prefix,
+        ' '.repeat(prefix.length)).join('\n');
+    } else if (13 + inner.length + 1 <= COLUMN_LIMIT) {
+      seedLine = '  return SolidBuilder(\n'
+        + fillColumns([`${inner},`, 'a,', 'b)'], ' '.repeat(13)).join('\n');
+    } else {
+      const innerHead = `             ${inner.slice(0, -'a, b)'.length)}`;
+      if (innerHead.length + 3 <= COLUMN_LIMIT) {
+        const innerCall = fillColumns(['a,', 'b),'], innerHead,
+          ' '.repeat(innerHead.length)).join('\n');
+        seedLine = `  return SolidBuilder(\n${innerCall}\n             a, b)`;
+      } else if (innerHead.length <= COLUMN_LIMIT) {
+        seedLine = `  return SolidBuilder(\n${innerHead}\n                 a, b),\n             a, b)`;
+      } else {
+        const separator = inner.lastIndexOf('::') + 2;
+        const namespace = inner.slice(0, separator);
+        const call = inner.slice(separator);
+        seedLine = call.length + 27 <= COLUMN_LIMIT
+          ? `  return SolidBuilder(${namespace}\n${' '.repeat(26)}${call},\n${' '.repeat(22)}a, b)`
+          : `  return SolidBuilder(\n             ${namespace}\n                 ${call},\n             a, b)`;
+      }
+    }
   }
   return [seedLine, ...calls.map((call) => `      .${call}`)].join('\n') + ';';
 }

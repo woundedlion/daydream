@@ -411,9 +411,7 @@ test('generateRecipeCpp wraps a long star seed constructor argument', () => {
   const cpp = generateRecipeCpp({
     base: 'truncatedIcosidodecahedron_hankin62_chamfer50', ops: ['dual'],
   }, 'IslamicStarPatterns');
-  assert.ok(cpp.includes('  return SolidBuilder(\n' +
-    '             IslamicStarPatterns::truncatedIcosidodecahedron_hankin62_chamfer50(\n' +
-    '                 a, b),\n             a, b)\n      .dual()\n      .build();'));
+  assert.equal(cpp, readFileSync(new URL('./fixtures/recipe-2.cpp', import.meta.url), 'utf8').trimEnd());
 });
 
 /**
@@ -1685,4 +1683,21 @@ test('createOpGate invalidates a pending pass when returning to its cached chain
   const pending = gate.refresh('octahedron', [], CANDIDATES);
   assert.equal(await gate.refresh('cube', [], CANDIDATES), null);
   assert.equal(await pending, null);
+});
+
+test('star seed calls match formatter-derived bin-packed fixtures', () => {
+  for (const [index, base] of ['dodecahedron_hk62_ambo_hk62',
+    'truncatedIcosidodecahedron_hk62_ambo_hk62'].entries()) {
+    const expected = readFileSync(new URL(`./fixtures/recipe-${index}.cpp`, import.meta.url), 'utf8').trimEnd();
+    assert.equal(generateRecipeCpp({ base, ops: ['kis'] }, 'IslamicStarPatterns'), expected);
+  }
+});
+
+test('long star seeds match formatter-derived namespace continuations', () => {
+  for (const [offset, base] of ['truncatedIcosahedron_hk58_chamfer63',
+    'truncatedIcosahedron_ambo_relax_truncate33_hk64',
+    'truncatedIcosahedron_ambo_relax_truncate001_hankin59'].entries()) {
+    assert.equal(generateRecipeCpp({ base, ops: ['kis'] }, 'IslamicStarPatterns'),
+      readFileSync(new URL(`./fixtures/recipe-${offset + 3}.cpp`, import.meta.url), 'utf8').trimEnd());
+  }
 });
