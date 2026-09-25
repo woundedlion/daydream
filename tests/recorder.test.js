@@ -228,6 +228,7 @@ class FakeMediaRecorder {
   static constructError = null;
   static startError = null;
   static startData = null;
+  static defaultMimeType = 'video/webm';
   static stopData = null;
   // Stream of the most recent construction attempt, including one that threw:
   // the only handle on the tracks a failed construction has to release.
@@ -238,7 +239,7 @@ class FakeMediaRecorder {
     if (FakeMediaRecorder.constructError) throw FakeMediaRecorder.constructError;
     this.stream = stream;
     this.options = options;
-    this.mimeType = options.mimeType || 'video/webm';
+    this.mimeType = options.mimeType || '';
     this.state = 'inactive';
     this.ondataavailable = null;
     this.onstop = null;
@@ -254,6 +255,10 @@ class FakeMediaRecorder {
     this.timesliceMs = timesliceMs;
     if (FakeMediaRecorder.startError) throw FakeMediaRecorder.startError;
     this.state = 'recording';
+    queueMicrotask(() => {
+      this.mimeType ||= FakeMediaRecorder.defaultMimeType;
+      this.onstart?.();
+    });
     if (FakeMediaRecorder.startData) {
       this.ondataavailable({ data: FakeMediaRecorder.startData });
     }
@@ -295,6 +300,7 @@ const installRecorderEnv = () => {
   FakeMediaRecorder.lastStream = null;
   FakeMediaRecorder.startError = null;
   FakeMediaRecorder.startData = null;
+  FakeMediaRecorder.defaultMimeType = 'video/webm';
   FakeMediaRecorder.stopData = null;
   FakeMediaRecorder.isTypeSupported = () => true;
   globalThis.MediaRecorder = FakeMediaRecorder;
@@ -529,19 +535,30 @@ test('start refuses and stays idle when recording is unsupported', () => {
   }
 });
 
-test('an unsupported explicit format reports the browser-selected container', () => {
+test('an unsupported explicit format reports the browser-selected container', async () => {
   const restore = installRecorderEnv();
   try {
     FakeMediaRecorder.isTypeSupported = () => false;
     const rec = new VideoRecorder(recordableCanvas());
     const fallbacks = [];
-    rec.format = 'mp4';
+    let pickerOptions;
+    globalThis.showSaveFilePicker = (options) => {
+      pickerOptions = options;
+      return Promise.resolve({});
+    };
+    rec.format = 'webm';
+    FakeMediaRecorder.defaultMimeType = 'video/mp4';
     rec.onFormatFallback = (extension) => fallbacks.push(extension);
     rec.download = () => {};
 
     rec.start('e');
 
-    assert.deepEqual(fallbacks, ['webm']);
+    assert.match(pickerOptions.suggestedName, /\.video$/);
+    assert.equal(pickerOptions.types, undefined);
+    assert.equal(rec.mediaRecorder.mimeType, '');
+    assert.deepEqual(fallbacks, []);
+    await Promise.resolve();
+    assert.deepEqual(fallbacks, ['mp4']);
   } finally {
     FakeMediaRecorder.isTypeSupported = () => true;
     restore();

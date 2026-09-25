@@ -298,9 +298,7 @@ export class VideoRecorder {
       this.reportFailure('MediaRecorder construction failed.', err);
       return;
     }
-    if (!mimeType && this.format !== 'auto') {
-      this.onFormatFallback?.(this.extension(recorder));
-    }
+    const notifyFallback = !mimeType && this.format !== 'auto';
 
     // ondataavailable/onstop/onerror fire after a fast stop→start may have installed
     // a new session, so the closures bind the per-session chunks/stream/recorder/sink
@@ -337,6 +335,10 @@ export class VideoRecorder {
       else chunks.push(e.data);
     };
 
+    recorder.onstart = () => {
+      if (notifyFallback && !ended && this.mediaRecorder === recorder)
+        this.onFormatFallback?.(this.extension(recorder));
+    };
     recorder.onstop = endSession;
 
     recorder.onerror = (e) => {
@@ -587,7 +589,8 @@ export class VideoRecorder {
       };
     }
 
-    const ext = this.extension(recorder);
+    // The picker needs the user gesture; a browser-default type may still be unknown.
+    const ext = recorder.mimeType ? this.extension(recorder) : 'video';
     const filename = this.timestampedName(effectName, ext);
     /** @param {string} message @param {unknown} cause */
     const saveFailure = (message, cause) => {
@@ -608,7 +611,8 @@ export class VideoRecorder {
     const hold = this.memorySink(recorder, chunks, 'the streaming save was unavailable');
     const opened = globalThis.showSaveFilePicker({
       suggestedName: filename,
-      types: [{ description: 'Video', accept: { [this.mimeForExt(ext)]: [`.${ext}`] } }],
+      ...(recorder.mimeType ? { types: [{ description: 'Video',
+        accept: { [this.mimeForExt(ext)]: [`.${ext}`] } }] } : {}),
     })
       .then((h) => { handle = h; })
       .catch((err) => {
