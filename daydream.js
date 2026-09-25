@@ -33,7 +33,6 @@ import { displayAliasesDiverged, repointDisplayAliases } from "./display_aliases
 import { createPoleLodBinding } from "./pole_lod.js";
 import { createRecordingControls } from "./recording_controls.js";
 import {
-  createSegmentPoolSpawner,
   createSegmentedPovControls,
 } from "./segmented_pov_controls.js";
 import { AppState, URLSync, replaceUrl } from "./state.js";
@@ -62,18 +61,6 @@ import {
 // Dwell time per effect while "Test All" cycles the favorites list.
 const TEST_ALL_INTERVAL_MS = 1000;
 const EXPECTED_SEGMENT_CONTROLLER_API_VERSION = 3;
-
-// The roster and the two panels are modules of their own; the page stays their
-// published entry point.
-export {
-  createRecordingControls,
-  createSegmentPoolSpawner,
-  createSegmentedPovControls,
-  DEFAULT_EFFECT,
-  resolutionPresets,
-  SHADER_DOCUMENT_EFFECTS,
-  WORKBENCH_EFFECTS,
-};
 
 if (SEGMENT_CONTROLLER_API_VERSION !== EXPECTED_SEGMENT_CONTROLLER_API_VERSION) {
   throw new StaleModuleError(

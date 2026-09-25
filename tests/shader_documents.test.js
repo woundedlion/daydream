@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 
-import { shaderWorkbenchUrl, start, WORKBENCH_EFFECTS } from '../daydream.js';
+import { shaderWorkbenchUrl, start } from '../daydream.js';
+import { WORKBENCH_EFFECTS } from '../effect_roster.js';
 import {
   compileShaderDocument, DEFAULT_LIMITS, exportShaderDocumentJson, validateShaderDocument,
 } from '../shader/shader_workbench.mjs';
