@@ -459,7 +459,7 @@ export interface HolosphereModule {
   srgb_to_linear_interp(s: number): number;
   linear_rgb_to_oklab(r: number, g: number, b: number): { L: number; a: number; b: number };
   oklab_to_linear_rgb(L: number, a: number, b: number): { r: number; g: number; b: number };
-  /** First sRGB gamut-exit chroma at lightness L along the unit OKLab direction (a,b), including the engine's numerical margin. */
+  /** First sRGB gamut-exit chroma at lightness L along the unit OKLab direction (a,b), including the engine's numerical margin. Returns NaN for non-finite inputs. */
   gamut_max_chroma(L: number, a: number, b: number): number;
   /** Returns sRGB channels in the 8-bit range [0, 255]. */
   hsv_to_rgb(h: number, s: number, v: number): { r: number; g: number; b: number };
