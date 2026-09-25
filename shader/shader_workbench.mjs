@@ -1519,8 +1519,7 @@ const requireRegistry = (registry) => {
 const registryDescriptorIdentity = (descriptor) => {
   try {
     return stableStringify(descriptorIdentity(canonicalDescriptor({ descriptor })));
-  } catch (error) {
-    if (!(error instanceof ShaderDocumentError)) throw error;
+  } catch {
     return stableStringify(descriptorIdentity(descriptor));
   }
 };
