@@ -43,3 +43,17 @@ test('aliases agree only when both reference the same view', () => {
   driver.dotMesh.instanceColor.array = new Uint16Array(4);
   assert.equal(displayAliasesDiverged(driver, view), true);
 });
+
+
+test('display aliases reject a mesh-size mismatch without changing either alias', () => {
+  const original = new Uint16Array(6);
+  const driver = { pixels: original, dotMesh: { count: 2,
+    instanceColor: fakeColorAttribute(original) } };
+  assert.throws(() => repointDisplayAliases(driver, new Uint16Array(9)), RangeError);
+  assert.equal(driver.pixels, original);
+  assert.equal(driver.dotMesh.instanceColor.array, original);
+  const next = new Uint16Array(6);
+  structuredClone(original.buffer, { transfer: [original.buffer] });
+  repointDisplayAliases(driver, next);
+  assert.equal(driver.pixels, next);
+});
