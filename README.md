@@ -557,8 +557,8 @@ files define line-ending policy and working-artifact exclusions.
 ├── bootstrap.js                Dynamic-import boot of daydream.js + failure overlay
 ├── daydream.js                 App entry: WASM loader, state wiring, GUI/sidebar
 ├── effect_roster.js            Effect/resolution roster data: shader-document and workbench lists, per-resolution favourites
-├── segmented_pov_controls.js   Segmented-POV panel: pool spawner and its controls, split out of the composition root
-├── recording_controls.js       Recording panel builder, split out of the composition root
+├── segmented_pov_controls.js   Segmented-POV panel: pool spawner and its controls
+├── recording_controls.js       Recording panel builder
 ├── app_lifecycle.js            Composition-root frame adapter, Test All ticker,
 │                                  module-load deadline, and teardown
 ├── engine_host.js              Owns the main-thread WASM engine + its reassignable display state
@@ -577,7 +577,7 @@ files define line-ending policy and working-artifact exclusions.
 ├── frame_constants.js          Simulation FPS and the slow-frame threshold derived from it
 ├── driver.js                   Three.js scene: sphere mesh, dots, OrbitControls,
 │                                  axes overlay, picture-in-picture camera, resize
-├── geometry.js                 Sphere-pixel position math (pixelToSpherical, etc.)
+├── geometry.js                 Sphere-pixel position math (pixelToSpherical)
 ├── state.js                    AppState (pub/sub) + URLSync (query-string mirror)
 ├── gui.js                      lil-gui wrapper used by the main page and tools
 ├── sidebar.js                  Effect list + sort + keyboard navigation
@@ -669,10 +669,10 @@ files define line-ending policy and working-artifact exclusions.
 │   └── install-engine-bundle.mjs  Validates and installs the verified engine artifact
 │
 ├── tests/                      Node unit tests (`npm test`)
-├── requirements/               Hash-locked ShellCheck and actionlint toolchains used by CI
+├── requirements/               Hash-locked ShellCheck toolchain used by CI
 ├── tsconfig.json               checkJs settings for the worker-protocol module set
 ├── eslint.config.mjs           JavaScript lint rules (recommended set) — the js-unit-suite.yml lint step
-├── .githooks/                  staged pre-commit checks, a pre-push mirror of the JS/browser suites, and the master fast-forward guard
+├── .githooks/                  Staged pre-commit checks, pre-push lint/typecheck/importmap/workflow-helper tests, master fast-forward guard
 ├── .github/workflows/          ci.yml (PR aggregate), engine-bundle.yml (verified engine gate), deploy.yml (engine gate → Pages), js-unit-suite.yml + browser-smoke.yml (reusable suites)
 ├── .github/dependabot.yml      Monthly grouped bump pull requests for the SHA-pinned actions and the locked Node dependencies
 │
