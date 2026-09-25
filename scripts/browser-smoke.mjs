@@ -132,8 +132,8 @@ function installSegmentProbe() {
 /** @param {import('puppeteer-core').Page} tab */
 async function smokeTwistParameters(tab) {
   await tab.evaluate(async () => {
-    const { scratchChainDocument } = await import('/tools/chain_document_store.js');
-    const catalog = await (await fetch('/shader/engine_catalog.json')).json();
+    const { scratchChainDocument } = await import('/src/workbench/shader/chain_document_store.js');
+    const catalog = await (await fetch('/generated/shader/engine_catalog.json')).json();
     const source = scratchChainDocument(catalog, [
       { label: 'twist', operator: 'sphere.lens.twist.v2' },
       { label: 'sample', operator: 'sample.spherical-rings.v3' },
@@ -166,7 +166,7 @@ async function smokeTwistParameters(tab) {
     element.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await tab.waitForFunction(async () => {
-    const { decodeShaderStateHash } = await import('/tools/shader_deeplink.js');
+    const { decodeShaderStateHash } = await import('/src/workbench/shader/shader_deeplink.js');
     const state = await decodeShaderStateHash(location.hash);
     return state?.document.preset_bank.presets[0].values['twist.twist-rate'] === 2;
   }, { timeout: READY_TIMEOUT_MS });
