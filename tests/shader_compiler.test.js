@@ -225,19 +225,12 @@ test('every committed pattern document is its own canonical re-export', () => {
   }
 });
 
-/**
- * The frozen migration table: every v1 descriptor digest maps to the digest of
- * the committed document of the same name, with no extra or missing entries,
- * so digest consumers can follow a v1 identity onto its v2 identity. The five
- * identity-frame replacements differ from their expansion, whose digest no
- * committed document carries, so the successor is read off the shipped file.
- */
 test('the digest migration table covers exactly the v1 fixtures', () => {
   const expected = new Map();
   for (const name of fixtureNames) {
     const successor = compile(readFileSync(new URL(name, PATTERNS), 'utf8'));
     assert.equal(successor.status, 'VALID', name);
-    expected.set(v1DescriptorDigest(fixture(name)), successor.descriptor_digest);
+    expected.set(v1DescriptorDigest(fixture(name)), name);
   }
   assert.deepEqual(MIGRATION, Object.fromEntries(expected));
   assert.equal(Object.keys(MIGRATION).length, fixtureNames.length);
@@ -250,10 +243,10 @@ test('every digest migration target resolves to a committed document', () => {
   for (const name of patternNames) {
     const compiled = compile(readFileSync(new URL(name, PATTERNS), 'utf8'));
     assert.equal(compiled.status, 'VALID', name);
-    shipped.set(compiled.descriptor_digest, name);
+    shipped.set(name, compiled.descriptor_digest);
   }
   for (const [legacy, successor] of Object.entries(MIGRATION))
-    assert.ok(shipped.has(successor), `${legacy} maps to unshipped digest ${successor}`);
+    assert.ok(shipped.has(successor), `${legacy} maps to unshipped document ${successor}`);
 });
 
 /**
