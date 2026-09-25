@@ -955,7 +955,10 @@ export function createShaderDocumentController({
     }
   };
   const onPresetChange = () => {
-    applyPreset(presetSelect.value);
+    if (!applyPreset(presetSelect.value)) {
+      presetSelect.value = active?.presetId ?? '';
+      return;
+    }
     chainUi?.strip.render();
     void flushDeepLink();
   };
