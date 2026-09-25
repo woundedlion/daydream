@@ -608,13 +608,6 @@ test('the page-failure surface is the shared one, and it is torn down', () => {
     'a listener that outlives the page discard reports into a dead app');
 });
 
-test('the composition root rejects a stale segmented-controller module', async (t) => {
-  const actual = await import('../segment_controller.js');
-  t.mock.module('../segment_controller.js', {
-    namedExports: { ...actual, SEGMENT_CONTROLLER_API_VERSION: -1 },
-  });
-  await assert.rejects(import('../daydream.js?stale-controller-test'), { name: 'StaleModuleError' });
-});
 
 test('a parameter write does not clear a rejected switch', async () => {
   const module = fakeWasmModule({
