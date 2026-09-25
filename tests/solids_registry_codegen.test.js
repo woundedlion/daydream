@@ -452,3 +452,9 @@ test('registry limits count composite operations after lowering', () => {
     base: 'cube', ops: ['gyro', 'needle', 'zip', { op: 'bevel', params: { t: 0.3 } }, 'dual'],
   }), /lowers to 9 primitive steps/);
 });
+
+test('registry exports refuse meshes beyond the effect face budget', () => {
+  const item = { base: 'truncatedIcosidodecahedron', ops: ['kis', 'kis', 'kis'], fCount: 2160 };
+  assert.throws(() => generateRegistryCpp(item), /2160 faces.*1152/);
+  assert.doesNotThrow(() => generateRegistryCpp({ ...item, fCount: 1152 }));
+});
