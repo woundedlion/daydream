@@ -55,7 +55,7 @@ export const BOOT_WATCHDOG_MS = 10000;
 // segment reports for this long) faults. Absolute rather than a multiple of the
 // display cadence: the fault is unrecoverable without a user-driven rebuild, and
 // the widest gap it legitimately sees is the first frame after an effect switch
-// (a cold effect build plus a full segment render of at most half of 288x144 on a
+// (a cold effect build plus up to a full 288x144 render per worker on a
 // throttled machine), so it is sized against a hung worker, not a slow one. Peer
 // to the boot/init deadlines above.
 export const RENDER_WATCHDOG_MS = 5000;
