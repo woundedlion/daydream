@@ -965,3 +965,21 @@ test('DeepLinkGUI refuses unsupported properties before URL hydration', () => {
   assert.equal(obj.pending, null);
   assert.deepEqual(gui.collectUrlKeys(), []);
 });
+
+test('a fallback URL writer hands pending keys to a newly registered URLSync', () => {
+  const timers = fakeTimers();
+  const url = installRecordingWindow('');
+  window.setTimeout = timers.setTimeout.bind(timers);
+  window.clearTimeout = timers.clearTimeout.bind(timers);
+  const write = makeUrlParamWriter(window);
+  write('first', 1);
+  const fallbackTimer = [...timers.pending.keys()][0];
+  const sync = new URLSync(new AppState({}), []);
+  write('second', 2);
+  assert.ok(timers.cleared.includes(fallbackTimer));
+  sync.flush();
+  const query = new URL(url.written(), 'http://x').searchParams;
+  assert.equal(query.get('first'), '1');
+  assert.equal(query.get('second'), '2');
+  write.cancel();
+});
