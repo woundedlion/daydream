@@ -66,7 +66,6 @@ export function createEffectPersistence({
       if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
         throw new TypeError('snapshot must be an object');
       }
-      if (!Object.hasOwn(snapshot, 'schemaVersion')) snapshot.schemaVersion = 1;
     } catch (error) {
       logWarn('Shader Workbench: ignoring invalid full-config snapshot', error);
       return;

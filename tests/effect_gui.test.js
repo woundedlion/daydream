@@ -281,7 +281,7 @@ function makeHarness({
       fieldDefinitions: () => state.fullConfigFieldDefinitions,
       restore: (snapshot) => {
         restoredFullConfigs.push(snapshot);
-        return restoreFullConfigAccepted
+        return restoreFullConfigAccepted && [10, 11].includes(snapshot.schemaVersion)
           ? FullConfigRestoreResult.APPLIED : FullConfigRestoreResult.INVALID_VALUE;
       },
       restoreResults: () => FullConfigRestoreResult,
@@ -960,7 +960,7 @@ test('restore reaches a parameter a write revealed, probing each name once', () 
   assert.deepEqual(reads, [...new Set(reads)], 'no name is probed twice');
 });
 
-test('ShaderBall restores one versioned snapshot before building session controls', () => {
+test('ShaderBall rejects an unversioned snapshot before building session controls', () => {
   const stored = {
     accepted: [0, 4294967295],
     requested: [0, 4294967295],
@@ -969,7 +969,7 @@ test('ShaderBall restores one versioned snapshot before building session control
     runtime: [],
   };
   const current = {
-    schemaVersion: 2,
+    schemaVersion: 11,
     accepted: [0, 4294967295],
     requested: [0, 4294967295],
     pendingFieldIds: [],
@@ -985,8 +985,10 @@ test('ShaderBall restores one versioned snapshot before building session control
 
   h.panel.build();
 
-  assert.deepEqual(h.restoredFullConfigs, [{ ...stored, schemaVersion: 1 }]);
-  assert.deepEqual(h.configNotices, [null]);
+  assert.deepEqual(h.restoredFullConfigs, [stored]);
+  assert.deepEqual(h.configNotices, []);
+  assert.deepEqual(h.warnings,
+    ['Shader Workbench: full-config snapshot was rejected: INVALID_VALUE']);
   assert.equal(h.gui().ctrl('Lens').session, true);
   assert.equal(h.gui().stored[FULL_CONFIG_STORAGE_KEY], JSON.stringify(current));
   assert.equal(h.gui().stored['__accepted.Lens'], undefined);
@@ -994,7 +996,7 @@ test('ShaderBall restores one versioned snapshot before building session control
 
 test('a rejected full-config snapshot is reported and announces no import', () => {
   const stored = {
-    schemaVersion: 2,
+    schemaVersion: 11,
     accepted: [0, 4294967295],
     requested: [0, 4294967295],
     pendingFieldIds: [],
@@ -1038,7 +1040,7 @@ test('a stored snapshot that is not a config object never reaches the engine', (
 
 test('Lens Glitch to None persists the exhaustive snapshot bit-exactly', () => {
   const initial = {
-    schemaVersion: 2,
+    schemaVersion: 11,
     accepted: [1, 2147483648],
     requested: [1, 2147483648],
     pendingFieldIds: [],
@@ -1046,7 +1048,7 @@ test('Lens Glitch to None persists the exhaustive snapshot bit-exactly', () => {
     runtime: [],
   };
   const updated = {
-    schemaVersion: 2,
+    schemaVersion: 11,
     accepted: [0, 4294967295],
     requested: [0, 4294967295],
     pendingFieldIds: [17],
@@ -2389,7 +2391,7 @@ test('the Export outcome is announced in a polite live region', () => {
 test('ShaderBall Export copies the versioned full-config snapshot', async () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   const snapshot = {
-    schemaVersion: 2,
+    schemaVersion: 11,
     accepted: [0, 4294967295],
     requested: [1, 4294967295],
     pendingFieldIds: [0],
@@ -2476,7 +2478,7 @@ test('ShaderBall Export names a missing clipboard operation', () => {
   const h = makeHarness({
     params: shaderBallParams(),
     fullConfig: true,
-    fullConfigSnapshot: { schemaVersion: 2 },
+    fullConfigSnapshot: { schemaVersion: 11 },
     copyText: null,
   });
   h.panel.build();
@@ -2682,7 +2684,7 @@ test('a slider drag defers persistence to the pointer release', () => {
 
 test('a ShaderBall drag writes one full-config snapshot, at the release', () => {
   const snapshot = (hue) => ({
-    schemaVersion: 2,
+    schemaVersion: 11,
     accepted: [hue],
     requested: [hue],
     pendingFieldIds: [],
@@ -2744,7 +2746,7 @@ test('a schema rebuild mid-drag still lands the write the drag deferred', () => 
 
 test('a schema rebuild mid-drag lands the whole workbench snapshot', () => {
   const snapshot = (hue) => ({
-    schemaVersion: 2,
+    schemaVersion: 11,
     accepted: [hue],
     requested: [hue],
     pendingFieldIds: [],
