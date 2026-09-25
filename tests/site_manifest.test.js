@@ -122,15 +122,12 @@ test('every site manifest entry is tracked and present', () => {
     `${untracked.length} ${MANIFEST} entries git does not track — they would 404 on Pages`);
 });
 
-test('the derived page roster names every served page', () => {
+test('the manifest publishes every tracked HTML page', () => {
   const entries = manifestEntries();
-  const covered = (path) =>
-    entries.includes(path);
-
-  const pages = new Set(PAGES);
+  const pages = new Set(entries.filter((file) => file.endsWith('.html')));
   assert.ok(pages.size > 0, `${MANIFEST} publishes no page`);
   const unlisted = [...trackedFiles()].filter(
-    (file) => file.endsWith('.html') && covered(file) && !pages.has(file));
+    (file) => file.endsWith('.html') && !pages.has(file));
   assert.deepEqual(unlisted.slice(0, 5), [],
     `${unlisted.length} served pages are named by no ${MANIFEST} entry, so the ` +
       'CSP and stylesheet cases never see them');
