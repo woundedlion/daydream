@@ -942,3 +942,48 @@ test('radian periodicity is independent of a catalog field bound', () => {
   assert.equal(parameter.interpolation.period, Math.fround(2 * Math.PI));
   assert.deepEqual(validateShaderDocument(document, { catalog }), []);
 });
+
+
+test('catalog fallback declarations preserve authored domains and leave load untouched', async () => {
+  const store = await makeStore();
+  const before = store.document();
+  const digest = store.compile().descriptor_digest;
+  const declarations = store.parameterDeclarations();
+  for (const authored of before.descriptor.parameters)
+    assert.deepEqual(declarations.find((parameter) => parameter.id === authored.id), authored);
+  for (const entry of store.chain()) {
+    const operator = CATALOG.operators.find((operator) => operator.id === entry.operator);
+    for (const field of operator.params)
+      assert.ok(declarations.some((parameter) => parameter.id === `${entry.label}.${field.id}`));
+  }
+  declarations[0].default = -999;
+  assert.deepEqual(store.document(), before);
+  assert.equal(store.compile().descriptor_digest, digest);
+  assert.equal(store.canUndo(), false);
+});
+
+test('editing an undeclared field backfills presets and policies atomically with undo', async () => {
+  const store = await makeStore({ mutate: addStaggered });
+  const before = store.document();
+  const parameter = store.parameterDeclarations().find((parameter) =>
+    !before.descriptor.parameters.some((authored) => authored.id === parameter.id));
+  assert.ok(parameter);
+  const presetId = before.preset_bank.presets[0].preset_id;
+  assert.equal(store.setPresetValue(presetId, parameter.id, parameter.domain.maximum + 1).ok, false);
+  assert.deepEqual(store.document(), before);
+  assert.equal(store.canUndo(), false);
+  assert.equal(store.setPresetValue(presetId, parameter.id, parameter.domain.maximum).ok, true);
+  const after = store.document();
+  assert.deepEqual(after.descriptor.parameters.at(-1), parameter);
+  assert.equal(after.descriptor.serialization.fields.at(-1), parameter.id);
+  assert.ok(after.descriptor.path_policies.find((policy) => policy.id === 'staggered')
+    .groups.includes(parameter.id));
+  for (const preset of after.preset_bank.presets)
+    assert.equal(preset.values[parameter.id], preset.preset_id === presetId
+      ? parameter.domain.maximum : parameter.default);
+  assertGreen(store);
+  store.undo();
+  assert.deepEqual(store.document(), before);
+  store.redo();
+  assert.deepEqual(store.document(), after);
+});

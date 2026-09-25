@@ -129,6 +129,57 @@ function installSegmentProbe() {
   };
 }
 
+/** @param {import('puppeteer-core').Page} tab */
+async function smokeTwistParameters(tab) {
+  await tab.evaluate(async () => {
+    const { scratchChainDocument } = await import('/tools/chain_document_store.js');
+    const catalog = await (await fetch('/shader/engine_catalog.json')).json();
+    const source = scratchChainDocument(catalog, [
+      { label: 'twist', operator: 'sphere.lens.twist.v2' },
+      { label: 'sample', operator: 'sample.spherical-rings.v3' },
+      { label: 'colorize', operator: 'colorize.generated-palette.v3' },
+    ]);
+    source.effect_metadata.display_name = 'Twist parameter smoke';
+    source.descriptor.parameters = source.descriptor.parameters.filter(
+      (parameter) => !parameter.id.startsWith('twist.'));
+    source.descriptor.serialization.fields = source.descriptor.parameters.map(
+      (parameter) => parameter.id);
+    for (const preset of source.preset_bank.presets)
+      for (const id of Object.keys(preset.values))
+        if (id.startsWith('twist.')) delete preset.values[id];
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([JSON.stringify(source)], 'twist.shader.json',
+      { type: 'application/json' }));
+    const input = document.getElementById('shader-document-file');
+    input.files = transfer.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await tab.waitForFunction(() => document.getElementById('shader-document-status')
+    .textContent.startsWith('Twist parameter smoke'), { timeout: READY_TIMEOUT_MS });
+  const chip = '.chain-chip[data-label="twist"]';
+  await tab.click(`${chip} .chain-chip-header`);
+  const input = `${chip} [data-parameter="twist.twist-rate"] .chain-param-value`;
+  await tab.waitForSelector(input, { visible: true, timeout: READY_TIMEOUT_MS });
+  const digest = await tab.$eval('#shader-document-digest', (element) => element.dataset.digest);
+  await tab.$eval(input, (element) => {
+    element.value = '2';
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await tab.waitForFunction(async () => {
+    const { decodeShaderStateHash } = await import('/tools/shader_deeplink.js');
+    const state = await decodeShaderStateHash(location.hash);
+    return state?.document.preset_bank.presets[0].values['twist.twist-rate'] === 2;
+  }, { timeout: READY_TIMEOUT_MS });
+  const error = await tab.$eval('#shader-document-status', (element) =>
+    element.dataset.status === 'error' ? element.textContent : null);
+  if (error) throw new Error(error);
+  await tab.click('.chain-undo');
+  await tab.waitForFunction((before) =>
+    document.getElementById('shader-document-digest').dataset.digest === before,
+  { timeout: READY_TIMEOUT_MS }, digest);
+  console.log('  tools/shader.html: omitted Twist parameter edited and undone');
+}
+
 /**
  * Loads one page and collects everything that went wrong on it.
  * @param {import('puppeteer-core').Browser} browser - The running browser.
@@ -162,6 +213,7 @@ async function smokePage(browser, origin, page) {
           `${NETWORK_IDLE_TIMEOUT_MS}ms`);
     }
     const draws = await tab.evaluate(() => window.daydreamSmokeDraws);
+    if (page === 'tools/shader.html') await smokeTwistParameters(tab);
     if (page === 'index.html') {
       await tab.evaluate(async () => {
         const { selectMimeType } = await import('/recorder.js');

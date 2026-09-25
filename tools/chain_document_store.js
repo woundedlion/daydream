@@ -454,6 +454,21 @@ export async function createChainDocumentStore({
     }
   };
 
+  /** @param {*} candidate @param {ParameterDeclaration} parameter */
+  const addParameter = (candidate, parameter) => {
+    candidate.descriptor.parameters.push(parameter);
+    candidate.descriptor.serialization.fields.push(parameter.id);
+    // A staggered group names a parameter's shared interpolation group where
+    // it declares one and its id otherwise; sharers contribute one group.
+    const group = parameter.interpolation.group ?? parameter.id;
+    for (const policy of candidate.descriptor.path_policies) {
+      if (policy.kind === 'STAGGERED_ORDERED' && !policy.groups.includes(group))
+        policy.groups.push(group);
+    }
+    for (const preset of candidate.preset_bank.presets)
+      preset.values[parameter.id] = parameter.default;
+  };
+
   /**
    * Declares an added instance and backfills every preset, the serialization
    * fields and staggered path-policy groups with its defaults. The instance
@@ -481,19 +496,7 @@ export async function createChainDocumentStore({
       }
       return parameter;
     });
-    for (const parameter of parameters) {
-      candidate.descriptor.parameters.push(parameter);
-      candidate.descriptor.serialization.fields.push(parameter.id);
-      // A staggered group names a parameter's shared interpolation group where
-      // it declares one and its id otherwise; sharers contribute one group.
-      const group = parameter.interpolation.group ?? parameter.id;
-      for (const policy of candidate.descriptor.path_policies) {
-        if (policy.kind === 'STAGGERED_ORDERED' && !policy.groups.includes(group))
-          policy.groups.push(group);
-      }
-      for (const preset of candidate.preset_bank.presets)
-        preset.values[parameter.id] = parameter.default;
-    }
+    for (const parameter of parameters) addParameter(candidate, parameter);
   };
 
   // A removal can leave two presets value-identical, making a transition
@@ -648,7 +651,7 @@ export async function createChainDocumentStore({
    * same control collapse into one undo entry, so undoing a drag restores the
    * value the run started from; any other edit, undo or redo ends the run.
    * @param {string} presetId - The preset the value belongs to.
-   * @param {string} parameterId - A declared `<label>.<field>` parameter id.
+   * @param {string} parameterId - A catalog `<label>.<field>` parameter id.
    * @param {*} value - The value to store; an enum8 takes its option id.
    * @param {(() => EditResult)|null} [admit] - Admission before changing document or history.
    * @returns {EditResult} The outcome; a refusal leaves the store untouched.
@@ -659,11 +662,17 @@ export async function createChainDocumentStore({
     if (index < 0)
       return refusal('UNKNOWN_PRESET', '$.preset_bank.presets',
         `the preset bank carries no preset "${presetId}"`);
-    if (!doc.descriptor.parameters.some(
-      (/** @type {{id: string}} */ parameter) => parameter.id === parameterId))
-      return refusal('UNKNOWN_PARAMETER', '$.descriptor.parameters',
-        `the document declares no parameter "${parameterId}"`);
     const candidate = structuredClone(doc);
+    if (!candidate.descriptor.parameters.some(
+      (/** @type {{id: string}} */ parameter) => parameter.id === parameterId)) {
+      const entry = chain().find((entry) => parameterId.startsWith(`${entry.label}.`));
+      const field = entry && operatorOf(entry).params.find(
+        (field) => `${entry.label}.${field.id}` === parameterId);
+      if (!entry || !field)
+        return refusal('UNKNOWN_PARAMETER', '$.descriptor.parameters',
+          `the catalog carries no parameter "${parameterId}" for this chain`);
+      addParameter(candidate, parameterFromField(entry.label, field));
+    }
     candidate.preset_bank.presets[index].values[parameterId] = value;
     return commit(candidate, `${presetId} ${parameterId}`, admit);
   };
@@ -671,6 +680,20 @@ export async function createChainDocumentStore({
   return {
     /** @returns {*} An isolated copy of the current (always-valid) document. */
     document: () => structuredClone(doc),
+
+    /** @returns {ParameterDeclaration[]} Authored declarations plus undeclared catalog fields. */
+    parameterDeclarations: () => {
+      const parameters = structuredClone(doc.descriptor.parameters);
+      const declared = new Set(parameters.map(
+        (/** @type {ParameterDeclaration} */ parameter) => parameter.id));
+      for (const entry of chain()) {
+        for (const field of operatorOf(entry).params) {
+          if (!declared.has(`${entry.label}.${field.id}`))
+            parameters.push(parameterFromField(entry.label, field));
+        }
+      }
+      return parameters;
+    },
 
     /** @returns {ChainEntry[]} The chain in document order. */
     chain: () => chain().map((entry) => ({ ...entry })),

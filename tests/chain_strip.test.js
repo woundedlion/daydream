@@ -11,7 +11,7 @@ import { afterEach, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { createChainDocumentStore } from '../tools/chain_document_store.js';
+import { createChainDocumentStore, scratchChainDocument } from '../tools/chain_document_store.js';
 import { createChainStrip } from '../tools/chain_strip.js';
 import { deactivatedParameterIds } from '../tools/chain_presentation.js';
 import { compileShaderDocument } from '../shader/shader_workbench.mjs';
@@ -49,9 +49,10 @@ restoreDocumentAfterEach();
  */
 async function makeStrip({
   presetId = null, bypassAvailable = () => true, writeThrough = false,
+  source = structuredClone(BASE.document),
 } = {}) {
   const store = await createChainDocumentStore({
-    document: structuredClone(BASE.document), catalog: CATALOG });
+    document: source, catalog: CATALOG });
   const container = fakeElement('section');
   const doc = installDocument({
     body: fakeElement('body'),
@@ -880,11 +881,12 @@ test('stage controls open transiently on hover and pin open on click', async () 
   assert.equal(region.getAttribute('role'), 'group');
   assert.equal(region.getAttribute('aria-label'), 'Twin Wave · sample parameters');
   assert.deepEqual(rowsOf(h, 'sample').map((row) => row.dataset.parameter),
-    declarationsFor(h, 'sample').map((parameter) => parameter.id),
-    'one control per declared parameter, in document order');
+    h.store.parameterDeclarations().filter((parameter) =>
+      parameter.id.startsWith('sample.')).map((parameter) => parameter.id),
+    'authored declarations followed by undeclared catalog controls');
   assert.deepEqual(rowsOf(h, 'sample')
     .map((row) => row.querySelector('.chain-param-name').textContent),
-  ['Angle Speed', 'Coverage Mode', 'Drift', 'Pattern Freq', 'Speed', 'Weight Mode'],
+  ['Angle Speed', 'Coverage Mode', 'Drift', 'Pattern Freq', 'Speed', 'Weight Mode', 'Edge Width'],
   'a control is labeled by its field segment alone: the chip names the instance');
 
   // The document's declared domain and the active preset's value, not the
@@ -901,7 +903,8 @@ test('stage controls open transiently on hover and pin open on click', async () 
     .querySelector('.chain-param-value').value, '3.881');
 
   chipByLabel(h, 'camera').dispatch('click');
-  assert.equal(rowsOf(h, 'camera').length, 1);
+  assert.equal(rowsOf(h, 'camera').length, h.store.parameterDeclarations().filter(
+    (parameter) => parameter.id.startsWith('camera.')).length);
 });
 
 test('stage controls open under keyboard focus as they do under the pointer', async () => {
@@ -928,7 +931,7 @@ test('stage controls open under keyboard focus as they do under the pointer', as
     'losing focus preserves a pinned card');
 });
 
-test('a stage with no parameters grows no disclosure', async () => {
+test('a fixed stage expands to explain its parameters and allow renaming', async () => {
   const h = await makeStrip();
   bandFor(h, 'sphere').querySelector('.chain-band-add').dispatch('click');
   paletteEntries(h).find((entry) => entry.dataset.operator === 'sphere.lens.glitch.v2')
@@ -939,9 +942,10 @@ test('a stage with no parameters grows no disclosure', async () => {
 
   const chip = chipByLabel(h, label);
   assert.equal(chip.getAttribute('aria-current'), 'true');
-  assert.equal(chip.getAttribute('aria-expanded'), null,
-    'a card that opens nothing offers no disclosure');
-  assert.equal(paramsOf(h, label), null);
+  assert.equal(chip.getAttribute('aria-expanded'), 'true');
+  assert.equal(paramsOf(h, label).querySelector('.chain-strip-note').textContent,
+    'No adjustable parameters');
+  assert.ok(paramsOf(h, label).querySelector('.chain-chip-rename'));
 });
 
 test('pinning a stage closes the previously pinned stage', async () => {
@@ -1350,4 +1354,66 @@ test('band insertion buttons expose the open palette state', async () => {
   assert.equal(add.getAttribute('aria-expanded'), 'true');
   h.doc.activeElement.dispatch('keydown', { key: 'Escape' });
   assert.equal(add.getAttribute('aria-expanded'), 'false');
+});
+
+
+test('omitted catalog fields display defaults and become undoable document edits', async () => {
+  const h = await makeStrip({ writeThrough: true });
+  const before = h.store.document();
+  const digest = h.store.compile().descriptor_digest;
+  const declaration = h.store.parameterDeclarations().find((parameter) =>
+    !before.descriptor.parameters.some((authored) => authored.id === parameter.id));
+  assert.ok(declaration);
+  const label = declaration.id.split('.')[0];
+  chipByLabel(h, label).dispatch('click');
+  const row = rowsOf(h, label).find((row) => row.dataset.parameter === declaration.id);
+  const readout = row.querySelector('.chain-param-value');
+  assert.equal(Number(readout.value), Number(declaration.default));
+  assert.deepEqual(h.store.document(), before);
+  assert.equal(h.store.compile().descriptor_digest, digest);
+  assert.equal(h.store.canUndo(), false);
+  readout.value = String(declaration.domain.maximum);
+  readout.dispatch('change');
+  assert.equal(h.store.document().preset_bank.presets[0].values[declaration.id],
+    declaration.domain.maximum);
+  h.strip.syncHistory();
+  h.container.querySelector('.chain-undo').dispatch('click');
+  assert.deepEqual(h.store.document(), before);
+  assert.equal(h.store.compile().descriptor_digest, digest);
+});
+
+
+test('every catalog operator exposes its full schema in a declaration-free stage', async () => {
+  const crossings = CATALOG.carriers.slice(0, -1).map((carrier, index) =>
+    CATALOG.operators.find((operator) => operator.input === carrier
+      && operator.output === CATALOG.carriers[index + 1]));
+  for (const operator of CATALOG.operators) {
+    const prefix = crossings.slice(0, CATALOG.carriers.indexOf(operator.input));
+    const suffix = crossings.slice(CATALOG.carriers.indexOf(operator.output));
+    const chain = [...prefix, operator, ...suffix].map((stage, index) => ({
+      label: index === prefix.length ? 'audit' : `stage${index}`, operator: stage.id,
+    }));
+    const source = scratchChainDocument(CATALOG, chain);
+    source.descriptor.parameters = source.descriptor.parameters.filter(
+      (parameter) => !parameter.id.startsWith('audit.'));
+    source.descriptor.serialization.fields = source.descriptor.parameters.map(
+      (parameter) => parameter.id);
+    for (const preset of source.preset_bank.presets)
+      for (const id of Object.keys(preset.values))
+        if (id.startsWith('audit.')) delete preset.values[id];
+    const h = await makeStrip({ source });
+    chipByLabel(h, 'audit').dispatch('click');
+    assert.deepEqual(rowsOf(h, 'audit').map((row) => row.dataset.parameter),
+      operator.params.map((field) => `audit.${field.id}`), operator.name);
+    for (const field of operator.params) {
+      const control = controlIn(rowFor(h, 'audit', `audit.${field.id}`));
+      assert.equal(String(control.value), String(field.default), `${operator.name}: ${field.id}`);
+    }
+    if (operator.params.length === 0)
+      assert.equal(paramsOf(h, 'audit').querySelector('.chain-strip-note').textContent,
+        'No adjustable parameters');
+    assert.deepEqual(h.store.document(), source);
+    assert.equal(h.store.canUndo(), false);
+    h.strip.destroy();
+  }
 });
