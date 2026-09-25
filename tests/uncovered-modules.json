@@ -43,7 +43,7 @@
     "branches": 87.5
   },
   "tools/shader_documents.js": {
-    "reason": "Halt paths are covered by shader_workbench.test.js. Remaining gaps include default browser fetch/download callbacks, missing catalog selections, and optional UI mounts; these are partial unit coverage, not a claim that they are unreachable.",
+    "reason": "Halt paths are covered by shader_documents.test.js. Remaining gaps include default browser fetch/download callbacks, missing catalog selections, and optional UI mounts; these are partial unit coverage, not a claim that they are unreachable.",
     "branches": 83.7
   },
   "tools/chain_strip.js": {
