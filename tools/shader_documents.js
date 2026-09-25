@@ -529,8 +529,9 @@ export function createShaderDocumentController({
    */
   const engineControlName = (parameterId, definitions) => {
     const label = parameterId.slice(0, parameterId.indexOf('.'));
-    if (chainUi?.store.bypassedLabels().includes(label)) return null;
-    if (active?.compiledSide !== true) return parameterId;
+    if (active?.compiledSide !== true) {
+      return chainUi?.store.bypassedLabels().includes(label) ? null : parameterId;
+    }
     if (BAKED_CONSTANT_IDS.has(parameterId)) return null;
     if (bakedFields.has(fieldSegment(parameterId))) return null;
     return engineParameterNames(parameterId).find((candidate) =>
