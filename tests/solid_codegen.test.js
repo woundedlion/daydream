@@ -1546,7 +1546,6 @@ test('createOpGate re-sweeps a chain whose last pass was incomplete', async () =
   assert.equal((await gate.refresh('cube', [], CANDIDATES)).complete, true);
 });
 
-/** Verifies a base the registry does not hold leaves the sweep incomplete, not blocking. */
 /**
  * Verifies a chain op the bridge soft-rejects while the standing chain is
  * rebuilt frees the mesh it was applied to and the arenas, as the validator's
@@ -1562,6 +1561,7 @@ test('createOpGate frees the standing chain when its rebuild is rejected', async
   assert.equal(state.cleared, 1, 'a rejected rebuild flushes the arenas like a rejected validation');
 });
 
+/** Verifies a base the registry does not hold leaves the sweep incomplete, not blocking. */
 test('createOpGate reports an unbuildable base as an incomplete pass', async () => {
   const { Mod } = fakeModule(() => { },
     { rejects: new Set(['base:nope']), reason: 'UNKNOWN_NAME' });

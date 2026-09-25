@@ -1018,8 +1018,6 @@ test('a numeric value can be typed directly and stays within its domain', async 
   assert.deepEqual(h.edits.at(-1), ['sample.pattern-freq', Number(slider.max)]);
 });
 
-// A browser's number input reports content it cannot parse as the empty
-// string, which is what the listener sees when an author types letters.
 test('the numeric readout reads back as the binary32 it shows', async () => {
   const h = await makeStrip();
   const row = rowFor(h, 'sample', 'sample.pattern-freq');
@@ -1070,6 +1068,8 @@ test('the readout carries no step grid and nudges by arrow key', async () => {
   assert.equal(value.value, '5.5', 'other keys are left to the input');
 });
 
+// A browser's number input reports content it cannot parse as the empty
+// string, which is what the listener sees when an author types letters.
 test('an unparsable numeric entry restores the stored value', async () => {
   const h = await makeStrip();
   const row = rowFor(h, 'sample', 'sample.pattern-freq');
