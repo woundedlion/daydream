@@ -593,8 +593,8 @@ function cppFloatArray(values) {
 
 /**
  * Serializes a complete canonical V4 recipe as the C++ that rebuilds it: every
- * field assigned, then the try_compile call and the assert the engine's callers
- * carry.
+ * field assigned, then construction of the palette with the engine's checked
+ * recipe constructor.
  * @param {PaletteRecipe} recipe - A canonical V4 recipe, as the compiler returned it.
  * @returns {string} The C++ source, ready to paste.
  * @throws {Error} When a field holds an enum ordinal the engine has no name for.
@@ -627,10 +627,5 @@ recipe.chroma.headroom = ${f(recipe.chroma.headroom)};
 recipe.chroma.axis.custom = ${cppFloatArray(recipe.chroma.custom)};
 recipe.hue_torsion = ${f(recipe.hueTorsion)};
 recipe.falloff_start = ${f(recipe.falloffStart)};
-GenerativePalette palette;
-PaletteRecipe canonical;
-PaletteCompileStatus status;
-HS_CHECK(GenerativePalette::try_compile(recipe, palette, canonical, status),
-         "Palette recipe error %d at field %d", static_cast<int>(status.code),
-         static_cast<int>(status.field));`;
+GenerativePalette palette(recipe);`;
 }

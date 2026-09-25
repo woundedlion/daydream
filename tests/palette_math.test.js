@@ -303,7 +303,7 @@ test('generativePaletteCpp serializes the complete V4 recipe', () => {
   assert.match(source, /PaletteHarmony::TRIADIC/);
   assert.match(source, /AxisCurve::ASCENDING/);
   assert.match(source, /ChromaBasis::LOCAL_GAMUT/);
-  assert.match(source, /GenerativePalette::try_compile\(recipe, palette, canonical, status\)/);
+  assert.match(source, /GenerativePalette palette\(recipe\);$/);
 });
 
 test('generativePaletteCpp names every supported color harmony', () => {
