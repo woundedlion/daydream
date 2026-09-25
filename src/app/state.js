@@ -375,7 +375,7 @@ export class URLSync {
    * Tear down the URLSync: drop the AppState subscription, cancel any pending
    * debounced flush, and clear the app-wide writer slot if it still points here.
    * Without this, a pagehide discard can leave the debounce timer firing
-   * history.replaceState into a dead page. Symmetric with disposeApp().
+   * history.replaceState into a dead page. Symmetric with createAppTeardown(...).dispose().
    * Latches: schedule(), setParam(), and reset() become no-ops afterwards, so a
    * holder of a direct reference cannot re-arm the debounce into a discarded page.
    * @returns {void}
