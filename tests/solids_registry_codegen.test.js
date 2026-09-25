@@ -90,7 +90,8 @@ test('generateRegistryCpp emits a Recipe mirror for a hankin-free chain too', ()
   assert.equal(generateRegistryCpp(item),
     '// solids.h defines no SEED_CUBE. Paste the constant and its\n'
     + '// static_assert beside the other SEED_* constants.\n'
-    + 'inline constexpr uint8_t SEED_CUBE = 1;\n'
+    + 'inline constexpr uint8_t SEED_CUBE =\n'
+    + '    static_cast<uint8_t>(BaseMesh::CUBE);\n'
     + 'static_assert(std::string_view(simple_registry[SEED_CUBE].name) == "cube");\n'
     + '\n'
     + '/** Step table for cube_truncate33. */\n'
@@ -98,9 +99,8 @@ test('generateRegistryCpp emits a Recipe mirror for a hankin-free chain too', ()
     + '    {Op::TRUNCATE, 0.33f},\n'
     + '};\n'
     + '/** Recipe mirror of IslamicStarPatterns::cube_truncate33. */\n'
-    + 'inline constexpr Recipe CUBE_TRUNCATE33_RECIPE = {\n'
-    + '    SEED_CUBE, CUBE_TRUNCATE33_STEPS,\n'
-    + '    static_cast<uint8_t>(std::size(CUBE_TRUNCATE33_STEPS))};\n'
+    + 'inline constexpr Recipe CUBE_TRUNCATE33_RECIPE = make_recipe(\n'
+    + '    SEED_CUBE, CUBE_TRUNCATE33_STEPS);\n'
     + '\n'
     + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
     + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
@@ -114,7 +114,7 @@ test('generateRegistryCpp emits a Recipe mirror for a hankin-free chain too', ()
 // 80-column limit, which is the shape clang-format packs them into.
 test('generateRegistryCpp packs a short Recipe body onto one continuation line', () => {
   const code = generateRegistryCpp({ base: 'cube', ops: ['kis'] });
-  assert.match(code, /\n {4}SEED_CUBE, CUBE_KIS_STEPS, static_cast<uint8_t>\(std::size\(CUBE_KIS_STEPS\)\)};\n/);
+  assert.match(code, /\n {4}SEED_CUBE, CUBE_KIS_STEPS\);\n/);
   for (const line of code.split('\n')) {
     assert.ok(line.length <= 80, `"${line}" is ${line.length} columns`);
   }
@@ -200,7 +200,7 @@ test('generateRegistryCpp defines constants absent from the tool roster', () => 
     assert.ok(block.startsWith(`// solids.h defines no ${constName}.`),
       `the paste for "${seed}" must open by naming the missing constant`);
     assert.match(block, new RegExp(
-      `inline constexpr uint8_t ${constName} = ${SIMPLE_SEEDS.indexOf(seed)};`),
+      `inline constexpr uint8_t ${constName} =\\s+static_cast<uint8_t>\\(BaseMesh::${upperSnake(seed)}\\);`),
     `${constName} must carry its simple_registry index`);
     // The house static_assert, which fails to compile if the index moves.
     assert.match(block, new RegExp('static_assert\\(\\s*std::string_view\\('
@@ -236,9 +236,8 @@ test('generateRegistryCpp emits a step table and Recipe mirror for a hankin chai
     + '    {Op::AMBO},\n'
     + '};\n'
     + '/** Recipe mirror of IslamicStarPatterns::dodecahedron_hk62_ambo. */\n'
-    + 'inline constexpr Recipe DODECAHEDRON_HK62_AMBO_RECIPE = {\n'
-    + '    SEED_DODECAHEDRON, DODECAHEDRON_HK62_AMBO_STEPS,\n'
-    + '    static_cast<uint8_t>(std::size(DODECAHEDRON_HK62_AMBO_STEPS))};\n'
+    + 'inline constexpr Recipe DODECAHEDRON_HK62_AMBO_RECIPE = make_recipe(\n'
+    + '    SEED_DODECAHEDRON, DODECAHEDRON_HK62_AMBO_STEPS);\n'
     + '\n'
     + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
     + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
@@ -274,12 +273,9 @@ test('generateRegistryCpp wraps a long paste in the tool format', () => {
     + ' * IslamicStarPatterns::truncatedIcosahedron_ambo_relax100_truncate01_hk59.\n'
     + ' */\n'
     + 'inline constexpr Recipe\n'
-    + '    TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_RECIPE = {\n'
+    + '    TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_RECIPE = make_recipe(\n'
     + '        SEED_TRUNCATED_ICOSAHEDRON,\n'
-    + '        TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_STEPS,\n'
-    // The count expression breaks at the innermost call that fits its argument.
-    + '        static_cast<uint8_t>(std::size(\n'
-    + '            TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_STEPS))};\n'
+    + '        TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_STEPS);\n'
     + '\n'
     + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
     + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
@@ -369,9 +365,8 @@ test('generateRegistryCpp flattens a star-pattern base onto its own seed', () =>
     + '    {Op::HANKIN, 54.0f * IslamicStarPatterns::D2R},\n'
     + '};\n'
     + '/** Recipe mirror of IslamicStarPatterns::icosahedron_kis_gyro_hk54. */\n'
-    + 'inline constexpr Recipe ICOSAHEDRON_KIS_GYRO_HK54_RECIPE = {\n'
-    + '    SEED_ICOSAHEDRON, ICOSAHEDRON_KIS_GYRO_HK54_STEPS,\n'
-    + '    static_cast<uint8_t>(std::size(ICOSAHEDRON_KIS_GYRO_HK54_STEPS))};\n'
+    + 'inline constexpr Recipe ICOSAHEDRON_KIS_GYRO_HK54_RECIPE = make_recipe(\n'
+    + '    SEED_ICOSAHEDRON, ICOSAHEDRON_KIS_GYRO_HK54_STEPS);\n'
     + '\n'
     + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
     + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
