@@ -13,8 +13,14 @@ test('CDN bytes must match the committed integrity value', async () => {
   assert.equal(await checkCdnIntegrity(source, async () => new Response(bytes)), 1);
   await assert.rejects(checkCdnIntegrity(source, async () => new Response(`${bytes}\n`)),
     /integrity mismatch/);
-  await assert.rejects(checkCdnIntegrity(source, async () => new Response('', { status: 404 })),
-    /HTTP 404/);
+  let attempts = 0;
+  const waits = [];
+  await assert.rejects(checkCdnIntegrity(source, async () => {
+    attempts++;
+    return new Response('', { status: 404 });
+  }, async (ms) => { waits.push(ms); }), /HTTP 404/);
+  assert.equal(attempts, 3);
+  assert.deepEqual(waits, [250, 500]);
   await assert.rejects(checkCdnIntegrity('document.head.appendChild({textContent: "{}"})'),
     /empty/);
 });
