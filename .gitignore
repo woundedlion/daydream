@@ -13,6 +13,14 @@ node_modules/
 /engine/
 /engine-bundle/
 
+# Local engine build outputs installed from Holosphere.
+/holosphere_wasm.js
+/holosphere_wasm.wasm
+/holosphere_wasm.sha
+/holosphere_wasm.wasm.sha256
+/holosphere_wasm.toolchain
+/shader/engine_catalog.json
+
 # Linked git worktrees. A checkout of this same tree, so `git add -A` from the
 # root would otherwise commit a second copy of the repository.
 /.worktrees/
