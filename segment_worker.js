@@ -328,13 +328,11 @@ export function installSegmentWorker() {
         canvasH = msg.h;
         segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
 
-        if (msg.effectName) {
-          if (engine.setEffect(msg.effectName)
-              !== wasmModule.EffectSetResult.INSTALLED) {
-            post({ type: 'engineRejected',
-                   reason: `setEffect(${msg.effectName}) rejected` });
-            break;
-          }
+        if (engine.setEffect(msg.effectName)
+            !== wasmModule.EffectSetResult.INSTALLED) {
+          post({ type: 'engineRejected',
+                 reason: `setEffect(${msg.effectName}) rejected` });
+          break;
         }
         // synchronizePreset, not selectPreset: this mirrors the engine-driven
         // index, and selectPreset would engage the pause msg.paused carries.
