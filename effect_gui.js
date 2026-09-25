@@ -39,7 +39,7 @@ import {
   fixedShaderStageTitles,
   legacyShaderBallParamNames,
   stageControlLabel,
-  shaderBallStageAssignments,
+  shaderStageAssignments,
 } from "./shader_stages.js";
 
 // How long a transient button label (Export status) stays before reverting.
@@ -770,7 +770,7 @@ export function createEffectGui({ engine, segments, config, host }) {
    *   order: Array<string>}|null} The grouping, or null when none claims the list.
    */
   function stageGrouping(params) {
-    const shaderBall = shaderBallStageAssignments(params);
+    const shaderBall = shaderStageAssignments(params);
     if (shaderBall) {
       return {
         assignments: shaderBall, titles: null, order: STAGE_ORDER,

@@ -83,7 +83,7 @@ export function runSwitchTransaction(apply, rollback, moduleDead = () => false) 
  * An effect that persists through the full-config snapshot API is carried across
  * the rollback's panel rebuild whole, by the panel itself. Replaying its
  * parameters one at a time on top of that restore would drive the effect through
- * the intermediate combinations the bridge refuses — a ShaderBall left with
+ * the intermediate combinations the bridge refuses — a Shader left with
  * requestedValue and acceptedValue split — so the param list is left empty and
  * only the pause state is carried here.
  *
