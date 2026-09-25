@@ -2211,6 +2211,7 @@ test('preset effects expose one-based labels and zero-indexed navigation', () =>
   assert.deepEqual(h.writes, ['preset:2', 'preset:0']);
   assert.equal(h.gui().ctrl('presetIndex').getValue(), 0);
   assert.equal(h.gui().ctrl('pause').getValue(), true);
+  assert.equal(h.gui().stored.pause, true);
 });
 
 test('preset navigation is available to global keyboard shortcuts', () => {

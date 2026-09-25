@@ -385,6 +385,7 @@ export function createEffectGui({ engine, segments, config, host }) {
     if (paused === undefined || paused === fx.pause.animationState.pause) return;
     fx.pause.animationState.pause = paused;
     fx.pause.controller?.updateDisplay();
+    fx.gui.writeStoredValue('pause', paused);
   }
 
   /** Update the preset controller and its visibility from live engine state. */
