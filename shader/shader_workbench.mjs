@@ -363,6 +363,21 @@ export function chainArenaBytes(ops, budgets) {
   return cursor;
 }
 
+/** @returns {string[]} Budget violations for a resolved catalog operator list. */
+export function chainBudgetReasons(ops, budgets) {
+  const reasons = [];
+  if (ops.length > budgets.max_chain_ops)
+    reasons.push(`The chain exceeds the ${budgets.max_chain_ops}-operator budget.`);
+  const known = ops.filter(Boolean);
+  const arenaBytes = chainArenaBytes(known, budgets);
+  if (arenaBytes > budgets.arena_bytes)
+    reasons.push(`The chain needs ${arenaBytes} arena bytes of the ${budgets.arena_bytes} budget.`);
+  const runtimeParameters = known.reduce((count, op) => count + op.params.length, 0);
+  if (runtimeParameters > budgets.max_params)
+    reasons.push(`The chain needs ${runtimeParameters} runtime parameters of the ${budgets.max_params} budget.`);
+  return reasons;
+}
+
 /**
  * Validates the ordered operator chain against the catalog, collecting every
  * semantic finding rather than stopping at the first.
@@ -376,14 +391,10 @@ const validateChain = (chain, catalog, report, guard) => {
     report('EMPTY_CHAIN', '$.descriptor.chain', 'A chain needs at least one operator.');
     return new Map();
   }
-  if (chain.length > budgets.max_chain_ops)
-    report('BUDGET_EXCEEDED', '$.descriptor.chain',
-      `The chain exceeds the ${budgets.max_chain_ops}-operator budget.`);
 
   const known = new Map();
   const resolved = new Array(chain.length);
   const labels = new Set();
-  let runtimeParameters = 0;
   chain.forEach((entry, index) => {
     const path = `$.descriptor.chain[${index}]`;
     guard(() => {
@@ -404,16 +415,10 @@ const validateChain = (chain, catalog, report, guard) => {
       }
       resolved[index] = operator;
       known.set(entry.label, operator);
-      runtimeParameters += operator.params.length;
     });
   });
-  const arenaBytes = chainArenaBytes(resolved.filter(Boolean), budgets);
-  if (arenaBytes > budgets.arena_bytes)
-    report('BUDGET_EXCEEDED', '$.descriptor.chain',
-      `The chain needs ${arenaBytes} arena bytes of the ${budgets.arena_bytes} budget.`);
-  if (runtimeParameters > budgets.max_params)
-    report('BUDGET_EXCEEDED', '$.descriptor.chain',
-      `The chain needs ${runtimeParameters} runtime parameters of the ${budgets.max_params} budget.`);
+  for (const reason of chainBudgetReasons(resolved, budgets))
+    report('BUDGET_EXCEEDED', '$.descriptor.chain', reason);
 
   const first = resolved[0];
   if (first && first.input !== 'sphere')
