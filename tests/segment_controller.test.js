@@ -794,7 +794,10 @@ test('a generation cut short by a worker fault is never published', async () => 
   c.tick();
   const results = c.frameState.results;
 
-  c.workers[1].onerror({ message: 'boom', filename: 'w.js', lineno: 1, colno: 2 });
+  const error = new Event('error', { cancelable: true });
+  Object.assign(error, { message: 'boom', filename: 'w.js', lineno: 1, colno: 2 });
+  c.workers[1].onerror(error);
+  assert.equal(error.defaultPrevented, true);
   await flush();
 
   assert.equal(c.frameState.pendingFrame, false, 'the unfinished generation stays unpublished');
@@ -1389,7 +1392,9 @@ test('a bare-Event boot fault auto-rebuilds the pool instead of latching', () =>
     const firstPool = c.workers.slice();
 
     // A module-graph load failure fires a message-less Event before ready.
-    c.workers[0].onerror({});
+    const error = new Event('error', { cancelable: true });
+    c.workers[0].onerror(error);
+    assert.equal(error.defaultPrevented, true);
     assert.equal(c.faulted, false, 'a transient module-load fault does not latch');
     assert.ok(firstPool.every((w) => w.terminated),
       'the failing pool is torn down before the backoff window, not left instantiating WASM');
