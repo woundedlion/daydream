@@ -266,9 +266,22 @@ export function fakeDriver() {
       this.resolution = [w, h, dotSize];
       this.dotMesh.instanceColor = fakeColorAttribute(null);
     },
-    // The real driver's render() calls the adapter it is handed; a fake that
-    // swallowed it would leave every per-frame wiring undriven.
-    render(adapter) { this.frames += 1; adapter.drawFrame(); },
+    render(adapter) {
+      this.frames += 1;
+      const advanced = !this.paused || this.stepFrames > 0;
+      if (advanced) {
+        this.stepFrames = Math.max(0, this.stepFrames - 1);
+        adapter.drawFrame();
+      }
+      adapter.sync?.(advanced);
+      const capture = this.recorder?.isRecording === true && advanced
+        && (adapter.captureReady?.() ?? true);
+      if (this.dotMesh.instanceColor?.array?.byteLength === 0) {
+        adapter.refreshPixelView?.();
+        return;
+      }
+      if (capture) this.recorder.captureFrame();
+    },
     dispose() { this.disposed = true; },
   };
 }
