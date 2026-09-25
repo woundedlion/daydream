@@ -548,7 +548,7 @@ export function proceduralPaletteCpp(parameters) {
 /**
  * The C++ enumerator each V4 recipe enum value serializes as, indexed by value.
  * The inverse of palette_controls.js's PaletteV4; WASM parity tests
- * pins both to the `enum class` rosters in core/color/palette_recipe.h.
+ * pin both to the `enum class` rosters in core/color/palette_recipe.h.
  */
 export const ENUM_NAMES = Object.freeze({
   domain: ['STRAIGHT', 'MIRROR', 'VIGNETTE', 'FALLOFF', 'LOOP'],
