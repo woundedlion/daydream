@@ -1661,7 +1661,9 @@ test('keydown leaves a modifier chord to the browser and the OS', () => {
 test('keydown ignores keys it does not own', () => {
   const ctx = { paused: true, stepFrames: 0 };
   const other = keyEvent('ArrowLeft');
-  Daydream.prototype.keydown.call(ctx, other);
+  const moves = [];
+  Daydream.prototype.keydown.call(ctx, other, (direction) => moves.push(direction));
+  assert.deepEqual(moves, []);
 
   assert.equal(ctx.paused, true);
   assert.equal(ctx.stepFrames, 0);
