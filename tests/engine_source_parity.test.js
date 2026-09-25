@@ -346,6 +346,7 @@ function engineStructFields(source, name) {
   for (const decl of body.split(';')) {
     const text = decl.trim();
     if (!text || text.startsWith('static')) continue;
+    if (/^bool\s+operator==\([^)]*\)\s+const\s*=\s*default$/.test(text)) continue;
     const member = text.match(/^(std::array<[^>]+>|[\w:]+)\s+(\w+)\s*(?:=[\s\S]+|\{\s*\})?$/);
     assert.ok(member, `unreadable member "${text}" in struct ${name} — the reader is out of date`);
     fields.push({ type: member[1], field: member[2] });
