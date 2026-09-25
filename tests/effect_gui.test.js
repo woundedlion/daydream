@@ -890,7 +890,7 @@ test('build restores the last accepted value before replaying an invalid request
     params: [outer],
     hydrated: { 'Outer Warp': 3 },
     acceptedStored: { '__accepted.Outer Warp': 0 },
-    onEngineParam: (_name, value) => {
+    onEngineParam: (name, value) => {
       outer.requestedValue = value;
       if (value !== 3) {
         outer.value = value;
@@ -919,7 +919,7 @@ test('a bool parameter stores its accepted value as a float', () => {
   };
   const h = makeHarness({
     params: [glow],
-    onEngineParam: (_name, value) => {
+    onEngineParam: (name, value) => {
       glow.value = value > 0.5;
       glow.requestedValue = glow.value;
       glow.acceptedValue = glow.value;
@@ -1834,7 +1834,7 @@ test('a warning raised mid-drag lands on the pointer release', () => {
   const h = makeHarness({
     params: [speed],
     engineValues: [0.1],
-    onEngineParam(_name, value, state) {
+    onEngineParam(name, value, state) {
       state.params = [value > 0.5 ? { ...speed, warning } : { ...speed }];
     },
   });
@@ -1864,7 +1864,7 @@ test('a warning raised mid-key-repeat lands on the key release', () => {
   const h = makeHarness({
     params: [speed],
     engineValues: [0.1],
-    onEngineParam(_name, value, state) {
+    onEngineParam(name, value, state) {
       state.params = [value > 0.5 ? { ...speed, warning } : { ...speed }];
     },
   });
@@ -1941,7 +1941,7 @@ test('requested selectors and rendered numeric values stay authoritative', () =>
         { ...projectionDef, requestedValue: 0, acceptedValue: 0 }, SPEED];
       state.generation = 2;
     },
-    onSynchronizePreset(_index, state) {
+    onSynchronizePreset(index, state) {
       state.params = [
         { ...functionDef, value: 6 },
         { ...projectionDef, value: 0 },
@@ -2268,7 +2268,7 @@ test('natural worker preset advancement keeps live transition values', () => {
     ownsDisplay: true,
     presetCount: 3,
     presetIndex: 0,
-    onSynchronizePreset: (_index, state) => {
+    onSynchronizePreset: (index, state) => {
       state.params = [TARGET_FUNCTION, TARGET_SPEED];
       state.engineValues = [6, 0.9];
       state.generation = 2;
@@ -2306,7 +2306,7 @@ test('a preset rebuild adopts the post-sync preset range and index', () => {
     generation: 1,
     presetCount: 3,
     presetIndex: 0,
-    onSynchronizePreset: (_index, state) => {
+    onSynchronizePreset: (index, state) => {
       state.presetCount = 1;
       state.presetIndex = 0;
       state.hostPresetIndex = 0;
@@ -2663,7 +2663,7 @@ test('a slider drag defers persistence to the pointer release', () => {
   const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
   const h = makeHarness({
     params: [speed],
-    onEngineParam: (_name, value) => { speed.value = value; },
+    onEngineParam: (name, value) => { speed.value = value; },
   });
   h.panel.build();
   const controller = h.gui().ctrl('Speed');
@@ -2719,7 +2719,7 @@ test('a schema rebuild mid-drag still lands the write the drag deferred', () => 
     params: [speed],
     engineValues: [0.1],
     generation: 3,
-    onEngineParam: (_name, value) => { speed.value = value; },
+    onEngineParam: (name, value) => { speed.value = value; },
   });
   h.panel.build();
   h.panel.mount();
@@ -2783,7 +2783,7 @@ test('a teardown mid-drag persists the deferred write, and a release only once',
       const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
       return makeHarness({
         params: [speed],
-        onEngineParam: (_name, value) => { speed.value = value; },
+        onEngineParam: (name, value) => { speed.value = value; },
       });
     };
 
@@ -2823,7 +2823,7 @@ test('a toggle persists without waiting for a pointer release', () => {
   const glow = { name: 'Glow', value: false, animated: true };
   const h = makeHarness({
     params: [glow],
-    onEngineParam: (_name, value) => { glow.value = value > 0.5; },
+    onEngineParam: (name, value) => { glow.value = value > 0.5; },
   });
   h.panel.build();
   h.gui().storedWrites.length = 0;
@@ -2920,7 +2920,7 @@ test('a drag whose release never lands ends when the window loses focus', () => 
   const h = makeHarness({
     params: [speed],
     engineValues: [0.1],
-    onEngineParam(_name, value, state) {
+    onEngineParam(name, value, state) {
       state.params = [value > 0.5 ? { ...speed, warning } : { ...speed }];
     },
   });
@@ -2953,7 +2953,7 @@ test('a second pointer neither re-latches a held control nor releases it', () =>
   const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
   const h = makeHarness({
     params: [speed],
-    onEngineParam: (_name, value) => { speed.value = value; },
+    onEngineParam: (name, value) => { speed.value = value; },
   });
   h.panel.build();
   const controller = h.gui().ctrl('Speed');

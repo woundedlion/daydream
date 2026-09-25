@@ -1,5 +1,5 @@
 // Local pattern fixtures and frozen v1 migration identities.
-// share. Current patterns are validated independently of historical fixtures.
+// Current patterns are validated independently of historical fixtures.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
