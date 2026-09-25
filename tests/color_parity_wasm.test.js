@@ -374,6 +374,7 @@ test('PaletteOps publishes every effect-owned GenerativePalette recipe', () => {
       'ShaderWorkbench Liquid',
       'ShaderWorkbench Flyby',
       'HyperLattice',
+      'MindSplatter',
     ]);
     assert.deepEqual(presets.filter((preset) => preset.randomHue)
       .map((preset) => preset.name), [
@@ -382,6 +383,7 @@ test('PaletteOps publishes every effect-owned GenerativePalette recipe', () => {
       'Dynamo',
       'GSReactionDiffusion',
       'MobiusRings',
+      'MindSplatter',
     ]);
     for (const preset of presets) {
       assert.equal(preset.recipe.schemaVersion, 4);
