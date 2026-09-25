@@ -114,7 +114,6 @@ function makeSegmentedFallback() {
   let active = true;
   const segments = {
     destroy: () => order.push('destroy'),
-    updateStats: () => order.push('updateStats'),
   };
   // An accessor, as the real controller has, so the write's position is visible.
   Object.defineProperty(segments, 'active', {
@@ -138,7 +137,7 @@ test('the segmented fallback clears the flag before it strands or tears down', (
   h.fallback('enable', new Error('no workers'));
 
   assert.deepEqual(h.order,
-    ['notice', 'active=false', 'strand', 'destroy', 'updateStats', 'toggle=false'],
+    ['notice', 'active=false', 'strand', 'destroy', 'toggle=false'],
     'a strand or a destroy ahead of the flag leaves a window a resuming '
     + 'continuation can spawn into');
   assert.equal(h.segments.active, false, 'the host is left inactive');

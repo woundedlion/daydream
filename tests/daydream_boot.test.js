@@ -677,10 +677,9 @@ test('segmented controls reconcile a mobile spawn and resize without a second po
   const driver = { isMobile: false };
   const segments = {
     active: false, count: 8, showBoundaries: false,
-    destroyed: 0, stats: 0,
+    destroyed: 0,
     create(count) { this.count = count; created.push(count); },
     destroy() { this.destroyed += 1; },
-    updateStats() { this.stats += 1; },
   };
   let finishWarm;
   t.mock.method(pageWarmer, 'warm', () => new Promise(resolve => { finishWarm = resolve; }));
@@ -707,7 +706,6 @@ test('segmented controls reconcile a mobile spawn and resize without a second po
   await enabled.changed(false);
   assert.equal(segments.active, false);
   assert.equal(segments.destroyed, 1);
-  assert.equal(segments.stats, 1);
   assert.deepEqual(notices, []);
 });
 

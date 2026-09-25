@@ -54,7 +54,7 @@ export function createSegmentSpawnGuard({ warmModules, spawn, isActive }) {
  * teardown.
  *
  * @param {Object} deps - Injected app collaborators.
- * @param {{active: boolean, destroy: () => void, updateStats: () => void}} deps.segments -
+ * @param {{active: boolean, destroy: () => void}} deps.segments -
  *   The segment controller.
  * @param {() => void} deps.strand - Bumps the spawn epoch.
  * @param {(message: string) => void} deps.showNotice - Reports the fallback;
@@ -82,7 +82,6 @@ export function createSegmentedFallback({
     segments.active = false;
     strand();
     segments.destroy();
-    segments.updateStats();
     showToggle(false);
   };
 }
