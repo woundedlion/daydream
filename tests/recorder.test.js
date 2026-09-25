@@ -1974,3 +1974,59 @@ test('start aborts and releases both streams when no video track is produced', (
   assert.equal(rec.notified.length, 1, 'the host is told the session never started');
   assert.match(rec.notified[0].message, /no video track/);
 });
+
+test('output setup failure closes the picked sink and stops the encoder', () => {
+  const restore = installRecorderEnv();
+  const captured = installConsoleCapture('error');
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    let finished = 0;
+    const errors = [];
+    rec.onError = (error) => errors.push(error);
+    rec.openSink = () => ({ write() { throw new Error('sink unavailable'); },
+      finish() { finished++; } });
+    FakeMediaRecorder.startData = { size: 10 };
+    rec.start('setup');
+    const encoder = FakeMediaRecorder.instances.at(-1);
+    assert.equal(finished, 1);
+    assert.equal(encoder.state, 'inactive');
+    assert.equal(encoder.ondataavailable, null);
+    assert.equal(encoder.onstop, null);
+    assert.equal(encoder.onerror, null);
+    assert.equal(rec.mediaRecorder, null);
+    assert.equal(errors.length, 1);
+    assert.match(errors[0].message, /sink unavailable/);
+    assert.match(captured.messages.join(), /output setup failed/);
+  } finally {
+    captured.restore();
+    restore();
+  }
+});
+
+test('createWritable rejection preserves every chunk for Downloads', async () => {
+  const restore = installRecorderEnv();
+  const captured = installConsoleCapture('warn');
+  globalThis.showSaveFilePicker = async () => ({
+    createWritable: async () => { throw new Error('file locked'); },
+  });
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    const finished = trackSinkFinish(rec);
+    const downloads = [];
+    rec.download = (_encoder, chunks) => downloads.push([...chunks]);
+    rec.start('fallback');
+    const encoder = rec.mediaRecorder;
+    const first = { size: 10 }, second = { size: 20 };
+    encoder.ondataavailable({ data: first });
+    await drainSink();
+    encoder.ondataavailable({ data: second });
+    rec.stop();
+    encoder.onstop();
+    await finished();
+    assert.deepEqual(downloads, [[first, second]]);
+    assert.match(captured.messages.join('\n'), /could not be opened; buffering in memory/);
+  } finally {
+    captured.restore();
+    restore();
+  }
+});
