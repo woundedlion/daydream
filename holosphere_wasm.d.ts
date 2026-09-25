@@ -401,11 +401,61 @@ export interface MeshOpResultEnum {
   ARENA_UNAVAILABLE: EnumValue;
 }
 
-/** How one V4 palette compile went; `code` 0 is success. */
+export interface PaletteCompileCodeEnum {
+  OK: EnumValue;
+  INVALID_SCHEMA: EnumValue;
+  NON_FINITE: EnumValue;
+  INVALID_ENUM: EnumValue;
+  HUE_LIMIT: EnumValue;
+  NON_INTEGER_LOOP_SWEEP: EnumValue;
+  INVALID_FALLOFF_START: EnumValue;
+  INCOMPATIBLE_OPTIONS: EnumValue;
+}
+
+export interface PaletteRecipeFieldEnum {
+  NONE: EnumValue;
+  PALETTE_DOMAIN: EnumValue;
+  EASING: EnumValue;
+  COLOR_PATH: EnumValue;
+  HUE_MODE: EnumValue;
+  HARMONY: EnumValue;
+  HUE_DIRECTION: EnumValue;
+  BASE_TURNS: EnumValue;
+  SPREAD_TURNS: EnumValue;
+  SWEEP_TURNS: EnumValue;
+  CUSTOM_TURNS_0: EnumValue;
+  CUSTOM_TURNS_1: EnumValue;
+  CUSTOM_TURNS_2: EnumValue;
+  CUSTOM_TURNS_3: EnumValue;
+  LIGHTNESS_CURVE: EnumValue;
+  LIGHTNESS_CENTER: EnumValue;
+  LIGHTNESS_RANGE: EnumValue;
+  LIGHTNESS_CUSTOM_0: EnumValue;
+  LIGHTNESS_CUSTOM_1: EnumValue;
+  LIGHTNESS_CUSTOM_2: EnumValue;
+  LIGHTNESS_CUSTOM_3: EnumValue;
+  CHROMA_CURVE: EnumValue;
+  CHROMA_BASIS: EnumValue;
+  CHROMA_CENTER: EnumValue;
+  CHROMA_RANGE: EnumValue;
+  CHROMA_CUSTOM_0: EnumValue;
+  CHROMA_CUSTOM_1: EnumValue;
+  CHROMA_CUSTOM_2: EnumValue;
+  CHROMA_CUSTOM_3: EnumValue;
+  CHROMA_HEADROOM: EnumValue;
+  HUE_TORSION: EnumValue;
+  FALLOFF_START: EnumValue;
+  SCHEMA_VERSION: EnumValue;
+  INPUT_OFFSET: EnumValue;
+  INPUT_SPAN: EnumValue;
+  COUNT: EnumValue;
+}
+
+/** How one V4 palette compile went; `code` PaletteCompileCode.OK is success. */
 export interface PaletteCompileStatus {
-  code: number;
+  code: EnumValue;
   /** Which recipe field an error names. */
-  field: number;
+  field: EnumValue;
   /** Bitmask over the recipe fields the compiler wrapped into range. */
   wrappedFields: number;
   /** The fields it clamped, in the same bit positions. */
@@ -451,6 +501,8 @@ export interface PaletteOps {
 }
 
 export interface HolosphereModule {
+  PaletteCompileCode: PaletteCompileCodeEnum;
+  PaletteRecipeField: PaletteRecipeFieldEnum;
   H_OFFSET: number;
   srgb_to_linear_float(s: number): number;
   linear_to_srgb_float(l: number): number;

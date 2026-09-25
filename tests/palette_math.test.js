@@ -1,3 +1,4 @@
+import * as paletteEnums from './fake_palette.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -8,7 +9,6 @@ const {
   generativePaletteCpp, setPaletteOps,
   NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
   paletteCompileError, paletteAdjustmentSummary,
-  COMPILE_CODE_NAMES, RECIPE_FIELD_NAMES,
   prettyPaletteName, paletteGradientCss,
 } = await import('../tools/palette_math.js');
 const { defaultPaletteRecipe, PaletteV4 } = await import('../tools/palette_controls.js');
@@ -27,7 +27,7 @@ function mockBakeLut() {
 
 function mockPaletteOps(overrides = {}) {
   const compile = (recipe) => ({
-    status: { code: 0, field: 0, wrappedFields: 0, clampedFields: 0, canonicalizedFields: 0 },
+    status: { code: paletteEnums.PaletteCompileCode.OK, field: paletteEnums.PaletteRecipeField.NONE, wrappedFields: 0, clampedFields: 0, canonicalizedFields: 0 },
     canonicalRecipe: structuredClone(recipe),
     lut: mockBakeLut(),
     diagnostics: new Float32Array(256 * 6),
@@ -51,7 +51,7 @@ function mockPaletteOps(overrides = {}) {
  * @returns {void}
  */
 function withPaletteOps(ops, body) {
-  setPaletteOps(ops);
+  setPaletteOps(ops, paletteEnums);
   try {
     body();
   } finally {
@@ -331,7 +331,7 @@ test('compilePaletteRecipe selects the requested bridge operation and owns its b
   const compile = (kind) => (input) => {
     calls.push([kind, input]);
     return {
-      status: { code: 0, field: 0 },
+      status: { code: paletteEnums.PaletteCompileCode.OK, field: paletteEnums.PaletteRecipeField.NONE },
       canonicalRecipe: input,
       lut,
       diagnostics,
@@ -352,7 +352,7 @@ test('compilePaletteRecipe selects the requested bridge operation and owns its b
 });
 
 test('GenerativePalette reports compiler failures', () => {
-  const ops = mockPaletteOps({ inspectV4: () => ({ status: { code: 2, field: 7 } }) });
+  const ops = mockPaletteOps({ inspectV4: () => ({ status: { code: paletteEnums.PaletteCompileCode.NON_FINITE, field: paletteEnums.PaletteRecipeField.BASE_TURNS } }) });
   withPaletteOps(ops, () => {
     assert.throws(() => new GenerativePalette(defaultPaletteRecipe()),
       /Palette recipe error NON_FINITE \(2\) at field BASE_TURNS \(7\)/);
@@ -365,14 +365,13 @@ test('GenerativePalette reports compiler failures', () => {
  * roster still reports the number rather than reading as a named reason.
  */
 test('paletteCompileError names the engine enumerators', () => {
-  assert.equal(paletteCompileError({ code: 5, field: 9 }),
+  setPaletteOps(null, paletteEnums);
+  assert.equal(paletteCompileError({ code: paletteEnums.PaletteCompileCode.NON_INTEGER_LOOP_SWEEP, field: paletteEnums.PaletteRecipeField.SWEEP_TURNS }),
     'Palette recipe error NON_INTEGER_LOOP_SWEEP (5) at field SWEEP_TURNS (9)');
-  assert.equal(paletteCompileError({ code: 3, field: 0 }),
+  assert.equal(paletteCompileError({ code: paletteEnums.PaletteCompileCode.INVALID_ENUM, field: paletteEnums.PaletteRecipeField.NONE }),
     'Palette recipe error INVALID_ENUM (3) at field NONE (0)');
-  assert.equal(paletteCompileError({ code: 99, field: 200 }),
+  assert.equal(paletteCompileError({ code: { value: 99 }, field: { value: 200 } }),
     'Palette recipe error unnamed 99 at field unnamed 200');
-  for (const name of COMPILE_CODE_NAMES) assert.match(name, /^[A-Z][A-Z0-9_]*$/);
-  for (const name of RECIPE_FIELD_NAMES) assert.match(name, /^[A-Z][A-Z0-9_]*$/);
 });
 
 /**
@@ -402,7 +401,7 @@ test('GenerativePalette uses the canonical recipe and exposes diagnostics', () =
   fallback[128] = 1;
   const ops = mockPaletteOps({
     inspectV4: (input) => ({
-      status: { code: 0, field: 0 },
+      status: { code: paletteEnums.PaletteCompileCode.OK, field: paletteEnums.PaletteRecipeField.NONE },
       canonicalRecipe: { ...structuredClone(input), falloffStart: 0.8 },
       lut: mockBakeLut(),
       diagnostics,
@@ -434,7 +433,7 @@ test('GenerativePalette.get blends adjacent entries in linear light', () => {
   lut.fill(128, 3);
   const ops = mockPaletteOps({
     inspectV4: (recipe) => ({
-      status: { code: 0, field: 0 },
+      status: { code: paletteEnums.PaletteCompileCode.OK, field: paletteEnums.PaletteRecipeField.NONE },
       canonicalRecipe: recipe,
       lut,
       diagnostics: new Float32Array(256 * 6),

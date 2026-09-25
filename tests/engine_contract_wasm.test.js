@@ -190,7 +190,7 @@ test('holosphere_wasm.d.ts declares every module function', () => {
   }
 });
 
-const RESULT_ENUMS = ['ChainStatus', 'ParamSetResult', 'ClipSetResult', 'ResolutionSetResult',
+const RESULT_ENUMS = ['PaletteCompileCode', 'PaletteRecipeField', 'ChainStatus', 'ParamSetResult', 'ClipSetResult', 'ResolutionSetResult',
   'EffectSetResult', 'FullConfigRestoreResult'];
 
 test('holosphere_wasm.d.ts declares every result enum roster the module exports', () => {
