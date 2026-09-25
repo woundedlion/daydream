@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "lil-gui": "0.21.0",
-    "three": "0.183.1"
+    "three": "0.186.0"
   },
   "engines": {
     "node": "22.23.2"
