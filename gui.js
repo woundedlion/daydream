@@ -335,6 +335,10 @@ class DeepLinkGUI {
    * @returns {Object} The created lil-gui controller.
    */
   addWithHydration(hydrate, object, prop, legacyProps, ...args) {
+    const supported = ['number', 'string', 'boolean', 'function'];
+    if (!supported.includes(typeof object[prop]) && !optionValues(args[0])) {
+      throw new TypeError(`DeepLinkGUI: unsupported property "${prop}"`);
+    }
     const key = this.getKey(prop);
     const isFunction = typeof object[prop] === 'function';
 
