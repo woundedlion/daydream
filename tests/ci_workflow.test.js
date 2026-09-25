@@ -394,3 +394,22 @@ test('the CI gate CLI rejects an ungated job before evaluating results', () => {
     rmSync(scratch, { recursive: true, force: true });
   }
 });
+
+test('required suite steps execute their complete bodies without suppression', () => {
+  const suite = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/js-unit-suite.yml`), 'utf8');
+  const expected = JSON.parse(readFileSync(resolve(REPO, 'tests/fixtures/js-suite-steps.json'), 'utf8'));
+  const blocks = suite.split(/(?=^ {6}- )/m);
+  assert.doesNotMatch(suite, /\|\|\s*true/);
+  for (const [name, body] of Object.entries(expected)) {
+    const block = blocks.find((entry) => entry.startsWith(`      - name: ${name}\n`));
+    assert.ok(block, name);
+    assert.doesNotMatch(block, /^ {8}(?:if|continue-on-error):/m, name);
+    const run = block.split('        run: ')[1];
+    assert.ok(run, name);
+    const actual = run.startsWith('|\n')
+      ? run.split('\n').slice(1).filter((line) => line.startsWith('          '))
+        .map((line) => line.slice(10)).join('\n').trimEnd()
+      : run.split('\n')[0];
+    assert.equal(actual, body, name);
+  }
+});
