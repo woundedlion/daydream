@@ -21,7 +21,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { lissajousCodeString } from '../src/workbench/lissajous/lissajous_math.js';
+import { closingDomain, lissajousCodeString } from '../src/workbench/lissajous/lissajous_math.js';
 import * as MB from '../src/workbench/mobius/mobius_transforms.js';
 import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS } from '../src/workbench/solids/solid_codegen.js';
 import { MAX_BUILD_FACES, MAX_BUILD_STEPS, upperSnake, primitiveCount } from '../src/workbench/solids/solid_registry_codegen.js';
@@ -513,4 +513,17 @@ test('MAX_BUILD_FACES matches the pinned effect budget', { skip: engineSkip }, (
   const match = /static constexpr size_t MAX_BUILD_FACES\s*=\s*(\d+);/.exec(header(ISLAMIC_STARS_H));
   assert.ok(match);
   assert.equal(MAX_BUILD_FACES, Number(match[1]));
+});
+
+test('closingDomain follows the pinned Comets traversal', { skip: engineSkip }, () => {
+  const match = /static float closing_domain\([^)]*\)\s*\{([\s\S]*?)\n {2}\}/.exec(header('effects/Comets.h'));
+  assert.ok(match);
+  const body = match[1].replace(/HS_CHECK\([\s\S]*?\);/, '')
+    .replace(/\bfloat\b/g, 'let').replace(/std::round/g, 'Math.round')
+    .replace(/math::PI_F/g, 'Math.PI').replace(/(\d)f\b/g, '$1');
+  const engineClosingDomain = Function('config', body);
+  for (const [m2, domain] of [[1, 4 * Math.PI], [1.06, 5.909], [1, 1],
+    [4.01, 3.132], [62.16, 0.404], [8.75, 2.872]]) {
+    assert.equal(closingDomain(m2, domain), engineClosingDomain({ m2, domain }));
+  }
 });
