@@ -39,9 +39,9 @@ const STAINED_GLASS = compileShaderDocument(readFileSync(
 { catalog: CATALOG });
 assert.equal(STAINED_GLASS.status, 'VALID');
 
-// kaleidoscope_hex_bright chain order: camera, lens, project, warp2, sample, transfer,
+// kaleidoscope_hex_bright chain order: camera, lens, project, warp2, sample,
 // colorize — sphere endos, a sphere->plane crossing, a plane endo, a
-// plane->field crossing, a field endo, the field->color exit.
+// plane->field crossing, the field->color exit.
 const PROJECT = 2;
 const WARP = 3;
 const SAMPLE = 4;

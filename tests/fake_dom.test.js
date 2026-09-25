@@ -1,6 +1,6 @@
 //
 // fake_dom.js's event propagation and value coercion, pinned on their own.
-// Fifteen suites dispatch and assert through this fake, so a listener that runs
+// The DOM suites dispatch and assert through this fake, so a listener that runs
 // at the wrong attachment point, a stopPropagation that stops nothing, or a
 // property handing back a type no browser produces would all read there as
 // assertions about the module under test rather than about the harness.

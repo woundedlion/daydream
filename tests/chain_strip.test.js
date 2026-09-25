@@ -33,7 +33,7 @@ afterEach(() => { frames.restore(); });
 const runFrame = () => frames.flush();
 
 // kaleidoscope_hex_bright chain: camera, lens (sphere endos), project (crossing), warp2
-// (plane endo), sample (crossing), transfer (field endo), colorize (exit).
+// (plane endo), sample (crossing), colorize (exit).
 const PROJECT = 2;
 
 restoreDocumentAfterEach();
