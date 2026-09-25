@@ -178,8 +178,12 @@ test('pre-push validates the pushed commit instead of a modified working tree', 
   writeFileSync(join(root, 'marker'), 'committed\n');
   for (const name of ['ci_workflow', 'deployment_pair', 'stage_site'])
     writeFileSync(join(root, `tests/${name}.test.js`), '');
+  const calls = join(root, 'tool-calls').replace(/\\/g, '/');
+  const node = join(root, 'bin/node');
+  writeFileSync(node, `#!/bin/sh\nprintf '%s\\n' "node $*" >> '${calls}'\nexec '${process.execPath.replace(/\\/g, '/')}' "$@"\n`);
+  chmodSync(node, 0o755);
   const npm = join(root, 'bin/npm');
-  writeFileSync(npm, '#!/bin/sh\n[ "$(cat marker)" = committed ] || exit 23\n'
+  writeFileSync(npm, `#!/bin/sh\nprintf '%s\\n' "npm $*" >> '${calls}'\n` + '[ "$(cat marker)" = committed ] || exit 23\n'
     + 'if [ "$2" = importmap ]; then for last; do :; done; cp vendor-importmap.js "$last"; fi\n');
   chmodSync(npm, 0o755);
   git('init', '-q');
@@ -192,6 +196,9 @@ test('pre-push validates the pushed commit instead of a modified working tree', 
     cwd: root, env, encoding: 'utf8', input: `refs/heads/master ${sha} refs/heads/master ${'0'.repeat(40)}\n`,
   });
   assert.equal(result.status, 0, result.stdout + result.stderr);
+  const logged = readFileSync(calls, 'utf8');
+  for (const command of ['npm run lint', 'npm run typecheck', 'npm run importmap', 'node --test'])
+    assert.ok(logged.includes(command), command);
   assert.equal(readFileSync(join(root, 'marker'), 'utf8'), 'working-tree-only\n');
   assert.equal(readFileSync(join(root, 'node_modules/.package-lock.json'), 'utf8'), '{}');
 });
