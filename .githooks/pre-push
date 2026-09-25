@@ -1,6 +1,5 @@
 #!/bin/sh
-# Local counterpart of the required JavaScript and browser CI suites. A tree
-# that cannot run them refuses the push; `git push --no-verify` is the escape.
+# Source checks are local; CI tests the resolved daydream/engine pair.
 
 for name in $(git rev-parse --local-env-vars); do
 	unset "$name"
@@ -10,7 +9,6 @@ if ! command -v node >/dev/null 2>&1; then
 	echo "pre-push: node not found; install Node.js to run the required suites." >&2
 	exit 1
 fi
-node --test tests/wasm_provenance.test.js || exit 1
 
 if ! command -v npm >/dev/null 2>&1; then
 	echo "pre-push: npm not found; install Node.js to run the required suites." >&2
@@ -25,8 +23,7 @@ npm run lint || exit 1
 npm run typecheck || exit 1
 
 tmp=$(mktemp ./vendor-importmap.XXXXXX) || exit 1
-probe_tmp=''
-trap 'rm -f "$tmp"; [ -z "$probe_tmp" ] || rm -rf "$probe_tmp"' EXIT
+trap 'rm -f "$tmp"' EXIT
 trap 'exit 130' INT TERM
 npm run importmap -- --out "$tmp" || exit 1
 # The suites above all run over the working tree, so the freshness check
@@ -37,32 +34,4 @@ if ! git -c core.autocrlf=false diff --no-index --ignore-cr-at-eol --exit-code -
 fi
 rm -f "$tmp"
 
-npm test || exit 1
-
-if ! node -e 'import("./scripts/browser.mjs").then((m) => m.resolveBrowser()).catch((error) => { console.error(error.message); process.exitCode = 1; })'; then
-	echo "pre-push: no browser found; set CHROME_PATH or install Chrome, Chromium or Edge to run the browser probes." >&2
-	exit 1
-fi
-if ! command -v timeout >/dev/null 2>&1; then
-	echo "pre-push: GNU timeout is required to bound browser probes." >&2
-	exit 1
-fi
-probe_tmp=$(mktemp -d "${TMPDIR:-/tmp}/daydream-pre-push.XXXXXX") || exit 1
-export TMPDIR="$probe_tmp" TMP="$probe_tmp" TEMP="$probe_tmp"
-probe_deadline=$(( $(date +%s) + 1500 ))
-run_probe() {
-	left=$(( probe_deadline - $(date +%s) ))
-	limit=$(( left < 420 ? left : 420 ))
-	if [ "$limit" -le 0 ]; then
-		echo "pre-push: browser probe budget exhausted before $*." >&2
-		return 1
-	fi
-	timeout -k 10s "${limit}s" "$@"
-}
-run_probe node scripts/browser-smoke.mjs || exit 1
-run_probe node scripts/workbench-probe.mjs || exit 1
-run_probe node scripts/panel-probe.mjs || exit 1
-run_probe node scripts/solids-probe.mjs || exit 1
-run_probe node scripts/palettes-probe.mjs || exit 1
-run_probe node scripts/mobius-probe.mjs || exit 1
-run_probe node scripts/lissajous-probe.mjs || exit 1
+node --test tests/ci_workflow.test.js tests/deployment_pair.test.js tests/stage_site.test.js || exit 1

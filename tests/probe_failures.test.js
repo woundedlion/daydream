@@ -149,7 +149,7 @@ function browserEntryPoints(modules) {
     .map(([name]) => name);
 }
 
-test('every script that drives a browser is wired into both rosters', () => {
+test('every script that drives a browser is wired into the paired CI suite', () => {
   const driven = browserEntryPoints(scriptModules());
   assert.ok(driven.includes('browser-smoke.mjs'),
     'the page smoke reads as scaffolding rather than as a browser entry point');
@@ -157,12 +157,9 @@ test('every script that drives a browser is wired into both rosters', () => {
     `the browser entry points are ${driven.join(', ')}`);
   const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
   const workflow = read('../.github/workflows/browser-smoke.yml');
-  const prePush = read('../.githooks/pre-push');
   for (const file of driven) {
     assert.ok(workflow.includes(`scripts/${file}`),
       `${file} is missing from .github/workflows/browser-smoke.yml`);
-    assert.ok(prePush.includes(`node scripts/${file}`),
-      `${file} is missing from .githooks/pre-push`);
   }
 });
 

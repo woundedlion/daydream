@@ -8,16 +8,14 @@ const REQUIRED_PATHS = new Set(['README.md', 'holosphere_wasm.js', 'holosphere_w
   'pov_segment_map.json', 'shader/shader_workbench.mjs', 'shader/sha256.mjs',
   'shader/engine_catalog.json']);
 
-const ownedPath = (path) => REQUIRED_PATHS.has(path)
+export const ownedPath = (path) => REQUIRED_PATHS.has(path)
   || /^shader\/patterns\/[^/]+\.shader\.json$/.test(path)
   || path === 'shader/patterns/shaderball_migration.json'
   || /^docs\/screenshots\/.+\.png$/.test(path);
 
-export function installEngineBundle(bundle, destination) {
+export function verifyEngineBundle(bundle, destination = bundle) {
   bundle = resolve(bundle);
   destination = resolve(destination);
-  if (!existsSync(resolve(destination, 'daydream.js')))
-    throw new Error('Destination is not a Daydream checkout');
   const manifest = readFileSync(resolve(bundle, 'holosphere_engine.sha256'), 'utf8');
   const entries = manifest.trim().split(/\r?\n/).map((line) => {
     const match = /^([a-f0-9]{64})\s+\*?(?:\.\/)?(.+)$/.exec(line);
@@ -36,11 +34,21 @@ export function installEngineBundle(bundle, destination) {
   for (const required of REQUIRED_PATHS) {
     if (!paths.has(required)) throw new Error(`Engine bundle is missing ${required}`);
   }
-  const installedPin = readFileSync(resolve(destination, 'holosphere_wasm.sha'), 'utf8').trim();
   const bundlePin = readFileSync(resolve(bundle, 'holosphere_wasm.sha'), 'utf8').trim();
   if (!/^[a-f0-9]{40}$/.test(bundlePin)) throw new Error('Invalid engine bundle source pin');
   if (process.env.HOLOSPHERE_BUNDLE_PIN && bundlePin !== process.env.HOLOSPHERE_BUNDLE_PIN)
     throw new Error(`Engine bundle source pin differs from ${process.env.HOLOSPHERE_BUNDLE_PIN}`);
+  return { entries, bundlePin };
+}
+
+export function installEngineBundle(bundle, destination) {
+  bundle = resolve(bundle);
+  destination = resolve(destination);
+  if (!existsSync(resolve(destination, 'daydream.js')))
+    throw new Error('Destination is not a Daydream checkout');
+  const { entries, bundlePin } = verifyEngineBundle(bundle, destination);
+  const paths = new Set(entries);
+  const installedPin = readFileSync(resolve(destination, 'holosphere_wasm.sha'), 'utf8').trim();
   const stale = [];
   for (const directory of ['shader/patterns', 'docs/screenshots']) {
     const root = resolve(destination, directory);
