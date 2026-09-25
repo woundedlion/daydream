@@ -99,7 +99,7 @@ export function stereo(v) {
  * near-singular divisor still yields a finite point carrying the numerator's
  * azimuth rather than a fixed constant. Only an exactly zero numerator is the
  * indeterminate 0/0 form, which returns (0,0). A nonzero divisor whose square
- * underflows to zero is lifted by STEREO_UNDERFLOW_LIFT along with the
+ * is subnormal or zero is lifted by STEREO_UNDERFLOW_LIFT along with the
  * numerator rather than read as an exact pole.
  */
 export function projectDiv(num, den) {
@@ -108,7 +108,7 @@ export function projectDiv(num, den) {
   let numRe = num.re;
   let numIm = num.im;
   let denom = denRe * denRe + denIm * denIm;
-  if (denom === 0.0 && (denRe !== 0.0 || denIm !== 0.0)) {
+  if (denom < 2 ** -1022 && (denRe !== 0.0 || denIm !== 0.0)) {
     denRe *= STEREO_UNDERFLOW_LIFT;
     denIm *= STEREO_UNDERFLOW_LIFT;
     numRe *= STEREO_UNDERFLOW_LIFT;
