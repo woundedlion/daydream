@@ -145,9 +145,6 @@ body {
   display: flex;
 }
 
-/* .btn / .btn-primary / .btn-secondary now live in tools.css (shared).
-   The add-op grid packs 14 buttons into the sidebar, so it overrides the
-   shared padding with a tighter vertical profile. */
 #addOpGrid .btn {
   padding: 0.2rem 0.3rem;
 }
