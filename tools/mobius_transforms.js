@@ -46,9 +46,7 @@ export const glslComplexFunctions = `
       `;
 
 // --- Projection-domain conventions ----------------------------------------
-// Mirrored from the engine (core/math/stereographic.h). The engine owns these
-// constants and the point-at-infinity behavior built on them; the tool renders
-// what the engine will run, so a divergence here is a lying preview.
+// Projection conventions: core/math/mobius.h and core/math/3dmath.h.
 
 /** Conventional magnitude representing the point at infinity. */
 export const STEREO_INF = 1e4;
@@ -65,7 +63,7 @@ export const STEREO_AZIMUTH_EPS = 1e-12;
 
 /**
  * 2^96, the factor projectDiv scales a divisor pair by when squaring the
- * divisor underflowed to zero; exact in float, so the lifted quotient is the
+ * divisor is subnormal or zero; exact in float, so the lifted quotient is the
  * unlifted one.
  */
 export const STEREO_UNDERFLOW_LIFT = 79228162514264337593543950336.0;
@@ -157,7 +155,7 @@ export const glslProjectionFunctions = `
           float num_re = num.re;
           float num_im = num.im;
           float denom = den_re * den_re + den_im * den_im;
-          if (denom == 0.0 && (den_re != 0.0 || den_im != 0.0)) {
+          if (denom < 1.1754943508222875e-38 && (den_re != 0.0 || den_im != 0.0)) {
             den_re *= STEREO_UNDERFLOW_LIFT;
             den_im *= STEREO_UNDERFLOW_LIFT;
             num_re *= STEREO_UNDERFLOW_LIFT;

@@ -7,11 +7,6 @@
 import * as THREE from 'three';
 import { initScene, copyWithFeedback, showFatalError, bootstrapTool, formatKB } from './shared.js';
 import { standDownIfHalted } from './engine_halt.js';
-// The shared op table and dispatch, the pure C++ export-string codegen
-// (formatFloat/pctSuffix/recipe builders), the pure face-geometry helpers and
-// the op-chain queue/validator machinery live in solid_codegen.js, and the
-// registry-paste generator in solid_registry_codegen.js, so they can be unit
-// tested without a DOM or the WASM module. DOM/WASM wiring stays inline.
 import {
   OP_DEFS,
   SAVED_SOLIDS_MAX,
@@ -35,16 +30,9 @@ import {
   createChainValidator,
   createOpGate,
 } from './solid_codegen.js';
-// The MeshOps call sequences — base solid, op chain, classify, readback and
-// the arena flush that follows each — with the module, the vertex
-// constructor and the error line injected, so they are exercised against a
-// stand-in module rather than only in a browser.
 import { buildBaseMesh, buildChainMesh } from './solid_build.js';
 import { generateRegistryCpp, MAX_RECIPE_STEPS } from './solid_registry_codegen.js';
 import { buildOpRow, formatParamValue, syncSweepWarning } from './solid_op_rows.js';
-// Scene construction from the JS-side mesh copy, and the stats line it
-// reports; the three.js namespace, the scene and the materials below are
-// passed in, so the renderer is unit tested against a stand-in namespace.
 import { createMeshRenderer, meshStatsLine, meshCanvasLabel, MAX_INDEX_LABELS }
   from './solid_render.js';
 import {
@@ -59,10 +47,6 @@ let meshRenderer = null;
 let labelsContainer;
 let createHolosphereModule = null;
 
-// Render materials are configuration-only and identical across updates, so
-// build them once and reuse. update() rebuilds geometry every call (it
-// depends on the mesh) but must not churn — or leak — a fresh material per
-// recompute, which previously happened on every op-slider tick.
 const faceMaterial = new THREE.MeshPhongMaterial({
   color: 0x3b82f6,
   transparent: true,
@@ -102,7 +86,6 @@ const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
 let wasmModule = null;
 let meshOpsWasm = null;
 
-// --- STATE ---
 const state = {
   base: 'cube',
   ops: [], // Array of objects { op: string, params: object }
@@ -143,7 +126,6 @@ async function init() {
     ({ default: createHolosphereModule } = await import('../holosphere_wasm.js'));
     wasmModule = await createHolosphereModule();
     meshOpsWasm = wasmModule.MeshOps;
-    console.log('WASM Module Loaded');
 
     // Populate Registry from WASM
     const registry = meshOpsWasm.getRegistry();
@@ -443,12 +425,7 @@ async function generateThumbnails(signal) {
           update();
           renderBaseSolid();
           // Update active state
-          document.querySelectorAll('.thumb-btn').forEach(b => {
-            const selected = b === btn;
-            b.classList.toggle('active', selected);
-            b.setAttribute('aria-checked', selected ? 'true' : 'false');
-            b.tabIndex = selected ? 0 : -1;
-          });
+          highlightBaseSolid();
         });
       });
 
@@ -458,9 +435,7 @@ async function generateThumbnails(signal) {
       img.src = dataURL;
       baseThumbnails[key] = dataURL;
 
-      // init() now renders the base preview before this (deferred) loop has
-      // produced its thumbnail, so refresh it the moment its own thumb exists
-      // rather than leaving the preview blank until the next selection.
+      // Refresh the selected preview when its thumbnail becomes available.
       if (key === state.base) {
         document.getElementById('baseThumb').src = dataURL;
       }
@@ -533,7 +508,6 @@ function wireCanvasTap(canvasEl) {
   onPageTeardown(() => { tap.stop(); tap.remove(); });
 }
 
-// --- SAVED ITEMS ---
 const SAVED_SOLIDS_KEY = 'daydream.savedSolids.v1';
 const SAVED_THUMB_SIZE = 256;
 function loadSavedSolids() {
@@ -960,15 +934,19 @@ function applyRestore(item) {
   renderOps();
 
   // Highlight active base in footer
+  highlightBaseSolid();
+
+  update();
+  renderBaseSolid();
+}
+
+function highlightBaseSolid() {
   document.querySelectorAll('.thumb-btn').forEach(b => {
     const selected = b.dataset.solid === state.base;
     b.classList.toggle('active', selected);
     b.setAttribute('aria-checked', selected ? 'true' : 'false');
-            b.tabIndex = selected ? 0 : -1;
+    b.tabIndex = selected ? 0 : -1;
   });
-
-  update();
-  renderBaseSolid();
 }
 
 function renderBaseSolid() {
@@ -1031,8 +1009,6 @@ function getDragTargetIndex(e, list) {
   return dropSlotIndex(mouseY, [...list.children]);
 }
 
-// Travel that separates a reorder drag from a press on the grip, replacing
-// the threshold the browser used to apply before firing dragstart.
 const DRAG_SLOP_PX = 4;
 
 /**
@@ -1321,7 +1297,6 @@ function clearSavedSolids() {
   renderSavedList();
 }
 
-// --- CHAIN VALIDATION ---
 // Candidate chains are proven on a sacrificial module instance before the
 // live module runs them; see createChainValidator in solid_codegen.js.
 const validator = createChainValidator(() => createHolosphereModule());

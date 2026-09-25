@@ -238,3 +238,12 @@ test('an engine enum value is logged by its constant name', () => {
   assert.equal(enumConstantName(RESULTS, 9), 'unrecognized result',
     'a value the mirrored table lacks still names something in the log line');
 });
+
+
+test('document enum options normalize case, whitespace, and hyphens', async () => {
+  const { optionIndex } = await import('../param_sync.js');
+  const definition = { options: ['Solid Fill', 'Point Cloud'] };
+  assert.equal(optionIndex(definition, '  point-cloud  '), 1);
+  assert.equal(optionIndex(definition, 'SOLID   FILL'), 0);
+  assert.equal(optionIndex(definition, 'unknown'), -1);
+});

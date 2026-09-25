@@ -4,20 +4,10 @@
  *
  * Page module for tools/palettes.html.
  */
-// Shared primitives, imported rather than re-implemented inline: the
-// clipboard copy (tools/clipboard.js) and the sRGB/linear-RGB transfer
-// functions (tools/color.js, which mirrors core/color/color_space.h's).
 import { copyToClipboard, wireCopyBlock } from './clipboard.js';
-// Labelled range slider + readout, shared with the other tool pages.
 import { createSlider, createSliderProxy } from './slider.js';
-// Fatal-error banner and load bootstrap from the THREE-free banner module
-// (not shared.js, which pulls in three.js — a dependency this tool
-// otherwise doesn't have).
 import { showFatalError, bootstrapTool } from './banner.js';
 import { linearRgbToHex } from './color.js';
-// Pure palette math (ProceduralPalette/GenerativePalette + helpers and the
-// C++ export-string generators) lives in palette_math.js so it can be unit
-// tested without a DOM. DOM-coupled wiring stays inline below.
 import {
   ProceduralPalette, GenerativePalette,
   proceduralPaletteCpp, proceduralParamsForViewport,
@@ -25,8 +15,6 @@ import {
   NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
   paletteGradientCss, prettyPaletteName, paletteAdjustmentSummary,
 } from './palette_math.js';
-// DOM-free interaction and recipe state live in palette_controls.js; the
-// DOM reads and writes around them stay inline.
 import {
   createPaletteViewport, axisFromEndpoints,
   axisControlState, PALETTE_AXIS_CONTROLS,
@@ -42,12 +30,7 @@ import {
   hueKeyState, customHueKeyState, moveCustomHueKey,
   loopSweepTurns, paletteEnumOrdinal,
 } from './palette_controls.js';
-// The two canvas painters take their canvas, context and palette as
-// arguments, so they live in their own module and are unit tested against a
-// context double; the pointer and keyboard wiring around them stays inline.
 import { createColorStripPainter, drawWaveGraph } from './palette_canvas.js';
-// The hue-key wheel's raster, marker geometry and pointer arithmetic, on the
-// same terms.
 import {
   createHueKeyWheelPainter, canvasPoint, wheelTurnAt,
   hueKeyNudgeTurns, hueKeyHandoff, HUE_KEY_NAMES, HUE_KEY_GRAB_RADIUS,
@@ -57,7 +40,6 @@ import { wireFlyout } from './flyout.js';
 import { createFrameScheduler, onPageTeardown } from './page_lifecycle.js';
 import { createPointerDrag, innerRect } from './pointer_drag.js';
 
-// --- Tab Switcher Logic ---
 let activeTab = 'procedural';
 
 function switchTab(tabName, updateUrl = true) {
@@ -87,7 +69,6 @@ function switchTab(tabName, updateUrl = true) {
   updatePalette();
 }
 
-// --- State and UI Elements ---
 
 const defaultParams = {
   A_R: 0.500, A_G: 0.500, A_B: 0.500, // Base (0.0 to 1.0)
@@ -606,7 +587,6 @@ const sliderDefinitions = [
   { param: 'D_B', container: 'D_B_container', label: 'B', color: 'blue-300', thumb: '', min: -1, max: 2, step: 0.001, scale: 1000, group: 'D' }
 ];
 
-// --- UI and Event Functions ---
 
 /**
  * Creates the HTML structure for a single parameter slider.

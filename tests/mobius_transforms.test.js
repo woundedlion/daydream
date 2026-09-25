@@ -183,7 +183,7 @@ test('GLSL complex ops match the JS implementations', () => {
 });
 
 // --- projection-domain conventions ----------------------------------------
-// These mirror core/math/stereographic.h (STEREO_INF, stereo, project_div). The
+// These mirror core/math/mobius.h and core/math/3dmath.h (STEREO_INF, stereo, project_div). The
 // engine owns them; the shader renders what the engine will run, so a
 // divergence would make the preview lie about the pole cap and about a
 // near-singular divisor.
@@ -199,7 +199,7 @@ test('glslProjectionFunctions constants match the JS exports', () => {
 
 /**
  * Absolute pin on the projection constants mirrored from
- * core/math/stereographic.h. The executed Möbius parity sweep stays outside
+ * core/math/mobius.h and core/math/3dmath.h. The executed Möbius parity sweep stays outside
  * the pole cap, where the fused engine transform intentionally differs.
  */
 test('projection constants hold their engine values (absolute pin)', () => {

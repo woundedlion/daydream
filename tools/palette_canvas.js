@@ -108,11 +108,7 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
       const phase = view.start + position * (view.end - view.start);
       const [r, g, b] = palette.get(phase);
 
-      // Plain 8-bit round, no dither: the strip mirrors the device's own
-      // 16->8 truncation (the LED output applies no dithering), so the
-      // preview stays faithful to what the hardware actually shows rather
-      // than a smoother fiction. If output dithering is ever added to the
-      // engine, mirror it here.
+      // Encode the preview as rounded 8-bit sRGB without dithering.
       const rInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, r))) * 255);
       const gInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, g))) * 255);
       const bInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, b))) * 255);
