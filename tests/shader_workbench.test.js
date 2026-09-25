@@ -1967,3 +1967,28 @@ test('catalog skew refuses initialization before any chain is applied', async ()
     MODULE.HolosphereEngine.getShaderChainCatalog = original;
   }
 });
+
+test('source and file switches preserve edits when discard is refused', async () => {
+  const harness = await editorWorkbench();
+  let confirmations = 0;
+  harness.win.confirm = () => { confirmations += 1; return false; };
+  stageEditor(harness, 'sample')('sample.pattern-freq', 3.5);
+  await harness.controller.flushDeepLink();
+  const hash = harness.win.location.hash;
+  const source = harness.elements.get('shader-document-select');
+  const before = source.value;
+  source.value = '';
+  await onChange(source)();
+  assert.equal(source.value, before);
+  assert.equal(harness.win.location.hash, hash);
+  const file = harness.elements.get('shader-document-file');
+  file.files = [{ size: 100, name: 'new.shader.json', text: () => {
+    throw new Error('refused file must not be read');
+  } }];
+  await onChange(file)();
+  assert.equal(confirmations, 2);
+  assert.equal(harness.win.location.hash, hash);
+  harness.controller.save();
+  await onChange(source)();
+  assert.equal(confirmations, 2, 'saving clears the dirty marker');
+});
