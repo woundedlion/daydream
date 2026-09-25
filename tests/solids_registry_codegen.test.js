@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { D2R_F32 } from '../tools/solid_codegen.js';
+import { D2R_F32 } from '../src/workbench/solids/solid_codegen.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -164,7 +164,7 @@ test('DEFINED_SEED_CONSTANTS splits SIMPLE_SEEDS into the two paste cases', () =
 test('generateRegistryCpp reuses constants on the tool roster', () => {
   for (const seed of DEFINED_SEED_CONSTANTS) {
     const code = generateRegistryCpp({ base: seed, ops: ['ambo'] });
-    assert.match(code, new RegExp(`\\n {4}make_recipe\\(SEED_${upperSnake(seed)},\\s`),
+    assert.match(code, new RegExp(`make_recipe\\(\\s*SEED_${upperSnake(seed)},\\s`),
       `the Recipe for "${seed}" must seed on its own constant`);
     assert.doesNotMatch(code, /inline constexpr uint8_t SEED_/,
       `the tool roster marks SEED_${upperSnake(seed)} reusable`);
@@ -188,7 +188,7 @@ test('generateRegistryCpp defines constants absent from the tool roster', () => 
     for (const line of block.split('\n')) {
       assert.ok(line.length <= 80, `"${line}" is ${line.length} columns`);
     }
-    assert.match(code, new RegExp(`\\n {4}make_recipe\\(${constName},\\s`),
+    assert.match(code, new RegExp(`make_recipe\\(\\s*${constName},\\s`),
       `the Recipe for "${seed}" must seed on the defined constant`);
   }
 });
@@ -454,4 +454,15 @@ test('registry exports refuse meshes beyond the effect face budget', () => {
   const item = { base: 'truncatedIcosidodecahedron', ops: ['kis', 'kis', 'kis'], fCount: 2160 };
   assert.throws(() => generateRegistryCpp(item), /2160 faces.*1152/);
   assert.doesNotThrow(() => generateRegistryCpp({ ...item, fCount: 1152 }));
+});
+
+test('registry arguments wrap after the function when that saves a line', () => {
+  assert.equal(generateRegistryCpp({ base: 'truncatedTetrahedron', ops: ['kis', 'gyro'] }),
+    readFileSync(new URL('./fixtures/registry-4.cpp', import.meta.url), 'utf8').trimEnd());
+});
+
+test('long registry arguments move below a wrapped function call', () => {
+  const ops = Array.from({ length: 3 }, () => ({ op: 'truncate', params: { t: 0.33 } }));
+  assert.equal(generateRegistryCpp({ base: 'truncatedCuboctahedron', ops }),
+    readFileSync(new URL('./fixtures/registry-5.cpp', import.meta.url), 'utf8').trimEnd());
 });
