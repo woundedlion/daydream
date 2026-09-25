@@ -142,6 +142,7 @@ export function addParamControl(
   }
   controller.isBoolean = (kind === 'boolean');
   controller.isEnum = (kind === 'enum');
+  controller.enumOptions = p.options;
   controller.isContinuous = (kind === 'number' || kind === 'integer');
   if (p.warning) {
     // A visible node beside the control: a title attribute would put the text
@@ -455,7 +456,7 @@ export function createEffectGui({ engine, segments, config, host }) {
     // the panel's one per-frame allocation. Only an engine-driven selector moves
     // its requested value on its own; every other source of one — a control, a
     // preset, a rebuild — re-seats the selectors itself.
-    if (advanced && activeEffect.hasEnumControls
+    if (!segmentsOwnDisplay() && advanced && activeEffect.hasEnumControls
         && (activeEffect.hasAnimatedEnums || presetAdvanced)) {
       adoptRequestedEnums(activeEffect, focused);
     }
@@ -480,13 +481,16 @@ export function createEffectGui({ engine, segments, config, host }) {
     for (let i = 0; i < n; i++) {
       const c = activeEffect.controllerByName.get(names[i]);
       if (!c) continue;
-      if (c.isEnum) continue;
+      if (c.isEnum && !segmentsOwnDisplay()) continue;
+      const liveValue = c.isEnum
+        ? selectorControlValue({ value: values[i], options: c.enumOptions })
+        : values[i];
 
       const isEditing = c.dragging
         || (focused !== null && c.domElement?.contains(focused) === true);
 
       const { update, value } = resolveParamSync(
-        c.getValue(), values[i], c.isBoolean, isEditing);
+        c.getValue(), liveValue, c.isBoolean, isEditing);
       if (!update) continue;
       c.object[c.property] = value;
       c.updateDisplay();
