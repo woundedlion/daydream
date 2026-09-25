@@ -17,7 +17,7 @@ const ROOT = new URL('../', import.meta.url);
 // Emscripten glue: an install output copied from Holosphere, checked by its
 // build there, and far too large to type-check usefully here. It has a
 // hand-written `.d.ts` sibling on the roster, which is what resolves the import.
-const NOT_CHECKED = new Set(['holosphere_wasm.js']);
+const NOT_CHECKED = new Set(['holosphere_wasm.js', 'shader/shader_workbench.mjs']);
 
 // Never entered: dependency and git metadata, the linked worktrees, the vendored
 // third-party drops, the engine checkout the parity cases read, and tests/,
@@ -138,7 +138,8 @@ test('the typecheck checks nullability and implicit any', () => {
 test('every not-checked module has a declaration file on the roster', () => {
   const roster = readTsconfig().files;
   for (const file of NOT_CHECKED) {
-    const declaration = file.replace(/\.m?js$/, '.d.ts');
+    const declaration = file.endsWith('.mjs')
+      ? file.replace(/\.mjs$/, '.d.mts') : file.replace(/\.js$/, '.d.ts');
     assert.ok(roster.includes(declaration),
       `${file} is exempt from the typecheck but a rostered module imports it; `
       + `without ${declaration} on tsconfig.json "files" the import is an `

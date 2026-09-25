@@ -9,7 +9,7 @@ import { errorDetail } from './banner.js';
 import { applyChainDocument } from './chain_apply.js';
 import { createChainDocumentStore, scratchChainDocument } from './chain_document_store.js';
 import { createChainStrip } from './chain_strip.js';
-import { titleCase } from './labels.js';
+import { engineControlNames } from '../shader/shader_workbench.mjs';
 import { copyToClipboard } from './copy_text.js';
 import { downloadBlob } from './download_file.js';
 import {
@@ -78,51 +78,12 @@ const fieldSegment = (parameterId) =>
 /** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[]}} ParameterDefinition */
 /** @typedef {{document: *, descriptor_digest?: string, diagnostics?: *, status?: string}} CompiledDocument */
 
-/**
- * Maps a document parameter identity (`<label>.<field>`) to the control
- * name a pre-spec promoted effect registered. Newly promoted effects register
- * label-derived names, so this alias table only serves the effects promoted
- * before the chain schema and shrinks as they are re-registered.
- * @param {string} parameterId
- */
+/** @param {string} parameterId @returns {string} The primary engine control name. */
 export function engineParameterName(parameterId) {
-  const dot = parameterId.indexOf('.');
-  if (dot < 0) return titleCase(parameterId);
-  const label = parameterId.slice(0, dot);
-  const field = parameterId.slice(dot + 1);
-  if (label === 'warp1') return `Planar Warp 1 ${titleCase(field)}`;
-  if (label === 'warp2') return `Planar Warp 2 ${titleCase(field)}`;
-  if (label === 'surface') return `Surface Noise ${titleCase(field)}`;
-  if (label === 'camera') return `Camera ${titleCase(field)}`;
-  if (label === 'sample' && field === 'angle-speed') return 'Source Angle Speed';
-  if (label === 'colorize' && field === 'value-opacity-low')
-    return 'Opacity at Value 0';
-  if (label === 'colorize' && field === 'value-opacity-high')
-    return 'Opacity at Value 1';
-  return titleCase(field);
+  return engineControlNames(parameterId)[0];
 }
 
-/** @param {string} parameterId @returns {string[]} Candidates, most specific first. */
-export function engineParameterNames(parameterId) {
-  const primary = engineParameterName(parameterId);
-  const dot = parameterId.indexOf('.');
-  if (dot < 0) return [primary];
-  const label = parameterId.slice(0, dot);
-  const field = parameterId.slice(dot + 1);
-  if (label === 'warp1' || label === 'warp2') {
-    const suffix = titleCase(field);
-    if (['Rotation Rate', 'Translation X', 'Translation Y', 'Scale X', 'Scale Y', 'Shear']
-        .includes(suffix)) return [primary, `Affine ${suffix}`];
-    if (['Radial Scale', 'Radial Phase', 'Angular Phase'].includes(suffix))
-      return [primary, `Polar ${suffix}`];
-    if (['Rotation', 'Cell X', 'Cell Y', 'Offset X', 'Offset Y'].includes(suffix))
-      return [primary, `Mirror ${suffix}`];
-    if (['Strength', 'Frequency', 'Field Angle', 'Scale', 'Vector Angle'].includes(suffix))
-      return [primary, `Warp ${suffix}`];
-    return [primary, suffix];
-  }
-  return [primary];
-}
+export { engineControlNames as engineParameterNames };
 
 /**
  * A document enum8 value's comparison key. A document spells an option in the
@@ -209,7 +170,7 @@ function applyDocumentValues(engine, module, compiled, presetId, baked, derived)
     if (derived.has(parameterId)) continue;
     if (BAKED_CONSTANT_IDS.has(parameterId)) continue;
     if (baked.has(fieldSegment(parameterId))) continue;
-    const name = engineParameterNames(parameterId)
+    const name = engineControlNames(parameterId)
       .find((candidate) => definitions.some(
         (/** @type {ParameterDefinition} */ definition) => definition.name === candidate));
     if (!name) return `no engine parameter matches "${parameterId}"`;
@@ -535,7 +496,7 @@ export function createShaderDocumentController({
     }
     if (BAKED_CONSTANT_IDS.has(parameterId)) return null;
     if (bakedFields.has(fieldSegment(parameterId))) return null;
-    return engineParameterNames(parameterId).find((candidate) =>
+    return engineControlNames(parameterId).find((candidate) =>
       definitions.some((definition) => definition.name === candidate)) ?? null;
   };
 
