@@ -1214,8 +1214,7 @@ test('a rejected full-config snapshot is reported and announces no import', () =
 });
 
 test('a stored snapshot that is not a config object never reaches the engine', () => {
-  // The key is a URL fragment a user can hand-edit, so every shape JSON admits
-  // has to stop here rather than at an embind argument conversion.
+  // JS rejects non-object URL values; the engine restore validates object members.
   for (const text of ['{not json', 'null', '[]', '"snapshot"', '7']) {
     const h = makeHarness({
       params: shaderBallParams(),
