@@ -37,7 +37,13 @@ export function stageSite(root, bundle, destination, pair) {
   if (head !== pair.daydream || readFileSync(resolve(root, 'generated/holosphere_wasm.sha'), 'utf8').trim() !== pair.holosphere)
     throw new Error('Deployment pair differs from the selected sources');
   destination = resolve(destination);
-  const committed = (path) => execFileSync('git', ['-C', root, 'show', `HEAD:${path}`]);
+  const committed = (path) => {
+    try {
+      return execFileSync('git', ['-C', root, 'show', `HEAD:${path}`], { stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (cause) {
+      throw new Error(`Site entry is not committed: ${path}`, { cause });
+    }
+  };
   if (!readFileSync(resolve(root, 'site_manifest.txt')).equals(committed('site_manifest.txt')))
     throw new Error('Site manifest differs from the selected daydream commit');
   const paths = sitePaths(root, bundle);
