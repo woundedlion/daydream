@@ -6,6 +6,7 @@
  *   node scripts/generate-importmap.mjs --local    # local where vendored, else CDN
  *   node scripts/generate-importmap.mjs --out F    # write to F instead of vendor-importmap.js
  *   node scripts/generate-importmap.mjs --vendor-root D  # probe D for the vendored dirs
+ *   node scripts/generate-importmap.mjs --root D   # read package and tracked imports from D
  *
  * `--local` checks the filesystem for the vendored library entry points and
  * sets each library to 'local' only when present, so a partial vendoring

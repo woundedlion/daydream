@@ -653,7 +653,7 @@ files define line-ending policy and working-artifact exclusions.
 │   ├── generate-importmap.mjs  Bakes the local-vs-CDN decision into vendor-importmap.js
 │   ├── vendor-imports.mjs      Parses module imports for the vendor integrity inventory
 │   ├── extract-engine-bundle.py  Validates archive paths before extracting the engine bundle
-│   ├── generate-shader-v2-documents.mjs  Regenerates the v2 pattern documents and digest-migration table from the v1 fixtures
+│   ├── generate-digest-migration.mjs  Regenerates the digest-to-filename migration table from the v1 fixtures
 │   ├── record-module-loads.mjs NODE_OPTIONS shim recording loaded test modules
 │   ├── require-tests.mjs       `pretest` guard against empty globs, unreachable tests, and shadow installs
 │   ├── serve-manifest.mjs      Local static server constrained to the published site manifest

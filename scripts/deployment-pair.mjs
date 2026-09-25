@@ -77,7 +77,8 @@ export async function run(command, env, api) {
     const previous = await latestSuccessfulPair(api, repo);
     const attempted = env.GITHUB_EVENT_NAME === 'schedule' && await pairWasAttempted(api, repo, pair);
     writeFileSync(pairFile, JSON.stringify(pair, null, 2) + '\n');
-    output({ ...pair, deploy: env.GITHUB_SHA === pair.daydream && !samePair(pair, previous) && !attempted });
+    const forced = env.GITHUB_EVENT_NAME === 'workflow_dispatch' && env.FORCE_DEPLOY === 'true';
+    output({ ...pair, deploy: env.GITHUB_SHA === pair.daydream && (forced || (!samePair(pair, previous) && !attempted)) });
   } else if (command === 'check') {
     const pair = validatePair(JSON.parse(readFileSync(pairFile, 'utf8')));
     output({ current: samePair(pair, await snapshotPair(api, repo)) });

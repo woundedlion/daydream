@@ -4,6 +4,11 @@ on:
   push:
     branches: [master]
   workflow_dispatch:
+    inputs:
+      force:
+        description: Republish an unchanged pair
+        type: boolean
+        default: false
   repository_dispatch:
     types: [holosphere-engine-ready]
   schedule:
@@ -38,6 +43,7 @@ jobs:
       - id: pair
         env:
           GH_TOKEN: ${{ github.token }}
+          FORCE_DEPLOY: ${{ inputs.force }}
         run: node scripts/deployment-pair.mjs resolve
       - name: Record deployment attempt
         if: steps.pair.outputs.deploy == 'true'
