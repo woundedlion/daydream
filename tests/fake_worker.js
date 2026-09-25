@@ -28,6 +28,7 @@ export class FakeWorker {
     this.sent = [];
     this.transfers = [];
     this.terminated = false;
+    this.postsAfterTermination = [];
     this.onmessage = null;
     this.onerror = null;
     this.onmessageerror = null;
@@ -35,7 +36,10 @@ export class FakeWorker {
   }
 
   postMessage(msg, transfer) {
-    if (this.terminated) return;
+    if (this.terminated) {
+      this.postsAfterTermination.push(msg);
+      return;
+    }
     if (msg.type === 'init' && this.index === FakeWorker.failInitialPostAt)
       throw new DOMException('message rejected', 'DataCloneError');
     if (msg.type === FakeWorker.failPostType && this.index === FakeWorker.failPostAt)
