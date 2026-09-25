@@ -176,7 +176,7 @@ test('endomorphisms carry controls; sockets carry only valid selectors', async (
   ]) {
     const functionLabel = chipByLabel(h, label)
       .querySelector('.chain-chip-function-label');
-    assert.equal(functionLabel.textContent, text);
+    assert.equal(functionLabel.childNodes[0].textContent, text);
     assert.equal(functionLabel.querySelector('.chain-chip-replace')
       .getAttribute('aria-label'), accessibleName);
   }
@@ -198,7 +198,7 @@ test('a socket names the function by the carrier its crossing produces', async (
 
   const sockets = h.container.querySelectorAll('.chain-chip--socket');
   const names = sockets.map((chip) => chip.querySelector('.chain-chip-function-label')
-    .textContent);
+    .childNodes[0].textContent);
   assert.deepEqual(names, ['Source: ', 'Color: ']);
   assert.deepEqual(
     sockets.map((chip) => chip.querySelector('.chain-chip-replace')
