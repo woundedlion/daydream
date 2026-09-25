@@ -261,7 +261,7 @@ test('the shared app GUI rejects unsupported properties like DeepLinkGUI', () =>
   const gui = fakeGui('test');
   for (const object of [{}, { value: null }, { value: undefined }, { value: {} }]) {
     assert.throws(() => gui.add(object, 'value'), TypeError);
-    assert.equal(gui.addSession(object, 'value'), undefined);
+    assert.throws(() => gui.addSession(object, 'value'), /DeepLinkGUI: unsupported property/);
   }
   assert.ok(gui.add({}, 'value', ['a', 'b']));
   assert.equal(gui.controllers.length, 1);

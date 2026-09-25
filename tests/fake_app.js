@@ -109,7 +109,7 @@ export function fakeGui(namespace, optionsReplaces = false) {
     },
     // Session controls carry no deep link, so the two are told apart here.
     addSession(target, property, ...args) {
-      if (!supportedProperty(target, property, args[0])) return undefined;
+      if (!supportedProperty(target, property, args[0])) throw new TypeError(`DeepLinkGUI: unsupported property "${property}"`);
       const c = fakeController(gui, target, property, args, optionsReplaces);
       c.session = true;
       gui.controllers.push(c);
