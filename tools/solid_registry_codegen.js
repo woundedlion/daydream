@@ -222,11 +222,17 @@ function definitionHeadCpp(type, declarator, breakAfterBrace = false) {
   };
 }
 
-/** @param {string} seed @param {string} steps @param {number} indent */
-function recipeBodyCpp(seed, steps, indent) {
-  const argumentsText = `${seed}, ${steps});`;
-  return indent + argumentsText.length <= COLUMN_LIMIT
-    ? argumentsText : `${seed},\n${' '.repeat(indent)}${steps});`;
+/** @param {string} name @param {string} seed @param {string} steps */
+function recipeDefinitionCpp(name, seed, steps) {
+  const declaration = `inline constexpr Recipe ${name} =`;
+  const call = `make_recipe(${seed}, ${steps});`;
+  if (`${declaration} ${call}`.length <= COLUMN_LIMIT) return `${declaration} ${call}`;
+  const splitDeclaration = declaration.length > COLUMN_LIMIT;
+  const head = splitDeclaration ? `inline constexpr Recipe\n    ${name} =` : declaration;
+  const indent = splitDeclaration ? 8 : 4;
+  const pad = ' '.repeat(indent);
+  if (indent + call.length <= COLUMN_LIMIT) return `${head}\n${pad}${call}`;
+  return `${head}\n${pad}make_recipe(${seed},\n${' '.repeat(indent + 12)}${steps});`;
 }
 
 /**
@@ -255,10 +261,13 @@ function seedAssertCpp(constName, seedName) {
  */
 function seedConstantCpp(seedName) {
   const constName = `SEED_${upperSnake(seedName)}`;
+  const declaration = `inline constexpr uint8_t ${constName} =`;
+  const value = `static_cast<uint8_t>(BaseMesh::${upperSnake(seedName)});`;
+  const definition = declaration.length + 1 + value.length <= COLUMN_LIMIT
+    ? `${declaration} ${value}` : `${declaration}\n    ${value}`;
   return `// solids.h defines no ${constName}. Paste the constant and its\n`
     + '// static_assert beside the other SEED_* constants.\n'
-    + `inline constexpr uint8_t ${constName} =\n`
-    + `    static_cast<uint8_t>(BaseMesh::${upperSnake(seedName)});\n`
+    + `${definition}\n`
     + `${seedAssertCpp(constName, seedName)}\n\n`;
 }
 
@@ -335,16 +344,11 @@ export function generateRegistryCpp(item, baseRecipe = null) {
   // without it a table short enough to fit gets packed onto fewer lines and the
   // paste no longer matches the formatted header.
   const table = definitionHeadCpp('OpStep', `${stepsName}[]`, true);
-  const recipe = definitionHeadCpp('Recipe', recipeName);
-  recipe.prefix = recipe.prefix.replace('{', 'make_recipe(');
-  if (recipe.prefix.split('\n').some((line) => line.length > COLUMN_LIMIT))
-    recipe.prefix = recipe.prefix.replace(' = make_recipe(', ' =\n    make_recipe(');
   return seedConstant
     + `${docCommentCpp(`Step table for ${funcName}.`)}\n`
     + `${table.prefix}${stepList.join(`,\n${' '.repeat(table.indent)}`)},\n};\n`
     + `${docCommentCpp(`Recipe mirror of IslamicStarPatterns::${funcName}.`)}\n`
-    + `${recipe.prefix}`
-    + `${recipeBodyCpp(`SEED_${upperSnake(seedName)}`, stepsName, recipe.indent)}\n\n`
+    + `${recipeDefinitionCpp(recipeName, `SEED_${upperSnake(seedName)}`, stepsName)}\n\n`
     + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
     + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
     + '// fail; the README registry table counts the entry too.\n'

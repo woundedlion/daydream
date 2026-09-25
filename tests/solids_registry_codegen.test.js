@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -88,33 +89,14 @@ function chainStep(op, param = 0, twist = 0) {
 test('generateRegistryCpp emits a Recipe mirror for a hankin-free chain too', () => {
   const item = { base: 'cube', ops: [{ op: 'truncate', params: { t: 0.33 } }] };
   assert.equal(generateRegistryCpp(item),
-    '// solids.h defines no SEED_CUBE. Paste the constant and its\n'
-    + '// static_assert beside the other SEED_* constants.\n'
-    + 'inline constexpr uint8_t SEED_CUBE =\n'
-    + '    static_cast<uint8_t>(BaseMesh::CUBE);\n'
-    + 'static_assert(std::string_view(simple_registry[SEED_CUBE].name) == "cube");\n'
-    + '\n'
-    + '/** Step table for cube_truncate33. */\n'
-    + 'inline constexpr OpStep CUBE_TRUNCATE33_STEPS[] = {\n'
-    + '    {Op::TRUNCATE, 0.33f},\n'
-    + '};\n'
-    + '/** Recipe mirror of IslamicStarPatterns::cube_truncate33. */\n'
-    + 'inline constexpr Recipe CUBE_TRUNCATE33_RECIPE = make_recipe(\n'
-    + '    SEED_CUBE, CUBE_TRUNCATE33_STEPS);\n'
-    + '\n'
-    + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
-    + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
-    + '// fail; the README registry table counts the entry too.\n'
-    + '    {"cube_truncate33", IslamicStarPatterns::cube_truncate33, '
-    + 'Category::Complex,\n'
-    + '     &CUBE_TRUNCATE33_RECIPE},');
+    readFileSync(new URL('./fixtures/registry-0.cpp', import.meta.url), 'utf8').trimEnd());
 });
 
 // A short seed and step-table name leave all three Recipe elements inside the
 // 80-column limit, which is the shape clang-format packs them into.
 test('generateRegistryCpp packs a short Recipe body onto one continuation line', () => {
   const code = generateRegistryCpp({ base: 'cube', ops: ['kis'] });
-  assert.match(code, /\n {4}SEED_CUBE, CUBE_KIS_STEPS\);\n/);
+  assert.match(code, /\n {4}make_recipe\(SEED_CUBE, CUBE_KIS_STEPS\);\n/);
   for (const line of code.split('\n')) {
     assert.ok(line.length <= 80, `"${line}" is ${line.length} columns`);
   }
@@ -185,7 +167,7 @@ test('DEFINED_SEED_CONSTANTS splits SIMPLE_SEEDS into the two paste cases', () =
 test('generateRegistryCpp reuses constants on the tool roster', () => {
   for (const seed of DEFINED_SEED_CONSTANTS) {
     const code = generateRegistryCpp({ base: seed, ops: ['ambo'] });
-    assert.match(code, new RegExp(`\\n {4}SEED_${upperSnake(seed)}, `),
+    assert.match(code, new RegExp(`\\n {4}make_recipe\\(SEED_${upperSnake(seed)},\\s`),
       `the Recipe for "${seed}" must seed on its own constant`);
     assert.doesNotMatch(code, /inline constexpr uint8_t SEED_/,
       `the tool roster marks SEED_${upperSnake(seed)} reusable`);
@@ -209,7 +191,7 @@ test('generateRegistryCpp defines constants absent from the tool roster', () => 
     for (const line of block.split('\n')) {
       assert.ok(line.length <= 80, `"${line}" is ${line.length} columns`);
     }
-    assert.match(code, new RegExp(`\\n {4}${constName}, `),
+    assert.match(code, new RegExp(`\\n {4}make_recipe\\(${constName},\\s`),
       `the Recipe for "${seed}" must seed on the defined constant`);
   }
 });
@@ -230,20 +212,7 @@ test('generateRegistryCpp emits a step table and Recipe mirror for a hankin chai
     ops: [{ op: 'hankin', params: { angle: 62 } }, 'ambo'],
   };
   assert.equal(generateRegistryCpp(item),
-    '/** Step table for dodecahedron_hk62_ambo. */\n'
-    + 'inline constexpr OpStep DODECAHEDRON_HK62_AMBO_STEPS[] = {\n'
-    + '    {Op::HANKIN, 62.0f * IslamicStarPatterns::D2R},\n'
-    + '    {Op::AMBO},\n'
-    + '};\n'
-    + '/** Recipe mirror of IslamicStarPatterns::dodecahedron_hk62_ambo. */\n'
-    + 'inline constexpr Recipe DODECAHEDRON_HK62_AMBO_RECIPE = make_recipe(\n'
-    + '    SEED_DODECAHEDRON, DODECAHEDRON_HK62_AMBO_STEPS);\n'
-    + '\n'
-    + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
-    + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
-    + '// fail; the README registry table counts the entry too.\n'
-    + '    {"dodecahedron_hk62_ambo", IslamicStarPatterns::dodecahedron_hk62_ambo,\n'
-    + '     Category::Complex, &DODECAHEDRON_HK62_AMBO_RECIPE},');
+    readFileSync(new URL('./fixtures/registry-1.cpp', import.meta.url), 'utf8').trimEnd());
 });
 
 test('generateRegistryCpp wraps a long paste in the tool format', () => {
@@ -257,33 +226,7 @@ test('generateRegistryCpp wraps a long paste in the tool format', () => {
     ],
   };
   assert.equal(generateRegistryCpp(item),
-    '/** Step table for truncatedIcosahedron_ambo_relax100_truncate01_hk59. */\n'
-    // A declarator past the limit moves below its type, taking the step list
-    // one indent level with it.
-    + 'inline constexpr OpStep\n'
-    + '    TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_STEPS[] = {\n'
-    + '        {Op::AMBO},\n'
-    + '        {Op::RELAX, 100.0f},\n'
-    + '        {Op::TRUNCATE, 0.01f},\n'
-    + '        {Op::HANKIN, 59.0f * IslamicStarPatterns::D2R},\n'
-    + '};\n'
-    // A doc comment past the limit becomes a filled block comment.
-    + '/**\n'
-    + ' * Recipe mirror of\n'
-    + ' * IslamicStarPatterns::truncatedIcosahedron_ambo_relax100_truncate01_hk59.\n'
-    + ' */\n'
-    + 'inline constexpr Recipe\n'
-    + '    TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_RECIPE = make_recipe(\n'
-    + '        SEED_TRUNCATED_ICOSAHEDRON,\n'
-    + '        TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_STEPS);\n'
-    + '\n'
-    + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
-    + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
-    + '// fail; the README registry table counts the entry too.\n'
-    + '    {"truncatedIcosahedron_ambo_relax100_truncate01_hk59",\n'
-    + '     IslamicStarPatterns::truncatedIcosahedron_ambo_relax100_truncate01_hk59,\n'
-    + '     Category::Complex,\n'
-    + '     &TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_RECIPE},');
+    readFileSync(new URL('./fixtures/registry-2.cpp', import.meta.url), 'utf8').trimEnd());
 });
 
 test('no paste line exceeds the column limit solids.h is formatted at', () => {
@@ -358,22 +301,7 @@ test('generateRegistryCpp flattens a star-pattern base onto its own seed', () =>
   const item = { base: 'icosahedron_kis_gyro', ops: [{ op: 'hankin', params: { angle: 54 } }] };
   const baseRecipe = { seed: 'icosahedron', ops: [chainStep('kis'), chainStep('gyro')] };
   assert.equal(generateRegistryCpp(item, baseRecipe),
-    '/** Step table for icosahedron_kis_gyro_hk54. */\n'
-    + 'inline constexpr OpStep ICOSAHEDRON_KIS_GYRO_HK54_STEPS[] = {\n'
-    + '    {Op::KIS},\n'
-    + '    {Op::GYRO},\n'
-    + '    {Op::HANKIN, 54.0f * IslamicStarPatterns::D2R},\n'
-    + '};\n'
-    + '/** Recipe mirror of IslamicStarPatterns::icosahedron_kis_gyro_hk54. */\n'
-    + 'inline constexpr Recipe ICOSAHEDRON_KIS_GYRO_HK54_RECIPE = make_recipe(\n'
-    + '    SEED_ICOSAHEDRON, ICOSAHEDRON_KIS_GYRO_HK54_STEPS);\n'
-    + '\n'
-    + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
-    + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
-    + '// fail; the README registry table counts the entry too.\n'
-    + '    {"icosahedron_kis_gyro_hk54",\n'
-    + '     IslamicStarPatterns::icosahedron_kis_gyro_hk54, Category::Complex,\n'
-    + '     &ICOSAHEDRON_KIS_GYRO_HK54_RECIPE},');
+    readFileSync(new URL('./fixtures/registry-3.cpp', import.meta.url), 'utf8').trimEnd());
 });
 
 test('generateRegistryCpp never names a star pattern as the Recipe seed', () => {
@@ -387,7 +315,7 @@ test('generateRegistryCpp never names a star pattern as the Recipe seed', () => 
     ],
   };
   const code = generateRegistryCpp(item, baseRecipe);
-  assert.match(code, /\n {4}SEED_DODECAHEDRON, /);
+  assert.match(code, /\n {4}make_recipe\(SEED_DODECAHEDRON, /);
   assert.doesNotMatch(code, /SEED_DODECAHEDRON_HK62/);
   // The base's own chain leads the step table, then the tool's ops.
   assert.match(code, /\{Op::HANKIN, 62\.0f \* IslamicStarPatterns::D2R\},\n {4}\{Op::AMBO\},\n {4}\{Op::HANKIN, 62\.0f \* IslamicStarPatterns::D2R\},\n {4}\{Op::DUAL\},\n\};/);
