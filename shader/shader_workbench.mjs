@@ -247,8 +247,13 @@ const checkDecodedDocumentLimits = (source, limits = DEFAULT_LIMITS) => {
       continue;
     }
     const keys = Object.keys(value);
+    const normalizedKeys = new Set();
     for (let index = keys.length - 1; index >= 0; --index) {
       const key = keys[index];
+      const normalized = key.normalize('NFC');
+      if (normalizedKeys.has(normalized))
+        fail('parse', 'DUPLICATE_KEY', `${path}.${key}`, 'Duplicate object key after NFC normalization.');
+      normalizedKeys.add(normalized);
       checkStringLength(key, bounded.stringLength, path);
       pending.push({ value: value[key], depth: depth + 1, path: `${path}.${key}` });
     }
