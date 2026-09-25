@@ -1,0 +1,7 @@
+{
+  "Lint JavaScript": "npm run lint",
+  "Verify committed import map": "npm run importmap\ngit diff --exit-code -- vendor-importmap.js",
+  "Lint shell": "mapfile -t FILES < <(git ls-files -- '*.sh' '.githooks/*')\nif [ \"${#FILES[@]}\" -eq 0 ]; then\n  echo \"::error::no shell files selected\"\n  exit 1\nfi\nshellcheck \"${FILES[@]}\"",
+  "Lint workflows": "mapfile -t FILES < <(git ls-files -- '.github/workflows/*.yml' '.github/workflows/*.yaml')\nif [ \"${#FILES[@]}\" -eq 0 ]; then\n  echo \"::error::no workflow files selected\"\n  exit 1\nfi\nactionlint -verbose -oneline \"${FILES[@]}\" 2> /tmp/actionlint-verbose.txt\nif grep -q 'Rule \"shellcheck\" was disabled' /tmp/actionlint-verbose.txt; then\n  echo \"::error::actionlint ran without shellcheck \u2014 the run: bodies went unchecked\"\n  exit 1\nfi\necho \"actionlint clean: ${#FILES[@]} workflows linted.\"",
+  "Test": "npm test"
+}
