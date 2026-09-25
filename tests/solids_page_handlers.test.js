@@ -253,3 +253,10 @@ test('an accepted topology tick publishes only after validation', async () => {
   await pending;
   assert.deepEqual(painted, [0.4, 0.5]);
 });
+
+test('saved solids discard non-object entries', () => {
+  const load = handler('loadSavedSolids', { SAVED_SOLIDS_KEY: 'saved',
+    localStorage: { getItem: () => '[null, 1, false, "bad", [], {"base":"cube"}]' },
+  });
+  assert.equal(JSON.stringify(load()), '[{"base":"cube"}]');
+});
