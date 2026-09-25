@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { githubApi, latestSuccessfulPair, recordPair, run, samePair, snapshotPair, validatePair } from '../scripts/deployment-pair.mjs';
+import { githubApi, latestSuccessfulPair, pairWasAttempted, recordPair, run, samePair, snapshotPair, validatePair } from '../scripts/deployment-pair.mjs';
 
 const pair = { daydream: 'a'.repeat(40), holosphere: 'b'.repeat(40) };
 const repo = 'example/daydream';
@@ -46,6 +46,14 @@ test('successful deployment records both exact commits only after status success
   assert.equal(calls[1][1].auto_inactive, false);
 });
 
+test('attempted pairs suppress scheduled retries independently of success', async () => {
+  assert.equal(await pairWasAttempted(async () => [{ payload: pair }], repo, pair), true);
+  assert.equal(await pairWasAttempted(async () => [{ payload: { ...pair, holosphere: 'c'.repeat(40) } }], repo, pair), false);
+  const calls = [];
+  await recordPair(async (...args) => { calls.push(args); return { id: 9 }; }, repo, pair, 'run', 'pending');
+  assert.equal(calls[1][1].state, 'pending');
+});
+
 test('GitHub API supports public reads, authenticated writes and surfaces HTTP errors', async () => {
   const calls = [];
   const fetcher = async (...args) => { calls.push(args); return { ok: true, json: async () => ({ ok: 1 }) }; };
@@ -70,6 +78,12 @@ test('resolve skips an already deployed pair and final checks reject either adva
   await run('resolve', env, api);
   assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'), /deploy=false/);
   assert.deepEqual(JSON.parse(readFileSync(env.PAIR_FILE)), pair);
+  writeFileSync(env.GITHUB_OUTPUT, '');
+  await run('resolve', { ...env, GITHUB_EVENT_NAME: 'schedule' }, async (path) => {
+    if (path.includes('statuses')) return [{ state: 'failure' }];
+    return api(path);
+  });
+  assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'), /deploy=false/);
   await run('check', env, heads);
   assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'), /current=true/);
   for (const moved of ['daydream', 'holosphere']) {

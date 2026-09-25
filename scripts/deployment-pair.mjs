@@ -45,7 +45,15 @@ export async function latestSuccessfulPair(api, repo) {
 
 export const samePair = (a, b) => Boolean(a && b && a.daydream === b.daydream && a.holosphere === b.holosphere);
 
-export async function recordPair(api, repo, pair, runUrl) {
+export async function pairWasAttempted(api, repo, pair) {
+  for (let page = 1; ; page++) {
+    const deployments = await api(`repos/${repo}/deployments?environment=${PAIR_ENVIRONMENT}&sha=${pair.daydream}&per_page=100&page=${page}`);
+    if (deployments.some((deployment) => samePair(pair, deployment.payload))) return true;
+    if (deployments.length < 100) return false;
+  }
+}
+
+export async function recordPair(api, repo, pair, runUrl, state = 'success') {
   validatePair(pair);
   const deployment = await api(`repos/${repo}/deployments`, {
     ref: pair.daydream, environment: PAIR_ENVIRONMENT, payload: pair,
@@ -53,8 +61,8 @@ export async function recordPair(api, repo, pair, runUrl) {
     description: `Holosphere ${pair.holosphere}`,
   });
   await api(`repos/${repo}/deployments/${deployment.id}/statuses`, {
-    state: 'success', auto_inactive: false, log_url: runUrl,
-    description: 'Unit, browser and Pages deployment checks passed',
+    state, auto_inactive: false, log_url: runUrl,
+    description: state === 'success' ? 'Unit, browser and Pages deployment checks passed' : 'Deployment pair attempt started',
   });
 }
 
@@ -67,14 +75,16 @@ export async function run(command, env, api) {
   if (command === 'resolve') {
     const pair = await snapshotPair(api, repo);
     const previous = await latestSuccessfulPair(api, repo);
+    const attempted = env.GITHUB_EVENT_NAME === 'schedule' && await pairWasAttempted(api, repo, pair);
     writeFileSync(pairFile, JSON.stringify(pair, null, 2) + '\n');
-    output({ ...pair, deploy: env.GITHUB_SHA === pair.daydream && !samePair(pair, previous) });
+    output({ ...pair, deploy: env.GITHUB_SHA === pair.daydream && !samePair(pair, previous) && !attempted });
   } else if (command === 'check') {
     const pair = validatePair(JSON.parse(readFileSync(pairFile, 'utf8')));
     output({ current: samePair(pair, await snapshotPair(api, repo)) });
-  } else if (command === 'record') {
+  } else if (command === 'record' || command === 'attempt') {
     await recordPair(api, repo, JSON.parse(readFileSync(pairFile, 'utf8')),
-      `${env.GITHUB_SERVER_URL}/${repo}/actions/runs/${env.GITHUB_RUN_ID}`);
+      `${env.GITHUB_SERVER_URL}/${repo}/actions/runs/${env.GITHUB_RUN_ID}`,
+      command === 'attempt' ? 'pending' : 'success');
   } else throw new Error(`Unknown deployment command: ${command}`);
 }
 
