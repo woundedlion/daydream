@@ -35,8 +35,8 @@ test('disposal flushes a deferred write once and detaches its global listener', 
   edits.persist(controller, { name: 'rate', accepted: 2 });
   edits.dispose();
   assert.equal(edits.active, false);
+  edits.persist(controller, { name: 'rate', accepted: 3 });
   emit(target, 'blur');
-  edits.dispose();
   assert.deepEqual(writes, [{ name: 'rate', accepted: 2 }]);
 });
 
