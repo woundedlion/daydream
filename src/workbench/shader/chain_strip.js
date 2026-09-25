@@ -120,12 +120,13 @@ const SOCKET_FUNCTIONS = {
  * @param {() => boolean} [options.bypassAvailable] - Whether a bypass reaches
  *   what is rendering. False disables the toggles and states why, rather than
  *   leaving a control that commits store state the render ignores.
+ * @param {(parameterId: string) => boolean} [options.parameterLive] - Whether a parameter reaches the active build.
  * @returns {Object} The strip.
  */
 export function createChainStrip({
   doc, container, store, catalog, announce, onApply, onSelect = () => {},
   presetId = () => null, onEditParameter = () => {}, onCommitParameter = () => {},
-  bypassAvailable = () => true,
+  bypassAvailable = () => true, parameterLive = () => true,
 }) {
   const { opOf, bandLayout, appendGap, choiceEntries, choiceKey, socketChoices, sharesBand } = createChainPresentation({
     catalog, chain: store.chain, legalSequences: store.legalSequences,
@@ -573,12 +574,15 @@ export function createChainStrip({
     const off = deactivatedParameterIds(declarations, values, store.chain(), catalog);
     for (const [id, row] of rows) {
       const shown = row.querySelector('.chain-param-note');
-      if (off.has(id)) {
+      const live = parameterLive(id);
+      for (const control of row.querySelectorAll('input, select')) control.disabled = !live;
+      const reason = live ? DEACTIVATED_REASON : 'This parameter is baked into the compiled build';
+      if (!live || off.has(id)) {
         row.dataset.deactivated = 'true';
-        if (shown !== null) continue;
+        if (shown !== null) { shown.textContent = reason; continue; }
         const note = el('span', 'chain-param-note');
         note.setAttribute('id', reasonId(id));
-        note.textContent = DEACTIVATED_REASON;
+        note.textContent = reason;
         row.appendChild(note);
         describeControls(row, reasonId(id));
       } else {
@@ -599,6 +603,7 @@ export function createChainStrip({
    * @returns {boolean}
    */
   const editParameter = (parameterId, value) => {
+    if (!parameterLive(parameterId)) return false;
     if (onEditParameter(parameterId, value) === false) {
       render();
       return false;
