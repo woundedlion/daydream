@@ -84,6 +84,10 @@ function engineConstant(source, name, path, scope = {}) {
   // Guards the eval below: arithmetic over the named constants, nothing else.
   assert.match(expr, /^[\w\s.+\-*/()]+$/, `${name} = ${expr} is not a plain arithmetic expression`);
   const names = Object.keys(scope);
+  const identifiers = expr.replace(/\b\d+(?:\.\d*)?(?:e[+-]?\d+)?\b/gi, '')
+    .match(/[A-Za-z_]\w*/g) ?? [];
+  assert.ok(identifiers.every((identifier) => Object.hasOwn(scope, identifier)),
+    `${name} = ${expr} names an unknown constant`);
   return Function(...names, `return ${expr};`)(...names.map((k) => scope[k]));
 }
 
@@ -93,6 +97,13 @@ function engineConstant(source, name, path, scope = {}) {
  * STEREO_INF on both sides, so the engine's expression is evaluated rather than
  * its value read, and a change to either the sentinel or the derivation fails.
  */
+test('engine constant expressions reject unknown identifiers', () => {
+  assert.throws(() => engineConstant('inline constexpr float X = process.exit(1);',
+    'X', 'fixture'), /unknown constant/);
+  assert.equal(engineConstant('inline constexpr float X = A * 1e-3f;',
+    'X', 'fixture', { A: 2000 }), 2);
+});
+
 test('projection constants match core/math/stereographic.h', { skip: engineSkip }, () => {
   const src = header(STEREO_H);
   const inf = engineConstant(src, 'STEREO_INF', STEREO_H);
