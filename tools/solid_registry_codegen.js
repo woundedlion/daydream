@@ -222,35 +222,11 @@ function definitionHeadCpp(type, declarator, breakAfterBrace = false) {
   };
 }
 
-/**
- * The Recipe initializer body: all three elements share one line where they
- * fit, else the seed constant and the step-table name share a line where they
- * fit, and the element-count expression breaks at the innermost call that keeps
- * its argument inside the column limit — the same shapes solids.h already
- * carries.
- * @param {string} constName - The SEED_* constant the recipe seeds on.
- * @param {string} stepsName - The step table's name.
- * @param {number} indent - Column the body's lines start at.
- * @returns {string} The body, ending in ';'.
- */
-function recipeBodyCpp(constName, stepsName, indent) {
-  const names = `${constName}, ${stepsName},`;
-  const size = `static_cast<uint8_t>(std::size(${stepsName}))};`;
-  if (indent + names.length + 1 + size.length <= COLUMN_LIMIT) {
-    return `${names} ${size}`;
-  }
-  const lines = indent + names.length <= COLUMN_LIMIT
-    ? [names] : [`${constName},`, `${stepsName},`];
-  if (indent + size.length <= COLUMN_LIMIT) {
-    lines.push(size);
-  } else {
-    const deeper = ' '.repeat(indent + INDENT);
-    const argument = `std::size(${stepsName}))};`;
-    lines.push(deeper.length + argument.length <= COLUMN_LIMIT
-      ? `static_cast<uint8_t>(\n${deeper}${argument}`
-      : `static_cast<uint8_t>(std::size(\n${deeper}${stepsName}))};`);
-  }
-  return lines.join(`\n${' '.repeat(indent)}`);
+/** @param {string} seed @param {string} steps @param {number} indent */
+function recipeBodyCpp(seed, steps, indent) {
+  const argumentsText = `${seed}, ${steps});`;
+  return indent + argumentsText.length <= COLUMN_LIMIT
+    ? argumentsText : `${seed},\n${' '.repeat(indent)}${steps});`;
 }
 
 /**
@@ -275,14 +251,14 @@ function seedAssertCpp(constName, seedName) {
  * constant for: the constant plus its registry-order static_assert, so a wrong
  * index fails to compile instead of replaying the recipe on another solid.
  * @param {string} seedName - The simple_registry entry name.
- * @param {number} seedIndex - Its simple_registry index.
  * @returns {string} The constant block, ending in a blank line.
  */
-function seedConstantCpp(seedName, seedIndex) {
+function seedConstantCpp(seedName) {
   const constName = `SEED_${upperSnake(seedName)}`;
   return `// solids.h defines no ${constName}. Paste the constant and its\n`
     + '// static_assert beside the other SEED_* constants.\n'
-    + `inline constexpr uint8_t ${constName} = ${seedIndex};\n`
+    + `inline constexpr uint8_t ${constName} =\n`
+    + `    static_cast<uint8_t>(BaseMesh::${upperSnake(seedName)});\n`
     + `${seedAssertCpp(constName, seedName)}\n\n`;
 }
 
@@ -337,7 +313,7 @@ export function generateRegistryCpp(item, baseRecipe = null) {
       + 'base must be flattened onto the seed its own chain starts from');
   }
   const seedConstant = DEFINED_SEED_CONSTANTS.has(seedName)
-    ? '' : seedConstantCpp(seedName, seedIndex);
+    ? '' : seedConstantCpp(seedName);
 
   const stepsName = `${upperSnake(funcName)}_STEPS`;
   const recipeName = `${upperSnake(funcName)}_RECIPE`;
@@ -360,6 +336,9 @@ export function generateRegistryCpp(item, baseRecipe = null) {
   // paste no longer matches the formatted header.
   const table = definitionHeadCpp('OpStep', `${stepsName}[]`, true);
   const recipe = definitionHeadCpp('Recipe', recipeName);
+  recipe.prefix = recipe.prefix.replace('{', 'make_recipe(');
+  if (recipe.prefix.split('\n').some((line) => line.length > COLUMN_LIMIT))
+    recipe.prefix = recipe.prefix.replace(' = make_recipe(', ' =\n    make_recipe(');
   return seedConstant
     + `${docCommentCpp(`Step table for ${funcName}.`)}\n`
     + `${table.prefix}${stepList.join(`,\n${' '.repeat(table.indent)}`)},\n};\n`
