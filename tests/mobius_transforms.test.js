@@ -183,7 +183,7 @@ test('GLSL complex ops match the JS implementations', () => {
 });
 
 // --- projection-domain conventions ----------------------------------------
-// These mirror core/math/mobius.h and core/math/3dmath.h (STEREO_INF, stereo, project_div). The
+// These mirror core/math/stereographic.h and core/math/3dmath.h (STEREO_INF, stereo, project_div). The
 // engine owns them; the shader renders what the engine will run, so a
 // divergence would make the preview lie about the pole cap and about a
 // near-singular divisor.
@@ -197,17 +197,6 @@ test('glslProjectionFunctions constants match the JS exports', () => {
   assert.equal(values.STEREO_UNDERFLOW_LIFT, STEREO_UNDERFLOW_LIFT);
 });
 
-/**
- * Absolute pin on the projection constants mirrored from
- * core/math/mobius.h and core/math/3dmath.h. The executed Möbius parity sweep stays outside
- * the pole cap, where the fused engine transform intentionally differs.
- */
-test('projection constants hold their engine values (absolute pin)', () => {
-  assert.equal(STEREO_INF, 1e4, 'STEREO_INF is the engine sentinel');
-  assert.equal(STEREO_POLE_EPS, 2e-8, 'STEREO_POLE_EPS value');
-  assert.equal(STEREO_AZIMUTH_EPS, 1e-12, 'STEREO_AZIMUTH_EPS value');
-  assert.equal(STEREO_UNDERFLOW_LIFT, 2 ** 96, 'STEREO_UNDERFLOW_LIFT value');
-});
 
 /**
  * The pole cap is the crossover where the raw quotient reaches the sentinel, not

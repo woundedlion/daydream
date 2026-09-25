@@ -46,7 +46,7 @@ export const glslComplexFunctions = `
       `;
 
 // --- Projection-domain conventions ----------------------------------------
-// Projection conventions: core/math/mobius.h and core/math/3dmath.h.
+// Projection conventions: core/math/stereographic.h and core/math/3dmath.h.
 
 /** Conventional magnitude representing the point at infinity. */
 export const STEREO_INF = 1e4;
