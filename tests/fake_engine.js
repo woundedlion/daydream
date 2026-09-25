@@ -153,8 +153,11 @@ export class FakeChainEngine {
 
   setShaderChain(entries) {
     this.chainCalls.push(entries);
+    const refusal = (code, entryIndex = -1) => ({ status: ChainStatus[code], code, entryIndex });
+    if (this.effect !== 'ShaderChain') return refusal('NOT_CHAIN_EFFECT');
     const malformed = { status: ChainStatus.MALFORMED_PAYLOAD, code: 'MALFORMED_PAYLOAD', entryIndex: -1 };
     if (!Array.isArray(entries)) return malformed;
+    if (entries.length > this.catalog.budgets.max_chain_ops) return refusal('TOO_LONG');
     for (const entry of entries) {
       if (entry === null || typeof entry !== 'object'
           || typeof entry.instance !== 'string'
@@ -164,6 +167,12 @@ export class FakeChainEngine {
       const injected = this.nextChainResult;
       this.nextChainResult = null;
       return { ...injected, status: ChainStatus[injected.code === 'APPLIED' ? 'OK' : injected.code] };
+    }
+    if (entries.length === 0) return refusal('EMPTY');
+    const instances = new Set();
+    for (const [index, entry] of entries.entries()) {
+      if (instances.has(entry.instance)) return refusal('DUPLICATE_INSTANCE', index);
+      instances.add(entry.instance);
     }
     const operators = new Map(this.catalog.operators.map((op) => [op.id, op]));
     const definitions = [];

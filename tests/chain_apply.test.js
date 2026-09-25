@@ -40,6 +40,7 @@ const compiledDocument = (values = {}, second = null) => ({
 /** A harness over one FakeChainEngine, recording the call order. */
 function harness() {
   const engine = new FakeChainEngine();
+  engine.setEffect('ShaderChain');
   const order = [];
   const originalChain = engine.setShaderChain.bind(engine);
   engine.setShaderChain = (entries) => {
@@ -227,16 +228,24 @@ test('an inadmissible preset is submitted together and reports native refusal', 
 
 test('the fake chain engine exposes status identities on every return path', () => {
   const engine = new FakeChainEngine();
+  engine.setEffect('ShaderChain');
   assert.equal(engine.setShaderChain(null).status, ChainStatus.MALFORMED_PAYLOAD);
   assert.equal(engine.setShaderChain([{ instance: 'x', operator: 'unknown' }]).status,
     ChainStatus.UNKNOWN_OPERATOR);
   engine.nextChainResult = { code: 'ARENA_OVERFLOW', entryIndex: -1 };
   assert.equal(engine.setShaderChain([]).status, ChainStatus.ARENA_OVERFLOW);
-  assert.equal(engine.setShaderChain([]).status, ChainStatus.OK);
+  assert.equal(engine.setShaderChain([]).status, ChainStatus.EMPTY);
+  assert.equal(engine.setShaderChain(Array.from({ length: 33 }, () => ({}))).status,
+    ChainStatus.TOO_LONG);
+  const duplicate = { instance: 'same', operator: 'sphere.rotate.v2' };
+  assert.equal(engine.setShaderChain([duplicate, duplicate]).status, ChainStatus.DUPLICATE_INSTANCE);
+  engine.setEffect('Comets');
+  assert.equal(engine.setShaderChain([]).status, ChainStatus.NOT_CHAIN_EFFECT);
 });
 
 test('fake parameter batches distinguish malformed and oversized payloads', () => {
   const engine = new FakeChainEngine();
+  engine.setEffect('ShaderChain');
   engine.setShaderChain(CHAIN.map(({ label, operator }) => ({ instance: label, operator })));
   const before = engine.getParameterDefinitions();
   for (const payload of [null, undefined, {}, [null], [undefined],
