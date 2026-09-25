@@ -150,7 +150,7 @@ export const PROTOCOL_VERSION = 10;
  * @typedef {{ type: 'booted', version: number }} BootedMsg */
 
 /**
- * A rendered quadrant. `pixels` is the segment's RGB16 rectangle ((x1-x0)*(y1-y0)*3),
+ * A rendered segment. `pixels` is the segment's RGB16 rectangle ((x1-x0)*(y1-y0)*3),
  * transferred (not copied) across the boundary. The rectangle is the worker's
  * `computeSegmentRange(segId, totalSegs, w, h)`; the controller re-derives it and
  * faults on a mismatch rather than trusting it, so a worker rendering stale
