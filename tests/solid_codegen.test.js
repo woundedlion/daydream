@@ -1712,3 +1712,12 @@ test('queued chain validation snapshots array membership and nested parameters',
   assert.deepEqual(calls.filter(({ op }) => op === 'truncate' || op === 'dual'),
     [{ op: 'truncate', args: [0.3] }]);
 });
+
+test('createOpGate invalidates a pending pass when returning to its cached chain', async () => {
+  const { Mod } = fakeModule();
+  const gate = createOpGate(createChainValidator(async () => Mod));
+  assert.notEqual(await gate.refresh('cube', [], CANDIDATES), null);
+  const pending = gate.refresh('octahedron', [], CANDIDATES);
+  assert.equal(await gate.refresh('cube', [], CANDIDATES), null);
+  assert.equal(await pending, null);
+});
