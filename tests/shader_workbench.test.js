@@ -1865,6 +1865,19 @@ test('the Ash Cloud document deep link routes the simulator to the workbench', (
   assert.deepEqual(replaced, ['/daydream/tools/shader.html?effect=ash-cloud']);
 });
 
+test('shader links reject malformed compact state before it reaches the store', async () => {
+  const state = { d: { descriptor: { chain: [{}, {}] } }, p: 'preset', b: [], a: false };
+  for (const invalid of [
+    { ...state, d: [] }, { ...state, p: '' }, { ...state, b: 'x' },
+    { ...state, b: [1] }, { ...state, b: ['a', 'a'] },
+    { ...state, b: ['a', 'b', 'c'] }, { ...state, a: 'yes' },
+  ]) {
+    const payload = gzipSync(JSON.stringify(invalid)).toString('base64url');
+    await assert.rejects(decodeShaderStateHash(`#shader=v1.${payload}`),
+      { message: 'invalid shader link state' });
+  }
+});
+
 test('shader links reject duplicate document keys before information is lost', async () => {
   for (const source of [
     '{"d":{"document_id":"first","document_id":"second"},"p":"p","b":[],"a":false}',
