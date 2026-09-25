@@ -410,11 +410,24 @@ test('generativePaletteCpp assigns the fields core/color/palette_recipe.h declar
 /**
  * The `SEED_*` constants core/mesh/solids.h declares.
  * @param {string} source - core/mesh/solids.h text.
+ * @param {string} bases - core/mesh/base_mesh.h text.
  * @returns {Map<string, number>} Constant name -> the simple_registry index it holds.
  */
-function engineSeedConstants(source) {
-  return new Map([...source.matchAll(/inline constexpr uint8_t (SEED_\w+)\s*=\s*(\d+);/g)]
-    .map(([, name, index]) => [name, Number(index)]));
+function engineSeedConstants(source, bases) {
+  const baseNames = [...bases.matchAll(/\bX\((\w+),\s*"[^"]*"\)/g)]
+    .map(([, name]) => name);
+  assert.ok(baseNames.length > 0, 'BaseMesh roster was not found');
+  assert.match(bases, /#define HS_BASE_MESH_ENUM\(name, label\) name,/);
+  assert.match(bases, /HS_BASE_MESH_LIST\(HS_BASE_MESH_ENUM\)/);
+  return new Map([...source.matchAll(/inline constexpr uint8_t (SEED_\w+)\s*=\s*([^;]+);/g)]
+    .map(([, name, expression]) => {
+      if (/^\d+$/.test(expression)) return [name, Number(expression)];
+      const base = expression.match(/^static_cast<uint8_t>\(BaseMesh::(\w+)\)$/);
+      assert.ok(base, `${name} has an unreadable seed expression: ${expression}`);
+      const index = baseNames.indexOf(base[1]);
+      assert.ok(index >= 0, `${name} names an unknown BaseMesh: ${base[1]}`);
+      return [name, index];
+    }));
 }
 
 /**
@@ -427,7 +440,7 @@ function engineSeedConstants(source) {
  * index.
  */
 test('DEFINED_SEED_CONSTANTS matches core/mesh/solids.h', { skip: engineSkip }, () => {
-  const declared = engineSeedConstants(header(SOLIDS_H));
+  const declared = engineSeedConstants(header(SOLIDS_H), header('core/mesh/base_mesh.h'));
   assert.ok(declared.size > 0,
     `no SEED_* constant found in ${SOLIDS_H} — the reader is out of date`);
   const seedOf = new Map(SIMPLE_SEEDS.map((name) => [`SEED_${upperSnake(name)}`, name]));
