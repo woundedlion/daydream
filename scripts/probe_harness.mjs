@@ -4,6 +4,7 @@
  * pointer helpers the gestures are made of.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 import puppeteer from 'puppeteer-core';
@@ -24,7 +25,7 @@ const reason = (error) => (error instanceof Error ? error.message : String(error
  *   browser, imported by a test it is just its interaction functions.
  */
 export function isMain(url) {
-  return process.argv[1] !== undefined && url === pathToFileURL(process.argv[1]).href;
+  return process.argv[1] !== undefined && url === pathToFileURL(realpathSync(process.argv[1])).href;
 }
 
 /**
