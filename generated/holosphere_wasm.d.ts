@@ -149,7 +149,7 @@ export interface HolosphereEngine {
   /** Clamped value of the last setPoleLod() on this engine, else the build default. */
   getPoleLod(): number;
   /**
-   * Restrict rendering to [x0,x1) x [y0,y1); reset by a setEffect rebuild.
+   * Restrict rendering to [x0,x1) x [y0,y1); reset by a setEffect rebuild or a RESIZED setResolution.
    * Bounds must be integral and in range, or the answer is INVALID_BOUNDS.
    *
    * APPLIED and FULL_FRAME_KEPT are both successes, but only APPLIED means the
@@ -310,7 +310,7 @@ export interface MeshOpsStatics {
     max_f: number; f_name: string;
     max_i: number; i_name: string;
   } | null;
-  /** Builds a registered solid; null when the registry carries no such name. */
+  /** Builds a registered solid; null on unknown name, arena, or connectivity rejection. See getLastResult(). */
   fromSolidName(name: string): MeshHandle | null;
   /** Every registered solid, the Simple ones first in seed-index order. Preserves the last result and adjustment flags. */
   getRegistry(): SolidRegistryEntry[];
