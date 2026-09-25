@@ -14,9 +14,8 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = new URL('../', import.meta.url);
 
-// Emscripten glue: an install output copied from Holosphere, checked by its
-// build there, and far too large to type-check usefully here. It has a
-// hand-written `.d.ts` sibling on the roster, which is what resolves the import.
+// Engine-installed Emscripten glue and shader compiler are checked upstream.
+// The glue import resolves through its hand-written .d.ts sibling.
 const NOT_CHECKED = new Set(['generated/holosphere_wasm.js', 'generated/shader/shader_workbench.mjs']);
 
 // Never entered: dependency and git metadata, the linked worktrees, the vendored
