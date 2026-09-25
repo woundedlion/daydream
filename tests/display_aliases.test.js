@@ -57,3 +57,13 @@ test('display aliases reject a mesh-size mismatch without changing either alias'
   repointDisplayAliases(driver, next);
   assert.equal(driver.pixels, next);
 });
+
+test('a detached alias without a mesh count accepts a replacement view', () => {
+  const original = new Uint16Array(6);
+  const driver = { pixels: original, dotMesh: { instanceColor: fakeColorAttribute(original) } };
+  structuredClone(original.buffer, { transfer: [original.buffer] });
+  const next = new Uint16Array(6);
+  repointDisplayAliases(driver, next);
+  assert.equal(driver.pixels, next);
+  assert.equal(driver.dotMesh.instanceColor.array, next);
+});
