@@ -265,7 +265,7 @@ test('holosphere_wasm.d.ts declares the object shapes the engine returns', () =>
 // The catalog is the contract the document compiler, the chain editor's
 // budgets and the fake chain engine all validate against; this pin is what
 // keeps the committed copy the engine's own export rather than a hand edit.
-test('getShaderChainCatalog matches the committed shader/engine_catalog.json', () => {
+test('getShaderChainCatalog matches the installed shader/engine_catalog.json', () => {
   const pinned = readPinned(
     new URL('../shader/engine_catalog.json', import.meta.url));
   assert.equal(pinned, `${M.HolosphereEngine.getShaderChainCatalog()}\n`,

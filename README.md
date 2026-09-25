@@ -32,7 +32,8 @@ Install Python with pip, Node.js with npm, CMake, Ninja and Emscripten.
 `tools/build_pins.py` records the CI tool versions; each repository's
 `package.json` declares its Node requirement. Install the pinned `just` command
 with `python -m pip install --require-hashes -r requirements/just.txt`.
-Then activate `emsdk_env` and run from Holosphere:
+A fresh daydream checkout needs the local engine build below before the simulator
+can run. Activate `emsdk_env` and run from Holosphere:
 
 ```bash
 cmake --preset wasm-release
@@ -534,6 +535,13 @@ files define line-ending policy and working-artifact exclusions.
 
 ### daydream (web simulator)
 
+The tracked tree below retains the authored JavaScript, shader sources, and
+`holosphere_wasm.d.ts` declarations. Local installs also produce ignored outputs:
+`holosphere_wasm.js`, `holosphere_wasm.wasm`, `holosphere_wasm.sha`,
+`holosphere_wasm.wasm.sha256`, `holosphere_wasm.toolchain`, and
+`shader/engine_catalog.json`. Build and install them with the Quickstart commands;
+CI installs the verified engine bundle before testing and deploying the simulator.
+
 <!-- docs-check: tree daydream exhaustive -->
 ```
 ├── index.html                  Main simulator page
@@ -541,11 +549,6 @@ files define line-ending policy and working-artifact exclusions.
 ├── site_manifest.txt           Repo-relative path list deploy.yml publishes to Pages
 ├── LICENSE                     PolyForm Noncommercial 1.0.0 (engine); effects reserved
 ├── vendor-importmap.js         CDN-by-default importmap helper, local opt-in
-├── holosphere_wasm.js          Installed from Holosphere's WASM build
-├── holosphere_wasm.wasm        Installed from Holosphere's WASM build
-├── holosphere_wasm.sha         Engine commit + tree state the module was built from
-├── holosphere_wasm.wasm.sha256 `sha256sum -c` manifest over the installed .wasm and .js — verified by the deploy gate
-├── holosphere_wasm.toolchain   emsdk + clang versions and the build configuration that produced the module
 ├── holosphere_wasm.d.ts        Hand-written declarations for the installed glue — what the typecheck sees
 ├── file_system_access.d.ts     Save-picker declarations lib.dom omits, for recorder.js's streaming sink
 ├── pov_segment_map.json        Firmware segment→canvas golden, installed from Holosphere — read by the segment cross-check

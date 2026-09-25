@@ -18,9 +18,13 @@ selected daydream checkout. Unit tests, source parity, browser probes and Pages
 all consume that same package. PR checks use the PR merge checkout and resolve
 Holosphere master once in their engine gate.
 
-Generated engine assets in git are a local development snapshot. Neither a push
-nor deployment requires committing refreshed copies. The local push hook checks
-source lint, types, import-map freshness and workflow helpers; CI is the required
+Generated WASM glue, binary, provenance files and engine catalog are ignored
+local build outputs. A fresh checkout needs an engine install before running
+the simulator or the full test suite. Build Holosphere's `wasm-release-install`
+preset from its sibling checkout, or install a verified package with
+`node scripts/install-engine-bundle.mjs <bundle> .`.
+Neither a push nor deployment requires committing generated outputs. The local
+push hook checks source lint, types, import-map freshness and workflow helpers; CI is the required
 runtime compatibility gate. `npm test` and the browser probe scripts remain
 available for local validation after installing an engine package.
 

@@ -1,7 +1,8 @@
-# The set published to GitHub Pages, one tracked regular file per line.
+# The set published to GitHub Pages, one regular file per line.
 # Paths are repo-relative. deploy.yml stages
 # exactly these, and tests/site_manifest.test.js checks that every asset the
-# served pages reference is listed and tracked.
+# served pages reference is listed and comes from tracked source or the
+# verified engine bundle.
 #
 # Anything absent from this list is not served: dev tooling, tests/, scripts/,
 # the engine source pin and its hash manifest. three.js and lil-gui load from
