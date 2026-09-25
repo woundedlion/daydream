@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readdirSync, readFileSync, mkdtempSync, symlinkSync, rmSync } from 'node:fs';
+import { readdirSync, readFileSync, mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -357,4 +357,40 @@ test('local pushes check source while paired browser coverage remains mandatory 
   for (const probe of ['browser-smoke', 'workbench-probe', 'panel-probe', 'solids-probe', 'palettes-probe', 'mobius-probe', 'lissajous-probe'])
     assert.ok(browser.includes(`scripts/${probe}.mjs`));
   assert.match(browser, /timeout -k 10s/);
+});
+
+for (const [results, status, output] of [
+  [{ build: { result: 'success' } }, 0, /CI green: 1 required jobs succeeded/],
+  [{ build: { result: 'failure' } }, 1, /required jobs did not succeed/],
+]) {
+  test(`the CI gate CLI returns ${status} for ${results.build.result}`, () => {
+    const result = spawnSync(process.execPath,
+      [join(REPO, 'scripts/verify-ci-green.mjs')], {
+        cwd: REPO, encoding: 'utf8',
+        env: { ...process.env, RESULTS: JSON.stringify(results) },
+      });
+    assert.equal(result.status, status);
+    assert.match(status === 0 ? result.stdout : result.stderr, output);
+  });
+}
+
+test('the CI gate CLI rejects an ungated job before evaluating results', () => {
+  const scratch = mkdtempSync(join(tmpdir(), 'daydream-ungated-cli-'));
+  try {
+    mkdirSync(join(scratch, '.github/workflows'), { recursive: true });
+    for (const [path, terminal] of GATED_WORKFLOWS) {
+      writeFileSync(join(scratch, path),
+        `jobs:\n  build:\n    runs-on: ubuntu-latest\n  ${terminal}:\n    needs: [build]\n  forgotten:\n    runs-on: ubuntu-latest\n`);
+    }
+    const result = spawnSync(process.execPath,
+      [join(REPO, 'scripts/verify-ci-green.mjs')], {
+        cwd: scratch, encoding: 'utf8',
+        env: { ...process.env, RESULTS: '{}' },
+      });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /job 'forgotten' is absent/);
+    assert.doesNotMatch(result.stderr, /required-job results/);
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
 });

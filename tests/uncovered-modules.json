@@ -14,7 +14,6 @@
     "reason": "The WebGL constructor and renderer event wiring require browser coverage; unit tests exercise sizing, draw, and teardown paths through the prototype. scripts/browser-smoke.mjs and the interaction probes exercise construction in Chrome."
   },
   "daydream.js": {
-    "lines": 94.29,
     "reason": "Composition-root GUI callbacks and late lifecycle error paths are only partially driven by the fake application tests; browser probes exercise the live controls.",
     "branches": 85
   },
@@ -32,11 +31,6 @@
     "lines": 91.47,
     "reason": "Server startup and filesystem cleanup error paths require infrastructure failures; fixture tests exercise staging and normal shutdown.",
     "branches": 72.22
-  },
-  "scripts/verify-ci-green.mjs": {
-    "lines": 79.5,
-    "reason": "The CLI reads the workflow and needs-result JSON from local files; tests/ci_workflow.test.js covers imported parsers and verdicts, while the CLI file-reading and exit paths run in CI.",
-    "branches": 87.5
   },
   "tools/shader_documents.js": {
     "reason": "Halt paths are covered by shader_documents.test.js. Remaining gaps include default browser fetch/download callbacks, missing catalog selections, and optional UI mounts; these are partial unit coverage, not a claim that they are unreachable.",
