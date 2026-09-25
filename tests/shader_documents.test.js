@@ -1164,6 +1164,7 @@ async function editorWorkbench({
       selections.push(effect);
       if (!selectEffect(effect)) return false;
       current = effect === 'ShaderChain' ? engine : compiledEngine;
+      if (effect === 'ShaderChain') engine.setEffect(effect);
       return true;
     },
     syncEffectGui: () => { ran.gui += 1; },

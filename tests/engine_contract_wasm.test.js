@@ -319,6 +319,17 @@ test('setShaderChain applies a chain, registers label.field params and bumps the
     'the applied chain must render a nonzero frame');
 });
 
+test('chain refusal statuses match the fake engine payload contracts', () => {
+  assert.equal(engine.setEffect('ShaderChain'), M.EffectSetResult.INSTALLED);
+  assert.equal(engine.setShaderChain([]).status, M.ChainStatus.EMPTY);
+  assert.equal(engine.setShaderChain(Array.from({ length: 33 }, () => ({}))).status,
+    M.ChainStatus.TOO_LONG);
+  const duplicate = { instance: 'same', operator: 'sphere.rotate.v2' };
+  assert.equal(engine.setShaderChain([duplicate, duplicate]).status, M.ChainStatus.DUPLICATE_INSTANCE);
+  assert.equal(engine.setEffect('Comets'), M.EffectSetResult.INSTALLED);
+  assert.equal(engine.setShaderChain([]).status, M.ChainStatus.NOT_CHAIN_EFFECT);
+});
+
 test('chain preset batches restore cross-field values and refuse singular edits without storing them', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)));
   assert.equal(engine.setEffect('ShaderChain'), M.EffectSetResult.INSTALLED);
