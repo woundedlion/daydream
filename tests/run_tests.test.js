@@ -277,3 +277,13 @@ test('aggregate coverage cannot hide a file with unexecuted branches', () => {
     Array.from({ length: 30 }, (_, i) => `function f${i}() { return 1; } f${i}();`).join('\n'));
   assert.match(failOutput(PATTERN), /lib\.mjs branch coverage .* below its 90% floor/);
 });
+
+test('CI rejects a failing todo test', () => {
+  writeFileSync(join(root, 'tests/sample.test.js'),
+    "import { test } from 'node:test'; import assert from 'node:assert/strict'; import '../lib.mjs';\n"
+    + "test('todo', { todo: true }, () => assert.fail('regression'));\n");
+  trackFixture();
+  assert.match(expectFailure(process.execPath, [SCRIPT, PATTERN], {
+    cwd: root, env: { ...env, CI: 'true' },
+  }), /CI must execute every test without todos/);
+});

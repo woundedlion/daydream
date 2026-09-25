@@ -111,6 +111,11 @@ const main = () => {
       console.error('run-tests: CI must execute every test without skips.');
       status = 1;
     }
+    if (status === 0 && process.env.CI
+        && !/^# todo 0\s*$/m.test(readFileSync(reportPath, 'utf8'))) {
+      console.error('run-tests: CI must execute every test without todos.');
+      status = 1;
+    }
     coverage = lineCoverage(readFileSync(reportPath, 'utf8'));
     branches = lineCoverage(readFileSync(reportPath, 'utf8'), 1);
     for (const entry of readdirSync(loadsDir)) {
