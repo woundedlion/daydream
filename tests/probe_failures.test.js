@@ -1,8 +1,9 @@
 import { closeProbeResources } from '../scripts/probe_harness.mjs';
 import { feedbackAtClick } from '../scripts/palettes-probe.mjs';
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { boxOf, centre, checks, dragBetween, isMain, measureChecks, runProbe, walkTo }
@@ -44,6 +45,19 @@ const PROBES = [
   ['mobius-probe.mjs', 'probePad', probePad],
   ['lissajous-probe.mjs', 'probeRationalLock', probeRationalLock],
 ];
+
+test('isMain recognizes an entry module reached through a junction', (t) => {
+  const temp = mkdtempSync(join(tmpdir(), 'probe-entry-'));
+  const original = process.argv[1];
+  t.after(() => {
+    process.argv[1] = original;
+    rmSync(temp, { recursive: true, force: true });
+  });
+  const scripts = fileURLToPath(new URL('../scripts', import.meta.url));
+  symlinkSync(scripts, join(temp, 'scripts'), 'junction');
+  process.argv[1] = join(temp, 'scripts', 'panel-probe.mjs');
+  assert.equal(isMain(pathToFileURL(join(scripts, 'panel-probe.mjs')).href), true);
+});
 
 /** The message a stubbed-out tab raises on the first call the probe makes. */
 const REFUSAL = 'the page went away mid-interaction';
