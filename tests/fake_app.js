@@ -36,20 +36,37 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
     object,
     property,
     args,
+    label: property,
+    decimalsSet: null,
+    disabled: false,
+    dragging: false,
+    displayUpdates: 0,
+    valueSets: [],
+    replayOnChange: false,
+    acceptedUrlValues: [],
+    handler: null,
     value: undefined,
     calls: [],
     domElement,
     [`$${kind}`]: widget,
     getValue() { return object[property]; },
-    decimals() { return controller; },
+    decimals(n) { controller.decimalsSet = n; return controller; },
     name(text) { controller.label = text; return controller; },
-    onChange(fn) { controller.changed = fn; return controller; },
-    updateDisplay() { return controller; },
+    onChange(fn) {
+      controller.changed = fn;
+      controller.handler = fn;
+      if (controller.replayOnChange) fn(controller.getValue());
+      return controller;
+    },
+    acceptUrlValue(value) { controller.acceptedUrlValues.push(value); return controller; },
+    updateDisplay() { controller.displayUpdates += 1; return controller; },
     setValue(v) {
       if (object[property] === v) return controller;
+      controller.valueSets.push(v);
       object[property] = v;
       controller.value = v;
       controller.changed?.(v);
+      controller.updateDisplay();
       return controller;
     },
     // Two implementations, told apart the way lil-gui does: a controller add()
@@ -69,10 +86,12 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
       const at = owner.controllers.indexOf(controller);
       if (at >= 0) owner.controllers.splice(at, 1);
       owner.controllers.push(replacement);
+      controller.domElement.remove();
+      owner.$children.appendChild(replacement.domElement);
       return replacement;
     },
     enable() { controller.enabled = true; return controller; },
-    disable() { controller.enabled = false; return controller; },
+    disable() { controller.enabled = false; controller.disabled = true; return controller; },
     listen() { return controller; },
   };
   return controller;
@@ -81,26 +100,44 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
 /**
  * A DeepLinkGUI (gui.js) root or folder: records the controllers, folders, and
  * stored values built on it.
- * @param {string} namespace - Root namespace or folder title.
- * @param {boolean} [optionsReplaces=false] - Builds every controller under the
- *   base Controller.options() behaviour instead of the OptionController one.
+ * @param {string|Object} [namespace] - Namespace, or panel hydration values.
+ * @param {boolean|Object} [optionsReplaces=false] - Base options() behavior,
+ *   or the panel's stored values when hydration values are supplied.
  * @returns {Object} The GUI double.
  */
 const supportedProperty = (target, property, choices) =>
   Object(choices) === choices || ['number', 'boolean', 'string', 'function'].includes(typeof target[property]);
 
-export function fakeGui(namespace, optionsReplaces = false) {
+export function fakeGui(namespace = {}, optionsReplaces = false) {
+  const panel = typeof namespace !== 'string';
+  const hydrated = panel ? namespace : {};
+  const stored = panel && typeof optionsReplaces === 'object' ? optionsReplaces : {};
+  if (panel) optionsReplaces = false;
+  const childrenElement = fakeElement('div');
+  childrenElement.ownerDocument = { createElement: (tag) => fakeElement(tag) };
+  childrenElement.classList.add('lil-children');
   const gui = {
     namespace,
     domElement: fakeElement('div'),
     controllers: [],
     folders: [],
-    stored: new Map(),
-    destroyed: false,
+    $children: childrenElement,
+    stored: panel ? stored : new Map(),
+    storedReads: [],
+    storedWrites: [],
+    destroyed: panel ? 0 : false,
+    destroyThrows: null,
+    _closed: false,
+    get closed() { return this._closed; },
+    ctrl(property) { return this.controllers.find((c) => c.property === property); },
     add(target, property, ...args) {
       if (!supportedProperty(target, property, args[0])) throw new TypeError(`Unsupported GUI property: ${property}`);
+      const replay = Object.hasOwn(hydrated, property);
+      if (replay) target[property] = hydrated[property];
       const c = fakeController(gui, target, property, args, optionsReplaces);
+      c.replayOnChange = replay;
       gui.controllers.push(c);
+      childrenElement.appendChild(c.domElement);
       return c;
     },
     // Session controls carry no deep link, so the two are told apart here.
@@ -109,15 +146,23 @@ export function fakeGui(namespace, optionsReplaces = false) {
       const c = fakeController(gui, target, property, args, optionsReplaces);
       c.session = true;
       gui.controllers.push(c);
+      childrenElement.appendChild(c.domElement);
       return c;
     },
     addMigrated(target, property, legacyProps, ...args) {
+      const legacy = legacyProps.find((name) => Object.hasOwn(hydrated, name));
+      if (legacy && !Object.hasOwn(hydrated, property)) target[property] = hydrated[legacy];
       const c = gui.add(target, property, ...args);
+      if (legacy) c.replayOnChange = true;
+      c.legacyNames = legacyProps;
       c.legacyProps = legacyProps;
       return c;
     },
     addUnhydrated(target, property, ...args) {
-      const c = gui.add(target, property, ...args);
+      if (!supportedProperty(target, property, args[0])) throw new TypeError(`Unsupported GUI property: ${property}`);
+      const c = fakeController(gui, target, property, args, optionsReplaces);
+      gui.controllers.push(c);
+      childrenElement.appendChild(c.domElement);
       c.unhydrated = true;
       return c;
     },
@@ -134,21 +179,59 @@ export function fakeGui(namespace, optionsReplaces = false) {
       gui.folders.push(folder);
       return folder;
     },
-    appendElement(element) { gui.domElement.appendChild(element); },
-    readStoredNumber(prop) {
+    appendElement(element) { childrenElement.appendChild(element); },
+    readStoredNumber(prop, legacyProperties = []) {
+      gui.storedReads.push(prop);
+      if (panel) {
+        if (stored[prop] !== undefined) return stored[prop];
+        const legacy = legacyProperties.find((name) => stored[name] !== undefined);
+        return legacy ? stored[legacy] : undefined;
+      }
       const value = gui.stored.get(prop);
       return typeof value === 'number' ? value : undefined;
     },
     readStoredString(prop) {
-      const value = gui.stored.get(prop);
+      const value = panel ? stored[prop] : gui.stored.get(prop);
       return value === undefined ? undefined : String(value);
     },
-    writeStoredValue(prop, value) { gui.stored.set(prop, value); },
-    close() { return gui; },
-    open() { return gui; },
-    destroy() { gui.destroyed = true; },
+    writeStoredValue(prop, value) {
+      if (panel) stored[prop] = value;
+      else gui.stored.set(prop, value);
+      gui.storedWrites.push([prop, value]);
+    },
+    close() { return gui.open(false); },
+    open(open = true) { gui._closed = !open; return gui; },
+    destroy() {
+      gui.destroyed = panel ? gui.destroyed + 1 : true;
+      if (gui.destroyThrows) throw gui.destroyThrows;
+      for (const controller of gui.controllers) {
+        if (controller.domElement.parentNode !== childrenElement)
+          throw new Error(`controller ${controller.property} has the wrong parent`);
+        childrenElement.removeChild(controller.domElement);
+      }
+    },
     collectUrlKeys() { return []; },
   };
+  gui.domElement.ownerDocument = childrenElement.ownerDocument;
+  gui.domElement.appendChild(childrenElement);
+  if (panel) {
+    gui.addDisplayFolder = (name) => {
+      const folder = { name, _closed: false,
+        get closed() { return this._closed; },
+        open(open = true) { this._closed = !open; },
+        close() { this.open(false); },
+      };
+      for (const method of ['add', 'addMigrated', 'addUnhydrated', 'addSession'])
+        folder[method] = (...args) => {
+          const control = gui[method](...args);
+          if (control) control.folder = name;
+          return control;
+        };
+      gui.folders.push(folder);
+      return folder;
+    };
+    gui.addFolder = gui.addDisplayFolder;
+  }
   return gui;
 }
 
