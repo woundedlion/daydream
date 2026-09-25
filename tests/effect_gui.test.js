@@ -19,9 +19,9 @@ import {
   kaleidoscopeSmoothStageAssignments,
   fixedShaderStageAssignments,
   fixedShaderStageTitles,
-  isShaderBallSchema,
+  isShaderSchema,
   legacyShaderBallParamNames,
-  shaderBallStageAssignments,
+  shaderStageAssignments,
 } from '../shader_stages.js';
 import { FullConfigRestoreResult } from './fake_engine.js';
 
@@ -489,15 +489,15 @@ test('an enumerated param becomes a dropdown of labels to engine indices', () =>
 });
 
 test('the ShaderBall schema is recognized by its stage selectors alone', () => {
-  assert.equal(isShaderBallSchema(shaderBallParams()), true);
+  assert.equal(isShaderSchema(shaderBallParams()), true);
   assert.equal(
-    isShaderBallSchema(shaderBallParams().filter((p) => p.name !== 'Coverage')),
+    isShaderSchema(shaderBallParams().filter((p) => p.name !== 'Coverage')),
     false, 'a missing stage selector is not the ShaderBall schema');
-  assert.equal(isShaderBallSchema([SPEED, GLOW]), false);
+  assert.equal(isShaderSchema([SPEED, GLOW]), false);
 });
 
 test('ShaderBall parameters map to banks in evaluation order', () => {
-  const assignments = shaderBallStageAssignments(shaderBallParams());
+  const assignments = shaderStageAssignments(shaderBallParams());
 
   // A stage nothing lands in builds an empty folder; a stage nothing lists
   // drops its controls on the floor.

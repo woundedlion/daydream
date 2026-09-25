@@ -26,7 +26,7 @@ import { DEFAULT_EFFECT, resolutionPresets } from '../effect_roster.js';
 import {
   FIXED_SHADER_MODE_FIELDS, STAGE_BOUNDARIES,
   kaleidoscopeSmoothStageAssignments, latticeMeltStageAssignments,
-  fixedShaderStageAssignments, shaderBallStageAssignments,
+  fixedShaderStageAssignments, shaderStageAssignments,
 } from '../shader_stages.js';
 
 // The module's stdout, captured rather than dropped: the WASM bridge answers an
@@ -794,7 +794,7 @@ test('live shader rosters assign every parameter and both planar-warp slots', ()
       ++checked;
       const assignments = latticeMeltStageAssignments(definitions)
         ?? kaleidoscopeSmoothStageAssignments(definitions)
-        ?? shaderBallStageAssignments(definitions)
+        ?? shaderStageAssignments(definitions)
         ?? fixedShaderStageAssignments(definitions);
       for (const definition of definitions) {
         if (!assignments?.has(definition.name)) {

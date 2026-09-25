@@ -98,7 +98,7 @@ export function createEffectPersistence({
 
   /**
    * Replay the stored accepted values into the engine. The definition list is
-   * re-read after every write because a write can change it — a ShaderBall
+   * re-read after every write because a write can change it — a Shader
    * selector swaps in the controls of the stage it selects — so parameters that
    * did not exist a write ago still get their stored value. Nothing in the loop
    * writes the stored values it reads, so one probe per name settles it and the

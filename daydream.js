@@ -17,7 +17,7 @@ import {
   resolutionCorrection,
 } from "./effect_sequencing.js";
 import { createEffectGui } from "./effect_gui.js";
-import { isShaderBallSchema } from "./shader_stages.js";
+import { isShaderSchema } from "./shader_stages.js";
 import {
   createAppTeardown,
   createFrameLoopGuard,
@@ -475,7 +475,7 @@ export function start({
     const generation = host.paramGeneration();
     if (generation === undefined || generation !== fullConfigGeneration) {
       fullConfigGeneration = generation;
-      fullConfigSchema = isShaderBallSchema(host.engine.getParameterDefinitions());
+      fullConfigSchema = isShaderSchema(host.engine.getParameterDefinitions());
     }
     return fullConfigSchema;
   }

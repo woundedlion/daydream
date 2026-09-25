@@ -126,7 +126,7 @@ export const STAGE_BOUNDARIES = new Map([
   ['Coverage', 'Coverage'],
   ['Palette', 'Colorize'],
 ]);
-const SHADERBALL_SIGNATURE = [
+const SHADER_SIGNATURE = [
   'Function', 'Projection', 'Lens', 'Planar Warp 1', 'Planar Warp 2',
   'Signal Weight', 'Value Transfer', 'Coverage', 'Palette',
 ];
@@ -300,17 +300,17 @@ export function legacyShaderBallParamNames(name) {
  * @param {Array<{name: string}>} params - Engine parameter definitions.
  * @returns {boolean} True when every stage selector is registered.
  */
-export function isShaderBallSchema(params) {
+export function isShaderSchema(params) {
   const names = new Set(params.map((parameter) => parameter.name));
-  return SHADERBALL_SIGNATURE.every((name) => names.has(name));
+  return SHADER_SIGNATURE.every((name) => names.has(name));
 }
 
 /**
  * @param {Array<{name: string}>} params - Engine parameter definitions in stream order.
  * @returns {Map<string, string>|null} Parameter name to pipeline-stage title.
  */
-export function shaderBallStageAssignments(params) {
-  if (!isShaderBallSchema(params)) return null;
+export function shaderStageAssignments(params) {
+  if (!isShaderSchema(params)) return null;
   const assignments = new Map();
   let stage = 'Function';
   for (const parameter of params) {
@@ -372,7 +372,7 @@ export function kaleidoscopeSmoothStageAssignments(params) {
 export function fixedShaderStageAssignments(params) {
   const names = new Set(params.map((parameter) => parameter.name));
   if (!names.has('Camera Wander') || !names.has('Palette Chroma')
-      || !names.has('Mapping Frequency') || isShaderBallSchema(params)) {
+      || !names.has('Mapping Frequency') || isShaderSchema(params)) {
     return null;
   }
   const assignments = new Map();
