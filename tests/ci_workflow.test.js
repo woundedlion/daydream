@@ -150,6 +150,23 @@ test('every workflow pins the Node version package.json requires', () => {
     `every setup-node pin must read ${required}`);
 });
 
+test('every setup-node action supplies a Node version pin', () => {
+  let setups = 0;
+  for (const file of readdirSync(resolve(REPO, WORKFLOW_DIR)).filter((name) => /\.ya?ml$/.test(name))) {
+    const source = readFileSync(resolve(REPO, WORKFLOW_DIR, file), 'utf8');
+    setups += [...source.matchAll(/^\s*- uses: actions\/setup-node@/gm)].length;
+  }
+  assert.ok(setups > 0);
+  assert.equal(nodePins(WORKFLOW_DIR).length, setups);
+});
+
+test('deployment has no job condition that can bypass dependency success', () => {
+  const deploy = readFileSync(resolve(REPO, DEPLOY_PATH), 'utf8')
+    .split(/^ {2}deploy:\s*$/m)[1]?.split(/^ {2}\S/m)[0];
+  assert.ok(deploy);
+  assert.doesNotMatch(deploy, /^ {4}if:/m);
+});
+
 test('column-zero comments do not end the jobs mapping', () => {
   const source = 'jobs:\n  build:\n    runs-on: ubuntu-latest\n# Browser gates\n'
     + '  browser:\n    runs-on: ubuntu-latest\n  gate:\n    needs: build\n';
