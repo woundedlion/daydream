@@ -3,10 +3,15 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdir
 import { dirname, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export const GENERATED_PATHS = new Set([
+export const RUNTIME_PATHS = new Set([
   'holosphere_wasm.js', 'holosphere_wasm.wasm', 'holosphere_wasm.sha',
   'holosphere_wasm.wasm.sha256', 'holosphere_wasm.toolchain', 'shader/engine_catalog.json',
+  'pov_segment_map.json', 'shader/shader_workbench.mjs', 'shader/sha256.mjs',
+  'shader/patterns/shaderball_migration.json',
 ]);
+
+export const runtimePath = (path) => RUNTIME_PATHS.has(path)
+  || /^shader\/patterns\/[^/]+\.shader\.json$/.test(path);
 
 const REQUIRED_PATHS = new Set(['README.md', 'holosphere_wasm.js', 'holosphere_wasm.wasm',
   'holosphere_wasm.sha', 'holosphere_wasm.wasm.sha256', 'holosphere_wasm.toolchain',

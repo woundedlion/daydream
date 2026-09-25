@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { installEngineBundle } from '../scripts/install-engine-bundle.mjs';
+import { installEngineBundle, runtimePath } from '../scripts/install-engine-bundle.mjs';
 
 const AMBIENT_BUNDLE_PIN = process.env.HOLOSPHERE_BUNDLE_PIN;
 beforeEach(() => { delete process.env.HOLOSPHERE_BUNDLE_PIN; });
@@ -146,4 +146,14 @@ test('install initializes a checkout with no previous engine pin', (t) => {
   assert.equal(readFileSync(join(destination, 'holosphere_wasm.sha'), 'utf8'), 'b'.repeat(40));
   assert.equal(readFileSync(join(destination, 'holosphere_wasm.js'), 'utf8'),
     'fresh holosphere_wasm.js');
+});
+
+test('runtime mirrors exclude Daydream declarations, legacy fixtures and documents', () => {
+  for (const path of ['pov_segment_map.json', 'shader/shader_workbench.mjs',
+    'shader/sha256.mjs', 'shader/patterns/kaleidoscope_flowers.shader.json',
+    'shader/patterns/shaderball_migration.json']) assert.equal(runtimePath(path), true, path);
+  for (const path of ['README.md', 'docs/screenshots/example.png',
+    'shader/shader_workbench.d.mts', 'holosphere_wasm.d.ts',
+    'shader/patterns/v1/example.shader.json', 'shader/patterns/digest_migration.v1v2.json',
+    'tools/shader_documents.js']) assert.equal(runtimePath(path), false, path);
 });
