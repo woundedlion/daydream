@@ -255,11 +255,11 @@ class DeepLinkGUI {
    * `controller.acceptUrlValue(value)` to persist an accepted value while the
    * controller continues to display the proposed value.
    * @param {Object} controller - The lil-gui controller to wrap.
-   * @param {Function} writeUrl - Callback that persists the control's value to the URL.
+   * @param {Function} persistUrl - Callback that persists the control's value to the URL.
    * @param {boolean} [applyOnLoad=false] - When true (value hydrated from URL), replay the caller's onChange once on first registration so its side effect runs at startup.
    * @returns {Object} The same controller, for chaining.
    */
-  attachUrlWriter(controller, writeUrl, applyOnLoad = false) {
+  attachUrlWriter(controller, persistUrl, applyOnLoad = false) {
     const userOnChange = [];
     let urlValue = controller.getValue();
     controller.acceptUrlValue = (value) => {
@@ -269,7 +269,7 @@ class DeepLinkGUI {
     controller.onChange((v) => {
       urlValue = v;
       for (const fn of userOnChange) fn(v);
-      writeUrl(urlValue);
+      persistUrl(urlValue);
     });
     controller.onChange = (fn) => {
       if (fn) userOnChange.push(fn);
@@ -279,7 +279,7 @@ class DeepLinkGUI {
       if (applyOnLoad && fn) {
         const proposed = controller.getValue();
         fn(proposed);
-        if (!Object.is(urlValue, proposed)) writeUrl(urlValue);
+        if (!Object.is(urlValue, proposed)) persistUrl(urlValue);
       }
       return controller;
     };

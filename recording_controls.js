@@ -84,10 +84,12 @@ export function createRecordingControls({
       canvasEl?.classList.add('recording');
       durationEl.style.display = '';
       recordCtrl.name('\u25a0 Stop');
+      recordCtrl.$button?.setAttribute('aria-label', 'Stop recording');
     } else {
       canvasEl?.classList.remove('recording');
       durationEl.style.display = 'none';
       recordCtrl.name('\u25cf Record');
+      recordCtrl.$button?.setAttribute('aria-label', 'Start recording');
     }
     driver.invalidate();
   };
@@ -123,6 +125,7 @@ export function createRecordingControls({
   recFolder.addSession(recSettings, 'recResolution', Object.keys(REC_RESOLUTIONS)).name('Rec Resolution');
   recFolder.addSession(recSettings, 'recFormat', Object.keys(REC_FORMATS)).name('Rec Format');
   const recordCtrl = recFolder.add(recordState, 'record').name('\u25cf Record');
+  recordCtrl.$button?.setAttribute('aria-label', 'Start recording');
   recordCtrl.disable();
 
   return {

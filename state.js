@@ -290,7 +290,7 @@ export class URLSync {
    *   key whose validator returns false keeps the state's existing (validated)
    *   default instead of being overwritten. Lives here, in the sync layer, so a
    *   garbage URL value can't poison state regardless of which consumer wires
-   *   the URLSync — callers no longer have to re-validate after construction.
+   *   the URLSync.
    * @param {Window} [win] - The window this writer reads and writes the URL on,
    *   and arms its debounce against, so a discarded page takes the timer with it.
    */

@@ -30,6 +30,7 @@ export function createEffectPersistence({
 }) {
   /** @param {string} name @returns {string} */
   const acceptedStorageKey = (name) => `__accepted.${name}`;
+  const restoredKeys = new Set();
 
   /**
    * Persist the active effect through its snapshot or accepted-value surface.
@@ -37,11 +38,12 @@ export function createEffectPersistence({
    * @param {{name: string, accepted: *}} [edited] - The one parameter an edit
    *   moved, carrying the value the write settled on. Narrowing to it keeps a
    *   per-keystroke persist off the whole-definition marshal.
+   * @param {boolean} [existingOnly=false] - Rewrite only restored companion keys.
    * @returns {void}
    */
-  function persistEffectState(gui, edited = undefined) {
+  function persistEffectState(gui, edited = undefined, existingOnly = false) {
     if (!usesFullConfigSnapshot()) {
-      if (edited === undefined) persistAcceptedParams(gui);
+      if (edited === undefined) persistAcceptedParams(gui, existingOnly);
       else persistAcceptedParam(gui, edited.name, edited.accepted);
       return;
     }
@@ -50,7 +52,7 @@ export function createEffectPersistence({
     gui.writeStoredValue(FULL_CONFIG_STORAGE_KEY, JSON.stringify(snapshot));
   }
 
-  /** @param {*} gui */
+  /** Replay a stored full snapshot or accepted parameter values. @param {*} gui */
   function restoreEffectState(gui) {
     if (!usesFullConfigSnapshot()) {
       restoreAcceptedParams(gui);
@@ -79,17 +81,16 @@ export function createEffectPersistence({
     showConfigImportNotice(null);
   }
 
-  /** @param {*} gui @param {string} name @param {*} accepted */
+  /** Store one accepted numeric value for URL canonicalization. @param {*} gui @param {string} name @param {*} accepted */
   function persistAcceptedParam(gui, name, accepted) {
-    // The float form, not the raw value: restoreAcceptedParams() reads the
-    // companion key back through the URL number grammar, which rejects a bool.
-    gui.writeStoredValue(acceptedStorageKey(name), String(engineParamValue(accepted)));
+    gui.writeStoredValue(acceptedStorageKey(name), engineParamValue(accepted));
   }
 
-  /** @param {*} gui */
-  function persistAcceptedParams(gui) {
+  /** Store writable accepted parameters. @param {*} gui @param {boolean} existingOnly */
+  function persistAcceptedParams(gui, existingOnly) {
     for (const parameter of getParameterDefinitions()) {
       if (parameter.readonly) continue;
+      if (existingOnly && !restoredKeys.has(parameter.name)) continue;
       persistAcceptedParam(gui, parameter.name, acceptedParamValue(parameter));
     }
   }
@@ -116,6 +117,7 @@ export function createEffectPersistence({
           acceptedStorageKey(candidate.name),
           legacyShaderBallParamNames(candidate.name).map(acceptedStorageKey));
         if (stored === undefined) continue;
+        restoredKeys.add(candidate.name);
         parameter = candidate;
         value = stored;
         break;
