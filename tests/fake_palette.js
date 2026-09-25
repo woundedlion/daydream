@@ -47,4 +47,5 @@ export const PaletteRecipeField = enumeration([
   'SCHEMA_VERSION',
   'INPUT_OFFSET',
   'INPUT_SPAN',
+  'COUNT',
 ]);

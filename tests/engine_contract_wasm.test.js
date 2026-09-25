@@ -20,6 +20,7 @@ import {
   ResolutionSetResult, EffectSetResult, FullConfigRestoreResult, ChainStatus,
 } from './fake_engine.js';
 import { isViewLive, refreshPixelView } from '../pixel_view.js';
+import { PaletteCompileCode, PaletteRecipeField } from './fake_palette.js';
 import { selectorControlValue } from '../param_sync.js';
 import { defaultPaletteRecipe, hueKeyState, PaletteV4, signedTurnDelta } from '../tools/palette_controls.js';
 import { DEFAULT_EFFECT, resolutionPresets } from '../effect_roster.js';
@@ -407,10 +408,10 @@ test('setShaderChain refuses transactionally and names the offending entry', () 
     'a non-array payload is refused at the boundary, never a trap');
 });
 
-const RESULT_MIRRORS = { ChainStatus, ParamSetResult, ClipSetResult, ResolutionSetResult,
+const RESULT_MIRRORS = { PaletteCompileCode, PaletteRecipeField, ChainStatus, ParamSetResult, ClipSetResult, ResolutionSetResult,
   EffectSetResult, FullConfigRestoreResult };
 for (const name of RESULT_ENUMS) {
-  test(`the module ${name} enum matches the fake_engine.js mirror`, () => {
+  test(`the module ${name} enum matches the test mirror`, () => {
     const actual = M[name];
     const mirror = RESULT_MIRRORS[name];
     assert.ok(actual, `the module must export ${name}`);
@@ -1532,13 +1533,13 @@ test('PaletteOps exposes the method surface the palette tool drives', () => {
       hueTorsion: 0, falloffStart: 0.9,
     };
     const compiled = ops.compileAndBakeV4(recipe);
-    assert.equal(compiled.status.code, 0);
+    assert.equal(compiled.status.code, M.PaletteCompileCode.OK);
     assert.ok(compiled.lut instanceof Uint8Array);
     assert.equal(compiled.lut.length, 256 * 3);
     recipe.chroma.center = 1;
     recipe.chroma.headroom = 0.8;
     const capped = ops.compileAndBakeV4(recipe);
-    assert.equal(capped.status.code, 0);
+    assert.equal(capped.status.code, M.PaletteCompileCode.OK);
     assert.ok(Math.abs(capped.canonicalRecipe.chroma.headroom - 0.8) < 1e-6);
     const inspected = ops.inspectV4(recipe);
     assert.equal(inspected.diagnostics.length, 256 * 6);
@@ -1560,7 +1561,7 @@ test('hue wheel harmony anchors agree with the WASM palette diagnostics', () => 
         for (let i = 0; i < keys.offsets.length; i++) {
           recipe.input = { offset: i / (keys.offsets.length - 1), span: 0 };
           const result = ops.inspectV4(recipe);
-          assert.equal(result.status.code, 0);
+          assert.equal(result.status.code, M.PaletteCompileCode.OK);
           const actual = result.diagnostics[4] / (2 * Math.PI);
           const expected = keys.baseTurns + keys.offsets[i];
           assert.ok(Math.abs(signedTurnDelta(actual - expected)) < 1e-5,
