@@ -241,8 +241,8 @@ test('waveGraphBand scales with the canvas height', () => {
   assert.equal(waveGraphBand(0).toY(0.5), 0);
 });
 
-/** Verifies proceduralPaletteCpp emits the ProceduralPalette initializer with f-suffixed floats and per-vector comments. */
-test('proceduralPaletteCpp emits a valid C++ initializer', () => {
+/** Verifies the procedural palette-list row and coefficient ordering. */
+test('proceduralPaletteCpp emits a valid C++ palette-list row', () => {
   // Every vector distinct: a swapped or dropped one moves the output.
   const params = {
     A_R: 0.5, A_G: 0.5, A_B: 0.5,
@@ -251,10 +251,8 @@ test('proceduralPaletteCpp emits a valid C++ initializer', () => {
     D_R: 0.0, D_G: 0.33, D_B: 0.67,
   };
   assert.equal(proceduralPaletteCpp(params),
-    `ProceduralPalette palette({0.5f, 0.5f, 0.5f},  // A
-                          {0.4f, 0.5f, 0.6f},  // B
-                          {1.0f, 1.0f, 1.0f},  // C
-                          {0.0f, 0.33f, 0.67f}); // D`);
+    'X(MY_PALETTE, (0.5f, 0.5f, 0.5f), (0.4f, 0.5f, 0.6f), ' +
+    '(1.0f, 1.0f, 1.0f), (0.0f, 0.33f, 0.67f)) \\');
 });
 
 /**
