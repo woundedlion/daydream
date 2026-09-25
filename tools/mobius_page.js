@@ -421,9 +421,6 @@ const initThree = () => {
     onAnimate: () => {
       if (isAnimating && activePreset && activePreset.update) {
         const now = performance.now();
-        // Seed on the first frame (dt = 0), then advance by real elapsed
-        // seconds. 0.6 units/s reproduces the original 0.01-per-frame speed
-        // at 60 Hz, now matched on any refresh rate.
         const dt = lastAnimTime ? (now - lastAnimTime) / 1000 : 0;
         lastAnimTime = now;
         animationTime += dt * 0.6;

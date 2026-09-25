@@ -178,3 +178,16 @@ export function enumConstantName(values, result) {
   return Object.keys(values).find((name) => values[name] === result)
     ?? 'unrecognized result';
 }
+
+/**
+ * Match an engine option using case-insensitive, hyphen/space-normalized labels.
+ * @param {{options?: string[]}} definition - Engine parameter definition.
+ * @param {*} label - Authored option label.
+ * @returns {number} The matching ordinal, or -1.
+ */
+export function optionIndex(definition, label) {
+  /** @param {*} value */
+  const key = (value) => String(value).toLowerCase().replace(/[\s-]+/g, ' ').trim();
+  const wanted = key(label);
+  return definition.options?.findIndex((option) => key(option) === wanted) ?? -1;
+}

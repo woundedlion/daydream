@@ -19,7 +19,6 @@ import {
 
 const TWO_PI = 2 * Math.PI;
 
-// --- Configuration and State ---
 const config = {
   C1: { min: 1, max: 100, step: 0.01, default: 12, scale: 100, label: "C₁" },
   C2: { min: 1, max: 100, step: 0.01, default: 5, scale: 100, label: "C₂" },
@@ -50,12 +49,10 @@ const lineMaterial = new THREE.LineBasicMaterial({
   depthTest: false // Always on top effect
 });
 
-// --- Lissajous Function ---
 // lissajous(m1, m2, a, t) lives in ./lissajous_math.js (imported above); the
 // preview and the engine share its m1/m2/a/t argument order, and the
 // exported LissajousParams initializer lists m1/m2/a/domain in that order.
 
-// --- THREE.js Setup ---
 const initThree = () => {
   // Camera moved closer than the default to make the curve fill the space.
   const result = initScene('canvasContainer', 'threeCanvas', {
@@ -106,7 +103,6 @@ const scheduleUpdate = createFrameScheduler(() => {
   updateCodeSnippet();
 });
 
-// --- RATIONAL CONSTRAINT LOGIC ---
 // findBestRationalRatio and the snapToRationalRatio closing-domain core live
 // in ./lissajous_math.js (imported above); this section keeps only the DOM
 // read/write wiring around them.
@@ -155,9 +151,7 @@ const snapFrequencies = (activeId, rawNewValue) => {
   scheduleUpdate();
 };
 
-// --- End RATIONAL CONSTRAINT LOGIC ---
 
-// --- Code Snippet Updater ---
 const updateCodeSnippet = () => {
   const codeOutput = document.getElementById('lissajous_code_output');
   if (!codeOutput) return;
@@ -178,7 +172,6 @@ const updateCodeSnippet = () => {
   }
 };
 
-// --- UI Setup ---
 
 // Slider handles by config id, so code that computes a value (the rational
 // snap) can drive the control it belongs to.
@@ -214,7 +207,6 @@ const mountSlider = (id, params) => {
   });
 };
 
-// --- Initialization ---
 const init = () => {
   Object.keys(config).forEach(id => {
     mountSlider(id, config[id]);

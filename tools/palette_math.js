@@ -355,8 +355,8 @@ export function compilePaletteRecipe(recipe, inspect = true) {
 }
 
 /**
- * A compiled V4 palette: the engine's own 256-entry sRGB LUT, sampled the way
- * the device samples it. Interchangeable with ProceduralPalette at the
+ * A compiled V4 palette: the engine's 256-entry 8-bit sRGB LUT, interpolated
+ * in linear light. Interchangeable with ProceduralPalette at the
  * get/getChannelValues surface the previews draw through.
  */
 export class GenerativePalette {

@@ -4,7 +4,8 @@
  */
 
 import { engineHalted } from './engine_halt.js';
-import { enumConstantName } from '../param_sync.js';
+import { enumConstantName, optionIndex } from '../param_sync.js';
+import { fieldOf as fieldSegment } from './chain_presentation.js';
 import { errorDetail } from './banner.js';
 import { applyChainDocument } from './chain_apply.js';
 import { createChainDocumentStore, scratchChainDocument } from './chain_document_store.js';
@@ -71,10 +72,6 @@ export function bakedTopologyFields(operatorCatalog) {
  */
 export const BAKED_CONSTANT_IDS = new Set(['camera.spin-speed']);
 
-/** @param {string} parameterId */
-const fieldSegment = (parameterId) =>
-  parameterId.slice(parameterId.indexOf('.') + 1);
-
 /** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[]}} ParameterDefinition */
 /** @typedef {{document: *, descriptor_digest?: string, diagnostics?: *, status?: string}} CompiledDocument */
 
@@ -84,23 +81,6 @@ export function engineParameterName(parameterId) {
 }
 
 export { engineControlNames as engineParameterNames };
-
-/**
- * A document enum8 value's comparison key. A document spells an option in the
- * catalog's kebab case and the engine registers its own display spelling, so
- * case and the hyphen/space split are both normalized away.
- * @param {*} label - A document value or an engine option.
- * @returns {string} The key.
- */
-function optionKey(label) {
-  return String(label).toLowerCase().replace(/[\s-]+/g, ' ').trim();
-}
-
-/** @param {ParameterDefinition} definition @param {*} label */
-function optionIndex(definition, label) {
-  const wanted = optionKey(label);
-  return definition.options?.findIndex((option) => optionKey(option) === wanted) ?? -1;
-}
 
 /**
  * Resolves one engine parameter write without performing it.
@@ -605,7 +585,7 @@ export function createShaderDocumentController({
       try {
         compiled = compiler.compileShaderDocument(source, { catalog: operatorCatalog });
       } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
+        const detail = errorDetail(error);
         show(`The document could not be compiled: ${detail}`, true);
         return false;
       }
@@ -685,7 +665,7 @@ export function createShaderDocumentController({
       }
       if (previous?.compiledSide && previous.official)
         selectEffect(previous.official.effectId);
-      if (written && previous) {
+      if (previous && (written || previous.compiledSide)) {
         const refusal = status.textContent;
         applyPreset(previous.presetId ?? presetSelect.value);
         show(refusal ?? '', true);
@@ -696,7 +676,7 @@ export function createShaderDocumentController({
       try {
         chainUi = await buildChainUi(compiled.document, candidateMount);
       } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
+        const detail = errorDetail(error);
         show(`The chain editor could not adopt the document: ${detail}`, true);
         return abandon();
       }
@@ -768,7 +748,7 @@ export function createShaderDocumentController({
       if (generation === linkGeneration) replaceShaderStateHash(hash, win);
     }).catch((error) => {
       if (generation !== linkGeneration) return;
-      const detail = error instanceof Error ? error.message : String(error);
+      const detail = errorDetail(error);
       show(`The shader link could not be updated: ${detail}.`, true);
     });
     return linkWrite;
@@ -870,7 +850,7 @@ export function createShaderDocumentController({
         sourceSelect.appendChild(option);
       }
     } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
+      const detail = errorDetail(error);
       show(`Source catalog failed to load: ${detail}`, true);
       return false;
     }
@@ -879,7 +859,7 @@ export function createShaderDocumentController({
     try {
       linked = await decodeShaderStateHash(win.location?.hash ?? '');
     } catch (error) {
-      linkError = error instanceof Error ? error.message : String(error);
+      linkError = errorDetail(error);
     }
     if (linked) {
       const effectId = linked.document.effect_id;

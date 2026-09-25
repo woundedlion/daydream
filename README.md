@@ -625,14 +625,14 @@ files define line-ending policy and working-artifact exclusions.
 │   ├── flyout.js               Button-controlled flyout with outside-click and Escape dismissal
 │   ├── kb_format.js            Dependency-free kilobyte formatter shared by the stat readouts
 │   ├── labels.js              Shared display-label formatting
-│   ├── lissajous_math.js       Pure Lissajous curve math from lissajous.html
-│   ├── lissajous_page.js       Page module extracted from lissajous.html's inline script
+│   ├── lissajous_math.js       Lissajous curves, rational constraints, and C++ export
+│   ├── lissajous_page.js       Lissajous scene and control wiring
 │   ├── mobius_page.js          Controller for the Möbius tool page
-│   ├── mobius_transforms.js    Pure Möbius coefficient presets from mobius.html
+│   ├── mobius_transforms.js    Möbius presets, projections, complex division, and GLSL
 │   ├── page_lifecycle.js       Animation-frame recompute coalescer + bfcache-aware teardown hook
 │   ├── pointer_drag.js         Pointer-drag lifecycle shared by standalone tools
 │   ├── palette_canvas.js       Gradient-strip and RGB-wave canvas painters for palettes.html
-│   ├── palette_controls.js     DOM-free zoom history and locked-slider delta capping for palettes.html
+│   ├── palette_controls.js     Palette recipes, hue controls, viewports, and constraints
 │   ├── palette_math.js         ProceduralPalette / GenerativePalette mirror + the PaletteOps bridge
 │   ├── palette_wheel.js        Hue-key wheel raster, markers and pointer arithmetic for palettes.html
 │   ├── palettes_page.js        Controller for the palette tuner page
@@ -1564,3 +1564,11 @@ This project is split-licensed: the rendering engine and the visual effects carr
 **Per-file notices are a C++ convention only.** The `Required Notice` banner at the top of engine and effect sources is a courtesy for files that travel alone; it is not what grants or withholds rights. Build tooling, generator and gate scripts, and test files — Python, shell, and JavaScript in either repo — deliberately carry no banner, and `tools/license_check.py` gates the C/C++ ones only. Scope is decided by the terms above and by the file's location in the tree, banner or not.
 
 **Third-party.** The engine vendors [FastNoiseLite](https://github.com/Auburn/FastNoiseLite) 1.1.1 as `core/vendor/FastNoiseLite.h` under the MIT License (Auburn / Jordan Peck), patched in tree as recorded in `core/vendor/FastNoiseLite_config.h` (first-party). `core/math/projections.h` carries map projections derived from [PROJ](https://proj.org) under the MIT License (Frank Warmerdam, Gerald I. Evenden, Kristian Evers, Toby C Wilkinson and the PROJ contributors); it sits outside `core/vendor/` because the engine's own projections are developed alongside them in the same header, and `LICENSE` names it as an exception. The simulator vendors one file: `daydream/tools/tailwind.css`, a prebuilt [Tailwind CSS](https://tailwindcss.com) 3.4.17 utility sheet (MIT, Tailwind Labs) served same-origin to the five tool pages, carrying its upstream MIT banner; its preflight reset derives from [modern-normalize](https://github.com/sindresorhus/modern-normalize) (MIT, Sindre Sorhus), itself derived from normalize.css (MIT, Nicolas Gallagher and Jonathan Neal). Everything else the simulator uses loads at runtime: [three.js](https://github.com/mrdoob/three.js) (MIT, three.js authors) and [lil-gui](https://github.com/georgealways/lil-gui) (MIT, George Michael Brower) come from the jsdelivr CDN at the versions pinned in `daydream/package.json` (currently three 0.183.1, lil-gui 0.21.0). The optional self-hosted fonts under `daydream/vendor/fonts/` (Inter and JetBrains Mono, both SIL OFL 1.1) are gitignored and distributed by neither repo.
+
+The `tools/` directory also holds browser utilities shared with the root simulator,
+including banners, clipboard, parameter labels, and pointer handling. These modules
+have no dependency on a design-tool page.
+
+Regenerate the tool utility stylesheet with `npm run generate:tailwind`; the pinned
+Tailwind dependency scans tool HTML and JavaScript. Commit `tools/tailwind.css` with
+changes that introduce utility classes.

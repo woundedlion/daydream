@@ -803,7 +803,7 @@ test('a catalog that cannot be fetched is reported, not left half-listed', async
 
   assert.equal(await controller.init(), false);
   assert.match(elements.get('shader-document-status').textContent,
-    /Source catalog failed to load: 404/);
+    /Source catalog failed to load: Error: 404/);
   assert.equal(elements.get('shader-document-select').options.length, 1);
 });
 
@@ -1530,7 +1530,7 @@ test('a malformed shader state link falls back to an editable scratch chain', as
     ['sphere.rotate.v2', 'project.stereographic.v2', 'sample.grid.v2',
       'colorize.generated-palette.v3']);
   assert.match(harness.elements.get('shader-document-status').textContent,
-    /shader link could not be restored: invalid shader link payload/i);
+    /shader link could not be restored: Error: invalid shader link payload/i);
 });
 
 test('a dynamic document builds the strip, and edits re-apply through the engine', async () => {
@@ -2037,4 +2037,17 @@ test('source and file switches preserve edits when discard is refused', async ()
   harness.controller.save();
   await onChange(source)();
   assert.equal(confirmations, 2, 'saving clears the dirty marker');
+});
+
+
+test('refused replacement restores the previous compiled preset after switching effects', async () => {
+  const harness = await editorWorkbench({ migration: HEX_MIGRATION });
+  harness.elements.get('shader-parity-toggle').dispatch('click');
+  harness.compiledEngine.selected.length = 0;
+  assert.equal(await harness.controller.loadSource(
+    JSON.parse(KALEIDOSCOPE_HEX_BRIGHT), 'refused.shader.json', null,
+    { preset: 'hex-twin-wave', bypassed: ['missing-stage'], paused: false }), false);
+  assert.equal(harness.selections.at(-1), 'KaleidoscopeHexBright');
+  assert.deepEqual(harness.compiledEngine.selected, ['hex-twin-wave']);
+  assert.match(harness.elements.get('shader-document-status').textContent, /missing-stage/);
 });

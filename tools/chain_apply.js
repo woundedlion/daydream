@@ -4,7 +4,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-import { enumConstantName } from '../param_sync.js';
+import { enumConstantName, optionIndex } from '../param_sync.js';
 
 /** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[]}} ParameterDefinition */
 /** @typedef {{document: *, descriptor_digest?: string}} CompiledDocument */
@@ -82,7 +82,7 @@ export function applyChainDocument({
     if (definition.readonly) return refuse(`"${parameterId}" is read-only`);
     let stored = value;
     if (typeof value === 'string') {
-      const index = definition.options?.indexOf(value) ?? -1;
+      const index = optionIndex(definition, value);
       if (index < 0) return refuse(`"${parameterId}" has no option "${value}"`);
       stored = index;
     }

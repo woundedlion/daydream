@@ -586,7 +586,15 @@ function color(css, selector, property) {
   for (let depth = 0; value.includes('var('); depth += 1) {
     assert.ok(depth < 8,
       `${selector} ${property} resolves to ${value}, a var() this reader loops on`);
-    value = value.replace(/var\(\s*(--[\w-]+)\s*\)/g, (_, token) => color(css, ':root', token));
+    value = value.replace(/var\(\s*(--[\w-]+)\s*(?:,\s*([^()]+))?\)/g,
+      (_, token, fallback) => {
+        const local = ruleBody(css, selector).match(
+          new RegExp(`(?:^|;)\\s*${token}\\s*:\\s*([^;]+)`));
+        if (local) return local[1].trim();
+        const root = rules(css).filter(([name]) => name === ':root')
+          .some(([, body]) => body.includes(`${token}:`));
+        return root ? color(css, ':root', token) : fallback ?? color(css, ':root', token);
+      });
   }
   return value;
 }
