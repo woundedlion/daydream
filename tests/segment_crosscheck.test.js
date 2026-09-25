@@ -7,8 +7,8 @@
 // That file is emitted by the engine's tools/pov_segment_map_export.cpp — a TU
 // compiled against hardware/pov_segment_map.h — pinned against the header by the
 // engine's unit_pov_segment_map_golden CTest, and installed into this checkout
-// alongside the WASM module. The deploy gate diffs the committed copy against the
-// engine checkout it pins to the module's SHA. So a C++-side convention change
+// alongside the WASM module from the verified engine bundle. Its checksum and
+// source revision travel with that bundle. A C++-side convention change
 // cannot leave this cross-check green: the reference table moves with the header,
 // and computeSegmentRange is then measured against the new convention.
 //
