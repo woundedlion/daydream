@@ -83,7 +83,7 @@ test('the hue dropdown restores its previous mode after a refused handoff', () =
   const select = { value: 'CUSTOM' };
   const context = {
     PaletteV4: { hueMode: { HARMONY: 0, CUSTOM: 1, SWEEP: 2 }, domain: { LOOP: 1 } },
-    previousHueMode: 0, paletteEnumOrdinal: () => 1,
+    previousHueMode: 0, selectedHueKey: 0, activeHueKey: null, paletteEnumOrdinal: () => 1,
     readPaletteRecipe: () => ({ hue: {}, domain: 0 }), customBaseTurns: () => 0,
     activateCustomHue: () => false,
   };

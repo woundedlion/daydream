@@ -1,10 +1,10 @@
-import { installFakeTimers } from './fake_timers.js';
 //
 // SegmentController — unit coverage for the generation-fence drop, the
 // worker-fault deadlock-break latch, and the quadrant compositor. Driven by a
 // fake Worker and a fake driver injected as a constructor dependency.
 //
-// Run: node --test --experimental-test-module-mocks "tests/*.test.js"
+// Run: npm test
+import { installFakeTimers } from './fake_timers.js';
 import { test, mock, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { unpinnedEngineMethods } from './fake_engine.js';
@@ -77,14 +77,14 @@ const consoleMocks = Object.keys(EXPECTED_CONSOLE_MESSAGES)
     if (!expected) originalConsole[method](...args);
   }));
 
-// The pool spawn, its watchdog and the segmented fallback are all downstream of
-// this promise, so a warm that never settles leaves the toggle reading Enabled
-// with no workers behind it and no fault anywhere.
-
-
-// The window is a wall-clock span, so these drive a warmer of their own with an
-// injected clock: on the page's shared warmer the reading would be whatever the
-// suite's own scheduling left behind.
+test('a worker clone failure records no delivered message', () => {
+  const worker = new FakeWorker('worker.js', {});
+  assert.throws(() => worker.postMessage({ type: 'bad', value: Symbol('uncloneable') }),
+    { name: 'DataCloneError' });
+  assert.deepEqual(worker.sent, []);
+  assert.deepEqual(worker.posted, []);
+  assert.deepEqual(worker.transfers, []);
+});
 
 test('a warmed binary is compiled once and handed to every worker', async () => {
   await warmModules({

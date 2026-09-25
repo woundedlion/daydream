@@ -1,4 +1,4 @@
-import { fixedDerivedBinding } from '../shader/shader_workbench.mjs';
+import { fixedDerivedBinding, compileShaderDocument, DEFAULT_LIMITS, exportShaderDocumentJson, validateShaderDocument } from '../shader/shader_workbench.mjs';
 import { afterEach, beforeEach, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -6,9 +6,6 @@ import { gzipSync } from 'node:zlib';
 
 import { shaderWorkbenchUrl, start } from '../daydream.js';
 import { WORKBENCH_EFFECTS } from '../effect_roster.js';
-import {
-  compileShaderDocument, DEFAULT_LIMITS, exportShaderDocumentJson, validateShaderDocument,
-} from '../shader/shader_workbench.mjs';
 import { scratchChainDocument } from '../tools/chain_document_store.js';
 import {
   decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,

@@ -35,13 +35,13 @@ test('start assembles the app and hands back its teardown', () => {
   assert.equal(teardown.disposed(), false);
   assert.equal(guis[0].namespace, 'view',
     "the global GUI root must keep the 'view' namespace its deep links are built from");
-  assert.deepEqual(listeners.map(([type]) => type),
+  assert.deepEqual(listeners.map(({ type }) => type),
     ['keydown', 'error', 'unhandledrejection', 'pagehide']);
 });
 
 test('a dismiss button that mounts after startup still clears the notice', () => {
   const { docListeners, elements, queried } = startApp();
-  const clicks = docListeners.filter(([type]) => type === 'click');
+  const clicks = docListeners.filter(({ type }) => type === 'click');
   assert.equal(clicks.length, 1,
     'the dismiss click is delegated to the document, not bound to one element');
 
@@ -53,7 +53,7 @@ test('a dismiss button that mounts after startup still clears the notice', () =>
   elements.get('apply-notice-text').textContent = 'Effect change was rejected.';
 
   const before = queried.length;
-  clicks[0][1]({ target: dismiss });
+  clicks[0].handler({ target: dismiss });
 
   assert.equal(body.hidden, true);
   assert.equal(elements.get('apply-notice-text').textContent, '');
@@ -136,7 +136,7 @@ test('the record button is offered only once an engine exists', () => {
 
 test('a keydown on the page target reaches the driver', () => {
   const { driver, listeners } = startApp();
-  const [, onKeyDown] = listeners.find(([type]) => type === 'keydown');
+  const { handler: onKeyDown } = listeners.find(({ type }) => type === 'keydown');
 
   onKeyDown({ key: ' ', target: {}, preventDefault() {} });
   assert.equal(driver.keys.length, 1, 'the global handler must dispatch to the driver');

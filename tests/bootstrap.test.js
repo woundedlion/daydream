@@ -482,6 +482,9 @@ test('refreshModuleCache skips cross-origin and unrelated resources', async () =
     performance: fakeTimeline(
       'https://cdn.jsdelivr.net/npm/three@0.183.1/build/three.module.js',
       'https://cdn.jsdelivr.net/npm/some-pkg/dist/some.wasm',
+      'http://localhost:8000/index.html',
+      'http://localhost:8000/favicon.svg',
+      'http://localhost:8000/image.png',
       'http://localhost:8000/styles/index.css',
       'http://localhost:8000/pov_segment_map.json',
       'http://localhost:8000/bootstrap.js',

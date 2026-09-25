@@ -1,9 +1,8 @@
-import { fakeTimers } from './fake_timers.js';
+import { fakeTimers, fakeScheduler } from './fake_timers.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
-import { fakeScheduler } from './fake_timers.js';
 import { repointDisplayAliases } from '../display_aliases.js';
 import {
   createRenderAdapter,
@@ -795,7 +794,7 @@ function makeTicker({
 } = {}) {
   const requested = [];
   const state = { effect, engineReady, listIndex: 0 };
-  const timer = fakeScheduler();
+  const timer = fakeScheduler({ repeat: true });
   const ticker = createTestAllTicker({
     intervalMs: 1000,
     availableEffects: () => lists[state.listIndex],

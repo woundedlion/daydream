@@ -588,15 +588,15 @@ test('an initial apply that trapped the module is reported as the trap', async (
 test('the page-failure surface is the shared one, and it is torn down', () => {
   const { teardown, listeners, win } = startApp();
   const failureListeners = () => listeners.filter(
-    ([type]) => type === 'error' || type === 'unhandledrejection');
+    ({ type }) => type === 'error' || type === 'unhandledrejection');
 
-  assert.deepEqual(failureListeners().map(([type]) => type),
+  assert.deepEqual(failureListeners().map(({ type }) => type),
     ['error', 'unhandledrejection'],
     'a synchronous throw from an animation frame, a lil-gui onChange, or a DOM '
     + 'listener is console-only without the error listener the shared surface '
     + 'installs alongside the rejection one');
 
-  const [, onError] = failureListeners()[0];
+  const { handler: onError } = failureListeners()[0];
   const { messages } = captureConsole(
     () => onError({ target: win, error: new Error('boom') }));
   assert.match(messages.join('\n'), /simulator error:.*boom/,
@@ -608,16 +608,12 @@ test('the page-failure surface is the shared one, and it is torn down', () => {
     'a listener that outlives the page discard reports into a dead app');
 });
 
-test('the composition root rejects a stale segmented-controller module', () => {
-  const at = SOURCE.indexOf(
-    'SEGMENT_CONTROLLER_API_VERSION !== EXPECTED_SEGMENT_CONTROLLER_API_VERSION');
-  assert.ok(at > 0,
-    'a controller from a different API generation must fail at module '
-    + 'evaluation, before there is an app for a case to drive');
-  assert.match(sliceTo(at, '\n}'), /throw new StaleModuleError\(/,
-    'the guard is the stale-cache case the boot overlay carries a remedy for: '
-    + 'a plain Error reads as a failure past the module graph and is offered '
-    + 'none (tests/bootstrap.test.js pins the classification)');
+test('the composition root rejects a stale segmented-controller module', async (t) => {
+  const actual = await import('../segment_controller.js');
+  t.mock.module('../segment_controller.js', {
+    namedExports: { ...actual, SEGMENT_CONTROLLER_API_VERSION: -1 },
+  });
+  await assert.rejects(import('../daydream.js?stale-controller-test'), { name: 'StaleModuleError' });
 });
 
 test('a parameter write does not clear a rejected switch', async () => {
@@ -989,6 +985,7 @@ test('stopping and restarting recording clears deferred captures between frames'
   rig.driver.heldCaptures = 3;
   rig.button.object.record();
   assert.equal(rig.driver.heldCaptures, 0);
+  rig.driver.heldCaptures = 3;
   rig.button.object.record();
   assert.equal(rig.driver.heldCaptures, 0);
 });

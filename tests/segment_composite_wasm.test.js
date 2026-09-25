@@ -12,7 +12,7 @@
 // only because they reach the same effect-load count on the same message
 // sequence, which is what makes the stitch meaningful and is checked below.
 //
-// Run: node --test --experimental-test-module-mocks "tests/segment_composite_wasm.test.js"
+// Run: npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import createHolosphereModule from '../holosphere_wasm.js';

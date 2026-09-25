@@ -3,7 +3,7 @@
 // metric lands in, which source each fault code names, and the text-node-only
 // fault message.
 //
-// Run: node --test --experimental-test-module-mocks "tests/*.test.js"
+// Run: npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
