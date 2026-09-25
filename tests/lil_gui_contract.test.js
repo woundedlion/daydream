@@ -10,6 +10,7 @@
 // object[prop]` and returns undefined for anything it has no controller for,
 // after logging. A double that hands back a controller for every property turns
 // a browser-side `TypeError: … reading 'onChange'` into a green run.
+import { DeepLinkGUI } from '../gui.js';
 import { fakeGui } from './fake_app.js';
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -257,14 +258,24 @@ test('addColor and addFolder hand back the shapes the GUI layer wraps', async ()
   assert.deepEqual(gui.children, [], 'destroy() empties the panel');
 });
 
-for (const namespace of ['test', {}]) {
-test(`the shared GUI rejects unsupported properties with ${typeof namespace} namespace`, () => {
-  const gui = fakeGui(namespace);
-  for (const object of [{}, { value: null }, { value: undefined }, { value: {} }]) {
-    assert.throws(() => gui.add(object, 'value'), TypeError);
-    assert.throws(() => gui.addSession(object, 'value'), /DeepLinkGUI: unsupported property/);
-  }
-  assert.ok(gui.add({}, 'value', ['a', 'b']));
-  assert.equal(gui.controllers.length, 1);
-});
+for (const search of ['', '?test.value=x']) {
+  test(`DeepLinkGUI and its double reject unsupported values with URL ${search}`, async () => {
+    const real = await realGUI();
+    const gui = new DeepLinkGUI(real, 'test', null, {
+      location: { search, pathname: '/', hash: '' },
+    });
+    const fake = fakeGui(search ? { value: 'x' } : {});
+    for (const factory of [() => ({}), () => ({ value: null }),
+      () => ({ value: undefined }), () => ({ value: {} })]) {
+      for (const target of [gui, fake]) {
+        const object = factory();
+        const before = object.value;
+        assert.throws(() => target.add(object, 'value'), TypeError);
+        assert.equal(object.value, before);
+        assert.throws(() => target.addSession(object, 'value'), TypeError);
+      }
+    }
+    assert.ok(gui.add({}, 'value', ['a', 'b']));
+    assert.ok(fake.add({}, 'value', ['a', 'b']));
+  });
 }
