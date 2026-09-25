@@ -677,7 +677,7 @@ export async function probeDocumentActions(tab) {
     'the digest button copies the full descriptor digest');
   await tab.waitForFunction(() => location.hash.startsWith('#shader=v1.'));
   const linked = await tab.evaluate(async () => {
-    const { decodeShaderStateHash } = await import('./shader_deeplink.js');
+    const { decodeShaderStateHash } = await import('../src/workbench/shader/shader_deeplink.js');
     return decodeShaderStateHash(location.hash);
   });
   check(linked.document.descriptor.chain[0].label === 'camera-rotate' && linked.bypassed.length === 0,

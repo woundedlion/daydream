@@ -175,8 +175,8 @@ export async function probeChain(tab) {
   await tab.click('#saveBtn');
   await tab.waitForSelector('#savedList [data-copy="recipe_cpp"]');
   const expected = await tab.evaluate(async () => {
-    const { generateRecipeCpp } = await import('./solid_codegen.js');
-    const { generateRegistryCpp } = await import('./solid_registry_codegen.js');
+    const { generateRecipeCpp } = await import('../src/workbench/solids/solid_codegen.js');
+    const { generateRegistryCpp } = await import('../src/workbench/solids/solid_registry_codegen.js');
     const item = JSON.parse(localStorage.getItem('daydream.savedSolids.v1')).at(-1);
     return [generateRecipeCpp(item, 'Archimedean'), generateRegistryCpp(item)];
   });
@@ -194,8 +194,8 @@ export async function probeChain(tab) {
 export async function probeNumericInputs(tab) {
   const { failures, check } = checks();
   const values = await tab.evaluate(async () => {
-    const { buildOpRow } = await import('./solid_op_rows.js');
-    const { OP_DEFS } = await import('./solid_codegen.js');
+    const { buildOpRow } = await import('../src/workbench/solids/solid_op_rows.js');
+    const { OP_DEFS } = await import('../src/workbench/solids/solid_codegen.js');
     return ['truncate', 'chamfer'].map((op) => {
       const row = buildOpRow({ op, params: { t: '0.3" autofocus onfocus="alert(1)' } }, 0, {
         opDef: OP_DEFS[op],

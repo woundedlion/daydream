@@ -216,7 +216,7 @@ async function smokePage(browser, origin, page) {
     if (page === 'tools/shader.html') await smokeTwistParameters(tab);
     if (page === 'index.html') {
       await tab.evaluate(async () => {
-        const { selectMimeType } = await import('/recorder.js');
+        const { selectMimeType } = await import('/src/recording/recorder.js');
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = 32;
         document.body.appendChild(canvas);

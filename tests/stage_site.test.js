@@ -18,7 +18,7 @@ function fixture(t) {
   const site = join(scratch, 'site');
   const write = (base, path, value) => { mkdirSync(dirname(join(base, path)), { recursive: true }); writeFileSync(join(base, path), value); };
   write(root, 'src/app/daydream.js', 'export const app = true;\n');
-  write(root, 'site_manifest.txt', '# source\n\nsrc/app/daydream.js\nshader/patterns/old.shader.json\n');
+  write(root, 'site_manifest.txt', '# source\n\nsrc/app/daydream.js\ngenerated/shader/patterns/old.shader.json\n');
   write(root, 'generated/shader/patterns/old.shader.json', '{}');
   write(root, 'generated/holosphere_wasm.sha', 'a'.repeat(40));
   const git = (...args) => execFileSync('git', ['-C', root, ...args], { env: isolatedGitEnv(), encoding: 'utf8' }).trim();
