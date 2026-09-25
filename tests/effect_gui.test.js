@@ -2145,9 +2145,6 @@ test('an effect switch clears the skew latch', () => {
     'the next effect gets its own skew episode');
 });
 
-// The Export action copies the live values, and reports the outcome on its own
-// button.
-
 test('preset controls carry icon labels and accessible names', () => {
   const h = makeHarness({ presetCount: 3, presetIndex: 0 });
   h.panel.build();
@@ -2356,6 +2353,8 @@ test('effects without presets do not show preset navigation', () => {
     'repeat(2, minmax(0px, 1fr))');
 });
 
+// The Export action copies the live values, and reports the outcome on its own
+// button.
 test('Export copies the live values as a C++ brace-init list', async () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   const h = makeHarness({ params: [SPEED, GLOW], engineValues: [0.25, 1] });
@@ -2631,8 +2630,6 @@ test('mount before build does nothing', () => {
 
   assert.deepEqual(h.container.children, []);
 });
-
-// destroy() must leave nothing of the panel behind.
 
 test('a drag registers window listeners that the pointer release drains', () => {
   const h = makeHarness({ params: [SPEED] });
@@ -2913,9 +2910,6 @@ test('a definition with no accepted value falls back to its requested target', (
     'the rung the whole-list persist writes');
 });
 
-// A second finger landing while a slider is held must neither re-latch the
-// control nor release it: the release the panel acts on is the opening
-// pointer's alone.
 test('a drag whose release never lands ends when the window loses focus', () => {
   const warning = 'Speed is faster than the segment stream can follow.';
   const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
@@ -2951,6 +2945,9 @@ test('a drag whose release never lands ends when the window loses focus', () => 
     .querySelector('.param-warning-note').textContent, warning);
 });
 
+// A second finger landing while a slider is held must neither re-latch the
+// control nor release it: the release the panel acts on is the opening
+// pointer's alone.
 test('a second pointer neither re-latches a held control nor releases it', () => {
   const speed = { name: 'Speed', value: 0.1, min: 0, max: 1, animated: true };
   const h = makeHarness({
@@ -3015,6 +3012,7 @@ test('toggles and dropdowns are never drag-tracked', () => {
   assert.deepEqual(h.dragTarget.listeners, []);
 });
 
+// destroy() must leave nothing of the panel behind.
 test('destroy detaches the panel DOM and tears the GUI down', () => {
   const h = makeHarness({ params: [SPEED] });
   h.panel.build();

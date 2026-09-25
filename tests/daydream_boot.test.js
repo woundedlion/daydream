@@ -242,8 +242,6 @@ function fakeWasmModule({
   return module;
 }
 
-// The double every case below boots on: a method the real engine never had
-// would let all of them pass over a surface the browser cannot answer.
 test('a booted render reconciles live panel values', async () => {
   const module = fakeWasmModule({ definitions: [
     { name: 'Speed', value: 0.2, min: 0, max: 1, animated: true },
@@ -255,6 +253,8 @@ test('a booted render reconciles live panel values', async () => {
   assert.equal(controls.find((control) => control.property === 'Speed').getValue(), 0.75);
 });
 
+// The double every case below boots on: a method the real engine never had
+// would let all of them pass over a surface the browser cannot answer.
 test('the boot double mocks only methods the engine has', () => {
   const { HolosphereEngine } = fakeWasmModule();
   assert.deepEqual(unpinnedEngineMethods(new HolosphereEngine()), []);
