@@ -373,6 +373,7 @@ test('PaletteOps publishes every effect-owned GenerativePalette recipe', () => {
       'Raymarch',
       'ShaderWorkbench Liquid',
       'ShaderWorkbench Flyby',
+      'HyperLattice',
     ]);
     assert.deepEqual(presets.filter((preset) => preset.randomHue)
       .map((preset) => preset.name), [
