@@ -79,7 +79,7 @@ test('staging rejects unsafe committed paths and untracked source entries', (t) 
   f.write(f.root, 'private.js', 'private');
   f.git('add', '--', 'site_manifest.txt');
   f.git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'untracked entry');
-  assert.throws(() => stageSite(f.root, f.bundle, f.site, { ...f.pair, daydream: f.git('rev-parse', 'HEAD') }), /not.*HEAD|exists on disk/i);
+  assert.throws(() => stageSite(f.root, f.bundle, f.site, { ...f.pair, daydream: f.git('rev-parse', 'HEAD') }), /Site entry is not committed: private\.js/);
 });
 
 test('staging rejects symlink directories escaping the selected checkout', (t) => {
