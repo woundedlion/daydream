@@ -434,6 +434,15 @@ test('parabolic at t=2.5 translates by 2 along the real axis', () => {
   assertComplex(c.D, 1, 0, 'D');
 });
 
+test('parabolic translation stays inside the pad without wrap discontinuities', () => {
+  for (let i = -2000; i <= 2000; ++i) {
+    const t = i / 100;
+    const value = parabolic(t).B.re;
+    assert.ok(value >= -2 && value <= 2);
+    assert.ok(Math.abs(parabolic(t + 0.001).B.re - value) <= 0.0008000001);
+  }
+});
+
 /** cayley(1): p = t * 0.5 = 0.5, the half-blend of identity toward (1,-i,1,i). */
 test('cayley at t=1 is the half-blend toward the Cayley map', () => {
   const c = cayley(1);

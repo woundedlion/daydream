@@ -181,7 +181,7 @@ const presets = [
   {
     id: 'parabolic',
     name: 'Parabolic (Drift)',
-    desc: 'Continuous translation along Real axis.',
+    desc: 'Continuous translation bouncing between -2 and 2 on the real axis.',
     animate: true,
     update: (t) => parabolic(t)
   },
