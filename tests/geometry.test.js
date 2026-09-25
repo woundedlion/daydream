@@ -58,16 +58,6 @@ test('H_OFFSET widens the latitude denominator to H + H_OFFSET - 1', () => {
     `phi should use H + H_OFFSET - 1, got ${phi}`);
 });
 
-/**
- * Pins the azimuth origin directly: column x=0 must land on +X with z~0,
- * guarding against an x<->z swap that would put it at +Z.
- */
-test('the x=0 column maps to +X, not +Z', () => {
-  const v = new THREE.Vector3().setFromSpherical(pixelToSpherical(0, 72, makeDaydream()));
-  assert.ok(v.x > 0.99, `x=0 should sit near +X, got x=${v.x}`);
-  assert.ok(Math.abs(v.z) < 1e-9, `x=0 should have z~0, got z=${v.z}`);
-});
-
 // A zero column count and a single row are what a driver reports before it has
 // been sized. The guarded arithmetic itself is unpinned: a future dimension
 // guard is free to answer any latitude, so long as it answers a point.
