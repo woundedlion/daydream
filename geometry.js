@@ -22,7 +22,7 @@ const TWO_PI = 2 * Math.PI;
  *
  * Latitude uses `y·π/(H + H_OFFSET − 1)`, matching the engine's
  * `pixel_to_vector`, which maps phi over `H + H_OFFSET` virtual rows
- * (core/math/geometry.h). The WASM/sim build runs with `Daydream.H_OFFSET == 0`
+ * (core/math/pixel_mapping.h). The WASM/sim build runs with `Daydream.H_OFFSET == 0`
  * (virtual row count == H), so the simulator maps the full sphere; the device's
  * south-pole clipping (H_OFFSET == 3) is a compile-time engine fork the sim
  * does not reproduce (see the device/host divergence ledger).

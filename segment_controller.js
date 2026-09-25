@@ -699,53 +699,45 @@ export class SegmentController {
   #onSegmentFrame(i, msg) {
     // A halted pool zeroed `pending`; ignore late frames so it can't go negative.
     if (this.faulted) return;
-    // This handler belongs to worker `i`, so its frame must carry segId i.
-    // The identity check subsumes a range check and rejects NaN/undefined,
-    // which would otherwise index `scratch`/`frameSeen` by string key and
-    // settle the barrier with a segment absent — publishing a torn frame
-    // the recorder counts as real. Staging it is unsafe and dropping it
-    // leaves `pending` short until the render watchdog reports a stall
-    // that names neither this worker nor the id it sent, so the protocol
-    // violation faults here with both.
     if (msg.segId !== i) {
       this.onWorkerFault(i, `worker seg ${i} reported a frame tagged segId `
         + `${String(msg.segId)}; a frame the pool cannot attribute is a `
         + 'protocol violation (stale cached worker or glue)');
       return;
-  }
-  // Count and stage only the first message from each segment.
-  if (this.#frameSeen[msg.segId]) return;
-  // Generation fence: keep only results from the current resolution; still
-  // settle the frame either way.
-  if (this.#inflightGen === this.#renderGen) {
-    // Mirror segment 0's live params for GUI sync, inside the fence so a
-    // stale-generation frame can't publish params against a new descriptor
-    // list.
-    if (msg.segId === 0) {
-      this.presetCount = msg.presetCount ?? null;
-      if (msg.paramRevision >= this.presetRevision)
-        this.presetIndex = msg.presetIndex ?? null;
-      if (msg.paramValues && msg.paramRevision === this.paramRevision)
-        this.paramValues = msg.paramValues;
     }
-    this.#scratch[msg.segId] = {
-      pixels: msg.pixels,
-      x0: msg.x0, x1: msg.x1,
-      y0: msg.y0, y1: msg.y1,
-    };
-    this.#timings[msg.segId] = msg.elapsed;
-    this.#arenas[msg.segId] = msg.arenaMetrics;
-    this.#fullFrames[msg.segId] = msg.fullFrame === true;
-    this.#warnings[msg.segId] = msg.warnings ?? null;
-  }
-  this.#frameSeen[msg.segId] = true;
-  this.#pending--;
-  if (this.#pending === 0 && this.#frameResolve) {
-    this.#frameResolve();
-    this.#frameResolve = null;
-  } else if (this.#pending > 0) {
-    this.armRenderWatchdog();
-  }
+    // Count and stage only the first message from each segment.
+    if (this.#frameSeen[msg.segId]) return;
+    // Generation fence: keep only results from the current resolution; still
+    // settle the frame either way.
+    if (this.#inflightGen === this.#renderGen) {
+      // Mirror segment 0's live params for GUI sync, inside the fence so a
+      // stale-generation frame can't publish params against a new descriptor
+      // list.
+      if (msg.segId === 0) {
+        this.presetCount = msg.presetCount ?? null;
+        if (msg.paramRevision >= this.presetRevision)
+          this.presetIndex = msg.presetIndex ?? null;
+        if (msg.paramValues && msg.paramRevision === this.paramRevision)
+          this.paramValues = msg.paramValues;
+      }
+      this.#scratch[msg.segId] = {
+        pixels: msg.pixels,
+        x0: msg.x0, x1: msg.x1,
+        y0: msg.y0, y1: msg.y1,
+      };
+      this.#timings[msg.segId] = msg.elapsed;
+      this.#arenas[msg.segId] = msg.arenaMetrics;
+      this.#fullFrames[msg.segId] = msg.fullFrame === true;
+      this.#warnings[msg.segId] = msg.warnings ?? null;
+    }
+    this.#frameSeen[msg.segId] = true;
+    this.#pending--;
+    if (this.#pending === 0 && this.#frameResolve) {
+      this.#frameResolve();
+      this.#frameResolve = null;
+    } else if (this.#pending > 0) {
+      this.armRenderWatchdog();
+    }
   }
 
   /**
@@ -1192,8 +1184,6 @@ export class SegmentController {
 
   /**
    * Whether `results` holds a published generation the overrun path can re-blit.
-   * An indexed loop rather than Array.some: this runs on every tick a render
-   * overruns.
    * @returns {boolean} True when at least one segment carries pixels.
    */
   hasPublishedFrame() {

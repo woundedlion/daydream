@@ -16,23 +16,27 @@ export const WARM_INTERVAL_MS = 10000;
 export const WARM_DEADLINE_MS = 20000;
 
 /**
- * Settle a warm on the earlier of its own completion and a deadline.
- * @param {Promise<void>} work - The warm in flight.
- * @param {number} ms - The deadline, in milliseconds.
- * @param {{setTimeout: Function, clearTimeout: Function}} timers - Timer source;
- *   the page, or whatever stands in for it under test.
- * @param {() => void} abandon - Runs when the deadline wins.
- * @returns {Promise<void>} Resolves either way: the spawn behind it must run.
+ * @template T
+ * @param {() => Promise<T>} start - Starts the operation.
+ * @param {number} ms - Deadline in milliseconds.
+ * @param {{setTimeout: Function, clearTimeout: Function}} timers - Timer source.
+ * @param {() => T} expire - Deadline result, or a thrown deadline error.
+ * @returns {Promise<T>} The operation or deadline result.
  */
-function warmWithDeadline(work, ms, timers, abandon) {
+export function raceDeadline(start, ms, timers, expire) {
   /** @type {any} */
   let timer = null;
-  const expired = new Promise((resolve) => {
-    timer = timers.setTimeout(() => { abandon(); resolve(undefined); }, ms);
-    // No-op in browsers; keeps an unfired deadline from holding the unit-test
-    // process open.
+  const expired = new Promise((resolve, reject) => {
+    timer = timers.setTimeout(() => {
+      try { resolve(expire()); } catch (error) { reject(error); }
+    }, ms);
     timer?.unref?.();
   });
+  let work;
+  try { work = start(); } catch (error) {
+    timers.clearTimeout(timer);
+    return Promise.reject(error);
+  }
   return Promise.race([work, expired]).finally(() => timers.clearTimeout(timer));
 }
 
@@ -145,7 +149,7 @@ export class ModuleWarmer {
         + 'will fetch and compile its own', error);
       return Promise.resolve();
     }
-    warm = warmWithDeadline(warm, deadlineMs, timers, () => {
+    warm = raceDeadline(() => warm, deadlineMs, timers, () => {
       controller.abort();
       // The binary never arrived, so a module held from an earlier warm can no
       // longer be claimed to match the one being served.

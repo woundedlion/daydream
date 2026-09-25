@@ -3,6 +3,8 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import { raceDeadline } from './module_warmer.js';
+
 /**
  * The composition root's frame, timer, and teardown wiring: the per-frame adapter
  * the driver calls, the global keydown shortcuts, the Test All walk, the module
@@ -332,25 +334,8 @@ export const MODULE_TRAP_NOTICE = 'The rendering engine hit an unrecoverable'
  * Wrap the render loop's per-frame body so a throw cannot freeze the page, and
  * stop the loop for good once the engine module reports itself dead.
  *
- * Three.js re-arms requestAnimationFrame only after the callback returns, so an
- * escaping throw stops the loop for the page's lifetime, silently and with the
- * last frame still on screen. Catching keeps the loop armed and keeps calling
- * the body: a failure is often per-frame state the next frame clears, and an
- * effect or resolution switch runs from an event handler, outside the loop, so
- * the user can still drive the app back to something that renders. A failure is
- * logged and banner-reported once, then not again until FRAME_GUARD_REARM_FRAMES
- * consecutive frames have rendered cleanly — a body throwing every frame (or
- * every other one) would otherwise report at display rate, while a latch that
- * never re-armed would swallow a later, unrelated failure for the page's
- * lifetime.
- *
- * A dead module outranks that re-arm. Its trap unwound nothing, so the frames
- * that follow are plausible rather than correct and need not throw at all — the
- * clean run that re-arms the report is exactly what a trapped module produces.
- * moduleDead() is therefore polled after every frame, throwing or not, and what
- * it reports is terminal: the body is never called again, no later clean frame
- * retracts the banner, and onModuleDead() releases the app so the page stops
- * presenting output it cannot stand behind.
+ * Reports re-arm after FRAME_GUARD_REARM_FRAMES clean frames. A dead module
+ * stops the loop permanently and releases the app.
  *
  * @param {Object} deps - Injected collaborators.
  * @param {() => void} deps.frame - The per-frame body.
@@ -451,27 +436,9 @@ export function loadWithDeadline(load, {
   ms = MODULE_LOAD_DEADLINE_MS,
   timers = globalThis,
 } = {}) {
-  /** @type {any} */
-  let timer = null;
-  const deadline = new Promise((_, reject) => {
-    timer = timers.setTimeout(() => reject(new Error(
-      `The rendering engine did not load within ${Math.round(ms / 1000)} seconds.`)), ms);
-    // No-op in browsers; keeps an unfired deadline from holding the unit-test
-    // process open.
-    timer?.unref?.();
+  return raceDeadline(load, ms, timers, () => {
+    throw new Error(`The rendering engine did not load within ${Math.round(ms / 1000)} seconds.`);
   });
-  // A synchronous throw from load() would escape before the race is built,
-  // leaving the deadline armed to reject unhandled long after the failure UI is
-  // up. Routed into the same rejection every other failure takes.
-  let started;
-  try {
-    started = load();
-  } catch (err) {
-    timers.clearTimeout(timer);
-    return Promise.reject(err);
-  }
-  return Promise.race([started, deadline])
-    .finally(() => timers.clearTimeout(timer));
 }
 
 /**

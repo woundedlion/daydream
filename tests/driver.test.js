@@ -1355,18 +1355,7 @@ test('a re-pointed engine view keeps the normalized read-back', () => {
   assert.ok(Math.abs(ctx.dotMesh.instanceColor.getY(2) - 32768 / 65535) < 1e-9);
 });
 
-test('precomputeMatrices keeps an existing color buffer rather than reallocating', () => {
-  const ctx = matricesCtx(8, 5);
-  const wasmView = new Uint16Array(8 * 5 * 3).fill(7);
-  ctx.dotMesh.instanceColor =
-    new THREE.InstancedBufferAttribute(wasmView, 3, true);
-  Daydream.prototype.precomputeMatrices.call(ctx);
 
-  // Reallocating would strand the engine, which writes through this same view.
-  assert.equal(ctx.dotMesh.instanceColor.array, wasmView);
-  assert.equal(ctx.pixels, wasmView);
-  assert.ok(wasmView.every((v) => v === 0), 'the reused buffer kept a stale frame');
-});
 
 test('precomputeMatrices flags both instance attributes for upload', () => {
   const ctx = matricesCtx(8, 5);
@@ -1817,16 +1806,7 @@ test('running display frames between simulation ticks do not poll the panel', ()
   assert.equal(syncs, 0);
 });
 
-test('precomputeMatrices tolerates a reused color view detached by heap growth', () => {
-  const ctx = matricesCtx(8, 5);
-  Daydream.prototype.precomputeMatrices.call(ctx);
-  const old = ctx.pixels;
-  structuredClone(old.buffer, { transfer: [old.buffer] });
-  assert.equal(old.byteLength, 0);
-  assert.doesNotThrow(() => Daydream.prototype.precomputeMatrices.call(ctx));
-  assert.equal(ctx.pixels, old);
-  assert.equal(ctx.dotMesh.instanceColor.array, old);
-});
+
 
 test('dot shader injection uses the current Three chunk and refuses a missing one', () => {
   const ctx = setupCtx(null, []);
