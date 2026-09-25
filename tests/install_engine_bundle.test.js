@@ -1,10 +1,17 @@
-import { test } from 'node:test';
+import { after, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { installEngineBundle } from '../scripts/install-engine-bundle.mjs';
+
+const AMBIENT_BUNDLE_PIN = process.env.HOLOSPHERE_BUNDLE_PIN;
+beforeEach(() => { delete process.env.HOLOSPHERE_BUNDLE_PIN; });
+after(() => {
+  if (AMBIENT_BUNDLE_PIN === undefined) delete process.env.HOLOSPHERE_BUNDLE_PIN;
+  else process.env.HOLOSPHERE_BUNDLE_PIN = AMBIENT_BUNDLE_PIN;
+});
 
 /**
  * @param {import('node:test').TestContext} t - The case, for cleanup.
@@ -81,7 +88,6 @@ test('bundle paths cannot escape the destination', (t) => {
 // from any other engine commit is refused whole.
 test('a bundle from another engine commit than the declared pin is refused', (t) => {
   const { bundle, destination } = fixture(t);
-  t.after(() => { delete process.env.HOLOSPHERE_BUNDLE_PIN; });
   process.env.HOLOSPHERE_BUNDLE_PIN = 'c'.repeat(40);
   assert.throws(() => installEngineBundle(bundle, destination),
     new RegExp(`source pin differs from ${'c'.repeat(40)}`));
