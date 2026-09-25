@@ -1442,9 +1442,8 @@ export function createOpGate(validator, retries = 3) {
    */
   async function refresh(base, ops, candidates, mesh = null) {
     const signature = `${base}|${ops.map(opTopologyKey).join(',')}`;
-    if (abandoned || signature === lastSignature) return null;
-
     const started = ++generation;
+    if (abandoned || signature === lastSignature) return null;
     const { bad, complete } = await probe(base, structuredClone(ops), candidates, mesh);
     if (started !== generation) return null;
 
