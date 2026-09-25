@@ -165,7 +165,7 @@ test('an unresolvable value aborts before the first write', () => {
   assert.match(refusal, /"sample\.coverage-mode" has no option "shadow"/);
   assert.deepEqual(engine.writes, [],
     'the values resolve up front, so a late refusal writes none of them');
-  assert.ok(!order.some((step) => step.startsWith('setParameter')));
+  assert.ok(!order.includes('setShaderChainParameters'));
 });
 
 test('a read-only parameter is refused before the first write', () => {

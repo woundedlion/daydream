@@ -19,7 +19,7 @@ test('formatKB: defaults to one fractional digit', () => {
 
 /** Capacities are shown whole, so sub-KB values must round rather than truncate. */
 test('formatKB: rounds at the requested width', () => {
-  assert.equal(formatKB(1500, 0), '1');
+  assert.equal(formatKB(1800, 0), '2');
   assert.equal(formatKB(100), '0.1');
 });
 
