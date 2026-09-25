@@ -956,3 +956,12 @@ test('DeepLinkGUI names unsupported session properties', () => {
     /DeepLinkGUI: unsupported property "pending"/);
   assert.deepEqual(gui.collectUrlKeys(), []);
 });
+
+test('DeepLinkGUI refuses unsupported properties before URL hydration', () => {
+  installWindowAt('?fx.pending=x');
+  const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
+  const obj = { pending: null };
+  assert.throws(() => gui.add(obj, 'pending'), /unsupported property/);
+  assert.equal(obj.pending, null);
+  assert.deepEqual(gui.collectUrlKeys(), []);
+});
