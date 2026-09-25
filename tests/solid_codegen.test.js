@@ -1,3 +1,4 @@
+import { fakeModule as makeMeshOps } from './fake_meshops.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -39,7 +40,6 @@ const {
   opTopologyKey,
   meshOpFailure,
   requireMeshResult,
-  MESH_OP_RESULT_NAMES,
   MORPH_SWEEP,
   unsweepableReason,
 } =
@@ -992,42 +992,7 @@ test('createCommitQueue survives a rejected commit', async () => {
   assert.deepEqual(log, ['after']);
 });
 
-/**
- * Builds a fake WASM module whose meshes track their own deletion, with a hook
- * to make a chosen op throw and a set of call tokens ('base:<name>',
- * 'classifyFaces') the bridge answers with a null plus the given reason.
- */
-function fakeModule(onOp = () => { }, { rejects = new Set(), reason = 'ARENA_EXHAUSTED' } = {}) {
-  const state = { live: 0, cleared: 0 };
-  const MeshOpResult = Object.fromEntries(MESH_OP_RESULT_NAMES.map((name) => [name, Symbol(name)]));
-  let lastResult = MeshOpResult.OK;
-  const rejected = (token) => {
-    if (!rejects.has(token)) return false;
-    lastResult = MeshOpResult[reason];
-    return true;
-  };
-  const makeMesh = () => {
-    state.live++;
-    const mesh = {
-      deleted: false,
-      delete() { this.deleted = true; state.live--; },
-      classifyFaces() { onOp('classifyFaces'); return rejected('classifyFaces') ? null : new Int32Array(1); },
-    };
-    for (const op of KNOWN_OPS) {
-      mesh[op] = () => { onOp(op); return rejected(op) ? null : makeMesh(); };
-    }
-    return mesh;
-  };
-  const Mod = {
-    MeshOpResult,
-    MeshOps: {
-      fromSolidName(name) { onOp(`base:${name}`); return rejected(`base:${name}`) ? null : makeMesh(); },
-      clearToolingMemory() { state.cleared++; },
-      getLastResult() { return lastResult; },
-    },
-  };
-  return { Mod, state };
-}
+const fakeModule = (onOp = () => {}, options = {}) => makeMeshOps({ ...options, onOp });
 
 /** Verifies the recorded reason is read back by identity and names its remedy. */
 test('meshOpFailure routes each recorded reason', () => {
