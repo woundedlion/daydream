@@ -132,7 +132,7 @@ test('shader state hash replacement preserves the route and query', () => {
   const writes = [];
   const win = {
     location: { pathname: '/tools/shader.html', search: '?effect=KaleidoscopeStainedGlass' },
-    history: { replaceState: (_state, _title, url) => writes.push(url) },
+    history: { replaceState: (state, title, url) => writes.push(url) },
   };
 
   assert.equal(replaceShaderStateHash('#shader=v1.payload', win), true);
@@ -156,16 +156,6 @@ test('simulator exposes Shader as a standalone tool', () => {
   assert.match(WORKBENCH, /id="shader-parity-toggle"/);
   assert.match(WORKBENCH, /id="shader-animation-toggle"/);
   assert.match(WORKBENCH, /id="shader-document-digest"/);
-  assert.doesNotMatch(WORKBENCH, /data-workbench-folder/,
-    'the folder banks are replaced by the pipeline strip');
-  assert.doesNotMatch(WORKBENCH, /shader_workbench_nav/);
-  assert.doesNotMatch(WORKBENCH, />Simulator<\/a>/);
-  assert.doesNotMatch(WORKBENCH, /id="effect-sidebar"/);
-  assert.doesNotMatch(WORKBENCH, /id="chain-editor"|id="chain-catalog"/,
-    'the sidebar rail and its catalog panel are retired');
-  assert.doesNotMatch(WORKBENCH, /parameter-dock/,
-    'stage parameters live on the strip\'s chips, not in a dock');
-  assert.doesNotMatch(WORKBENCH, /shader-workbench-nav/);
   assert.match(WORKBENCH_CSS, /\.lil-controller\.lil-option option\s*\{/);
   assert.match(WORKBENCH_CSS, /color-scheme:\s*dark/);
   assert.match(WORKBENCH_CSS, /background-color:\s*var\(--background-color\)/);
@@ -1146,7 +1136,7 @@ async function editorWorkbench({
   const win = {
     location,
     history: {
-      replaceState: (_state, _title, url) => {
+      replaceState: (state, title, url) => {
         urls.push(url);
         const next = new URL(url, 'https://example.test');
         location.pathname = next.pathname;

@@ -182,7 +182,7 @@ test('blitToOffscreen clears the whole offscreen before drawing into it', () => 
   const log = [];
   rec.offCtx = {
     clearRect: (...a) => log.push(`clear:${a.join(',')}`),
-    drawImage: (_img, ...a) => log.push(`draw:${a.join(',')}`),
+    drawImage: (image, ...a) => log.push(`draw:${a.join(',')}`),
   };
 
   rec.blitToOffscreen();
@@ -1349,7 +1349,7 @@ test('the in-memory fallback sink stops the session at its byte bound', () => {
   try {
     const rec = new VideoRecorder(recordableCanvas());
     let downloaded = null;
-    rec.download = (_recorder, chunks) => { downloaded = chunks.length; };
+    rec.download = (recorder, chunks) => { downloaded = chunks.length; };
     const notified = [];
     rec.onError = (err) => notified.push(err);
 
@@ -2037,7 +2037,7 @@ test('createWritable rejection preserves every chunk for Downloads', async () =>
     const rec = new VideoRecorder(recordableCanvas());
     const finished = trackSinkFinish(rec);
     const downloads = [];
-    rec.download = (_encoder, chunks) => downloads.push([...chunks]);
+    rec.download = (encoder, chunks) => downloads.push([...chunks]);
     rec.start('fallback');
     const encoder = rec.mediaRecorder;
     const first = { size: 10 }, second = { size: 20 };

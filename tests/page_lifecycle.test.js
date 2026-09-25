@@ -195,8 +195,8 @@ test('watchMediaMatch runs only for matching changes and detaches', () => {
   let changed = null;
   let removed = null;
   const query = {
-    addEventListener: (_type, listener) => { changed = listener; },
-    removeEventListener: (_type, listener) => { removed = listener; },
+    addEventListener: (type, listener) => { changed = listener; },
+    removeEventListener: (type, listener) => { removed = listener; },
   };
   let runs = 0;
   const stop = watchMediaMatch(query, () => { runs++; });
