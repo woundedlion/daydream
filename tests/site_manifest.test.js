@@ -1,7 +1,7 @@
 // site_manifest.txt is the served set: deploy.yml stages exactly its entries.
 // A wildcard `cp` allowlist would publish any future root-level dev script and
 // still miss a runtime asset placed in a new directory, so the manifest is
-// checked from both sides here — every entry is tracked and present, and every
+// checked from both sides here — every source entry is tracked and present, and every
 // asset the served pages reach is covered by an entry.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,11 +10,14 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { dirname, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { manifestEntries, servedPages } from './site_pages.js';
+import { GENERATED_PATHS } from '../scripts/install-engine-bundle.mjs';
 import { verifiedEnginePaths } from '../scripts/stage-site.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MANIFEST = 'site_manifest.txt';
 const PAGES = servedPages();
+const sourceOnly = !process.env.ENGINE_BUNDLE_DIR;
+const generated = (path) => sourceOnly && GENERATED_PATHS.has(path);
 
 const read = (path) => readFileSync(resolve(REPO, path), 'utf8');
 
@@ -98,7 +101,7 @@ const referencesOf = (path) => {
   return { targets, escaping };
 };
 
-test('every site manifest entry is tracked and present', () => {
+test('every site manifest entry is tracked source or an installed engine asset', () => {
   const entries = manifestEntries();
   assert.ok(entries.length > 0, `${MANIFEST} lists nothing`);
   assert.deepEqual([...new Set(entries)], entries, `${MANIFEST} repeats an entry`);
@@ -110,8 +113,9 @@ test('every site manifest entry is tracked and present', () => {
   const untracked = [];
   for (const entry of entries) {
     if (/^[./]|\\|\/$/.test(entry)) malformed.push(entry);
-    if (!existsSync(resolve(REPO, entry)) || !lstatSync(resolve(REPO, entry)).isFile()) absent.push(entry);
-    if (!tracked.includes(entry))
+    if (!generated(entry)
+        && (!existsSync(resolve(REPO, entry)) || !lstatSync(resolve(REPO, entry)).isFile())) absent.push(entry);
+    if (!generated(entry) && !tracked.includes(entry))
       untracked.push(entry);
   }
   assert.deepEqual(malformed.slice(0, 5), [],
@@ -167,6 +171,11 @@ const walkFromPages = () => {
     const refs = referencesOf(path);
     escaping.push(...refs.escaping);
     for (const target of refs.targets) {
+      if (generated(target)) {
+        if (!covered(target)) unpublished.push(`${path} -> ${target}`);
+        seen.add(target);
+        continue;
+      }
       if (!tracked.has(target)) {
         // Only a deliberately gitignored drop may be absent from the deploy
         // checkout; anything else is a reference that 404s on Pages.
@@ -271,7 +280,7 @@ test('the site manifest publishes nothing the served pages do not reach', () => 
   const reached = (entry) =>
     seen.has(entry);
   const unreached = entries.filter(
-    (entry) => !UNREFERENCED.includes(entry) && !served.has(entry) && !reached(entry));
+    (entry) => !generated(entry) && !UNREFERENCED.includes(entry) && !served.has(entry) && !reached(entry));
   assert.deepEqual(unreached.slice(0, 5), [],
     `${unreached.length} ${MANIFEST} entries are neither a served page, ` +
       'reachable from one, nor declared unreferenced — the manifest is the only ' +

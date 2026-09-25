@@ -3,6 +3,11 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdir
 import { dirname, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+export const GENERATED_PATHS = new Set([
+  'holosphere_wasm.js', 'holosphere_wasm.wasm', 'holosphere_wasm.sha',
+  'holosphere_wasm.wasm.sha256', 'holosphere_wasm.toolchain', 'shader/engine_catalog.json',
+]);
+
 const REQUIRED_PATHS = new Set(['README.md', 'holosphere_wasm.js', 'holosphere_wasm.wasm',
   'holosphere_wasm.sha', 'holosphere_wasm.wasm.sha256', 'holosphere_wasm.toolchain',
   'pov_segment_map.json', 'shader/shader_workbench.mjs', 'shader/sha256.mjs',
@@ -48,7 +53,8 @@ export function installEngineBundle(bundle, destination) {
     throw new Error('Destination is not a Daydream checkout');
   const { entries, bundlePin } = verifyEngineBundle(bundle, destination);
   const paths = new Set(entries);
-  const installedPin = readFileSync(resolve(destination, 'holosphere_wasm.sha'), 'utf8').trim();
+  const pinPath = resolve(destination, 'holosphere_wasm.sha');
+  const installedPin = existsSync(pinPath) ? readFileSync(pinPath, 'utf8').trim() : 'none';
   const stale = [];
   for (const directory of ['shader/patterns', 'docs/screenshots']) {
     const root = resolve(destination, directory);

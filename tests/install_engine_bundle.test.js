@@ -138,3 +138,12 @@ test('a publication failure restores the complete previous installation', (t) =>
   assert.equal(readFileSync(join(destination, 'docs/screenshots/blocked'), 'utf8'), 'consumer-owned');
   assert.equal(existsSync(join(destination, 'holosphere_wasm.js')), false);
 });
+
+test('install initializes a checkout with no previous engine pin', (t) => {
+  const { bundle, destination } = fixture(t);
+  rmSync(join(destination, 'holosphere_wasm.sha'));
+  installEngineBundle(bundle, destination);
+  assert.equal(readFileSync(join(destination, 'holosphere_wasm.sha'), 'utf8'), 'b'.repeat(40));
+  assert.equal(readFileSync(join(destination, 'holosphere_wasm.js'), 'utf8'),
+    'fresh holosphere_wasm.js');
+});
