@@ -575,7 +575,10 @@ export function start({
     applyResolution: (preserveParams) => apply.applyResolution(preserveParams),
     currentUrl: () =>
       win.location.pathname + win.location.search + win.location.hash,
-    restoreUrl: (url) => replaceUrl(url, win),
+    restoreUrl: (url) => {
+      urlSync.discardPending();
+      replaceUrl(url, win);
+    },
     showResolution: (resolution) => resolutionController.setValue(resolution),
     syncResolutionUrl: () => urlSync.schedule(),
     logError: (message, error) => console.error(message, error),

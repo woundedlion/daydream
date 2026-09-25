@@ -495,6 +495,16 @@ export class URLSync {
     this.schedule();
   }
 
+  /** Discards buffered writes before restoring a complete URL snapshot. */
+  discardPending() {
+    this.adhoc.clear();
+    this.pendingReset = null;
+    if (this.timer !== null) this.win.clearTimeout(this.timer);
+    this.timer = null;
+    this.suspendedDirty = false;
+    this.suspendedDelayMs = 0;
+  }
+
   /**
    * Drop from a params object the keys a scheduled reset() will clear, so a
    * reader running inside the debounce window does not see params the app has
