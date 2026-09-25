@@ -250,9 +250,12 @@ test('proceduralPaletteCpp emits a valid C++ palette-list row', () => {
     C_R: 1.0, C_G: 1.0, C_B: 1.0,
     D_R: 0.0, D_G: 0.33, D_B: 0.67,
   };
-  assert.equal(proceduralPaletteCpp(params),
-    'X(MY_PALETTE, (0.5f, 0.5f, 0.5f), (0.4f, 0.5f, 0.6f), ' +
-    '(1.0f, 1.0f, 1.0f), (0.0f, 0.33f, 0.67f)) \\');
+  const rows = proceduralPaletteCpp(params).split('\n');
+  assert.deepEqual(rows.map((row) => row.trimEnd().replace(/ \\$/, '').trim()), [
+    'X(MY_PALETTE, (0.5f, 0.5f, 0.5f), (0.4f, 0.5f, 0.6f), (1.0f, 1.0f, 1.0f),',
+    '(0.0f, 0.33f, 0.67f))',
+  ]);
+  assert.ok(rows.every((row) => row.length <= 80 && row.endsWith('\\')));
 });
 
 /**

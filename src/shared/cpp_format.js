@@ -26,13 +26,14 @@ export const COLUMN_LIMIT = 80;
  * @param {string} firstIndent - Text the first line starts with.
  * @param {string} [restIndent] - Text every later line starts with; the first
  *   line's indent when omitted.
+ * @param {number} [limit] - Maximum line width.
  * @returns {string[]} The filled lines.
  */
-export function fillColumns(words, firstIndent, restIndent = firstIndent) {
+export function fillColumns(words, firstIndent, restIndent = firstIndent, limit = COLUMN_LIMIT) {
   const lines = [];
   let line = firstIndent + words[0];
   for (const word of words.slice(1)) {
-    if (line.length + 1 + word.length > COLUMN_LIMIT) {
+    if (line.length + 1 + word.length > limit) {
       lines.push(line);
       line = restIndent + word;
     } else {

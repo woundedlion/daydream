@@ -9,7 +9,7 @@
 // preview can differ most in dark tones.
 
 import { srgbToLinearFloat, linearToSrgbFloat, linearRgbToHex } from '../../shared/color.js';
-import { formatFloatCpp } from '../../shared/cpp_format.js';
+import { fillColumns, formatFloatCpp } from '../../shared/cpp_format.js';
 
 /** @typedef {import('./palette_controls.js').PaletteRecipe} PaletteRecipe */
 
@@ -494,10 +494,14 @@ export function proceduralPaletteCpp(parameters) {
   const f = (/** @type {number} */ n) => formatFloatCpp(n, 6);
   const v = (/** @type {number} */ r, /** @type {number} */ g, /** @type {number} */ b) =>
     `(${f(r)}, ${f(g)}, ${f(b)})`;
-  return `X(MY_PALETTE, ${v(parameters.A_R, parameters.A_G, parameters.A_B)}, ` +
-    `${v(parameters.B_R, parameters.B_G, parameters.B_B)}, ` +
-    `${v(parameters.C_R, parameters.C_G, parameters.C_B)}, ` +
-    `${v(parameters.D_R, parameters.D_G, parameters.D_B)}) \\`;
+  const words = [
+    `${v(parameters.A_R, parameters.A_G, parameters.A_B)},`,
+    `${v(parameters.B_R, parameters.B_G, parameters.B_B)},`,
+    `${v(parameters.C_R, parameters.C_G, parameters.C_B)},`,
+    `${v(parameters.D_R, parameters.D_G, parameters.D_B)})`,
+  ];
+  return fillColumns(words, '  X(MY_PALETTE, ', '    ', 78)
+    .map((line) => `${line.padEnd(78)} \\`).join('\n');
 }
 
 /**
