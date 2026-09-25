@@ -1476,6 +1476,7 @@ for (const [label, act] of [
     assert.equal(c.faulted, true, 'the fault latch is held');
     assert.equal(FakeWorker.instances.length, beforeCount, 'no workers were respawned');
     assert.equal(worker.posted.length, postedBefore, 'nothing is broadcast to dead workers');
+    assert.deepEqual(worker.postsAfterTermination, []);
   });
 }
 
@@ -2195,6 +2196,7 @@ test('a faulted pool keeps tick() from dispatching another doomed render', () =>
   assert.equal(c.frameState.renderInFlight, false, 'faulted pool never re-dispatches');
   c.workers.forEach((w, i) =>
     assert.equal(w.posted.length, before[i], 'no new render broadcast'));
+  assert.ok(c.workers.every((w) => w.postsAfterTermination.length === 0));
 });
 
 test('a fault latched by composite() mid-tick() does not re-dispatch a doomed render', async () => {
@@ -2220,6 +2222,7 @@ test('a fault latched by composite() mid-tick() does not re-dispatch a doomed re
   assert.equal(c.frameState.renderInFlight, false, 'no render dispatched to the just-faulted pool');
   c.workers.forEach((w, i) =>
     assert.equal(w.posted.length, before[i], 'no new render broadcast'));
+  assert.ok(c.workers.every((w) => w.postsAfterTermination.length === 0));
 });
 
 test('tick() holds the assembled generation when the display buffer is missing', async () => {
