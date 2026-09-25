@@ -1,4 +1,5 @@
 import { parse } from 'espree';
+import { analyze } from 'eslint-scope';
 
 /**
  * @param {string} src - JavaScript source or HTML containing inline scripts.
@@ -18,7 +19,7 @@ export function vendorAddonsFromSource(src, file) {
     if (!node || typeof node !== 'object') return;
     if (['ImportExpression', 'ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration'].includes(node.type)
         && node.source) {
-      if (node.source.type === 'Identifier' && localUrls.has(node.source.name)) return;
+      if (node.source.type === 'Identifier' && localUrls.has(node.source)) return;
       if (node.source.type !== 'Literal' || typeof node.source.value !== 'string')
         throw new Error(`${file}: module imports must use literal specifiers so vendor integrity is complete`);
       const name = node.source.value;
@@ -30,7 +31,7 @@ export function vendorAddonsFromSource(src, file) {
     }
   };
   for (const body of sources) {
-    const ast = parse(body, { ecmaVersion: 'latest', sourceType: 'module' });
+    const ast = parse(body, { ecmaVersion: 'latest', sourceType: 'module', range: true });
     localUrls = new Set();
     for (const node of ast.body) {
       if (node.type !== 'VariableDeclaration' || node.kind !== 'const') continue;
@@ -46,6 +47,12 @@ export function vendorAddonsFromSource(src, file) {
             && call.arguments[1].property.name === 'url') localUrls.add(declaration.id.name);
       }
     }
+    const scopes = analyze(ast, { ecmaVersion: 2022, sourceType: 'module' });
+    const constants = localUrls;
+    localUrls = new Set(scopes.scopes.flatMap((scope) => scope.references)
+      .filter((reference) => reference.resolved?.scope.type === 'module'
+        && constants.has(reference.resolved.name))
+      .map((reference) => reference.identifier));
     visit(ast);
   }
   return [...found].sort();
