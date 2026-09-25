@@ -317,31 +317,18 @@ function engineValuedEnumerators(source, name) {
   return { roster, count };
 }
 
-// The two status enums a failed compile is reported through, as palette_math.js
-// names its rosters and as core/color/palette_recipe.h declares them.
-const STATUS_ENUMS = [
-  ['COMPILE_CODE_NAMES', 'PaletteCompileCode'],
-  ['RECIPE_FIELD_NAMES', 'PaletteRecipeField'],
-];
-
-/**
- * Pins the compiler-status rosters palette_math.js reports a failed palette
- * compile through. The bridge hands back bare ordinals, so these names are the
- * only thing that turns a refusal into a reason a user can act on; an enumerator
- * inserted or renumbered in the engine would otherwise re-label every message
- * silently and point the blame at the wrong recipe field.
- */
+/** Verifies the test palette enums, including COUNT, against the engine source. */
 test('the compile-status rosters match core/color/palette_recipe.h', { skip: engineSkip }, () => {
   const cpp = header(PALETTE_RECIPE_H);
-  for (const [roster, cppName] of STATUS_ENUMS) {
+  for (const cppName of ['PaletteCompileCode', 'PaletteRecipeField']) {
     const { roster: want, count } = engineValuedEnumerators(cpp, cppName);
-    assert.ok(want.size > 0, `${cppName} yielded no enumerators — the reader is out of date`);
-    const got = Object.keys(paletteEnums[cppName]);
-    assert.equal(got.length, count ?? Math.max(...want.keys()) + 1,
-      `${roster} does not span ${cppName}'s ordinals`);
-    for (const [value, name] of want) {
-      assert.equal(got[value], name, `${roster}[${value}] drifted from ${cppName}::${name}`);
-    }
+    assert.ok(want.size > 0, `${cppName} yielded no enumerators`);
+    const got = paletteEnums[cppName];
+    const names = [...want.values(), ...(count === null ? [] : ['COUNT'])];
+    assert.deepEqual(Object.keys(got).sort(), names.sort(), `${cppName} roster drifted`);
+    for (const [value, name] of want)
+      assert.equal(got[name].value, value, `${cppName}.${name} ordinal drifted`);
+    if (count !== null) assert.equal(got.COUNT.value, count, `${cppName}.COUNT drifted`);
   }
 });
 
