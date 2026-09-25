@@ -319,6 +319,37 @@ test('the alias table keys stay frozen to the pre-spec promoted labels', () => {
 });
 
 const MODULE = { ParamSetResult, HolosphereEngine: { getShaderChainCatalog: () => ENGINE_CATALOG } };
+
+for (const operation of ['selectEffect', 'setShaderChainParameters', 'stage edit']) {
+  test(`a halted ${operation} reports failure and blocks later engine calls`, async (t) => {
+    t.after(() => { delete MODULE.HS_MODULE_DEAD; });
+    let calls = 0;
+    const halt = () => {
+      calls += 1;
+      MODULE.HS_MODULE_DEAD = true;
+      throw new Error('engine halted during edit');
+    };
+    let shouldHalt = false;
+    const harness = await editorWorkbench({
+      selectEffect: () => shouldHalt ? halt() : true,
+    });
+    if (operation === 'selectEffect') shouldHalt = true;
+    if (operation === 'setShaderChainParameters')
+      harness.engine.setShaderChainParameters = halt;
+    if (operation === 'stage edit') {
+      harness.engine.setParameter = halt;
+      stageEditor(harness, 'sample')('sample.pattern-freq', 7);
+    } else {
+      assert.equal(await harness.controller.loadSource(
+        KALEIDOSCOPE_STAINED_GLASS, 'other.shader.json'), false);
+    }
+    assert.equal(MODULE.HS_MODULE_DEAD, true);
+    assert.equal(calls, 1);
+    assert.match(harness.elements.get('shader-document-status').textContent, /engine halted/);
+    await harness.controller.loadSource(KALEIDOSCOPE_STAINED_GLASS, 'later.shader.json');
+    assert.equal(calls, 1);
+  });
+}
 const BAKED = bakedTopologyFields(JSON.parse(ENGINE_CATALOG));
 
 const fixedDocument = () => ({ document: {
