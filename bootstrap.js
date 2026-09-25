@@ -3,6 +3,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import { raceDeadline } from './module_warmer.js';
 import { errorDetail, showFatalError } from './tools/banner.js';
 
 // The vendored libraries index.html loads from the CDN, and the remedy for a
@@ -51,15 +52,8 @@ const MODULE_FETCH_FAILURE = new RegExp([
 // '.js', so the shader workbench and its digest module need their own entry.
 const REFRESHED_EXTENSIONS = ['.js', '.mjs', '.wasm', '.css', '.json'];
 
-// Re-fetches in flight at once. Past the browser's per-host connection limit
-// the extra requests only queue, and the multi-megabyte binary — the one
-// re-fetch a Reload exists for — waits behind whatever small modules opened
-// their sockets first.
 const REFRESH_CONCURRENCY = 6;
 
-// Resource-timing entries kept, over the 250-entry default. Once full, the
-// buffer stops recording later loads, including the large WASM binary a Reload
-// most needs to re-fetch.
 const RESOURCE_TIMING_ENTRIES = 1000;
 
 // Deadline for the Reload sweep. The sweep only primes the cache; the reload
@@ -157,27 +151,8 @@ export function refreshWithDeadline(refresh, {
   createController = () => new AbortController(),
 } = {}) {
   const controller = createController();
-  /** @type {any} */
-  let timer = null;
-  const expired = new Promise((resolve) => {
-    timer = timers.setTimeout(() => { controller.abort(); resolve(undefined); }, ms);
-    // No-op in browsers; keeps an unfired deadline from holding the unit-test
-    // process open.
-    timer?.unref?.();
-  });
-  // A synchronous throw from refresh() would leave the deadline armed with
-  // nothing to abort and the reload unreached.
-  let swept;
-  try {
-    swept = Promise.resolve(refresh({ signal: controller.signal }));
-  } catch {
-    timers.clearTimeout(timer);
-    return Promise.resolve();
-  }
-  // Raced, not awaited: a lane that ignores the signal must not outlive the
-  // deadline that fired for it.
-  return Promise.race([swept.catch(() => {}), expired])
-    .finally(() => timers.clearTimeout(timer));
+  return raceDeadline(() => refresh({ signal: controller.signal }), ms, timers,
+    () => { controller.abort(); }).catch(() => {});
 }
 
 /**

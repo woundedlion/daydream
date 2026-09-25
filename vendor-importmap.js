@@ -1,4 +1,9 @@
 /*
+ * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
+ * Licensed under the Polyform Noncommercial License 1.0.0
+ */
+
+/*
  * Builds the page's importmap for 3rd-party libraries (three.js, lil-gui).
  * The script auto-detects its own location, so it works from index.html
  * (./vendor-importmap.js) or tools/*.html (../vendor-importmap.js) with no

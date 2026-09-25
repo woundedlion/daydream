@@ -119,7 +119,7 @@ export class Daydream {
   static LABEL_VISIBILITY_FRAMING_RATIO = Daydream.SPHERE_RADIUS / Daydream.CAMERA_Z;
   static DEFAULT_H = 20;
   static DEFAULT_W = 96;
-  // Virtual-row padding over logical H (core/platform.h). Sim = 0 (full sphere);
+  // Virtual-row padding over logical H (core/platform/platform.h). Sim = 0 (full sphere);
   // device = 3 (south-pole clip). See pixelToSpherical.
   static H_OFFSET = 0;
   static FPS = FPS;
@@ -929,12 +929,10 @@ export class Daydream {
     this.dotMesh.instanceMatrix.array.set(matrices);
 
     const needed = this.dotMesh.count * 3;
-    if (!this.dotMesh.instanceColor) {
-      this.dotMesh.instanceColor = new THREE.InstancedBufferAttribute(
-        new Uint16Array(needed), 3, true
-      );
-      this.dotMesh.instanceColor.setUsage(THREE.StreamDrawUsage);
-    }
+    this.dotMesh.instanceColor = new THREE.InstancedBufferAttribute(
+      new Uint16Array(needed), 3, true
+    );
+    this.dotMesh.instanceColor.setUsage(THREE.StreamDrawUsage);
     this.pixels = this.dotMesh.instanceColor.array;
     if (isViewLive(this.pixels)) this.pixels.fill(0);
 
