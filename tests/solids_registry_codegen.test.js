@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { D2R_F32 } from '../tools/solid_codegen.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -76,10 +77,6 @@ test('opStepCpp rejects a parameterized op with no params object', () => {
       `params-less "${op}" must be rejected`);
   }
 });
-
-// Mirrors solids.h `static constexpr float D2R = PI_F / 180.0f`, so a test can
-// state a base chain's hankin angle in the radians the engine reports.
-const D2R_F32 = Math.fround(Math.fround(Math.PI) / 180);
 
 /** A MeshOps.getRecipe() step, in the engine-native units it reports. */
 function chainStep(op, param = 0, twist = 0) {
