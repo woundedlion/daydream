@@ -186,13 +186,6 @@ async function init() {
   updateArenaMetrics();
   if (!wasmModule) return;
 
-  // Initialize Three.js. The shared scaffold supplies the renderer / camera /
-  // OrbitControls / resize / animation loop; the solids-specific bits (auto-
-  // rotate, transparent buffer, light rig, free-zoom range, and the per-frame
-  // index-label projection) are passed as options. Resize uses the scaffold's
-  // default (canvas-container clientWidth) — a window-relative override
-  // subtracting both sidebar widths went negative once the ≤640px layout
-  // stacks the sidebars at width:100%.
   const result = initScene('canvas-container', 'canvas', {
     cameraPosition: [2, 1.5, 2],
     far: 100,
@@ -1438,17 +1431,13 @@ function update() {
   });
 }
 
-// Rebuild the THREE scene from the cached currentMesh + currentFaceClasses,
-// WITHOUT re-running the WASM op chain. update() calls this after a
-// recompute; presentation-only toggles (faces/verts/normals/indices/
-// colorize/geodesics) call it directly so they don't pay for the chain
-// (relax alone runs up to 500 iterations) when only the view changed.
 function updateIndexLabelNotice(capped) {
   const notice = document.getElementById('indexLabelNotice');
   const text = capped ? `Vertex indices require fewer than ${MAX_INDEX_LABELS} vertices.` : '';
   if (notice && notice.textContent !== text) notice.textContent = text;
 }
 
+/** Rebuild the scene from cached mesh data without replaying the op chain. */
 function renderMesh() {
   const meshData = currentMesh;
   if (!meshData || !meshRenderer) return;
