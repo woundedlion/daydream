@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
-  chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync,
+  chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -160,4 +160,38 @@ test('pre-push requires installed dependencies', { skip: SKIP }, (t) => {
   assert.notEqual(run.status, 0);
   assert.match(run.stderr, /node_modules is missing/);
   assert.doesNotMatch(run.stderr, /unexpected-npm/);
+});
+
+test('pre-push validates the pushed commit instead of a modified working tree', { skip: SKIP }, (t) => {
+  const root = fixtureRoot(t);
+  const env = isolatedGitEnv();
+  const git = (...args) => execFileSync('git', ['-C', root, ...args], { env, encoding: 'utf8' });
+  mkdirSync(join(root, '.githooks'));
+  mkdirSync(join(root, 'tests'));
+  mkdirSync(join(root, 'node_modules'));
+  mkdirSync(join(root, 'bin'));
+  writeFileSync(join(root, '.githooks/pre-push'), readFileSync(HOOK));
+  writeFileSync(join(root, 'node_modules/.package-lock.json'), '{}');
+  writeFileSync(join(root, 'package.json'), '{}');
+  writeFileSync(join(root, 'package-lock.json'), '{}');
+  writeFileSync(join(root, 'vendor-importmap.js'), 'map\n');
+  writeFileSync(join(root, 'marker'), 'committed\n');
+  for (const name of ['ci_workflow', 'deployment_pair', 'stage_site'])
+    writeFileSync(join(root, `tests/${name}.test.js`), '');
+  const npm = join(root, 'bin/npm');
+  writeFileSync(npm, '#!/bin/sh\n[ "$(cat marker)" = committed ] || exit 23\n'
+    + 'if [ "$2" = importmap ]; then for last; do :; done; cp vendor-importmap.js "$last"; fi\n');
+  chmodSync(npm, 0o755);
+  git('init', '-q');
+  git('add', '.githooks/pre-push', 'tests', 'package.json', 'package-lock.json', 'vendor-importmap.js', 'marker');
+  git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture');
+  const sha = git('rev-parse', 'HEAD').trim();
+  writeFileSync(join(root, 'marker'), 'working-tree-only\n');
+  const posixBin = join(root, 'bin').replace(/\\/g, '/').replace(/^([A-Za-z]):/, (all, drive) => `/${drive.toLowerCase()}`);
+  const result = spawnSync(SH, ['-c', `PATH="${posixBin}:$PATH"; export PATH; . "$0"`, HOOK], {
+    cwd: root, env, encoding: 'utf8', input: `refs/heads/master ${sha} refs/heads/master ${'0'.repeat(40)}\n`,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.equal(readFileSync(join(root, 'marker'), 'utf8'), 'working-tree-only\n');
+  assert.equal(readFileSync(join(root, 'node_modules/.package-lock.json'), 'utf8'), '{}');
 });

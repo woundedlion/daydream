@@ -45,4 +45,4 @@ INDEX_PATH="$(git rev-parse --path-format=absolute --git-path index)"
   node --test "$SNAPSHOT/tests/site_manifest.test.js"
 )
 
-echo "[pre-commit] staged formatting, lint, and documentation checks passed."
+echo "[pre-commit] staged whitespace, lint, and documentation checks passed."

@@ -79,6 +79,9 @@ test('resolve skips an already deployed pair and final checks reject either adva
   assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'), /deploy=false/);
   assert.deepEqual(JSON.parse(readFileSync(env.PAIR_FILE)), pair);
   writeFileSync(env.GITHUB_OUTPUT, '');
+  await run('resolve', { ...env, GITHUB_EVENT_NAME: 'workflow_dispatch', FORCE_DEPLOY: 'true' }, api);
+  assert.match(readFileSync(env.GITHUB_OUTPUT, 'utf8'), /deploy=true/);
+  writeFileSync(env.GITHUB_OUTPUT, '');
   await run('resolve', { ...env, GITHUB_EVENT_NAME: 'schedule' }, async (path) => {
     if (path.includes('statuses')) return [{ state: 'failure' }];
     return api(path);

@@ -6,7 +6,7 @@
 # reports a zero old-OID to this hook, so the stdin old field cannot be trusted).
 #
 # A rewind or a deletion needs a deliberate, one-shot, target-scoped token; a
-# leaked or global env var can no longer bless routine landings. Authorize the
+# only the token file authorizes routine landings. Authorize the
 # exact target, then perform the change:
 #   git rev-parse <target> > "$(git rev-parse --git-common-dir)/hs-allow-nonff"
 # The target is the new commit for a rewind and the doomed commit for a
@@ -21,11 +21,15 @@ tokfile="$gitdir/hs-allow-nonff"
 logfile="$gitdir/hs-nonff.log"
 
 while read -r _old new ref; do
+  if [ -z "$ref" ] || [ -z "$new" ]; then
+    echo "reference-transaction: REFUSED malformed reference transaction." >&2
+    exit 1
+  fi
 	[ "$ref" = "refs/heads/master" ] || continue
 	cur=$(git rev-parse --verify -q "$ref" 2>/dev/null) || cur=''
 	[ -z "$cur" ] && continue                                # creation
 	case "$new" in
-		"$z"|"") kind='deletion'; target=$cur ;;
+        "$z") kind='deletion'; target=$cur ;;
 		*)
 			git merge-base --is-ancestor "$cur" "$new" 2>/dev/null && continue
 			kind='rewind'; target=$new ;;

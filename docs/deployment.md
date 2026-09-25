@@ -34,3 +34,7 @@ Site staging keeps committed daydream files byte-for-byte and adds only engine
 assets verified against the selected package. Removed engine patterns and
 screenshots are omitted, and newly added verified assets are served without a
 consumer commit. Modified frontend files and provenance mismatches fail staging.
+
+Manual deployments accept `force` to republish an unchanged successful pair.
+The pre-push hook checks each pushed commit in a temporary checkout; unrelated
+working-tree edits do not substitute for the source being pushed.
