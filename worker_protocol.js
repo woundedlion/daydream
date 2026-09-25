@@ -33,33 +33,21 @@ export const PROTOCOL_VERSION = 10;
  * @typedef {{ name: string, value: number, acceptedValue?: number }} SegParam
  */
 
-/**
- * Versioned ShaderBall state. Field-array indices are defined by the engine's
- * exhaustive stable field-ID table, never by the current presentation schema.
- * Accepted/requested entries are uint32 payload words and must not pass through
- * floating-point reinterpretation during persistence or transport.
- * @typedef {{
- *   schemaVersion: number,
- *   accepted: number[],
- *   requested: number[],
- *   pendingFieldIds: number[],
- *   hasRuntime: boolean,
- *   runtime: number[],
- * }} FullConfigSnapshot
- */
+/** @typedef {import('./holosphere_wasm.js').FullConfigSnapshot} FullConfigSnapshot */
 
 /**
  * Usage snapshot of a single arena (bytes).
- * @typedef {{ usage: number, high_water_mark: number, capacity: number }} ArenaUsage
+ * @typedef {Pick<import('./holosphere_wasm.js').ArenaUsage,
+ * 'usage'|'high_water_mark'|'capacity'>} SegArenaUsage
  */
 
 /**
  * Per-segment arena metrics, mirroring the engine's three arenas. Null when the
  * binding is unavailable.
  * @typedef {{
- *   scratch_arena_a: ArenaUsage,
- *   scratch_arena_b: ArenaUsage,
- *   persistent_arena: ArenaUsage,
+ *   scratch_arena_a: SegArenaUsage,
+ *   scratch_arena_b: SegArenaUsage,
+ *   persistent_arena: SegArenaUsage,
  * }} SegArenaMetrics
  */
 

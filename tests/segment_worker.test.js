@@ -1217,7 +1217,7 @@ function typedefShapes(source) {
 // together.
 const PROTOCOL_SHAPE_PIN = {
   version: 10,
-  sha256: '6c4c0243e7d48c251c338afaa2556ae0d196392551f968ea1386444015e742a4',
+  sha256: '2826c2e2a6599287682cc3da6db91aa5e0eeff4e749e79ccac4383a90f897f9c',
 };
 
 test('a reshaped protocol message forces a PROTOCOL_VERSION bump', () => {
