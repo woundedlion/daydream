@@ -54,6 +54,7 @@ class FakeEngine {
     this.presetCount = 3;
     this.presetIndex = 0;
     this.metricsThrows = false;
+    this.restoreResult = FullConfigRestoreResult.APPLIED;
     this.paramResult = ParamSetResult.APPLIED;
     this.calls = [];
     // Reused view, like the real engine's getParamValues() into WASM memory, so
@@ -99,7 +100,7 @@ class FakeEngine {
   getFullConfigSnapshot() { return null; }
   restoreFullConfigSnapshot(snapshot) {
     this.calls.push(['restoreFullConfigSnapshot', snapshot]);
-    return FullConfigRestoreResult.APPLIED;
+    return this.restoreResult;
   }
   getFullConfigFieldDefinitions() { return []; }
   getConfigImportNotice() { return ''; }
@@ -172,6 +173,9 @@ let nextResolutionOk = true;
 let nextEffectOk = true;
 /** Seeds the next-constructed engine's clipOk, so init-time rejection is testable. */
 let nextClipOk = true;
+let nextRestoreResult = FullConfigRestoreResult.APPLIED;
+let nextRestoreMissing = false;
+let nextLive = false;
 /** Options the worker handed the module factory, where the instantiate hook lands. */
 let moduleOptions = null;
 /** Module object returned by the mocked factory. */
@@ -186,12 +190,14 @@ mock.module('../holosphere_wasm.js', {
       EffectSetResult,
       FullConfigRestoreResult,
       HolosphereEngine: class {
-        static isLive() { return false; }
+        static isLive() { return nextLive; }
         constructor() {
           engineInstance = new FakeEngine();
           engineInstance.resolutionOk = nextResolutionOk;
           engineInstance.effectOk = nextEffectOk;
           engineInstance.clipOk = nextClipOk;
+          engineInstance.restoreResult = nextRestoreResult;
+          if (nextRestoreMissing) engineInstance.restoreFullConfigSnapshot = undefined;
           return engineInstance;
         }
       },
@@ -251,6 +257,9 @@ beforeEach(() => {
   nextResolutionOk = true;
   nextEffectOk = true;
   nextClipOk = true;
+  nextRestoreResult = FullConfigRestoreResult.APPLIED;
+  nextRestoreMissing = false;
+  nextLive = false;
 });
 
 /** The worker posts 'booted' at module load; the controller's boot watchdog depends on this ping. */
@@ -1243,3 +1252,22 @@ test('render faults when getArenaMetrics traps the module', async () => {
   assert.deepEqual(posted, []);
   assert.equal(engineInstance.calls.length, calls, 'a halted session ignores later messages');
 });
+
+for (const fault of ['missing restore API', 'rejected restore', 'live engine']) {
+  test(`init rejects ${fault} before ready or replay`, async () => {
+    nextRestoreMissing = fault === 'missing restore API';
+    nextRestoreResult = fault === 'rejected restore'
+      ? FullConfigRestoreResult.INVALID_VALUE : FullConfigRestoreResult.APPLIED;
+    nextLive = fault === 'live engine';
+    await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
+      effectName: 'ShaderBall', fullConfigSnapshot: { schema_version: 1 }, paused: true });
+    assert.equal(posted.length, 1);
+    assert.equal(posted[0].msg.type, 'engineRejected');
+    const reason = nextLive ? 'HolosphereEngine is already live'
+      : nextRestoreMissing ? 'Shader workbench full-config restore API is unavailable'
+        : 'Shader workbench full-config restore rejected: INVALID_VALUE';
+    assert.equal(posted[0].msg.reason, reason);
+    if (nextLive) assert.equal(engineInstance, null);
+    else assert.ok(!engineInstance.calls.some(([name]) => name === 'setAnimationsPaused'));
+  });
+}
