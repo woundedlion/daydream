@@ -5,9 +5,7 @@
 # The fast-forward check derives the ref's current value itself (git update-ref
 # reports a zero old-OID to this hook, so the stdin old field cannot be trusted).
 #
-# A rewind or a deletion needs a deliberate, one-shot, target-scoped token; a
-# only the token file authorizes routine landings. Authorize the
-# exact target, then perform the change:
+# A rewind or deletion needs a deliberate, one-shot, target-scoped token:
 #   git rev-parse <target> > "$(git rev-parse --git-common-dir)/hs-allow-nonff"
 # The target is the new commit for a rewind and the doomed commit for a
 # deletion. The token authorizes only that one value and is consumed on use.
