@@ -1236,13 +1236,10 @@ test('render faults when getArenaMetrics traps the module', async () => {
     'pixels from a trapped module must not reach the composite');
   assert.equal(captured.length, 1, 'one rethrow task scheduled');
   assert.throws(() => captured[0](), /binding gone/);
-});
-
-/** A pixel buffer whose length disagrees with the canvas faults instead of zero-filling the tail. */
-
-test('a fresh worker still initializes and renders after a preceding module trap', async () => {
-  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
-  assert.ok(posted.some(({ msg }) => msg.type === 'ready'));
+  posted.length = 0;
+  const calls = engineInstance.calls.length;
   await dispatch({ type: 'render' });
-  assert.ok(posted.some(({ msg }) => msg.type === 'frame'));
+  await dispatch({ type: 'setParameter', name: 'Alpha', value: 0.5 });
+  assert.deepEqual(posted, []);
+  assert.equal(engineInstance.calls.length, calls, 'a halted session ignores later messages');
 });
