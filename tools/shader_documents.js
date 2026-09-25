@@ -632,11 +632,11 @@ export function createShaderDocumentController({
     // as editable as a scratch chain; a digest match only arms the toolbar's
     // parity toggle to the promoted build.
     const imported = typeof source === 'string' ? JSON.parse(source) : source;
-    const promotedDigest = imported.schema_version === 1
+    const promotedFilename = imported.schema_version === 1
       ? digestMigration[compiler.v1DescriptorDigest(imported)] : undefined;
     const official = [...sourceCatalog.values()].find((candidate) =>
       candidate.descriptorDigest === compiled.descriptor_digest
-      || candidate.descriptorDigest === promotedDigest) ?? null;
+      || candidate.filename === promotedFilename) ?? null;
     // Ahead of the teardown: a refusal here must leave the editor it would
     // have replaced standing.
     try {
