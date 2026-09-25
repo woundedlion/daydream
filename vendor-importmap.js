@@ -16,9 +16,9 @@
  * Do NOT commit a `local` VENDOR block — it would break the live deploy.
  *
  * The generator also bakes sha384 hashes for the top-level libraries and the
- * addons statically imported by the app. Relative sub-imports inside those
- * modules do not pass through the import map, so the exact CDN version pin is
- * the primary supply-chain boundary. CI regenerates and diffs this file.
+ * addons statically imported by the app, including their relative static
+ * dependencies. Integrity entries use resolved URLs. CI regenerates and diffs
+ * this file.
  *
  * If a page needs page-specific local imports (e.g. tool helpers), assign
  * window.daydreamExtraImports = { name: '...' } before this script.
@@ -38,6 +38,9 @@
     threeAddons: {
       'controls/OrbitControls.js': 'sha384-qwbKZfqvfut7iKUj5OTm9S0ZtyKO8qwf6tgArWhWhvjzpRG9qEN88IL6J8gVOZOx',
       'renderers/CSS2DRenderer.js': 'sha384-z6mvHHI+Qnu2M3bcgZ/iybgTVGXzWGHgPkH8lSvg0AYfVzzQm62z5G1K00co2ncK',
+    },
+    threeFiles: {
+      'build/three.core.js': 'sha384-T0d5qlOvyPT92JVj73IjXSVeqEuJIXH7hs2dZzcsSyRv/ugCdA1BDA07IZZ1QryO',
     },
   };
   // === END GENERATED ===
@@ -86,6 +89,9 @@
     integrity[imports['three']] = INTEGRITY.three;
     for (const [path, hash] of Object.entries(INTEGRITY.threeAddons)) {
       integrity[`${threeBase}examples/jsm/${path}`] = hash;
+    }
+    for (const [path, hash] of Object.entries(INTEGRITY.threeFiles)) {
+      integrity[`${threeBase}${path}`] = hash;
     }
   }
   if (VENDOR.lilGui === 'cdn') integrity[lilGui] = INTEGRITY.lilGui;
