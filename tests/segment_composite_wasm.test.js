@@ -15,7 +15,7 @@
 // Run: npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import createHolosphereModule from '../holosphere_wasm.js';
+import createHolosphereModule from '../generated/holosphere_wasm.js';
 import {
   computeSegmentRange, extractSegment, compositeSegment,
 } from '../segment_layout.js';

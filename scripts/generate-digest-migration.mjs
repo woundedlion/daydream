@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import {
   parseShaderDocument,
   v1DescriptorDigest,
-} from '../shader/shader_workbench.mjs';
+} from '../generated/shader/shader_workbench.mjs';
 
 const REPO = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const PATTERNS = resolve(REPO, 'shader/patterns');

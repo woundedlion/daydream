@@ -115,7 +115,7 @@ export const FullConfigRestoreResult = Object.freeze({
 // exports it: the committed pin carries the export plus a POSIX trailing
 // newline, which the export itself does not.
 const CHAIN_CATALOG_TEXT = readFileSync(
-  new URL('../../shader/engine_catalog.json', import.meta.url), 'utf8',
+  new URL('../../generated/shader/engine_catalog.json', import.meta.url), 'utf8',
 ).replace(/\n$/, '');
 
 /**

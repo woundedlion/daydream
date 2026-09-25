@@ -14,16 +14,16 @@ import { readFileSync } from 'node:fs';
 import { createChainDocumentStore, scratchChainDocument } from '../tools/chain_document_store.js';
 import { createChainStrip } from '../tools/chain_strip.js';
 import { deactivatedParameterIds } from '../tools/chain_presentation.js';
-import { compileShaderDocument } from '../shader/shader_workbench.mjs';
+import { compileShaderDocument } from '../generated/shader/shader_workbench.mjs';
 import {
   documentEvents, fakeElement, installAnimationFrames, installDocument,
   restoreDocumentAfterEach,
 } from './helpers/fake_dom.js';
 
 const CATALOG = JSON.parse(readFileSync(
-  new URL('../shader/engine_catalog.json', import.meta.url), 'utf8'));
+  new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
 const BASE = compileShaderDocument(readFileSync(
-  new URL('../shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8'),
+  new URL('../generated/shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8'),
 { catalog: CATALOG });
 assert.equal(BASE.status, 'VALID');
 

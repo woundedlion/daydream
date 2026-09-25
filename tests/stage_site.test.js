@@ -18,22 +18,22 @@ function fixture(t) {
   const site = join(scratch, 'site');
   const write = (base, path, value) => { mkdirSync(dirname(join(base, path)), { recursive: true }); writeFileSync(join(base, path), value); };
   write(root, 'daydream.js', 'export const app = true;\n');
-  write(root, 'site_manifest.txt', '# source\n\ndaydream.js\nshader/patterns/old.shader.json\n');
-  write(root, 'shader/patterns/old.shader.json', '{}');
-  write(root, 'holosphere_wasm.sha', 'a'.repeat(40));
+  write(root, 'site_manifest.txt', '# source\n\ndaydream.js\ngenerated/shader/patterns/old.shader.json\n');
+  write(root, 'generated/shader/patterns/old.shader.json', '{}');
+  write(root, 'generated/holosphere_wasm.sha', 'a'.repeat(40));
   const git = (...args) => execFileSync('git', ['-C', root, ...args], { env: isolatedGitEnv(), encoding: 'utf8' }).trim();
   git('init', '-q');
   git('config', 'core.autocrlf', 'false');
   git('config', 'user.email', 'test@example.com');
   git('config', 'user.name', 'Test');
-  git('add', '--', 'daydream.js', 'site_manifest.txt', 'shader/patterns/old.shader.json', 'holosphere_wasm.sha');
+  git('add', '--', 'daydream.js', 'site_manifest.txt', 'generated/shader/patterns/old.shader.json', 'generated/holosphere_wasm.sha');
   git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture');
   const pair = { daydream: git('rev-parse', 'HEAD'), holosphere: 'b'.repeat(40) };
-  const files = Object.fromEntries(['README.md', 'holosphere_wasm.js', 'holosphere_wasm.wasm',
-    'holosphere_wasm.wasm.sha256', 'holosphere_wasm.toolchain', 'pov_segment_map.json',
-    'shader/shader_workbench.mjs', 'shader/sha256.mjs', 'shader/engine_catalog.json',
-    'shader/patterns/new.shader.json', 'docs/screenshots/new.png'].map((path) => [path, 'new ' + path]));
-  files['holosphere_wasm.sha'] = pair.holosphere;
+  const files = Object.fromEntries(['README.md', 'generated/holosphere_wasm.js', 'generated/holosphere_wasm.wasm',
+    'generated/holosphere_wasm.wasm.sha256', 'generated/holosphere_wasm.toolchain', 'generated/pov_segment_map.json',
+    'generated/shader/shader_workbench.mjs', 'generated/shader/sha256.mjs', 'generated/shader/engine_catalog.json',
+    'generated/shader/patterns/new.shader.json', 'docs/screenshots/new.png'].map((path) => [path, 'new ' + path]));
+  files['generated/holosphere_wasm.sha'] = pair.holosphere;
   const manifest = Object.entries(files).map(([path, content]) => {
     write(bundle, path, content);
     return `${createHash('sha256').update(content).digest('hex')}  ${path}`;
@@ -45,11 +45,11 @@ function fixture(t) {
 
 test('site staging publishes verified additions, removes stale owned entries and records the actual pair', (t) => {
   const f = fixture(t);
-  assert.ok(sitePaths(f.root).includes('shader/patterns/old.shader.json'));
-  assert.ok(!sitePaths(f.root, f.bundle).includes('shader/patterns/old.shader.json'));
+  assert.ok(sitePaths(f.root).includes('generated/shader/patterns/old.shader.json'));
+  assert.ok(!sitePaths(f.root, f.bundle).includes('generated/shader/patterns/old.shader.json'));
   stageSite(f.root, f.bundle, f.site, f.pair);
-  assert.equal(existsSync(join(f.site, 'shader/patterns/old.shader.json')), false);
-  assert.equal(readFileSync(join(f.site, 'shader/patterns/new.shader.json'), 'utf8'), 'new shader/patterns/new.shader.json');
+  assert.equal(existsSync(join(f.site, 'generated/shader/patterns/old.shader.json')), false);
+  assert.equal(readFileSync(join(f.site, 'generated/shader/patterns/new.shader.json'), 'utf8'), 'new generated/shader/patterns/new.shader.json');
   assert.equal(readFileSync(join(f.site, 'daydream.js'), 'utf8'), 'export const app = true;\n');
   assert.deepEqual(JSON.parse(readFileSync(join(f.site, 'deployment-pair.json'))), f.pair);
   assert.throws(() => stageSite(f.root, null, f.site, f.pair), /verified engine bundle/);
@@ -63,7 +63,7 @@ test('staging refuses modified frontend, manifest, or engine bytes', (t) => {
   assert.throws(() => stageSite(f.root, f.bundle, f.site, f.pair), /Site source differs/);
   f.write(f.root, 'site_manifest.txt', 'daydream.js');
   assert.throws(() => stageSite(f.root, f.bundle, f.site, f.pair), /Site manifest differs/);
-  f.write(f.root, 'holosphere_wasm.js', 'tampered');
+  f.write(f.root, 'generated/holosphere_wasm.js', 'tampered');
   assert.throws(() => verifiedEnginePaths(f.root, f.bundle), /Installed engine asset differs/);
 });
 

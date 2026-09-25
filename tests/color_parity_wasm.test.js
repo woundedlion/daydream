@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import createHolosphereModule from '../holosphere_wasm.js';
+import createHolosphereModule from '../generated/holosphere_wasm.js';
 import * as C from '../tools/color.js';
 import * as P from '../tools/palette_math.js';
 import {
@@ -31,7 +31,7 @@ test('WASM parity module is present with the exports this suite pins', () => {
     'PaletteOps',
   ]) {
     assert.equal(typeof M[name], 'function',
-      `holosphere_wasm.js is missing export ${name} — parity check would not run`);
+      `generated/holosphere_wasm.js is missing export ${name} — parity check would not run`);
   }
 });
 

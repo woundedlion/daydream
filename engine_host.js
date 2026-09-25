@@ -5,8 +5,8 @@
 
 import { refreshPixelView as computePixelView } from "./pixel_view.js";
 
-/** @typedef {import('./holosphere_wasm.js').HolosphereEngine} HolosphereEngine */
-/** @typedef {import('./holosphere_wasm.js').HolosphereModule} HolosphereModule */
+/** @typedef {import('./generated/holosphere_wasm.js').HolosphereEngine} HolosphereEngine */
+/** @typedef {import('./generated/holosphere_wasm.js').HolosphereModule} HolosphereModule */
 
 /**
  * Owns the main-thread WASM engine and its reassignable display state. The pixel

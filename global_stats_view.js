@@ -11,8 +11,8 @@
 import { SLOW_FRAME_MS } from "./frame_constants.js";
 import { formatKB } from "./tools/kb_format.js";
 
-/** @typedef {import('./holosphere_wasm.js').ArenaUsage} ArenaUsage */
-/** @typedef {import('./holosphere_wasm.js').ArenaMetrics} ArenaMetrics */
+/** @typedef {import('./generated/holosphere_wasm.js').ArenaUsage} ArenaUsage */
+/** @typedef {import('./generated/holosphere_wasm.js').ArenaMetrics} ArenaMetrics */
 /** @typedef {Object<string, Array<HTMLElement|null>>} StatsCells */
 
 /** Stats-panel cell element IDs per row, ordered [desktop, mobile]. */

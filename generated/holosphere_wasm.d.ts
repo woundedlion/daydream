@@ -2,7 +2,7 @@
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
  *
- * Hand-written declarations for holosphere_wasm.js, the Emscripten glue the
+ * Hand-written declarations for generated/holosphere_wasm.js, the Emscripten glue the
  * Holosphere WASM install writes here. The glue itself is a generated install
  * output and is never type-checked (tests/tsconfig_roster.test.js), so this
  * file is what the typecheck sees for the module. It covers the surface the
@@ -537,7 +537,7 @@ export interface HolosphereModule {
     getSupportedResolutions(): Array<[number, number]>;
     /**
      * The engine's operator catalog as one JSON string, byte-identical (plus
-     * the committed trailing newline) to the shader/engine_catalog.json pin.
+     * the committed trailing newline) to the generated/shader/engine_catalog.json pin.
      */
     getShaderChainCatalog(): string;
   };

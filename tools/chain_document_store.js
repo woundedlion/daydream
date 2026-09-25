@@ -4,9 +4,9 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-const COMPILER_URL = new URL('../shader/shader_workbench.mjs', import.meta.url).href;
+const COMPILER_URL = new URL('../generated/shader/shader_workbench.mjs', import.meta.url).href;
 
-// Mirror of the compiler's LABEL_PATTERN (shader/shader_workbench.mjs).
+// Mirror of the compiler's LABEL_PATTERN (generated/shader/shader_workbench.mjs).
 const LABEL_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
 /** @typedef {{id: string, name: string, min: number, max: number, default: *, curve?: string, topology?: false}} CatalogNumericField */

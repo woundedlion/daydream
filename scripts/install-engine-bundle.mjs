@@ -4,23 +4,23 @@ import { dirname, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const RUNTIME_PATHS = new Set([
-  'holosphere_wasm.js', 'holosphere_wasm.wasm', 'holosphere_wasm.sha',
-  'holosphere_wasm.wasm.sha256', 'holosphere_wasm.toolchain', 'shader/engine_catalog.json',
-  'pov_segment_map.json', 'shader/shader_workbench.mjs', 'shader/sha256.mjs',
-  'shader/patterns/shaderball_migration.json',
+  'generated/holosphere_wasm.js', 'generated/holosphere_wasm.wasm', 'generated/holosphere_wasm.sha',
+  'generated/holosphere_wasm.wasm.sha256', 'generated/holosphere_wasm.toolchain', 'generated/shader/engine_catalog.json',
+  'generated/pov_segment_map.json', 'generated/shader/shader_workbench.mjs', 'generated/shader/sha256.mjs',
+  'generated/shader/patterns/shaderball_migration.json',
 ]);
 
 export const runtimePath = (path) => RUNTIME_PATHS.has(path)
-  || /^shader\/patterns\/[^/]+\.shader\.json$/.test(path);
+  || /^generated\/shader\/patterns\/[^/]+\.shader\.json$/.test(path);
 
-const REQUIRED_PATHS = new Set(['README.md', 'holosphere_wasm.js', 'holosphere_wasm.wasm',
-  'holosphere_wasm.sha', 'holosphere_wasm.wasm.sha256', 'holosphere_wasm.toolchain',
-  'pov_segment_map.json', 'shader/shader_workbench.mjs', 'shader/sha256.mjs',
-  'shader/engine_catalog.json']);
+const REQUIRED_PATHS = new Set(['README.md', 'generated/holosphere_wasm.js', 'generated/holosphere_wasm.wasm',
+  'generated/holosphere_wasm.sha', 'generated/holosphere_wasm.wasm.sha256', 'generated/holosphere_wasm.toolchain',
+  'generated/pov_segment_map.json', 'generated/shader/shader_workbench.mjs', 'generated/shader/sha256.mjs',
+  'generated/shader/engine_catalog.json']);
 
 export const ownedPath = (path) => REQUIRED_PATHS.has(path)
-  || /^shader\/patterns\/[^/]+\.shader\.json$/.test(path)
-  || path === 'shader/patterns/shaderball_migration.json'
+  || /^generated\/shader\/patterns\/[^/]+\.shader\.json$/.test(path)
+  || path === 'generated/shader/patterns/shaderball_migration.json'
   || /^docs\/screenshots\/.+\.png$/.test(path);
 
 export function verifyEngineBundle(bundle, destination = bundle) {
@@ -44,7 +44,7 @@ export function verifyEngineBundle(bundle, destination = bundle) {
   for (const required of REQUIRED_PATHS) {
     if (!paths.has(required)) throw new Error(`Engine bundle is missing ${required}`);
   }
-  const bundlePin = readFileSync(resolve(bundle, 'holosphere_wasm.sha'), 'utf8').trim();
+  const bundlePin = readFileSync(resolve(bundle, 'generated/holosphere_wasm.sha'), 'utf8').trim();
   if (!/^[a-f0-9]{40}$/.test(bundlePin)) throw new Error('Invalid engine bundle source pin');
   if (process.env.HOLOSPHERE_BUNDLE_PIN && bundlePin !== process.env.HOLOSPHERE_BUNDLE_PIN)
     throw new Error(`Engine bundle source pin differs from ${process.env.HOLOSPHERE_BUNDLE_PIN}`);
@@ -58,10 +58,10 @@ export function installEngineBundle(bundle, destination) {
     throw new Error('Destination is not a Daydream checkout');
   const { entries, bundlePin } = verifyEngineBundle(bundle, destination);
   const paths = new Set(entries);
-  const pinPath = resolve(destination, 'holosphere_wasm.sha');
+  const pinPath = resolve(destination, 'generated/holosphere_wasm.sha');
   const installedPin = existsSync(pinPath) ? readFileSync(pinPath, 'utf8').trim() : 'none';
   const stale = [];
-  for (const directory of ['shader/patterns', 'docs/screenshots']) {
+  for (const directory of ['generated/shader/patterns', 'docs/screenshots']) {
     const root = resolve(destination, directory);
     if (!existsSync(root)) continue;
     for (const entry of readdirSync(root, { recursive: true, withFileTypes: true })) {

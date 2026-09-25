@@ -123,7 +123,7 @@ let registrySolidNames = new Set();
 async function init() {
   // Load WASM
   try {
-    ({ default: createHolosphereModule } = await import('../holosphere_wasm.js'));
+    ({ default: createHolosphereModule } = await import('../generated/holosphere_wasm.js'));
     wasmModule = await createHolosphereModule();
     meshOpsWasm = wasmModule.MeshOps;
 

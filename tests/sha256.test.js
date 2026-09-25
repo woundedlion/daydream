@@ -2,16 +2,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { sha256Hex } from '../shader/sha256.mjs';
-import { compileShaderDocument } from '../shader/shader_workbench.mjs';
+import { sha256Hex } from '../generated/shader/sha256.mjs';
+import { compileShaderDocument } from '../generated/shader/shader_workbench.mjs';
 
 test('a committed shader document keeps its recorded digests', () => {
   const source = readFileSync(
-    new URL('../shader/patterns/example.shader.json', import.meta.url),
+    new URL('../generated/shader/patterns/example.shader.json', import.meta.url),
     'utf8',
   );
   const catalog = JSON.parse(readFileSync(
-    new URL('../shader/engine_catalog.json', import.meta.url),
+    new URL('../generated/shader/engine_catalog.json', import.meta.url),
     'utf8',
   ));
   const compiled = compileShaderDocument(source, { catalog });

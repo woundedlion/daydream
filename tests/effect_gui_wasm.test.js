@@ -13,7 +13,7 @@ function widgets() {
 }
 
 test('preset values survive URL reload after flushed or pending parameter edits', async () => {
-  const { default: createModule } = await import('../holosphere_wasm.js');
+  const { default: createModule } = await import('../generated/holosphere_wasm.js');
   const module = await createModule({ print: () => {} });
   for (const flushEdit of [false, true]) {
     const win = {

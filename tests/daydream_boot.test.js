@@ -131,7 +131,7 @@ test('catalog effects are offered at both simulator resolutions', async () => {
 
 test('the shader-document roster names exactly the documents that ship', () => {
   const manifest = JSON.parse(readFileSync(
-    new URL('../shader/patterns/shaderball_migration.json', import.meta.url),
+    new URL('../generated/shader/patterns/shaderball_migration.json', import.meta.url),
     'utf8'));
 
   assert.deepEqual([...SHADER_DOCUMENT_EFFECTS].sort(),

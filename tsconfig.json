@@ -17,8 +17,8 @@
     "types": []
   },
   "files": [
-    "holosphere_wasm.d.ts",
-    "shader/shader_workbench.d.mts",
+    "generated/holosphere_wasm.d.ts",
+    "generated/shader/shader_workbench.d.mts",
     "file_system_access.d.ts",
     "engine_host.js",
     "frame_constants.js",

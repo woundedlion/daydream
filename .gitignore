@@ -14,17 +14,17 @@ node_modules/
 /engine-bundle/
 
 # Engine runtime assets installed from Holosphere.
-/holosphere_wasm.js
-/holosphere_wasm.wasm
-/holosphere_wasm.sha
-/holosphere_wasm.wasm.sha256
-/holosphere_wasm.toolchain
-/shader/engine_catalog.json
-/pov_segment_map.json
-/shader/shader_workbench.mjs
-/shader/sha256.mjs
-/shader/patterns/*.shader.json
-/shader/patterns/shaderball_migration.json
+/generated/holosphere_wasm.js
+/generated/holosphere_wasm.wasm
+/generated/holosphere_wasm.sha
+/generated/holosphere_wasm.wasm.sha256
+/generated/holosphere_wasm.toolchain
+/generated/shader/engine_catalog.json
+/generated/pov_segment_map.json
+/generated/shader/shader_workbench.mjs
+/generated/shader/sha256.mjs
+/generated/shader/patterns/*.shader.json
+/generated/shader/patterns/shaderball_migration.json
 
 # Linked git worktrees. A checkout of this same tree, so `git add -A` from the
 # root would otherwise commit a second copy of the repository.

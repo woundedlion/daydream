@@ -10,17 +10,17 @@ import { errorDetail } from './banner.js';
 import { applyChainDocument } from './chain_apply.js';
 import { createChainDocumentStore, scratchChainDocument } from './chain_document_store.js';
 import { createChainStrip } from './chain_strip.js';
-import { engineControlNames } from '../shader/shader_workbench.mjs';
+import { engineControlNames } from '../generated/shader/shader_workbench.mjs';
 import { copyToClipboard } from './copy_text.js';
 import { downloadBlob } from './download_file.js';
 import {
   decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
 } from './shader_deeplink.js';
 
-const MIGRATION_URL = '../shader/patterns/shaderball_migration.json';
+const MIGRATION_URL = '../generated/shader/patterns/shaderball_migration.json';
 const DIGEST_MIGRATION_URL = '../shader/patterns/digest_migration.v1v2.json';
-const CATALOG_URL = '../shader/engine_catalog.json';
-const COMPILER_URL = new URL('../shader/shader_workbench.mjs', import.meta.url).href;
+const CATALOG_URL = '../generated/shader/engine_catalog.json';
+const COMPILER_URL = new URL('../generated/shader/shader_workbench.mjs', import.meta.url).href;
 
 // The effect the dynamic path previews on: the engine's chain interpreter,
 // programmed through setShaderChain.
@@ -832,7 +832,7 @@ export function createShaderDocumentController({
       const migration = JSON.parse(await fetchText(MIGRATION_URL));
       const entries = await Promise.all(Object.entries(migration.source_documents)
         .map(async ([effectId, filename]) => {
-          const source = await fetchText(`../shader/patterns/${filename}`);
+          const source = await fetchText(`../generated/shader/patterns/${filename}`);
           const compiled = compiler.compileShaderDocument(source,
             { catalog: operatorCatalog });
           if (compiled.status !== 'VALID')

@@ -1058,7 +1058,7 @@ async function init() {
   // the exact C++ color math (PaletteOps). The generative tab can't render
   // without it, so fail loudly rather than silently fall back.
   try {
-    const { default: createHolosphereModule } = await import('../holosphere_wasm.js');
+    const { default: createHolosphereModule } = await import('../generated/holosphere_wasm.js');
     const wasm = await createHolosphereModule();
     wasmModule = wasm;
     paletteOps = new wasm.PaletteOps();

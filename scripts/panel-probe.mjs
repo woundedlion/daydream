@@ -581,7 +581,7 @@ export async function probeWarningNote(tab, layout) {
 
   await tab.evaluate(async () => {
     const [{ default: loadEngine }, { createEffectGui }, { GUI }] = await Promise.all([
-      import('./holosphere_wasm.js'), import('./effect_gui.js'), import('./gui.js'),
+      import('./generated/holosphere_wasm.js'), import('./effect_gui.js'), import('./gui.js'),
     ]);
     const module = await loadEngine();
     const engine = new module.HolosphereEngine();

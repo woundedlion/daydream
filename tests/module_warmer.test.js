@@ -33,7 +33,7 @@ test('default warm uses its served module URL, global fetch, and clears its dead
     assert.ok(warmer.module instanceof WebAssembly.Module);
     assert.equal(requested.length, GRAPH.length + 1);
     assert.ok(requested.every((url) => url.startsWith('https://daydream.test/nested/')));
-    assert.ok(requested.includes('https://daydream.test/nested/holosphere_wasm.wasm?v=abc123'));
+    assert.ok(requested.includes('https://daydream.test/nested/generated/holosphere_wasm.wasm?v=abc123'));
     assert.equal(clock.timers.length, 1);
     assert.equal(clock.timers[0].delay, WARM_DEADLINE_MS);
     assert.equal(clock.isPending(clock.timers[0]), false);
@@ -58,7 +58,7 @@ test('warmModules revalidates the whole worker module graph', async () => {
 
   // Derived from the worker's own import graph plus the binary its glue
   // streams, so a module joining the graph is one the warm must drain too.
-  const graph = [...GRAPH, 'holosphere_wasm.wasm?v=abc123'];
+  const graph = [...GRAPH, 'generated/holosphere_wasm.wasm?v=abc123'];
   assert.deepEqual(calls.map(([url]) => url).sort(),
     graph.map((file) => `http://localhost:8000/${file}`).sort(),
     'every static import of the worker, or a stale one survives the warm');
@@ -160,7 +160,7 @@ test('the dedupe window covers one base URL, not every caller in it', async () =
     baseUrl: 'http://localhost:8000/second/segment_controller.js',
   });
   assert.deepEqual(seen.slice().sort(),
-    [...GRAPH, 'holosphere_wasm.wasm?v=abc123']
+    [...GRAPH, 'generated/holosphere_wasm.wasm?v=abc123']
       .map((file) => `http://localhost:8000/second/${file}`).sort(),
     'a second base URL inside the window warms its own module graph');
 

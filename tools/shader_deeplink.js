@@ -5,7 +5,7 @@
 
 // @ts-check
 
-const COMPILER_URL = new URL('../shader/shader_workbench.mjs', import.meta.url).href;
+const COMPILER_URL = new URL('../generated/shader/shader_workbench.mjs', import.meta.url).href;
 const PREFIX = '#shader=v1.';
 const MAX_PAYLOAD_CHARS = 65536;
 const MAX_STATE_BYTES = 524288;

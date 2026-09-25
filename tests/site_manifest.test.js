@@ -226,7 +226,7 @@ const UNREFERENCED = [
   ...new Set(read('README.md').match(/docs\/screenshots\/[\w.-]+\.png/g) ?? []),
 ];
 
-const PATTERNS = 'shader/patterns';
+const PATTERNS = 'generated/shader/patterns';
 const MIGRATION = `${PATTERNS}/shaderball_migration.json`;
 const missingCatalog = sourceOnly && !existsSync(resolve(REPO, MIGRATION));
 
@@ -235,7 +235,7 @@ const missingCatalog = sourceOnly && !existsSync(resolve(REPO, MIGRATION));
 // digest table, published for its own sake.
 const PATTERN_NON_SOURCES = [
   MIGRATION,
-  `${PATTERNS}/digest_migration.v1v2.json`,
+  'shader/patterns/digest_migration.v1v2.json',
 ];
 
 // Pattern documents nothing served fetches: the compiler's worked example is a
@@ -263,10 +263,10 @@ const patternFiles = () =>
 
 test('the site manifest publishes every source catalog document',
   { skip: missingCatalog && 'engine catalog is installed separately' }, () => {
-  const migration = JSON.parse(read('shader/patterns/shaderball_migration.json'));
+  const migration = JSON.parse(read('generated/shader/patterns/shaderball_migration.json'));
   const entries = new Set(manifestEntries());
   const missing = Object.values(migration.source_documents)
-    .map((filename) => `shader/patterns/${filename}`)
+    .map((filename) => `generated/shader/patterns/${filename}`)
     .filter((path) => !entries.has(path));
   assert.deepEqual(missing, []);
 });
@@ -293,7 +293,7 @@ test('the site manifest publishes exactly the pattern documents the catalog fetc
   { skip: missingCatalog && 'engine catalog is installed separately' }, () => {
   const served = servedPatterns();
   const listed = new Set(
-    manifestEntries().filter((entry) => entry.startsWith(`${PATTERNS}/`)));
+    manifestEntries().filter((entry) => entry.startsWith(`${PATTERNS}/`) || PATTERN_NON_SOURCES.includes(entry)));
   const files = patternFiles();
 
   assert.deepEqual([...served].filter((doc) => !listed.has(doc)).sort(), [],

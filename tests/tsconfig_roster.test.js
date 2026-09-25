@@ -17,7 +17,7 @@ const ROOT = new URL('../', import.meta.url);
 // Emscripten glue: an install output copied from Holosphere, checked by its
 // build there, and far too large to type-check usefully here. It has a
 // hand-written `.d.ts` sibling on the roster, which is what resolves the import.
-const NOT_CHECKED = new Set(['holosphere_wasm.js', 'shader/shader_workbench.mjs']);
+const NOT_CHECKED = new Set(['generated/holosphere_wasm.js', 'generated/shader/shader_workbench.mjs']);
 
 // Never entered: dependency and git metadata, the linked worktrees, the vendored
 // third-party drops, the engine checkout the parity cases read, and tests/,
@@ -203,7 +203,6 @@ const ROOT_EXEMPTIONS = {
   'effect_roster.js': 'Consumes dynamically shaped engine catalog entries and effect instances without a declared common interface.',
   'geometry.js': 'Imports Three.js, whose types are unavailable under noResolve.',
   'gui.js': 'Imports lil-gui, whose declarations are unavailable under noResolve.',
-  'holosphere_wasm.js': 'Generated Emscripten glue is represented by holosphere_wasm.d.ts.',
   'main.js': 'Imports bootstrap.js, which reaches the untyped application composition.',
   'recording_controls.js': 'Builds dynamic lil-gui controls and consumes a driver whose declarations are unavailable.',
   'vendor-importmap.js': 'Generated script-tag IIFE; its source and generated variants are checked by vendor-importmap.test.js.',

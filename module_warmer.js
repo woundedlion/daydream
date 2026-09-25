@@ -83,7 +83,7 @@ export class ModuleWarmer {
   } = {}) {
     if (typeof fetchResource !== 'function') return Promise.resolve();
     let probe;
-    try { probe = new URL('./holosphere_wasm.js', baseUrl); }
+    try { probe = new URL('./generated/holosphere_wasm.js', baseUrl); }
     catch { return Promise.resolve(); }
     if (probe.protocol !== 'http:' && probe.protocol !== 'https:') return Promise.resolve();
     const now = clock();
@@ -108,7 +108,7 @@ export class ModuleWarmer {
     let warm;
     try {
       const workerJs = drain('./segment_worker.js');
-      const glueJs = drain('./holosphere_wasm.js');
+      const glueJs = drain('./generated/holosphere_wasm.js');
       const layoutJs = drain('./segment_layout.js');
       const protocolJs = drain('./worker_protocol.js');
       const haltJs = drain('./tools/engine_halt.js');
@@ -116,7 +116,7 @@ export class ModuleWarmer {
         const source = new TextDecoder().decode(bytes);
         const path = source.match(/new URL\(["'](holosphere_wasm\.wasm\?v=[a-f0-9]+)["']/)?.[1];
         if (!path) throw new Error('WASM glue has no versioned binary URL');
-        return drain(`./${path}`);
+        return drain(new URL(path, probe).href);
       });
       warm = Promise.allSettled([
         workerJs,

@@ -44,7 +44,7 @@ jobs:
         env:
           SELECTED_PIN: ${{ inputs.engine-sha }}
         run: |
-          HOLOSPHERE_BUNDLE_PIN="${SELECTED_PIN:-$(cat engine-bundle/holosphere_wasm.sha)}" node scripts/install-engine-bundle.mjs engine-bundle
+          HOLOSPHERE_BUNDLE_PIN="${SELECTED_PIN:-$(cat engine-bundle/generated/holosphere_wasm.sha)}" node scripts/install-engine-bundle.mjs engine-bundle
           echo "ENGINE_BUNDLE_DIR=$GITHUB_WORKSPACE/engine-bundle" >> "$GITHUB_ENV"
       - run: npm ci
       - name: Install the browser pinned by Puppeteer

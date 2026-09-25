@@ -4,7 +4,7 @@
  */
 
 
-import createHolosphereModule from "./holosphere_wasm.js";
+import createHolosphereModule from "./generated/holosphere_wasm.js";
 import { Daydream, MOBILE_BREAKPOINT_PX } from "./driver.js";
 import { GUI, resetGUI } from "./gui.js";
 import { EffectSidebar } from "./sidebar.js";
