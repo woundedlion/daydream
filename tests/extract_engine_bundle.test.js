@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const python = process.platform === 'win32' ? 'python' : 'python3';
-const script = resolve('scripts/extract-engine-bundle.py');
+const script = fileURLToPath(new URL('../scripts/extract-engine-bundle.py', import.meta.url));
 for (const name of ['../escaped', '/absolute', 'C:/absolute', 'nested\\escaped', 'link']) {
   test(`bundle extraction rejects ${name} before writing any files`, () => {
     const dir = mkdtempSync(join(tmpdir(), 'bundle-path-'));
