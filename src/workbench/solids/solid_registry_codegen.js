@@ -233,6 +233,17 @@ function recipeDefinitionCpp(name, seed, steps) {
   const indent = splitDeclaration ? 8 : 4;
   const pad = ' '.repeat(indent);
   if (indent + call.length <= COLUMN_LIMIT) return `${head}\n${pad}${call}`;
+  const argumentsFit = indent + seed.length + steps.length + 4 <= COLUMN_LIMIT;
+  const alignedStepsFit = indent + 12 + steps.length + 2 <= COLUMN_LIMIT;
+  if ((argumentsFit || !alignedStepsFit)
+      && (head.split('\n').at(-1) ?? '').length + ' make_recipe('.length <= COLUMN_LIMIT) {
+    const argumentsText = fillColumns([`${seed},`, `${steps});`], pad).join('\n');
+    return `${head} make_recipe(\n${argumentsText}`;
+  }
+  if (!alignedStepsFit) {
+    const argumentsText = fillColumns([`${seed},`, `${steps});`], ' '.repeat(indent + 4)).join('\n');
+    return `${head}\n${pad}make_recipe(\n${argumentsText}`;
+  }
   return `${head}\n${pad}make_recipe(${seed},\n${' '.repeat(indent + 12)}${steps});`;
 }
 
