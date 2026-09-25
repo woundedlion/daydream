@@ -10,9 +10,7 @@
 // ends up showing or holding, so it survives a re-shaping of start() and reds a
 // wrong one.
 //
-// Four cases below still read the source, because nothing a started app or an
-// injected factory exposes can see what they pin: the module-evaluation version
-// guard, which runs before there is an app; the owner tag the root hands the
+// Three cases below read the source: the owner tag the root hands the
 // segmented controls, which only a real worker pool could raise a notice
 // through; and the two halves of the workbench init rejection, whose controller
 // the fake document carries none of the element ids for. Each is anchored on the
