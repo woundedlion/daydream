@@ -219,9 +219,12 @@ test('computed addon imports cannot bypass the integrity inventory', () => {
 
 test('escaped literal addon specifiers are included in the integrity inventory', () => {
   installModules();
-  writeFileSync(join(root, 'escaped.js'), "import('three/addons/controls/OrbitControls\\u002ejs');");
+  const renderers = join(root, 'node_modules/three/examples/jsm/renderers');
+  mkdirSync(renderers, { recursive: true });
+  writeFileSync(join(renderers, 'CSS2DRenderer.js'), '// CSS2DRenderer fixture\n');
+  writeFileSync(join(root, 'escaped.js'), "import('three/addons/renderers/CSS2DRenderer\\u002ejs');");
   execFileSync('git', ['add', 'escaped.js'], { cwd: root, env });
-  assert.ok(run().includes("'controls/OrbitControls.js'"));
+  assert.ok(run().includes("'renderers/CSS2DRenderer.js'"));
 });
 
 
