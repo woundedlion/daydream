@@ -235,3 +235,29 @@ test('--root requires a path', () => {
   assert.match(expectFailure(process.execPath, [SCRIPT_SRC, '--root', '--local'], { env }),
     /--root requires a path/);
 });
+
+test('transitive Three imports cannot escape the package', () => {
+  installModules();
+  writeFileSync(join(root, 'node_modules/three/build/three.module.js'),
+    "import '../../outside.js';\n");
+  assert.match(runExpectingFailure(), /Three import escapes its package: \.\.\/\.\.\/outside\.js/);
+});
+
+for (const dependency of ['three', 'lil-gui']) {
+  test(`the ${dependency} dependency must use an exact version`, () => {
+    installModules();
+    const pkg = JSON.parse(PKG);
+    pkg.dependencies[dependency] = `^${pkg.dependencies[dependency]}`;
+    writeFileSync(join(root, 'package.json'), JSON.stringify(pkg));
+    assert.match(runExpectingFailure(), /must be an exact version, not a range/);
+  });
+}
+
+test('a missing GENERATED block fails without rewriting the source', () => {
+  installModules();
+  const source = 'const untouched = true;\n';
+  writeFileSync(join(root, 'vendor-importmap.js'), source);
+  const error = expectFailure(process.execPath, [SCRIPT_SRC, '--root', root], { env });
+  assert.match(error, /GENERATED VENDOR block not found/);
+  assert.equal(readFileSync(join(root, 'vendor-importmap.js'), 'utf8'), source);
+});

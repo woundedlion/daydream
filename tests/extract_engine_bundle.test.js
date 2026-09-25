@@ -43,3 +43,17 @@ test('bundle extraction rejects a NUL-truncated filename before writing', () => 
     assert.equal(existsSync(join(dir, 'out')), false);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('bundle extraction rejects duplicate names before writing any files', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bundle-duplicate-'));
+  try {
+    const archive = join(dir, 'bundle.zip');
+    execFileSync(python, ['-W', 'ignore', '-c',
+      'import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],"w"); z.writestr("safe","first"); z.writestr("safe","second"); z.close()',
+      archive]);
+    const result = spawnSync(python, [script, archive, join(dir, 'out')], { encoding: 'utf8' });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /unsafe bundle entry: 'safe'/);
+    assert.equal(existsSync(join(dir, 'out')), false);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

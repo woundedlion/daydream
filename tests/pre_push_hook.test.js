@@ -47,7 +47,7 @@ test('pre-push refuses a push from a tree that cannot run the suites',
  * @param {Object<string, string>} tools - Stand-in name to shell body.
  * @returns {Object} The spawnSync result.
  */
-function runWithTools(root, tools) {
+function runWithTools(root, tools, input = '') {
   assert.ok(SH, MISSING_SH);
   const bin = join(root, 'bin');
   mkdirSync(bin, { recursive: true });
@@ -65,6 +65,7 @@ function runWithTools(root, tools) {
     cwd: root,
     env,
     encoding: 'utf8',
+    input,
   });
 }
 
@@ -161,6 +162,69 @@ test('pre-push requires installed dependencies', { skip: SKIP }, (t) => {
   assert.match(run.stderr, /node_modules is missing/);
   assert.doesNotMatch(run.stderr, /unexpected-npm/);
 });
+
+test('pre-push accepts a ref deletion without running source checks', { skip: SKIP }, (t) => {
+  const root = fixtureRoot(t);
+  mkdirSync(join(root, 'node_modules'));
+  writeFileSync(join(root, 'node_modules/.package-lock.json'), '{}');
+  const run = runWithTools(root, {
+    node: 'echo unexpected-node >&2; exit 17',
+    npm: 'echo unexpected-npm >&2; exit 17',
+    git: '[ "$1" = rev-parse ] && [ "$2" = --local-env-vars ] && exit 0; echo unexpected-git >&2; exit 17',
+  }, `refs/heads/topic ${'0'.repeat(40)} refs/heads/topic ${'1'.repeat(40)}\n`);
+  assert.equal(run.status, 0, run.stdout + run.stderr);
+  assert.equal(run.stderr, '');
+});
+
+for (const installStatus of [0, 19]) {
+  test(`pre-push installs snapshot dependencies and propagates install status ${installStatus}`,
+    { skip: SKIP }, (t) => {
+      const root = fixtureRoot(t);
+      const env = isolatedGitEnv();
+      const git = (...args) => execFileSync('git', ['-C', root, ...args], { env, encoding: 'utf8' });
+      for (const directory of ['.githooks', 'tests', 'node_modules', 'bin'])
+        mkdirSync(join(root, directory));
+      writeFileSync(join(root, '.githooks/pre-push'), readFileSync(HOOK));
+      writeFileSync(join(root, 'node_modules/.package-lock.json'), '{}');
+      writeFileSync(join(root, 'package.json'), '{}');
+      writeFileSync(join(root, 'package-lock.json'), '{}');
+      writeFileSync(join(root, 'vendor-importmap.js'), 'map\n');
+      for (const name of ['ci_workflow', 'deployment_pair', 'stage_site'])
+        writeFileSync(join(root, `tests/${name}.test.js`), '');
+      const log = join(root, 'calls.log').replace(/\\/g, '/');
+      const npm = join(root, 'bin/npm');
+      writeFileSync(npm, '#!/bin/sh\n'
+        + `printf '%s\\n' "$*" >> "${log}"\n`
+        + `if [ "$1" = ci ]; then mkdir -p node_modules; echo '{}' > node_modules/.package-lock.json; exit ${installStatus}; fi\n`
+        + 'if [ "$2" = importmap ]; then for last; do :; done; cp vendor-importmap.js "$last"; fi\n');
+      chmodSync(npm, 0o755);
+      git('init', '-q');
+      git('add', '.githooks/pre-push', 'tests', 'package.json', 'package-lock.json', 'vendor-importmap.js');
+      git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test',
+        '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture');
+      const sha = git('rev-parse', 'HEAD').trim();
+      const changedPackage = '{"private":true}\n';
+      writeFileSync(join(root, 'package.json'), changedPackage);
+      const posixBin = join(root, 'bin').replace(/\\/g, '/')
+        .replace(/^([A-Za-z]):/, (all, drive) => `/${drive.toLowerCase()}`);
+      const result = spawnSync(SH, ['-c', `PATH="${posixBin}:$PATH"; export PATH; . "$0"`, HOOK], {
+        cwd: root, env, encoding: 'utf8',
+        input: `refs/heads/master ${sha} refs/heads/master ${'0'.repeat(40)}\n`,
+      });
+      const calls = readFileSync(join(root, 'calls.log'), 'utf8').trim().split('\n');
+      assert.equal(calls[0], 'ci --ignore-scripts');
+      if (installStatus === 0) {
+        assert.equal(result.status, 0, result.stdout + result.stderr);
+        assert.deepEqual(calls.slice(1, 3), ['run lint', 'run typecheck']);
+        assert.match(calls[3], /^run importmap -- --out /);
+      } else {
+        assert.notEqual(result.status, 0);
+        assert.deepEqual(calls, ['ci --ignore-scripts']);
+      }
+      assert.equal(readFileSync(join(root, 'package.json'), 'utf8'), changedPackage);
+      assert.equal(readFileSync(join(root, 'node_modules/.package-lock.json'), 'utf8'), '{}');
+    });
+}
 
 test('pre-push validates the pushed commit instead of a modified working tree', { skip: SKIP }, (t) => {
   const root = fixtureRoot(t);

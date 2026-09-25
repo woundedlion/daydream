@@ -23,9 +23,8 @@
     "branches": 83.33
   },
   "scripts/generate-importmap.mjs": {
-    "lines": 89,
     "reason": "Tracked CLI fixture suites cover dependency reads, hashing, addon scans and import-map rewriting. Remaining gaps include malformed package metadata and filesystem/tool failures.",
-    "branches": 65
+    "branches": 81.48
   },
   "scripts/vendor-stage.mjs": {
     "lines": 91.47,

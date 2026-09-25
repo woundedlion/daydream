@@ -5,6 +5,18 @@ import { readFileSync } from 'node:fs';
 import { sha256Hex } from '../generated/shader/sha256.mjs';
 import { compileShaderDocument } from '../generated/shader/shader_workbench.mjs';
 
+test('SHA-256 agrees with Node across UTF-8 block and padding boundaries', () => {
+  for (let length = 0; length <= 130; length++) {
+    for (const character of ['a', '\u00e9', '\u20ac', '\u{1f600}']) {
+      const width = Buffer.byteLength(character, 'utf8');
+      const value = character.repeat(Math.floor(length / width)) + 'x'.repeat(length % width);
+      assert.equal(Buffer.byteLength(value, 'utf8'), length);
+      assert.equal(sha256Hex(value), createHash('sha256').update(value).digest('hex'),
+        `${length} bytes using ${character}`);
+    }
+  }
+});
+
 test('a committed shader document keeps its recorded digests', () => {
   const source = readFileSync(
     new URL('../generated/shader/patterns/example.shader.json', import.meta.url),
