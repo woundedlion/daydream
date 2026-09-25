@@ -537,7 +537,7 @@ export interface HolosphereModule {
     getSupportedResolutions(): Array<[number, number]>;
     /**
      * The engine's operator catalog as one JSON string, byte-identical (plus
-     * the committed trailing newline) to the generated/shader/engine_catalog.json pin.
+     * the installed trailing newline) to generated/shader/engine_catalog.json.
      */
     getShaderChainCatalog(): string;
   };

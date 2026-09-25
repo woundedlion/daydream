@@ -1,40 +1,14 @@
 * text=auto eol=lf
 vendor-importmap.js text eol=lf
 
-# The deploy gate reads these on a Linux runner; CRLF would make sha256sum -c
-# look for a filename with a trailing CR and break provenance verification.
-holosphere_wasm.sha        text eol=lf
-holosphere_wasm.js         text eol=lf
-holosphere_wasm.wasm.sha256 text eol=lf
-holosphere_wasm.toolchain  text eol=lf
-*.yml                      text eol=lf
-holosphere_wasm.wasm       binary
-
-# Installed verbatim from the engine's LF-pinned golden; without this a Windows
-# install commits CRLF here and forks the copy from the bundle the deploy gate
-# verifies with sha256sum and installs.
-pov_segment_map.json       text eol=lf
+*.yml text eol=lf
 
 # The deploy staging shell reads this line by line; a trailing CR would make
 # every path miss on the runner.
 site_manifest.txt          text eol=lf
 
-# Installed verbatim from the engine bundle the deploy gate verifies with
-# sha256sum: the README from an LF-pinned copy, the gallery as binaries. Without
-# this a Windows install commits CRLF and forks the mirror from the bundle.
-README.md                  text eol=lf
-docs/screenshots/**        binary
-
 # Git hooks are sourced by /bin/sh; CRLF would break the shebang on checkout.
 .githooks/**               text eol=lf
 
-# The v2 pattern documents and the digest-migration table are pinned
-# byte-identical to the compiler's canonical export, which emits LF; the
-# catalog joins them so the engine-emitted replacement diffs cleanly.
-shader/engine_catalog.json text eol=lf
-shader/patterns/**         text eol=lf
-
-# Installed verbatim from the engine's LF-pinned copies; without this a Windows
-# install commits CRLF here and forks the mirror from the digests, which are LF.
-shader/sha256.mjs          text eol=lf
-shader/shader_workbench.mjs text eol=lf
+# Authored pattern documents use LF for canonical JSON exports.
+src/workbench/shader/patterns/** text eol=lf
