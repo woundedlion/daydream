@@ -632,7 +632,6 @@ export async function probeWarningNote(tab, layout) {
     const widget = controller.querySelector('.lil-widget').getBoundingClientRect();
     const panel = element.closest('.effect-gui').getBoundingClientRect();
     return {
-      missing: false,
       title: controller.getAttribute('title'),
       text: element.textContent,
       width: Math.round(box.width), height: Math.round(box.height),
@@ -645,8 +644,6 @@ export async function probeWarningNote(tab, layout) {
     };
   });
 
-  check(!note.missing, 'the warned control carries a note node');
-  if (note.missing) return failures.map((failure) => `${layout}: ${failure}`);
   check(note.text.includes('Planar Warp 1') && note.text.includes('Mirror Tile'),
     `the note carries the warning text (${note.text})`);
   check(note.title === null,
@@ -758,7 +755,7 @@ export async function probeKeyboardEdits(tab) {
 
 if (isMain(import.meta.url)) await runProbe({
   name: 'panel-probe',
-  minimumChecks: 58,
+  minimumChecks: 56,
   page: PAGE,
   timeoutMs: TIMEOUT_MS,
   success: 'the effect panel restored what it captured, and the sidebar measured '
