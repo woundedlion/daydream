@@ -138,4 +138,6 @@ test('pre-push refuses a failing unit suite even when later gates pass',
     });
     assert.notEqual(run.status, 0, `${run.stdout}${run.stderr}`);
     assert.match(run.stderr, /unit-suite-failed/);
+    assert.doesNotMatch(run.stderr, /no browser found|GNU timeout is required|browser probe/,
+      'the unit-suite refusal must fire before later gates');
   });
