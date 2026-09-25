@@ -1,5 +1,5 @@
 import { detachedView } from './fake_buffer.js';
-import { test, mock } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EngineHost } from '../engine_host.js';
 import { unpinnedEngineMethods } from './fake_engine.js';
@@ -214,14 +214,14 @@ test('dispose() releases the recorder before the engine and leaves the host iner
     'a held module keeps the whole Emscripten heap alive behind an inert host');
 });
 
-test('a recorder that throws on release does not strand the engine', () => {
+test('a recorder that throws on release does not strand the engine', (t) => {
   const host = new EngineHost();
   host.adapter = { drawFrame() {} };
   host.module = { HEAPU16: new Uint16Array(4) };
   host.recorder = { dispose() { throw new Error('stream ended'); } };
   let deleted = false;
   host.engine = { delete() { deleted = true; } };
-  const logged = mock.method(console, 'error', () => {});
+  const logged = t.mock.method(console, 'error', () => {});
 
   assert.doesNotThrow(() => host.dispose());
 
@@ -232,15 +232,14 @@ test('a recorder that throws on release does not strand the engine', () => {
   assert.equal(host.engine, null);
   assert.equal(host.module, null);
   assert.equal(logged.mock.callCount(), 1, 'the failure is still reported');
-  logged.mock.restore();
 });
 
-test('an engine delete that throws still leaves the host inert', () => {
+test('an engine delete that throws still leaves the host inert', (t) => {
   const host = new EngineHost();
   host.adapter = { drawFrame() {} };
   host.module = { HEAPU16: new Uint16Array(4) };
   host.engine = { delete() { throw new Error('already deleted'); } };
-  const logged = mock.method(console, 'error', () => {});
+  const logged = t.mock.method(console, 'error', () => {});
 
   assert.doesNotThrow(() => host.dispose());
 
@@ -248,7 +247,6 @@ test('an engine delete that throws still leaves the host inert', () => {
   assert.equal(host.adapter, null);
   assert.equal(host.module, null);
   assert.equal(logged.mock.callCount(), 1);
-  logged.mock.restore();
 });
 
 test('dispose() runs on a host that never reached a module load', () => {
