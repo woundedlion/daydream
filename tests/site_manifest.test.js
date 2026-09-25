@@ -223,7 +223,8 @@ test('the site manifest covers every asset the served pages reference', () => {
 // place here only by being published for its own sake.
 const UNREFERENCED = [
   'README.md',
-  ...new Set(read('README.md').match(/docs\/screenshots\/[\w.-]+\.png/g) ?? []),
+  ...new Set((existsSync(resolve(REPO, 'README.md')) ? read('README.md') : '')
+    .match(/docs\/screenshots\/[\w.-]+\.png/g) ?? []),
 ];
 
 const PATTERNS = 'generated/shader/patterns';

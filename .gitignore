@@ -52,3 +52,6 @@ Thumbs.db
 
 # Recoverable scratch files from interrupted engine installs.
 /.hs-tmp-*/
+
+/README.md
+/docs/screenshots/
