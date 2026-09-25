@@ -311,3 +311,20 @@ test('v1 Mobius coefficients adopt the current snap catalog curve', () => {
   assert.ok(coefficients.every((parameter) => parameter.interpolation.kind === 'SNAP'));
   assert.equal(compileShaderDocument(expanded, { catalog }).status, 'VALID');
 });
+
+test('v1 expansion follows a retuned linear catalog curve', () => {
+  const catalog = structuredClone(CATALOG);
+  for (const id of ['sphere.displace.curl.v2', 'sphere.displace.direct.v2']) {
+    catalog.operators.find((operator) => operator.id === id)
+      .params.find((field) => field.id === 'scale').curve = 'linear';
+  }
+  for (const field of catalog.operators.find((operator) => operator.id === 'sphere.lens.mobius.v2').params)
+    if (field.id.startsWith('mobius-')) field.curve = 'linear';
+  for (const name of ['kaleidoscope_hex_oil.shader.json', 'lattice_melt.shader.json', 'mobius_grid.shader.json']) {
+    const expanded = expandV1Document(fixture(name), catalog).document;
+    const parameters = expanded.descriptor.parameters.filter((parameter) =>
+      parameter.id === 'surface.scale' || parameter.id.startsWith('lens.mobius-'));
+    assert.ok(parameters.length > 0);
+    assert.ok(parameters.every((parameter) => parameter.interpolation.kind === 'LINEAR'));
+  }
+});
