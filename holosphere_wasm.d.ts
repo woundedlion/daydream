@@ -153,7 +153,7 @@ export interface HolosphereEngine {
    * Bounds must be integral and in range, or the answer is INVALID_BOUNDS.
    *
    * APPLIED and FULL_FRAME_KEPT are both successes, but only APPLIED means the
-   * band is in force: an effect reporting needs_full_frame() keeps the full
+   * band is in force: an effect reporting needs_full_frame() or persists_pixels() keeps the full
    * canvas, so a segment pool has to tell the two apart to know whether a
    * worker rendered its band or recomputed the whole frame. NO_EFFECT is the
    * ordinary answer between a resolution change and the setEffect that follows
