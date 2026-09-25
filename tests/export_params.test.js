@@ -88,8 +88,7 @@ test('formatExportParams: all-readonly yields empty braces', () => {
   assert.equal(formatExportParams(params, [1]), '{  }');
 });
 
-/** A tiny nonzero value keeps a meaningful significand instead of collapsing to
- *  0.0000f the way the old fixed 4-decimal formatter did. */
+/** A tiny nonzero value keeps a meaningful significand. */
 test('formatExportParams: preserves small-magnitude significand', () => {
   const params = [{ name: 'Tiny' }];
   assert.equal(formatExportParams(params, [0.00001]), '{ 0.00001f }');

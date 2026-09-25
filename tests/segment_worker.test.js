@@ -399,7 +399,7 @@ test('init applies the segment clip and posts ready', async () => {
   assert.ok(posted.some((p) => p.msg.type === 'ready'), 'ready posted');
 });
 
-/** Regression: an init whose setResolution is rejected posts no ready and an explicit engineRejected so the controller faults at once. */
+/** An init whose setResolution is rejected posts no ready and an explicit engineRejected so the controller faults at once. */
 test('init with a rejected resolution posts engineRejected, not ready', async () => {
   nextResolutionOk = false;
   await dispatch({ type: 'init', segId: 0, totalSegs: 1, w: 8, h: 4, effectName: 'Plasma' });
@@ -597,7 +597,7 @@ test('the worker never transfers the engine pixel view', async () => {
 });
 
 /**
- * Regression: an UNSUPPORTED setResolution must leave the worker's geometry and
+ * An UNSUPPORTED setResolution must leave the worker's geometry and
  * clip untouched, so it keeps extracting the old-size quadrant.
  */
 test('a rejected setResolution leaves segRange and clip untouched', async () => {
