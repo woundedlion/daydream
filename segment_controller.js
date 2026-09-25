@@ -655,6 +655,7 @@ export class SegmentController {
   };
 
   worker.onerror = (e) => {
+    e?.preventDefault?.();
     // A message-less error Event before the pool is ready is a module-graph
     // load failure (a plain Event, not an ErrorEvent) — transient, so rebuild
     // a bounded number of times before latching. A messaged error is a real
