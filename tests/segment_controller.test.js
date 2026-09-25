@@ -3058,8 +3058,10 @@ test('a pool fault notifies the host once after workers stop', () => {
   const faults = [];
   const controller = makeController({ onFault: (message) => {
     assert.equal(controller.faulted, true);
+    assert.ok(controller.workers.every((worker) => worker.terminated));
     faults.push(message);
   } });
+  controller.create(2);
   controller.onWorkerFault(0, 'render failed');
   controller.onWorkerFault(1, 'another failure');
   assert.deepEqual(faults, ['render failed']);
