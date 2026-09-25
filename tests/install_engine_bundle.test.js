@@ -148,12 +148,11 @@ test('install initializes a checkout with no previous engine pin', (t) => {
     'fresh generated/holosphere_wasm.js');
 });
 
-test('runtime mirrors exclude Daydream declarations, legacy fixtures and documents', () => {
-  for (const path of ['generated/pov_segment_map.json', 'generated/shader/shader_workbench.mjs',
+test('runtime mirrors include engine documents but exclude Daydream sources', () => {
+  for (const path of ['README.md', 'docs/screenshots/example.png', 'generated/pov_segment_map.json', 'generated/shader/shader_workbench.mjs',
     'generated/shader/sha256.mjs', 'generated/shader/patterns/kaleidoscope_flowers.shader.json',
     'generated/shader/patterns/shaderball_migration.json']) assert.equal(runtimePath(path), true, path);
-  for (const path of ['README.md', 'docs/screenshots/example.png',
-    'generated/shader/shader_workbench.d.mts', 'generated/holosphere_wasm.d.ts',
+  for (const path of ['generated/shader/shader_workbench.d.mts', 'generated/holosphere_wasm.d.ts',
     'src/workbench/shader/patterns/v1/example.shader.json', 'src/workbench/shader/patterns/digest_migration.v1v2.json',
     'src/workbench/shader/shader_documents.js']) assert.equal(runtimePath(path), false, path);
 });
