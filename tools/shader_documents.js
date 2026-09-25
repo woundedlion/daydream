@@ -490,7 +490,10 @@ export function createShaderDocumentController({
   const writeStageEdit = (parameterId, value) => {
     try {
       if (chainUi === null || active === null || active.presetId === null) return;
+      const declaresParameter = !chainUi.store.document().descriptor.parameters.some(
+        (/** @type {{id: string}} */ parameter) => parameter.id === parameterId);
       const result = chainUi.store.setPresetValue(active.presetId, parameterId, value, () => {
+        if (declaresParameter && active.compiledSide) return { ok: true };
         const engine = getEngine();
         const module = getModule();
         if (!engine || !module) return { ok: true };
@@ -515,6 +518,11 @@ export function createShaderDocumentController({
         announce(diagnostic.code === 'ENGINE_REFUSAL' ? diagnostic.message
           : `"${parameterId}" was refused: ${diagnostic.message}`);
         return false;
+      }
+      if (declaresParameter) {
+        const dropped = syncParity();
+        applyPreset(active.presetId);
+        if (dropped) chainUi.strip.render();
       }
       chainUi.strip.syncHistory();
       scheduleDeepLink();

@@ -2058,3 +2058,29 @@ test('refused replacement restores the previous compiled preset after switching 
   assert.deepEqual(harness.compiledEngine.selected, ['hex-twin-wave']);
   assert.match(harness.elements.get('shader-document-status').textContent, /missing-stage/);
 });
+
+
+for (const compiled of [false, true]) {
+  test(`an omitted parameter edit declares it and updates parity from ${compiled ? 'compiled' : 'interpreter'} preview`, async () => {
+    const harness = await editorWorkbench({ migration: HEX_MIGRATION });
+    const toggle = harness.elements.get('shader-parity-toggle');
+    const original = savedValues(harness);
+    const before = JSON.parse(harness.downloads.at(-1)[1]);
+    const digest = harness.elements.get('shader-document-digest').dataset.digest;
+    assert.equal(toggle.disabled, false);
+    assert.equal(Object.hasOwn(original, 'sample.edge-width'), false);
+    if (compiled) toggle.dispatch('click');
+    stageEditor(harness, 'sample')('sample.edge-width', 0.25);
+    assert.equal(toggle.disabled, true);
+    assert.equal(toggle.getAttribute('aria-pressed'), 'false');
+    assert.ok(harness.engine.writes.some(([name, value]) =>
+      name === 'sample.edge-width' && value === 0.25));
+    assert.equal(savedValues(harness)['sample.edge-width'], 0.25);
+    assert.notEqual(harness.elements.get('shader-document-digest').dataset.digest, digest);
+    harness.elements.get('chain-strip').querySelector('.chain-undo').dispatch('click');
+    assert.equal(toggle.disabled, false);
+    savedValues(harness);
+    assert.deepEqual(JSON.parse(harness.downloads.at(-1)[1]), before);
+    assert.equal(harness.elements.get('shader-document-digest').dataset.digest, digest);
+  });
+}

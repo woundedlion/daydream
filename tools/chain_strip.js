@@ -15,7 +15,7 @@ import {
 /** @typedef {import('./chain_presentation.js').LegalityEntry} LegalityEntry */
 /** @typedef {import('./chain_presentation.js').SequenceEntry} SequenceEntry */
 /** @typedef {import('./chain_presentation.js').SpanChoice} SpanChoice */
-/** @typedef {import('./chain_presentation.js').ParameterDeclaration} ParameterDeclaration */
+/** @typedef {import('./chain_document_store.js').ParameterDeclaration} ParameterDeclaration */
 /** @typedef {import('./chain_presentation.js').BandLayout} BandLayout */
 
 import { createFrameScheduler } from './page_lifecycle.js';
@@ -35,7 +35,7 @@ import { createFrameScheduler } from './page_lifecycle.js';
  * focus restored to the edited chip.
  *
  * Every chip carries its stage's controls inline, built from the document's
- * parameter declarations over the active preset's values, so a stage is tuned
+ * declarations and catalog defaults over the active preset's values, so a stage is tuned
  * where it sits in the pipeline. A chip discloses them transiently under the
  * pointer and under keyboard focus alike, and pinned open by selection.
  */
@@ -54,6 +54,7 @@ import { createFrameScheduler } from './page_lifecycle.js';
  *   legalInsertions: (index: number) => LegalityEntry[],
  *   legalSequences: (start: number, deleteCount: number,
  *     maxLength: number) => SequenceEntry[],
+ *   parameterDeclarations: () => ParameterDeclaration[],
  *   document: () => *,
  *   replaceSpan: (start: number, deleteCount: number,
  *     sequence: Array<{label?: string, operator: string}>) => EditResult,
@@ -717,6 +718,11 @@ export function createChainStrip({
     region.setAttribute('role', 'group');
     region.setAttribute('aria-label', `${opOf(entry).name} · ${entry.label} parameters`);
     region.appendChild(renameRow(entry));
+    if (declared.length === 0) {
+      const note = el('p', 'chain-strip-note');
+      note.textContent = 'No adjustable parameters';
+      region.appendChild(note);
+    }
     for (const declaration of declared) {
       const name = titleCase(fieldOf(declaration.id));
       const row = el('div', 'chain-param');
@@ -799,8 +805,7 @@ export function createChainStrip({
     const isBypassed = bypassed.has(entry.label);
     const declared = declarations.filter(
       (declaration) => declaration.id.startsWith(`${entry.label}.`));
-    const hasParams = declared.length > 0;
-    const expanded = hasParams && isSelected;
+    const expanded = isSelected;
     const chip = el('div', 'chain-chip'
       + (crossing ? ' chain-chip--socket' : ' chain-chip--stage')
       + (expanded ? ' chain-chip--expanded' : '')
@@ -811,7 +816,7 @@ export function createChainStrip({
     // hides the chip's inline stage controls from assistive technology.
     chip.setAttribute('role', 'group');
     if (isSelected) chip.setAttribute('aria-current', 'true');
-    if (hasParams) chip.setAttribute('aria-expanded', String(expanded));
+    chip.setAttribute('aria-expanded', String(expanded));
     chip.setAttribute('tabindex', tabLabel === entry.label ? '0' : '-1');
     chip.setAttribute('aria-keyshortcuts',
       'ArrowLeft ArrowRight Alt+ArrowLeft Alt+ArrowRight Enter Space b Delete Backspace Insert');
@@ -917,31 +922,29 @@ export function createChainStrip({
     }
 
     chip.appendChild(header);
-    if (hasParams) chip.appendChild(paramsElement(entry, declared));
+    chip.appendChild(paramsElement(entry, declared));
 
     chip.addEventListener('click', (/** @type {*} */ event) => {
       const clickedHeader = event.target === chip
         || event.target?.closest?.('.chain-chip-header') === header;
       if (clickedHeader) select(entry.label);
     });
-    if (hasParams) {
-      const setTransientOpen = (/** @type {boolean} */ open) => {
-        if (store.selectedLabel() === entry.label) return;
-        chip.classList.toggle('chain-chip--expanded', open);
-        chip.setAttribute('aria-expanded', String(open));
-        if (open) markDeactivated();
-      };
-      chip.addEventListener('mouseenter', () => setTransientOpen(true));
-      chip.addEventListener('mouseleave', () => setTransientOpen(false));
-      chip.addEventListener('focusin', () => {
-        if (!restoringFocus) setTransientOpen(true);
-      });
-      chip.addEventListener('focusout', (/** @type {*} */ event) => {
-        const next = event.relatedTarget ?? null;
-        if (next !== null && chip.contains(next)) return;
-        setTransientOpen(false);
-      });
-    }
+    const setTransientOpen = (/** @type {boolean} */ open) => {
+      if (store.selectedLabel() === entry.label) return;
+      chip.classList.toggle('chain-chip--expanded', open);
+      chip.setAttribute('aria-expanded', String(open));
+      if (open) markDeactivated();
+    };
+    chip.addEventListener('mouseenter', () => setTransientOpen(true));
+    chip.addEventListener('mouseleave', () => setTransientOpen(false));
+    chip.addEventListener('focusin', () => {
+      if (!restoringFocus) setTransientOpen(true);
+    });
+    chip.addEventListener('focusout', (/** @type {*} */ event) => {
+      const next = event.relatedTarget ?? null;
+      if (next !== null && chip.contains(next)) return;
+      setTransientOpen(false);
+    });
     chip.addEventListener('keydown',
       (/** @type {*} */ event) => chipKeydown(event, index, entry, crossing, chip));
     return chip;
@@ -1003,11 +1006,13 @@ export function createChainStrip({
     rows.clear();
 
     const snapshot = store.document();
-    declarations = snapshot.descriptor.parameters;
+    declarations = store.parameterDeclarations();
     const presets = snapshot.preset_bank.presets;
     const preset = presets.find(
       (/** @type {*} */ candidate) => candidate.preset_id === presetId()) ?? presets[0];
-    values = { ...preset?.values };
+    values = Object.fromEntries(declarations.map((parameter) =>
+      [parameter.id, parameter.default]));
+    Object.assign(values, preset?.values);
 
     const chain = store.chain();
     const selected = store.selectedLabel();
