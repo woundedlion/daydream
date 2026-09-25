@@ -1179,7 +1179,10 @@ function updateOpParam(index, key, value, revision) {
     val = snapToStep(val, def);
   }
   const previous = state.ops[index].params[key];
-  state.ops[index].params[key] = val;
+  const candidateOp = {
+    op: state.ops[index].op,
+    params: { ...state.ops[index].params, [key]: val },
+  };
 
   // Sync UI elements. The row's data-key names the param it drives, so the
   // state object's key order need not match OP_DEFS'.
@@ -1192,33 +1195,35 @@ function updateOpParam(index, key, value, revision) {
     if (slider) slider.value = val;
     if (input) input.value = formatParamValue(val, def);
   }
-  if (item) syncSweepWarning(item, state.ops[index]);
+  if (item) syncSweepWarning(item, candidateOp);
 
   // truncate and bevel short-circuit to ambo at t == 0.5, so a slider tick can
   // change the element census the way adding an op does. That crossing goes
   // through the gate like any other mutation: the live module is the page's
   // only one, and a trap on it costs a reload.
-  const before = {
-    op: state.ops[index].op,
-    params: { ...state.ops[index].params, [key]: previous },
-  };
-  if (opTopologyKey(before) !== opTopologyKey(state.ops[index])) {
+  if (opTopologyKey(state.ops[index]) !== opTopologyKey(candidateOp)) {
+    const candidate = structuredClone(state.ops);
+    candidate[index] = candidateOp;
     scheduleUpdate.cancel();
     queueCommit(async () => {
-      const check = await chainIsValid(state.base, state.ops);
+      if (revision !== opsRevision || state.ops[index]?.params?.[key] !== previous) return;
+      const check = await chainIsValid(state.base, candidate);
+      if (revision !== opsRevision || state.ops[index]?.params?.[key] !== previous) return;
       if (check.ok) {
+        state.ops[index].params[key] = val;
+        renderOps();
         update();
         return;
       }
       showGateMsg(`rejected: ${check.message}`);
-      if (state.ops[index]?.params?.[key] === val) {
-        state.ops[index].params[key] = previous;
+      if (state.ops[index]?.params?.[key] === previous) {
         renderOps();
         update();
       }
     });
     return;
   }
+  state.ops[index].params[key] = val;
   scheduleUpdate();
 }
 

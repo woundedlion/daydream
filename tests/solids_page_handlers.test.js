@@ -232,7 +232,7 @@ test('a refused topology tick repaints the restored chain', async () => {
   const painted = [];
   const state = { base: 'cube', ops: [{ op: 'truncate', params: { t: 0.4 } }] };
   const context = {
-    state, opsRevision: 1, OP_DEFS: {},
+    state, opsRevision: 1, OP_DEFS: {}, structuredClone,
     document: { getElementById: () => ({ children: [] }) },
     opTopologyKey: (entry) => entry.params.t === 0.5,
     scheduleUpdate: { cancel() {} }, queueCommit: (fn) => { queued = fn; },
@@ -240,7 +240,33 @@ test('a refused topology tick repaints the restored chain', async () => {
     showGateMsg() {}, renderOps() {}, update: () => painted.push(state.ops[0].params.t),
   };
   handler('updateOpParam', context)(0, 't', '0.5', 1);
+  assert.equal(state.ops[0].params.t, 0.4, 'pending topology never reaches live state');
   await queued();
   assert.equal(state.ops[0].params.t, 0.4);
   assert.deepEqual(painted, [0.4]);
+});
+
+test('an accepted topology tick publishes only after validation', async () => {
+  let queued;
+  let resolveCheck;
+  const state = { base: 'cube', ops: [{ op: 'truncate', params: { t: 0.4 } }] };
+  const painted = [];
+  const context = {
+    state, opsRevision: 1, OP_DEFS: {}, structuredClone,
+    document: { getElementById: () => ({ children: [] }) },
+    opTopologyKey: (entry) => entry.params.t === 0.5,
+    scheduleUpdate: { cancel() {} }, queueCommit: (fn) => { queued = fn; },
+    chainIsValid: async (_base, ops) => {
+      assert.equal(ops[0].params.t, 0.5);
+      return new Promise((resolve) => { resolveCheck = resolve; });
+    },
+    showGateMsg() {}, renderOps() {}, update: () => painted.push(state.ops[0].params.t),
+  };
+  handler('updateOpParam', context)(0, 't', '0.5', 1);
+  const pending = queued();
+  context.update();
+  assert.deepEqual(painted, [0.4]);
+  resolveCheck({ ok: true });
+  await pending;
+  assert.deepEqual(painted, [0.4, 0.5]);
 });
