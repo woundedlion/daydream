@@ -502,23 +502,23 @@ test('the generative tab carries every control the readings name', () => {
  * with the default recipe silently authors a different palette at load.
  */
 test('the generative tab opens on the default recipe', () => {
-  const recipe = defaultPaletteRecipe();
-  const sliderValue = (id) => {
-    const tag = PALETTES_HTML.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`))?.[0];
-    assert.ok(tag, `palettes.html must carry a ${id} control`);
-    return Number(tag.match(/value="([^"]*)"/)[1]);
-  };
-
-  assert.ok(Math.abs(sliderValue('gen_spread') / 360 - recipe.hue.spreadTurns) < 1e-9);
-  assert.equal(sliderValue('gen_sweep'), recipe.hue.sweepTurns);
-  assert.equal(sliderValue('gen_torsion'), recipe.hueTorsion);
-  assert.equal(sliderValue('gen_headroom'), recipe.chroma.headroom);
-  assert.equal(sliderValue('gen_falloff'), recipe.falloffStart);
-  const easingBlock = PALETTES_HTML.match(/<select[^>]*\bid="gen_easing"[\s\S]*?<\/select>/)?.[0];
-  assert.ok(easingBlock, 'palettes.html must carry a gen_easing select');
-  const easing = easingBlock.match(/<option value="(\w+)" selected>/)?.[1];
-  assert.equal(PaletteV4.easing[easing], recipe.easing,
-    'the easing option marked selected must be the default recipe\'s');
+  const values = new Map();
+  for (const id of Object.values(PALETTE_CONTROL_IDS)) {
+    const input = PALETTES_HTML.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`))?.[0];
+    if (input) {
+      values.set(id, input.match(/value="([^"]*)"/)[1]);
+    } else {
+      const select = PALETTES_HTML.match(new RegExp(`<select[^>]*id="${id}"[\\s\\S]*?</select>`))?.[0];
+      assert.ok(select, id);
+      const options = [...select.matchAll(/<option\s+value="([^"]+)"([^>]*)>/g)];
+      values.set(id, (options.find((option) => /\bselected\b/.test(option[2])) ?? options[0])[1]);
+    }
+  }
+  const defaults = paletteControlsFromRecipe(defaultPaletteRecipe());
+  const actual = paletteControlReadings((id) => values.get(id), defaults.customHueOffsets);
+  assert.ok(Math.abs(actual.spreadTurns - defaults.spreadTurns) < 1e-12);
+  actual.spreadTurns = defaults.spreadTurns;
+  assert.deepEqual(actual, defaults);
 });
 
 /** Verifies the two fields the engine canonicalizes are canonical before it sees them. */
