@@ -429,3 +429,8 @@ test('the browser suite discovers every probe script', () => {
   const suite = readFileSync(resolve(REPO, WORKFLOW_DIR, 'browser-smoke.yml'), 'utf8');
   assert.match(suite, /for script in scripts\/browser-smoke\.mjs scripts\/\*-probe\.mjs/);
 });
+
+test('scheduled deployment runs cannot replace pending manual dispatches', () => {
+  const deploy = readFileSync(resolve(REPO, DEPLOY_PATH), 'utf8');
+  assert.ok(deploy.includes('group: pages-${{ github.event_name }}'));
+});
