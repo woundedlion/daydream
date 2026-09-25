@@ -1589,6 +1589,16 @@ test('the parity toggle disarms on a descriptor edit, not on a bypass', async ()
   assert.equal(toggle.disabled, true);
 });
 
+test('compiled stage edits reach stages bypassed in the interpreter', async () => {
+  const harness = await editorWorkbench({ migration: HEX_MIGRATION });
+  stripChips(harness).find((chip) => chip.dataset.label === 'warp2')
+    .querySelector('.chain-chip-bypass').dispatch('click');
+  harness.elements.get('shader-parity-toggle').dispatch('click');
+  harness.compiledEngine.writes.length = 0;
+  stageEditor(harness, 'warp2')('warp2.speed', 0.01);
+  assert.deepEqual(harness.compiledEngine.writes, [['Planar Warp 2 Speed', 0.01]]);
+});
+
 test('a descriptor edit under the compiled build returns the preview to the interpreter', async () => {
   const harness = await editorWorkbench({ migration: HEX_MIGRATION });
   const status = harness.elements.get('shader-document-status');
