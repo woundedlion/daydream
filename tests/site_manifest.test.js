@@ -293,7 +293,7 @@ test('the site manifest publishes exactly the pattern documents the catalog fetc
   { skip: missingCatalog && 'engine catalog is installed separately' }, () => {
   const served = new Set([...servedPatterns()].filter((entry) => entry.startsWith(`${PATTERNS}/`)));
   const listed = new Set(
-    manifestEntries().filter((entry) => entry.startsWith(`${PATTERNS}/`) || PATTERN_NON_SOURCES.includes(entry)));
+    manifestEntries().filter((entry) => entry.startsWith(`${PATTERNS}/`)));
   const files = patternFiles();
 
   assert.deepEqual([...served].filter((doc) => !listed.has(doc)).sort(), [],
