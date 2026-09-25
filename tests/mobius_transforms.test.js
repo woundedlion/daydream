@@ -504,3 +504,13 @@ test('preset generators hold their determinant across a range of t', () => {
       `cayley@${t} determinant (${d.re}, ${d.im}) is degenerate`);
   }
 });
+
+test('projectDiv rescales subnormal nonzero divisor magnitudes', () => {
+  for (const scale of [1e-160, 3e-162]) {
+    assert.ok(scale * scale > 0 && scale * scale < 2 ** -1022);
+    assertComplex(projectDiv({ re: 3 * scale, im: -scale }, { re: scale, im: 0 }),
+      3, -1, 'subnormal real divisor');
+    assertComplex(projectDiv({ re: scale, im: 3 * scale }, { re: 0, im: scale }),
+      3, -1, 'subnormal imaginary divisor');
+  }
+});
