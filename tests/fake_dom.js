@@ -638,13 +638,15 @@ export function fakeElement(tag = 'div', options = {}) {
   });
   // textContent is a DOMString: a write of anything else comes back stringified,
   // and null (or a missing argument) reads back as the empty string.
-  let text = '';
   Object.defineProperty(element, 'textContent', {
     enumerable: true,
     configurable: true,
-    get() { return text; },
+    get() {
+      return element.childNodes.map((node) =>
+        typeof node === 'string' ? node : node.textContent ?? '').join('');
+    },
     set(value) {
-      text = value === null || value === undefined ? '' : String(value);
+      const text = value === null || value === undefined ? '' : String(value);
       element.replaceChildren(...(text === '' ? [] : [text]));
     },
   });
@@ -678,7 +680,7 @@ export function fakeElement(tag = 'div', options = {}) {
     Object.defineProperty(element, 'value', {
       enumerable: true,
       configurable: true,
-      get() { return optionValue === null ? text : optionValue; },
+      get() { return optionValue === null ? element.textContent : optionValue; },
       set(value) { optionValue = String(value); },
     });
   }
