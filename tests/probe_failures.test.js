@@ -71,9 +71,8 @@ function throwingTab() {
     get(_target, property) {
       if (property === 'then') return undefined; // not a thenable
       if (property === 'mouse' || property === 'keyboard') return tab;
-      return (/** @type {unknown[]} */ ...args) => {
+      return () => {
         calls.push(String(property));
-        void args;
         throw new Error(REFUSAL);
       };
     },

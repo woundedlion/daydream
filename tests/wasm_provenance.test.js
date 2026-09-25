@@ -4,18 +4,19 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import {
   BAKED_CONSTANT_IDS, bakedTopologyFields, engineParameterNames,
 } from '../tools/shader_documents.js';
 import { MORPH_SWEEP, OP_DEFS } from '../tools/solid_codegen.js';
 
-const text = (path) => readFileSync(path, 'utf8').replaceAll('\r\n', '\n');
-const sha256 = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
+const REPO = fileURLToPath(new URL('..', import.meta.url));
+const text = (path) => readFileSync(resolve(REPO, path), 'utf8').replaceAll('\r\n', '\n');
+const sha256 = (path) => createHash('sha256').update(readFileSync(resolve(REPO, path))).digest('hex');
 const engineCandidates = process.env.HOLOSPHERE_ENGINE_DIR
   ? [resolve(process.env.HOLOSPHERE_ENGINE_DIR)]
-  : ['engine', '../Holosphere', '../pov'].map((path) => resolve(path));
+  : ['engine', '../Holosphere', '../pov'].map((path) => resolve(REPO, path));
 const engineRoot = engineCandidates.find(
   (path) => existsSync(resolve(path, 'scripts/shader_workbench.mjs')));
 const engineMissing = `no Holosphere checkout found in ${engineCandidates.join(', ')}`;
@@ -75,7 +76,7 @@ const ALIAS_PROBES = [
 
 const controlNameCorpus = () => {
   const ids = new Set(ALIAS_PROBES);
-  for (const name of readdirSync('shader/patterns')) {
+  for (const name of readdirSync(resolve(REPO, 'shader/patterns'))) {
     if (!name.endsWith('.shader.json')) continue;
     for (const parameter of JSON.parse(text(`shader/patterns/${name}`))
       .descriptor?.parameters ?? []) ids.add(parameter.id);
@@ -231,7 +232,7 @@ test('pattern mirrors match the pinned engine in both content and membership', {
   const mirrored = (name) => name.endsWith('.shader.json') || name === 'shaderball_migration.json';
   const expected = execFileSync('git', ['-C', engineRoot, 'ls-tree', '--name-only',
     `${enginePin}:patterns`], { encoding: 'utf8' }).trim().split('\n').filter(mirrored).sort();
-  const actual = readdirSync('shader/patterns').filter(mirrored).sort();
+  const actual = readdirSync(resolve(REPO, 'shader/patterns')).filter(mirrored).sort();
   assert.deepEqual(actual, expected);
   for (const name of expected) {
     assert.equal(text(`shader/patterns/${name}`),

@@ -1666,18 +1666,18 @@ test('composite() faults when the layout admits no band for a segment', () => {
 // the table is derived once per layout rather than once per segment per frame.
 test('the band table is reused until the layout moves', () => {
   const c = makeController();
-  const first = c.compositor.segmentBands(2, 4, 4, c.frameState.renderGen);
-  assert.equal(c.compositor.segmentBands(2, 4, 4, c.frameState.renderGen), first, 'an unchanged layout reuses the table');
+  const first = c.compositor.segmentBands(2, 4, 4);
+  assert.equal(c.compositor.segmentBands(2, 4, 4), first, 'an unchanged layout reuses the table');
 
   c.destroy();
-  const afterGen = c.compositor.segmentBands(2, 4, 4, c.frameState.renderGen);
+  const afterGen = c.compositor.segmentBands(2, 4, 4);
   assert.equal(afterGen, first, 'a new generation preserves unchanged geometry');
 
-  const resized = c.compositor.segmentBands(2, 8, 4, c.frameState.renderGen);
+  const resized = c.compositor.segmentBands(2, 8, 4);
   assert.notEqual(resized, afterGen, 'a resize rebuilds the table');
   assert.equal(resized[1].x0, 4, 'the rebuilt table describes the new width');
 
-  const recounted = c.compositor.segmentBands(4, 8, 4, c.frameState.renderGen);
+  const recounted = c.compositor.segmentBands(4, 8, 4);
   assert.notEqual(recounted, resized, 'a segment-count change rebuilds the table');
 });
 

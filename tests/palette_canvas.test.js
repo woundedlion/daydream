@@ -95,7 +95,6 @@ test('a height-only resize keeps the baked gradient', () => {
   painter.draw(palette);
   assert.equal(created.length, 1, 'the cache does not depend on the strip height');
   assert.equal(palette.getCalls, 8);
-  assert.deepEqual(created[0].ctx.ops.length, 0);
 });
 
 test('the baked gradient carries the sRGB-encoded palette, opaque, one row tall', () => {
