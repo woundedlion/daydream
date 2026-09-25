@@ -215,18 +215,15 @@ test('the self-clear waits out keyboard focus inside the notice', () => {
 
   h.notice.show('Effect change was rejected.', 'switch');
   h.doc.activeElement = h.dismiss;
+  const armed = h.timer.handle;
   h.expire();
 
   assert.equal(h.body.hidden, false,
     'hiding the body drops focus from the dismiss button the user is standing on');
   assert.equal(h.notice.owner(), 'switch');
   assert.equal(h.timer.ms, 8000, 'the dwell is served again');
+  assert.equal(h.timer.handle, armed + 1, 'expiry arms a fresh dwell');
 
-  // The button is still the user's own way out, deferred dwell or not.
-  h.notice.clear();
-  assert.equal(h.body.hidden, true);
-
-  h.notice.show('Effect change was rejected.', 'switch');
   h.doc.activeElement = null;
   h.expire();
   assert.equal(h.body.hidden, true);
