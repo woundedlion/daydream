@@ -1309,6 +1309,17 @@ test('a load whose preset the engine refuses puts the program back', async () =>
     harness.elements.get('shader-preset-select').options.map((o) => o.value), presets);
 });
 
+test('a refused preset restores the dropdown selection', async () => {
+  const harness = await editorWorkbench();
+  const select = harness.elements.get('shader-preset-select');
+  const previous = select.value;
+  harness.engine.setShaderChainParameters = () => ParamSetResult.INADMISSIBLE;
+  select.value = select.options.find((option) => option.value !== previous).value;
+  select.dispatch('change');
+  assert.equal(select.value, previous);
+  assert.match(harness.elements.get('shader-document-status').textContent, /INADMISSIBLE/);
+});
+
 test('a shader state link restores its document, preset, bypasses, and pause', async () => {
   const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
   const preset = document.preset_bank.presets[1];
