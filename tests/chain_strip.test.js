@@ -18,7 +18,7 @@ import { compileShaderDocument } from '../shader/shader_workbench.mjs';
 import {
   documentEvents, fakeElement, installAnimationFrames, installDocument,
   restoreDocumentAfterEach,
-} from './fake_dom.js';
+} from './helpers/fake_dom.js';
 
 const CATALOG = JSON.parse(readFileSync(
   new URL('../shader/engine_catalog.json', import.meta.url), 'utf8'));

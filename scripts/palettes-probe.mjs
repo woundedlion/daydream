@@ -5,7 +5,7 @@
  *   node scripts/palettes-probe.mjs
  *
  * Both gestures read the pointer through getBoundingClientRect and ride on
- * pointer capture, neither of which tests/fake_dom.js has: its rects are zero,
+ * pointer capture, neither of which tests/helpers/fake_dom.js has: its rects are zero,
  * so every strip position collapses onto 0 and every wheel hit test misses, and
  * a drag that leaves the element stops arriving. This job drags the strip with a
  * real mouse and requires the phase window it swept, walks the pointer out of

@@ -1,4 +1,4 @@
-import { fakeModule as makeMeshOps } from './fake_meshops.js';
+import { fakeModule as makeMeshOps } from './helpers/fake_meshops.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

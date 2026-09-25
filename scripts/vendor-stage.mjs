@@ -22,7 +22,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { manifestEntries } from '../tests/site_pages.js';
+import { manifestEntries } from '../tests/helpers/site_pages.js';
 import { serveManifest } from './serve-manifest.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');

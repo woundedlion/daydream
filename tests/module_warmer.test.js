@@ -1,10 +1,10 @@
-import { installFakeTimers } from './fake_timers.js';
+import { installFakeTimers } from './helpers/fake_timers.js';
 import { test, mock, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { registerHooks } from 'node:module';
 
-import { ModuleWarmer, warmModules, pageWarmer, GRAPH, WARM_INTERVAL_MS, WARM_DEADLINE_MS, EMPTY_WASM } from './module_warmer_fixture.js';
+import { ModuleWarmer, warmModules, pageWarmer, GRAPH, WARM_INTERVAL_MS, WARM_DEADLINE_MS, EMPTY_WASM } from './fixtures/module_warmer_fixture.js';
 beforeEach(() => pageWarmer.discard());
 
 test('default warm uses its served module URL, global fetch, and clears its deadline', async (t) => {

@@ -3,7 +3,7 @@
 // and the scaled-step rounding guard that rejects a step that collapses to 0.
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
+import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
 const { createSlider, createSliderProxy } = await import('../tools/slider.js');
 

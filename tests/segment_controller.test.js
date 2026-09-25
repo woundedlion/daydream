@@ -4,13 +4,13 @@
 // fake Worker and a fake driver injected as a constructor dependency.
 //
 // Run: npm test
-import { installFakeTimers } from './fake_timers.js';
+import { installFakeTimers } from './helpers/fake_timers.js';
 import { test, mock, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { unpinnedEngineMethods } from './fake_engine.js';
-import { fakeElement, installDocument } from './fake_dom.js';
-import { fakeColorAttribute } from './fake_three.js';
-import { FakeWorker } from './fake_worker.js';
+import { unpinnedEngineMethods } from './helpers/fake_engine.js';
+import { fakeElement, installDocument } from './helpers/fake_dom.js';
+import { fakeColorAttribute } from './helpers/fake_three.js';
+import { FakeWorker } from './helpers/fake_worker.js';
 import { displayAliasesDiverged, repointDisplayAliases } from '../display_aliases.js';
 
 // Stand-in for the injected Daydream renderer: the grid and display buffer the
@@ -39,7 +39,7 @@ const {
   INIT_WATCHDOG_MS,
   RENDER_WATCHDOG_MS,
 } = await import('../segment_controller.js');
-import { ModuleWarmer, warmModules, pageWarmer, EMPTY_WASM } from './module_warmer_fixture.js';
+import { ModuleWarmer, warmModules, pageWarmer, EMPTY_WASM } from './fixtures/module_warmer_fixture.js';
 const { PROTOCOL_VERSION } = await import('../worker_protocol.js');
 
 const EXPECTED_CONSOLE_MESSAGES = {

@@ -2,7 +2,7 @@
 // tools/chain_apply.js applies a compiled chain document to the chain engine
 // in one fixed order: setShaderChain, then the preset values by parameter id
 // (enum8s as the option index the post-APPLIED definitions resolve), then the
-// GUI resync and repaint. The engine double is tests/fake_engine.js's
+// GUI resync and repaint. The engine double is tests/helpers/fake_engine.js's
 // FakeChainEngine, which rebuilds definitions from the pinned catalog and
 // bumps the param generation on every APPLIED exactly as the module does.
 import { test } from 'node:test';
@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { applyChainDocument } from '../tools/chain_apply.js';
 import {
   FakeChainEngine, ChainStatus, ParamSetResult, unpinnedEngineMethods,
-} from './fake_engine.js';
+} from './helpers/fake_engine.js';
 
 const MODULE = { ParamSetResult };
 

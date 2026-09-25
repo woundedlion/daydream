@@ -12,8 +12,8 @@ import assert from 'node:assert/strict';
 import { register } from 'node:module';
 import {
   log, Mesh, PerspectiveCamera, Scene, WebGLRenderer, OrbitControls,
-} from './fake_three.js';
-import { fakeElement, installDocument } from './fake_dom.js';
+} from './helpers/fake_three.js';
+import { fakeElement, installDocument } from './helpers/fake_dom.js';
 
 /**
  * A container element reporting the box the scene is sized against.
@@ -28,8 +28,8 @@ const sizedElement = (width, height) =>
 // assertions below share one module instance — and one `log`. The hook is
 // process-wide and never deregistered, which is only safe because `node --test`
 // gives each test file its own process.
-register('./three_loader_hooks.js', import.meta.url, {
-  data: { fakeThreeUrl: import.meta.resolve('./fake_three.js') },
+register('./helpers/three_loader_hooks.js', import.meta.url, {
+  data: { fakeThreeUrl: import.meta.resolve('./helpers/fake_three.js') },
 });
 
 const shared = await import('../tools/shared.js');

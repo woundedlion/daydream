@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expectFailure, fixtureRepo, isolatedGitEnv } from './fixture_repo.js';
+import { expectFailure, fixtureRepo, isolatedGitEnv } from './helpers/fixture_repo.js';
 import { COVERAGE, lineCoverage } from '../scripts/run-tests.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));

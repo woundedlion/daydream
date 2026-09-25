@@ -4,7 +4,7 @@
  *
  *   node scripts/solids-probe.mjs
  *
- * The unit suite runs over tests/fake_dom.js, which models neither layout nor
+ * The unit suite runs over tests/helpers/fake_dom.js, which models neither layout nor
  * pointer capture, so it cannot tell a grip that reorders from one that reorders
  * only under a mouse: the row geometry the drop slot is read from, the capture
  * the gesture rides on, and the touch-action that decides whether a finger drags

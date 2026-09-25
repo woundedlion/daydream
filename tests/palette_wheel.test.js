@@ -1,7 +1,7 @@
 // The palette tool's hue-key wheel, run end to end against a recording context
 // double: the gamut raster, the marker and label geometry laid over it, and the
 // pointer and keyboard arithmetic a key is moved by.
-import { fakeContext } from './fake_canvas.js';
+import { fakeContext } from './helpers/fake_canvas.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {

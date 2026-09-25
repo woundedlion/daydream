@@ -5,7 +5,7 @@
 // ordering invariant — instanceColor.array must be nulled before
 // InstancedMesh.dispose(), because that array may alias WASM memory. The
 // context-loss handlers run against the shared fake DOM.
-import { detachedView } from './fake_buffer.js';
+import { detachedView } from './helpers/fake_buffer.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -14,9 +14,9 @@ import {
   Daydream, dotDetailFor, fitDistance, initialAspect, MOBILE_BREAKPOINT_PX,
 } from '../driver.js';
 import { repointDisplayAliases } from '../display_aliases.js';
-import { captureConsole } from './fake_console.js';
-import { fakeElement } from './fake_dom.js';
-import { fakeColorAttribute, fakeMatrixAttribute } from './fake_three.js';
+import { captureConsole } from './helpers/fake_console.js';
+import { fakeElement } from './helpers/fake_dom.js';
+import { fakeColorAttribute, fakeMatrixAttribute } from './helpers/fake_three.js';
 
 // ---------------------------------------------------------------------------
 // dotDetailFor

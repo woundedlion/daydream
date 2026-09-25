@@ -7,8 +7,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBaseMesh, buildChainMesh, readbackMesh } from '../tools/solid_build.js';
-import { fakeModule } from './fake_meshops.js';
-import { installConsoleCapture } from './fake_console.js';
+import { fakeModule } from './helpers/fake_meshops.js';
+import { installConsoleCapture } from './helpers/fake_console.js';
 
 /**
  * The live wiring a build runs against, recording what it was told.

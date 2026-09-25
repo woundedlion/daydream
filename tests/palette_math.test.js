@@ -1,4 +1,4 @@
-import * as paletteEnums from './fake_palette.js';
+import * as paletteEnums from './helpers/fake_palette.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 

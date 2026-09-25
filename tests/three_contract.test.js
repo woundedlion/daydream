@@ -1,8 +1,8 @@
 //
-// Pins the three surface tests/fake_three.js stands in for, so the double the
+// Pins the three surface tests/helpers/fake_three.js stands in for, so the double the
 // scene suites run over cannot drift from the library the tool pages load.
 // shared.test.js redirects `three` and its OrbitControls addon to the fake;
-// this one imports the real modules and drives them over tests/fake_dom.js,
+// this one imports the real modules and drives them over tests/helpers/fake_dom.js,
 // which is enough DOM for OrbitControls to connect.
 //
 // A rename is what this catches. The double keeps answering the old name, so a
@@ -14,8 +14,8 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-import * as fake from './fake_three.js';
-import { fakeElement } from './fake_dom.js';
+import * as fake from './helpers/fake_three.js';
+import { fakeElement } from './helpers/fake_dom.js';
 
 // A class declaration's prototype is non-writable, which is what separates the
 // double's classes from the attribute factories it also exports.

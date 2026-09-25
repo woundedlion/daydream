@@ -1,8 +1,8 @@
-import { detachedView } from './fake_buffer.js';
+import { detachedView } from './helpers/fake_buffer.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EngineHost } from '../engine_host.js';
-import { unpinnedEngineMethods } from './fake_engine.js';
+import { unpinnedEngineMethods } from './helpers/fake_engine.js';
 
 function pixelEngine(getPixels, getBufferLength) {
   return { getPixels, getBufferLength };

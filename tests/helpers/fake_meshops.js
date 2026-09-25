@@ -1,4 +1,4 @@
-import { KNOWN_OPS, MESH_OP_RESULT_NAMES } from '../tools/solid_codegen.js';
+import { KNOWN_OPS, MESH_OP_RESULT_NAMES } from '../../tools/solid_codegen.js';
 
 // One triangle: the smallest readback that exercises both arrays.
 const VERTICES = () => Float32Array.from([0, 0, 0, 1, 0, 0, 0, 1, 0]);

@@ -3,7 +3,7 @@
 // namespacing, and the debounced URL writer, against a stubbed lil-gui.
 //
 // Run: npm test
-import { fakeTimers } from './fake_timers.js';
+import { fakeTimers } from './helpers/fake_timers.js';
 import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { URL } from 'node:url';
@@ -18,8 +18,8 @@ import {
   snapshotEffectControlState,
   restoreEffectControlState,
 } from '../effect_sequencing.js';
-import { fakeElement, installWindow, restoreWindowAfterEach } from './fake_dom.js';
-import { captureConsole } from './fake_console.js';
+import { fakeElement, installWindow, restoreWindowAfterEach } from './helpers/fake_dom.js';
+import { captureConsole } from './helpers/fake_console.js';
 
 // Roots created by a test; destroy() cancels the 200ms URL-write debounce so no
 // timer survives the teardown that drops the window stub.

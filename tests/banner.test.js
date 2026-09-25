@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {
   clearFatalError, errorDetail, showFatalError, bootstrapTool, reportPageFailures,
 } from '../tools/banner.js';
-import { captureConsole, installConsoleCapture } from './fake_console.js';
-import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
+import { captureConsole, installConsoleCapture } from './helpers/fake_console.js';
+import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
 restoreDocumentAfterEach();
 

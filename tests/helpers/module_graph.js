@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const REPO = fileURLToPath(new URL('..', import.meta.url));
+const REPO = fileURLToPath(new URL('../..', import.meta.url));
 
 /**
  * Static import/export-from specifiers of one module source. Dynamic `import()`

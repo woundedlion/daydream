@@ -7,9 +7,9 @@
 import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { installConsoleCapture } from './fake_console.js';
-import { fakeElement, restoreDocumentAfterEach } from './fake_dom.js';
-import { startApp as startUntrackedApp } from './fake_app.js';
+import { installConsoleCapture } from './helpers/fake_console.js';
+import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
+import { startApp as startUntrackedApp } from './helpers/fake_app.js';
 
 restoreDocumentAfterEach();
 const startedApps = [];

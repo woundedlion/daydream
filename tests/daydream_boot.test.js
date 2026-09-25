@@ -21,13 +21,13 @@
 import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { fakeElement, restoreDocumentAfterEach } from './fake_dom.js';
+import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 import { URL_FLUSH_DEBOUNCE_MS } from '../state.js';
 import { pageWarmer } from '../module_warmer.js';
 import {
   EffectSetResult, ParamSetResult, ResolutionSetResult, unpinnedEngineMethods,
-} from './fake_engine.js';
-import { captureConsole, installConsoleCapture } from './fake_console.js';
+} from './helpers/fake_engine.js';
+import { captureConsole, installConsoleCapture } from './helpers/fake_console.js';
 import { createRecordingControls } from '../recording_controls.js';
 import { createSegmentedPovControls } from '../segmented_pov_controls.js';
 import {
@@ -37,7 +37,7 @@ import {
   startApp as startUntrackedApp,
   segmentCountControl,
   SHADER_DOCUMENT_EFFECTS,
-} from './fake_app.js';
+} from './helpers/fake_app.js';
 
 test('the app doubles preserve controller and instance attribute contracts', () => {
   const state = { amount: 1 };

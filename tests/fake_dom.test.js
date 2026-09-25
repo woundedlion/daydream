@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import {
   documentEvents, fakeElement, installAnimationFrames, installDocument,
   restoreDocumentAfterEach,
-} from './fake_dom.js';
+} from './helpers/fake_dom.js';
 
 restoreDocumentAfterEach();
 

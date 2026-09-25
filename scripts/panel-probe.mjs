@@ -5,7 +5,7 @@
  *
  *   node scripts/panel-probe.mjs
  *
- * The unit suite runs over tests/fake_dom.js, where scrollTop is a plain
+ * The unit suite runs over tests/helpers/fake_dom.js, where scrollTop is a plain
  * expando: any number written to it reads back. A browser clamps it to
  * scrollHeight - clientHeight, so a panel that has not laid out takes 0 whatever
  * was written. Only a real layout decides whether the offset survives a rebuild.

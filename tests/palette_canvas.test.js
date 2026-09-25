@@ -1,4 +1,4 @@
-import { fakeContext } from './fake_canvas.js';
+import { fakeContext } from './helpers/fake_canvas.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pageHandlers } from './page_handlers.js';
+import { pageHandlers } from './helpers/page_handlers.js';
 const handler = pageHandlers(new URL('../tools/mobius_page.js', import.meta.url));
 
 test('animated snippets throttle formatting and flush the final stopped value', () => {

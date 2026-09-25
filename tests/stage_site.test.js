@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { installEngineBundle } from '../scripts/install-engine-bundle.mjs';
 import { sitePaths, stageSite, verifiedEnginePaths } from '../scripts/stage-site.mjs';
-import { isolatedGitEnv } from './fixture_repo.js';
+import { isolatedGitEnv } from './helpers/fixture_repo.js';
 
 function fixture(t) {
   const scratch = mkdtempSync(join(tmpdir(), 'stage-site-'));

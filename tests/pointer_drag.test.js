@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createPointerDrag, innerRect } from '../tools/pointer_drag.js';
-import { fakeElement } from './fake_dom.js';
+import { fakeElement } from './helpers/fake_dom.js';
 
 /** A pointerdown that passes the helper's own guard unless overridden. */
 const down = (pointerId = 7, extra = {}) => ({

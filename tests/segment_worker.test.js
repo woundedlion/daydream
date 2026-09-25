@@ -1,5 +1,5 @@
-import { captureTimeouts } from './fake_timers.js';
-import { installConsoleCapture } from './fake_console.js';
+import { captureTimeouts } from './helpers/fake_timers.js';
+import { installConsoleCapture } from './helpers/fake_console.js';
 //
 // Run: npm test
 import { test, mock, beforeEach } from 'node:test';
@@ -13,9 +13,9 @@ import {
   unpinnedEngineMethods, ParamSetResult, ClipSetResult,
   ResolutionSetResult, EffectSetResult,
   FullConfigRestoreResult,
-} from './fake_engine.js';
-import { fakeWorkerScope } from './fake_worker.js';
-import { staticModuleGraph } from './module_graph.js';
+} from './helpers/fake_engine.js';
+import { fakeWorkerScope } from './helpers/fake_worker.js';
+import { staticModuleGraph } from './helpers/module_graph.js';
 
 // ---------------------------------------------------------------------------
 // Fakes — installed BEFORE importing the worker, which binds self.postMessage

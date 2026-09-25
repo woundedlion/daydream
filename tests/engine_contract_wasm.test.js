@@ -18,9 +18,9 @@ import {
 import {
   ENGINE_METHODS, ENGINE_OPTIONAL_METHODS, ParamSetResult, ClipSetResult,
   ResolutionSetResult, EffectSetResult, FullConfigRestoreResult, ChainStatus,
-} from './fake_engine.js';
+} from './helpers/fake_engine.js';
 import { isViewLive, refreshPixelView } from '../pixel_view.js';
-import { PaletteCompileCode, PaletteRecipeField } from './fake_palette.js';
+import { PaletteCompileCode, PaletteRecipeField } from './helpers/fake_palette.js';
 import { selectorControlValue } from '../param_sync.js';
 import { defaultPaletteRecipe, hueKeyState, PaletteV4, signedTurnDelta } from '../tools/palette_controls.js';
 import { DEFAULT_EFFECT, resolutionPresets } from '../effect_roster.js';

@@ -6,7 +6,7 @@
  *
  * The lock couples three controls: the checkbox, the frequency slider the
  * pointer is on, and the Domain slider it disables and then drives from the
- * snapped ratio. Only a real browser closes that loop, and tests/fake_dom.js
+ * snapped ratio. Only a real browser closes that loop, and tests/helpers/fake_dom.js
  * reaches no part of it: a range input turns a pointer x into a value through
  * its own layout, which the fake has none of, and it is the UA — not the page —
  * that refuses input on a disabled control. This job drags each frequency thumb

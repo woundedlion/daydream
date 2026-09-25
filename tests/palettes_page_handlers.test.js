@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pageHandlers } from './page_handlers.js';
-import { fakeElement } from './fake_dom.js';
+import { pageHandlers } from './helpers/page_handlers.js';
+import { fakeElement } from './helpers/fake_dom.js';
 
 const handler = pageHandlers(new URL('../tools/palettes_page.js', import.meta.url));
 

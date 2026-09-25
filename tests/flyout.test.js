@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { wireFlyout } from '../tools/flyout.js';
 import {
   documentEvents, fakeElement, installDocument, restoreDocumentAfterEach,
-} from './fake_dom.js';
+} from './helpers/fake_dom.js';
 
 restoreDocumentAfterEach();
 

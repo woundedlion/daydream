@@ -3,7 +3,7 @@
 // GUI suites run over cannot drift from the library the browser loads. Every
 // other suite
 // substitutes a stand-in for lil-gui; this one imports the real module and
-// drives it over tests/fake_dom.js, which is enough DOM for panel and
+// drives it over tests/helpers/fake_dom.js, which is enough DOM for panel and
 // controller construction.
 //
 // The dispatch contract matters most: add() picks a controller off `typeof
@@ -11,10 +11,10 @@
 // after logging. A double that hands back a controller for every property turns
 // a browser-side `TypeError: … reading 'onChange'` into a green run.
 import { DeepLinkGUI } from '../gui.js';
-import { fakeGui } from './fake_app.js';
+import { fakeGui } from './helpers/fake_app.js';
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
+import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
 restoreDocumentAfterEach();
 

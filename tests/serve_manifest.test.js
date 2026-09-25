@@ -10,7 +10,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { MIME, serveManifest } from '../scripts/serve-manifest.mjs';
-import { request } from './http_request.js';
+import { request } from './helpers/http_request.js';
 
 const ENTRIES = ['index.html', 'engine.wasm', 'styles/index.css', 'styles/fonts/pin.woff2', 'gone.js'];
 

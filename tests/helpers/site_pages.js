@@ -3,9 +3,9 @@
 // manifest is gated by them without a second list to keep in step.
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sitePaths } from '../scripts/stage-site.mjs';
+import { sitePaths } from '../../scripts/stage-site.mjs';
 
-const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 /**
  * site_manifest.txt's entries.

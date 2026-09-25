@@ -6,7 +6,7 @@
  *
  * A pad turns a viewport point into a coefficient through its own
  * getBoundingClientRect, and keeps the gesture through pointer capture once the
- * pointer has left it. tests/fake_dom.js supplies neither: its rects are zero,
+ * pointer has left it. tests/helpers/fake_dom.js supplies neither: its rects are zero,
  * which the pad reads as an unlaid-out control and declines, and a move outside
  * the element never arrives. This job presses the pad at known fractions of its
  * box and requires the coefficient those fractions name, walks the pointer off

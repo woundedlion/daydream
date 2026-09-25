@@ -5,8 +5,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { fakeElement } from './fake_dom.js';
-import { fakeScheduler } from './fake_timers.js';
+import { fakeElement } from './helpers/fake_dom.js';
+import { fakeScheduler } from './helpers/fake_timers.js';
 import { createApplyNotice } from '../apply_notice.js';
 
 // The shared notice element: the parameter writer and the switch coordinator
