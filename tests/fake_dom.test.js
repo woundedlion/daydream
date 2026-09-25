@@ -277,6 +277,21 @@ test('a disabled flag on a tag that carries no such attribute gates nothing', ()
   assert.deepEqual(seen, ['click'], 'a div is clickable whatever the expando says');
 });
 
+test('textContent follows appends, replacements and clears', () => {
+  const el = fakeElement('div');
+  const span = fakeElement('span');
+  span.textContent = 'child';
+  el.textContent = 'old';
+  el.replaceChildren(span);
+  assert.equal(el.textContent, 'child');
+  el.innerHTML = '';
+  assert.equal(el.textContent, '');
+  el.append('a ', span);
+  assert.equal(el.textContent, 'a child');
+  span.textContent = 'new';
+  assert.equal(el.textContent, 'a new');
+});
+
 test('textContent and setAttribute hand back the strings a browser stores', () => {
   const el = fakeElement('div');
   const stale = fakeElement('span');
