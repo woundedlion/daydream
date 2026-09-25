@@ -1,5 +1,6 @@
 import { mock, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { installConsoleCapture } from './helpers/fake_console.js';
 import { fakeElement, installDocument } from './helpers/fake_dom.js';
 import {
@@ -1062,11 +1063,17 @@ test('the encoder is opened at the configured bitrate', () => {
 test('the documented sink bounds are the exported ones', () => {
   const restore = installRecorderEnv();
   try {
-    assert.equal(PICKER_GRACE_SECONDS, 120);
-    assert.equal(MEMORY_BUFFER_LIMIT_BYTES, 512_000_000);
+    const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+    const grace = /`PICKER_GRACE_SECONDS` \((\d+) s\)/.exec(readme);
+    const memory = /\*\*(\d+) MB\*\* \(`MEMORY_BUFFER_LIMIT_BYTES`\)/.exec(readme);
+    const backlog = /\*\*(\d+) MB\*\* at the default (\d+) Mbps/.exec(readme);
+    assert.ok(grace && memory && backlog);
+    assert.equal(PICKER_GRACE_SECONDS, Number(grace[1]));
+    assert.equal(MEMORY_BUFFER_LIMIT_BYTES, Number(memory[1]) * 1_000_000);
     const rec = new VideoRecorder(recordableCanvas());
-    assert.equal(rec.bitrateMbps * 1_000_000 / 8 * PICKER_GRACE_SECONDS, 240_000_000,
+    assert.equal(rec.bitrateMbps * 1_000_000 / 8 * PICKER_GRACE_SECONDS, Number(backlog[1]) * 1_000_000,
       'the picker backlog bound at the default bitrate');
+    assert.equal(rec.bitrateMbps, Number(backlog[2]));
   } finally {
     restore();
   }
