@@ -43,23 +43,19 @@
     "branches": 87.5
   },
   "tools/shader_documents.js": {
-    "reason": "Unit coverage baseline; browser probes exercise live page and browser lifecycle branches.",
-    "branches": 82.73
+    "reason": "Halt paths are covered by shader_workbench.test.js. Remaining gaps include default browser fetch/download callbacks, missing catalog selections, and optional UI mounts; these are partial unit coverage, not a claim that they are unreachable.",
+    "branches": 83.7
   },
   "tools/chain_strip.js": {
-    "reason": "Unit coverage baseline; browser probes exercise live page and browser lifecycle branches.",
+    "reason": "Remaining branches include focus restoration, pointer capture and viewport geometry fallbacks, optional controls, and teardown after DOM removal. The fake DOM covers editing; browser probes cover native focus and pointer behavior.",
     "branches": 84.59
   },
-  "tools/shader_deeplink.js": {
-    "reason": "Unit coverage baseline; browser probes exercise live page and browser lifecycle branches.",
-    "branches": 87.23
-  },
   "scripts/browser.mjs": {
-    "reason": "Unit coverage baseline; browser probes exercise live page and browser lifecycle branches.",
+    "reason": "The import-time LOCALAPPDATA branch depends on the host environment. Resolver fixtures cover explicit paths, candidate selection and missing executables; they do not reload the module under both Windows environment states.",
     "branches": 88.89
   },
   "tools/shared.js": {
-    "reason": "Unit coverage baseline; browser probes exercise live page and browser lifecycle branches.",
+    "reason": "Remaining branches include optional scene callbacks, renderer teardown and browser sizing fallbacks. Mocked scene tests cover construction and disposal; live WebGL and layout behavior is exercised by browser probes.",
     "branches": 89.19
   },
   "effect_panel_view.js": {
@@ -73,9 +69,5 @@
   "module_warmer.js": {
     "reason": "Browser module preload fallback paths are partially exercised by unit fixtures.",
     "branches": 81.82
-  },
-  "scripts/run-tests.mjs": {
-    "reason": "Coverage-gate filesystem and child-process failures are only partially exercised by fixture runs.",
-    "branches": 89.83
   }
 }

@@ -678,8 +678,13 @@ export function createShaderDocumentController({
       || candidate.descriptorDigest === promotedDigest) ?? null;
     // Ahead of the teardown: a refusal here must leave the editor it would
     // have replaced standing.
-    if (!selectEffect(CHAIN_EFFECT)) {
-      show(`The preview engine rejected effect "${CHAIN_EFFECT}".`, true);
+    try {
+      if (!selectEffect(CHAIN_EFFECT)) {
+        show(`The preview engine rejected effect "${CHAIN_EFFECT}".`, true);
+        return false;
+      }
+    } catch (error) {
+      show(`The preview edit failed: ${errorDetail(error)}`, true);
       return false;
     }
     const previous = active;
