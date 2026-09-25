@@ -35,6 +35,7 @@ function makeRecordingSettings() {
 test('a setting written before the recorder exists is held, not lost', () => {
   const h = makeRecordingSettings();
 
+  assert.throws(() => h.block.replay(), TypeError);
   h.block.settings.recQuality = 8;
   assert.equal(h.block.settings.recQuality, 8, 'the setting is its own durable home');
   assert.deepEqual(h.warnings, [], 'there is no session to warn about yet');
