@@ -603,6 +603,7 @@ export class VideoRecorder {
     /** @type {FileSystemWritableFileStream|null} */
     let writable = null;
     let failed = false;
+    let failureReported = false;
     let aborted = false;
     let picked = false;
     let backlogBytes = 0;
@@ -682,6 +683,7 @@ export class VideoRecorder {
           } catch (err) {
             failed = true;
             if (this.mediaRecorder === recorder) {
+              failureReported = true;
               this.stop();
               this.reportFailure(
                 'streaming write failed mid-session; recording stopped and the saved file is truncated.',
@@ -716,6 +718,11 @@ export class VideoRecorder {
             // Flush it and report truncation rather than downloading the
             // post-failure tail as if it were a complete video.
             if (failed) {
+              if (!failureReported) {
+                failureReported = true;
+                this.onSaveError?.(new Error(
+                  'streaming write failed; the saved file is truncated.'), filename);
+              }
               try { await writable.close(); } catch { /* writable already errored */ }
               console.error('VideoRecorder: streaming write failed mid-session; the saved file is truncated to the data written before the failure.');
               return;

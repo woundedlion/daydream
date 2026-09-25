@@ -2047,3 +2047,28 @@ test('createWritable rejection preserves every chunk for Downloads', async () =>
     restore();
   }
 });
+
+test('a streaming write failure after Stop reaches the save-error UI', async () => {
+  const restore = installRecorderEnv();
+  const captured = installConsoleCapture('error', 'warn');
+  globalThis.showSaveFilePicker = async () => ({ createWritable: async () => ({
+    write: async () => { throw new Error('disk full'); }, close: async () => {},
+  }) });
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    const finished = trackSinkFinish(rec);
+    const errors = [];
+    rec.onSaveError = (error) => errors.push(error);
+    rec.start('stream');
+    const recorder = rec.mediaRecorder;
+    recorder.ondataavailable({ data: { size: 10 } });
+    rec.stop();
+    recorder.onstop();
+    await finished();
+    assert.equal(errors.length, 1);
+    assert.match(errors[0].message, /truncated/);
+  } finally {
+    captured.restore();
+    restore();
+  }
+});
