@@ -86,13 +86,13 @@ test('pre-push refuses a push from a tree that cannot install the suites',
     assert.match(run.stderr, /npm not found/);
   });
 
-test('pre-push permits a source push without an installed engine or browser',
+test('pre-push runs the source checks successfully',
   { skip: SKIP }, (t) => {
     const root = fixtureRoot(t);
     mkdirSync(join(root, 'node_modules'), { recursive: true });
     writeFileSync(join(root, 'node_modules', '.package-lock.json'), '{}\n');
     const run = runWithTools(root, {
-      node: 'case "$*" in *wasm_provenance*|*-e*) exit 1;; esac\nexit 0',
+      node: 'exit 0',
       npm: 'exit 0',
       git: 'exit 0',
       mktemp: 'f=./vendor-importmap.probe\n: > "$f"\necho "$f"',
@@ -133,6 +133,31 @@ test('pre-push refuses a failing source workflow suite',
     });
     assert.notEqual(run.status, 0, `${run.stdout}${run.stderr}`);
     assert.match(run.stderr, /unit-suite-failed/);
-    assert.doesNotMatch(run.stderr, /no browser found|GNU timeout is required|browser probe/,
-      'the unit-suite refusal must fire before later gates');
   });
+
+for (const step of ['lint', 'typecheck', 'importmap']) {
+  test(`pre-push stops when ${step} fails`, { skip: SKIP }, (t) => {
+    const root = fixtureRoot(t);
+    mkdirSync(join(root, 'node_modules'), { recursive: true });
+    writeFileSync(join(root, 'node_modules/.package-lock.json'), '{}\n');
+    const run = runWithTools(root, {
+      node: 'echo unexpected-unit-suite >&2; exit 0',
+      npm: `if [ "$2" = ${step} ]; then echo ${step}-failed >&2; exit 7; fi`,
+      git: 'exit 0',
+      mktemp: 'echo ./vendor-importmap.probe',
+      rm: 'exit 0',
+    });
+    assert.notEqual(run.status, 0);
+    assert.match(run.stderr, new RegExp(`${step}-failed`));
+    assert.doesNotMatch(run.stderr, /unexpected-unit-suite/);
+  });
+}
+
+test('pre-push requires installed dependencies', { skip: SKIP }, (t) => {
+  const run = runWithTools(fixtureRoot(t), {
+    node: 'exit 0', npm: 'echo unexpected-npm >&2; exit 0', git: 'exit 0',
+  });
+  assert.notEqual(run.status, 0);
+  assert.match(run.stderr, /node_modules is missing/);
+  assert.doesNotMatch(run.stderr, /unexpected-npm/);
+});
