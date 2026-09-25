@@ -34,7 +34,14 @@ import { dirname, resolve, posix } from 'node:path';
 import { parse } from 'espree';
 import { vendorAddonsFromSource } from './vendor-imports.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const rootIndex = process.argv.indexOf('--root');
+const rootPath = rootIndex === -1
+  ? resolve(dirname(fileURLToPath(import.meta.url)), '..') : process.argv[rootIndex + 1];
+if (rootPath === undefined || rootPath.startsWith('--')) {
+  console.error('generate-importmap: --root requires a path');
+  process.exit(1);
+}
+const ROOT = resolve(rootPath);
 const SOURCE = resolve(ROOT, 'vendor-importmap.js');
 
 const local = process.argv.includes('--local');

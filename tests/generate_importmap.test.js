@@ -1,12 +1,11 @@
 //
 // scripts/generate-importmap.mjs rewrites only the GENERATED VENDOR block of
 // vendor-importmap.js. Driven as a subprocess against a temp fixture so the
-// real repo files are never touched: the script resolves ROOT as <scriptdir>/..
-// and reads package.json + vendor-importmap.js from there.
+// --root selects its package.json, vendor-importmap.js and tracked source files.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, readFileSync, rmSync, copyFileSync, symlinkSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,18 +40,15 @@ const ORBIT_BODY = '// fixture OrbitControls.js\n';
 const LIL_BODY = '// fixture lil-gui.esm.min.js\n';
 const sri = (body) => `sha384-${createHash('sha384').update(body).digest('base64')}`;
 
-/** Recreates the fixture repo: the script under scripts/, plus package.json and vendor-importmap.js at ROOT. */
+/** Recreates the fixture's package, import map and source tree. */
 const buildRoot = () => {
   rmSync(root, { recursive: true, force: true });
   mkdirSync(join(root, 'scripts'), { recursive: true });
   mkdirSync(join(root, 'node_modules'), { recursive: true });
-  symlinkSync(resolve(HERE, '../node_modules/espree'), join(root, 'node_modules/espree'), 'junction');
-  copyFileSync(SCRIPT_SRC, join(root, 'scripts', 'generate-importmap.mjs'));
-  copyFileSync(resolve(HERE, '../scripts/vendor-imports.mjs'), join(root, 'scripts/vendor-imports.mjs'));
   writeFileSync(join(root, 'package.json'), PKG);
   writeFileSync(join(root, 'vendor-importmap.js'), IMPORTMAP);
   execFileSync('git', ['init', '-q'], { cwd: root, env });
-  execFileSync('git', ['add', 'scripts/generate-importmap.mjs', 'package.json',
+  execFileSync('git', ['add', 'package.json',
     'vendor-importmap.js'], { cwd: root, env });
 };
 
@@ -60,19 +56,19 @@ const root = fixtureRepo('importmap-', buildRoot);
 
 const env = isolatedGitEnv();
 
-/** Runs the fixture's script with the given args and returns the rewritten vendor-importmap.js. */
+/** Runs the tracked script against the fixture with the given args and returns the rewritten vendor-importmap.js. */
 const run = (...args) => {
   writeFileSync(join(root, 'vendor-importmap.js'), IMPORTMAP);
-  execFileSync(process.execPath, [join(root, 'scripts', 'generate-importmap.mjs'), ...args],
+  execFileSync(process.execPath, [SCRIPT_SRC, '--root', root, ...args],
     { env });
   return readFileSync(join(root, 'vendor-importmap.js'), 'utf8');
 };
 
-/** Runs the fixture's script expecting failure and returns its stderr. */
+/** Runs the tracked script against the fixture expecting failure and returns its stderr. */
 const runExpectingFailure = (...args) => {
   writeFileSync(join(root, 'vendor-importmap.js'), IMPORTMAP);
   return expectFailure(process.execPath,
-    [join(root, 'scripts', 'generate-importmap.mjs'), ...args], { env });
+    [SCRIPT_SRC, '--root', root, ...args], { env });
 };
 
 /**
@@ -226,4 +222,12 @@ test('escaped literal addon specifiers are included in the integrity inventory',
   writeFileSync(join(root, 'escaped.js'), "import('three/addons/controls/OrbitControls\\u002ejs');");
   execFileSync('git', ['add', 'escaped.js'], { cwd: root, env });
   assert.ok(run().includes("'controls/OrbitControls.js'"));
+});
+
+
+test('--root requires a path', () => {
+  assert.match(expectFailure(process.execPath, [SCRIPT_SRC, '--root'], { env }),
+    /--root requires a path/);
+  assert.match(expectFailure(process.execPath, [SCRIPT_SRC, '--root', '--local'], { env }),
+    /--root requires a path/);
 });

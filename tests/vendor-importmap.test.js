@@ -1,6 +1,6 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -23,10 +23,6 @@ after(() => rmSync(FIXTURE, { recursive: true, force: true }));
  * @returns {string} The rewritten source, with a locally-resolved VENDOR block.
  */
 const generateLocalSrc = () => {
-  mkdirSync(join(FIXTURE, 'scripts'), { recursive: true });
-  copyFileSync(join(REPO, 'scripts', 'generate-importmap.mjs'),
-    join(FIXTURE, 'scripts', 'generate-importmap.mjs'));
-  copyFileSync(join(REPO, 'scripts', 'vendor-imports.mjs'), join(FIXTURE, 'scripts', 'vendor-imports.mjs'));
   copyFileSync(join(REPO, 'package.json'), join(FIXTURE, 'package.json'));
   copyFileSync(join(REPO, 'vendor-importmap.js'), join(FIXTURE, 'vendor-importmap.js'));
   // --local resolves a library locally only where its vendored entry point exists.
@@ -34,9 +30,7 @@ const generateLocalSrc = () => {
   writeFileSync(join(FIXTURE, 'three.js', 'build', 'three.module.js'), '');
   mkdirSync(join(FIXTURE, 'node_modules', 'lil-gui', 'dist'), { recursive: true });
   writeFileSync(join(FIXTURE, 'node_modules', 'lil-gui', 'dist', 'lil-gui.esm.min.js'), '');
-  symlinkSync(join(REPO, 'node_modules', 'espree'),
-    join(FIXTURE, 'node_modules', 'espree'), 'junction');
-  execFileSync(process.execPath, [join(FIXTURE, 'scripts', 'generate-importmap.mjs'), '--local'],
+  execFileSync(process.execPath, [join(REPO, 'scripts', 'generate-importmap.mjs'), '--root', FIXTURE, '--local'],
     { stdio: ['ignore', 'ignore', 'inherit'] });
   return readFileSync(join(FIXTURE, 'vendor-importmap.js'), 'utf8');
 };
