@@ -440,11 +440,6 @@ const initThree = () => {
     u_d: { value: { re: config.D.re, im: config.D.im } }
   };
 
-  // 64x64 is plenty: the pattern is computed per-fragment from the
-  // interpolated position (the vertex shader is a pass-through), so the
-  // geometry only needs enough tessellation for a smooth silhouette and
-  // low interpolation error — 128x128 (~16k verts) was ~4x more than
-  // needed.
   const geometry = new THREE.SphereGeometry(1.5, 64, 64);
   const material = new THREE.ShaderMaterial({
     uniforms: uniforms,

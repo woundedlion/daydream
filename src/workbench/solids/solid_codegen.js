@@ -1219,7 +1219,7 @@ export function createChainValidator(createModule) {
    * @param {ChainOp[]} ops - The candidate op chain.
    * @returns {Promise<{ok: boolean, message: string}>} Whether the whole chain is safe for the live module, and why it is not when it is not.
    * @details A missing validator (module failed to spawn) resolves ok: true;
-   * prevention degrades to the old behavior rather than blocking the tool. The
+   * the tool remains usable without validation. The
    * result is an object, so callers must test `.ok` — an object is truthy, and
    * a call site left testing the result itself reads every chain as valid.
    * A chain is also refused when the engine saturated one of its arguments

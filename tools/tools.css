@@ -122,8 +122,7 @@ input[type=range]:disabled::-webkit-slider-thumb {
 
 /* Toggle switch: a 40×20 pill with a sliding 12px knob. Markup is
  * `<button class="toggle-switch"><div class="toggle-knob"></div></button>`;
- * add `.is-on` for the active (blue, knob-right) state. Replaces the long
- * repeated Tailwind utility strings the solids toggles hand-rolled. */
+ * add `.is-on` for the active (blue, knob-right) state. */
 .toggle-switch {
   width: 2.5rem;
   height: 1.25rem;
