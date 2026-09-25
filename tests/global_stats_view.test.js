@@ -144,7 +144,7 @@ test('update mirrors every arena row into the mobile cells', () => {
   }
 });
 
-test('update leaves the arena rows untouched when the effect reports none', () => {
+test('update marks arena rows unavailable when the effect reports none', () => {
   const { doc, byId } = makeDoc();
   const view = new GlobalStatsView(doc);
   view.update(1, metrics());
