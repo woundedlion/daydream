@@ -508,7 +508,7 @@ export function createChainStrip({
         focusChip(forward ? index + 1 : index - 1);
         return;
       }
-      // The same span the '‹ ›' buttons disable themselves outside of: a
+      // The same span the '←'/'→' move buttons disable themselves outside of: a
       // crossing has no reorder, and a band edge has no neighbour to swap with.
       if (crossing || !sharesBand(index, forward ? 1 : -1)) return;
       moveChip(index, forward ? index + 2 : index - 1);
@@ -519,8 +519,8 @@ export function createChainStrip({
       select(entry.label);
       return;
     }
-    // The header controls sit outside the tab order, so bypass needs a key of
-    // its own; the other three carry Delete, Alt+Arrow and Insert already.
+    // The b key is a chip-level bypass shortcut alongside the tabbable
+    // header controls.
     if ((key === 'b' || key === 'B')
       && !event.altKey && !event.ctrlKey && !event.metaKey) {
       event.preventDefault();
