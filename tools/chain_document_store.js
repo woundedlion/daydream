@@ -322,33 +322,8 @@ export async function createChainDocumentStore({
     return { ok: true };
   };
 
-  /**
-   * The engine-budget cost of an operator list, computed from whatever cost
-   * keys the catalog's budgets object declares.
-   * @param {CatalogOperator[]} ops - Operators of a candidate chain.
-   * @returns {{arenaBytes: number, paramCount: number}} Totals.
-   */
-  const chainCost = (ops) => ({
-    arenaBytes: compiler.chainArenaBytes(ops, budgets),
-    paramCount: ops.reduce((total, op) => total + op.params.length, 0),
-  });
-
-  /**
-   * Why a candidate chain breaks a declared budget, or null when it fits.
-   * @param {CatalogOperator[]} ops - Operators of a candidate chain.
-   * @returns {string|null} The refusal reason.
-   */
-  const budgetReason = (ops) => {
-    if (budgets.max_chain_ops !== undefined && ops.length > budgets.max_chain_ops)
-      return `the chain would exceed the ${budgets.max_chain_ops}-operator budget`;
-    const { arenaBytes, paramCount } = chainCost(ops);
-    if (budgets.max_params !== undefined && paramCount > budgets.max_params)
-      return `the chain would exceed the ${budgets.max_params}-parameter budget`;
-    if (budgets.arena_bytes !== undefined && arenaBytes > budgets.arena_bytes)
-      return `the chain would need ${arenaBytes} arena bytes of the `
-        + `${budgets.arena_bytes} budget`;
-    return null;
-  };
+  /** @param {CatalogOperator[]} ops @returns {string|null} */
+  const budgetReason = (ops) => compiler.chainBudgetReasons(ops, budgets)[0] ?? null;
 
   /**
    * @param {number} start - First chain index of the span.
