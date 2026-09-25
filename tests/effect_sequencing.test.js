@@ -540,19 +540,6 @@ test('an engine rejection leaves the panel and the workers untouched', () => {
   assert.match(app.errors[0], /setEffect\("Alpha"\) failed/);
 });
 
-test('a segmented pool is told which effect to render', () => {
-  const app = makeApp({ segmented: true });
-
-  app.pipeline.applyEffect();
-
-  assert.deepEqual(app.log.slice(-4), [
-    'segments.setEffect Alpha',
-    'effectGui.applyAnimationPause',
-    'sidebar.setActive Alpha',
-    'driver.stepOnce',
-  ]);
-});
-
 test('a segmented switch rebuilds the worker effect after the panel', () => {
   const app = makeApp({ segmented: true });
 

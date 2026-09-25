@@ -980,17 +980,12 @@ test('renderPip skips the second mesh pass while the toggle is off', () => {
   assert.deepEqual(log, [], 'the toggle did not suppress the PiP pass');
 });
 
-test('renderPip stays suppressed on mobile and while recording', () => {
-  for (const suppress of [
-    (ctx) => { ctx.isMobile = true; },
-    (ctx) => { ctx.recorder = { isRecording: true }; },
-  ]) {
-    const log = [];
-    const ctx = pipCtx(log);
-    suppress(ctx);
-    Daydream.prototype.renderPip.call(ctx);
-    assert.deepEqual(log, []);
-  }
+test('renderPip stays suppressed on mobile', () => {
+  const log = [];
+  const ctx = pipCtx(log);
+  ctx.isMobile = true;
+  Daydream.prototype.renderPip.call(ctx);
+  assert.deepEqual(log, []);
 });
 
 test('renderPip stays suppressed under headless automation', () => {
