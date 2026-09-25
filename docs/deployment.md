@@ -7,6 +7,10 @@ cross-repository dispatch credential. Identical successful pairs are skipped.
 Old queued workflows also skip when their own source commit differs from the
 selected daydream commit.
 
+Every selected pair is recorded before its gates run. Scheduled reconciliations
+skip pairs already attempted, including failed or interrupted attempts. A manual
+deployment or repository dispatch can retry a failed pair.
+
 The engine gate waits up to 55 minutes for the complete Holosphere CI workflow
 at that exact commit to succeed. It downloads its checksummed engine artifact,
 validates the package's source pin and owned paths, and overlays it on the

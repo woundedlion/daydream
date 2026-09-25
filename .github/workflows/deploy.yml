@@ -23,7 +23,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
-      deployments: read
+      deployments: write
     outputs:
       daydream: ${{ steps.pair.outputs.daydream }}
       holosphere: ${{ steps.pair.outputs.holosphere }}
@@ -39,6 +39,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/deployment-pair.mjs resolve
+      - name: Record deployment attempt
+        if: steps.pair.outputs.deploy == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/deployment-pair.mjs attempt
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: deployment-pair
