@@ -28,14 +28,14 @@ export function isMain(url) {
   return process.argv[1] !== undefined && url === pathToFileURL(realpathSync(process.argv[1])).href;
 }
 
+const checkRuns = new AsyncLocalStorage();
+
 /**
  * A verdict sink: one console line per check, and the misses kept for the
  * probe's own report.
  * @returns {{failures: string[], count: number, check: (ok: boolean, message: string) => void}}
  *   The collected failures and the recorder that fills them.
  */
-const checkRuns = new AsyncLocalStorage();
-
 export function checks() {
   let count = 0;
   /** @type {string[]} */
