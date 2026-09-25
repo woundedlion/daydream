@@ -1118,11 +1118,14 @@ async function editorWorkbench({
   // once, so the count tells a write a timer started from one still pending.
   let pausedReads = 0;
   const animationWrites = [];
-  const writeParameter = engine.setParameter.bind(engine);
-  engine.setParameter = (name, value) => {
-    animationsPaused = true;
-    return writeParameter(name, value);
-  };
+  for (const [target, method] of [[engine, 'setParameter'],
+    [engine, 'setShaderChainParameters'], [compiledEngine, 'setParameter']]) {
+    const write = target[method].bind(target);
+    target[method] = (...args) => {
+      animationsPaused = true;
+      return write(...args);
+    };
+  }
   let current = engine;
   const elements = workbenchMounts();
   elements.set('chain-strip', fakeElement('section'));
@@ -1589,7 +1592,13 @@ test('Kaleidoscope Stained Glass loads its effect preset into the interpreter co
 });
 
 test('preset and stage writes preserve the animation state', async () => {
-  const harness = await editorWorkbench();
+  const harness = await editorWorkbench({ migration: HEX_MIGRATION });
+  const presets = harness.elements.get('shader-preset-select');
+  presets.value = presets.options.at(-1).value;
+  await onChange(presets)();
+  assert.equal(harness.animationsPaused(), false);
+  harness.elements.get('shader-parity-toggle').dispatch('click');
+  assert.equal(harness.animationsPaused(), false);
   const toggle = harness.elements.get('shader-animation-toggle');
   assert.equal(harness.animationsPaused(), false,
     'preset writes do not leave the chain frozen');
