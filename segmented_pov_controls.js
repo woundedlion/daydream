@@ -109,7 +109,6 @@ export function createSegmentedPovControls({
       } else {
         segSpawn.strand();
         segments.destroy();
-        segments.updateStats();
       }
     } catch (e) {
       segmentedFailed(v ? 'enable' : 'teardown', e);
