@@ -103,8 +103,6 @@ class FakeEngine {
     return this.restoreResult;
   }
   getFullConfigFieldDefinitions() { return []; }
-  getConfigImportNotice() { return ''; }
-  clearConfigImportNotice() {}
   setAnimationsPaused(p) {
     this.calls.push(['setAnimationsPaused', p]);
     this.paused = p;

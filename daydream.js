@@ -517,8 +517,6 @@ export function start({
       fieldDefinitions: () => host.engine.getFullConfigFieldDefinitions(),
       restore: (snapshot) => host.engine.restoreFullConfigSnapshot(snapshot),
       restoreResults: () => host.module.FullConfigRestoreResult,
-      importNotice: () => host.engine.getConfigImportNotice(),
-      clearImportNotice: () => host.engine.clearConfigImportNotice(),
       showImportNotice: (message) => applyNotice.show(message, CONFIG_NOTICE),
     },
     host: {

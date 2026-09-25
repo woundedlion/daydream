@@ -1047,8 +1047,6 @@ test('the full-config accessors answer as the workbench panel assumes', () => {
   assert.equal(engine.restoreFullConfigSnapshot(null),
     M.FullConfigRestoreResult.NOT_SHADER_WORKBENCH,
     'restoring into a non-Shader effect must be refused by name');
-  assert.equal(typeof engine.getConfigImportNotice(), 'string',
-    'the notice is rendered straight into the panel, so it must be a string');
 
   assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED,
     'setEffect must succeed for ShaderBall');
@@ -1108,9 +1106,6 @@ test('the full-config accessors answer as the workbench panel assumes', () => {
       'a mistyped restore changed the effect');
   }
 
-  engine.clearConfigImportNotice();
-  assert.equal(engine.getConfigImportNotice(), '',
-    'the notice must be consumed by the clear the panel pairs with it');
 });
 
 test('schema 10 snapshots migrate the rendered palette mapping and discard its duplicate', () => {

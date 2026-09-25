@@ -198,8 +198,6 @@ export interface HolosphereEngine {
   restoreFullConfigSnapshot(snapshot: FullConfigSnapshot): EnumValue;
   /** Stable field ids and names in ConfigFieldId order; null with no Shader workbench loaded. */
   getFullConfigFieldDefinitions(): FullConfigFieldDefinition[] | null;
-  getConfigImportNotice(): string;
-  clearConfigImportNotice(): void;
   /**
    * True when the effect strobes each POV column to black after it is shown
    * (discrete columns with dark gaps), false when columns persist and smear

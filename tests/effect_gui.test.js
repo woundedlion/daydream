@@ -207,7 +207,6 @@ function makeHarness({
   fullConfigSnapshot = null,
   fullConfigFieldDefinitions = null,
   restoreFullConfigAccepted = true,
-  configImportNotice = '',
 } = {}) {
   const state = {
     params,
@@ -229,7 +228,6 @@ function makeHarness({
   const warnings = [];
   const restoredFullConfigs = [];
   const configNotices = [];
-  let configNoticeClears = 0;
   let paramDefinitionReads = 0;
   const guis = [];
   const dragTarget = fakeElement('window');
@@ -287,8 +285,6 @@ function makeHarness({
           ? FullConfigRestoreResult.APPLIED : FullConfigRestoreResult.INVALID_VALUE;
       },
       restoreResults: () => FullConfigRestoreResult,
-      importNotice: () => configImportNotice,
-      clearImportNotice: () => { configNoticeClears += 1; },
       showImportNotice: (message) => configNotices.push(message),
     },
     host: {
@@ -316,7 +312,6 @@ function makeHarness({
 
   return { panel, state, writes, warnings, guis, dragTarget, container, engine,
            restoredFullConfigs, configNotices,
-           configNoticeClears: () => configNoticeClears,
            paramDefinitionReads: () => paramDefinitionReads,
            gui: () => guis[guis.length - 1] };
 }
@@ -980,14 +975,12 @@ test('ShaderBall restores one versioned snapshot before building session control
     fullConfig: true,
     fullConfigSnapshot: current,
     acceptedStored: { [FULL_CONFIG_STORAGE_KEY]: JSON.stringify(stored) },
-    configImportNotice: 'Imported legacy ShaderBall config.',
   });
 
   h.panel.build();
 
   assert.deepEqual(h.restoredFullConfigs, [{ ...stored, schemaVersion: 1 }]);
-  assert.deepEqual(h.configNotices, ['Imported legacy ShaderBall config.']);
-  assert.equal(h.configNoticeClears(), 1);
+  assert.deepEqual(h.configNotices, [null]);
   assert.equal(h.gui().ctrl('Lens').session, true);
   assert.equal(h.gui().stored[FULL_CONFIG_STORAGE_KEY], JSON.stringify(current));
   assert.equal(h.gui().stored['__accepted.Lens'], undefined);
@@ -1008,7 +1001,6 @@ test('a rejected full-config snapshot is reported and announces no import', () =
     fullConfigSnapshot: { ...stored },
     acceptedStored: { [FULL_CONFIG_STORAGE_KEY]: JSON.stringify(stored) },
     restoreFullConfigAccepted: false,
-    configImportNotice: 'Imported legacy ShaderBall config.',
   });
 
   h.panel.build();
@@ -1018,7 +1010,6 @@ test('a rejected full-config snapshot is reported and announces no import', () =
     ['Shader Workbench: full-config snapshot was rejected: INVALID_VALUE']);
   assert.deepEqual(h.configNotices, [],
     'a refused restore announced an import that did not happen');
-  assert.equal(h.configNoticeClears(), 0, 'a refused restore consumed the notice');
 });
 
 test('a stored snapshot that is not a config object never reaches the engine', () => {

@@ -177,8 +177,6 @@ const CONFIG_DEFAULTS = {
   fieldDefinitions: () => null,
   restore: () => null,
   restoreResults: () => ({}),
-  importNotice: () => '',
-  clearImportNotice: () => {},
   showImportNotice: () => {},
 };
 const HOST_DEFAULTS = {
@@ -261,8 +259,6 @@ function checkedGroup(group, members, required, defaults = {}) {
  * @param {() => Record<string, unknown>} [deps.config.restoreResults] - The
  *   engine's FullConfigRestoreResult enum, which that value is judged against by
  *   identity.
- * @param {() => string} [deps.config.importNotice] - Reads a migration notice.
- * @param {() => void} [deps.config.clearImportNotice] - Consumes that notice.
  * @param {(message: string|null) => void} [deps.config.showImportNotice] - Shows
  *   or clears the migration notice.
  *
@@ -309,7 +305,6 @@ export function createEffectGui({ engine, segments, config, host }) {
     inUse: usesFullConfigSnapshot, snapshot: getFullConfigSnapshot,
     fieldDefinitions: getFullConfigFieldDefinitions,
     restore: restoreFullConfigSnapshot, restoreResults: fullConfigRestoreResults,
-    importNotice: getConfigImportNotice, clearImportNotice: clearConfigImportNotice,
     showImportNotice: showConfigImportNotice,
   } = checkedGroup('config', config ?? {}, [], CONFIG_DEFAULTS);
   const {
@@ -328,7 +323,7 @@ export function createEffectGui({ engine, segments, config, host }) {
   let unstagedWarned = '';
   let rebuildFailureGeneration;
   const persistence = createEffectPersistence({
-    getParameterDefinitions, setEngineParam, usesFullConfigSnapshot, getFullConfigSnapshot, restoreFullConfigSnapshot, fullConfigRestoreResults, getConfigImportNotice, clearConfigImportNotice, showConfigImportNotice, logWarn
+    getParameterDefinitions, setEngineParam, usesFullConfigSnapshot, getFullConfigSnapshot, restoreFullConfigSnapshot, fullConfigRestoreResults, showConfigImportNotice, logWarn
   });
   const view = createEffectPanelView({ focusedElement, guiContainer, isMobile });
   /**
