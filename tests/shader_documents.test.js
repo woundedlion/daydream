@@ -399,9 +399,9 @@ test('a preset the effect does not carry falls back to its first reference', () 
   const engine = fixedEngine(() => true);
 
   assert.equal(applyFixedShaderDocument(
-    engine, MODULE, fixedDocument(), 'study', ['noon'], BAKED, fixedDerivedBinding), null);
+    engine, MODULE, fixedDocument(), 'dusk', ['noon'], BAKED, fixedDerivedBinding), null);
   assert.deepEqual(engine.selected, ['noon']);
-  assert.deepEqual(engine.writes, [['Pattern Freq', 2]]);
+  assert.deepEqual(engine.writes, [['Pattern Freq', 5]]);
 });
 
 // Every id is resolved before the first write: a refusal after one write would
@@ -2021,7 +2021,7 @@ test('catalog skew refuses initialization before any chain is applied', async ()
 });
 
 test('source and file switches preserve edits when discard is refused', async () => {
-  const harness = await editorWorkbench();
+  const harness = await editorWorkbench({ migration: HEX_MIGRATION });
   let confirmations = 0;
   harness.win.confirm = () => { confirmations += 1; return false; };
   stageEditor(harness, 'sample')('sample.pattern-freq', 3.5);
@@ -2029,7 +2029,8 @@ test('source and file switches preserve edits when discard is refused', async ()
   const hash = harness.win.location.hash;
   const source = harness.elements.get('shader-document-select');
   const before = source.value;
-  source.value = '';
+  source.value = source.options.find((option) => option.value !== before).value;
+  assert.notEqual(source.value, before);
   await onChange(source)();
   assert.equal(source.value, before);
   assert.equal(harness.win.location.hash, hash);
