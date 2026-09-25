@@ -6,11 +6,7 @@
 import { fakeElement, installDocument } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
 
-// bootstrap.js starts the app on import when a document already exists, and
-// daydream.js pulls it in for the failure overlay — so the module graph is
-// loaded here, at import time, before any test installs one.
-const { start, createSegmentPoolSpawner, SHADER_DOCUMENT_EFFECTS } =
-  await import('../daydream.js');
+import { start, createSegmentPoolSpawner, SHADER_DOCUMENT_EFFECTS } from '../daydream.js';
 
 export { createSegmentPoolSpawner, SHADER_DOCUMENT_EFFECTS };
 
