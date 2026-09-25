@@ -513,7 +513,9 @@ const SAVED_THUMB_SIZE = 256;
 function loadSavedSolids() {
   try {
     const parsed = JSON.parse(localStorage.getItem(SAVED_SOLIDS_KEY) || '[]');
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((entry) => entry !== null && typeof entry === 'object' && !Array.isArray(entry))
+      : [];
   } catch (error) {
     console.warn('Could not restore saved solids:', error);
     return [];
