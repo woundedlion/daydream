@@ -318,6 +318,8 @@ test('engine bundle callers grant Actions read only to the bundle gate', () => {
 });
 
 test('bundle installation checks additions as well as tracked changes', () => {
+  assert.equal(execFileSync('git', ['-C', process.cwd(), 'check-ignore',
+    'engine-bundle/README.md'], { encoding: 'utf8' }).trim(), 'engine-bundle/README.md');
   for (const name of ['engine-bundle', 'js-unit-suite', 'deploy']) {
     const source = readFileSync(`${WORKFLOW_DIR}/${name}.yml`, 'utf8');
     assert.ok(source.includes('test -z "$(git status --porcelain)"'), name);
