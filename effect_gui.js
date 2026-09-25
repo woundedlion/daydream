@@ -956,7 +956,7 @@ export function createEffectGui({ engine, segments, config, host }) {
         const edited = { name: p.name, accepted: acceptedControlValue };
         fx.edits.persist(controller, edited);
         if (accepted) setWorkerParam(p.name, value);
-        adoptEnginePause(pause, p);
+        if (!fx.hydrating) adoptEnginePause(pause, p);
         fx.warningsDirty = true;
       });
     });
@@ -980,6 +980,7 @@ export function createEffectGui({ engine, segments, config, host }) {
     const fx = {
       gui: createGui(),
       animationPauseApplied: false,
+      hydrating: true,
       warningsDirty: false,
     };
 
@@ -1002,6 +1003,7 @@ export function createEffectGui({ engine, segments, config, host }) {
       const pause = addPauseToggle(fx, params, initialPause, hydratePause);
       addParamControllers(fx, params, pause, previousParamNames);
       fx.pause = pause;
+      fx.hydrating = false;
       return fx;
     } catch (error) {
       disposeEffect(fx);

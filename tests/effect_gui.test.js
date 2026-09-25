@@ -1518,6 +1518,22 @@ test('a hydrated pause is committed after the effect renderers rebuild', () => {
   assert.deepEqual(h.writes, ['paused:true']);
 });
 
+test('accepted parameter replay preserves the hydrated animation pause', () => {
+  const plain = { name: 'Width', value: 1, min: 0, max: 2 };
+  for (const hydrated of [{ Width: 1.5 }, { Width: 1.5, pause: false },
+    { Speed: 0.5, pause: false }, { Width: 1.5, pause: true }]) {
+    const h = makeHarness({
+      params: [SPEED, plain], hydrated,
+      acceptedStored: { '__accepted.Speed': 0.4, '__accepted.Width': 1 },
+    });
+    h.panel.build();
+    h.panel.applyAnimationPause();
+    assert.equal(h.engine.paused, hydrated.pause === true);
+    assert.equal(h.panel.active().pause.animationState.pause, hydrated.pause === true);
+    h.panel.destroy();
+  }
+});
+
 test('a fresh effect explicitly commits the unpaused state', () => {
   const h = makeHarness({ params: [SPEED] });
   h.panel.build();
