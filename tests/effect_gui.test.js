@@ -231,7 +231,7 @@ function makeHarness({
   let paramDefinitionReads = 0;
   const guis = [];
   const dragTarget = fakeElement('window');
-  // Engine double: owns the animation-pause state the panel now reads back,
+  // Engine double: owns the animation-pause state the panel reads back,
   // driven by the same two writes the real engine drives it with.
   const engine = { paused: false };
 

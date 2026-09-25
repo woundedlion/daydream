@@ -559,9 +559,7 @@ test('hankin controls start at one degree', () => {
  */
 test('a seeded hankin angle agrees across the control, the funcName and the recipe', () => {
   // A face whose interior angle at its second vertex is arccos(-1/3) = 109.4712
-  // degrees, so the tool's half-internal-angle seed is 54.7356 — the unsnapped
-  // value that showed one angle in state, another on the thumb, and a third in
-  // the name.
+  // degrees, giving a half-internal-angle seed of 54.7356 degrees.
   const s = Math.sqrt(8) / 3;
   const mesh = {
     vertices: [{ x: 1, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }, { x: -1 / 3, y: s, z: 0 }],
