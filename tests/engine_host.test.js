@@ -195,7 +195,7 @@ test('dispose() releases the recorder before the engine and leaves the host iner
   const order = [];
   const host = new EngineHost();
   host.adapter = { drawFrame() {} };
-  host.module = { HEAPU16: new Uint16Array(4) };
+  host.module = {};
   host.recorder = { dispose() { order.push('recorder'); } };
   host.engine = {
     ...pixelEngine(() => new Uint16Array(4), () => 4),
@@ -217,7 +217,7 @@ test('dispose() releases the recorder before the engine and leaves the host iner
 test('a recorder that throws on release does not strand the engine', (t) => {
   const host = new EngineHost();
   host.adapter = { drawFrame() {} };
-  host.module = { HEAPU16: new Uint16Array(4) };
+  host.module = {};
   host.recorder = { dispose() { throw new Error('stream ended'); } };
   let deleted = false;
   host.engine = { delete() { deleted = true; } };
@@ -237,7 +237,7 @@ test('a recorder that throws on release does not strand the engine', (t) => {
 test('an engine delete that throws still leaves the host inert', (t) => {
   const host = new EngineHost();
   host.adapter = { drawFrame() {} };
-  host.module = { HEAPU16: new Uint16Array(4) };
+  host.module = {};
   host.engine = { delete() { throw new Error('already deleted'); } };
   const logged = t.mock.method(console, 'error', () => {});
 
@@ -267,13 +267,13 @@ test('moduleDead() reads false before the load and on a live module', () => {
   const host = new EngineHost();
   assert.equal(host.moduleDead(), false, 'no module has not trapped');
 
-  host.module = { HEAPU16: new Uint16Array(4) };
+  host.module = {};
   assert.equal(host.moduleDead(), false);
 });
 
 test('moduleDead() reads the glue flag once the module traps', () => {
   const host = new EngineHost();
-  host.module = { HEAPU16: new Uint16Array(4) };
+  host.module = {};
 
   host.module.HS_MODULE_DEAD = true;
 

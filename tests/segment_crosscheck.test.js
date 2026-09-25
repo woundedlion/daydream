@@ -29,7 +29,7 @@
 //      of canvas rows the firmware segment's PPS LEDs touch (the bottom strip
 //      runs reversed, so only the covered set is equal, not the traversal order).
 //
-// Run: node --test --experimental-test-module-mocks "tests/segment_crosscheck.test.js"
+// Run: npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

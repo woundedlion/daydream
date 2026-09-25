@@ -31,7 +31,7 @@ test('default warm uses its served module URL, global fetch, and clears its dead
     const warmer = new ModuleWarmer();
     await warmer.warm();
     assert.ok(warmer.module instanceof WebAssembly.Module);
-    assert.equal(requested.length, 6);
+    assert.equal(requested.length, GRAPH.length + 1);
     assert.ok(requested.every((url) => url.startsWith('https://daydream.test/nested/')));
     assert.ok(requested.includes('https://daydream.test/nested/holosphere_wasm.wasm?v=abc123'));
     assert.equal(clock.timers.length, 1);

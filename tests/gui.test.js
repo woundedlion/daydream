@@ -1,9 +1,9 @@
-import { fakeTimers } from './fake_timers.js';
 //
 // gui.js — DeepLinkGUI URL hydration (dropdown, slider, checkbox), per-root key
 // namespacing, and the debounced URL writer, against a stubbed lil-gui.
 //
-// Run: node --test --experimental-test-module-mocks "tests/*.test.js"
+// Run: npm test
+import { fakeTimers } from './fake_timers.js';
 import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { URL } from 'node:url';

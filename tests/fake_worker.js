@@ -44,8 +44,9 @@ export class FakeWorker {
       throw new DOMException('message rejected', 'DataCloneError');
     if (msg.type === FakeWorker.failPostType && this.index === FakeWorker.failPostAt)
       throw new DOMException('message rejected', 'DataCloneError');
+    const received = structuredClone(msg, { transfer });
     this.sent.push(msg);
-    this.posted.push(structuredClone(msg, { transfer }));
+    this.posted.push(received);
     this.transfers.push(transfer ?? null);
   }
 

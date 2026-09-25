@@ -3,7 +3,7 @@
 // in, the slow-frame colouring, and the resolve-once latch that keeps a panel
 // mounted after the first frame from re-querying forever.
 //
-// Run: node --test --experimental-test-module-mocks "tests/*.test.js"
+// Run: npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

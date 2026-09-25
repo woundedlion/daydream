@@ -25,9 +25,6 @@ function makeEffectControls(values, paused = false, sinks = null) {
       setValue: (value) => {
         state[name] = value;
         if (sinks) {
-          sinks.engine[name] = value;
-          sinks.workers[name] = value;
-          sinks.url[name] = value;
           sinks.events.push(`param:${name}`);
         }
       },
@@ -37,9 +34,6 @@ function makeEffectControls(values, paused = false, sinks = null) {
     setValue: (value) => {
       animationState.pause = value;
       if (sinks) {
-        sinks.engine.paused = value;
-        sinks.workers.paused = value;
-        sinks.url.paused = value;
         sinks.events.push(`pause:${value}`);
       }
     },
@@ -53,7 +47,7 @@ function makeEffectControls(values, paused = false, sinks = null) {
 }
 
 function makeSinks() {
-  return { engine: {}, workers: {}, url: {}, events: [] };
+  return { events: [] };
 }
 
 test('effect state snapshot copies writable controls and pause state', () => {
@@ -79,7 +73,7 @@ test('a full-config effect snapshots no parameters to replay', () => {
     + 'top of it would only drive it through combinations the bridge refuses');
 });
 
-test('effect state restoration updates controls, engine, workers, and URL together', () => {
+test('effect state restoration updates controls through their setters', () => {
   const snapshot = snapshotEffectControlState(
     makeEffectControls({ Speed: 0.75, Glow: true }, true));
   const sinks = makeSinks();
@@ -89,9 +83,6 @@ test('effect state restoration updates controls, engine, workers, and URL togeth
 
   const expected = { Speed: 0.75, Glow: true, paused: true };
   assert.deepEqual({ ...rebuilt.state, paused: rebuilt.pause.animationState.pause }, expected);
-  assert.deepEqual(sinks.engine, expected);
-  assert.deepEqual(sinks.workers, expected);
-  assert.deepEqual(sinks.url, expected);
   assert.equal(sinks.events[0], 'pause:true');
 });
 
@@ -107,13 +98,10 @@ test('one effect snapshot survives nested effect and resolution rollback', () =>
   restoreEffectControlState(effectRollback, snapshot);
   restoreEffectControlState(resolutionRollback, snapshot);
 
-  const expected = { Speed: 0.9, Glow: true, paused: false };
-  assert.deepEqual(effectSinks.engine, expected);
-  assert.deepEqual(effectSinks.workers, expected);
-  assert.deepEqual(effectSinks.url, expected);
-  assert.deepEqual(resolutionSinks.engine, expected);
-  assert.deepEqual(resolutionSinks.workers, expected);
-  assert.deepEqual(resolutionSinks.url, expected);
+  for (const restored of [effectRollback, resolutionRollback]) {
+    assert.deepEqual(restored.state, { Speed: 0.9, Glow: true });
+    assert.equal(restored.pause.animationState.pause, false);
+  }
 });
 
 test('initial state dismisses the loader only after a successful apply', () => {
@@ -441,7 +429,7 @@ function makeApp({
       return rejectedEffects.has(name)
         ? EffectSetResult.UNKNOWN_EFFECT : EffectSetResult.INSTALLED;
     },
-    strobeColumns: () => 7,
+    strobeColumns: () => true,
     setResolution(w, h) {
       log.push(`engine.setResolution ${w}x${h}`);
       return rejectedResolutions.has(`${w}x${h}`)
@@ -512,7 +500,7 @@ test('applying an effect points the engine at it and rebuilds the panel', () => 
 
   assert.deepEqual(app.log, [
     'engine.setEffect Alpha',
-    'driver.setStrobeColumns 7',
+    'driver.setStrobeColumns true',
     'effectGui.destroy',
     'clearEffectParamUrl',
     'effectGui.build',
@@ -536,7 +524,7 @@ test('an engine rejection leaves the panel and the workers untouched', () => {
 
   assert.equal(app.pipeline.applyEffect(), ApplyResult.REJECTED);
 
-  assert.deepEqual(app.log, ['engine.setEffect Alpha', 'driver.setStrobeColumns 7']);
+  assert.deepEqual(app.log, ['engine.setEffect Alpha', 'driver.setStrobeColumns true']);
   assert.match(app.errors[0], /setEffect\("Alpha"\) failed/);
 });
 
@@ -547,7 +535,7 @@ test('a segmented switch rebuilds the worker effect after the panel', () => {
 
   assert.deepEqual(app.log, [
     'engine.setEffect Alpha',
-    'driver.setStrobeColumns 7',
+    'driver.setStrobeColumns true',
     'effectGui.destroy',
     'clearEffectParamUrl',
     'effectGui.build',
@@ -566,7 +554,7 @@ test('a preserved pause is committed after the segmented effect rebuild', () => 
 
   assert.deepEqual(app.log, [
     'engine.setEffect Alpha',
-    'driver.setStrobeColumns 7',
+    'driver.setStrobeColumns true',
     'effectGui.destroy',
     'effectGui.build',
     'effectGui.mount',
@@ -605,7 +593,7 @@ test('a resolution change waits for main acceptance before resizing workers', ()
     'engine.getEffectPresetCounts',
     'sidebar.setEffects Alpha,Gamma sizes={"Alpha":12} presets={"Alpha":3}',
     'engine.setEffect Alpha',
-    'driver.setStrobeColumns 7',
+    'driver.setStrobeColumns true',
     'effectGui.destroy',
     'clearEffectParamUrl',
     'effectGui.build',

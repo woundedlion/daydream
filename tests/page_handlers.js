@@ -26,6 +26,6 @@ export function pageHandlers(url) {
     };
     visit(parsed);
     assert.ok(declaration, `missing handler ${name}`);
-    return runInNewContext(`(${source.slice(...declaration.range)})`, context);
+    return runInNewContext(`"use strict"; (${source.slice(...declaration.range)})`, context);
   };
 }

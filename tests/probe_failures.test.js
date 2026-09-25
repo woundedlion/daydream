@@ -1,15 +1,12 @@
-import { closeProbeResources } from '../scripts/probe_harness.mjs';
-import { feedbackAtClick } from '../scripts/palettes-probe.mjs';
+import { closeProbeResources, boxOf, centre, checks, dragBetween, isMain, measureChecks, runProbe, walkTo } from '../scripts/probe_harness.mjs';
+import { feedbackAtClick, probeColorStrip, probeHueWheel, rgbMovedTogether } from '../scripts/palettes-probe.mjs';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { boxOf, centre, checks, dragBetween, isMain, measureChecks, runProbe, walkTo }
-  from '../scripts/probe_harness.mjs';
 import { probeDocumentActions, probeParity, probeStrip, probeStripHistory } from '../scripts/workbench-probe.mjs';
-import { probeColorStrip, probeHueWheel, rgbMovedTogether } from '../scripts/palettes-probe.mjs';
 import { probeHistoryRestore, probeRationalLock } from '../scripts/lissajous-probe.mjs';
 import {
   probeKeyboardEdits, probeMobilePanel, probePanel, probePresetName, probeSidebar, probeSliderDrag,

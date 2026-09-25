@@ -1,4 +1,3 @@
-import { detachedView } from './fake_buffer.js';
 //
 // fake_three.js's upload semantics and teardown sink, pinned on their own.
 // app_lifecycle.test.js, driver.test.js and segment_controller.test.js all
@@ -6,6 +5,7 @@ import { detachedView } from './fake_buffer.js';
 // accepted a re-point no GPU buffer can take, or a version that stopped
 // counting, would read there as an assertion about the module under test rather
 // than about the harness.
+import { detachedView } from './fake_buffer.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {

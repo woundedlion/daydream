@@ -75,7 +75,7 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
     // built from an options list is an OptionController, whose options() updates
     // its <select> in place and hands back the same controller; any other
     // controller is destroyed and a replacement carrying the copied name is
-    // appended to the end of the panel. Pinned by tests/lil_gui_contract.test.js.
+    // appended to the end of the panel. The real options behavior is exercised in tests/lil_gui_contract.test.js.
     options(choices) {
       if (!optionsReplaces && isOptionList(controller.args[0])) {
         controller.args = [choices];
@@ -92,7 +92,7 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
       owner.$children.appendChild(replacement.domElement);
       return replacement;
     },
-    enable() { controller.enabled = true; return controller; },
+    enable() { controller.enabled = true; controller.disabled = false; return controller; },
     disable() { controller.enabled = false; controller.disabled = true; return controller; },
     listen() { return controller; },
   };
@@ -129,8 +129,7 @@ export function fakeGui(namespace = {}, optionsReplaces = false) {
     storedWrites: [],
     destroyed: panel ? 0 : false,
     destroyThrows: null,
-    _closed: false,
-    get closed() { return this._closed; },
+    closed: false,
     ctrl(property) { return this.controllers.find((c) => c.property === property); },
     add(target, property, ...args) {
       if (!supportedProperty(target, property, args[0])) throw new TypeError(`Unsupported GUI property: ${property}`);
@@ -202,7 +201,7 @@ export function fakeGui(namespace = {}, optionsReplaces = false) {
       gui.storedWrites.push([prop, value]);
     },
     close() { return gui.open(false); },
-    open(open = true) { gui._closed = !open; return gui; },
+    open(open = true) { gui.closed = !open; return gui; },
     destroy() {
       gui.destroyed = panel ? gui.destroyed + 1 : true;
       if (gui.destroyThrows) throw gui.destroyThrows;
@@ -218,9 +217,8 @@ export function fakeGui(namespace = {}, optionsReplaces = false) {
   gui.domElement.appendChild(childrenElement);
   if (panel) {
     gui.addDisplayFolder = (name) => {
-      const folder = { name, _closed: false,
-        get closed() { return this._closed; },
-        open(open = true) { this._closed = !open; },
+      const folder = { name, closed: false,
+        open(open = true) { this.closed = !open; },
         close() { this.open(false); },
       };
       for (const method of ['add', 'addMigrated', 'addUnhydrated', 'addSession'])
@@ -312,33 +310,29 @@ export function startApp({
     'apply-notice-body', 'apply-notice-text', 'canvas-container',
     'loading-overlay', 'apply-notice', 'segment-stats'];
   const elements = new Map(ids.map((id) => [id, fakeElement('div')]));
-  const docListeners = [];
+  const docTarget = fakeElement('document');
+  const docListeners = docTarget.listeners;
   // Every id the app asks the document for, in order, so a case can pin what the
   // wiring resolves instead of restating it.
   const queried = [];
   const doc = installDocument({
     getElementById: (id) => { queried.push(id); return elements.get(id) ?? null; },
     createElement: (tag) => fakeElement(tag),
-    addEventListener: (type, handler) => docListeners.push([type, handler]),
-    removeEventListener: (type, handler) => {
-      const at = docListeners.findIndex(([t, h]) => t === type && h === handler);
-      if (at >= 0) docListeners.splice(at, 1);
-    },
+    addEventListener: docTarget.addEventListener.bind(docTarget),
+    removeEventListener: docTarget.removeEventListener.bind(docTarget),
     body: fakeElement('body'),
     documentElement: { dataset: daydreamMode ? { daydreamMode } : {} },
   });
   for (const element of elements.values()) element.ownerDocument = doc;
-  const listeners = [];
+  const windowTarget = fakeElement('window');
+  const listeners = windowTarget.listeners;
   /** @type {string[]} Targets win.location.replace() was sent to. */
   const replaced = [];
   /** @type {string[]} URLs written through history.replaceState(). */
   const urlWrites = [];
   const win = {
-    addEventListener: (type, handler) => listeners.push([type, handler]),
-    removeEventListener: (type, handler) => {
-      const at = listeners.findIndex(([t, h]) => t === type && h === handler);
-      if (at >= 0) listeners.splice(at, 1);
-    },
+    addEventListener: windowTarget.addEventListener.bind(windowTarget),
+    removeEventListener: windowTarget.removeEventListener.bind(windowTarget),
     location: {
       pathname: '/',
       search,

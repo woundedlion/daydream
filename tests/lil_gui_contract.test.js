@@ -1,4 +1,3 @@
-import { fakeGui } from './fake_app.js';
 //
 // Pins the behaviour of the lil-gui build package.json pins, so the doubles the
 // GUI suites run over cannot drift from the library the browser loads. Every
@@ -11,6 +10,7 @@ import { fakeGui } from './fake_app.js';
 // object[prop]` and returns undefined for anything it has no controller for,
 // after logging. A double that hands back a controller for every property turns
 // a browser-side `TypeError: … reading 'onChange'` into a green run.
+import { fakeGui } from './fake_app.js';
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
@@ -258,7 +258,7 @@ test('addColor and addFolder hand back the shapes the GUI layer wraps', async ()
 });
 
 for (const namespace of ['test', {}]) {
-test('the shared GUI rejects unsupported properties like DeepLinkGUI', () => {
+test(`the shared GUI rejects unsupported properties with ${typeof namespace} namespace`, () => {
   const gui = fakeGui(namespace);
   for (const object of [{}, { value: null }, { value: undefined }, { value: {} }]) {
     assert.throws(() => gui.add(object, 'value'), TypeError);
