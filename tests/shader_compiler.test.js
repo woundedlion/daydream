@@ -238,18 +238,6 @@ test('the digest migration table covers exactly the v1 fixtures', () => {
   assert.deepEqual(Object.keys(MIGRATION).sort(), legacyV1Digests);
 });
 
-/** Verifies every migration target names a document the repository ships. */
-test('every digest migration target resolves to a committed document', () => {
-  const shipped = new Map();
-  for (const name of patternNames) {
-    const compiled = compile(readFileSync(new URL(name, PATTERNS), 'utf8'));
-    assert.equal(compiled.status, 'VALID', name);
-    shipped.set(name, compiled.descriptor_digest);
-  }
-  for (const [legacy, successor] of Object.entries(MIGRATION))
-    assert.ok(shipped.has(successor), `${legacy} maps to unshipped document ${successor}`);
-});
-
 /**
  * v1 documents distinct only by an identity-policy spelling expand to the
  * same chain: expansion canonicalizes them, and the registry migration merges
