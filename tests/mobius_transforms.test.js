@@ -7,7 +7,7 @@ const {
   glslComplexFunctions, glslProjectionFunctions, mobiusCodeString,
   stereo, projectDiv, STEREO_INF, STEREO_POLE_EPS, STEREO_AZIMUTH_EPS,
   STEREO_UNDERFLOW_LIFT,
-} = await import('../tools/mobius_transforms.js');
+} = await import('../src/workbench/mobius/mobius_transforms.js');
 
 const EPS = 1e-12;
 

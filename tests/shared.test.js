@@ -32,7 +32,7 @@ register('./helpers/three_loader_hooks.js', import.meta.url, {
   data: { fakeThreeUrl: import.meta.resolve('./helpers/fake_three.js') },
 });
 
-const shared = await import('../tools/shared.js');
+const shared = await import('../src/workbench/shared.js');
 const { capPixelRatio, getCssColor, initScene } = shared;
 
 const RAF_ID = 7;
@@ -108,13 +108,13 @@ function mountScene(opts = {}) {
 // no source module's test could see.
 test('the re-exports are the functions their source modules export', async () => {
   const sources = {
-    './clipboard.js': ['copyToClipboard', 'copyWithFeedback', 'COPY_FEEDBACK', 'wireCopyBlock'],
-    './cpp_format.js': ['formatFloatCpp'],
-    './kb_format.js': ['formatKB'],
-    './banner.js': ['showFatalError', 'bootstrapTool', 'reportPageFailures'],
+    '../shared/clipboard.js': ['copyToClipboard', 'copyWithFeedback', 'COPY_FEEDBACK', 'wireCopyBlock'],
+    '../shared/cpp_format.js': ['formatFloatCpp'],
+    '../shared/kb_format.js': ['formatKB'],
+    '../shared/banner.js': ['showFatalError', 'bootstrapTool', 'reportPageFailures'],
   };
   for (const [specifier, names] of Object.entries(sources)) {
-    const module = await import(new URL(specifier, import.meta.resolve('../tools/shared.js')));
+    const module = await import(new URL(specifier, import.meta.resolve('../src/workbench/shared.js')));
     for (const name of names) {
       assert.equal(shared[name], module[name], `shared.${name}`);
     }

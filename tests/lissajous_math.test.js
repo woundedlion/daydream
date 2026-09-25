@@ -10,7 +10,7 @@ const {
   closingDomain,
   domainClosureWarning,
 } =
-  await import('../tools/lissajous_math.js');
+  await import('../src/workbench/lissajous/lissajous_math.js');
 
 const TWO_PI = 2 * Math.PI;
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);

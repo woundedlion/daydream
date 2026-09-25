@@ -11,7 +11,7 @@ import * as THREE from 'three';
  */
 const makeDaydream = (hOffset = 0) => ({ W: 288, H: 144, H_OFFSET: hOffset });
 
-const { pixelToSpherical } = await import('../geometry.js');
+const { pixelToSpherical } = await import('../src/renderer/geometry.js');
 
 const W = 288, H = 144;
 

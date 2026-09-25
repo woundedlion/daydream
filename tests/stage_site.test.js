@@ -17,8 +17,8 @@ function fixture(t) {
   const bundle = join(scratch, 'bundle');
   const site = join(scratch, 'site');
   const write = (base, path, value) => { mkdirSync(dirname(join(base, path)), { recursive: true }); writeFileSync(join(base, path), value); };
-  write(root, 'daydream.js', 'export const app = true;\n');
-  write(root, 'site_manifest.txt', '# source\n\ndaydream.js\ngenerated/shader/patterns/old.shader.json\n');
+  write(root, 'src/app/daydream.js', 'export const app = true;\n');
+  write(root, 'site_manifest.txt', '# source\n\nsrc/app/daydream.js\nshader/patterns/old.shader.json\n');
   write(root, 'generated/shader/patterns/old.shader.json', '{}');
   write(root, 'generated/holosphere_wasm.sha', 'a'.repeat(40));
   const git = (...args) => execFileSync('git', ['-C', root, ...args], { env: isolatedGitEnv(), encoding: 'utf8' }).trim();
@@ -26,7 +26,7 @@ function fixture(t) {
   git('config', 'core.autocrlf', 'false');
   git('config', 'user.email', 'test@example.com');
   git('config', 'user.name', 'Test');
-  git('add', '--', 'daydream.js', 'site_manifest.txt', 'generated/shader/patterns/old.shader.json', 'generated/holosphere_wasm.sha');
+  git('add', '--', 'src/app/daydream.js', 'site_manifest.txt', 'generated/shader/patterns/old.shader.json', 'generated/holosphere_wasm.sha');
   git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture');
   const pair = { daydream: git('rev-parse', 'HEAD'), holosphere: 'b'.repeat(40) };
   const files = Object.fromEntries(['README.md', 'generated/holosphere_wasm.js', 'generated/holosphere_wasm.wasm',
@@ -50,7 +50,7 @@ test('site staging publishes verified additions, removes stale owned entries and
   stageSite(f.root, f.bundle, f.site, f.pair);
   assert.equal(existsSync(join(f.site, 'generated/shader/patterns/old.shader.json')), false);
   assert.equal(readFileSync(join(f.site, 'generated/shader/patterns/new.shader.json'), 'utf8'), 'new generated/shader/patterns/new.shader.json');
-  assert.equal(readFileSync(join(f.site, 'daydream.js'), 'utf8'), 'export const app = true;\n');
+  assert.equal(readFileSync(join(f.site, 'src/app/daydream.js'), 'utf8'), 'export const app = true;\n');
   assert.deepEqual(JSON.parse(readFileSync(join(f.site, 'deployment-pair.json'))), f.pair);
   assert.throws(() => stageSite(f.root, null, f.site, f.pair), /verified engine bundle/);
   for (const key of ['daydream', 'holosphere'])
@@ -59,9 +59,9 @@ test('site staging publishes verified additions, removes stale owned entries and
 
 test('staging refuses modified frontend, manifest, or engine bytes', (t) => {
   const f = fixture(t);
-  f.write(f.root, 'daydream.js', 'tampered');
+  f.write(f.root, 'src/app/daydream.js', 'tampered');
   assert.throws(() => stageSite(f.root, f.bundle, f.site, f.pair), /Site source differs/);
-  f.write(f.root, 'site_manifest.txt', 'daydream.js');
+  f.write(f.root, 'site_manifest.txt', 'src/app/daydream.js');
   assert.throws(() => stageSite(f.root, f.bundle, f.site, f.pair), /Site manifest differs/);
   f.write(f.root, 'generated/holosphere_wasm.js', 'tampered');
   assert.throws(() => verifiedEnginePaths(f.root, f.bundle), /Installed engine asset differs/);

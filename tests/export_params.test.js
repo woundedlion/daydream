@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { formatExportParams } = await import('../tools/export_params.js');
+const { formatExportParams } = await import('../src/shared/export_params.js');
 
 /** Each value renders through the shared formatFloatCpp (trailing zeros trimmed,
  *  whole values keep one fractional digit) inside a brace-init list. */

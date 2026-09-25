@@ -4,12 +4,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 
-import { shaderWorkbenchUrl, start } from '../daydream.js';
-import { WORKBENCH_EFFECTS } from '../effect_roster.js';
-import { scratchChainDocument } from '../tools/chain_document_store.js';
+import { shaderWorkbenchUrl, start } from '../src/app/daydream.js';
+import { WORKBENCH_EFFECTS } from '../src/effects/effect_roster.js';
+import { scratchChainDocument } from '../src/workbench/shader/chain_document_store.js';
 import {
   decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
-} from '../tools/shader_deeplink.js';
+} from '../src/workbench/shader/shader_deeplink.js';
 import {
   applyFixedShaderDocument,
   BAKED_CONSTANT_IDS,
@@ -18,7 +18,7 @@ import {
   engineParameterName,
   SHADER_LINK_DEBOUNCE_MS,
   SHADER_LINK_MAX_WAIT_MS,
-} from '../tools/shader_documents.js';
+} from '../src/workbench/shader/shader_documents.js';
 import {
   FakeChainEngine, ParamSetResult, unpinnedEngineMethods,
 } from './helpers/fake_engine.js';
@@ -144,7 +144,7 @@ test('shader state hash replacement preserves the route and query', () => {
 test('simulator exposes Shader as a standalone tool', () => {
   assert.match(INDEX, /href="tools\/shader\.html"[^>]*>Shader/);
   assert.match(WORKBENCH, /data-daydream-mode="shader-workbench"/);
-  assert.match(WORKBENCH, /src="\.\.\/main\.js"/);
+  assert.match(WORKBENCH, /src="\.\.\/src\/app\/main\.js"/);
   assert.match(WORKBENCH, /id="chain-strip"/);
   assert.doesNotMatch(WORKBENCH, /id="chain-library"/);
   assert.match(WORKBENCH, /id="gui-container"/);
@@ -682,7 +682,7 @@ function patternFetch(files, migration = MIGRATION) {
     if (name === 'shaderball_migration.json') return migration;
     if (name === 'engine_catalog.json') return ENGINE_CATALOG;
     if (name === 'digest_migration.v1v2.json') return readFileSync(
-      new URL('../shader/patterns/digest_migration.v1v2.json', import.meta.url), 'utf8');
+      new URL('../src/workbench/shader/patterns/digest_migration.v1v2.json', import.meta.url), 'utf8');
     const source = files[name];
     if (source === undefined) throw new Error(`404 ${name}`);
     return source;

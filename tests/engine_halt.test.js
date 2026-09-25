@@ -1,7 +1,7 @@
 // The halted-engine predicate the tool pages gate every later bridge call on.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { engineHalted, standDownIfHalted } from '../tools/engine_halt.js';
+import { engineHalted, standDownIfHalted } from '../src/shared/engine_halt.js';
 
 test('the caller that was on the stack sees the trap as a RuntimeError', () => {
   assert.equal(engineHalted(new WebAssembly.RuntimeError('unreachable')), true);

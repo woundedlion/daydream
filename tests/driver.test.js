@@ -12,8 +12,8 @@ import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import {
   Daydream, dotDetailFor, fitDistance, initialAspect, MOBILE_BREAKPOINT_PX,
-} from '../driver.js';
-import { repointDisplayAliases } from '../display_aliases.js';
+} from '../src/renderer/driver.js';
+import { repointDisplayAliases } from '../src/engine/display_aliases.js';
 import { captureConsole } from './helpers/fake_console.js';
 import { fakeElement } from './helpers/fake_dom.js';
 import { fakeColorAttribute, fakeMatrixAttribute } from './helpers/fake_three.js';
@@ -1684,7 +1684,7 @@ test('an unavailable preset leaves the running arrow key unclaimed', () => {
 // The constructor needs a WebGL context, so every case above drives a prototype
 // method over a hand-built `this`. What the constructor itself does, and the
 // class's field roster, are read out of the source instead.
-const DRIVER_SOURCE = readFileSync(new URL('../driver.js', import.meta.url), 'utf8');
+const DRIVER_SOURCE = readFileSync(new URL('../src/renderer/driver.js', import.meta.url), 'utf8');
 
 /**
  * The constructor reaches WebGL on its first statement, so its wiring is read
@@ -1695,9 +1695,9 @@ const DRIVER_SOURCE = readFileSync(new URL('../driver.js', import.meta.url), 'ut
 test('the driver hands its own document to every collaborator that defaults to the global', () => {
   // Every class the driver could build whose constructor takes an optional doc,
   // derived from its own module rather than listed here.
-  const modules = [...DRIVER_SOURCE.matchAll(/^import \{([^}]*)\} from "(\.\/[^"]+)"/gmu)]
+  const modules = [...DRIVER_SOURCE.matchAll(/^import \{([^}]*)\} from "(\.{1,2}\/[^"]+)"/gmu)]
     .flatMap(([, names, path]) => {
-      const source = readFileSync(new URL(`../${path.slice(2)}`, import.meta.url), 'utf8');
+      const source = readFileSync(new URL(path, new URL('../src/renderer/driver.js', import.meta.url)), 'utf8');
       return names.split(',').map((n) => n.trim())
         .filter((name) => new RegExp(`class ${name}\\b[\\s\\S]*?constructor\\([^)]*doc = globalThis\\.document`)
           .test(source));

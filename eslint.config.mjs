@@ -33,7 +33,7 @@ export default [
     languageOptions: { globals: globals.node },
   },
   {
-    files: ['segment_worker.js'],
+    files: ['src/segments/segment_worker.js'],
     languageOptions: { globals: globals.worker },
   },
 ];

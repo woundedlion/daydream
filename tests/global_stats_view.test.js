@@ -10,8 +10,8 @@ import { readFileSync } from 'node:fs';
 import { fakeElement, installDocument } from './helpers/fake_dom.js';
 import { captureConsole } from './helpers/fake_console.js';
 
-import { SLOW_FRAME_MS } from '../frame_constants.js';
-import { GlobalStatsView, STATS_CELL_IDS } from '../global_stats_view.js';
+import { SLOW_FRAME_MS } from '../src/renderer/frame_constants.js';
+import { GlobalStatsView, STATS_CELL_IDS } from '../src/ui/global_stats_view.js';
 
 // Pins the module's cell ids against the real markup: a rename on either side
 // blanks the stats bar behind a single console.warn.

@@ -5,8 +5,8 @@
 // unsubscribe rules are checked without a WASM engine, lil-gui, or a browser.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AppState } from '../state.js';
-import { ApplyResult, createSwitchCoordinator } from '../effect_sequencing.js';
+import { AppState } from '../src/app/state.js';
+import { ApplyResult, createSwitchCoordinator } from '../src/effects/effect_sequencing.js';
 
 // An effect GUI record in the shape snapshotEffectControlState() reads: one
 // writable "Speed" control plus the pause toggle. Every per-parameter write goes

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { EffectPanelEdits } from '../effect_panel_edits.js';
+import { EffectPanelEdits } from '../src/ui/effect_panel_edits.js';
 
 function fixture() {
   const target = new EventTarget();

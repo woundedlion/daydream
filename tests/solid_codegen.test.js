@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const SOLIDS_PAGE = readFileSync(new URL('../tools/solids_page.js', import.meta.url), 'utf8');
+const SOLIDS_PAGE = readFileSync(new URL('../src/workbench/solids/solids_page.js', import.meta.url), 'utf8');
 
 const {
   OP_DEFS,
@@ -43,8 +43,8 @@ const {
   MORPH_SWEEP,
   unsweepableReason,
 } =
-  await import('../tools/solid_codegen.js');
-const { formatFloatCpp } = await import('../tools/cpp_format.js');
+  await import('../src/workbench/solids/solid_codegen.js');
+const { formatFloatCpp } = await import('../src/shared/cpp_format.js');
 
 /**
  * Builds an op whose params object records every key a code path reads, in read

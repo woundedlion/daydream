@@ -3,9 +3,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const { upperSnake, opStepCpp, generateRegistryCpp, MAX_RECIPE_STEPS, MAX_BUILD_STEPS } =
-  await import('../tools/solid_registry_codegen.js');
+  await import('../src/workbench/solids/solid_registry_codegen.js');
 const { OP_DEFS, KNOWN_OPS, PARAMETERIZED_OPS, SIMPLE_SEEDS, DEFINED_SEED_CONSTANTS } =
-  await import('../tools/solid_codegen.js');
+  await import('../src/workbench/solids/solid_codegen.js');
 
 test('upperSnake splits camelCase runs and uppercases the rest', () => {
   assert.equal(upperSnake('truncatedIcosahedron_hk58_chamfer63'),

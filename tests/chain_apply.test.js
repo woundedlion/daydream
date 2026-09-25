@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { applyChainDocument } from '../tools/chain_apply.js';
+import { applyChainDocument } from '../src/workbench/shader/chain_apply.js';
 import {
   FakeChainEngine, ChainStatus, ParamSetResult, unpinnedEngineMethods,
 } from './helpers/fake_engine.js';

@@ -10,7 +10,7 @@ import {
   paramGenerationStale,
   selectorControlValue,
   enumConstantName,
-} from '../param_sync.js';
+} from '../src/effects/param_sync.js';
 
 // resolveParamSync is the DOM-free core of sync()'s per-controller "fight-the-
 // slider" decision: coerce the engine's raw value, never clobber a controller the
@@ -241,7 +241,7 @@ test('an engine enum value is logged by its constant name', () => {
 
 
 test('document enum options normalize case, whitespace, and hyphens', async () => {
-  const { optionIndex } = await import('../param_sync.js');
+  const { optionIndex } = await import('../src/effects/param_sync.js');
   const definition = { options: ['Solid Fill', 'Point Cloud'] };
   assert.equal(optionIndex(definition, '  point-cloud  '), 1);
   assert.equal(optionIndex(definition, 'SOLID   FILL'), 0);

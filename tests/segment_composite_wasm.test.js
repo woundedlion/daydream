@@ -18,7 +18,7 @@ import assert from 'node:assert/strict';
 import createHolosphereModule from '../generated/holosphere_wasm.js';
 import {
   computeSegmentRange, extractSegment, compositeSegment,
-} from '../segment_layout.js';
+} from '../src/segments/segment_layout.js';
 
 // The smaller of the two shipped presets: every instance below is a whole WASM
 // module with its own arena, so the canvas is kept cheap.

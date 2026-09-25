@@ -10,7 +10,7 @@
 // object[prop]` and returns undefined for anything it has no controller for,
 // after logging. A double that hands back a controller for every property turns
 // a browser-side `TypeError: … reading 'onChange'` into a green run.
-import { DeepLinkGUI } from '../gui.js';
+import { GUI as DeepLinkGUI } from '../src/ui/gui.js';
 import { fakeGui } from './helpers/fake_app.js';
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -263,6 +263,8 @@ for (const search of ['', '?test.value=x']) {
     const real = await realGUI();
     const gui = new DeepLinkGUI(real, 'test', null, {
       location: { search, pathname: '/', hash: '' },
+      setTimeout: () => 1,
+      clearTimeout: () => {},
     });
     const fake = fakeGui(search ? { value: 'x' } : {});
     for (const factory of [() => ({}), () => ({ value: null }),

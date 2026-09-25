@@ -14,7 +14,7 @@ import {
 } from '../generated/shader/shader_workbench.mjs';
 
 const REPO = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const PATTERNS = resolve(REPO, 'shader/patterns');
+const PATTERNS = resolve(REPO, 'src/workbench/shader/patterns');
 const FIXTURES = resolve(PATTERNS, 'v1');
 
 const migration = {};

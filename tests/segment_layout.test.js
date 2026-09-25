@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeSegmentRange, extractSegment, compositeSegment, stampBoundaries } from '../segment_layout.js';
+import { computeSegmentRange, extractSegment, compositeSegment, stampBoundaries } from '../src/segments/segment_layout.js';
 
 // An odd width is rejected outright (see the case below), so the exactly-once
 // tiling invariant holds for every width the layout accepts.

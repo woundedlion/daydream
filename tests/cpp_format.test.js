@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { formatFloatCpp } = await import('../tools/cpp_format.js');
+const { formatFloatCpp } = await import('../src/shared/cpp_format.js');
 
 /** A whole number keeps one fractional digit and the f suffix (never "2f"). */
 test('formatFloatCpp: whole value renders as "2.0f"', () => {

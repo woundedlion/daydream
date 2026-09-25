@@ -33,7 +33,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { computeSegmentRange } from '../segment_layout.js';
+import { computeSegmentRange } from '../src/segments/segment_layout.js';
 
 /**
  * @typedef {{ arm_b: boolean, y_base: number, y_step: number, y: number[] }} GoldenSegment

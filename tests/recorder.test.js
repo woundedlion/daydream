@@ -4,7 +4,7 @@ import { installConsoleCapture } from './helpers/fake_console.js';
 import { fakeElement, installDocument } from './helpers/fake_dom.js';
 import {
   MEMORY_BUFFER_LIMIT_BYTES, PICKER_GRACE_SECONDS, selectMimeType, VideoRecorder,
-} from '../recorder.js';
+} from '../src/recording/recorder.js';
 
 /** Fixed local wall-clock time so the timestamped file name is exact. */
 const SAVE_CLOCK = new Date(2026, 0, 2, 3, 4, 5);

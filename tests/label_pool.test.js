@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { LabelPool } from '../driver.js';
+import { LabelPool } from '../src/renderer/driver.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
 // Parent-tracking scene stub: add/remove mirror what THREE.Object3D exposes to

@@ -14,7 +14,8 @@ import {
 import { sha256Hex } from '../generated/shader/sha256.mjs';
 
 const PATTERNS = new URL('../generated/shader/patterns/', import.meta.url);
-const FIXTURES = new URL('../shader/patterns/v1/', import.meta.url);
+const AUTHORED_PATTERNS = new URL('../src/workbench/shader/patterns/', import.meta.url);
+const FIXTURES = new URL('v1/', AUTHORED_PATTERNS);
 const patternNames = readdirSync(PATTERNS).filter((f) => f.endsWith('.shader.json'));
 const identityProjectionPatterns = [
   'alien_core.shader.json',
@@ -44,7 +45,7 @@ const legacyV1Digests = [
 const CATALOG = JSON.parse(
   readFileSync(new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
 const MIGRATION = JSON.parse(
-  readFileSync(new URL('../shader/patterns/digest_migration.v1v2.json', import.meta.url), 'utf8'));
+  readFileSync(new URL('digest_migration.v1v2.json', AUTHORED_PATTERNS), 'utf8'));
 
 /**
  * Reads a file the canonical LF export is pinned against. A CRLF working-tree

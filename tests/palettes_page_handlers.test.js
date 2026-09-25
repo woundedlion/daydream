@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { pageHandlers } from './helpers/page_handlers.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
-const handler = pageHandlers(new URL('../tools/palettes_page.js', import.meta.url));
+const handler = pageHandlers(new URL('../src/workbench/palettes/palettes_page.js', import.meta.url));
 
 test('copy feedback ignores an older clipboard completion', async () => {
   const pending = [];

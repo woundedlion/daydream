@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement } from './helpers/fake_dom.js';
 import { fakeColorAttribute } from './helpers/fake_three.js';
-import { repointDisplayAliases } from '../display_aliases.js';
+import { repointDisplayAliases } from '../src/engine/display_aliases.js';
 import {
   createRenderAdapter,
   createAppTeardown,
@@ -14,8 +14,8 @@ import {
   loadWithDeadline,
   MODULE_LOAD_DEADLINE_MS,
   createTestAllTicker,
-} from '../app_lifecycle.js';
-import { EngineHost } from '../engine_host.js';
+} from '../src/app/app_lifecycle.js';
+import { EngineHost } from '../src/engine/engine_host.js';
 
 // app_lifecycle.js is the composition root's frame, timer, and teardown wiring.
 // The contracts under test are the ones a browser would only reveal as a black

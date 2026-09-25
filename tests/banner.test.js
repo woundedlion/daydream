@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   clearFatalError, errorDetail, showFatalError, bootstrapTool, reportPageFailures,
-} from '../tools/banner.js';
+} from '../src/shared/banner.js';
 import { captureConsole, installConsoleCapture } from './helpers/fake_console.js';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 

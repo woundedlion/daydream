@@ -14,7 +14,7 @@ import {
   URL_FLUSH_MAX_RETRIES,
   URL_FLUSH_RETRY_MS,
   writeUrl,
-} from '../state.js';
+} from '../src/app/state.js';
 
 // Dispose the active URLSync before restoring window: a debounced flush() would
 // otherwise fire into a deleted window after teardown.

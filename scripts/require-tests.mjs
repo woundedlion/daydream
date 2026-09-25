@@ -49,7 +49,7 @@ const testShape = /\.(?:test|spec)\.m?js$/;
 const tracked = String(execFileSync('git', ['ls-files', '-z']))
   .split('\0')
   .filter((path) => path !== '' && existsSync(path) && /\.m?js$/.test(path))
-  .filter((path) => !path.split('/').some((part) => skipDirs.has(part)));
+  .filter((path) => !skipDirs.has(path.split('/')[0]));
 const reachableBy = (path, spec) => spec.pattern.test(path);
 const files = tracked.filter((path) =>
   globSpecs.some((spec) => reachableBy(path, spec)));
@@ -64,7 +64,7 @@ const scanInstalls = (current) => {
     if (entry.name === 'node_modules') {
       if (current !== '.') strays.push(path);
     } else if (entry.isDirectory()) {
-      if (skipDirs.has(entry.name)) continue;
+      if (current === '.' && skipDirs.has(entry.name)) continue;
       scanInstalls(path);
     }
   }

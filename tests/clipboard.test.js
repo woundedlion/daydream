@@ -9,7 +9,7 @@ const {
   copyToClipboard,
   copyWithFeedback,
   wireCopyBlock,
-} = await import('../tools/clipboard.js');
+} = await import('../src/shared/clipboard.js');
 
 restoreDocumentAfterEach();
 

@@ -11,9 +11,9 @@ import { afterEach, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { createChainDocumentStore, scratchChainDocument } from '../tools/chain_document_store.js';
-import { createChainStrip } from '../tools/chain_strip.js';
-import { deactivatedParameterIds } from '../tools/chain_presentation.js';
+import { createChainDocumentStore, scratchChainDocument } from '../src/workbench/shader/chain_document_store.js';
+import { createChainStrip } from '../src/workbench/shader/chain_strip.js';
+import { deactivatedParameterIds } from '../src/workbench/shader/chain_presentation.js';
 import { compileShaderDocument } from '../generated/shader/shader_workbench.mjs';
 import {
   documentEvents, fakeElement, installAnimationFrames, installDocument,

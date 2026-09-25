@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createChainPresentation } from '../tools/chain_presentation.js';
-import { titleCase } from '../tools/labels.js';
+import { createChainPresentation } from '../src/workbench/shader/chain_presentation.js';
+import { titleCase } from '../src/shared/labels.js';
 
 const op = (id, input, output = input) => ({ id, input, output, name: id, params: [] });
 const rotate = op('rotate', 'sphere');

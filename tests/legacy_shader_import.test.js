@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { importLegacyShaderSelection } from '../legacy_shader_import.js';
+import { importLegacyShaderSelection } from '../src/effects/legacy_shader_import.js';
 
 // The engine canonicalizes both spellings (targets/wasm/engine_bindings.h), so
 // a link carrying either one has to reach Shader.

@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pageHandlers } from './helpers/page_handlers.js';
-import { createPointerDrag } from '../tools/pointer_drag.js';
+import { createPointerDrag } from '../src/shared/pointer_drag.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
-const handler = pageHandlers(new URL('../tools/solids_page.js', import.meta.url));
+const handler = pageHandlers(new URL('../src/workbench/solids/solids_page.js', import.meta.url));
 
 test('parameter changes from removed or reordered rows cannot edit the replacement', () => {
   const state = { ops: [] };

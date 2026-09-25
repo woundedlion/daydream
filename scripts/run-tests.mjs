@@ -142,7 +142,7 @@ const main = () => {
   }
   const roster = tracked.split('\0')
     .filter(Boolean)
-    .filter((path) => !path.split('/').some((part) => SKIP_DIRS.has(part)))
+    .filter((path) => !SKIP_DIRS.has(path.split('/')[0]))
     .filter((path) => ![...testDirs].some((dir) => path === dir || path.startsWith(`${dir}/`)))
     .sort();
 

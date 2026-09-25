@@ -21,7 +21,7 @@ import {
   UNDO_DEPTH,
   createChainDocumentStore,
   scratchChainDocument,
-} from '../tools/chain_document_store.js';
+} from '../src/workbench/shader/chain_document_store.js';
 import {
   chainArenaBytes,
   compileShaderDocument,
@@ -878,7 +878,7 @@ test('an injected compiler isolates the store from its default compiler module',
   const directory = mkdtempSync(join(tmpdir(), 'chain-store-isolation-'));
   try {
     const path = join(directory, 'store.mjs');
-    writeFileSync(path, readFileSync(new URL('../tools/chain_document_store.js', import.meta.url)));
+    writeFileSync(path, readFileSync(new URL('../src/workbench/shader/chain_document_store.js', import.meta.url)));
     const isolated = await import(pathToFileURL(path).href);
     let imports = 0;
     const store = await isolated.createChainDocumentStore({
@@ -925,7 +925,7 @@ test('chain labels use the compiler grammar', () => {
     assert.ok(declaration?.init.regex);
     return declaration.init.regex;
   };
-  assert.deepEqual(grammar('../tools/chain_document_store.js'),
+  assert.deepEqual(grammar('../src/workbench/shader/chain_document_store.js'),
     grammar('../generated/shader/shader_workbench.mjs'));
 });
 

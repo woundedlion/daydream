@@ -8,7 +8,7 @@ import {
   createSegmentSpawnGuard,
   createSegmentedFallback,
   maxSegmentCount,
-} from '../segment_policy.js';
+} from '../src/segments/segment_policy.js';
 
 // The segmented spawn guard: spawning awaits a module warm-up, so a toggle burst
 // leaves several continuations in flight against one worker pool.

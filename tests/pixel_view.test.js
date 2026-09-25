@@ -1,7 +1,7 @@
 import { detachedView } from './helpers/fake_buffer.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isViewLive, refreshPixelView } from '../pixel_view.js';
+import { isViewLive, refreshPixelView } from '../src/renderer/pixel_view.js';
 
 
 

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createMeshRenderer, meshStatsLine, meshCanvasLabel } from '../tools/solid_render.js';
+import { createMeshRenderer, meshStatsLine, meshCanvasLabel } from '../src/workbench/solids/solid_render.js';
 import { fakeElement } from './helpers/fake_dom.js';
 import {
   BufferGeometry,

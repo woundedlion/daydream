@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { wireFlyout } from '../tools/flyout.js';
+import { wireFlyout } from '../src/shared/flyout.js';
 import {
   documentEvents, fakeElement, installDocument, restoreDocumentAfterEach,
 } from './helpers/fake_dom.js';

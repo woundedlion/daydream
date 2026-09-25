@@ -1,0 +1,1189 @@
+// @ts-check
+/*
+ * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
+ * Licensed under the Polyform Noncommercial License 1.0.0
+ */
+
+import { titleCase } from '../../shared/labels.js';
+import {
+  createChainPresentation, deactivatedParameterIds, formatNumericValue, nudgeStep, fieldOf,
+} from './chain_presentation.js';
+
+/** @typedef {import('./chain_presentation.js').CatalogOperator} CatalogOperator */
+/** @typedef {import('./chain_presentation.js').OperatorCatalog} OperatorCatalog */
+/** @typedef {import('./chain_presentation.js').ChainEntry} ChainEntry */
+/** @typedef {import('./chain_presentation.js').LegalityEntry} LegalityEntry */
+/** @typedef {import('./chain_presentation.js').SequenceEntry} SequenceEntry */
+/** @typedef {import('./chain_presentation.js').SpanChoice} SpanChoice */
+/** @typedef {import('./chain_document_store.js').ParameterDeclaration} ParameterDeclaration */
+/** @typedef {import('./chain_presentation.js').BandLayout} BandLayout */
+
+import { createFrameScheduler } from '../../shared/page_lifecycle.js';
+
+/**
+ * The pipeline strip: the loaded document's operator chain read left to right in
+ * execution order as chips grouped into one band per editable carrier family, with the
+ * family crossings drawn as socket chips on the band boundaries. The terminal
+ * carrier is the pipeline's output type rather than an editable band, and is
+ * conveyed by its incoming socket. Every structural gesture — palette insertion, ✕
+ * removal, socket selection, and button or Alt+Arrow reorder — funnels into the
+ * document store's one span-replacement primitive, so the strip can commit
+ * nothing the store's validator refuses; it only decides which spans the
+ * gestures name. Undo and redo go to the store's history instead. Selection
+ * and the session bypass set live in the store too: the strip is a view plus
+ * gesture translation, rebuilt whole after every committed edit with keyboard
+ * focus restored to the edited chip.
+ *
+ * Every chip carries its stage's controls inline, built from the document's
+ * declarations and catalog defaults over the active preset's values, so a stage is tuned
+ * where it sits in the pipeline. A chip discloses them transiently under the
+ * pointer and under keyboard focus alike, and pinned open by selection.
+ */
+
+/** @typedef {{severity: string, phase: string, code: string, path: string, message: string}} Diagnostic */
+/** @typedef {{ok: true}|{ok: false, diagnostics: Diagnostic[]}} EditResult */
+/**
+ * The document-store surface the strip drives. Legality queries throw RangeError
+ * for invalid indices; mutation methods return EditResult refusals.
+ * @typedef {{
+ *   chain: () => ChainEntry[],
+ *   selectedLabel: () => string|null,
+ *   setSelectedLabel: (label: string|null) => boolean,
+ *   bypassedLabels: () => string[],
+ *   setBypassed: (label: string, on: boolean) => EditResult,
+ *   legalInsertions: (index: number) => LegalityEntry[],
+ *   legalSequences: (start: number, deleteCount: number,
+ *     maxLength: number) => SequenceEntry[],
+ *   parameterDeclarations: () => ParameterDeclaration[],
+ *   document: () => *,
+ *   replaceSpan: (start: number, deleteCount: number,
+ *     sequence: Array<{label?: string, operator: string}>) => EditResult,
+ *   relabel: (oldLabel: string, newLabel: string) => EditResult,
+ *   endValueRun: () => void,
+ *   undo: () => boolean, redo: () => boolean,
+ *   canUndo: () => boolean, canRedo: () => boolean,
+ * }} ChainStore
+ */
+// Keeps a palette clamped inside the viewport clear of its edge.
+const PALETTE_MARGIN = 8;
+
+// Separates a palette from the control it opened from.
+const PALETTE_GAP = 4;
+
+const DEACTIVATED_REASON = 'Deactivated by the current topology selection';
+
+// A bypass is a program-shape override, and only the interpreter is sent a
+// program shape; the compiled build takes the document chain whole.
+const BYPASS_UNAVAILABLE = 'Bypass applies to the interpreter only: '
+  + 'the compiled build renders the whole chain.';
+
+const MIN_SCROLL_STEP = 160;
+const SCROLL_STEP_RATIO = 0.75;
+
+// Pixels one WheelEvent.DOM_DELTA_LINE notch stands for.
+const WHEEL_LINE_PX = 16;
+
+/**
+ * A socket's function name, by the carrier the crossing produces. A band holds
+ * at most one socket and no two bands produce the same carrier, so these stay
+ * distinct within a strip.
+ * @type {Record<string, {name: string, accessibleName: string}>}
+ */
+const SOCKET_FUNCTIONS = {
+  plane: { name: 'Projection', accessibleName: 'Projection' },
+  field: { name: 'Source', accessibleName: 'Source function' },
+  color: { name: 'Color', accessibleName: 'Color' },
+};
+
+/**
+ * Builds the pipeline strip into a container and wires its gestures.
+ * @param {Object} options - The strip's collaborators.
+ * @param {*} options.doc - Document the strip renders into.
+ * @param {*} options.container - Element the strip owns.
+ * @param {ChainStore} options.store - The chain document store.
+ * @param {OperatorCatalog} options.catalog - The operator catalog.
+ * @param {(message: string) => void} options.announce - Writes the workbench's
+ *   one shared live status region; every refusal reports through it, and a
+ *   committed edit clears it.
+ * @param {() => void} options.onApply - Runs after every committed structural
+ *   edit, undo/redo and bypass toggle; the caller re-applies the program shape
+ *   through the engine.
+ * @param {(label: string|null) => void} [options.onSelect] - Runs when the
+ *   selected instance changes, which is also what expands the chip's controls.
+ * @param {() => string|null} [options.presetId] - The preset the inline stage
+ *   controls read and write; null falls back to the document's first.
+ * @param {(parameterId: string, value: *) => boolean|void} [options.onEditParameter] -
+ *   Takes every inline control edit as the document value the store stores: a
+ *   number for a binary32 field, the option id for an enum8 one.
+ * @param {() => void} [options.onCommitParameter] - Runs once an inline control
+ *   edit completes: a slider release, a chosen option, an entered value.
+ * @param {() => boolean} [options.bypassAvailable] - Whether a bypass reaches
+ *   what is rendering. False disables the toggles and states why, rather than
+ *   leaving a control that commits store state the render ignores.
+ * @returns {Object} The strip.
+ */
+export function createChainStrip({
+  doc, container, store, catalog, announce, onApply, onSelect = () => {},
+  presetId = () => null, onEditParameter = () => {}, onCommitParameter = () => {},
+  bypassAvailable = () => true,
+}) {
+  const { opOf, bandLayout, appendGap, choiceEntries, choiceKey, socketChoices, sharesBand } = createChainPresentation({
+    catalog, chain: store.chain, legalSequences: store.legalSequences,
+  });
+
+  /** @type {string|null} Roving-tabindex position, by instance label. */
+  let focusedLabel = null;
+  // A rebuild puts the focus back where it was; that is not a disclosure
+  // gesture, so it must not open the chip it lands on.
+  let restoringFocus = false;
+  /** @type {string|null} The last selection onSelect was told about. */
+  let notifiedSelection = null;
+  /** @type {{element: *, anchor: *}|null} */
+  let palette = null;
+  /** @type {{undo: *, redo: *}|null} The current render's history buttons. */
+  let history = null;
+  /** @type {ParameterDeclaration[]} The current render's declarations. */
+  let declarations = [];
+  /** @type {Object<string, *>} The values the inline controls show. */
+  let values = {};
+  /**
+   * @type {Map<string, *>} Every chip's parameter rows, by parameter id; a chip
+   * builds its rows whether or not it is the expanded one.
+   */
+  const rows = new Map();
+
+  /**
+   * @param {string} tag - Element tag.
+   * @param {string} classes - Class attribute.
+   * @returns {*} The created element.
+   */
+  const el = (tag, classes) => {
+    const node = doc.createElement(tag);
+    node.className = classes;
+    return node;
+  };
+
+  /**
+   * @param {string} selector - Element class selector.
+   * @param {string} attribute - Dataset key to match.
+   * @param {string} value - Value to match.
+   * @returns {*|null} The first match.
+   */
+  const elementBy = (selector, attribute, value) => {
+    for (const node of container.querySelectorAll(selector)) {
+      if (node.dataset[attribute] === value) return node;
+    }
+    return null;
+  };
+
+  /** @param {string} label @returns {*|null} The chip carrying the instance. */
+  const chipByLabel = (label) => elementBy('.chain-chip', 'label', label);
+
+  /** @param {number} index @returns {*|null} The chip at that chain index. */
+  const chipAt = (index) => elementBy('.chain-chip', 'index', String(index));
+
+  /**
+   * Surfaces a store refusal in the shared live region.
+   * @param {EditResult} result - The refused edit.
+   * @returns {false} Always false, for tail-calling.
+   */
+  const report = (result) => {
+    if (result.ok === false) {
+      announce(result.diagnostics[0]?.message ?? 'the edit was refused');
+    }
+    return false;
+  };
+
+  /** Tells the caller when the store's selection has moved. */
+  const notifySelection = () => {
+    const selected = store.selectedLabel();
+    if (selected === notifiedSelection) return;
+    notifiedSelection = selected;
+    onSelect(selected);
+  };
+
+  /**
+   * Rebuilds the strip after a committed edit, restores focus, and re-applies
+   * the program through the caller.
+   * @param {string|null} focusLabel - Chip to hand keyboard focus back to.
+   * @returns {true} Always true, for tail-calling.
+   */
+  const commit = (focusLabel) => {
+    announce('');
+    render({ focusLabel });
+    notifySelection();
+    onApply();
+    return true;
+  };
+
+  /**
+   * Selects one chip (or clears the selection) and re-renders.
+   * @param {string|null} label - The instance label, or null.
+   * @returns {void}
+   */
+  const select = (label) => {
+    const selected = label === store.selectedLabel() ? null : label;
+    if (!store.setSelectedLabel(selected)) return;
+    if (selected !== null) focusedLabel = selected;
+    render({ focusLabel: label });
+    notifySelection();
+  };
+
+  /**
+   * Moves the chip at one chain index to a gap, as the m-for-m span replacement
+   * that keeps every label (and so every parameter value).
+   * @param {number} index - The chip's chain index.
+   * @param {number} gap - Target gap, 0..chain length.
+   * @returns {boolean} Whether the move committed.
+   */
+  const moveChip = (index, gap) => {
+    const chain = store.chain();
+    if (gap < 0 || gap > chain.length) return false;
+    if (gap === index || gap === index + 1) return true;
+    const entry = chain[index];
+    const result = gap < index
+      ? store.replaceSpan(gap, index - gap + 1, [entry, ...chain.slice(gap, index)])
+      : store.replaceSpan(index, gap - index, [...chain.slice(index + 1, gap), entry]);
+    if (!result.ok) return report(result);
+    return commit(entry.label);
+  };
+
+  /**
+   * Removes one endomorphism, the empty span replacement legality makes
+   * automatic. Focus lands on whatever fills the vacated position.
+   * @param {number} index - The chip's chain index.
+   * @returns {boolean} Whether the removal committed.
+   */
+  const removeChip = (index) => {
+    const result = store.replaceSpan(index, 1, []);
+    if (!result.ok) return report(result);
+    const after = store.chain();
+    return commit(after[index]?.label ?? after[index - 1]?.label ?? null);
+  };
+
+  /**
+   * Toggles one endomorphism's session bypass and re-applies the program. Runs
+   * for the keyboard path too, which reaches no disabled button.
+   * @param {string} label - The instance label.
+   * @returns {void}
+   */
+  const toggleBypass = (label) => {
+    if (!bypassAvailable()) {
+      announce(BYPASS_UNAVAILABLE);
+      return;
+    }
+    const on = !store.bypassedLabels().includes(label);
+    const result = store.setBypassed(label, on);
+    if (!result.ok) {
+      report(result);
+      return;
+    }
+    announce('');
+    render({ focusLabel: label, focusBypass: true });
+    onApply();
+  };
+
+  const undo = () => {
+    if (!store.undo()) return false;
+    return commit(focusedLabel);
+  };
+
+  const redo = () => {
+    if (!store.redo()) return false;
+    return commit(focusedLabel);
+  };
+
+  /**
+   * Anchors an open palette under the control that opened it, clamped inside
+   * the viewport.
+   * @param {*} element - The open palette.
+   * @param {*} anchor - The control it opened from.
+   * @returns {void}
+   */
+  const placePalette = (element, anchor) => {
+    let bounds = element.getBoundingClientRect();
+    const width = bounds.width;
+    const viewport = doc.documentElement?.clientWidth ?? 0;
+    const anchorBounds = anchor.getBoundingClientRect();
+    let left = anchorBounds.left;
+    if (viewport > 0) left = Math.min(left, viewport - width - PALETTE_MARGIN);
+    element.style.left = `${Math.max(PALETTE_MARGIN, left)}px`;
+    const viewportHeight = doc.documentElement?.clientHeight ?? 0;
+    let top = anchorBounds.bottom + PALETTE_GAP;
+    if (viewportHeight > 0) {
+      const available = Math.max(0, viewportHeight - 2 * PALETTE_MARGIN);
+      top = Math.min(top, viewportHeight - Math.min(bounds.height, available) - PALETTE_MARGIN);
+      top = Math.max(PALETTE_MARGIN, top);
+      const maxHeight = Math.max(0, viewportHeight - top - PALETTE_MARGIN);
+      element.style.maxHeight = `${Math.min(bounds.height, maxHeight)}px`;
+      element.style.overflowY = 'auto';
+      bounds = element.getBoundingClientRect();
+      top = Math.min(top, viewportHeight - Math.min(bounds.height, maxHeight) - PALETTE_MARGIN);
+    }
+    element.style.top = `${Math.max(PALETTE_MARGIN, top)}px`;
+  };
+
+  /** Removes an open palette without committing anything. */
+  const closePalette = () => {
+    if (palette === null) return;
+    const element = palette.element;
+    if (palette.anchor.getAttribute('aria-haspopup') !== null) palette.anchor.setAttribute('aria-expanded', 'false');
+    palette = null;
+    element.remove();
+  };
+
+  /**
+   * Dismisses an open palette on a press outside it. The document outlives the
+   * strip, so destroy() must take this back off.
+   * @param {*} event - A pointerdown anywhere in the document.
+   * @returns {void}
+   */
+  const dismissPalette = (event) => {
+    if (palette === null || palette.element.contains(event.target)) return;
+    closePalette();
+  };
+
+  /**
+   * Opens the palette with only the operators valid at this position.
+   * @param {Object} options - What the palette replaces.
+   * @param {'insert'|'replace'} options.kind - Insertion at a gap or replacement
+   *   of one chip.
+   * @param {number} options.index - The gap or chip chain index.
+   * @param {*} options.anchor - Element the palette sits after and under, and
+   *   the one Escape returns focus to.
+   * @returns {void}
+   */
+  const openPalette = ({ kind, index, anchor }) => {
+    closePalette();
+    const chain = store.chain();
+    /** @type {Map<string, SpanChoice>} */
+    const choices = new Map(kind === 'insert'
+      ? store.legalInsertions(index).filter((candidate) => candidate.legal)
+        .map((candidate) => [candidate.operator.id,
+          { start: index, deleteCount: 0, operators: [candidate.operator] }])
+      : socketChoices(index).map((choice) => [choiceKey(choice.operators), choice]));
+    const title = kind === 'insert'
+      ? `Insert at position ${index + 1}`
+      : `Replace ${opOf(chain[index]).name} · ${chain[index].label}`;
+
+    const element = el('div', 'chain-palette');
+    element.setAttribute('role', 'listbox');
+    element.setAttribute('aria-label', title);
+
+    /**
+     * @param {*} entry - The activated palette entry.
+     * @returns {void}
+     */
+    const activate = (entry) => {
+      const choice = choices.get(entry.dataset.operator);
+      if (choice === undefined) return;
+      const result = store.replaceSpan(choice.start, choice.deleteCount,
+        choiceEntries(choice));
+      if (!result.ok) {
+        report(result);
+        return;
+      }
+      palette = null;
+      const after = store.chain();
+      const focusLabel = choice.operators.length === 0
+        ? (after[index]?.label ?? after[index - 1]?.label ?? null)
+        : (after[choice.start]?.label ?? null);
+      if (kind === 'insert') store.setSelectedLabel(focusLabel);
+      commit(focusLabel);
+    };
+
+    /** @type {Array<*>} */
+    const options = [];
+    /**
+     * @param {*} option - A built palette entry.
+     * @returns {void}
+     */
+    const addOption = (option) => {
+      option.setAttribute('role', 'option');
+      option.setAttribute('tabindex', '-1');
+      option.setAttribute('aria-selected', 'false');
+      option.addEventListener('click', () => activate(option));
+      options.push(option);
+      element.appendChild(option);
+    };
+
+    /**
+     * Focuses one option, carrying the listbox's single selection with it.
+     * @param {*} option - The option to focus.
+     * @returns {void}
+     */
+    const focusOption = (option) => {
+      for (const other of options) {
+        other.setAttribute('aria-selected', String(other === option));
+      }
+      option.focus();
+    };
+
+    for (const [key, choice] of choices) {
+      const option = el('div', 'chain-palette-entry');
+      option.dataset.operator = key;
+      const name = el('span', 'chain-palette-name');
+      name.textContent = choice.operators.map((candidate) => candidate.name)
+        .join(' → ');
+      option.appendChild(name);
+      addOption(option);
+    }
+
+    element.addEventListener('keydown', (/** @type {*} */ event) => {
+      const key = event.key;
+      if (key === 'Escape') {
+        event.preventDefault();
+        closePalette();
+        anchor.focus();
+        return;
+      }
+      if (key === 'ArrowDown' || key === 'ArrowUp') {
+        event.preventDefault();
+        const target = event.target && typeof event.target.closest === 'function'
+          ? event.target.closest('.chain-palette-entry') : null;
+        const at = options.indexOf(target);
+        const next = options[at + (key === 'ArrowDown' ? 1 : -1)];
+        if (next) focusOption(next);
+        return;
+      }
+      if (key === 'Enter' || key === ' ') {
+        event.preventDefault();
+        const target = event.target && typeof event.target.closest === 'function'
+          ? event.target.closest('.chain-palette-entry') : null;
+        if (target) activate(target);
+      }
+    });
+
+    element.addEventListener('focusout', (/** @type {*} */ event) => {
+      if (palette?.element !== element) return;
+      const next = event.relatedTarget ?? null;
+      if (next !== null && element.contains(next)) return;
+      closePalette();
+    });
+
+    // After the anchor, so the palette reads in place; childNodes is walked by
+    // index because fake and real child lists share indexOf only through the
+    // array prototype.
+    const parent = anchor.parentNode;
+    const at = Array.prototype.indexOf.call(parent.childNodes, anchor);
+    parent.insertBefore(element, parent.childNodes[at + 1] ?? null);
+    placePalette(element, anchor);
+    palette = { element, anchor };
+    if (anchor.getAttribute('aria-haspopup') !== null) anchor.setAttribute('aria-expanded', 'true');
+    const first = options[0];
+    if (first) focusOption(first);
+  };
+
+  /**
+   * Moves keyboard focus to the chip at a chain index, updating the roving
+   * tabindex.
+   * @param {number} index - Target chain index.
+   * @returns {void}
+   */
+  const focusChip = (index) => {
+    const chip = chipAt(index);
+    if (!chip) return;
+    for (const other of container.querySelectorAll('.chain-chip')) {
+      other.setAttribute('tabindex', other === chip ? '0' : '-1');
+    }
+    focusedLabel = chip.dataset.label ?? null;
+    chip.focus();
+  };
+
+  /**
+   * @param {*} event - A chip's keydown.
+   * @param {number} index - The chip's chain index.
+   * @param {ChainEntry} entry - The chain entry.
+   * @param {boolean} crossing - Whether the operator crosses carriers.
+   * @param {*} chip - The chip element.
+   * @returns {void}
+   */
+  const chipKeydown = (event, index, entry, crossing, chip) => {
+    const inside = event.target !== chip;
+    if (inside) return;
+    const key = event.key;
+    if (key === 'ArrowRight' || key === 'ArrowLeft') {
+      event.preventDefault();
+      const forward = key === 'ArrowRight';
+      if (!event.altKey) {
+        focusChip(forward ? index + 1 : index - 1);
+        return;
+      }
+      // The same span the '←'/'→' move buttons disable themselves outside of: a
+      // crossing has no reorder, and a band edge has no neighbour to swap with.
+      if (crossing || !sharesBand(index, forward ? 1 : -1)) return;
+      moveChip(index, forward ? index + 2 : index - 1);
+      return;
+    }
+    if (key === 'Enter' || key === ' ') {
+      event.preventDefault();
+      select(entry.label);
+      return;
+    }
+    // The b key is a chip-level bypass shortcut alongside the tabbable
+    // header controls.
+    if ((key === 'b' || key === 'B')
+      && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault();
+      if (!crossing) toggleBypass(entry.label);
+      return;
+    }
+    if (key === 'Delete' || key === 'Backspace') {
+      event.preventDefault();
+      if (crossing) openPalette({ kind: 'replace', index, anchor: chip });
+      else removeChip(index);
+      return;
+    }
+    if (key === 'Insert') {
+      event.preventDefault();
+      openPalette({ kind: 'insert', index: index + 1, anchor: chip });
+    }
+  };
+
+  /**
+   * @param {string} parameterId - The deactivated parameter.
+   * @returns {string} The id its reason node is published under, for the row's
+   *   controls to describe themselves by.
+   */
+  const reasonId = (parameterId) => `chain-param-off-${encodeURIComponent(parameterId)}`;
+
+  /**
+   * Points a row's controls at its reason node, or takes the reference back.
+   * @param {*} row - The parameter row.
+   * @param {string|null} id - The reason node's id, or null to clear.
+   * @returns {void}
+   */
+  const describeControls = (row, id) => {
+    for (const selector of ['.chain-param-control', '.chain-param-value']) {
+      const control = row.querySelector(selector);
+      if (control === null) continue;
+      if (id === null) control.removeAttribute('aria-describedby');
+      else control.setAttribute('aria-describedby', id);
+    }
+  };
+
+  // Only the workbench page carries the stylesheet that reads this attribute.
+  /**
+   * Repaints the dimming of the expanded chip's deactivated controls and the
+   * reason beside them. The row is `display: contents`, so it generates no box
+   * for a tooltip to hang off: the reason is a node, reaching a pointer and
+   * assistive technology alike.
+   */
+  const markDeactivated = () => {
+    const off = deactivatedParameterIds(declarations, values, store.chain(), catalog);
+    for (const [id, row] of rows) {
+      const shown = row.querySelector('.chain-param-note');
+      if (off.has(id)) {
+        row.dataset.deactivated = 'true';
+        if (shown !== null) continue;
+        const note = el('span', 'chain-param-note');
+        note.setAttribute('id', reasonId(id));
+        note.textContent = DEACTIVATED_REASON;
+        row.appendChild(note);
+        describeControls(row, reasonId(id));
+      } else {
+        delete row.dataset.deactivated;
+        if (shown === null) continue;
+        row.removeChild(shown);
+        describeControls(row, null);
+      }
+    }
+  };
+
+  /**
+   * Takes one inline control edit: the document write is the caller's, and the
+   * strip keeps the value it now shows so a topology edit re-dims what the new
+   * selection deactivates.
+   * @param {string} parameterId - The edited parameter.
+   * @param {*} value - The document value.
+   * @returns {boolean}
+   */
+  const editParameter = (parameterId, value) => {
+    if (onEditParameter(parameterId, value) === false) {
+      render();
+      return false;
+    }
+    values[parameterId] = value;
+    markDeactivated();
+    return true;
+  };
+  /** @type {{parameterId: string, value: number}|null} */
+  let pendingSliderEdit = null;
+  const scheduleSliderEdit = createFrameScheduler(() => {
+    const edit = pendingSliderEdit;
+    pendingSliderEdit = null;
+    if (edit !== null) editParameter(edit.parameterId, edit.value);
+  });
+  const commitSliderEdit = () => {
+    scheduleSliderEdit.cancel();
+    const edit = pendingSliderEdit;
+    pendingSliderEdit = null;
+    if (edit !== null) editParameter(edit.parameterId, edit.value);
+  };
+
+  /**
+   * @param {ParameterDeclaration} declaration - An enum8 declaration.
+   * @returns {*} The dropdown of its domain values.
+   */
+  const enumControl = (declaration) => {
+    const select = el('select', 'chain-param-control');
+    for (const value of declaration.domain?.values ?? []) {
+      const option = el('option', 'chain-param-option');
+      option.value = value;
+      option.textContent = titleCase(value);
+      option.selected = value === values[declaration.id];
+      select.appendChild(option);
+    }
+    select.addEventListener('change', (/** @type {*} */ event) => {
+      editParameter(declaration.id, event.target.value);
+      store.endValueRun();
+      onCommitParameter();
+    });
+    return select;
+  };
+
+  /**
+   * @param {ParameterDeclaration} declaration - A binary32 declaration.
+   * @param {*} readout - The row's value readout, repainted as the slider moves.
+   * @returns {*} The slider over its domain.
+   */
+  const sliderControl = (declaration, readout) => {
+    const slider = el('input', 'chain-param-control');
+    const minimum = Number(declaration.domain?.minimum);
+    const maximum = Number(declaration.domain?.maximum);
+    slider.type = 'range';
+    slider.min = String(minimum);
+    slider.max = String(maximum);
+    // A range input re-snaps its value onto its step grid, so any grid at all
+    // rewrites the authored value the moment the control is touched. Arrow keys
+    // stay usable without one: a step-free range nudges by a hundredth of span.
+    slider.step = 'any';
+    slider.value = String(values[declaration.id]);
+    slider.addEventListener('input', (/** @type {*} */ event) => {
+      const value = Number(event.target.value);
+      readout.value = formatNumericValue(value);
+      pendingSliderEdit = { parameterId: declaration.id, value };
+      scheduleSliderEdit();
+    });
+    slider.addEventListener('change', () => {
+      commitSliderEdit();
+      store.endValueRun();
+      onCommitParameter();
+    });
+    return slider;
+  };
+
+  /**
+   * The instance label as an editable field. The label is canonical and
+   * digest-bearing — every parameter id namespaces under it — so a rename is a
+   * document edit through the store, and a refusal restores the field.
+   * @param {ChainEntry} entry - The expanded chain entry.
+   * @returns {*} The rename row.
+   */
+  const renameRow = (entry) => {
+    const row = el('div', 'chain-chip-rename-row');
+    const label = el('span', 'chain-param-name');
+    label.textContent = 'Name';
+    row.appendChild(label);
+    const field = el('input', 'chain-chip-rename');
+    field.type = 'text';
+    field.value = entry.label;
+    field.setAttribute('aria-label', `${opOf(entry).name} · ${entry.label} name`);
+    field.addEventListener('change', (/** @type {*} */ event) => {
+      const next = String(event.target.value ?? '').trim();
+      if (next === entry.label) return;
+      const result = store.relabel(entry.label, next);
+      if (!result.ok) {
+        field.value = entry.label;
+        report(result);
+        return;
+      }
+      commit(next);
+    });
+    row.appendChild(field);
+    return row;
+  };
+
+  /**
+   * The expanded chip's own controls, one row per parameter the document
+   * declares for the instance, labeled by the field segment alone: the chip
+   * already names the instance.
+   * @param {ChainEntry} entry - The expanded chain entry.
+   * @param {ParameterDeclaration[]} declared - The instance's declarations.
+   * @returns {*} The parameter region.
+   */
+  const paramsElement = (entry, declared) => {
+    const region = el('div', 'chain-chip-params');
+    region.dataset.label = entry.label;
+    region.setAttribute('role', 'group');
+    region.setAttribute('aria-label', `${opOf(entry).name} · ${entry.label} parameters`);
+    region.appendChild(renameRow(entry));
+    if (declared.length === 0) {
+      const note = el('p', 'chain-strip-note');
+      note.textContent = 'No adjustable parameters';
+      region.appendChild(note);
+    }
+    for (const declaration of declared) {
+      const name = titleCase(fieldOf(declaration.id));
+      const row = el('div', 'chain-param');
+      row.dataset.parameter = declaration.id;
+      const label = el('span', 'chain-param-name');
+      label.textContent = name;
+      row.appendChild(label);
+      if (declaration.storage === 'enum8') {
+        const select = enumControl(declaration);
+        select.setAttribute('aria-label', name);
+        row.appendChild(select);
+      } else {
+        const readout = el('input', 'chain-param-value');
+        readout.type = 'number';
+        readout.value = formatNumericValue(values[declaration.id]);
+        const slider = sliderControl(declaration, readout);
+        slider.setAttribute('aria-label', name);
+        readout.min = slider.min;
+        readout.max = slider.max;
+        // A step grid is based at the input's min, and a stored binary32 lands
+        // on it only by accident, so any grid at all reports the readout
+        // stepMismatch. Its arrow keys carry the increment instead.
+        readout.step = 'any';
+        readout.setAttribute('aria-label', `${name} value`);
+        /** @param {string} raw - The entered text. @returns {void} */
+        const enterValue = (raw) => {
+          // A number input reports content it cannot parse as the empty string,
+          // which Number() reads as a finite 0 rather than as no value.
+          const trimmed = raw.trim();
+          const typed = trimmed === '' ? Number.NaN : Number(trimmed);
+          const current = Number(values[declaration.id]);
+          const value = Number.isFinite(typed)
+            ? Math.min(Number(slider.max), Math.max(Number(slider.min), typed))
+            : current;
+          readout.value = formatNumericValue(value);
+          if (value === current) return;
+          slider.value = String(value);
+          editParameter(declaration.id, value);
+        };
+        readout.addEventListener('change', (/** @type {*} */ event) => {
+          enterValue(String(event.target.value ?? ''));
+          store.endValueRun();
+          onCommitParameter();
+        });
+        readout.addEventListener('keydown', (/** @type {*} */ event) => {
+          const direction = event.key === 'ArrowUp' ? 1
+            : event.key === 'ArrowDown' ? -1 : 0;
+          if (direction === 0) return;
+          event.preventDefault();
+          const shown = Number(readout.value);
+          const from = Number.isFinite(shown) ? shown : Number(values[declaration.id]);
+          enterValue(String(from + direction * nudgeStep(declaration)));
+          store.endValueRun();
+          onCommitParameter();
+        });
+        row.appendChild(slider);
+        row.appendChild(readout);
+      }
+      rows.set(declaration.id, row);
+      region.appendChild(row);
+    }
+    return region;
+  };
+
+  /**
+   * @param {number} index - The entry's chain index.
+   * @param {ChainEntry} entry - The chain entry.
+   * @param {Object} view - Render-pass state.
+   * @param {boolean} view.crossing - Whether the operator crosses carriers.
+   * @param {string|null} view.selected - The selected label.
+   * @param {Set<string>} view.bypassed - The bypassed labels.
+   * @param {string|null} view.tabLabel - The roving-tabindex label.
+   * @returns {*} The chip element.
+   */
+  const chipElement = (index, entry, {
+    crossing, selected, bypassed, tabLabel,
+  }) => {
+    const op = opOf(entry);
+    const isSelected = selected === entry.label;
+    const isBypassed = bypassed.has(entry.label);
+    const declared = declarations.filter(
+      (declaration) => declaration.id.startsWith(`${entry.label}.`));
+    const expanded = isSelected;
+    const chip = el('div', 'chain-chip'
+      + (crossing ? ' chain-chip--socket' : ' chain-chip--stage')
+      + (expanded ? ' chain-chip--expanded' : '')
+      + (isBypassed ? ' chain-chip--bypassed' : ''));
+    chip.dataset.label = entry.label;
+    chip.dataset.index = String(index);
+    // Not a listbox option: an option's children are presentational, which
+    // hides the chip's inline stage controls from assistive technology.
+    chip.setAttribute('role', 'group');
+    if (isSelected) chip.setAttribute('aria-current', 'true');
+    chip.setAttribute('aria-expanded', String(expanded));
+    chip.setAttribute('tabindex', tabLabel === entry.label ? '0' : '-1');
+    chip.setAttribute('aria-keyshortcuts',
+      'ArrowLeft ArrowRight Alt+ArrowLeft Alt+ArrowRight Enter Space b Delete Backspace Insert');
+    chip.setAttribute('aria-label', `${op.name} · ${entry.label}`
+      + (crossing ? `, ${op.input} to ${op.output}` : '')
+      + (isBypassed ? ', bypassed' : ''));
+    const header = el('div', 'chain-chip-header');
+
+    if (crossing) {
+      const functionLabel = el('label', 'chain-chip-function-label');
+      const socketFunction = SOCKET_FUNCTIONS[op.output] ?? {
+        name: titleCase(op.output),
+        accessibleName: `${titleCase(op.output)} function`,
+      };
+      functionLabel.textContent = `${socketFunction.name}: `;
+      const replacement = el('select', 'chain-chip-replace');
+      replacement.setAttribute('tabindex', '0');
+      replacement.setAttribute('aria-label', socketFunction.accessibleName);
+      const choices = new Map(socketChoices(index).map(
+        (choice) => [choiceKey(choice.operators), choice]));
+      for (const [key, choice] of choices) {
+        const option = el('option', 'chain-chip-replace-option');
+        option.value = key;
+        option.textContent = choice.operators.map((candidate) => candidate.name)
+          .join(' → ');
+        option.selected = key === entry.operator;
+        replacement.appendChild(option);
+      }
+      replacement.addEventListener('click', (/** @type {*} */ event) => {
+        event.stopPropagation();
+      });
+      replacement.addEventListener('change', (/** @type {*} */ event) => {
+        event.stopPropagation();
+        const choice = choices.get(event.target.value);
+        if (choice === undefined) return;
+        const result = store.replaceSpan(choice.start, choice.deleteCount,
+          choiceEntries(choice));
+        if (!result.ok) {
+          report(result);
+          return;
+        }
+        commit(store.chain()[choice.start]?.label ?? null);
+      });
+      functionLabel.appendChild(replacement);
+      header.appendChild(functionLabel);
+    } else {
+      const name = el('span', 'chain-chip-name');
+      name.textContent = op.name;
+      header.appendChild(name);
+      const toggle = el('button', 'chain-chip-bypass');
+      const bypassable = bypassAvailable();
+      toggle.type = 'button';
+      toggle.setAttribute('tabindex', '0');
+      toggle.setAttribute('aria-keyshortcuts', 'b');
+      toggle.disabled = !bypassable;
+      toggle.setAttribute('aria-pressed', String(isBypassed));
+      toggle.setAttribute('aria-label', `Bypass ${op.name} · ${entry.label}`);
+      toggle.setAttribute('title', bypassable ? 'Bypass' : BYPASS_UNAVAILABLE);
+      toggle.textContent = '◉';
+      toggle.addEventListener('click', (/** @type {*} */ event) => {
+        event.stopPropagation();
+        toggleBypass(entry.label);
+      });
+      header.appendChild(toggle);
+      const earlier = el('button', 'chain-chip-move');
+      earlier.type = 'button';
+      earlier.setAttribute('tabindex', '0');
+      earlier.setAttribute('aria-keyshortcuts', 'Alt+ArrowLeft');
+      earlier.textContent = '←';
+      earlier.disabled = !sharesBand(index, -1);
+      earlier.setAttribute('aria-label', `Move ${op.name} · ${entry.label} earlier`);
+      earlier.setAttribute('title', 'Move earlier');
+      earlier.addEventListener('click', (/** @type {*} */ event) => {
+        event.stopPropagation();
+        moveChip(index, index - 1);
+      });
+      const later = el('button', 'chain-chip-move');
+      later.type = 'button';
+      later.setAttribute('tabindex', '0');
+      later.setAttribute('aria-keyshortcuts', 'Alt+ArrowRight');
+      later.textContent = '→';
+      later.disabled = !sharesBand(index, 1);
+      later.setAttribute('aria-label', `Move ${op.name} · ${entry.label} later`);
+      later.setAttribute('title', 'Move later');
+      later.addEventListener('click', (/** @type {*} */ event) => {
+        event.stopPropagation();
+        moveChip(index, index + 2);
+      });
+      header.appendChild(earlier);
+      header.appendChild(later);
+      const remove = el('button', 'chain-chip-remove');
+      remove.type = 'button';
+      remove.setAttribute('tabindex', '0');
+      remove.setAttribute('aria-keyshortcuts', 'Delete Backspace');
+      remove.setAttribute('aria-label', `Remove ${op.name} · ${entry.label}`);
+      remove.setAttribute('title', 'Delete');
+      remove.textContent = '×';
+      remove.addEventListener('click', (/** @type {*} */ event) => {
+        event.stopPropagation();
+        removeChip(index);
+      });
+      header.appendChild(remove);
+    }
+
+    chip.appendChild(header);
+    chip.appendChild(paramsElement(entry, declared));
+
+    chip.addEventListener('click', (/** @type {*} */ event) => {
+      const clickedHeader = event.target === chip
+        || event.target?.closest?.('.chain-chip-header') === header;
+      if (clickedHeader) select(entry.label);
+    });
+    const setTransientOpen = (/** @type {boolean} */ open) => {
+      if (store.selectedLabel() === entry.label) return;
+      chip.classList.toggle('chain-chip--expanded', open);
+      chip.setAttribute('aria-expanded', String(open));
+      if (open) markDeactivated();
+    };
+    chip.addEventListener('mouseenter', () => setTransientOpen(true));
+    chip.addEventListener('mouseleave', () => setTransientOpen(false));
+    chip.addEventListener('focusin', () => {
+      if (!restoringFocus) setTransientOpen(true);
+    });
+    chip.addEventListener('focusout', (/** @type {*} */ event) => {
+      const next = event.relatedTarget ?? null;
+      if (next !== null && chip.contains(next)) return;
+      setTransientOpen(false);
+    });
+    chip.addEventListener('keydown',
+      (/** @type {*} */ event) => chipKeydown(event, index, entry, crossing, chip));
+    return chip;
+  };
+
+  /**
+   * @param {BandLayout} band - The band the button belongs to.
+   * @returns {*|null} The band's insertion affordance, when a stage fits.
+   */
+  const bandAddButton = (band) => {
+    const title = titleCase(band.carrier);
+    const gap = appendGap(band);
+    if (gap === null || !store.legalInsertions(gap).some((entry) => entry.legal))
+      return null;
+    const add = el('button', 'chain-band-add');
+    add.type = 'button';
+    add.setAttribute('aria-haspopup', 'listbox');
+    add.setAttribute('aria-expanded', 'false');
+    add.setAttribute('aria-label', `Add a ${title} stage`);
+    add.textContent = '+';
+    add.addEventListener('click',
+      () => openPalette({ kind: 'insert', index: gap, anchor: add }));
+    return add;
+  };
+
+  /** @param {*} viewport @param {number} direction */
+  const scrollPipeline = (viewport, direction) => {
+    const distance = Math.max(MIN_SCROLL_STEP,
+      Number(viewport.clientWidth ?? 0) * SCROLL_STEP_RATIO);
+    viewport.scrollLeft = Math.max(0,
+      Number(viewport.scrollLeft ?? 0) + direction * distance);
+  };
+
+  /** @param {*} viewport @param {number} direction @returns {*} */
+  const scrollButton = (viewport, direction) => {
+    const button = el('button', 'chain-scroll-button');
+    button.type = 'button';
+    button.setAttribute('aria-label', direction < 0
+      ? 'Scroll shader chain left' : 'Scroll shader chain right');
+    button.textContent = direction < 0 ? '‹' : '›';
+    button.addEventListener('click', () => scrollPipeline(viewport, direction));
+    return button;
+  };
+
+  /**
+   * Rebuilds the whole strip from the store. Keyboard focus is restored to the
+   * named chip (its bypass toggle when asked), or to the roving-tabindex chip
+   * when the strip held focus before the rebuild.
+   * @param {{focusLabel?: string|null, focusBypass?: boolean}} [options]
+   * @returns {void}
+   */
+  const render = ({ focusLabel = null, focusBypass = false } = {}) => {
+    const active = doc.activeElement ?? null;
+    const hadFocus = active !== null && container.contains(active);
+    const scrolled = Number(
+      container.querySelector('.chain-strip-viewport')?.scrollLeft ?? 0);
+    palette = null;
+    const layout = bandLayout();
+    rows.clear();
+
+    const snapshot = store.document();
+    declarations = store.parameterDeclarations();
+    const presets = snapshot.preset_bank.presets;
+    const preset = presets.find(
+      (/** @type {*} */ candidate) => candidate.preset_id === presetId()) ?? presets[0];
+    values = Object.fromEntries(declarations.map((parameter) =>
+      [parameter.id, parameter.default]));
+    Object.assign(values, preset?.values);
+
+    const chain = store.chain();
+    const selected = store.selectedLabel();
+    const bypassed = new Set(store.bypassedLabels());
+    const labels = chain.map((entry) => entry.label);
+    const tabLabel = focusLabel !== null && labels.includes(focusLabel) ? focusLabel
+      : focusedLabel !== null && labels.includes(focusedLabel) ? focusedLabel
+      : selected ?? labels[0] ?? null;
+
+    const actions = el('div', 'chain-strip-actions');
+    const undoButton = el('button', 'chain-undo');
+    undoButton.type = 'button';
+    undoButton.textContent = 'Undo';
+    undoButton.disabled = !store.canUndo();
+    undoButton.addEventListener('click', () => undo());
+    const redoButton = el('button', 'chain-redo');
+    redoButton.type = 'button';
+    redoButton.textContent = 'Redo';
+    redoButton.disabled = !store.canRedo();
+    redoButton.addEventListener('click', () => redo());
+    actions.appendChild(undoButton);
+    actions.appendChild(redoButton);
+    history = { undo: undoButton, redo: redoButton };
+    // The disabled toggles carry no reason of their own, and a title on a
+    // 1.125rem button is not one.
+    if (!bypassAvailable()) {
+      const note = el('p', 'chain-strip-note');
+      note.textContent = BYPASS_UNAVAILABLE;
+      actions.appendChild(note);
+    }
+
+    const strip = el('div', 'chain-strip');
+    strip.setAttribute('role', 'toolbar');
+    strip.setAttribute('aria-label', 'Shader chain');
+    strip.setAttribute('aria-orientation', 'horizontal');
+    const view = { selected, bypassed, tabLabel };
+    for (const band of layout) {
+      const title = titleCase(band.carrier);
+      const element = el('div', 'chain-band');
+      element.setAttribute('role', 'group');
+      element.setAttribute('aria-label', `${title} stages`);
+      element.dataset.carrier = band.carrier;
+      const heading = el('div', 'chain-band-title');
+      heading.setAttribute('aria-hidden', 'true');
+      heading.textContent = title;
+      element.appendChild(heading);
+      for (const chip of band.chips) {
+        element.appendChild(chipElement(chip, chain[chip],
+          { crossing: false, ...view }));
+      }
+      const add = bandAddButton(band);
+      if (add !== null) element.appendChild(add);
+      strip.appendChild(element);
+      if (band.socket !== null) {
+        strip.appendChild(chipElement(band.socket, chain[band.socket],
+          { crossing: true, ...view }));
+      }
+    }
+
+    const viewport = el('div', 'chain-strip-viewport');
+    viewport.setAttribute('tabindex', '0');
+    viewport.setAttribute('aria-label', 'Scrollable shader chain');
+    viewport.appendChild(strip);
+    viewport.addEventListener('wheel', (/** @type {*} */ event) => {
+      const delta = event.shiftKey ? event.deltaY : event.deltaX;
+      if (delta === 0) return;
+      const width = Number(viewport.clientWidth ?? 0);
+      const overflow = Number(viewport.scrollWidth ?? 0) - width;
+      // Nothing to scroll: the wheel belongs to whatever encloses the strip.
+      if (overflow <= 0) return;
+      // deltaMode counts pixels, lines or pages; a line-mode browser sends 3
+      // where a pixel-mode one sends 100.
+      const scale = event.deltaMode === 1 ? WHEEL_LINE_PX
+        : event.deltaMode === 2 ? Math.max(MIN_SCROLL_STEP, width) : 1;
+      viewport.scrollLeft = Math.min(overflow,
+        Math.max(0, Number(viewport.scrollLeft ?? 0) + delta * scale));
+      event.preventDefault();
+    }, { passive: false });
+    viewport.addEventListener('keydown', (/** @type {*} */ event) => {
+      if (event.target !== viewport
+        || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
+      event.preventDefault();
+      scrollPipeline(viewport, event.key === 'ArrowLeft' ? -1 : 1);
+    });
+
+    container.replaceChildren(actions, scrollButton(viewport, -1), viewport,
+      scrollButton(viewport, 1));
+    // The strip is rebuilt whole after every committed edit; the horizontal
+    // offset is view state, not document state, so it outlives the rebuild.
+    if (scrolled > 0) viewport.scrollLeft = scrolled;
+    markDeactivated();
+
+    const target = focusLabel !== null ? chipByLabel(focusLabel) : null;
+    restoringFocus = true;
+    try {
+      if (target) {
+        focusedLabel = focusLabel;
+        if (focusBypass) {
+          const toggle = target.querySelector('.chain-chip-bypass');
+          (toggle ?? target).focus();
+        } else {
+          target.focus();
+        }
+      } else if (hadFocus || focusLabel !== null) {
+        const fallback = tabLabel !== null ? chipByLabel(tabLabel) : null;
+        if (fallback) {
+          focusedLabel = tabLabel;
+          fallback.focus();
+        }
+      }
+    } finally {
+      restoringFocus = false;
+    }
+  };
+
+  /**
+   * The container's history shortcut. The container outlives the strip, so
+   * destroy() must take it back off.
+   * @param {*} event - A keydown anywhere in the strip.
+   * @returns {void}
+   */
+  const historyKeydown = (event) => {
+    const target = event.target;
+    if (target?.isContentEditable ||
+        ['INPUT', 'SELECT', 'TEXTAREA'].includes(target?.tagName)) return;
+    if (!(event.ctrlKey || event.metaKey)) return;
+    const key = typeof event.key === 'string' ? event.key.toLowerCase() : '';
+    if (key === 'z' && !event.shiftKey) {
+      event.preventDefault();
+      undo();
+    } else if (key === 'y' || (key === 'z' && event.shiftKey)) {
+      event.preventDefault();
+      redo();
+    }
+  };
+  // After the first render: a strip that throws before it returns hands the
+  // caller no destroy(), so listeners bound ahead of it would outlive it on the
+  // container the next successful load renders into.
+  render();
+  container.addEventListener('keydown', historyKeydown);
+  doc.addEventListener('pointerdown', dismissPalette);
+
+  return {
+    render,
+
+    /**
+     * Repaints the Undo/Redo buttons a value edit moved, which a rebuild would
+     * do too — but a rebuild during a slider drag would replace the control
+     * under the pointer.
+     * @returns {void}
+     */
+    syncHistory() {
+      if (history === null) return;
+      history.undo.disabled = !store.canUndo();
+      history.redo.disabled = !store.canRedo();
+    },
+
+    flushParameterEdit: commitSliderEdit,
+
+    /**
+     * Detaches the strip's listeners and empties its container. Every other
+     * listener sits on an element the strip built inside the container, so
+     * emptying it drops them.
+     * @returns {void}
+     */
+    destroy() {
+      scheduleSliderEdit.cancel();
+      pendingSliderEdit = null;
+      container.removeEventListener('keydown', historyKeydown);
+      doc.removeEventListener('pointerdown', dismissPalette);
+      container.replaceChildren();
+    },
+  };
+}
