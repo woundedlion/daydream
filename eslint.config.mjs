@@ -16,7 +16,7 @@ export default [
   {
     ignores: [
       'holosphere_wasm.js', 'vendor/**', 'three.js/**', 'engine/**',
-      '.worktrees/**', 'engine-bundle/**',
+      '.worktrees/**', 'engine-bundle/**', '.hs-tmp-*/**', '.claude/**', 'prompts/**',
     ],
   },
   js.configs.recommended,

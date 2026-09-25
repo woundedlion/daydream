@@ -13,20 +13,24 @@ export class EffectPanelEdits {
   activeKeyEdits = new Set();
   pending = null;
 
+  /** @param {EventTarget} dragTarget @param {(edited: *) => void} persist */
   constructor(dragTarget, persist) {
     this.dragTarget = dragTarget;
     this.write = persist;
   }
 
+  /** @returns {boolean} Whether a pointer or keyboard edit is held. */
   get active() {
     return this.activeDragEnds.size > 0 || this.activeKeyEdits.size > 0;
   }
 
+  /** @param {*} controller @param {*} edited */
   persist(controller, edited) {
     if (controller.dragging) this.pending = edited;
     else this.write(edited);
   }
 
+  /** Write the pending edit once. */
   flush() {
     const edited = this.pending;
     this.pending = null;
@@ -51,6 +55,7 @@ export class EffectPanelEdits {
     });
   }
 
+  /** @param {*} controller - The control whose keyboard gesture is observed. */
   trackKeyboard(controller) {
     const widget = focusWidget(controller);
     if (!widget) return;
@@ -64,6 +69,7 @@ export class EffectPanelEdits {
     widget.addEventListener('blur', end);
   }
 
+  /** Remove drag listeners and flush any held URL write. */
   dispose() {
     for (const end of this.activeDragEnds) {
       for (const type of DRAG_END_EVENTS) this.dragTarget.removeEventListener(type, end);

@@ -24,7 +24,10 @@ export function focusWidget(controller) {
     ?? controller?.$button ?? null;
 }
 
-/** Panel mounting and view state across synchronous rebuilds. */
+/**
+ * Panel mounting and view state across synchronous rebuilds.
+ * @param {{focusedElement: () => *, guiContainer: *, isMobile: () => boolean}} dependencies
+ */
 export function createEffectPanelView({ focusedElement, guiContainer, isMobile }) {
   let mountClosedOverride;
   /** Return the element that owns a GUI panel's vertical scroll offset. */

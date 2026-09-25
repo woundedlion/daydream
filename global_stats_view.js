@@ -35,6 +35,7 @@ export class GlobalStatsView {
     this.missLogged = false;
   }
 
+  /** Mark every stats cell unavailable. @returns {void} */
   clear() {
     for (const row of Object.values(this.resolveCells())) {
       for (const cell of row) if (cell) cell.textContent = 'Unavailable';

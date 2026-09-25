@@ -1132,7 +1132,7 @@ export function createEffectGui({ engine, segments, config, host }) {
         showConfigImportNotice('Effect controls could not be built.');
         return;
       }
-      persistence.persist(activeEffect.gui);
+      persistence.persist(activeEffect.gui, undefined, true);
       rebuildFailureGeneration = undefined;
       skewLogged = false;
     },
