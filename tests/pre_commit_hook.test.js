@@ -87,12 +87,19 @@ test('pre-commit checks the staged tree', { skip: SKIP }, async (t) => {
     const bin = join(root, 'node_modules', '.bin');
     mkdirSync(bin, { recursive: true });
     const eslint = join(bin, 'eslint');
-    writeFileSync(eslint, '#!/bin/sh\ngrep -q BAD && exit 1\nexit 0\n');
+    writeFileSync(eslint, '#!/bin/sh\nif grep -q BAD; then echo staged-eslint-failed >&2; exit 1; fi\nexit 0\n');
     chmodSync(eslint, 0o755);
 
     writeFileSync(join(root, 'app.js'), 'BAD\n');
     git('add', 'app.js');
     writeFileSync(join(root, 'app.js'), 'GOOD working tree\n');
-    assert.notEqual(runHook().status, 0);
+    const rejected = runHook();
+    assert.notEqual(rejected.status, 0);
+    assert.match(rejected.stdout + rejected.stderr, /staged-eslint-failed/);
+    git('add', 'app.js');
+    writeFileSync(join(root, 'app.js'), 'BAD working tree\n');
+    const accepted = runHook();
+    assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
+    assert.doesNotMatch(accepted.stdout + accepted.stderr, /staged-eslint-failed/);
   });
 });
