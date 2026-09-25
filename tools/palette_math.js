@@ -531,21 +531,18 @@ export function waveGraphBand(height) {
 }
 
 /**
- * Emit the C++ initializer the engine actually consumes —
- * `ProceduralPalette name({r,g,b}f, ...)` — not bare JS arrays. Brace-init
- * each vec3 with `f`-suffixed floats so the output pastes straight into
- * palettes.h beside the named instances, matching the generative tab.
+ * Emit a row for HS_PROCEDURAL_PALETTE_LIST in palettes.h.
  * @param {ProceduralParams} parameters - The 12 cosine-formula coefficients (A/B/C/D per R/G/B channel).
- * @returns {string} The C++ ProceduralPalette initializer source.
+ * @returns {string} The C++ palette-list row with a placeholder name.
  */
 export function proceduralPaletteCpp(parameters) {
   const f = (/** @type {number} */ n) => formatFloatCpp(n, 6);
   const v = (/** @type {number} */ r, /** @type {number} */ g, /** @type {number} */ b) =>
-    `{${f(r)}, ${f(g)}, ${f(b)}}`;
-  return `ProceduralPalette palette(${v(parameters.A_R, parameters.A_G, parameters.A_B)},  // A
-                          ${v(parameters.B_R, parameters.B_G, parameters.B_B)},  // B
-                          ${v(parameters.C_R, parameters.C_G, parameters.C_B)},  // C
-                          ${v(parameters.D_R, parameters.D_G, parameters.D_B)}); // D`;
+    `(${f(r)}, ${f(g)}, ${f(b)})`;
+  return `X(MY_PALETTE, ${v(parameters.A_R, parameters.A_G, parameters.A_B)}, ` +
+    `${v(parameters.B_R, parameters.B_G, parameters.B_B)}, ` +
+    `${v(parameters.C_R, parameters.C_G, parameters.C_B)}, ` +
+    `${v(parameters.D_R, parameters.D_G, parameters.D_B)}) \\`;
 }
 
 /**

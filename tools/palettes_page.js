@@ -62,6 +62,8 @@ let activeTab = 'procedural';
 
 function switchTab(tabName, updateUrl = true) {
   activeTab = tabName;
+  document.getElementById('export_code_kind').textContent = tabName === 'procedural'
+    ? 'Row for HS_PROCEDURAL_PALETTE_LIST in palettes.h' : 'Recipe builder body';
   document.querySelector('.palette-shell').dataset.activeTab = tabName;
   document.querySelectorAll('.tab-btn').forEach(btn => {
     const selected = btn.dataset.tab === tabName;
