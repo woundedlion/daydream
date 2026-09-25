@@ -1475,7 +1475,7 @@ test('sync adopts programmatic changes to an ordinary parameter', () => {
   assert.equal(h.gui().ctrl('Speed').getValue(), 0.9);
 });
 
-test('a Lens dropdown keeps requested state ahead of the renderer', () => {
+test('a segmented Lens dropdown follows the renderer', () => {
   const lens = {
     name: 'Lens', value: 3, requestedValue: 0, acceptedValue: 0,
     options: ['None', 'Glitch', 'Twist', 'Kaleidoscope', 'Mobius', 'Tangent Noise'],
@@ -1491,7 +1491,7 @@ test('a Lens dropdown keeps requested state ahead of the renderer', () => {
 
   h.panel.sync();
 
-  assert.equal(controller.getValue(), 0);
+  assert.equal(controller.getValue(), 3);
 });
 
 test('sync reads the worker pool once it owns the display', () => {
@@ -1973,7 +1973,7 @@ test('requested selectors and rendered numeric values stay authoritative', () =>
   h.state.presetIndex = 2;
   h.state.segmentValues = [4, 0, 0.55];
   h.panel.sync();
-  assert.equal(h.gui().ctrl('Function').getValue(), 6);
+  assert.equal(h.gui().ctrl('Function').getValue(), 4);
   assert.equal(h.gui().ctrl('Speed').getValue(), 0.55);
 
   h.state.segmentValues = [6, 0, 0.9];
@@ -2283,7 +2283,7 @@ test('natural worker preset advancement keeps live transition values', () => {
   h.panel.sync();
 
   assert.equal(oldGui.destroyed, 1);
-  assert.equal(h.gui().ctrl('Function').getValue(), 6);
+  assert.equal(h.gui().ctrl('Function').getValue(), 4);
   assert.equal(h.gui().ctrl('Speed').getValue(), 0.1);
   assert.equal(h.gui().ctrl('presetIndex').getValue(), 2);
   assert.equal(h.gui().ctrl('pause').getValue(), false);
@@ -3120,4 +3120,18 @@ test('externally rendered stage parameters build no stage folders', () => {
   h.panel.build();
   assert.equal(h.panel.active().stageFolders.size, 0);
   assert.deepEqual(h.panel.active().paramNames, params.map((parameter) => parameter.name));
+});
+
+test('segmented enums follow the lagging pool values', () => {
+  const h = makeHarness({
+    params: [{ name: 'Mode', value: 0, requestedValue: 2,
+      options: ['A', 'B', 'C'], animated: true }],
+    engineValues: [2], segmentValues: [0], ownsDisplay: true,
+  });
+  h.panel.build();
+  h.panel.sync();
+  assert.equal(h.gui().ctrl('Mode').getValue(), 0);
+  h.state.segmentValues = [1.6];
+  h.panel.sync();
+  assert.equal(h.gui().ctrl('Mode').getValue(), 2);
 });
