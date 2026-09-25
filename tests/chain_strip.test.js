@@ -48,7 +48,7 @@ restoreDocumentAfterEach();
  * @returns {Promise<Object>} The harness.
  */
 async function makeStrip({
-  presetId = null, bypassAvailable = () => true, writeThrough = false,
+  presetId = null, bypassAvailable = () => true, writeThrough = false, parameterLive = () => true,
   source = structuredClone(BASE.document),
 } = {}) {
   const store = await createChainDocumentStore({
@@ -81,7 +81,7 @@ async function makeStrip({
       assert.equal(store.setPresetValue(target, parameterId, value).ok, true);
     },
     onCommitParameter: () => commits.push(edits.length),
-    bypassAvailable,
+    bypassAvailable, parameterLive,
   });
   return {
     store, container, doc, strip, applied, selections, announced, edits, commits,
@@ -1416,4 +1416,15 @@ test('every catalog operator exposes its full schema in a declaration-free stage
     assert.equal(h.store.canUndo(), false);
     h.strip.destroy();
   }
+});
+
+test('parameters baked into the active build cannot commit edits', async () => {
+  const h = await makeStrip({ parameterLive: (id) => id !== 'sample.coverage-mode' });
+  const row = rowFor(h, 'sample', 'sample.coverage-mode');
+  const select = controlIn(row);
+  assert.equal(select.disabled, true);
+  assert.match(row.querySelector('.chain-param-note').textContent, /baked into the compiled build/);
+  select.dispatch('change', { target: { value: 'hard' } });
+  assert.deepEqual(h.edits, []);
+  assert.equal(controlIn(rowFor(h, 'sample', 'sample.pattern-freq')).disabled, false);
 });
