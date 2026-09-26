@@ -47,7 +47,10 @@ test('the app doubles preserve controller and instance attribute contracts', () 
   assert.deepEqual(changes, [[2, 2]]);
   assert.equal(control.getValue(), 2);
 
-  const attribute = fakeDriver().dotMesh.instanceColor;
+  const driver = fakeDriver();
+  assert.equal(driver.dotMesh, null);
+  driver.updateResolution(2, 1, 1);
+  const attribute = driver.dotMesh.instanceColor;
   attribute.array = new Uint16Array(6);
   attribute.needsUpdate = true;
   assert.equal(attribute.version, 1);
@@ -1031,6 +1034,7 @@ test('global cap edits survive module loading, paused redraw and effect switches
   const app = startApp({ loadModule: () => loading });
   app.guis[0].controllers.find((c) => c.property === 'topCap').setValue(2);
   app.guis[0].controllers.find((c) => c.property === 'bottomCap').setValue(3);
+  assert.equal(app.driver.dotMesh, null);
   const module = fakeWasmModule();
   module.FullConfigRestoreResult = FullConfigRestoreResult;
   module.HolosphereEngine.prototype.getFullConfigSnapshot = () => null;
@@ -1038,6 +1042,9 @@ test('global cap edits survive module loading, paused redraw and effect switches
   resolve(module);
   await app.teardown.ready;
   assert.deepEqual(module.caps, [[2, 3]]);
+  assert.equal(app.teardown.disposed(), false);
+  app.driver.renderer.frame();
+  assert.ok(app.driver.dotMesh.instanceColor.array.length > 0);
   assert.equal(app.driver.DISPLAY_NORTH_PHI, 0.02 * Math.PI);
   app.driver.paused = true;
   let draws = 0;
