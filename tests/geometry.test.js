@@ -2,16 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 
-/**
- * Builds the sphere-resolution stand-in pixelToSpherical takes in place of the
- * Daydream driver, keeping the tests free of the browser graph. A fresh object
- * per call so no test observes another's H_OFFSET.
- * @param {number} [hOffset=0] - Virtual rows past the panel (the device uses 3).
- * @returns {{W:number, H:number, H_OFFSET:number}} The driver stand-in.
- */
-const makeDaydream = (hOffset = 0) => ({ W: 288, H: 144, H_OFFSET: hOffset });
+const makeDaydream = (north = 0, south = Math.PI) => ({
+  W: 288, H: 144, DISPLAY_NORTH_PHI: north, DISPLAY_SOUTH_PHI: south,
+});
 
-const { pixelToSpherical } = await import('../src/renderer/geometry.js');
+const { pixelToSpherical, displayGeometryFromModule } = await import('../src/renderer/geometry.js');
 
 const W = 288, H = 144;
 
@@ -48,21 +43,32 @@ test('pixelToSpherical matches the engine convention (theta from +X)', () => {
   }
 });
 
-/**
- * Verifies a non-zero H_OFFSET maps phi over `H + H_OFFSET` virtual rows, so the
- * sim can preview the device's row->latitude mapping (device H_OFFSET == 3).
- */
-test('H_OFFSET widens the latitude denominator to H + H_OFFSET - 1', () => {
-  const phi = pixelToSpherical(0, 50, makeDaydream(3)).phi;
-  assert.ok(Math.abs(phi - (50 * Math.PI) / (H + 3 - 1)) < 1e-12,
-    `phi should use H + H_OFFSET - 1, got ${phi}`);
+test('physical endpoints preserve distinct longitudes on both edge rings', () => {
+  const dims = makeDaydream(0.04, Math.PI - 0.07);
+  for (const y of [0, H - 1]) {
+    const a = new THREE.Vector3().setFromSpherical(pixelToSpherical(0, y, dims));
+    const b = new THREE.Vector3().setFromSpherical(pixelToSpherical(W / 2, y, dims));
+    assert.ok(a.distanceTo(b) > 0.07);
+  }
+  assert.equal(pixelToSpherical(0, 0, dims).phi, 0.04);
+  assert.ok(Math.abs(pixelToSpherical(0, H - 1, dims).phi - (Math.PI - 0.07)) < 1e-12);
+});
+
+test('compiled geometry is validated and preserves asymmetric caps', () => {
+  const module = { DISPLAY_PROFILE: 1, DISPLAY_NORTH_PHI: 0.02, DISPLAY_SOUTH_PHI: 3.1 };
+  assert.deepEqual(displayGeometryFromModule(module), module);
+  for (const invalid of [{}, { ...module, DISPLAY_PROFILE: 7 },
+    { ...module, DISPLAY_NORTH_PHI: NaN }, { ...module, DISPLAY_SOUTH_PHI: 4 },
+    { ...module, DISPLAY_NORTH_PHI: 3.11 }]) {
+    assert.throws(() => displayGeometryFromModule(invalid), /display geometry/);
+  }
 });
 
 // A zero column count and a single row are what a driver reports before it has
 // been sized. The guarded arithmetic itself is unpinned: a future dimension
 // guard is free to answer any latitude, so long as it answers a point.
 test('degenerate dimensions keep spherical coordinates finite', () => {
-  const spherical = pixelToSpherical(2, 1, { W: 0, H: 1 });
+  const spherical = pixelToSpherical(2, 1, { ...makeDaydream(), W: 0, H: 1 });
   assert.ok(Number.isFinite(spherical.phi), `phi is ${spherical.phi}`);
   assert.ok(Number.isFinite(spherical.theta), `theta is ${spherical.theta}`);
   assert.equal(spherical.radius, 1, 'the point stays on the unit sphere');
@@ -90,5 +96,15 @@ test('pixelToSpherical hits independent golden vectors', () => {
     assert.ok(
       Math.abs(v.x - g[0]) < 1e-9 && Math.abs(v.y - g[1]) < 1e-9 && Math.abs(v.z - g[2]) < 1e-9,
       `pixel (${x},${y}) -> (${v.x},${v.y},${v.z}); golden (${g})`);
+  }
+});
+
+test('physical profile leaves two percent of the arc empty at each pole', () => {
+  const dims = makeDaydream(0.02 * Math.PI, 0.98 * Math.PI);
+  assert.ok(Math.abs(pixelToSpherical(0, 0, dims).phi / Math.PI - 0.02) < 1e-12);
+  assert.ok(Math.abs(pixelToSpherical(0, H - 1, dims).phi / Math.PI - 0.98) < 1e-12);
+  for (let y = 0; y < H; y++) {
+    assert.ok(Math.abs(pixelToSpherical(0, y, dims).phi
+      + pixelToSpherical(0, H - 1 - y, dims).phi - Math.PI) < 1e-12);
   }
 });

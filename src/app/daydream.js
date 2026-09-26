@@ -4,6 +4,7 @@
  */
 
 
+import { displayGeometryFromModule } from "../renderer/geometry.js";
 import createHolosphereModule from "../../generated/holosphere_wasm.js";
 import { Daydream, MOBILE_BREAKPOINT_PX } from "../renderer/driver.js";
 import { GUI, resetGUI } from "../ui/gui.js";
@@ -316,6 +317,7 @@ export function start({
     teardown: () => appTeardown,
     start: (module) => {
       host.module = module;
+      Object.assign(daydream, displayGeometryFromModule(module));
       if (module.HolosphereEngine.isLive())
         throw new Error('HolosphereEngine is already live.');
       host.engine = new module.HolosphereEngine();

@@ -1195,7 +1195,8 @@ function matricesCtx(w, h) {
   return {
     W: w,
     H: h,
-    H_OFFSET: Daydream.H_OFFSET,
+    DISPLAY_NORTH_PHI: 0,
+    DISPLAY_SOUTH_PHI: Math.PI,
     pixels: null,
     matrixCache: new Map(),
     dotMesh: {
@@ -1402,7 +1403,8 @@ test('precomputeMatrices reuses a grid it has already composed', () => {
 test('updateResolution rebuilds the mesh and buffer at the new grid', () => {
   const log = [];
   const ctx = setupCtx(fakeMesh(log), log);
-  ctx.H_OFFSET = Daydream.H_OFFSET;
+  ctx.DISPLAY_NORTH_PHI = 0;
+  ctx.DISPLAY_SOUTH_PHI = Math.PI;
   ctx.setupDots = Daydream.prototype.setupDots;
   ctx.precomputeMatrices = Daydream.prototype.precomputeMatrices;
   ctx.invalidate = Daydream.prototype.invalidate;
@@ -1820,4 +1822,17 @@ test('dot shader injection uses the current Three chunk and refuses a missing on
   assert.match(shader.vertexShader, /instanceColor/);
   assert.throws(() => ctx.dotMaterial.onBeforeCompile({ uniforms: {}, vertexShader: 'void main() {}' }),
     /missing the begin_vertex chunk/);
+});
+
+test('changing latitude endpoints rebuilds cached LED placement', () => {
+  const ctx = matricesCtx(8, 5);
+  Daydream.prototype.precomputeMatrices.call(ctx);
+  const pole = dotAt(ctx, 0).clone();
+  ctx.DISPLAY_NORTH_PHI = 0.02 * Math.PI;
+  ctx.DISPLAY_SOUTH_PHI = 0.98 * Math.PI;
+  Daydream.prototype.precomputeMatrices.call(ctx);
+  assert.equal(ctx.matrixCache.size, 2);
+  assert.ok(dotAt(ctx, 0).distanceTo(pole) > 1);
+  assert.ok(dotAt(ctx, 0).distanceTo(dotAt(ctx, 4)) > 3);
+  assert.ok(dotAt(ctx, 32).distanceTo(dotAt(ctx, 36)) > 3);
 });
