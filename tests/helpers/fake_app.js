@@ -250,7 +250,7 @@ export function fakeDriver() {
     columnFillOverlap: 1,
     recorder: null,
     pixels: null,
-    dotMesh: { instanceColor: fakeColorAttribute(null) },
+    dotMesh: null,
     renderer: { setAnimationLoop(frame) { this.frame = frame; } },
     startFrameLoop(frame) { this.renderer.setAnimationLoop(frame); },
     keys: [],
@@ -263,7 +263,7 @@ export function fakeDriver() {
     setDisplayGeometry(geometry) { Object.assign(this, geometry); },
     updateResolution(w, h, dotSize) {
       this.resolution = [w, h, dotSize];
-      this.dotMesh.instanceColor = fakeColorAttribute(null);
+      this.dotMesh = { instanceColor: fakeColorAttribute(null) };
     },
     render(adapter) {
       this.frames += 1;

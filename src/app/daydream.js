@@ -619,9 +619,9 @@ export function start({
     onChange: (geometry) => {
       daydream.setDisplayGeometry(geometry);
       host.invalidateView();
-      host.refresh();
       segments.setDisplayCaps(displayCaps.state.topCap, displayCaps.state.bottomCap);
       if (host.adapter) {
+        host.refresh();
         host.adapter.drawFrame();
         effectGui.sync(true);
         if (daydream.dotMesh?.instanceColor) daydream.dotMesh.instanceColor.needsUpdate = true;
