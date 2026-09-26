@@ -4,7 +4,7 @@
  */
 
 
-import { displayGeometryFromModule } from "../renderer/geometry.js";
+import { createDisplayCapsBinding } from "../renderer/display_caps.js";
 import createHolosphereModule from "../../generated/holosphere_wasm.js";
 import { Daydream, MOBILE_BREAKPOINT_PX } from "../renderer/driver.js";
 import { GUI, resetGUI } from "../ui/gui.js";
@@ -317,7 +317,6 @@ export function start({
     teardown: () => appTeardown,
     start: (module) => {
       host.module = module;
-      Object.assign(daydream, displayGeometryFromModule(module));
       if (module.HolosphereEngine.isLive())
         throw new Error('HolosphereEngine is already live.');
       host.engine = new module.HolosphereEngine();
@@ -325,6 +324,7 @@ export function start({
       // Push the Pole LOD value the GUI settled on during the async WASM-load
       // window; its onChange no-op'd while host.engine was null.
       poleLod.replay();
+      if (!displayCaps.replay()) throw new Error('Engine rejected display cap settings.');
 
       if (!syncResolutionOptions(module)) return;
 
@@ -613,6 +613,30 @@ export function start({
   // value so a pool spawned later inherits it.
   guiInstance.add(poleLod.state, 'poleLod', 0, 2, 0.05).name('Pole LOD')
     .onChange((v) => { poleLod.apply(v); segments.setPoleLod(v); });
+
+  const displayCaps = createDisplayCapsBinding({
+    getEngine: () => host.engine,
+    onChange: (geometry) => {
+      daydream.setDisplayGeometry(geometry);
+      host.invalidateView();
+      host.refresh();
+      segments.setDisplayCaps(displayCaps.state.topCap, displayCaps.state.bottomCap);
+      if (host.adapter) {
+        host.adapter.drawFrame();
+        effectGui.sync(true);
+        if (daydream.dotMesh?.instanceColor) daydream.dotMesh.instanceColor.needsUpdate = true;
+      }
+      daydream.invalidate();
+    },
+  });
+  const applyDisplayCaps = () => {
+    if (!displayCaps.apply()) throw new Error('Engine rejected display cap settings.');
+    if (!host.engine) segments.setDisplayCaps(displayCaps.state.topCap, displayCaps.state.bottomCap);
+  };
+  guiInstance.add(displayCaps.state, 'topCap', 0, 25, 0.1).name('Top cap (%)')
+    .onChange(applyDisplayCaps);
+  guiInstance.add(displayCaps.state, 'bottomCap', 0, 25, 0.1).name('Bottom cap (%)')
+    .onChange(applyDisplayCaps);
 
   // Not on the workbench page: its effects are programmed through
   // setShaderChain and no worker message carries that program, so a pool would

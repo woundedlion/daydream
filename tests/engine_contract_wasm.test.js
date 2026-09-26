@@ -45,6 +45,7 @@ const W = 96, H = 20;
 assert.equal(M.HolosphereEngine.isLive(), false);
 const engine = new M.HolosphereEngine();
 assert.equal(M.HolosphereEngine.isLive(), true);
+const initialDisplayAngles = [engine.getDisplayNorthPhi(), engine.getDisplaySouthPhi()];
 
 // Both non-rejections leave the requested size active; only RESIZED tears the
 // effect down. The shared engine makes either possible at most call sites.
@@ -1708,4 +1709,72 @@ test('simulator consumes the WASM display geometry', async () => {
   const dims = { W: 288, H: 144, ...displayGeometryFromModule(M) };
   assert.equal(pixelToSpherical(0, 0, dims).phi, M.DISPLAY_NORTH_PHI);
   assert.ok(Math.abs(pixelToSpherical(0, 143, dims).phi - M.DISPLAY_SOUTH_PHI) < 1e-12);
+});
+
+test('display caps default to full coverage and validate requests without rebuilding', () => {
+  assert.equal(initialDisplayAngles[0], 0);
+  assert.ok(Math.abs(initialDisplayAngles[1] - Math.PI) < 1e-6);
+  assert.equal(engine.setDisplayCaps(0, 0), true);
+  const generation = engine.getParamGeneration();
+  for (const caps of [[0, 0], [-1, 0], [0, 25.1], [NaN, 0], [0, Infinity]]) {
+    assert.equal(engine.setDisplayCaps(...caps), caps[0] === 0 && caps[1] === 0);
+    assert.equal(engine.getParamGeneration(), generation);
+    assert.equal(engine.getDisplayNorthPhi(), 0);
+    assert.ok(Math.abs(engine.getDisplaySouthPhi() - Math.PI) < 1e-6);
+  }
+});
+
+test('display caps preserve tuning, pause, clipping and resolution-independent placement', () => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)));
+  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED);
+  assert.equal(engine.setParameter('Alpha', 0.65), M.ParamSetResult.APPLIED);
+  engine.setAnimationsPaused(true);
+  assert.equal(engine.setClip(0, W / 2, 0, H), M.ClipSetResult.APPLIED);
+  const definitions = engine.getParameterDefinitions();
+  const generation = engine.getParamGeneration();
+  try {
+    assert.equal(engine.setDisplayCaps(2, 3), true);
+    assert.notEqual(engine.getParamGeneration(), generation);
+    assert.deepEqual(engine.getParameterDefinitions(), definitions);
+    assert.equal(engine.getAnimationsPaused(), true);
+    assert.ok(Math.abs(engine.getDisplayNorthPhi() - Math.PI * 0.02) < 1e-6);
+    assert.ok(Math.abs(engine.getDisplaySouthPhi() - Math.PI * 0.97) < 1e-6);
+    engine.getPixels().fill(0);
+    engine.drawFrame();
+    const pixels = engine.getPixels();
+    for (let y = 0; y < H; y++) {
+      assert.ok(pixels.subarray((y * W + W / 2) * 3, (y + 1) * W * 3).every((v) => v === 0));
+    }
+    assert.ok(pixels.some((v) => v !== 0));
+    assert.ok(resolutionOk(engine.setResolution(288, 144)));
+    assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED);
+    assert.ok(Math.abs(engine.getDisplayNorthPhi() - Math.PI * 0.02) < 1e-6);
+    assert.ok(Math.abs(engine.getDisplaySouthPhi() - Math.PI * 0.97) < 1e-6);
+  } finally {
+    engine.setDisplayCaps(0, 0);
+    engine.setAnimationsPaused(false);
+    engine.setResolution(W, H);
+  }
+});
+
+test('display caps preserve complete shader configuration and custom chain programs', () => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)));
+  assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
+  assert.equal(engine.setParameter('Palette Mapping', 3), M.ParamSetResult.APPLIED);
+  const snapshot = engine.getFullConfigSnapshot();
+  try {
+    assert.equal(engine.setDisplayCaps(2, 2), true);
+    assert.deepEqual(engine.getFullConfigSnapshot(), snapshot);
+    assert.equal(engine.setEffect('ShaderChain'), M.EffectSetResult.INSTALLED);
+    const chain = DEFAULT_CHAIN.map((entry) => ({ ...entry, instance: `custom-${entry.instance}` }));
+    assert.equal(engine.setShaderChain(chain).status, M.ChainStatus.OK);
+    assert.equal(engine.setParameter('custom-sample.pattern-freq', 3), M.ParamSetResult.APPLIED);
+    const definitions = engine.getParameterDefinitions();
+    assert.equal(engine.setDisplayCaps(3, 4), true);
+    assert.deepEqual(engine.getParameterDefinitions(), definitions);
+    engine.drawFrame();
+    assert.ok(engine.getPixels().some((v) => v !== 0));
+  } finally {
+    engine.setDisplayCaps(0, 0);
+  }
 });

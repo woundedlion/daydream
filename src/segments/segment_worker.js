@@ -312,6 +312,10 @@ export function installSegmentWorker() {
           break;
         }
         engine = new mod.HolosphereEngine();
+        if (!engine.setDisplayCaps(msg.topCap ?? 0, msg.bottomCap ?? 0)) {
+          post({ type: 'engineRejected', reason: 'setDisplayCaps rejected' });
+          break;
+        }
         // The latch tracks the live engine; a fresh one starts unlatched.
         awaitingEffect = false;
         // A rejected resolution leaves no usable geometry: skip the canvasW/canvasH
@@ -429,6 +433,20 @@ export function installSegmentWorker() {
         if (engine && wasmModule) {
           applyPreset(msg.index);
           paramRevision = msg.paramRevision;
+        } else {
+          rejectBeforeInit(msg.type);
+        }
+        break;
+      }
+
+      case 'setDisplayCaps': {
+        if (engine && wasmModule) {
+          if (!engine.setDisplayCaps(msg.topCap, msg.bottomCap)) {
+            post({ type: 'engineRejected', reason: 'setDisplayCaps rejected' });
+            break;
+          }
+          arenaMetricsWarned = false;
+          applyClip();
         } else {
           rejectBeforeInit(msg.type);
         }

@@ -23,7 +23,7 @@ import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 import { URL_FLUSH_DEBOUNCE_MS } from '../src/app/state.js';
 import { pageWarmer } from '../src/segments/module_warmer.js';
 import {
-  EffectSetResult, ParamSetResult, ResolutionSetResult, unpinnedEngineMethods,
+  EffectSetResult, ParamSetResult, ResolutionSetResult, FullConfigRestoreResult, unpinnedEngineMethods,
 } from './helpers/fake_engine.js';
 import { captureConsole, installConsoleCapture } from './helpers/fake_console.js';
 import { createRecordingControls } from '../src/recording/recording_controls.js';
@@ -181,6 +181,7 @@ function fakeWasmModule({
   let built = 0;
   let deleted = 0;
   const poleLod = [];
+  const caps = [];
   const params = [];
   const module = {
     DISPLAY_PROFILE: 0,
@@ -193,6 +194,7 @@ function fakeWasmModule({
     engines: () => built,
     deletes: () => deleted,
     poleLod,
+    caps,
     params,
     HolosphereEngine: class {
       constructor() { built++; }
@@ -210,6 +212,9 @@ function fakeWasmModule({
         return ParamSetResult.APPLIED;
       }
       setPoleLod(v) { poleLod.push(v); }
+      setDisplayCaps(top, bottom) { caps.push([top, bottom]); return true; }
+      getDisplayNorthPhi() { return (caps.at(-1)?.[0] ?? 0) * Math.PI / 100; }
+      getDisplaySouthPhi() { return (1 - (caps.at(-1)?.[1] ?? 0) / 100) * Math.PI; }
       setAnimationsPaused() {}
       getAnimationsPaused() { return false; }
       getPresetCount() { return 0; }
@@ -925,6 +930,9 @@ test('a trapped resolution query stops the startup instead of booting on', async
         throw new WebAssembly.RuntimeError('unreachable');
       }
       setPoleLod() {}
+      setDisplayCaps() { return true; }
+      getDisplayNorthPhi() { return 0; }
+      getDisplaySouthPhi() { return Math.PI; }
       delete() {}
     },
   };
@@ -1003,7 +1011,7 @@ test('a refused parameter write reports its reason and a later accepted edit cle
   assert.deepEqual(module.params.at(-1), ['Speed', 1.25]);
 });
 
-test('startup takes display placement from the compiled engine before rendering', async () => {
+test('startup defaults to full coverage despite compiled physical geometry', async () => {
   const module = fakeWasmModule();
   Object.assign(module, {
     DISPLAY_PROFILE: 1,
@@ -1011,7 +1019,53 @@ test('startup takes display placement from the compiled engine before rendering'
     DISPLAY_SOUTH_PHI: 0.98 * Math.PI,
   });
   const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
-  assert.equal(app.driver.DISPLAY_PROFILE, 1);
-  assert.equal(app.driver.DISPLAY_NORTH_PHI, module.DISPLAY_NORTH_PHI);
-  assert.equal(app.driver.DISPLAY_SOUTH_PHI, module.DISPLAY_SOUTH_PHI);
+  assert.deepEqual(module.caps, [[0, 0]]);
+  assert.equal(app.driver.DISPLAY_PROFILE, 0);
+  assert.equal(app.driver.DISPLAY_NORTH_PHI, 0);
+  assert.equal(app.driver.DISPLAY_SOUTH_PHI, Math.PI);
+});
+
+test('global cap edits survive module loading, paused redraw and effect switches', async () => {
+  let resolve;
+  const loading = new Promise((done) => { resolve = done; });
+  const app = startApp({ loadModule: () => loading });
+  app.guis[0].controllers.find((c) => c.property === 'topCap').setValue(2);
+  app.guis[0].controllers.find((c) => c.property === 'bottomCap').setValue(3);
+  const module = fakeWasmModule();
+  module.FullConfigRestoreResult = FullConfigRestoreResult;
+  module.HolosphereEngine.prototype.getFullConfigSnapshot = () => null;
+  module.HolosphereEngine.prototype.restoreFullConfigSnapshot = () => FullConfigRestoreResult.NOT_SHADER_WORKBENCH;
+  resolve(module);
+  await app.teardown.ready;
+  assert.deepEqual(module.caps, [[2, 3]]);
+  assert.equal(app.driver.DISPLAY_NORTH_PHI, 0.02 * Math.PI);
+  app.driver.paused = true;
+  let draws = 0;
+  module.HolosphereEngine.prototype.drawFrame = () => { draws++; };
+  app.guis[0].controllers.find((c) => c.property === 'topCap').setValue(4);
+  assert.equal(draws, 1);
+  assert.equal(app.driver.DISPLAY_NORTH_PHI, 0.04 * Math.PI);
+  assert.equal(app.driver.DISPLAY_SOUTH_PHI, 0.97 * Math.PI);
+  assert.equal(app.driver.paused, true);
+  assert.ok(app.driver.dotMesh.instanceColor.version > 0);
+  app.guis[0].controllers.find((c) => c.property === 'resolution').setValue('Holosphere (96x20)');
+  assert.deepEqual(module.caps.at(-1), [4, 3]);
+});
+
+test('a rejected startup cap profile disposes the incompatible engine', async () => {
+  const module = fakeWasmModule();
+  module.HolosphereEngine.prototype.setDisplayCaps = () => false;
+  const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
+  assert.equal(app.teardown.disposed(), true);
+  assert.equal(module.deletes(), 1);
+});
+
+test('a rejected live cap edit leaves the displayed geometry unchanged', async () => {
+  const module = fakeWasmModule();
+  const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
+  module.HolosphereEngine.prototype.setDisplayCaps = () => false;
+  const control = app.guis[0].controllers.find((c) => c.property === 'topCap');
+  assert.throws(() => control.setValue(2), /Engine rejected display cap settings/);
+  assert.equal(app.driver.DISPLAY_NORTH_PHI, 0);
+  assert.equal(app.driver.DISPLAY_SOUTH_PHI, Math.PI);
 });

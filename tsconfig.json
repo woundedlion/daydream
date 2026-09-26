@@ -31,6 +31,7 @@
     "src/ui/apply_notice.js",
     "src/engine/display_aliases.js",
     "src/renderer/pole_lod.js",
+    "src/renderer/display_caps.js",
     "src/recording/recording_settings.js",
     "src/segments/segment_policy.js",
     "src/effects/legacy_shader_import.js",
