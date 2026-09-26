@@ -134,6 +134,13 @@ class FakeEngine {
     this.calls.push(['setPoleLod', v]);
     this.poleLod = v;
   }
+  setDisplayCaps(top, bottom) {
+    this.calls.push(['setDisplayCaps', top, bottom]);
+    if (this.capsRejected) return false;
+    this.caps = [top, bottom];
+    this.clip = null;
+    return true;
+  }
   // `fullFrame` models a needs_full_frame() effect: the bounds are accepted but
   // the clip stays at the full canvas.
   setClip(x0, x1, y0, y1) {
@@ -391,7 +398,7 @@ test('init applies the segment clip and posts ready', async () => {
   await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
 
   assert.ok(engineInstance, 'engine constructed');
-  assert.deepEqual(engineInstance.calls[0], ['setResolution', 8, 4]);
+  assert.deepEqual(engineInstance.calls[1], ['setResolution', 8, 4]);
   assert.equal(engineInstance.effect, 'Plasma');
   // segId 3 of 4 over 8x4 → arm B (x0=4), bottom band (y0=2): clip {2,4,4,8}.
   assert.deepEqual(engineInstance.clip, { y0: 2, y1: 4, x0: 4, x1: 8 });
@@ -405,7 +412,7 @@ test('init with a rejected resolution posts engineRejected, not ready', async ()
   await dispatch({ type: 'init', segId: 0, totalSegs: 1, w: 8, h: 4, effectName: 'Plasma' });
 
   assert.ok(engineInstance, 'engine constructed');
-  assert.deepEqual(engineInstance.calls[0], ['setResolution', 8, 4], 'setResolution attempted');
+  assert.deepEqual(engineInstance.calls[1], ['setResolution', 8, 4], 'setResolution attempted');
   assert.ok(!posted.some((p) => p.msg.type === 'ready'), 'no ready for a rejected resolution');
   const failed = posted.find((p) => p.msg.type === 'engineRejected');
   assert.ok(failed, 'engineRejected posted');
@@ -854,7 +861,7 @@ test('init selects the carried preset before applying tuned params', async () =>
     presetIndex: 2, params: [{ name: 'Speed', value: 0.5 }],
   });
   assert.equal(engineInstance.presetIndex, 2);
-  assert.deepEqual(engineInstance.calls.slice(1, 3),
+  assert.deepEqual(engineInstance.calls.slice(2, 4),
     [['setEffect', 'Plasma'], ['synchronizePreset', 2]]);
   assert.deepEqual(engineInstance.params, [['Speed', 0.5]]);
 });
@@ -886,6 +893,19 @@ test('setPoleLod handler forwards the value to the engine', async () => {
   await dispatch({ type: 'setPoleLod', value: 0.75 });
   assert.equal(engineInstance.poleLod, 0.75);
   assert.deepEqual(engineInstance.calls.at(-1), ['setPoleLod', 0.75]);
+});
+
+test('worker cap changes preserve tuning and restore the segment clip', async () => {
+  await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4,
+    effectName: 'Plasma', topCap: 2, bottomCap: 3, params: [{ name: 'Speed', value: 0.5 }] });
+  assert.deepEqual(engineInstance.calls[0], ['setDisplayCaps', 2, 3]);
+  await dispatch({ type: 'setDisplayCaps', topCap: 4, bottomCap: 5 });
+  assert.deepEqual(engineInstance.caps, [4, 5]);
+  assert.deepEqual(engineInstance.params, [['Speed', 0.5]]);
+  assert.deepEqual(engineInstance.clip, { y0: 2, y1: 4, x0: 4, x1: 8 });
+  engineInstance.capsRejected = true;
+  await dispatch({ type: 'setDisplayCaps', topCap: 26, bottomCap: 0 });
+  assert.match(posted.at(-1).msg.reason, /setDisplayCaps rejected/);
 });
 
 test('setEffect handler rebuilds, then re-applies the carried param snapshot', async () => {
@@ -1214,8 +1234,8 @@ function typedefShapes(source) {
 // what makes a reshaped message fault instead, and only this pin ties the two
 // together.
 const PROTOCOL_SHAPE_PIN = {
-  version: 10,
-  sha256: '983562b7ccffe92065812668f4cb31b35a879905776bac1d4623dbcb09043670',
+  version: 11,
+  sha256: '359101870799ceed4497d801f31820f5cb3f941b10898519c064eed1c03ecf33',
 };
 
 test('a reshaped protocol message forces a PROTOCOL_VERSION bump', () => {

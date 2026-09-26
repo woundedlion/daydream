@@ -75,7 +75,7 @@ test('the global GUI carries the controls a deep link names', () => {
 
   assert.deepEqual(root.controllers.map((c) => c.property),
     ['resolution', 'testAll', 'labelAxes', 'cullBackSphere', 'showPip',
-      'columnFillOverlap', 'poleLod']);
+      'columnFillOverlap', 'poleLod', 'topCap', 'bottomCap']);
   const segments = root.folders.find((f) => f.namespace === 'Segmented POV');
   assert.ok(segments, 'the segmented folder name is a deep-link key segment');
   assert.deepEqual(segments.controllers.map((c) => c.property),

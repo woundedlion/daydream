@@ -54,10 +54,13 @@ The engine still mirrors `README.md` and `docs/screenshots/` at their public pat
 
 ## Display geometry
 
-The simulator reads `DISPLAY_PROFILE`, `DISPLAY_NORTH_PHI`, and
-`DISPLAY_SOUTH_PHI` from the installed engine before building its LED grid.
-Profile `0` is the ideal sphere; profile `1` is physical placement, with LED
-centers spanning 2% through 98% of the north-to-south arc by default. The same
-compiled profile controls effect rendering and displayed LED positions at every
-resolution. Changing profiles requires an engine build and install; there is no
-independent simulator geometry toggle.
+The global **Top cap (%)** and **Bottom cap (%)** controls adjust the missing
+north-to-south arc independently, from 0% to 25% each. Both default to 0% for full
+coverage; use 2% each to preview the provisional physical device calibration.
+The controls persist as `view.topCap` and `view.bottomCap` in shared URLs.
+
+Daydream applies the percentages to the engine and every segmented worker with
+`setDisplayCaps`, then reads `getDisplayNorthPhi` and `getDisplaySouthPhi` for
+LED placement. Changes preserve effect configuration and reset geometry-dependent
+simulation history. Settings survive effect and resolution changes, and update
+the preview while paused. Firmware retains its compiled physical profile.

@@ -235,6 +235,8 @@ export class SegmentController {
     // Near-pole azimuthal decimation. Per-module-instance in the engine, so each
     // worker holds its own copy and a pool rebuilt mid-session must be re-seeded.
     this.poleLod = 0;
+    this.topCap = 0;
+    this.bottomCap = 0;
 
     /** @type {Worker[]} */
     this.workers = [];
@@ -556,6 +558,8 @@ export class SegmentController {
           paused: this.animationsPaused,
           presetIndex: this.presetIndex ?? undefined,
           poleLod: this.poleLod,
+          topCap: this.topCap,
+          bottomCap: this.bottomCap,
           paramRevision: this.paramRevision,
           wasmModule: this.moduleWarmer.module ?? undefined,
         });
@@ -1055,6 +1059,24 @@ export class SegmentController {
   }
 
   /**
+   * Update worker geometry and discard frames rendered for the previous caps.
+   * @param {number} topCap
+   * @param {number} bottomCap
+   * @returns {void}
+   */
+  setDisplayCaps(topCap, bottomCap) {
+    this.topCap = topCap;
+    this.bottomCap = bottomCap;
+    if (this.faulted) return;
+    this.paramValues = null;
+    this.#renderGen++;
+    this.#results.fill(null);
+    this.#pendingFrame = false;
+    this.broadcast({ type: 'setDisplayCaps', topCap, bottomCap });
+    if (this.driver.paused) this.tick();
+  }
+
+  /**
    * Tell all workers to update resolution. The apply pipeline follows this with
    * setEffect() after it has rebuilt the main engine and parameter snapshot.
    * @param {number} w
@@ -1280,6 +1302,7 @@ export class SegmentController {
           }
         }
         this.#renderInFlight = false;
+        if (generation !== this.#renderGen && this.driver.paused) this.tick();
       }).catch((error) => {
         // A rejected chain would skip the `.then` above and strand renderInFlight
         // latched true with no watchdog armed, wedging the pipeline silently.

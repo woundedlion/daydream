@@ -14,6 +14,7 @@ import {
   getActiveURLSync,
 } from '../src/app/state.js';
 import { engineParamValue } from '../src/effects/param_sync.js';
+import { createDisplayCapsBinding } from '../src/renderer/display_caps.js';
 import {
   snapshotEffectControlState,
   restoreEffectControlState,
@@ -930,6 +931,21 @@ test('a control added inside a scheduled reset ignores the params it drops', () 
   const global = { poleLod: 0 };
   new DeepLinkGUI({ autoPlace: false }, 'view').add(global, 'poleLod', 0, 2);
   assert.equal(global.poleLod, 1.5, 'an excluded key still hydrates');
+});
+
+test('cap controls hydrate bounded percentages and retain their URL keys through effect resets', () => {
+  installRecordingWindow('?view.topCap=2.04&view.bottomCap=99&fx.Alpha=0.75');
+  new URLSync(new AppState({}), []);
+  const binding = createDisplayCapsBinding({ getEngine: () => null, onChange: () => {} });
+  const gui = new DeepLinkGUI({ autoPlace: false }, 'view');
+  gui.add(binding.state, 'topCap', 0, 25, 0.1).onChange(binding.apply);
+  gui.add(binding.state, 'bottomCap', 0, 25, 0.1).onChange(binding.apply);
+  assert.deepEqual(binding.state, { topCap: 2, bottomCap: 25 });
+  assert.deepEqual(gui.collectUrlKeys(), ['view.topCap', 'view.bottomCap']);
+  resetGUI(gui.collectUrlKeys());
+  assert.equal(gui.urlParams().get('view.topCap'), '2');
+  assert.equal(gui.urlParams().get('view.bottomCap'), '25');
+  assert.equal(gui.urlParams().has('fx.Alpha'), false);
 });
 
 

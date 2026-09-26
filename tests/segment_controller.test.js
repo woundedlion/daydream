@@ -778,6 +778,8 @@ test('create posts each worker the whole init payload', () => {
       paused: true,
       presetIndex: 4,
       poleLod: 1.5,
+      topCap: 0,
+      bottomCap: 0,
       paramRevision: 1,
       wasmModule: undefined,
     }]);
@@ -2712,6 +2714,46 @@ test('a pool spawned after the slider moved inherits the pole LOD', () => {
   for (const w of c.workers) {
     const init = w.posted.find((m) => m.type === 'init');
     assert.equal(init.poleLod, 0.8, 'init seeds the fresh worker engine');
+  }
+});
+
+test('cap changes reach current workers and survive pool recreation', () => {
+  const c = readyController(2);
+  c.setDisplayCaps(2, 3);
+  for (const w of c.workers) {
+    assert.deepEqual(w.posted.find((m) => m.type === 'setDisplayCaps'),
+      { type: 'setDisplayCaps', topCap: 2, bottomCap: 3 });
+  }
+  c.create(2);
+  for (const w of c.workers) {
+    const init = w.posted.find((m) => m.type === 'init');
+    assert.equal(init.topCap, 2);
+    assert.equal(init.bottomCap, 3);
+  }
+});
+
+test('paused cap edits fence old frames and dispatch a replacement after they settle', async () => {
+  setDisplayGrid(4, 2);
+  const c = readyController(2);
+  c.active = true;
+  c.tick();
+  driver.paused = true;
+  try {
+    c.setDisplayCaps(2, 3);
+    assert.notEqual(c.frameState.inflightGen, c.frameState.renderGen);
+    deliverFrame(c, 0);
+    deliverFrame(c, 1);
+    await flush();
+    assert.equal(c.frameState.renderInFlight, true);
+    assert.equal(c.frameState.inflightGen, c.frameState.renderGen);
+    assert.ok(c.frameState.results.every((frame) => frame === null));
+    deliverFrame(c, 0, { x0: 0, x1: 2, y0: 0, y1: 2 });
+    deliverFrame(c, 1, { x0: 2, x1: 4, y0: 0, y1: 2 });
+    await flush();
+    assert.equal(c.frameState.renderInFlight, false);
+    assert.ok(driver.invalidations > 0);
+  } finally {
+    driver.paused = false;
   }
 });
 

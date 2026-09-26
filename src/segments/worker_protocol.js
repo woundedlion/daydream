@@ -25,7 +25,7 @@
  * same-named but reshaped message. Bump on any breaking change to the messages below.
  * @type {number}
  */
-export const PROTOCOL_VERSION = 10;
+export const PROTOCOL_VERSION = 11;
 
 /**
  * One tuned effect parameter, flattened for structured-clone transport. Booleans
@@ -71,6 +71,7 @@ export const PROTOCOL_VERSION = 10;
  *   fullConfigSnapshot?: FullConfigSnapshot, paused?: boolean,
  *   presetIndex?: number|undefined,
  *   poleLod?: number, paramRevision: number,
+ *   topCap?: number, bottomCap?: number,
  *   wasmModule?: WebAssembly.Module|undefined,
  * }} InitMsg
  */
@@ -108,6 +109,9 @@ export const PROTOCOL_VERSION = 10;
  * differently from the single-engine one.
  * @typedef {{ type: 'setPoleLod', value: number }} SetPoleLodMsg */
 
+/** Set missing arc percentages on the worker's engine.
+ * @typedef {{ type: 'setDisplayCaps', topCap: number, bottomCap: number }} SetDisplayCapsMsg */
+
 /** Request one frame; the worker replies with a FrameMsg. `recycle` hands back
  * the retired generation's segment buffer (transferred, so the controller gives
  * up ownership) for the worker to refill in place instead of allocating and
@@ -119,7 +123,7 @@ export const PROTOCOL_VERSION = 10;
  * Every message the controller sends to a worker.
  * @typedef {InitMsg | SetEffectMsg | SetResolutionMsg
  *   | SetParameterMsg | SetAnimationsPausedMsg | SelectPresetMsg | SetPoleLodMsg
- *   | RenderMsg} WorkerInboundMsg
+ *   | SetDisplayCapsMsg | RenderMsg} WorkerInboundMsg
  */
 
 // --- Worker -> Controller (received by the controller) ---------------------

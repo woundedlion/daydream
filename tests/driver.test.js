@@ -1836,3 +1836,26 @@ test('changing latitude endpoints rebuilds cached LED placement', () => {
   assert.ok(dotAt(ctx, 0).distanceTo(dotAt(ctx, 4)) > 3);
   assert.ok(dotAt(ctx, 32).distanceTo(dotAt(ctx, 36)) > 3);
 });
+
+test('cap slider changes bound the matrix cache and update live placement', () => {
+  const ctx = matricesCtx(8, 5);
+  ctx.precomputeMatrices = (...args) => Daydream.prototype.precomputeMatrices.call(ctx, ...args);
+  ctx.precomputeMatrices();
+  const colors = ctx.dotMesh.instanceColor;
+  ctx.invalidate = () => { ctx.invalidated = true; };
+  for (let cap = 0; cap < 100; cap++) {
+    Daydream.prototype.setDisplayGeometry.call(ctx, {
+      DISPLAY_PROFILE: 1, DISPLAY_NORTH_PHI: cap / 1000,
+      DISPLAY_SOUTH_PHI: Math.PI - cap / 1000,
+    });
+    assert.ok(ctx.matrixCache.size <= 1);
+    assert.equal(ctx.dotMesh.instanceColor, colors);
+  }
+  assert.equal(ctx.invalidated, true);
+  assert.ok(dotAt(ctx, 0).distanceTo(dotAt(ctx, 4)) > 3);
+  ctx.dotMesh = null;
+  Daydream.prototype.setDisplayGeometry.call(ctx, {
+    DISPLAY_PROFILE: 0, DISPLAY_NORTH_PHI: 0, DISPLAY_SOUTH_PHI: Math.PI,
+  });
+  assert.equal(ctx.matrixCache.size, 0);
+});

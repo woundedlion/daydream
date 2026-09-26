@@ -10,6 +10,7 @@ export const ENGINE_METHODS = [
   'getPresetCount', 'getPresetIndex', 'selectPreset', 'selectPresetById',
   'synchronizePreset', 'nextPreset', 'previousPreset',
   'setPoleLod', 'setClip', 'drawFrame', 'getPixels', 'getArenaMetrics',
+  'setDisplayCaps', 'getDisplayNorthPhi', 'getDisplaySouthPhi',
   'getParameterDefinitions', 'getParamValues', 'getBufferLength',
   'getParamGeneration', 'getEffectSizes', 'getEffectPresetCounts',
   'strobeColumns', 'setShaderChain', 'setShaderChainParameters',

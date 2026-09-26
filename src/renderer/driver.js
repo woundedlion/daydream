@@ -891,8 +891,9 @@ export class Daydream {
    * handler over W*H instances, and toggling back to a preset would otherwise
    * redo every spherical conversion, lookAt and compose to reach the same
    * matrices.
+   * @param {boolean} [resetColors=true] - Allocate colors for a new pixel grid.
    */
-  precomputeMatrices() {
+  precomputeMatrices(resetColors = true) {
     const count = this.W * this.H;
     const key = `${this.W}x${this.H}x${this.DISPLAY_NORTH_PHI}x${this.DISPLAY_SOUTH_PHI}`;
     let matrices = this.matrixCache.get(key);
@@ -925,16 +926,32 @@ export class Daydream {
     // read and write the same 16 floats an element at a time.
     this.dotMesh.instanceMatrix.array.set(matrices);
 
-    const needed = this.dotMesh.count * 3;
-    this.dotMesh.instanceColor = new THREE.InstancedBufferAttribute(
-      new Uint16Array(needed), 3, true
-    );
-    this.dotMesh.instanceColor.setUsage(THREE.StreamDrawUsage);
-    this.pixels = this.dotMesh.instanceColor.array;
-    if (isViewLive(this.pixels)) this.pixels.fill(0);
+    if (resetColors) {
+      const needed = this.dotMesh.count * 3;
+      this.dotMesh.instanceColor = new THREE.InstancedBufferAttribute(
+        new Uint16Array(needed), 3, true
+      );
+      this.dotMesh.instanceColor.setUsage(THREE.StreamDrawUsage);
+      this.pixels = this.dotMesh.instanceColor.array;
+      if (isViewLive(this.pixels)) this.pixels.fill(0);
+      this.dotMesh.instanceColor.needsUpdate = true;
+    }
 
     this.dotMesh.instanceMatrix.needsUpdate = true;
-    this.dotMesh.instanceColor.needsUpdate = true;
+  }
+
+  /**
+   * Apply LED-center latitudes and discard placements from the previous profile.
+   * @param {{DISPLAY_PROFILE:number, DISPLAY_NORTH_PHI:number, DISPLAY_SOUTH_PHI:number}} geometry
+   * @returns {void}
+   */
+  setDisplayGeometry(geometry) {
+    if (this.DISPLAY_NORTH_PHI === geometry.DISPLAY_NORTH_PHI
+        && this.DISPLAY_SOUTH_PHI === geometry.DISPLAY_SOUTH_PHI) return;
+    Object.assign(this, geometry);
+    this.matrixCache.clear();
+    if (this.dotMesh) this.precomputeMatrices(false);
+    this.invalidate();
   }
 
   /**

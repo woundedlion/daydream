@@ -260,6 +260,7 @@ export function fakeDriver() {
     stepOnce() { this.invalidated = true; this.stepFrames = 1; },
     keydown(e) { this.keys.push(e); },
     setStrobeColumns(strobe) { this.strobe = strobe; },
+    setDisplayGeometry(geometry) { Object.assign(this, geometry); },
     updateResolution(w, h, dotSize) {
       this.resolution = [w, h, dotSize];
       this.dotMesh.instanceColor = fakeColorAttribute(null);

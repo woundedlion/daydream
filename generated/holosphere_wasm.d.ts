@@ -146,6 +146,10 @@ export interface HolosphereEngine {
   nextPreset(): boolean;
   previousPreset(): boolean;
   setPoleLod(value: number): void;
+  /** Sets missing arc percentages (0..25 each), preserving effect configuration. */
+  setDisplayCaps(topPercent: number, bottomPercent: number): boolean;
+  getDisplayNorthPhi(): number;
+  getDisplaySouthPhi(): number;
   /** Clamped value of the last setPoleLod() on this engine, else the build default. */
   getPoleLod(): number;
   /**
