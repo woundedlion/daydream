@@ -119,9 +119,6 @@ export class Daydream {
   static LABEL_VISIBILITY_FRAMING_RATIO = Daydream.SPHERE_RADIUS / Daydream.CAMERA_Z;
   static DEFAULT_H = 20;
   static DEFAULT_W = 96;
-  // Virtual-row padding over logical H (core/platform/platform.h). Sim = 0 (full sphere);
-  // device = 3 (south-pole clip). See pixelToSpherical.
-  static H_OFFSET = 0;
   static FPS = FPS;
   // Bounds the post-stall frame backlog (clock consumes one interval per frame).
   static MAX_FRAME_BACKLOG_SECONDS = 0.25;
@@ -166,15 +163,15 @@ export class Daydream {
     this.win = win;
     this.nav = nav;
 
-    // Pixel grid, virtual-row padding, and dot radius. H_OFFSET is mirrored from
-    // the class default so `this` satisfies pixelToSpherical's dims contract.
     this.W = Daydream.DEFAULT_W;
     this.H = Daydream.DEFAULT_H;
-    this.H_OFFSET = Daydream.H_OFFSET;
+    this.DISPLAY_PROFILE = 0;
+    this.DISPLAY_NORTH_PHI = 0;
+    this.DISPLAY_SOUTH_PHI = Math.PI;
     this.DOT_SIZE = Daydream.DEFAULT_DOT_SIZE;
     // Shared RGB16 color buffer effects draw into; allocated by precomputeMatrices().
     this.pixels = null;
-    // Composed instance matrices per grid, keyed `WxHxH_OFFSET`. Entries come
+    // Composed instance matrices per grid, keyed by resolution and latitude endpoints. Entries come
     // from the resolution-preset table, so the map holds a couple of grids.
     /** @type {Map<string, Float32Array>} */
     this.matrixCache = new Map();
@@ -897,7 +894,7 @@ export class Daydream {
    */
   precomputeMatrices() {
     const count = this.W * this.H;
-    const key = `${this.W}x${this.H}x${this.H_OFFSET}`;
+    const key = `${this.W}x${this.H}x${this.DISPLAY_NORTH_PHI}x${this.DISPLAY_SOUTH_PHI}`;
     let matrices = this.matrixCache.get(key);
 
     if (!matrices) {

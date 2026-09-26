@@ -503,7 +503,9 @@ export interface PaletteOps {
 export interface HolosphereModule {
   PaletteCompileCode: PaletteCompileCodeEnum;
   PaletteRecipeField: PaletteRecipeFieldEnum;
-  H_OFFSET: number;
+  DISPLAY_PROFILE: number;
+  DISPLAY_NORTH_PHI: number;
+  DISPLAY_SOUTH_PHI: number;
   srgb_to_linear_float(s: number): number;
   linear_to_srgb_float(l: number): number;
   srgb_to_linear_interp(s: number): number;

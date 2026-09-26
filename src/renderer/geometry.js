@@ -20,20 +20,32 @@ const TWO_PI = 2 * Math.PI;
  * makes THREE reproduce the engine vector exactly, avoiding an x↔z mirror
  * (det=−1 reflection) that would render chiral content opposite-handed.
  *
- * Latitude uses `y·π/(H + H_OFFSET − 1)`, matching the engine's
- * `pixel_to_vector`, which maps phi over `H + H_OFFSET` virtual rows
- * (core/math/pixel_mapping.h). The WASM/sim build runs with `Daydream.H_OFFSET == 0`
- * (virtual row count == H), so the simulator maps the full sphere; the device's
- * south-pole clipping (H_OFFSET == 3) is a compile-time engine fork the sim
- * does not reproduce (see the device/host divergence ledger).
+ * Latitude endpoints are LED-center angles exported by the engine.
  * @param {number} x - The pixel x-coordinate [0, dims.W - 1].
  * @param {number} y - The pixel y-coordinate [0, dims.H - 1].
- * @param {{W:number, H:number, H_OFFSET?:number}} dims - Sphere resolution (e.g. the Daydream driver): column count W, row count H, and virtual-row offset H_OFFSET.
+ * @param {{W:number, H:number, DISPLAY_NORTH_PHI:number, DISPLAY_SOUTH_PHI:number}} dims - Sphere resolution (e.g. the Daydream driver): column count W, row count H, and LED-center polar angles.
  * @param {THREE.Spherical} [out] - Target to write into (default: new Spherical).
  * @returns {THREE.Spherical} `out`, set to the spherical coordinates (radius 1).
  */
 export const pixelToSpherical = (x, y, dims, out = new THREE.Spherical()) => {
-  const hVirt = dims.H + (dims.H_OFFSET ?? 0);
-  out.set(1, (y * Math.PI) / Math.max(1, hVirt - 1), Math.PI / 2 - (x * TWO_PI) / (dims.W || 1));
+  const phi = dims.DISPLAY_NORTH_PHI
+    + y * (dims.DISPLAY_SOUTH_PHI - dims.DISPLAY_NORTH_PHI) / Math.max(1, dims.H - 1);
+  out.set(1, phi, Math.PI / 2 - (x * TWO_PI) / (dims.W || 1));
   return out;
 };
+
+/**
+ * Read the compiled engine's display geometry.
+ * @param {{DISPLAY_PROFILE:number, DISPLAY_NORTH_PHI:number, DISPLAY_SOUTH_PHI:number}} module - Engine module.
+ * @returns {{DISPLAY_PROFILE:number, DISPLAY_NORTH_PHI:number, DISPLAY_SOUTH_PHI:number}} Display geometry.
+ */
+export function displayGeometryFromModule(module) {
+  const { DISPLAY_PROFILE, DISPLAY_NORTH_PHI, DISPLAY_SOUTH_PHI } = module;
+  if (![0, 1].includes(DISPLAY_PROFILE)
+      || !Number.isFinite(DISPLAY_NORTH_PHI) || !Number.isFinite(DISPLAY_SOUTH_PHI)
+      || DISPLAY_NORTH_PHI < 0 || DISPLAY_SOUTH_PHI > Math.PI + 1e-6
+      || DISPLAY_NORTH_PHI >= DISPLAY_SOUTH_PHI) {
+    throw new Error('Engine display geometry is missing or invalid.');
+  }
+  return { DISPLAY_PROFILE, DISPLAY_NORTH_PHI, DISPLAY_SOUTH_PHI };
+}

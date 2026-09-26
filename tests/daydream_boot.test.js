@@ -183,6 +183,9 @@ function fakeWasmModule({
   const poleLod = [];
   const params = [];
   const module = {
+    DISPLAY_PROFILE: 0,
+    DISPLAY_NORTH_PHI: 0,
+    DISPLAY_SOUTH_PHI: Math.PI,
     HS_MODULE_DEAD: false,
     EffectSetResult,
     ParamSetResult,
@@ -908,6 +911,9 @@ for (const optionsReplaces of [false, true]) {
 test('a trapped resolution query stops the startup instead of booting on', async () => {
   let built = 0;
   const module = {
+    DISPLAY_PROFILE: 0,
+    DISPLAY_NORTH_PHI: 0,
+    DISPLAY_SOUTH_PHI: Math.PI,
     HS_MODULE_DEAD: false,
     HolosphereEngine: class {
       constructor() { built++; }
@@ -995,4 +1001,17 @@ test('a refused parameter write reports its reason and a later accepted edit cle
   captureConsole(() => speed.setValue(1.25));
   assert.equal(noticeText(app), '');
   assert.deepEqual(module.params.at(-1), ['Speed', 1.25]);
+});
+
+test('startup takes display placement from the compiled engine before rendering', async () => {
+  const module = fakeWasmModule();
+  Object.assign(module, {
+    DISPLAY_PROFILE: 1,
+    DISPLAY_NORTH_PHI: 0.02 * Math.PI,
+    DISPLAY_SOUTH_PHI: 0.98 * Math.PI,
+  });
+  const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
+  assert.equal(app.driver.DISPLAY_PROFILE, 1);
+  assert.equal(app.driver.DISPLAY_NORTH_PHI, module.DISPLAY_NORTH_PHI);
+  assert.equal(app.driver.DISPLAY_SOUTH_PHI, module.DISPLAY_SOUTH_PHI);
 });
