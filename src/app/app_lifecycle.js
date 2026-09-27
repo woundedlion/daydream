@@ -27,14 +27,14 @@ import { displayAliasesDiverged, repointDisplayAliases } from '../engine/display
  *   refresh: () => boolean, view: () => Uint16Array|null}} deps.host - The EngineHost
  *   owning the main engine and its view.
  * @param {DisplayDriver} deps.driver - The Daydream driver.
- * @param {{ownsDisplay: boolean, active: boolean, frameComposited: boolean,
+ * @param {{ownsDisplay: boolean, active: boolean, consumeCapture: () => boolean,
  *   tick: () => void, updateStats: () => void}} deps.segments - The SegmentController.
  * @param {(advanced: boolean) => void} deps.syncEffectGui - Mirrors engine params
  *   into the panel, told whether the simulation stepped this frame.
  * @param {(message: string) => void} [deps.logError] - Console sink for the
  *   once-per-page alias divergence report.
  * @returns {{drawFrame: () => void, sync: (advanced: boolean) => void,
- *   getArenaMetrics: () => Object|null, captureReady: () => boolean,
+ *   getArenaMetrics: () => Object|null, captureReady: (advanced?: boolean) => boolean,
  *   refreshPixelView: () => void}} The adapter.
  */
 export function createRenderAdapter({
@@ -100,15 +100,12 @@ export function createRenderAdapter({
       return segments.ownsDisplay ? null : host.engine.getArenaMetrics();
     },
     /**
-     * Whether the buffer holds a real frame the recorder may capture this tick.
-     * The single-engine path always renders the full canvas in drawFrame();
-     * a pool that owns the display composites a frame late, so report false until
-     * (and on any tick where) a composite has not landed — otherwise the recorder
-     * captures the cleared (black) buffer left by driver.render()'s fill(0).
-     * @returns {boolean} True when the displayed buffer is a real rendered frame.
+     * Consume the displayed frame's capture obligation, including while idle.
+     * @param {boolean} [advanced] - Whether the simulation stepped this repaint.
+     * @returns {boolean} True once per newly displayed frame.
      */
-    captureReady() {
-      return segments.ownsDisplay ? segments.frameComposited : true;
+    captureReady(advanced = true) {
+      return segments.ownsDisplay ? segments.consumeCapture() : advanced;
     }
   };
 }

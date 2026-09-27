@@ -63,6 +63,11 @@ function makeAdapter({ ownsDisplay = false, active = false,
     ownsDisplay,
     active,
     frameComposited,
+    consumeCapture() {
+      const pending = this.frameComposited;
+      this.frameComposited = false;
+      return pending;
+    },
     tick() { calls.push('segments.tick'); },
     updateStats() { calls.push('segments.updateStats'); },
   };

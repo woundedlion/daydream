@@ -12,6 +12,8 @@ import { fakeElement, installDocument } from './helpers/fake_dom.js';
 import { fakeColorAttribute } from './helpers/fake_three.js';
 import { FakeWorker } from './helpers/fake_worker.js';
 import { displayAliasesDiverged, repointDisplayAliases } from '../src/engine/display_aliases.js';
+import { Daydream } from '../src/renderer/driver.js';
+import { createRenderAdapter } from '../src/app/app_lifecycle.js';
 
 // Stand-in for the injected Daydream renderer: the grid and display buffer the
 // compositor reads, plus the dot mesh the second display alias lives on.
@@ -206,19 +208,19 @@ test('dispose drops the held compilation that destroy keeps for the next pool',
  */
 function makeController({ resolution = 'lo', effect = 'TestEffect',
                          presets = { lo: { w: 4, h: 4 } },
-                         moduleWarmer, onFault } = {}) {
+                         moduleWarmer, onFault, driver: renderDriver = driver } = {}) {
   const state = { resolution, effect };
   return new SegmentController({
     moduleWarmer,
     onFault,
     resolutionPresets: presets,
     appState: { get: (k) => state[k], set: (k, v) => { state[k] = v; } },
-    driver,
+    driver: renderDriver,
     getWasmEngine: () => null,
     refreshPixelView: () => {},
-    getMemoryView: () => driver.pixels,
-    repointDisplayAliases: (view) => repointDisplayAliases(driver, view),
-    displayAliasesDiverged: (view) => displayAliasesDiverged(driver, view),
+    getMemoryView: () => renderDriver.pixels,
+    repointDisplayAliases: (view) => repointDisplayAliases(renderDriver, view),
+    displayAliasesDiverged: (view) => displayAliasesDiverged(renderDriver, view),
   });
 }
 
@@ -2856,4 +2858,70 @@ test('a pool fault notifies the host once after workers stop', () => {
   controller.onWorkerFault(1, 'another failure');
   assert.deepEqual(faults, ['render failed']);
   controller.destroy();
+});
+
+test('paused steps capture completed worker generations once after painting', async (t) => {
+  const pixels = new Uint16Array(4 * 2 * 3);
+  const captured = [];
+  let displayed = -1;
+  const renderer = {
+    W: 4, H: 2, pixels,
+    paused: true, stepFrames: 0, needsRender: false, heldCaptures: 0,
+    win: { performance },
+    dotMesh: { instanceColor: fakeColorAttribute(pixels) },
+    advanceFrameClock: () => false,
+    stepSimulation: Daydream.prototype.stepSimulation,
+    invalidate: Daydream.prototype.invalidate,
+    controls: { update() {} },
+    xAxis: {}, yAxis: {}, zAxis: {},
+    labelPool: { activeCount: 0 },
+    renderer: { setScissorTest() {} },
+    updateStats() {}, updateCullUniforms() {}, refreshLabels() {}, renderPip() {},
+    renderMainView() { displayed = pixels[0]; },
+    recorder: { isRecording: true, captureFrame() { captured.push(displayed); } },
+  };
+  const controller = readyController(2, { driver: renderer });
+  t.after(() => controller.destroy());
+  controller.active = true;
+  controller.showBoundaries = false;
+  const adapter = createRenderAdapter({
+    driver: renderer, segments: controller, syncEffectGui() {},
+    host: { engine: { drawFrame() { assert.fail('main engine stepped'); } } },
+  });
+  const repaint = () => Daydream.prototype.render.call(renderer, adapter);
+  const complete = async (value) => {
+    for (let s = 0; s < 2; s++) {
+      deliverFrame(controller, s, {
+        x0: s * 2, x1: s * 2 + 2, y0: 0, y1: 2,
+        pixels: new Uint16Array(12).fill(value),
+      });
+    }
+    await flush();
+  };
+
+  for (const value of [100, 200]) {
+    renderer.stepFrames = 1;
+    repaint();
+    const previous = captured.slice();
+    assert.equal(renderer.stepFrames, 0);
+    await complete(value);
+    assert.deepEqual(captured, previous, 'completion has not painted the canvas');
+    repaint();
+    assert.equal(displayed, value);
+    assert.deepEqual(captured, [...previous, value]);
+    renderer.invalidate();
+    repaint();
+    repaint();
+    assert.deepEqual(captured, [...previous, value], 'camera redraw repeated a capture');
+  }
+
+  renderer.recorder.isRecording = false;
+  renderer.stepFrames = 1;
+  repaint();
+  await complete(300);
+  repaint();
+  renderer.recorder.isRecording = true;
+  renderer.invalidate();
+  repaint();
+  assert.deepEqual(captured, [100, 200], 'recording start captured an idle held frame');
 });

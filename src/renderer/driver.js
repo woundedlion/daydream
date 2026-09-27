@@ -540,9 +540,9 @@ export class Daydream {
    * adapter. Advances the fixed-timestep simulation if an interval has accrued,
    * updates controls, and repaints the main view, labels, and PiP — but only
    * when the sim stepped, the camera moved, or invalidate() was called. Hands
-   * this.recorder one frame per advanced tick the adapter reports capture-ready.
+   * this.recorder each newly completed frame the adapter reports capture-ready.
    * @param {{drawFrame: () => void, sync?: (advanced: boolean) => void,
-   *   getArenaMetrics?: () => ?Object, captureReady?: () => boolean,
+   *   getArenaMetrics?: () => ?Object, captureReady?: (advanced: boolean) => boolean,
    *   refreshPixelView?: () => void}} adapter - Per-frame render adapter (see
    *   createRenderAdapter): drawFrame() paints the pixel buffer,
    *   sync(advanced) reconciles the effect panel and is told whether the sim
@@ -567,10 +567,9 @@ export class Daydream {
     if (!advanced && !this.needsRender) return;
     this.needsRender = false;
 
-    // Capture only when the sim advanced. In segmented mode the composite lands a
-    // frame late, so captureReady() gates out the leading cleared black frames.
-    const captureDue = this.recorder?.isRecording === true && advanced &&
-      (typeof adapter?.captureReady !== 'function' || adapter.captureReady());
+    const captureReady = typeof adapter?.captureReady === 'function'
+      ? adapter.captureReady(advanced) : advanced;
+    const captureDue = this.recorder?.isRecording === true && captureReady;
 
     // Three throws if an attribute's array byteLength differs from the size it gave
     // the GPU buffer, and a mid-frame heap growth detaches the aliased instanceColor
