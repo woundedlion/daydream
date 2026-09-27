@@ -94,6 +94,9 @@ jobs:
   deploy:
     name: Deploy to Pages
     needs: [resolve, gate, js-tests, browser-smoke]
+    concurrency:
+      group: pages-publication
+      cancel-in-progress: false
     permissions:
       contents: read
       deployments: write
