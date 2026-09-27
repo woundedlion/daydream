@@ -442,5 +442,17 @@ test('the browser suite discovers every probe script', () => {
 
 test('scheduled deployment runs cannot replace pending manual dispatches', () => {
   const deploy = readFileSync(resolve(REPO, DEPLOY_PATH), 'utf8');
-  assert.ok(deploy.includes('group: pages-${{ github.event_name }}'));
+  assert.match(deploy, /^concurrency:\r?\n {2}group: pages-\$\{\{ github.event_name \}\}\r?\n {2}cancel-in-progress: false/m);
+});
+
+test('all event types serialize final pair checks, publication and recording in one job', () => {
+  const deploy = readFileSync(resolve(REPO, DEPLOY_PATH), 'utf8');
+  const job = deploy.split(/^ {2}deploy:\r?\n/m)[1].split(/^ {2}[\w-]+:\r?\n/m)[0];
+  assert.match(job, /^ {4}concurrency:\r?\n {6}group: pages-publication\r?\n {6}cancel-in-progress: false/m);
+  const check = job.indexOf('run: node scripts/deployment-pair.mjs check');
+  const publish = job.indexOf('uses: actions/deploy-pages@');
+  const record = job.indexOf('run: node scripts/deployment-pair.mjs record');
+  assert.ok(check >= 0 && check < publish && publish < record);
+  assert.match(job.slice(check, publish), /if: steps.current.outputs.current == 'true'/);
+  assert.match(job.slice(publish, record), /name: Record successful deployment pair\s+if: steps.current.outputs.current == 'true'/);
 });

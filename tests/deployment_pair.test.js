@@ -9,6 +9,52 @@ const pair = { daydream: 'a'.repeat(40), holosphere: 'b'.repeat(40) };
 const repo = 'example/daydream';
 const heads = async (path) => ({ sha: path.includes('woundedlion/pov') ? pair.holosphere : pair.daydream });
 
+for (const newerFirst of [false, true]) {
+  test(`cross-event publication preserves the newest pair when ${newerFirst ? 'newer' : 'older'} enters first`, async (t) => {
+    const root = mkdtempSync(join(tmpdir(), 'deployment-order-'));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const newer = { ...pair, holosphere: 'c'.repeat(40) };
+    let currentHeads = newerFirst ? newer : pair;
+    const events = [];
+    const queues = new Map();
+    const workflow = readFileSync(new URL('../.github/workflows/deploy.yml', import.meta.url), 'utf8');
+    const job = workflow.split(/^ {2}deploy:\r?\n/m)[1];
+    const groupTemplate = job.match(/^ {4}concurrency:\r?\n {6}group: (.+)/m)?.[1].trim();
+    assert.ok(groupTemplate, 'publication job needs its own concurrency group');
+    const publish = (event, selected, afterCheck = async () => {}) => {
+      const group = groupTemplate.replace('${{ github.event_name }}', event);
+      const previous = queues.get(group) || Promise.resolve();
+      const publication = previous.then(async () => {
+        const env = { GITHUB_REPOSITORY: repo, GITHUB_OUTPUT: join(root, event + '.out'), PAIR_FILE: join(root, event + '.json') };
+        writeFileSync(env.PAIR_FILE, JSON.stringify(selected));
+        await run('check', env, async (path) => ({ sha: path.includes('woundedlion/pov') ? currentHeads.holosphere : currentHeads.daydream }));
+        events.push(event + ':check');
+        await afterCheck();
+        if (!readFileSync(env.GITHUB_OUTPUT, 'utf8').includes('current=true')) return;
+        events.push(event + ':publish');
+        await run('record', env, async (path, body) => {
+          if (path.endsWith('/deployments')) events.push(body.payload);
+          return { id: 1 };
+        });
+      });
+      queues.set(group, publication);
+      return publication;
+    };
+    let second;
+    const first = newerFirst
+      ? publish('repository_dispatch', newer, async () => { second = publish('schedule', pair); })
+      : publish('schedule', pair, async () => {
+        currentHeads = newer;
+        second = publish('repository_dispatch', newer);
+      });
+    await first;
+    await second;
+    assert.deepEqual(events, newerFirst
+      ? ['repository_dispatch:check', 'repository_dispatch:publish', newer, 'schedule:check']
+      : ['schedule:check', 'schedule:publish', pair, 'repository_dispatch:check', 'repository_dispatch:publish', newer]);
+  });
+}
+
 test('pair selection snapshots trusted master heads and rejects malformed revisions', async () => {
   const paths = [];
   assert.deepEqual(await snapshotPair(async (path) => { paths.push(path); return heads(path); }, repo), pair);
