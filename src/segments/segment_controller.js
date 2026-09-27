@@ -181,7 +181,7 @@ export class SegmentController {
   /** True when workers have new results to display. */
   #pendingFrame = false;
 
-  /** True only on ticks that blit a real composite. */
+  /** A newly blitted composite awaiting consumption by the render adapter. */
   #frameComposited = false;
 
   /**
@@ -278,12 +278,18 @@ export class SegmentController {
   }
 
   /**
-   * Whether the last tick blitted a real composited generation, as opposed to
-   * re-blitting the published one over an overrun or leaving the buffer black.
+   * Whether a newly composited generation is awaiting capture consumption.
    * @returns {boolean}
    */
   get frameComposited() {
     return this.#frameComposited;
+  }
+
+  /** @returns {boolean} Whether a newly composited frame is owed a capture. */
+  consumeCapture() {
+    const pending = this.#frameComposited;
+    this.#frameComposited = false;
+    return pending;
   }
 
   /**
