@@ -655,7 +655,7 @@ test('a dead module stops the frames, releases the app, and names the reload', (
   guarded();
   guarded();
 
-  assert.equal(frames, 2, 'the body must not run once the module is known dead');
+  assert.equal(frames, 1, 'the body must not run when the module is dead on entry');
   assert.equal(releases, 1, 'the release runs once, not per frame');
   assert.equal(reported.length, 1);
   assert.match(reported[0], /Reload the page/,
@@ -665,12 +665,14 @@ test('a dead module stops the frames, releases the app, and names the reload', (
 
 test('a dead module is polled on a clean frame, not only on a throw', () => {
   let dead = false;
+  let frames = 0;
   const { guarded, reported } = makeFrameGuard(
-    () => {}, { moduleDead: () => dead });
+    () => { frames += 1; dead = true; }, { moduleDead: () => dead });
 
-  dead = true;
+  guarded();
   guarded();
 
+  assert.equal(frames, 1);
   assert.equal(reported.length, 1,
     'a trapped module hands back plausible frames; waiting for a throw waits '
     + 'for one that never comes');
@@ -708,7 +710,7 @@ test('a release that throws still leaves the loop stopped', () => {
   assert.throws(() => guarded(), /teardown failed/);
   guarded();
 
-  assert.equal(frames, 1, 'the latch is set before the release is attempted');
+  assert.equal(frames, 0, 'the latch is set before the release is attempted');
 });
 
 // The global keydown guard: the shortcuts are the canvas's, so a key typed into
