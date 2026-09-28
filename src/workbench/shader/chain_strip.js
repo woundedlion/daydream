@@ -363,6 +363,10 @@ export function createChainStrip({
         .map((candidate) => [candidate.operator.id,
           { start: index, deleteCount: 0, operators: [candidate.operator] }])
       : socketChoices(index).map((choice) => [choiceKey(choice.operators), choice]));
+    if (choices.size === 0) {
+      announce('No legal operators are available here.');
+      return;
+    }
     const title = kind === 'insert'
       ? `Insert at position ${index + 1}`
       : `Replace ${opOf(chain[index]).name} · ${chain[index].label}`;
