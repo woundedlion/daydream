@@ -145,7 +145,7 @@ export function buildChainMesh(base, ops, ctx) {
     if (!mesh) return null;
   } catch (e) {
     console.error('Error creating base solid:', e);
-    ctx.onTrap(e);
+    if (!ctx.onTrap(e)) ctx.onError(`Base solid failed: ${e instanceof Error ? e.message : String(e)}`);
     return null;
   }
 
