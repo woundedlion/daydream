@@ -777,7 +777,7 @@ export function createChainStrip({
             : event.key === 'ArrowDown' ? -1 : 0;
           if (direction === 0) return;
           event.preventDefault();
-          const shown = Number(readout.value);
+          const shown = readout.value.trim() === '' ? NaN : Number(readout.value);
           const from = Number.isFinite(shown) ? shown : Number(values[declaration.id]);
           enterValue(String(from + direction * nudgeStep(declaration)));
           store.endValueRun();
