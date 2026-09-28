@@ -20,10 +20,9 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // Re-exported from their dependency-free modules for scene-based pages.
-export { copyToClipboard, copyWithFeedback, COPY_FEEDBACK, wireCopyBlock } from '../shared/clipboard.js';
-export { formatFloatCpp } from '../shared/cpp_format.js';
+export { copyWithFeedback, wireCopyBlock } from '../shared/clipboard.js';
 export { formatKB } from '../shared/kb_format.js';
-export { showFatalError, bootstrapTool, reportPageFailures } from '../shared/banner.js';
+export { showFatalError, bootstrapTool } from '../shared/banner.js';
 
 /**
  * Caps a WebGL renderer's device-pixel ratio at CSS resolution: the tool scenes
