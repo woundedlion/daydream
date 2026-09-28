@@ -54,6 +54,7 @@ export function createEffectPersistence({
 
   /** Replay a stored full snapshot or accepted parameter values. @param {*} gui */
   function restoreEffectState(gui) {
+    restoredKeys.clear();
     if (!usesFullConfigSnapshot()) {
       restoreAcceptedParams(gui);
       return;
