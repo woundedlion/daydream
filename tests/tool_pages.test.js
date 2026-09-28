@@ -379,8 +379,7 @@ test('every served page\'s stylesheets define every class it uses', () => {
     for (const [, css] of src.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)) {
       for (const cls of definedClasses(css)) defined.add(cls);
     }
-    // tailwind.css is committed prebuilt with no config or build step, so a
-    // utility a script reaches for that no rule defines stays silently unstyled.
+    // Dynamic utility names must also exist in the generated stylesheet.
     const sources = [[page, referencedClasses(src)],
       ...classSourcesFor({ page, scripts })
         .map((source) => [source, scriptClasses(read(source))])];

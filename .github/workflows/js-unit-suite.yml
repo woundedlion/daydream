@@ -70,6 +70,10 @@ jobs:
         run: |
           npm run importmap
           git diff --exit-code -- vendor-importmap.js
+      - name: Verify generated Tailwind styles
+        run: |
+          npm run generate:tailwind
+          git diff --exit-code -- tools/tailwind.css
       - name: Verify CDN integrity
         run: node scripts/check-cdn-integrity.mjs
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
