@@ -41,7 +41,7 @@ test('npm install points git at the tracked hooks, every one executable', () => 
 });
 
 test('the reusable JavaScript suite runs all required checks', () => {
-  const suite = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/js-unit-suite.yml`), 'utf8');
+  const suite = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/js-unit-suite.yml`), 'utf8').replaceAll('\r\n', '\n');
   for (const command of ['npm test', 'npm run lint', 'npm run typecheck']) {
     assert.ok(suite.split(/\r?\n/).some((line) =>
       line.trim().replace(/^- /, '') === `run: ${command}`),
@@ -53,7 +53,7 @@ test('the reusable JavaScript suite runs all required checks', () => {
 // No workflow is a tracked *.sh file, so the shell gate above cannot see the
 // bash inside the `run:` blocks; actionlint is what pipes it through shellcheck.
 test('the reusable suite lints the workflow YAML and the bash inside it', () => {
-  const suite = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/js-unit-suite.yml`), 'utf8');
+  const suite = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/js-unit-suite.yml`), 'utf8').replaceAll('\r\n', '\n');
   assert.match(suite, /https:\/\/github\.com\/rhysd\/actionlint\/releases\/download\/v1\.7\.12\/actionlint_1\.7\.12_linux_amd64\.tar\.gz/);
   assert.match(suite, /8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8.*sha256sum --check --strict/);
   assert.ok(suite.indexOf('sha256sum --check --strict') < suite.indexOf('tar -xzf'));
@@ -276,7 +276,7 @@ test('PR suites consume the provenance-gated bundle before CI can pass', () => {
 });
 
 test('the reusable suite verifies CDN integrity and lints tracked shell hooks', () => {
-  const suite = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/js-unit-suite.yml`), 'utf8');
+  const suite = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/js-unit-suite.yml`), 'utf8').replaceAll('\r\n', '\n');
   assert.match(suite, /name: Verify CDN integrity\s+run: node scripts\/check-cdn-integrity\.mjs/);
   assert.match(suite, /run: pip install --require-hashes -r requirements\/shellcheck\.txt/);
   const shell = suite.split('- name: Lint shell')[1]?.split(/\n {6}- /)[0] ?? '';
@@ -294,7 +294,7 @@ test('workflow trigger parsing cannot hide flow or quoted declarations', () => {
 });
 
 test('shell lint has no workflow-wide excluded diagnostics', () => {
-  const suite = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/js-unit-suite.yml`), 'utf8');
+  const suite = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/js-unit-suite.yml`), 'utf8').replaceAll('\r\n', '\n');
   assert.doesNotMatch(suite, /shellcheck[^\n]*--exclude/);
 });
 
@@ -306,7 +306,7 @@ test('engine bundle API failures stop the gate instead of entering its poll time
 });
 
 test('actionlint enumerates both workflow extensions', () => {
-  const suite = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/js-unit-suite.yml`), 'utf8');
+  const suite = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/js-unit-suite.yml`), 'utf8').replaceAll('\r\n', '\n');
   assert.ok(suite.includes("git ls-files -- '.github/workflows/*.yml' '.github/workflows/*.yaml'"));
 });
 
@@ -405,7 +405,7 @@ test('the CI gate CLI rejects an ungated job before evaluating results', () => {
 });
 
 test('required suite steps execute their complete bodies without suppression', () => {
-  const suite = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/js-unit-suite.yml`), 'utf8');
+  const suite = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/js-unit-suite.yml`), 'utf8').replaceAll('\r\n', '\n');
   const expected = JSON.parse(readFileSync(resolve(REPO, 'tests/fixtures/js-suite-steps.json'), 'utf8'));
   const blocks = suite.split(/(?=^ {6}- )/m);
   assert.doesNotMatch(suite, /\|\|\s*true/);

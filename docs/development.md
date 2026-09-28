@@ -1,6 +1,6 @@
 # Frontend development
 
-The shared [README](../README.md) describes Holosphere and daydream together.
+The shared [README](https://github.com/woundedlion/pov/blob/master/README.md) describes Holosphere and daydream together.
 Holosphere owns that file and mirrors it into this checkout.
 
 ## Source layout

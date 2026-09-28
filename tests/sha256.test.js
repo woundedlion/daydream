@@ -17,7 +17,7 @@ test('SHA-256 agrees with Node across UTF-8 block and padding boundaries', () =>
   }
 });
 
-test('a committed shader document keeps its recorded digests', () => {
+test('an installed shader document keeps its recorded digests', () => {
   const source = readFileSync(
     new URL('../generated/shader/patterns/example.shader.json', import.meta.url),
     'utf8',
