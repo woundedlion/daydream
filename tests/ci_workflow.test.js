@@ -89,7 +89,7 @@ const triggersOf = (source) => {
 // A workflow only workflow_call reaches is gated through its caller; every
 // other one is reachable on its own and needs a terminal job on the list.
 test('GATED_WORKFLOWS names every directly triggered workflow', () => {
-  assert.deepEqual(triggersOf(workflow), ['pull_request']);
+  assert.deepEqual(triggersOf(workflow), ['push', 'pull_request']);
   const direct = readdirSync(resolve(REPO, WORKFLOW_DIR)).filter((file) => /\.ya?ml$/.test(file))
     .map((file) => `${WORKFLOW_DIR}/${file}`)
     .filter((path) => triggersOf(readFileSync(resolve(REPO, path), 'utf8'))
