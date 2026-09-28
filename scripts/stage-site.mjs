@@ -25,7 +25,7 @@ export function sitePaths(root, bundle) {
   const screenshots = new Set(readFileSync(resolve(root, 'README.md'), 'utf8')
     .match(/docs\/screenshots\/[\w.-]+\.png/g) ?? []);
   const published = verified.filter((path) => entries.includes(path) || screenshots.has(path)
-    || (path.startsWith('generated/shader/patterns/') && path !== 'generated/shader/patterns/example.shader.json'));
+    || path.startsWith('generated/shader/patterns/'));
   return [...new Set([...entries.filter((path) => !ownedPath(path)), ...published])];
 }
 
