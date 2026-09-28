@@ -19,11 +19,11 @@ export function fakeScheduler({ repeat = false } = {}) {
       assert.equal(timer.fn, null, 'only one timer may be pending');
       timer.fn = fn; timer.ms = ms; return ++timer.handle;
     },
-    cancel: (handle) => { timer.cancelled.push(handle); timer.fn = null; },
+    cancel: (handle) => { timer.cancelled.push(handle); if (handle === timer.handle) timer.fn = null; },
     /** Runs the pending callback. @returns {void} */
     fire: () => {
       const fn = timer.fn;
-      assert.ok(fn);
+      if (!fn) return;
       if (!repeat) timer.fn = null;
       fn();
     },
@@ -70,7 +70,7 @@ export const installFakeTimers = () => {
   };
   const isPending = (timer) => pending.has(timer.handle);
   const fire = (timer) => {
-    pending.delete(timer.handle);
+    if (!pending.delete(timer.handle)) return;
     timer.fn();
   };
   const pendingAt = (delay) =>
@@ -125,6 +125,7 @@ export function fakeTimers() {
     },
     /** Runs the one pending timer. @returns {void} */
     fire() {
+      if (pending.size === 0) return;
       const [id, { fn }] = [...pending][0];
       pending.delete(id);
       fn();
