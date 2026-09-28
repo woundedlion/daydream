@@ -338,3 +338,11 @@ test('readbackMesh unpacks a mixed-degree face array', () => {
   assert.equal(meshData.vertices.length, 4);
   assert.deepEqual(meshData.vertices[3], { x: 1, y: 1, z: 0 });
 });
+for (const error of [new Error('base refused'), 'base refused']) {
+  test(`base build reports a recoverable ${typeof error} exception`, () => {
+    const { Mod } = fakeModule({ onOp: () => { throw error; } });
+    const { ctx, errors } = context(Mod);
+    assert.equal(quietly(() => buildChainMesh('cube', [], ctx)), null);
+    assert.deepEqual(errors, ['Base solid failed: base refused']);
+  });
+}
