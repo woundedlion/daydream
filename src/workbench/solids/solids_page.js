@@ -100,10 +100,7 @@ const state = {
 
 const baseThumbnails = {};
 
-// The most recently built mesh (JS-side copy), read by the stats panel,
-// index labels, and the internal-angle helper. Module-scoped — every reader
-// lives in this script (the window.* handlers below close over it), so it
-// needs no global.
+// JS mesh readback for stats, index labels, and internal angles.
 let currentMesh = null;
 // Per-face topology class ids for the Colorize Faces toggle, cached from the
 // last recompute. classifyFaces() needs the live WASM mesh, which update()
