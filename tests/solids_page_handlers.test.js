@@ -215,7 +215,7 @@ test('a refused topology tick repaints the restored chain', async () => {
   const painted = [];
   const state = { base: 'cube', ops: [{ op: 'truncate', params: { t: 0.4 } }] };
   const context = {
-    state, opsRevision: 1, OP_DEFS: {}, structuredClone,
+    state, opsRevision: 1, OP_DEFS: {}, structuredClone, parameterEdits: new Map(),
     document: { getElementById: () => ({ children: [] }) },
     opTopologyKey: (entry) => entry.params.t === 0.5,
     scheduleUpdate: { cancel() {} }, queueCommit: (fn) => { queued = fn; },
@@ -235,7 +235,7 @@ test('an accepted topology tick publishes only after validation', async () => {
   const state = { base: 'cube', ops: [{ op: 'truncate', params: { t: 0.4 } }] };
   const painted = [];
   const context = {
-    state, opsRevision: 1, OP_DEFS: {}, structuredClone,
+    state, opsRevision: 1, OP_DEFS: {}, structuredClone, parameterEdits: new Map(),
     document: { getElementById: () => ({ children: [] }) },
     opTopologyKey: (entry) => entry.params.t === 0.5,
     scheduleUpdate: { cancel() {} }, queueCommit: (fn) => { queued = fn; },
@@ -252,6 +252,28 @@ test('an accepted topology tick publishes only after validation', async () => {
   resolveCheck({ ok: true });
   await pending;
   assert.deepEqual(painted, [0.4, 0.5]);
+});
+
+test('a topology commit cannot overwrite an edit returning to the same value', async () => {
+  let queued;
+  let resolveCheck;
+  const state = { base: 'cube', ops: [{ op: 'truncate', params: { t: 0.49 } }] };
+  const context = {
+    state, opsRevision: 1, OP_DEFS: {}, structuredClone, parameterEdits: new Map(),
+    document: { getElementById: () => ({ children: [] }) },
+    opTopologyKey: (entry) => entry.params.t === 0.5,
+    scheduleUpdate: Object.assign(() => {}, { cancel() {} }),
+    queueCommit: (fn) => { queued = fn; },
+    chainIsValid: () => new Promise((resolve) => { resolveCheck = resolve; }),
+    showGateMsg() {}, renderOps() {}, update() {},
+  };
+  const edit = handler('updateOpParam', context);
+  edit(0, 't', '0.5', 1);
+  const pending = queued();
+  edit(0, 't', '0.49', 1);
+  resolveCheck({ ok: true });
+  await pending;
+  assert.equal(state.ops[0].params.t, 0.49);
 });
 
 test('saved solids discard non-object entries', () => {

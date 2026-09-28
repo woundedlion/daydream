@@ -1131,6 +1131,8 @@ function renderOps() {
   });
 }
 
+const parameterEdits = new Map();
+
 function updateOpParam(index, key, value, revision) {
   if (revision !== opsRevision || !state.ops[index]) return;
   // Snap onto the op's step grid (which also clamps to its range) and reject
@@ -1149,7 +1151,9 @@ function updateOpParam(index, key, value, revision) {
   } else if (def) {
     val = snapToStep(val, def);
   }
-  const previous = state.ops[index].params[key];
+  const editKey = `${revision}:${index}:${key}`;
+  const edit = Symbol();
+  parameterEdits.set(editKey, edit);
   const candidateOp = {
     op: state.ops[index].op,
     params: { ...state.ops[index].params, [key]: val },
@@ -1177,9 +1181,9 @@ function updateOpParam(index, key, value, revision) {
     candidate[index] = candidateOp;
     scheduleUpdate.cancel();
     queueCommit(async () => {
-      if (revision !== opsRevision || state.ops[index]?.params?.[key] !== previous) return;
+      if (revision !== opsRevision || parameterEdits.get(editKey) !== edit) return;
       const check = await chainIsValid(state.base, candidate);
-      if (revision !== opsRevision || state.ops[index]?.params?.[key] !== previous) return;
+      if (revision !== opsRevision || parameterEdits.get(editKey) !== edit) return;
       if (check.ok) {
         state.ops[index].params[key] = val;
         renderOps();
@@ -1187,7 +1191,7 @@ function updateOpParam(index, key, value, revision) {
         return;
       }
       showGateMsg(`rejected: ${check.message}`);
-      if (state.ops[index]?.params?.[key] === previous) {
+      if (parameterEdits.get(editKey) === edit) {
         renderOps();
         update();
       }
@@ -1220,6 +1224,7 @@ let opsRevision = 0;
  * @returns {void} */
 function setOps(next) {
   state.ops = next;
+  parameterEdits.clear();
   opsRevision++;
 }
 
