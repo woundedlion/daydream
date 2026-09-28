@@ -4,6 +4,17 @@ import assert from 'node:assert/strict';
 import { EngineHost } from '../src/engine/engine_host.js';
 import { unpinnedEngineMethods } from './helpers/fake_engine.js';
 
+test('a RuntimeError latches death without a module flag and prevents deletion', () => {
+  const host = new EngineHost();
+  let deleted = false;
+  host.engine = { delete() { deleted = true; } };
+  assert.equal(host.moduleDead(new Error('ordinary')), false);
+  assert.equal(host.moduleDead(new WebAssembly.RuntimeError('out of bounds')), true);
+  host.dispose();
+  assert.equal(deleted, false);
+  assert.equal(host.moduleDead(), true);
+});
+
 function pixelEngine(getPixels, getBufferLength) {
   return { getPixels, getBufferLength };
 }

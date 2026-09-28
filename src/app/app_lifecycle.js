@@ -339,7 +339,7 @@ export const MODULE_TRAP_NOTICE = 'The rendering engine hit an unrecoverable'
  * @param {(message: string) => void} deps.report - Renders the failure banner.
  * @param {(message: string) => void} [deps.clearReport] - Clears a recovered failure.
  * @param {(...args: *) => void} [deps.logError] - Console sink for the throw.
- * @param {() => boolean} [deps.moduleDead] - Reads the engine module's death
+ * @param {(error?: *) => boolean} [deps.moduleDead] - Reads the engine module's death
  *   flag; polled before and after the frame, so it has to stay a cheap read.
  * @param {() => void} [deps.onModuleDead] - Releases the app once the module is
  *   dead. Runs after the banner, which the release leaves standing.
@@ -369,8 +369,8 @@ export function createFrameLoopGuard({
    * banner, release, no further frames.
    * @returns {void}
    */
-  function checkDead() {
-    if (dead || !moduleDead()) return;
+  function checkDead(/** @type {*} */ error = undefined) {
+    if (dead || !moduleDead(error)) return;
     // Latched before the release, so a release that throws still leaves the
     // loop stopped rather than resuming into a dead module.
     dead = true;
@@ -390,6 +390,8 @@ export function createFrameLoopGuard({
         clean = 0;
       }
     } catch (e) {
+      checkDead(e);
+      if (dead) return;
       clean = 0;
       if (!reported) {
         reported = true;

@@ -51,7 +51,7 @@ export const ApplyResult = Object.freeze({
  * @param {() => string} apply - Applies the requested state, returning an
  *   ApplyResult; anything but APPLIED is a rejection.
  * @param {Function} rollback - Restores the previous applied state.
- * @param {() => boolean} [moduleDead] - Reads whether a thrown apply trapped
+ * @param {(error?: *) => boolean} [moduleDead] - Reads whether a thrown apply trapped
  *   the engine module, in which case no rollback call is safe.
  * @returns {{applied: boolean, failure: any|null, recoveryFailure: any|null,
  *   moduleDead?: boolean}}
@@ -64,7 +64,7 @@ export function runSwitchTransaction(apply, rollback, moduleDead = () => false) 
     }
   } catch (error) {
     failure = error;
-    if (moduleDead()) {
+    if (moduleDead(error)) {
       return { applied: false, failure, recoveryFailure: null, moduleDead: true };
     }
   }
@@ -211,7 +211,7 @@ export function switchFailureReport(label, result) {
  * @param {(message: string, error: any) => void} deps.logError - Console sink.
  * @param {(message: string|null) => void} deps.showNotice - Recoverable error sink.
  * @param {(message: string) => void} deps.showFatal - Fatal-banner sink.
- * @param {() => boolean} [deps.moduleDead] - Reads whether the engine module
+ * @param {(error?: *) => boolean} [deps.moduleDead] - Reads whether the engine module
  *   trapped after an apply threw.
  * @param {() => boolean} [deps.usesFullConfigSnapshot] - Whether the live effect
  *   persists through the exhaustive versioned snapshot API, which the panel
@@ -363,7 +363,7 @@ export function createSwitchCoordinator({
  *   itself.
  * @param {(message: string, error?: any) => void} [deps.logError] - Console sink.
  * @param {(message: string, error?: any) => void} [deps.logWarn] - Console sink.
- * @param {() => boolean} [deps.moduleDead] - Reads whether the engine module
+ * @param {(error?: *) => boolean} [deps.moduleDead] - Reads whether the engine module
  *   trapped. A trap is terminal for the whole module, so a sidebar query that
  *   tripped one is re-thrown rather than degraded to a warning.
  * @returns {{applyEffect: (preserveParams?: boolean) => string,
@@ -491,12 +491,12 @@ export function createApplyPipeline({
       // later call is a recovery path, so a dead module leaves through the throw.
       try { effectSizes = engine.getEffectSizes(); }
       catch (e) {
-        if (moduleDead()) throw e;
+        if (moduleDead(e)) throw e;
         logWarn('getEffectSizes failed (sidebar sizes unavailable):', e);
       }
       try { presetCounts = engine.getEffectPresetCounts(); }
       catch (e) {
-        if (moduleDead()) throw e;
+        if (moduleDead(e)) throw e;
         logWarn('getEffectPresetCounts failed (sidebar preset counts unavailable):', e);
       }
     }
