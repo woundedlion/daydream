@@ -534,22 +534,6 @@ select.chain-param-control {
   background-color: var(--background-color);
 }
 
-/* ── Narrow viewports ────────────────────────────────────────────────────── */
-
-@media (max-width: 768px) {
-  .chain-strip {
-    flex-wrap: nowrap;
-  }
-
-  .chain-band {
-    flex: 0 0 auto;
-  }
-
-  .chain-chip-params {
-    max-width: none;
-  }
-}
-
 .chain-chip:focus-visible {
   outline: 3px solid var(--bright-text);
   outline-offset: 3px;
