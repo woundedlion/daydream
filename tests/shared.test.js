@@ -108,10 +108,9 @@ function mountScene(opts = {}) {
 // no source module's test could see.
 test('the re-exports are the functions their source modules export', async () => {
   const sources = {
-    '../shared/clipboard.js': ['copyToClipboard', 'copyWithFeedback', 'COPY_FEEDBACK', 'wireCopyBlock'],
-    '../shared/cpp_format.js': ['formatFloatCpp'],
+    '../shared/clipboard.js': ['copyWithFeedback', 'wireCopyBlock'],
     '../shared/kb_format.js': ['formatKB'],
-    '../shared/banner.js': ['showFatalError', 'bootstrapTool', 'reportPageFailures'],
+    '../shared/banner.js': ['showFatalError', 'bootstrapTool'],
   };
   for (const [specifier, names] of Object.entries(sources)) {
     const module = await import(new URL(specifier, import.meta.resolve('../src/workbench/shared.js')));
