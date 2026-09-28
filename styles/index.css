@@ -120,8 +120,11 @@
   background: rgb(var(--bright-text-rgb) / 0.3);
 }
 
-.nav-license {
-  margin-left: auto;
+.license-link {
+  position: fixed;
+  right: 10px;
+  bottom: 10px;
+  z-index: 2000;
   padding: 8px 4px;
   color: rgb(var(--bright-text-rgb) / 0.7);
   text-decoration: none;
@@ -130,7 +133,7 @@
   white-space: nowrap;
 }
 
-.nav-license:hover {
+.license-link:hover {
   color: var(--bright-text);
   text-decoration: underline;
 }
@@ -573,10 +576,8 @@
     display: none;
   }
 
-  .nav-license {
-    margin-left: 0;
-    padding: 5px 2px;
-    font-size: 10px;
+  .license-link {
+    display: none;
   }
 
   .tab {
@@ -781,7 +782,7 @@
     align-items: flex-start;
     flex-wrap: wrap;
     width: auto;
-    right: 72px;
+    right: 0;
     top: 0;
     bottom: auto;
     pointer-events: none;
