@@ -958,7 +958,7 @@ test('a trapped resolution query stops the startup instead of booting on', async
 test('a workbench init that trapped the module releases the app', () => {
   const at = SOURCE.indexOf('shaderDocuments?.init().catch(');
   assert.ok(at >= 0, 'the workbench init rejection must stay handled');
-  assert.match(sliceTo(at, 'WORKBENCH_NOTICE);'), /abandonOnModuleDeath\(\)/,
+  assert.match(sliceTo(at, 'WORKBENCH_NOTICE);'), /abandonOnModuleDeath\(err\)/,
     'a trap is terminal for the whole module, not for the call that tripped it: '
     + 'without the death read the rejection is reported as an ordinary workbench '
     + 'failure and the simulator keeps calling into a shortened shadow stack');

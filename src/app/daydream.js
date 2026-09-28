@@ -252,8 +252,8 @@ export function start({
    * unreported (-sASSERTIONS=0). No call is a recovery path.
    * @returns {boolean} Whether the module is dead and the app was released.
    */
-  function abandonOnModuleDeath() {
-    if (!host.moduleDead()) return false;
+  function abandonOnModuleDeath(error) {
+    if (!host.moduleDead(error)) return false;
     console.error('Startup stopped: the rendering engine trapped.');
     reportBootFailure(MODULE_TRAP_NOTICE, { document: doc, location: win.location });
     appTeardown?.dispose();
@@ -272,7 +272,7 @@ export function start({
     try { supported = module.HolosphereEngine.getSupportedResolutions(); }
     catch (e) {
       console.warn('getSupportedResolutions failed (offering every preset):', e);
-      if (abandonOnModuleDeath()) return false;
+      if (abandonOnModuleDeath(e)) return false;
     }
 
     const { labels, unlabeled } = offeredResolutions(resolutionPresets, supported);
@@ -376,14 +376,14 @@ export function start({
         // listener and cover a running simulator with the fatal banner.
         shaderDocuments?.init().catch((err) => {
           console.error('The shader workbench could not be initialized:', err);
-          if (abandonOnModuleDeath()) return;
+          if (abandonOnModuleDeath(err)) return;
           applyNotice.show(
             `The shader workbench could not be initialized: ${errorDetail(err)}`,
             WORKBENCH_NOTICE);
         });
       } catch (err) {
         console.error('Initial resolution/effect could not be applied:', err);
-        if (abandonOnModuleDeath()) return;
+        if (abandonOnModuleDeath(err)) return;
         const title = 'No supported resolution and effect could be applied.';
         reportBootFailure(err, { document: doc, location: win.location, title });
         // The rejected apply has already moved the engine, pool, driver and
@@ -552,7 +552,7 @@ export function start({
     driver: daydream,
     sidebar,
     muteSubscription: (write) => switches.mute(write),
-    moduleDead: () => host.moduleDead(),
+    moduleDead: (error) => host.moduleDead(error),
   });
 
   const switches = createSwitchCoordinator({
@@ -571,7 +571,7 @@ export function start({
     logError: (message, error) => console.error(message, error),
     showNotice: (message) => applyNotice.show(message, SWITCH_NOTICE),
     showFatal: showFatalError,
-    moduleDead: () => host.moduleDead(),
+    moduleDead: (error) => host.moduleDead(error),
     usesFullConfigSnapshot,
   });
 
@@ -676,7 +676,7 @@ export function start({
     },
     report: showFatalError,
     clearReport: clearFatalError,
-    moduleDead: () => host.moduleDead(),
+    moduleDead: (error) => host.moduleDead(error),
     onModuleDead: () => appTeardown?.dispose(),
   }));
 

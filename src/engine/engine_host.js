@@ -3,6 +3,8 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import { engineHalted } from '../shared/engine_halt.js';
+
 import { refreshPixelView as computePixelView } from "../renderer/pixel_view.js";
 
 /** @typedef {import('../../generated/holosphere_wasm.js').HolosphereEngine} HolosphereEngine */
@@ -48,11 +50,12 @@ export class EngineHost {
    * while writing past its end. No call recovers, so the state is terminal and
    * latches here: a read after dispose() has dropped the module reference still
    * reports dead. A plain property read, cheap enough for a per-frame caller.
+   * @param {*} [error] - Error from an engine call.
    * @returns {boolean} Whether the module has trapped.
    */
-  moduleDead() {
+  moduleDead(error = undefined) {
     if (this.dead) return true;
-    this.dead = this.module?.HS_MODULE_DEAD === true;
+    this.dead = engineHalted(error, this.module);
     return this.dead;
   }
 
