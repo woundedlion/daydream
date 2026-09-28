@@ -1372,6 +1372,18 @@ test('createChainValidator serializes overlapping tasks', async () => {
 const CANDIDATES = ['kis', 'ambo', 'dual'];
 
 /** Verifies a clean sweep blocks nothing and reports itself complete. */
+test('createOpGate joins concurrent refreshes for the same signature', async () => {
+  const { Mod } = fakeModule();
+  const validator = createChainValidator(async () => Mod);
+  let sweeps = 0;
+  const withValidator = validator.withValidator;
+  validator.withValidator = (...args) => { sweeps++; return withValidator(...args); };
+  const gate = createOpGate(validator);
+  const results = await Promise.all(Array.from({ length: 30 }, () => gate.refresh('cube', [], CANDIDATES)));
+  assert.equal(sweeps, 1);
+  assert.ok(results.every((result) => result === results[0]));
+});
+
 test('createOpGate clears every candidate that replays', async () => {
   const { Mod, state } = fakeModule();
   const gate = createOpGate(createChainValidator(async () => Mod));
