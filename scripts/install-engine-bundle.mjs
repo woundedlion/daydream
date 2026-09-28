@@ -19,10 +19,7 @@ const REQUIRED_PATHS = new Set(['README.md', 'generated/holosphere_wasm.js', 'ge
   'generated/pov_segment_map.json', 'generated/shader/shader_workbench.mjs', 'generated/shader/sha256.mjs',
   'generated/shader/engine_catalog.json']);
 
-export const ownedPath = (path) => REQUIRED_PATHS.has(path)
-  || /^generated\/shader\/patterns\/[^/]+\.shader\.json$/.test(path)
-  || path === 'generated/shader/patterns/shaderball_migration.json'
-  || /^docs\/screenshots\/.+\.png$/.test(path);
+export const ownedPath = runtimePath;
 
 export function verifyEngineBundle(bundle, destination = bundle) {
   bundle = resolve(bundle);
