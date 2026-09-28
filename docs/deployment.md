@@ -2,8 +2,11 @@
 
 A push to daydream master, a manual deployment, or a `holosphere-engine-ready`
 repository dispatch resolves the current master commits of daydream and
-Holosphere. A five-minute schedule reconciles engine-only pushes without a
-cross-repository dispatch credential. Identical successful pairs are skipped.
+Holosphere. A schedule requests reconciliation every five minutes without a
+cross-repository dispatch credential. GitHub may delay or drop scheduled runs;
+engine-only pushes have no guaranteed deployment latency. A manual deployment
+or configured repository dispatch requests an immediate run. Identical successful
+pairs are skipped.
 Old queued workflows also skip when their own source commit differs from the
 selected daydream commit.
 
