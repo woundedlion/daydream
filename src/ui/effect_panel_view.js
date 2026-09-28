@@ -3,6 +3,10 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+/** @typedef {{property: string, domElement: HTMLElement, $select?: HTMLSelectElement, $input?: HTMLInputElement, $button?: HTMLButtonElement}} PanelController */
+/** @typedef {{domElement: HTMLElement, closed: boolean, open: (open?: boolean) => void, close: () => void}} PanelFolder */
+/** @typedef {{gui: PanelFolder, controllerByName?: Map<string, PanelController>, pause: {controller?: PanelController}, actionControllers?: PanelController[], stageFolders?: Map<string, PanelFolder>}} PanelRecord */
+
 /**
  * The key one of the panel's own controls is remembered under across a rebuild,
  * outside the namespace the engine parameter names occupy.
@@ -16,8 +20,8 @@ function panelControlKey(property) {
 /**
  * The focusable widget a lil-gui controller built: a dropdown's select, an
  * input, or a button, whichever its control kind owns.
- * @param {Object|undefined} controller - A controller from an effect record.
- * @returns {Object|null} The element that takes focus, or null.
+ * @param {PanelController|undefined} controller - A controller from an effect record.
+ * @returns {HTMLElement|null} The element that takes focus, or null.
  */
 export function focusWidget(controller) {
   return controller?.$select ?? controller?.$input
@@ -29,8 +33,9 @@ export function focusWidget(controller) {
  * @param {{focusedElement: () => *, guiContainer: *, isMobile: () => boolean}} dependencies
  */
 export function createEffectPanelView({ focusedElement, guiContainer, isMobile }) {
+  /** @type {boolean|undefined} */
   let mountClosedOverride;
-  /** Return the element that owns a GUI panel's vertical scroll offset. */
+  /** @param {PanelFolder|undefined} gui @returns {HTMLElement|null} */
   function scrollElement(gui) {
     return gui?.domElement?.querySelector?.('.lil-children') ?? null;
   }
@@ -39,8 +44,8 @@ export function createEffectPanelView({ focusedElement, guiContainer, isMobile }
    * Every controller a rebuilt panel can hand keyboard focus back to, keyed by
    * the property it binds: the parameters, the pause toggle, the preset
    * selector, then the action row's buttons.
-   * @param {Object|null} fx - An effect record, or null.
-   * @returns {Array<[string, Object]>} Property/controller pairs.
+   * @param {PanelRecord|null} fx - An effect record, or null.
+   * @returns {Array<[string, PanelController]>} Property/controller pairs.
    */
   function panelControllers(fx) {
     if (!fx) return [];
@@ -56,7 +61,7 @@ export function createEffectPanelView({ focusedElement, guiContainer, isMobile }
    * Which control holds keyboard focus. Discarding the focused control drops
    * focus to <body>, so a rebuild that renames nothing can still cost a full
    * document re-traverse to get back to the panel.
-   * @param {Object|null} fx - The effect record about to be replaced.
+   * @param {PanelRecord|null} fx - The effect record about to be replaced.
    * @returns {string|null} The bound property, or null when focus is elsewhere.
    */
   function focusedControlProperty(fx) {
@@ -71,7 +76,7 @@ export function createEffectPanelView({ focusedElement, guiContainer, isMobile }
   /**
    * Capture the panel's scroll offset, focused control, and per-stage folder
    * collapse state ahead of a rebuild.
-   * @param {Object|null} fx - The effect record about to be replaced.
+   * @param {PanelRecord|null} fx - The effect record about to be replaced.
    * @returns {{scrollTop: number, property: string|null, closed: boolean,
    *   stagesClosed: Map<string, boolean>}} The captured state.
    */
@@ -92,7 +97,7 @@ export function createEffectPanelView({ focusedElement, guiContainer, isMobile }
    * Re-seat a captured scroll offset and keyboard focus on the record that
    * replaced the captured one. A detached element cannot hold focus, so the
    * replacement must already be mounted.
-   * @param {Object|null} fx - The record now published.
+   * @param {PanelRecord|null} fx - The record now published.
    * @param {{scrollTop: number, property: string|null, closed: boolean,
    *   stagesClosed: Map<string, boolean>}} captured - The state
    *   capturePanelFocus() returned. A stage the replacement does not carry is
@@ -121,7 +126,7 @@ export function createEffectPanelView({ focusedElement, guiContainer, isMobile }
 
   /**
    * Mount one effect record in the current GUI container.
-   * @param {Object} fx - Record to mount.
+   * @param {PanelRecord} fx - Record to mount.
    * @param {boolean} [closed] - Initial panel state; defaults to a pending
    *   rebuild state or the mobile layout default.
    * @returns {void}
@@ -141,6 +146,7 @@ export function createEffectPanelView({ focusedElement, guiContainer, isMobile }
     capture: capturePanelFocus,
     restore: restorePanelFocus,
     mount: mountEffect,
+    /** @param {boolean} closed @param {() => void} apply */
     rebuild(closed, apply) {
       mountClosedOverride = closed;
       try { apply(); } finally { mountClosedOverride = undefined; }

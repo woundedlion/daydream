@@ -37,13 +37,13 @@ export class EffectPanelEdits {
     if (edited !== null) this.write(edited);
   }
 
-  /** Observe pointer identity without capturing lil-gui's mouse gesture. */
+  /** @param {import("./effect_panel_view.js").PanelController & {dragging: boolean}} controller */
   trackDrag(controller) {
     controller.domElement.addEventListener('pointerdown', (event) => {
       if (!event.isPrimary || event.button !== 0 || controller.dragging) return;
       const { pointerId } = event;
       controller.dragging = true;
-      const end = (release) => {
+      const end = (/** @type {Event & {pointerId?: number}} */ release) => {
         if (release.type !== 'blur' && release.pointerId !== pointerId) return;
         controller.dragging = false;
         for (const type of DRAG_END_EVENTS) this.dragTarget.removeEventListener(type, end);
@@ -59,7 +59,7 @@ export class EffectPanelEdits {
   trackKeyboard(controller) {
     const widget = focusWidget(controller);
     if (!widget) return;
-    widget.addEventListener('keydown', (event) => {
+    widget.addEventListener('keydown', (/** @type {KeyboardEvent} */ event) => {
       if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
         this.activeKeyEdits.add(controller);
       }
