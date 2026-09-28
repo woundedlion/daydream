@@ -113,11 +113,11 @@ export const DEFAULT_EFFECT = 'IslamicStars';
 // resolution. The dropdown offers only the subset the engine reports through
 // getSupportedResolutions(). Null prototype: a URL string indexes this table, and
 // an inherited key ("constructor", "toString") would answer as a preset.
-export const resolutionPresets = {
-  __proto__: null,
+/** @type {Record<string, {h: number, w: number, dotSize: number, favorites: string[]}>} */
+export const resolutionPresets = Object.assign(Object.create(null), {
   "Holosphere (96x20)": { h: 20, w: 96, dotSize: 2, favorites: LoResFavorites },
   "Phantasm (288x144)": { h: 144, w: 288, dotSize: 0.25, favorites: HiResFavorites },
-};
+});
 
 /**
  * The effect list offered at a resolution.

@@ -12,7 +12,11 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ES2022", "DOM", "WebWorker"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "WebWorker"
+    ],
     "skipLibCheck": true,
     "types": []
   },
@@ -78,6 +82,9 @@
     "src/workbench/solids/solid_codegen.js",
     "src/workbench/solids/solid_op_rows.js",
     "src/workbench/solids/solid_registry_codegen.js",
-    "src/workbench/solids/solid_render.js"
+    "src/workbench/solids/solid_render.js",
+    "src/ui/effect_panel_edits.js",
+    "src/ui/effect_panel_view.js",
+    "src/effects/effect_roster.js"
   ]
 }
