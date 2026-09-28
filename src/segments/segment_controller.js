@@ -511,6 +511,7 @@ export class SegmentController {
     this.#frameSeen = new Array(numSegments).fill(false);
     this.paramValues = null;
     this.refreshPresetState();
+    this.animationsPaused = this.getWasmEngine()?.getAnimationsPaused?.() ?? this.animationsPaused;
     this.#ready = false;
 
     const res = this.resolutionPresets[this.appState.get('resolution')];
