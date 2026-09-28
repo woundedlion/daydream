@@ -194,7 +194,7 @@ test('the engine checkout can fetch a pin after master advances', () => {
   const checkout = workflow.match(
     /- name: Checkout the pinned engine\n[\s\S]*?(?=\n\s{6}- )/,
   )?.[0] ?? '';
-  assert.match(checkout, /fetch-depth: 0/);
+  assert.match(checkout, /fetch-depth: 1/);
 });
 
 // The engine-parity cases above and the hook cases skip without their flag, so
