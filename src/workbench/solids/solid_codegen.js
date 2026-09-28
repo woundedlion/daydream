@@ -1334,6 +1334,8 @@ export function opTopologyKey(o) {
  */
 export function createOpGate(validator, retries = 3) {
   let generation = 0;
+  /** @type {{signature: string, promise: Promise<?OpGateVerdict>}|null} */
+  let pending = null;
   /** @type {?string} */
   let lastSignature = null;
   let failures = 0;
@@ -1347,15 +1349,16 @@ export function createOpGate(validator, retries = 3) {
    * @param {?SolidMesh} seedMesh - The current chain's readback mesh, used to
    *   seed each candidate the way the page would seed it; null falls back to
    *   the OP_DEFS defaults.
+   * @param {number} started - Refresh generation.
    * @returns {Promise<{bad: Set<string>, complete: boolean}>} The ops that would
    *   trap, and whether the sweep ever got a full pass against a live module.
    *   Where it did not, `bad` is only a lower bound on what would trap.
    */
-  function probe(base, ops, candidates, seedMesh) {
+  function probe(base, ops, candidates, seedMesh, started) {
     return validator.withValidator(async (Mod) => {
       /** @type {Set<string>} */
       const bad = new Set();
-      if (!Mod) return { bad, complete: false };
+      if (!Mod || started !== generation) return { bad, complete: false };
       /**
        * Replays the standing chain on a validator instance.
        * @param {WasmModule} M - The live validator instance.
@@ -1422,6 +1425,11 @@ export function createOpGate(validator, retries = 3) {
       };
 
       for (const op of candidates) {
+        if (started !== generation) {
+          try { mesh.delete(); Mod.MeshOps.clearToolingMemory(); }
+          catch (e) { validator.noteDeath(e); }
+          return { bad, complete: false };
+        }
         /** @type {{op: string, params: Object<string, number>}} */
         const candidate = { op, params: seedOpParams(op, seedMesh) };
         let verdict = attempt(Mod, candidate);
@@ -1461,18 +1469,26 @@ export function createOpGate(validator, retries = 3) {
    */
   async function refresh(base, ops, candidates, mesh = null) {
     const signature = `${base}|${ops.map(opTopologyKey).join(',')}`;
+    if (pending?.signature === signature) return pending.promise;
     const started = ++generation;
     if (abandoned || signature === lastSignature) return null;
-    const { bad, complete } = await probe(base, structuredClone(ops), candidates, mesh);
-    if (started !== generation) return null;
+    const promise = settle();
+    pending = { signature, promise };
+    try { return await promise; }
+    finally { if (pending?.promise === promise) pending = null; }
 
-    if (complete) {
-      lastSignature = signature;
-      failures = 0;
-    } else if (++failures >= retries) {
-      abandoned = true;
+    async function settle() {
+      const { bad, complete } = await probe(base, structuredClone(ops), candidates, mesh, started);
+      if (started !== generation) return null;
+
+      if (complete) {
+        lastSignature = signature;
+        failures = 0;
+      } else if (++failures >= retries) {
+        abandoned = true;
+      }
+      return { blocked: bad, complete, abandoned };
     }
-    return { blocked: bad, complete, abandoned };
   }
 
   return { refresh };
