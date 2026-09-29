@@ -47,8 +47,7 @@ jobs:
         run: |
           pin="$SELECTED_PIN"
           if [ -z "$pin" ]; then
-            pin="$(gh api 'repos/woundedlion/pov/actions/workflows/ci.yml/runs?branch=master&status=success&per_page=100' \
-              --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")][0].head_sha // empty')"
+            pin="$(gh api repos/woundedlion/pov/commits/master --jq .sha)"
           fi
           if ! printf '%s' "$pin" | grep -Eq '^[0-9a-f]{40}$'; then
             echo "::error::Selected engine must be one full commit"
