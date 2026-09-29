@@ -305,6 +305,27 @@ test('engine bundle API failures stop the gate instead of entering its poll time
   assert.match(gate, /actions: read/);
 });
 
+test('engine selection snapshots current master and preserves an explicit pair', (t) => {
+  const gate = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/engine-bundle.yml`), 'utf8');
+  const block = gate.split('      - name: Resolve engine pin\n')[1].split('      - name:')[0];
+  const body = block.split('        run: |\n')[1].replace(/^ {10}/gm, '');
+  const current = 'a'.repeat(40);
+  const selected = 'b'.repeat(40);
+  const shell = process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash';
+  const scratch = mkdtempSync(join(tmpdir(), 'daydream-engine-selection-'));
+  t.after(() => rmSync(scratch, { recursive: true, force: true }));
+  for (const pin of ['', selected]) {
+    const output = join(scratch, pin || 'master');
+    const result = spawnSync(shell, ['-e', '-s'], {
+      encoding: 'utf8',
+      input: `gh() {\n  test "$*" = 'api repos/woundedlion/pov/commits/master --jq .sha' || return 1\n  test -z "$SELECTED_PIN" || return 1\n  printf '%s\\n' '${current}'\n}\n${body}`,
+      env: { ...process.env, SELECTED_PIN: pin, GITHUB_OUTPUT: output.replaceAll('\\', '/') },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(readFileSync(output, 'utf8').trim(), `pin=${pin || current}`);
+  }
+});
+
 test('actionlint enumerates both workflow extensions', () => {
   const suite = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/js-unit-suite.yml`), 'utf8').replaceAll('\r\n', '\n');
   assert.ok(suite.includes("git ls-files -- '.github/workflows/*.yml' '.github/workflows/*.yaml'"));
