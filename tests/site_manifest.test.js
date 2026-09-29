@@ -229,6 +229,7 @@ const UNREFERENCED = [
 
 const PATTERNS = 'generated/shader/patterns';
 const MIGRATION = `${PATTERNS}/shaderball_migration.json`;
+const DIGEST_MIGRATION = 'src/workbench/shader/patterns/digest_migration.v1v2.json';
 const missingCatalog = sourceOnly && !existsSync(resolve(REPO, MIGRATION));
 
 // Documents in the pattern directory that are not source documents: the
@@ -236,23 +237,21 @@ const missingCatalog = sourceOnly && !existsSync(resolve(REPO, MIGRATION));
 // digest table, published for its own sake.
 const PATTERN_NON_SOURCES = [
   MIGRATION,
-  'src/workbench/shader/patterns/digest_migration.v1v2.json',
+  DIGEST_MIGRATION,
 ];
 
-// Pattern documents nothing served fetches: the compiler's worked example is a
-// test input, like the v1 expansion fixtures under src/workbench/shader/patterns/v1/, and
-// stays off Pages.
-const PATTERN_UNPUBLISHED = [`${PATTERNS}/example.shader.json`];
+/** @type {string[]} */
+const PATTERN_UNPUBLISHED = [];
 
 /**
- * The pattern documents the served set must hold. The source catalog fetches
- * `${PATTERNS}/<filename>` for every shaderball_migration.json source document,
- * so the static reference walk cannot reach them.
+ * Pattern documents fetched by the source catalog and legacy digest links.
  * @returns {Set<string>} Repo-relative pattern document paths.
  */
 const servedPatterns = () => new Set([
   ...Object.values(missingCatalog ? {} : JSON.parse(read(MIGRATION)).source_documents).map(
     (/** @type {*} */ filename) => `${PATTERNS}/${filename}`),
+  ...Object.values(JSON.parse(read(DIGEST_MIGRATION))).map(
+    (filename) => `${PATTERNS}/${filename}`),
   ...PATTERN_NON_SOURCES,
 ]);
 
@@ -290,7 +289,7 @@ test('the site manifest publishes nothing the served pages do not reach', () => 
       'thing keeping dev tooling off Pages');
 });
 
-test('the site manifest publishes exactly the pattern documents the catalog fetches',
+test('the site manifest publishes exactly the catalog and legacy digest documents',
   { skip: missingCatalog && 'engine catalog is installed separately' }, () => {
   const served = new Set([...servedPatterns()].filter((entry) => entry.startsWith(`${PATTERNS}/`)));
   const listed = new Set(
@@ -298,18 +297,18 @@ test('the site manifest publishes exactly the pattern documents the catalog fetc
   const files = patternFiles();
 
   assert.deepEqual([...served].filter((doc) => !listed.has(doc)).sort(), [],
-    `${MANIFEST} omits pattern documents the source catalog fetches by name — ` +
+    `${MANIFEST} omits pattern documents the catalog or legacy digest links fetch — ` +
       'they would 404 on Pages');
   assert.deepEqual([...listed].filter((doc) => !served.has(doc)).sort(), [],
-    `${MANIFEST} publishes pattern documents ${MIGRATION} does not name`);
+    `${MANIFEST} publishes pattern documents neither catalog nor digest migration names`);
   assert.deepEqual(PATTERN_UNPUBLISHED.filter((doc) => !files.includes(doc)), [],
     `the unpublished allowlist names documents ${PATTERNS} no longer holds`);
   assert.deepEqual(
     files.filter((doc) => !served.has(doc) && !PATTERN_UNPUBLISHED.includes(doc)).sort(), [],
-    `${PATTERNS} holds documents ${MIGRATION} does not name, so nothing demands ` +
+    `${PATTERNS} holds documents neither catalog nor digest migration names, so nothing demands ` +
       `a ${MANIFEST} entry for them`);
   assert.deepEqual([...served].filter((doc) => !files.includes(doc)).sort(), [],
-    `${MIGRATION} names source documents that are not on disk`);
+    'Catalog or digest migration names documents that are not on disk');
 });
 
 test('the deploy workflow stages the site from the committed manifest', () => {
