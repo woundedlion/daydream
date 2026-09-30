@@ -91,6 +91,15 @@
         <section id="gui-container" class="gui-container" aria-label="Controls"></section>
         <a href="LICENSE" class="license-link" target="_blank" rel="noopener">Licenses<span class="visually-hidden"> (opens in a new window)</span></a>
     </div>
+    <script>
+        window.addEventListener('error', (event) => {
+            const overlay = document.getElementById('loading-overlay');
+            if (!overlay || overlay.classList.contains('error') || !(event.error instanceof SyntaxError)) return;
+            overlay.classList.add('error');
+            overlay.setAttribute('role', 'alert');
+            overlay.textContent = 'Unable to load the application. Reload the page to try again.';
+        }, { once: true });
+    </script>
     <script type="module" src="src/app/main.js" onerror="const overlay = document.getElementById('loading-overlay'); overlay.classList.add('error'); overlay.setAttribute('role', 'alert'); overlay.textContent = 'Unable to load the application. Reload the page to try again.';"></script>
 </body>
 
