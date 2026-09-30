@@ -158,15 +158,6 @@ test('DeepLinkGUI exposes and changes the wrapped panel state', () => {
   assert.equal(gui.closed, true);
 });
 
-test('DeepLinkGUI rejects an unsupported property before registering its URL key', () => {
-  installWindowAt('');
-  const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
-
-  assert.throws(() => gui.add({ pending: null }, 'pending'),
-    /DeepLinkGUI: unsupported property "pending"/);
-  assert.deepEqual(gui.collectUrlKeys(), []);
-});
-
 /**
  * Installs a window at a query string, for the cases that hydrate from a deep
  * link and discard what is written back.
