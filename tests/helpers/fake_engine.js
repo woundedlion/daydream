@@ -159,10 +159,10 @@ export class FakeChainEngine {
     const malformed = { status: ChainStatus.MALFORMED_PAYLOAD, code: 'MALFORMED_PAYLOAD', entryIndex: -1 };
     if (!Array.isArray(entries)) return malformed;
     if (entries.length > this.catalog.budgets.max_chain_ops) return refusal('TOO_LONG');
-    for (const entry of entries) {
+    for (const [index, entry] of entries.entries()) {
       if (entry === null || typeof entry !== 'object'
           || typeof entry.instance !== 'string'
-          || typeof entry.operator !== 'string') return malformed;
+          || typeof entry.operator !== 'string') return refusal('MALFORMED_PAYLOAD', index);
     }
     if (this.nextChainResult !== null) {
       const injected = this.nextChainResult;
