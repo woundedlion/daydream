@@ -143,6 +143,7 @@ const ENGINE_CPP_TO_JS = [
   [/\bconst(?:expr)? float\b/g, 'const'],
   [/\bfloat\b/g, 'let'],
   [/\bstd::(max|min|abs)\(/g, 'Math.$1('],
+  [/\bf(max|min)f\(/g, 'Math.$1('],
   [/\bsqrtf\(/g, 'Math.sqrt('],
   [/\bmath::Complex\b/g, 'Complex'],
   [/\b(?:projections::)?stereographic_detail::radial_scale\b/g, 'radial_scale'],
@@ -195,7 +196,7 @@ function transpileEngineComplex(src, name, params, bindings) {
     body = body.replace(pattern, /** @type {string} */ (replacement));
   }
   body = complexToObject(body);
-  assert.doesNotMatch(body, /::|sqrtf|\bfloat\b|\bComplex\b/,
+  assert.doesNotMatch(body, /::|\b(?:sqrtf|fminf|fmaxf|float|Complex)\b/,
     `${name} still holds C++ this reader cannot translate: ${body}`);
   return Function(...Object.keys(bindings),
     `return function(${params.join(', ')}) { ${body} };`)(...Object.values(bindings));
