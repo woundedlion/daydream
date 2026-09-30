@@ -18,12 +18,18 @@ import { EffectSetResult, ResolutionSetResult } from './helpers/fake_engine.js';
 function makeEffectControls(values, paused = false, sinks = null) {
   const state = { ...values };
   const animationState = { pause: paused };
+  const engine = { paused };
   const controllerByName = new Map();
   for (const name of Object.keys(values)) {
     controllerByName.set(name, {
       getValue: () => state[name],
       setValue: (value) => {
+        if (state[name] === value) return;
         state[name] = value;
+        if (name !== 'Telemetry') {
+          engine.paused = true;
+          animationState.pause = true;
+        }
         if (sinks) {
           sinks.events.push(`param:${name}`);
         }
@@ -32,7 +38,9 @@ function makeEffectControls(values, paused = false, sinks = null) {
   }
   const pauseController = {
     setValue: (value) => {
+      if (animationState.pause === value) return;
       animationState.pause = value;
+      engine.paused = value;
       if (sinks) {
         sinks.events.push(`pause:${value}`);
       }
@@ -40,6 +48,7 @@ function makeEffectControls(values, paused = false, sinks = null) {
   };
   return {
     state,
+    engine,
     pause: { animationState, controller: pauseController },
     controllerByName,
     writableParamNames: Object.keys(values).filter((name) => name !== 'Telemetry'),
@@ -104,6 +113,15 @@ test('one effect snapshot survives nested effect and resolution rollback', () =>
     assert.deepEqual(restored.state, { Speed: 0.9, Glow: true });
     assert.equal(restored.pause.animationState.pause, false);
   }
+});
+
+test('restoring an unpaused snapshot resumes after animated parameter replay', () => {
+  const snapshot = snapshotEffectControlState(makeEffectControls({ Speed: 0.8 }, false));
+  const restored = makeEffectControls({ Speed: 0.1 }, false);
+  restoreEffectControlState(restored, snapshot);
+  assert.equal(restored.state.Speed, 0.8);
+  assert.equal(restored.engine.paused, false);
+  assert.equal(restored.pause.animationState.pause, false);
 });
 
 test('initial state dismisses the loader only after a successful apply', () => {
