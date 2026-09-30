@@ -517,6 +517,7 @@ test('ShaderBall builds one URL-transparent bank for every pipeline stage', () =
 
   assert.deepEqual(h.gui().folders.map((folder) => folder.name),
     STAGE_ORDER);
+  assert.ok(h.gui().folders.every((folder) => folder.display));
   assert.equal(h.gui().ctrl('Camera Wander').folder, 'Camera');
   assert.equal(h.gui().ctrl('Camera Wander').label, 'Wander');
   assert.equal(h.gui().ctrl('Planar Warp 1').folder, 'Planar Warp 1');
