@@ -53,6 +53,7 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
       } })),
       ...item.ops,
     ];
+    /** @type {import('./solid_codegen.js').MeshWrapper|null} */
     let mesh = null;
     try {
       mesh = mod.MeshOps.fromSolidName(baseRecipe?.seed ?? item.base);
@@ -70,9 +71,10 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
           : name === 'zip' ? ['kis', 'dual']
           : name === 'gyro' ? [{ op: 'snub', params: { t: 0.5, twist: 0 } }, 'dual']
           : name === 'bevel' ? ['ambo', typeof op !== 'string' && op.params?.t === 0.5
-            ? 'ambo' : { op: 'truncate', params: typeof op === 'string' ? {} : op.params }]
+            ? 'ambo' : { op: 'truncate', params: typeof op === 'string' ? {} : (op.params ?? {}) }]
           : [op];
         for (const primitive of primitives) {
+          if (!mesh) throw new Error('Registry mesh was rejected');
           const next = applyOp(mesh, primitive);
           mesh.delete();
           mesh = next;

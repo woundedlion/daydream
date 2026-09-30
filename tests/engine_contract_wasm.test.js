@@ -9,9 +9,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import createHolosphereModule from '../generated/holosphere_wasm.js';
+import { validateRegistryFaces } from '../src/workbench/solids/solid_registry_codegen.js';
 import { applyChainDocument } from '../src/workbench/shader/chain_apply.js';
 import {
-  KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, SIMPLE_SEEDS,
+  createChainValidator, KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, SIMPLE_SEEDS,
   DEFINED_SEED_CONSTANTS, applyOp, meshOpFailure, MESH_OP_RESULT_NAMES,
 } from '../src/workbench/solids/solid_codegen.js';
 import {
@@ -1804,4 +1805,15 @@ test('display caps preserve MobiusGrid after topology rebuilds', () => {
   } finally {
     engine.setDisplayCaps(0, 0);
   }
+});
+
+
+test('registry export rejects oversized intermediate primitive endpoints', async () => {
+  const validator = createChainValidator(() => createHolosphereModule({ print: sink, printErr: sink }));
+  await assert.rejects(validateRegistryFaces(validator, {
+    name: 'Oversized', base: 'truncatedIcosahedron', ops: ['kis', 'kis', 'kis', 'dual'], fCount: 812,
+  }), /endpoint has 1620 faces/);
+  await validateRegistryFaces(validator, {
+    name: 'Small', base: 'cube', ops: ['kis'], fCount: 24,
+  });
 });
