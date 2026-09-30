@@ -141,10 +141,9 @@ export async function probeStrip(tab) {
       && getComputedStyle(node.querySelector('.chain-chip-function-label')).display !== 'none'),
   'an open transition card keeps the same selector-only header');
   await tab.mouse.move(0, 0);
-  await tab.waitForFunction(() => document.querySelector(
-    '.chain-chip[data-label="project"]')?.getAttribute('aria-expanded') === 'false');
-  check(await tab.$eval('.chain-chip[data-label="project"]',
-    (node) => node.getAttribute('aria-expanded') === 'false'),
+  check(await tab.waitForFunction(() => document.querySelector(
+    '.chain-chip[data-label="project"]')?.getAttribute('aria-expanded') === 'false')
+    .then(() => true, () => false),
   'mouse leave closes a transient stage card');
 
   // The pointer is parked off the strip, so only the keyboard can be opening
@@ -550,24 +549,23 @@ export async function probeStripHistory(tab) {
     'reorder restores focus to the moved instance after rebuilding');
 
   await tab.keyboard.press('Delete');
-  await tab.waitForFunction((label) => ![...document.querySelectorAll('.chain-chip')]
-    .some((node) => node.dataset.label === label), {}, first);
-  check(!(await labels()).includes(first), 'Delete removes the focused instance');
+  check(await tab.waitForFunction((label) => ![...document.querySelectorAll('.chain-chip')]
+    .some((node) => node.dataset.label === label), {}, first).then(() => true, () => false), 'Delete removes the focused instance');
   check(await tab.evaluate(() => document.activeElement?.classList.contains('chain-chip')),
     'removal leaves focus on a surviving chip');
   await tab.keyboard.down('Control');
   await tab.keyboard.press('z');
   await tab.keyboard.up('Control');
-  await tab.waitForFunction((wanted) => JSON.stringify([...document.querySelectorAll('.chain-chip')]
-    .map((node) => node.dataset.label)) === wanted, {}, JSON.stringify(reordered));
-  check(JSON.stringify(await labels()) === JSON.stringify(reordered),
+  check(await tab.waitForFunction((wanted) => JSON.stringify([...document.querySelectorAll('.chain-chip')]
+    .map((node) => node.dataset.label)) === wanted, {}, JSON.stringify(reordered))
+    .then(() => true, () => false),
     'the history shortcut bubbles from the replacement chip and restores the removed instance');
   await tab.keyboard.down('Control');
   await tab.keyboard.press('z');
   await tab.keyboard.up('Control');
-  await tab.waitForFunction((wanted) => JSON.stringify([...document.querySelectorAll('.chain-chip')]
-    .map((node) => node.dataset.label)) === wanted, {}, JSON.stringify(before));
-  check(JSON.stringify(await labels()) === JSON.stringify(before),
+  check(await tab.waitForFunction((wanted) => JSON.stringify([...document.querySelectorAll('.chain-chip')]
+    .map((node) => node.dataset.label)) === wanted, {}, JSON.stringify(before))
+    .then(() => true, () => false),
     'a second undo restores the original order');
   check(await tab.$$eval('.chain-chip[tabindex="0"]', nodes => nodes.length === 1),
     'the rebuilt strip retains one roving tab stop');
@@ -632,13 +630,13 @@ export async function probeDocumentActions(tab) {
   const chip = '.chain-chip[data-label="rotate"]';
   const toggle = `${chip} .chain-chip-bypass`;
   await tab.click(toggle);
-  await tab.waitForFunction((selector) => document.querySelector(selector)?.getAttribute('aria-pressed') === 'true', {}, toggle);
-  check(await tab.$eval(toggle, (node) => node.getAttribute('aria-pressed')) === 'true',
+  check(await tab.waitForFunction((selector) => document.querySelector(selector)?.getAttribute('aria-pressed') === 'true', {}, toggle)
+    .then(() => true, () => false),
     'the bypass button bypasses the stage');
   await tab.focus(chip);
   await tab.keyboard.press('b');
-  await tab.waitForFunction((selector) => document.querySelector(selector)?.getAttribute('aria-pressed') === 'false', {}, toggle);
-  check(await tab.$eval(toggle, (node) => node.getAttribute('aria-pressed')) === 'false',
+  check(await tab.waitForFunction((selector) => document.querySelector(selector)?.getAttribute('aria-pressed') === 'false', {}, toggle)
+    .then(() => true, () => false),
     'the b shortcut restores the stage');
   await tab.$eval(`${chip} .chain-chip-rename`, (node) => {
     node.value = 'camera-rotate';
@@ -646,11 +644,10 @@ export async function probeDocumentActions(tab) {
   });
   await tab.waitForSelector('.chain-chip[data-label="camera-rotate"]');
   await tab.click('.chain-undo');
-  await tab.waitForSelector(chip);
-  check(await tab.$(chip) !== null, 'undo restores the original stage name');
+  check(await tab.waitForSelector(chip).then(() => true, () => false), 'undo restores the original stage name');
   await tab.click('.chain-redo');
-  await tab.waitForSelector('.chain-chip[data-label="camera-rotate"]');
-  check(await tab.$('.chain-chip[data-label="camera-rotate"]') !== null,
+  check(await tab.waitForSelector('.chain-chip[data-label="camera-rotate"]')
+    .then(() => true, () => false),
     'redo restores the renamed stage');
   const topology = await tab.$eval('select.chain-param-control', (node) => ({
     id: node.closest('.chain-param').dataset.parameter,
@@ -672,8 +669,8 @@ export async function probeDocumentActions(tab) {
       value: { writeText: async (text) => { window.copiedDigest = text; } } });
   });
   await tab.click('#shader-document-digest');
-  await tab.waitForFunction(() => /^[a-f0-9]{64}$/.test(window.copiedDigest));
-  check(await tab.evaluate(() => /^[a-f0-9]{64}$/.test(window.copiedDigest)),
+  check(await tab.waitForFunction(() => /^[a-f0-9]{64}$/.test(window.copiedDigest))
+    .then(() => true, () => false),
     'the digest button copies the full descriptor digest');
   await tab.waitForFunction(() => location.hash.startsWith('#shader=v1.'));
   const linked = await tab.evaluate(async () => {
@@ -685,31 +682,34 @@ export async function probeDocumentActions(tab) {
   return failures;
 }
 
+export async function runWorkbenchSections(open, sections = [
+  probeDocumentActions, probeStripHistory, probeStrip, probeParity,
+]) {
+  const failures = [];
+  for (const section of sections) {
+    let tab;
+    try {
+      tab = await open({ viewport: VIEWPORT });
+      await tab.waitForFunction(() => !document.getElementById('loading-overlay'));
+      await tab.waitForSelector('.chain-chip');
+      failures.push(...await section(tab));
+    } catch (error) {
+      failures.push(`${section.name}: ${error instanceof Error ? error.message : error}`);
+    } finally {
+      if (tab) {
+        try { await tab.close(); }
+        catch (error) { failures.push(`${section.name} close: ${error}`); }
+      }
+    }
+  }
+  return failures;
+}
+
 if (isMain(import.meta.url)) await runProbe({
   name: 'workbench-probe',
   minimumChecks: 60,
   page: PAGE,
   timeoutMs: TIMEOUT_MS,
   success: 'every pipeline control behaved.',
-  run: async ({ open }) => {
-    const failures = [];
-    const openWorkbench = async () => {
-      const tab = await open({ viewport: VIEWPORT });
-      await tab.waitForFunction(() => !document.getElementById('loading-overlay'));
-      await tab.waitForSelector('.chain-chip');
-      return tab;
-    };
-    const actionsTab = await openWorkbench();
-    failures.push(...await probeDocumentActions(actionsTab));
-    await actionsTab.close();
-    const historyTab = await openWorkbench();
-    failures.push(...await probeStripHistory(historyTab));
-    await historyTab.close();
-    const tab = await openWorkbench();
-    failures.push(...await probeStrip(tab));
-    // A separate page: the strip probe's structural edits disarm the toggle.
-    const parityTab = await openWorkbench();
-    failures.push(...await probeParity(parityTab));
-    return failures;
-  },
+  run: ({ open }) => runWorkbenchSections(open),
 });

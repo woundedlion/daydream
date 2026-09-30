@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { probeDocumentActions, probeParity, probeStrip, probeStripHistory } from '../scripts/workbench-probe.mjs';
+import { runWorkbenchSections, probeDocumentActions, probeParity, probeStrip, probeStripHistory } from '../scripts/workbench-probe.mjs';
 import { probeHistoryRestore, probeRationalLock } from '../scripts/lissajous-probe.mjs';
 import {
   probeKeyboardEdits, probeMobilePanel, probePanel, probePresetName, probeSidebar, probeSliderDrag,
@@ -263,4 +263,22 @@ test('the preset name probe detaches on a missing control and on CDP failure', a
     else assert.equal((await probePresetName(tab)).length, 1);
     assert.equal(detached, 1);
   }
+});
+
+test('workbench sections continue after interaction and close failures', async () => {
+  const visited = [];
+  let closed = 0;
+  const failures = await runWorkbenchSections(async () => ({
+    waitForFunction: async () => {}, waitForSelector: async () => {},
+    close: async () => { closed++; if (closed === 1) throw new Error('close failed'); },
+  }), [
+    async function first() { visited.push('first'); throw new Error('timed out'); },
+    async function second() { visited.push('second'); return ['assertion failed']; },
+  ]);
+  assert.deepEqual(visited, ['first', 'second']);
+  assert.equal(closed, 2);
+  assert.equal(failures.length, 3);
+  assert.match(failures[0], /first: timed out/);
+  assert.match(failures[1], /first close:.*close failed/);
+  assert.equal(failures[2], 'assertion failed');
 });
