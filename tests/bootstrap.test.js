@@ -588,3 +588,12 @@ test('index identifies new-window tool links and associates stats headers', () =
   assert.ok(headers.length > 0);
   for (const header of headers) assert.match(header, /\bscope="col"/);
 });
+
+
+test('WASM compile and link failures offer the stale-cache remedy', () => {
+  for (const ErrorType of [WebAssembly.LinkError, WebAssembly.CompileError]) {
+    const { doc, overlay } = fakeDocument();
+    showBootstrapFailure(new ErrorType('stale module'), { document: doc });
+    assert.equal(childWithClass(overlay, 'load-error-remedy').textContent, STALE_MODULE_REMEDY);
+  }
+});
