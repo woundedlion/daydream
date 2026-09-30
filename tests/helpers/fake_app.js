@@ -106,6 +106,9 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
   return controller;
 }
 
+const supportedProperty = (target, property, choices) =>
+  Object(choices) === choices || ['number', 'boolean', 'string', 'function'].includes(typeof target[property]);
+
 /**
  * A DeepLinkGUI (gui.js) root or folder: records the controllers, folders, and
  * stored values built on it.
@@ -114,9 +117,6 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
  *   or the panel's stored values when hydration values are supplied.
  * @returns {Object} The GUI double.
  */
-const supportedProperty = (target, property, choices) =>
-  Object(choices) === choices || ['number', 'boolean', 'string', 'function'].includes(typeof target[property]);
-
 export function fakeGui(namespace = {}, optionsReplaces = false) {
   const panel = typeof namespace !== 'string';
   const hydrated = panel ? namespace : {};
