@@ -5,7 +5,7 @@
  */
 
 /** @typedef {{id: string, topology?: boolean, values?: string[], gated_by?: {field: string, values: string[]}}} CatalogParameter */
-/** @typedef {{id: string, name: string, input: string, output: string, params: CatalogParameter[]}} CatalogOperator */
+/** @typedef {{id: string, name: string|null, input: string, output: string, params: CatalogParameter[]}} CatalogOperator */
 /** @typedef {{carriers: string[], operators: CatalogOperator[]}} OperatorCatalog */
 /** @typedef {{label: string, operator: string}} ChainEntry */
 /** @typedef {{operator: CatalogOperator, legal: boolean, reason?: string}} LegalityEntry */
