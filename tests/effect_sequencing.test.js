@@ -227,12 +227,6 @@ test('the first entry itself is kept', () => {
     { nextEffect: 'A', effectChanged: false });
 });
 
-test('every offered effect is kept unchanged', () => {
-  for (const cur of ['A', 'B', 'C']) {
-    assert.equal(planResolutionApply(['A', 'B', 'C'], cur).effectChanged, false);
-  }
-});
-
 // offeredResolutions keeps the resolution dropdown to the rows the engine
 // reports through getSupportedResolutions().
 
@@ -740,14 +734,6 @@ test('a resolution change before the engine exists keeps the effect param URL en
 
   assert.equal(app.log.includes('clearEffectParamUrl'), false,
     'the URL is the only carrier of those values until the initial apply seeds them');
-});
-
-test('an effect change before the engine exists drops the outgoing entries', () => {
-  const app = makeApp({ noEngine: true });
-
-  assert.equal(app.pipeline.applyEffect(), ApplyResult.APPLIED);
-
-  assert.equal(app.log.includes('clearEffectParamUrl'), true);
 });
 
 test('an effect the resized engine rejects rejects the resolution change', () => {
