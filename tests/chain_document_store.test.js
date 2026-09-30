@@ -689,12 +689,13 @@ test('an exhausted operator budget refuses insertion but not replacement', async
 });
 
 test('arena accounting honors per_param_name_bytes when declared', async () => {
-  // The 6-op fixture chain costs 3592 arena bytes under the engine budgets
-  // (49-byte overhead + blocks + 34 schema params x 81 name bytes); the
-  // wave-shear insertion brings it to 4168. A budget between the two refuses
-  // the insertion only while the name figure is counted.
   const catalog = structuredClone(CATALOG);
-  catalog.budgets.arena_bytes = 3800;
+  const operators = new Map(catalog.operators.map((operator) => [operator.id, operator]));
+  const baseOps = BASE.document.descriptor.chain.map((entry) => operators.get(entry.operator));
+  const insertionOps = [...baseOps, operators.get('warp.wave-shear.v2')];
+  const budget = Math.floor((chainArenaBytes(baseOps, catalog.budgets)
+    + chainArenaBytes(insertionOps, catalog.budgets)) / 2);
+  catalog.budgets.arena_bytes = budget;
   const store = await makeStore({ catalog });
   const entry = store.legalInsertions(WARP)
     .find((candidate) => candidate.operator.id === 'warp.wave-shear.v2');
@@ -702,7 +703,7 @@ test('arena accounting honors per_param_name_bytes when declared', async () => {
   assert.match(entry.reason, /arena bytes/);
   const unnamed = structuredClone(CATALOG);
   delete unnamed.budgets.per_param_name_bytes;
-  unnamed.budgets.arena_bytes = 3800;
+  unnamed.budgets.arena_bytes = budget;
   const uncounted = await makeStore({ catalog: unnamed });
   assert.equal(uncounted.legalInsertions(WARP)
     .find((candidate) => candidate.operator.id === 'warp.wave-shear.v2').legal, true);
