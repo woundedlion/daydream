@@ -113,25 +113,6 @@ generated/shader/shader_workbench.mjs
 generated/shader/engine_catalog.json
 generated/shader/patterns/shaderball_migration.json
 src/workbench/shader/patterns/digest_migration.v1v2.json
-generated/shader/patterns/example.shader.json
-generated/shader/patterns/alien_ocean.shader.json
-generated/shader/patterns/grid_space.shader.json
-generated/shader/patterns/cosmic_eyeball.shader.json
-generated/shader/patterns/ash_cloud.shader.json
-generated/shader/patterns/lattice_melt.shader.json
-generated/shader/patterns/chromatic_lichen.shader.json
-generated/shader/patterns/mermaid_skin.shader.json
-generated/shader/patterns/kaleidoscope_flowers.shader.json
-generated/shader/patterns/kaleidoscope_smooth.shader.json
-generated/shader/patterns/kaleidoscope_mandala.shader.json
-generated/shader/patterns/alien_core.shader.json
-generated/shader/patterns/kaleidoscope_hex_bright.shader.json
-generated/shader/patterns/kaleidoscope_hex_soft.shader.json
-generated/shader/patterns/mobius_grid.shader.json
-generated/shader/patterns/kaleidoscope_pent_bright.shader.json
-generated/shader/patterns/kaleidoscope_hex_oil.shader.json
-generated/shader/patterns/alien_brain.shader.json
-generated/shader/patterns/kaleidoscope_stained_glass.shader.json
 
 # The project license, carrying the notices MIT requires for the PROJ-derived
 # projection code and FastNoiseLite compiled into generated/holosphere_wasm.wasm.
