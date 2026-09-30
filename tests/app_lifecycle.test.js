@@ -78,7 +78,7 @@ function makeAdapter({ ownsDisplay = false, active = false,
     syncEffectGui: () => calls.push('effectGui.sync'),
     logError: (message) => errors.push(message),
   });
-  return { adapter, calls, errors, driver, host, segments, view };
+  return { adapter, calls, errors, driver, host, view };
 }
 
 test('a single-engine frame renders and republishes the view', () => {
@@ -230,7 +230,6 @@ function makeTeardown({
     noticeTarget,
     host,
     segments,
-    handlers: { onKeyDown, onUnhandledRejection },
   };
 }
 
@@ -578,15 +577,18 @@ test('a frame that throws every tick reports once', () => {
 
 test('a failing reporter cannot skip dead-module release', () => {
   let released = false;
+  const errors = [];
   const guarded = createFrameLoopGuard({
     frame() {},
     report() { throw new Error('report unavailable'); },
-    logError() {},
+    logError: (...args) => errors.push(args),
     moduleDead: () => true,
     onModuleDead() { released = true; },
   });
   assert.doesNotThrow(guarded);
   assert.equal(released, true);
+  assert.equal(errors.at(-1)[0], 'Render error reporting failed:');
+  assert.equal(errors.at(-1)[1].message, 'report unavailable');
 });
 
 test('a failing frame reporter preserves the recovery message', () => {
@@ -948,4 +950,16 @@ test('focused links and their children retain Space and arrow keys', () => {
     for (const key of [' ', 'ArrowLeft', 'ArrowRight']) h.handler({ key, target });
   }
   assert.deepEqual(h.keys, []);
+});
+
+
+test('render adapters tolerate a missing pixel view', () => {
+  const h = makeAdapter();
+  h.host.view = () => null;
+  h.host.refresh = () => {};
+  h.adapter.refreshPixelView();
+  h.adapter.drawFrame();
+  assert.equal(h.driver.pixels, null);
+  assert.equal(h.driver.dotMesh.instanceColor.array, null);
+  assert.deepEqual(h.errors, []);
 });

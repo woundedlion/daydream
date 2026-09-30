@@ -21,8 +21,7 @@ function fakeDocument() {
     overlay,
     // The click handler returns the refresh-then-reload chain, so the caller is
     // handed it to await rather than dispatching and losing it.
-    click: (element) => element.disabled ? undefined
-      : element.listeners.find(({ type }) => type === 'click')?.handler(),
+    click: (element) => element.listeners.find(({ type }) => type === 'click')?.handler(),
   };
 }
 
@@ -36,6 +35,7 @@ test('bootstrap catches a synchronous loader throw', async () => {
     loader: () => { throw new Error('WebGL unavailable'); },
     document: doc,
     logger: quietLogger,
+    performance: {},
   });
 
   assert.equal(loaded, false);
@@ -53,6 +53,7 @@ test('bootstrap catches a rejected module import', async () => {
     loader: () => Promise.reject(new TypeError('module fetch failed')),
     document: doc,
     logger: quietLogger,
+    performance: {},
   });
 
   assert.equal(loaded, false);
@@ -67,6 +68,7 @@ test('bootstrap leaves the loading overlay intact after a successful import', as
     loader: async () => { calls += 1; },
     document: doc,
     logger: quietLogger,
+    performance: {},
   });
 
   assert.equal(loaded, true);
@@ -185,7 +187,7 @@ test('the reload button reports the sweep and cannot be re-fired', async () => {
   assert.equal(reload.textContent, 'Reloading…');
   assert.equal(reload.disabled, true);
   assert.equal(refreshes, 1);
-  await click(reload);
+  reload.dispatch('click');
   assert.equal(refreshes, 1, 'the disabled button cannot start a second sweep');
 });
 
@@ -300,6 +302,7 @@ test('a reload the page refuses hands the button back', async () => {
   showBootstrapFailure(new Error('failed'), {
     document: doc,
     location: { reload() { throw new Error('navigation blocked'); } },
+    refresh: async () => {},
     logger: { error: (...args) => logged.push(args) },
   });
 
@@ -533,6 +536,7 @@ test('bootstrap falls back to a fatal banner when there is no overlay', async ()
     loader: () => { throw new Error('offline'); },
     document: { getElementById: () => null },
     logger: quietLogger,
+    performance: {},
     fatal: (message) => messages.push(message),
   });
 
@@ -548,6 +552,7 @@ test('bootstrap leaves the fatal banner alone when the overlay renders', async (
     loader: () => Promise.reject(new Error('boom')),
     document: doc,
     logger: quietLogger,
+    performance: {},
     fatal: () => { fatals += 1; },
   });
 
@@ -562,7 +567,7 @@ test('index boots through the entry module and bootstrap.js stays importable', (
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /<link href="\.\/favicon\.svg" rel="icon"/);
   assert.match(html, /<script type="module" src="src\/app\/main\.js"[^>]*><\/script>/);
-  assert.doesNotMatch(html, /<script type="module" src="daydream\.js"><\/script>/);
+  assert.equal([...html.matchAll(/<script\b[^>]*type="module"/g)].length, 1);
   const source = readFileSync(new URL('../src/app/bootstrap.js', import.meta.url), 'utf8');
   const body = source.replace(/export\s+async\s+function\s+bootstrap\s*\(/, 'function(');
   const invocation = /\bbootstrap\s*(?:\?\.\s*)?(?:\(|\.(?:call|apply)\s*\()|\(\s*bootstrap\s*\)\s*\(/;
