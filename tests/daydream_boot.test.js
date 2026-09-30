@@ -1073,6 +1073,7 @@ test('a rejected live cap edit leaves the displayed geometry unchanged', async (
   module.HolosphereEngine.prototype.setDisplayCaps = () => false;
   const control = app.guis[0].controllers.find((c) => c.property === 'topCap');
   assert.throws(() => control.setValue(2), /Engine rejected display cap settings/);
+  assert.equal(control.getValue(), 0);
   assert.equal(app.driver.DISPLAY_NORTH_PHI, 0);
   assert.equal(app.driver.DISPLAY_SOUTH_PHI, Math.PI);
 });
