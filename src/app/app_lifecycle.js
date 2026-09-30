@@ -361,7 +361,7 @@ export function createFrameLoopGuard({
   /** @param {string} message */
   function reportNotice(message) {
     try { report(message); }
-    catch (error) { console.error('Render error reporting failed:', error); }
+    catch (error) { logError('Render error reporting failed:', error); }
   }
 
   /**
