@@ -200,11 +200,9 @@ const ROOT_EXEMPTIONS = {
   'src/app/bootstrap.js': 'Imports daydream.js and its untyped Three.js and lil-gui dependencies.',
   'src/app/daydream.js': 'Application composition depends on driver.js and gui.js, whose third-party types are unavailable under noResolve.',
   'src/renderer/driver.js': 'Imports Three.js and its renderer addons, whose types are unavailable under noResolve.',
-  'src/ui/effect_gui.js': 'Builds lil-gui controls through gui.js; the control surface has no declarations.',
   'src/renderer/geometry.js': 'Imports Three.js, whose types are unavailable under noResolve.',
   'src/ui/gui.js': 'Imports lil-gui, whose declarations are unavailable under noResolve.',
   'src/app/main.js': 'Imports bootstrap.js, which reaches the untyped application composition.',
-  'src/recording/recording_controls.js': 'Builds dynamic lil-gui controls and consumes a driver whose declarations are unavailable.',
   'vendor-importmap.js': 'Generated script-tag IIFE; its source and generated variants are checked by vendor-importmap.test.js.',
 };
 

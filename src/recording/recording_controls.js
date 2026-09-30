@@ -27,12 +27,12 @@ import { errorDetail } from "../shared/banner.js";
  * @param {*} deps.driver - The driver: its frame interval, its axis-label state,
  *   the recorder handle it renders through, and the invalidate that redraws the
  *   PiP a session suppresses.
- * @param {() => ?Object} deps.getRecorder - Reads the live recorder, null until
+ * @param {() => import("./recorder.js").VideoRecorder|null} deps.getRecorder - Reads the live recorder, null until
  *   the module load resolves.
  * @param {() => string} deps.getEffect - Names the effect a session records.
  * @param {(message: string) => void} deps.showNotice - Owner-tagged sink for the
  *   session and fault reports.
- * @returns {{attach: (recorder: Object) => void, tick: () => void,
+ * @returns {{attach: (recorder: import("./recorder.js").VideoRecorder) => void, tick: () => void,
  *   removeOverlay: () => void}} The post-load hookup, the per-frame duration
  *   readout, and the overlay release the page teardown runs.
  */
@@ -44,7 +44,9 @@ export function createRecordingControls({
   getEffect,
   showNotice,
 }) {
+  /** @type {Record<string, number|null>} */
   const REC_RESOLUTIONS = { 'Native': null, '720p': 720, '1080p': 1080 };
+  /** @type {Record<string, "auto"|"mp4"|"webm">} */
   const REC_FORMATS = { 'Auto': 'auto', 'MP4': 'mp4', 'WebM': 'webm' };
   const recordingSettings = createRecordingSettings({ getRecorder, warn: showNotice });
   const recSettings = recordingSettings.settings;
@@ -60,6 +62,7 @@ export function createRecordingControls({
   durationEl.style.display = 'none';
   doc.getElementById('canvas-container')?.appendChild(durationEl);
 
+  /** @type {number|null} */
   let durationSecond = null;
 
   // Whether the UI is currently showing a session. A failure hook runs after the
@@ -95,12 +98,13 @@ export function createRecordingControls({
   };
 
   const recordState = { record: () => {
-    if (!getRecorder()) {
+    const recorder = getRecorder();
+    if (!recorder) {
       console.warn('Recording is unavailable until the rendering engine finishes loading.');
       return;
     }
     const wasRecording = recordingShown;
-    const isRecording = getRecorder().toggle(getEffect());
+    const isRecording = recorder.toggle(getEffect());
     // A start that never began a session has already reported why through onError;
     // there was no session to stop, and the same owner tag would overwrite it.
     if (!wasRecording && !isRecording) return;
@@ -133,7 +137,7 @@ export function createRecordingControls({
      * Hand the controls the recorder the module load built: push the settings
      * that accumulated while none existed, wire the fallback and fault hooks,
      * point the driver at it, and offer the Record button.
-     * @param {Object} recorder - The freshly constructed VideoRecorder.
+     * @param {import("./recorder.js").VideoRecorder} recorder - The freshly constructed VideoRecorder.
      * @returns {void}
      */
     attach(recorder) {

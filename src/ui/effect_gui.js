@@ -42,6 +42,11 @@ import {
   shaderStageAssignments,
 } from "../effects/shader_stages.js";
 
+/** @typedef {{name: string, value: number|boolean, min: number, max: number, animated?: boolean, readonly?: boolean, warning?: string, options?: string[], step?: number, acceptedValue?: number|boolean, requestedValue?: number|boolean}} ParameterDefinition */
+/** @typedef {import("./effect_panel_view.js").PanelController & Record<string, any>} GuiController */
+/** @typedef {import("./effect_panel_view.js").PanelFolder & Record<string, any>} Gui */
+/** @typedef {Record<string, any> & {gui: Gui, pause: {animationState: {pause: boolean}, controller: GuiController|null, setPaused: (value: boolean) => void}, paramNames: string[], controllerByName: Map<string, GuiController>}} EffectRecord */
+
 // How long a transient button label (Export status) stays before reverting.
 export const FLASH_MS = 1500;
 // Transient Export button labels.
@@ -65,23 +70,23 @@ function paramWarningId(name) {
 
 /**
  * The warning text the engine publishes for each parameter that carries one.
- * @param {Array<Object>} params - Engine parameter definitions.
+ * @param {Array<ParameterDefinition>} params - Engine parameter definitions.
  * @returns {Map<string, string>} Parameter name to warning text.
  */
 function paramWarningTexts(params) {
-  return new Map(params.filter((p) => p.warning).map((p) => [p.name, p.warning]));
+  return new Map(params.filter((p) => p.warning).map((p) => [p.name, /** @type {string} */ (p.warning)]));
 }
 
 /**
  * The `gui` method a parameter's control is added through: a session control
  * owns no deep-link key, a migrated one accepts its former keys too, and an
  * unhydrated one owns its key but is never seeded from the URL.
- * @param {Object} gui - The effect GUI to add to.
- * @param {Object} p - The parameter definition.
+ * @param {Gui} gui - The effect GUI to add to.
+ * @param {ParameterDefinition} p - The parameter definition.
  * @param {boolean} hydrate - Whether a matching deep link may seed it.
  * @param {Array<string>} legacyNames - Former deep-link property names.
  * @param {boolean} persist - Whether the control owns a deep-link key.
- * @returns {(object: Object, property: string, ...rest: Array<*>) => Object}
+ * @returns {(object: Record<string, any>, property: string, ...rest: Array<*>) => GuiController}
  */
 function paramAddMethod(gui, p, hydrate, legacyNames, persist) {
   if (p.readonly || !persist) return (...args) => gui.addSession(...args);
@@ -112,13 +117,13 @@ export function sliderDecimals(min, max) {
  * Add the lil-gui control one engine parameter definition calls for. A readonly
  * (engine-written telemetry) param becomes a session control: the engine refuses
  * to set it, so seeding it from a URL and writing it back is meaningless.
- * @param {Object} gui - The effect GUI to add to.
- * @param {Object} state - The GUI-bound value object.
- * @param {Object} p - The parameter definition.
+ * @param {Gui} gui - The effect GUI to add to.
+ * @param {Record<string, any>} state - The GUI-bound value object.
+ * @param {ParameterDefinition} p - The parameter definition.
  * @param {boolean} [hydrate=true] - Whether a matching deep link may seed it.
  * @param {Array<string>} [legacyNames=[]] - Former deep-link property names.
  * @param {boolean} [persist=true] - Whether the control owns a deep-link key.
- * @returns {Object} The created controller.
+ * @returns {GuiController} The created controller.
  */
 export function addParamControl(
   gui, state, p, hydrate = true, legacyNames = [], persist = true) {
@@ -129,7 +134,7 @@ export function addParamControl(
     controller = add(state, p.name);
   } else if (kind === 'enum') {
     // Dropdown of labels whose values are the option indices the engine expects.
-    controller = add(state, p.name, enumChoices(p.options));
+    controller = add(state, p.name, enumChoices(p.options ?? []));
   } else if (kind === 'integer') {
     // The engine truncates a fractional write, so offer only what it can hold.
     controller = add(state, p.name, p.min, p.max, 1).decimals(0);
@@ -173,6 +178,7 @@ const CONFIG_DEFAULTS = {
 const HOST_DEFAULTS = {
   focusedElement: () => null,
   paramFilter: () => null,
+  /** @param {...any} args */
   logWarn: (...args) => console.warn(...args),
 };
 
@@ -180,14 +186,16 @@ const HOST_DEFAULTS = {
  * Fill a collaborator group's absent members in and check that every member the
  * panel will call is callable.
  * @param {string} group - Group name, which a fault message names.
- * @param {Object|undefined} members - What the caller passed for the group.
+ * @template {Record<string, any>} T
+ * @template {Record<string, any>} D
+ * @param {T|undefined} members - What the caller passed for the group.
  * @param {Array<string>} required - Members with no stand-in.
- * @param {Object} [defaults] - Members that stand in when absent.
- * @returns {Object} The filled group.
+ * @param {D} [defaults] - Members that stand in when absent.
+ * @returns {T & D} The filled group.
  * @throws {TypeError} On a group that is not an object, or a member that is not
  *   a function.
  */
-function checkedGroup(group, members, required, defaults = {}) {
+function checkedGroup(group, members, required, defaults = /** @type {D} */ ({})) {
   if (members === null || typeof members !== 'object') {
     throw new TypeError(`createEffectGui: the ${group} collaborator is missing.`);
   }
@@ -197,7 +205,7 @@ function checkedGroup(group, members, required, defaults = {}) {
       throw new TypeError(`createEffectGui: ${group}.${name} must be a function.`);
     }
   }
-  return filled;
+  return /** @type {T & D} */ (filled);
 }
 
 /**
@@ -209,7 +217,7 @@ function checkedGroup(group, members, required, defaults = {}) {
  * @param {Object} deps - Injected app collaborators, in four groups.
  * @param {(error?: *) => boolean} [deps.moduleDead] - Whether the engine module is unusable.
  * @param {Object} deps.engine - The main engine the panel reads and writes.
- * @param {() => Array<Object>} deps.engine.getParameterDefinitions - Reads the
+ * @param {() => Array<ParameterDefinition>} deps.engine.getParameterDefinitions - Reads the
  *   parameter definitions for the effect the engine currently has loaded.
  * @param {() => number|undefined} deps.engine.paramGeneration - Reads the
  *   effect-load generation, stamped onto each definitions snapshot.
@@ -243,8 +251,8 @@ function checkedGroup(group, members, required, defaults = {}) {
  *   accepted-value surface.
  * @param {() => boolean} [deps.config.inUse] - Whether the active effect
  *   persists through the snapshot API.
- * @param {() => Object|null} [deps.config.snapshot] - Captures that state.
- * @param {() => Array<Object>|null} [deps.config.fieldDefinitions] - Names the
+ * @param {() => {accepted: number[]}|null} [deps.config.snapshot] - Captures that state.
+ * @param {() => Array<{name: string, id: number}>|null} [deps.config.fieldDefinitions] - Names the
  *   fields in a snapshot.
  * @param {(snapshot: Object) => unknown} [deps.config.restore] - Atomically
  *   restores a captured state, returning one FullConfigRestoreResult value.
@@ -255,18 +263,18 @@ function checkedGroup(group, members, required, defaults = {}) {
  *   or clears the migration notice.
  *
  * @param {Object} deps.host - The page the panel mounts into.
- * @param {() => Object} deps.host.createGui - Makes an empty effect GUI root: a
+ * @param {() => Gui} deps.host.createGui - Makes an empty effect GUI root: a
  *   DeepLinkGUI (gui.js), whose whole add/stored-value surface the panel uses.
  * @param {() => Object|null} deps.host.container - The element the panel mounts in.
  * @param {() => boolean} deps.host.isMobile - Whether to mount the panel collapsed.
- * @param {?(text: string) => Promise<boolean>} deps.host.copyText - Copies text
+ * @param {((text: string) => Promise<boolean>)|null} deps.host.copyText - Copies text
  *   using the browser's available clipboard path, null where there is none.
  * @param {() => void} deps.host.applyEffect - Rebuilds the panel from engine
  *   state (the Reset button).
- * @param {{addEventListener: Function, removeEventListener: Function}}
+ * @param {EventTarget}
  *   deps.host.dragTarget - Where the drag-end listeners live (the window): a
  *   lil-gui drag continues outside the control's own DOM.
- * @param {() => Object|null} [deps.host.focusedElement] - The document's focused
+ * @param {() => Node|null} [deps.host.focusedElement] - The document's focused
  *   element. A control whose number input has focus is being typed into, so the
  *   per-frame value stream must leave it alone.
  * @param {() => {external: true}|null} [deps.host.paramFilter] - The chain
@@ -307,12 +315,14 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       || typeof dragTarget?.removeEventListener !== 'function') {
     throw new TypeError('createEffectGui: host.dragTarget must be an event target.');
   }
+  /** @type {EffectRecord|null} */
   let activeEffect = null;
   // Throttle the param/value length-skew warning to once per skew episode.
   let skewLogged = false;
   // The unstaged-parameter set last warned about. A panel rebuilds on every
   // warning move and every preset, all over the same schema.
   let unstagedWarned = '';
+  /** @type {string|undefined} */
   let rebuildFailureGeneration;
   const persistence = createEffectPersistence({
     getParameterDefinitions, setEngineParam, usesFullConfigSnapshot, getFullConfigSnapshot, restoreFullConfigSnapshot, fullConfigRestoreResults, showConfigImportNotice, logWarn
@@ -346,7 +356,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    * an effect, so the schema generation cannot report it. Deferred while an
    * edit is in flight, pointer or keyboard: the rebuild would discard the
    * controller under the pointer, or the input a held arrow key repeats into.
-   * @param {Object} fx - The active effect record.
+   * @param {EffectRecord} fx - The active effect record.
    * @returns {boolean} True when the panel must be rebuilt to show them.
    */
   function paramWarningsStale(fx) {
@@ -363,6 +373,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   }
 
   /** Update the pause controller without writing back to the engine. */
+  /** @param {EffectRecord} fx @param {boolean|undefined} paused */
   function adoptPauseDisplay(fx, paused) {
     if (paused === undefined || paused === fx.pause.animationState.pause) return;
     fx.pause.animationState.pause = paused;
@@ -371,6 +382,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   }
 
   /** Update the preset controller and its visibility from live engine state. */
+  /** @param {EffectRecord} fx @param {number} count @param {number} index */
   function adoptPresetDisplay(fx, count, index) {
     if (!fx.preset || count <= 0) return;
     if (fx.preset.state.presetIndex === index) return;
@@ -383,8 +395,8 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    * holds. Only the definitions carry `requestedValue`, so this reads the
    * definitions snapshot rather than the per-frame value stream — an effect
    * with no enum control skips it and keeps sync() off that marshal.
-   * @param {Object} fx - The active effect record.
-   * @param {Object|null} focused - The document's focused element, or null. An
+   * @param {EffectRecord} fx - The active effect record.
+   * @param {Node|null} focused - The document's focused element, or null. An
    *   animated selector streams a new requested value every frame, so an open
    *   dropdown has to be left alone like any other controller under edit.
    * @returns {void}
@@ -417,7 +429,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     const presetIndex = activeEffect.preset ? getPresetIndex() : null;
     const presetAdvanced = activeEffect.preset
       && activeEffect.preset.state.presetIndex !== presetIndex;
-    const presetSynced = !activeEffect.preset || synchronizePreset(presetIndex);
+    const presetSynced = !activeEffect.preset || synchronizePreset(/** @type {number} */ (presetIndex));
     const filterStale =
       (paramFilter() !== null) !== (activeEffect.paramsExternal === true);
     const warningsStale = paramWarningsStale(activeEffect);
@@ -475,7 +487,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
 
   /**
    * Copy text to the clipboard and report the outcome on the Export label.
-   * @param {Object} fx - The effect record owning the Export button. A copy that
+   * @param {EffectRecord} fx - The effect record owning the Export button. A copy that
    *   lands after the effect changed reports nothing: the label belongs to a
    *   panel that is gone.
    * @param {string} text - The text to copy.
@@ -483,7 +495,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    * @returns {Promise<void>} Clipboard completion.
    */
   function copyAndFlash(fx, text, flashExport) {
-    return copyText(text).then((copied) => {
+    return /** @type {(text: string) => Promise<boolean>} */ (copyText)(text).then((copied) => {
       if (activeEffect !== fx) return;
       if (copied) {
         flashExport(EXPORT_COPIED);
@@ -499,8 +511,8 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
 
   /**
    * Write the live parameter values to the clipboard as a C++ brace-init list.
-   * @param {Object} fx - The effect record owning the Export button.
-   * @param {Array<Object>} params - The engine's parameter definitions.
+   * @param {EffectRecord} fx - The effect record owning the Export button.
+   * @param {Array<ParameterDefinition>} params - The engine's parameter definitions.
    * @param {(label: string) => void} flashExport - Shows a transient Export label.
    * @returns {Promise<void>|void} Clipboard completion, or nothing when blocked.
    */
@@ -523,7 +535,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     if ((!values || values.length === 0) && !fx.paramsExternal
         && !paramGenerationStale(fx.paramGeneration, paramGeneration())) {
       values = fx.paramNames.map((name) =>
-        engineParamValue(fx.controllerByName.get(name).getValue()));
+        engineParamValue(fx.controllerByName.get(name)?.getValue()));
     }
     const blocked = paramExportBlocker(
       values, fx.paramNames.length, typeof copyText === 'function');
@@ -535,7 +547,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
 
     let text;
     try {
-      text = formatExportParams(params, values);
+      text = formatExportParams(params, /** @type {ArrayLike<number>} */ (values));
     } catch (err) {
       logWarn('Export: parameter formatting failed', err);
       flashExport(EXPORT_FAILED);
@@ -547,8 +559,8 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
 
   /**
    * Add the effect GUI's Reset, Export, and preset navigation buttons.
-   * @param {Object} fx - The effect record being built.
-   * @param {Array<Object>} params - The engine's parameter definitions.
+   * @param {EffectRecord} fx - The effect record being built.
+   * @param {Array<ParameterDefinition>} params - The engine's parameter definitions.
    * @returns {void}
    */
   function addEffectActions(fx, params) {
@@ -563,12 +575,14 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     exportStatus.setAttribute('aria-live', 'polite');
     actionRow.appendChild(exportStatus);
     fx.actionControllers = [];
+    /** @param {GuiController} controller @param {string} icon @param {string} label */
     const presentAction = (controller, icon, label) => {
       controller.name(icon);
       const button = controller.$button ?? controller.domElement;
       button.setAttribute('aria-label', label);
       button.setAttribute('title', label);
     };
+    /** @param {Record<string, any>} actions @param {string} property @param {string} icon @param {string} label @param {string} className */
     const addAction = (actions, property, icon, label, className) => {
       const controller = fx.gui.add(actions, property);
       controller.domElement.classList.add('effect-action', className);
@@ -597,6 +611,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       }, FLASH_MS);
     };
 
+    /** @type {{reset: () => void, export: () => Promise<void>|void, presetIndex?: number, previousPreset?: () => boolean, nextPreset?: () => boolean}} */
     const effectActions = {
       /**
        * Rebuild the effect GUI from the engine's current state, discarding
@@ -628,6 +643,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
         .addSession(effectActions, 'presetIndex', presetOptions)
         .name('Preset');
       fx.preset = { state: effectActions, controller: preset };
+      /** @param {number} index */
       const choose = (index) => {
         const count = getPresetCount();
         if (count <= 0 || !selectPreset(index)) {
@@ -647,6 +663,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
         return true;
       };
       preset.onChange(choose);
+      /** @param {number} delta */
       const move = (delta) => {
         const count = getPresetCount();
         if (count <= 0) return false;
@@ -670,16 +687,17 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   /**
    * Add the "Pause Animation" toggle when the effect has an animated param or
    * multiple presets available for manual selection.
-   * @param {Object} fx - The effect record being built.
-   * @param {Array<Object>} params - The engine's parameter definitions.
+   * @param {EffectRecord} fx - The effect record being built.
+   * @param {Array<ParameterDefinition>} params - The engine's parameter definitions.
    * @param {boolean} [initialPause=false] - Initial pause state.
    * @param {boolean} [hydrate=true] - Read the stored pause value while constructing the toggle.
-   * @returns {{animationState: {pause: boolean}, controller: Object|null,
+   * @returns {{animationState: {pause: boolean}, controller: GuiController|null,
    *   setPaused: (v: boolean) => void}} The toggle's state, its controller (null
    *   when neither animation surface is available), and its state transition.
    */
   function addPauseToggle(fx, params, initialPause = false, hydrate = true) {
     const animationState = { pause: Boolean(initialPause) };
+    /** @type {GuiController|null} */
     let controller = null;
     /**
      * Adopt a pause transition, applying it immediately after initial hydration
@@ -691,6 +709,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       animationState.pause = Boolean(v);
       if (fx.animationPauseApplied) setAnimationsPaused(animationState.pause);
     };
+    /** @param {boolean} v */
     const setPaused = (v) => {
       const paused = Boolean(v);
       if (controller) {
@@ -701,10 +720,10 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     };
     if (params.some(p => p.animated) || getPresetCount() > 0) {
       const add = hydrate
-        ? (...args) => fx.gui.add(...args)
-        : (...args) => fx.gui.addUnhydrated(...args);
+        ? (/** @type {any[]} */ ...args) => fx.gui.add(...args)
+        : (/** @type {any[]} */ ...args) => fx.gui.addUnhydrated(...args);
       controller = add(animationState, 'pause').name('Pause Animation');
-      controller.onChange(transitionPaused);
+      controller?.onChange(transitionPaused);
     }
     return { animationState, controller, setPaused };
   }
@@ -714,9 +733,9 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    * parameter write: the engine pauses animation-driven params implicitly when
    * one of them is written. The toggle's transition carries the adopted state on
    * to the worker pool, whose engines each keep their own copy.
-   * @param {{animationState: {pause: boolean}, controller: Object|null,
+   * @param {{animationState: {pause: boolean}, controller: GuiController|null,
    *   setPaused: (v: boolean) => void}} pause - The effect's pause toggle.
-   * @param {Object} written - The definition of the parameter just written.
+   * @param {ParameterDefinition} written - The definition of the parameter just written.
    * @returns {void}
    */
   function adoptEnginePause(pause, written) {
@@ -731,7 +750,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    * Pick the pipeline grouping for a parameter list. Each recognizer owns its
    * stage assignments, folder titles, and folder order together, so the three
    * cannot disagree; the first that claims the list wins.
-   * @param {Array<Object>} params - The engine's parameter definitions.
+   * @param {Array<ParameterDefinition>} params - The engine's parameter definitions.
    * @returns {{assignments: Map<string, string>, titles: Map<string, string>|null,
    *   order: Array<string>}|null} The grouping, or null when none claims the list.
    */
@@ -748,16 +767,16 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
         getFullConfigSnapshot(), getFullConfigFieldDefinitions(), logWarn)
       : null;
     const fixedGrouping = () => {
-      const claimed = new Set(fixedShader.values());
+      const claimed = new Set(fixedShader?.values());
       return {
-        assignments: fixedShader,
+        assignments: /** @type {Map<string, string>} */ (fixedShader),
         titles: fixedTitles,
         order: STAGE_ORDER.filter((stage) => claimed.has(stage)),
       };
     };
     // Only a Fixed Shader carrying a configuration snapshot outranks the named
     // fixed pipelines; without one it is the last resort below.
-    if (fixedTitles) return fixedGrouping();
+    if (fixedTitles && fixedShader) return fixedGrouping();
     const latticeMelt = latticeMeltStageAssignments(params);
     if (latticeMelt) {
       return {
@@ -781,12 +800,12 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    * Present an engine-written telemetry control. `disabled` would take it out of
    * the accessibility tree and the tab order, so the value the control exists to
    * show could not be read at all; read-only leaves it reachable and inert.
-   * @param {Object} controller - The controller to present.
+   * @param {GuiController} controller - The controller to present.
    * @returns {void}
    */
   function presentReadonlyParam(controller) {
     controller.domElement.classList.add('param-readonly');
-    controller.domElement.addEventListener('keydown', (event) => {
+    controller.domElement.addEventListener('keydown', (/** @type {KeyboardEvent} */ event) => {
       if (typeof event.key === 'string' && ((controller.$select && event.key.length === 1
           && !event.ctrlKey && !event.metaKey && !event.altKey) || event.key.startsWith('Arrow')
           || [' ', 'Enter', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key))) {
@@ -794,7 +813,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
         event.stopPropagation();
       }
     }, true);
-    controller.domElement.addEventListener('click', (event) => {
+    controller.domElement.addEventListener('click', (/** @type {Event} */ event) => {
       event.preventDefault();
       event.stopPropagation();
     }, true);
@@ -808,7 +827,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    * the stage, so the visible label drops it, and the truncated labels repeat
    * across folders — "Mode" once per stage — so the widget takes the parameter's
    * own name as its accessible name instead of the shared visible one.
-   * @param {Object} controller - The stage folder's controller.
+   * @param {GuiController} controller - The stage folder's controller.
    * @param {string} stage - The pipeline stage it was grouped under.
    * @param {string} name - Engine parameter name.
    * @returns {void}
@@ -825,14 +844,15 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    * Build one controller per engine parameter, recording the value-stream order.
    * A ?param=value deep link reaches the engine through the GUI's load-time
    * onChange replay.
-   * @param {Object} fx - The effect record being built.
-   * @param {Array<Object>} params - The engine's parameter definitions.
-   * @param {{animationState: Object, controller: Object|null, setPaused: Function}}
+   * @param {EffectRecord} fx - The effect record being built.
+   * @param {Array<ParameterDefinition>} params - The engine's parameter definitions.
+   * @param {{animationState: {pause: boolean}, controller: GuiController|null, setPaused: (value: boolean) => void}}
    *   pause - The effect's pause toggle.
    * @param {Set<string>|null} [previousParamNames=null] - Names present before a schema rebuild.
    * @returns {void}
    */
   function addParamControllers(fx, params, pause, previousParamNames = null) {
+    /** @type {Record<string, number|boolean>} */
     const state = {};
     const external = paramFilter() !== null;
     // Fixed for the schema this build is committed to: no parameter write adds
@@ -904,7 +924,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       if (kind === 'boolean') {
         acceptedControlValue = engineParamValue(acceptedControlValue) > 0.5;
       }
-      controller.onChange(v => {
+      controller.onChange((/** @type {number|boolean} */ v) => {
         const value = engineParamValue(v);
         const accepted = setEngineParam(p.name, value) !== false;
         if (accepted) acceptedControlValue = v;
@@ -925,7 +945,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    * @param {{initialPause?: boolean, hydratePause?: boolean,
    *   restoreAccepted?: boolean,
    *   previousParamNames?: Set<string>|null}} [options] - Rebuild state.
-   * @returns {Object} A complete, unmounted effect record.
+   * @returns {EffectRecord} A complete, unmounted effect record.
    */
   function createEffectRecord({
     initialPause = false,
@@ -933,12 +953,12 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     restoreAccepted = false,
     previousParamNames = null,
   } = {}) {
-    const fx = {
+    const fx = /** @type {EffectRecord} */ (/** @type {unknown} */ ({
       gui: createGui(),
       animationPauseApplied: false,
       hydrating: true,
       warningsDirty: false,
-    };
+    }));
 
     fx.edits = new EffectPanelEdits(dragTarget, (edited) => persistence.persist(fx.gui, edited));
 
@@ -969,7 +989,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   /**
    * Release one effect record without changing which record is published,
    * flushing the persistence an in-flight drag deferred.
-   * @param {Object|null} fx - Record to release.
+   * @param {EffectRecord|null} fx - Record to release.
    * @returns {void}
    */
   function disposeEffect(fx) {
