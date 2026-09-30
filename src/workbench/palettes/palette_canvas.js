@@ -203,6 +203,10 @@ export function drawWaveGraph({ canvas, ctx, palette }) {
   ctx.lineTo(width, yTop);
   ctx.moveTo(0, yBottom);
   ctx.lineTo(width, yBottom);
+  for (const value of [0, 1]) {
+    ctx.moveTo(0, toY(value));
+    ctx.lineTo(width, toY(value));
+  }
   ctx.stroke();
 
   // Draw center line (0.5 reference)
