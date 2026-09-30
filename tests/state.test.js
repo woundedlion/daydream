@@ -569,7 +569,9 @@ test('URLSync resume keeps a suspended retry at the ladder delay', () => {
     assert.equal(sync.armedDelayMs, URL_FLUSH_RETRY_MS, 'the refusal armed the ladder');
 
     sync.suspend();
+    assert.equal(sync.timer, null);
     sync.resume();
+    assert.notEqual(sync.timer, null, 'resume must re-arm the pending retry');
     assert.equal(sync.armedDelayMs, URL_FLUSH_RETRY_MS,
       'resume pulled the ladder forward to the debounce');
   } finally {
