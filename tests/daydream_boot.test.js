@@ -1028,7 +1028,7 @@ test('startup defaults to full coverage despite compiled physical geometry', asy
   assert.equal(app.driver.DISPLAY_SOUTH_PHI, Math.PI);
 });
 
-test('global cap edits survive module loading, paused redraw and effect switches', async () => {
+test('global cap edits survive module loading, paused redraw and resolution switches', async () => {
   let resolve;
   const loading = new Promise((done) => { resolve = done; });
   const app = startApp({ loadModule: () => loading });
@@ -1054,9 +1054,13 @@ test('global cap edits survive module loading, paused redraw and effect switches
   assert.equal(app.driver.DISPLAY_NORTH_PHI, 0.04 * Math.PI);
   assert.equal(app.driver.DISPLAY_SOUTH_PHI, 0.97 * Math.PI);
   assert.equal(app.driver.paused, true);
-  assert.ok(app.driver.dotMesh.instanceColor.version > 0);
+  const capsBefore = module.caps.length;
+  const color = app.driver.dotMesh.instanceColor;
+  const versionBefore = color.version;
   app.guis[0].controllers.find((c) => c.property === 'resolution').setValue('Holosphere (96x20)');
+  assert.equal(module.caps.length, capsBefore + 1);
   assert.deepEqual(module.caps.at(-1), [4, 3]);
+  assert.ok(color.version > versionBefore);
 });
 
 test('a rejected startup cap profile disposes the incompatible engine', async () => {
