@@ -408,6 +408,9 @@ async function generateThumbnails(signal) {
             const check = await chainIsValid(key, state.ops);
             if (!check.ok) {
               showGateMsg(`rejected: the op stack fails on this solid — ${check.message}`);
+              if (document.activeElement === btn) {
+                document.querySelector('.thumb-btn[aria-checked="true"]')?.focus();
+              }
               return;
             }
           }
