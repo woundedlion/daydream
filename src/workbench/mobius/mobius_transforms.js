@@ -197,7 +197,7 @@ export function snapComplex(value, threshold = 0.05) {
 
 /**
  * Elliptic (Rotation) preset: continuous rotation around the poles.
- * @param {number} t - Elapsed time in seconds.
+ * @param {number} t - Animation time, advancing at 0.6 units per second.
  * @returns {{A:{re:number,im:number}, B:{re:number,im:number}, C:{re:number,im:number}, D:{re:number,im:number}}} The Mobius coefficients {A, B, C, D}.
  */
 export function elliptic(t) {
@@ -212,7 +212,7 @@ export function elliptic(t) {
 
 /**
  * Hyperbolic (Zoom) preset: continuous flow from Source to Sink.
- * @param {number} t - Elapsed time in seconds.
+ * @param {number} t - Animation time, advancing at 0.6 units per second.
  * @returns {{A:{re:number,im:number}, B:{re:number,im:number}, C:{re:number,im:number}, D:{re:number,im:number}}} The Mobius coefficients {A, B, C, D}.
  */
 export function hyperbolic(t) {
@@ -232,7 +232,7 @@ export function hyperbolic(t) {
 
 /**
  * Loxodromic (Spiral) preset: seamless spiral flow.
- * @param {number} t - Elapsed time in seconds.
+ * @param {number} t - Animation time, advancing at 0.6 units per second.
  * @returns {{A:{re:number,im:number}, B:{re:number,im:number}, C:{re:number,im:number}, D:{re:number,im:number}}} The Mobius coefficients {A, B, C, D}.
  */
 export function loxodromic(t) {
@@ -253,7 +253,7 @@ export function loxodromic(t) {
 
 /**
  * Parabolic (Drift) preset: continuous translation bouncing between -2 and 2.
- * @param {number} t - Elapsed time in seconds.
+ * @param {number} t - Animation time, advancing at 0.6 units per second.
  * @returns {{A:{re:number,im:number}, B:{re:number,im:number}, C:{re:number,im:number}, D:{re:number,im:number}}} The Mobius coefficients {A, B, C, D}.
  */
 export function parabolic(t) {
@@ -267,7 +267,7 @@ export function parabolic(t) {
 
 /**
  * Inversion (Rotation) preset: continuous rotation around the Real axis (swaps 0/∞).
- * @param {number} t - Elapsed time in seconds.
+ * @param {number} t - Animation time, advancing at 0.6 units per second.
  * @returns {{A:{re:number,im:number}, B:{re:number,im:number}, C:{re:number,im:number}, D:{re:number,im:number}}} The Mobius coefficients {A, B, C, D}.
  */
 export function inversion(t) {
@@ -284,7 +284,7 @@ export function inversion(t) {
 
 /**
  * Tumble preset: rotation around the Imaginary axis.
- * @param {number} t - Elapsed time in seconds.
+ * @param {number} t - Animation time, advancing at 0.6 units per second.
  * @returns {{A:{re:number,im:number}, B:{re:number,im:number}, C:{re:number,im:number}, D:{re:number,im:number}}} The Mobius coefficients {A, B, C, D}.
  */
 export function tumble(t) {
@@ -302,7 +302,7 @@ export function tumble(t) {
 /**
  * Cayley Transform preset: interpolate Identity (1,0,0,1) -> Cayley (1,-i,1,i),
  * saturating the interpolation parameter at p = 1.
- * @param {number} t - Elapsed time in seconds.
+ * @param {number} t - Animation time, advancing at 0.6 units per second.
  * @returns {{A:{re:number,im:number}, B:{re:number,im:number}, C:{re:number,im:number}, D:{re:number,im:number}}} The Mobius coefficients {A, B, C, D}.
  */
 export function cayley(t) {

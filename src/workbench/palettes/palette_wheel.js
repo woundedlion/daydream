@@ -55,9 +55,7 @@ const LABEL_FONT = '700 20px Inter, sans-serif';
 const LABEL_HEIGHT = 28;
 const LABEL_PADDING_X = 7;
 const LABEL_INSET = 18;
-// Lightness steps the raster is cached at: rebuilding it costs a 360x12 gamut
-// bisection plus a 65k-sample raster, which a lightness drag would otherwise pay
-// per slider tick for a step the wheel cannot show.
+// Quantized lightness keys for the raster cache.
 const LIGHTNESS_STEPS = 64;
 
 /**
@@ -77,8 +75,6 @@ export function paintHueWheelRaster(data, width, height, lightness) {
   const maximumChroma = Math.max(0.001, maxSrgbGamutChroma(lightness));
   const chromaPerPixel = maximumChroma / radius;
   const turnsPerRadian = 1 / (Math.PI * 2);
-  // 65k samples: the colour conversion fills this one array rather than
-  // returning a fresh triple per pixel.
   const rgb = [0, 0, 0];
   for (let y = 0; y < height; y++) {
     const dy = y + 0.5 - centerY;
