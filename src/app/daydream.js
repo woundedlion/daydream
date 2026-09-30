@@ -629,14 +629,21 @@ export function start({
       daydream.invalidate();
     },
   });
+  let acceptedCaps = { ...displayCaps.state };
+  const capControls = [];
   const applyDisplayCaps = () => {
-    if (!displayCaps.apply()) throw new Error('Engine rejected display cap settings.');
+    if (!displayCaps.apply()) {
+      Object.assign(displayCaps.state, acceptedCaps);
+      for (const control of capControls) control.updateDisplay();
+      throw new Error('Engine rejected display cap settings.');
+    }
+    acceptedCaps = { ...displayCaps.state };
     if (!host.engine) segments.setDisplayCaps(displayCaps.state.topCap, displayCaps.state.bottomCap);
   };
-  guiInstance.add(displayCaps.state, 'topCap', 0, 25, 0.1).name('Top cap (%)')
-    .onChange(applyDisplayCaps);
-  guiInstance.add(displayCaps.state, 'bottomCap', 0, 25, 0.1).name('Bottom cap (%)')
-    .onChange(applyDisplayCaps);
+  capControls.push(guiInstance.add(displayCaps.state, 'topCap', 0, 25, 0.1).name('Top cap (%)')
+    .onChange(applyDisplayCaps));
+  capControls.push(guiInstance.add(displayCaps.state, 'bottomCap', 0, 25, 0.1).name('Bottom cap (%)')
+    .onChange(applyDisplayCaps));
 
   // Not on the workbench page: its effects are programmed through
   // setShaderChain and no worker message carries that program, so a pool would
