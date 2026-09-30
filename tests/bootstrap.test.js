@@ -508,11 +508,13 @@ test('refreshModuleCache survives a rejected re-fetch and a missing timeline', a
     performance: fakeTimeline('http://localhost:8000/daydream.js'),
     fetch: () => Promise.reject(new TypeError('network down')),
   }));
+  let fetches = 0;
   await assert.doesNotReject(() => refreshModuleCache({
     origin: 'http://localhost:8000',
-    performance: undefined,
-    fetch: () => assert.fail('no resource timeline: nothing to re-fetch'),
+    performance: null,
+    fetch: () => { fetches += 1; },
   }));
+  assert.equal(fetches, 0);
   await assert.doesNotReject(() => refreshModuleCache({
     origin: 'http://localhost:8000',
     performance: fakeTimeline('http://localhost:8000/daydream.js'),
