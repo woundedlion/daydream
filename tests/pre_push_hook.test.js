@@ -120,6 +120,21 @@ test('pre-push refuses a stale working-tree import map', { skip: SKIP }, (t) => 
   assert.match(run.stderr, /vendor-importmap\.js is stale/);
 });
 
+test('pre-push refuses stale Tailwind styles', { skip: SKIP }, (t) => {
+  const root = fixtureRoot(t);
+  mkdirSync(join(root, 'node_modules'), { recursive: true });
+  writeFileSync(join(root, 'node_modules/.package-lock.json'), '{}\n');
+  const run = runWithTools(root, {
+    node: 'exit 0',
+    npm: 'exit 0',
+    git: 'for arg; do if [ "$arg" = tools/tailwind.css ]; then exit 1; fi; done',
+    mktemp: 'echo ./generated.probe',
+    rm: 'exit 0',
+  });
+  assert.notEqual(run.status, 0);
+  assert.match(run.stderr, /tools\/tailwind\.css is stale/);
+});
+
 test('pre-push refuses a failing source workflow suite',
   { skip: SKIP }, (t) => {
     const root = fixtureRoot(t);
@@ -136,7 +151,7 @@ test('pre-push refuses a failing source workflow suite',
     assert.match(run.stderr, /unit-suite-failed/);
   });
 
-for (const step of ['lint', 'typecheck', 'importmap']) {
+for (const step of ['lint', 'typecheck', 'importmap', 'generate:tailwind']) {
   test(`pre-push stops when ${step} fails`, { skip: SKIP }, (t) => {
     const root = fixtureRoot(t);
     mkdirSync(join(root, 'node_modules'), { recursive: true });
@@ -189,6 +204,8 @@ for (const installStatus of [0, 19]) {
       writeFileSync(join(root, 'package.json'), '{}');
       writeFileSync(join(root, 'package-lock.json'), '{}');
       writeFileSync(join(root, 'vendor-importmap.js'), 'map\n');
+  mkdirSync(join(root, 'tools'));
+  writeFileSync(join(root, 'tools/tailwind.css'), 'css\n');
       for (const name of ['ci_workflow', 'deployment_pair', 'stage_site'])
         writeFileSync(join(root, `tests/${name}.test.js`), '');
       const log = join(root, 'calls.log').replace(/\\/g, '/');
@@ -196,10 +213,11 @@ for (const installStatus of [0, 19]) {
       writeFileSync(npm, '#!/bin/sh\n'
         + `printf '%s\\n' "$*" >> "${log}"\n`
         + `if [ "$1" = ci ]; then mkdir -p node_modules; echo '{}' > node_modules/.package-lock.json; exit ${installStatus}; fi\n`
-        + 'if [ "$2" = importmap ]; then for last; do :; done; cp vendor-importmap.js "$last"; fi\n');
+        + 'if [ "$2" = importmap ]; then for last; do :; done; cp vendor-importmap.js "$last"; fi\n'
+    + 'if [ "$2" = generate:tailwind ]; then for last; do :; done; cp tools/tailwind.css "$last"; fi\n');
       chmodSync(npm, 0o755);
       git('init', '-q');
-      git('add', '.githooks/pre-push', 'tests', 'package.json', 'package-lock.json', 'vendor-importmap.js');
+      git('add', '.githooks/pre-push', 'tests', 'package.json', 'package-lock.json', 'vendor-importmap.js', 'tools/tailwind.css');
       git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test',
         '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture');
       const sha = git('rev-parse', 'HEAD').trim();
@@ -239,6 +257,8 @@ test('pre-push validates the pushed commit instead of a modified working tree', 
   writeFileSync(join(root, 'package.json'), '{}');
   writeFileSync(join(root, 'package-lock.json'), '{}');
   writeFileSync(join(root, 'vendor-importmap.js'), 'map\n');
+  mkdirSync(join(root, 'tools'));
+  writeFileSync(join(root, 'tools/tailwind.css'), 'css\n');
   writeFileSync(join(root, 'marker'), 'committed\n');
   for (const name of ['ci_workflow', 'deployment_pair', 'stage_site'])
     writeFileSync(join(root, `tests/${name}.test.js`), '');
@@ -248,10 +268,11 @@ test('pre-push validates the pushed commit instead of a modified working tree', 
   chmodSync(node, 0o755);
   const npm = join(root, 'bin/npm');
   writeFileSync(npm, `#!/bin/sh\nprintf '%s\\n' "npm $*" >> '${calls}'\n` + '[ "$(cat marker)" = committed ] || exit 23\n'
-    + 'if [ "$2" = importmap ]; then for last; do :; done; cp vendor-importmap.js "$last"; fi\n');
+    + 'if [ "$2" = importmap ]; then for last; do :; done; cp vendor-importmap.js "$last"; fi\n'
+    + 'if [ "$2" = generate:tailwind ]; then for last; do :; done; cp tools/tailwind.css "$last"; fi\n');
   chmodSync(npm, 0o755);
   git('init', '-q');
-  git('add', '.githooks/pre-push', 'tests', 'package.json', 'package-lock.json', 'vendor-importmap.js', 'marker');
+  git('add', '.githooks/pre-push', 'tests', 'package.json', 'package-lock.json', 'vendor-importmap.js', 'tools/tailwind.css', 'marker');
   git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture');
   const sha = git('rev-parse', 'HEAD').trim();
   writeFileSync(join(root, 'marker'), 'working-tree-only\n');
@@ -261,7 +282,7 @@ test('pre-push validates the pushed commit instead of a modified working tree', 
   });
   assert.equal(result.status, 0, result.stdout + result.stderr);
   const logged = readFileSync(calls, 'utf8');
-  for (const command of ['npm run lint', 'npm run typecheck', 'npm run importmap', 'node --test'])
+  for (const command of ['npm run lint', 'npm run typecheck', 'npm run importmap', 'npm run generate:tailwind', 'node --test'])
     assert.ok(logged.includes(command), command);
   assert.equal(readFileSync(join(root, 'marker'), 'utf8'), 'working-tree-only\n');
   assert.equal(readFileSync(join(root, 'node_modules/.package-lock.json'), 'utf8'), '{}');
