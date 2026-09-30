@@ -373,6 +373,7 @@ export function createShaderDocumentController({
     const digest = liveDigest();
     digestButton.dataset.digest = digest ?? '';
     digestButton.textContent = digest ? digest.slice(0, DIGEST_ABBREVIATION) : '—';
+    digestButton.setAttribute('aria-label', `Copy the descriptor digest ${digestButton.textContent}`);
     digestButton.disabled = !digest;
   };
 
