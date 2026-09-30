@@ -458,19 +458,12 @@ test('DEFINED_SEED_CONSTANTS matches core/mesh/solids.h', { skip: engineSkip }, 
     + 'the paste redefine a constant the header already has');
 });
 
-/**
- * Pins solid_registry_codegen.js's MAX_BUILD_STEPS to the build-step cap
- * IslamicStars.h declares. The generator refuses a registry entry that lowers
- * to more primitive steps than that, and the effect's own static_assert is the
- * only check after it, so a raised or lowered cap would leave the tool refusing
- * entries the engine builds, or pasting ones it cannot.
- */
-test('MAX_BUILD_STEPS matches effects/IslamicStars.h', { skip: engineSkip }, () => {
-  const src = header(ISLAMIC_STARS_H);
-  const m = src.match(/static constexpr size_t MAX_BUILD_STEPS\s*=\s*(\d+);/);
-  assert.ok(m, `MAX_BUILD_STEPS not found in ${ISLAMIC_STARS_H} — the reader is out of date`);
-  assert.equal(MAX_BUILD_STEPS, Number(m[1]),
-    "MAX_BUILD_STEPS drifted from the effect's build-step cap");
+test('MAX_BUILD_STEPS matches the pinned shared build budget', { skip: engineSkip }, () => {
+  const source = header(ISLAMIC_STARS_H);
+  assert.match(source, /static constexpr size_t MAX_BUILD_STEPS\s*=\s*IslamicStarsDetail::MAX_BUILD_OPS;/);
+  const match = /namespace IslamicStarsDetail\s*\{[^}]*inline constexpr size_t MAX_BUILD_OPS\s*=\s*(\d+);/.exec(source);
+  assert.ok(match, 'IslamicStarsDetail::MAX_BUILD_OPS not found');
+  assert.equal(MAX_BUILD_STEPS, Number(match[1]));
 });
 
 
@@ -509,9 +502,11 @@ test('engine struct reader ignores semicolons inside member comments', () => {
   ]);
 });
 
-test('MAX_BUILD_FACES matches the pinned effect budget', { skip: engineSkip }, () => {
-  const match = /static constexpr size_t MAX_BUILD_FACES\s*=\s*(\d+);/.exec(header(ISLAMIC_STARS_H));
-  assert.ok(match);
+test('MAX_BUILD_FACES matches the pinned shared build budget', { skip: engineSkip }, () => {
+  const source = header(ISLAMIC_STARS_H);
+  assert.match(source, /static constexpr size_t MAX_BUILD_FACES\s*=\s*IslamicStarsDetail::MAX_BUILD_FACES;/);
+  const match = /namespace IslamicStarsDetail\s*\{[^}]*inline constexpr size_t MAX_BUILD_FACES\s*=\s*(\d+);/.exec(source);
+  assert.ok(match, 'IslamicStarsDetail::MAX_BUILD_FACES not found');
   assert.equal(MAX_BUILD_FACES, Number(match[1]));
 });
 
