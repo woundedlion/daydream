@@ -1789,3 +1789,19 @@ test('display caps preserve complete shader configuration and custom chain progr
     engine.setDisplayCaps(0, 0);
   }
 });
+
+
+test('display caps preserve MobiusGrid after topology rebuilds', () => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)));
+  assert.equal(engine.setEffect('MobiusGrid'), M.EffectSetResult.INSTALLED);
+  const definitions = engine.getParameterDefinitions();
+  try {
+    assert.equal(engine.setDisplayCaps(2, 3), true);
+    assert.deepEqual(engine.getParameterDefinitions(), definitions);
+    engine.getPixels().fill(0);
+    engine.drawFrame();
+    assert.ok(engine.getPixels().some((value) => value !== 0));
+  } finally {
+    engine.setDisplayCaps(0, 0);
+  }
+});
