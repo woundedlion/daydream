@@ -479,3 +479,60 @@ test('all event types serialize final pair checks, publication and recording in 
   assert.match(job.slice(check, publish), /if: steps.current.outputs.current == 'true'/);
   assert.match(job.slice(publish, record), /name: Record successful deployment pair\s+if: steps.current.outputs.current == 'true'/);
 });
+
+
+test('engine bundle polling retries transient queries and artifact calls', (t) => {
+  const shell = findBash();
+  if (!shell) { t.skip('Bash is unavailable'); return; }
+  const gate = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/engine-bundle.yml`), 'utf8').replaceAll('\r\n', '\n');
+  const block = gate.split('      - name: Download the verified engine bundle\n')[1].split('      - name:')[0];
+  const root = mkdtempSync(join(tmpdir(), 'engine-retries-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const body = block.split('        run: |\n')[1].replace(/^ {10}/gm, '')
+    .replaceAll('/tmp/engine-bundle.zip', '"$FIXTURE_ROOT/bundle.zip"');
+  const stubs = `
+    sleep() { :; }
+    python3() { test "$(cat "$FIXTURE_ROOT/bundle.zip")" = bundle; }
+    gh() {
+      case "$2" in
+        *workflows*) kind=query ;;
+        *runs/*/artifacts) kind=artifact ;;
+        *artifacts/*/zip) kind=zip ;;
+        *) return 9 ;;
+      esac
+      counter="$FIXTURE_ROOT/$kind"
+      n=0
+      if [ -f "$counter" ]; then n=$(cat "$counter"); fi
+      n=$((n + 1))
+      printf '%s' "$n" > "$counter"
+      case "$kind" in
+        query)
+          if [ "$FIRST_FAIL" = true ]; then return 1; fi
+          if [ "$n" = 1 ]; then return 0; fi
+          if [ "$n" = 2 ]; then return 1; fi
+          printf '12\\tcompleted\\tsuccess\\t2026-09-30\\t%s\\n' "$PIN" ;;
+        artifact)
+          if [ "$n" -lt 3 ]; then return 1; fi
+          printf '42\\tfalse\\t2030-01-01\\n' ;;
+        zip)
+          if [ "$n" -lt 3 ]; then printf 'partial'; return 1; fi
+          printf 'bundle' ;;
+      esac
+    }
+  `;
+  for (const firstFail of [false, true]) {
+    const fixture = join(root, String(firstFail));
+    mkdirSync(fixture);
+    const result = spawnSync(shell, ['-e', '-s'], {
+      input: stubs + body, encoding: 'utf8',
+      env: { ...process.env, FIXTURE_ROOT: fixture.replaceAll('\\', '/'),
+        PIN: 'a'.repeat(40), FIRST_FAIL: String(firstFail) },
+    });
+    assert.equal(result.status, firstFail ? 1 : 0, result.stderr + result.stdout);
+    assert.equal(readFileSync(join(fixture, 'query'), 'utf8'), firstFail ? '1' : '3');
+    if (!firstFail) {
+      assert.equal(readFileSync(join(fixture, 'artifact'), 'utf8'), '3');
+      assert.equal(readFileSync(join(fixture, 'zip'), 'utf8'), '3');
+    }
+  }
+});
