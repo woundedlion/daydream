@@ -8,12 +8,12 @@
 // document or its digest. The fixture is a real multi-preset pattern document
 // compiled against the pinned engine catalog.
 import { test } from 'node:test';
+import * as compiler from '../generated/shader/shader_workbench.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import * as compiler from '../generated/shader/shader_workbench.mjs';
 
 import {
   DEFAULT_SCRATCH_CHAIN,
@@ -920,9 +920,12 @@ test('a refused structural edit preserves the redo document', async () => {
 });
 
 test('chain labels use the compiler grammar', async () => {
-  for (const label of ['orbit', 'orbit-two', 'orbit2', 'Orbit', '2orbit', 'orbit--two', 'orbit_', '']) {
+  for (const [label, valid] of [
+    ['orbit', true], ['orbit-two', true], ['orbit2', true], ['Orbit', false],
+    ['2orbit', false], ['orbit--two', false], ['orbit_', false], ['', false],
+  ]) {
     const store = await makeStore();
-    assert.equal(store.relabel('camera', label).ok, compiler.LABEL_PATTERN.test(label), label);
+    assert.equal(store.relabel('camera', label).ok, valid, label);
   }
 });
 
