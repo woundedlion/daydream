@@ -217,7 +217,7 @@ export function fakeGui(namespace = {}, optionsReplaces = false) {
   gui.domElement.appendChild(childrenElement);
   if (panel) {
     gui.addDisplayFolder = (name) => {
-      const folder = { name, closed: false,
+      const folder = { name, display: true, closed: false,
         open(open = true) { this.closed = !open; },
         close() { this.open(false); },
       };
@@ -230,7 +230,11 @@ export function fakeGui(namespace = {}, optionsReplaces = false) {
       gui.folders.push(folder);
       return folder;
     };
-    gui.addFolder = gui.addDisplayFolder;
+    gui.addFolder = (name) => {
+      const folder = gui.addDisplayFolder(name);
+      folder.display = false;
+      return folder;
+    };
   }
   return gui;
 }
