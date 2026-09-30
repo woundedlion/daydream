@@ -27,9 +27,9 @@ export class EngineHost {
     this.module = null;
     /** @type {HolosphereEngine|null} */
     this.engine = null;
-    /** @type {Object|null} */
+    /** @type {ReturnType<typeof import('../app/app_lifecycle.js').createRenderAdapter>|null} */
     this.adapter = null;
-    /** @type {{dispose: () => void}|null} */
+    /** @type {import('../recording/recorder.js').VideoRecorder|null} */
     this.recorder = null;
     this.pixelView = null;
     this.onViewRefreshed = onViewRefreshed;

@@ -20,7 +20,7 @@
  * source, displayed attribute, and driver.pixels all reference the same WASM
  * view. Shared by EngineHost.refresh(), the frame adapter's alias heal, and
  * SegmentController's composite heal.
- * @param {DisplayDriver} driver - The Daydream driver owning the dot mesh.
+ * @param {DisplayDriver} driver - The Daydream driver with a non-null dot mesh and instanceColor attribute.
  * @param {Uint16Array} view - The WASM pixel view to alias.
  * @returns {void}
  */
@@ -37,7 +37,7 @@ export function repointDisplayAliases(driver, view) {
 
 /**
  * Whether either display alias has stopped referencing the engine's pixel view.
- * @param {DisplayDriver} driver - The Daydream driver owning the dot mesh.
+ * @param {DisplayDriver} driver - The Daydream driver with a non-null dot mesh and instanceColor attribute.
  * @param {Uint16Array} view - The view both aliases must reference.
  * @returns {boolean} True when at least one alias points elsewhere.
  */
