@@ -48,7 +48,17 @@ export const samePair = (a, b) => Boolean(a && b && a.daydream === b.daydream &&
 export async function pairWasAttempted(api, repo, pair) {
   for (let page = 1; ; page++) {
     const deployments = await api(`repos/${repo}/deployments?environment=${PAIR_ENVIRONMENT}&sha=${pair.daydream}&per_page=100&page=${page}`);
-    if (deployments.some((deployment) => samePair(pair, deployment.payload))) return true;
+    for (const deployment of deployments) {
+      if (!samePair(pair, deployment.payload)) continue;
+      const statuses = await api(`repos/${repo}/deployments/${deployment.id}/statuses?per_page=1`);
+      if (statuses[0]?.state === 'success') return true;
+      const runId = statuses[0]?.log_url?.match(/\/actions\/runs\/(\d+)\/?$/)?.[1];
+      if (runId) {
+        const run = await api(`repos/${repo}/actions/runs/${runId}`);
+        if (run.conclusion === 'cancelled') continue;
+      }
+      return true;
+    }
     if (deployments.length < 100) return false;
   }
 }
