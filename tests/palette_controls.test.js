@@ -566,7 +566,7 @@ test('an axis endpoint pair becomes its center and range', () => {
   const recipe = paletteRecipeFromControls(defaultPaletteRecipe(), CONTROL_READINGS);
 
   assert.deepEqual(recipe.lightness, { ...defaultPaletteRecipe().lightness,
-    curve: PaletteV4.curve.ASCENDING, ...axisFromEndpoints(0.2, 0.8) });
+    curve: PaletteV4.curve.ASCENDING, center: 0.5, range: 0.6000000000000001 });
   assert.equal(recipe.chroma.center, 0.4);
   assert.equal(recipe.chroma.range, 0.2);
 });
@@ -585,14 +585,13 @@ test('a CUSTOM axis keeps the template points its endpoints cannot describe', ()
 });
 
 test('custom hue turns are derived only in CUSTOM hue mode', () => {
-  const offsets = [0, 0.07, 0.14];
   const harmony = paletteRecipeFromControls(defaultPaletteRecipe(), CONTROL_READINGS);
   const custom = paletteRecipeFromControls(defaultPaletteRecipe(),
     { ...CONTROL_READINGS, hueMode: 'CUSTOM' });
 
   assert.deepEqual(harmony.hue.customTurns, defaultPaletteRecipe().hue.customTurns);
   assert.deepEqual(custom.hue.customTurns,
-    customHueTurns(0.25, offsets, defaultPaletteRecipe().hue.customTurns));
+    [0.25, 0.32, 0.39, 0]);
 });
 
 test('a fully saturated chroma center preserves the authored headroom', () => {
