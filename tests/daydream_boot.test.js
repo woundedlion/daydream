@@ -957,7 +957,7 @@ test('a failed workbench init reports without the page-failure banner', () => {
 });
 
 
-test('stopping and restarting recording clears deferred captures between frames', () => {
+test('the record toggle drops held captures', () => {
   const rig = recordingRig();
   rig.attach(fakeRecorder());
   rig.button.object.record();
