@@ -4,8 +4,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-// Pure math from tools/lissajous.html so it can be unit-tested in Node without
-// a DOM.
+// Lissajous curves and rational-frequency matching.
 import { formatFloatCpp } from '../../shared/cpp_format.js';
 
 const TWO_PI = 2 * Math.PI;

@@ -49,10 +49,6 @@ const lineMaterial = new THREE.LineBasicMaterial({
   depthTest: false // Always on top effect
 });
 
-// lissajous(m1, m2, a, t) lives in ./lissajous_math.js (imported above); the
-// preview and the engine share its m1/m2/a/t argument order, and the
-// exported LissajousParams initializer lists m1/m2/a/domain in that order.
-
 const initThree = () => {
   // Camera moved closer than the default to make the curve fill the space.
   const result = initScene('canvasContainer', 'threeCanvas', {
@@ -102,10 +98,6 @@ const scheduleUpdate = createFrameScheduler(() => {
   regenerateCurve();
   updateCodeSnippet();
 });
-
-// findBestRationalRatio and the snapToRationalRatio closing-domain core live
-// in ./lissajous_math.js (imported above); this section keeps only the DOM
-// read/write wiring around them.
 
 /**
  * Snaps the active frequency (C1 or C2) to maintain a simple rational ratio with the passive frequency.
