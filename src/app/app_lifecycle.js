@@ -3,8 +3,6 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-import { raceDeadline } from '../segments/module_warmer.js';
-
 /**
  * The composition root's frame, timer, and teardown wiring: the per-frame adapter
  * the driver calls, the global keydown shortcuts, the Test All walk, the module
@@ -14,6 +12,7 @@ import { raceDeadline } from '../segments/module_warmer.js';
  * browser.
  */
 
+import { raceDeadline } from '../segments/module_warmer.js';
 import { errorDetail } from '../shared/banner.js';
 import { displayAliasesDiverged, repointDisplayAliases } from '../engine/display_aliases.js';
 
