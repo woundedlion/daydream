@@ -1,9 +1,10 @@
+import { engineRoot, engineMissing, engineSkip } from './helpers/engine_checkout.js';
 import { LOWERING, primitiveCount } from '../src/workbench/solids/solid_registry_codegen.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
@@ -16,13 +17,7 @@ import { MORPH_SWEEP, OP_DEFS } from '../src/workbench/solids/solid_codegen.js';
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const text = (path) => readFileSync(resolve(REPO, path), 'utf8').replaceAll('\r\n', '\n');
 const sha256 = (path) => createHash('sha256').update(readFileSync(resolve(REPO, path))).digest('hex');
-const engineCandidates = process.env.HOLOSPHERE_ENGINE_DIR
-  ? [resolve(process.env.HOLOSPHERE_ENGINE_DIR)]
-  : ['engine', '../Holosphere', '../pov'].map((path) => resolve(REPO, path));
-const engineRoot = engineCandidates.find(
-  (path) => existsSync(resolve(path, 'scripts/shader_workbench.mjs')));
-const engineMissing = `no Holosphere checkout found in ${engineCandidates.join(', ')}`;
-const engineSkip = engineRoot || process.env.HOLOSPHERE_ENGINE_REQUIRED ? false : engineMissing;
+
 
 const enginePin = text('generated/holosphere_wasm.sha').trim();
 const committed = (root, path, revision = enginePin) => execFileSync(
@@ -277,6 +272,7 @@ test('Mobius projection constants match the pinned engine sources', { skip: engi
 
 
 test('registry composite lowering matches expand_to_primitives', { skip: engineSkip }, () => {
+  assert.ok(engineRoot, engineMissing);
   const recipe = committed(engineRoot, 'core/mesh/recipe.h').toString('utf8');
   const body = recipe.slice(recipe.indexOf('inline size_t expand_to_primitives'));
   for (const [name, lower] of Object.entries(LOWERING)) {
