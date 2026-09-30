@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { validatePair } from './deployment-pair.mjs';
@@ -22,7 +22,16 @@ export function verifiedEnginePaths(root, bundle) {
 export function sitePaths(root, bundle) {
   const entries = readFileSync(resolve(root, 'site_manifest.txt'), 'utf8')
     .split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith('#'));
-  if (!bundle) return entries;
+  if (!bundle) {
+    const patterns = 'generated/shader/patterns';
+    const directory = resolve(root, patterns);
+    const installed = existsSync(directory)
+      ? readdirSync(directory, { withFileTypes: true })
+        .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
+        .map((entry) => `${patterns}/${entry.name}`)
+      : [];
+    return [...new Set([...entries, ...installed])];
+  }
   const verified = verifiedEnginePaths(root, bundle);
   const screenshots = new Set(readFileSync(resolve(root, 'README.md'), 'utf8')
     .match(/docs\/screenshots\/[\w.-]+\.png/g) ?? []);

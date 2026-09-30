@@ -57,6 +57,15 @@ test('site staging publishes verified additions, removes stale owned entries and
     assert.throws(() => stageSite(f.root, f.bundle, f.site, { ...f.pair, [key]: 'c'.repeat(40) }), /selected sources/);
 });
 
+test('source-only site paths discover installed patterns without manifest entries', (t) => {
+  const f = fixture(t);
+  f.write(f.root, 'site_manifest.txt', 'src/app/daydream.js\n');
+  f.write(f.root, 'generated/shader/patterns/added.shader.json', '{}');
+  const paths = sitePaths(f.root);
+  assert.ok(paths.includes('generated/shader/patterns/new.shader.json'));
+  assert.ok(paths.includes('generated/shader/patterns/added.shader.json'));
+});
+
 test('staging refuses modified frontend, manifest, or engine bytes', (t) => {
   const f = fixture(t);
   f.write(f.root, 'src/app/daydream.js', 'tampered');
