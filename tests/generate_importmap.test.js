@@ -154,7 +154,7 @@ test('the addon scan ignores untracked working-tree files', () => {
   installModules();
   mkdirSync(join(root, 'prompts'), { recursive: true });
   writeFileSync(join(root, 'prompts', 'draft.html'),
-    "import 'three/addons/renderers/UntrackedRenderer.js';\n");
+    "<script type='module'>import 'three/addons/renderers/UntrackedRenderer.js';</script>\n");
   const out = run();
   assert.ok(!out.includes('UntrackedRenderer.js'));
 });
