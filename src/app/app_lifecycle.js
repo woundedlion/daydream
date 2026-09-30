@@ -444,7 +444,7 @@ export function loadWithDeadline(load, {
  * Build the handlers for the main WASM module promise, guarded against a page
  * discard that settles first.
  *
- * The teardown's pagehide listener is registered during module evaluation, so a
+ * The teardown's pagehide listener is registered during app startup, so a
  * discard can win the race with the module load. Startup is skipped once the app
  * is disposed; a disposal that lands while startup is running instead releases
  * what startup built, since dispose() runs once and will not revisit it. A load
@@ -454,7 +454,7 @@ export function loadWithDeadline(load, {
  * @param {Object} deps - Injected app collaborators.
  * @param {() => ?{dispose: Function, disposed: () => boolean}} deps.teardown -
  *   Reads the app teardown, which the composition root builds after these
- *   handlers, and reads null when module evaluation never got that far.
+ *   handlers, and reads null when app startup never got that far.
  * @param {(module: Object) => void} deps.start - Brings the app up on the
  *   loaded module.
  * @param {() => void} deps.discardStartup - Releases the engine, recorder, and
