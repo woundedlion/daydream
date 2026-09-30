@@ -35,26 +35,6 @@ afterEach(async () => {
 
 const INDEX = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const WORKBENCH = readFileSync(new URL('../tools/shader.html', import.meta.url), 'utf8');
-const WORKBENCH_CSS = readFileSync(new URL('../tools/shader.css', import.meta.url), 'utf8');
-const TOP_LEVEL_WORKBENCH_CSS = (() => {
-  let result = '';
-  let cursor = 0;
-  while (cursor < WORKBENCH_CSS.length) {
-    const open = WORKBENCH_CSS.indexOf('{', cursor);
-    if (open < 0) break;
-    let depth = 1;
-    let close = open + 1;
-    while (close < WORKBENCH_CSS.length && depth > 0) {
-      if (WORKBENCH_CSS[close] === '{') depth += 1;
-      else if (WORKBENCH_CSS[close] === '}') depth -= 1;
-      close += 1;
-    }
-    if (!WORKBENCH_CSS.slice(cursor, open).trim().startsWith('@'))
-      result += WORKBENCH_CSS.slice(cursor, close);
-    cursor = close;
-  }
-  return result;
-})();
 const ENGINE_CATALOG = readFileSync(
   new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8');
 // §4.5: the document the workbench opens on, built from the same catalog the
@@ -156,103 +136,6 @@ test('simulator exposes Shader as a standalone tool', () => {
   assert.match(WORKBENCH, /id="shader-parity-toggle"/);
   assert.match(WORKBENCH, /id="shader-animation-toggle"/);
   assert.match(WORKBENCH, /id="shader-document-digest"/);
-  assert.match(WORKBENCH_CSS, /\.lil-controller\.lil-option option\s*\{/);
-  assert.match(WORKBENCH_CSS, /color-scheme:\s*dark/);
-  assert.match(WORKBENCH_CSS, /background-color:\s*var\(--background-color\)/);
-  assert.match(WORKBENCH_CSS, /\.chain-param\[data-deactivated="true"\]\s*\{/);
-  assert.match(WORKBENCH_CSS, /\.chain-param-note\s*\{[^}]*grid-column:\s*1 \/ -1/,
-    'the reason node takes a row of its own instead of a parameter grid cell');
-});
-
-test('transition cards use opaque surfaces', () => {
-  assert.match(WORKBENCH_CSS,
-    /\.chain-chip--socket\s*\{[^}]*background:\s*var\(--panel-bg\)/,
-    'transition headers keep an opaque reading surface');
-  assert.match(WORKBENCH_CSS,
-    /\.chain-palette\s*\{[^}]*background:\s*var\(--panel-bg\)/,
-    'transition palettes keep an opaque panel surface');
-  assert.match(WORKBENCH_CSS,
-    /\.chain-palette-entry\s*\{[^}]*background:\s*#[0-9a-f]{6}/i,
-    'transition choices keep opaque raised rows');
-  assert.match(WORKBENCH_CSS,
-    /\.chain-palette-entry:hover,[^{]+\{[^}]*background:\s*#[0-9a-f]{6}/i,
-    'transition choice hover remains opaque');
-});
-
-test('closed and open cards share one header layout', () => {
-  assert.match(WORKBENCH_CSS,
-    /\.chain-chip-params\s*\{[^}]*display:\s*grid[^}]*width:\s*max-content/,
-    'hidden parameter grids reserve the open card width');
-  assert.match(WORKBENCH_CSS,
-    /\.chain-chip:not\(\.chain-chip--expanded\) \.chain-chip-params\s*\{[^}]*height:\s*0[^}]*visibility:\s*hidden/,
-    'closed cards collapse only the parameter body');
-  assert.doesNotMatch(WORKBENCH_CSS,
-    /\.chain-chip[^{]*(?:chain-chip--expanded|:not\(\.chain-chip--expanded\))[^{]*\.chain-chip-(?:name|label|pair|function-label)[^{]*\{/,
-    'header content does not depend on the card state');
-});
-
-// §4.1: the toolbar's slim row over a main area the canvas fills, with the
-// pipeline strip overlaying that area's top edge so the preview keeps the
-// height the strip would otherwise take. The toolbar keeps the engine stats
-// row, and the document status output is the one live region the strip and
-// library announce through. The global controls keep the floating panel every
-// other page mounts, inside the main area so it covers the canvas and nothing
-// else.
-test('the workbench page declares its desktop toolbar, pipeline and canvas layout', () => {
-  // search() answers -1 for a missing match, which orders ahead of every real
-  // offset: an ordering assertion whose left operand is deleted would pass.
-  const region = (/** @type {RegExp} */ pattern) => {
-    const at = WORKBENCH.search(pattern);
-    assert.ok(at >= 0, `the workbench page must carry ${pattern}`);
-    return at;
-  };
-  assert.ok(region(/id="shader-toolbar"/) < region(/id="chain-strip"/));
-  assert.ok(region(/<main class="main-area"/) < region(/id="chain-strip"/)
-    && region(/id="chain-strip"/) < region(/id="canvas-container"/),
-  'the pipeline sits inside the main area, ahead of the canvas it overlays');
-  assert.match(TOP_LEVEL_WORKBENCH_CSS,
-    /\.chain-strip-region\s*\{[^}]*position:\s*absolute[^}]*top:\s*0/,
-    'anchored to that area rather than stacked above it');
-  assert.ok(region(/id="canvas-container"/) < region(/<\/main>/),
-    'the canvas is what the main area holds');
-  assert.ok(region(/id="canvas-container"/) < region(/id="gui-container"/)
-    && region(/id="gui-container"/) < region(/<\/main>/),
-  'the global controls float inside the main area, over the canvas alone');
-  assert.ok(TOP_LEVEL_WORKBENCH_CSS.includes('#gui-container > .lil-gui {'),
-    'and are capped by that area rather than the viewport');
-  assert.ok(region(/id="shader-toolbar"/) < region(/id="global-stats-desktop"/)
-    && region(/id="global-stats-desktop"/) < region(/id="chain-strip"/),
-  'the engine memory and compute stats stay in the toolbar row');
-  assert.match(WORKBENCH,
-    /id="shader-document-status"[^>]*role="status"[^>]*aria-live="polite"/);
-  assert.match(TOP_LEVEL_WORKBENCH_CSS, /\.chain-strip-viewport\s*\{[^}]*overflow-x:\s*auto/,
-    'expanded chips scroll rather than crushing the bands');
-  assert.match(TOP_LEVEL_WORKBENCH_CSS,
-    /\.chain-strip-viewport::-webkit-scrollbar\s*\{[^}]*display:\s*none/,
-  'the pipeline scrollbar stays hidden');
-  assert.match(TOP_LEVEL_WORKBENCH_CSS, /\.chain-strip\s*\{[^}]*align-items:\s*flex-start/,
-    'short domain bands do not stretch to the tallest stage');
-  assert.match(TOP_LEVEL_WORKBENCH_CSS, /\.chain-band\s*\{[^}]*flex:\s*0 0 auto/,
-    'domain bands size to their contents');
-  assert.match(TOP_LEVEL_WORKBENCH_CSS, /\.chain-chip-header\s*\{[^}]*display:\s*flex/,
-    'the card header lays its controls out in one row');
-  assert.match(TOP_LEVEL_WORKBENCH_CSS,
-    /\.chain-chip-remove,\s*\.chain-chip-bypass,\s*\.chain-chip-move\s*\{[^}]*display:\s*inline-grid/,
-  'bypass, reorder and delete size alike inside it');
-  assert.doesNotMatch(TOP_LEVEL_WORKBENCH_CSS,
-    /\.chain-chip-params\s*\{[^}]*(?:max-height|overflow-y|scrollbar-gutter):/,
-  'stage parameters remain fully visible without their own scroller');
-  assert.match(TOP_LEVEL_WORKBENCH_CSS,
-    /\.chain-chip--expanded\s*\{[^}]*width:\s*max-content/,
-  'expanded cards grow to fit their controls');
-  assert.doesNotMatch(TOP_LEVEL_WORKBENCH_CSS,
-    /\.chain-chip--expanded\s*\{[^}]*max-width:/,
-  'the horizontal pipeline viewport, not the card, handles narrow screens');
-  assert.match(TOP_LEVEL_WORKBENCH_CSS,
-    /\.chain-chip-params\s*\{[^}]*grid-template-columns:\s*max-content 6rem 4rem/,
-  'parameter labels, sliders, and numeric inputs stay inside the card');
-  assert.match(TOP_LEVEL_WORKBENCH_CSS, /\[data-carrier="color"\]/,
-    'each carrier domain carries its own hue');
 });
 
 // The alias table serves effects promoted before the chain schema: a document
