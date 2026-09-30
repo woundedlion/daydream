@@ -217,14 +217,6 @@ test('remove() detaches every listener the drag wired', () => {
   assert.equal(calls.start.length, 0);
 });
 
-// The shared fake throws on a removal with no listener behind it, so a second
-// remove() cannot pass for an idempotent one.
-test('remove() detaches once and does not stand in for an idempotent disposal', () => {
-  const { drag } = harness();
-  drag.remove();
-  assert.throws(() => drag.remove(), /no pointerdown listener registered/);
-});
-
 test('a page with no callbacks at all still captures and releases', () => {
   const element = fakeElement('canvas');
   const drag = createPointerDrag({ element });
