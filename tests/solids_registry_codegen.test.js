@@ -3,7 +3,7 @@ import { D2R_F32 } from '../src/workbench/solids/solid_codegen.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { upperSnake, opStepCpp, generateRegistryCpp, MAX_RECIPE_STEPS, MAX_BUILD_STEPS } =
+const { upperSnake, opStepCpp, generateRegistryCpp, validateRegistryFaces, MAX_RECIPE_STEPS, MAX_BUILD_STEPS } =
   await import('../src/workbench/solids/solid_registry_codegen.js');
 const { OP_DEFS, KNOWN_OPS, PARAMETERIZED_OPS, SIMPLE_SEEDS, DEFINED_SEED_CONSTANTS } =
   await import('../src/workbench/solids/solid_codegen.js');
@@ -465,4 +465,22 @@ test('long registry arguments move below a wrapped function call', () => {
   const ops = Array.from({ length: 3 }, () => ({ op: 'truncate', params: { t: 0.33 } }));
   assert.equal(generateRegistryCpp({ base: 'truncatedCuboctahedron', ops }),
     readFileSync(new URL('./fixtures/registry-5.cpp', import.meta.url), 'utf8').trimEnd());
+});
+
+
+test('registry validation refuses unavailable engines and rejected seeds', async () => {
+  const item = { name: 'Rejected', base: 'cube', ops: [] };
+  await assert.rejects(validateRegistryFaces({ withValidator: async (task) => task(null) }, item),
+    /validation engine unavailable/);
+  let cleared = 0;
+  const failures = [];
+  const validator = {
+    withValidator: async (task) => task({ MeshOps: {
+      fromSolidName: () => null, clearToolingMemory: () => { cleared++; },
+    } }),
+    noteDeath: (error) => failures.push(error),
+  };
+  await assert.rejects(validateRegistryFaces(validator, item), /Registry mesh was rejected/);
+  assert.equal(cleared, 1);
+  assert.equal(failures.length, 1);
 });

@@ -1817,3 +1817,15 @@ test('registry export rejects oversized intermediate primitive endpoints', async
     name: 'Small', base: 'cube', ops: ['kis'], fCount: 24,
   });
 });
+
+
+test('registry validation expands composite and flattened base recipes', async () => {
+  const validator = createChainValidator(() => createHolosphereModule({ print: sink, printErr: sink }));
+  for (const op of ['meta', 'needle', 'zip', 'gyro',
+    { op: 'bevel', params: { t: 0.5 } }, { op: 'bevel', params: { t: 0.25 } }]) {
+    await validateRegistryFaces(validator, { name: 'Composite', base: 'cube', ops: [op] });
+  }
+  await validateRegistryFaces(validator, { name: 'Flattened', base: 'authored', ops: ['dual'] }, {
+    seed: 'cube', ops: [{ op: 'hankin', param: 45 * Math.PI / 180, twist: 0 }],
+  });
+});

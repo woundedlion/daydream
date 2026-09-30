@@ -15,8 +15,7 @@
   },
   "scripts/check-cdn-integrity.mjs": {
     "lines": 91.18,
-    "reason": "The command-line exit path is outside imported-helper tests; CI invokes the command against the pinned CDN resources.",
-    "branches": 83.33
+    "reason": "The command-line exit path is outside imported-helper tests; CI invokes the command against the pinned CDN resources."
   },
   "scripts/generate-importmap.mjs": {
     "reason": "Tracked CLI fixture suites cover dependency reads, hashing, addon scans and import-map rewriting. Remaining gaps include malformed package metadata and filesystem/tool failures.",
