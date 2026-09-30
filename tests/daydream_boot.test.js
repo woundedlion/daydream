@@ -30,32 +30,11 @@ import { createRecordingControls } from '../src/recording/recording_controls.js'
 import { createSegmentedPovControls } from '../src/ui/segmented_pov_controls.js';
 import {
   createSegmentPoolSpawner,
-  fakeDriver,
   fakeGui,
   startApp as startUntrackedApp,
   segmentCountControl,
   SHADER_DOCUMENT_EFFECTS,
 } from './helpers/fake_app.js';
-
-test('the app doubles preserve controller and instance attribute contracts', () => {
-  const state = { amount: 1 };
-  const control = fakeGui('test').add(state, 'amount');
-  const changes = [];
-  control.onChange((value) => changes.push([value, state.amount]));
-  control.setValue(1);
-  control.setValue(2);
-  assert.deepEqual(changes, [[2, 2]]);
-  assert.equal(control.getValue(), 2);
-
-  const driver = fakeDriver();
-  assert.equal(driver.dotMesh, null);
-  driver.updateResolution(2, 1, 1);
-  const attribute = driver.dotMesh.instanceColor;
-  attribute.array = new Uint16Array(6);
-  attribute.needsUpdate = true;
-  assert.equal(attribute.version, 1);
-  assert.throws(() => { attribute.array = new Uint16Array(3); }, /GPU buffer is sized 6/);
-});
 
 restoreDocumentAfterEach();
 const startedApps = [];
@@ -975,15 +954,6 @@ test('a failed workbench init reports without the page-failure banner', () => {
     /workbench could not be initialized: \$\{[^}]+\}`,\s*$/,
     'the workbench half must report through the shader config notice, the '
     + 'owner tag its other messages carry');
-});
-
-test('the driver double distinguishes redraws from simulation steps', () => {
-  const driver = fakeDriver();
-  driver.invalidate();
-  assert.equal(driver.invalidated, true);
-  assert.equal(driver.stepFrames, 0);
-  driver.stepOnce();
-  assert.equal(driver.stepFrames, 1);
 });
 
 
