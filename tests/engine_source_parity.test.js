@@ -93,12 +93,6 @@ function engineConstant(source, name, path, scope = {}) {
   return Function(...names, `return ${expr};`)(...names.map((k) => scope[k]));
 }
 
-/**
- * Pins the stereographic-projection constants mobius_transforms.js mirrors to
- * their definitions in core/math/stereographic.h. STEREO_POLE_EPS is derived from
- * STEREO_INF on both sides, so the engine's expression is evaluated rather than
- * its value read, and a change to either the sentinel or the derivation fails.
- */
 test('engine constant expressions reject unknown identifiers', () => {
   assert.throws(() => engineConstant('inline constexpr float X = process.exit(1);',
     'X', 'fixture'), /unknown constant/);
@@ -106,6 +100,12 @@ test('engine constant expressions reject unknown identifiers', () => {
     'X', 'fixture', { A: 2000 }), 2);
 });
 
+/**
+ * Pins the stereographic-projection constants mobius_transforms.js mirrors to
+ * their definitions in core/math/stereographic.h. STEREO_POLE_EPS is derived from
+ * STEREO_INF on both sides, so the engine's expression is evaluated rather than
+ * its value read, and a change to either the sentinel or the derivation fails.
+ */
 test('projection constants match core/math/stereographic.h', { skip: engineSkip }, () => {
   const src = header(STEREO_H);
   const inf = engineConstant(src, 'STEREO_INF', STEREO_H);
