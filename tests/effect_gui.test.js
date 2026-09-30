@@ -1677,6 +1677,7 @@ test('a failed schema rebuild keeps the live panel and reports once per generati
   h.panel.sync();
 
   assert.equal(h.warnings.length, 1, 'the same failure logged again on the next frame');
+  assert.deepEqual(h.configNotices, ['Effect controls could not be rebuilt.']);
   assert.equal(h.guis.length, 2,
     'a failure the generation has not moved past re-allocated a panel per frame');
 
@@ -3135,4 +3136,22 @@ test('segmented enums follow the lagging pool values', () => {
   h.state.segmentValues = [1.6];
   h.panel.sync();
   assert.equal(h.gui().ctrl('Mode').getValue(), 2);
+});
+
+
+test('an applied full-config restore clears the import notice', () => {
+  const stored = { schemaVersion: 11, accepted: [], requested: [], pendingFieldIds: [], hasRuntime: false, runtime: [] };
+  const h = makeHarness({ params: shaderBallParams(), fullConfig: true,
+    fullConfigSnapshot: stored, acceptedStored: { [FULL_CONFIG_STORAGE_KEY]: JSON.stringify(stored) } });
+  h.panel.build();
+  assert.deepEqual(h.restoredFullConfigs, [stored]);
+  assert.deepEqual(h.configNotices, [null]);
+});
+
+test('a failed initial panel build reports an unavailable control panel', () => {
+  const h = makeHarness({ params: null });
+  h.panel.build();
+  assert.equal(h.panel.active(), null);
+  assert.deepEqual(h.configNotices, ['Effect controls could not be built.']);
+  assert.match(h.warnings[0], /panel construction failed/);
 });
