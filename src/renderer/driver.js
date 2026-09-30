@@ -95,7 +95,7 @@ export const MOBILE_BREAKPOINT_PX = 900;
  * Browser-side simulator: drives the three.js scene that renders the LED
  * sphere as instanced dots, on a fixed-timestep sim clock with on-demand
  * repainting. Holds all rendering config (camera, resolution, axes, PiP) and
- * the shared pixel color buffer effects draw into.
+ * the pixel color buffer alias refreshed through pixel_view.js.
  */
 export class Daydream {
   static SCENE_ANTIALIAS = true;
@@ -169,7 +169,7 @@ export class Daydream {
     this.DISPLAY_NORTH_PHI = 0;
     this.DISPLAY_SOUTH_PHI = Math.PI;
     this.DOT_SIZE = Daydream.DEFAULT_DOT_SIZE;
-    // Shared RGB16 color buffer effects draw into; allocated by precomputeMatrices().
+    // Zeroed RGB16 placeholder until pixel_view.js supplies the WASM view.
     this.pixels = null;
     // Composed instance matrices per grid, keyed by resolution and latitude endpoints. Entries come
     // from the resolution-preset table, so the map holds a couple of grids.
@@ -882,8 +882,7 @@ export class Daydream {
   /**
    * Compute each dot's instance matrix: map its pixel (x,y) to a point on the
    * sphere and orient the dot to face outward from the center. Also allocates
-   * the shared instanceColor buffer (exposed as this.pixels) that effects write
-   * pixel colors into.
+   * zeroed instanceColor placeholder, replaced by the view from pixel_view.js.
    *
    * The matrices are a function of the grid alone, so they are composed once per
    * grid and replayed afterwards: this runs synchronously inside the resolution
