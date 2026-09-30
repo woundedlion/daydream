@@ -31,8 +31,6 @@ function setText(cell, text) {
   if (cell.textContent !== text) cell.textContent = text;
 }
 
-// The global stat bars this overlay stands in for while segmented mode is on.
-// They belong to the page, so what is hidden here is handed back as it was.
 const STAT_BAR_IDS = ['global-stats-desktop', 'stats-bar'];
 
 /**
@@ -88,18 +86,10 @@ export class SegmentStatsView {
     this.statsSegCount = 0;   // segment count the cached table was built for
     /** @type {SegmentStatsCells | null} */
     this.statsCells = null;
-    // Overlay containers, resolved once and re-resolved when one leaves the
-    // document. An id the document does not carry yet is left uncached, so a
-    // repaint before the page is built re-queries.
     /** @type {Object<string, HTMLElement>} */
     this.byId = {};
-    // Inline display each hidden stat bar carried, keyed by id; an entry exists
-    // only while this overlay is the one hiding that bar.
     /** @type {Object<string, string>} */
     this.hiddenStatBars = {};
-    // Identity of the fault the standing alert box was built from, so a fault
-    // raised while an earlier one is still on screen repaints rather than
-    // leaving the old message up.
     /** @type {string | null} */
     this.shownFault = null;
   }
@@ -175,13 +165,9 @@ export class SegmentStatsView {
       if (this.shownFault === fault
           && el.firstElementChild?.getAttribute('role') === 'alert') return;
       this.shownFault = fault;
-      // Build via text nodes, not innerHTML: the fault message is arbitrary text
-      // and must never be parsed as markup.
       const box = this.doc.createElement('div');
       box.setAttribute('role', 'alert');
       box.className = 'seg-status seg-fault';
-      // segId < 0 is a pool-wide fault, not one worker; FAULT_RENDER is the whole
-      // render path, other negatives are pool init/module load.
       const who = !f ? 'worker ?'
         : f.segId === FAULT_RENDER ? 'render pipeline'
         : f.segId < 0 ? 'pool init'
@@ -221,16 +207,12 @@ export class SegmentStatsView {
 
     const numSegs = state.count;
 
-    // Build the table once; rebuild only on a segment-count change or after the
-    // fault overlay tore it down.
     let cells = this.statsCells;
     if (!cells || !this.statsTable || this.statsSegCount !== numSegs
         || this.statsTable.parentNode !== el) {
       cells = this.buildStatsTable(numSegs, el);
     }
 
-    // Derive maxTime over numSegs, not the whole timings array, so a stale tail
-    // entry can't outrank the live segments.
     let maxTime = 0;
     for (let s = 0; s < numSegs; s++) {
       const r = state.results[s];
@@ -238,10 +220,6 @@ export class SegmentStatsView {
       if (timing > maxTime) maxTime = timing;
       const c = cells.rows[s];
 
-      // A segment whose engine refused a parameter or a preset renders a
-      // configuration its peers do not; the notices go verbatim into the node
-      // describing the row header, which a title attribute would leave behind a
-      // hover no keyboard or touch user can reach.
       const warnings = state.warnings?.[s];
       const diverged = Array.isArray(warnings) && warnings.length > 0;
       setText(c.label, diverged ? `Seg ${s} ⚠` : `Seg ${s}`);
@@ -249,15 +227,10 @@ export class SegmentStatsView {
       if (c.label.className !== labelClass) c.label.className = labelClass;
       setText(c.notice, diverged ? warnings.join('; ') : '');
 
-      // A needs_full_frame() || persists_pixels() effect shades the whole canvas in every worker and
-      // the rectangle is only what was sliced out of it, so naming the rect
-      // there would claim a segmented render the pool never did.
       setText(c.range, !(state.frameSeen[s] && r) ? '?'
         : state.fullFrames[s] ? 'full frame'
         : `x[${r.x0}–${r.x1}] y[${r.y0}–${r.y1}]`);
       setText(c.compute, `${timing.toFixed(1)} ms`);
-      // Written only on a crossing: an unchanged class attribute still costs a
-      // style invalidation per row per composited frame.
       const computeClass = timing > SLOW_FRAME_MS ? 'seg-time slow' : 'seg-time';
       if (c.compute.className !== computeClass) c.compute.className = computeClass;
 
@@ -320,8 +293,6 @@ export class SegmentStatsView {
       return tr;
     };
     const spanCell = () => { const e = td(''); e.colSpan = 3; return e; };
-    // Row-header descriptions sit outside the table, so the text reaches
-    // assistive technology through aria-describedby without joining the row.
     const notices = this.doc.createElement('div');
     notices.className = 'visually-hidden';
 
@@ -348,9 +319,6 @@ export class SegmentStatsView {
     const maxRow = mkRow([rowHeader('max'), td(''), maxTime, spanCell()]);
     maxRow.className = 'seg-total';
 
-    // round-trip spans dispatch to last worker response, so it carries the
-    // structured clone, buffer transfer and event-loop latency that `max` — the
-    // slowest worker's own drawFrame() — excludes.
     const wallTime = td('', 'seg-time');
     mkRow([rowHeader('round-trip'), td(''), wallTime, spanCell()]);
 

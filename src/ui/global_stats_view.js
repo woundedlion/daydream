@@ -58,8 +58,6 @@ export class GlobalStatsView {
     for (const el of cells.perf) {
       if (!el) continue;
       el.textContent = perfText;
-      // Written only on a crossing: an unchanged class attribute still costs a
-      // style invalidation per cell per frame.
       if (el.className !== perfClass) el.className = perfClass;
     }
 
@@ -77,8 +75,6 @@ export class GlobalStatsView {
      * @param {string} text
      */
     const updateRow = (row, text) => {
-      // Arena figures hold still across many frames, and a textContent write
-      // dirties layout whether or not the string changed.
       for (const el of row) if (el && el.textContent !== text) el.textContent = text;
     };
     /**

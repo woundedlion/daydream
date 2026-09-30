@@ -39,8 +39,6 @@ const getUrlParams = (win = window) => {
     cached = { search, params: new URLSearchParams(search) };
     parsedSearchCache.set(win, cached);
   }
-  // A copy per call: callers mutate what they are handed, and the pending
-  // overlay is only valid for the read it was applied to.
   const params = new URLSearchParams(cached.params);
   const sync = getActiveURLSync();
   sync?.applyPendingReset(params);
@@ -87,8 +85,6 @@ const makeUrlParamWriter = (win = null) => {
   const writer = (key, value) => {
     const sync = getActiveURLSync();
     if (sync) {
-      // Flush any writes buffered before the sync registered mid-debounce so
-      // they funnel through the same authority instead of being stranded.
       if (pendingUrlWrites.size) {
         (win ?? window).clearTimeout(urlTimer);
         urlTimer = null;
@@ -102,8 +98,6 @@ const makeUrlParamWriter = (win = null) => {
     (win ?? window).clearTimeout(urlTimer);
     urlTimer = (win ?? window).setTimeout(commit, URL_FLUSH_DEBOUNCE_MS);
   };
-  // Symmetric with URLSync.dispose(): a discarded GUI must not leave the
-  // debounced timer firing history.replaceState into a dead page.
   writer.cancel = () => { (win ?? window).clearTimeout(urlTimer); urlTimer = null; pendingUrlWrites.clear(); };
   return writer;
 };
@@ -273,9 +267,6 @@ class DeepLinkGUI {
     });
     controller.onChange = (fn) => {
       if (fn) userOnChange.push(fn);
-      // For a URL-hydrated value, fire each newly-registered handler once so its
-      // load-time side effect runs the deep-linked state — once per handler, so a
-      // second fan-out consumer isn't skipped by a single shared latch.
       if (applyOnLoad && fn) {
         const proposed = controller.getValue();
         fn(proposed);
@@ -374,9 +365,7 @@ class DeepLinkGUI {
             if (typeof min === 'number' && val < min) val = min;
             if (typeof max === 'number' && val > max) val = max;
           }
-          // The snap multiply introduces float noise (0.3 -> 0.30000000000000004),
-          // so an already-on-grid value must not read as clamped; only a change
-          // larger than a fraction of the step counts.
+          // Ignore multiplication noise on values already aligned to the step.
           const snapTol = Number.isFinite(step) && step > 0 ? Math.abs(step) * 1e-6 : 0;
           valClamped = Math.abs(val - raw) > snapTol;
         }
@@ -393,15 +382,10 @@ class DeepLinkGUI {
       }
       const allowed = optionValues(args[0]);
       if (allowed) {
-        // The URL carries the option value, not its label, so an object-enum
-        // whose labels share a value can't round-trip to the exact label.
         const hasDuplicateValues = new Set(allowed.map(String)).size !== allowed.length;
         if (hasDuplicateValues) {
           console.warn(`DeepLinkGUI: enum "${key}" has options sharing a value; the deep link may restore a different label.`);
         }
-        // Deep-link values arrive as strings, but an enum's option values may be
-        // numbers (or other non-strings); fall back to a string-form match so a
-        // typed option isn't rejected for being unequal to the raw URL string.
         let idx = allowed.indexOf(val);
         if (idx < 0) idx = allowed.findIndex((opt) => String(opt) === String(val));
         if (idx < 0) {
@@ -433,8 +417,6 @@ class DeepLinkGUI {
     }
 
     if (!isFunction && valClamped) {
-      // The applied value differs from the URL string (number clamped/snapped, or
-      // out-of-range enum rejected): rewrite the URL so it no longer holds the stale one.
       this.urlWriter(key, controller.getValue());
     }
 
@@ -476,12 +458,7 @@ class DeepLinkGUI {
     const folder = this.gui.addFolder(name);
     const wrapped = new DeepLinkGUI(folder, null, this);
     wrapped.folderIndex = this.children.length;
-    // Fixed here rather than at add() time so a folder's controls can never
-    // split across two naming schemes when a same-name sibling appears later.
-    // A positional segment for an empty name keeps the level from collapsing;
-    // the first claimant of a name keeps the bare segment, so unique-named
-    // folders hold their existing (shared-link-stable) keys. A display folder
-    // claims no segment, so it is not a claimant.
+    // Folder segments remain stable after later siblings are added.
     const duplicate = this.children.some((c) => c.keySegment === name);
     wrapped.keySegment = name
       ? (duplicate ? `${name}#${wrapped.folderIndex}` : name)

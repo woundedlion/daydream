@@ -108,8 +108,6 @@ export function start({
   const shaderWorkbench = doc.documentElement?.dataset.daydreamMode === 'shader-workbench';
   const requestedEffect = new URLSearchParams(win.location?.search ?? '').get('effect');
   const requestedSelection = importLegacyShaderSelection(requestedEffect);
-  // Shader-document ids name effects only the workbench offers, so the simulator
-  // routes them there instead of dropping them for its default effect.
   const workbenchEffect = requestedSelection.effect === 'Shader' ? 'Shader'
     : SHADER_DOCUMENT_EFFECTS.includes(requestedEffect) ? requestedEffect : null;
   if (!shaderWorkbench && workbenchEffect) {
@@ -189,8 +187,6 @@ export function start({
 
   const applyNotice = createApplyNotice({ doc });
 
-  // Owner tags for the shared notice element: a parameter write clears only its
-  // own message, leaving a switch rejection standing.
   const PARAM_NOTICE = 'param';
   const SWITCH_NOTICE = 'switch';
   const SEGMENT_NOTICE = 'segments';
@@ -231,18 +227,11 @@ export function start({
     segments.setAnimationsPaused(paused);
   }
 
-  // Delegated, and the button is resolved at click time: the notice sink resolves
-  // its own elements the same way, so markup that arrives after construction is
-  // dismissible rather than carrying an inert button.
   const onApplyNoticeDismiss = (e) => {
     if (e.target === doc.getElementById('apply-notice-dismiss')) applyNotice.clear();
   };
   doc.addEventListener('click', onApplyNoticeDismiss);
 
-  // Assigned by the teardown wiring at the end of start(), which runs before the
-  // WASM load it kicks off. Declared above its readers rather than beside that
-  // wiring: a read before the assignment then reads null instead of throwing
-  // out of the temporal dead zone.
   let appTeardown = null;
 
   /**
@@ -279,11 +268,6 @@ export function start({
     if (unlabeled.length > 0) {
       console.warn(`Engine resolutions with no preset (not offered): ${unlabeled.join(', ')}`);
     }
-    // The dropdown is an OptionController, whose options() updates the <select>
-    // in place and hands back the same controller; the base Controller.options()
-    // instead destroys the receiver and returns a replacement carrying only the
-    // copied name. Taking the return value and re-attaching the handler is the
-    // form that holds under both (tests/lil_gui_contract.test.js).
     resolutionController = resolutionController.options(labels).onChange(setResolution);
 
     const current = appState.get('resolution');
@@ -301,8 +285,6 @@ export function start({
   // Initialize WASM
   ///////////////////////////////////////////////////////////////////////////////
 
-  // Assigned in the GUI setup below; declared here so the load-failure handler can
-  // switch the Test All toggle off and disable it.
   let testAllController = null;
 
   const testAllTicker = createTestAllTicker({
@@ -341,11 +323,6 @@ export function start({
       host.adapter = {
         ...renderAdapter,
         drawFrame() {
-          // The migrated effect is applied before the first frame, so the URL
-          // may advertise it from here. Holding the suspension until a pool
-          // composites would strand every later deep-link write for the session
-          // whenever no composite lands; a frame the guard catches strands it
-          // the same way, so the release runs whether or not the frame threw.
           try {
             renderAdapter.drawFrame();
           } finally {
@@ -364,16 +341,11 @@ export function start({
       recording.attach(host.recorder);
 
       const loadingOverlay = doc.getElementById('loading-overlay');
-      // The module is loaded and the engine is built, so a refused initial apply
-      // is a state failure, not a load failure: report it as its own thing.
       try {
         applyInitialState(
           () => apply.applyResolution(true),
           () => loadingOverlay?.remove(),
         );
-        // Workbench-only, and it reports its own load failures through the
-        // toolbar status: an escaped rejection would reach the page-failure
-        // listener and cover a running simulator with the fatal banner.
         shaderDocuments?.init().catch((err) => {
           console.error('The shader workbench could not be initialized:', err);
           if (abandonOnModuleDeath(err)) return;
@@ -386,8 +358,6 @@ export function start({
         if (abandonOnModuleDeath(err)) return;
         const title = 'No supported resolution and effect could be applied.';
         reportBootFailure(err, { document: doc, location: win.location, title });
-        // The rejected apply has already moved the engine, pool, driver and
-        // sidebar; the panels would stay live over a blanked canvas.
         appTeardown?.dispose();
       }
     },
@@ -415,8 +385,6 @@ export function start({
   // GUI + Sidebar Setup
   ///////////////////////////////////////////////////////////////////////////////
 
-  // Namespaced roots keep the URL keys apart: 'fx' holds the C++ register_param()
-  // names plus the panel's own 'pause' toggle, 'view' the app's own controls.
   const guiInstance = createGui({ autoPlace: false }, 'view');
   guiInstance.domElement.classList.add('global-gui');
   if (win.matchMedia?.(`(max-width: ${MOBILE_BREAKPOINT_PX}px)`).matches ?? false) {
@@ -429,8 +397,6 @@ export function start({
     console.warn('daydream: #gui-container not found; skipping global GUI mount.');
   }
 
-  // Not deep-linked here: urlSync owns the `resolution` param, so a second writer
-  // under the 'view' namespace would give the URL two authorities for one setting.
   const setResolution = (v) => appState.set('resolution', v);
   // Reassigned by syncResolutionOptions, which narrows the offered rows through
   // lil-gui's options().
@@ -443,8 +409,6 @@ export function start({
   if (!sidebarContainer && !shaderWorkbench) {
     console.warn('daydream: #effect-sidebar not found; the effect list is not shown.');
   }
-  // Off-document fallback: the sidebar is a collaborator of the apply pipeline and
-  // of the teardown, so it exists whether or not the page offers it a mount point.
   const sidebar = new EffectSidebar(
     sidebarContainer ?? doc.createElement('div'),
     (name) => appState.set('effect', name)
@@ -454,10 +418,6 @@ export function start({
   // Composition — the effect panel, the apply path, and the switch transaction
   ///////////////////////////////////////////////////////////////////////////////
 
-  // Which effect is loaded is read off its parameter schema, the same signal the
-  // panel groups its controls by. Definitions are the expensive read and this
-  // runs on every parameter write, so the answer is held for the load generation
-  // it was taken from.
   let fullConfigGeneration = null;
   let fullConfigSchema = false;
   /**
@@ -465,15 +425,11 @@ export function start({
    *   versioned snapshot API rather than through per-parameter values.
    */
   function usesFullConfigSnapshot() {
-    // The restore result is judged against the module's enum, so a build that
-    // exports the methods without it cannot report a restore either way.
     if (typeof host.engine?.getFullConfigSnapshot !== 'function'
         || typeof host.engine.restoreFullConfigSnapshot !== 'function'
         || !host.module?.FullConfigRestoreResult) {
       return false;
     }
-    // An engine without a generation counter reports undefined for every load,
-    // so there is nothing to hold the answer against and it is re-read.
     const generation = host.paramGeneration();
     if (generation === undefined || generation !== fullConfigGeneration) {
       fullConfigGeneration = generation;
@@ -608,9 +564,6 @@ export function start({
     getEngine: () => host.engine,
     onChange: () => daydream.invalidate(),
   });
-  // The aggressiveness is per module instance, so segmented mode needs it pushed to
-  // every worker's own engine as well as to the main one; the controller keeps the
-  // value so a pool spawned later inherits it.
   guiInstance.add(poleLod.state, 'poleLod', 0, 2, 0.05).name('Pole LOD')
     .onChange((v) => { poleLod.apply(v); segments.setPoleLod(v); });
 
@@ -645,10 +598,6 @@ export function start({
   capControls.push(guiInstance.add(displayCaps.state, 'bottomCap', 0, 25, 0.1).name('Bottom cap (%)')
     .onChange(applyDisplayCaps));
 
-  // Not on the workbench page: its effects are programmed through
-  // setShaderChain and no worker message carries that program, so a pool would
-  // install a bare ShaderChain and composite a preview that differs from the
-  // single-engine one. Building nothing keeps a deep link from spawning it too.
   const segSpawn = shaderWorkbench ? null : createSegmentedPovControls({
     gui: guiInstance,
     segments,
@@ -670,8 +619,6 @@ export function start({
   });
   win.addEventListener("keydown", onKeyDown);
 
-  // Covers a synchronous throw as well as a rejection: a sidebar rAF, a lil-gui
-  // onChange, or a DOM listener that throws is otherwise console-only.
   const pageFailureListeners = reportPageFailures('simulator', win);
 
   daydream.startFrameLoop(createFrameLoopGuard({
@@ -712,12 +659,6 @@ export function start({
     removeOverlay: () => recording.removeOverlay(),
   });
 
-  // Last: a throw anywhere above abandons the build, and a load already in
-  // flight would then build an engine into a half-built app — no teardown to
-  // release it, no pagehide listener. Only synchronous construction sits between
-  // this and the import, so the binary's fetch still starts in the same task.
-  // Deadlined: a stalled fetch reports through the same failure UI (overlay,
-  // detail, Reload) rather than leaving the loading overlay spinning.
   const ready = loadWithDeadline(loadModule)
     .then(moduleLoad.onModuleReady).catch(moduleLoad.onModuleFailed);
 
