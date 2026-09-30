@@ -228,7 +228,10 @@ export function start({
   }
 
   const onApplyNoticeDismiss = (e) => {
-    if (e.target === doc.getElementById('apply-notice-dismiss')) applyNotice.clear();
+    if (e.target === doc.getElementById('apply-notice-dismiss')) {
+      doc.getElementById('canvas')?.focus();
+      applyNotice.clear();
+    }
   };
   doc.addEventListener('click', onApplyNoticeDismiss);
 
