@@ -52,3 +52,16 @@ and test-discovery checks validate these references and module coverage.
 
 After changing Tailwind classes in HTML or browser source, run
 `npm run generate:tailwind` and commit `tools/tailwind.css` with the source change.
+
+## Display geometry
+
+The global **Top cap (%)** and **Bottom cap (%)** controls adjust the missing
+north-to-south arc independently, from 0% to 25% each. Both default to 0% for full
+coverage; use 2% each to preview the provisional physical device calibration.
+The controls persist as `view.topCap` and `view.bottomCap` in shared URLs.
+
+Daydream applies the percentages to the engine and every segmented worker with
+`setDisplayCaps`, then reads `getDisplayNorthPhi` and `getDisplaySouthPhi` for
+LED placement. Changes preserve effect configuration and reset geometry-dependent
+simulation history. Settings survive effect and resolution changes, and update
+the preview while paused. Firmware retains its compiled physical profile.
