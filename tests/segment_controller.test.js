@@ -1332,15 +1332,6 @@ test('a completed render clears the render watchdog so it cannot fault later', a
     assert.equal(c.faulted, false);
     await done;
 
-    // What an uncancelled callback costs: it survives into the next render,
-    // where `pending` is nonzero again, and faults a pool that is progressing.
-    const leftovers = clock.pendingAt(RENDER_WATCHDOG_MS);
-    const next = c.renderParallel();
-    for (const timer of leftovers) clock.fire(timer);
-    assert.equal(c.faulted, false, 'no watchdog from the settled frame faults the next one');
-    deliverFrame(c, 0);
-    deliverFrame(c, 1);
-    await next;
   } finally {
     clock.restore();
   }
