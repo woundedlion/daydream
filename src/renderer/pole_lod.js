@@ -11,10 +11,8 @@
 /**
  * Bind the Pole LOD control to an engine that does not exist yet.
  *
- * DeepLinkGUI replays a URL-hydrated control's onChange at registration, during
- * module evaluation, while the engine is still null — so the value's only
- * durable home is this state, and replay() is what carries it (deep-linked or
- * default) into the engine the module load builds.
+ * DeepLinkGUI replays URL-hydrated controls during app startup, before the
+ * engine loads. replay() applies the stored value after the engine loads.
  *
  * @param {Object} deps - Injected app collaborators.
  * @param {() => ?{setPoleLod: (v: number) => void}} deps.getEngine - Reads the

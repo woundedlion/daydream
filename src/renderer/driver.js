@@ -169,7 +169,7 @@ export class Daydream {
     this.DISPLAY_NORTH_PHI = 0;
     this.DISPLAY_SOUTH_PHI = Math.PI;
     this.DOT_SIZE = Daydream.DEFAULT_DOT_SIZE;
-    // Zeroed RGB16 placeholder until pixel_view.js supplies the WASM view.
+    // Zeroed RGB16 placeholder until the engine host supplies the WASM view.
     this.pixels = null;
     // Composed instance matrices per grid, keyed by resolution and latitude endpoints. Entries come
     // from the resolution-preset table, so the map holds a couple of grids.
@@ -787,8 +787,7 @@ export class Daydream {
     if (this.dotMesh) {
       this.scene.remove(this.dotMesh);
       this.dotMesh.geometry.dispose();
-      // instanceColor.array may alias WASM memory; detach before dispose() so
-      // Three.js can't read/re-upload a buffer the engine is about to free.
+      // instanceColor.array may alias WASM memory.
       if (this.dotMesh.instanceColor) this.dotMesh.instanceColor.array = null;
       this.dotMesh.dispose();
     }
@@ -883,7 +882,7 @@ export class Daydream {
   /**
    * Compute each dot's instance matrix: map its pixel (x,y) to a point on the
    * sphere and orient the dot to face outward from the center. Also allocates
-   * zeroed instanceColor placeholder, replaced by the view from pixel_view.js.
+   * zeroed instanceColor placeholder, replaced by the view from the engine host.
    *
    * The matrices are a function of the grid alone, so they are composed once per
    * grid and replayed afterwards: this runs synchronously inside the resolution
