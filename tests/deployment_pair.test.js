@@ -9,29 +9,18 @@ const pair = { daydream: 'a'.repeat(40), holosphere: 'b'.repeat(40) };
 const repo = 'example/daydream';
 const heads = async (path) => ({ sha: path.includes('woundedlion/pov') ? pair.holosphere : pair.daydream });
 
-test('a third publication replaces the one pending slot and cancelled pairs can retry', async () => {
+test('publication is serialized and cancelled deployment attempts can retry', async () => {
   const workflow = readFileSync(new URL('../.github/workflows/deploy.yml', import.meta.url), 'utf8');
   const job = workflow.split(/^ {2}deploy:\r?\n/m)[1];
   assert.match(job, /group: pages-publication/);
   assert.match(job, /cancel-in-progress: false/);
   const newer = { ...pair, holosphere: 'c'.repeat(40) };
-  const active = { pair, conclusion: null };
-  let pending = null;
-  const enqueue = (candidate) => {
-    if (pending) pending.conclusion = 'cancelled';
-    pending = candidate;
-  };
-  const newest = { pair: newer, conclusion: null };
-  enqueue(newest);
-  enqueue({ pair, conclusion: null });
-  assert.equal(active.conclusion, null);
-  assert.equal(newest.conclusion, 'cancelled');
   const attempted = async (conclusion) => pairWasAttempted(async (path) => {
     if (path.includes('/actions/runs/')) return { conclusion };
     if (path.includes('/statuses')) return [{ state: 'pending', log_url: 'https://github.com/example/daydream/actions/runs/42' }];
     return [{ id: 9, payload: newer }];
   }, repo, newer);
-  assert.equal(await attempted(newest.conclusion), false);
+  assert.equal(await attempted('cancelled'), false);
   assert.equal(await attempted('failure'), true);
   assert.equal(await attempted(null), true);
   assert.equal(await attempted('success'), true);
