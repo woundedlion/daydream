@@ -697,6 +697,8 @@ export async function createChainDocumentStore({
 
     /** @returns {ChainEntry[]} The chain in document order. */
     chain: () => chain().map((entry) => ({ ...entry })),
+    /** @returns {ReadonlyArray<Readonly<ChainEntry>>} Current chain without cloning. */
+    chainView: () => chain(),
 
     /** @returns {*} The compiler's full result for the current document, digests included. */
     compile: () => {
