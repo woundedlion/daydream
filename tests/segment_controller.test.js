@@ -1,6 +1,6 @@
 //
 // SegmentController — unit coverage for the generation-fence drop, the
-// worker-fault deadlock-break latch, and the quadrant compositor. Driven by a
+// worker-fault deadlock-break latch, and worker-pool lifecycle. Driven by a
 // fake Worker and a fake driver injected as a constructor dependency.
 //
 // Run: npm test
@@ -1192,7 +1192,7 @@ test('a message-less error after the pool is ready still latches fast', () => {
     'worker failed after the pool became ready without an error message');
 });
 
-test('the deadlines and rebuild budgets hold their documented values', () => {
+test('the deadlines and rebuild budgets retain their safety limits', () => {
   assert.deepEqual(
     {
       retry: BOOT_RETRY_DELAY_MS,

@@ -538,6 +538,7 @@ test('start refuses and stays idle when recording is unsupported', () => {
 
 test('an unsupported explicit format reports the browser-selected container', async () => {
   const restore = installRecorderEnv();
+  const captured = installConsoleCapture('warn');
   try {
     FakeMediaRecorder.isTypeSupported = () => false;
     const rec = new VideoRecorder(recordableCanvas());
@@ -560,8 +561,11 @@ test('an unsupported explicit format reports the browser-selected container', as
     assert.deepEqual(fallbacks, []);
     await Promise.resolve();
     assert.deepEqual(fallbacks, ['mp4']);
+    assert.equal(captured.messages.length, 1);
+    assert.match(captured.messages[0], /requested format "webm" is unsupported/);
   } finally {
     FakeMediaRecorder.isTypeSupported = () => true;
+    captured.restore();
     restore();
   }
 });
@@ -1668,8 +1672,7 @@ test('a cancelled save picker tells the host the session ended', async () => {
   const abort = new Error('user cancelled');
   abort.name = 'AbortError';
   globalThis.showSaveFilePicker = async () => { throw abort; };
-  const prevError = console.error;
-  console.error = () => {};
+  const captured = installConsoleCapture('error');
   try {
     const rec = new VideoRecorder(recordableCanvas());
     rec.download = () => {};
@@ -1691,7 +1694,7 @@ test('a cancelled save picker tells the host the session ended', async () => {
     recorder.onstop();
     assert.equal(rec.mediaRecorder, null, 'the stop path still finalizes the session');
   } finally {
-    console.error = prevError;
+    captured.restore();
     restore();
   }
 });
@@ -1899,39 +1902,39 @@ const startAborted = (offscreen) => {
  */
 test('start aborts without capturing when the offscreen has no 2D context', () => {
   const captures = [];
-  const rec = startAborted({
+  const outcome = startAborted({
     width: 0, height: 0,
     getContext: () => null,
     captureStream: (fps) => { captures.push(fps); return makeFakeStream(); },
   });
 
   assert.deepEqual(captures, [], 'no capture stream is opened without a drawing context');
-  assert.equal(rec.recorders.length, 0, 'no recorder is constructed');
-  assert.equal(rec.rec.isRecording, false);
-  assert.equal(rec.rec.mediaRecorder, null);
-  assert.equal(rec.rec.stream, null);
-  assert.equal(rec.rec.track, null);
-  assert.equal(rec.rec.offscreen, null, 'the context-less buffer is not latched');
-  assert.equal(rec.notified.length, 1, 'the host is told the session never started');
-  assert.match(rec.notified[0].message, /2D drawing context/);
+  assert.equal(outcome.recorders.length, 0, 'no recorder is constructed');
+  assert.equal(outcome.rec.isRecording, false);
+  assert.equal(outcome.rec.mediaRecorder, null);
+  assert.equal(outcome.rec.stream, null);
+  assert.equal(outcome.rec.track, null);
+  assert.equal(outcome.rec.offscreen, null, 'the context-less buffer is not latched');
+  assert.equal(outcome.notified.length, 1, 'the host is told the session never started');
+  assert.match(outcome.notified[0].message, /2D drawing context/);
 });
 
 /** Verifies a captureStream that throws outright leaves no session behind. */
 test('start aborts and stays idle when captureStream throws', () => {
   const failure = new Error('capture unavailable');
-  const rec = startAborted({
+  const outcome = startAborted({
     width: 0, height: 0,
     getContext: () => ({ clearRect() {}, drawImage() {} }),
     captureStream: () => { throw failure; },
   });
 
-  assert.equal(rec.recorders.length, 0, 'no recorder is constructed');
-  assert.equal(rec.rec.isRecording, false);
-  assert.equal(rec.rec.mediaRecorder, null);
-  assert.equal(rec.rec.stream, null);
-  assert.equal(rec.rec.track, null);
-  assert.equal(rec.rec.offscreen, null, 'the capture buffer is released');
-  assert.deepEqual(rec.notified, [failure], 'the host is told the session never started');
+  assert.equal(outcome.recorders.length, 0, 'no recorder is constructed');
+  assert.equal(outcome.rec.isRecording, false);
+  assert.equal(outcome.rec.mediaRecorder, null);
+  assert.equal(outcome.rec.stream, null);
+  assert.equal(outcome.rec.track, null);
+  assert.equal(outcome.rec.offscreen, null, 'the capture buffer is released');
+  assert.deepEqual(outcome.notified, [failure], 'the host is told the session never started');
 });
 
 /**
@@ -1942,15 +1945,15 @@ test('start aborts and stays idle when captureStream throws', () => {
  */
 test('a failed timed-fallback capture releases every stream it opened', () => {
   const failure = new Error('capture unavailable');
-  const timedTrack = { stopped: false, stop() { this.stopped = true; } };
-  const manualMode = { getVideoTracks: () => [timedTrack], getTracks: () => [timedTrack] };
+  const manualTrack = { stopped: false, stop() { this.stopped = true; } };
+  const manualMode = { getVideoTracks: () => [manualTrack], getTracks: () => [manualTrack] };
   const fallbackTrack = { stopped: false, stop() { this.stopped = true; } };
   const fallback = {
     getVideoTracks: () => { throw failure; },
     getTracks: () => [fallbackTrack],
   };
   const fps = [];
-  const rec = startAborted({
+  const outcome = startAborted({
     width: 0, height: 0,
     getContext: () => ({ clearRect() {}, drawImage() {} }),
     // The first track has no requestFrame, which forces the timed fallback.
@@ -1958,13 +1961,13 @@ test('a failed timed-fallback capture releases every stream it opened', () => {
   });
 
   assert.deepEqual(fps, [0, 16], 'the timed fallback is attempted at the frame rate');
-  assert.equal(timedTrack.stopped, true, 'the manual-mode track is stopped');
+  assert.equal(manualTrack.stopped, true, 'the manual-mode track is stopped');
   assert.equal(fallbackTrack.stopped, true, 'the half-opened fallback stream is released');
-  assert.equal(rec.recorders.length, 0, 'no recorder is constructed');
-  assert.equal(rec.rec.isRecording, false);
-  assert.equal(rec.rec.stream, null);
-  assert.equal(rec.rec.offscreen, null, 'the capture buffer is released');
-  assert.deepEqual(rec.notified, [failure], 'the host is told the session never started');
+  assert.equal(outcome.recorders.length, 0, 'no recorder is constructed');
+  assert.equal(outcome.rec.isRecording, false);
+  assert.equal(outcome.rec.stream, null);
+  assert.equal(outcome.rec.offscreen, null, 'the capture buffer is released');
+  assert.deepEqual(outcome.notified, [failure], 'the host is told the session never started');
 });
 
 /**
@@ -1979,7 +1982,7 @@ test('start aborts and releases both streams when no video track is produced', (
     opened.push(stray);
     return { getVideoTracks: () => [], getTracks: () => [stray] };
   };
-  const rec = startAborted({
+  const outcome = startAborted({
     width: 0, height: 0,
     getContext: () => ({ clearRect() {}, drawImage() {} }),
     captureStream: trackless,
@@ -1988,14 +1991,14 @@ test('start aborts and releases both streams when no video track is produced', (
   assert.equal(opened.length, 2, 'both the manual-frame and timed-fallback streams opened');
   assert.deepEqual(opened.map((t) => t.stopped), [true, true],
     'neither trackless stream is left capturing');
-  assert.equal(rec.recorders.length, 0, 'no recorder is constructed');
-  assert.equal(rec.rec.isRecording, false);
-  assert.equal(rec.rec.mediaRecorder, null);
-  assert.equal(rec.rec.stream, null);
-  assert.equal(rec.rec.track, null);
-  assert.equal(rec.rec.offscreen, null, 'the capture buffer is released');
-  assert.equal(rec.notified.length, 1, 'the host is told the session never started');
-  assert.match(rec.notified[0].message, /no video track/);
+  assert.equal(outcome.recorders.length, 0, 'no recorder is constructed');
+  assert.equal(outcome.rec.isRecording, false);
+  assert.equal(outcome.rec.mediaRecorder, null);
+  assert.equal(outcome.rec.stream, null);
+  assert.equal(outcome.rec.track, null);
+  assert.equal(outcome.rec.offscreen, null, 'the capture buffer is released');
+  assert.equal(outcome.notified.length, 1, 'the host is told the session never started');
+  assert.match(outcome.notified[0].message, /no video track/);
 });
 
 test('output setup failure closes the picked sink and stops the encoder', () => {

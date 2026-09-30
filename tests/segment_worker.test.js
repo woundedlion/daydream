@@ -180,6 +180,7 @@ let nextResolutionOk = true;
 let nextEffectOk = true;
 /** Seeds the next-constructed engine's clipOk, so init-time rejection is testable. */
 let nextClipOk = true;
+let nextCapsRejected = false;
 let nextRestoreResult = FullConfigRestoreResult.APPLIED;
 let nextRestoreMissing = false;
 let nextLive = false;
@@ -203,6 +204,7 @@ mock.module('../generated/holosphere_wasm.js', {
           engineInstance.resolutionOk = nextResolutionOk;
           engineInstance.effectOk = nextEffectOk;
           engineInstance.clipOk = nextClipOk;
+          engineInstance.capsRejected = nextCapsRejected;
           engineInstance.restoreResult = nextRestoreResult;
           if (nextRestoreMissing) engineInstance.restoreFullConfigSnapshot = undefined;
           return engineInstance;
@@ -264,6 +266,7 @@ beforeEach(() => {
   nextResolutionOk = true;
   nextEffectOk = true;
   nextClipOk = true;
+  nextCapsRejected = false;
   nextRestoreResult = FullConfigRestoreResult.APPLIED;
   nextRestoreMissing = false;
   nextLive = false;
@@ -276,6 +279,14 @@ test('worker posts booted at module load', () => {
 });
 
 /** A version mismatch faults before any WASM work so the controller stops fast. */
+test('init reports rejected display caps before configuring the engine', async () => {
+  nextCapsRejected = true;
+  await dispatch({ type: 'init', segId: 0, totalSegs: 1, w: 8, h: 4, effectName: 'Plasma' });
+  assert.deepEqual(posted.map(({ msg }) => msg),
+    [{ type: 'engineRejected', reason: 'setDisplayCaps rejected' }]);
+  assert.deepEqual(engineInstance.calls, [['setDisplayCaps', 0, 0]]);
+});
+
 test('init faults on a protocol version mismatch', async () => {
   await dispatch({ type: 'init', version: PROTOCOL_VERSION + 1,
                    segId: 2, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
