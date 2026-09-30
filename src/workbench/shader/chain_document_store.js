@@ -38,9 +38,10 @@ const refusal = (code, path, message) => ({
  * catalog's domain and default under the interpolation trait its curve names.
  * @param {string} label - Owning chain instance label.
  * @param {CatalogField} field - Catalog schema field.
+ * @param {string} operator - Catalog operator id.
  * @returns {ParameterDeclaration} A descriptor.parameters entry.
  */
-const parameterFromField = (label, field) => {
+const parameterFromField = (label, field, operator) => {
   if (field.topology) {
     return {
       id: `${label}.${field.id}`,
@@ -77,7 +78,10 @@ const parameterFromField = (label, field) => {
     classification: 'preset',
     storage: 'binary32',
     unit: periodic !== null ? periodic.unit
-      : field.id.endsWith('speed') ? 'turn-per-frame' : 'ratio',
+      : field.id.endsWith('speed')
+        ? ((operator.startsWith('sample.') && ['speed', 'angle-speed'].includes(field.id))
+          || field.id === 'projection-spin-speed' || field.id === 'spin-speed'
+          ? 'radian-per-frame' : 'turn-per-frame') : 'ratio',
     domain: { minimum, maximum },
     interpolation: periodic !== null
       ? { kind, period: periodic.period } : { kind },
@@ -131,7 +135,7 @@ export function scratchChainDocument(catalog, chain = DEFAULT_SCRATCH_CHAIN) {
         + `"${entry.operator}"`);
     }
     for (const field of operator.params) {
-      const parameter = parameterFromField(entry.label, field);
+      const parameter = parameterFromField(entry.label, field, entry.operator);
       parameters.push(parameter);
       values[parameter.id] = parameter.default;
     }
@@ -486,7 +490,7 @@ export async function createChainDocumentStore({
       (template) => [template.parameter.id.slice(template.label.length + 1), template]));
     const parameters = op.params.map((field) => {
       const template = templates.get(field.id);
-      if (template === undefined) return parameterFromField(entry.label, field);
+      if (template === undefined) return parameterFromField(entry.label, field, entry.operator);
       const parameter = structuredClone(template.parameter);
       const prefix = `${template.label}.`;
       parameter.id = `${entry.label}.${parameter.id.slice(prefix.length)}`;
@@ -671,7 +675,7 @@ export async function createChainDocumentStore({
       if (!entry || !field)
         return refusal('UNKNOWN_PARAMETER', '$.descriptor.parameters',
           `the catalog carries no parameter "${parameterId}" for this chain`);
-      addParameter(candidate, parameterFromField(entry.label, field));
+      addParameter(candidate, parameterFromField(entry.label, field, entry.operator));
     }
     candidate.preset_bank.presets[index].values[parameterId] = value;
     return commit(candidate, `${presetId} ${parameterId}`, admit);
@@ -689,7 +693,7 @@ export async function createChainDocumentStore({
       for (const entry of chain()) {
         for (const field of operatorOf(entry).params) {
           if (!declared.has(`${entry.label}.${field.id}`))
-            parameters.push(parameterFromField(entry.label, field));
+            parameters.push(parameterFromField(entry.label, field, entry.operator));
         }
       }
       return parameters;

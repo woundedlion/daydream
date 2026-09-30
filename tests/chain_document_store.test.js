@@ -850,9 +850,10 @@ test('the scratch document compiles clean against the catalog', async () => {
   const units = new Map(compiled.document.descriptor.parameters.map(
     (parameter) => [parameter.id, parameter.unit]));
   for (const id of [
-    'project.projection-spin-speed', 'sample.speed', 'sample.angle-speed',
     'colorize.hue-noise-speed', 'colorize.phase-oscillation-speed',
   ]) assert.equal(units.get(id), 'turn-per-frame', id);
+  for (const id of ['project.projection-spin-speed', 'sample.speed', 'sample.angle-speed'])
+    assert.equal(units.get(id), 'radian-per-frame', id);
   assert.equal(units.get('colorize.palette-mapping'), 'mapping');
 });
 
