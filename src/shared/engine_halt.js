@@ -23,7 +23,8 @@
  * @returns {boolean} True when the instance is unrecoverable.
  */
 export function engineHalted(error, module = null) {
-  return error instanceof WebAssembly.RuntimeError
+  return (typeof globalThis.WebAssembly?.RuntimeError === 'function'
+    && error instanceof globalThis.WebAssembly.RuntimeError)
     || module?.HS_MODULE_DEAD === true;
 }
 
