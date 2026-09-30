@@ -1428,3 +1428,18 @@ test('parameters baked into the active build cannot commit edits', async () => {
   assert.deepEqual(h.edits, []);
   assert.equal(controlIn(rowFor(h, 'sample', 'sample.pattern-freq')).disabled, false);
 });
+
+
+test('hover and focus independently keep stage controls open', async () => {
+  const h = await makeStrip();
+  const chip = chipByLabel(h, 'sample');
+  chip.dispatch('mouseenter');
+  chip.dispatch('focusin');
+  chip.dispatch('mouseleave');
+  assert.equal(chip.getAttribute('aria-expanded'), 'true');
+  chip.dispatch('mouseenter');
+  chip.dispatch('focusout', { relatedTarget: null });
+  assert.equal(chip.getAttribute('aria-expanded'), 'true');
+  chip.dispatch('mouseleave');
+  assert.equal(chip.getAttribute('aria-expanded'), 'false');
+});

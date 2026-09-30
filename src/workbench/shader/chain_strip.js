@@ -944,15 +944,25 @@ export function createChainStrip({
       chip.setAttribute('aria-expanded', String(open));
       if (open) markDeactivated();
     };
-    chip.addEventListener('mouseenter', () => setTransientOpen(true));
-    chip.addEventListener('mouseleave', () => setTransientOpen(false));
+    let hovered = false;
+    let focusInside = false;
+    chip.addEventListener('mouseenter', () => {
+      hovered = true;
+      setTransientOpen(hovered || focusInside);
+    });
+    chip.addEventListener('mouseleave', () => {
+      hovered = false;
+      setTransientOpen(hovered || focusInside);
+    });
     chip.addEventListener('focusin', () => {
-      if (!restoringFocus) setTransientOpen(true);
+      focusInside = true;
+      if (!restoringFocus) setTransientOpen(hovered || focusInside);
     });
     chip.addEventListener('focusout', (/** @type {*} */ event) => {
       const next = event.relatedTarget ?? null;
       if (next !== null && chip.contains(next)) return;
-      setTransientOpen(false);
+      focusInside = false;
+      setTransientOpen(hovered || focusInside);
     });
     chip.addEventListener('keydown',
       (/** @type {*} */ event) => chipKeydown(event, index, entry, crossing, chip));
