@@ -47,10 +47,6 @@
     "reason": "Browser probes exercise focused controller DOM paths.",
     "branches": 81.82
   },
-  "src/effects/effect_roster.js": {
-    "reason": "Malformed engine roster error paths are not all exercised by fixture modules.",
-    "branches": 66.67
-  },
   "src/segments/module_warmer.js": {
     "reason": "Browser module preload fallback paths are partially exercised by unit fixtures.",
     "branches": 81.82
