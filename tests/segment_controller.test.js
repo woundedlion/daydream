@@ -1456,6 +1456,8 @@ for (const [label, act] of [
   ['setParameter', (c) => c.setParameter('Speed', 0.5)],
   ['setAnimationsPaused', (c) => c.setAnimationsPaused(true)],
   ['setPoleLod', (c) => c.setPoleLod(1)],
+  ['selectPreset', (c) => c.selectPreset(2)],
+  ['setDisplayCaps', (c) => c.setDisplayCaps(0.1, 0.2)],
 ]) {
   test(`${label} on a faulted active pool stays latched`, () => {
     const c = makeController();
@@ -1467,7 +1469,10 @@ for (const [label, act] of [
     assert.equal(c.faulted, true);
     const postedBefore = worker.posted.length;
 
+    c.presetCount = 3;
     act(c);
+    if (label === 'selectPreset') assert.equal(c.presetIndex, 2);
+    if (label === 'setDisplayCaps') assert.deepEqual([c.topCap, c.bottomCap], [0.1, 0.2]);
     assert.equal(c.faulted, true, 'the fault latch is held');
     assert.equal(FakeWorker.instances.length, beforeCount, 'no workers were respawned');
     assert.equal(worker.posted.length, postedBefore, 'nothing is broadcast to dead workers');
