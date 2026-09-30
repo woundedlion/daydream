@@ -1371,7 +1371,7 @@ test('createChainValidator serializes overlapping tasks', async () => {
 // The add-op buttons the solids page offers, as refreshOpGating reads them.
 const CANDIDATES = ['kis', 'ambo', 'dual'];
 
-/** Verifies a clean sweep blocks nothing and reports itself complete. */
+/** Concurrent requests for the same signature share one validator sweep. */
 test('createOpGate joins concurrent refreshes for the same signature', async () => {
   const { Mod } = fakeModule();
   const validator = createChainValidator(async () => Mod);
@@ -1384,6 +1384,7 @@ test('createOpGate joins concurrent refreshes for the same signature', async () 
   assert.ok(results.every((result) => result === results[0]));
 });
 
+/** Verifies a clean sweep blocks nothing and reports itself complete. */
 test('createOpGate clears every candidate that replays', async () => {
   const { Mod, state } = fakeModule();
   const gate = createOpGate(createChainValidator(async () => Mod));
