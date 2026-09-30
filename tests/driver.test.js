@@ -1175,6 +1175,15 @@ test('a keyboard-focused canvas rings and orbits until it loses focus', () => {
   assert.equal(propagationStopped, true,
     'the window handler reads the same arrow key as a paused frame step');
 
+  const position = ctx.camera.position.clone();
+  for (const event of [{ key: ' ' }, { key: 'ArrowLeft', ctrlKey: true },
+    { key: 'ArrowLeft', altKey: true }]) {
+    ctx.handlers.keydown({ ...event,
+      preventDefault: () => assert.fail('unowned key prevented'),
+      stopPropagation: () => assert.fail('unowned key stopped'),
+    });
+    assert.deepEqual(ctx.camera.position, position);
+  }
   ctx.handlers.blur();
   assert.equal(ctx.classes.has('keyboard-focus'), false);
 });
