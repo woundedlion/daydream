@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  bootstrap, refreshModuleCache, refreshWithDeadline, showBootstrapFailure,
+  bootRemedy, bootstrap, refreshModuleCache, refreshWithDeadline, showBootstrapFailure,
   StaleModuleError, STALE_MODULE_REMEDY, VENDOR_REMEDY,
 } from '../src/app/bootstrap.js';
 import { fakeElement } from './helpers/fake_dom.js';
@@ -600,5 +600,16 @@ test('WASM compile and link failures offer the stale-cache remedy', () => {
     const { doc, overlay } = fakeDocument();
     showBootstrapFailure(new ErrorType('stale module'), { document: doc });
     assert.equal(childWithClass(overlay, 'load-error-remedy').textContent, STALE_MODULE_REMEDY);
+  }
+});
+
+
+test('boot failure advice tolerates an absent WebAssembly global', () => {
+  const wasm = globalThis.WebAssembly;
+  try {
+    delete globalThis.WebAssembly;
+    assert.equal(typeof bootRemedy(new Error('unavailable')), 'string');
+  } finally {
+    globalThis.WebAssembly = wasm;
   }
 });

@@ -479,8 +479,11 @@ export function createModuleLoadHandlers({
     },
     onModuleFailed(err) {
       if (disposed()) return;
-      reportFailure(err);
-      teardown()?.dispose();
+      try {
+        reportFailure(err);
+      } finally {
+        teardown()?.dispose();
+      }
     },
   };
 }

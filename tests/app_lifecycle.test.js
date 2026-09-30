@@ -963,3 +963,15 @@ test('render adapters tolerate a missing pixel view', () => {
   assert.equal(h.driver.dotMesh.instanceColor.array, null);
   assert.deepEqual(h.errors, []);
 });
+
+
+test('failure reporting cannot prevent teardown', () => {
+  let disposed = false;
+  const handlers = createModuleLoadHandlers({
+    teardown: () => ({ disposed: () => disposed, dispose: () => { disposed = true; } }),
+    start: () => {}, discardStartup: () => {},
+    reportFailure: () => { throw new Error('report failed'); },
+  });
+  assert.throws(() => handlers.onModuleFailed(new Error('boot failed')), /report failed/);
+  assert.equal(disposed, true);
+});
