@@ -1,7 +1,7 @@
 //
 // Module-resolution hooks, registered with module.register(). They redirect
 // three and its OrbitControls addon to the fake for every importer in the
-// process, so tools/shared.js gets the fake whichever file pulls it in. Each
+// process, so src/workbench/shared.js gets the fake whichever file pulls it in. Each
 // test file gets its own process, so the redirect never leaks into another
 // suite.
 const REDIRECTED = new Set([

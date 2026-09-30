@@ -120,7 +120,7 @@ const CHAIN_CATALOG_TEXT = readFileSync(
 ).replace(/\n$/, '');
 
 /**
- * Stand-in for the chain-capable engine surface tools/chain_apply.js drives:
+ * Stand-in for the chain-capable engine surface src/workbench/shader/chain_apply.js drives:
  * setShaderChain with the module's payload-shape checks, parameter definitions
  * rebuilt from the pinned catalog on every APPLIED (with the generation bump
  * the real engine makes), and an injectable refusal. Every method it mocks is

@@ -25,7 +25,7 @@ const DOT = `#${PARAM}_dot`;
 const LABEL = `#${PARAM}_label`;
 const REAL_AXIS = `#${PARAM}_re_axis`;
 const IMAGINARY_AXIS = `#${PARAM}_im_axis`;
-// The pad spans [-MAX_EXTENT, MAX_EXTENT] on both axes; tools/mobius_page.js
+// The pad spans [-MAX_EXTENT, MAX_EXTENT] on both axes; src/workbench/mobius/mobius_page.js
 // owns the value.
 const MAX_EXTENT = 2;
 const DRAG_STEPS = 12;

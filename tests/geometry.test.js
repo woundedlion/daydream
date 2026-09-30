@@ -11,7 +11,7 @@ const { pixelToSpherical, displayGeometryFromModule } = await import('../src/ren
 const W = 288, H = 144;
 
 /**
- * Reference implementation of the engine's pixel_to_vector (core/math/geometry.h,
+ * Reference implementation of the engine's pixel_to_vector (core/math/pixel_mapping.h,
  * README §2), with azimuth (theta) measured from +X.
  * @param {number} x - Pixel column index in [0, W).
  * @param {number} y - Pixel row index in [0, H).

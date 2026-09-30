@@ -1,5 +1,5 @@
 //
-// tools/chain_strip.js renders the pipeline strip — the chain left to right as
+// src/workbench/shader/chain_strip.js renders the pipeline strip — the chain left to right as
 // chips grouped into one band per editable carrier, with crossings as socket chips on
 // the band boundaries — and translates every gesture (band + palettes, ✕
 // removal, socket selection, reorder buttons, Alt+Arrow, bypass, undo) into the

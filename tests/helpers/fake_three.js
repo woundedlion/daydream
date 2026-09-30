@@ -1,6 +1,6 @@
 //
 // Stand-in for three + three/addons/controls/OrbitControls.js, covering the
-// surface tools/shared.js constructs plus the buffer-attribute double the
+// surface src/workbench/shared.js constructs plus the buffer-attribute double the
 // suites that drive the dot mesh share. three_loader_hooks.js redirects both
 // specifiers here, so shared.js gets these classes and the test importing this
 // module shares their `log`. tests/three_contract.test.js pins this surface

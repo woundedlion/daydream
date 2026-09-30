@@ -1,5 +1,5 @@
 //
-// tools/chain_apply.js applies a compiled chain document to the chain engine
+// src/workbench/shader/chain_apply.js applies a compiled chain document to the chain engine
 // in one fixed order: setShaderChain, then the preset values by parameter id
 // (enum8s as the option index the post-APPLIED definitions resolve), then the
 // GUI resync and repaint. The engine double is tests/helpers/fake_engine.js's

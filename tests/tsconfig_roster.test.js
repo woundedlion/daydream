@@ -4,7 +4,7 @@
 // with no diagnostic — the typecheck stays green while checking nothing about
 // it, and a `// @ts-check` pragma on an unrostered file is inert for the same
 // reason. These cases keep the roster closed under the pipeline's own imports,
-// over every file that claims the pragma, and over tools/, which is rostered
+// over every file that claims the pragma, and over src/, which is rostered
 // apart from browser page controllers and modules a bare third-party import
 // puts out of reach.
 import { test } from 'node:test';
