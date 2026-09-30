@@ -15,6 +15,7 @@
 
 import {
   applyOp,
+  meshOpFailure,
   CATALAN_BASES,
   D2R_F32,
   DEFINED_SEED_CONSTANTS,
@@ -66,8 +67,10 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
     try {
       mesh = mod.MeshOps.fromSolidName(baseRecipe?.seed ?? item.base);
       const check = () => {
-        if (!mesh) throw new Error('Registry mesh was rejected');
-        const faces = mesh.getFaces().counts.length;
+        if (!mesh) throw new Error(meshOpFailure(mod, 'Registry mesh').message);
+        const result = mesh.getFaces();
+        if (!result) throw new Error(meshOpFailure(mod, 'Registry faces').message);
+        const faces = result.counts.length;
         if (faces > MAX_BUILD_FACES)
           throw new Error(`Registry endpoint has ${faces} faces; maximum is ${MAX_BUILD_FACES}`);
       };
@@ -76,7 +79,7 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
         const name = typeof op === 'string' ? op : op.op;
         const primitives = LOWERING[name]?.(op) ?? [op];
         for (const primitive of primitives) {
-          if (!mesh) throw new Error('Registry mesh was rejected');
+          if (!mesh) throw new Error(meshOpFailure(mod, 'Registry mesh').message);
           const next = applyOp(mesh, primitive);
           mesh.delete();
           mesh = next;
