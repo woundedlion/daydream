@@ -134,7 +134,7 @@ generated/shader/patterns/kaleidoscope_stained_glass.shader.json
 
 # The project license, carrying the notices MIT requires for the PROJ-derived
 # projection code and FastNoiseLite compiled into generated/holosphere_wasm.wasm.
-LICENSE
+LICENSE.txt
 
 # Documentation supplied by the verified engine bundle.
 README.md
