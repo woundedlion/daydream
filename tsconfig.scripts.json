@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noResolve": false,
+    "types": [
+      "node"
+    ],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ]
+  },
+  "files": [
+    "scripts/deployment-pair.mjs",
+    "scripts/stage-site.mjs",
+    "scripts/install-engine-bundle.mjs"
+  ]
+}

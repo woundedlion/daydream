@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { validatePair } from './deployment-pair.mjs';
 import { ownedPath, verifyEngineBundle } from './install-engine-bundle.mjs';
 
+/** @param {string} root @param {string} bundle */
 export function verifiedEnginePaths(root, bundle) {
   const { entries } = verifyEngineBundle(bundle, root);
   for (const path of entries) {
@@ -17,6 +18,7 @@ export function verifiedEnginePaths(root, bundle) {
   return entries;
 }
 
+/** @param {string} root @param {string|undefined} bundle */
 export function sitePaths(root, bundle) {
   const entries = readFileSync(resolve(root, 'site_manifest.txt'), 'utf8')
     .split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith('#'));
@@ -29,6 +31,7 @@ export function sitePaths(root, bundle) {
   return [...new Set([...entries.filter((path) => !ownedPath(path)), ...published])];
 }
 
+/** @param {string} root @param {string} bundle @param {string} destination @param {import('./deployment-pair.mjs').DeploymentPair} pair */
 export function stageSite(root, bundle, destination, pair) {
   validatePair(pair);
   if (!bundle) throw new Error('A verified engine bundle is required');
@@ -37,7 +40,7 @@ export function stageSite(root, bundle, destination, pair) {
   if (head !== pair.daydream || readFileSync(resolve(root, 'generated/holosphere_wasm.sha'), 'utf8').trim() !== pair.holosphere)
     throw new Error('Deployment pair differs from the selected sources');
   destination = resolve(destination);
-  const committed = (path) => {
+  const committed = (/** @type {string} */ path) => {
     try {
       return execFileSync('git', ['-C', root, 'show', `HEAD:${path}`], { stdio: ['ignore', 'pipe', 'pipe'] });
     } catch (cause) {

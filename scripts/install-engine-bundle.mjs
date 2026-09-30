@@ -10,6 +10,7 @@ export const RUNTIME_PATHS = new Set([
   'generated/shader/patterns/shaderball_migration.json', 'README.md',
 ]);
 
+/** @param {string} path */
 export const runtimePath = (path) => RUNTIME_PATHS.has(path)
   || /^generated\/shader\/patterns\/[^/]+\.shader\.json$/.test(path)
   || /^docs\/screenshots\/.+\.png$/.test(path);
@@ -21,6 +22,7 @@ const REQUIRED_PATHS = new Set(['README.md', 'generated/holosphere_wasm.js', 'ge
 
 export const ownedPath = runtimePath;
 
+/** @param {string} bundle @param {string} [destination] */
 export function verifyEngineBundle(bundle, destination = bundle) {
   bundle = resolve(bundle);
   destination = resolve(destination);
@@ -49,6 +51,7 @@ export function verifyEngineBundle(bundle, destination = bundle) {
   return { entries, bundlePin };
 }
 
+/** @param {string} bundle @param {string} destination */
 export function installEngineBundle(bundle, destination) {
   bundle = resolve(bundle);
   destination = resolve(destination);

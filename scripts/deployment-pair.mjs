@@ -1,16 +1,21 @@
 import { appendFileSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
+/** @typedef {{daydream: string, holosphere: string}} DeploymentPair */
+/** @typedef {(path: string, body?: Object) => Promise<any>} GitHubApi */
+
 const ENGINE_REPO = 'woundedlion/pov';
 const PAIR_ENVIRONMENT = 'daydream-pair';
-const validSha = (value) => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
+const validSha = (/** @type {unknown} */ value) => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
 
+/** @param {*} pair @returns {DeploymentPair} */
 export function validatePair(pair) {
   if (!pair || !validSha(pair.daydream) || !validSha(pair.holosphere))
     throw new Error('Deployment pair must contain two full commit SHAs');
   return pair;
 }
 
+/** @param {string|undefined} token @param {typeof fetch} [fetcher] @returns {GitHubApi} */
 export function githubApi(token, fetcher = fetch) {
   return async (path, body) => {
     const response = await fetcher(`https://api.github.com/${path}`, {
@@ -25,6 +30,7 @@ export function githubApi(token, fetcher = fetch) {
   };
 }
 
+/** @param {GitHubApi} api @param {string} repo */
 export async function snapshotPair(api, repo) {
   const [daydream, holosphere] = await Promise.all([
     api(`repos/${repo}/commits/master`), api(`repos/${ENGINE_REPO}/commits/master`),
@@ -32,6 +38,7 @@ export async function snapshotPair(api, repo) {
   return validatePair({ daydream: daydream.sha, holosphere: holosphere.sha });
 }
 
+/** @param {GitHubApi} api @param {string} repo */
 export async function latestSuccessfulPair(api, repo) {
   for (let page = 1; ; page++) {
     const deployments = await api(`repos/${repo}/deployments?environment=${PAIR_ENVIRONMENT}&per_page=100&page=${page}`);
@@ -43,8 +50,10 @@ export async function latestSuccessfulPair(api, repo) {
   }
 }
 
+/** @param {DeploymentPair|null} a @param {DeploymentPair|null} b */
 export const samePair = (a, b) => Boolean(a && b && a.daydream === b.daydream && a.holosphere === b.holosphere);
 
+/** @param {GitHubApi} api @param {string} repo @param {DeploymentPair} pair */
 export async function pairWasAttempted(api, repo, pair) {
   for (let page = 1; ; page++) {
     const deployments = await api(`repos/${repo}/deployments?environment=${PAIR_ENVIRONMENT}&sha=${pair.daydream}&per_page=100&page=${page}`);
@@ -63,6 +72,7 @@ export async function pairWasAttempted(api, repo, pair) {
   }
 }
 
+/** @param {GitHubApi} api @param {string} repo @param {DeploymentPair} pair @param {string} runUrl @param {string} [state] */
 export async function recordPair(api, repo, pair, runUrl, state = 'success') {
   validatePair(pair);
   const deployment = await api(`repos/${repo}/deployments`, {
@@ -76,12 +86,16 @@ export async function recordPair(api, repo, pair, runUrl, state = 'success') {
   });
 }
 
+/** @param {string} command @param {NodeJS.ProcessEnv} env @param {GitHubApi} api */
 export async function run(command, env, api) {
   const repo = env.GITHUB_REPOSITORY;
   const pairFile = env.PAIR_FILE || 'deployment-pair.json';
   if (!repo || !/^[\w.-]+\/[\w.-]+$/.test(repo)) throw new Error('Missing repository');
-  const output = (values) => appendFileSync(env.GITHUB_OUTPUT,
+  const output = (/** @type {Record<string, string|boolean>} */ values) => {
+    if (!env.GITHUB_OUTPUT) throw new Error('Missing GitHub output file');
+    appendFileSync(env.GITHUB_OUTPUT,
     Object.entries(values).map(([key, value]) => `${key}=${value}\n`).join(''));
+  };
   if (command === 'resolve') {
     const pair = await snapshotPair(api, repo);
     const previous = await latestSuccessfulPair(api, repo);
