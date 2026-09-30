@@ -4,7 +4,7 @@
  */
 
 /*
- * M?bius transform preset generators. Each preset
+ * Möbius transform preset generators. Each preset
  * generator maps elapsed time `t` to the four complex Mobius coefficients
  * {A, B, C, D} of f(z) = (Az + B) / (Cz + D); these feed the live shader
  * uniforms, so the coefficients must stay bit-for-bit identical to what the
