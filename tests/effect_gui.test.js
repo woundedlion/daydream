@@ -1287,10 +1287,15 @@ test('the toggle resumes when the engine reports animations running again', () =
 });
 
 test('without the pause accessor the panel falls back to the animated flag', () => {
-  const h = makeHarness({ params: [SPEED], pauseAccessor: false });
+  const width = { name: 'Width', value: 1, min: 0, max: 2 };
+  const h = makeHarness({ params: [SPEED, width], pauseAccessor: false });
   h.panel.build();
   h.panel.applyAnimationPause();
   h.writes.length = 0;
+
+  h.gui().ctrl('Width').setValue(1.5);
+  assert.equal(h.panel.active().pause.animationState.pause, false);
+  assert.deepEqual(h.writes.filter((w) => w.startsWith('paused')), []);
 
   h.gui().ctrl('Speed').setValue(0.5);
 
@@ -2556,12 +2561,25 @@ test('an Export that lands after an effect switch does not flash the old panel',
   const stale = h.gui();
 
   stale.ctrl('export').object.export();
+  h.panel.destroy();
   h.panel.build();
   await Promise.resolve();
 
   assert.deepEqual(h.state.copyText.copied, ['{ 0.25f }']);
   assert.equal(stale.ctrl('export').label, '\u29c9',
     'the replaced panel is left alone');
+});
+
+test('Export reports a parameter formatting failure', () => {
+  const h = makeHarness({
+    params: [{ name: 'Mode', value: 0, min: 0, max: 1, exportOptions: ['Mode::A'] }],
+    engineValues: [1],
+  });
+  h.panel.build();
+  h.gui().ctrl('export').object.export();
+  assert.equal(h.gui().ctrl('export').label, '\u2717');
+  assert.match(h.warnings[0], /parameter formatting failed/);
+  assert.deepEqual(h.state.copyText.copied, []);
 });
 
 test('the Export flash reverts to the default label', () => {

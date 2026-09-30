@@ -9,6 +9,7 @@ import { detachedView } from './helpers/fake_buffer.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { parse } from 'espree';
 import * as THREE from 'three';
 import {
   Daydream, dotDetailFor, fitDistance, initialAspect, MOBILE_BREAKPOINT_PX,
@@ -1791,6 +1792,26 @@ test('every hand-built context stands in only for state the driver has', () => {
     assert.deepEqual(unpinnedContextFields(ctx), [],
       `${name} carries fields the Daydream class never assigns`);
   }
+});
+
+test('ad-hoc contexts use fields assigned by the driver', () => {
+  const source = readFileSync(new URL(import.meta.url), 'utf8');
+  const tree = parse(source, { ecmaVersion: 'latest', sourceType: 'module' });
+  const visit = (node) => {
+    if (!node || typeof node !== 'object') return;
+    if (node.type === 'VariableDeclarator' && node.id.name === 'ctx'
+        && node.init?.type === 'ObjectExpression') {
+      const fields = Object.fromEntries(node.init.properties
+        .filter((property) => property.type === 'Property')
+        .map((property) => [property.key.name ?? property.key.value, null]));
+      assert.deepEqual(unpinnedContextFields(fields), []);
+    }
+    for (const child of Object.values(node)) {
+      if (Array.isArray(child)) child.forEach(visit);
+      else if (child && typeof child === 'object') visit(child);
+    }
+  };
+  visit(tree);
 });
 
 test('dispose during a real Three animation callback cancels the rearmed frame', async () => {
