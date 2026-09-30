@@ -543,6 +543,8 @@ test('snapToStep snaps to the nearest step from min and clamps', () => {
 test('snapToStep leaves an on-grid value alone', () => {
   const def = OP_DEFS.hankin.params.angle;
   for (const angle of [1, 17, 54, 90]) assert.equal(snapToStep(angle, def), angle);
+  for (const t of [0.07, 0.29, 0.57, 0.99])
+    assert.equal(snapToStep(t, { min: 0.01, max: 1, step: 0.01 }), t);
 });
 
 test('hankin controls start at one degree', () => {
