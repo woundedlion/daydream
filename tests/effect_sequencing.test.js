@@ -97,6 +97,8 @@ test('one effect snapshot survives nested effect and resolution rollback', () =>
 
   restoreEffectControlState(effectRollback, snapshot);
   restoreEffectControlState(resolutionRollback, snapshot);
+  assert.deepEqual(effectSinks.events, ['param:Speed', 'param:Glow', 'pause:false']);
+  assert.deepEqual(resolutionSinks.events, effectSinks.events);
 
   for (const restored of [effectRollback, resolutionRollback]) {
     assert.deepEqual(restored.state, { Speed: 0.9, Glow: true });
