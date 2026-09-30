@@ -222,7 +222,6 @@ test('an inadmissible preset is submitted together and reports native refusal', 
 
   assert.match(run(compiledDocument(values)), /preset: INADMISSIBLE/);
   assert.deepEqual(order, ['setShaderChain', 'batch-refused', 'syncEffectGui', 'invalidate']);
-  assert.deepEqual(order.slice(-2), ['syncEffectGui', 'invalidate']);
 });
 
 test('the fake chain engine exposes status identities on every return path', () => {

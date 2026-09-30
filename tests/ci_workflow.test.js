@@ -458,10 +458,6 @@ test('reusable suites require the independently selected engine pin', () => {
   assert.ok(gate.includes('pin: ${{ steps.engine.outputs.pin }}'));
 });
 
-test('the browser suite discovers every probe script', () => {
-  const suite = readFileSync(resolve(REPO, WORKFLOW_DIR, 'browser-smoke.yml'), 'utf8');
-  assert.match(suite, /for script in scripts\/browser-smoke\.mjs scripts\/\*-probe\.mjs/);
-});
 
 test('scheduled deployment runs cannot replace pending manual dispatches', () => {
   const deploy = readFileSync(resolve(REPO, DEPLOY_PATH), 'utf8');

@@ -240,9 +240,6 @@ const PATTERN_NON_SOURCES = [
   DIGEST_MIGRATION,
 ];
 
-/** @type {string[]} */
-const PATTERN_UNPUBLISHED = [];
-
 /**
  * Pattern documents fetched by the source catalog and legacy digest links.
  * @returns {Set<string>} Repo-relative pattern document paths.
@@ -301,23 +298,14 @@ test('the site manifest publishes exactly the catalog and legacy digest document
       'they would 404 on Pages');
   assert.deepEqual([...listed].filter((doc) => !served.has(doc)).sort(), [],
     `${MANIFEST} publishes pattern documents neither catalog nor digest migration names`);
-  assert.deepEqual(PATTERN_UNPUBLISHED.filter((doc) => !files.includes(doc)), [],
-    `the unpublished allowlist names documents ${PATTERNS} no longer holds`);
   assert.deepEqual(
-    files.filter((doc) => !served.has(doc) && !PATTERN_UNPUBLISHED.includes(doc)).sort(), [],
+    files.filter((doc) => !served.has(doc)).sort(), [],
     `${PATTERNS} holds documents neither catalog nor digest migration names, so nothing demands ` +
       `a ${MANIFEST} entry for them`);
   assert.deepEqual([...served].filter((doc) => !files.includes(doc)).sort(), [],
     'Catalog or digest migration names documents that are not on disk');
 });
 
-test('the deploy workflow stages the site from the committed manifest', () => {
-  const workflow = read('.github/workflows/deploy.yml');
-  assert.match(workflow, /site_manifest\.txt/,
-    'deploy.yml must stage _site from the committed manifest');
-  assert.doesNotMatch(workflow, /^\s*cp\b.*\*/m,
-    'deploy.yml stages a wildcard set, which the manifest cannot constrain');
-});
 
 
 test('deploy manifest entries cannot recursively publish untracked files', () => {

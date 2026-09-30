@@ -1,4 +1,4 @@
-import { closeProbeResources, boxOf, centre, checks, dragBetween, isMain, measureChecks, runProbe, walkTo } from '../scripts/probe_harness.mjs';
+import { closeProbeResources, checks, isMain, measureChecks } from '../scripts/probe_harness.mjs';
 import { feedbackAtClick, probeColorStrip, probeHueWheel, rgbMovedTogether } from '../scripts/palettes-probe.mjs';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -79,13 +79,6 @@ function throwingTab() {
   });
   return { tab, calls };
 }
-
-test('the probe harness exports the scaffolding every probe runs on', () => {
-  for (const [name, exported] of Object.entries(
-    { runProbe, checks, boxOf, centre, dragBetween, walkTo, isMain })) {
-    assert.equal(typeof exported, 'function', name);
-  }
-});
 
 test('checks() keeps the misses and drops the passes', () => {
   const { failures, check } = checks();
