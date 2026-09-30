@@ -995,6 +995,25 @@ test('a refused shared compilation automatically retries without the module', ()
   }
 });
 
+test('shared module rejection faults after the boot retry budget is exhausted', () => {
+  const clock = installFakeTimers();
+  const c = makeController();
+  try {
+    c.active = true;
+    c.create(2, MAX_BOOT_RETRIES);
+    c.workers[0].onmessage({ data: {
+      type: 'engineRejected', sharedModule: true, reason: 'LinkError',
+    } });
+    assert.equal(c.faulted, true);
+    assert.match(c.faultInfo.message, /engine rejected: LinkError/);
+    assert.equal(c.retryTimer, null);
+    assert.deepEqual(clock.pendingAt(BOOT_RETRY_DELAY_MS), []);
+  } finally {
+    c.destroy();
+    clock.restore();
+  }
+});
+
 test('a rejection unrelated to the shared module keeps the compilation', async () => {
   const warmer = new ModuleWarmer();
   await warmer.warm({
