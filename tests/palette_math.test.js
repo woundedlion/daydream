@@ -482,9 +482,9 @@ test('a gallery swatch is a gradient sampled off the palette it loads', () => {
   assert.equal(stops[1], linearRgbToHex(...palette.get(1 / 3)));
 });
 
-test('a single-stop gradient samples the start rather than dividing by zero', () => {
-  const flat = paletteGradientCss(
-    { a: [0.5, 0.5, 0.5], b: [0, 0, 0], c: [1, 1, 1], d: [0, 0, 0] }, 1);
+test('a requested single stop is clamped to both gradient endpoints', () => {
+  const gradient = paletteGradientCss(
+    { a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [0.5, 0.5, 0.5], d: [0, 0, 0] }, 1);
 
-  assert.match(flat, /^linear-gradient\(to right, (#[0-9a-f]{6}), \1\)$/i);
+  assert.equal(gradient, 'linear-gradient(to right, #ffffff, #000000)');
 });
