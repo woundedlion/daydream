@@ -146,19 +146,21 @@ export function fakeTimers() {
 export function fakeUrlTimer() {
   const delays = [];
   let pending = null;
+  let nextId = 0;
   return {
     delays,
     setTimeout(fn, ms) {
-      pending = fn;
+      assert.equal(pending, null, 'only one URL timer may be pending');
+      pending = { fn, id: ++nextId };
       delays.push(ms);
-      return 0;
+      return pending.id;
     },
-    clearTimeout() { pending = null; },
+    clearTimeout(id) { if (pending?.id === id) pending = null; },
     /** @returns {boolean} Whether a timer is currently armed. */
     armed() { return pending !== null; },
     /** Runs the pending timer. @returns {void} */
     fire() {
-      const fn = pending;
+      const fn = pending?.fn;
       pending = null;
       assert.ok(fn, 'a timer is pending');
       fn();
