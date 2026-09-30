@@ -282,3 +282,44 @@ test('a warm in flight when a worker refuses the module does not restore it', as
   assert.equal(warmer.module, null,
     'the discarded warm handed the pool back the compilation a worker refused');
 });
+
+
+test('unversioned glue clears a held module and permits an immediate retry', async (t) => {
+  const { ModuleWarmer } = await import('../src/segments/module_warmer.js');
+  const warmer = new ModuleWarmer();
+  const warnings = [];
+  t.mock.method(console, 'warn', (...args) => warnings.push(args));
+  let versioned = true;
+  let now = 0;
+  const requested = [];
+  const dependencies = {
+    baseUrl: 'https://daydream.test/src/segments/module_warmer.js',
+    now: () => now,
+    fetch: async (url) => {
+      requested.push(url.href);
+      const bytes = url.pathname.endsWith('.wasm') ? EMPTY_WASM
+        : new TextEncoder().encode(versioned
+          ? 'new URL("holosphere_wasm.wasm?v=abc123", import.meta.url)'
+          : 'new URL("holosphere_wasm.wasm", import.meta.url)');
+      return { ok: true, arrayBuffer: async () => bytes.buffer };
+    },
+  };
+  await warmer.warm(dependencies);
+  assert.ok(warmer.module instanceof WebAssembly.Module);
+
+  now += WARM_INTERVAL_MS;
+  versioned = false;
+  requested.length = 0;
+  await warmer.warm(dependencies);
+  assert.equal(warmer.module, null);
+  assert.equal(requested.length, GRAPH.length);
+  assert.ok(requested.every((url) => !new URL(url).pathname.endsWith('.wasm')));
+  assert.equal(warnings.length, 1);
+  assert.match(String(warnings[0][1]), /no versioned binary URL/);
+
+  versioned = true;
+  requested.length = 0;
+  await warmer.warm(dependencies);
+  assert.equal(requested.length, GRAPH.length + 1);
+  assert.ok(warmer.module instanceof WebAssembly.Module);
+});
