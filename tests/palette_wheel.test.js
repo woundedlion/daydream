@@ -98,7 +98,7 @@ test('hue key markers ring the wheel at the turns their offsets name', () => {
   assert.equal(points.length, 3);
   assert.ok(Math.abs(points[0].x - (100 + radius)) < 1e-9);
   assert.ok(Math.abs(points[0].y - 100) < 1e-9);
-  assert.ok(Math.abs(points[1].y - (100 + radius)) < 1e-9, 'a quarter turn is down');
+  assert.ok(Math.abs(points[1].y - (100 - radius)) < 1e-9, 'a quarter turn is up');
   assert.ok(Math.abs(points[2].x - (100 - radius)) < 1e-9, 'a half turn is left');
 });
 
