@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { findBash } from './helpers/fixture_repo.js';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync, mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
@@ -299,19 +300,20 @@ test('shell lint has no workflow-wide excluded diagnostics', () => {
 });
 
 test('engine bundle API failures stop the gate instead of entering its poll timeout', () => {
-  const gate = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/engine-bundle.yml`), 'utf8');
+  const gate = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/engine-bundle.yml`), 'utf8').replaceAll('\r\n', '\n');
   assert.doesNotMatch(gate, /\|\| true/);
   assert.match(gate, /Cannot query engine CI; check token access[^\n]+\n\s+exit 1/);
   assert.match(gate, /actions: read/);
 });
 
 test('engine selection snapshots current master and preserves an explicit pair', (t) => {
-  const gate = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/engine-bundle.yml`), 'utf8');
+  const gate = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/engine-bundle.yml`), 'utf8').replaceAll('\r\n', '\n');
   const block = gate.split('      - name: Resolve engine pin\n')[1].split('      - name:')[0];
   const body = block.split('        run: |\n')[1].replace(/^ {10}/gm, '');
   const current = 'a'.repeat(40);
   const selected = 'b'.repeat(40);
-  const shell = process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash';
+  const shell = findBash();
+  if (!shell) { t.skip('Bash is unavailable'); return; }
   const scratch = mkdtempSync(join(tmpdir(), 'daydream-engine-selection-'));
   t.after(() => rmSync(scratch, { recursive: true, force: true }));
   for (const pin of ['', selected]) {
@@ -332,7 +334,7 @@ test('actionlint enumerates both workflow extensions', () => {
 });
 
 test('old engine pins warn and expired bundles explain the producing-run remedy', () => {
-  const gate = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/engine-bundle.yml`), 'utf8');
+  const gate = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/engine-bundle.yml`), 'utf8').replaceAll('\r\n', '\n');
   assert.match(gate, /::warning::Engine pin/);
   assert.match(gate, /::warning::Engine bundle expires/);
   assert.match(gate, /if \[ "\$expired" = true \]/);

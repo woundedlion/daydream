@@ -46,6 +46,25 @@ export const findSh = () => {
   return null;
 };
 
+/**
+ * Locates Bash: PATH first, then the copy Git for Windows ships
+ * alongside its exec path (git is a prerequisite of every hook anyway).
+ * @returns {string|null} Interpreter to spawn, or null if none was found.
+ */
+export const findBash = () => {
+  if (spawnSync('bash', ['-c', 'exit 0']).status === 0) return 'bash';
+  try {
+    const execPath = execFileSync('git', ['--exec-path'], {
+      encoding: 'utf8',
+    }).trim();
+    const candidate = resolve(execPath, '../../../usr/bin/bash.exe');
+    if (existsSync(candidate)) return candidate;
+  } catch {
+    /* fall through to the skip */
+  }
+  return null;
+};
+
 // A config path that never exists, so no operator setting reaches a fixture: a
 // global core.excludesFile or core.autocrlf would steer ls-files and add, and a
 // global core.hooksPath would install the caller's hooks into the fixtures.
