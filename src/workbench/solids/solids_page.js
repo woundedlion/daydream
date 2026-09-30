@@ -440,6 +440,7 @@ async function generateThumbnails(signal) {
       span.textContent = title;
       const fullName = document.createElement('span');
       fullName.className = 'thumb-name-full';
+      fullName.setAttribute('aria-hidden', 'true');
       fullName.textContent = title;
 
       btn.appendChild(img);
