@@ -61,11 +61,13 @@ function makeApp({
     notices: [],
     fatals: [],
     urlSyncs: [],
+    restoredUrls: [],
   };
   app.activeEffect = makeEffectRecord('Alpha', 0.5, false, app.paramWrites);
 
   const applyEffect = (preserveParams = false) => {
     const effect = appState.get('effect');
+    app.url = `/?effect=${effect}`;
     app.calls.push({
       fn: 'applyEffect', effect, preserveParams,
       restoring: app.switches.isRestoring(),
@@ -85,6 +87,7 @@ function makeApp({
 
   const applyResolution = (preserveParams = false) => {
     const resolution = appState.get('resolution');
+    app.url = `/?resolution=${resolution}`;
     app.calls.push({
       fn: 'applyResolution', resolution, preserveParams,
       restoring: app.switches.isRestoring(),
@@ -100,7 +103,7 @@ function makeApp({
     applyEffect,
     applyResolution,
     currentUrl: () => app.url,
-    restoreUrl: (url) => { app.url = url; },
+    restoreUrl: (url) => { app.restoredUrls.push(url); app.url = url; },
     showResolution: (resolution) => { app.control.resolution = resolution; },
     syncResolutionUrl: () => app.urlSyncs.push(appState.get('resolution')),
     logError: (message, error) => app.errors.push({ message, error }),
@@ -140,6 +143,7 @@ test('a rejected effect switch restores state, URL, and control values', () => {
   assert.equal(app.appState.get('effect'), 'Alpha');
   assert.equal(app.applied.effect, 'Alpha');
   assert.equal(app.url, urlBefore);
+  assert.deepEqual(app.restoredUrls, [urlBefore]);
   // The rollback rebuilt the GUI at engine defaults, then replayed the snapshot.
   assert.equal(app.activeEffect.state.Speed, 0.9);
   assert.deepEqual(app.notices,
