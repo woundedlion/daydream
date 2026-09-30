@@ -879,12 +879,14 @@ export function createShaderDocumentController({
     }
     if (linked) {
       const effectId = linked.document.effect_id;
-      const filename = typeof linked.document.document_id === 'string'
-        ? `${linked.document.document_id}.shader.json` : 'linked.shader.json';
+      const entry = [...sourceCatalog.values()].find(
+        (candidate) => candidate.compiled.document.effect_id === effectId);
+      const filename = entry?.filename ?? 'linked.shader.json';
       // Named only once the load stands: a refused link falls through to the
       // requested effect or the scratch chain, which name themselves.
       if (await loadSource(linked.document, filename, null, linked)) {
-        sourceSelect.value = sourceCatalog.has(effectId) ? effectId : '';
+        active.savedDocument = entry ? JSON.stringify(entry.compiled.document) : null;
+        sourceSelect.value = entry?.effectId ?? '';
         selectedSource = sourceSelect.value;
         return true;
       }

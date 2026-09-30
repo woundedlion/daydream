@@ -2074,3 +2074,23 @@ for (const compiled of [false, true]) {
     assert.equal(harness.elements.get('shader-document-digest').dataset.digest, digest);
   });
 }
+
+
+test('restored edits require discard confirmation and save to the catalog filename', async () => {
+  const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  document.preset_bank.presets[0].values['sample.pattern-freq'] = 7.25;
+  const hash = await encodeShaderStateHash({
+    document, preset: document.preset_bank.presets[0].preset_id, bypassed: [], paused: false,
+  });
+  const harness = await editorWorkbench({ source: null, hash, migration: HEX_MIGRATION });
+  let confirmations = 0;
+  harness.win.confirm = () => { confirmations += 1; return false; };
+  const source = harness.elements.get('shader-document-select');
+  const before = source.value;
+  source.value = '';
+  await onChange(source)();
+  assert.equal(confirmations, 1);
+  assert.equal(source.value, before);
+  harness.controller.save();
+  assert.equal(harness.downloads.at(-1)[0], 'kaleidoscope_hex_bright.shader.json');
+});
