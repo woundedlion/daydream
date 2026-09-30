@@ -146,7 +146,7 @@ export const PROTOCOL_VERSION = 11;
  *   sharedModule?: boolean }} EngineRejectedMsg */
 
 /** Worker module body started executing — its static imports (incl. the WASM
- * glue ./generated/holosphere_wasm.js) all resolved. Sent before the WASM instantiate so
+ * glue generated/holosphere_wasm.js) all resolved. Sent before the WASM instantiate so
  * the controller can detect a missing/renamed glue file fast, ahead of the
  * slower init watchdog. Carries no segId: the controller maps it to the worker
  * via the per-worker message handler. Carries the protocol version so the
