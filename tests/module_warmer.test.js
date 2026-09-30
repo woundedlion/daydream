@@ -15,6 +15,10 @@ test('default warm uses its served module URL, global fetch, and clears its dead
         format: 'module', shortCircuit: true,
         source: readFileSync(new URL('../src/segments/module_warmer.js', import.meta.url), 'utf8'),
       };
+      if (url === new URL('../shared/deadline.js', moduleUrl).href) return {
+        format: 'module', shortCircuit: true,
+        source: readFileSync(new URL('../src/shared/deadline.js', import.meta.url), 'utf8'),
+      };
       return nextLoad(url, context);
     },
   });

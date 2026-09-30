@@ -45,6 +45,7 @@
     "src/effects/effect_persistence.js",
     "src/segments/worker_protocol.js",
     "src/segments/module_warmer.js",
+    "src/shared/deadline.js",
     "src/ui/segmented_pov_controls.js",
     "src/segments/segment_controller.js",
     "src/segments/segment_compositor.js",

@@ -4,6 +4,8 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import { raceDeadline } from '../shared/deadline.js';
+
 // Minimum spacing between two actual warms. lil-gui fires onChange per drag
 // step, so the segment-count slider warms several times a second.
 export const WARM_INTERVAL_MS = 10000;
@@ -14,31 +16,6 @@ export const WARM_INTERVAL_MS = 10000;
 // mode enabled with no workers, no watchdog and nothing on screen to say so.
 // Sized alongside the worker init watchdog, which bounds the same binary.
 export const WARM_DEADLINE_MS = 20000;
-
-/**
- * @template T
- * @param {() => Promise<T>} start - Starts the operation.
- * @param {number} ms - Deadline in milliseconds.
- * @param {{setTimeout: Function, clearTimeout: Function}} timers - Timer source.
- * @param {() => T} expire - Deadline result, or a thrown deadline error.
- * @returns {Promise<T>} The operation or deadline result.
- */
-export function raceDeadline(start, ms, timers, expire) {
-  /** @type {any} */
-  let timer = null;
-  const expired = new Promise((resolve, reject) => {
-    timer = timers.setTimeout(() => {
-      try { resolve(expire()); } catch (error) { reject(error); }
-    }, ms);
-    timer?.unref?.();
-  });
-  let work;
-  try { work = start(); } catch (error) {
-    timers.clearTimeout(timer);
-    return Promise.reject(error);
-  }
-  return Promise.race([work, expired]).finally(() => timers.clearTimeout(timer));
-}
 
 /**
  * Warm state for one module graph: the dedupe window a burst of warms collapses
