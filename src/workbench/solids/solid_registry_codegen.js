@@ -31,11 +31,19 @@ import { COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns } from '../../shared/cpp_form
 export { MAX_RECIPE_STEPS };
 export const MAX_BUILD_STEPS = 8;
 export const MAX_BUILD_FACES = 1152;
-const DOUBLE_STEP_OPS = new Set(['gyro', 'needle', 'zip', 'bevel']);
+/** @type {Record<string, (op: import('./solid_codegen.js').ChainOp) => import('./solid_codegen.js').ChainOp[]>} */
+export const LOWERING = {
+  meta: () => ['ambo', 'dual', 'kis'],
+  needle: () => ['dual', 'kis'],
+  zip: () => ['kis', 'dual'],
+  gyro: () => [{ op: 'snub', params: { t: 0.5, twist: 0 } }, 'dual'],
+  bevel: (op) => ['ambo', typeof op !== 'string' && op.params?.t === 0.5
+    ? 'ambo' : { op: 'truncate', params: typeof op === 'string' ? {} : (op.params ?? {}) }],
+};
 
 /** @param {string} op @returns {number} Lowered primitive count. */
 export function primitiveCount(op) {
-  return op === 'meta' ? 3 : DOUBLE_STEP_OPS.has(op) ? 2 : 1;
+  return LOWERING[op]?.(op).length ?? 1;
 }
 
 /**
@@ -66,13 +74,7 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
       check();
       for (const op of ops) {
         const name = typeof op === 'string' ? op : op.op;
-        const primitives = name === 'meta' ? ['ambo', 'dual', 'kis']
-          : name === 'needle' ? ['dual', 'kis']
-          : name === 'zip' ? ['kis', 'dual']
-          : name === 'gyro' ? [{ op: 'snub', params: { t: 0.5, twist: 0 } }, 'dual']
-          : name === 'bevel' ? ['ambo', typeof op !== 'string' && op.params?.t === 0.5
-            ? 'ambo' : { op: 'truncate', params: typeof op === 'string' ? {} : (op.params ?? {}) }]
-          : [op];
+        const primitives = LOWERING[name]?.(op) ?? [op];
         for (const primitive of primitives) {
           if (!mesh) throw new Error('Registry mesh was rejected');
           const next = applyOp(mesh, primitive);
