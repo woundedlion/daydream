@@ -166,6 +166,15 @@ describe(
       assert.equal(existsSync(tokenPath()), false);
     });
 
+    test('a linked worktree consumes the common-directory override token', () => {
+      const linked = join(root, 'linked');
+      git(repo, 'worktree', 'add', '--detach', linked, mid);
+      writeToken(old);
+      assert.equal(runHook([`${mid} ${old} refs/heads/master`], 'prepared', linked).status, 0);
+      assert.equal(existsSync(tokenPath()), false);
+      assert.match(readLog(), new RegExp(`OVERRIDE rewind master ${mid} -> ${old}`));
+    });
+
     test('a token prefix of the target authorizes', () => {
       writeToken(old.slice(0, 10));
       assert.equal(runHook([`${ZERO} ${old} refs/heads/master`]).status, 0);
