@@ -285,7 +285,7 @@ test('a rejected resolution switch re-asserts the applied resolution in the URL'
     const app = makeApp({ rejectResolutions: new Set(['Hi']) });
 
     app.appState.set('resolution', 'Hi');
-    // Deferred past the current task, after the rollback settles state.
+    // Deferred to a microtask after the rollback settles state.
     assert.deepEqual(app.urlSyncs, []);
     await Promise.resolve();
 
