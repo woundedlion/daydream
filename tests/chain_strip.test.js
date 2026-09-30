@@ -1443,3 +1443,17 @@ test('hover and focus independently keep stage controls open', async () => {
   chip.dispatch('mouseleave');
   assert.equal(chip.getAttribute('aria-expanded'), 'false');
 });
+
+
+test('separate slider drags form separate undo entries', async () => {
+  const h = await makeStrip({ writeThrough: true });
+  for (const value of ['5.5', '6']) {
+    const slider = controlIn(rowFor(h, 'sample', 'sample.pattern-freq'));
+    slider.value = value;
+    slider.dispatch('input');
+    slider.dispatch('change');
+  }
+  assert.deepEqual(h.commits, [1, 2]);
+  assert.equal(h.store.undo(), true);
+  assert.equal(h.store.document().preset_bank.presets[0].values['sample.pattern-freq'], 5.5);
+});
