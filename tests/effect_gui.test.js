@@ -3155,3 +3155,14 @@ test('a failed initial panel build reports an unavailable control panel', () => 
   assert.deepEqual(h.configNotices, ['Effect controls could not be built.']);
   assert.match(h.warnings[0], /panel construction failed/);
 });
+
+
+test('preset advancement refreshes nonanimated requested selectors', () => {
+  const mode = { name: 'Mode', value: 0, requestedValue: 0, options: ['Off', 'On'], animated: false };
+  const h = makeHarness({ params: [mode], engineValues: [0], presetCount: 3, presetIndex: 0 });
+  h.panel.build();
+  h.state.params = [{ ...mode, requestedValue: 1 }];
+  h.state.presetIndex = 1;
+  h.panel.sync();
+  assert.equal(h.gui().ctrl('Mode').getValue(), 1);
+});
