@@ -480,7 +480,23 @@ test('registry validation refuses unavailable engines and rejected seeds', async
     } }),
     noteDeath: (error) => failures.push(error),
   };
-  await assert.rejects(validateRegistryFaces(validator, item), /Registry mesh was rejected/);
+  await assert.rejects(validateRegistryFaces(validator, item), /Registry mesh failed/);
   assert.equal(cleared, 1);
   assert.equal(failures.length, 1);
+});
+
+
+test('registry null faces preserve the engine failure before flushing', async () => {
+  let reason = 7;
+  let deleted = false;
+  const mod = { MeshOpResult: { ARENA_EXHAUSTED: 7 }, MeshOps: {
+    getLastResult: () => reason,
+    fromSolidName: () => ({ getFaces: () => null, delete: () => { deleted = true; } }),
+    clearToolingMemory: () => { reason = 0; },
+  } };
+  const validator = { withValidator: async (task) => task(mod), noteDeath: () => {} };
+  await assert.rejects(validateRegistryFaces(validator, { base: 'cube', ops: [] }),
+    /Registry faces failed:.*arena/i);
+  assert.equal(reason, 0);
+  assert.equal(deleted, true);
 });
