@@ -567,9 +567,8 @@ export function createChainStrip({
     }
   };
 
-  // Only the workbench page carries the stylesheet that reads this attribute.
   /**
-   * Repaints the dimming of the expanded chip's deactivated controls and the
+   * Repaints each parameter row's deactivated controls and the
    * reason beside them. The row is `display: contents`, so it generates no box
    * for a tooltip to hang off: the reason is a node, reaching a pointer and
    * assistive technology alike.
@@ -582,6 +581,7 @@ export function createChainStrip({
       for (const control of row.querySelectorAll('input, select')) control.disabled = !live;
       const reason = live ? DEACTIVATED_REASON : 'This parameter is baked into the compiled build';
       if (!live || off.has(id)) {
+        // The workbench stylesheet reads this attribute.
         row.dataset.deactivated = 'true';
         if (shown !== null) { shown.textContent = reason; continue; }
         const note = el('span', 'chain-param-note');
