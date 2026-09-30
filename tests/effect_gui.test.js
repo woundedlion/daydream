@@ -3173,6 +3173,18 @@ test('a failed initial panel build reports an unavailable control panel', () => 
   assert.match(h.warnings[0], /panel construction failed/);
 });
 
+for (const rebuild of [false, true]) test(`panel ${rebuild ? 'rebuild' : 'build'} propagates module death`, () => {
+  const deps = wiring();
+  const trap = new WebAssembly.RuntimeError('unreachable');
+  let dead = false;
+  deps.engine.getParameterDefinitions = () => { if (dead) throw trap; return []; };
+  deps.engine.paramGeneration = () => dead ? 2 : 1;
+  const panel = createEffectGui({ ...deps, moduleDead: (error) => error === trap });
+  if (rebuild) panel.build();
+  dead = true;
+  assert.throws(() => rebuild ? panel.sync() : panel.build(), (error) => error === trap);
+});
+
 
 test('preset advancement refreshes nonanimated requested selectors', () => {
   const mode = { name: 'Mode', value: 0, requestedValue: 0, options: ['Off', 'On'], animated: false };

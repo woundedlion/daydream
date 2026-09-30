@@ -446,6 +446,7 @@ export function start({
   const paramFilterRef = { current: null };
 
   const effectGui = createEffectGui({
+    moduleDead: (error) => host.moduleDead(error),
     engine: {
       getParameterDefinitions: () => host.engine.getParameterDefinitions(),
       paramGeneration: () => host.paramGeneration(),
