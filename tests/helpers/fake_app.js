@@ -4,6 +4,7 @@
 // on the assembly the root actually produced rather than on its source text.
 import { fakeElement, installDocument } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
+import { isViewLive } from '../../src/renderer/pixel_view.js';
 
 import { start } from '../../src/app/daydream.js';
 import { createSegmentPoolSpawner } from '../../src/ui/segmented_pov_controls.js';
@@ -266,8 +267,11 @@ export function fakeDriver() {
     keys: [],
     frames: 0,
     stepFrames: 0,
-    invalidate() { this.invalidated = true; },
-    stepOnce() { this.invalidated = true; this.stepFrames = 1; },
+    heldCaptures: 0,
+    needsRender: true,
+    advanceFrameClock() { return true; },
+    invalidate() { this.invalidated = true; this.needsRender = true; },
+    stepOnce() { this.invalidate(); this.stepFrames = Math.max(1, this.stepFrames); },
     keydown(e) { this.keys.push(e); },
     setStrobeColumns(strobe) { this.strobe = strobe; },
     setDisplayGeometry(geometry) { Object.assign(this, geometry); },
@@ -276,20 +280,31 @@ export function fakeDriver() {
       this.dotMesh = { instanceColor: fakeColorAttribute(null) };
     },
     render(adapter) {
+      if (this.contextLost) return;
       this.frames += 1;
-      const advanced = !this.paused || this.stepFrames > 0;
+      const clockReady = this.advanceFrameClock();
+      const advanced = (clockReady || this.stepFrames !== 0)
+        && (!this.paused || this.stepFrames > 0);
       if (advanced) {
         this.stepFrames = Math.max(0, this.stepFrames - 1);
         adapter.drawFrame();
       }
-      adapter.sync?.(advanced);
-      const capture = this.recorder?.isRecording === true && advanced
-        && (adapter.captureReady?.() ?? true);
-      if (this.dotMesh.instanceColor?.array?.byteLength === 0) {
-        adapter.refreshPixelView?.();
+      if (advanced || this.paused || this.needsRender) adapter?.sync?.(advanced);
+      if (!advanced && !this.needsRender) return;
+      this.needsRender = false;
+      const captureReady = typeof adapter?.captureReady === 'function'
+        ? adapter.captureReady(advanced) : advanced;
+      const captureDue = this.recorder?.isRecording === true && captureReady;
+      if (this.dotMesh?.instanceColor && !isViewLive(this.dotMesh.instanceColor.array)) {
+        adapter?.refreshPixelView?.();
+        if (captureDue) this.heldCaptures++;
+        this.needsRender = true;
         return;
       }
-      if (capture) this.recorder.captureFrame();
+      const owed = this.recorder ? (captureDue ? 1 : 0) + this.heldCaptures : 0;
+      this.heldCaptures = owed > 0 ? owed - 1 : 0;
+      if (owed > 0) this.recorder.captureFrame();
+      if (this.heldCaptures > 0) this.needsRender = true;
     },
     dispose() { this.disposed = true; },
   };
