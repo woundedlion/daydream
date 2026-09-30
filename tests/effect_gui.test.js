@@ -3195,3 +3195,13 @@ test('preset advancement refreshes nonanimated requested selectors', () => {
   h.panel.sync();
   assert.equal(h.gui().ctrl('Mode').getValue(), 1);
 });
+
+for (const fullConfig of [false, true]) test(`preset selection clears writable values only with fullConfig=${fullConfig}`, () => {
+  const h = makeHarness({ params: [SPEED, TELEMETRY], presetCount: 3, fullConfig,
+    fullConfigSnapshot: { schemaVersion: 11, accepted: [], requested: [], pendingFieldIds: [], hasRuntime: false, runtime: [] } });
+  h.panel.build();
+  h.gui().storedWrites.length = 0;
+  assert.equal(h.panel.movePreset(1), true);
+  const cleared = h.gui().storedWrites.filter(([, value]) => value === null).map(([name]) => name);
+  assert.deepEqual(cleared, fullConfig ? [] : ['Speed']);
+});
