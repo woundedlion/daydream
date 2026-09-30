@@ -47,6 +47,7 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
     replayOnChange: false,
     acceptedUrlValues: [],
     handler: null,
+    handlers: [],
     value: undefined,
     calls: [],
     domElement,
@@ -55,8 +56,14 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
     decimals(n) { controller.decimalsSet = n; return controller; },
     name(text) { controller.label = text; return controller; },
     onChange(fn) {
-      controller.changed = fn;
-      controller.handler = fn;
+      if (controller.session) controller.handlers = [fn];
+      else controller.handlers.push(fn);
+      controller.changed = controller.session ? fn
+        : (value) => {
+          const results = controller.handlers.map((handler) => handler(value));
+          return results.some((result) => result?.then) ? Promise.all(results) : undefined;
+        };
+      controller.handler = controller.changed;
       if (controller.replayOnChange) fn(controller.getValue());
       return controller;
     },
