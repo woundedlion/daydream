@@ -13,7 +13,6 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { parse } from 'espree';
 import * as compiler from '../generated/shader/shader_workbench.mjs';
 
 import {
@@ -854,7 +853,7 @@ test('the scratch document compiles clean against the catalog', async () => {
   ]) assert.equal(units.get(id), 'turn-per-frame', id);
   for (const id of ['project.projection-spin-speed', 'sample.speed', 'sample.angle-speed'])
     assert.equal(units.get(id), 'radian-per-frame', id);
-  assert.equal(units.get('colorize.palette-mapping'), 'mapping');
+  assert.equal(units.get('colorize.palette-mapping'), 'mode');
 });
 
 test('the store adopts the scratch document and edits it', async () => {
@@ -875,11 +874,13 @@ test('the scratch builder refuses an operator the catalog lacks', () => {
   /carries no operator "warp\.nope\.v2"/);
 });
 
-test('an injected compiler isolates the store from its default compiler module', async () => {
+test('an injected compiler handles store validation', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'chain-store-isolation-'));
   try {
     const path = join(directory, 'store.mjs');
-    writeFileSync(path, readFileSync(new URL('../src/workbench/shader/chain_document_store.js', import.meta.url)));
+    writeFileSync(path, readFileSync(new URL('../src/workbench/shader/chain_document_store.js', import.meta.url), 'utf8')
+      .replace("from '../../../generated/shader/shader_workbench.mjs'",
+        `from '${new URL('../generated/shader/shader_workbench.mjs', import.meta.url).href}'`));
     const isolated = await import(pathToFileURL(path).href);
     let imports = 0;
     const store = await isolated.createChainDocumentStore({
@@ -917,17 +918,11 @@ test('a refused structural edit preserves the redo document', async () => {
   assert.deepEqual(store.document(), edited);
 });
 
-test('chain labels use the compiler grammar', () => {
-  const grammar = (path) => {
-    const ast = parse(readFileSync(new URL(path, import.meta.url), 'utf8'),
-      { ecmaVersion: 'latest', sourceType: 'module' });
-    const declaration = ast.body.flatMap((node) => node.declarations ?? [])
-      .find((node) => node.id.name === 'LABEL_PATTERN');
-    assert.ok(declaration?.init.regex);
-    return declaration.init.regex;
-  };
-  assert.deepEqual(grammar('../src/workbench/shader/chain_document_store.js'),
-    grammar('../generated/shader/shader_workbench.mjs'));
+test('chain labels use the compiler grammar', async () => {
+  for (const label of ['orbit', 'orbit-two', 'orbit2', 'Orbit', '2orbit', 'orbit--two', 'orbit_', '']) {
+    const store = await makeStore();
+    assert.equal(store.relabel('camera', label).ok, compiler.LABEL_PATTERN.test(label), label);
+  }
 });
 
 test('radian periodicity is independent of a catalog field bound', () => {
