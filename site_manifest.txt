@@ -1,7 +1,8 @@
 # Source-owned GitHub Pages assets, one repo-relative regular file per line.
 # Deployment also publishes the verified engine bundle's pattern documents,
 # README, and every screenshot that README references. Runtime entries below
-# identify required assets; the verified bundle supplies their bytes.
+# identify optional bundle assets. install-engine-bundle.mjs REQUIRED_PATHS
+# defines the required engine assets.
 # Tests and development scripts are excluded. Third-party libraries load
 # through vendor-importmap.js.
 
@@ -104,7 +105,7 @@ src/workbench/solids/solid_render.js
 src/workbench/solids/solids_page.js
 
 # Shader workbench: the document compiler, the operator catalog, and the
-# required pattern documents. Deployment includes all bundle patterns; the
+# selected pattern documents. Deployment includes all bundle patterns; the
 # local v1 expansion fixtures under src/workbench/shader/patterns/v1/ do not ship.
 generated/shader/sha256.mjs
 generated/shader/shader_workbench.mjs
