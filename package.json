@@ -8,7 +8,7 @@
     "prepare": "git config core.hooksPath .githooks",
     "pretest": "node scripts/require-tests.mjs",
     "test": "node scripts/run-tests.mjs --experimental-test-module-mocks \"tests/**/*.test.js\" \"tests/**/*.test.mjs\" \"tests/**/*.spec.js\" \"tests/**/*.spec.mjs\"",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.scripts.json",
     "lint": "eslint .",
     "importmap": "node scripts/generate-importmap.mjs",
     "importmap:local": "node scripts/generate-importmap.mjs --local",
@@ -24,6 +24,7 @@
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@puppeteer/browsers": "3.2.0",
+    "@types/node": "22.20.4",
     "eslint": "10.8.0",
     "eslint-scope": "9.1.2",
     "espree": "11.2.0",

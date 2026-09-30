@@ -37,7 +37,10 @@ function readTsconfig() {
     .split('\n')
     .filter((line) => !line.trimStart().startsWith('//'))
     .join('\n');
-  return JSON.parse(stripped);
+  const config = JSON.parse(stripped);
+  const scripts = JSON.parse(readFileSync(new URL('tsconfig.scripts.json', ROOT), 'utf8'));
+  config.files.push(...scripts.files);
+  return config;
 }
 
 // Relative module specifiers, covering `import`, `export … from`, a bare
@@ -174,6 +177,26 @@ test('the typecheck roster stays inside its stated scope', () => {
 });
 
 const ROOT_EXEMPTIONS = {
+  'scripts/browser-smoke.mjs': 'Browser automation entry point; browser harness types are not yet declared.',
+  'scripts/browser.mjs': 'Browser discovery and launch helpers require typed Puppeteer options.',
+  'scripts/check-cdn-integrity.mjs': 'Standalone CDN network diagnostic outside deployment staging.',
+  'scripts/generate-digest-migration.mjs': 'Offline migration generator outside deployment staging.',
+  'scripts/generate-importmap.mjs': 'Generated import-map writer validated by output parity tests.',
+  'scripts/lissajous-probe.mjs': 'Browser probe callbacks require DOM element narrowing.',
+  'scripts/mobius-probe.mjs': 'Browser probe callbacks require DOM element narrowing.',
+  'scripts/palettes-probe.mjs': 'Browser probe callbacks require DOM element narrowing.',
+  'scripts/panel-probe.mjs': 'Browser probe callbacks require DOM element narrowing.',
+  'scripts/probe_harness.mjs': 'Shared browser probe harness needs Puppeteer callback types.',
+  'scripts/record-module-loads.mjs': 'Node loader hook checked through test discovery integration.',
+  'scripts/require-tests.mjs': 'Test-discovery bootstrap outside deployment staging.',
+  'scripts/run-tests.mjs': 'Test runner wrapper outside deployment staging.',
+  'scripts/serve-manifest.mjs': 'Development server request handlers lack Node annotations.',
+  'scripts/site-pages.mjs': 'Publication roster wrapper has no typed public arguments.',
+  'scripts/solids-probe.mjs': 'Browser probe callbacks require DOM element narrowing.',
+  'scripts/vendor-imports.mjs': 'Import parser helpers require AST node types.',
+  'scripts/vendor-stage.mjs': 'Browser fixture staging uses untyped import parser helpers.',
+  'scripts/verify-ci-green.mjs': 'GitHub check polling uses untyped response objects.',
+  'scripts/workbench-probe.mjs': 'Browser probe callbacks require DOM element narrowing.',
   'src/app/bootstrap.js': 'Imports daydream.js and its untyped Three.js and lil-gui dependencies.',
   'src/app/daydream.js': 'Application composition depends on driver.js and gui.js, whose third-party types are unavailable under noResolve.',
   'src/renderer/driver.js': 'Imports Three.js and its renderer addons, whose types are unavailable under noResolve.',
@@ -198,6 +221,7 @@ test('every source module is typechecked or has a written exemption', () => {
     }
   };
   collect('src/');
+  collect('scripts/');
   const exemptions = { ...ROOT_EXEMPTIONS, ...TOOL_PAGE_EXEMPTIONS,
     'src/workbench/shared.js': 'Imports Three.js and its renderer addons, whose types are unavailable under noResolve.',
   };
