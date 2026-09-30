@@ -55,7 +55,7 @@ export const PROTOCOL_VERSION = 11;
 
 /**
  * Bootstrap message: assigns the worker its segment index within the pool and the
- * canvas geometry, then optionally selects an effect with tuned values. `paused`
+ * canvas geometry and required effect, with optional tuned values. `paused`
  * carries the host's current pause state so a pool re-created under a paused GUI
  * doesn't start animating; `poleLod` does the same for the Pole LOD slider, whose
  * value lives per module instance and so must be re-pushed to every fresh engine.
