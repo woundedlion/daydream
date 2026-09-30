@@ -42,3 +42,13 @@ test('transient requests retry with bounded backoff and mismatches do not retry'
   }), /integrity mismatch/);
   assert.equal(attempts, 1);
 });
+
+
+test('unexpected CDN hosts are refused before fetching', async () => {
+  let calls = 0;
+  await assert.rejects(checkCdnIntegrity(source.replace('cdn.jsdelivr.net', 'evil.example'), async () => {
+    calls++;
+    return new Response(bytes);
+  }), /Unexpected CDN URL/);
+  assert.equal(calls, 0);
+});
