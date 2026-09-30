@@ -33,19 +33,3 @@ export const pixelToSpherical = (x, y, dims, out = new THREE.Spherical()) => {
   out.set(1, phi, Math.PI / 2 - (x * TWO_PI) / (dims.W || 1));
   return out;
 };
-
-/**
- * Read the compiled engine's display geometry.
- * @param {{DISPLAY_PROFILE:number, DISPLAY_NORTH_PHI:number, DISPLAY_SOUTH_PHI:number}} module - Engine module.
- * @returns {{DISPLAY_PROFILE:number, DISPLAY_NORTH_PHI:number, DISPLAY_SOUTH_PHI:number}} Display geometry.
- */
-export function displayGeometryFromModule(module) {
-  const { DISPLAY_PROFILE, DISPLAY_NORTH_PHI, DISPLAY_SOUTH_PHI } = module;
-  if (![0, 1].includes(DISPLAY_PROFILE)
-      || !Number.isFinite(DISPLAY_NORTH_PHI) || !Number.isFinite(DISPLAY_SOUTH_PHI)
-      || DISPLAY_NORTH_PHI < 0 || DISPLAY_SOUTH_PHI > Math.PI + 1e-6
-      || DISPLAY_NORTH_PHI >= DISPLAY_SOUTH_PHI) {
-    throw new Error('Engine display geometry is missing or invalid.');
-  }
-  return { DISPLAY_PROFILE, DISPLAY_NORTH_PHI, DISPLAY_SOUTH_PHI };
-}

@@ -1717,8 +1717,9 @@ test('the glue honours instantiateWasm, and shared-module instances stay isolate
 });
 
 test('simulator consumes the WASM display geometry', async () => {
-  const { displayGeometryFromModule, pixelToSpherical } = await import('../src/renderer/geometry.js');
-  const dims = { W: 288, H: 144, ...displayGeometryFromModule(M) };
+  const { pixelToSpherical } = await import('../src/renderer/geometry.js');
+  const dims = { W: 288, H: 144, DISPLAY_PROFILE: M.DISPLAY_PROFILE,
+    DISPLAY_NORTH_PHI: M.DISPLAY_NORTH_PHI, DISPLAY_SOUTH_PHI: M.DISPLAY_SOUTH_PHI };
   assert.equal(pixelToSpherical(0, 0, dims).phi, M.DISPLAY_NORTH_PHI);
   assert.ok(Math.abs(pixelToSpherical(0, 143, dims).phi - M.DISPLAY_SOUTH_PHI) < 1e-12);
 });
