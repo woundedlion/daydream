@@ -1058,11 +1058,16 @@ test('global cap edits survive module loading, paused redraw and resolution swit
   assert.equal(app.driver.DISPLAY_SOUTH_PHI, 0.97 * Math.PI);
   assert.equal(app.driver.paused, true);
   const capsBefore = module.caps.length;
-  const color = app.driver.dotMesh.instanceColor;
-  const versionBefore = color.version;
+  const colorBefore = app.driver.dotMesh.instanceColor;
   app.guis[0].controllers.find((c) => c.property === 'resolution').setValue('Holosphere (96x20)');
-  assert.equal(module.caps.length, capsBefore + 1);
+  assert.equal(module.caps.length, capsBefore);
   assert.deepEqual(module.caps.at(-1), [4, 3]);
+  assert.equal(app.driver.DISPLAY_NORTH_PHI, 0.04 * Math.PI);
+  assert.equal(app.driver.DISPLAY_SOUTH_PHI, 0.97 * Math.PI);
+  const color = app.driver.dotMesh.instanceColor;
+  assert.notEqual(color, colorBefore);
+  const versionBefore = color.version;
+  app.driver.renderer.frame();
   assert.ok(color.version > versionBefore);
 });
 
