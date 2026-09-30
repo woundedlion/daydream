@@ -392,8 +392,7 @@ test('Alt+Arrow reorders only where the move buttons are enabled', async () => {
   assert.deepEqual(moves.map((button) => button.disabled), [true, true]);
 
   assert.deepEqual(h.applied, []);
-  assert.equal(lastAnnounced(h), '',
-    'an inert gesture writes nothing to the shared live region');
+  assert.deepEqual(h.announced, []);
 });
 
 test('× and Delete remove an endomorphism and re-apply the program', async () => {
@@ -744,7 +743,7 @@ test('the toolbar roves between chips and exposes their controls to Tab', async 
   assert.ok(headerControls.length >= 12);
   assert.deepEqual(
     [...new Set(headerControls.map((node) => node.getAttribute('tabindex')))], ['0'],
-    'every chip header control is roved to, never tabbed to');
+    'every chip header control is keyboard tabbable');
   assert.deepEqual(
     strip.querySelectorAll('.chain-chip').map((chip) => chip.getAttribute('tabindex'))
       .filter((value) => value !== '-1'),
@@ -1424,7 +1423,9 @@ test('parameters baked into the active build cannot commit edits', async () => {
   const select = controlIn(row);
   assert.equal(select.disabled, true);
   assert.match(row.querySelector('.chain-param-note').textContent, /baked into the compiled build/);
-  select.dispatch('change', { target: { value: 'hard' } });
+  select.disabled = false;
+  select.value = 'weight';
+  select.dispatch('change');
   assert.deepEqual(h.edits, []);
   assert.equal(controlIn(rowFor(h, 'sample', 'sample.pattern-freq')).disabled, false);
 });
