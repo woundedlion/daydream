@@ -90,7 +90,7 @@ test('nothing outside the manifest set is served', () => withSite(async (get) =>
   assert.equal(tooling.type, 'text/plain; charset=utf-8');
 
   assert.equal((await get('/styles-extra.css')).status, 404,
-    'an entry covers a path only at a segment boundary');
+    'unlisted paths are refused even when their names share a manifest prefix');
   assert.equal((await get('/gone.js')).status, 404,
     'an entry whose file is missing has nothing to serve');
 }));
