@@ -1219,10 +1219,9 @@ test('a host hook that throws does not poison the streaming write chain', async 
 
 /**
  * A Save dialog nobody answers holds every chunk in the write chain. The sink
- * bounds that hold at 120 s of video at the latched bitrate (15 MB at 1 Mbps
- * here) and ends the session there, telling the host; the chunks queued under
- * the bound still reach the file when it is finally picked, so what is saved is
- * a contiguous prefix rather than a recording missing its middle.
+ * bounds that hold at 120 s of video: 15 MB at 1 Mbps, or 240 MB using the
+ * 16 Mbps default when bitrate is zero. Queued chunks reach the eventual file
+ * as a contiguous prefix after the session ends at that limit.
  */
 for (const bitrate of [1, 0]) {
 test(`an unanswered save dialog bounds backlog with configured bitrate ${bitrate}`, async () => {
