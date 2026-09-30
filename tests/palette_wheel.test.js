@@ -186,9 +186,9 @@ test('the lift off the bottom keeps the boxes it separated apart', () => {
 
 test('a point on the wheel names the hue under it', () => {
   assert.equal(wheelTurnAt(100, 50, 100, 100), 0);
-  assert.ok(Math.abs(wheelTurnAt(50, 100, 100, 100) - 0.25) < 1e-12);
+  assert.ok(Math.abs(wheelTurnAt(50, 100, 100, 100) - 0.75) < 1e-12);
   assert.ok(Math.abs(wheelTurnAt(0, 50, 100, 100) - 0.5) < 1e-12);
-  assert.ok(Math.abs(wheelTurnAt(50, 0, 100, 100) - 0.75) < 1e-12,
+  assert.ok(Math.abs(wheelTurnAt(50, 0, 100, 100) - 0.25) < 1e-12,
     'a turn behind the seam wraps forward rather than going negative');
 });
 
