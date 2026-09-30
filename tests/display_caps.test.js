@@ -30,8 +30,14 @@ test('invalid or rejected caps do not publish geometry', () => {
     onChange: () => assert.fail('rejected geometry published'),
   });
   assert.equal(binding.apply(), false);
+  let calls = 0;
+  const accepting = createDisplayCapsBinding({
+    getEngine: () => ({ setDisplayCaps: () => { calls++; return true; } }),
+    onChange: () => assert.fail('invalid geometry published'),
+  });
   for (const value of [-1, 25.1, NaN, Infinity]) {
-    binding.state.topCap = value;
-    assert.equal(binding.apply(), false);
+    accepting.state.topCap = value;
+    assert.equal(accepting.apply(), false);
+    assert.equal(calls, 0);
   }
 });
