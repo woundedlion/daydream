@@ -190,9 +190,8 @@ test('AppState.notify carries past a throwing subscriber', () => {
     'the caught error itself reaches the console');
 });
 
-// The README states these limits as numbers; the ladder cases hold them by
-// name, so only this pin notices a limit drifting from what is documented.
-test('the documented URL-write limits are the exported ones', () => {
+// Default URL-write timing and retry limits.
+test('URL-write limits retain their defaults', () => {
   assert.equal(URL_FLUSH_DEBOUNCE_MS, 200);
   assert.equal(URL_FLUSH_RETRY_MS, 2000);
   assert.equal(URL_FLUSH_MAX_RETRIES, 20);
