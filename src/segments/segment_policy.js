@@ -88,8 +88,7 @@ export function createSegmentedFallback({
 
 /**
  * GUI ceiling on the worker pool, and the two lower ones a constrained device
- * gets. Every pool member holds its own WASM instance — 17.5 MB of linear memory
- * before growth — and the main thread holds one more, so an N-segment pool costs
+ * gets. Each worker and the main thread hold separate WASM instances: an N-segment pool costs
  * N+1 heaps.
  */
 export const SEGMENT_COUNT_MAX = 8;
