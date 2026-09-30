@@ -244,12 +244,12 @@ test('repeated wave-graph draws leave an unlaid-out canvas its own size', () => 
     'the drawn area is the backing store read back in CSS pixels');
 });
 
-test('the wave graph draws the band edges and the three channels without clamp overlays', () => {
+test('the wave graph draws band edges, clamp boundaries, and three channels', () => {
   const canvas = { width: 16, height: 100 };
   const ctx = fakeContext();
   drawWaveGraph({ canvas, ctx, palette: fakePalette() });
 
-  const { yTop, yBottom } = waveGraphBand(100);
+  const { yTop, yBottom, toY } = waveGraphBand(100);
   assert.deepEqual(ctx.ops[0], ['fillRect', 0, 0, 16, 100],
     'the opaque background is the first paint; nothing clears ahead of it');
 
@@ -257,6 +257,10 @@ test('the wave graph draws the band edges and the three channels without clamp o
   assert.ok(moves.some(([x, y]) => x === 0 && y === yTop), 'the value band top edge is missing');
   assert.ok(moves.some(([x, y]) => x === 0 && y === yBottom), 'the value band bottom edge is missing');
   assert.ok(moves.some(([x, y]) => x === 0 && y === 50), 'the 0.5 reference line is missing');
+  for (const value of [0, 1]) {
+    assert.ok(moves.some(([x, y]) => x === 0 && y === toY(value)));
+    assert.ok(ctx.ops.some(([n, x, y]) => n === 'lineTo' && x === 16 && y === toY(value)));
+  }
 
   const strokes = ctx.ops.filter(([n]) => n === 'stroke').map(([, style, w]) => [style, w]);
   assert.deepEqual(strokes.slice(-3),
@@ -278,7 +282,7 @@ test('the wave graph plots each channel through the shared value-to-y map', () =
   const { toY } = waveGraphBand(100);
   // The red curve is the first channel path: its moveTo opens the run of lineTo
   // that follows, one per remaining column.
-  const redStart = ctx.ops.findIndex(([n, x, y]) => n === 'moveTo' && x === 0 && y === toY(0));
+  const redStart = ctx.ops.findLastIndex(([n, x, y]) => n === 'moveTo' && x === 0 && y === toY(0));
   assert.ok(redStart > 0, 'the red curve must start at column 0');
   const redPath = ctx.ops.slice(redStart + 1, redStart + 4).map(([n, x, y]) => [n, x, y]);
   assert.deepEqual(redPath, [
