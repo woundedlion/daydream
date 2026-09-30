@@ -1322,12 +1322,12 @@ test('parameter gate predicates match every catalog live value', () => {
   for (const { operator, parameter } of gates) {
     const gate = parameter.gated_by;
     const choices = operator.params.find(candidate => candidate.id === gate.field).values;
-    for (const value of choices) {
+    const active = choices.filter((value) => {
       const result = deactivatedParameterIds([{ id: `stage.${parameter.id}` }],
         { [`stage.${gate.field}`]: value }, [{ label: 'stage', operator: operator.id }], CATALOG);
-      assert.equal(result.has(`stage.${parameter.id}`), !gate.values.includes(value),
-        `${operator.id}.${parameter.id} at ${value}`);
-    }
+      return !result.has(`stage.${parameter.id}`);
+    });
+    assert.deepEqual(active, gate.values, `${operator.id}.${parameter.id}`);
   }
 });
 
