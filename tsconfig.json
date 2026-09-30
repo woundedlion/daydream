@@ -85,6 +85,8 @@
     "src/workbench/solids/solid_registry_codegen.js",
     "src/workbench/solids/solid_render.js",
     "src/ui/effect_panel_edits.js",
+    "src/ui/effect_gui.js",
+    "src/recording/recording_controls.js",
     "src/ui/effect_panel_view.js",
     "src/effects/effect_roster.js"
   ]

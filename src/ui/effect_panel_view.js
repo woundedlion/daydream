@@ -5,7 +5,7 @@
 
 /** @typedef {{property: string, domElement: HTMLElement, $select?: HTMLSelectElement, $input?: HTMLInputElement, $button?: HTMLButtonElement}} PanelController */
 /** @typedef {{domElement: HTMLElement, closed: boolean, open: (open?: boolean) => void, close: () => void}} PanelFolder */
-/** @typedef {{gui: PanelFolder, controllerByName?: Map<string, PanelController>, pause: {controller?: PanelController}, actionControllers?: PanelController[], stageFolders?: Map<string, PanelFolder>}} PanelRecord */
+/** @typedef {{gui: PanelFolder, controllerByName?: Map<string, PanelController>, pause: {controller?: PanelController|null}, actionControllers?: PanelController[], stageFolders?: Map<string, PanelFolder>}} PanelRecord */
 
 /**
  * The key one of the panel's own controls is remembered under across a rebuild,
@@ -124,7 +124,7 @@ export function createEffectPanelView({ focusedElement, guiContainer, isMobile }
 
   /**
    * Mount one effect record in the current GUI container.
-   * @param {PanelRecord} fx - Record to mount.
+   * @param {PanelRecord|null} fx - Record to mount.
    * @param {boolean} [closed] - Initial panel state; defaults to a pending
    *   rebuild state or the mobile layout default.
    * @returns {void}

@@ -19,13 +19,14 @@
  * builds. The recorder latches these at start(), so a write during a session is
  * reported rather than silently deferred to the next one.
  *
+ * @template {{isRecording: boolean}} T
  * @param {Object} deps - Injected app collaborators.
- * @param {() => ?{isRecording: boolean}} deps.getRecorder - Reads the live
+ * @param {() => T|null} deps.getRecorder - Reads the live
  *   recorder, null until the module load resolves.
  * @param {(message: string) => void} [deps.warn] - Sink for the mid-recording
  *   notice.
- * @returns {{settings: Object, define: (prop: string, initial: *, label: string,
- *   push: (recorder: Object, value: *) => void) => void, replay: () => void}}
+ * @returns {{settings: Record<string, any>, define: (prop: string, initial: *, label: string,
+ *   push: (recorder: T, value: *) => void) => void, replay: () => void}}
  *   The GUI-bound settings object, the per-setting definer, and the post-load
  *   replay.
  */
@@ -33,7 +34,7 @@ export function createRecordingSettings({
   getRecorder,
   warn = (message) => console.warn(message),
 }) {
-  /** @type {Object} */
+  /** @type {Record<string, any>} */
   const settings = {};
   /** @type {Array<() => void>} */
   const replays = [];
@@ -56,7 +57,7 @@ export function createRecordingSettings({
       });
       // Unguarded: replay() runs immediately after the recorder is constructed,
       // and a null-tolerant replay would drop every setting in silence.
-      replays.push(() => push(/** @type {Object} */ (getRecorder()), value));
+      replays.push(() => push(/** @type {T} */ (getRecorder()), value));
     },
     replay() {
       for (const push of replays) push();
