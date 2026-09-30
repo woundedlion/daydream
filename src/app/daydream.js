@@ -425,7 +425,7 @@ export function start({
    *   versioned snapshot API rather than through per-parameter values.
    */
   function usesFullConfigSnapshot() {
-    if (typeof host.engine?.getFullConfigSnapshot !== 'function'
+    if (host.moduleDead() || typeof host.engine?.getFullConfigSnapshot !== 'function'
         || typeof host.engine.restoreFullConfigSnapshot !== 'function'
         || !host.module?.FullConfigRestoreResult) {
       return false;
