@@ -1325,8 +1325,10 @@ function showGateMsg(text) {
 function openOpGate(reason) {
   if (!wasmModule) return;
   for (const btn of document.querySelectorAll('#addOpGrid [data-op]')) {
+    btn.dataset.authoredDescription ??= btn.getAttribute('aria-describedby') ?? '';
     btn.removeAttribute('aria-disabled');
-    btn.removeAttribute('aria-describedby');
+    if (btn.dataset.authoredDescription) btn.setAttribute('aria-describedby', btn.dataset.authoredDescription);
+    else btn.removeAttribute('aria-describedby');
     btn.removeAttribute('title');
   }
   showGateMsg(`op availability is no longer checked: ${reason}`);
@@ -1347,6 +1349,7 @@ async function refreshOpGating() {
   }
 
   for (const btn of buttons) {
+    btn.dataset.authoredDescription ??= btn.getAttribute('aria-describedby') ?? '';
     const blocked = probe.blocked.has(btn.dataset.op);
     // An incomplete pass names only a lower bound on what would trap, so an
     // op it does not name stays where the last complete pass left it.
@@ -1354,9 +1357,10 @@ async function refreshOpGating() {
     btn.setAttribute('aria-disabled', String(blocked));
     if (blocked) {
       btn.title = 'Would exceed an engine mesh limit on the current solid';
-      btn.setAttribute('aria-describedby', 'opGateMsg');
+      btn.setAttribute('aria-describedby', [btn.dataset.authoredDescription, 'opGateMsg'].filter(Boolean).join(' '));
     } else {
-      btn.removeAttribute('aria-describedby');
+      if (btn.dataset.authoredDescription) btn.setAttribute('aria-describedby', btn.dataset.authoredDescription);
+      else btn.removeAttribute('aria-describedby');
       btn.removeAttribute('title');
     }
   }
