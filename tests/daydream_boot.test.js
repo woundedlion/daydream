@@ -178,7 +178,7 @@ function fakeWasmModule({
     caps,
     params,
     HolosphereEngine: class {
-      constructor() { built++; }
+      constructor() { built++; this.paused = false; module.engine = this; }
       static isLive() { return false; }
       static getSupportedResolutions() { return resolutions; }
       setResolution(w, h) {
@@ -190,16 +190,23 @@ function fakeWasmModule({
       setEffect() { return EffectSetResult.INSTALLED; }
       setParameter(name, value) {
         params.push([name, value]);
+        if (definitions.find((definition) => definition.name === name)?.animated) this.paused = true;
         return ParamSetResult.APPLIED;
       }
       setPoleLod(v) { poleLod.push(v); }
       setDisplayCaps(top, bottom) { caps.push([top, bottom]); return true; }
       getDisplayNorthPhi() { return (caps.at(-1)?.[0] ?? 0) * Math.PI / 100; }
       getDisplaySouthPhi() { return (1 - (caps.at(-1)?.[1] ?? 0) / 100) * Math.PI; }
-      setAnimationsPaused() {}
-      getAnimationsPaused() { return false; }
+      setAnimationsPaused(paused) { this.paused = paused; }
+      getAnimationsPaused() { return this.paused; }
       getPresetCount() { return 0; }
-      getPresetIndex() { return 0; }
+      getPresetIndex() { return this.presetIndex ?? 0; }
+      selectPreset(index) {
+        if (index < 0 || index >= this.getPresetCount()) return false;
+        this.presetIndex = index;
+        this.paused = true;
+        return true;
+      }
       getParameterDefinitions() { return definitions.map((d) => ({ ...d })); }
       getParamValues() { return new Float32Array(0); }
       getParamGeneration() { return 1; }
@@ -620,6 +627,25 @@ test('a parameter write does not clear a rejected switch', async () => {
     'both announce through the one notice element, so each must tag its writes '
     + 'with an owner of its own; sharing a tag lets a slider nudge clear a '
     + 'switch rejection');
+});
+
+test('resolution rollback restores an unpaused animated parameter snapshot', async () => {
+  const module = fakeWasmModule({ definitions: [
+    { name: 'Speed', value: 0.2, min: 0, max: 1, animated: true },
+  ] });
+  const app = await bootedApp({ loadModule: async () => module });
+  const controls = app.guis.at(-1).controllers;
+  controls.find((control) => control.property === 'Speed').setValue(0.8);
+  controls.find((control) => control.property === 'pause').setValue(false);
+  assert.equal(module.engine.getAnimationsPaused(), false);
+  module.HolosphereEngine.prototype.setResolution = (w) => (w === 96
+    ? ResolutionSetResult.UNSUPPORTED : ResolutionSetResult.RESIZED);
+  captureConsole(() => resolutionControl(app).setValue('Holosphere (96x20)'));
+  assert.match(noticeText(app), /Resolution change was rejected/);
+  const restored = app.guis.at(-1).controllers;
+  assert.equal(restored.find((control) => control.property === 'Speed').getValue(), 0.8);
+  assert.equal(restored.find((control) => control.property === 'pause').getValue(), false);
+  assert.equal(module.engine.getAnimationsPaused(), false);
 });
 
 test('a segmented-POV failure is announced and returns the toggle', async (t) => {
