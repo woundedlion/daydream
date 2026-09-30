@@ -4,14 +4,9 @@
  */
 
 /**
- * Which pipeline stage each engine parameter of a shader effect belongs to, and
- * what a stage folder and its controls are called. Three schemas are recognized:
- * ShaderBall's selector-driven one, the versioned Fixed Shader snapshot, and the
- * composed LatticeMelt and KaleidoscopeSmooth rosters. The named rosters list
- * membership only; every schema stages a parameter through the one
- * STAGE_BY_PARAMETER table, so no two can place the same name differently. Name
- * classification only, so the taxonomy is readable and testable apart from the
- * panel that renders it.
+ * Pipeline-stage names and parameter assignments. Shader's selector schema
+ * follows sequential STAGE_BOUNDARIES; fixed and composed rosters use
+ * STAGE_BY_PARAMETER and WARP_STAGE_BOUNDARIES.
  */
 
 export const STAGE_ORDER = [
@@ -293,7 +288,7 @@ export function legacyShaderBallParamNames(name) {
 }
 
 /**
- * Whether a parameter schema is ShaderBall's, recognized by its per-stage
+ * Whether a parameter schema is Shader's, recognized by its per-stage
  * selectors. The panel's stage grouping and the app's choice of persistence
  * strategy both key off this predicate, so the two cannot disagree about which
  * effect is loaded.
