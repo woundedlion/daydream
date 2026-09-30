@@ -113,15 +113,16 @@ class FakeEngine {
   getPresetIndex() { return this.presetIndex; }
   selectPreset(index) {
     this.calls.push(['selectPreset', index]);
-    if (index < 0 || index >= this.presetCount) return false;
+    if (!Number.isInteger(index) || index < 0 || index >= this.presetCount) return false;
     this.presetIndex = index;
+    this.paused = true;
     return true;
   }
   // Logged under its own name so a caller that must not engage the pause is
   // distinguishable from one that may.
   synchronizePreset(index) {
     this.calls.push(['synchronizePreset', index]);
-    if (index < 0 || index >= this.presetCount) return false;
+    if (!Number.isInteger(index) || index < 0 || index >= this.presetCount) return false;
     this.presetIndex = index;
     return true;
   }
@@ -140,7 +141,6 @@ class FakeEngine {
     this.calls.push(['setDisplayCaps', top, bottom]);
     if (this.capsRejected) return false;
     this.caps = [top, bottom];
-    this.clip = null;
     return true;
   }
   // `fullFrame` models a needs_full_frame() effect: the bounds are accepted but
