@@ -3,9 +3,8 @@
 // engine functions they mirror, run against the real shipped WASM module.
 //
 // The C++ runs the math in float; the JS ports run it in double, so float
-// outputs are compared within a small tolerance while integer outputs (the HSV
-// bytes, the LUT-quantized palette) must match exactly (or within 1 LUT step,
-// where the float-vs-double cosine input can land in an adjacent cell).
+// outputs are compared within a small tolerance. LUT-quantized palette outputs
+// allow one LUT step when float and double inputs fall in adjacent cells.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
