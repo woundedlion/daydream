@@ -275,7 +275,7 @@ test('getShaderChainCatalog matches the installed generated/shader/engine_catalo
 });
 
 // The default ShaderChain program, spelled as the payload setShaderChain
-// takes. tools/chain_apply.js drives exactly this call shape.
+// takes. src/workbench/shader/chain_apply.js drives exactly this call shape.
 const DEFAULT_CHAIN = [
   { instance: 'camera', operator: 'sphere.rotate.v2' },
   { instance: 'project', operator: 'project.stereographic.v2' },
@@ -947,9 +947,7 @@ test('a resolution change leaves a held pixel view attached at the wrong length'
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
 });
 
-// engine_host.js calls getParamGeneration through an optional-call guard and
-// daydream.js's Pole LOD slider calls setPoleLod on an optional chain, so a
-// dropped export is silent on both call sites.
+// EngineHost reads generation; display controls require the Pole LOD exports.
 test('getParamGeneration and setPoleLod stay exported', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
@@ -964,10 +962,10 @@ test('getParamGeneration and setPoleLod stay exported', () => {
     'cannot be detected');
 
   assert.equal(typeof engine.setPoleLod, 'function',
-    'setPoleLod must stay callable (daydream.js binds the Pole LOD slider to it)');
+    'setPoleLod must stay callable (display_controls.js binds the Pole LOD slider to it)');
   assert.equal(engine.getPoleLod(), 0,
     'a fresh engine must start undecimated (HS_POLE_LOD_DEFAULT)');
-  // daydream.js's slider spans [0, 2]; the setting is what the segmented
+  // display_controls.js's slider spans [0, 2]; the setting is what the segmented
   // controller has to forward to every worker, so it has to be readable back.
   for (const v of [0, 1, 2]) {
     engine.setPoleLod(v);
@@ -1156,7 +1154,7 @@ test('schema 10 snapshots migrate the rendered palette mapping and discard its d
 });
 
 // daydream.js reads the pause indicator through an optional-call guard
-// (engineAnimationsPaused: () => host.engine.getAnimationsPaused?.()), so a
+// (getAnimationsPaused: () => host.engine?.getAnimationsPaused?.()), so a
 // dropped export is silent at the call site and only desyncs the GUI toggle.
 test('getAnimationsPaused reports the pause both of its writers engage', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
@@ -1397,7 +1395,7 @@ test('meshOpFailure routes a real bridge reject by the reason the module records
 test('solid_codegen KNOWN_OPS matches the operators MeshOps binds', () => {
   assert.deepEqual([...KNOWN_OPS].sort(), meshOpNames(),
     'the codegen op list and the ops bound by the WASM module must agree; ' +
-    'update tools/solid_codegen.js KNOWN_OPS to match the engine');
+    'update src/workbench/solids/solid_codegen.js KNOWN_OPS to match the engine');
 });
 
 // One case per OP_DEFS slider endpoint: the named param at that edge, every
@@ -1441,7 +1439,7 @@ test('every OP_DEFS bound sits inside the engine domain the WASM bridge enforces
     `${clamped.length} OP_DEFS endpoints made the WASM bridge log on a ${seed}; ` +
     'the range reaches outside the engine domain for that operator, so the ' +
     'preview silently clamps while the generated C++ carries the authored value ' +
-    'into an engine assert. Narrow the range in tools/solid_codegen.js');
+    'into an engine assert. Narrow the range in src/workbench/solids/solid_codegen.js');
 });
 
 test('the Platonic and Catalan seed lists name registered Simple solids', () => {
@@ -1454,7 +1452,7 @@ test('the Platonic and Catalan seed lists name registered Simple solids', () => 
     .filter((name) => !simple.has(name));
   assert.deepEqual(unregistered.slice(0, 5), [],
     `solid_codegen.js lists ${unregistered.length} names the engine registers no ` +
-    'Simple solid for; update tools/solid_codegen.js to match solids.h');
+    'Simple solid for; update src/workbench/solids/solid_codegen.js to match solids.h');
   const inBoth = [...PLATONIC_SOLIDS].filter((name) => CATALAN_BASES.has(name));
   assert.deepEqual(inBoth.slice(0, 5), [],
     `${inBoth.length} names are in both seed lists; the namespace qualifier ` +
