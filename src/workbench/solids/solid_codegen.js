@@ -403,7 +403,7 @@ function dispatchOp(mesh, o, opName) {
 }
 
 /**
- * The MeshOpResult keys the WASM bridge binds, in enum order.
+ * The set of MeshOpResult keys the WASM bridge binds.
  * @details engine_contract_wasm.test.js pins this list against the module enum.
  */
 export const MESH_OP_RESULT_NAMES = [
