@@ -235,7 +235,7 @@ export function paletteGradientCss(entry, stopCount = GRADIENT_STOPS) {
   const preview = new ProceduralPalette(entry.a, entry.b, entry.c, entry.d);
   const stops = [];
   for (let i = 0; i < stopCount; i++) {
-    const [r, g, b] = preview.get(stopCount === 1 ? 0 : i / (stopCount - 1));
+    const [r, g, b] = preview.get(i / (stopCount - 1));
     stops.push(linearRgbToHex(r, g, b));
   }
   return `linear-gradient(to right, ${stops.join(', ')})`;
