@@ -2,7 +2,6 @@
 // Builds daydream.js's composition root against injected seams (document, page
 // target, navigator, driver, GUI factory, module loader), so a case can assert
 // on the assembly the root actually produced rather than on its source text.
-// Shared by tests/daydream_start.test.js and tests/daydream_boot.test.js.
 import { fakeElement, installDocument } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
 
