@@ -87,7 +87,7 @@ export function paintHueWheelRaster(data, width, height, lightness) {
       const distance = Math.hypot(dx, dy);
       const offset = (y * width + x) * 4;
       oklchLinearRgb(lightness, distance * chromaPerPixel,
-        wrapTurns(Math.atan2(dy, dx) * turnsPerRadian), rgb);
+        wrapTurns(Math.atan2(-dy, dx) * turnsPerRadian), rgb);
       const inGamut = distance <= radius
         && rgb[0] >= GAMUT_LOW && rgb[0] <= GAMUT_HIGH
         && rgb[1] >= GAMUT_LOW && rgb[1] <= GAMUT_HIGH
@@ -118,7 +118,7 @@ export function hueKeyMarkerPoints(state, width, height) {
     const angle = (state.baseTurns + offset) * Math.PI * 2;
     return {
       x: centerX + Math.cos(angle) * radius,
-      y: centerY + Math.sin(angle) * radius,
+      y: centerY - Math.sin(angle) * radius,
     };
   });
 }
@@ -201,7 +201,7 @@ function separateLabels(labels) {
  */
 export function wheelTurnAt(x, y, width, height) {
   return wrapTurns(
-    Math.atan2(y - height * 0.5, x - width * 0.5) / (Math.PI * 2));
+    Math.atan2(height * 0.5 - y, x - width * 0.5) / (Math.PI * 2));
 }
 
 /**
