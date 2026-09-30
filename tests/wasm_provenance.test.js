@@ -1,3 +1,4 @@
+import { LOWERING, primitiveCount } from '../src/workbench/solids/solid_registry_codegen.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -272,4 +273,34 @@ test('Mobius projection constants match the pinned engine sources', { skip: engi
   const lift = /COMPLEX_UNDERFLOW_LIFT\s*=\s*0x1p(\d+)f/.exec(math);
   assert.ok(lift);
   assert.equal(MB.STEREO_UNDERFLOW_LIFT, 2 ** Number(lift[1]));
+});
+
+
+test('registry composite lowering matches expand_to_primitives', { skip: engineSkip }, () => {
+  const recipe = committed(engineRoot, 'core/mesh/recipe.h').toString('utf8');
+  const body = recipe.slice(recipe.indexOf('inline size_t expand_to_primitives'));
+  for (const [name, lower] of Object.entries(LOWERING)) {
+    const block = body.split(`case Op::${name.toUpperCase()}:`)[1]?.split('break;')[0];
+    assert.ok(block, name);
+    for (const t of [0.25, 0.5]) {
+      let chosen = block;
+      if (name === 'bevel') {
+        assert.match(block, /if \(step\.param == 0\.5f\)/);
+        chosen = block.split('if (')[0] + (t === 0.5
+          ? block.split('if (step.param == 0.5f)')[1].split('else')[0]
+          : block.split('else')[1]);
+      }
+      const emitted = [...chosen.matchAll(/emit\(\{Op::([A-Z]+)([^}]*)\}\)/g)].map((match) => {
+        const op = match[1].toLowerCase();
+        if (op === 'truncate') { assert.match(match[2], /step\.param/); return { op, params: { t } }; }
+        if (op === 'snub') {
+          assert.match(match[2], /MeshOps::SNUB_DEFAULT_T, MeshOps::SNUB_DEFAULT_TWIST/);
+          return { op, params: { t: OP_DEFS.snub.params.t.val, twist: OP_DEFS.snub.params.twist.val } };
+        }
+        return op;
+      });
+      assert.deepEqual(lower({ op: name, params: { t } }), emitted, `${name}(${t})`);
+      assert.equal(primitiveCount(name), emitted.length);
+    }
+  }
 });
