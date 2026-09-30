@@ -6,8 +6,8 @@
 
 const COMPILER_URL = new URL('../../../generated/shader/shader_workbench.mjs', import.meta.url).href;
 
-// Mirror of the compiler's LABEL_PATTERN (generated/shader/shader_workbench.mjs).
-const LABEL_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+import { LABEL_PATTERN, declarationFromCatalogField as parameterFromField }
+  from '../../../generated/shader/shader_workbench.mjs';
 
 /** @typedef {{id: string, name: string|null, min: number, max: number, default: *, curve?: string, topology?: false}} CatalogNumericField */
 /** @typedef {{id: string, topology: true, values: string[], default: *}} CatalogTopologyField */
@@ -32,62 +32,6 @@ const refusal = (code, path, message) => ({
   ok: false,
   diagnostics: [{ severity: 'error', phase: 'edit', code, path, message }],
 });
-
-/**
- * The document parameter declaration a catalog field backfills as: the
- * catalog's domain and default under the interpolation trait its curve names.
- * @param {string} label - Owning chain instance label.
- * @param {CatalogField} field - Catalog schema field.
- * @param {string} operator - Catalog operator id.
- * @returns {ParameterDeclaration} A descriptor.parameters entry.
- */
-const parameterFromField = (label, field, operator) => {
-  if (field.topology) {
-    return {
-      id: `${label}.${field.id}`,
-      classification: 'preset',
-      storage: 'enum8',
-      unit: field.id === 'palette-mapping' ? 'mapping' : 'mode',
-      domain: { values: [...field.values] },
-      interpolation: { kind: 'MIXED_ENUM' },
-      default: field.default,
-    };
-  }
-  // Catalog curves are lowercase kebab; document interpolation kinds keep
-  // their own uppercase vocabulary.
-  const minimum = Math.fround(field.min);
-  const maximum = Math.fround(field.max);
-  let periodic = null;
-  let kind;
-  switch (field.curve) {
-    case 'shortest-turn':
-      periodic = { period: 1, unit: 'turn' };
-      kind = 'SHORTEST_PERIODIC';
-      break;
-    case 'shortest-periodic':
-      periodic = { period: Math.fround(2 * Math.PI), unit: 'radian' };
-      kind = 'SHORTEST_PERIODIC';
-      break;
-    case 'log-positive': kind = 'LOG_POSITIVE'; break;
-    case 'snap': kind = 'SNAP'; break;
-    case 'lerp': kind = 'LINEAR'; break;
-    default: throw new Error(`unknown catalog curve "${field.curve}" for "${field.id}"`);
-  }
-  return {
-    id: `${label}.${field.id}`,
-    classification: 'preset',
-    storage: 'binary32',
-    unit: periodic !== null ? periodic.unit
-      : field.id.endsWith('speed')
-        ? ((operator.startsWith('sample.') && ['speed', 'angle-speed'].includes(field.id))
-          || field.id === 'projection-spin-speed' || field.id === 'spin-speed'
-          ? 'radian-per-frame' : 'turn-per-frame') : 'ratio',
-    domain: { minimum, maximum },
-    interpolation: periodic !== null
-      ? { kind, period: periodic.period } : { kind },
-    default: field.default,
-  };
-};
 
 /**
  * Undo entries one session keeps. Each is a whole document clone, so this is
