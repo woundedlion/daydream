@@ -374,7 +374,8 @@ test('chain parameter batch boundary reports malformed and oversized payloads', 
   const name = before[0].name;
   for (const payload of [null, undefined, {}, [null], [undefined],
     [{ name: 1, value: 0 }], [{ name }], [{ name, value: '0.5' }]]) {
-    assert.equal(engine.setShaderChainParameters(payload), M.ParamSetResult.MALFORMED_PAYLOAD);
+    const writes = Array.isArray(payload) ? [{ name, value: 0.5 }, ...payload] : payload;
+    assert.equal(engine.setShaderChainParameters(writes), M.ParamSetResult.MALFORMED_PAYLOAD);
   }
   const catalog = JSON.parse(M.HolosphereEngine.getShaderChainCatalog());
   assert.equal(engine.setShaderChainParameters(
@@ -530,8 +531,9 @@ test('an unknown effect name is rejected and leaves the prior effect renderable'
 
   assert.equal(engine.setClip(0, W, 0, H), M.ClipSetResult.APPLIED,
     'the prior effect must still accept a full-canvas clip');
+  engine.getPixels().fill(0);
   engine.drawFrame();
-  assert.equal(engine.getPixels().length, W * H * 3,
+  assert.ok(engine.getPixels().some((value) => value !== 0),
     'the prior effect must still render into the full buffer');
 });
 
@@ -1089,7 +1091,9 @@ test('the full-config accessors answer as the workbench panel assumes', () => {
     [M.FullConfigRestoreResult.INVALID_PENDING,
       { ...snapshot, pendingFieldIds: [snapshot.accepted.length] }],
   ]) {
-    assert.equal(engine.restoreFullConfigSnapshot(bad), outcome);
+    const changed = { ...bad, requested: [...bad.requested] };
+    changed.requested[0] = changed.requested[0] === 0 ? 1 : 0;
+    assert.equal(engine.restoreFullConfigSnapshot(changed), outcome);
   }
   assert.deepEqual(engine.getFullConfigSnapshot(), snapshot,
     'a refused restore changed the effect');
@@ -1143,7 +1147,9 @@ test('schema 10 snapshots migrate the rendered palette mapping and discard its d
     [{ ...legacy, pendingFieldIds: [152, 152] }, M.FullConfigRestoreResult.INVALID_PENDING],
     [{ ...legacy, accepted: current.accepted }, M.FullConfigRestoreResult.INVALID_LENGTH],
   ]) {
-    assert.equal(engine.restoreFullConfigSnapshot(bad), outcome);
+    const changed = { ...bad, requested: [...bad.requested] };
+    changed.requested[0] = changed.requested[0] === 0 ? 1 : 0;
+    assert.equal(engine.restoreFullConfigSnapshot(changed), outcome);
     assert.deepEqual(engine.getFullConfigSnapshot(), current);
   }
 });
