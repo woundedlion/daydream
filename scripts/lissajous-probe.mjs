@@ -31,7 +31,7 @@ const DOMAIN_GROUP = '#Duration_container';
 const DOMAIN_READOUT = '#Duration_value';
 const DRAG_STEPS = 8;
 // Largest denominator the ratio search admits, and the frequency sliders'
-// range; tools/lissajous_math.js and tools/lissajous_page.js own them.
+// range; src/workbench/lissajous/lissajous_math.js and src/workbench/lissajous/lissajous_page.js own them.
 const MAX_RATIONAL_TERM = 8;
 const FREQUENCY_RANGE = { min: 1, max: 100 };
 // The exported literals are float32 round-trips, so a snapped ratio matches to

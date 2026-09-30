@@ -52,7 +52,7 @@ test('every solids visualization switch carries an accessible name', () => {
 const SPECIFIER = /(?:from|import)\s*\(?\s*['"](\.[^'"]+\.js)['"]/g;
 
 /**
- * The modules a page ends up loading, its own and the tools/ ones alike. The
+ * The modules a page ends up loading, its own and the src/ ones alike. The
  * walk follows every relative specifier, so a module a page reaches only
  * through another (index.html pulls the banner via bootstrap.js) is found.
  * @param {string} page - Repo-relative page path.

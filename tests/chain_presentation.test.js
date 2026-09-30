@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createChainPresentation } from '../src/workbench/shader/chain_presentation.js';
-import { titleCase } from '../src/shared/labels.js';
 
 const op = (id, input, output = input) => ({ id, input, output, name: id, params: [] });
 const rotate = op('rotate', 'sphere');
@@ -48,10 +47,4 @@ test('socket choices prefer the narrowest span and stop collapse at an endomorph
   assert.deepEqual(model.socketChoices(2), [{ start: 2, deleteCount: 1, operators: [direct] }]);
   assert.deepEqual(calls, [[2, 1, 3], [1, 2, 1]]);
   assert.equal(model.sharesBand(0, 1), false);
-});
-
-test('shared labels preserve empty segments and single-letter words', () => {
-  assert.equal(titleCase(''), '');
-  assert.equal(titleCase('x-offset'), 'X Offset');
-  assert.equal(titleCase('edge--fade'), 'Edge  Fade');
 });

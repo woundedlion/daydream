@@ -85,7 +85,7 @@ const controlNameCorpus = () => {
   return [...ids].sort();
 };
 
-// tools/shader_documents.js re-implements the engine's promoted-binding
+// src/workbench/shader/shader_documents.js re-implements the engine's promoted-binding
 // predicates for the browser: the live topology field, the baked topology set,
 // the baked-constant exemption and the control-name alias table. That module is
 // not installed here, so the two are pinned by behaviour rather than by bytes.
@@ -152,7 +152,7 @@ test('MORPH_SWEEP matches the engine morphability constants', { skip: engineSkip
       truncate: { min: truncateMin, max: 1 - amboEpsilon, excluded: [Number(truncate[1])] },
       chamfer: { min: chamferMin, max: chamferMax },
     },
-    'tools/solid_codegen.js MORPH_SWEEP drifted from the installed engine pin',
+    'src/workbench/solids/solid_codegen.js MORPH_SWEEP drifted from the installed engine pin',
   );
 });
 

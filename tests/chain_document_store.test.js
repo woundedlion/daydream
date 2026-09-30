@@ -1,5 +1,5 @@
 //
-// tools/chain_document_store.js is the chain editor's document state machine:
+// src/workbench/shader/chain_document_store.js is the chain editor's document state machine:
 // one span-replacement primitive generates insert, remove, replace and move,
 // every commit reconciles the whole document (preset backfill, serialization
 // fields, staggered groups, degenerate transition edges) and must leave it

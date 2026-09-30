@@ -29,7 +29,7 @@ const STOOD_IN = Object.keys(fake).filter((name) => isClass(fake[name]));
 const ADDONS = { OrbitControls };
 
 /**
- * The vector arithmetic tools/solid_render.js emits its positions with, run
+ * The vector arithmetic src/workbench/solids/solid_render.js emits its positions with, run
  * end to end.
  * @param {typeof THREE.Vector3} Vector3 - The class under test.
  * @returns {number[]} Every quantity the sequence produces, in order.

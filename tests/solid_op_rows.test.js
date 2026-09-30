@@ -152,7 +152,7 @@ test('the header buttons call their handlers with the row index', () => {
 });
 
 // The grip carries no listener of its own. The page captures the pointer on it
-// (tools/pointer_drag.js), which is what makes mouse and touch reorder over one
+// (src/shared/pointer_drag.js), which is what makes mouse and touch reorder over one
 // path and leaves nothing armed behind a press that never dragged.
 test('the row hands its grip and itself to the page drag wiring, once', () => {
   const { el, wired } = build({ op: 'kis', params: {} }, 1, 3);
