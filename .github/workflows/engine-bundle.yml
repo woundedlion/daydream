@@ -61,13 +61,28 @@ jobs:
           GH_TOKEN: ${{ secrets.POV_TOKEN || github.token }}
           PIN: ${{ steps.engine.outputs.pin }}
         run: |
+          retry_api() {
+            local attempt
+            for attempt in 1 2 3 4; do
+              if gh api "$@"; then return 0; fi
+              if [ "$attempt" -lt 4 ]; then sleep 5; fi
+            done
+            return 1
+          }
           deadline=$((SECONDS + 3300))
+          queried=false
           while :; do
             run="$(gh api "repos/woundedlion/pov/actions/workflows/ci.yml/runs?head_sha=$PIN&branch=master&per_page=10" \
               --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")][0] // empty | [(.id // "-"), (.status // "-"), (.conclusion // "-"), (.head_commit.timestamp // "-"), (.head_sha // "-")] | @tsv')" || {
-              echo "::error::Cannot query engine CI; check token access to woundedlion/pov Actions."
-              exit 1
+              if [ "$queried" = false ]; then
+                echo "::error::Cannot query engine CI; check token access to woundedlion/pov Actions."
+                exit 1
+              fi
+              run=''
+              echo "::warning::Engine CI query failed; retrying within the wait budget."
+
             }
+            queried=true
             run_id='' run_status='' run_conclusion='' pin_date='' run_sha=''
             if [ -n "$run" ]; then
               IFS=$'\t' read -r run_id run_status run_conclusion pin_date run_sha <<< "$run"
@@ -83,7 +98,7 @@ jobs:
                 if [ "$pin_age_days" -ge 60 ]; then
                   echo "::warning::Engine pin $PIN is $pin_age_days days old; retained bundles can expire."
                 fi
-                artifact="$(gh api "repos/woundedlion/pov/actions/runs/$run_id/artifacts" --jq ".artifacts | map(select(.name == \"holosphere-engine-$PIN\")) | .[0] // empty | [.id, .expired, .expires_at] | @tsv")"
+                artifact="$(retry_api "repos/woundedlion/pov/actions/runs/$run_id/artifacts" --jq ".artifacts | map(select(.name == \"holosphere-engine-$PIN\")) | .[0] // empty | [.id, .expired, .expires_at] | @tsv")"
                 if [ -z "$artifact" ]; then
                   echo "::error::successful POV CI for $PIN published no verified engine bundle, or it expired. Rerun: gh run rerun $run_id --repo woundedlion/pov"
                   exit 1
@@ -97,7 +112,11 @@ jobs:
                 if [ "$remaining_days" -le 14 ]; then
                   echo "::warning::Engine bundle expires in $remaining_days days. Renew it with: gh run rerun $run_id --repo woundedlion/pov"
                 fi
-                gh api "repos/woundedlion/pov/actions/artifacts/$artifact_id/zip" > /tmp/engine-bundle.zip
+                for attempt in 1 2 3 4; do
+                  if gh api "repos/woundedlion/pov/actions/artifacts/$artifact_id/zip" > /tmp/engine-bundle.zip; then break; fi
+                  if [ "$attempt" -eq 4 ]; then exit 1; fi
+                  sleep 5
+                done
                 python3 scripts/extract-engine-bundle.py /tmp/engine-bundle.zip engine-bundle
                 break
               fi
