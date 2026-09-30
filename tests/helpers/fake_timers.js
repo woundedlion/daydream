@@ -125,7 +125,7 @@ export function fakeTimers() {
     },
     /** Runs the one pending timer. @returns {void} */
     fire() {
-      if (pending.size === 0) return;
+      assert.equal(pending.size, 1, 'exactly one timer must be pending');
       const [id, { fn }] = [...pending][0];
       pending.delete(id);
       fn();
