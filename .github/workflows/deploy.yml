@@ -29,6 +29,7 @@ jobs:
     permissions:
       contents: read
       deployments: write
+      actions: read
     outputs:
       daydream: ${{ steps.pair.outputs.daydream }}
       holosphere: ${{ steps.pair.outputs.holosphere }}
