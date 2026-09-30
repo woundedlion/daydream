@@ -207,6 +207,7 @@ function checkedGroup(group, members, required, defaults = {}) {
  * it is composed rather than at the first frame that happens to call the slot.
  *
  * @param {Object} deps - Injected app collaborators, in four groups.
+ * @param {(error?: *) => boolean} [deps.moduleDead] - Whether the engine module is unusable.
  * @param {Object} deps.engine - The main engine the panel reads and writes.
  * @param {() => Array<Object>} deps.engine.getParameterDefinitions - Reads the
  *   parameter definitions for the effect the engine currently has loaded.
@@ -281,7 +282,7 @@ function checkedGroup(group, members, required, defaults = {}) {
  *   destroy: () => void}}
  * @throws {TypeError} On a missing collaborator or an uncallable member.
  */
-export function createEffectGui({ engine, segments, config, host }) {
+export function createEffectGui({ engine, segments, config, host, moduleDead = () => false }) {
   const {
     getParameterDefinitions, paramGeneration, setAnimationsPaused, getPresetCount,
     getPresetIndex, synchronizePreset, selectPreset,
@@ -1017,6 +1018,7 @@ export function createEffectGui({ engine, segments, config, host }) {
         previousParamNames: new Set(previous.paramNames),
       });
     } catch (error) {
+      if (moduleDead(error)) throw error;
       if (rebuildFailureGeneration !== generation) {
         logWarn('Effect GUI: parameter-schema rebuild failed', error);
         showConfigImportNotice('Effect controls could not be rebuilt.');
@@ -1079,6 +1081,7 @@ export function createEffectGui({ engine, segments, config, host }) {
       try {
         activeEffect = createEffectRecord({ restoreAccepted: true });
       } catch (error) {
+        if (moduleDead(error)) throw error;
         activeEffect = null;
         logWarn('Effect GUI: panel construction failed', error);
         showConfigImportNotice('Effect controls could not be built.');
