@@ -1669,7 +1669,7 @@ test('keydown leaves a modifier chord to the browser and the OS', () => {
   assert.deepEqual(moves, [], 'a chord reached the preset walk');
 });
 
-test('keydown ignores keys it does not own', () => {
+test('paused left arrow leaves preset navigation untouched', () => {
   const ctx = { paused: true, stepFrames: 0 };
   const other = keyEvent('ArrowLeft');
   const moves = [];
@@ -1717,8 +1717,9 @@ test('the driver hands its own document to every collaborator that defaults to t
     });
   // Classes the driver module declares itself carry the same hazard.
   const local = [...DRIVER_SOURCE.matchAll(
-    /export class (\w+)[\s\S]{0,400}?constructor\([^)]*doc = globalThis\.document/gu)]
-    .map(([, name]) => name);
+    /export class (\w+)(?:(?!export class)[\s\S])*?constructor\([^)]*doc = globalThis\.document/gu)]
+    .map(([, name]) => name).filter((name) => name !== 'Daydream');
+  assert.ok(local.includes('LabelPool'));
   const collaborators = [...modules, ...local];
   // Guards the derivation, not the roster: pinning the member names would red
   // on a reformat that leaves the threading intact.
@@ -1767,6 +1768,7 @@ function unpinnedContextFields(ctx) {
 
 test('every hand-built context stands in only for state the driver has', () => {
   const contexts = {
+    mainCtx: mainCtx([]),
     sizeCtx: sizeCtx(1200, 800),
     setupCtx: setupCtx(fakeMesh([]), []),
     disposeCtx: disposeCtx(fakeMesh([]), []),
@@ -1853,11 +1855,13 @@ test('cap slider changes bound the matrix cache and update live placement', () =
   ctx.precomputeMatrices();
   const colors = ctx.dotMesh.instanceColor;
   ctx.invalidate = () => { ctx.invalidated = true; };
-  for (let cap = 0; cap < 100; cap++) {
+  for (let cap = 1; cap < 100; cap++) {
+    const matrixVersion = ctx.dotMesh.instanceMatrix.version;
     Daydream.prototype.setDisplayGeometry.call(ctx, {
       DISPLAY_PROFILE: 1, DISPLAY_NORTH_PHI: cap / 1000,
       DISPLAY_SOUTH_PHI: Math.PI - cap / 1000,
     });
+    assert.ok(ctx.dotMesh.instanceMatrix.version > matrixVersion);
     assert.ok(ctx.matrixCache.size <= 1);
     assert.equal(ctx.dotMesh.instanceColor, colors);
   }
@@ -1880,4 +1884,27 @@ test('render shows axes and labels before the inset view', () => {
   for (const axis of [ctx.xAxis, ctx.yAxis, ctx.zAxis]) assert.equal(axis.visible, true);
   assert.ok(log.indexOf('refreshLabels') < log.indexOf('labelRenderer.render'));
   assert.ok(log.indexOf('labelRenderer.render') < log.indexOf('renderPip'));
+});
+
+
+test('stepOnce always queues at least one frame', () => {
+  const ctx = { paused: true, stepFrames: 0, invalidate() {} };
+  Daydream.prototype.stepOnce.call(ctx, 0);
+  assert.equal(ctx.stepFrames, 1);
+});
+
+test('stats tolerate absent arena metrics', () => {
+  const calls = [];
+  const ctx = { statsView: { update: (...args) => calls.push(args) } };
+  for (const adapter of [null, {}, { getArenaMetrics: () => undefined }])
+    Daydream.prototype.updateStats.call(ctx, 12, adapter);
+  assert.deepEqual(calls, [[12, null], [12, null], [12, null]]);
+});
+
+test('dispose clears the stats view', () => {
+  const log = [];
+  const ctx = disposeCtx(fakeMesh(log), log);
+  ctx.statsView = { clear: () => log.push('stats.clear') };
+  Daydream.prototype.dispose.call(ctx);
+  assert.ok(log.includes('stats.clear'));
 });
