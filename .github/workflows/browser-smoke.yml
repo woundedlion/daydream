@@ -58,9 +58,7 @@ jobs:
       - name: Drive every browser probe
         shell: bash
         env:
-          # Ceiling for one script, and for the loop as a whole. The budget sits
-          # inside timeout-minutes so a hang is reported here, against the script
-          # that hung, rather than killed by the runner with the rest unrun.
+          # Per-script and total probe deadlines fit inside the job timeout.
           PROBE_TIMEOUT_S: '420'
           PROBE_BUDGET_S: '1500'
         run: |

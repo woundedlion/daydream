@@ -98,16 +98,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/bin"
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP/bin" actionlint
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
-      # The deploy gate, the engine-bundle wait and the probe budget are shell
-      # inside `run:` blocks, which the step above cannot reach: no workflow is
-      # a tracked *.sh file. actionlint checks the workflow itself (expression
-      # syntax, the `needs` graph, event and matrix keys) and pipes every
-      # `run:` body through shellcheck. The file list comes from the index, so a
-      # new workflow is linted with no edit here and an empty list is a broken
-      # path list.
-      # actionlint drops its shellcheck integration silently when the binary is
-      # not on PATH, which would leave every run body unchecked behind a green
-      # step; -verbose reports the drop, so it is captured and made fatal.
+      # Lint workflow expressions and embedded shell with actionlint and shellcheck.
       - name: Lint workflows
         run: |
           mapfile -t FILES < <(git ls-files -- '.github/workflows/*.yml' '.github/workflows/*.yaml')
