@@ -169,10 +169,11 @@ const main = () => {
     .sort();
   const uncovered = roster.filter((file) => !loaded.has(file) && typeof exempt[file] !== 'string');
   const stale = Object.keys(exempt).filter((file) => !roster.includes(file)).sort();
-  const redundant = Object.keys(exempt).filter((file) =>
-    typeof exempt[file] === 'string' ? loaded.has(file)
-      : Object.keys(exempt[file]).filter((key) => key !== 'reason').some((key) =>
-        (key === 'lines' ? coverage.get(file) >= 95 : branches.get(file) >= 90))).sort();
+  const redundant = Object.keys(exempt).flatMap((file) =>
+    typeof exempt[file] === 'string' ? (loaded.has(file) ? [file] : [])
+      : Object.keys(exempt[file]).filter((key) => key !== 'reason')
+        .filter((key) => key === 'lines' ? coverage.get(file) >= 95 : branches.get(file) >= 90)
+        .map((key) => `${file} (${key})`)).sort();
   const failures = [];
   for (const [file, lines] of coverage) {
     if (!roster.includes(file)) continue;
@@ -203,7 +204,7 @@ const main = () => {
     `these ${EXEMPT_PATH} entries name no source module`, stale, 'Delete the stale exemptions.',
   ));
   if (redundant.length > 0) failures.push(block(
-    `these ${EXEMPT_PATH} entries are covered after all`, redundant, 'Delete the redundant exemptions.',
+    `these ${EXEMPT_PATH} entries are covered after all`, redundant, 'Delete the redundant exemption or floor.',
   ));
   if (failures.length > 0) {
     console.error(failures.join('\n'));
