@@ -1000,3 +1000,25 @@ test('new kaleidoscope instances retain the loaded authored symmetry default', a
   for (const preset of doc.preset_bank.presets)
     assert.equal(preset.values['mirror2.symmetry'], 'hexagonal-prism');
 });
+
+
+test('relabel rewrites an authored interpolation group', async () => {
+  const store = await makeStore({ mutate: (doc) => {
+    const parameter = doc.descriptor.parameters.find((p) => p.id === 'warp2.rotation');
+    parameter.interpolation.group = 'warp2.mix';
+  } });
+  assert.equal(store.relabel('warp2', 'warp').ok, true);
+  assert.equal(store.document().descriptor.parameters.find((p) => p.id === 'warp.rotation')
+    .interpolation.group, 'warp.mix');
+});
+
+
+test('new instances remap authored interpolation groups to their own labels', async () => {
+  const store = await makeStore({ mutate: (doc) => {
+    doc.descriptor.parameters.find((p) => p.id === 'warp2.rotation').interpolation.group = 'warp2.mix';
+  } });
+  const operator = store.chain().find((entry) => entry.label === 'warp2').operator;
+  assert.equal(store.replaceSpan(3, 0, [{ label: 'warp3', operator }]).ok, true);
+  assert.equal(store.document().descriptor.parameters.find((p) => p.id === 'warp3.rotation')
+    .interpolation.group, 'warp3.mix');
+});
