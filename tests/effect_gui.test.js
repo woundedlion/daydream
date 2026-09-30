@@ -2937,8 +2937,7 @@ test('a drag whose release never lands ends when the window loses focus', () => 
   assert.equal(controller.dragging, false);
   assert.deepEqual(h.dragTarget.listeners, [], 'the end listeners drain');
   assert.equal(h.panel.active().edits.activeDragEnds.size, 0);
-  assert.equal(h.gui().storedWrites.length > 0, true,
-    'the persistence the drag deferred still lands');
+  assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', 0.9]]);
 
   h.panel.sync();
 
