@@ -1,15 +1,15 @@
 Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
 
-Scope: These terms cover the Holosphere engine — the rendering engine, math,
-scan/raster, hardware drivers, and test harness. The visual effects, including
+Scope: These terms cover this repository's simulator and tool sources, and the
+Holosphere rendering engine, math, scan/raster, hardware drivers, and test
+harness. The visual effects, including
 their compiled form linked into the `holosphere_wasm.wasm` artifact distributed
 with this repository, are Copyright 2025 Gabriel Levy. All rights reserved.
 They are not covered by the license below — no rights to use, copy, modify, or
 distribute them are granted.
 
-Engine source exceptions represented in the distributed WASM:
-
-Exceptions outside `effects/`, each carrying its own terms in its own header:
+Holosphere source exceptions represented in the distributed WASM (all paths
+below refer to the Holosphere repository, not this repository):
 
 - `core/engine/effects_legacy.h` — retired effect sources, All Rights Reserved
   on the same terms as `effects/`.
