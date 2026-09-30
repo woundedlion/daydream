@@ -55,17 +55,22 @@ export const installFakeTimers = () => {
   const timers = [];
   /** @type {Map<object, FakeTimer>} */
   const pending = new Map();
+  const issued = new Set();
   globalThis.setTimeout = (fn, delay) => {
     const handle = { unref() {} };
     const timer = { fn, delay, handle };
     timers.push(timer);
+    issued.add(handle);
     pending.set(handle, timer);
     return handle;
   };
   // A handle armed before the swap belongs to the real timer queue, so hand it
   // back rather than silently dropping the cancellation.
   globalThis.clearTimeout = (handle) => {
-    if (pending.delete(handle)) return;
+    if (issued.has(handle)) {
+      pending.delete(handle);
+      return;
+    }
     realClearTimeout(handle);
   };
   const isPending = (timer) => pending.has(timer.handle);
