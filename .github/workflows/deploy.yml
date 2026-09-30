@@ -137,10 +137,7 @@ jobs:
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - name: Stage site from site_manifest.txt and verified engine assets
         run: node scripts/stage-site.mjs engine-bundle _site deployment-pair.json
-      # Pages derives a Content-Type from the served path, so an asset missing
-      # from the staged tree is served as a 404 page under the engine's name.
-      # That is the half of the check below that can be made before publishing,
-      # and it runs here rather than against the live site.
+      # Check staged engine assets before publishing.
       - name: Verify the staged engine assets
         run: |
           status=0
@@ -166,8 +163,7 @@ jobs:
       - id: deployment
         if: steps.current.outputs.current == 'true'
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
-      # A served Content-Type exists only once the site is published, so this
-      # confirms what the step above could only predict.
+      # Check the published engine MIME types.
       - name: Verify published engine MIME types
         if: steps.current.outputs.current == 'true'
         env:
