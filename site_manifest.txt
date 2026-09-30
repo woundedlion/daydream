@@ -69,6 +69,7 @@ tools/solids.html
 tools/solids.css
 tools/tools.css
 tools/tailwind.css
+src/shared/deadline.js
 src/shared/banner.js
 src/workbench/shader/chain_apply.js
 src/workbench/shader/chain_document_store.js

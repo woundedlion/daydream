@@ -3,7 +3,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-import { raceDeadline } from '../segments/module_warmer.js';
+import { raceDeadline } from '../shared/deadline.js';
 import { errorDetail, showFatalError } from '../shared/banner.js';
 
 // The vendored libraries index.html loads from the CDN, and the remedy for a

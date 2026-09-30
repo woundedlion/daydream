@@ -12,7 +12,7 @@
  * browser.
  */
 
-import { raceDeadline } from '../segments/module_warmer.js';
+import { raceDeadline } from '../shared/deadline.js';
 import { errorDetail } from '../shared/banner.js';
 import { displayAliasesDiverged, repointDisplayAliases } from '../engine/display_aliases.js';
 
