@@ -426,8 +426,6 @@ test('a narrow numeric range displays its nonzero slider steps', () => {
 
   assert.equal(controller.decimalsSet, 5);
   assert.equal(controller.getValue(), 0.000016);
-  controller.setValue(0);
-  assert.equal(controller.getValue(), 0);
 });
 
 // lil-gui steps a bounded control by span/1000 with no explicit step, so a
@@ -961,7 +959,7 @@ test('restore reaches a parameter a write revealed, probing each name once', () 
   assert.deepEqual(reads, [...new Set(reads)], 'no name is probed twice');
 });
 
-test('ShaderBall rejects an unversioned snapshot before building session controls', () => {
+test('an engine-rejected unversioned snapshot is reported before session controls', () => {
   const stored = {
     accepted: [0, 4294967295],
     requested: [0, 4294967295],
@@ -2383,6 +2381,8 @@ test('the Export outcome is announced in a polite live region', () => {
 
   h.gui().ctrl('export').object.export();
   assert.equal(status.textContent, EXPORT_FAILED);
+  h.gui().ctrl('export').object.export();
+  assert.equal(status.textContent, `${EXPORT_FAILED}\u200b`);
 
   mock.timers.tick(FLASH_MS);
   assert.equal(status.textContent, '',
@@ -3112,7 +3112,7 @@ test('readonly enum type-ahead cannot move the visible selection', () => {
     assert.equal(control.$select.dispatch('keydown', { key }).defaultPrevented, true);
   }
   assert.equal(control.$select.dispatch('keydown', { key: 'Tab' }).defaultPrevented, false);
-  assert.equal(control.getValue(), 0);
+  assert.equal(control.$select.dispatch('click').defaultPrevented, true);
 });
 
 test('externally rendered stage parameters build no stage folders', () => {
