@@ -234,9 +234,10 @@ test('snapToRationalRatio: a pair closing past the denominator cap still snaps',
  * rather than nothing, so the caller keeps a usable frequency.
  */
 test('snapToRationalRatio: an unsatisfiable range falls back to the closest ratio', () => {
-  const { snappedActiveC } =
-    snapToRationalRatio(6, 4, MAX_RATIONAL_TERM, { min: 1000, max: 2000 });
-  assert.equal(snappedActiveC, 6);
+  const result = snapToRationalRatio(4 * Math.PI, 4, 8, { min: -2000, max: -1000 });
+  assert.equal(result.snappedActiveC, 4 * (22 / 7));
+  assert.equal(result.m, 22);
+  assert.equal(result.n, 7);
 });
 
 /** Verifies the curve starts at (0, 1, 0) when t=0 (sin(0)=0, cos(0)=1). */
