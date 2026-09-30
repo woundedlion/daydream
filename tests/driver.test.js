@@ -1869,3 +1869,15 @@ test('cap slider changes bound the matrix cache and update live placement', () =
   });
   assert.equal(ctx.matrixCache.size, 0);
 });
+
+
+test('render shows axes and labels before the inset view', () => {
+  const log = [];
+  const ctx = renderCtx(new Uint16Array(4), log);
+  ctx.labelAxes = true;
+  ctx.labelPool.activeCount = 1;
+  Daydream.prototype.render.call(ctx, null);
+  for (const axis of [ctx.xAxis, ctx.yAxis, ctx.zAxis]) assert.equal(axis.visible, true);
+  assert.ok(log.indexOf('refreshLabels') < log.indexOf('labelRenderer.render'));
+  assert.ok(log.indexOf('labelRenderer.render') < log.indexOf('renderPip'));
+});
