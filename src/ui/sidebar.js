@@ -184,7 +184,7 @@ export class EffectSidebar {
       btn.tabIndex = -1; // roving tabindex
       btn.dataset.effect = name;
       btn.setAttribute('aria-label', `${name}, ${presetCount} preset${presetCount === 1 ? '' : 's'}`
-        + (size > 0 ? `, code size ${formatKB(size)} KiB` : ''));
+        + (size > 0 ? `, object size ${formatKB(size)} KiB` : ''));
 
       const nameSpan = this.doc.createElement('span');
       nameSpan.className = 'effect-name';
