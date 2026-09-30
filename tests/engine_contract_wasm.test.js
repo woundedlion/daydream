@@ -1118,6 +1118,7 @@ test('the full-config accessors answer as the workbench panel assumes', () => {
 });
 
 test('schema 10 snapshots migrate the rendered palette mapping and discard its duplicate', () => {
+  assert.ok(resolutionOk(engine.setResolution(288, 144)));
   assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
   assert.equal(engine.setParameter('Palette Mapping', 3), M.ParamSetResult.APPLIED);
   const current = engine.getFullConfigSnapshot();
