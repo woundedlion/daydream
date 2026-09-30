@@ -1605,6 +1605,11 @@ test('space pauses and resumes, dropping any queued step on resume', () => {
   // Space also scrolls the page on the mobile layout.
   assert.equal(pause.prevented, true);
 
+  const repeated = { ...keyEvent(' '), repeat: true };
+  Daydream.prototype.keydown.call(ctx, repeated);
+  assert.equal(ctx.paused, true);
+  assert.equal(repeated.prevented, true);
+
   Daydream.prototype.keydown.call(ctx, keyEvent(' '));
   assert.equal(ctx.paused, false);
   assert.equal(ctx.stepFrames, 0, 'a queued step survived the resume');

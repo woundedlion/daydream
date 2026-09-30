@@ -448,9 +448,10 @@ export class Daydream {
     // Cmd+Space among them — so no playback shortcut claims one.
     if (e.altKey || e.ctrlKey || e.metaKey) return;
     if (e.key === ' ') {
+      e.preventDefault();
+      if (e.repeat) return;
       this.paused = !this.paused;
       if (!this.paused) this.stepFrames = 0;
-      e.preventDefault(); // else Space also scrolls the page on the mobile layout
     } else if (this.paused && e.key === "ArrowRight") {
       this.stepFrames++;
       e.preventDefault();
