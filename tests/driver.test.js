@@ -1863,7 +1863,7 @@ test('cap slider changes bound the matrix cache and update live placement', () =
   for (let cap = 1; cap < 100; cap++) {
     const matrixVersion = ctx.dotMesh.instanceMatrix.version;
     Daydream.prototype.setDisplayGeometry.call(ctx, {
-      DISPLAY_PROFILE: 1, DISPLAY_NORTH_PHI: cap / 1000,
+      DISPLAY_NORTH_PHI: cap / 1000,
       DISPLAY_SOUTH_PHI: Math.PI - cap / 1000,
     });
     assert.ok(ctx.dotMesh.instanceMatrix.version > matrixVersion);
@@ -1874,7 +1874,7 @@ test('cap slider changes bound the matrix cache and update live placement', () =
   assert.ok(dotAt(ctx, 0).distanceTo(dotAt(ctx, 4)) > 3);
   ctx.dotMesh = null;
   Daydream.prototype.setDisplayGeometry.call(ctx, {
-    DISPLAY_PROFILE: 0, DISPLAY_NORTH_PHI: 0, DISPLAY_SOUTH_PHI: Math.PI,
+    DISPLAY_NORTH_PHI: 0, DISPLAY_SOUTH_PHI: Math.PI,
   });
   assert.equal(ctx.matrixCache.size, 0);
 });
