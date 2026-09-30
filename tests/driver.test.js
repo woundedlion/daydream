@@ -1817,8 +1817,9 @@ test('dot shader injection uses the current Three chunk and refuses a missing on
   Daydream.prototype.setupDots.call(ctx);
   const shader = { uniforms: {}, vertexShader: THREE.ShaderLib.basic.vertexShader };
   ctx.dotMaterial.onBeforeCompile(shader);
-  assert.equal(shader.uniforms.uCameraPos, ctx.cullUniforms.uCameraPos);
-  assert.match(shader.vertexShader, /uColumnFillArc/);
+  for (const name of ['uCameraPos', 'uCullThreshold', 'uColumnFillArc'])
+    assert.equal(shader.uniforms[name], ctx.cullUniforms[name]);
+  assert.match(shader.vertexShader, /transformed\.x \+= sign\(transformed\.x\) \* ext/);
   assert.match(shader.vertexShader, /instanceColor/);
   assert.throws(() => ctx.dotMaterial.onBeforeCompile({ uniforms: {}, vertexShader: 'void main() {}' }),
     /missing the begin_vertex chunk/);
