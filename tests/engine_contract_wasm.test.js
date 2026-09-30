@@ -15,7 +15,7 @@ import {
   DEFINED_SEED_CONSTANTS, applyOp, meshOpFailure, MESH_OP_RESULT_NAMES,
 } from '../src/workbench/solids/solid_codegen.js';
 import {
-  ENGINE_METHODS, ENGINE_OPTIONAL_METHODS, ParamSetResult, ClipSetResult,
+  FakeChainEngine, ENGINE_METHODS, ENGINE_OPTIONAL_METHODS, ParamSetResult, ClipSetResult,
   ResolutionSetResult, EffectSetResult, FullConfigRestoreResult, ChainStatus,
 } from './helpers/fake_engine.js';
 import { isViewLive, refreshPixelView } from '../src/renderer/pixel_view.js';
@@ -321,14 +321,19 @@ test('setShaderChain applies a chain, registers label.field params and bumps the
 });
 
 test('chain refusal statuses match the fake engine payload contracts', () => {
+  const fake = new FakeChainEngine();
+  fake.setEffect('ShaderChain');
   assert.equal(engine.setEffect('ShaderChain'), M.EffectSetResult.INSTALLED);
-  assert.equal(engine.setShaderChain([]).status, M.ChainStatus.EMPTY);
-  assert.equal(engine.setShaderChain(Array.from({ length: 33 }, () => ({}))).status,
-    M.ChainStatus.TOO_LONG);
+  const max = JSON.parse(M.HolosphereEngine.getShaderChainCatalog()).budgets.max_chain_ops;
   const duplicate = { instance: 'same', operator: 'sphere.rotate.v2' };
-  assert.equal(engine.setShaderChain([duplicate, duplicate]).status, M.ChainStatus.DUPLICATE_INSTANCE);
+  const payloads = [null, [null], [duplicate, null], [],
+    Array.from({ length: max + 1 }, () => ({})), [duplicate, duplicate]];
+  const plain = ({ status, code, entryIndex }) => ({ status: status.value, code, entryIndex });
+  for (const payload of payloads)
+    assert.deepEqual(plain(engine.setShaderChain(payload)), plain(fake.setShaderChain(payload)));
   assert.equal(engine.setEffect('Comets'), M.EffectSetResult.INSTALLED);
-  assert.equal(engine.setShaderChain([]).status, M.ChainStatus.NOT_CHAIN_EFFECT);
+  fake.setEffect('Comets');
+  assert.deepEqual(plain(engine.setShaderChain([])), plain(fake.setShaderChain([])));
 });
 
 test('chain preset batches restore cross-field values and refuse singular edits without storing them', () => {
