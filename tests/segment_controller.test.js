@@ -1754,13 +1754,19 @@ test('the boundary setter re-composites and invalidates a paused held generation
     'each visible change flags one upload');
 });
 
-test('the boundary setter composites nothing when the pool owns no display', () => {
+test('the boundary setter composites nothing when the pool owns no display', async () => {
   driver.W = 4; driver.H = 2;
   driver.pixels = new Uint16Array(4 * 2 * 3).fill(77);
 
   // Inactive controller: the single main-thread engine owns the display buffer.
   const c = readyController(2);
 
+  await publishGeneration(c, [
+    { pixels: new Uint16Array(12).fill(111), x0: 0, x1: 2, y0: 0, y1: 2 },
+    { pixels: new Uint16Array(12).fill(222), x0: 2, x1: 4, y0: 0, y1: 2 },
+  ]);
+  assert.equal(c.hasPublishedFrame(), true);
+  assert.equal(c.active, false);
   c.showBoundaries = true;
 
   assert.equal(driver.pixels[idx(0, 0, 4)], 77,
