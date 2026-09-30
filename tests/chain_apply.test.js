@@ -108,11 +108,11 @@ test('an enum8 value is written as its option index from the fresh definitions',
 });
 
 test('the named preset is the one applied', () => {
-  const first = harness();
-  assert.equal(first.run(compiledDocument(
-    { 'sample.speed': 0.1 }, { 'sample.speed': 0.9 }), 'dusk'), null);
-  assert.deepEqual(first.engine.writes, [['sample.speed', 0.9]]);
-
+  for (const [preset, value] of [['noon', 0.1], ['dusk', 0.9]]) {
+    const h = harness();
+    assert.equal(h.run(compiledDocument({ 'sample.speed': 0.1 }, { 'sample.speed': 0.9 }), preset), null);
+    assert.deepEqual(h.engine.writes, [['sample.speed', value]]);
+  }
 });
 
 test('a setShaderChain refusal is surfaced verbatim and stops the apply', () => {
@@ -128,14 +128,12 @@ test('a setShaderChain refusal is surfaced verbatim and stops the apply', () => 
 });
 
 test('an entry-level refusal names the offending chain entry', () => {
-  const { run } = harness();
-  const compiled = compiledDocument({});
-  compiled.document.descriptor.chain[1] =
-    { label: 'project', operator: 'project.unknown.v9' };
-
-  const refusal = run(compiled);
-  assert.match(refusal, /UNKNOWN_OPERATOR/);
-  assert.match(refusal, /chain entry 1/);
+  for (const index of [0, 1]) {
+    const { run } = harness();
+    const compiled = compiledDocument({});
+    compiled.document.descriptor.chain[index] = { label: 'unknown', operator: 'project.unknown.v9' };
+    assert.match(run(compiled), new RegExp(`UNKNOWN_OPERATOR.*chain entry ${index}`));
+  }
 });
 
 test('a value the chain never registered still resyncs rebuilt definitions', () => {
@@ -193,7 +191,7 @@ test('a non-numeric value is refused before the first write', () => {
   assert.deepEqual(engine.writes, []);
 });
 
-test('every APPLIED bumps the generation and refreshes the definitions', () => {
+test('the fake chain engine advances generations after repeated application', () => {
   const { engine, run } = harness();
   const before = engine.getParamGeneration();
   assert.deepEqual(engine.getParameterDefinitions(), [],
@@ -205,7 +203,7 @@ test('every APPLIED bumps the generation and refreshes the definitions', () => {
     'an APPLIED setShaderChain must move the generation');
   assert.ok(engine.getParameterDefinitions()
     .some((definition) => definition.name === 'sample.pattern-freq'),
-  'the applied values were resolved against the post-APPLIED snapshot');
+  'the fake exposes definitions after accepting the chain');
 
   assert.equal(run(compiledDocument({ 'sample.pattern-freq': 5 })), null);
   assert.notEqual(engine.getParamGeneration(), after,
@@ -216,13 +214,14 @@ test('an inadmissible preset is submitted together and reports native refusal', 
   const { engine, order, run } = harness();
   const values = { 'sample.speed': 0.5, 'camera.wander': 0.75 };
   engine.setShaderChainParameters = (writes) => {
+    order.push('batch-refused');
     assert.deepEqual(writes, Object.entries(values).map(([name, value]) => ({ name, value })));
     return ParamSetResult.INADMISSIBLE;
   };
   engine.setParameter = () => { throw new Error('preset fields must be admitted together'); };
 
   assert.match(run(compiledDocument(values)), /preset: INADMISSIBLE/);
-  assert.deepEqual(engine.writes, []);
+  assert.deepEqual(order, ['setShaderChain', 'batch-refused', 'syncEffectGui', 'invalidate']);
   assert.deepEqual(order.slice(-2), ['syncEffectGui', 'invalidate']);
 });
 
