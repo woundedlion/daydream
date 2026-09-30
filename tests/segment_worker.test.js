@@ -461,10 +461,8 @@ test('render extracts only this segment quadrant from the canvas buffer', async 
   // Quadrant is the bottom-right 4x2 block: x in [4,8), y in [2,4).
   assert.deepEqual([frame.x0, frame.x1, frame.y0, frame.y1], [4, 8, 2, 4]);
 
-  // Source buffer uses the same encoding as FakeEngine.getPixels.
   const W = 8;
-  const src = new Uint16Array(W * 4 * 3);
-  for (let i = 0; i < src.length; i++) src[i] = (i * 7) & 0xffff;
+  const src = Uint16Array.from(engineInstance.getPixels());
   for (let ry = 0; ry < 2; ry++) {
     for (let rx = 0; rx < 4; rx++) {
       for (let c = 0; c < 3; c++) {
