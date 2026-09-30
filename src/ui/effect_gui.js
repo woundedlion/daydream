@@ -51,9 +51,6 @@ const EXPORT_ICON = '\u29c9';
 const RESET_ICON = '\u21ba';
 const PREVIOUS_ICON = '\u25c0';
 const NEXT_ICON = '\u25b6';
-// Panel control names an engine parameter cannot reuse. The action buttons are
-// functions and the preset selector is a session control, so none of those owns
-// a deep-link key; the pause toggle owns `pause`.
 const RESERVED_CONTROL_NAMES = new Set(['pause']);
 
 /**
@@ -145,10 +142,6 @@ export function addParamControl(
   controller.enumOptions = p.options;
   controller.isContinuous = (kind === 'number' || kind === 'integer');
   if (p.warning) {
-    // A visible node beside the control: a title attribute would put the text
-    // behind a hover no keyboard or touch user can reach. aria-invalid and
-    // aria-describedby go on the widget carrying the control's role, not on
-    // the wrapper it is drawn in.
     const widget = focusWidget(controller) ?? controller.domElement;
     const note = controller.domElement.ownerDocument.createElement('span');
     note.id = paramWarningId(p.name);
@@ -162,9 +155,6 @@ export function addParamControl(
   return controller;
 }
 
-// Collaborator members that must be callable, and those that stand in when the
-// caller leaves them out. host.dragTarget is an event target, not a function,
-// so it is checked apart.
 const ENGINE_MEMBERS = [
   'getParameterDefinitions', 'paramGeneration', 'paramValues', 'setParam',
   'setAnimationsPaused', 'animationsPaused', 'getPresetCount', 'getPresetIndex',
@@ -337,11 +327,6 @@ export function createEffectGui({ engine, segments, config, host }) {
    *   current parameter snapshot.
    */
   function liveParamValues() {
-    // The main engine's value stream describes whatever effect it last loaded;
-    // pairing it with a snapshot from an earlier load binds sliders to another
-    // effect's values, which equal parameter counts would hide. The main engine
-    // also owns the parameter definitions in segmented mode, even though segment
-    // 0 owns the live values, so this identity check precedes the source choice.
     if (activeEffect
         && paramGenerationStale(activeEffect.paramGeneration, paramGeneration())) {
       return null;
@@ -429,15 +414,9 @@ export function createEffectGui({ engine, segments, config, host }) {
   function sync(advanced = true) {
     if (!activeEffect || !activeEffect.controllerByName) return;
     const presetIndex = activeEffect.preset ? getPresetIndex() : null;
-    // Mirroring the preset can itself load a new schema, so the rebuild follows
-    // it — but a refusal must not gate the rebuild, which is what clears the
-    // stale schema a refusal comes from.
     const presetAdvanced = activeEffect.preset
       && activeEffect.preset.state.presetIndex !== presetIndex;
     const presetSynced = !activeEffect.preset || synchronizePreset(presetIndex);
-    // Where the parameters render is external state: adopting a document moves
-    // them onto the pipeline strip without moving the schema generation, so the
-    // mode is compared against the one the panel was built with.
     const filterStale =
       (paramFilter() !== null) !== (activeEffect.paramsExternal === true);
     const warningsStale = paramWarningsStale(activeEffect);
@@ -465,10 +444,6 @@ export function createEffectGui({ engine, segments, config, host }) {
     if (!values || values.length === 0) return;
 
     const names = activeEffect.paramNames;
-    // A names/values length skew means the cached param list drifted from the
-    // engine's value stream (e.g. a stale list after an async effect change);
-    // skip rather than silently mis-bind sliders by index, mirroring the Export
-    // action's check.
     if (paramValueSkew(names.length, values.length)) {
       if (!skewLogged) {
         logWarn(`Effect GUI: param/value length skew (${names.length} vs ${values.length}); skipping sync`);
@@ -544,8 +519,6 @@ export function createEffectGui({ engine, segments, config, host }) {
       return copyAndFlash(fx, JSON.stringify(snapshot, null, 2), flashExport);
     }
     let values = liveParamValues();
-    // The controller fallback needs one control per stream slot, which the
-    // selected-instance filter deliberately does not build.
     if ((!values || values.length === 0) && !fx.paramsExternal
         && !paramGenerationStale(fx.paramGeneration, paramGeneration())) {
       values = fx.paramNames.map((name) =>
@@ -583,8 +556,6 @@ export function createEffectGui({ engine, segments, config, host }) {
     actionRow.classList.add('effect-action-row');
     fx.gui.appendElement(actionRow);
     fx.actionRow = actionRow;
-    // The Export outcome is otherwise a glyph swap, which no screen reader
-    // announces. Out of flow, so it claims no action-row grid cell.
     const exportStatus = ownerDocument.createElement('span');
     exportStatus.className = 'visually-hidden';
     exportStatus.setAttribute('role', 'status');
@@ -616,9 +587,7 @@ export function createEffectGui({ engine, segments, config, host }) {
     const flashExport = (label) => {
       clearTimeout(fx.exportFlashTimer);
       presentAction(exportCtrl, label === EXPORT_COPIED ? '\u2713' : '\u2717', label);
-      // A live region re-announces a repeated message only after its text has
-      // changed. The revert empties it; a repeat inside the flash window instead
-      // alternates an inaudible zero-width marker.
+      // A changed live-region string re-announces repeated messages.
       exportStatus.textContent = exportStatus.textContent === label
         ? `${label}\u200B` : label;
       fx.exportFlashTimer = setTimeout(() => {
@@ -664,8 +633,6 @@ export function createEffectGui({ engine, segments, config, host }) {
           adoptPresetDisplay(fx, count, getPresetIndex());
           return false;
         }
-        // A preset rewrites every parameter, so it raises or clears warnings
-        // with no schema-generation move behind them.
         fx.warningsDirty = true;
         if (!usesFullConfigSnapshot()) {
           for (const parameter of getParameterDefinitions()) {
@@ -675,8 +642,6 @@ export function createEffectGui({ engine, segments, config, host }) {
         persistence.persist(fx.gui);
         adoptPresetDisplay(fx, count, index);
         adoptPauseDisplay(fx, engineAnimationsPaused() ?? true);
-        // The preset writes requested enum values with no simulation step behind
-        // it, which is the one source sync()'s stepped-frame gate does not cover.
         adoptRequestedEnums(fx, focusedElement() ?? null);
         return true;
       };
@@ -820,8 +785,6 @@ export function createEffectGui({ engine, segments, config, host }) {
    */
   function presentReadonlyParam(controller) {
     controller.domElement.classList.add('param-readonly');
-    // Capture phase, so it lands ahead of lil-gui's own keydown on the widget,
-    // which increments on an arrow key whatever attributes the widget carries.
     controller.domElement.addEventListener('keydown', (event) => {
       if (typeof event.key === 'string' && ((controller.$select && event.key.length === 1
           && !event.ctrlKey && !event.metaKey && !event.altKey) || event.key.startsWith('Arrow')
@@ -853,8 +816,6 @@ export function createEffectGui({ engine, segments, config, host }) {
     controller.name(stageControlLabel(stage, name));
     const widget = focusWidget(controller);
     if (!widget) return;
-    // lil-gui points the widget at the visible label; aria-labelledby wins over
-    // aria-label, so the shared label has to go.
     widget.removeAttribute('aria-labelledby');
     widget.setAttribute('aria-label', name);
   }
@@ -871,8 +832,6 @@ export function createEffectGui({ engine, segments, config, host }) {
    * @returns {void}
    */
   function addParamControllers(fx, params, pause, previousParamNames = null) {
-    // paramNames records the value-stream order; sync() binds by name, not
-    // index, so a C++ param reorder can't mis-bind sliders.
     const state = {};
     const external = paramFilter() !== null;
     // Fixed for the schema this build is committed to: no parameter write adds
@@ -906,14 +865,10 @@ export function createEffectGui({ engine, segments, config, host }) {
           stage, fx.gui.addDisplayFolder(stageTitles?.get(stage) ?? stage));
       }
     }
-    // Keyed by stage, not by folder title: a slot the user collapsed keeps its
-    // state across a rebuild that re-titles it from a new selector value.
     fx.stageFolders = stageFolders;
 
     params.forEach(p => {
-      // A param rendered elsewhere still claims its paramNames slot: the value
-      // stream is positional, so building no control must not shift the binding
-      // of the ones that stay.
+      // External controls still occupy slots in the positional value stream.
       if (external) {
         fx.paramNames.push(p.name);
         return;
@@ -995,8 +950,7 @@ export function createEffectGui({ engine, segments, config, host }) {
       if (reservedParams.length > 0) {
         logWarn(`Engine parameter names conflict with effect controls: ${reservedParams.join(', ')}`);
       }
-      // Stamp before controls are attached: URL replay can synchronously write
-      // engine params and make this snapshot stale, which the next sync must see.
+      // URL hydration can advance the generation while attaching controls.
       fx.paramGeneration = paramGeneration();
 
       addEffectActions(fx, params);
@@ -1050,9 +1004,6 @@ export function createEffectGui({ engine, segments, config, host }) {
     if (!previous) return false;
 
     const generation = `${paramGeneration()}:${paramFilter() !== null}`;
-    // A rebuild that already failed for this schema generation fails the same
-    // way every frame, so the retry waits for a new generation rather than
-    // allocating and discarding a panel at frame rate.
     if (rebuildFailureGeneration === generation) return false;
     const wasMounted = Boolean(previous.gui?.domElement?.parentNode);
     const captured = view.capture(previous);
@@ -1074,9 +1025,6 @@ export function createEffectGui({ engine, segments, config, host }) {
       return false;
     }
 
-    // URL replay for newly revealed controls may itself pause the engine. Read
-    // the actual state after all parameter callbacks, and update only the new
-    // toggle model while it is still detached so preservation emits no write.
     const actualPause = engineAnimationsPaused() ?? preservedPause;
     next.pause.setPaused(actualPause);
     next.animationPauseApplied = previous.animationPauseApplied;

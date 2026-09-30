@@ -9,8 +9,6 @@
  * holding it.
  */
 
-// Dwell time before a notice self-clears, so a stale rejection cannot outlive
-// the action that raised it.
 const APPLY_NOTICE_MS = 8000;
 
 /**
@@ -49,9 +47,6 @@ export function createApplyNotice({
   /** @type {string|null} */
   let held = null;
 
-  // Latched only once both elements are present, so markup that arrives after
-  // construction still gets its notices; the absence is reported once rather
-  // than dropping every rejection message unremarked.
   const resolve = () => {
     if (elements) return elements;
     const found = {
@@ -81,13 +76,6 @@ export function createApplyNotice({
     if (handle !== null) cancel(handle);
     handle = null;
     held = notice === null ? null : owner;
-    // Hidden content sits outside the accessibility tree, so the text has to
-    // land in an already-exposed body: unhide before writing, hide before
-    // clearing. Writing first leaves the unhide as the only mutation assistive
-    // tech sees, which is not reliably announced.
-    // Written only on a change: an accepted parameter write clears the notice
-    // per pointermove across a slider drag, and an unchanged attribute or
-    // textContent still costs an invalidation.
     const hidden = notice === null;
     const content = notice ?? '';
     if (body.hidden !== hidden) body.hidden = hidden;
@@ -95,9 +83,6 @@ export function createApplyNotice({
     if (notice !== null) handle = schedule(() => expire(owner), timeoutMs);
   };
 
-  // Hiding the body takes the dismiss button inside it out of the tree and drops
-  // keyboard focus to <body>, so the dwell is served again while the user stands
-  // on it. Only the self-clear waits; an explicit clear() is the user's own act.
   const expire = (/** @type {string|null} */ owner) => {
     if (elements?.body.contains?.(doc.activeElement)) {
       handle = schedule(() => expire(owner), timeoutMs);

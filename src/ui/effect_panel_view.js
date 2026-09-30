@@ -114,8 +114,6 @@ export function createEffectPanelView({ focusedElement, guiContainer, isMobile }
     if (captured.property !== null) {
       for (const [property, controller] of panelControllers(fx)) {
         if (property !== captured.property) continue;
-        // A rebuilt panel's control heights differ, so the default
-        // scroll-into-view would land the panel somewhere else.
         focusWidget(controller)?.focus?.({ preventScroll: true });
         break;
       }

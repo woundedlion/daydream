@@ -43,8 +43,6 @@ export class EffectSidebar {
   constructor(container, onSelect) {
     this.container = container;
     this.doc = container.ownerDocument;
-    // Observer and frame timers come from the container's own window; a
-    // detached document has no defaultView, leaving only the ambient one.
     this.win = this.doc?.defaultView ?? globalThis;
     this.onSelect = onSelect;
     /** @type {Map<string, HTMLButtonElement>} */
@@ -157,9 +155,6 @@ export class EffectSidebar {
    *   authored preset count; the displayed count has a minimum of 1.
    */
   setEffects(names, effectSizes, presetCounts) {
-    // Discarding the focused option drops focus to <body>, where the list's
-    // keydown handler no longer sees it and Space reaches the global one
-    // instead. Name it now; the rebuilt button carrying that name takes it back.
     const focused = /** @type {HTMLElement|null} */ (this.doc.activeElement);
     const refocusName = focused && this.listEl.contains(focused)
       ? (focused.dataset?.effect ?? '') : null;
@@ -209,9 +204,6 @@ export class EffectSidebar {
     this.setRovingTabbable(
       this.activeButton() || this.orderedButtons[0]
     );
-    // Only when focus was already in the list: a rebuild driven from elsewhere
-    // must not pull it out of whatever the user is on. An option that left the
-    // roster hands focus to the tab stop rather than off the list.
     if (refocusName !== null) {
       (this.buttons.get(refocusName) || this.tabbableBtn)?.focus();
     }
@@ -227,8 +219,6 @@ export class EffectSidebar {
    */
   setActive(name) {
     const newBtn = this.buttons.get(name);
-    // An off-list name has no button: keep the current selection rather than
-    // deselecting it and pointing activeName at a missing entry.
     if (!newBtn) return;
 
     const oldBtn = this.activeButton();
@@ -241,9 +231,6 @@ export class EffectSidebar {
     newBtn.classList.add('active');
     newBtn.setAttribute('aria-selected', 'true');
     this.setRovingTabbable(newBtn);
-    // Re-applying the live effect (Reset) selects the same node again; scrolling
-    // it would yank a mobile strip the user has scrolled elsewhere. A rebuilt
-    // roster hands over a fresh node, which is still scrolled into view.
     if (newBtn !== this.scrolledBtn) {
       this.scrolledBtn = newBtn;
       newBtn.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
@@ -423,8 +410,6 @@ export class EffectSidebar {
     const focused = /** @type {HTMLElement|null} */ (this.doc.activeElement);
     const idx = focused ? btns.indexOf(focused) : -1;
 
-    // Measuring the stride forces a style recalc, so it is held until a resize
-    // or a new roster invalidates it.
     this.gridStride ??= columnStride(this.listEl);
     const target = navTargetIndex(idx, btns.length, e.key, this.gridStride);
     if (target !== -1) {
