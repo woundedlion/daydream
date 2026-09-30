@@ -147,12 +147,13 @@ test('arena metrics come from the main engine only while it renders', () => {
 
 test('a segmented frame is capturable only once a composite has landed', () => {
   assert.equal(makeAdapter().adapter.captureReady(), true);
+  assert.equal(makeAdapter().adapter.captureReady(false), false);
   assert.equal(
     makeAdapter({ ownsDisplay: true, frameComposited: false }).adapter.captureReady(),
     false);
-  assert.equal(
-    makeAdapter({ ownsDisplay: true, frameComposited: true }).adapter.captureReady(),
-    true);
+  const pooled = makeAdapter({ ownsDisplay: true, frameComposited: true }).adapter;
+  assert.equal(pooled.captureReady(), true);
+  assert.equal(pooled.captureReady(), false);
 });
 
 /**
