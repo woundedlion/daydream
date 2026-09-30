@@ -790,6 +790,10 @@ test('pointer gestures never start a chip drag', async () => {
   assert.deepEqual(h.applied, []);
   assert.deepEqual(h.container.listeners.filter(
     (listener) => listener.type.startsWith('pointer')), []);
+  for (const chip of chips(h))
+    assert.deepEqual(chip.listeners.filter((listener) => listener.type.startsWith('pointer')), []);
+  assert.equal(h.doc.listenerCount('pointermove'), 0);
+  assert.equal(h.doc.listenerCount('pointerup'), 0);
 });
 
 test('a strip whose first render throws binds nothing to the mount', async () => {
