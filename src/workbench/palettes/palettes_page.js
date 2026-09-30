@@ -581,7 +581,7 @@ const sliderDefinitions = [
   { param: 'C_G', container: 'C_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: -5, max: 5, step: 0.001, scale: 1000, group: 'C' },
   { param: 'C_B', container: 'C_B_container', label: 'B', color: 'blue-300', thumb: '', min: -5, max: 5, step: 0.001, scale: 1000, group: 'C' },
   // D (Phase): Range [-1, 2] — a full period either side of [0, 1], so an
-  // engine phase past 1 (or a zoom-derived negative one) stays representable.
+  // engine phase past 1 (or a negative one) stays representable.
   { param: 'D_R', container: 'D_R_container', label: 'R', color: 'red-300', thumb: 'r-thumb', min: -1, max: 2, step: 0.001, scale: 1000, group: 'D' },
   { param: 'D_G', container: 'D_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: -1, max: 2, step: 0.001, scale: 1000, group: 'D' },
   { param: 'D_B', container: 'D_B_container', label: 'B', color: 'blue-300', thumb: '', min: -1, max: 2, step: 0.001, scale: 1000, group: 'D' }
@@ -696,7 +696,7 @@ function mountSlider(def) {
 
 /**
  * Updates all slider positions and value spans from the 'parameters' object.
- * Used after zooming or resetting zoom.
+ * Called when loading a named palette.
  */
 function updateAllSliders() {
   sliderDefinitions.forEach(def => {
