@@ -808,7 +808,11 @@ export function generateRecipeCpp(item, baseNamespace) {
  */
 export function snapToStep(value, def) {
   const snapped = def.min + Math.round((value - def.min) / def.step) * def.step;
-  return Math.min(def.max, Math.max(def.min, snapped));
+  const decimals = Math.max(0, ...[def.min, def.step].map((value) => {
+    const [fraction, exponent = '0'] = String(value).toLowerCase().split('e');
+    return (fraction.split('.')[1]?.length ?? 0) - Number(exponent);
+  }));
+  return Math.min(def.max, Math.max(def.min, Number(snapped.toFixed(Math.min(100, decimals)))));
 }
 
 /**
