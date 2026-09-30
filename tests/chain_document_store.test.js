@@ -987,3 +987,15 @@ test('editing an undeclared field backfills presets and policies atomically with
   store.redo();
   assert.deepEqual(store.document(), after);
 });
+
+
+test('new kaleidoscope instances retain the loaded authored symmetry default', async () => {
+  const store = await makeStore();
+  assert.deepEqual(store.replaceSpan(1, 0,
+    [{ label: 'mirror2', operator: 'sphere.lens.kaleidoscope.v2' }]), { ok: true });
+  const doc = store.document();
+  assert.equal(doc.descriptor.parameters.find((p) => p.id === 'mirror2.symmetry').default,
+    'hexagonal-prism');
+  for (const preset of doc.preset_bank.presets)
+    assert.equal(preset.values['mirror2.symmetry'], 'hexagonal-prism');
+});
