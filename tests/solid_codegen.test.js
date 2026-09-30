@@ -123,7 +123,7 @@ test('generateFuncAndRecipe emits the OP_DEFS params of every known op', () => {
     for (const [key, def] of defs) {
       const moved = generateFuncAndRecipe(
         { base: 'cube', ops: [{ op, params: { ...defaults, [key]: offDefault(def) } }] });
-      assert.notDeepEqual(moved, base,
+      assert.notDeepEqual(moved.recipe, base.recipe,
         `generateFuncAndRecipe ignores "${key}" of "${op}"`);
     }
   }
