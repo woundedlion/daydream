@@ -719,6 +719,9 @@ test('segmented controls reconcile a mobile spawn and resize without a second po
 });
 
 test('the segmented controls have their own notice owner', () => {
+  const owners = [...SOURCE.matchAll(/const \w+_NOTICE = '([^']+)'/g)].map((match) => match[1]);
+  assert.ok(owners.length > 1);
+  assert.equal(new Set(owners).size, owners.length);
   // The call site, not the definition above it: the owner tag is the root's.
   const at = SOURCE.lastIndexOf('createSegmentedPovControls(');
   assert.ok(at >= 0, 'the segmented controls must stay wired to their factory');
