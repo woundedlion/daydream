@@ -36,14 +36,7 @@ const globPattern = (glob) => {
   }
   return new RegExp(`${pattern}$`);
 };
-const globSpecs = globs.map((glob) => {
-  const parts = glob.split('/');
-  const globAt = parts.findIndex((part) => part.includes('*'));
-  return {
-    dir: globAt <= 0 ? '.' : parts.slice(0, globAt).join('/'),
-    pattern: globPattern(glob),
-  };
-});
+const globSpecs = globs.map((glob) => ({ pattern: globPattern(glob) }));
 const skipDirs = new Set(['.git', '.worktrees', 'three.js', 'vendor', 'engine']);
 const testShape = /\.(?:test|spec)\.m?js$/;
 const tracked = String(execFileSync('git', ['ls-files', '-z']))
