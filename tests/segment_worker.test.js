@@ -94,6 +94,8 @@ class FakeEngine {
     return EffectSetResult.INSTALLED;
   }
   setParameter(name, value) {
+    this.calls.push(['setParameter', name, value]);
+    if (this.paramResult === ParamSetResult.APPLIED) this.paused = true;
     this.params.push([name, value]);
     return this.paramResult;
   }
@@ -942,19 +944,20 @@ test('setEffect restores ShaderBall snapshot after rebuilding', async () => {
   ]);
 });
 
-test('setEffect re-applies pause after rebuilding the worker engine', async () => {
+for (const paused of [false, true]) test(`setEffect restores pause=${paused} after parameter replay`, async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
   await dispatch({
-    type: 'setEffect', name: 'Waves', paused: true,
+    type: 'setEffect', name: 'Waves', paused,
     params: [{ name: 'Freq', value: 0.25 }],
   });
 
   assert.equal(engineInstance.effect, 'Waves');
   assert.deepEqual(engineInstance.params, [['Freq', 0.25]]);
-  assert.equal(engineInstance.paused, true);
-  assert.deepEqual(engineInstance.calls.slice(-2), [
+  assert.equal(engineInstance.paused, paused);
+  assert.deepEqual(engineInstance.calls.slice(-3), [
     ['setEffect', 'Waves'],
-    ['setAnimationsPaused', true],
+    ['setParameter', 'Freq', 0.25],
+    ['setAnimationsPaused', paused],
   ]);
 });
 
