@@ -604,6 +604,7 @@ test('a seeded hankin angle agrees across the control, the funcName and the reci
  * away at 54 and 73 degrees, both of which solids.h ships.
  */
 test('the preview converts a hankin angle in the float precision the paste uses', () => {
+  assert.equal(new Uint32Array(new Float32Array([D2R_F32]).buffer)[0], 0x3c8efa35);
   for (const angle of [54, 73]) {
     const calls = [];
     applyOp(stubMesh(calls), { op: 'hankin', params: { angle } });
