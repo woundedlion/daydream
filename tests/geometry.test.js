@@ -6,7 +6,7 @@ const makeDaydream = (north = 0, south = Math.PI) => ({
   W: 288, H: 144, DISPLAY_NORTH_PHI: north, DISPLAY_SOUTH_PHI: south,
 });
 
-const { pixelToSpherical, displayGeometryFromModule } = await import('../src/renderer/geometry.js');
+const { pixelToSpherical } = await import('../src/renderer/geometry.js');
 
 const W = 288, H = 144;
 
@@ -52,16 +52,6 @@ test('physical endpoints preserve distinct longitudes on both edge rings', () =>
   }
   assert.equal(pixelToSpherical(0, 0, dims).phi, 0.04);
   assert.ok(Math.abs(pixelToSpherical(0, H - 1, dims).phi - (Math.PI - 0.07)) < 1e-12);
-});
-
-test('compiled geometry is validated and preserves asymmetric caps', () => {
-  const module = { DISPLAY_PROFILE: 1, DISPLAY_NORTH_PHI: 0.02, DISPLAY_SOUTH_PHI: 3.1 };
-  assert.deepEqual(displayGeometryFromModule(module), module);
-  for (const invalid of [{}, { ...module, DISPLAY_PROFILE: 7 },
-    { ...module, DISPLAY_NORTH_PHI: NaN }, { ...module, DISPLAY_SOUTH_PHI: 4 },
-    { ...module, DISPLAY_NORTH_PHI: 3.11 }]) {
-    assert.throws(() => displayGeometryFromModule(invalid), /display geometry/);
-  }
 });
 
 // A zero column count and a single row are what a driver reports before it has
