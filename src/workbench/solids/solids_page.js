@@ -1285,6 +1285,7 @@ function addOp(opName) {
 
 function resetOps() {
   queueCommit(async () => {
+    if (state.ops.length > 1 && !window.confirm(`Clear all ${state.ops.length} operations?`)) return;
     setOps([]);
     renderOps();
     update();
