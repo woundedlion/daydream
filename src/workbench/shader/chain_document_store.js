@@ -9,10 +9,10 @@ const COMPILER_URL = new URL('../../../generated/shader/shader_workbench.mjs', i
 // Mirror of the compiler's LABEL_PATTERN (generated/shader/shader_workbench.mjs).
 const LABEL_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
-/** @typedef {{id: string, name: string, min: number, max: number, default: *, curve?: string, topology?: false}} CatalogNumericField */
+/** @typedef {{id: string, name: string|null, min: number, max: number, default: *, curve?: string, topology?: false}} CatalogNumericField */
 /** @typedef {{id: string, topology: true, values: string[], default: *}} CatalogTopologyField */
 /** @typedef {CatalogNumericField|CatalogTopologyField} CatalogField */
-/** @typedef {{id: string, name: string, input: string, output: string, blocks?: *, params: CatalogField[]}} CatalogOperator */
+/** @typedef {{id: string, name: string|null, input: string, output: string, blocks?: *, params: CatalogField[]}} CatalogOperator */
 /** @typedef {{label: string, operator: string}} ChainEntry */
 /** @typedef {{label?: string, operator: string}} ChainEdit */
 /** @typedef {{severity: string, phase: string, code: string, path: string, message: string}} Diagnostic */
