@@ -28,7 +28,7 @@ test('the staged import map resolves both libraries locally', () => {
 });
 
 test('the committed import map is untouched by staging', () => {
-  const committed = readFileSync('vendor-importmap.js', 'utf8');
+  const committed = readFileSync(new URL('../vendor-importmap.js', import.meta.url), 'utf8');
   assert.match(committed, /const VENDOR = \{ three: 'cdn', lilGui: 'cdn' \};/,
     'the deploy serves this file; a local block would 404 on Pages');
 });
