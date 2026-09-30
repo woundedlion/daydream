@@ -383,6 +383,7 @@ test('paletteCompileError names the engine enumerators', () => {
  * of the mask would drop them.
  */
 test('paletteAdjustmentSummary names every adjusted field', () => {
+  setPaletteOps(null, paletteEnums);
   assert.equal(paletteAdjustmentSummary(
     { wrappedFields: 0, clampedFields: 0, canonicalizedFields: 0 }), '');
   assert.equal(paletteAdjustmentSummary({}), '');
