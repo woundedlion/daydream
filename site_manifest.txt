@@ -113,6 +113,7 @@ generated/shader/shader_workbench.mjs
 generated/shader/engine_catalog.json
 generated/shader/patterns/shaderball_migration.json
 src/workbench/shader/patterns/digest_migration.v1v2.json
+generated/shader/patterns/example.shader.json
 generated/shader/patterns/alien_ocean.shader.json
 generated/shader/patterns/grid_space.shader.json
 generated/shader/patterns/cosmic_eyeball.shader.json
