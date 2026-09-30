@@ -1,3 +1,4 @@
+import { engineRoot, engineMissing, engineSkip } from './helpers/engine_checkout.js';
 //
 // Source-text parity between the browser tools' hand-transcribed engine values
 // and the C++ headers they are transcribed from.
@@ -18,22 +19,17 @@ import * as paletteEnums from './helpers/fake_palette.js';
 import { test } from 'node:test';
 import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+const REPO = fileURLToPath(new URL('..', import.meta.url));
 import { closingDomain, lissajousCodeString } from '../src/workbench/lissajous/lissajous_math.js';
 import * as MB from '../src/workbench/mobius/mobius_transforms.js';
 import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS } from '../src/workbench/solids/solid_codegen.js';
 import { MAX_BUILD_FACES, MAX_BUILD_STEPS, upperSnake, primitiveCount } from '../src/workbench/solids/solid_registry_codegen.js';
 
-const REPO = fileURLToPath(new URL('..', import.meta.url));
-const engineCandidates = process.env.HOLOSPHERE_ENGINE_DIR
-  ? [resolve(REPO, process.env.HOLOSPHERE_ENGINE_DIR)]
-  : ['engine', '../Holosphere', '../pov'].map((path) => resolve(REPO, path));
-const engineRoot = engineCandidates.find(
-  (path) => existsSync(resolve(path, 'scripts/shader_workbench.mjs')));
-const engineMissing = `no Holosphere checkout found in ${engineCandidates.join(', ')}`;
-const engineSkip = engineRoot || process.env.HOLOSPHERE_ENGINE_REQUIRED ? false : engineMissing;
+
 
 const enginePin = readFileSync(new URL('../generated/holosphere_wasm.sha', import.meta.url), 'utf8').trim();
 
