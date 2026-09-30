@@ -7,7 +7,7 @@
  * Hold cap percentages until the engine loads and publish accepted geometry.
  * @param {{getEngine: () => Pick<import('../../generated/holosphere_wasm.js').HolosphereEngine,
  *   'setDisplayCaps'|'getDisplayNorthPhi'|'getDisplaySouthPhi'>|null,
- *   onChange: (geometry: {DISPLAY_PROFILE:number, DISPLAY_NORTH_PHI:number,
+ *   onChange: (geometry: {DISPLAY_NORTH_PHI:number,
  *   DISPLAY_SOUTH_PHI:number}) => void}} deps
  * @returns {{state: {topCap: number, bottomCap: number}, apply: () => boolean,
  *   replay: () => boolean}} Control state and its engine binding.
@@ -22,7 +22,6 @@ export function createDisplayCapsBinding({ getEngine, onChange }) {
     if (!engine) return true;
     if (!engine.setDisplayCaps(state.topCap, state.bottomCap)) return false;
     onChange({
-      DISPLAY_PROFILE: state.topCap === 0 && state.bottomCap === 0 ? 0 : 1,
       DISPLAY_NORTH_PHI: engine.getDisplayNorthPhi(),
       DISPLAY_SOUTH_PHI: engine.getDisplaySouthPhi(),
     });

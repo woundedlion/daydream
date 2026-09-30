@@ -187,7 +187,6 @@ function fakeWasmModule({
   const caps = [];
   const params = [];
   const module = {
-    DISPLAY_PROFILE: 0,
     DISPLAY_NORTH_PHI: 0,
     DISPLAY_SOUTH_PHI: Math.PI,
     HS_MODULE_DEAD: false,
@@ -922,7 +921,6 @@ for (const optionsReplaces of [false, true]) {
 test('a trapped resolution query stops the startup instead of booting on', async () => {
   let built = 0;
   const module = {
-    DISPLAY_PROFILE: 0,
     DISPLAY_NORTH_PHI: 0,
     DISPLAY_SOUTH_PHI: Math.PI,
     HS_MODULE_DEAD: false,
@@ -1020,13 +1018,11 @@ test('a refused parameter write reports its reason and a later accepted edit cle
 test('startup defaults to full coverage despite compiled physical geometry', async () => {
   const module = fakeWasmModule();
   Object.assign(module, {
-    DISPLAY_PROFILE: 1,
     DISPLAY_NORTH_PHI: 0.02 * Math.PI,
     DISPLAY_SOUTH_PHI: 0.98 * Math.PI,
   });
   const app = await bootedApp({ loadModule: () => Promise.resolve(module) });
   assert.deepEqual(module.caps, [[0, 0]]);
-  assert.equal(app.driver.DISPLAY_PROFILE, 0);
   assert.equal(app.driver.DISPLAY_NORTH_PHI, 0);
   assert.equal(app.driver.DISPLAY_SOUTH_PHI, Math.PI);
 });

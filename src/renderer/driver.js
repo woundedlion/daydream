@@ -165,7 +165,6 @@ export class Daydream {
 
     this.W = Daydream.DEFAULT_W;
     this.H = Daydream.DEFAULT_H;
-    this.DISPLAY_PROFILE = 0;
     this.DISPLAY_NORTH_PHI = 0;
     this.DISPLAY_SOUTH_PHI = Math.PI;
     this.DOT_SIZE = Daydream.DEFAULT_DOT_SIZE;
@@ -940,7 +939,7 @@ export class Daydream {
 
   /**
    * Apply LED-center latitudes and discard placements from the previous profile.
-   * @param {{DISPLAY_PROFILE:number, DISPLAY_NORTH_PHI:number, DISPLAY_SOUTH_PHI:number}} geometry
+   * @param {{DISPLAY_NORTH_PHI:number, DISPLAY_SOUTH_PHI:number}} geometry
    * @returns {void}
    */
   setDisplayGeometry(geometry) {
