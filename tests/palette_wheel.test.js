@@ -311,8 +311,11 @@ test('a selection past the end of a shorter key set highlights its last key', ()
 });
 
 test('the wheel caps display density at two and caches the resized raster', (t) => {
-  const previous = globalThis.devicePixelRatio;
-  t.after(() => { globalThis.devicePixelRatio = previous; });
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'devicePixelRatio');
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, 'devicePixelRatio', previous);
+    else delete globalThis.devicePixelRatio;
+  });
   globalThis.devicePixelRatio = 3;
   const { painter, canvas, ctx } = wheelSetup(256);
   canvas.clientWidth = 136;
