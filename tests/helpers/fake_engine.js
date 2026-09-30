@@ -143,11 +143,13 @@ export class FakeChainEngine {
     /** @type {?{code: string, entryIndex: number}} Injected next refusal. */
     this.nextChainResult = null;
     this.definitions = [];
+    this.paused = false;
   }
 
   setEffect(name) {
     this.effect = name;
     this.definitions = [];
+    this.paused = false;
     this.generation += 1;
     return EffectSetResult.INSTALLED;
   }
@@ -183,12 +185,14 @@ export class FakeChainEngine {
       for (const field of operator.params) {
         const base = {
           name: `${entry.instance}.${field.id}`,
-          animated: false, readonly: false, preset: true,
+          animated: true, readonly: false, preset: true,
         };
-        definitions.push(field.topology
-          ? { ...base, value: field.values.indexOf(field.default),
-              min: 0, max: field.values.length - 1, options: [...field.values] }
-          : { ...base, value: field.default, min: field.min, max: field.max });
+        const value = field.topology ? field.values.indexOf(field.default) : Math.fround(field.default);
+        definitions.push({ ...base, value, requestedValue: value, acceptedValue: value,
+          ...(field.topology
+            ? { min: 0, max: field.values.length - 1, step: 1, options: [...field.values] }
+            : { min: Math.fround(field.min), max: Math.fround(field.max) }),
+        });
       }
     }
     this.definitions = definitions;
@@ -208,7 +212,12 @@ export class FakeChainEngine {
     if (!definition) return ParamSetResult.UNKNOWN_PARAM;
     if (typeof value !== 'number' || !Number.isFinite(value))
       return ParamSetResult.NON_FINITE;
-    definition.value = value;
+    const accepted = Math.fround(Math.max(definition.min, Math.min(definition.max,
+      definition.options ? Math.trunc(value) : value)));
+    definition.value = accepted;
+    definition.requestedValue = accepted;
+    definition.acceptedValue = accepted;
+    this.paused = true;
     this.writes.push([name, value]);
     return ParamSetResult.APPLIED;
   }
@@ -228,11 +237,13 @@ export class FakeChainEngine {
         return ParamSetResult.NON_FINITE;
     }
     for (const { name, value } of writes) {
-      this.definitions.find((definition) => definition.name === name).value = value;
-      this.writes.push([name, value]);
+      this.setParameter(name, value);
     }
     return ParamSetResult.APPLIED;
   }
+
+  getAnimationsPaused() { return this.paused; }
+  setAnimationsPaused(paused) { this.paused = paused; }
 
   getParamGeneration() {
     return this.generation;

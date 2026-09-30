@@ -321,6 +321,32 @@ test('setShaderChain applies a chain, registers label.field params and bumps the
     'the applied chain must render a nonzero frame');
 });
 
+test('applied chain definitions and parameter pause behavior match the fake engine', () => {
+  const fake = new FakeChainEngine();
+  engine.setEffect('ShaderChain');
+  fake.setEffect('ShaderChain');
+  assert.equal(engine.setShaderChain(DEFAULT_CHAIN).code, 'APPLIED');
+  assert.equal(fake.setShaderChain(DEFAULT_CHAIN).code, 'APPLIED');
+  assert.deepEqual(fake.getParameterDefinitions(), engine.getParameterDefinitions());
+  for (const [method, args] of [
+    ['setParameter', ['camera.wander', 0.2]],
+    ['setParameter', ['sample.coverage-mode', 2]],
+    ['setShaderChainParameters', [[{ name: 'sample.pattern-freq', value: 1.3 }]]],
+  ]) {
+    engine.setAnimationsPaused(false);
+    fake.setAnimationsPaused(false);
+    assert.equal(fake[method](...args).value, engine[method](...args).value);
+    assert.equal(engine.getAnimationsPaused(), true);
+    assert.equal(fake.getAnimationsPaused(), engine.getAnimationsPaused());
+    assert.deepEqual(fake.getParameterDefinitions(), engine.getParameterDefinitions());
+  }
+  for (const target of [engine, fake]) {
+    target.setAnimationsPaused(false);
+    target.setParameter('missing', 1);
+    assert.equal(target.getAnimationsPaused(), false);
+  }
+});
+
 test('chain refusal statuses match the fake engine payload contracts', () => {
   const fake = new FakeChainEngine();
   fake.setEffect('ShaderChain');
