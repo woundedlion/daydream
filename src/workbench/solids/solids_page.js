@@ -31,7 +31,7 @@ import {
   createOpGate,
 } from './solid_codegen.js';
 import { buildBaseMesh, buildChainMesh } from './solid_build.js';
-import { generateRegistryCpp, MAX_RECIPE_STEPS } from './solid_registry_codegen.js';
+import { generateRegistryCpp, validateRegistryFaces, MAX_RECIPE_STEPS } from './solid_registry_codegen.js';
 import { buildOpRow, formatParamValue, syncSweepWarning } from './solid_op_rows.js';
 import { createMeshRenderer, meshStatsLine, meshCanvasLabel, MAX_INDEX_LABELS }
   from './solid_render.js';
@@ -857,6 +857,7 @@ async function copyCode(index, lang, btn) {
     if (lang === 'recipe_cpp') {
       code = generateRecipeCpp(item, seedNs);
     } else if (lang === 'registry') {
+      await validateRegistryFaces(validator, item, baseRecipe);
       code = generateRegistryCpp(item, baseRecipe);
     } else {
       console.warn("Unsupported export type.");

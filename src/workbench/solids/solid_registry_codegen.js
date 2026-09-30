@@ -14,6 +14,7 @@
  */
 
 import {
+  applyOp,
   CATALAN_BASES,
   D2R_F32,
   DEFINED_SEED_CONSTANTS,
@@ -35,6 +36,56 @@ const DOUBLE_STEP_OPS = new Set(['gyro', 'needle', 'zip', 'bevel']);
 /** @param {string} op @returns {number} Lowered primitive count. */
 export function primitiveCount(op) {
   return op === 'meta' ? 3 : DOUBLE_STEP_OPS.has(op) ? 2 : 1;
+}
+
+/**
+ * @param {import('./solid_codegen.js').ChainValidator} validator
+ * @param {import('./solid_codegen.js').SolidSpec} item
+ * @param {?{seed:string, ops:Array<{op:string,param:number,twist:number}>}} baseRecipe
+ * @returns {Promise<void>} Resolves when every primitive endpoint fits.
+ */
+export async function validateRegistryFaces(validator, item, baseRecipe = null) {
+  await validator.withValidator((mod) => {
+    if (!mod) throw new Error('Registry validation engine unavailable');
+    const ops = [
+      ...(baseRecipe?.ops ?? []).map(({ op, param, twist }) => ({ op, params: {
+        t: param, angle: param / D2R_F32, iter: param, twist,
+      } })),
+      ...item.ops,
+    ];
+    let mesh = null;
+    try {
+      mesh = mod.MeshOps.fromSolidName(baseRecipe?.seed ?? item.base);
+      const check = () => {
+        if (!mesh) throw new Error('Registry mesh was rejected');
+        const faces = mesh.getFaces().counts.length;
+        if (faces > MAX_BUILD_FACES)
+          throw new Error(`Registry endpoint has ${faces} faces; maximum is ${MAX_BUILD_FACES}`);
+      };
+      check();
+      for (const op of ops) {
+        const name = typeof op === 'string' ? op : op.op;
+        const primitives = name === 'meta' ? ['ambo', 'dual', 'kis']
+          : name === 'needle' ? ['dual', 'kis']
+          : name === 'zip' ? ['kis', 'dual']
+          : name === 'gyro' ? [{ op: 'snub', params: { t: 0.5, twist: 0 } }, 'dual']
+          : name === 'bevel' ? ['ambo', typeof op !== 'string' && op.params?.t === 0.5
+            ? 'ambo' : { op: 'truncate', params: typeof op === 'string' ? {} : op.params }]
+          : [op];
+        for (const primitive of primitives) {
+          const next = applyOp(mesh, primitive);
+          mesh.delete();
+          mesh = next;
+          check();
+        }
+      }
+    } catch (error) {
+      validator.noteDeath(error);
+      throw error;
+    } finally {
+      try { mesh?.delete(); mod.MeshOps.clearToolingMemory(); } catch { /* halted engine */ }
+    }
+  });
 }
 
 /**
