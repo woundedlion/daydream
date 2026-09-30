@@ -32,6 +32,14 @@ After `npm ci` and an engine install, run `npm run lint`, `npm run typecheck`, a
 `npm test`. Test suites live in `tests/`, reusable support code in
 `tests/helpers/`, and fixture inputs in `tests/fixtures/`.
 
+A local green run can include skipped checks. Engine source checks search
+`engine`, `../Holosphere`, and `../pov` relative to this checkout; set
+`HOLOSPHERE_ENGINE_DIR` (also checkout-relative) for another location. They skip
+when no checkout exists unless `HOLOSPHERE_ENGINE_REQUIRED=1`. Hook tests can
+skip when no supported shell is available unless `DAYDREAM_HOOK_SH_REQUIRED=1`.
+CI sets both required flags and installs the selected engine bundle; inspect
+the test summary for skips when comparing a local run with CI.
+
 Run `node scripts/browser-smoke.mjs` to exercise the simulator and every tool
 page. The other `scripts/*-probe.mjs` commands exercise tool interactions and
 the simulator's effect panel. These scripts require Chrome, Chromium, or Edge;
