@@ -484,7 +484,8 @@ export function createShaderDocumentController({
   const parameterLive = (parameterId) => active?.compiledSide !== true
     || (!BAKED_CONSTANT_IDS.has(parameterId) && !bakedFields.has(fieldSegment(parameterId))
       && !compiler.fixedDerivedBinding?.(
-        (chainUi?.store.document() ?? active.compiled.document).descriptor, parameterId, {}));
+        { chain: chainUi?.store.chainView() ?? active.compiled.document.descriptor.chain },
+        parameterId, {}));
 
   /**
    * Routes an inline stage-control edit into the active preset: the document is
