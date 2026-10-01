@@ -605,10 +605,11 @@ export function fakeElement(tag = 'div', options = {}) {
       if (this.disabled === true) return;
       if (this.getAttribute('tabindex') === null && !FOCUSABLE_TAGS.has(this.tagName)
           && !(this.tagName === 'A' && this.getAttribute('href') !== null)) return;
+      const doc = activeDocument();
+      if (!this.isConnected || !doc) return;
       this.focusCalls++;
       this.focusOptions = options;
-      const doc = activeDocument();
-      if (doc) doc.activeElement = this;
+      doc.activeElement = this;
     },
     select() {},
     scrollIntoView() { this.scrollIntoViewCalls++; },

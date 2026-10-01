@@ -2,7 +2,9 @@ import { fakeGui } from './helpers/fake_app.js';
 import { CHAIN_SNAPSHOT_STORAGE_KEY } from '../src/effects/effect_persistence.js';
 import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { fakeElement } from './helpers/fake_dom.js';
+import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
+
+restoreDocumentAfterEach();
 import {
   createEffectGui,
   addParamControl,
@@ -178,7 +180,7 @@ function makeHarness({
   generation = 1,
   copyText = fakeCopyText(),
   isMobile = false,
-  container = fakeElement('div'),
+  container = fakeElement('div', { connected: true }),
   hydrated = {},
   acceptedStored = {},
   pausesOnWrite = (p) => Boolean(p.animated),
@@ -195,6 +197,7 @@ function makeHarness({
   fullConfigFieldDefinitions = null,
   restoreChainSnapshotAccepted = true,
 } = {}) {
+  installDocument({ body: fakeElement('body', { connected: true }), activeElement: null });
   const state = {
     params,
     focused: null,

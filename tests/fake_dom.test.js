@@ -584,7 +584,7 @@ test('every detaching mutator disconnects the subtree it evicts', () => {
 // through a removal, so the focus a real browser drops there must drop here too.
 test('focus tracks the document, and unparenting the focused node blurs it', () => {
   const doc = installDocument({ activeElement: null });
-  const list = fakeElement('div');
+  const list = fakeElement('div', { connected: true });
   const row = fakeElement('button');
   const label = fakeElement('span');
   list.appendChild(row);
@@ -897,8 +897,8 @@ test('child and sibling navigation follows insertions, moves and removals', () =
 
 test('focus respects native tags, tabindex, and disabled state', () => {
   const doc = installDocument(documentEvents());
-  const button = fakeElement('button');
-  const div = fakeElement('div');
+  const button = fakeElement('button', { connected: true });
+  const div = fakeElement('div', { connected: true });
   button.focus();
   assert.equal(doc.activeElement, button);
   div.focus();
@@ -911,4 +911,17 @@ test('focus respects native tags, tabindex, and disabled state', () => {
   assert.equal(doc.activeElement, doc.body);
   button.focus();
   assert.equal(doc.activeElement, doc.body);
+});
+
+test('focus before insertion leaves the active element unchanged', () => {
+  const body = fakeElement('body', { connected: true });
+  const doc = installDocument({ ...documentEvents(), body, activeElement: body });
+  const button = fakeElement('button');
+  button.focus();
+  assert.equal(doc.activeElement, doc.body);
+  assert.equal(button.focusCalls, 0);
+  doc.body.appendChild(button);
+  button.focus();
+  assert.equal(doc.activeElement, button);
+  assert.equal(button.focusCalls, 1);
 });
