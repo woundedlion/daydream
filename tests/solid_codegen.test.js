@@ -1166,7 +1166,7 @@ test('createChainValidator carries each rejection reason out to the caller', asy
   const arena = await createChainValidator(async () => arenaMod).chainIsValid('cube', ['dual']);
   assert.equal(arena.ok, false);
   assert.match(arena.message, /^Face classification failed: /);
-  assert.match(arena.message, /flushed — try again/, 'the arena remedy must survive the gate');
+  assert.match(arena.message, /remove an op/, 'the arena remedy must survive the gate');
 
   const overflowMod = fakeModule(
     () => { }, { rejects: new Set(['base:cube']), reason: 'FACE_DEGREE_OVERFLOW' }).Mod;
