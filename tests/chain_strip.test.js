@@ -677,6 +677,19 @@ test('undo and redo revert and reapply whole edits through the same apply path',
   chipByLabel(h, 'camera').dispatch('keydown', { key: 'z', ctrlKey: true });
   assert.equal(labels(h).length, 6);
   assert.equal(h.applied.length, 4);
+  chipByLabel(h, 'camera').dispatch('keydown', { key: 'y', ctrlKey: true });
+  assert.equal(labels(h).length, 7);
+  chipByLabel(h, 'camera').dispatch('keydown', { key: 'z', metaKey: true });
+  assert.equal(labels(h).length, 6);
+  chipByLabel(h, 'camera').dispatch('keydown', { key: 'z', ctrlKey: true, shiftKey: true });
+  assert.equal(labels(h).length, 7);
+  const selector = h.doc.createElement('select');
+  const textArea = h.doc.createElement('textarea');
+  for (const control of [selector, textArea]) {
+    h.container.appendChild(control);
+    control.dispatch('keydown', { key: 'z', ctrlKey: true });
+    assert.equal(labels(h).length, 7);
+  }
 });
 
 test('bypass toggles the program shape without touching the document', async () => {
