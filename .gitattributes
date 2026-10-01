@@ -5,9 +5,3 @@ vendor-importmap.js text eol=lf
 
 # Git hooks are sourced by /bin/sh; CRLF would break the shebang on checkout.
 .githooks/**               text eol=lf
-
-# Authored pattern documents use LF for canonical JSON exports.
-src/workbench/shader/patterns/** text eol=lf
-
-# The archive digest covers its captured CRLF bytes.
-tests/fixtures/legacy_shader_snapshots.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

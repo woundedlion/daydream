@@ -105,8 +105,8 @@ src/workbench/solids/solid_registry_codegen.js
 src/workbench/solids/solid_render.js
 src/workbench/solids/solids_page.js
 
-# Shader workbench: the document compiler, the operator catalog, and the
-# selected pattern documents. Deployment includes all bundle patterns; the
+# Shader workbench: the compiler and catalogs.
+# Deployment includes the verified bundle patterns.
 generated/shader/sha256.mjs
 generated/shader/shader_workbench.mjs
 generated/shader/composed_effect_roster.mjs
