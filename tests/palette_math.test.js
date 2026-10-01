@@ -89,10 +89,10 @@ test('ProceduralPalette.get at t=0, t=0.25 and t=0.5 for a known coefficient set
     assert.ok(Math.abs(at025[ch] - 0.21404114048223255) < NEAR,
       `channel ${ch} linearized at t=0.25: ${at025[ch]}`);
   }
-  assert.ok(Math.abs(p.getChannelValue(0.25, 0) - 0.5) < NEAR, 'raw cosine at t=0.25');
+  assert.ok(Math.abs(p.getChannelValues(0.25)[0] - 0.5) < NEAR, 'raw cosine at t=0.25');
 
-  assert.ok(Math.abs(p.getChannelValue(0, 0) - 1.0) < NEAR);
-  assert.ok(Math.abs(p.getChannelValue(0.5, 0) - 0.0) < NEAR);
+  assert.ok(Math.abs(p.getChannelValues(0)[0] - 1.0) < NEAR);
+  assert.ok(Math.abs(p.getChannelValues(0.5)[0] - 0.0) < NEAR);
 });
 
 /** Verifies the named-palette table is a non-empty set of uniquely named {name, a,b,c,d} vec3 entries. */

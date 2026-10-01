@@ -154,7 +154,7 @@ test('ProceduralPalette cosine parity (procedural_palette_linear)', () => {
       a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2], d[0], d[1], d[2], t);
     const wCh = [w.r, w.g, w.b];
     for (let ch = 0; ch < 3; ch++) {
-      const srgb = Math.max(0, Math.min(1, pal.getChannelValue(t, ch)));
+      const srgb = Math.max(0, Math.min(1, pal.getChannelValues(t)[ch]));
       const jsLinear = M.srgb_to_linear_interp(srgb);
       // Within one 16-bit LUT step: the only divergence is float-vs-double cosine rounding.
       assert.ok(Math.abs(jsLinear - wCh[ch]) <= 1,
@@ -728,7 +728,7 @@ test('every named procedural palette evaluates within one linear LSB', () => {
     for (const t of [-1, 0, 0.25, 0.5, 0.75, 1, 2]) {
       const color = M.procedural_palette_linear(...a, ...b, ...c, ...d, t);
       for (const [channel, expected] of [color.r, color.g, color.b].entries()) {
-        const srgb = Math.max(0, Math.min(1, palette.getChannelValue(t, channel)));
+        const srgb = Math.max(0, Math.min(1, palette.getChannelValues(t)[channel]));
         assert.ok(Math.abs(M.srgb_to_linear_interp(srgb) - expected) <= 1,
           `${name} t=${t} channel=${channel}`);
       }
