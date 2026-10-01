@@ -832,6 +832,11 @@ function deleteSolid(index) {
 
 async function copyCode(index, lang, btn) {
   const item = savedSolids[index];
+  const shapeError = savedChainShapeError(item.base, item.ops);
+  if (shapeError) {
+    showCopyFailure(btn, `export failed: ${shapeError}`);
+    return;
+  }
   if (!registrySolidNames.has(item.base)) {
     showCopyFailure(btn, `export failed: unknown base solid ${item.base}`);
     return;
