@@ -130,11 +130,11 @@ test('the hue wheel uses authored custom lightness instead of canonical center',
       return { points: [0], degrees: [0], scale: 1 };
     } },
     PaletteV4: { curve: { CUSTOM: 5 } },
-    currentHueKeyState: () => ({}), activeHueKey: null, selectedHueKey: 0,
+    currentHueKeyState: () => ({ offsets: [0, 0.3, 0.6] }), activeHueKey: null, selectedHueKey: 0,
     hueKeyWheelDrawnPoints: [], hueKeyWheelScale: 1, syncHueKeyHandles: () => {},
   };
   const draw = handler('drawHueKeyWheel', context);
-  draw({ lightness: { curve: 5, center: 0.62, custom: [0.1, 0.4, 0.7] } });
+  draw({ lightness: { curve: 5, center: 0.62, custom: [0.1, 0.4, 0.7, 0] } });
   assert.ok(Math.abs(drawn[0].lightness - 0.4) < 1e-12);
   draw({ lightness: { curve: 0, center: 0.7, custom: [0, 0, 0] } });
   assert.equal(drawn[1].lightness, 0.7);

@@ -149,12 +149,13 @@ function currentHueKeyState(recipe) {
 
 function drawHueKeyWheel(recipe) {
   if (!hueKeyWheelPainter) return;
+  const state = currentHueKeyState(recipe);
+  const lightnessKeys = recipe.lightness.custom.slice(0, state.offsets.length);
   const { points, degrees, scale } = hueKeyWheelPainter.draw({
     lightness: recipe.lightness.curve === PaletteV4.curve.CUSTOM
-      ? recipe.lightness.custom.reduce((sum, value) => sum + value, 0)
-        / recipe.lightness.custom.length
+      ? lightnessKeys.reduce((sum, value) => sum + value, 0) / lightnessKeys.length
       : recipe.lightness.center,
-    state: currentHueKeyState(recipe),
+    state,
     activeKey: activeHueKey,
     selectedKey: selectedHueKey,
   });
