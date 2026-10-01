@@ -28,7 +28,7 @@ the simulator or the full test suite. Build Holosphere's `wasm-release-install`
 preset from its sibling checkout, or install a verified package with
 `node scripts/install-engine-bundle.mjs <bundle> .`.
 Neither a push nor deployment requires committing generated outputs. The local
-push hook checks source lint, types, import-map freshness and workflow helpers; CI is the required
+push hook checks source lint, types, import-map freshness, Tailwind output freshness and workflow helpers; CI is the required
 runtime compatibility gate. `npm test` and the browser probe scripts remain
 available for local validation after installing an engine package.
 
