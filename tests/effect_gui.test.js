@@ -3196,7 +3196,7 @@ test('preset advancement refreshes nonanimated requested selectors', () => {
   assert.equal(h.gui().ctrl('Mode').getValue(), 1);
 });
 
-for (const fullConfig of [false, true]) test(`preset selection clears writable values only with fullConfig=${fullConfig}`, () => {
+for (const fullConfig of [false, true]) test(`preset selection ${fullConfig ? 'keeps' : 'clears'} stored writable values (fullConfig=${fullConfig})`, () => {
   const h = makeHarness({ params: [SPEED, TELEMETRY], presetCount: 3, fullConfig,
     fullConfigSnapshot: { schemaVersion: 11, accepted: [], requested: [], pendingFieldIds: [], hasRuntime: false, runtime: [] } });
   h.panel.build();
