@@ -15,7 +15,7 @@
  * The recorder is constructed only once the module load resolves and the canvas
  * exists, but the GUI mounts synchronously in start(), before the WASM load resolves — so each setting holds its own
  * value behind an accessor, pushes it at every write, and replay() carries
- * whatever accumulated (deep-linked or default) into the recorder the load
+ * whatever accumulated (default or edited) into the recorder the load
  * builds. The recorder latches these at start(), so a write during a session is
  * reported rather than silently deferred to the next one.
  *
