@@ -427,7 +427,6 @@ const CONTRAST_SURFACES = {
   'tools.css': {
     'body': 'body',
     '.slider-label': '.param-group',
-    '.btn-primary': '.btn-primary',
     '.btn-secondary': '.btn-secondary',
   },
   'mobius.css': {
@@ -476,8 +475,9 @@ const CONTRAST_SURFACES = {
     '.chain-param-control': '.chain-chip',
     '.chain-param-option': '.chain-param-option',
     '.chain-param-value': '.chain-param-value',
-    '.chain-palette-entry:hover, .chain-palette-entry:focus-visible':
-      '.chain-palette-entry:hover, .chain-palette-entry:focus-visible',
+    ['.chain-palette-entry:hover, .chain-palette-entry:focus-visible,'
+      + ' .chain-palette-entry[aria-selected="true"]']:
+      '.chain-palette-entry:hover, .chain-palette-entry:focus-visible, .chain-palette-entry[aria-selected="true"]',
   },
   'solids.css': {
     '.thumb-btn .thumb-label': '.thumb-btn',

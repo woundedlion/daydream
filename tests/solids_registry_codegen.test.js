@@ -496,7 +496,7 @@ test('registry null faces preserve the engine failure before flushing', async ()
   } };
   const validator = { withValidator: async (task) => task(mod), noteDeath: () => {} };
   await assert.rejects(validateRegistryFaces(validator, { base: 'cube', ops: [] }),
-    /Registry faces failed:.*arena/i);
+    /Registry faces failed:.*needs more tooling memory.*remove an op/i);
   assert.equal(reason, 0);
   assert.equal(deleted, true);
 });

@@ -82,7 +82,7 @@ test('an exhausted arena on the base solid is reported with its own remedy', () 
   assert.equal(buildChainMesh('cube', ['dual'], ctx), null, 'there is nothing to draw');
   assert.equal(errors.length, 1, 'the failure must be surfaced, not swallowed');
   assert.match(errors[0], /^Base solid "cube" failed: /);
-  assert.match(errors[0], /tooling arena is full; it has been flushed/,
+  assert.match(errors[0], /chain needs more tooling memory than the engine reserves.*remove an op/,
     'the reason must be read back before the flush overwrites it');
   assert.equal(state.cleared, 1, 'ARENA_EXHAUSTED must flush the arenas');
   assert.deepEqual(state.calls, ['base:cube'], 'no later call may run on the null');
@@ -121,7 +121,7 @@ test('an exhausted arena on the vertex readback draws nothing and still frees th
     'a refused readback must not pass an empty mesh on to the stats and export');
   assert.equal(errors.length, 1);
   assert.match(errors[0], /^Mesh vertex readback failed: /);
-  assert.match(errors[0], /tooling arena is full/);
+  assert.match(errors[0], /chain needs more tooling memory than the engine reserves.*remove an op/);
   assert.equal(state.live, 0, 'the wrapper must be freed even when the readback fails');
   assert.ok(state.cleared >= 1, 'the arenas must be flushed on the way out');
   assert.ok(!state.calls.includes('getFaces'), 'the face readback must not run on the null');
@@ -134,7 +134,7 @@ test('an exhausted arena on the face readback draws nothing and still frees the 
   assert.equal(buildChainMesh('cube', [], ctx), null);
   assert.equal(errors.length, 1);
   assert.match(errors[0], /^Mesh face readback failed: /);
-  assert.match(errors[0], /tooling arena is full/);
+  assert.match(errors[0], /chain needs more tooling memory than the engine reserves.*remove an op/);
   assert.equal(state.live, 0);
 });
 
@@ -159,7 +159,7 @@ test('an exhausted arena on the classify pass still draws, with the reason to re
   assert.ok(built, 'colorize data is optional — the mesh still draws');
   assert.equal(built.faceClasses, null);
   assert.match(built.classifyFailure, /^Face classification failed: /);
-  assert.match(built.classifyFailure, /tooling arena is full/,
+  assert.match(built.classifyFailure, /chain needs more tooling memory than the engine reserves.*remove an op/,
     'a colorize toggle that silently stops working must name its reason');
   assert.deepEqual(errors, [],
     'the classify reason is reported after the draw, which rewrites the same line');
@@ -174,7 +174,7 @@ test('a soft-rejected op ends the chain, freeing the mesh and flushing the arena
     'a half-applied solid must not be drawn with wrong stats');
   assert.equal(errors.length, 1);
   assert.match(errors[0], /^Op "kis" failed: /, 'the failing op must be named');
-  assert.match(errors[0], /tooling arena is full/,
+  assert.match(errors[0], /chain needs more tooling memory than the engine reserves.*remove an op/,
     'the reason must be read back before the flush overwrites it');
   assert.ok(!state.calls.includes('ambo'), 'the chain must stop at the rejection');
   assert.equal(state.live, 0, 'the last valid wrapper must be freed');

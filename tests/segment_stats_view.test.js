@@ -256,7 +256,7 @@ test('the generated table names itself and scopes its headers', () => {
   assert.equal(caption.tagName, 'CAPTION');
   assert.equal(caption.className, 'visually-hidden');
   assert.equal(caption.textContent,
-    'Per-segment compute time and arena high-water marks');
+    'Per-segment compute time, scratch high-water marks and persistent usage');
   const { rows } = grid(stats);
   const headers = rows[0].children;
   assert.equal(headers.length, 6);
