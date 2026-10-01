@@ -352,6 +352,10 @@ export function start({
             urlSync.resume();
           }
         }).catch((err) => {
+          if (workbenchUrlPending) {
+            workbenchUrlPending = false;
+            urlSync.resume();
+          }
           console.error('The shader workbench could not be initialized:', err);
           if (abandonOnModuleDeath(err)) return;
           applyNotice.show(
@@ -514,6 +518,12 @@ export function start({
 
   const shaderDocuments = shaderWorkbench ? createShaderDocumentController({
     doc,
+    onOriginalLinkReleased: () => {
+      if (workbenchUrlPending) {
+        workbenchUrlPending = false;
+        urlSync.resume();
+      }
+    },
     getEngine: () => host.engine,
     getModule: () => host.module,
     selectEffect: (effect) => {

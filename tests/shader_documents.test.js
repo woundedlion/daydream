@@ -1011,6 +1011,7 @@ function compiledBuildEngine() {
 async function editorWorkbench({
   source = KALEIDOSCOPE_HEX_BRIGHT, patternCatalog = EMPTY_PATTERN_CATALOG, hash = '', search = '?effect=ShaderChain', initialEffect = null, paused = false,
   selectEffect = () => true,
+  onOriginalLinkReleased = () => {},
 } = {}) {
   const engine = new FakeChainEngine();
   const compiledEngine = compiledBuildEngine();
@@ -1059,6 +1060,7 @@ async function editorWorkbench({
   const ran = { gui: 0, invalidated: 0 };
   const controller = createShaderDocumentController({
     doc,
+    onOriginalLinkReleased,
     getEngine: () => current,
     getModule: () => MODULE,
     selectEffect: (effect) => {
@@ -2095,6 +2097,24 @@ test('a linked runtime snapshot that disagrees with its document retains the ori
   await harness.controller.dispose();
   ownedEditors.delete(harness.controller);
   assert.equal(harness.win.location.hash, hash);
+});
+
+test('abandoning a refused link reports its release once', async () => {
+  let releases = 0;
+  const harness = await editorWorkbench({ source: null,
+    search: '?effect=ShaderChain&fx.__chainSnapshot=%7Bbroken',
+    onOriginalLinkReleased: () => { releases++; },
+  });
+  assert.equal(harness.controller.preservesOriginalLink(), true);
+  assert.equal(releases, 0);
+  const picker = harness.elements.get('shader-document-file');
+  picker.files = [{ name: 'study.shader.json', size: KALEIDOSCOPE_HEX_BRIGHT.length,
+    text: async () => KALEIDOSCOPE_HEX_BRIGHT }];
+  await onChange(picker)();
+  assert.equal(harness.controller.preservesOriginalLink(), false);
+  assert.equal(releases, 1);
+  assert.equal(await harness.controller.loadSource(KALEIDOSCOPE_HEX_BRIGHT), true);
+  assert.equal(releases, 1);
 });
 
 

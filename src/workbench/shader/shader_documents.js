@@ -188,6 +188,7 @@ function defaultDownload(doc, filename, source) {
  * getAnimationsPaused?: () => boolean|null,
  * setAnimationsPaused?: (paused: boolean) => void,
  * setParamFilter?: (filter: {external: true}|null) => void,
+ * onOriginalLinkReleased?: () => void,
  * fetchText?: (url: string) => Promise<string>, importCompiler?: () => Promise<*>,
  * download?: (filename: string, source: string) => void,
  * initialEffect?: string|null, win?: *}} dependencies - initialEffect is the effect the
@@ -203,6 +204,7 @@ export function createShaderDocumentController({
   getAnimationsPaused: readAnimationsPaused = () => null,
   setAnimationsPaused = () => {},
   setParamFilter = () => {},
+  onOriginalLinkReleased = () => {},
   fetchText = async (url) => {
     const response = await fetch(new URL(url, import.meta.url));
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
@@ -275,6 +277,11 @@ export function createShaderDocumentController({
   let linkPending = false;
   let linkDisposed = false;
   let preserveRefusedLink = false;
+  const releaseOriginalLink = () => {
+    if (!preserveRefusedLink) return;
+    preserveRefusedLink = false;
+    onOriginalLinkReleased();
+  };
 
   /** @param {string} message @param {boolean} [error] */
   const show = (message, error = false) => {
@@ -491,7 +498,7 @@ export function createShaderDocumentController({
           : `"${parameterId}" was refused: ${diagnostic.message}`);
         return false;
       }
-      preserveRefusedLink = false;
+      releaseOriginalLink();
       if (addsDeclaration) {
         const dropped = syncParity();
         applyPreset(active.presetId);
@@ -527,7 +534,7 @@ export function createShaderDocumentController({
       catalog: operatorCatalog,
       announce,
       onApply: () => {
-        preserveRefusedLink = false;
+        releaseOriginalLink();
         const dropped = syncParity();
         applyPreset(active?.presetId ?? presetSelect.value);
         if (dropped) {
@@ -961,7 +968,7 @@ export function createShaderDocumentController({
           return;
         }
         selectLoadedSource('', SCRATCH_FILENAME, '');
-        preserveRefusedLink = false;
+        releaseOriginalLink();
         scheduleDeepLink();
         await flushDeepLink();
         return;
@@ -976,7 +983,7 @@ export function createShaderDocumentController({
         return;
       }
       selectLoadedSource(entry.effectId, entry.filename, '');
-      preserveRefusedLink = false;
+      releaseOriginalLink();
       scheduleDeepLink();
       await flushDeepLink();
     } catch (error) {
@@ -988,7 +995,7 @@ export function createShaderDocumentController({
       presetSelect.value = active?.presetId ?? '';
       return;
     }
-    preserveRefusedLink = false;
+    releaseOriginalLink();
     scheduleDeepLink();
     chainUi?.strip.render();
     void flushDeepLink();
@@ -1006,7 +1013,7 @@ export function createShaderDocumentController({
       if (!allowSourceChange()) return;
       if (!await loadSource(await file.text(), file.name)) return;
       selectLoadedSource(null, file.name, 'Imported');
-      preserveRefusedLink = false;
+      releaseOriginalLink();
       scheduleDeepLink();
       await flushDeepLink();
     } catch (error) {
@@ -1018,7 +1025,7 @@ export function createShaderDocumentController({
   const onAnimationToggle = () => {
     const paused = getAnimationsPaused();
     if (paused === null) return;
-    preserveRefusedLink = false;
+    releaseOriginalLink();
     setAnimationsPaused(!paused);
     showAnimationState();
     invalidate();
