@@ -354,7 +354,6 @@ input[type=checkbox] {
   height: 96px;
   cursor: pointer;
   touch-action: none;
-  /* Indicate it's clickable */
 }
 
 #waveGraphCanvas {
