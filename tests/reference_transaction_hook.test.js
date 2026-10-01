@@ -190,6 +190,7 @@ describe(
     test('a token shorter than seven characters never authorizes', () => {
       writeToken(old.slice(0, 6));
       assert.equal(runHook([`${ZERO} ${old} refs/heads/master`]).status, 1);
+      writeToken(mid.slice(0, 6));
       assert.equal(runHook([`${mid} ${ZERO} refs/heads/master`]).status, 1);
     });
 
