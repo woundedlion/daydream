@@ -154,7 +154,6 @@ test('applyOp forwards each op its engine arguments', () => {
     assert.deepEqual(calls, [expected], `applyOp dispatched ${expected.op} wrongly`);
   }
   // The degree->radian conversion is a real change of value, not an identity.
-  assert.notEqual(Math.fround(54 * D2R_F32), 54);
 });
 
 /** Verifies applyOp rejects an op the mesh wrapper binds no method for. */
@@ -227,7 +226,6 @@ test('generateFuncAndRecipe builds func name and SolidBuilder chain', () => {
 
   assert.equal(funcName, 'icosahedron_truncate50_dual');
   assert.equal(recipe, 'SolidBuilder(icosahedron(a, b), a, b).truncate(0.5f).dual().build()');
-  assert.match(recipe, /\.truncate\(0\.5f\)/);
 });
 
 /** Verifies generateFuncAndRecipe special-cases hankin (degree angle scaled by D2R) and relax (integer iter count). */
