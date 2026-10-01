@@ -869,3 +869,27 @@ test('installAnimationFrames queues callbacks until a flush runs them', () => {
   assert.equal(globalThis.requestAnimationFrame, saved,
     'restore hands the globals back');
 });
+
+test('child and sibling navigation follows insertions, moves and removals', () => {
+  const list = fakeElement();
+  const old = fakeElement();
+  const newest = fakeElement();
+  assert.equal(list.firstChild, null);
+  assert.equal(list.lastChild, null);
+  assert.equal(list.parentElement, null);
+  list.appendChild(old);
+  list.insertBefore(newest, list.firstChild);
+  assert.equal(list.firstChild, newest);
+  assert.equal(list.lastChild, old);
+  assert.equal(newest.parentElement, list);
+  assert.equal(newest.previousSibling, null);
+  assert.equal(newest.nextSibling, old);
+  assert.equal(old.previousSibling, newest);
+  assert.equal(old.nextSibling, null);
+  assert.equal(list.insertBefore(newest, newest), newest);
+  assert.deepEqual(list.childNodes, [newest, old]);
+  newest.remove();
+  assert.equal(old.previousSibling, null);
+  assert.equal(newest.parentElement, null);
+  assert.equal(newest.nextSibling, null);
+});
