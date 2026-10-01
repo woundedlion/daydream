@@ -97,10 +97,10 @@
             if (!overlay || overlay.classList.contains('error') || !(event.error instanceof SyntaxError)) return;
             overlay.classList.add('error');
             overlay.setAttribute('role', 'alert');
-            overlay.textContent = 'Unable to load the application. Reload the page to try again.';
+            overlay.textContent = 'Unable to load the application. Hard-reload the page (Ctrl+Shift+R / Cmd+Shift+R) to fetch the current version.';
         }, { once: true });
     </script>
-    <script type="module" src="src/app/main.js" onerror="const overlay = document.getElementById('loading-overlay'); overlay.classList.add('error'); overlay.setAttribute('role', 'alert'); overlay.textContent = 'Unable to load the application. Reload the page to try again.';"></script>
+    <script type="module" src="src/app/main.js" onerror="const overlay = document.getElementById('loading-overlay'); overlay.classList.add('error'); overlay.setAttribute('role', 'alert'); overlay.textContent = 'Unable to load the application. Hard-reload the page (Ctrl+Shift+R / Cmd+Shift+R) to fetch the current version.';"></script>
 </body>
 
 </html>
