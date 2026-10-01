@@ -136,11 +136,13 @@ test('the teardown releases the page listeners and the GUI it built', () => {
   assert.equal(driver.disposed, true, 'the driver owns GPU buffers');
 });
 
-test('a failed engine load reports and disarms the Test All ticker', async () => {
+test('a failed engine load reports and disarms the Test All ticker', async (t) => {
+  const cancelTicker = t.mock.method(globalThis, 'clearInterval');
   const captured = installConsoleCapture('error');
   let app;
   try {
     app = startApp({ loadModule: () => Promise.reject(new Error('no wasm')) });
+    app.guis[0].controllers.find((c) => c.property === 'testAll').setValue(true);
     await app.teardown.ready;
   } finally {
     captured.restore();
@@ -151,6 +153,8 @@ test('a failed engine load reports and disarms the Test All ticker', async () =>
     'the load failure must name the renderer and carry the underlying error');
 
   const testAll = app.guis[0].controllers.find((c) => c.property === 'testAll');
+  assert.equal(testAll.getValue(), false);
+  assert.equal(cancelTicker.mock.calls.length, 1);
   assert.equal(testAll.enabled, false,
     'without an engine the ticker would spin for the page lifetime');
   assert.ok(app.elements.get('loading-overlay').classList.contains('error'),
