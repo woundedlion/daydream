@@ -497,6 +497,7 @@ export class URLSync {
 
   /** Discards buffered writes before restoring a complete URL snapshot. */
   discardPending() {
+    this.retries = 0;
     this.adhoc.clear();
     this.pendingReset = null;
     if (this.timer !== null) this.win.clearTimeout(this.timer);
