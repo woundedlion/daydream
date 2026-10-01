@@ -20,7 +20,6 @@ import {
   resolutionCorrection,
 } from "../effects/effect_sequencing.js";
 import { createEffectGui } from "../ui/effect_gui.js";
-import { isShaderSchema } from "../effects/shader_stages.js";
 import {
   createAppTeardown,
   createFrameLoopGuard,
@@ -76,7 +75,7 @@ if (SEGMENT_CONTROLLER_API_VERSION !== EXPECTED_SEGMENT_CONTROLLER_API_VERSION) 
  * @param {string} [effect] - Effect the workbench opens on.
  * @returns {string} Same-origin workbench URL.
  */
-export function shaderWorkbenchUrl(location, effect = 'Shader') {
+export function shaderWorkbenchUrl(location, effect = 'ShaderChain') {
   const source = typeof location === 'string' || location instanceof URL
     ? location : location.href;
   const current = new URL(source);
@@ -110,7 +109,7 @@ export function start({
   const shaderWorkbench = doc.documentElement?.dataset.daydreamMode === 'shader-workbench';
   const requestedEffect = new URLSearchParams(win.location?.search ?? '').get('effect');
   const requestedSelection = importLegacyShaderSelection(requestedEffect);
-  const workbenchEffect = requestedSelection.effect === 'Shader' ? 'Shader'
+  const workbenchEffect = requestedSelection.effect === 'ShaderChain' ? 'ShaderChain'
     : SHADER_DOCUMENT_EFFECTS.includes(requestedEffect) ? requestedEffect : null;
   if (!shaderWorkbench && workbenchEffect) {
     const redirectedEffect = requestedSelection.migrated
@@ -145,7 +144,7 @@ export function start({
     : Object.values(resolutionPresets).flatMap((preset) => preset.favorites));
   for (const alias of LEGACY_SHADER_ALIASES) knownEffects.add(alias);
   const appState = new AppState({
-    effect: shaderWorkbench ? 'Shader' : DEFAULT_EFFECT,
+    effect: shaderWorkbench ? 'ShaderChain' : DEFAULT_EFFECT,
     resolution: "Phantasm (288x144)",
   });
   const urlSync = new URLSync(appState, ['effect', 'resolution'], {
@@ -153,11 +152,9 @@ export function start({
     effect: (v) => knownEffects.has(v),
   }, win);
   const legacySelection = importLegacyShaderSelection(appState.get('effect'));
-  let legacyUrlPending = legacySelection.migrated;
-  if (legacyUrlPending) {
-    urlSync.suspend();
-    appState.set('effect', legacySelection.effect);
-  }
+  let workbenchUrlPending = shaderWorkbench;
+  if (workbenchUrlPending) urlSync.suspend();
+  if (legacySelection.migrated) appState.set('effect', legacySelection.effect);
   const availableEffects = (resolution) => shaderWorkbench
     ? [...WORKBENCH_EFFECTS] : favoritesFor(resolution);
 
@@ -344,21 +341,7 @@ export function start({
         segments,
         syncEffectGui: (advanced) => effectGui.sync(advanced),
       });
-      host.adapter = {
-        ...renderAdapter,
-        drawFrame() {
-          try {
-            renderAdapter.drawFrame();
-          } finally {
-            if (legacyUrlPending) {
-              legacyUrlPending = false;
-              urlSync.resume();
-              applyNotice.show(legacySelection.notice, CONFIG_NOTICE);
-            }
-          }
-        },
-      };
-
+      host.adapter = renderAdapter;
 
       // Construct the recorder now that daydream's canvas exists.
       host.recorder = new VideoRecorder(daydream.canvas);
@@ -370,7 +353,12 @@ export function start({
           () => apply.applyResolution(true),
           () => loadingOverlay?.remove(),
         );
-        shaderDocuments?.init().catch((err) => {
+        shaderDocuments?.init().then(() => {
+          if (workbenchUrlPending && !shaderDocuments.preservesOriginalLink()) {
+            workbenchUrlPending = false;
+            urlSync.resume();
+          }
+        }).catch((err) => {
           console.error('The shader workbench could not be initialized:', err);
           if (abandonOnModuleDeath(err)) return;
           applyNotice.show(
@@ -429,24 +417,10 @@ export function start({
   // Composition — the effect panel, the apply path, and the switch transaction
   ///////////////////////////////////////////////////////////////////////////////
 
-  let fullConfigGeneration = null;
-  let fullConfigSchema = false;
-  /**
-   * @returns {boolean} Whether the live effect persists through the exhaustive
-   *   versioned snapshot API rather than through per-parameter values.
-   */
-  function usesFullConfigSnapshot() {
-    if (host.moduleDead() || typeof host.engine?.getFullConfigSnapshot !== 'function'
-        || typeof host.engine.restoreFullConfigSnapshot !== 'function'
-        || !host.module?.FullConfigRestoreResult) {
-      return false;
-    }
-    const generation = host.paramGeneration();
-    if (generation === undefined || generation !== fullConfigGeneration) {
-      fullConfigGeneration = generation;
-      fullConfigSchema = isShaderSchema(host.engine.getParameterDefinitions());
-    }
-    return fullConfigSchema;
+  /** @returns {boolean} */
+  function usesChainSnapshot() {
+    if (host.moduleDead() || !host.module?.ChainSnapshotRestoreResult) return false;
+    return callWorkbenchBinding(host.engine, 'getShaderChainBindings', 'isValid', [], false);
   }
 
   // The shader-document controller (created below, after the panel it filters)
@@ -482,11 +456,10 @@ export function start({
       setParam: (name, value) => segments.setParameter(name, value),
     },
     config: {
-      inUse: usesFullConfigSnapshot,
-      snapshot: () => callWorkbenchBinding(host.engine, 'getLegacyShaderBindings', 'getFullConfigSnapshot', []),
-      fieldDefinitions: () => callWorkbenchBinding(host.engine, 'getLegacyShaderBindings', 'getFullConfigFieldDefinitions', []),
-      restore: (snapshot) => callWorkbenchBinding(host.engine, 'getLegacyShaderBindings', 'restoreFullConfigSnapshot', [snapshot], host.module.FullConfigRestoreResult.NOT_SHADER_WORKBENCH),
-      restoreResults: () => host.module.FullConfigRestoreResult,
+      inUse: usesChainSnapshot,
+      snapshot: () => callWorkbenchBinding(host.engine, 'getShaderChainBindings', 'getSnapshot', []),
+      restore: (snapshot) => callWorkbenchBinding(host.engine, 'getShaderChainBindings', 'restoreSnapshot', [snapshot], host.module.ChainSnapshotRestoreResult.NOT_SHADER_CHAIN),
+      restoreResults: () => host.module.ChainSnapshotRestoreResult,
       showImportNotice: (message) => applyNotice.show(message, CONFIG_NOTICE),
     },
     host: {
@@ -540,7 +513,10 @@ export function start({
     showNotice: (message) => applyNotice.show(message, SWITCH_NOTICE),
     showFatal: showFatalError,
     moduleDead: (error) => host.moduleDead(error),
-    usesFullConfigSnapshot,
+    usesChainSnapshot,
+    getChainSnapshot: () => callWorkbenchBinding(host.engine, 'getShaderChainBindings', 'getSnapshot', []),
+    restoreChainSnapshot: (snapshot) => callWorkbenchBinding(host.engine, 'getShaderChainBindings', 'restoreSnapshot', [snapshot])
+      === host.module.ChainSnapshotRestoreResult.APPLIED,
   });
 
   const shaderDocuments = shaderWorkbench ? createShaderDocumentController({

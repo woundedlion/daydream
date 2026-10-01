@@ -9,7 +9,7 @@
  * segment pipeline drives plus the MeshOps and PaletteOps bridges the
  * standalone tools run on; tests/helpers/fake_engine.js pins that method roster and all
  * six result enums — ParamSetResult, ClipSetResult, ResolutionSetResult,
- * EffectSetResult, FullConfigRestoreResult, ChainStatus — against the real module, and
+ * EffectSetResult, ChainSnapshotRestoreResult, ChainStatus — against the real module, and
  * tests/engine_contract_wasm.test.js pins the declarations below against both.
  */
 
@@ -113,18 +113,34 @@ export type ParameterDefinition =
   | BooleanParameterDefinition
   | NumericParameterDefinition;
 
-export interface FullConfigSnapshot {
-  schemaVersion: number;
-  accepted: number[];
-  requested: number[];
-  pendingFieldIds: number[];
-  hasRuntime: boolean;
-  runtime: number[];
+export interface ChainSpatialWalkState {
+  noiseSeed: number;
+  walkTime: number;
+  angularVelocity: number;
+  spinPhase: number;
+  position: number[];
+  direction: number[];
+  wander: number[];
+  rawOrientation: number[];
+  legacy: boolean;
 }
 
-export interface FullConfigFieldDefinition {
-  id: number;
-  name: string;
+export type ChainRuntimeState =
+  | {instance: string; kind: 'spatial-walk-v1'; state: ChainSpatialWalkState}
+  | {instance: string; kind: 'source-clock-v1'; state: {primary: number; secondary: number; angle: number}}
+  | {instance: string; kind: 'noise-clock-v1'; state: {phase: number; noiseSeed: number}}
+  | {instance: string; kind: 'phase-clock-v1' | 'ripple-clock-v1'; state: {phase: number}}
+  | {instance: string; kind: 'affine-clock-v1'; state: {phase: number; rotation: number}}
+  | {instance: string; kind: 'color-clock-v1'; state: {oscillationPhase: number; hueNoisePhase: number; hueNoiseSeed: number}}
+  | {instance: string; kind: 'spherical-rings-v1'; state: {walk: ChainSpatialWalkState; phase: number}};
+
+export interface ChainSnapshot {
+  schemaVersion: number;
+  chain: Array<{instance: string; operator: string}>;
+  parameters: Array<{name: string; value: number}>;
+  runtime?: ChainRuntimeState[];
+  paletteBank?: {chroma: number; hues: number[]; cycles: Array<{frame: number; nextSequence: number; fadeActive: boolean; displayDirty: boolean}>};
+  animationsPaused: boolean;
 }
 
 /** Authoring handle invalidated by effect replacement, resizing, or engine deletion. */
@@ -133,20 +149,13 @@ export interface ShaderChainBindings {
   setShaderChain(entries: Array<{ instance: string; operator: string }>): { status: EnumValue; code: string; entryIndex: number };
   setShaderChainParameters(entries: Array<{ name: string; value: number }>): EnumValue;
   getProgram(): Array<{ instance: string; operator: string }> | null;
-  delete(): void;
-}
-
-export interface LegacyShaderBindings {
-  isValid(): boolean;
-  getFullConfigSnapshot(): FullConfigSnapshot | null;
-  restoreFullConfigSnapshot(snapshot: FullConfigSnapshot): EnumValue;
-  getFullConfigFieldDefinitions(): FullConfigFieldDefinition[] | null;
+  getSnapshot(): ChainSnapshot | null;
+  restoreSnapshot(snapshot: ChainSnapshot): EnumValue;
   delete(): void;
 }
 
 export interface HolosphereEngine {
   getShaderChainBindings(): ShaderChainBindings | null;
-  getLegacyShaderBindings(): LegacyShaderBindings | null;
   /** RESIZED tears the effect down; ALREADY_ACTIVE is a pure no-op; UNSUPPORTED keeps the old geometry. */
   setResolution(w: number, h: number): EnumValue;
   /** INSTALLED on success; UNKNOWN_EFFECT / UNSUPPORTED_RESOLUTION keep the prior effect. */
@@ -215,12 +224,6 @@ export interface HolosphereEngine {
    * this beside a snapshot and rebuild the definitions when it moves.
    */
   getParamGeneration(): number;
-  /** Complete Shader workbench state, independent of the visible parameter schema. */
-  getFullConfigSnapshot(): FullConfigSnapshot | null;
-  /** Atomically restore accepted, requested, pending, and optional runtime state. */
-  restoreFullConfigSnapshot(snapshot: FullConfigSnapshot): EnumValue;
-  /** Stable field ids and names in ConfigFieldId order; null with no Shader workbench loaded. */
-  getFullConfigFieldDefinitions(): FullConfigFieldDefinition[] | null;
   /**
    * True when the effect strobes each POV column to black after it is shown
    * (discrete columns with dark gaps), false when columns persist and smear
@@ -231,18 +234,6 @@ export interface HolosphereEngine {
   getEffectSizes(): Record<string, number>;
   /** Effect name to authored preset count at the active resolution. */
   getEffectPresetCounts(): Record<string, number>;
-  /**
-   * The status compares by identity against HolosphereModule.ChainStatus.
-   * Programs the ShaderChain effect with an ordered operator chain. APPLIED
-   * rebuilds the parameter definitions (named `instance.field`) and bumps the
-   * param generation before returning; any other code refuses transactionally,
-   * with entryIndex naming the offending entry (-1 = the whole chain).
-   */
-  setShaderChain(
-    entries: Array<{ instance: string; operator: string }>,
-  ): { status: EnumValue; code: string; entryIndex: number };
-  /** Atomically admits chain parameter values; returns a ParamSetResult member. */
-  setShaderChainParameters(entries: Array<{ name: string; value: number }>): EnumValue;
   /** Embind destructor: releases the C++ instance the handle points at. */
   delete(): void;
 }
@@ -386,15 +377,14 @@ export type ParamSetResultEnum = {
   TOO_LONG: EnumValue;
 };
 
-/** What restoreFullConfigSnapshot() answers, compared by identity against the member. */
-export type FullConfigRestoreResultEnum = {
+/** What restoreSnapshot() answers, compared by identity against the member. */
+export type ChainSnapshotRestoreResultEnum = {
   APPLIED: EnumValue;
-  NOT_SHADER_WORKBENCH: EnumValue;
+  NOT_SHADER_CHAIN: EnumValue;
   UNSUPPORTED_VERSION: EnumValue;
   INVALID_LENGTH: EnumValue;
   INVALID_VALUE: EnumValue;
-  INVALID_ACCEPTED: EnumValue;
-  INVALID_PENDING: EnumValue;
+  INVALID_CHAIN: EnumValue;
 };
 
 /** What setResolution() answers, compared by identity against the member. */
@@ -524,7 +514,6 @@ export interface PaletteOps {
 }
 
 export interface HolosphereModule {
-  LegacyShaderBindings: Function;
   ShaderChainBindings: {
     getShaderChainCatalog(): string;
   };
@@ -568,12 +557,11 @@ export interface HolosphereModule {
      * The engine's operator catalog as one JSON string, byte-identical (plus
      * the installed trailing newline) to generated/shader/engine_catalog.json.
      */
-    getShaderChainCatalog(): string;
   };
   ChainStatus: ChainStatusEnum;
   ClipSetResult: ClipSetResultEnum;
   ParamSetResult: ParamSetResultEnum;
-  FullConfigRestoreResult: FullConfigRestoreResultEnum;
+  ChainSnapshotRestoreResult: ChainSnapshotRestoreResultEnum;
   ResolutionSetResult: ResolutionSetResultEnum;
   EffectSetResult: EffectSetResultEnum;
   MeshOps: MeshOpsStatics;

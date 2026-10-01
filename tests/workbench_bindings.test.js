@@ -17,16 +17,16 @@ test('typed capability takes precedence over a forwarding engine method and rele
 
 test('unsupported capabilities never fall through to an engine forwarding method', () => {
   const engine = {
-    getLegacyShaderBindings: () => null,
-    getFullConfigSnapshot: () => { throw new Error('unsupported capability reached'); },
+    getShaderChainBindings: () => null,
+    getSnapshot: () => { throw new Error('unsupported capability reached'); },
   };
-  assert.equal(callWorkbenchBinding(engine, 'getLegacyShaderBindings', 'getFullConfigSnapshot', []), null);
-  assert.equal(callWorkbenchBinding(null, 'getLegacyShaderBindings', 'getFullConfigSnapshot', []), null);
+  assert.equal(callWorkbenchBinding(engine, 'getShaderChainBindings', 'getSnapshot', []), null);
+  assert.equal(callWorkbenchBinding(null, 'getShaderChainBindings', 'getSnapshot', []), null);
 });
 
-test('older installed modules retain their forwarding API during migration', () => {
-  assert.equal(callWorkbenchBinding({ getFullConfigSnapshot: () => 'snapshot' },
-    'getLegacyShaderBindings', 'getFullConfigSnapshot', []), 'snapshot');
+test('missing capabilities return unavailable without calling facade methods', () => {
+  assert.equal(callWorkbenchBinding({ getSnapshot: () => 'snapshot' },
+    'getShaderChainBindings', 'getSnapshot', []), null);
 });
 
 test('ordinary errors release handles; module traps leave the halted module alone', () => {
@@ -44,12 +44,10 @@ test('ordinary errors release handles; module traps leave the halted module alon
   }
 });
 
-test('catalog export uses the typed adapter and supports older module statics', () => {
+test('catalog export uses the typed adapter', () => {
   assert.equal(shaderChainCatalog({
     ShaderChainBindings: { getShaderChainCatalog: () => 'typed' },
     HolosphereEngine: { getShaderChainCatalog: () => 'forwarding' },
   }), 'typed');
-  assert.equal(shaderChainCatalog({
-    HolosphereEngine: { getShaderChainCatalog: () => 'forwarding' },
-  }), 'forwarding');
+
 });

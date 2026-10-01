@@ -99,24 +99,24 @@ export function installSegmentWorker() {
 
   /**
    * Restore a complete shader-workbench snapshot after the effect has been rebuilt.
-   * @param {import('./worker_protocol.js').FullConfigSnapshot|undefined} snapshot
+   * @param {import('./worker_protocol.js').ChainSnapshot|undefined} snapshot
    * @returns {boolean} True when no snapshot was supplied or it was accepted.
    */
-  function restoreFullConfig(snapshot) {
+  function restoreChainSnapshot(snapshot) {
     if (!snapshot) return true;
     if (!engine || !wasmModule
-        || typeof engine.restoreFullConfigSnapshot !== 'function'
-        || !wasmModule.FullConfigRestoreResult) {
+        || typeof engine.getShaderChainBindings !== 'function'
+        || !wasmModule.ChainSnapshotRestoreResult) {
       post({ type: 'engineRejected',
-             reason: 'Shader workbench full-config restore API is unavailable' });
+             reason: 'Shader chain snapshot restore API is unavailable' });
       return false;
     }
-    const result = callWorkbenchBinding(engine, 'getLegacyShaderBindings', 'restoreFullConfigSnapshot', [snapshot], wasmModule.FullConfigRestoreResult.NOT_SHADER_WORKBENCH);
-    const restoreResults = wasmModule.FullConfigRestoreResult;
+    const result = callWorkbenchBinding(engine, 'getShaderChainBindings', 'restoreSnapshot', [snapshot], wasmModule.ChainSnapshotRestoreResult.NOT_SHADER_CHAIN);
+    const restoreResults = wasmModule.ChainSnapshotRestoreResult;
     if (result === restoreResults.APPLIED) return true;
     const name = enumConstantName(restoreResults, result);
     post({ type: 'engineRejected',
-           reason: `Shader workbench full-config restore rejected: ${name}` });
+           reason: `Shader chain snapshot restore rejected: ${name}` });
     return false;
   }
 
@@ -346,7 +346,7 @@ export function installSegmentWorker() {
         if (typeof msg.presetIndex === 'number') {
           applyPreset(msg.presetIndex, 'synchronizePreset');
         }
-        if (!restoreFullConfig(msg.fullConfigSnapshot)) break;
+        if (!restoreChainSnapshot(msg.chainSnapshot)) break;
         replayParams(msg.params);
         if (typeof msg.paused === 'boolean') engine.setAnimationsPaused(msg.paused);
         if (typeof msg.poleLod === 'number') engine.setPoleLod(msg.poleLod);
@@ -374,7 +374,7 @@ export function installSegmentWorker() {
           if (typeof msg.presetIndex === 'number') {
             applyPreset(msg.presetIndex, 'synchronizePreset');
           }
-          if (!restoreFullConfig(msg.fullConfigSnapshot)) break;
+          if (!restoreChainSnapshot(msg.chainSnapshot)) break;
           replayParams(msg.params);
           if (typeof msg.paused === 'boolean') {
             engine.setAnimationsPaused(msg.paused);

@@ -6,7 +6,8 @@
 // @ts-check
 
 const COMPILER_URL = new URL('../../../generated/shader/shader_workbench.mjs', import.meta.url).href;
-const PREFIX = '#shader=v1.';
+const PREFIX = '#shader=v2.';
+const LEGACY_PREFIX = '#shader=v1.';
 const MAX_PAYLOAD_CHARS = 65536;
 const MAX_STATE_BYTES = 524288;
 
@@ -22,11 +23,17 @@ function normalizedState(value) {
       || typeof value.paused !== 'boolean') {
     throw new Error('invalid shader link state');
   }
+  if (value.chainSnapshot !== undefined
+      && (!value.chainSnapshot || typeof value.chainSnapshot !== 'object'
+        || value.chainSnapshot.schemaVersion !== 1 || !Array.isArray(value.chainSnapshot.chain)
+        || !Array.isArray(value.chainSnapshot.parameters)))
+    throw new Error('invalid shader link snapshot');
   return {
     document: value.document,
     preset: value.preset,
     bypassed: [...value.bypassed],
     paused: value.paused,
+    ...(value.chainSnapshot === undefined ? {} : {chainSnapshot: value.chainSnapshot}),
   };
 }
 
@@ -88,6 +95,7 @@ export async function encodeShaderStateHash(state) {
     p: value.preset,
     b: value.bypassed,
     a: value.paused,
+    ...(value.chainSnapshot === undefined ? {} : {s: value.chainSnapshot}),
   };
   const bytes = new TextEncoder().encode(JSON.stringify(compact));
   if (bytes.length > MAX_STATE_BYTES) throw new Error('shader link state is too large');
@@ -99,11 +107,12 @@ export async function encodeShaderStateHash(state) {
 
 /** @param {string} hash @returns {Promise<*|null>} */
 export async function decodeShaderStateHash(hash) {
-  if (!hash.startsWith(PREFIX)) {
+  const prefix = hash.startsWith(PREFIX) ? PREFIX : LEGACY_PREFIX;
+  if (!hash.startsWith(prefix)) {
     if (hash.startsWith('#shader=')) throw new Error('unsupported shader link version');
     return null;
   }
-  const payload = hash.slice(PREFIX.length);
+  const payload = hash.slice(prefix.length);
   if (payload.length === 0 || payload.length > MAX_PAYLOAD_CHARS)
     throw new Error('invalid shader link payload');
   let compact;
@@ -126,6 +135,7 @@ export async function decodeShaderStateHash(hash) {
     preset: compact?.p,
     bypassed: compact?.b,
     paused: compact?.a,
+    ...(compact?.s === undefined ? {} : {chainSnapshot: compact.s}),
   });
 }
 

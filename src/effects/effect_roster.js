@@ -36,7 +36,7 @@ export const SHADER_DOCUMENT_EFFECTS = Object.freeze([
 // interpreter each dynamically previewed document is programmed onto
 // (src/workbench/shader/shader_documents.js), and the shipped documents.
 export const WORKBENCH_EFFECTS = Object.freeze([
-  'Shader', 'ShaderChain', ...SHADER_DOCUMENT_EFFECTS,
+  'ShaderChain', ...SHADER_DOCUMENT_EFFECTS,
 ]);
 
 const HiResFavorites = [

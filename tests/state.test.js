@@ -1089,19 +1089,19 @@ test('URLSync writes nothing when the URL already matches state', () => {
 test('URLSync discards a failed transaction before restoring full-config hydration', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const calls = installRecordingWindow('?effect=Shader&fx.__fullConfig=snapshot', '/sim');
+    const calls = installRecordingWindow('?effect=Shader&fx.__chainSnapshot=snapshot', '/sim');
     const state = new AppState({ effect: 'Shader' });
     const sync = new URLSync(state, ['effect']);
     sync.suspend();
     sync.reset(['effect']);
-    sync.setParam('fx.__fullConfig', 'failed');
+    sync.setParam('fx.__chainSnapshot', 'failed');
     sync.retries = 15;
     sync.discardPending();
     assert.equal(sync.retries, 0);
     const params = new URLSearchParams(window.location.search);
     sync.applyPendingReset(params);
     sync.overlayPending(params);
-    assert.equal(params.get('fx.__fullConfig'), 'snapshot');
+    assert.equal(params.get('fx.__chainSnapshot'), 'snapshot');
     sync.resume();
     mock.timers.tick(1000);
     assert.equal(calls.length, 0);

@@ -2513,19 +2513,19 @@ test('snapshot-capable effects rebuild from their exhaustive state', () => {
   };
   const c = makeController({ effect: 'SnapshotEffect' });
   c.getWasmEngine = () => ({
-    getFullConfigSnapshot: () => snapshot,
+    getShaderChainBindings: () => ({getSnapshot: () => snapshot, delete: () => {}}),
     getParameterDefinitions: () => {
       throw new Error('dynamic definitions are not persistence');
     },
   });
-  assert.deepEqual(c.snapshotEffectState(), { fullConfigSnapshot: snapshot });
+  assert.deepEqual(c.snapshotEffectState(), { chainSnapshot: snapshot });
 });
 
 test('an effect outside the Shader workbench rebuilds from its params', () => {
   const c = makeController({ effect: 'alien-brain' });
   c.getWasmEngine = () => ({
     ...fakeEngine([{ name: 'Speed', value: 0.5 }]),
-    getFullConfigSnapshot: () => null,
+    getShaderChainBindings: () => null,
   });
   assert.deepEqual(c.snapshotEffectState(), {
     params: [{ name: 'Speed', value: 0.5 }],

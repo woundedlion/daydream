@@ -40,6 +40,8 @@
     "src/recording/recording_settings.js",
     "src/segments/segment_policy.js",
     "src/effects/legacy_shader_import.js",
+    "src/effects/legacy_shader_schema.js",
+    "src/effects/legacy_shader_snapshot.js",
     "src/ui/sidebar.js",
     "src/recording/recorder.js",
     "src/effects/effect_sequencing.js",

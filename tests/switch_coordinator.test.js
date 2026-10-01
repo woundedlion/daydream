@@ -113,7 +113,7 @@ function makeApp({
     // Reads the effect the engine has loaded, not the one appState was just
     // written to: the snapshot is taken before the apply, so it must describe
     // the outgoing effect.
-    usesFullConfigSnapshot: () => fullConfigEffects.has(app.applied.effect),
+    usesChainSnapshot: () => fullConfigEffects.has(app.applied.effect),
   });
   return app;
 }

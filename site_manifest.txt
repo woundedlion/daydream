@@ -24,6 +24,8 @@ src/segments/segment_policy.js
 src/ui/segmented_pov_controls.js
 src/app/daydream.js
 src/effects/legacy_shader_import.js
+src/effects/legacy_shader_schema.js
+src/effects/legacy_shader_snapshot.js
 src/renderer/driver.js
 src/ui/effect_gui.js
 src/effects/effect_persistence.js

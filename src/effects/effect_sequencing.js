@@ -13,6 +13,7 @@
  */
 
 import { resolveActiveEffect } from "./effect_roster.js";
+import { callWorkbenchBinding } from '../engine/workbench_bindings.js';
 
 /** @typedef {import('../../generated/holosphere_wasm.js').HolosphereEngine} HolosphereEngine */
 /** @typedef {import('../../generated/holosphere_wasm.js').HolosphereModule} HolosphereModule */
@@ -29,7 +30,7 @@ import { resolveActiveEffect } from "./effect_roster.js";
  *   animationState: {pause: boolean}}} [pause] - Live pause controls and state.
  */
 
-/** @typedef {{paramValues: Array<[string, any]>, animationsPaused: boolean}} EffectControlSnapshot */
+/** @typedef {{paramValues: Array<[string, any]>, animationsPaused: boolean, chainSnapshot?: *}} EffectControlSnapshot */
 
 /** @typedef {{applied: boolean, failure: any, recoveryFailure: any,
  *   moduleDead?: boolean}} SwitchOutcome */
@@ -78,32 +79,26 @@ export function runSwitchTransaction(apply, rollback, moduleDead = () => false) 
 }
 
 /**
- * Copy the writable values and animation state from an applied effect GUI.
- *
- * An effect that persists through the full-config snapshot API is carried across
- * the rollback's panel rebuild whole, by the panel itself. Replaying its
- * parameters one at a time on top of that restore would drive the effect through
- * the intermediate combinations the bridge refuses — a Shader left with
- * requestedValue and acceptedValue split — so the param list is left empty and
- * only the pause state is carried here.
- *
- * @param {EffectControlRecord|null|undefined} effect - Active effect control state.
- * @param {() => boolean} [usesFullConfigSnapshot] - Whether the live effect
- *   persists through the exhaustive versioned snapshot API.
+ * @param {EffectControlRecord|null|undefined} effect
+ * @param {() => boolean} [usesChainSnapshot]
+ * @param {() => *} [getChainSnapshot]
  * @returns {EffectControlSnapshot|null}
  */
 export function snapshotEffectControlState(effect,
-                                           usesFullConfigSnapshot = () => false) {
+                                           usesChainSnapshot = () => false,
+                                           getChainSnapshot = () => null) {
   if (!effect?.controllerByName) return null;
   /** @type {Array<[string, any]>} */
   const paramValues = [];
-  if (!usesFullConfigSnapshot()) {
+  if (!usesChainSnapshot()) {
     for (const name of effect.writableParamNames || []) {
       const controller = effect.controllerByName.get(name);
       if (controller) paramValues.push([name, controller.getValue()]);
     }
   }
+  const chainSnapshot = usesChainSnapshot() ? getChainSnapshot() : null;
   return {
+    ...(chainSnapshot ? { chainSnapshot } : {}),
     paramValues,
     animationsPaused: Boolean(effect.pause?.animationState.pause),
   };
@@ -113,10 +108,13 @@ export function snapshotEffectControlState(effect,
  * Restore a copied effect state through the rebuilt GUI controllers.
  * @param {EffectControlRecord|null|undefined} effect - Rebuilt effect control state.
  * @param {EffectControlSnapshot|null} snapshot - What snapshotEffectControlState() held.
+ * @param {(snapshot: *) => boolean} [restoreChainSnapshot]
  * @returns {void}
  */
-export function restoreEffectControlState(effect, snapshot) {
+export function restoreEffectControlState(effect, snapshot, restoreChainSnapshot = () => false) {
   if (!effect?.controllerByName || !snapshot) return;
+  if (snapshot.chainSnapshot && !restoreChainSnapshot(snapshot.chainSnapshot))
+    throw new Error('Chain snapshot rollback was rejected.');
   const pauseController = effect.pause?.controller;
   // Restoring an animated param trips effect_gui's take-over auto-pause. Pausing
   // first makes that a no-op; resuming after the loop undoes one it did fire.
@@ -213,9 +211,11 @@ export function switchFailureReport(label, result) {
  * @param {(message: string) => void} deps.showFatal - Fatal-banner sink.
  * @param {(error?: *) => boolean} [deps.moduleDead] - Reads whether the engine module
  *   trapped after an apply threw.
- * @param {() => boolean} [deps.usesFullConfigSnapshot] - Whether the live effect
+ * @param {() => boolean} [deps.usesChainSnapshot] - Whether the live effect
  *   persists through the exhaustive versioned snapshot API, which the panel
  *   rebuild restores whole; its parameters are then not replayed one at a time.
+ * @param {() => *} [deps.getChainSnapshot] - Captures engine-owned runtime state.
+ * @param {(snapshot: *) => boolean} [deps.restoreChainSnapshot] - Restores engine-owned runtime state.
  * @returns {{isRestoring: () => boolean, mute: (write: () => void) => void,
  *   dispose: () => void}} The mute-window query, a muted-write helper for state
  *   the caller applies itself, and an idempotent unsubscribe.
@@ -233,7 +233,9 @@ export function createSwitchCoordinator({
   showNotice,
   showFatal,
   moduleDead = () => false,
-  usesFullConfigSnapshot = () => false,
+  usesChainSnapshot = () => false,
+  getChainSnapshot = () => null,
+  restoreChainSnapshot = () => false,
 }) {
   let restoring = false;
 
@@ -259,7 +261,7 @@ export function createSwitchCoordinator({
     if (applyEffect(true) !== ApplyResult.APPLIED) {
       throw new Error(`Effect rollback to "${effect}" was rejected.`);
     }
-    restoreEffectControlState(getActiveEffect(), effectState);
+    restoreEffectControlState(getActiveEffect(), effectState, restoreChainSnapshot);
   });
 
   const restoreResolution = (
@@ -274,7 +276,7 @@ export function createSwitchCoordinator({
     if (applyResolution(true) !== ApplyResult.APPLIED) {
       throw new Error(`Resolution rollback to "${resolution}" was rejected.`);
     }
-    restoreEffectControlState(getActiveEffect(), effectState);
+    restoreEffectControlState(getActiveEffect(), effectState, restoreChainSnapshot);
   });
 
   const report = (/** @type {string} */ label, /** @type {SwitchOutcome} */ result) => {
@@ -290,7 +292,7 @@ export function createSwitchCoordinator({
     if (key === 'effect') {
       const previousUrl = currentUrl();
       const previousEffectState =
-        snapshotEffectControlState(getActiveEffect(), usesFullConfigSnapshot);
+        snapshotEffectControlState(getActiveEffect(), usesChainSnapshot, getChainSnapshot);
       report('Effect', runSwitchTransaction(
         () => applyEffect(),
         () => restoreEffect(old, previousUrl, previousEffectState),
@@ -300,7 +302,7 @@ export function createSwitchCoordinator({
       const previousEffect = appState.get('effect');
       const previousUrl = currentUrl();
       const previousEffectState =
-        snapshotEffectControlState(getActiveEffect(), usesFullConfigSnapshot);
+        snapshotEffectControlState(getActiveEffect(), usesChainSnapshot, getChainSnapshot);
       const result = runSwitchTransaction(
         () => applyResolution(),
         () => restoreResolution(old, previousEffect, previousUrl, previousEffectState),
@@ -416,10 +418,13 @@ export function createApplyPipeline({
    *   (the caller must revert appState so UI/URL don't advertise an unapplied
    *   effect), else ApplyResult.APPLIED.
    */
-  function applyEffect(preserveParams = false, broadcast = true) {
+  function applyEffect(preserveParams = false, broadcast = true, chainSnapshot = null) {
     // A rejected effect leaves the engine unchanged, so return before the worker
     // broadcast below: sending the rejected name would diverge them from main.
     if (getEngine() && !selectEngineEffect()) return ApplyResult.REJECTED;
+    if (chainSnapshot && callWorkbenchBinding(getEngine(), 'getShaderChainBindings',
+      'restoreSnapshot', [chainSnapshot]) !== getModule().ChainSnapshotRestoreResult.APPLIED)
+      return ApplyResult.REJECTED;
 
     effectGui.destroy();
     if (!preserveParams) clearEffectParamUrl();
@@ -467,6 +472,7 @@ export function createApplyPipeline({
     }
 
     const engine = getEngine();
+    const chainSnapshot = callWorkbenchBinding(engine, 'getShaderChainBindings', 'getSnapshot', []);
     if (engine) {
       // Only UNSUPPORTED rejects; RESIZED and ALREADY_ACTIVE both leave the
       // requested size active.
@@ -515,8 +521,8 @@ export function createApplyPipeline({
     }
 
     // A correction's param URL entries belong to the effect it dropped.
-    const keepParams = (preserveParams || !engine) && !effectChanged;
-    if (applyEffect(keepParams, false) !== ApplyResult.APPLIED) {
+    const keepParams = (preserveParams || !engine || chainSnapshot !== null) && !effectChanged;
+    if (applyEffect(keepParams, false, effectChanged ? null : chainSnapshot) !== ApplyResult.APPLIED) {
       return ApplyResult.REJECTED;
     }
 

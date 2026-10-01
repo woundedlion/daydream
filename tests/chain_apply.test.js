@@ -42,13 +42,13 @@ function harness() {
   const engine = new FakeChainEngine();
   engine.setEffect('ShaderChain');
   const order = [];
-  const originalChain = engine.setShaderChain.bind(engine);
-  engine.setShaderChain = (entries) => {
+  const originalChain = engine.bindings.setShaderChain.bind(engine);
+  engine.bindings.setShaderChain = (entries) => {
     order.push('setShaderChain');
     return originalChain(entries);
   };
-  const originalWrite = engine.setShaderChainParameters.bind(engine);
-  engine.setShaderChainParameters = (writes) => {
+  const originalWrite = engine.bindings.setShaderChainParameters.bind(engine);
+  engine.bindings.setShaderChainParameters = (writes) => {
     order.push('setShaderChainParameters');
     return originalWrite(writes);
   };
@@ -213,7 +213,7 @@ test('the fake chain engine advances generations after repeated application', ()
 test('an inadmissible preset is submitted together and reports native refusal', () => {
   const { engine, order, run } = harness();
   const values = { 'sample.speed': 0.5, 'camera.wander': 0.75 };
-  engine.setShaderChainParameters = (writes) => {
+  engine.bindings.setShaderChainParameters = (writes) => {
     order.push('batch-refused');
     assert.deepEqual(writes, Object.entries(values).map(([name, value]) => ({ name, value })));
     return ParamSetResult.INADMISSIBLE;
@@ -227,34 +227,34 @@ test('an inadmissible preset is submitted together and reports native refusal', 
 test('the fake chain engine exposes status identities on every return path', () => {
   const engine = new FakeChainEngine();
   engine.setEffect('ShaderChain');
-  assert.equal(engine.setShaderChain(null).status, ChainStatus.MALFORMED_PAYLOAD);
-  assert.equal(engine.setShaderChain([{ instance: 'x', operator: 'unknown' }]).status,
+  assert.equal(engine.bindings.setShaderChain(null).status, ChainStatus.MALFORMED_PAYLOAD);
+  assert.equal(engine.bindings.setShaderChain([{ instance: 'x', operator: 'unknown' }]).status,
     ChainStatus.UNKNOWN_OPERATOR);
   engine.nextChainResult = { code: 'ARENA_OVERFLOW', entryIndex: -1 };
-  assert.equal(engine.setShaderChain([]).status, ChainStatus.ARENA_OVERFLOW);
-  assert.equal(engine.setShaderChain([]).status, ChainStatus.EMPTY);
-  assert.equal(engine.setShaderChain(Array.from({ length: 33 }, () => ({}))).status,
+  assert.equal(engine.bindings.setShaderChain([]).status, ChainStatus.ARENA_OVERFLOW);
+  assert.equal(engine.bindings.setShaderChain([]).status, ChainStatus.EMPTY);
+  assert.equal(engine.bindings.setShaderChain(Array.from({ length: 33 }, () => ({}))).status,
     ChainStatus.TOO_LONG);
   const duplicate = { instance: 'same', operator: 'sphere.rotate.v2' };
-  assert.equal(engine.setShaderChain([duplicate, duplicate]).status, ChainStatus.DUPLICATE_INSTANCE);
+  assert.equal(engine.bindings.setShaderChain([duplicate, duplicate]).status, ChainStatus.DUPLICATE_INSTANCE);
   engine.setEffect('Comets');
-  assert.equal(engine.setShaderChain([]).status, ChainStatus.NOT_CHAIN_EFFECT);
+  assert.equal(engine.bindings.setShaderChain([]).status, ChainStatus.NOT_CHAIN_EFFECT);
 });
 
 test('fake parameter batches distinguish malformed and oversized payloads', () => {
   const engine = new FakeChainEngine();
   engine.setEffect('ShaderChain');
-  engine.setShaderChain(CHAIN.map(({ label, operator }) => ({ instance: label, operator })));
+  engine.bindings.setShaderChain(CHAIN.map(({ label, operator }) => ({ instance: label, operator })));
   const before = engine.getParameterDefinitions();
   for (const payload of [null, undefined, {}, [null], [undefined],
     [{ name: 1, value: 0 }], [{ name: 'camera.wander' }],
     [{ name: 'camera.wander', value: '0.5' }]]) {
-    assert.equal(engine.setShaderChainParameters(payload), ParamSetResult.MALFORMED_PAYLOAD);
+    assert.equal(engine.bindings.setShaderChainParameters(payload), ParamSetResult.MALFORMED_PAYLOAD);
   }
-  assert.equal(engine.setShaderChainParameters(
+  assert.equal(engine.bindings.setShaderChainParameters(
     Array(engine.catalog.budgets.max_params + 1).fill({ name: 'camera.wander', value: 0 })),
   ParamSetResult.TOO_LONG);
-  assert.equal(engine.setShaderChainParameters([{ name: 'camera.wander', value: NaN }]),
+  assert.equal(engine.bindings.setShaderChainParameters([{ name: 'camera.wander', value: NaN }]),
     ParamSetResult.NON_FINITE);
   assert.deepEqual(engine.getParameterDefinitions(), before);
 });

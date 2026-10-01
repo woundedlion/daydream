@@ -20,7 +20,7 @@ import {
   SHADER_LINK_MAX_WAIT_MS,
 } from '../src/workbench/shader/shader_documents.js';
 import {
-  FakeChainEngine, ParamSetResult, unpinnedEngineMethods,
+  FakeChainEngine, ParamSetResult, ChainSnapshotRestoreResult, unpinnedEngineMethods,
 } from './helpers/fake_engine.js';
 import {
   documentEvents, fakeElement, installAnimationFrames, installDocument,
@@ -56,11 +56,34 @@ test('shader state hashes round-trip the complete authoring state', async () => 
   };
   const hash = await encodeShaderStateHash(state);
 
-  assert.match(hash, /^#shader=v1\.[A-Za-z0-9_-]+$/);
+  assert.match(hash, /^#shader=v2\.[A-Za-z0-9_-]+$/);
   assert.deepEqual(JSON.parse(JSON.stringify(await decodeShaderStateHash(hash))), state);
   assert.equal(await decodeShaderStateHash('#unrelated'), null);
   await assert.rejects(decodeShaderStateHash('#shader=v1.not-gzip'),
     /invalid shader link payload/);
+});
+
+test('v2 shader links retain typed runtime and palette state while v1 authoring links remain readable', async () => {
+  const state = {
+    document: {descriptor: {chain: [{label: 'source'}]}},
+    preset: 'night', bypassed: [], paused: true,
+    chainSnapshot: {
+      schemaVersion: 1, chain: [{instance: 'source', operator: 'sample.grid.v2'}],
+      parameters: [{name: 'source.pattern-freq', value: 1}], animationsPaused: true,
+      runtime: [{instance: 'source', kind: 'source-clock-v1',
+        state: {primary: 1.25, secondary: 0.5, angle: 2}}],
+      paletteBank: {chroma: 0.75, hues: [0, 159, 318],
+        cycles: [{frame: 713, nextSequence: 7, fadeActive: true, displayDirty: false}]},
+    },
+  };
+  assert.deepEqual(JSON.parse(JSON.stringify(
+    await decodeShaderStateHash(await encodeShaderStateHash(state)))), state);
+  const original = {document: state.document, preset: state.preset, bypassed: [], paused: true};
+  const payload = gzipSync(JSON.stringify({d: original.document, p: original.preset,
+    b: original.bypassed, a: original.paused})).toString('base64url');
+  assert.deepEqual(JSON.parse(JSON.stringify(await decodeShaderStateHash(`#shader=v1.${payload}`))), original);
+  await assert.rejects(encodeShaderStateHash({...state, chainSnapshot: {schemaVersion: 2}}),
+    /invalid shader link snapshot/);
 });
 
 test('shader links bound the expanded UTF-8 state including its wrapper', async () => {
@@ -189,7 +212,7 @@ test('the alias table keys stay frozen to the pre-spec promoted labels', () => {
     ['camera', 'colorize', 'sample', 'surface', 'warp1', 'warp2']);
 });
 
-const MODULE = { ParamSetResult, HolosphereEngine: { getShaderChainCatalog: () => ENGINE_CATALOG } };
+const MODULE = { ParamSetResult, ChainSnapshotRestoreResult, ShaderChainBindings: { getShaderChainCatalog: () => ENGINE_CATALOG } };
 
 for (const operation of ['selectEffect', 'setShaderChainParameters', 'stage edit']) {
   test(`a halted ${operation} reports failure and blocks later engine calls`, async (t) => {
@@ -206,7 +229,7 @@ for (const operation of ['selectEffect', 'setShaderChainParameters', 'stage edit
     });
     if (operation === 'selectEffect') shouldHalt = true;
     if (operation === 'setShaderChainParameters')
-      harness.engine.setShaderChainParameters = halt;
+      harness.engine.bindings.setShaderChainParameters = halt;
     if (operation === 'stage edit') {
       harness.engine.setParameter = halt;
       stageEditor(harness, 'sample')('sample.pattern-freq', 7);
@@ -494,7 +517,7 @@ function workbenchEngine() {
   const writes = [];
   const selected = [];
   const chained = [];
-  return {
+  const engine = {
     definitions,
     writes,
     selected,
@@ -521,6 +544,17 @@ function workbenchEngine() {
       return ParamSetResult.APPLIED;
     },
   };
+  const bindings = {
+    setShaderChain: engine.bindings?.setShaderChain ?? engine.setShaderChain,
+    setShaderChainParameters: engine.bindings?.setShaderChainParameters ?? engine.setShaderChainParameters,
+    getSnapshot: () => null,
+    delete: () => {},
+  };
+  delete engine.setShaderChain;
+  delete engine.setShaderChainParameters;
+  engine.bindings = bindings;
+  engine.getShaderChainBindings = () => ({...bindings});
+  return engine;
 }
 
 /**
@@ -692,7 +726,7 @@ test('a deep-linked document id opens that document', async () => {
 // §4.5: the legacy Shader route names no document, and neither does a
 // stale id, so both open the scratch chain.
 test('a deep link naming no catalog document opens the scratch chain', async () => {
-  for (const initialEffect of ['Shader', 'retired-pattern', null]) {
+  for (const initialEffect of ['ShaderChain', 'retired-pattern', null]) {
     const harness = workbench({ initialEffect });
 
     assert.equal(await harness.controller.init(), true);
@@ -794,7 +828,7 @@ test('overlapping loads are serialized in request order', async () => {
 
 test('a setShaderChain refusal is surfaced with its code', async () => {
   const engine = workbenchEngine();
-  engine.setShaderChain = (entries) => {
+  engine.bindings.setShaderChain = (entries) => {
     engine.chained.push(entries);
     return { code: 'ARENA_OVERFLOW', entryIndex: -1 };
   };
@@ -973,13 +1007,13 @@ function compiledBuildEngine() {
  * The document controller over the real compiler, the real chain store, and a
  * FakeChainEngine, with the workbench mounts present and kaleidoscope_hex_bright loaded over
  * the scratch document the page opens on.
- * @param {{source?: string|null, migration?: string, hash?: string,
+ * @param {{source?: string|null, migration?: string, hash?: string, search?: string, initialEffect?: string|null,
  *   paused?: boolean, selectEffect?: () => boolean}} [seams] - source null
  *   leaves the scratch document loaded.
  * @returns {Promise<Object>} The controller and everything it wrote to.
  */
 async function editorWorkbench({
-  source = KALEIDOSCOPE_HEX_BRIGHT, migration = EMPTY_MIGRATION, hash = '', paused = false,
+  source = KALEIDOSCOPE_HEX_BRIGHT, migration = EMPTY_MIGRATION, hash = '', search = '?effect=ShaderChain', initialEffect = null, paused = false,
   selectEffect = () => true,
 } = {}) {
   const engine = new FakeChainEngine();
@@ -990,7 +1024,7 @@ async function editorWorkbench({
   let pausedReads = 0;
   const animationWrites = [];
   for (const [target, method] of [[engine, 'setParameter'],
-    [engine, 'setShaderChainParameters'], [compiledEngine, 'setParameter']]) {
+    [engine.bindings, 'setShaderChainParameters'], [compiledEngine, 'setParameter']]) {
     const write = target[method].bind(target);
     target[method] = (...args) => {
       animationsPaused = true;
@@ -1012,7 +1046,7 @@ async function editorWorkbench({
   const filters = [];
   const urls = [];
   const location = {
-    pathname: '/tools/shader.html', search: '?effect=Shader', hash,
+    pathname: '/tools/shader.html', search, hash,
   };
   const win = {
     location,
@@ -1052,6 +1086,7 @@ async function editorWorkbench({
     importCompiler: () => import('../generated/shader/shader_workbench.mjs'),
     download: (filename, source) => downloads.push([filename, source]),
     win,
+    initialEffect,
   });
   ownedEditors.add(controller);
   assert.equal(await controller.init(), true);
@@ -1193,9 +1228,9 @@ test('a load whose preset the engine refuses puts the program back', async () =>
   const presets = harness.elements.get('shader-preset-select').options.map((o) => o.value);
   const program = harness.engine.chainCalls.at(-1);
 
-  const write = harness.engine.setShaderChainParameters.bind(harness.engine);
+  const write = harness.engine.bindings.setShaderChainParameters.bind(harness.engine);
   let refuse = true;
-  harness.engine.setShaderChainParameters = (writes) => {
+  harness.engine.bindings.setShaderChainParameters = (writes) => {
     if (!refuse) return write(writes);
     refuse = false;
     return ParamSetResult.READONLY;
@@ -1220,7 +1255,7 @@ test('a refused preset restores the dropdown selection', async () => {
   const harness = await editorWorkbench();
   const select = harness.elements.get('shader-preset-select');
   const previous = select.value;
-  harness.engine.setShaderChainParameters = () => ParamSetResult.INADMISSIBLE;
+  harness.engine.bindings.setShaderChainParameters = () => ParamSetResult.INADMISSIBLE;
   select.value = select.options.find((option) => option.value !== previous).value;
   select.dispatch('change');
   assert.equal(select.value, previous);
@@ -1788,8 +1823,8 @@ test('a chip control edit joins the structural history and coalesces per control
 
 test('legacy custom Shader URLs preserve their state on the workbench route', () => {
   assert.equal(
-    shaderWorkbenchUrl('https://example.test/daydream/index.html?effect=ShaderBall&fx.Speed=2#preview'),
-    '/daydream/tools/shader.html?effect=Shader&fx.Speed=2#preview',
+    shaderWorkbenchUrl('https://example.test/daydream/index.html?effect=ShaderBall&fx.Speed=2#preview', 'ShaderBall'),
+    '/daydream/tools/shader.html?effect=ShaderBall&fx.Speed=2#preview',
   );
 });
 
@@ -1919,15 +1954,15 @@ test('disposing a document controller flushes edits and releases its whole UI', 
 });
 
 test('catalog skew refuses initialization before any chain is applied', async () => {
-  const original = MODULE.HolosphereEngine.getShaderChainCatalog;
-  MODULE.HolosphereEngine.getShaderChainCatalog = () => '{}';
+  const original = MODULE.ShaderChainBindings.getShaderChainCatalog;
+  MODULE.ShaderChainBindings.getShaderChainCatalog = () => '{}';
   try {
     const page = workbench();
     assert.equal(await page.controller.init(), false);
     assert.match(page.elements.get('shader-document-status').textContent, /does not match/);
     assert.equal(page.engine.chained.length, 0);
   } finally {
-    MODULE.HolosphereEngine.getShaderChainCatalog = original;
+    MODULE.ShaderChainBindings.getShaderChainCatalog = original;
   }
 });
 
@@ -2043,4 +2078,101 @@ test('noncatalog shader links have their own source option', async () => {
   assert.equal(source.selectedOptions[0].textContent, 'Linked: linked.shader.json');
   assert.equal(source.selectedOptions[0].disabled, true);
   assert.notEqual(source.value, '');
+});
+
+
+test('legacy imports adopt accepted state and preserve pending edits and original archive in a sidecar', async () => {
+  const fixtures = JSON.parse(readFileSync(new URL('./fixtures/legacy_shader_snapshots.json', import.meta.url)));
+  const original = structuredClone(fixtures[0].presets[9].snapshot);
+  original.requested[0] = original.accepted[0] === 0 ? 1 : 0;
+  original.pendingFieldIds = [0];
+  const text = JSON.stringify(original);
+  const search = `?effect=Shader&fx.__fullConfig=${encodeURIComponent(text)}`;
+  const harness = await editorWorkbench({source: null, search, initialEffect: 'Shader'});
+  const query = new URLSearchParams(harness.win.location.search);
+  assert.equal(query.get('fx.__fullConfig'), text);
+  const sidecar = JSON.parse(query.get('fx.__legacyShader'));
+  assert.deepEqual(sidecar.original, original);
+  assert.deepEqual(sidecar.pendingFieldIds, [0]);
+  const snapshot = JSON.parse(query.get('fx.__chainSnapshot'));
+  assert.equal(snapshot.chain.find((entry) => entry.instance === 'outer').operator, 'warp.polar-chart.v2');
+  assert.equal(harness.controller.preservesOriginalLink(), false);
+  assert.match(harness.elements.get('shader-document-status').textContent, /Pending edits remain preserved/);
+  harness.controller.save();
+  const saved = JSON.parse(harness.downloads.at(-1)[1]);
+  assert.deepEqual(validateShaderDocument(saved, {catalog: JSON.parse(ENGINE_CATALOG)}), []);
+});
+
+test('restoring an imported query snapshot retains its original legacy sidecar', async () => {
+  const fixtures = JSON.parse(readFileSync(new URL('./fixtures/legacy_shader_snapshots.json', import.meta.url)));
+  const original = structuredClone(fixtures[0].presets[9].snapshot);
+  original.requested[0] = original.accepted[0] === 0 ? 1 : 0;
+  original.pendingFieldIds = [0];
+  const initial = await editorWorkbench({source: null, initialEffect: 'Shader',
+    search: `?effect=Shader&fx.__fullConfig=${encodeURIComponent(JSON.stringify(original))}`});
+  const query = new URLSearchParams(initial.win.location.search);
+  const restored = await editorWorkbench({source: null, initialEffect: 'Shader',
+    search: initial.win.location.search});
+  const restoredQuery = new URLSearchParams(restored.win.location.search);
+  assert.equal(restoredQuery.get('fx.__legacyShader'), query.get('fx.__legacyShader'));
+  assert.equal(restoredQuery.get('fx.__fullConfig'), JSON.stringify(original));
+  assert.deepEqual(JSON.parse(restoredQuery.get('fx.__legacyShader')).pendingFieldIds, [0]);
+});
+
+test('a refused legacy archive retains its entire URL through initialization and disposal', async () => {
+  for (const text of ['{broken', JSON.stringify({schemaVersion: 9})]) {
+    const search = `?effect=ShaderBall&fx.__fullConfig=${encodeURIComponent(text)}&fx.FutureField=42`;
+    const harness = await editorWorkbench({source: null, search, initialEffect: 'ShaderBall'});
+    assert.equal(harness.controller.preservesOriginalLink(), true);
+    assert.equal(harness.win.location.search, search);
+    assert.equal(harness.urls.length, 0);
+    assert.match(harness.elements.get('shader-document-status').textContent, /could not be restored/);
+    await harness.controller.dispose();
+    ownedEditors.delete(harness.controller);
+    assert.equal(harness.win.location.search, search);
+  }
+});
+
+test('a failed document replacement keeps a refused legacy link preserved', async () => {
+  const search = '?effect=Shader&fx.__fullConfig=%7Bbroken';
+  const harness = await editorWorkbench({source: null, search, initialEffect: 'Shader'});
+  const input = harness.elements.get('shader-document-file');
+  input.files = [{name: 'broken.shader.json', size: 20, text: async () => '{broken'}];
+  await onChange(input)();
+  assert.equal(harness.controller.preservesOriginalLink(), true);
+  assert.equal(harness.win.location.search, search);
+  assert.equal(harness.urls.length, 0);
+  await harness.controller.dispose();
+  ownedEditors.delete(harness.controller);
+  assert.equal(harness.win.location.search, search);
+});
+
+test('a chain snapshot restores its program and accepted parameters into the editor', async () => {
+  const engine = new FakeChainEngine();
+  engine.setEffect('ShaderChain');
+  engine.setParameter('sample.pattern-freq', 2.25);
+  const bindings = engine.getShaderChainBindings();
+  const snapshot = bindings.getSnapshot();
+  bindings.delete();
+  const harness = await editorWorkbench({source: null,
+    search: `?effect=ShaderChain&fx.__chainSnapshot=${encodeURIComponent(JSON.stringify(snapshot))}`});
+  const restored = harness.engine.getShaderChainBindings();
+  assert.deepEqual(restored.getProgram(), snapshot.chain);
+  assert.equal(harness.engine.getParameterDefinitions().find((entry) => entry.name === 'sample.pattern-freq').acceptedValue, 2.25);
+  restored.delete();
+  assert.equal(harness.controller.preservesOriginalLink(), false);
+});
+
+test('a linked runtime snapshot that disagrees with its document retains the original link', async () => {
+  const seed = await editorWorkbench({source: null});
+  const state = await decodeShaderStateHash(seed.win.location.hash);
+  state.chainSnapshot.parameters[0].value += 1;
+  const hash = await encodeShaderStateHash(state);
+  const harness = await editorWorkbench({source: null, hash});
+  assert.equal(harness.controller.preservesOriginalLink(), true);
+  assert.equal(harness.win.location.hash, hash);
+  assert.match(harness.elements.get('shader-document-status').textContent, /does not match/);
+  await harness.controller.dispose();
+  ownedEditors.delete(harness.controller);
+  assert.equal(harness.win.location.hash, hash);
 });

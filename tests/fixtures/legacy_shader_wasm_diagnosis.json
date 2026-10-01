@@ -1,0 +1,1696 @@
+{
+  "schemaVersion": 1,
+  "baselineSourceCommit": "b6d2c0100e10d57b18f9bd749d5ab28b34574dd8",
+  "configuration": "wasm-release",
+  "candidate": "ShaderChain retirement candidate before final integration",
+  "acceptedFramebufferLimits": {
+    "HUE_ROTATION_AND_NOISE_LUTS": 3066,
+    "PEIRCE_FAST_SQUARE": 256
+  },
+  "comparisons": [
+    {
+      "resolution": "96x20",
+      "frame_count": 227,
+      "changed_frames": 125,
+      "old_metrics": {
+        "HUE_ROTATION_AND_NOISE_LUTS": {
+          "value": 2543,
+          "sample_count": 21408
+        },
+        "PEIRCE_FAST_SQUARE": {
+          "value": 97,
+          "sample_count": 6696
+        }
+      },
+      "new_metrics": {
+        "HUE_ROTATION_AND_NOISE_LUTS": {
+          "value": 2543,
+          "sample_count": 21408
+        },
+        "PEIRCE_FAST_SQUARE": {
+          "value": 97,
+          "sample_count": 6696
+        }
+      },
+      "differences": [
+        {
+          "preset": 0,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 3
+        },
+        {
+          "preset": 0,
+          "operation": "case:endpoint_max",
+          "max_delta": 38345,
+          "changed_channels": 3040
+        },
+        {
+          "preset": 0,
+          "operation": "case:interior",
+          "max_delta": 18,
+          "changed_channels": 437
+        },
+        {
+          "preset": 0,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 3
+        },
+        {
+          "preset": 0,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 3
+        },
+        {
+          "preset": 21,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 6
+        },
+        {
+          "preset": 21,
+          "operation": "case:endpoint_max",
+          "max_delta": 38345,
+          "changed_channels": 3040
+        },
+        {
+          "preset": 21,
+          "operation": "case:interior",
+          "max_delta": 18,
+          "changed_channels": 437
+        },
+        {
+          "preset": 21,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 6
+        },
+        {
+          "preset": 21,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 6
+        },
+        {
+          "preset": 22,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 5
+        },
+        {
+          "preset": 22,
+          "operation": "case:endpoint_max",
+          "max_delta": 38345,
+          "changed_channels": 3040
+        },
+        {
+          "preset": 22,
+          "operation": "case:interior",
+          "max_delta": 18,
+          "changed_channels": 437
+        },
+        {
+          "preset": 22,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 5
+        },
+        {
+          "preset": 22,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 5
+        },
+        {
+          "preset": 23,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 10
+        },
+        {
+          "preset": 23,
+          "operation": "case:endpoint_max",
+          "max_delta": 38345,
+          "changed_channels": 3040
+        },
+        {
+          "preset": 23,
+          "operation": "case:interior",
+          "max_delta": 18,
+          "changed_channels": 437
+        },
+        {
+          "preset": 23,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 10
+        },
+        {
+          "preset": 23,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 10
+        },
+        {
+          "preset": 1,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 6
+        },
+        {
+          "preset": 1,
+          "operation": "case:endpoint_max",
+          "max_delta": 27,
+          "changed_channels": 239
+        },
+        {
+          "preset": 1,
+          "operation": "case:interior",
+          "max_delta": 1,
+          "changed_channels": 9
+        },
+        {
+          "preset": 1,
+          "operation": "seam:mirror-cell",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 1,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 6
+        },
+        {
+          "preset": 1,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 6
+        },
+        {
+          "preset": 2,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 13
+        },
+        {
+          "preset": 2,
+          "operation": "case:endpoint_max",
+          "max_delta": 274,
+          "changed_channels": 892
+        },
+        {
+          "preset": 2,
+          "operation": "case:interior",
+          "max_delta": 5,
+          "changed_channels": 187
+        },
+        {
+          "preset": 2,
+          "operation": "seam:fold",
+          "max_delta": 1,
+          "changed_channels": 3
+        },
+        {
+          "preset": 2,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 13
+        },
+        {
+          "preset": 2,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 13
+        },
+        {
+          "preset": 3,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 44
+        },
+        {
+          "preset": 3,
+          "operation": "case:endpoint_max",
+          "max_delta": 420,
+          "changed_channels": 1985
+        },
+        {
+          "preset": 3,
+          "operation": "case:interior",
+          "max_delta": 20,
+          "changed_channels": 765
+        },
+        {
+          "preset": 3,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 44
+        },
+        {
+          "preset": 3,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 44
+        },
+        {
+          "preset": 4,
+          "operation": "case:default",
+          "max_delta": 5,
+          "changed_channels": 41
+        },
+        {
+          "preset": 4,
+          "operation": "case:endpoint_max",
+          "max_delta": 56880,
+          "changed_channels": 348
+        },
+        {
+          "preset": 4,
+          "operation": "case:interior",
+          "max_delta": 369,
+          "changed_channels": 308
+        },
+        {
+          "preset": 4,
+          "operation": "boundary:square-edge",
+          "max_delta": 1,
+          "changed_channels": 7
+        },
+        {
+          "preset": 4,
+          "operation": "transition:from",
+          "max_delta": 5,
+          "changed_channels": 41
+        },
+        {
+          "preset": 4,
+          "operation": "transition:to",
+          "max_delta": 5,
+          "changed_channels": 41
+        },
+        {
+          "preset": 5,
+          "operation": "case:endpoint_max",
+          "max_delta": 925,
+          "changed_channels": 95
+        },
+        {
+          "preset": 5,
+          "operation": "case:interior",
+          "max_delta": 5,
+          "changed_channels": 170
+        },
+        {
+          "preset": 6,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 7
+        },
+        {
+          "preset": 6,
+          "operation": "case:endpoint_max",
+          "max_delta": 1,
+          "changed_channels": 4
+        },
+        {
+          "preset": 6,
+          "operation": "case:interior",
+          "max_delta": 1,
+          "changed_channels": 11
+        },
+        {
+          "preset": 6,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 7
+        },
+        {
+          "preset": 6,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 7
+        },
+        {
+          "preset": 7,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 12
+        },
+        {
+          "preset": 7,
+          "operation": "case:endpoint_max",
+          "max_delta": 145,
+          "changed_channels": 1062
+        },
+        {
+          "preset": 7,
+          "operation": "case:interior",
+          "max_delta": 1,
+          "changed_channels": 80
+        },
+        {
+          "preset": 7,
+          "operation": "singularity:north-pole",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 7,
+          "operation": "boundary:singularity-fade",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 7,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 12
+        },
+        {
+          "preset": 7,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 12
+        },
+        {
+          "preset": 8,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 8
+        },
+        {
+          "preset": 8,
+          "operation": "case:endpoint_max",
+          "max_delta": 145,
+          "changed_channels": 1062
+        },
+        {
+          "preset": 8,
+          "operation": "case:interior",
+          "max_delta": 1,
+          "changed_channels": 80
+        },
+        {
+          "preset": 8,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 8
+        },
+        {
+          "preset": 8,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 8
+        },
+        {
+          "preset": 9,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 9,
+          "operation": "case:endpoint_max",
+          "max_delta": 34,
+          "changed_channels": 12
+        },
+        {
+          "preset": 9,
+          "operation": "boundary:projection-weight",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 9,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 9,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 10,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 2
+        },
+        {
+          "preset": 10,
+          "operation": "case:endpoint_max",
+          "max_delta": 150,
+          "changed_channels": 79
+        },
+        {
+          "preset": 10,
+          "operation": "case:interior",
+          "max_delta": 2,
+          "changed_channels": 14
+        },
+        {
+          "preset": 10,
+          "operation": "seam:mirror-cell",
+          "max_delta": 1,
+          "changed_channels": 2
+        },
+        {
+          "preset": 10,
+          "operation": "singularity:gnomonic-horizon",
+          "max_delta": 1,
+          "changed_channels": 2
+        },
+        {
+          "preset": 10,
+          "operation": "boundary:hemisphere",
+          "max_delta": 1,
+          "changed_channels": 2
+        },
+        {
+          "preset": 10,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 2
+        },
+        {
+          "preset": 10,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 2
+        },
+        {
+          "preset": 11,
+          "operation": "case:endpoint_max",
+          "max_delta": 124,
+          "changed_channels": 68
+        },
+        {
+          "preset": 11,
+          "operation": "case:interior",
+          "max_delta": 5,
+          "changed_channels": 16
+        },
+        {
+          "preset": 13,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 13,
+          "operation": "case:endpoint_max",
+          "max_delta": 124,
+          "changed_channels": 68
+        },
+        {
+          "preset": 13,
+          "operation": "case:interior",
+          "max_delta": 5,
+          "changed_channels": 16
+        },
+        {
+          "preset": 13,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 13,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 14,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 5
+        },
+        {
+          "preset": 14,
+          "operation": "case:endpoint_max",
+          "max_delta": 124,
+          "changed_channels": 68
+        },
+        {
+          "preset": 14,
+          "operation": "case:interior",
+          "max_delta": 5,
+          "changed_channels": 16
+        },
+        {
+          "preset": 14,
+          "operation": "seam:mirror-cell",
+          "max_delta": 1,
+          "changed_channels": 3
+        },
+        {
+          "preset": 14,
+          "operation": "boundary:projection-weight",
+          "max_delta": 1,
+          "changed_channels": 2
+        },
+        {
+          "preset": 14,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 5
+        },
+        {
+          "preset": 14,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 5
+        },
+        {
+          "preset": 12,
+          "operation": "case:endpoint_max",
+          "max_delta": 51,
+          "changed_channels": 46
+        },
+        {
+          "preset": 12,
+          "operation": "case:interior",
+          "max_delta": 1,
+          "changed_channels": 2
+        },
+        {
+          "preset": 15,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 15,
+          "operation": "case:endpoint_max",
+          "max_delta": 51,
+          "changed_channels": 11
+        },
+        {
+          "preset": 15,
+          "operation": "case:interior",
+          "max_delta": 2,
+          "changed_channels": 3
+        },
+        {
+          "preset": 15,
+          "operation": "seam:mirror-cell",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 15,
+          "operation": "boundary:projection-weight",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 15,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 15,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 16,
+          "operation": "case:endpoint_max",
+          "max_delta": 51,
+          "changed_channels": 11
+        },
+        {
+          "preset": 16,
+          "operation": "case:interior",
+          "max_delta": 2,
+          "changed_channels": 3
+        },
+        {
+          "preset": 17,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 17,
+          "operation": "case:endpoint_max",
+          "max_delta": 51,
+          "changed_channels": 11
+        },
+        {
+          "preset": 17,
+          "operation": "case:interior",
+          "max_delta": 2,
+          "changed_channels": 3
+        },
+        {
+          "preset": 17,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 17,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 18,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 53
+        },
+        {
+          "preset": 18,
+          "operation": "case:endpoint_max",
+          "max_delta": 506,
+          "changed_channels": 1654
+        },
+        {
+          "preset": 18,
+          "operation": "case:interior",
+          "max_delta": 6,
+          "changed_channels": 532
+        },
+        {
+          "preset": 18,
+          "operation": "seam:mirror-cell",
+          "max_delta": 1,
+          "changed_channels": 7
+        },
+        {
+          "preset": 18,
+          "operation": "boundary:projection-weight",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 18,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 53
+        },
+        {
+          "preset": 18,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 53
+        },
+        {
+          "preset": 19,
+          "operation": "case:default",
+          "max_delta": 2,
+          "changed_channels": 87
+        },
+        {
+          "preset": 19,
+          "operation": "case:endpoint_max",
+          "max_delta": 282,
+          "changed_channels": 798
+        },
+        {
+          "preset": 19,
+          "operation": "case:interior",
+          "max_delta": 6,
+          "changed_channels": 82
+        },
+        {
+          "preset": 19,
+          "operation": "seam:mirror-cell",
+          "max_delta": 1,
+          "changed_channels": 9
+        },
+        {
+          "preset": 19,
+          "operation": "boundary:projection-weight",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 19,
+          "operation": "transition:from",
+          "max_delta": 2,
+          "changed_channels": 87
+        },
+        {
+          "preset": 19,
+          "operation": "transition:to",
+          "max_delta": 2,
+          "changed_channels": 87
+        },
+        {
+          "preset": 20,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 73
+        },
+        {
+          "preset": 20,
+          "operation": "case:endpoint_max",
+          "max_delta": 282,
+          "changed_channels": 798
+        },
+        {
+          "preset": 20,
+          "operation": "case:interior",
+          "max_delta": 6,
+          "changed_channels": 82
+        },
+        {
+          "preset": 20,
+          "operation": "seam:mirror-cell",
+          "max_delta": 1,
+          "changed_channels": 8
+        },
+        {
+          "preset": 20,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 73
+        },
+        {
+          "preset": 20,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 73
+        }
+      ],
+      "baseline_sha256": "ace8bcc222956523b6d6e1b12fe2718700f3da0ff98f5d6427728928eb891223",
+      "candidate_sha256": "c9ede573fbd0c0e4bc02abfca490848eadc6a212b72bc27453d707a803e6948b"
+    },
+    {
+      "resolution": "288x144",
+      "frame_count": 227,
+      "changed_frames": 146,
+      "old_metrics": {
+        "HUE_ROTATION_AND_NOISE_LUTS": {
+          "value": 2820,
+          "sample_count": 391320
+        },
+        "PEIRCE_FAST_SQUARE": {
+          "value": 125,
+          "sample_count": 128736
+        }
+      },
+      "new_metrics": {
+        "HUE_ROTATION_AND_NOISE_LUTS": {
+          "value": 2820,
+          "sample_count": 391320
+        },
+        "PEIRCE_FAST_SQUARE": {
+          "value": 125,
+          "sample_count": 128736
+        }
+      },
+      "differences": [
+        {
+          "preset": 0,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 84
+        },
+        {
+          "preset": 0,
+          "operation": "case:endpoint_max",
+          "max_delta": 58124,
+          "changed_channels": 68461
+        },
+        {
+          "preset": 0,
+          "operation": "case:interior",
+          "max_delta": 34,
+          "changed_channels": 11012
+        },
+        {
+          "preset": 0,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 84
+        },
+        {
+          "preset": 0,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 84
+        },
+        {
+          "preset": 21,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 76
+        },
+        {
+          "preset": 21,
+          "operation": "case:endpoint_max",
+          "max_delta": 58124,
+          "changed_channels": 68461
+        },
+        {
+          "preset": 21,
+          "operation": "case:interior",
+          "max_delta": 34,
+          "changed_channels": 11012
+        },
+        {
+          "preset": 21,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 76
+        },
+        {
+          "preset": 21,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 76
+        },
+        {
+          "preset": 22,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 145
+        },
+        {
+          "preset": 22,
+          "operation": "case:endpoint_max",
+          "max_delta": 58124,
+          "changed_channels": 68461
+        },
+        {
+          "preset": 22,
+          "operation": "case:interior",
+          "max_delta": 34,
+          "changed_channels": 11012
+        },
+        {
+          "preset": 22,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 145
+        },
+        {
+          "preset": 22,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 145
+        },
+        {
+          "preset": 23,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 244
+        },
+        {
+          "preset": 23,
+          "operation": "case:endpoint_max",
+          "max_delta": 58124,
+          "changed_channels": 68461
+        },
+        {
+          "preset": 23,
+          "operation": "case:interior",
+          "max_delta": 34,
+          "changed_channels": 11012
+        },
+        {
+          "preset": 23,
+          "operation": "seam:longitude-wrap",
+          "max_delta": 1,
+          "changed_channels": 2
+        },
+        {
+          "preset": 23,
+          "operation": "boundary:projection-weight",
+          "max_delta": 1,
+          "changed_channels": 2
+        },
+        {
+          "preset": 23,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 244
+        },
+        {
+          "preset": 23,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 244
+        },
+        {
+          "preset": 1,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 104
+        },
+        {
+          "preset": 1,
+          "operation": "case:endpoint_max",
+          "max_delta": 61432,
+          "changed_channels": 5931
+        },
+        {
+          "preset": 1,
+          "operation": "case:interior",
+          "max_delta": 2,
+          "changed_channels": 203
+        },
+        {
+          "preset": 1,
+          "operation": "seam:mirror-cell",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 1,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 104
+        },
+        {
+          "preset": 1,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 104
+        },
+        {
+          "preset": 2,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 351
+        },
+        {
+          "preset": 2,
+          "operation": "case:endpoint_max",
+          "max_delta": 64364,
+          "changed_channels": 20173
+        },
+        {
+          "preset": 2,
+          "operation": "case:interior",
+          "max_delta": 5127,
+          "changed_channels": 3459
+        },
+        {
+          "preset": 2,
+          "operation": "seam:fold",
+          "max_delta": 1,
+          "changed_channels": 7
+        },
+        {
+          "preset": 2,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 351
+        },
+        {
+          "preset": 2,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 351
+        },
+        {
+          "preset": 3,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 591
+        },
+        {
+          "preset": 3,
+          "operation": "case:endpoint_max",
+          "max_delta": 61173,
+          "changed_channels": 45461
+        },
+        {
+          "preset": 3,
+          "operation": "case:interior",
+          "max_delta": 10324,
+          "changed_channels": 13488
+        },
+        {
+          "preset": 3,
+          "operation": "seam:fold",
+          "max_delta": 1,
+          "changed_channels": 9
+        },
+        {
+          "preset": 3,
+          "operation": "singularity:gnomonic-horizon",
+          "max_delta": 1,
+          "changed_channels": 7
+        },
+        {
+          "preset": 3,
+          "operation": "boundary:hemisphere",
+          "max_delta": 1,
+          "changed_channels": 7
+        },
+        {
+          "preset": 3,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 591
+        },
+        {
+          "preset": 3,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 591
+        },
+        {
+          "preset": 4,
+          "operation": "case:default",
+          "max_delta": 8,
+          "changed_channels": 571
+        },
+        {
+          "preset": 4,
+          "operation": "case:endpoint_max",
+          "max_delta": 59977,
+          "changed_channels": 7304
+        },
+        {
+          "preset": 4,
+          "operation": "case:interior",
+          "max_delta": 20816,
+          "changed_channels": 6925
+        },
+        {
+          "preset": 4,
+          "operation": "seam:quadrant-ties",
+          "max_delta": 1,
+          "changed_channels": 4
+        },
+        {
+          "preset": 4,
+          "operation": "boundary:square-edge",
+          "max_delta": 1,
+          "changed_channels": 18
+        },
+        {
+          "preset": 4,
+          "operation": "transition:from",
+          "max_delta": 8,
+          "changed_channels": 571
+        },
+        {
+          "preset": 4,
+          "operation": "transition:to",
+          "max_delta": 8,
+          "changed_channels": 571
+        },
+        {
+          "preset": 5,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 20
+        },
+        {
+          "preset": 5,
+          "operation": "case:endpoint_max",
+          "max_delta": 1052,
+          "changed_channels": 1787
+        },
+        {
+          "preset": 5,
+          "operation": "case:interior",
+          "max_delta": 23,
+          "changed_channels": 4793
+        },
+        {
+          "preset": 5,
+          "operation": "seam:fold",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 5,
+          "operation": "seam:mirror-cell",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 5,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 20
+        },
+        {
+          "preset": 5,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 20
+        },
+        {
+          "preset": 6,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 159
+        },
+        {
+          "preset": 6,
+          "operation": "case:endpoint_max",
+          "max_delta": 1,
+          "changed_channels": 115
+        },
+        {
+          "preset": 6,
+          "operation": "case:interior",
+          "max_delta": 10,
+          "changed_channels": 127
+        },
+        {
+          "preset": 6,
+          "operation": "seam:fold",
+          "max_delta": 1,
+          "changed_channels": 3
+        },
+        {
+          "preset": 6,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 159
+        },
+        {
+          "preset": 6,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 159
+        },
+        {
+          "preset": 7,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 196
+        },
+        {
+          "preset": 7,
+          "operation": "case:endpoint_max",
+          "max_delta": 1420,
+          "changed_channels": 23067
+        },
+        {
+          "preset": 7,
+          "operation": "case:interior",
+          "max_delta": 17,
+          "changed_channels": 1683
+        },
+        {
+          "preset": 7,
+          "operation": "singularity:south-pole",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 7,
+          "operation": "boundary:singularity-fade",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 7,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 196
+        },
+        {
+          "preset": 7,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 196
+        },
+        {
+          "preset": 8,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 212
+        },
+        {
+          "preset": 8,
+          "operation": "case:endpoint_max",
+          "max_delta": 1420,
+          "changed_channels": 23067
+        },
+        {
+          "preset": 8,
+          "operation": "case:interior",
+          "max_delta": 17,
+          "changed_channels": 1683
+        },
+        {
+          "preset": 8,
+          "operation": "seam:longitude-wrap",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 8,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 212
+        },
+        {
+          "preset": 8,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 212
+        },
+        {
+          "preset": 9,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 10
+        },
+        {
+          "preset": 9,
+          "operation": "case:endpoint_max",
+          "max_delta": 834,
+          "changed_channels": 141
+        },
+        {
+          "preset": 9,
+          "operation": "case:interior",
+          "max_delta": 2,
+          "changed_channels": 31
+        },
+        {
+          "preset": 9,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 10
+        },
+        {
+          "preset": 9,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 10
+        },
+        {
+          "preset": 10,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 18
+        },
+        {
+          "preset": 10,
+          "operation": "case:endpoint_max",
+          "max_delta": 927,
+          "changed_channels": 1761
+        },
+        {
+          "preset": 10,
+          "operation": "case:interior",
+          "max_delta": 28,
+          "changed_channels": 438
+        },
+        {
+          "preset": 10,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 18
+        },
+        {
+          "preset": 10,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 18
+        },
+        {
+          "preset": 11,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 13
+        },
+        {
+          "preset": 11,
+          "operation": "case:endpoint_max",
+          "max_delta": 164,
+          "changed_channels": 1660
+        },
+        {
+          "preset": 11,
+          "operation": "case:interior",
+          "max_delta": 5,
+          "changed_channels": 341
+        },
+        {
+          "preset": 11,
+          "operation": "seam:mirror-cell",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 11,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 13
+        },
+        {
+          "preset": 11,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 13
+        },
+        {
+          "preset": 13,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 3
+        },
+        {
+          "preset": 13,
+          "operation": "case:endpoint_max",
+          "max_delta": 164,
+          "changed_channels": 1660
+        },
+        {
+          "preset": 13,
+          "operation": "case:interior",
+          "max_delta": 5,
+          "changed_channels": 341
+        },
+        {
+          "preset": 13,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 3
+        },
+        {
+          "preset": 13,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 3
+        },
+        {
+          "preset": 14,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 30
+        },
+        {
+          "preset": 14,
+          "operation": "case:endpoint_max",
+          "max_delta": 164,
+          "changed_channels": 1660
+        },
+        {
+          "preset": 14,
+          "operation": "case:interior",
+          "max_delta": 5,
+          "changed_channels": 341
+        },
+        {
+          "preset": 14,
+          "operation": "seam:mirror-cell",
+          "max_delta": 1,
+          "changed_channels": 2
+        },
+        {
+          "preset": 14,
+          "operation": "boundary:projection-weight",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 14,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 30
+        },
+        {
+          "preset": 14,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 30
+        },
+        {
+          "preset": 12,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 7
+        },
+        {
+          "preset": 12,
+          "operation": "case:endpoint_max",
+          "max_delta": 64,
+          "changed_channels": 841
+        },
+        {
+          "preset": 12,
+          "operation": "case:interior",
+          "max_delta": 2,
+          "changed_channels": 22
+        },
+        {
+          "preset": 12,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 7
+        },
+        {
+          "preset": 12,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 7
+        },
+        {
+          "preset": 15,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 23
+        },
+        {
+          "preset": 15,
+          "operation": "case:endpoint_max",
+          "max_delta": 310,
+          "changed_channels": 200
+        },
+        {
+          "preset": 15,
+          "operation": "case:interior",
+          "max_delta": 8,
+          "changed_channels": 165
+        },
+        {
+          "preset": 15,
+          "operation": "seam:mirror-cell",
+          "max_delta": 1,
+          "changed_channels": 1
+        },
+        {
+          "preset": 15,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 23
+        },
+        {
+          "preset": 15,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 23
+        },
+        {
+          "preset": 16,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 17
+        },
+        {
+          "preset": 16,
+          "operation": "case:endpoint_max",
+          "max_delta": 310,
+          "changed_channels": 200
+        },
+        {
+          "preset": 16,
+          "operation": "case:interior",
+          "max_delta": 8,
+          "changed_channels": 165
+        },
+        {
+          "preset": 16,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 17
+        },
+        {
+          "preset": 16,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 17
+        },
+        {
+          "preset": 17,
+          "operation": "case:default",
+          "max_delta": 2,
+          "changed_channels": 30
+        },
+        {
+          "preset": 17,
+          "operation": "case:endpoint_max",
+          "max_delta": 310,
+          "changed_channels": 200
+        },
+        {
+          "preset": 17,
+          "operation": "case:interior",
+          "max_delta": 8,
+          "changed_channels": 165
+        },
+        {
+          "preset": 17,
+          "operation": "transition:from",
+          "max_delta": 2,
+          "changed_channels": 30
+        },
+        {
+          "preset": 17,
+          "operation": "transition:to",
+          "max_delta": 2,
+          "changed_channels": 30
+        },
+        {
+          "preset": 18,
+          "operation": "case:default",
+          "max_delta": 1,
+          "changed_channels": 1550
+        },
+        {
+          "preset": 18,
+          "operation": "case:endpoint_max",
+          "max_delta": 62986,
+          "changed_channels": 38928
+        },
+        {
+          "preset": 18,
+          "operation": "case:interior",
+          "max_delta": 24730,
+          "changed_channels": 11458
+        },
+        {
+          "preset": 18,
+          "operation": "seam:mirror-cell",
+          "max_delta": 1,
+          "changed_channels": 55
+        },
+        {
+          "preset": 18,
+          "operation": "boundary:projection-weight",
+          "max_delta": 1,
+          "changed_channels": 10
+        },
+        {
+          "preset": 18,
+          "operation": "transition:from",
+          "max_delta": 1,
+          "changed_channels": 1550
+        },
+        {
+          "preset": 18,
+          "operation": "transition:to",
+          "max_delta": 1,
+          "changed_channels": 1550
+        },
+        {
+          "preset": 19,
+          "operation": "case:default",
+          "max_delta": 2,
+          "changed_channels": 1217
+        },
+        {
+          "preset": 19,
+          "operation": "case:endpoint_max",
+          "max_delta": 53077,
+          "changed_channels": 14380
+        },
+        {
+          "preset": 19,
+          "operation": "case:interior",
+          "max_delta": 10,
+          "changed_channels": 1341
+        },
+        {
+          "preset": 19,
+          "operation": "seam:mirror-cell",
+          "max_delta": 1,
+          "changed_channels": 44
+        },
+        {
+          "preset": 19,
+          "operation": "boundary:projection-weight",
+          "max_delta": 1,
+          "changed_channels": 4
+        },
+        {
+          "preset": 19,
+          "operation": "transition:from",
+          "max_delta": 2,
+          "changed_channels": 1217
+        },
+        {
+          "preset": 19,
+          "operation": "transition:to",
+          "max_delta": 2,
+          "changed_channels": 1217
+        },
+        {
+          "preset": 20,
+          "operation": "case:default",
+          "max_delta": 2,
+          "changed_channels": 1371
+        },
+        {
+          "preset": 20,
+          "operation": "case:endpoint_max",
+          "max_delta": 53077,
+          "changed_channels": 14380
+        },
+        {
+          "preset": 20,
+          "operation": "case:interior",
+          "max_delta": 10,
+          "changed_channels": 1341
+        },
+        {
+          "preset": 20,
+          "operation": "seam:mirror-cell",
+          "max_delta": 1,
+          "changed_channels": 54
+        },
+        {
+          "preset": 20,
+          "operation": "singularity:stereographic-pole",
+          "max_delta": 1,
+          "changed_channels": 2
+        },
+        {
+          "preset": 20,
+          "operation": "boundary:projection-weight",
+          "max_delta": 1,
+          "changed_channels": 8
+        },
+        {
+          "preset": 20,
+          "operation": "transition:from",
+          "max_delta": 2,
+          "changed_channels": 1371
+        },
+        {
+          "preset": 20,
+          "operation": "transition:to",
+          "max_delta": 2,
+          "changed_channels": 1371
+        }
+      ],
+      "baseline_sha256": "24f0c45a873bda3e2213e131ebd58f7bc940c8c60bd959576687ff08657d7719",
+      "candidate_sha256": "3b9d85fa86ee95236b4ec591f97cd1ba6d7580db88ee0f27f6e3514a97451c49"
+    }
+  ]
+}

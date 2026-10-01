@@ -660,10 +660,11 @@ test('legalSequences bridges a span with a run of crossings', async () => {
   assert.equal(store.replaceSpan(PROJECT, 3,
     [{ operator: 'sample.spherical-rings.v3' }]).ok, true);
 
-  // The source expands back into a projection and a plane sampler: 2 sphere
-  // sources plus 8 projections over 8 plane sources.
   const expansions = ids(store.legalSequences(PROJECT, 1, 3));
-  assert.equal(expansions.length, 66);
+  const crossings = (input, output) => CATALOG.operators.filter(
+    (operator) => operator.input === input && operator.output === output).length;
+  assert.equal(expansions.length, crossings('sphere', 'field')
+    + crossings('sphere', 'plane') * crossings('plane', 'field'));
   assert.equal(expansions.includes('project.stereographic.v2 sample.grid.v2'), true);
   assert.equal(store.replaceSpan(PROJECT, 1, [
     { operator: 'project.stereographic.v2' }, { operator: 'sample.grid.v2' }]).ok, true);

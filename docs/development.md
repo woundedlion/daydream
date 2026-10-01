@@ -26,6 +26,46 @@ See [deployment](deployment.md) for installing and verifying an engine package.
 Legacy shader fixtures and their digest migration table are frontend source in
 `src/workbench/shader/patterns/`.
 
+## Shader state
+
+Shader authoring opens `ShaderChain`. The engine facade supplies effect lifecycle,
+parameter controls and buffers; authoring operations use a short-lived
+`getShaderChainBindings()` handle. Release each handle after the call. Handles
+expire when the effect or geometry is replaced or the engine/module is destroyed.
+
+`getSnapshot()` and `restoreSnapshot()` carry the ordered instance/operator chain,
+accepted named parameters, typed per-instance runtime, palette state and animation
+pause. Workbench links use `#shader=v2` with their document and typed snapshot;
+version 1 document links remain readable. URL persistence also stores versioned
+state in `fx.__chainSnapshot`;
+resolution rollback and segment-worker initialization use the same snapshot. Worker
+protocol version 12 carries `chainSnapshot` instead of the retired slot archive.
+
+Snapshot schema version 1 uses `chain: [{instance, operator}]` and
+`parameters: [{name, value}]`. Runtime entries identify their instance and stable
+state kind. Omit runtime to initialize fresh state; when present, it must include
+every stateful instance exactly once. `ChainRuntimeState` in the module declarations
+defines the walk, source, noise, affine, phase, ring and color state shapes.
+The engine validates a replacement before applying it, so a rejected snapshot
+preserves the active program and runtime.
+
+Links naming `Shader`, `ShaderBall` or `ShaderWorkbench` enter the legacy importer.
+Only version 10/11 `fx.__fullConfig` archives can be converted. The converter maps
+accepted values into an editable chain, preserving the complete original archive
+and pending requested edits in `fx.__legacyShader`. Unsupported layouts or invalid
+archives retain their original text and show a refusal; persistence does not
+replace a refused snapshot with defaults. The 24 historical presets at both
+supported resolutions are captured compatibility fixtures.
+
+The frozen WASM backend diagnosis records arithmetic differences at extreme
+endpoint settings separately from the published approximation-oracle budgets.
+Those budgets remain unchanged; their old and new observed metrics match.
+Same-backend extreme endpoint framebuffer parity remains under review.
+Default legacy preset rendering is checked against the frozen old WASM frames
+within one RGB16 code. Native endpoint archives retain their original framebuffer
+probes and seeds and verify complete typed restoration; native and WASM framebuffer
+codes are not required to match each other.
+
 ## Validation
 
 After `npm ci` and an engine install, run `npm run lint`, `npm run typecheck`, and

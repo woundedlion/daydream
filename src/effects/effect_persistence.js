@@ -6,7 +6,9 @@
 import { engineParamValue, enumConstantName } from './param_sync.js';
 import { legacyShaderBallParamNames } from './shader_stages.js';
 
-export const FULL_CONFIG_STORAGE_KEY = '__fullConfig';
+export const CHAIN_SNAPSHOT_STORAGE_KEY = '__chainSnapshot';
+export const LEGACY_CONFIG_STORAGE_KEY = '__fullConfig';
+export const LEGACY_SIDECAR_STORAGE_KEY = '__legacyShader';
 
 /**
  * The value the engine last took for one parameter: what it admitted for
@@ -23,14 +25,15 @@ export function acceptedParamValue(parameter) {
 
 /**
  * URL storage and replay of engine-accepted effect state.
- * @param {{getParameterDefinitions: () => Array<{name: string, readonly?: boolean, value: *, acceptedValue?: *, requestedValue?: *}>, setEngineParam: (name: string, value: number) => *, usesFullConfigSnapshot: () => boolean, getFullConfigSnapshot: () => *, restoreFullConfigSnapshot: (snapshot: *) => *, fullConfigRestoreResults: () => *, showConfigImportNotice: (message: string|null) => void, logWarn: (...args: *) => void}} dependencies
+ * @param {{getParameterDefinitions: () => Array<{name: string, readonly?: boolean, value: *, acceptedValue?: *, requestedValue?: *}>, setEngineParam: (name: string, value: number) => *, usesChainSnapshot: () => boolean, getSnapshot: () => *, restoreSnapshot: (snapshot: *) => *, chainSnapshotRestoreResults: () => *, showConfigImportNotice: (message: string|null) => void, logWarn: (...args: *) => void}} dependencies
  */
 export function createEffectPersistence({
-  getParameterDefinitions, setEngineParam, usesFullConfigSnapshot, getFullConfigSnapshot, restoreFullConfigSnapshot, fullConfigRestoreResults, showConfigImportNotice, logWarn
+  getParameterDefinitions, setEngineParam, usesChainSnapshot, getSnapshot, restoreSnapshot, chainSnapshotRestoreResults, showConfigImportNotice, logWarn
 }) {
   /** @param {string} name @returns {string} */
   const acceptedStorageKey = (name) => `__accepted.${name}`;
   const restoredKeys = new Set();
+  let refusedSnapshot = false;
 
   /**
    * Persist the active effect through its snapshot or accepted-value surface.
@@ -42,24 +45,27 @@ export function createEffectPersistence({
    * @returns {void}
    */
   function persistEffectState(gui, edited = undefined, existingOnly = false) {
-    if (!usesFullConfigSnapshot()) {
+    if (!usesChainSnapshot()) {
       if (edited === undefined) persistAcceptedParams(gui, existingOnly);
       else persistAcceptedParam(gui, edited.name, edited.accepted);
       return;
     }
-    const snapshot = getFullConfigSnapshot();
+    if (refusedSnapshot || (gui.readStoredString(LEGACY_CONFIG_STORAGE_KEY) !== undefined
+        && gui.readStoredString(LEGACY_SIDECAR_STORAGE_KEY) === undefined)) return;
+    const snapshot = getSnapshot();
     if (!snapshot) return;
-    gui.writeStoredValue(FULL_CONFIG_STORAGE_KEY, JSON.stringify(snapshot));
+    gui.writeStoredValue(CHAIN_SNAPSHOT_STORAGE_KEY, JSON.stringify(snapshot));
   }
 
-  /** Replay a stored full snapshot or accepted parameter values. @param {*} gui */
+  /** Replay a stored chain snapshot or accepted parameter values. @param {*} gui */
   function restoreEffectState(gui) {
     restoredKeys.clear();
-    if (!usesFullConfigSnapshot()) {
+    refusedSnapshot = false;
+    if (!usesChainSnapshot()) {
       restoreAcceptedParams(gui);
       return;
     }
-    const text = gui.readStoredString(FULL_CONFIG_STORAGE_KEY);
+    const text = gui.readStoredString(CHAIN_SNAPSHOT_STORAGE_KEY);
     if (text === undefined) return;
     let snapshot;
     try {
@@ -68,13 +74,17 @@ export function createEffectPersistence({
         throw new TypeError('snapshot must be an object');
       }
     } catch (error) {
-      logWarn('Shader Workbench: ignoring invalid full-config snapshot', error);
+      refusedSnapshot = true;
+      showConfigImportNotice('The chain snapshot is invalid. Its original text remains preserved.');
+      logWarn('Shader Workbench: invalid chain snapshot', error);
       return;
     }
-    const results = fullConfigRestoreResults();
-    const outcome = restoreFullConfigSnapshot(snapshot);
+    const results = chainSnapshotRestoreResults();
+    const outcome = restoreSnapshot(snapshot);
     if (outcome !== results.APPLIED) {
-      logWarn('Shader Workbench: full-config snapshot was rejected: '
+      refusedSnapshot = true;
+      showConfigImportNotice('The chain snapshot was rejected. Its original text remains preserved.');
+      logWarn('Shader Workbench: chain snapshot was rejected: '
         + enumConstantName(results, outcome));
       return;
     }
@@ -95,16 +105,7 @@ export function createEffectPersistence({
     }
   }
 
-  /**
-   * Replay the stored accepted values into the engine. The definition list is
-   * re-read after every write because a write can change it — a Shader
-   * selector swaps in the controls of the stage it selects — so parameters that
-   * did not exist a write ago still get their stored value. Nothing in the loop
-   * writes the stored values it reads, so one probe per name settles it and the
-   * rescan costs a set lookup rather than a URL read.
-   * @param {*} gui - The effect GUI holding the stored values.
-   * @returns {void}
-   */
+  /** @param {*} gui @returns {void} */
   function restoreAcceptedParams(gui) {
     const probed = new Set();
     for (;;) {
