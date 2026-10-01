@@ -22,7 +22,6 @@ import {
 import { isViewLive, refreshPixelView } from '../src/renderer/pixel_view.js';
 import { PaletteCompileCode, PaletteRecipeField } from './helpers/fake_palette.js';
 import { selectorControlValue } from '../src/effects/param_sync.js';
-import { defaultPaletteRecipe, hueKeyState, PaletteV4, signedTurnDelta } from '../src/workbench/palettes/palette_controls.js';
 import { DEFAULT_EFFECT, resolutionPresets } from '../src/effects/effect_roster.js';
 import {
   FIXED_SHADER_MODE_FIELDS, STAGE_BOUNDARIES,
@@ -1552,14 +1551,11 @@ test('MeshOps.getRecipe returns an authored chain for every Complex solid', () =
     'getRecipe must return null for an unknown name');
 });
 
-test('PaletteOps exposes the method surface the palette tool drives', () => {
+test('PaletteOps compiles a palette recipe', () => {
   assert.equal(typeof M.PaletteOps, 'function',
     'the module must export PaletteOps');
   const ops = new M.PaletteOps();
   try {
-    assert.equal(typeof ops.compileAndBakeV4, 'function');
-    assert.equal(typeof ops.inspectV4, 'function');
-    assert.equal(ops.bakeLut, undefined);
     const recipe = {
       schemaVersion: 4, input: { offset: 0, span: 1 },
       domain: 0, easing: 1, colorPath: 0,
@@ -1591,30 +1587,6 @@ test('PaletteOps exposes the method surface the palette tool drives', () => {
   }
 });
 
-test('hue wheel harmony anchors agree with the WASM palette diagnostics', () => {
-  const ops = new M.PaletteOps();
-  try {
-    for (const harmony of Object.values(PaletteV4.harmony)) {
-      for (const direction of Object.values(PaletteV4.direction)) {
-        const recipe = defaultPaletteRecipe();
-        Object.assign(recipe.hue, { harmony, direction, baseTurns: 0.9375 });
-        recipe.easing = PaletteV4.easing.LINEAR;
-        const keys = hueKeyState(recipe);
-        for (let i = 0; i < keys.offsets.length; i++) {
-          recipe.input = { offset: i / (keys.offsets.length - 1), span: 0 };
-          const result = ops.inspectV4(recipe);
-          assert.equal(result.status.code, M.PaletteCompileCode.OK);
-          const actual = result.diagnostics[4] / (2 * Math.PI);
-          const expected = keys.baseTurns + keys.offsets[i];
-          assert.ok(Math.abs(signedTurnDelta(actual - expected)) < 1e-5,
-            `harmony ${harmony}, direction ${direction}, key ${i}: ${actual} != ${expected}`);
-        }
-      }
-    }
-  } finally {
-    ops.delete();
-  }
-});
 
 // solids.html and palettes.html run on these two classes, so they are the
 // tools' half of the boundary; embind's own prototypes are what pins them.

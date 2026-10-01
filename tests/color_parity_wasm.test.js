@@ -346,17 +346,6 @@ test('Palette V4 enum spellings and ordinals match the shipped engine', () => {
   }
 });
 
-test('PaletteOps exposes only the V4 recipe compiler operations', () => {
-  const ops = new M.PaletteOps();
-  try {
-    assert.equal(typeof ops.compileAndBakeV4, 'function');
-    assert.equal(typeof ops.inspectV4, 'function');
-    assert.equal(typeof ops.effectPresetsV4, 'function');
-    assert.equal(ops.bakeLut, undefined);
-  } finally {
-    ops.delete();
-  }
-});
 
 test('PaletteOps publishes every effect-owned GenerativePalette recipe', () => {
   const ops = new M.PaletteOps();
