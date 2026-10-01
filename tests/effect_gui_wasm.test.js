@@ -8,13 +8,13 @@ import { fakeElement } from './helpers/fake_dom.js';
 
 function widgets() {
   const root = fakeGui('widgets');
-  root.$children = root.domElement;
   return root;
 }
 
 test('preset values survive URL reload after flushed or pending parameter edits', async () => {
   const { default: createModule } = await import('../generated/holosphere_wasm.js');
   const module = await createModule({ print: () => {} });
+  const warnings = [];
   for (const flushEdit of [false, true]) {
     const win = {
       location: new URL('https://example.test/?effect=AlienBrain'),
@@ -43,6 +43,7 @@ test('preset values survive URL reload after flushed or pending parameter edits'
       },
       segments: { ownsDisplay: () => false, paramValues: () => null, setParam: () => {} },
       host: {
+        logWarn: (...args) => warnings.push(args),
         createGui: () => new GUI(widgets(), 'fx', null, win),
         container: () => null,
         isMobile: () => false,
@@ -80,6 +81,7 @@ test('preset values survive URL reload after flushed or pending parameter edits'
       panel.destroy();
       sync.dispose();
       engine.delete();
+      assert.deepEqual(warnings, []);
     }
   }
 });
