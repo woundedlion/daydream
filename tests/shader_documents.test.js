@@ -2067,6 +2067,7 @@ test('a chain snapshot restores its program and accepted parameters into the edi
   const engine = new FakeChainEngine();
   engine.setEffect('ShaderChain');
   engine.setParameter('sample.pattern-freq', 2.25);
+  engine.setAnimationsPaused(true);
   const bindings = engine.getShaderChainBindings();
   const snapshot = bindings.getSnapshot();
   bindings.delete();
@@ -2076,6 +2077,9 @@ test('a chain snapshot restores its program and accepted parameters into the edi
   assert.deepEqual(restored.getProgram(), snapshot.chain);
   assert.equal(harness.engine.getParameterDefinitions().find((entry) => entry.name === 'sample.pattern-freq').acceptedValue, 2.25);
   restored.delete();
+  const linked = await decodeShaderStateHash(harness.win.location.hash);
+  assert.deepEqual(JSON.parse(JSON.stringify(linked.chainSnapshot)), snapshot);
+  assert.equal(linked.paused, snapshot.animationsPaused);
   assert.equal(harness.controller.preservesOriginalLink(), false);
 });
 

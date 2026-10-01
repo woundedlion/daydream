@@ -846,7 +846,7 @@ test('init applies the carried params AFTER setEffect rebuilds to defaults', asy
 
 test('init restores accepted params before replaying rejected requests', async () => {
   await dispatch({
-    type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Shader',
+    type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'ShaderChain',
     params: [
       { name: 'Planar Warp 1', acceptedValue: 0, value: 6 },
       { name: 'Planar Warp 1 Scale', acceptedValue: 1, value: 100 },
@@ -858,15 +858,18 @@ test('init restores accepted params before replaying rejected requests', async (
   ]);
 });
 
-test('init restores Shader full config atomically instead of replaying params', async () => {
+test('init restores ShaderChain snapshot atomically instead of replaying params', async () => {
   const snapshot = {
     schemaVersion: 2,
-    accepted: [1, 2], requested: [1, 7], pendingFieldIds: [1],
-    hasRuntime: false, runtime: [],
+    chain: [{instance: 'project', operator: 'project.stereographic.v2'},
+      {instance: 'sample', operator: 'sample.grid.v2'},
+      {instance: 'colorize', operator: 'colorize.generated-palette.v3'}],
+    parameters: [{name: 'sample.pattern-freq', value: 1}],
+    animationsPaused: true,
   };
   await dispatch({
     type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
-    effectName: 'Shader', chainSnapshot: snapshot,
+    effectName: 'ShaderChain', chainSnapshot: snapshot,
   });
   assert.deepEqual(engineInstance.calls.find((call) =>
     call[0] === 'restoreSnapshot'),
@@ -945,20 +948,23 @@ test('setEffect handler rebuilds, then re-applies the carried param snapshot', a
   assert.equal(posted.find((p) => p.msg.type === 'frame').msg.paramRevision, 9);
 });
 
-test('setEffect restores Shader snapshot after rebuilding', async () => {
+test('setEffect restores ShaderChain snapshot after rebuilding', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
     effectName: 'Plasma' });
   const snapshot = {
     schemaVersion: 2,
-    accepted: [3], requested: [4], pendingFieldIds: [0],
-    hasRuntime: false, runtime: [],
+    chain: [{instance: 'project', operator: 'project.stereographic.v2'},
+      {instance: 'sample', operator: 'sample.grid.v2'},
+      {instance: 'colorize', operator: 'colorize.generated-palette.v3'}],
+    parameters: [{name: 'sample.pattern-freq', value: 1}],
+    animationsPaused: true,
   };
   await dispatch({
-    type: 'setEffect', name: 'Shader', chainSnapshot: snapshot,
+    type: 'setEffect', name: 'ShaderChain', chainSnapshot: snapshot,
     paramRevision: 14,
   });
   assert.deepEqual(engineInstance.calls.slice(-2), [
-    ['setEffect', 'Shader'],
+    ['setEffect', 'ShaderChain'],
     ['restoreSnapshot', snapshot],
   ]);
 });
@@ -1303,7 +1309,7 @@ for (const fault of ['missing restore API', 'rejected restore', 'live engine']) 
       ? ChainSnapshotRestoreResult.INVALID_VALUE : ChainSnapshotRestoreResult.APPLIED;
     nextLive = fault === 'live engine';
     await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
-      effectName: 'Shader', chainSnapshot: { schema_version: 1 }, paused: true });
+      effectName: 'ShaderChain', chainSnapshot: { schema_version: 1 }, paused: true });
     assert.equal(posted.length, 1);
     assert.equal(posted[0].msg.type, 'engineRejected');
     const reason = nextLive ? 'HolosphereEngine is already live'

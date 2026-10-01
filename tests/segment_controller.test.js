@@ -2508,8 +2508,11 @@ test('snapshotParams() is empty when no engine is bound', () => {
 test('snapshot-capable effects rebuild from their exhaustive state', () => {
   const snapshot = {
     schemaVersion: 2,
-    accepted: [1, 2, 3], requested: [1, 9, 3], pendingFieldIds: [1],
-    hasRuntime: true, runtime: [0.25],
+    chain: [{instance: 'project', operator: 'project.stereographic.v2'},
+      {instance: 'sample', operator: 'sample.grid.v2'},
+      {instance: 'colorize', operator: 'colorize.generated-palette.v3'}],
+    parameters: [{name: 'sample.pattern-freq', value: 1}],
+    animationsPaused: true,
   };
   const c = makeController({ effect: 'SnapshotEffect' });
   c.getWasmEngine = () => ({
@@ -2532,8 +2535,8 @@ test('an effect outside the Shader workbench rebuilds from its params', () => {
   });
 });
 
-test('Shader falls back to params until the snapshot API is installed', () => {
-  const c = makeController({ effect: 'Shader' });
+test('ShaderChain falls back to params until the snapshot API is installed', () => {
+  const c = makeController({ effect: 'ShaderChain' });
   c.getWasmEngine = () => fakeEngine([{ name: 'Speed', value: 0.5 }]);
   assert.deepEqual(c.snapshotEffectState(), {
     params: [{ name: 'Speed', value: 0.5 }],
