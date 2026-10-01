@@ -1127,6 +1127,8 @@ test('the index a presetless effect refuses is not logged', async () => {
   }
 
   assert.deepEqual(logged, [], 'the ordinary effect-switch path is silent');
+  assert.equal(engineInstance.calls.some(([method]) => method === 'synchronizePreset'), false,
+    'the engine is not called for the already-active index');
 });
 
 // console.error reaches no one on a worker thread; the frame's warnings are the
