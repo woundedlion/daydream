@@ -64,7 +64,7 @@ if ! git -c core.autocrlf=false diff --no-index --ignore-cr-at-eol --exit-code -
 fi
 rm -f "$tmp"
 
-tmp=$(mktemp ./tailwind.XXXXXX.css) || exit 1
+tmp=$(mktemp ./tailwind.XXXXXX) || exit 1
 npm run generate:tailwind -- --output "$tmp" || exit 1
 if ! git -c core.autocrlf=false diff --no-index --ignore-cr-at-eol --exit-code -- tools/tailwind.css "$tmp"; then
 	echo "pre-push: tools/tailwind.css is stale; regenerate and commit it." >&2
