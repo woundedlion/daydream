@@ -551,16 +551,10 @@ export function formatSolidName(name) {
  * Quantizes to hundredths and pads to two digits so 0.05 -> "05" and 0.5 -> "50"
  * stay distinct and self-describing in generated funcNames.
  *
- * DEDUP GRANULARITY: the suffix only distinguishes parameter values to the
- * nearest 0.01, so two solids whose params round to the same hundredth (i.e.
- * differ by < 0.005) collide on one funcName and the later paste silently
- * overwrites the earlier. (The hankin op uses a whole-degree suffix, `_hk{deg}`,
- * with the same caveat at 1° granularity.) Generated-source byte-stability is a
- * hard requirement (see module header), so widening precision is intentionally
- * avoided; author distinct params at least 0.01 apart to keep names unique.
+ * Names are unique per on-grid chain.
  *
  * A negative value is rejected: its `-` prefix would taint the funcName into an
- * invalid C++ identifier, and the upstream tool clamps these params to min 0.01.
+ * invalid C++ identifier.
  * @param {number} val - The fractional parameter value (typically 0..1+).
  * @returns {string} A two-or-more digit percent suffix.
  */
