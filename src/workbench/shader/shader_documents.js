@@ -43,7 +43,6 @@ export function engineParameterName(parameterId) {
   return engineControlNames(parameterId)[0];
 }
 
-export { engineControlNames as engineParameterNames };
 
 /**
  * Resolves one engine parameter write without performing it.
