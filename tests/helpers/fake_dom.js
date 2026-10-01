@@ -897,9 +897,12 @@ export function installAnimationFrames() {
   return {
     get pending() { return queued.size; },
     flush(timestamp = performance.now()) {
-      const callbacks = [...queued.values()];
-      queued.clear();
-      for (const callback of callbacks) callback(timestamp);
+      for (const handle of [...queued.keys()]) {
+        const callback = queued.get(handle);
+        if (!callback) continue;
+        queued.delete(handle);
+        callback(timestamp);
+      }
     },
     restore() {
       queued.clear();
