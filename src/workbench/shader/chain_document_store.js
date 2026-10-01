@@ -625,6 +625,10 @@ export async function createChainDocumentStore({
     /** @returns {*} An isolated copy of the current (always-valid) document. */
     document: () => structuredClone(doc),
 
+    /** @param {string} parameterId @returns {boolean} Whether the document declares this parameter. */
+    declares: (parameterId) => doc.descriptor.parameters.some(
+      (/** @type {ParameterDeclaration} */ parameter) => parameter.id === parameterId),
+
     /** @returns {ParameterDeclaration[]} Authored declarations plus undeclared catalog fields. */
     parameterDeclarations: () => {
       const parameters = structuredClone(doc.descriptor.parameters);
