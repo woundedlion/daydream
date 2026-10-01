@@ -204,8 +204,8 @@ for (const installStatus of [0, 19]) {
       writeFileSync(join(root, 'package.json'), '{}');
       writeFileSync(join(root, 'package-lock.json'), '{}');
       writeFileSync(join(root, 'vendor-importmap.js'), 'map\n');
-  mkdirSync(join(root, 'tools'));
-  writeFileSync(join(root, 'tools/tailwind.css'), 'css\n');
+      mkdirSync(join(root, 'tools'));
+      writeFileSync(join(root, 'tools/tailwind.css'), 'css\n');
       for (const name of ['ci_workflow', 'deployment_pair', 'stage_site'])
         writeFileSync(join(root, `tests/${name}.test.js`), '');
       const log = join(root, 'calls.log').replace(/\\/g, '/');
@@ -214,7 +214,7 @@ for (const installStatus of [0, 19]) {
         + `printf '%s\\n' "$*" >> "${log}"\n`
         + `if [ "$1" = ci ]; then mkdir -p node_modules; echo '{}' > node_modules/.package-lock.json; exit ${installStatus}; fi\n`
         + 'if [ "$2" = importmap ]; then for last; do :; done; cp vendor-importmap.js "$last"; fi\n'
-    + 'if [ "$2" = generate:tailwind ]; then for last; do :; done; cp tools/tailwind.css "$last"; fi\n');
+        + 'if [ "$2" = generate:tailwind ]; then for last; do :; done; cp tools/tailwind.css "$last"; fi\n');
       chmodSync(npm, 0o755);
       git('init', '-q');
       git('add', '.githooks/pre-push', 'tests', 'package.json', 'package-lock.json', 'vendor-importmap.js', 'tools/tailwind.css');
