@@ -102,7 +102,6 @@ test('the strip lays the chain out as editable carrier bands with sockets betwee
   const h = await makeStrip();
   const strip = h.container.querySelector('.chain-strip');
   assert.equal(strip.getAttribute('role'), 'group');
-  assert.equal(strip.getAttribute('aria-orientation'), 'horizontal');
   assert.equal(strip.getAttribute('aria-label'), 'Shader chain');
 
   const bands = strip.querySelectorAll('.chain-band');

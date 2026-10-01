@@ -1069,7 +1069,6 @@ export function createChainStrip({
     const strip = el('div', 'chain-strip');
     strip.setAttribute('role', 'group');
     strip.setAttribute('aria-label', 'Shader chain');
-    strip.setAttribute('aria-orientation', 'horizontal');
     const view = { selected, bypassed, tabLabel };
     for (const band of layout) {
       const title = titleCase(band.carrier);
