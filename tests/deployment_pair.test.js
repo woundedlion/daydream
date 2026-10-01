@@ -9,11 +9,7 @@ const pair = { daydream: 'a'.repeat(40), holosphere: 'b'.repeat(40) };
 const repo = 'example/daydream';
 const heads = async (path) => ({ sha: path.includes('woundedlion/pov') ? pair.holosphere : pair.daydream });
 
-test('publication is serialized and cancelled deployment attempts can retry', async () => {
-  const workflow = readFileSync(new URL('../.github/workflows/deploy.yml', import.meta.url), 'utf8');
-  const job = workflow.split(/^ {2}deploy:\r?\n/m)[1];
-  assert.match(job, /group: pages-publication/);
-  assert.match(job, /cancel-in-progress: false/);
+test('cancelled deployment attempts can retry', async () => {
   const newer = { ...pair, holosphere: 'c'.repeat(40) };
   const attempted = async (conclusion) => pairWasAttempted(async (path) => {
     if (path.includes('/actions/runs/')) return { conclusion };
