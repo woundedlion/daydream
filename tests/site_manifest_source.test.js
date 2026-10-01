@@ -19,7 +19,10 @@ test('source manifest checks accept absent installed assets but reject untracked
   const git = (...args) => execFileSync('git', args, { cwd: root, env, stdio: 'pipe' });
   git('clone', '--quiet', '--shared', '--no-checkout', REPO, root);
   git('-c', 'core.hooksPath=/dev/null', 'checkout', '--quiet', '--detach', 'HEAD');
-  for (const path of ['tests/site_manifest.test.js', 'scripts/install-engine-bundle.mjs'])
+  for (const path of [
+    'tests/site_manifest.test.js', 'scripts/install-engine-bundle.mjs',
+    'scripts/site-pages.mjs', 'scripts/stage-site.mjs', 'tests/helpers/site_pages.js',
+  ])
     copyFileSync(join(REPO, path), join(root, path));
   const installed = new Set([...RUNTIME_PATHS, ...git('ls-files').toString().trim().split('\n').filter(runtimePath)]);
   git('rm', '--cached', '--ignore-unmatch', '--', ...installed);
