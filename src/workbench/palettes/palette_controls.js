@@ -964,9 +964,8 @@ export function paletteEnumName(group, value) {
  * The inverse of paletteRecipeFromControls: the readings that reproduce a
  * recipe, for loading a preset into the tab's controls.
  *
- * The hue keys come back as the base-plus-offsets form the wheel edits, taken
- * from the recipe's own hue mode — so loading a harmony leaves the wheel on the
- * keys that harmony draws, ready for a handoff into CUSTOM.
+ * customHueOffsets is meaningful only in CUSTOM mode. Other modes preserve
+ * their authored baseTurns; a handoff into CUSTOM uses customHueKeyState().
  * @param {PaletteRecipe} recipe - The recipe to load.
  * @returns {PaletteControlReadings} The readings, in paletteRecipeFromControls' own shape.
  * @throws {RangeError} When a field holds an ordinal PaletteV4 has no member for.
