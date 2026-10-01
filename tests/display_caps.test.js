@@ -20,7 +20,9 @@ test('caps replay defaults and pre-load edits using the accepted engine angles',
   assert.deepEqual(pushed, [[2, 3]]);
   assert.deepEqual(changed[0], { DISPLAY_NORTH_PHI: 0.06283185, DISPLAY_SOUTH_PHI: 3.047344 });
   binding.state.topCap = binding.state.bottomCap = 0;
-  binding.apply();
+  assert.equal(binding.apply(), true);
+  assert.deepEqual(pushed.at(-1), [0, 0]);
+  assert.equal(changed.length, 2);
 });
 
 test('invalid or rejected caps do not publish geometry', () => {
