@@ -213,6 +213,7 @@ function makeTeardown({
     switches: { dispose() { note('switches.dispose'); } },
     stopTimers: () => note('stopTimers'),
     effectGui: { destroy() { note('effectGui.destroy'); } },
+    shaderDocuments: { dispose() { note('shaderDocuments.dispose'); } },
     globalGui: { destroy() { note('globalGui.destroy'); } },
     host,
     urlSync: { dispose() { note('urlSync.dispose'); } },
@@ -250,6 +251,7 @@ test('dispose releases in an order nothing can re-enter', () => {
     'switches.dispose',
     'stopTimers',
     'effectGui.destroy',
+    'shaderDocuments.dispose',
     'globalGui.destroy',
     'recorder.dispose',
     'engine.delete adapter=null',
@@ -320,6 +322,7 @@ test('a step that throws does not strand the releases behind it', () => {
     'switches.dispose',
     'stopTimers',
     'effectGui.destroy',
+    'shaderDocuments.dispose',
     'recorder.dispose',
     'engine.delete adapter=null',
     'urlSync.dispose',
@@ -336,7 +339,7 @@ test('a step that throws does not strand the releases behind it', () => {
 
 test('every dispose step is independent of the ones before it', () => {
   const failing = new Set([
-    'switches.dispose', 'stopTimers', 'effectGui.destroy', 'globalGui.destroy',
+    'switches.dispose', 'stopTimers', 'effectGui.destroy', 'shaderDocuments.dispose', 'globalGui.destroy',
     'urlSync.dispose', 'sidebar.dispose', 'strandSegmentWork', 'removeOverlay',
   ]);
   const t = makeTeardown({ failing });
