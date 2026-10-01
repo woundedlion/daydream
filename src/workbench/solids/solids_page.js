@@ -865,8 +865,8 @@ async function copyCode(index, lang, btn) {
     if (lang === 'recipe_cpp') {
       code = generateRecipeCpp(item, seedNs);
     } else if (lang === 'registry') {
-      await validateRegistryFaces(validator, item, baseRecipe);
       code = generateRegistryCpp(item, baseRecipe);
+      await validateRegistryFaces(validator, item, baseRecipe);
     } else {
       console.warn("Unsupported export type.");
       return;
