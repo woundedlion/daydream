@@ -794,6 +794,27 @@ export function createShaderDocumentController({
   const loadScratch = () =>
     loadSource(scratchChainDocument(operatorCatalog), SCRATCH_FILENAME);
 
+  /** @type {HTMLOptionElement | null} */
+  let loadedSourceOption = null;
+  /**
+   * @param {string | null} effectId Catalog identity, empty for scratch, null for a file.
+   * @param {string} filename Loaded document filename.
+   * @param {string} kind Display label for an imported or linked document.
+   */
+  const selectLoadedSource = (effectId, filename, kind) => {
+    loadedSourceOption?.remove();
+    loadedSourceOption = null;
+    if (effectId === null) {
+      loadedSourceOption = doc.createElement('option');
+      loadedSourceOption.value = '__loaded-document__';
+      loadedSourceOption.textContent = `${kind}: ${filename}`;
+      loadedSourceOption.disabled = true;
+      sourceSelect.appendChild(loadedSourceOption);
+    }
+    sourceSelect.value = effectId ?? '__loaded-document__';
+    selectedSource = sourceSelect.value;
+  };
+
   const init = async () => {
     try {
       compiler = await importCompiler();
@@ -852,8 +873,7 @@ export function createShaderDocumentController({
       // requested effect or the scratch chain, which name themselves.
       if (await loadSource(linked.document, filename, null, linked)) {
         active.savedDocument = entry ? JSON.stringify(entry.compiled.document) : null;
-        sourceSelect.value = entry?.effectId ?? '';
-        selectedSource = sourceSelect.value;
+        selectLoadedSource(entry?.effectId ?? null, filename, 'Linked');
         return true;
       }
       linkError = status.textContent || 'the linked state was refused';
@@ -884,7 +904,7 @@ export function createShaderDocumentController({
     try {
       const option = sourceSelect.selectedOptions[0];
       if (!option?.value) {
-        if (await loadScratch()) selectedSource = sourceSelect.value;
+        if (await loadScratch()) selectLoadedSource('', SCRATCH_FILENAME, '');
         else sourceSelect.value = selectedSource;
         await flushDeepLink();
         return;
@@ -895,7 +915,7 @@ export function createShaderDocumentController({
         return;
       }
       if (await loadSource(entry.source, entry.filename, entry.compiled))
-        selectedSource = sourceSelect.value;
+        selectLoadedSource(entry.effectId, entry.filename, '');
       else sourceSelect.value = selectedSource;
       await flushDeepLink();
     } catch (error) {
@@ -922,8 +942,7 @@ export function createShaderDocumentController({
       }
       if (!allowSourceChange()) return;
       if (await loadSource(await file.text(), file.name)) {
-        sourceSelect.value = '';
-        selectedSource = '';
+        selectLoadedSource(null, file.name, 'Imported');
       }
       await flushDeepLink();
     } catch (error) {

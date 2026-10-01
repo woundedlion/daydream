@@ -537,7 +537,7 @@ function workbenchMounts() {
   ].map((id) => [id, fakeElement(id.endsWith('select') ? 'select' : 'div')]));
   const scratch = fakeElement('option');
   scratch.value = '';
-  scratch.textContent = 'Scratch shader';
+  scratch.textContent = 'Scratch Chain';
   elements.get('shader-document-select').appendChild(scratch);
   return elements;
 }
@@ -643,7 +643,7 @@ test('the source catalog lists each document by its product display name', async
   const select = elements.get('shader-document-select');
   assert.deepEqual(select.options.map((option) => option.value), ['', 'KaleidoscopeFlowers']);
   assert.deepEqual(select.options.map((option) => option.textContent),
-    ['Scratch shader', 'Kaleidoscope Flowers']);
+    ['Scratch Chain', 'Kaleidoscope Flowers']);
   const status = elements.get('shader-document-status');
   assert.equal(status.dataset.status, 'ok');
   assert.match(status.textContent, /Scratch Chain · Catalog Defaults/,
@@ -1990,4 +1990,33 @@ test('restored edits require discard confirmation and save to the catalog filena
   assert.equal(source.value, before);
   harness.controller.save();
   assert.equal(harness.downloads.at(-1)[0], 'kaleidoscope_hex_bright.shader.json');
+});
+
+
+test('imported documents have a named source and can switch directly to scratch', async () => {
+  const harness = await editorWorkbench({ source: null });
+  const input = harness.elements.get('shader-document-file');
+  input.files = [{ name: 'study.shader.json', size: KALEIDOSCOPE_HEX_BRIGHT.length,
+    text: async () => KALEIDOSCOPE_HEX_BRIGHT }];
+  await onChange(input)();
+  const source = harness.elements.get('shader-document-select');
+  assert.equal(source.selectedOptions[0].textContent, 'Imported: study.shader.json');
+  assert.equal(source.selectedOptions[0].disabled, true);
+  assert.notEqual(source.value, '');
+  source.value = '';
+  await onChange(source)();
+  assert.equal(source.value, '');
+  assert.equal(source.selectedOptions[0].textContent, 'Scratch Chain');
+  assert.equal(source.options.some((option) => option.value === '__loaded-document__'), false);
+});
+
+test('noncatalog shader links have their own source option', async () => {
+  const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  const hash = await encodeShaderStateHash({ document,
+    preset: document.preset_bank.presets[0].preset_id, bypassed: [], paused: false });
+  const harness = await editorWorkbench({ source: null, hash });
+  const source = harness.elements.get('shader-document-select');
+  assert.equal(source.selectedOptions[0].textContent, 'Linked: linked.shader.json');
+  assert.equal(source.selectedOptions[0].disabled, true);
+  assert.notEqual(source.value, '');
 });
