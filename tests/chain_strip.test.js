@@ -101,7 +101,7 @@ const labels = (h) => h.store.chain().map((entry) => entry.label);
 test('the strip lays the chain out as editable carrier bands with sockets between them', async () => {
   const h = await makeStrip();
   const strip = h.container.querySelector('.chain-strip');
-  assert.equal(strip.getAttribute('role'), 'toolbar');
+  assert.equal(strip.getAttribute('role'), 'group');
   assert.equal(strip.getAttribute('aria-orientation'), 'horizontal');
   assert.equal(strip.getAttribute('aria-label'), 'Shader chain');
 
@@ -128,7 +128,7 @@ test('the strip lays the chain out as editable carrier bands with sockets betwee
 
   const all = chips(h);
   assert.equal(all.length, 6);
-  // A toolbar of groups, not a listbox of options: an option's children are
+  // A strip of groups, not a listbox of options: an option's children are
   // presentational, so every inline stage control would go unexposed.
   for (const chip of all) {
     assert.equal(chip.getAttribute('role'), 'group');
@@ -748,7 +748,7 @@ test('a bypass unavailable to the render is disabled, with the reason in text', 
   assert.deepEqual(h.store.bypassedLabels(), ['lens']);
 });
 
-test('the toolbar roves between chips and exposes their controls to Tab', async () => {
+test('the strip roves between chips and exposes their controls to Tab', async () => {
   const h = await makeStrip();
   const strip = h.container.querySelector('.chain-strip');
   const headerControls = strip.querySelectorAll(

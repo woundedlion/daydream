@@ -1065,7 +1065,7 @@ export function createChainStrip({
     }
 
     const strip = el('div', 'chain-strip');
-    strip.setAttribute('role', 'toolbar');
+    strip.setAttribute('role', 'group');
     strip.setAttribute('aria-label', 'Shader chain');
     strip.setAttribute('aria-orientation', 'horizontal');
     const view = { selected, bypassed, tabLabel };
