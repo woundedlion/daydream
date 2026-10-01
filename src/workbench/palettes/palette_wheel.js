@@ -13,7 +13,7 @@
  */
 
 import { linearToSrgbFloat } from '../../shared/color.js';
-import { maxSrgbGamutChroma, oklchLinearRgb, wrapTurns } from './palette_controls.js';
+import { linearRgbInGamut, maxSrgbGamutChroma, oklchLinearRgb, wrapTurns } from './palette_controls.js';
 
 /**
  * @typedef {{baseTurns: number, offsets: number[]}} HueKeyState
@@ -44,10 +44,6 @@ export const HUE_KEY_GRAB_RADIUS = 23;
 // Slate-900, so the region outside the gamut reads as a boundary rather than as
 // the canvas edge.
 const BACKDROP = Object.freeze([15, 23, 42]);
-// A channel this far outside [0, 1] is still drawn: the bisected gamut boundary
-// lands on it from either side.
-const GAMUT_LOW = -0.0001;
-const GAMUT_HIGH = 1.0001;
 const RASTER_RADIUS = 0.47;
 const MARKER_RADIUS = 0.405;
 const MARKER_DOT_RADIUS = 8;
@@ -84,10 +80,7 @@ export function paintHueWheelRaster(data, width, height, lightness) {
       const offset = (y * width + x) * 4;
       oklchLinearRgb(lightness, distance * chromaPerPixel,
         wrapTurns(Math.atan2(-dy, dx) * turnsPerRadian), rgb);
-      const inGamut = distance <= radius
-        && rgb[0] >= GAMUT_LOW && rgb[0] <= GAMUT_HIGH
-        && rgb[1] >= GAMUT_LOW && rgb[1] <= GAMUT_HIGH
-        && rgb[2] >= GAMUT_LOW && rgb[2] <= GAMUT_HIGH;
+      const inGamut = distance <= radius && linearRgbInGamut(rgb);
       for (let channel = 0; channel < 3; channel++) {
         data[offset + channel] = inGamut
           ? Math.round(
