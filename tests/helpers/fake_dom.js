@@ -344,8 +344,8 @@ function fakeStyle() {
  *
  * dispatch() propagates over the parentNode chain the way the DOM does, so a
  * listener's attachment point is observable: capture listeners run root-first,
- * then every listener on the dispatching node in registration order, then the
- * non-capture listeners back up to the root. The event carries `target` (the
+ * then the dispatching node's capture listeners, then its bubble listeners,
+ * then the non-capture listeners back up to the root. The event carries `target` (the
  * dispatching node unless the caller names one), `currentTarget`,
  * stopPropagation() and stopImmediatePropagation(); the two stop methods are
  * the event's own and overwrite any the caller passed. Focus, blur, enter/leave,
