@@ -95,6 +95,12 @@
   flex-shrink: 0;
 }
 
+.tool-links {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
 .nav-label {
   color: var(--bright-text);
   font-family: var(--nav-font);
