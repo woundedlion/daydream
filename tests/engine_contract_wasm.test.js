@@ -1080,13 +1080,6 @@ test('getPresetIds names the presets selectPresetById answers to', () => {
     'a rejected selectPresetById must not engage the pause');
 });
 
-// effect_gui.js round-trips the whole Shader workbench through these four
-// accessors and compares the restore outcome against the enum, so the shapes and
-// the rejection roster are the contract — not just that the methods exist.
-
-
-
-
 // daydream.js reads the pause indicator through an optional-call guard
 // (getAnimationsPaused: () => host.engine?.getAnimationsPaused?.()), so a
 // dropped export is silent at the call site and only desyncs the GUI toggle.
