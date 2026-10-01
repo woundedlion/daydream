@@ -5,6 +5,7 @@
  *   node scripts/workbench-probe.mjs
  */
 import { boxOf, centre, checks, isMain, runProbe } from './probe_harness.mjs';
+import { readFileSync } from 'node:fs';
 
 const PAGE = 'tools/shader.html';
 const VIEWPORT = { width: 1674, height: 543 };
@@ -676,7 +677,7 @@ export async function probeDocumentActions(tab) {
   check(await tab.waitForFunction(() => /^[a-f0-9]{64}$/.test(window.copiedDigest))
     .then(() => true, () => false),
     'the digest button copies the full descriptor digest');
-  await tab.waitForFunction(() => location.hash.startsWith('#shader=v1.'));
+  await tab.waitForFunction(() => location.hash.startsWith('#shader=v2.'));
   const linked = await tab.evaluate(async () => {
     const { decodeShaderStateHash } = await import('../src/workbench/shader/shader_deeplink.js');
     return decodeShaderStateHash(location.hash);
@@ -686,20 +687,101 @@ export async function probeDocumentActions(tab) {
   return failures;
 }
 
+/** @param {import('puppeteer-core').Page} tab */
+export async function probeLegacyImport(tab) {
+  const { failures, check } = checks();
+  const fixtures = JSON.parse(readFileSync(
+    new URL('../tests/fixtures/legacy_shader_snapshots.json', import.meta.url), 'utf8'));
+  const original = structuredClone(fixtures[0].presets[9].snapshot);
+  original.requested[0] = original.accepted[0] === 0 ? 1 : 0;
+  original.pendingFieldIds = original.accepted.flatMap((value, index) =>
+    value === original.requested[index] ? [] : [index]);
+  const text = JSON.stringify(original);
+  const url = new URL(tab.url());
+  url.hash = '';
+  url.search = new URLSearchParams({effect: 'Shader', 'fx.__fullConfig': text}).toString();
+  await tab.goto(url.href, {timeout: TIMEOUT_MS});
+  await tab.waitForFunction(() => !document.getElementById('loading-overlay'));
+  await tab.waitForFunction(() => location.hash.startsWith('#shader=v2.'));
+  const imported = await tab.evaluate(async () => {
+    const {decodeShaderStateHash} = await import('../src/workbench/shader/shader_deeplink.js');
+    const query = new URLSearchParams(location.search);
+    return {original: query.get('fx.__fullConfig'),
+      sidecar: JSON.parse(query.get('fx.__legacyShader')), state: await decodeShaderStateHash(location.hash),
+      notice: document.getElementById('shader-document-status').textContent};
+  });
+  check(imported.original === text && JSON.stringify(imported.sidecar.original) === text,
+    'legacy import preserves the complete original archive in the URL and sidecar');
+  check(imported.sidecar.pendingFieldIds.includes(0) && imported.notice.includes('Pending edits'),
+    'legacy import preserves pending requested edits with a visible notice');
+  check(imported.state.chainSnapshot.chain.some((entry) => entry.operator === 'warp.polar-chart.v2'),
+    'legacy Polar Chart becomes a typed authored chain');
+  await tab.reload({timeout: TIMEOUT_MS});
+  await tab.waitForFunction(() => !document.getElementById('loading-overlay'));
+  const restored = await tab.evaluate(async () => {
+    const {decodeShaderStateHash} = await import('../src/workbench/shader/shader_deeplink.js');
+    return decodeShaderStateHash(location.hash);
+  });
+  check(JSON.stringify(restored.chainSnapshot) === JSON.stringify(imported.state.chainSnapshot),
+    'reloading the imported link preserves its typed parameter and runtime snapshot');
+
+  const refused = JSON.stringify({schemaVersion: 9, retained: 'original'});
+  url.search = new URLSearchParams({effect: 'ShaderBall', 'fx.__fullConfig': refused}).toString();
+  await tab.goto(url.href, {timeout: TIMEOUT_MS});
+  await tab.waitForFunction(() => !document.getElementById('loading-overlay'));
+  await tab.waitForFunction(() => document.getElementById('shader-document-status')
+    ?.textContent.includes('could not be restored'));
+  const refusal = await tab.evaluate(() => ({search: location.search, hash: location.hash,
+    notice: document.getElementById('shader-document-status').textContent}));
+  check(refusal.search === url.search && refusal.hash === '',
+    'a refused legacy archive retains its exact original URL');
+  check(refusal.notice.includes('could not be restored'),
+    'a refused legacy archive shows an explicit restore notice');
+  return failures;
+}
+
+/** @param {import('puppeteer-core').Page} tab @param {() => void} [releaseCatalog] */
+export async function probeStartupPersistence(tab, releaseCatalog = () => {}) {
+  const {failures, check} = checks();
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    check(await tab.evaluate(() => !new URLSearchParams(location.search).has('fx.__chainSnapshot')),
+      'slow workbench startup keeps factory defaults out of the original URL');
+  } finally {
+    releaseCatalog();
+  }
+  await tab.waitForSelector('.chain-chip[data-label="rotate"]');
+  check(await tab.$eval('#shader-document-status', (node) => node.textContent.includes('Scratch Chain')),
+    'slow workbench startup opens the scratch document');
+  return failures;
+}
+
 export async function runWorkbenchSections(open, sections = [
-  probeDocumentActions, probeStripHistory, probeStrip, probeParity,
+  probeDocumentActions, probeStripHistory, probeStrip, probeParity, probeLegacyImport, probeStartupPersistence,
 ]) {
   const failures = [];
   for (const section of sections) {
     let tab;
+    let releaseCatalog = () => {};
+    const catalogReady = new Promise((resolve) => { releaseCatalog = () => resolve(undefined); });
     try {
-      tab = await open({ viewport: VIEWPORT });
+      tab = await open({ viewport: VIEWPORT,
+        ...(section === probeStartupPersistence ? {prepare: async (page) => {
+          await page.setRequestInterception(true);
+          page.on('request', async (request) => {
+            if (request.url().endsWith('/generated/shader/engine_catalog.json'))
+              await catalogReady;
+            await request.continue();
+          });
+        }} : {}),
+      });
       await tab.waitForFunction(() => !document.getElementById('loading-overlay'));
-      await tab.waitForSelector('.chain-chip');
-      failures.push(...await section(tab));
+      if (section !== probeStartupPersistence) await tab.waitForSelector('.chain-chip');
+      failures.push(...await (section === probeStartupPersistence ? section(tab, releaseCatalog) : section(tab)));
     } catch (error) {
       failures.push(`${section.name}: ${error instanceof Error ? error.message : error}`);
     } finally {
+      releaseCatalog();
       if (tab) {
         try { await tab.close(); }
         catch (error) { failures.push(`${section.name} close: ${error}`); }

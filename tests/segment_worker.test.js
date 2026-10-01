@@ -12,7 +12,7 @@ import { PROTOCOL_VERSION } from '../src/segments/worker_protocol.js';
 import {
   unpinnedEngineMethods, ParamSetResult, ClipSetResult,
   ResolutionSetResult, EffectSetResult,
-  FullConfigRestoreResult,
+  ChainSnapshotRestoreResult,
 } from './helpers/fake_engine.js';
 import { fakeWorkerScope } from './helpers/fake_worker.js';
 import { staticModuleGraph } from './helpers/module_graph.js';
@@ -54,7 +54,7 @@ class FakeEngine {
     this.presetCount = 3;
     this.presetIndex = 0;
     this.metricsThrows = false;
-    this.restoreResult = FullConfigRestoreResult.APPLIED;
+    this.restoreResult = ChainSnapshotRestoreResult.APPLIED;
     this.paramResult = ParamSetResult.APPLIED;
     this.calls = [];
     // Reused view, like the real engine's getParamValues() into WASM memory, so
@@ -99,12 +99,12 @@ class FakeEngine {
     this.params.push([name, value]);
     return this.paramResult;
   }
-  getFullConfigSnapshot() { return null; }
-  restoreFullConfigSnapshot(snapshot) {
-    this.calls.push(['restoreFullConfigSnapshot', snapshot]);
-    return this.restoreResult;
+  getShaderChainBindings() {
+    return {restoreSnapshot: (snapshot) => {
+      this.calls.push(['restoreSnapshot', snapshot]);
+      return this.restoreResult;
+    }, delete: () => {}};
   }
-  getFullConfigFieldDefinitions() { return []; }
   setAnimationsPaused(p) {
     this.calls.push(['setAnimationsPaused', p]);
     this.paused = p;
@@ -181,7 +181,7 @@ let nextEffectOk = true;
 /** Seeds the next-constructed engine's clipOk, so init-time rejection is testable. */
 let nextClipOk = true;
 let nextCapsRejected = false;
-let nextRestoreResult = FullConfigRestoreResult.APPLIED;
+let nextRestoreResult = ChainSnapshotRestoreResult.APPLIED;
 let nextRestoreMissing = false;
 let nextLive = false;
 /** Options the worker handed the module factory, where the instantiate hook lands. */
@@ -197,7 +197,7 @@ mock.module('../generated/holosphere_wasm.js', {
       ClipSetResult,
       ResolutionSetResult,
       EffectSetResult,
-      FullConfigRestoreResult,
+      ChainSnapshotRestoreResult,
       HolosphereEngine: class {
         static isLive() { return nextLive; }
         constructor() {
@@ -207,7 +207,7 @@ mock.module('../generated/holosphere_wasm.js', {
           engineInstance.clipOk = nextClipOk;
           engineInstance.capsRejected = nextCapsRejected;
           engineInstance.restoreResult = nextRestoreResult;
-          if (nextRestoreMissing) engineInstance.restoreFullConfigSnapshot = undefined;
+          if (nextRestoreMissing) engineInstance.getShaderChainBindings = undefined;
           return engineInstance;
         }
       },
@@ -273,7 +273,7 @@ beforeEach(() => {
   nextEffectOk = true;
   nextClipOk = true;
   nextCapsRejected = false;
-  nextRestoreResult = FullConfigRestoreResult.APPLIED;
+  nextRestoreResult = ChainSnapshotRestoreResult.APPLIED;
   nextRestoreMissing = false;
   nextLive = false;
 });
@@ -866,11 +866,11 @@ test('init restores Shader full config atomically instead of replaying params', 
   };
   await dispatch({
     type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
-    effectName: 'Shader', fullConfigSnapshot: snapshot,
+    effectName: 'Shader', chainSnapshot: snapshot,
   });
   assert.deepEqual(engineInstance.calls.find((call) =>
-    call[0] === 'restoreFullConfigSnapshot'),
-  ['restoreFullConfigSnapshot', snapshot]);
+    call[0] === 'restoreSnapshot'),
+  ['restoreSnapshot', snapshot]);
   assert.deepEqual(engineInstance.params, []);
 });
 
@@ -954,12 +954,12 @@ test('setEffect restores Shader snapshot after rebuilding', async () => {
     hasRuntime: false, runtime: [],
   };
   await dispatch({
-    type: 'setEffect', name: 'Shader', fullConfigSnapshot: snapshot,
+    type: 'setEffect', name: 'Shader', chainSnapshot: snapshot,
     paramRevision: 14,
   });
   assert.deepEqual(engineInstance.calls.slice(-2), [
     ['setEffect', 'Shader'],
-    ['restoreFullConfigSnapshot', snapshot],
+    ['restoreSnapshot', snapshot],
   ]);
 });
 
@@ -1259,8 +1259,8 @@ function typedefShapes(source) {
 // what makes a reshaped message fault instead, and only this pin ties the two
 // together.
 const PROTOCOL_SHAPE_PIN = {
-  version: 11,
-  sha256: '359101870799ceed4497d801f31820f5cb3f941b10898519c064eed1c03ecf33',
+  version: 12,
+  sha256: 'e1af8cf18de64138da789f8f2a31ebbc93058e351f2a890fe6521dce3136cd38',
 };
 
 test('a reshaped protocol message forces a PROTOCOL_VERSION bump', () => {
@@ -1300,15 +1300,15 @@ for (const fault of ['missing restore API', 'rejected restore', 'live engine']) 
   test(`init rejects ${fault} before ready or replay`, async () => {
     nextRestoreMissing = fault === 'missing restore API';
     nextRestoreResult = fault === 'rejected restore'
-      ? FullConfigRestoreResult.INVALID_VALUE : FullConfigRestoreResult.APPLIED;
+      ? ChainSnapshotRestoreResult.INVALID_VALUE : ChainSnapshotRestoreResult.APPLIED;
     nextLive = fault === 'live engine';
     await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
-      effectName: 'Shader', fullConfigSnapshot: { schema_version: 1 }, paused: true });
+      effectName: 'Shader', chainSnapshot: { schema_version: 1 }, paused: true });
     assert.equal(posted.length, 1);
     assert.equal(posted[0].msg.type, 'engineRejected');
     const reason = nextLive ? 'HolosphereEngine is already live'
-      : nextRestoreMissing ? 'Shader workbench full-config restore API is unavailable'
-        : 'Shader workbench full-config restore rejected: INVALID_VALUE';
+      : nextRestoreMissing ? 'Shader chain snapshot restore API is unavailable'
+        : 'Shader chain snapshot restore rejected: INVALID_VALUE';
     assert.equal(posted[0].msg.reason, reason);
     if (nextLive) assert.equal(engineInstance, null);
     else assert.ok(!engineInstance.calls.some(([name]) => name === 'setAnimationsPaused'));

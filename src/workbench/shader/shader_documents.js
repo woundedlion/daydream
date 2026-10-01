@@ -4,7 +4,7 @@
  */
 
 import { engineHalted } from '../../shared/engine_halt.js';
-import { shaderChainCatalog } from '../../engine/workbench_bindings.js';
+import { callWorkbenchBinding, shaderChainCatalog } from '../../engine/workbench_bindings.js';
 import { enumConstantName, optionIndex } from '../../effects/param_sync.js';
 import { fieldOf as fieldSegment } from './chain_presentation.js';
 import { errorDetail } from '../../shared/banner.js';
@@ -13,6 +13,8 @@ import { createChainDocumentStore, scratchChainDocument } from './chain_document
 import { createChainStrip } from './chain_strip.js';
 import { BAKED_CONSTANT_IDS, bakedTopologyFields, engineControlNames } from '../../../generated/shader/shader_workbench.mjs';
 export { BAKED_CONSTANT_IDS, bakedTopologyFields } from '../../../generated/shader/shader_workbench.mjs';
+import { convertLegacyShaderSnapshot, documentFromChainSnapshot } from '../../effects/legacy_shader_snapshot.js';
+import { CHAIN_SNAPSHOT_STORAGE_KEY, LEGACY_CONFIG_STORAGE_KEY, LEGACY_SIDECAR_STORAGE_KEY } from '../../effects/effect_persistence.js';
 import { copyToClipboard } from '../../shared/copy_text.js';
 import { downloadBlob } from '../../shared/download_file.js';
 import {
@@ -594,6 +596,7 @@ export function createShaderDocumentController({
     // Every load previews through the interpreter, so a shipped pattern opens
     // as editable as a scratch chain; a digest match only arms the toolbar's
     // parity toggle to the promoted build.
+    const previousSnapshot = callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'getSnapshot', []);
     const official = [...sourceCatalog.values()].find((candidate) =>
       candidate.descriptorDigest === compiled.descriptor_digest) ?? null;
     // Ahead of the teardown: a refusal here must leave the editor it would
@@ -646,6 +649,7 @@ export function createShaderDocumentController({
       if (previous && (written || previous.compiledSide)) {
         const refusal = status.textContent;
         applyPreset(previous.presetId ?? presetSelect.value);
+        if (previousSnapshot) callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'restoreSnapshot', [previousSnapshot]);
         show(refusal ?? '', true);
       }
       return false;
@@ -678,6 +682,24 @@ export function createShaderDocumentController({
     syncParity();
     if (session) setAnimationsPaused(session.paused);
     if (!applyPreset(presetId)) return abandon(true);
+    if (session?.chainSnapshot) {
+      const expected = callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'getSnapshot', []);
+      const snapshot = session.chainSnapshot;
+      const values = new Map(snapshot.parameters.map((/** @type {*} */ entry) => [entry.name, entry.value]));
+      if (!expected || JSON.stringify(expected.chain) !== JSON.stringify(snapshot.chain)
+          || expected.parameters.length !== values.size
+          || expected.parameters.some((/** @type {*} */ entry) => entry.value !== Math.fround(values.get(entry.name)))) {
+        show('The shader link snapshot does not match its document and preset.', true);
+        return abandon(true);
+      }
+      if (callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'restoreSnapshot', [snapshot])
+          !== getModule().ChainSnapshotRestoreResult.APPLIED) {
+        show('The shader link runtime snapshot was rejected.', true);
+        return abandon(true);
+      }
+      syncEffectGui();
+      invalidate();
+    }
     active.savedDocument = JSON.stringify(currentDocument());
     previousUi?.strip.destroy();
     if (stripMount && candidateMount) stripMount.replaceChildren(candidateMount);
@@ -716,11 +738,13 @@ export function createShaderDocumentController({
     if (!linkPending || !active || active.presetId === null) return linkWrite;
     linkPending = false;
     const generation = linkGeneration;
+    const chainSnapshot = callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'getSnapshot', []);
     const state = {
       document: currentDocument(),
       preset: active.presetId,
       bypassed: chainUi?.store.bypassedLabels() ?? [],
       paused: getAnimationsPaused() === true,
+      ...(chainSnapshot ? {chainSnapshot} : {}),
     };
     linkWrite = encodeShaderStateHash(state).then((hash) => {
       if (generation === linkGeneration) replaceShaderStateHash(hash, win);
@@ -879,6 +903,46 @@ export function createShaderDocumentController({
       linkPending = false;
       linkGeneration += 1;
     }
+    const query = new URLSearchParams(win.location?.search ?? '');
+    const chainText = query.get(`fx.${CHAIN_SNAPSHOT_STORAGE_KEY}`);
+    const legacyText = query.get(`fx.${LEGACY_CONFIG_STORAGE_KEY}`);
+    if (!linked && !linkError && (chainText !== null || legacyText !== null)) {
+      try {
+        const original = JSON.parse(chainText ?? legacyText ?? '');
+        const conversion = chainText !== null ? { ok: true, snapshot: original }
+          : convertLegacyShaderSnapshot(original, operatorCatalog);
+        if (!conversion.ok) throw new Error(conversion.reason);
+        const imported = documentFromChainSnapshot(conversion.snapshot, operatorCatalog);
+        const previous = callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'getSnapshot', []);
+        if (!await loadSource(imported, 'imported.shader.json'))
+          throw new Error(status.textContent || 'the imported chain could not be adopted');
+        const outcome = callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'restoreSnapshot', [conversion.snapshot]);
+        if (outcome !== getModule().ChainSnapshotRestoreResult.APPLIED) {
+          if (previous) callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'restoreSnapshot', [previous]);
+          throw new Error('the imported chain snapshot was rejected');
+        }
+        if (legacyText !== null && chainText === null) {
+          query.set(`fx.${LEGACY_SIDECAR_STORAGE_KEY}`, JSON.stringify(conversion.legacy));
+          query.set(`fx.${CHAIN_SNAPSHOT_STORAGE_KEY}`, JSON.stringify(conversion.snapshot));
+          win.history?.replaceState(null, '', `${win.location.pathname}?${query}${win.location.hash ?? ''}`);
+        }
+        selectLoadedSource(null, 'imported.shader.json', 'Imported');
+        syncEffectGui();
+        invalidate();
+        show(conversion.notice ?? 'Restored the chain snapshot.');
+        return true;
+      } catch (error) {
+        linkError = errorDetail(error);
+        preserveRefusedLink = true;
+        clearLinkTimers();
+        linkPending = false;
+        linkGeneration += 1;
+      }
+    }
+    if (chainText === null && legacyText === null && ['Shader', 'ShaderBall', 'ShaderWorkbench'].includes(initialEffect ?? '')) {
+      preserveRefusedLink = true;
+      linkError = 'the legacy link carries no versioned snapshot; its original URL remains preserved';
+    }
     const requested = sourceCatalog.get(initialEffect ?? '');
     let loaded;
     if (requested === undefined) loaded = await loadScratch();
@@ -903,11 +967,15 @@ export function createShaderDocumentController({
       return;
     }
     try {
-      preserveRefusedLink = false;
       const option = sourceSelect.selectedOptions[0];
       if (!option?.value) {
-        if (await loadScratch()) selectLoadedSource('', SCRATCH_FILENAME, '');
-        else sourceSelect.value = selectedSource;
+        if (!await loadScratch()) {
+          sourceSelect.value = selectedSource;
+          return;
+        }
+        selectLoadedSource('', SCRATCH_FILENAME, '');
+        preserveRefusedLink = false;
+        scheduleDeepLink();
         await flushDeepLink();
         return;
       }
@@ -916,20 +984,25 @@ export function createShaderDocumentController({
         show(`The source catalog carries no document for "${option.value}".`, true);
         return;
       }
-      if (await loadSource(entry.source, entry.filename, entry.compiled))
-        selectLoadedSource(entry.effectId, entry.filename, '');
-      else sourceSelect.value = selectedSource;
+      if (!await loadSource(entry.source, entry.filename, entry.compiled)) {
+        sourceSelect.value = selectedSource;
+        return;
+      }
+      selectLoadedSource(entry.effectId, entry.filename, '');
+      preserveRefusedLink = false;
+      scheduleDeepLink();
       await flushDeepLink();
     } catch (error) {
       show(`Could not load shader source: ${errorDetail(error)}`, true);
     }
   };
   const onPresetChange = () => {
-    preserveRefusedLink = false;
     if (!applyPreset(presetSelect.value)) {
       presetSelect.value = active?.presetId ?? '';
       return;
     }
+    preserveRefusedLink = false;
+    scheduleDeepLink();
     chainUi?.strip.render();
     void flushDeepLink();
   };
@@ -944,10 +1017,10 @@ export function createShaderDocumentController({
         return;
       }
       if (!allowSourceChange()) return;
+      if (!await loadSource(await file.text(), file.name)) return;
+      selectLoadedSource(null, file.name, 'Imported');
       preserveRefusedLink = false;
-      if (await loadSource(await file.text(), file.name)) {
-        selectLoadedSource(null, file.name, 'Imported');
-      }
+      scheduleDeepLink();
       await flushDeepLink();
     } catch (error) {
       show(`Could not open shader document: ${errorDetail(error)}`, true);
@@ -1017,5 +1090,6 @@ export function createShaderDocumentController({
     init, loadSource, save, saveAs, applyPreset,
     dispose,
     flushDeepLink,
+    preservesOriginalLink: () => preserveRefusedLink,
   };
 }

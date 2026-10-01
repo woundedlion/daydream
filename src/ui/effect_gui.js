@@ -36,10 +36,8 @@ import {
   latticeMeltStageAssignments,
   kaleidoscopeSmoothStageAssignments,
   fixedShaderStageAssignments,
-  fixedShaderStageTitles,
   legacyShaderBallParamNames,
   stageControlLabel,
-  shaderStageAssignments,
 } from "../effects/shader_stages.js";
 
 /** @typedef {{name: string, value: number|boolean, min: number, max: number, animated?: boolean, readonly?: boolean, warning?: string, options?: string[], step?: number, acceptedValue?: number|boolean, requestedValue?: number|boolean}} ParameterDefinition */
@@ -170,7 +168,6 @@ const HOST_MEMBERS = ['createGui', 'container', 'isMobile', 'applyEffect'];
 const CONFIG_DEFAULTS = {
   inUse: () => false,
   snapshot: () => null,
-  fieldDefinitions: () => null,
   restore: () => null,
   restoreResults: () => ({}),
   showImportNotice: () => {},
@@ -252,12 +249,10 @@ function checkedGroup(group, members, required, defaults = /** @type {D} */ ({})
  * @param {() => boolean} [deps.config.inUse] - Whether the active effect
  *   persists through the snapshot API.
  * @param {() => {accepted: number[]}|null} [deps.config.snapshot] - Captures that state.
- * @param {() => Array<{name: string, id: number}>|null} [deps.config.fieldDefinitions] - Names the
- *   fields in a snapshot.
  * @param {(snapshot: Object) => unknown} [deps.config.restore] - Atomically
- *   restores a captured state, returning one FullConfigRestoreResult value.
+ *   restores a captured state, returning one ChainSnapshotRestoreResult value.
  * @param {() => Record<string, unknown>} [deps.config.restoreResults] - The
- *   engine's FullConfigRestoreResult enum, which that value is judged against by
+ *   engine's ChainSnapshotRestoreResult enum, which that value is judged against by
  *   identity.
  * @param {(message: string|null) => void} [deps.config.showImportNotice] - Shows
  *   or clears the migration notice.
@@ -302,9 +297,8 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     setParam: setWorkerParam,
   } = checkedGroup('segments', segments, SEGMENT_MEMBERS);
   const {
-    inUse: usesFullConfigSnapshot, snapshot: getFullConfigSnapshot,
-    fieldDefinitions: getFullConfigFieldDefinitions,
-    restore: restoreFullConfigSnapshot, restoreResults: fullConfigRestoreResults,
+    inUse: usesChainSnapshot, snapshot: getSnapshot,
+    restore: restoreSnapshot, restoreResults: chainSnapshotRestoreResults,
     showImportNotice: showConfigImportNotice,
   } = checkedGroup('config', config ?? {}, [], CONFIG_DEFAULTS);
   const {
@@ -325,7 +319,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   /** @type {string|undefined} */
   let rebuildFailureGeneration;
   const persistence = createEffectPersistence({
-    getParameterDefinitions, setEngineParam, usesFullConfigSnapshot, getFullConfigSnapshot, restoreFullConfigSnapshot, fullConfigRestoreResults, showConfigImportNotice, logWarn
+    getParameterDefinitions, setEngineParam, usesChainSnapshot, getSnapshot, restoreSnapshot, chainSnapshotRestoreResults, showConfigImportNotice, logWarn
   });
   const view = createEffectPanelView({ focusedElement, guiContainer, isMobile });
   /**
@@ -517,10 +511,10 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    * @returns {Promise<void>|void} Clipboard completion, or nothing when blocked.
    */
   function exportParams(fx, params, flashExport) {
-    if (usesFullConfigSnapshot()) {
-      const snapshot = getFullConfigSnapshot();
+    if (usesChainSnapshot()) {
+      const snapshot = getSnapshot();
       if (!snapshot) {
-        logWarn('Export: Shader Workbench full-config snapshot is unavailable');
+        logWarn('Export: Shader Workbench chain snapshot is unavailable');
         flashExport(EXPORT_FAILED);
         return;
       }
@@ -651,7 +645,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
           return false;
         }
         fx.warningsDirty = true;
-        if (!usesFullConfigSnapshot()) {
+        if (!usesChainSnapshot()) {
           for (const parameter of getParameterDefinitions()) {
             if (!parameter.readonly) fx.gui.writeStoredValue(parameter.name, null);
           }
@@ -755,28 +749,15 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    *   order: Array<string>}|null} The grouping, or null when none claims the list.
    */
   function stageGrouping(params) {
-    const shaderBall = shaderStageAssignments(params);
-    if (shaderBall) {
-      return {
-        assignments: shaderBall, titles: null, order: STAGE_ORDER,
-      };
-    }
     const fixedShader = fixedShaderStageAssignments(params);
-    const fixedTitles = fixedShader
-      ? fixedShaderStageTitles(
-        getFullConfigSnapshot(), getFullConfigFieldDefinitions(), logWarn)
-      : null;
     const fixedGrouping = () => {
       const claimed = new Set(fixedShader?.values());
       return {
         assignments: /** @type {Map<string, string>} */ (fixedShader),
-        titles: fixedTitles,
+        titles: null,
         order: STAGE_ORDER.filter((stage) => claimed.has(stage)),
       };
     };
-    // Only a Fixed Shader carrying a configuration snapshot outranks the named
-    // fixed pipelines; without one it is the last resort below.
-    if (fixedTitles && fixedShader) return fixedGrouping();
     const latticeMelt = latticeMeltStageAssignments(params);
     if (latticeMelt) {
       return {
@@ -857,7 +838,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     const external = paramFilter() !== null;
     // Fixed for the schema this build is committed to: no parameter write adds
     // or drops a stage selector.
-    const persistParamKeys = !usesFullConfigSnapshot();
+    const persistParamKeys = !usesChainSnapshot();
     fx.paramNames = [];
     fx.writableParamNames = [];
     fx.controllerByName = new Map();

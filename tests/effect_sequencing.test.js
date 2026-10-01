@@ -13,7 +13,7 @@ import {
   switchFailureReport,
 } from '../src/effects/effect_sequencing.js';
 import { resolutionEffects } from '../src/effects/effect_roster.js';
-import { EffectSetResult, ResolutionSetResult } from './helpers/fake_engine.js';
+import { EffectSetResult, ResolutionSetResult, ChainSnapshotRestoreResult } from './helpers/fake_engine.js';
 
 function makeEffectControls(values, paused = false, sinks = null) {
   const state = { ...values };
@@ -417,6 +417,8 @@ function makeApp({
   noEngine = false,
   segmented = false,
   subscribeEffect = false,
+  chainSnapshot = null,
+  restoreSnapshotResult = ChainSnapshotRestoreResult.APPLIED,
 } = {}) {
   const log = [];
   const errors = [];
@@ -438,6 +440,15 @@ function makeApp({
   };
 
   const engine = {
+    getShaderChainBindings: () => chainSnapshot ? {
+      getSnapshot: () => { log.push('chain.capture'); return structuredClone(chainSnapshot); },
+      restoreSnapshot: (snapshot) => {
+        log.push('chain.restore');
+        assert.deepEqual(snapshot, chainSnapshot);
+        return restoreSnapshotResult;
+      },
+      delete: () => {},
+    } : null,
     setEffect(name) {
       log.push(`engine.setEffect ${name}`);
       return rejectedEffects.has(name)
@@ -470,7 +481,7 @@ function makeApp({
   const pipeline = createApplyPipeline({
     appState,
     getEngine: () => (noEngine ? null : engine),
-    getModule: () => (noEngine ? null : { EffectSetResult, ResolutionSetResult }),
+    getModule: () => (noEngine ? null : { EffectSetResult, ResolutionSetResult, ChainSnapshotRestoreResult }),
     invalidateEngineView: () => log.push('host.invalidateView'),
     presets: APPLY_PRESETS,
     availableEffects: (label) => offers[label],
@@ -760,4 +771,35 @@ test('an effect the resized engine rejects rejects the resolution change', () =>
   assert.equal(app.pipeline.applyResolution(), ApplyResult.REJECTED);
 
   assert.equal(app.log.includes('driver.stepOnce'), false);
+});
+
+
+test('resolution rebuild restores the chain runtime before rebuilding controls or broadcasting', () => {
+  const snapshot = {schemaVersion: 1, chain: [{instance: 'camera', operator: 'sphere.rotate.v2'}],
+    parameters: [{name: 'camera.wander', value: 0.3}],
+    runtime: [{instance: 'camera', kind: 'spatial-walk-v1', state: {walkTime: 37}}], animationsPaused: false};
+  const app = makeApp({chainSnapshot: snapshot, segmented: true});
+  assert.equal(app.pipeline.applyResolution(), ApplyResult.APPLIED);
+  assert.ok(app.log.indexOf('chain.capture') < app.log.findIndex((event) => event.startsWith('engine.setResolution')));
+  assert.ok(app.log.indexOf('chain.restore') < app.log.indexOf('effectGui.build'));
+  assert.ok(app.log.indexOf('chain.restore') < app.log.findIndex((event) => event.startsWith('segments.setEffect')));
+  assert.equal(app.log.includes('clearEffectParamUrl'), false);
+});
+
+test('a refused chain restore rejects a resolution transaction before rebuilding its controls', () => {
+  const app = makeApp({chainSnapshot: {schemaVersion: 1}, restoreSnapshotResult: ChainSnapshotRestoreResult.INVALID_CHAIN});
+  assert.equal(app.pipeline.applyResolution(), ApplyResult.REJECTED);
+  assert.equal(app.log.includes('effectGui.build'), false);
+});
+
+test('rollback captures and restores complete chain runtime without individual parameter replay', () => {
+  const effect = makeEffectControls({Speed: 0.25}, true);
+  const chain = {schemaVersion: 1, runtime: [{instance: 'sample', kind: 'source-clock-v1', state: {primary: 1.25}}]};
+  const snapshot = snapshotEffectControlState(effect, () => true, () => structuredClone(chain));
+  assert.deepEqual(snapshot.chainSnapshot, chain);
+  assert.deepEqual(snapshot.paramValues, []);
+  let restored;
+  restoreEffectControlState(effect, snapshot, (value) => { restored = value; return true; });
+  assert.deepEqual(restored, chain);
+  assert.throws(() => restoreEffectControlState(effect, snapshot, () => false), /rollback was rejected/);
 });

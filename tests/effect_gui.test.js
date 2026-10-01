@@ -1,5 +1,5 @@
 import { fakeGui } from './helpers/fake_app.js';
-import { FULL_CONFIG_STORAGE_KEY } from '../src/effects/effect_persistence.js';
+import { CHAIN_SNAPSHOT_STORAGE_KEY } from '../src/effects/effect_persistence.js';
 import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement } from './helpers/fake_dom.js';
@@ -14,16 +14,12 @@ import {
 import {
   LATTICE_MELT_STAGE_ORDER,
   KALEIDOSCOPE_SMOOTH_STAGE_ORDER,
-  STAGE_ORDER,
   latticeMeltStageAssignments,
   kaleidoscopeSmoothStageAssignments,
   fixedShaderStageAssignments,
-  fixedShaderStageTitles,
-  isShaderSchema,
   legacyShaderBallParamNames,
-  shaderStageAssignments,
 } from '../src/effects/shader_stages.js';
-import { FullConfigRestoreResult } from './helpers/fake_engine.js';
+import { ChainSnapshotRestoreResult } from './helpers/fake_engine.js';
 
 // createEffectGui owns the effect panel: which control an engine parameter maps
 // to, which value stream feeds the sliders each frame, what an Export may copy,
@@ -121,27 +117,6 @@ function kaleidoscopeSmoothParams() {
   ].map((name) => ({ name, value: 0.5, min: 0, max: 1, animated: true }));
 }
 
-function fixedShaderConfig(overrides = {}) {
-  const values = new Map([
-    ['slots.function', 5],
-    ['slots.projection', 2],
-    ['slots.projection_frame', 1],
-    ['slots.surface_noise', 0],
-    ['slots.surface_lens', 0],
-    ['slots.warp_program.outer.kind', 1],
-    ['slots.warp_program.inner.kind', 0],
-    ['slots.signal_weight', 1],
-    ['slots.value_transfer', 0],
-    ['slots.coverage', 3],
-    ['slots.palette', 0],
-  ]);
-  for (const [name, value] of Object.entries(overrides)) values.set(name, value);
-  return {
-    fields: [...values.keys()].map((name, id) => ({ name, id })),
-    snapshot: { accepted: [...values.values()] },
-  };
-}
-
 /**
  * Clipboard copy double that resolves, fails, or rejects on demand.
  * @param {boolean|Error} [outcome] - Resolution value or rejection value.
@@ -203,8 +178,8 @@ function makeHarness({
   presetIndex = 0,
   presetSelectionAccepted = true,
   presetSyncAccepted = true,
-  fullConfig = false,
-  fullConfigSnapshot = null,
+  chainSnapshotEnabled = false,
+  chainSnapshot = null,
   fullConfigFieldDefinitions = null,
   restoreFullConfigAccepted = true,
 } = {}) {
@@ -221,7 +196,7 @@ function makeHarness({
     presetCount,
     presetIndex,
     hostPresetIndex: presetIndex,
-    fullConfigSnapshot,
+    chainSnapshot,
     fullConfigFieldDefinitions,
   };
   const writes = [];
@@ -276,15 +251,15 @@ function makeHarness({
       setParam: (name, value) => writes.push(`worker:${name}=${value}`),
     },
     config: {
-      inUse: () => fullConfig,
-      snapshot: () => state.fullConfigSnapshot,
+      inUse: () => chainSnapshotEnabled,
+      snapshot: () => state.chainSnapshot,
       fieldDefinitions: () => state.fullConfigFieldDefinitions,
       restore: (snapshot) => {
         restoredFullConfigs.push(snapshot);
-        return restoreFullConfigAccepted && [10, 11].includes(snapshot.schemaVersion)
-          ? FullConfigRestoreResult.APPLIED : FullConfigRestoreResult.INVALID_VALUE;
+        return restoreFullConfigAccepted && snapshot.schemaVersion === 1
+          ? ChainSnapshotRestoreResult.APPLIED : ChainSnapshotRestoreResult.INVALID_VALUE;
       },
-      restoreResults: () => FullConfigRestoreResult,
+      restoreResults: () => ChainSnapshotRestoreResult,
       showImportNotice: (message) => configNotices.push(message),
     },
     host: {
@@ -481,56 +456,14 @@ test('an enumerated param becomes a dropdown of labels to engine indices', () =>
   assert.equal(controller.isContinuous, false);
 });
 
-test('the ShaderBall schema is recognized by its stage selectors alone', () => {
-  assert.equal(isShaderSchema(shaderBallParams()), true);
-  assert.equal(
-    isShaderSchema(shaderBallParams().filter((p) => p.name !== 'Coverage')),
-    false, 'a missing stage selector is not the ShaderBall schema');
-  assert.equal(isShaderSchema([SPEED, GLOW]), false);
-});
 
-test('ShaderBall parameters map to banks in evaluation order', () => {
-  const assignments = shaderStageAssignments(shaderBallParams());
 
-  // A stage nothing lands in builds an empty folder; a stage nothing lists
-  // drops its controls on the floor.
-  assert.deepEqual([...new Set(assignments.values())].sort(),
-    [...STAGE_ORDER].sort(),
-    'the stage list and the assignments cover the same banks');
-  assert.equal(assignments.get('Projection Wander'), 'Projection Frame');
-  assert.equal(assignments.get('Surface Noise Scale'), 'Surface Noise');
-  assert.equal(assignments.get('Planar Warp 1 Strength'), 'Planar Warp 1');
-  assert.equal(assignments.get('Hue Shift Mode'), 'Colorize');
-  assert.equal(assignments.get('Hue Shift Amount'), 'Colorize');
-});
 
-test('ShaderBall builds one URL-transparent bank for every pipeline stage', () => {
-  const params = shaderBallParams();
-  const h = makeHarness({
-    params,
-    engineValues: params.map((parameter) => parameter.value),
-  });
 
-  h.panel.build();
 
-  assert.deepEqual(h.gui().folders.map((folder) => folder.name),
-    STAGE_ORDER);
-  assert.ok(h.gui().folders.every((folder) => folder.display));
-  assert.equal(h.gui().ctrl('Camera Wander').folder, 'Camera');
-  assert.equal(h.gui().ctrl('Camera Wander').label, 'Wander');
-  assert.equal(h.gui().ctrl('Planar Warp 1').folder, 'Planar Warp 1');
-  assert.equal(h.gui().ctrl('Planar Warp 1').label, 'Mode');
-  assert.equal(h.gui().ctrl('Planar Warp 1 Strength').label, 'Strength');
-  assert.equal(h.gui().ctrl('Function').folder, 'Function');
-  assert.equal(h.gui().ctrl('Surface Noise').folder, 'Surface Noise');
-  assert.equal(h.gui().ctrl('Surface Noise').label, 'Mode');
-  assert.equal(h.gui().ctrl('Palette').folder, 'Colorize');
-  assert.equal(h.gui().ctrl('Palette').label, 'Palette');
-  assert.equal(h.gui().ctrl('Hue Shift Mode').folder, 'Colorize');
-});
 
 test('stage controls sharing a visible label keep distinct accessible names', () => {
-  const params = shaderBallParams();
+  const params = latticeMeltParams();
   const h = makeHarness({
     params,
     engineValues: params.map((parameter) => parameter.value),
@@ -541,8 +474,8 @@ test('stage controls sharing a visible label keep distinct accessible names', ()
   const labelled = params
     .map((p) => h.gui().ctrl(p.name))
     .filter((c) => c.folder !== undefined);
-  const shared = labelled.filter((c) => c.label === 'Mode');
-  assert.ok(shared.length > 1, 'more than one stage selector reads "Mode"');
+  const shared = labelled.filter((c) => c.label === 'Wander');
+  assert.ok(shared.length > 1, 'camera and projection share the visible Wander label');
   const widget = (c) => c.$select ?? c.$input ?? c.$button;
   for (const controller of shared) {
     assert.equal(widget(controller).getAttribute('aria-labelledby'), null,
@@ -556,7 +489,7 @@ test('stage controls sharing a visible label keep distinct accessible names', ()
 });
 
 test('a schema rebuild keeps the stage folders the user collapsed', () => {
-  const params = shaderBallParams();
+  const params = latticeMeltParams();
   const h = makeHarness({
     params,
     engineValues: params.map((parameter) => parameter.value),
@@ -565,17 +498,17 @@ test('a schema rebuild keeps the stage folders the user collapsed', () => {
   h.panel.build();
   h.panel.mount();
   const folder = (name) => h.gui().folders.find((f) => f.name === name);
-  folder('Surface Noise').close();
-  folder('Colorize').close();
+  folder('Curl').close();
+  folder('Generated Triadic').close();
 
   h.state.generation = 8;
   h.panel.sync();
 
-  assert.deepEqual(h.gui().folders.map((f) => f.name), STAGE_ORDER,
+  assert.deepEqual(h.gui().folders.map((f) => f.name), ['Camera', 'Curl', 'Spin + Wander', 'Folded Sinusoidal', 'Primitive Lattice', 'Generated Triadic'],
     'the panel was rebuilt');
-  assert.equal(folder('Surface Noise').closed, true);
-  assert.equal(folder('Colorize').closed, true);
-  assert.equal(folder('Function').closed, false, 'the rest stay open');
+  assert.equal(folder('Curl').closed, true);
+  assert.equal(folder('Generated Triadic').closed, true);
+  assert.equal(folder('Primitive Lattice').closed, false, 'the rest stay open');
 });
 
 test('LatticeMelt controls use the fixed pipeline modes as folders', () => {
@@ -662,63 +595,9 @@ test('KaleidoscopeSmooth controls use the fixed pipeline modes as folders', () =
   assert.equal(h.gui().ctrl('Hue Noise Speed').folder, 'Generated Analogous');
 });
 
-test('promoted Shader controls use their accepted structural modes as folders', () => {
-  const params = [
-    'Camera Wander', 'Projection Spin Speed', 'Singularity Fade',
-    'Planar Warp 1 Translation X', 'Pattern Freq', 'Edge Fade Width',
-    'Palette Chroma', 'Mapping Frequency',
-  ].map((name) => ({ name, value: 0 }));
-  const assignments = fixedShaderStageAssignments(params);
-  const { snapshot, fields } = fixedShaderConfig();
-  const titles = fixedShaderStageTitles(snapshot, fields);
-  const h = makeHarness({
-    params,
-    engineValues: params.map(() => 0),
-    fullConfigSnapshot: snapshot,
-    fullConfigFieldDefinitions: fields,
-  });
 
-  h.panel.build();
 
-  assert.equal(assignments.get('Camera Wander'), 'Camera');
-  assert.equal(assignments.get('Projection Spin Speed'), 'Projection Frame');
-  assert.equal(assignments.get('Singularity Fade'), 'Projection');
-  assert.equal(assignments.get('Planar Warp 1 Translation X'), 'Planar Warp 1');
-  assert.equal(assignments.get('Pattern Freq'), 'Function');
-  assert.equal(assignments.get('Edge Fade Width'), 'Coverage');
-  assert.equal(assignments.get('Palette Chroma'), 'Colorize');
-  assert.equal(titles.get('Planar Warp 1'), 'Affine Frame');
-  assert.deepEqual(h.gui().folders.map((folder) => folder.name),
-    ['Camera', 'Spin + Wander', 'Gnomonic', 'Affine Frame',
-      'Primitive Lattice', 'Edge Fade', 'Generated Triadic']);
-  assert.equal(h.gui().ctrl('Planar Warp 1 Translation X').label,
-    'Translation X');
-});
 
-test('a renamed snapshot field costs only its own stage folder a title', () => {
-  const params = [
-    'Camera Wander', 'Projection Spin Speed', 'Singularity Fade',
-    'Planar Warp 1 Translation X', 'Pattern Freq', 'Edge Fade Width',
-    'Palette Chroma', 'Mapping Frequency',
-  ].map((name) => ({ name, value: 0, min: 0, max: 1 }));
-  const { snapshot, fields } = fixedShaderConfig();
-  const renamed = fields.map((field) => (field.name === 'slots.projection'
-    ? { ...field, name: 'slots.projection_kind' } : field));
-  const h = makeHarness({
-    params,
-    engineValues: params.map(() => 0),
-    fullConfigSnapshot: snapshot,
-    fullConfigFieldDefinitions: renamed,
-  });
-
-  h.panel.build();
-
-  assert.deepEqual(h.gui().folders.map((folder) => folder.name),
-    ['Camera', 'Spin + Wander', 'Projection', 'Affine Frame',
-      'Primitive Lattice', 'Edge Fade', 'Generated Triadic']);
-  assert.deepEqual(h.warnings,
-    ['Shader stages: the snapshot resolves no mode for slots.projection']);
-});
 
 test('fixed Shader controls retain stage folders without dynamic metadata', () => {
   const params = [
@@ -729,7 +608,7 @@ test('fixed Shader controls retain stage folders without dynamic metadata', () =
   const h = makeHarness({
     params,
     engineValues: params.map(() => 0),
-    fullConfigSnapshot: null,
+    chainSnapshot: null,
     fullConfigFieldDefinitions: null,
   });
 
@@ -760,32 +639,7 @@ test('fixed Shader warp ownership follows each explicit slot boundary', () => {
   assert.equal(assignments.get('Mirror Cell X'), 'Planar Warp 2');
 });
 
-test('a promoted Shader snapshot outranks a matching dedicated-effect schema', () => {
-  const params = [...kaleidoscopeSmoothParams(), {
-    name: 'Central Meridian', value: 0.5, min: 0, max: 1, animated: true,
-  }];
-  const { snapshot, fields } = fixedShaderConfig({
-    'slots.function': 3,
-    'slots.projection': 6,
-    'slots.warp_program.outer.kind': 0,
-    'slots.warp_program.inner.kind': 6,
-    'slots.coverage': 1,
-    'slots.palette': 2,
-  });
-  const h = makeHarness({
-    params,
-    engineValues: params.map(() => 0),
-    fullConfigSnapshot: snapshot,
-    fullConfigFieldDefinitions: fields,
-  });
 
-  h.panel.build();
-
-  assert.equal(h.gui().ctrl('Central Meridian').folder, 'Equirectangular');
-  assert.equal(h.gui().ctrl('Planar Warp 2 Cell Y').folder, 'Mirror Tile');
-  assert.equal(h.gui().ctrl('Pattern Mix').folder, 'Grid');
-  assert.equal(h.gui().ctrl('Hue Noise Speed').folder, 'Generated Analogous');
-});
 
 test('renamed ShaderBall controls accept every legacy deep-link name', () => {
   assert.deepEqual(legacyShaderBallParamNames('Camera Wander'), ['Outer Wander']);
@@ -968,7 +822,7 @@ test('an engine-rejected unversioned snapshot is reported before session control
     runtime: [],
   };
   const current = {
-    schemaVersion: 11,
+    schemaVersion: 1,
     accepted: [0, 4294967295],
     requested: [0, 4294967295],
     pendingFieldIds: [],
@@ -977,25 +831,25 @@ test('an engine-rejected unversioned snapshot is reported before session control
   };
   const h = makeHarness({
     params: shaderBallParams(),
-    fullConfig: true,
-    fullConfigSnapshot: current,
-    acceptedStored: { [FULL_CONFIG_STORAGE_KEY]: JSON.stringify(stored) },
+    chainSnapshotEnabled: true,
+    chainSnapshot: current,
+    acceptedStored: { [CHAIN_SNAPSHOT_STORAGE_KEY]: JSON.stringify(stored) },
   });
 
   h.panel.build();
 
   assert.deepEqual(h.restoredFullConfigs, [stored]);
-  assert.deepEqual(h.configNotices, []);
+  assert.deepEqual(h.configNotices, ['The chain snapshot was rejected. Its original text remains preserved.']);
   assert.deepEqual(h.warnings,
-    ['Shader Workbench: full-config snapshot was rejected: INVALID_VALUE']);
+    ['Shader Workbench: chain snapshot was rejected: INVALID_VALUE']);
   assert.equal(h.gui().ctrl('Lens').session, true);
-  assert.equal(h.gui().stored[FULL_CONFIG_STORAGE_KEY], JSON.stringify(current));
+  assert.equal(h.gui().stored[CHAIN_SNAPSHOT_STORAGE_KEY], JSON.stringify(stored));
   assert.equal(h.gui().stored['__accepted.Lens'], undefined);
 });
 
 test('a rejected full-config snapshot is reported and announces no import', () => {
   const stored = {
-    schemaVersion: 11,
+    schemaVersion: 1,
     accepted: [0, 4294967295],
     requested: [0, 4294967295],
     pendingFieldIds: [],
@@ -1004,9 +858,9 @@ test('a rejected full-config snapshot is reported and announces no import', () =
   };
   const h = makeHarness({
     params: shaderBallParams(),
-    fullConfig: true,
-    fullConfigSnapshot: { ...stored },
-    acceptedStored: { [FULL_CONFIG_STORAGE_KEY]: JSON.stringify(stored) },
+    chainSnapshotEnabled: true,
+    chainSnapshot: { ...stored },
+    acceptedStored: { [CHAIN_SNAPSHOT_STORAGE_KEY]: JSON.stringify(stored) },
     restoreFullConfigAccepted: false,
   });
 
@@ -1014,9 +868,8 @@ test('a rejected full-config snapshot is reported and announces no import', () =
 
   assert.deepEqual(h.restoredFullConfigs, [stored], 'the snapshot never reached the engine');
   assert.deepEqual(h.warnings,
-    ['Shader Workbench: full-config snapshot was rejected: INVALID_VALUE']);
-  assert.deepEqual(h.configNotices, [],
-    'a refused restore announced an import that did not happen');
+    ['Shader Workbench: chain snapshot was rejected: INVALID_VALUE']);
+  assert.deepEqual(h.configNotices, ['The chain snapshot was rejected. Its original text remains preserved.']);
 });
 
 test('a stored snapshot that is not a config object never reaches the engine', () => {
@@ -1024,22 +877,22 @@ test('a stored snapshot that is not a config object never reaches the engine', (
   for (const text of ['{not json', 'null', '[]', '"snapshot"', '7']) {
     const h = makeHarness({
       params: shaderBallParams(),
-      fullConfig: true,
-      fullConfigSnapshot: null,
-      acceptedStored: { [FULL_CONFIG_STORAGE_KEY]: text },
+      chainSnapshotEnabled: true,
+      chainSnapshot: null,
+      acceptedStored: { [CHAIN_SNAPSHOT_STORAGE_KEY]: text },
     });
 
     h.panel.build();
 
     assert.deepEqual(h.restoredFullConfigs, [], `restored from ${text}`);
     assert.equal(h.warnings.length, 1, `warnings for ${text}`);
-    assert.match(h.warnings[0], /ignoring invalid full-config snapshot/);
+    assert.match(h.warnings[0], /invalid chain snapshot/);
   }
 });
 
 test('Lens Glitch to None persists the exhaustive snapshot bit-exactly', () => {
   const initial = {
-    schemaVersion: 11,
+    schemaVersion: 1,
     accepted: [1, 2147483648],
     requested: [1, 2147483648],
     pendingFieldIds: [],
@@ -1047,7 +900,7 @@ test('Lens Glitch to None persists the exhaustive snapshot bit-exactly', () => {
     runtime: [],
   };
   const updated = {
-    schemaVersion: 11,
+    schemaVersion: 1,
     accepted: [0, 4294967295],
     requested: [0, 4294967295],
     pendingFieldIds: [17],
@@ -1060,10 +913,10 @@ test('Lens Glitch to None persists the exhaustive snapshot bit-exactly', () => {
   });
   const h = makeHarness({
     params,
-    fullConfig: true,
-    fullConfigSnapshot: initial,
+    chainSnapshotEnabled: true,
+    chainSnapshot: initial,
     onEngineParam: (name, value, state) => {
-      if (name === 'Lens' && value === 0) state.fullConfigSnapshot = updated;
+      if (name === 'Lens' && value === 0) state.chainSnapshot = updated;
     },
   });
   h.panel.build();
@@ -1074,9 +927,9 @@ test('Lens Glitch to None persists the exhaustive snapshot bit-exactly', () => {
 
   assert.deepEqual(h.writes, ['engine:Lens=0', 'worker:Lens=0']);
   assert.deepEqual(h.gui().storedWrites, [
-    [FULL_CONFIG_STORAGE_KEY, JSON.stringify(updated)],
+    [CHAIN_SNAPSHOT_STORAGE_KEY, JSON.stringify(updated)],
   ]);
-  assert.deepEqual(JSON.parse(h.gui().stored[FULL_CONFIG_STORAGE_KEY]), updated);
+  assert.deepEqual(JSON.parse(h.gui().stored[CHAIN_SNAPSHOT_STORAGE_KEY]), updated);
 });
 
 test('build warns when an engine param claims the pause toggle deep-link key', () => {
@@ -2397,7 +2250,7 @@ test('the Export outcome is announced in a polite live region', () => {
 test('ShaderBall Export copies the versioned full-config snapshot', async () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   const snapshot = {
-    schemaVersion: 11,
+    schemaVersion: 1,
     accepted: [0, 4294967295],
     requested: [1, 4294967295],
     pendingFieldIds: [0],
@@ -2405,8 +2258,8 @@ test('ShaderBall Export copies the versioned full-config snapshot', async () => 
     runtime: [],
   };
   const h = makeHarness({
-    params: shaderBallParams(), fullConfig: true,
-    fullConfigSnapshot: snapshot,
+    params: shaderBallParams(), chainSnapshotEnabled: true,
+    chainSnapshot: snapshot,
   });
   h.panel.build();
 
@@ -2483,8 +2336,8 @@ test('ShaderBall Export names a missing clipboard operation', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   const h = makeHarness({
     params: shaderBallParams(),
-    fullConfig: true,
-    fullConfigSnapshot: { schemaVersion: 11 },
+    chainSnapshotEnabled: true,
+    chainSnapshot: { schemaVersion: 1 },
     copyText: null,
   });
   h.panel.build();
@@ -2495,12 +2348,12 @@ test('ShaderBall Export names a missing clipboard operation', () => {
   assert.deepEqual(h.warnings, ['Export: clipboard copy unavailable']);
 });
 
-test('ShaderBall Export fails visibly when the full-config snapshot is unavailable', () => {
+test('chain Export fails visibly when the typed snapshot is unavailable', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   const h = makeHarness({
     params: shaderBallParams(),
-    fullConfig: true,
-    fullConfigSnapshot: null,
+    chainSnapshotEnabled: true,
+    chainSnapshot: null,
   });
   h.panel.build();
 
@@ -2509,7 +2362,7 @@ test('ShaderBall Export fails visibly when the full-config snapshot is unavailab
   assert.deepEqual(h.state.copyText.copied, []);
   assert.equal(h.gui().ctrl('export').label, '\u2717');
   assert.deepEqual(h.warnings,
-    ['Export: Shader Workbench full-config snapshot is unavailable']);
+    ['Export: Shader Workbench chain snapshot is unavailable']);
 });
 
 test('Export refuses a value stream that has skewed from the panel', () => {
@@ -2701,7 +2554,7 @@ test('a slider drag defers persistence to the pointer release', () => {
 
 test('a ShaderBall drag writes one full-config snapshot, at the release', () => {
   const snapshot = (hue) => ({
-    schemaVersion: 11,
+    schemaVersion: 1,
     accepted: [hue],
     requested: [hue],
     pendingFieldIds: [],
@@ -2710,10 +2563,10 @@ test('a ShaderBall drag writes one full-config snapshot, at the release', () => 
   });
   const h = makeHarness({
     params: shaderBallParams(),
-    fullConfig: true,
-    fullConfigSnapshot: snapshot(0),
+    chainSnapshotEnabled: true,
+    chainSnapshot: snapshot(0),
     onEngineParam: (name, value, state) => {
-      if (name === 'Hue Shift Amount') state.fullConfigSnapshot = snapshot(value);
+      if (name === 'Hue Shift Amount') state.chainSnapshot = snapshot(value);
     },
   });
   h.panel.build();
@@ -2729,7 +2582,7 @@ test('a ShaderBall drag writes one full-config snapshot, at the release', () => 
   h.dragTarget.dispatch('pointerup', pointerUp());
 
   assert.deepEqual(h.gui().storedWrites, [
-    [FULL_CONFIG_STORAGE_KEY, JSON.stringify(snapshot(0.5))],
+    [CHAIN_SNAPSHOT_STORAGE_KEY, JSON.stringify(snapshot(0.5))],
   ], 'the release deep-links the state the last move would have');
 });
 test('a schema rebuild mid-drag still lands the write the drag deferred', () => {
@@ -2763,7 +2616,7 @@ test('a schema rebuild mid-drag still lands the write the drag deferred', () => 
 
 test('a schema rebuild mid-drag lands the whole workbench snapshot', () => {
   const snapshot = (hue) => ({
-    schemaVersion: 11,
+    schemaVersion: 1,
     accepted: [hue],
     requested: [hue],
     pendingFieldIds: [],
@@ -2772,11 +2625,11 @@ test('a schema rebuild mid-drag lands the whole workbench snapshot', () => {
   });
   const h = makeHarness({
     params: shaderBallParams(),
-    fullConfig: true,
-    fullConfigSnapshot: snapshot(0),
+    chainSnapshotEnabled: true,
+    chainSnapshot: snapshot(0),
     generation: 3,
     onEngineParam: (name, value, state) => {
-      if (name === 'Hue Shift Amount') state.fullConfigSnapshot = snapshot(value);
+      if (name === 'Hue Shift Amount') state.chainSnapshot = snapshot(value);
     },
   });
   h.panel.build();
@@ -2792,7 +2645,7 @@ test('a schema rebuild mid-drag lands the whole workbench snapshot', () => {
 
   assert.equal(h.guis.length, 2, 'the schema rebuilt under the drag');
   assert.deepEqual(dragged.storedWrites, [
-    [FULL_CONFIG_STORAGE_KEY, JSON.stringify(snapshot(0.5))],
+    [CHAIN_SNAPSHOT_STORAGE_KEY, JSON.stringify(snapshot(0.5))],
   ], 'the configuration a reload restores is the dragged one');
 });
 
@@ -3157,9 +3010,9 @@ test('segmented enums follow the lagging pool values', () => {
 
 
 test('an applied full-config restore clears the import notice', () => {
-  const stored = { schemaVersion: 11, accepted: [], requested: [], pendingFieldIds: [], hasRuntime: false, runtime: [] };
-  const h = makeHarness({ params: shaderBallParams(), fullConfig: true,
-    fullConfigSnapshot: stored, acceptedStored: { [FULL_CONFIG_STORAGE_KEY]: JSON.stringify(stored) } });
+  const stored = { schemaVersion: 1, accepted: [], requested: [], pendingFieldIds: [], hasRuntime: false, runtime: [] };
+  const h = makeHarness({ params: shaderBallParams(), chainSnapshotEnabled: true,
+    chainSnapshot: stored, acceptedStored: { [CHAIN_SNAPSHOT_STORAGE_KEY]: JSON.stringify(stored) } });
   h.panel.build();
   assert.deepEqual(h.restoredFullConfigs, [stored]);
   assert.deepEqual(h.configNotices, [null]);
@@ -3196,12 +3049,12 @@ test('preset advancement refreshes nonanimated requested selectors', () => {
   assert.equal(h.gui().ctrl('Mode').getValue(), 1);
 });
 
-for (const fullConfig of [false, true]) test(`preset selection ${fullConfig ? 'keeps' : 'clears'} stored writable values (fullConfig=${fullConfig})`, () => {
-  const h = makeHarness({ params: [SPEED, TELEMETRY], presetCount: 3, fullConfig,
-    fullConfigSnapshot: { schemaVersion: 11, accepted: [], requested: [], pendingFieldIds: [], hasRuntime: false, runtime: [] } });
+for (const chainSnapshotEnabled of [false, true]) test(`preset selection ${chainSnapshotEnabled ? 'keeps' : 'clears'} stored writable values (chainSnapshotEnabled=${chainSnapshotEnabled})`, () => {
+  const h = makeHarness({ params: [SPEED, TELEMETRY], presetCount: 3, chainSnapshotEnabled,
+    chainSnapshot: { schemaVersion: 1, accepted: [], requested: [], pendingFieldIds: [], hasRuntime: false, runtime: [] } });
   h.panel.build();
   h.gui().storedWrites.length = 0;
   assert.equal(h.panel.movePreset(1), true);
   const cleared = h.gui().storedWrites.filter(([, value]) => value === null).map(([name]) => name);
-  assert.deepEqual(cleared, fullConfig ? [] : ['Speed']);
+  assert.deepEqual(cleared, chainSnapshotEnabled ? [] : ['Speed']);
 });

@@ -13,7 +13,7 @@ export const ENGINE_METHODS = [
   'setDisplayCaps', 'getDisplayNorthPhi', 'getDisplaySouthPhi',
   'getParameterDefinitions', 'getParamValues', 'getBufferLength',
   'getParamGeneration', 'getEffectSizes', 'getEffectPresetCounts',
-  'strobeColumns', 'setShaderChain', 'setShaderChainParameters',
+  'strobeColumns',
 ];
 
 /**
@@ -22,9 +22,7 @@ export const ENGINE_METHODS = [
  * that grows one of them is not reported as mocking a method the engine lacks.
  */
 export const ENGINE_OPTIONAL_METHODS = [
-  'getShaderChainBindings', 'getLegacyShaderBindings',
-  'getFullConfigSnapshot', 'restoreFullConfigSnapshot',
-  'getFullConfigFieldDefinitions',
+  'getShaderChainBindings',
   'getAnimationsPaused', 'getPresetIds', 'getPoleLod',
   // embind's own handle release, which engine_host.js calls on teardown.
   'delete',
@@ -103,14 +101,13 @@ export const ChainStatus = Object.freeze({
   MIGRATE_FAILED: Object.freeze({ value: 13 }),
 });
 
-export const FullConfigRestoreResult = Object.freeze({
+export const ChainSnapshotRestoreResult = Object.freeze({
   APPLIED: Object.freeze({ value: 0 }),
-  NOT_SHADER_WORKBENCH: Object.freeze({ value: 1 }),
+  NOT_SHADER_CHAIN: Object.freeze({ value: 1 }),
   UNSUPPORTED_VERSION: Object.freeze({ value: 2 }),
   INVALID_LENGTH: Object.freeze({ value: 3 }),
   INVALID_VALUE: Object.freeze({ value: 4 }),
-  INVALID_ACCEPTED: Object.freeze({ value: 5 }),
-  INVALID_PENDING: Object.freeze({ value: 6 }),
+  INVALID_CHAIN: Object.freeze({ value: 5 }),
 });
 
 // The engine catalog exactly as the module's getShaderChainCatalog static
@@ -135,6 +132,10 @@ export class FakeChainEngine {
 
   constructor() {
     this.catalog = JSON.parse(CHAIN_CATALOG_TEXT);
+    this.bindings = {
+      setShaderChain: (entries) => this.#setShaderChain(entries),
+      setShaderChainParameters: (writes) => this.#setShaderChainParameters(writes),
+    };
     this.effect = null;
     this.generation = 1;
     this.effectGeneration = 0;
@@ -154,7 +155,7 @@ export class FakeChainEngine {
     this.definitions = [];
     this.generation += 1;
     if (name === 'ShaderChain') {
-      const result = this.setShaderChain([
+      const result = this.#setShaderChain([
         { instance: 'camera', operator: 'sphere.rotate.v2' },
         { instance: 'project', operator: 'project.stereographic.v2' },
         { instance: 'sample', operator: 'sample.grid.v2' },
@@ -166,7 +167,7 @@ export class FakeChainEngine {
     return EffectSetResult.INSTALLED;
   }
 
-  setShaderChain(entries) {
+  #setShaderChain(entries) {
     this.chainCalls.push(entries);
     const refusal = (code, entryIndex = -1) => ({ status: ChainStatus[code], code, entryIndex });
     if (this.effect !== 'ShaderChain') return refusal('NOT_CHAIN_EFFECT');
@@ -207,6 +208,7 @@ export class FakeChainEngine {
         });
       }
     }
+    this.program = structuredClone(entries);
     this.definitions = definitions;
     this.generation += 1;
     return { status: ChainStatus.OK, code: 'APPLIED', entryIndex: -1 };
@@ -219,9 +221,25 @@ export class FakeChainEngine {
     const isValid = () => !released && this.effectGeneration === generation;
     return {
       isValid,
-      setShaderChain: (entries) => isValid() ? this.setShaderChain(entries)
+      getProgram: () => isValid() ? structuredClone(this.program) : null,
+      getSnapshot: () => isValid() ? {
+        schemaVersion: 1, chain: structuredClone(this.program),
+        parameters: this.definitions.map((d) => ({name: d.name, value: d.acceptedValue})),
+        animationsPaused: this.paused,
+      } : null,
+      restoreSnapshot: (snapshot) => {
+        if (!isValid()) return ChainSnapshotRestoreResult.NOT_SHADER_CHAIN;
+        if (snapshot?.schemaVersion !== 1) return ChainSnapshotRestoreResult.UNSUPPORTED_VERSION;
+        const outcome = this.#setShaderChain(snapshot.chain);
+        if (outcome.code !== 'APPLIED') return ChainSnapshotRestoreResult.INVALID_CHAIN;
+        if (this.#setShaderChainParameters(snapshot.parameters) !== ParamSetResult.APPLIED)
+          return ChainSnapshotRestoreResult.INVALID_VALUE;
+        this.paused = snapshot.animationsPaused;
+        return ChainSnapshotRestoreResult.APPLIED;
+      },
+      setShaderChain: (entries) => isValid() ? this.bindings.setShaderChain(entries)
         : { code: 'NOT_CHAIN_EFFECT', status: ChainStatus.NOT_CHAIN_EFFECT, entryIndex: -1 },
-      setShaderChainParameters: (writes) => isValid() ? this.setShaderChainParameters(writes)
+      setShaderChainParameters: (writes) => isValid() ? this.bindings.setShaderChainParameters(writes)
         : ParamSetResult.NO_EFFECT,
       delete: () => { released = true; },
     };
@@ -249,7 +267,7 @@ export class FakeChainEngine {
     return ParamSetResult.APPLIED;
   }
 
-  setShaderChainParameters(writes) {
+  #setShaderChainParameters(writes) {
     if (!Array.isArray(writes)) return ParamSetResult.MALFORMED_PAYLOAD;
     if (writes.length > this.catalog.budgets.max_params) return ParamSetResult.TOO_LONG;
     for (const entry of writes) {

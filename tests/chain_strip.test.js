@@ -241,15 +241,18 @@ test('a socket collapses an emptied band and expands back out of one', async () 
 
   select = h.container.querySelectorAll('.chain-chip--socket')[0]
     .querySelector('.chain-chip-replace');
-  assert.equal(select.options.length, 66,
-    '2 sphere sources plus 8 projections over 8 plane sources');
+  const crossings = (input, output) => CATALOG.operators.filter(
+    (operator) => operator.input === input && operator.output === output).length;
+  assert.equal(select.options.length, crossings('sphere', 'field')
+    + crossings('sphere', 'plane') * crossings('plane', 'field'),
+  'the socket offers every direct and projected source');
   select.value = 'project.equirectangular.v2 sample.lattice.v2';
   select.dispatch('change');
   assert.deepEqual(h.store.chain().map((entry) => entry.operator),
     ['sphere.rotate.v2', 'sphere.lens.kaleidoscope.v2', 'project.equirectangular.v2',
       'sample.lattice.v2', 'colorize.generated-palette.v3']);
   assert.ok(bandFor(h, 'plane').querySelector('.chain-band-add'),
-    'the plane band and its 15-operator vocabulary are back');
+    'the plane band and its operator vocabulary are back');
   assert.equal(h.applied.length, 3);
 });
 
@@ -422,7 +425,7 @@ test('Delete opens a socket replacement palette containing only valid stages', a
   const palette = paletteOf(h);
   assert.equal(palette.getAttribute('role'), 'listbox');
   const entries = paletteEntries(h);
-  assert.equal(entries.length, 8,
+  assert.equal(entries.length, 12,
     'only the projection functions valid for this socket are shown');
   assert.equal(entries[0].dataset.remove, undefined);
   const bonne = entries.find((entry) => entry.dataset.operator === 'project.bonne.v2');

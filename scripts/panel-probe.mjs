@@ -580,34 +580,22 @@ export async function probeWarningNote(tab, layout) {
   const { failures, check } = checks();
 
   await tab.evaluate(async () => {
-    const [{ default: loadEngine }, { createEffectGui }, { GUI }] = await Promise.all([
-      import('./generated/holosphere_wasm.js'), import('./src/ui/effect_gui.js'), import('./src/ui/gui.js'),
+    const [{ createEffectGui }, { GUI }] = await Promise.all([
+      import('./src/ui/effect_gui.js'), import('./src/ui/gui.js'),
     ]);
-    const module = await loadEngine();
-    const engine = new module.HolosphereEngine();
-    engine.setResolution(8, 4);
-    engine.setEffect('Shader');
-    const choose = (name, label) => {
-      const definition = engine.getParameterDefinitions().find((param) => param.name === name);
-      const value = definition.options.indexOf(label);
-      if (value < 0) throw new Error(`${name} has no ${label} option`);
-      engine.setParameter(name, value);
-    };
-    choose('Planar Warp 1', 'Mirror Tile');
-    choose('Function', 'Noise Contour (Sphere)');
+    let value = 1;
     const container = document.getElementById('gui-container');
     const previous = [...container.children];
     previous.forEach((node) => { node.hidden = true; });
     const panel = createEffectGui({
       engine: {
-        getParameterDefinitions: () => engine.getParameterDefinitions(),
-        paramGeneration: () => 0, paramValues: () => engine.getParamValues(),
-        setParam: (name, value) => engine.setParameter(name, value) === module.ParamSetResult.APPLIED,
-        setAnimationsPaused: (value) => engine.setAnimationsPaused(value),
-        animationsPaused: () => engine.getAnimationsPaused(),
-        getPresetCount: () => engine.getPresetCount(), getPresetIndex: () => engine.getPresetIndex(),
-        synchronizePreset: (index) => engine.synchronizePreset(index),
-        selectPreset: (index) => engine.selectPreset(index),
+        getParameterDefinitions: () => [{ name: 'Probe', value, min: 0, max: 10,
+          warning: 'This parameter requires a supported source and projection combination.' }],
+        paramGeneration: () => 0, paramValues: () => [value],
+        setParam: (name, next) => { value = next; return true; },
+        setAnimationsPaused: () => {}, animationsPaused: () => false,
+        getPresetCount: () => 0, getPresetIndex: () => 0,
+        synchronizePreset: () => true, selectPreset: () => false,
       },
       segments: { ownsDisplay: () => false, paramValues: () => null, setParam: () => {} },
       host: {
@@ -620,7 +608,7 @@ export async function probeWarningNote(tab, layout) {
     panel.mount();
     panel.active().gui.open();
     window.disposeWarningProbe = () => {
-      panel.destroy(); engine.delete(); previous.forEach((node) => { node.hidden = false; });
+      panel.destroy(); previous.forEach((node) => { node.hidden = false; });
     };
   });
   const element = await tab.waitForSelector('.effect-gui .param-warning-note');
@@ -644,7 +632,7 @@ export async function probeWarningNote(tab, layout) {
     };
   });
 
-  check(note.text.includes('Planar Warp 1') && note.text.includes('Mirror Tile'),
+  check(note.text.includes('supported source and projection combination'),
     `the note carries the warning text (${note.text})`);
   check(note.title === null,
     `the control publishes no pointer-only tooltip (${note.title})`);

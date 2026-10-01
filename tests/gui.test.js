@@ -673,11 +673,11 @@ test('a parsed query string is re-read when the location moves', () => {
 
 test('readStoredString returns an opaque namespaced companion value', () => {
   const snapshot = '{"schemaVersion":2,"accepted":[4294967295]}';
-  installWindowAt(`?fx.__fullConfig=${encodeURIComponent(snapshot)}`);
+  installWindowAt(`?fx.__chainSnapshot=${encodeURIComponent(snapshot)}`);
   const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
 
-  assert.equal(gui.readStoredString('__fullConfig'), snapshot);
-  assert.deepEqual(gui.collectUrlKeys(), ['fx.__fullConfig']);
+  assert.equal(gui.readStoredString('__chainSnapshot'), snapshot);
+  assert.deepEqual(gui.collectUrlKeys(), ['fx.__chainSnapshot']);
 });
 
 test('addUnhydrated keeps the current value but still deep-links later edits', () => {

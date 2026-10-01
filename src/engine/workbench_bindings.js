@@ -8,7 +8,7 @@ import { engineHalted } from '../shared/engine_halt.js';
 
 /**
  * @param {*} engine
- * @param {'getShaderChainBindings'|'getLegacyShaderBindings'} accessor
+ * @param {'getShaderChainBindings'} accessor
  * @param {string} method
  * @param {Array<*>} args
  * @param {*} unavailable
@@ -16,8 +16,7 @@ import { engineHalted } from '../shared/engine_halt.js';
  */
 export function callWorkbenchBinding(engine, accessor, method, args, unavailable = null) {
   if (!engine) return unavailable;
-  if (typeof engine[accessor] !== 'function')
-    return engine[method]?.(...args) ?? unavailable;
+  if (typeof engine[accessor] !== 'function') return unavailable;
   const bindings = engine[accessor]();
   if (!bindings) return unavailable;
   let release = true;
@@ -33,5 +32,5 @@ export function callWorkbenchBinding(engine, accessor, method, args, unavailable
 
 /** @param {*} module @returns {string} */
 export function shaderChainCatalog(module) {
-  return (module.ShaderChainBindings ?? module.HolosphereEngine).getShaderChainCatalog();
+  return module.ShaderChainBindings.getShaderChainCatalog();
 }

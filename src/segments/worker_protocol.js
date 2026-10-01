@@ -26,7 +26,7 @@
  * segment_worker.test.js enforces it.
  * @type {number}
  */
-export const PROTOCOL_VERSION = 11;
+export const PROTOCOL_VERSION = 12;
 
 // Sentinel segIds for pool-wide faults with no single worker to blame:
 // FAULT_POOL for a module-load/init timeout, FAULT_RENDER for any fault raised
@@ -42,7 +42,7 @@ export const FAULT_RENDER = -2;
  * @typedef {{ name: string, value: number, acceptedValue?: number }} SegParam
  */
 
-/** @typedef {import('../../generated/holosphere_wasm.js').FullConfigSnapshot} FullConfigSnapshot */
+/** @typedef {import('../../generated/holosphere_wasm.js').ChainSnapshot} ChainSnapshot */
 
 /**
  * Usage snapshot of a single arena (bytes).
@@ -76,7 +76,7 @@ export const FAULT_RENDER = -2;
  *   type: 'init', version: number, segId: number, totalSegs: number,
  *   w: number, h: number,
  *   effectName: string, params?: SegParam[],
- *   fullConfigSnapshot?: FullConfigSnapshot, paused?: boolean,
+ *   chainSnapshot?: ChainSnapshot, paused?: boolean,
  *   presetIndex?: number|undefined,
  *   poleLod?: number, paramRevision: number,
  *   topCap?: number, bottomCap?: number,
@@ -89,7 +89,7 @@ export const FAULT_RENDER = -2;
  * current tuned values, applied AFTER engine.setEffect() — which rebuilds the
  * effect with defaults — so the segment matches instead of reverting to defaults.
  * @typedef {{ type: 'setEffect', name: string, params?: SegParam[],
- *   fullConfigSnapshot?: FullConfigSnapshot,
+ *   chainSnapshot?: ChainSnapshot,
  *   paused?: boolean, presetIndex?: number|undefined,
  *   paramRevision: number }} SetEffectMsg
  */

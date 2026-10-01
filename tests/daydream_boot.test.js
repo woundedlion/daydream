@@ -23,7 +23,7 @@ import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 import { URL_FLUSH_DEBOUNCE_MS } from '../src/app/state.js';
 import { pageWarmer } from '../src/segments/module_warmer.js';
 import {
-  EffectSetResult, ParamSetResult, ResolutionSetResult, FullConfigRestoreResult, unpinnedEngineMethods,
+  EffectSetResult, ParamSetResult, ResolutionSetResult, ChainSnapshotRestoreResult, unpinnedEngineMethods,
 } from './helpers/fake_engine.js';
 import { captureConsole, installConsoleCapture } from './helpers/fake_console.js';
 import { createRecordingControls } from '../src/recording/recording_controls.js';
@@ -299,62 +299,21 @@ async function bootedApp(options) {
   }
 }
 
-test('the migrated ShaderBall URL is written only once a frame has applied it', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
-  const app = await bootedApp({
-    daydreamMode: 'shader-workbench',
-    search: '?effect=ShaderBall',
-    loadModule: () => Promise.resolve(fakeWasmModule()),
-  });
-  const notice = app.elements.get('apply-notice-text');
-  // The URL flush is a debounce on win.setTimeout, which fake_app.js forwards to
-  // the global. Nothing is armed while the migration holds the suspension, so a
-  // mocked clock takes over from here and the window costs no wall time.
-  t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS * 2);
-
-  assert.equal(app.teardown.disposed(), false, 'the module must have booted');
-  assert.deepEqual(app.urlWrites, [],
-    'the suspension brackets the whole migration: until the engine has the new '
-    + 'effect, a URL advertising it is a link that reopens on something the app '
-    + 'never applied');
-  assert.equal(notice.textContent, '',
-    'the notice reports a migration that has happened, not one that is pending');
-
-  app.driver.renderer.frame();
-  t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS * 2);
-
-  assert.equal(app.urlWrites.length, 1,
-    'the release sits in the adapter frame callback, which is what makes the '
-    + 'migrated effect reach the URL at all; released from anywhere a run can '
-    + 'skip -- a pool composite, say -- the suspension never lifts and every '
-    + 'later deep-link write is stranded for the session');
-  assert.match(app.urlWrites[0], /[?&]effect=Shader(&|$)/,
-    'the live identity is what a shared link must carry');
-  assert.equal(notice.textContent, 'ShaderBall is now Shader; opened with defaults.',
-    'the rename is only discoverable through the notice the release raises');
+test('legacy links without a snapshot retain their original URL across rendered and failed frames', async (t) => {
+  t.mock.timers.enable({apis: ['setTimeout']});
+  for (const failingFrames of [0, 1]) {
+    const app = await bootedApp({
+      daydreamMode: 'shader-workbench', search: '?effect=ShaderBall',
+      loadModule: () => Promise.resolve(fakeWasmModule({failingFrames})),
+    });
+    t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS * 2);
+    assert.deepEqual(app.urlWrites, []);
+    captureConsole(() => app.driver.renderer.frame());
+    t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS * 2);
+    assert.deepEqual(app.urlWrites, [], 'unconverted legacy state remains available in the original URL');
+    assert.equal(app.teardown.disposed(), false);
+  }
 });
-
-test('a first frame that throws still releases the migrated URL', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
-  const app = await bootedApp({
-    daydreamMode: 'shader-workbench',
-    search: '?effect=ShaderBall',
-    loadModule: () => Promise.resolve(fakeWasmModule({ failingFrames: 1 })),
-  });
-  t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS * 2);
-  assert.deepEqual(app.urlWrites, [], 'the migration is suspended until a frame');
-
-  // The frame guard catches and keeps the loop armed, so nothing else ever
-  // revisits the suspension.
-  captureConsole(() => app.driver.renderer.frame());
-  t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS * 2);
-
-  assert.equal(app.urlWrites.length, 1,
-    'a frame that throws must not strand the suspension: every later deep-link '
-    + 'write is held for the session behind it');
-  assert.match(app.urlWrites[0], /[?&]effect=Shader(&|$)/);
-});
-
 
 /**
  * A MediaRecorder stand-in as VideoRecorder presents one: a toggle that flips
@@ -977,7 +936,7 @@ test('a trapped resolution query stops the startup instead of booting on', async
 });
 
 test('a workbench init that trapped the module releases the app', () => {
-  const at = SOURCE.indexOf('shaderDocuments?.init().catch(');
+  const at = SOURCE.indexOf('shaderDocuments?.init().then(');
   assert.ok(at >= 0, 'the workbench init rejection must stay handled');
   assert.match(sliceTo(at, 'WORKBENCH_NOTICE);'), /abandonOnModuleDeath\(err\)/,
     'a trap is terminal for the whole module, not for the call that tripped it: '
@@ -986,7 +945,7 @@ test('a workbench init that trapped the module releases the app', () => {
 });
 
 test('a failed workbench init reports without the page-failure banner', () => {
-  const at = SOURCE.indexOf('shaderDocuments?.init().catch(');
+  const at = SOURCE.indexOf('shaderDocuments?.init().then(');
   assert.ok(at >= 0,
     'init() is async and the surrounding catch only sees a synchronous throw, '
     + 'so a dropped rejection reaches the page-failure listener and covers a '
@@ -1046,9 +1005,9 @@ test('global cap edits survive module loading, paused redraw and resolution swit
   app.guis[0].controllers.find((c) => c.property === 'bottomCap').setValue(3);
   assert.equal(app.driver.dotMesh, null);
   const module = fakeWasmModule();
-  module.FullConfigRestoreResult = FullConfigRestoreResult;
-  module.HolosphereEngine.prototype.getFullConfigSnapshot = () => null;
-  module.HolosphereEngine.prototype.restoreFullConfigSnapshot = () => FullConfigRestoreResult.NOT_SHADER_WORKBENCH;
+  module.ChainSnapshotRestoreResult = ChainSnapshotRestoreResult;
+  module.HolosphereEngine.prototype.getSnapshot = () => null;
+  module.HolosphereEngine.prototype.restoreSnapshot = () => ChainSnapshotRestoreResult.NOT_SHADER_CHAIN;
   resolve(module);
   await app.teardown.ready;
   assert.deepEqual(module.caps, [[2, 3]]);

@@ -3,12 +3,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-/**
- * The retired identities the engine still canonicalizes to Shader
- * (targets/wasm/engine_bindings.h). A link carrying either one has to survive
- * effect-name validation, or it is rewritten to the default effect.
- */
-export const LEGACY_SHADER_ALIASES = ['ShaderBall', 'ShaderWorkbench'];
+export const LEGACY_SHADER_ALIASES = ['Shader', 'ShaderBall', 'ShaderWorkbench'];
 
 /**
  * Maps a retired Shader identity before current effect-name validation.
@@ -21,8 +16,8 @@ export function importLegacyShaderSelection(effect) {
     return { effect, migrated: false };
   }
   return {
-    effect: 'Shader',
+    effect: 'ShaderChain',
     migrated: true,
-    notice: `${effect} is now Shader; opened with defaults.`,
+    notice: `${effect} is a legacy Shader identity; its original configuration is preserved during import.`,
   };
 }

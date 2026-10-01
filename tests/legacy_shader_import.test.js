@@ -1,23 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-
 import { importLegacyShaderSelection } from '../src/effects/legacy_shader_import.js';
 
-// The engine canonicalizes both spellings (targets/wasm/engine_bindings.h), so
-// a link carrying either one has to reach Shader.
-test('either retired identity opens Shader and unrelated ones pass through', () => {
-  assert.deepEqual(importLegacyShaderSelection('ShaderBall'), {
-    effect: 'Shader',
-    migrated: true,
-    notice: 'ShaderBall is now Shader; opened with defaults.',
-  });
-  assert.deepEqual(importLegacyShaderSelection('ShaderWorkbench'), {
-    effect: 'Shader',
-    migrated: true,
-    notice: 'ShaderWorkbench is now Shader; opened with defaults.',
-  });
-  assert.deepEqual(importLegacyShaderSelection('LatticeMelt'),
-    { effect: 'LatticeMelt', migrated: false });
-  assert.deepEqual(importLegacyShaderSelection(null),
-    { effect: null, migrated: false });
+test('legacy identities select the chain importer and preserve the original identity in the notice', () => {
+  for (const effect of ['Shader', 'ShaderBall', 'ShaderWorkbench']) {
+    const result = importLegacyShaderSelection(effect);
+    assert.equal(result.effect, 'ShaderChain');
+    assert.equal(result.migrated, true);
+    assert.match(result.notice, new RegExp(effect));
+    assert.match(result.notice, /original configuration is preserved/);
+  }
+  for (const effect of ['LatticeMelt', 'ShaderChain', null])
+    assert.deepEqual(importLegacyShaderSelection(effect), {effect, migrated: false});
 });

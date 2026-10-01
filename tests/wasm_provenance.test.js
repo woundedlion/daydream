@@ -56,7 +56,7 @@ test('the installed operator catalog describes the installed WASM', async () => 
   const { default: createModule } = await import('../generated/holosphere_wasm.js');
   const module = await createModule();
   assert.deepEqual(JSON.parse(text('generated/shader/engine_catalog.json')),
-    JSON.parse(module.HolosphereEngine.getShaderChainCatalog()));
+    JSON.parse(module.ShaderChainBindings.getShaderChainCatalog()));
 });
 
 test('MORPH_SWEEP matches the engine morphability constants', { skip: engineSkip }, () => {

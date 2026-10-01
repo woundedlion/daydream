@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import createHolosphereModule from '../generated/holosphere_wasm.js';
 import { validateRegistryFaces } from '../src/workbench/solids/solid_registry_codegen.js';
+import { callWorkbenchBinding } from '../src/engine/workbench_bindings.js';
 import { applyChainDocument } from '../src/workbench/shader/chain_apply.js';
 import {
   createChainValidator, KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, SIMPLE_SEEDS,
@@ -17,16 +18,14 @@ import {
 } from '../src/workbench/solids/solid_codegen.js';
 import {
   FakeChainEngine, ENGINE_METHODS, ENGINE_OPTIONAL_METHODS, ParamSetResult, ClipSetResult,
-  ResolutionSetResult, EffectSetResult, FullConfigRestoreResult, ChainStatus,
+  ResolutionSetResult, EffectSetResult, ChainSnapshotRestoreResult, ChainStatus,
 } from './helpers/fake_engine.js';
 import { isViewLive, refreshPixelView } from '../src/renderer/pixel_view.js';
 import { PaletteCompileCode, PaletteRecipeField } from './helpers/fake_palette.js';
-import { selectorControlValue } from '../src/effects/param_sync.js';
 import { DEFAULT_EFFECT, resolutionPresets } from '../src/effects/effect_roster.js';
 import {
-  FIXED_SHADER_MODE_FIELDS, STAGE_BOUNDARIES,
   kaleidoscopeSmoothStageAssignments, latticeMeltStageAssignments,
-  fixedShaderStageAssignments, shaderStageAssignments,
+  fixedShaderStageAssignments,
 } from '../src/effects/shader_stages.js';
 
 // The module's stdout, captured rather than dropped: the WASM bridge answers an
@@ -43,6 +42,7 @@ const W = 96, H = 20;
 // One shared engine: the engine owns a single global arena, so a second
 // instantiation traps (the app itself only ever makes one).
 assert.equal(M.HolosphereEngine.isLive(), false);
+const chainCall = (target, method, payload) => callWorkbenchBinding(target, 'getShaderChainBindings', method, [payload]);
 const engine = new M.HolosphereEngine();
 assert.equal(M.HolosphereEngine.isLive(), true);
 const initialDisplayAngles = [engine.getDisplayNorthPhi(), engine.getDisplaySouthPhi()];
@@ -50,7 +50,6 @@ const initialDisplayAngles = [engine.getDisplayNorthPhi(), engine.getDisplaySout
 test('typed authoring handles track effect incarnations and reject unsupported effects', () => {
   engine.setEffect('Comets');
   assert.equal(engine.getShaderChainBindings(), null);
-  assert.equal(engine.getLegacyShaderBindings(), null);
   engine.setEffect('ShaderChain');
   const chain = engine.getShaderChainBindings();
   assert.equal(chain.isValid(), true);
@@ -67,16 +66,15 @@ test('typed authoring handles track effect incarnations and reject unsupported e
   assert.equal(chain.setShaderChainParameters([]), M.ParamSetResult.NO_EFFECT);
   chain.delete();
 
-  engine.setEffect('Shader');
-  const legacy = engine.getLegacyShaderBindings();
-  const snapshot = legacy.getFullConfigSnapshot();
-  assert.equal(legacy.restoreFullConfigSnapshot(snapshot), M.FullConfigRestoreResult.APPLIED);
+  engine.setEffect('ShaderChain');
+  const legacy = engine.getShaderChainBindings();
+  const snapshot = legacy.getSnapshot();
+  assert.equal(legacy.restoreSnapshot(snapshot), M.ChainSnapshotRestoreResult.APPLIED);
   engine.setResolution(288, 144);
-  assert.equal(engine.getLegacyShaderBindings(), null, 'resizing leaves no effect');
+  assert.equal(engine.getShaderChainBindings(), null, 'resizing leaves no effect');
   assert.equal(legacy.isValid(), false);
-  assert.equal(legacy.getFullConfigSnapshot(), null);
-  assert.equal(legacy.getFullConfigFieldDefinitions(), null);
-  assert.equal(legacy.restoreFullConfigSnapshot(snapshot), M.FullConfigRestoreResult.NOT_SHADER_WORKBENCH);
+  assert.equal(legacy.getSnapshot(), null);
+  assert.equal(legacy.restoreSnapshot(snapshot), M.ChainSnapshotRestoreResult.NOT_SHADER_CHAIN);
   legacy.delete();
   engine.setResolution(W, H);
 });
@@ -145,16 +143,15 @@ test('marked-dead modules reject capability acquisition and calls', async () => 
 });
 
 test('snapshot adapters reject getter-driven replacement without touching the new effect', () => {
-  engine.setEffect('Shader');
-  const legacy = engine.getLegacyShaderBindings();
-  const snapshot = legacy.getFullConfigSnapshot();
-  Object.defineProperty(snapshot, 'accepted', {
+  engine.setEffect('ShaderChain');
+  const legacy = engine.getShaderChainBindings();
+  const snapshot = legacy.getSnapshot();
+  Object.defineProperty(snapshot, 'parameters', {
     enumerable: true,
     get() { engine.setEffect('Comets'); return []; },
   });
-  assert.notEqual(legacy.restoreFullConfigSnapshot(snapshot), M.FullConfigRestoreResult.APPLIED);
+  assert.notEqual(legacy.restoreSnapshot(snapshot), M.ChainSnapshotRestoreResult.APPLIED);
   assert.equal(legacy.isValid(), false);
-  assert.equal(engine.getLegacyShaderBindings(), null);
   assert.equal(engine.getPresetCount() > 0, true);
   legacy.delete();
 });
@@ -182,9 +179,7 @@ test('adapter decode rejects nested authoring and deletion from getters', async 
 test('authoring adapter declarations match their exported methods', () => {
   engine.setEffect('ShaderChain');
   const chain = engine.getShaderChainBindings();
-  engine.setEffect('Shader');
-  const legacy = engine.getLegacyShaderBindings();
-  for (const [name, handle] of [['ShaderChainBindings', chain], ['LegacyShaderBindings', legacy]]) {
+  for (const [name, handle] of [['ShaderChainBindings', chain]]) {
     const declared = [...interfaceBody(name).matchAll(/^\s*([A-Za-z_]\w*)\s*\(/gm)]
       .map((match) => match[1]);
     for (const method of declared) assert.equal(typeof handle[method], 'function');
@@ -295,8 +290,6 @@ test('generated/holosphere_wasm.d.ts declares the engine statics the app calls',
   assert.ok(declared.has('getSupportedResolutions'),
     'daydream.js narrows its resolution presets through this static; a bare '
     + '`new () => HolosphereEngine` declares it out of existence');
-  assert.ok(declared.has('getShaderChainCatalog'),
-    'the catalog pin below reads this static; the declarations must carry it');
 });
 
 /**
@@ -339,7 +332,7 @@ test('generated/holosphere_wasm.d.ts declares every module function', () => {
 });
 
 const RESULT_ENUMS = ['PaletteCompileCode', 'PaletteRecipeField', 'ChainStatus', 'ParamSetResult', 'ClipSetResult', 'ResolutionSetResult',
-  'EffectSetResult', 'FullConfigRestoreResult'];
+  'EffectSetResult', 'ChainSnapshotRestoreResult'];
 
 test('generated/holosphere_wasm.d.ts declares every result enum roster the module exports', () => {
   const moduleBody = interfaceBody('HolosphereModule');
@@ -394,19 +387,17 @@ test('generated/holosphere_wasm.d.ts declares the object shapes the engine retur
     + 'BooleanParameterDefinition to check — repoint it at an effect that does');
   assertDeclaredShape('BooleanParameterDefinition', toggle);
 
-  assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
+  assert.equal(engine.setEffect('ShaderChain'), M.EffectSetResult.INSTALLED);
   const definitions = engine.getParameterDefinitions();
   const selector = definitions.find((/** @type {*} */ d) => d.options !== undefined);
-  assert.ok(selector, 'ShaderBall must expose a selector, or this pin never '
+  assert.ok(selector, 'ShaderChain must expose a topology control, or this pin never '
     + 'reaches the optional enum members');
   for (const definition of [definitions[0], selector]) {
     assertDeclaredShape('NumericParameterDefinition', definition);
   }
 
-  const snapshot = engine.getFullConfigSnapshot();
-  assertDeclaredShape('FullConfigSnapshot', snapshot);
-  assertDeclaredShape('FullConfigFieldDefinition',
-    engine.getFullConfigFieldDefinitions()[0]);
+  const snapshot = callWorkbenchBinding(engine, 'getShaderChainBindings', 'getSnapshot', []);
+  assertDeclaredShape('ChainSnapshot', snapshot);
 });
 
 // The catalog is the contract the document compiler, the chain editor's
@@ -415,7 +406,7 @@ test('generated/holosphere_wasm.d.ts declares the object shapes the engine retur
 test('getShaderChainCatalog matches the installed generated/shader/engine_catalog.json', () => {
   const pinned = readPinned(
     new URL('../generated/shader/engine_catalog.json', import.meta.url));
-  assert.equal(pinned, `${M.HolosphereEngine.getShaderChainCatalog()}\n`,
+  assert.equal(pinned, `${M.ShaderChainBindings.getShaderChainCatalog()}\n`,
     'generated/shader/engine_catalog.json must be the module export plus its trailing '
     + 'newline — re-pin the catalog from the installed module');
 });
@@ -435,7 +426,7 @@ test('setShaderChain applies a chain, registers label.field params and bumps the
     'the chain interpreter effect must be registered in the WASM build');
 
   const before = engine.getParamGeneration();
-  const applied = engine.setShaderChain(DEFAULT_CHAIN);
+  const applied = chainCall(engine, 'setShaderChain', DEFAULT_CHAIN);
   assert.equal(applied.status, M.ChainStatus.OK);
   assert.equal(applied.code, 'APPLIED', 'the default chain must compile');
   assert.equal(applied.entryIndex, -1, 'APPLIED blames no entry');
@@ -453,7 +444,7 @@ test('setShaderChain applies a chain, registers label.field params and bumps the
     'the camera instance must register its wander field');
   const coverage = defs.find((d) => d.name === 'sample.coverage-mode');
   assert.ok(coverage, 'the sample instance must register its topology enum');
-  const catalog = JSON.parse(M.HolosphereEngine.getShaderChainCatalog());
+  const catalog = JSON.parse(M.ShaderChainBindings.getShaderChainCatalog());
   const field = catalog.operators.find((op) => op.id === 'sample.grid.v2')
     .params.find((p) => p.id === 'coverage-mode');
   assert.deepEqual(Array.from(coverage.options), field.values,
@@ -476,8 +467,8 @@ test('applied chain definitions and parameter pause behavior match the fake engi
   assert.equal(engine.getAnimationsPaused(), true);
   assert.equal(fake.getAnimationsPaused(), true);
   assert.deepEqual(fake.getParameterDefinitions(), engine.getParameterDefinitions());
-  assert.equal(engine.setShaderChain(DEFAULT_CHAIN).code, 'APPLIED');
-  assert.equal(fake.setShaderChain(DEFAULT_CHAIN).code, 'APPLIED');
+  assert.equal(chainCall(engine, 'setShaderChain', DEFAULT_CHAIN).code, 'APPLIED');
+  assert.equal(chainCall(fake, 'setShaderChain', DEFAULT_CHAIN).code, 'APPLIED');
   assert.deepEqual(fake.getParameterDefinitions(), engine.getParameterDefinitions());
   for (const [method, args] of [
     ['setParameter', ['camera.wander', 0.2]],
@@ -486,7 +477,9 @@ test('applied chain definitions and parameter pause behavior match the fake engi
   ]) {
     engine.setAnimationsPaused(false);
     fake.setAnimationsPaused(false);
-    assert.equal(fake[method](...args).value, engine[method](...args).value);
+    const write = (target) => method === 'setParameter' ? target[method](...args)
+      : callWorkbenchBinding(target, 'getShaderChainBindings', method, args);
+    assert.equal(write(fake).value, write(engine).value);
     assert.equal(engine.getAnimationsPaused(), true);
     assert.equal(fake.getAnimationsPaused(), engine.getAnimationsPaused());
     assert.deepEqual(fake.getParameterDefinitions(), engine.getParameterDefinitions());
@@ -502,16 +495,17 @@ test('chain refusal statuses match the fake engine payload contracts', () => {
   const fake = new FakeChainEngine();
   fake.setEffect('ShaderChain');
   assert.equal(engine.setEffect('ShaderChain'), M.EffectSetResult.INSTALLED);
-  const max = JSON.parse(M.HolosphereEngine.getShaderChainCatalog()).budgets.max_chain_ops;
+  const max = JSON.parse(M.ShaderChainBindings.getShaderChainCatalog()).budgets.max_chain_ops;
   const duplicate = { instance: 'same', operator: 'sphere.rotate.v2' };
   const payloads = [null, [null], [duplicate, null], [],
     Array.from({ length: max + 1 }, () => ({})), [duplicate, duplicate]];
   const plain = ({ status, code, entryIndex }) => ({ status: status.value, code, entryIndex });
   for (const payload of payloads)
-    assert.deepEqual(plain(engine.setShaderChain(payload)), plain(fake.setShaderChain(payload)));
+    assert.deepEqual(plain(chainCall(engine, 'setShaderChain', payload)), plain(chainCall(fake, 'setShaderChain', payload)));
   assert.equal(engine.setEffect('Comets'), M.EffectSetResult.INSTALLED);
   fake.setEffect('Comets');
-  assert.deepEqual(plain(engine.setShaderChain([])), plain(fake.setShaderChain([])));
+  assert.equal(engine.getShaderChainBindings(), null);
+  assert.equal(fake.getShaderChainBindings(), null);
 });
 
 test('chain preset batches restore cross-field values and refuse singular edits without storing them', () => {
@@ -535,7 +529,7 @@ test('chain preset batches restore cross-field values and refuse singular edits 
   assert.deepEqual(snapshot(), values);
   assert.equal(engine.setParameter('lens.mobius-b-re', 0), M.ParamSetResult.INADMISSIBLE);
   assert.deepEqual(snapshot(), values);
-  assert.equal(engine.setShaderChainParameters([
+  assert.equal(chainCall(engine, 'setShaderChainParameters', [
     { name: 'lens.mobius-a-re', value: 2 },
     { name: 'lens.mobius-b-re', value: 0 },
   ]), M.ParamSetResult.INADMISSIBLE);
@@ -547,20 +541,20 @@ test('chain preset batches restore cross-field values and refuse singular edits 
 test('chain parameter batch boundary reports malformed and oversized payloads', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)));
   assert.equal(engine.setEffect('ShaderChain'), M.EffectSetResult.INSTALLED);
-  assert.equal(engine.setShaderChain(DEFAULT_CHAIN).code, 'APPLIED');
+  assert.equal(chainCall(engine, 'setShaderChain', DEFAULT_CHAIN).code, 'APPLIED');
   const before = engine.getParameterDefinitions();
   const name = before[0].name;
   for (const payload of [null, undefined, {}, [null], [undefined],
     [{ name: 1, value: 0 }], [{ name }], [{ name, value: '0.5' }]]) {
     const writes = Array.isArray(payload) ? [{ name, value: 0.5 }, ...payload] : payload;
-    assert.equal(engine.setShaderChainParameters(writes), M.ParamSetResult.MALFORMED_PAYLOAD);
+    assert.equal(chainCall(engine, 'setShaderChainParameters', writes), M.ParamSetResult.MALFORMED_PAYLOAD);
   }
-  const catalog = JSON.parse(M.HolosphereEngine.getShaderChainCatalog());
-  assert.equal(engine.setShaderChainParameters(
+  const catalog = JSON.parse(M.ShaderChainBindings.getShaderChainCatalog());
+  assert.equal(chainCall(engine, 'setShaderChainParameters',
     Array(catalog.budgets.max_params + 1).fill({ name, value: 0 })),
   M.ParamSetResult.TOO_LONG);
   for (const value of [NaN, Infinity, -Infinity]) {
-    assert.equal(engine.setShaderChainParameters([{ name, value }]), M.ParamSetResult.NON_FINITE);
+    assert.equal(chainCall(engine, 'setShaderChainParameters', [{ name, value }]), M.ParamSetResult.NON_FINITE);
   }
   assert.deepEqual(engine.getParameterDefinitions(), before);
 });
@@ -568,11 +562,11 @@ test('chain parameter batch boundary reports malformed and oversized payloads', 
 test('setShaderChain refuses transactionally and names the offending entry', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('ShaderChain'), M.EffectSetResult.INSTALLED);
-  assert.equal(engine.setShaderChain(DEFAULT_CHAIN).code, 'APPLIED');
+  assert.equal(chainCall(engine, 'setShaderChain', DEFAULT_CHAIN).code, 'APPLIED');
   const generation = engine.getParamGeneration();
   const names = Array.from(engine.getParameterDefinitions(), (d) => d.name);
 
-  const unknown = engine.setShaderChain([
+  const unknown = chainCall(engine, 'setShaderChain', [
     { instance: 'camera', operator: 'sphere.rotate.v2' },
     { instance: 'project', operator: 'project.unknown.v9' },
     { instance: 'sample', operator: 'sample.grid.v2' },
@@ -587,13 +581,13 @@ test('setShaderChain refuses transactionally and names the offending entry', () 
   assert.deepEqual(Array.from(engine.getParameterDefinitions(), (d) => d.name),
     names, 'a refused chain must leave the active program registered');
 
-  assert.equal(engine.setShaderChain('nonsense').status, M.ChainStatus.MALFORMED_PAYLOAD);
-  assert.equal(engine.setShaderChain('nonsense').code, 'MALFORMED_PAYLOAD',
+  assert.equal(chainCall(engine, 'setShaderChain', 'nonsense').status, M.ChainStatus.MALFORMED_PAYLOAD);
+  assert.equal(chainCall(engine, 'setShaderChain', 'nonsense').code, 'MALFORMED_PAYLOAD',
     'a non-array payload is refused at the boundary, never a trap');
 });
 
 const RESULT_MIRRORS = { PaletteCompileCode, PaletteRecipeField, ChainStatus, ParamSetResult, ClipSetResult, ResolutionSetResult,
-  EffectSetResult, FullConfigRestoreResult };
+  EffectSetResult, ChainSnapshotRestoreResult };
 for (const name of RESULT_ENUMS) {
   test(`the module ${name} enum matches the test mirror`, () => {
     const actual = M[name];
@@ -819,164 +813,24 @@ test('a rejected parameter write names its reason', () => {
     'setParameter must report NON_FINITE for a NaN value');
 });
 
-test('parameter definitions separate rendered and requested state', () => {
-  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
-  const before = engine.getParameterDefinitions().find((d) => d.name === 'Lens');
-  assert.ok(before, 'ShaderBall must expose the Lens selector');
-  assert.equal(typeof before.requestedValue, 'number');
-  assert.equal(typeof before.acceptedValue, 'number');
 
-  // Admission needs a compiled program for the resulting topology; the
-  // tetrahedral kaleidoscope is a lens the default topology has one for, so
-  // this write is accepted rather than held pending behind a warning.
-  const requested = before.options?.indexOf('Kaleidoscope (Tetrahedral)');
-  assert.ok(requested > 0 && requested !== before.value,
-    'the tetrahedral kaleidoscope must be a compiled lens alternative to the default');
-  assert.equal(engine.setParameter('Lens', requested), M.ParamSetResult.APPLIED);
-  const after = engine.getParameterDefinitions().find((d) => d.name === 'Lens');
 
-  assert.equal(after.value, before.value,
-    'the GUI value remains the renderer-owned state until a frame advances');
-  assert.equal(after.requestedValue, requested,
-    'reload/worker initialization can copy the accepted write immediately');
-  assert.equal(after.acceptedValue, requested,
-    'a valid request is immediately available as the renderer seed');
-  assert.equal(selectorControlValue(after), requested,
-    'the GUI selector must retain the accepted request while rendering catches up');
-});
 
-test('ShaderBall reports an invalid selector without changing its neighbors', () => {
-  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
-  let before = engine.getParameterDefinitions();
-  const warp = before.find((d) => d.name === 'Planar Warp 1');
-  const curlFlow = warp?.options?.indexOf('Projected Curl Flow');
-  assert.notEqual(curlFlow, undefined);
-  assert.notEqual(curlFlow, -1);
-  assert.equal(engine.setParameter('Planar Warp 1', curlFlow), M.ParamSetResult.APPLIED);
-  assert.equal(engine.setParameter('Planar Warp 1 Strength', 0), M.ParamSetResult.APPLIED);
-  assert.equal(engine.setParameter('Planar Warp 1 Speed', 0), M.ParamSetResult.APPLIED);
-  assert.equal(engine.setParameter('Planar Warp 1 Scale', 1), M.ParamSetResult.APPLIED);
-  before = engine.getParameterDefinitions();
-  const rootValue = (name) => before.find((d) => d.name === name)?.requestedValue;
 
-  const projectionBefore = before.find((d) => d.name === 'Projection');
-  const bonne = projectionBefore?.options?.indexOf('Bonne');
-  assert.notEqual(bonne, undefined);
-  assert.notEqual(bonne, -1);
-  assert.equal(engine.setParameter('Projection', bonne), M.ParamSetResult.APPLIED);
-  const after = engine.getParameterDefinitions();
-  const projection = after.find((d) => d.name === 'Projection');
-  assert.equal(projection?.requestedValue, bonne);
-  assert.equal(projection?.acceptedValue, rootValue('Projection'),
-    'the renderer seed remains on the last accepted projection');
-  assert.match(projection?.warning ?? '', /requires seam-safe stages/);
-  for (const name of [
-    'Function', 'Lens', 'Planar Warp 1', 'Planar Warp 2', 'Coverage',
-  ]) {
-    assert.equal(after.find((d) => d.name === name)?.requestedValue, rootValue(name),
-      `${name} must not move as a byproduct of the Projection edit`);
-  }
 
-  assert.equal(engine.setParameter('Planar Warp 1', 0), M.ParamSetResult.APPLIED);
-  const repaired = engine.getParameterDefinitions().find((d) => d.name === 'Projection');
-  assert.equal(repaired?.acceptedValue, bonne,
-    'repairing the cross-stage conflict admits the dynamic topology');
-  assert.equal(repaired?.warning, undefined);
-});
 
-test('ShaderBall accepts valid Curl Flow through the dynamic backend', () => {
-  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
-  assert.equal(engine.setParameter('Planar Warp 1', 0), M.ParamSetResult.APPLIED);
-  const outer = engine.getParameterDefinitions().find((d) => d.name === 'Planar Warp 1');
-  const curlFlow = outer?.options?.indexOf('Projected Curl Flow');
-  assert.notEqual(curlFlow, undefined);
-  assert.notEqual(curlFlow, -1);
 
-  assert.equal(engine.setParameter('Planar Warp 1', curlFlow), M.ParamSetResult.APPLIED);
-  const accepted = engine.getParameterDefinitions().find((d) => d.name === 'Planar Warp 1');
-  assert.equal(accepted?.requestedValue, curlFlow);
-  assert.equal(accepted?.acceptedValue, curlFlow);
-  assert.equal(accepted?.warning, undefined);
-});
-
-test('ShaderBall keeps planar warps when dodecahedral Grid becomes Primitive Lattice', () => {
-  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
-  let vectorMirrorPreset = -1;
-  for (let index = 0; index < engine.getPresetCount(); index++) {
-    assert.equal(engine.selectPreset(index), true);
-    const definitions = engine.getParameterDefinitions();
-    const selectedOption = (name) => {
-      const definition = definitions.find((entry) => entry.name === name);
-      return definition?.options?.[definition.requestedValue];
-    };
-    if (selectedOption('Planar Warp 1') === 'Projected Vector Noise' &&
-        selectedOption('Planar Warp 2') === 'Mirror Tile') {
-      vectorMirrorPreset = index;
-      break;
-    }
-  }
-  assert.notEqual(vectorMirrorPreset, -1,
-    'ShaderBall must retain the vector-noise/mirror preset used by this contract');
-
-  const before = engine.getParameterDefinitions();
-  const functionDef = before.find((d) => d.name === 'Function');
-  const outerDef = before.find((d) => d.name === 'Planar Warp 1');
-  const innerDef = before.find((d) => d.name === 'Planar Warp 2');
-  const primitiveLattice = functionDef?.options?.indexOf('Primitive Lattice');
-  const vectorNoise = outerDef?.options?.indexOf('Projected Vector Noise');
-  const mirrorTile = innerDef?.options?.indexOf('Mirror Tile');
-  assert.equal(outerDef?.requestedValue, vectorNoise);
-  assert.equal(innerDef?.requestedValue, mirrorTile);
-
-  assert.equal(engine.setParameter('Function', primitiveLattice), M.ParamSetResult.APPLIED);
-  const requested = engine.getParameterDefinitions();
-  assert.equal(requested.find((d) => d.name === 'Planar Warp 1')?.requestedValue, vectorNoise,
-    'the Function edit must not rewrite requested Planar Warp 1');
-  assert.equal(requested.find((d) => d.name === 'Planar Warp 2')?.requestedValue, mirrorTile,
-    'the Function edit must not rewrite requested Planar Warp 2');
-  assert.equal(requested.find((d) => d.name === 'Function')?.warning, undefined);
-
-  engine.drawFrame();
-  const rendered = engine.getParameterDefinitions();
-  assert.equal(rendered.find((d) => d.name === 'Function')?.value, primitiveLattice);
-  assert.equal(rendered.find((d) => d.name === 'Planar Warp 1')?.value, vectorNoise,
-    'rendered Planar Warp 1 must remain Projected Vector Noise');
-  assert.equal(rendered.find((d) => d.name === 'Planar Warp 2')?.value, mirrorTile,
-    'rendered Planar Warp 2 must remain Mirror Tile');
-});
 
 // A promoted fixed Shader registers no stage selectors, so shader_stages.js reads
 // its stage titles out of a JS mirror of the engine's option labels indexed by
 // the full-config snapshot. ShaderBall registers the same slot storage as enum
 // parameters, so its option lists are the mirror's source of truth.
-test('shader_stages.js mirrors ShaderBall stage option labels exactly', () => {
-  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
-  const definitions = engine.getParameterDefinitions();
-  const parameterForStage = new Map(
-    [...STAGE_BOUNDARIES].map(([name, stage]) => [stage, name]));
 
-  for (const [stage, [field, labels]] of FIXED_SHADER_MODE_FIELDS) {
-    const snapshot = engine.getFullConfigSnapshot();
-    const fieldId = engine.getFullConfigFieldDefinitions().find((entry) => entry.name === field)?.id;
-    const value = snapshot.accepted[fieldId];
-    assert.ok(Number.isInteger(value) && value >= 0 && value < labels.length,
-      `${field} must resolve to a valid mode in the native snapshot`);
-    const name = parameterForStage.get(stage);
-    assert.ok(name, `STAGE_BOUNDARIES must claim stage ${stage}`);
-    const definition = definitions.find((entry) => entry.name === name);
-    assert.ok(definition, `ShaderBall must register the ${name} selector`);
-    assert.deepEqual(definition.options, labels,
-      `shader_stages.js ${field} labels must mirror the ${name} option roster`);
-  }
-});
 
 test('live shader rosters assign every parameter and both planar-warp slots', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  assert.equal(Object.hasOwn(engine.getEffectSizes(), 'Shader'), false,
+    'the slot workbench is absent from the active effect roster');
   const unassigned = [];
   const misplaced = [];
   const dualWarpRosters = [];
@@ -991,7 +845,6 @@ test('live shader rosters assign every parameter and both planar-warp slots', ()
       ++checked;
       const assignments = latticeMeltStageAssignments(definitions)
         ?? kaleidoscopeSmoothStageAssignments(definitions)
-        ?? shaderStageAssignments(definitions)
         ?? fixedShaderStageAssignments(definitions);
       for (const definition of definitions) {
         if (!assignments?.has(definition.name)) {
@@ -1217,119 +1070,9 @@ test('getPresetIds names the presets selectPresetById answers to', () => {
 // effect_gui.js round-trips the whole Shader workbench through these four
 // accessors and compares the restore outcome against the enum, so the shapes and
 // the rejection roster are the contract — not just that the methods exist.
-test('the full-config accessors answer as the workbench panel assumes', () => {
-  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
-    'setEffect must succeed for a registered effect');
 
-  // effect_gui.js takes null as "this effect keeps no snapshot" and skips the
-  // whole full-config path, so a non-Shader effect must answer with one.
-  assert.equal(engine.getFullConfigSnapshot(), null,
-    'a non-Shader effect must report no snapshot');
-  assert.equal(engine.getFullConfigFieldDefinitions(), null,
-    'a non-Shader effect must report no field definitions');
-  assert.equal(engine.restoreFullConfigSnapshot(null),
-    M.FullConfigRestoreResult.NOT_SHADER_WORKBENCH,
-    'restoring into a non-Shader effect must be refused by name');
 
-  assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED,
-    'setEffect must succeed for ShaderBall');
-  const snapshot = engine.getFullConfigSnapshot();
-  assert.deepEqual(Object.keys(snapshot),
-    ['schemaVersion', 'accepted', 'requested', 'pendingFieldIds', 'hasRuntime', 'runtime'],
-    'the snapshot is persisted verbatim, so its keys are the storage format');
-  assert.equal(typeof snapshot.schemaVersion, 'number');
-  assert.equal(snapshot.requested.length, snapshot.accepted.length,
-    'accepted and requested must be the same field count');
-  assert.deepEqual(snapshot.pendingFieldIds, [],
-    'a freshly loaded effect must carry no unresolved edit');
-  assert.equal(typeof snapshot.hasRuntime, 'boolean');
 
-  const fields = engine.getFullConfigFieldDefinitions();
-  assert.equal(fields.length, snapshot.accepted.length,
-    'a field with no definition cannot be labelled without hardcoding its index');
-  assert.deepEqual(fields.map((f) => f.id), fields.map((_, i) => i),
-    'the id is the index into the snapshot arrays');
-  assert.ok(fields.every((f) => typeof f.name === 'string' && f.name.includes('.')),
-    'every field must carry its stable dotted config path');
-
-  assert.equal(engine.restoreFullConfigSnapshot(snapshot),
-    M.FullConfigRestoreResult.APPLIED,
-    'the engine refused the snapshot it had just produced');
-
-  // Each rejection leaves the effect exactly as it was, so a refused restore
-  // needs no rollback — which is why the panel only logs and returns.
-  for (const [outcome, bad] of [
-    [M.FullConfigRestoreResult.UNSUPPORTED_VERSION,
-      { ...snapshot, schemaVersion: 9 }],
-    [M.FullConfigRestoreResult.INVALID_LENGTH,
-      { ...snapshot, accepted: snapshot.accepted.slice(1) }],
-    [M.FullConfigRestoreResult.INVALID_PENDING,
-      { ...snapshot, pendingFieldIds: [snapshot.accepted.length] }],
-  ]) {
-    const changed = { ...bad, requested: [...bad.requested] };
-    changed.requested[0] = changed.requested[0] === 0 ? 1 : 0;
-    assert.equal(engine.restoreFullConfigSnapshot(changed), outcome);
-  }
-  assert.deepEqual(engine.getFullConfigSnapshot(), snapshot,
-    'a refused restore changed the effect');
-
-  for (const malformed of [
-    { ...snapshot, accepted: undefined },
-    { ...snapshot, accepted: 'x' },
-    ...[{}, 'x', -1, 0.5, 1e300].map((value) => ({
-      ...snapshot, accepted: [value, ...snapshot.accepted.slice(1)],
-    })),
-    { ...snapshot, hasRuntime: 'yes' },
-    { ...snapshot, runtime: null },
-    { ...snapshot, schemaVersion: String(snapshot.schemaVersion) },
-    { ...snapshot, pendingFieldIds: 'x' },
-  ]) {
-    let result;
-    assert.doesNotThrow(() => { result = engine.restoreFullConfigSnapshot(malformed); });
-    assert.notEqual(result, M.FullConfigRestoreResult.APPLIED);
-    assert.deepEqual(engine.getFullConfigSnapshot(), snapshot,
-      'a mistyped restore changed the effect');
-  }
-
-});
-
-test('schema 10 snapshots migrate the rendered palette mapping and discard its duplicate', () => {
-  assert.ok(resolutionOk(engine.setResolution(288, 144)));
-  assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
-  assert.equal(engine.setParameter('Palette Mapping', 3), M.ParamSetResult.APPLIED);
-  const current = engine.getFullConfigSnapshot();
-  assert.equal(current.schemaVersion, 11);
-  assert.equal(current.accepted.length, 152);
-  const mappings = engine.getFullConfigFieldDefinitions()
-    .filter((field) => field.name.endsWith('.palette_mapping'));
-  assert.deepEqual(mappings, [{ id: 22, name: 'slots.palette_mapping' }]);
-  assert.equal(current.accepted[22], 3);
-
-  const legacy = {
-    ...structuredClone(current), schemaVersion: 10,
-    accepted: [...current.accepted, 0],
-    requested: [...current.requested, 1],
-    pendingFieldIds: [...current.pendingFieldIds, 152],
-  };
-  assert.equal(engine.setParameter('Palette Mapping', 2), M.ParamSetResult.APPLIED);
-  assert.equal(engine.restoreFullConfigSnapshot(legacy), M.FullConfigRestoreResult.APPLIED);
-  assert.deepEqual(engine.getFullConfigSnapshot(), current);
-  assert.equal(engine.getParameterDefinitions()
-    .find((parameter) => parameter.name === 'Palette Mapping').acceptedValue, 3);
-
-  for (const [bad, outcome] of [
-    [{ ...legacy, accepted: [...current.accepted, 4] }, M.FullConfigRestoreResult.INVALID_VALUE],
-    [{ ...legacy, pendingFieldIds: [] }, M.FullConfigRestoreResult.INVALID_PENDING],
-    [{ ...legacy, pendingFieldIds: [152, 152] }, M.FullConfigRestoreResult.INVALID_PENDING],
-    [{ ...legacy, accepted: current.accepted }, M.FullConfigRestoreResult.INVALID_LENGTH],
-  ]) {
-    const changed = { ...bad, requested: [...bad.requested] };
-    changed.requested[0] = changed.requested[0] === 0 ? 1 : 0;
-    assert.equal(engine.restoreFullConfigSnapshot(changed), outcome);
-    assert.deepEqual(engine.getFullConfigSnapshot(), current);
-  }
-});
 
 // daydream.js reads the pause indicator through an optional-call guard
 // (getAnimationsPaused: () => host.engine?.getAnimationsPaused?.()), so a
@@ -1919,27 +1662,7 @@ test('display caps preserve tuning, pause, clipping and resolution-independent p
   }
 });
 
-test('display caps preserve complete shader configuration and custom chain programs', () => {
-  assert.ok(resolutionOk(engine.setResolution(W, H)));
-  assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
-  assert.equal(engine.setParameter('Palette Mapping', 3), M.ParamSetResult.APPLIED);
-  const snapshot = engine.getFullConfigSnapshot();
-  try {
-    assert.equal(engine.setDisplayCaps(2, 2), true);
-    assert.deepEqual(engine.getFullConfigSnapshot(), snapshot);
-    assert.equal(engine.setEffect('ShaderChain'), M.EffectSetResult.INSTALLED);
-    const chain = DEFAULT_CHAIN.map((entry) => ({ ...entry, instance: `custom-${entry.instance}` }));
-    assert.equal(engine.setShaderChain(chain).status, M.ChainStatus.OK);
-    assert.equal(engine.setParameter('custom-sample.pattern-freq', 3), M.ParamSetResult.APPLIED);
-    const definitions = engine.getParameterDefinitions();
-    assert.equal(engine.setDisplayCaps(3, 4), true);
-    assert.deepEqual(engine.getParameterDefinitions(), definitions);
-    engine.drawFrame();
-    assert.ok(engine.getPixels().some((v) => v !== 0));
-  } finally {
-    engine.setDisplayCaps(0, 0);
-  }
-});
+
 
 
 test('display caps preserve MobiusGrid after topology rebuilds', () => {

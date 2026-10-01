@@ -945,12 +945,12 @@ export class SegmentController {
    * Capture the active effect's versioned snapshot when available, otherwise
    * use the parameter-list protocol.
    * @returns {{params?: import('./worker_protocol.js').SegParam[],
-   *   fullConfigSnapshot?: import('./worker_protocol.js').FullConfigSnapshot}}
+   *   chainSnapshot?: import('./worker_protocol.js').ChainSnapshot}}
    */
   snapshotEffectState() {
     const engine = this.getWasmEngine();
-    const snapshot = callWorkbenchBinding(engine, 'getLegacyShaderBindings', 'getFullConfigSnapshot', []);
-    if (snapshot) return { fullConfigSnapshot: snapshot };
+    const snapshot = callWorkbenchBinding(engine, 'getShaderChainBindings', 'getSnapshot', []);
+    if (snapshot) return { chainSnapshot: snapshot };
     return { params: this.snapshotParams() };
   }
 
