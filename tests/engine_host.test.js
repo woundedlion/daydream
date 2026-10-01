@@ -161,11 +161,11 @@ test('paramGeneration() reports the engine\'s effect-load counter', () => {
   assert.equal(host.paramGeneration(), 4);
 });
 
-test('paramGeneration() is undefined on a module without the accessor', () => {
+test('paramGeneration() requires the accessor on a loaded module', () => {
   const host = new EngineHost();
   host.engine = pixelEngine(() => new Uint16Array(4), () => 4);
 
-  assert.equal(host.paramGeneration(), undefined);
+  assert.throws(() => host.paramGeneration(), TypeError);
 });
 
 // Both accessors sit behind the object daydream.js hands SegmentController, and
