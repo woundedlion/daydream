@@ -172,8 +172,8 @@ for (const name of ['shader_workbench.mjs', 'sha256.mjs', 'composed_effect_roste
 test('pattern mirrors match the pinned engine in both content and membership', { skip: engineSkip }, () => {
   assert.ok(engineRoot, engineMissing);
   const mirrored = (name) => name.endsWith('.shader.json') || name === 'catalog.json';
-  const expected = execFileSync('git', ['-C', engineRoot, 'ls-tree', '--name-only',
-    `${enginePin}:patterns`], { encoding: 'utf8' }).trim().split('\n').filter(mirrored).sort();
+  const catalog = JSON.parse(committed(engineRoot, 'patterns/catalog.json').toString('utf8'));
+  const expected = ['catalog.json', ...Object.values(catalog.source_documents)].sort();
   const actual = readdirSync(resolve(REPO, 'generated/shader/patterns')).filter(mirrored).sort();
   assert.deepEqual(actual, expected);
   for (const name of expected) {
