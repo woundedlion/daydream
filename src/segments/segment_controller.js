@@ -880,8 +880,8 @@ export class SegmentController {
     this.clearTimers(...ALL_TIMERS);
     const firstFault = !this.faulted;
     if (!this.faulted) {
-      // No auto-restart by design: stay latched until a user-driven resolution/mode
-      // change rebuilds the pool, rather than retrying a deterministically-faulting render.
+      // Stay latched until an effect switch (bounded by MAX_FAULTED_REBUILDS),
+      // resolution change, or segmented-mode toggle rebuilds the pool.
       this.faulted = true;
       this.faultInfo = { segId, message };
     } else {
@@ -1111,7 +1111,7 @@ export class SegmentController {
     // render still owns the in-flight latch and releases it via frameResolve;
     // tick() then dispatches the re-render at the new size. A render that never
     // replies is bounded by renderParallel's watchdog, so a resize during a hung
-    // frame faults and recovers rather than wedging the pipeline.
+    // frame faults and latches rather than wedging the pipeline.
     this.broadcast({ type: 'setResolution', w, h });
   }
 
