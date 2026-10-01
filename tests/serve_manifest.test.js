@@ -12,7 +12,7 @@ import { dirname, join } from 'node:path';
 import { MIME, serveManifest } from '../scripts/serve-manifest.mjs';
 import { request } from './helpers/http_request.js';
 
-const ENTRIES = ['index.html', 'engine.wasm', 'styles/index.css', 'styles/fonts/pin.woff2', 'gone.js'];
+const ENTRIES = ['index.html', 'engine.wasm', 'styles/index.css', 'styles/fonts/pin.woff2', 'gone.js', '../outside.txt', 'styles/fonts'];
 
 const FILES = {
   'index.html': '<!doctype html>\n',
@@ -81,7 +81,7 @@ test('explicit nested file entries are served', () => withSite(async (get) => {
   assert.equal(nested.type, 'application/octet-stream',
     'an extension the table does not name has no MIME type to guess');
 
-  assert.equal((await get('/styles')).status, 404,
+  assert.equal((await get('/styles/fonts')).status, 404,
     'the directory itself is not a file, so there is nothing to send');
 }));
 
