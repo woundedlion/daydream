@@ -31,9 +31,12 @@ import { engineHalted } from '../../shared/engine_halt.js';
 import { COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns } from '../../shared/cpp_format.js';
 
 export { MAX_RECIPE_STEPS };
+/** Maximum lowered primitive steps accepted by the effect. */
 export const MAX_BUILD_STEPS = 8;
+/** Maximum face count of every replay endpoint. */
 export const MAX_BUILD_FACES = 1152;
-/** @type {Record<string, (op: import('./solid_codegen.js').ChainOp) => import('./solid_codegen.js').ChainOp[]>} */
+/** Composite operations expanded into engine primitives.
+ * @type {Record<string, (op: import('./solid_codegen.js').ChainOp) => import('./solid_codegen.js').ChainOp[]>} */
 export const LOWERING = {
   meta: () => ['ambo', 'dual', 'kis'],
   needle: () => ['dual', 'kis'],
@@ -49,6 +52,7 @@ export function primitiveCount(op) {
 }
 
 /**
+ * Replays flattened primitives on the sacrificial validator and checks endpoint budgets.
  * @param {import('./solid_codegen.js').ChainValidator} validator
  * @param {import('./solid_codegen.js').SolidSpec} item
  * @param {?{seed:string, ops:Array<{op:string,param:number,twist:number}>}} baseRecipe
@@ -81,7 +85,13 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
         const primitives = LOWERING[name]?.(op) ?? [op];
         for (const primitive of primitives) {
           if (!mesh) throw new Error(meshOpFailure(mod, 'Registry mesh').message);
-          const next = applyOp(mesh, primitive);
+          let next;
+          try {
+            next = applyOp(mesh, primitive);
+          } catch (error) {
+            if (engineHalted(error, mod)) throw error;
+            throw new Error(meshOpFailure(mod, `Op "${name}"`).message, { cause: error });
+          }
           mesh.delete();
           mesh = next;
           check();
