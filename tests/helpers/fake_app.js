@@ -7,10 +7,6 @@ import { fakeColorAttribute } from './fake_three.js';
 import { Daydream } from '../../src/renderer/driver.js';
 
 import { start } from '../../src/app/daydream.js';
-import { createSegmentPoolSpawner } from '../../src/ui/segmented_pov_controls.js';
-import { SHADER_DOCUMENT_EFFECTS } from '../../src/effects/effect_roster.js';
-
-export { createSegmentPoolSpawner, SHADER_DOCUMENT_EFFECTS };
 
 // The third add() argument that makes lil-gui build an OptionController: a list
 // of choices, or an object mapping labels to them.
