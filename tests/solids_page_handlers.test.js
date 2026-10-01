@@ -116,7 +116,7 @@ for (const op of ['ambo', 'meta']) test(`${op} gate preserves authored descripti
   const messages = [];
   const added = [];
   const context = {
-    wasmModule: {}, state: { base: 'cube', ops: [] }, currentMesh: {},
+    wasmModule: {}, state: { base: 'cube', ops: [] }, currentMesh: {}, currentMeshIsCurrent: true,
     document: { querySelectorAll: () => [button] },
     opGate: { refresh: async () => ({ blocked: new Set([op]), complete: true }) },
     showGateMsg: (message) => messages.push(message), addOp: (op) => added.push(op),
@@ -283,4 +283,20 @@ test('saved solids discard non-object entries', () => {
     localStorage: { getItem: () => '[null, 1, false, "bad", [], {"base":"cube"}]' },
   });
   assert.equal(JSON.stringify(load()), '[{"base":"cube"}]');
+});
+
+test('a failed rebuild invalidates cached mesh metadata and prevents saving', () => {
+  const messages = [];
+  const previous = { vertices: [], faces: [] };
+  const context = {
+    currentMesh: previous, currentMeshIsCurrent: true,
+    wasmModule: {}, meshOpsWasm: {}, state: { base: 'cube', ops: [{ op: 'dual' }] },
+    buildContext: () => ({}), buildChainMesh: () => null,
+    showGateMsg: message => messages.push(message),
+  };
+  handler('update', context)();
+  assert.equal(context.currentMeshIsCurrent, false);
+  assert.equal(context.currentMesh, previous);
+  handler('saveSolid', context)();
+  assert.match(messages[0], /no successful preview/);
 });
