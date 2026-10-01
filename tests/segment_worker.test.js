@@ -278,7 +278,7 @@ test('worker posts booted at module load', () => {
   assert.equal(bootedAtLoad[0].msg.version, PROTOCOL_VERSION, 'booted carries the protocol version');
 });
 
-/** A version mismatch faults before any WASM work so the controller stops fast. */
+/** A rejected display-cap write refuses init before other engine calls. */
 test('init reports rejected display caps before configuring the engine', async () => {
   nextCapsRejected = true;
   await dispatch({ type: 'init', segId: 0, totalSegs: 1, w: 8, h: 4, effectName: 'Plasma' });
@@ -287,6 +287,7 @@ test('init reports rejected display caps before configuring the engine', async (
   assert.deepEqual(engineInstance.calls, [['setDisplayCaps', 0, 0]]);
 });
 
+/** A version mismatch faults before any WASM work so the controller stops fast. */
 test('init faults on a protocol version mismatch', async () => {
   await dispatch({ type: 'init', version: PROTOCOL_VERSION + 1,
                    segId: 2, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
