@@ -11,11 +11,11 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { serveStagedSite, stageSite } from '../scripts/vendor-stage.mjs';
+import { serveStagedSite, stageProbeSite } from '../scripts/vendor-stage.mjs';
 import { manifestEntries } from './helpers/site_pages.js';
 import { request } from './helpers/http_request.js';
 
-const staged = stageSite();
+const staged = stageProbeSite();
 after(() => rmSync(staged.root, { recursive: true, force: true }));
 
 const stagedFile = (path) => readFileSync(join(staged.root, path), 'utf8');
