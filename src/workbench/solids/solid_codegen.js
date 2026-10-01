@@ -786,8 +786,8 @@ export function generateRecipeCpp(item, baseNamespace) {
   const doc = doxygenCpp([
     `@brief Builds the ${funcName} star pattern (V=${commentCount(item.vCount)}, `
       + `F=${commentCount(item.fCount)}, I=${commentCount(item.iCount)}).`,
-    '@param a Output arena for the result and even pipeline stages.',
-    '@param b Scratch arena for odd pipeline stages.',
+    '@param a First arena in the alternating construction pair.',
+    '@param b Second arena; the result may borrow storage from either arena.',
     '@return The resulting star-pattern mesh.',
   ]);
   return `${doc}\n${signatureCpp(funcName)}\n${returnRecipeCpp(recipe)}\n}`;

@@ -314,8 +314,8 @@ test('generateRecipeCpp wraps the recipe in a FLASHMEM function with V/F/I comme
   const expected =
     '/**\n' +
     ' * @brief Builds the tetrahedron_kis star pattern (V=8, F=12, I=4).\n' +
-    ' * @param a Output arena for the result and even pipeline stages.\n' +
-    ' * @param b Scratch arena for odd pipeline stages.\n' +
+    ' * @param a First arena in the alternating construction pair.\n' +
+    ' * @param b Second arena; the result may borrow storage from either arena.\n' +
     ' * @return The resulting star-pattern mesh.\n' +
     ' */\n' +
     'FLASHMEM static PolyMesh tetrahedron_kis(Arena &a, Arena &b) {\n' +
@@ -340,8 +340,8 @@ test('generateRecipeCpp wraps a long function the way solid_generators.h carries
     '/**\n'
     + ' * @brief Builds the truncatedIcosahedron_hk58_chamfer63 star pattern (V=1200,\n'
     + ' * F=602, I=3600).\n'
-    + ' * @param a Output arena for the result and even pipeline stages.\n'
-    + ' * @param b Scratch arena for odd pipeline stages.\n'
+    + ' * @param a First arena in the alternating construction pair.\n'
+    + ' * @param b Second arena; the result may borrow storage from either arena.\n'
     + ' * @return The resulting star-pattern mesh.\n'
     + ' */\n'
     + 'FLASHMEM static PolyMesh truncatedIcosahedron_hk58_chamfer63(Arena &a,\n'
