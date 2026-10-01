@@ -23,13 +23,13 @@ test('a previous slider blur preserves the new locked drag', () => {
   };
   const mount = handler('mountSlider', context);
   definitions.forEach(mount);
-  sliders.red.dispatchEvent({ type: 'mousedown' });
-  sliders.green.dispatchEvent({ type: 'mousedown' });
-  sliders.red.dispatchEvent({ type: 'blur' });
+  sliders.red.dispatch('mousedown');
+  sliders.green.dispatch('mousedown');
+  sliders.red.dispatch('blur');
   input.green(0.6);
   assert.equal(context.parameters.red, 0.6);
   assert.equal(context.parameters.green, 0.6);
-  sliders.green.dispatchEvent({ type: 'blur' });
+  sliders.green.dispatch('blur');
   assert.equal(context.lockedDragOwner, null);
 });
 
