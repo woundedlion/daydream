@@ -1368,6 +1368,12 @@ test('band insertion buttons expose the open palette state', async () => {
   assert.equal(add.getAttribute('aria-expanded'), 'false');
   add.dispatch('click');
   assert.equal(add.getAttribute('aria-expanded'), 'true');
+  add.dispatch('pointerdown');
+  add.dispatch('click');
+  assert.equal(add.getAttribute('aria-expanded'), 'false');
+  assert.equal(paletteOf(h), null);
+  add.dispatch('click');
+  assert.equal(add.getAttribute('aria-expanded'), 'true');
   h.doc.activeElement.dispatch('keydown', { key: 'Escape' });
   assert.equal(add.getAttribute('aria-expanded'), 'false');
 });
