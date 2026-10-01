@@ -332,8 +332,12 @@ export async function probeStrip(tab) {
 
   // A computed backgroundColor spells its alpha only when that alpha is below
   // one, so an rgb() is exactly a surface nothing reads through.
-  const entryBox = await boxOf(tab, '.chain-palette .chain-palette-entry');
-  const painted = async () => tab.evaluate(() => {
+  const entrySelector = '.chain-palette .chain-palette-entry:nth-child(2)';
+  const entryBox = await boxOf(tab, entrySelector);
+  check(await tab.$eval(entrySelector,
+    (node) => node.getAttribute('aria-selected')) !== 'true',
+  'the hover probe starts on an unselected palette row');
+  const painted = async () => tab.evaluate((entrySelector) => {
     const paint = (selector) => {
       const node = document.querySelector(selector);
       return node === null ? 'absent' : getComputedStyle(node).backgroundColor;
@@ -341,9 +345,9 @@ export async function probeStrip(tab) {
     return {
       card: paint('.chain-chip--socket'),
       palette: paint('.chain-palette'),
-      entry: paint('.chain-palette .chain-palette-entry'),
+      entry: paint(entrySelector),
     };
-  });
+  }, entrySelector);
   const resting = await painted();
   await tab.mouse.move(centre(entryBox).x, centre(entryBox).y);
   const hovered = await painted();
