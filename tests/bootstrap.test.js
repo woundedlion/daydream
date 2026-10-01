@@ -5,17 +5,19 @@ import {
   bootRemedy, bootstrap, refreshModuleCache, refreshWithDeadline, showBootstrapFailure,
   StaleModuleError, STALE_MODULE_REMEDY, VENDOR_REMEDY,
 } from '../src/app/bootstrap.js';
-import { fakeElement } from './helpers/fake_dom.js';
+import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
+
+restoreDocumentAfterEach();
 
 function fakeDocument() {
-  const overlay = fakeElement('div');
+  const overlay = fakeElement('div', { connected: true });
   const spinner = fakeElement('div');
   spinner.className = 'spinner';
   overlay.append(spinner);
-  const doc = {
+  const doc = installDocument({
     createElement: (tagName) => fakeElement(tagName),
     getElementById: (id) => id === 'loading-overlay' ? overlay : null,
-  };
+  });
   return {
     doc,
     overlay,
@@ -152,6 +154,7 @@ test('the failure overlay moves focus onto its reload button', () => {
 
   assert.equal(overlay.getAttribute('role'), 'alert');
   assert.equal(childWithClass(overlay, 'context-lost-reload').focusCalls, 1);
+  assert.equal(doc.activeElement, childWithClass(overlay, 'context-lost-reload'));
 });
 
 test('reload button refreshes the module cache before reloading', async () => {
