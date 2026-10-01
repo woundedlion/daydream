@@ -659,7 +659,7 @@ function saveSolid() {
 
   const title = formatSolidName(state.base);
 
-  // Derive the edge count directly from the wrapper's vertices and faces.
+  // Derive the edge count from the readback copy.
   const vCount = currentMesh.vertices.length;
   const fCount = currentMesh.faces.length;
   const eCount = uniqueEdges(currentMesh.faces, vCount).length;
@@ -1144,8 +1144,8 @@ const parameterEdits = new Map();
 function updateOpParam(index, key, value, revision) {
   if (revision !== opsRevision || !state.ops[index]) return;
   // Snap onto the op's step grid (which also clamps to its range) and reject
-  // non-numeric input before it reaches state — the number box carries
-  // neither bounds nor grid, and the WASM mesh boundary is deliberately
+  // non-numeric input before it reaches state — the number box's
+  // min/max/step do not constrain typed input, and the WASM mesh boundary is deliberately
   // fail-fast, so an out-of-range or NaN value typed here could kill the
   // page or produce garbage geometry, and an off-grid one would export a
   // coefficient no control ever shows. The grid also keeps integral-step
@@ -1394,7 +1394,7 @@ function freezeEditing() {
   for (const el of controls) el.disabled = true;
 }
 
-// The live module is unrecoverable after an engine trap (see update()); if
+// The live module is unrecoverable after an engine trap (see buildChainMesh in solid_build.js); if
 // one ever escapes the validator gate, fail loudly once instead of letting
 // every later call trap the re-entrancy guard and spam the console.
 function engineTrapped(e) {
