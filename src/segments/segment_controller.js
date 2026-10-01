@@ -487,8 +487,9 @@ export class SegmentController {
 
   /**
    * (Re)build the worker pool at the current resolution: destroy any existing
-   * pool, then spawn `numSegments` fresh workers, each loading its own WASM
-   * module and initialized with this engine's tuned params and paused state.
+   * pool, then spawn `numSegments` fresh workers, each instantiating its own WASM
+   * instance from the warmer's shared compilation when held, else compiling its
+   * own, initialized with this engine's tuned params and paused state.
    * Latches a pool fault (leaving an empty controller) if the segment count is
    * not layout-legal or the resolution key is unknown.
    * @param {number} numSegments - Pool size; must satisfy segment_layout's
