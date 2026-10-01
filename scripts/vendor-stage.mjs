@@ -75,7 +75,7 @@ function linkInto(from, to) {
  * @returns {{root: string, entries: string[]}} The staged root and the set to serve.
  * @throws {Error} When the pinned libraries are not installed.
  */
-export function stageSite() {
+export function stageProbeSite() {
   const root = mkdtempSync(join(tmpdir(), 'daydream-staged-site-'));
   try {
     for (const entry of manifestEntries()) {
@@ -114,7 +114,7 @@ export function stageSite() {
  *   origin and a shutdown that also removes the staged tree.
  */
 export async function serveStagedSite() {
-  const staged = stageSite();
+  const staged = stageProbeSite();
   let site;
   try {
     site = await serveManifest(staged.entries, staged.root);
