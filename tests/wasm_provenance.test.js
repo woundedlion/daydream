@@ -4,13 +4,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import {
-  BAKED_CONSTANT_IDS, bakedTopologyFields, engineParameterNames,
-} from '../src/workbench/shader/shader_documents.js';
 import * as MB from '../src/workbench/mobius/mobius_transforms.js';
 import { MORPH_SWEEP, OP_DEFS } from '../src/workbench/solids/solid_codegen.js';
 
@@ -62,57 +58,6 @@ test('the installed operator catalog describes the installed WASM', async () => 
   assert.deepEqual(JSON.parse(text('generated/shader/engine_catalog.json')),
     JSON.parse(module.HolosphereEngine.getShaderChainCatalog()));
 });
-
-// One id per alias branch, so the comparison keeps covering the table when the
-// committed documents stop exercising a branch.
-const ALIAS_PROBES = [
-  'bare-id', 'warp1.rotation-rate', 'warp2.radial-scale', 'warp1.cell-x',
-  'warp2.field-angle', 'warp1.unaliased-field', 'surface.scale', 'camera.wander',
-  'sample.angle-speed', 'lens.symmetry',
-];
-
-const controlNameCorpus = () => {
-  const ids = new Set(ALIAS_PROBES);
-  for (const name of readdirSync(resolve(REPO, 'generated/shader/patterns'))) {
-    if (!name.endsWith('.shader.json')) continue;
-    for (const parameter of JSON.parse(text(`generated/shader/patterns/${name}`))
-      .descriptor?.parameters ?? []) ids.add(parameter.id);
-  }
-  return [...ids].sort();
-};
-
-// src/workbench/shader/shader_documents.js re-implements the engine's promoted-binding
-// predicates for the browser: the live topology field, the baked topology set,
-// the baked-constant exemption and the control-name alias table. That module is
-// not installed here, so the two are pinned by behaviour rather than by bytes.
-test('the browser promoted-binding predicates agree with the installed engine pin',
-  { skip: engineSkip }, async (t) => {
-    assert.ok(engineRoot, engineMissing);
-    const revision = enginePin;
-    const snapshot = mkdtempSync(resolve(tmpdir(), 'daydream-engine-predicates-'));
-    t.after(() => rmSync(snapshot, { recursive: true, force: true }));
-    for (const name of ['wasm_smoke_predicates.mjs', 'shader_workbench.mjs', 'sha256.mjs'])
-      writeFileSync(resolve(snapshot, name), committed(engineRoot, `scripts/${name}`, revision));
-    const predicates = await import(pathToFileURL(resolve(snapshot, 'wasm_smoke_predicates.mjs')).href);
-    const catalog = JSON.parse(text('generated/shader/engine_catalog.json'));
-    assert.deepEqual(
-      [...bakedTopologyFields(catalog)].sort(),
-      [...predicates.bakedTopologyFields(catalog)].sort(),
-      'the baked topology fields drifted from the installed engine pin',
-    );
-    assert.deepEqual(
-      [...BAKED_CONSTANT_IDS].sort(),
-      [...predicates.BAKED_CONSTANT_IDS].sort(),
-      'the baked-constant exemption drifted from the installed engine pin',
-    );
-    for (const parameterId of controlNameCorpus()) {
-      assert.deepEqual(
-        engineParameterNames(parameterId),
-        predicates.engineControlNames(parameterId),
-        `the control names for "${parameterId}" drifted from the installed engine pin`,
-      );
-    }
-  });
 
 test('MORPH_SWEEP matches the engine morphability constants', { skip: engineSkip }, () => {
   assert.ok(engineRoot, engineMissing);

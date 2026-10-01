@@ -10,7 +10,8 @@ import { errorDetail } from '../../shared/banner.js';
 import { applyChainDocument } from './chain_apply.js';
 import { createChainDocumentStore, scratchChainDocument } from './chain_document_store.js';
 import { createChainStrip } from './chain_strip.js';
-import { engineControlNames } from '../../../generated/shader/shader_workbench.mjs';
+import { BAKED_CONSTANT_IDS, bakedTopologyFields, engineControlNames } from '../../../generated/shader/shader_workbench.mjs';
+export { BAKED_CONSTANT_IDS, bakedTopologyFields } from '../../../generated/shader/shader_workbench.mjs';
 import { copyToClipboard } from '../../shared/copy_text.js';
 import { downloadBlob } from '../../shared/download_file.js';
 import {
@@ -34,43 +35,6 @@ const SCRATCH_FILENAME = 'scratch.shader.json';
 
 export const SHADER_LINK_DEBOUNCE_MS = 200;
 export const SHADER_LINK_MAX_WAIT_MS = 1000;
-
-// The one topology parameter a fixed effect leaves live, as an ordinary
-// dropdown, rather than baking its variant in.
-const LIVE_TOPOLOGY_FIELD = 'palette-mapping';
-
-/**
- * The topology fields a fixed effect bakes in, read off the catalog's per
- * parameter `topology` flag. Topology enum8 parameters select an operator's
- * structural variant, so a fixed build registers no control for them and the
- * fixed apply path skips their authored values.
- * @param {*} operatorCatalog - The engine operator catalog.
- * @returns {Set<string>} The field segments the fixed path skips.
- */
-export function bakedTopologyFields(operatorCatalog) {
-  const fields = new Set();
-  for (const operator of operatorCatalog?.operators ?? []) {
-    for (const parameter of operator.params ?? [])
-      if (parameter.topology === true) fields.add(parameter.id);
-  }
-  fields.delete(LIVE_TOPOLOGY_FIELD);
-  return fields;
-}
-
-/**
- * Document parameter ids a compiled build holds as a compile-time constant.
- * The interpreter registers an ordinary control and reads the authored value;
- * the compiled effect registers none, so the fixed apply skips the id instead
- * of reading it as unmatched. AshCloud's CAMERA_SPIN_RATE is the only one.
- *
- * Whole ids, not field segments: `sample.spherical-rings.v3` registers a live
- * `spin-speed` of its own.
- *
- * The engine's scripts/wasm_smoke_predicates.mjs holds the same set and gates
- * the promoted documents against it; that module is not installed here, so
- * tests/wasm_provenance.test.js pins this re-implementation to it.
- */
-export const BAKED_CONSTANT_IDS = new Set(['camera.spin-speed']);
 
 /** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[]}} ParameterDefinition */
 /** @typedef {{document: *, descriptor_digest?: string, diagnostics?: *, status?: string}} CompiledDocument */
