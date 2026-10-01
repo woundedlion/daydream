@@ -1021,3 +1021,21 @@ test('new instances remap authored interpolation groups to their own labels', as
   assert.equal(store.document().descriptor.parameters.find((p) => p.id === 'warp3.rotation')
     .interpolation.group, 'warp3.mix');
 });
+
+test('declaration queries follow committed replacement and undo without cloning', async () => {
+  const store = await makeStore();
+  const clone = globalThis.structuredClone;
+  try {
+    globalThis.structuredClone = () => assert.fail('declaration lookup cloned the document');
+    assert.equal(store.declares('project.singularity-fade'), true);
+    assert.equal(store.declares('missing.parameter'), false);
+  } finally {
+    globalThis.structuredClone = clone;
+  }
+  assert.equal(store.replaceSpan(PROJECT, 1,
+    [{ label: 'project', operator: 'project.bonne.v2' }]).ok, true);
+  assert.equal(store.declares('project.singularity-fade'), false);
+  assert.equal(store.declares('project.central-meridian'), true);
+  store.undo();
+  assert.equal(store.declares('project.singularity-fade'), true);
+});

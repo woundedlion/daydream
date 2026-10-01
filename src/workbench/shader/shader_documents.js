@@ -465,8 +465,7 @@ export function createShaderDocumentController({
     if (!parameterLive(parameterId)) return false;
     try {
       if (chainUi === null || active === null || active.presetId === null) return;
-      const declaresParameter = !chainUi.store.document().descriptor.parameters.some(
-        (/** @type {{id: string}} */ parameter) => parameter.id === parameterId);
+      const declaresParameter = !chainUi.store.declares(parameterId);
       const result = chainUi.store.setPresetValue(active.presetId, parameterId, value, () => {
         if (declaresParameter && active.compiledSide) return { ok: true };
         const engine = getEngine();
