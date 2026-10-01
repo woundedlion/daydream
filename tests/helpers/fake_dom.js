@@ -9,7 +9,7 @@
 // So these ship green here and only a real browser catches them: zero-width or
 // overflowing chips, off-screen flyouts, scroll arrows that never appear,
 // scrollTop clamping, a renamed or deleted CSS rule, a display:none control that
-// still takes a click, focus landing on a non-focusable node, and a drag that
+// still takes a click, a drag that
 // loses pointer capture or ignores pointercancel. The seven probes
 // browser-smoke.yml drives are what catch them: scripts/browser-smoke.mjs,
 // workbench-probe.mjs, panel-probe.mjs, solids-probe.mjs, palettes-probe.mjs,
@@ -599,6 +599,9 @@ export function fakeElement(tag = 'div', options = {}) {
       };
     },
     focus(options) {
+      if (this.disabled === true) return;
+      if (this.getAttribute('tabindex') === null && !FOCUSABLE_TAGS.has(this.tagName)
+          && !(this.tagName === 'A' && this.getAttribute('href') !== null)) return;
       this.focusCalls++;
       this.focusOptions = options;
       const doc = activeDocument();
@@ -670,7 +673,19 @@ export function fakeElement(tag = 'div', options = {}) {
     configurable: true,
     value: fakeDataset(element),
   });
-  if (DISABLEABLE_TAGS.has(element.tagName)) element.disabled = false;
+  if (DISABLEABLE_TAGS.has(element.tagName)) {
+    let disabled = false;
+    Object.defineProperty(element, 'disabled', {
+      enumerable: true,
+      configurable: true,
+      get() { return disabled; },
+      set(value) {
+        disabled = Boolean(value);
+        const doc = activeDocument();
+        if (disabled && doc?.activeElement === element) doc.activeElement = doc.body;
+      },
+    });
+  }
   if (element.tagName === 'INPUT') {
     let inputValue = '';
     let checked = false;

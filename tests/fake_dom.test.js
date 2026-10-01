@@ -893,3 +893,22 @@ test('child and sibling navigation follows insertions, moves and removals', () =
   assert.equal(newest.parentElement, null);
   assert.equal(newest.nextSibling, null);
 });
+
+
+test('focus respects native tags, tabindex, and disabled state', () => {
+  const doc = installDocument(documentEvents());
+  const button = fakeElement('button');
+  const div = fakeElement('div');
+  button.focus();
+  assert.equal(doc.activeElement, button);
+  div.focus();
+  assert.equal(doc.activeElement, button);
+  div.tabIndex = -1;
+  div.focus();
+  assert.equal(doc.activeElement, div);
+  button.focus();
+  button.disabled = true;
+  assert.equal(doc.activeElement, doc.body);
+  button.focus();
+  assert.equal(doc.activeElement, doc.body);
+});
