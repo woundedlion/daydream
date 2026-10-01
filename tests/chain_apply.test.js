@@ -194,8 +194,8 @@ test('a non-numeric value is refused before the first write', () => {
 test('the fake chain engine advances generations after repeated application', () => {
   const { engine, run } = harness();
   const before = engine.getParamGeneration();
-  assert.deepEqual(engine.getParameterDefinitions(), [],
-    'no definitions exist until a chain lands');
+  assert.equal(engine.getParameterDefinitions().length, 31,
+    'the default chain installs its definitions');
 
   assert.equal(run(compiledDocument({ 'sample.pattern-freq': 3 })), null);
   const after = engine.getParamGeneration();
