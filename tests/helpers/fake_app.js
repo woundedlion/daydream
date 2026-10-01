@@ -204,7 +204,16 @@ export function fakeGui(namespace = {}, optionsReplaces = false) {
         childrenElement.removeChild(controller.domElement);
       }
     },
-    collectUrlKeys() { return []; },
+    collectUrlKeys(prefix = panel ? '' : namespace) {
+      const keys = gui.controllers.filter((controller) => !controller.session
+        && typeof controller.object[controller.property] !== 'function').map((controller) => {
+        const folder = panel && gui.folders.find((candidate) => candidate.name === controller.folder);
+        return [prefix, folder && !folder.display ? folder.name : '', controller.property].filter(Boolean).join('.');
+      });
+      if (!panel) for (const folder of gui.folders)
+        keys.push(...folder.collectUrlKeys([prefix, folder.display ? '' : folder.namespace].filter(Boolean).join('.')));
+      return keys;
+    },
   };
   gui.domElement.ownerDocument = childrenElement.ownerDocument;
   gui.domElement.appendChild(childrenElement);

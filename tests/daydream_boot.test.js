@@ -270,6 +270,21 @@ function resolutionControl(app) {
   return app.guis[0].controllers.find((c) => c.property === 'resolution');
 }
 
+test('an effect switch preserves view deep-link parameters', async () => {
+  const app = await bootedApp({ search: '?view.poleLod=1.5&fx.stale=2',
+    loadModule: async () => fakeWasmModule(),
+  });
+  const option = app.elements.get('effect-sidebar').querySelectorAll('[data-effect]')
+    .find((entry) => entry.dataset.effect === 'Raymarch');
+  assert.ok(option);
+  assert.ok(app.guis[0].collectUrlKeys().includes('view.poleLod'), app.guis[0].collectUrlKeys().join(', '));
+  option.onclick();
+  await new Promise((resolve) => setTimeout(resolve, URL_FLUSH_DEBOUNCE_MS + 20));
+  const query = new URL(app.urlWrites.at(-1), 'https://example.test').searchParams;
+  assert.equal(query.get('view.poleLod'), '1.5', app.urlWrites.join('\n'));
+  assert.equal(query.has('fx.stale'), false);
+});
+
 /**
  * A controller in the Recording folder of a booted app.
  * @param {Object} app - A startApp() result.
