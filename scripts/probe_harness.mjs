@@ -183,7 +183,8 @@ export function collectProblems(tab, origin, problems) {
     if (href === undefined) return false;
     const url = new URL(href, origin);
     return ABSENT_ORIGINS.has(url.origin) ||
-      (url.origin === origin && ABSENT_PATHS.some((re) => re.test(url.pathname)));
+      (url.origin === new URL(origin).origin
+        && ABSENT_PATHS.some((re) => re.test(url.pathname)));
   };
   tab.on('console', (message) => {
     if (message.type() !== 'error' || absent(message.location()?.url)) return;

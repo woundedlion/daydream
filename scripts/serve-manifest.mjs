@@ -42,8 +42,9 @@ export async function serveManifest(entries, root = ROOT) {
     /** @type {?string} */
     let target = null;
     try {
-      const requested = decodeURIComponent(
-        new URL(req.url ?? '/', 'http://localhost').pathname).replace(/^\/+/, '');
+      const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
+      if (!pathname.startsWith('/daydream/')) throw new Error('outside site prefix');
+      const requested = decodeURIComponent(pathname.slice('/daydream/'.length));
       const path = requested === '' ? 'index.html' : requested;
       if (path.split(/[\\/]/).some(part => part === '..' || part === '.')) {
         throw new Error('non-canonical path');
@@ -89,7 +90,7 @@ export async function serveManifest(entries, root = ROOT) {
     throw new Error('the manifest server did not bind a port');
   }
   return {
-    origin: `http://127.0.0.1:${address.port}`,
+    origin: `http://127.0.0.1:${address.port}/daydream`,
     close: () => new Promise((done) => server.close(() => done(undefined))),
   };
 }
