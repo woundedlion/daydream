@@ -4,6 +4,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import { callWorkbenchBinding } from '../../engine/workbench_bindings.js';
 import { enumConstantName, optionIndex } from '../../effects/param_sync.js';
 
 /** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[]}} ParameterDefinition */
@@ -55,7 +56,7 @@ export function applyChainDocument({
   const live = new Set(chain.map((entry) => entry.instance));
   const bypassed = new Set(
     documentChain.map((entry) => entry.label).filter((label) => !live.has(label)));
-  const result = engine.setShaderChain(chain);
+  const result = callWorkbenchBinding(engine, 'getShaderChainBindings', 'setShaderChain', [chain], { code: 'NOT_CHAIN_EFFECT', entryIndex: -1 });
   if (result?.code !== 'APPLIED') {
     const code = result?.code ?? 'no result';
     const at = typeof result?.entryIndex === 'number' && result.entryIndex >= 0
@@ -91,7 +92,7 @@ export function applyChainDocument({
     writes.push({ name: parameterId, value: stored });
   }
 
-  const written = engine.setShaderChainParameters(writes);
+  const written = callWorkbenchBinding(engine, 'getShaderChainBindings', 'setShaderChainParameters', [writes], module.ParamSetResult.NO_EFFECT);
   if (written !== module.ParamSetResult.APPLIED)
     return refuse(`the engine refused the preset: ${enumConstantName(module.ParamSetResult, written)}`);
 

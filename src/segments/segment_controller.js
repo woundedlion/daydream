@@ -23,6 +23,7 @@
  *   - displayAliasesDiverged(view): whether either display alias has stopped
  *     referencing that view
  */
+import { callWorkbenchBinding } from '../engine/workbench_bindings.js';
 import {
   isValidSegmentCount,
 } from "./segment_layout.js";
@@ -948,7 +949,7 @@ export class SegmentController {
    */
   snapshotEffectState() {
     const engine = this.getWasmEngine();
-    const snapshot = engine?.getFullConfigSnapshot?.();
+    const snapshot = callWorkbenchBinding(engine, 'getLegacyShaderBindings', 'getFullConfigSnapshot', []);
     if (snapshot) return { fullConfigSnapshot: snapshot };
     return { params: this.snapshotParams() };
   }

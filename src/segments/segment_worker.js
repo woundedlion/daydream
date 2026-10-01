@@ -11,6 +11,7 @@
  * share arrives with `init` when the controller has one.
  */
 
+import { callWorkbenchBinding } from '../engine/workbench_bindings.js';
 import createHolosphereModule from "../../generated/holosphere_wasm.js";
 import { computeSegmentRange, extractSegment } from "./segment_layout.js";
 import { PROTOCOL_VERSION } from "./worker_protocol.js";
@@ -110,7 +111,7 @@ export function installSegmentWorker() {
              reason: 'Shader workbench full-config restore API is unavailable' });
       return false;
     }
-    const result = engine.restoreFullConfigSnapshot(snapshot);
+    const result = callWorkbenchBinding(engine, 'getLegacyShaderBindings', 'restoreFullConfigSnapshot', [snapshot], wasmModule.FullConfigRestoreResult.NOT_SHADER_WORKBENCH);
     const restoreResults = wasmModule.FullConfigRestoreResult;
     if (result === restoreResults.APPLIED) return true;
     const name = enumConstantName(restoreResults, result);

@@ -32,6 +32,7 @@ src/ui/effect_panel_edits.js
 src/effects/effect_roster.js
 src/effects/effect_sequencing.js
 src/engine/engine_host.js
+src/engine/workbench_bindings.js
 src/renderer/frame_constants.js
 src/renderer/geometry.js
 src/ui/global_stats_view.js

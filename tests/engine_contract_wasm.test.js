@@ -47,6 +47,153 @@ const engine = new M.HolosphereEngine();
 assert.equal(M.HolosphereEngine.isLive(), true);
 const initialDisplayAngles = [engine.getDisplayNorthPhi(), engine.getDisplaySouthPhi()];
 
+test('typed authoring handles track effect incarnations and reject unsupported effects', () => {
+  engine.setEffect('Comets');
+  assert.equal(engine.getShaderChainBindings(), null);
+  assert.equal(engine.getLegacyShaderBindings(), null);
+  engine.setEffect('ShaderChain');
+  const chain = engine.getShaderChainBindings();
+  assert.equal(chain.isValid(), true);
+  const program = chain.getProgram();
+  assert.equal(chain.setShaderChain(program).code, 'APPLIED');
+  assert.equal(chain.isValid(), true, 'schema rebind preserves effect incarnation');
+  assert.equal(engine.setEffect('missing'), M.EffectSetResult.UNKNOWN_EFFECT);
+  assert.equal(engine.setResolution(W, H), M.ResolutionSetResult.ALREADY_ACTIVE);
+  assert.equal(chain.isValid(), true, 'rejected and no-op lifecycle calls preserve handles');
+  engine.setEffect('ShaderChain');
+  assert.equal(chain.isValid(), false, 'same-type replacement still invalidates handles');
+  assert.equal(chain.getProgram(), null);
+  assert.equal(chain.setShaderChain(program).code, 'NOT_CHAIN_EFFECT');
+  assert.equal(chain.setShaderChainParameters([]), M.ParamSetResult.NO_EFFECT);
+  chain.delete();
+
+  engine.setEffect('Shader');
+  const legacy = engine.getLegacyShaderBindings();
+  const snapshot = legacy.getFullConfigSnapshot();
+  assert.equal(legacy.restoreFullConfigSnapshot(snapshot), M.FullConfigRestoreResult.APPLIED);
+  engine.setResolution(288, 144);
+  assert.equal(engine.getLegacyShaderBindings(), null, 'resizing leaves no effect');
+  assert.equal(legacy.isValid(), false);
+  assert.equal(legacy.getFullConfigSnapshot(), null);
+  assert.equal(legacy.getFullConfigFieldDefinitions(), null);
+  assert.equal(legacy.restoreFullConfigSnapshot(snapshot), M.FullConfigRestoreResult.NOT_SHADER_WORKBENCH);
+  legacy.delete();
+  engine.setResolution(W, H);
+});
+
+test('geometry rebuild invalidates authoring handles while preserving their configuration', () => {
+  engine.setEffect('ShaderChain');
+  const before = engine.getShaderChainBindings();
+  const program = before.getProgram();
+  assert.equal(engine.setDisplayCaps(5, 6), true);
+  assert.equal(before.isValid(), false);
+  const after = engine.getShaderChainBindings();
+  assert.deepEqual(after.getProgram(), program);
+  before.delete();
+  after.delete();
+  engine.setDisplayCaps(0, 0);
+});
+
+test('authoring handles outlive deleted engines safely and cannot bind a successor', async () => {
+  const module = await createHolosphereModule({ print: sink, printErr: sink });
+  const owner = new module.HolosphereEngine();
+  owner.setEffect('ShaderChain');
+  const chain = owner.getShaderChainBindings();
+  const program = chain.getProgram();
+  owner.delete();
+  assert.equal(chain.isValid(), false);
+  assert.equal(chain.setShaderChain(program).code, 'NOT_CHAIN_EFFECT');
+  const successor = new module.HolosphereEngine();
+  successor.setEffect('ShaderChain');
+  assert.equal(chain.isValid(), false);
+  chain.delete();
+  successor.delete();
+});
+
+test('adapter payload getters cannot commit to replaced or resized effects', () => {
+  for (const replace of [() => engine.setEffect('ShaderChain'),
+    () => engine.setResolution(288, 144),
+    () => engine.setDisplayCaps(7, 8)]) {
+    engine.setResolution(W, H);
+    engine.setEffect('ShaderChain');
+    const chain = engine.getShaderChainBindings();
+    const program = chain.getProgram();
+    Object.defineProperty(program[0], 'instance', {
+      enumerable: true,
+      get() { replace(); return 'stale'; },
+    });
+    assert.equal(chain.setShaderChain(program).code, 'NOT_CHAIN_EFFECT');
+    assert.equal(chain.isValid(), false);
+    chain.delete();
+  }
+  engine.setResolution(W, H);
+  engine.setDisplayCaps(0, 0);
+});
+
+test('marked-dead modules reject capability acquisition and calls', async () => {
+  const module = await createHolosphereModule({ print: sink, printErr: sink });
+  const owner = new module.HolosphereEngine();
+  owner.setEffect('ShaderChain');
+  const chain = owner.getShaderChainBindings();
+  module.HS_MODULE_DEAD = true;
+  assert.equal(chain.isValid(), false);
+  assert.equal(chain.getProgram(), null);
+  assert.equal(owner.getShaderChainBindings(), null);
+  module.HS_MODULE_DEAD = false;
+  chain.delete();
+  owner.delete();
+});
+
+test('snapshot adapters reject getter-driven replacement without touching the new effect', () => {
+  engine.setEffect('Shader');
+  const legacy = engine.getLegacyShaderBindings();
+  const snapshot = legacy.getFullConfigSnapshot();
+  Object.defineProperty(snapshot, 'accepted', {
+    enumerable: true,
+    get() { engine.setEffect('Comets'); return []; },
+  });
+  assert.notEqual(legacy.restoreFullConfigSnapshot(snapshot), M.FullConfigRestoreResult.APPLIED);
+  assert.equal(legacy.isValid(), false);
+  assert.equal(engine.getLegacyShaderBindings(), null);
+  assert.equal(engine.getPresetCount() > 0, true);
+  legacy.delete();
+});
+
+test('adapter decode rejects nested authoring and deletion from getters', async () => {
+  for (const action of ['delete', 'nested']) {
+    const module = await createHolosphereModule({ print: sink, printErr: sink });
+    const owner = new module.HolosphereEngine();
+    owner.setEffect('ShaderChain');
+    const chain = owner.getShaderChainBindings();
+    const program = chain.getProgram();
+    Object.defineProperty(program[0], 'instance', {
+      enumerable: true,
+      get() {
+        if (action === 'delete') owner.delete();
+        else chain.setShaderChainParameters([]);
+        return 'camera';
+      },
+    });
+    assert.throws(() => chain.setShaderChain(program), WebAssembly.RuntimeError);
+    assert.equal(module.HS_MODULE_DEAD, true);
+  }
+});
+
+test('authoring adapter declarations match their exported methods', () => {
+  engine.setEffect('ShaderChain');
+  const chain = engine.getShaderChainBindings();
+  engine.setEffect('Shader');
+  const legacy = engine.getLegacyShaderBindings();
+  for (const [name, handle] of [['ShaderChainBindings', chain], ['LegacyShaderBindings', legacy]]) {
+    const declared = [...interfaceBody(name).matchAll(/^\s*([A-Za-z_]\w*)\s*\(/gm)]
+      .map((match) => match[1]);
+    for (const method of declared) assert.equal(typeof handle[method], 'function');
+    assert.deepEqual(Object.keys(Object.getPrototypeOf(handle)).sort(),
+      declared.filter((method) => method !== 'delete').sort());
+    handle.delete();
+  }
+});
+
 // Both non-rejections leave the requested size active; only RESIZED tears the
 // effect down. The shared engine makes either possible at most call sites.
 const resolutionOk = (r) => r === M.ResolutionSetResult.RESIZED
