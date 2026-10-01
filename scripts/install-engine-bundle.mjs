@@ -15,12 +15,7 @@ export const runtimePath = (path) => RUNTIME_PATHS.has(path)
   || /^generated\/shader\/patterns\/[^/]+\.shader\.json$/.test(path)
   || /^docs\/screenshots\/.+\.png$/.test(path);
 
-const REQUIRED_PATHS = new Set(['README.md', 'generated/holosphere_wasm.js', 'generated/holosphere_wasm.wasm',
-  'generated/holosphere_wasm.sha', 'generated/holosphere_wasm.wasm.sha256', 'generated/holosphere_wasm.toolchain',
-  'generated/pov_segment_map.json', 'generated/shader/shader_workbench.mjs', 'generated/shader/sha256.mjs',
-  'generated/shader/engine_catalog.json', 'generated/shader/patterns/shaderball_migration.json']);
-
-export const ownedPath = runtimePath;
+const REQUIRED_PATHS = RUNTIME_PATHS;
 
 /** @param {string} bundle @param {string} [destination] */
 export function verifyEngineBundle(bundle, destination = bundle) {
@@ -34,7 +29,7 @@ export function verifyEngineBundle(bundle, destination = bundle) {
     if (path.includes('\\') || path.split('/').some((part) => part === '..' || part === '')
         || !resolve(destination, path).startsWith(destination + sep))
       throw new Error(`Invalid engine bundle path: ${path}`);
-    if (!ownedPath(path)) throw new Error(`Engine bundle carries unexpected path: ${path}`);
+    if (!runtimePath(path)) throw new Error(`Engine bundle carries unexpected path: ${path}`);
     const bytes = readFileSync(resolve(bundle, path));
     if (createHash('sha256').update(bytes).digest('hex') !== hash)
       throw new Error(`Engine bundle checksum mismatch: ${path}`);
@@ -67,7 +62,7 @@ export function installEngineBundle(bundle, destination) {
     if (!existsSync(root)) continue;
     for (const entry of readdirSync(root, { recursive: true, withFileTypes: true })) {
       const relative = resolve(entry.parentPath, entry.name).slice(root.length + 1).replaceAll('\\', '/');
-      if (entry.isFile() && ownedPath(`${directory}/${relative}`)
+      if (entry.isFile() && runtimePath(`${directory}/${relative}`)
           && !paths.has(`${directory}/${relative}`))
         stale.push(`${directory}/${relative}`);
     }
