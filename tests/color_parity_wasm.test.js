@@ -370,8 +370,8 @@ test('PaletteOps publishes every effect-owned GenerativePalette recipe', () => {
       'GSReactionDiffusion',
       'MobiusRings',
       'Raymarch',
-      'ShaderWorkbench Liquid',
-      'ShaderWorkbench Flyby',
+      'Standalone Liquid',
+      'Standalone Flyby',
       'HyperLattice',
       'MindSplatter',
     ]);
