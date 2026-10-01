@@ -378,7 +378,7 @@
   cursor: pointer;
 }
 
-/* Reload button on the GPU context-lost overlay (reuses .loading-overlay.error). */
+/* Reload button on the GPU context-lost and boot-failure overlays (reuses .loading-overlay.error). */
 .context-lost-reload {
   margin-top: 4px;
   padding: 6px 16px;
