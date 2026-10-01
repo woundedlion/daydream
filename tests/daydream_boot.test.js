@@ -20,6 +20,7 @@ import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
+import { URL_FLUSH_DEBOUNCE_MS } from '../src/app/state.js';
 import { pageWarmer } from '../src/segments/module_warmer.js';
 import {
   EffectSetResult, ParamSetResult, ResolutionSetResult, ChainSnapshotRestoreResult, unpinnedEngineMethods,
@@ -1038,4 +1039,35 @@ test('a rejected live cap edit leaves the displayed geometry unchanged', async (
   assert.equal(control.getValue(), 0);
   assert.equal(app.driver.DISPLAY_NORTH_PHI, 0);
   assert.equal(app.driver.DISPLAY_SOUTH_PHI, Math.PI);
+});
+
+
+test('a workbench missing document controls preserves its URL across rendered and failed frames', async (t) => {
+  t.mock.timers.enable({apis: ['setTimeout']});
+  for (const failingFrames of [0, 1]) {
+    const module = fakeWasmModule({failingFrames});
+    let releases = 0;
+    module.ChainSnapshotRestoreResult = ChainSnapshotRestoreResult;
+    module.HolosphereEngine.prototype.getShaderChainBindings = () => ({
+      isValid: () => true,
+      getSnapshot: () => ({schemaVersion: 2, chain: [
+        {instance: 'project', operator: 'project.stereographic.v2'},
+        {instance: 'sample', operator: 'sample.grid.v3'},
+        {instance: 'colorize', operator: 'colorize.generated-palette.v3'},
+      ], parameters: [], animationsPaused: false}),
+      restoreSnapshot: () => ChainSnapshotRestoreResult.APPLIED,
+      delete: () => { releases++; },
+    });
+    const app = await bootedApp({
+      daydreamMode: 'shader-workbench', search: '?effect=ShaderChain',
+      loadModule: () => Promise.resolve(module),
+    });
+    t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS * 2);
+    assert.deepEqual(app.urlWrites, []);
+    captureConsole(() => app.driver.renderer.frame());
+    t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS * 2);
+    assert.deepEqual(app.urlWrites, []);
+    assert.equal(app.teardown.disposed(), false);
+    assert.ok(releases > 0);
+  }
 });
