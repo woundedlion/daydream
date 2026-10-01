@@ -349,7 +349,7 @@ function recordingRig({ labelAxes = false } = {}) {
   };
   const gui = fakeGui('view');
   const driver = {
-    frameInterval: 62.5, labelAxes, recorder: null, invalidations: 0, steps: 0,
+    frameInterval: 1 / 16, labelAxes, recorder: null, invalidations: 0, steps: 0,
     invalidate() { this.invalidations += 1; },
     stepOnce() { this.steps += 1; },
   };
@@ -388,7 +388,7 @@ test('the record toggle announces the session and the container it settled on', 
   const recorder = rig.attach(fakeRecorder('webm'));
 
   assert.equal(rig.button.enabled, true);
-  assert.equal(recorder.frameInterval, 62.5,
+  assert.equal(recorder.frameInterval, 1 / 16,
     'the recorder locks its capture rate to the driver frame interval');
   assert.equal(recorder.format, 'mp4',
     'a format chosen before the load must replay into the recorder it built');
