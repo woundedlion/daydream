@@ -21,15 +21,15 @@ export async function checkCdnIntegrity(source, fetchModule = fetch, wait = dela
     if (!url.startsWith('https://cdn.jsdelivr.net/npm/'))
       throw new Error(`Unexpected CDN URL: ${url}`);
     let bytes;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 4; attempt++) {
       try {
         const response = await fetchModule(url, { signal: AbortSignal.timeout(30_000) });
         if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
         bytes = Buffer.from(await response.arrayBuffer());
         break;
       } catch (error) {
-        if (attempt === 2) throw error;
-        await wait(250 * 2 ** attempt);
+        if (attempt === 3) throw error;
+        await wait([5_000, 15_000, 45_000][attempt]);
       }
     }
     const actual = `sha384-${createHash('sha384')
