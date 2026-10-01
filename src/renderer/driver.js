@@ -168,7 +168,8 @@ export class Daydream {
     this.DISPLAY_NORTH_PHI = 0;
     this.DISPLAY_SOUTH_PHI = Math.PI;
     this.DOT_SIZE = Daydream.DEFAULT_DOT_SIZE;
-    // Zeroed RGB16 placeholder until the engine host supplies the WASM view.
+    // Null until precomputeMatrices allocates a zeroed RGB16 placeholder;
+    // the engine host then supplies the WASM view.
     this.pixels = null;
     // Composed instance matrices per grid, keyed by resolution and latitude endpoints. Entries come
     // from the resolution-preset table, so the map holds a couple of grids.
