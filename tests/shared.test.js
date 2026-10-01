@@ -1,7 +1,7 @@
 //
-// shared.js's own export is initScene; showFatalError et al. are re-exports
+// shared.js exports initScene, capPixelRatio and getCssColor; other exports
 // covered by their source modules' tests (banner.test.js, clipboard.test.js,
-// cpp_format.test.js). three + three/addons are redirected onto fake_three.js
+// kb_format.test.js). three + three/addons are redirected onto fake_three.js
 // by loader hooks, so initScene builds a whole scene here without a WebGL
 // context and dispose() can be checked step by step. dispose() carries an
 // ordering invariant: the frame loop and the resize listener must both be
