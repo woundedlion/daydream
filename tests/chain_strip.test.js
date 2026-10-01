@@ -53,9 +53,9 @@ async function makeStrip({
 } = {}) {
   const store = await createChainDocumentStore({
     document: source, catalog: CATALOG });
-  const container = fakeElement('section');
+  const container = fakeElement('section', { connected: true });
   const doc = installDocument({
-    body: fakeElement('body'),
+    body: fakeElement('body', { connected: true }),
     activeElement: null,
     createElement: (/** @type {string} */ tag) => fakeElement(tag),
     ...documentEvents(),
@@ -815,10 +815,10 @@ test('pointer gestures never start a chip drag', async () => {
 test('a strip whose first render throws binds nothing to the mount', async () => {
   const store = await createChainDocumentStore({
     document: structuredClone(BASE.document), catalog: CATALOG });
-  const container = fakeElement('section');
+  const container = fakeElement('section', { connected: true });
   let failing = true;
   const doc = installDocument({
-    body: fakeElement('body'),
+    body: fakeElement('body', { connected: true }),
     activeElement: null,
     createElement: (/** @type {string} */ tag) => {
       if (failing && tag === 'button') throw new Error('render failed');
