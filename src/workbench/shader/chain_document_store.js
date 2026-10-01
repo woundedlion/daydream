@@ -729,14 +729,14 @@ export async function createChainDocumentStore({
     /** Ends a control's coalesced value run so its next gesture opens a new entry. */
     endValueRun: () => { coalesceKey = null; },
 
-    /** @returns {boolean} Whether a structural edit can be undone. */
+    /** @returns {boolean} Whether an edit or coalesced value run can be undone. */
     canUndo: () => undoStack.length > 0,
 
     /** @returns {boolean} Whether an undone edit can be reapplied. */
     canRedo: () => redoStack.length > 0,
 
     /**
-     * Reverts the last structural edit whole, reconciliation included.
+     * Reverts the last edit or coalesced value run, reconciliation included.
      * Selection and bypass are session state, not history: they are pruned
      * against the restored chain, never restored.
      * @returns {boolean} Whether an edit was undone.
