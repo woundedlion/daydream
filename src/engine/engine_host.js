@@ -60,16 +60,14 @@ export class EngineHost {
   }
 
   /**
-   * Identity of the effect the engine currently has loaded, bumped on every
-   * setEffect. A parameter-definition snapshot and a value-stream read reporting
+   * Identity of the effect and parameter schema, bumped on every effect
+   * replacement or descriptor-schema change. A parameter-definition snapshot and a value-stream read reporting
    * the same generation describe the same effect.
    * @returns {number|undefined} The engine's generation counter; undefined
-   *   before the WASM load, after dispose(), or when the loaded module does not
-   *   expose one, which pins every read to the same value and leaves the length
-   *   guard as the only pairing check.
+   *   before the WASM load or after dispose().
    */
   paramGeneration() {
-    return this.engine?.getParamGeneration?.();
+    return this.engine?.getParamGeneration();
   }
 
   /** Drop the cached view so the next refresh() re-fetches it (used after a resize). */
