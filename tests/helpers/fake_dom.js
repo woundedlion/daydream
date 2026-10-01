@@ -405,6 +405,17 @@ export function fakeElement(tag = 'div', options = {}) {
     get children() {
       return this.childNodes.filter((node) => node && typeof node === 'object');
     },
+    get firstChild() { return this.childNodes[0] ?? null; },
+    get lastChild() { return this.childNodes.at(-1) ?? null; },
+    get nextSibling() {
+      const siblings = this.parentNode?.childNodes;
+      return siblings?.[siblings.indexOf(this) + 1] ?? null;
+    },
+    get previousSibling() {
+      const siblings = this.parentNode?.childNodes;
+      return siblings?.[siblings.indexOf(this) - 1] ?? null;
+    },
+    get parentElement() { return this.parentNode?.tagName ? this.parentNode : null; },
     get firstElementChild() {
       return this.children[0] || null;
     },
@@ -450,6 +461,7 @@ export function fakeElement(tag = 'div', options = {}) {
       if (reference === null || reference === undefined) return this.appendChild(node);
       const at = this.childNodes.indexOf(reference);
       if (at < 0) throw new Error('insertBefore: the reference node is not a child');
+      if (node === reference) return node;
       detach([node]);
       reparent([node], this);
       this.childNodes.splice(this.childNodes.indexOf(reference), 0, node);
