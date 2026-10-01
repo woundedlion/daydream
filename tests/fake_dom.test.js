@@ -13,6 +13,23 @@ import {
 
 restoreDocumentAfterEach();
 
+test('platform non-bubbling events still reach capturing ancestors', () => {
+  const parent = fakeElement('div');
+  const child = fakeElement('button');
+  parent.appendChild(child);
+  for (const type of ['focus', 'blur', 'mouseenter', 'mouseleave', 'pointerenter', 'pointerleave', 'load', 'scroll']) {
+    const seen = [];
+    parent.addEventListener(type, () => seen.push('capture'), true);
+    child.addEventListener(type, () => seen.push('target'));
+    parent.addEventListener(type, () => seen.push('bubble'));
+    child.dispatch(type);
+    assert.deepEqual(seen, ['capture', 'target'], type);
+    seen.length = 0;
+    child.dispatch(type, { bubbles: true });
+    assert.deepEqual(seen, ['capture', 'target', 'bubble'], type);
+  }
+});
+
 test('connected element events reach document capture and bubble listeners', () => {
   const doc = installDocument(documentEvents());
   const element = fakeElement('button', { connected: true });
