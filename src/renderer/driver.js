@@ -392,6 +392,7 @@ export class Daydream {
     this.onCanvasKeyDown = (e) => {
       if (e.altKey || e.ctrlKey || e.metaKey) return;
       if (!this.canvas.classList.contains("keyboard-focus")) return;
+      if (this.paused && e.key === "ArrowRight" && !e.shiftKey) return;
 
       let dTheta = 0;
       let dPhi = 0;
