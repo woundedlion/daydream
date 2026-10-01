@@ -13,8 +13,8 @@ import { engineRoot, engineMissing, engineSkip } from './helpers/engine_checkout
 // The engine is a separate repository. The JS unit suite checks it out and sets
 // HOLOSPHERE_ENGINE_REQUIRED, under which a missing tree fails instead of
 // skipping; only a local run without a checkout skips. That every case here can
-// skip is why the workflow's own declaration of the flag is pinned from
-// tests/wasm_provenance.test.js, which never skips.
+// skip is why the workflow's own declaration of the flag is pinned by a case
+// in tests/wasm_provenance.test.js that never skips.
 import * as paletteEnums from './helpers/fake_palette.js';
 import { test } from 'node:test';
 import { execFileSync } from 'node:child_process';
