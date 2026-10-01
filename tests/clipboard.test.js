@@ -214,28 +214,18 @@ test('wireCopyBlock wires the button and block triggers', async () => {
     value: { clipboard: { writeText: async (text) => { writes.push(text); } } },
     configurable: true,
   });
-  const clickable = (tag = 'button') => {
-    const element = fakeElement(tag);
-    const handlers = new Map();
-    element.addEventListener = (type, listener) => handlers.set(type, listener);
-    element.removeEventListener = (type, listener) => {
-      if (handlers.get(type) === listener) handlers.delete(type);
-    };
-    element.click = () => handlers.get('click')?.();
-    element.keydown = (event) => handlers.get('keydown')?.(event);
-    return element;
-  };
+
   const source = fakeElement('code');
   source.textContent = 'generated output';
-  const button = clickable();
-  const block = clickable('pre');
+  const button = fakeElement('button');
+  const block = fakeElement('pre');
   const prompt = fakeElement('span');
 
   try {
     const detach = wireCopyBlock({ source, button, prompt, block });
-    button.click();
+    button.dispatch('click');
     await Promise.resolve();
-    block.click();
+    block.dispatch('click');
     await Promise.resolve();
 
     assert.equal(block.tabIndex, -1);
@@ -243,15 +233,15 @@ test('wireCopyBlock wires the button and block triggers', async () => {
     assert.equal(block.getAttribute('aria-label'), null);
     let prevented = 0;
     for (const key of ['Enter', ' ', 'Tab']) {
-      block.keydown({ key, preventDefault: () => { prevented++; } });
+      if (block.dispatch('keydown', { key }).defaultPrevented) prevented++;
       await Promise.resolve();
     }
     assert.equal(prevented, 0);
     assert.deepEqual(writes, Array(2).fill('generated output'));
     assert.equal(prompt.textContent, 'Copied!');
     detach();
-    button.click();
-    block.click();
+    button.dispatch('click');
+    block.dispatch('click');
     await Promise.resolve();
     assert.equal(writes.length, 2);
   } finally {
