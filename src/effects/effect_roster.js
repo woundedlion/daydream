@@ -3,6 +3,9 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import { SHADER_DOCUMENT_EFFECTS } from '../../generated/shader/composed_effect_roster.mjs';
+export { SHADER_DOCUMENT_EFFECTS };
+
 /**
  * The simulator's roster: the effects each resolution offers, the shader
  * documents the workbench carries, and the display metadata per resolution.
@@ -21,16 +24,6 @@ export function resolutionEffects(presets, resolution) {
   const preset = Object.hasOwn(presets, resolution) ? presets[resolution] : null;
   return preset?.favorites ?? null;
 }
-
-export const SHADER_DOCUMENT_EFFECTS = Object.freeze([
-  'alien-brain', 'kaleidoscope-hex-soft', 'alien-ocean', 'alien-core',
-  'kaleidoscope-mandala', 'grid-space', 'ash-cloud', 'lattice-melt',
-  'chromatic-lichen', 'mermaid-skin',
-  'kaleidoscope-pent-bright', 'kaleidoscope-hex-oil',
-  'kaleidoscope-stained-glass', 'kaleidoscope-smooth',
-  'kaleidoscope-hex-bright', 'kaleidoscope-flowers',
-  'cosmic-eyeball', 'mobius-grid',
-]);
 
 // Every effect the workbench page may hold: the scratch shader, the chain
 // interpreter each dynamically previewed document is programmed onto

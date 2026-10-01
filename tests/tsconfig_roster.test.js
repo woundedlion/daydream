@@ -16,7 +16,10 @@ const ROOT = new URL('../', import.meta.url);
 
 // Engine-installed Emscripten glue and shader compiler are checked upstream.
 // The glue import resolves through its hand-written .d.ts sibling.
-const NOT_CHECKED = new Set(['generated/holosphere_wasm.js', 'generated/shader/shader_workbench.mjs']);
+const NOT_CHECKED = new Set([
+  'generated/holosphere_wasm.js', 'generated/shader/shader_workbench.mjs',
+  'generated/shader/composed_effect_roster.mjs',
+]);
 
 // Never entered: dependency and git metadata, the linked worktrees, the vendored
 // third-party drops, the engine checkout the parity cases read, and tests/,

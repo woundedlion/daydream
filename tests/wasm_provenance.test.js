@@ -160,7 +160,7 @@ test('CI checks source parity after installing the selected runtime', () => {
   assert.match(suite, /HOLOSPHERE_ENGINE_REQUIRED: '1'/);
 });
 
-for (const name of ['shader_workbench.mjs', 'sha256.mjs']) {
+for (const name of ['shader_workbench.mjs', 'sha256.mjs', 'composed_effect_roster.mjs']) {
   test(`shader mirror ${name} matches the pinned engine`, { skip: engineSkip }, () => {
     assert.ok(engineRoot, engineMissing);
     const pin = text('generated/holosphere_wasm.sha').trim();
