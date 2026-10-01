@@ -705,7 +705,20 @@ export function fakeElement(tag = 'div', options = {}) {
   // An <option>'s value falls back to its text, as in the DOM, and `selected`
   // is the flag the owning <select>'s selection views read.
   if (element.tagName === 'OPTION') {
-    element.selected = false;
+    let selected = false;
+    Object.defineProperty(element, 'selected', {
+      enumerable: true, configurable: true,
+      get() { return selected; },
+      set(value) {
+        selected = Boolean(value);
+        const parent = element.parentNode;
+        if (selected && parent?.tagName === 'SELECT' && !parent.multiple) {
+          for (const sibling of parent.children) {
+            if (sibling !== element && sibling.tagName === 'OPTION') sibling.selected = false;
+          }
+        }
+      },
+    });
     let optionValue = null;
     Object.defineProperty(element, 'value', {
       enumerable: true,
