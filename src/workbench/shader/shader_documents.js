@@ -918,6 +918,8 @@ export function createShaderDocumentController({
         selectLoadedSource(null, 'imported.shader.json', 'Imported');
         syncEffectGui();
         invalidate();
+        scheduleDeepLink();
+        await flushDeepLink();
         show('Restored the chain snapshot.');
         return true;
       } catch (error) {
