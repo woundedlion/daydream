@@ -323,8 +323,13 @@ test('setShaderChain applies a chain, registers label.field params and bumps the
 
 test('applied chain definitions and parameter pause behavior match the fake engine', () => {
   const fake = new FakeChainEngine();
+  engine.setAnimationsPaused(true);
+  fake.setAnimationsPaused(true);
   engine.setEffect('ShaderChain');
   fake.setEffect('ShaderChain');
+  assert.equal(engine.getAnimationsPaused(), true);
+  assert.equal(fake.getAnimationsPaused(), true);
+  assert.deepEqual(fake.getParameterDefinitions(), engine.getParameterDefinitions());
   assert.equal(engine.setShaderChain(DEFAULT_CHAIN).code, 'APPLIED');
   assert.equal(fake.setShaderChain(DEFAULT_CHAIN).code, 'APPLIED');
   assert.deepEqual(fake.getParameterDefinitions(), engine.getParameterDefinitions());

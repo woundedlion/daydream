@@ -149,8 +149,17 @@ export class FakeChainEngine {
   setEffect(name) {
     this.effect = name;
     this.definitions = [];
-    this.paused = false;
     this.generation += 1;
+    if (name === 'ShaderChain') {
+      const result = this.setShaderChain([
+        { instance: 'camera', operator: 'sphere.rotate.v2' },
+        { instance: 'project', operator: 'project.stereographic.v2' },
+        { instance: 'sample', operator: 'sample.grid.v2' },
+        { instance: 'colorize', operator: 'colorize.generated-palette.v3' },
+      ]);
+      this.chainCalls.pop();
+      if (result.code !== 'APPLIED') throw new Error('default chain failed');
+    }
     return EffectSetResult.INSTALLED;
   }
 
