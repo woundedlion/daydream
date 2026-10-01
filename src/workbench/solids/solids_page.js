@@ -691,10 +691,7 @@ function saveSolid() {
     vCount, fCount, iCount
   };
 
-  // Report a funcName collision rather than letting it overwrite silently:
-  // generateFuncAndRecipe encodes op params at coarse granularity (pctSuffix
-  // to 0.01, hankin to 1 deg), so two near-identical solids can share a
-  // funcName and the later C++ paste would clobber the earlier definition.
+  // Names identify on-grid chains.
   // The engine registry is the other half: a chain whose name matches an
   // entry solids.h already carries redefines it at paste time.
   const funcName = savedFuncName(item);
