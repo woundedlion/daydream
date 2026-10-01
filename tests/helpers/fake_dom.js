@@ -760,7 +760,7 @@ export function fakeElement(tag = 'div', options = {}) {
 /**
  * The listener surface a document stand-in needs for a module that wires a
  * document-level handler, spread into an installDocument() surface.
- * dispatch(type, event) runs the matching handlers in registration order over
+ * dispatch(type, event) runs capture listeners before bubble listeners over
  * an event whose `target` defaults to the installed document and whose `type`,
  * preventDefault(), stopPropagation() and stopImmediatePropagation() are the
  * event's own and overwrite any the caller passed, as on an element; removing a
@@ -791,25 +791,7 @@ export function documentEvents() {
     },
     /** @param {string} type @param {Object} [event] @returns {Object} The dispatched event. */
     dispatch(type, event = {}) {
-      let stoppedHere = false;
-      // The type and the propagation/default controls belong to the event, so
-      // they overwrite anything the caller supplied rather than the reverse.
-      const dispatched = {
-        target: globalThis.document,
-        ...event,
-        type,
-        defaultPrevented: false,
-        // The document is the root of this fake's path: nothing propagates past
-        // it, so only the immediate form has listeners left to stop.
-        stopPropagation() {},
-        stopImmediatePropagation() { stoppedHere = true; },
-        preventDefault() { dispatched.defaultPrevented = true; },
-      };
-      for (const listener of [...listeners]) {
-        if (stoppedHere) break;
-        if (listener.type === type) listener.handler(dispatched);
-      }
-      return dispatched;
+      return fakeElement().dispatch.call(this, type, { target: globalThis.document, ...event });
     },
   };
 }
