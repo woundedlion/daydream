@@ -111,7 +111,7 @@ jobs:
     env:
       # The engine pair the browser instantiates, staged and then served. Both
       # steps below read this list, so neither can check a different set.
-      ENGINE_ASSETS: generated/holosphere_wasm.wasm generated/holosphere_wasm.js
+      ENGINE_ASSETS: generated/holosphere_wasm.wasm generated/holosphere_wasm.js generated/shader/shader_workbench.mjs generated/shader/sha256.mjs
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -143,7 +143,7 @@ jobs:
           status=0
           for asset in $ENGINE_ASSETS; do
             case "$asset" in
-              *.wasm|*.js) ;;
+              *.wasm|*.js|*.mjs) ;;
               *) echo "::error::$asset has no Content-Type this workflow knows"; status=1 ;;
             esac
             if [ ! -s "_site/$asset" ]; then
@@ -172,7 +172,7 @@ jobs:
           for asset in $ENGINE_ASSETS; do
             mime="$(curl --fail --silent --show-error --location --retry 5 --retry-all-errors --output /dev/null --write-out '%{content_type}' "${PAGE_URL%/}/$asset")"
             case "$asset:$mime" in
-              *.wasm:application/wasm*|*.js:text/javascript*|*.js:application/javascript*) ;;
+              *.wasm:application/wasm*|*.js:text/javascript*|*.js:application/javascript*|*.mjs:text/javascript*|*.mjs:application/javascript*) ;;
               *) echo "::error::$asset has unexpected Content-Type: $mime"; exit 1 ;;
             esac
           done
