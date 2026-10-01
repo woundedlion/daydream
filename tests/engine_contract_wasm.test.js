@@ -508,6 +508,23 @@ test('chain refusal statuses match the fake engine payload contracts', () => {
   assert.equal(fake.getShaderChainBindings(), null);
 });
 
+test('chain snapshots match fake key sets, decode refusals and runtime round trips', () => {
+  const fake = new FakeChainEngine();
+  fake.setEffect('ShaderChain');
+  engine.setEffect('ShaderChain');
+  const saved = chainCall(engine, 'getSnapshot');
+  assert.deepEqual(Object.keys(chainCall(fake, 'getSnapshot')).sort(), Object.keys(saved).sort());
+  const missingPause = structuredClone(saved);
+  delete missingPause.animationsPaused;
+  for (const snapshot of [null, { schemaVersion: 2 }, missingPause,
+    { ...saved, chain: [] }, { ...saved, runtime: null }, { ...saved, paletteBank: {} }])
+    assert.equal(chainCall(fake, 'restoreSnapshot', snapshot).value,
+      chainCall(engine, 'restoreSnapshot', snapshot).value);
+  assert.equal(chainCall(fake, 'restoreSnapshot', saved), ChainSnapshotRestoreResult.APPLIED);
+  assert.deepEqual(chainCall(fake, 'getSnapshot').runtime, saved.runtime);
+  assert.deepEqual(chainCall(fake, 'getSnapshot').paletteBank, saved.paletteBank);
+});
+
 test('chain preset batches restore cross-field values and refuse singular edits without storing them', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)));
   assert.equal(engine.setEffect('ShaderChain'), M.EffectSetResult.INSTALLED);
