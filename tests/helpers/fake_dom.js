@@ -236,7 +236,8 @@ const DISABLED_DEAF_EVENTS = new Set([
 
 /**
  * Whether a node sits this event out because it is a disabled form control.
- * Only that node goes deaf: the event still reaches its ancestors.
+ * Activation events (click, auxclick, dblclick) are not dispatched at all.
+ * Other gated event types skip this node's listeners but still reach ancestors.
  * @param {Object} node - Node the event has reached.
  * @param {string} type - Event type.
  * @returns {boolean} True when the node's own listeners must not run.
@@ -348,10 +349,10 @@ function fakeStyle() {
  * stopPropagation() and stopImmediatePropagation(); the two stop methods are
  * the event's own and overwrite any the caller passed. Focus, blur, enter/leave,
  * load and scroll do not bubble by default; callers can set `bubbles` explicitly.
- * A disabled form control runs none of its own
- * listeners for an activation, pointer, keyboard or value-change event, as in
- * the DOM, while focus-related events, custom events and every ancestor
- * listener are unaffected.
+ * Activation events (click, auxclick, dblclick) on a disabled form control are
+ * not dispatched. Other gated pointer, keyboard and value-change events skip
+ * its own listeners and still reach ancestors. Focus-related and custom events
+ * are unaffected.
  * @param {string} [tag] - Tag name.
  * @param {Object} [options] - Fake-element options.
  * @param {boolean} [options.allowRedundantRemoval] - Let removeEventListener
