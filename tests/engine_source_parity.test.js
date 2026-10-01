@@ -27,7 +27,7 @@ const REPO = fileURLToPath(new URL('..', import.meta.url));
 import { closingDomain, lissajousCodeString } from '../src/workbench/lissajous/lissajous_math.js';
 import * as MB from '../src/workbench/mobius/mobius_transforms.js';
 import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS } from '../src/workbench/solids/solid_codegen.js';
-import { MAX_BUILD_FACES, MAX_BUILD_STEPS, upperSnake, primitiveCount } from '../src/workbench/solids/solid_registry_codegen.js';
+import { MAX_BUILD_FACES, MAX_BUILD_STEPS, upperSnake, primitiveCount, LOWERING } from '../src/workbench/solids/solid_registry_codegen.js';
 
 
 
@@ -518,4 +518,13 @@ test('closingDomain follows the pinned Comets traversal', { skip: engineSkip }, 
     [4.01, 3.132], [62.16, 0.404], [8.75, 2.872]]) {
     assert.equal(closingDomain(m2, domain), engineClosingDomain({ m2, domain }));
   }
+});
+
+
+test('gyro lowering uses the engine snub defaults', { skip: engineSkip }, () => {
+  const path = 'core/mesh/conway.h';
+  const cpp = header(path);
+  const [snub] = LOWERING.gyro('gyro');
+  assert.equal(snub.params.t, engineConstant(cpp, 'SNUB_DEFAULT_T', path));
+  assert.equal(snub.params.twist, engineConstant(cpp, 'SNUB_DEFAULT_TWIST', path));
 });
