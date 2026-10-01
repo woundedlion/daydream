@@ -426,8 +426,8 @@ export class VideoRecorder {
    * Requests a single video frame; call once per simulation frame, from the same
    * task that rendered it — the source is a WebGL canvas without
    * preserveDrawingBuffer, so a blit after compositing reads transparent black.
-   * When an offscreen scaling canvas is in use, blits the source canvas into it
-   * (scaled to the target resolution) before requesting the frame.
+   * Blits the source canvas into the pinned offscreen capture canvas,
+   * letterboxed to its fixed size, before requesting the frame.
    * @returns {void}
    */
   captureFrame() {
