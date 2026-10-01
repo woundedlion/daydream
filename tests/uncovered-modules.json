@@ -45,9 +45,5 @@
   "src/ui/effect_panel_view.js": {
     "reason": "Browser probes exercise focused controller DOM paths.",
     "branches": 81.82
-  },
-  "src/segments/module_warmer.js": {
-    "reason": "Browser module preload fallback paths are partially exercised by unit fixtures.",
-    "branches": 81.82
   }
 }
