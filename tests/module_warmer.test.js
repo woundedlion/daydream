@@ -323,3 +323,40 @@ test('unversioned glue clears a held module and permits an immediate retry', asy
   assert.equal(requested.length, GRAPH.length + 1);
   assert.ok(warmer.module instanceof WebAssembly.Module);
 });
+
+for (const baseUrl of ['not a URL', 'file:///tmp/src/segments/module_warmer.js']) {
+  test(`warm ignores unsupported base URL ${baseUrl}`, async () => {
+    const warmer = new ModuleWarmer();
+    let calls = 0;
+    await warmer.warm({ baseUrl, fetch: () => { calls += 1; } });
+    assert.equal(calls, 0);
+    assert.equal(warmer.module, null);
+  });
+}
+
+test('warm without fetch is a no-op', async () => {
+  const warmer = new ModuleWarmer();
+  await warmer.warm({ fetch: null });
+  assert.equal(warmer.module, null);
+});
+
+test('an HTTP error reports its status and re-arms the warm window', async (t) => {
+  const warmer = new ModuleWarmer();
+  const warnings = [];
+  t.mock.method(console, 'warn', (...args) => warnings.push(args.join(' ')));
+  let calls = 0;
+  const options = {
+    baseUrl: 'https://daydream.test/src/segments/module_warmer.js',
+    now: () => 100,
+    fetch: async () => {
+      calls += 1;
+      return { ok: false, status: 404, arrayBuffer: async () => EMPTY_WASM.buffer };
+    },
+  };
+  await warmer.warm(options);
+  assert.equal(warmer.module, null);
+  assert.ok(warnings.some((warning) => /Module fetch failed: 404/.test(warning)));
+  const firstCalls = calls;
+  await warmer.warm(options);
+  assert.ok(calls > firstCalls);
+});
