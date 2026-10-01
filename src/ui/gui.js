@@ -250,7 +250,7 @@ class DeepLinkGUI {
    * controller continues to display the proposed value.
    * @param {Object} controller - The lil-gui controller to wrap.
    * @param {Function} persistUrl - Callback that persists the control's value to the URL.
-   * @param {boolean} [applyOnLoad=false] - When true (value hydrated from URL), replay the caller's onChange once on first registration so its side effect runs at startup.
+   * @param {boolean} [applyOnLoad=false] - When true (value hydrated from URL), replay each onChange handler once when it registers so its side effect runs at startup.
    * @returns {Object} The same controller, for chaining.
    */
   attachUrlWriter(controller, persistUrl, applyOnLoad = false) {
