@@ -102,11 +102,6 @@
   --carrier-fill: rgb(183 139 255 / 0.1);
 }
 
-[data-carrier="color"] {
-  --carrier: #ffb057;
-  --carrier-fill: rgb(255 176 87 / 0.1);
-}
-
 /* ── Pipeline strip ──────────────────────────────────────────────────────── */
 
 /* Above .gui-container's 2000: the region's opacity confines the palette to
