@@ -573,20 +573,6 @@ export function offeredResolutions(presets, supported) {
 }
 
 /**
- * The effect list a resolution preset offers.
- * @param {Object<string, {favorites?: Array<string>}>} presets - Preset label to
- *   its definition.
- * @param {string} resolution - A preset label.
- * @returns {Array<string>|null} That preset's list, or null when the preset is
- *   unknown or carries none — the caller substitutes a default list rather than
- *   leaving the sidebar and the effect switch with nothing to offer.
- */
-export function resolutionEffects(presets, resolution) {
-  const preset = Object.hasOwn(presets, resolution) ? presets[resolution] : null;
-  return preset?.favorites ?? null;
-}
-
-/**
  * Correct a resolution the engine turned out not to offer. The hydrated value
  * comes from the URL or the seeded default, both chosen before the engine
  * reported which presets it can build.
