@@ -127,14 +127,8 @@ const snapFrequencies = (activeId, rawNewValue) => {
   sliderHandles[activeId].setValue(snappedActiveC);
   sliderHandles[activeId].setReadout(snappedActiveC);
 
-  // Update the Domain slider UI to reflect the new calculated domain. An
-  // extreme ratio can put the closing period past the slider's range, and
-  // then the value the control lands on is the domain in effect.
-  const durationConfig = config.Duration;
-  const shownDomain = sliderHandles.Duration.setValue(newDomain);
-  state.Duration = newDomain < durationConfig.min || newDomain > durationConfig.max
-    ? shownDomain
-    : newDomain;
+  sliderHandles.Duration.setValue(newDomain);
+  state.Duration = newDomain;
   // The thumb can only land on the step grid, which the closing period misses by
   // up to half a step. The readout names the domain in effect — what the preview
   // draws, what the export emits, and what the closure warning judges.
