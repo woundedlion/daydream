@@ -702,6 +702,7 @@ export function createShaderDocumentController({
         show('The shader link runtime snapshot was rejected.', true);
         return abandon(true);
       }
+      showAnimationState();
       syncEffectGui();
       invalidate();
     }
