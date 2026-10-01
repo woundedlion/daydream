@@ -1631,6 +1631,7 @@ test('a cancelled save picker discards buffered chunks without downloading', asy
     rec.download = (recorder, chunks, name) => downloads.push({ chunks, name });
 
     rec.start('cancelled');
+    const sessionChunks = rec.chunks;
     const recorder = rec.mediaRecorder;
     // Chunks arrive before the picker's rejection has settled the open promise.
     recorder.ondataavailable({ data: { size: 10 } });
@@ -1642,6 +1643,7 @@ test('a cancelled save picker discards buffered chunks without downloading', asy
     await sinkFinished();
 
     assert.equal(downloads.length, 0, 'no download after the picker was cancelled');
+    assert.deepEqual(sessionChunks, []);
   } finally {
     captured.restore();
     restore();
