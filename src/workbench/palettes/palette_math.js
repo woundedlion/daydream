@@ -138,15 +138,6 @@ export class ProceduralPalette {
     ];
   }
 
-  /**
-   * One channel of the raw (unclamped, sRGB) cosine sample at t.
-   * @param {number} t - Time parameter in [0, 1].
-   * @param {number} channelIndex - Channel to sample (0=R, 1=G, 2=B).
-   * @returns {number} Unclamped sRGB cosine value for the channel.
-   */
-  getChannelValue(t, channelIndex) {
-    return this.getChannelValues(t)[channelIndex];
-  }
 }
 
 /**
@@ -406,15 +397,6 @@ export class GenerativePalette {
     return this.get(t).map(linearToSrgbFloat);
   }
 
-  /**
-   * One channel of the sRGB sample at a phase.
-   * @param {number} t - Phase in [0, 1].
-   * @param {number} channelIndex - Channel to read (0=R, 1=G, 2=B).
-   * @returns {number} The channel's sRGB value.
-   */
-  getChannelValue(t, channelIndex) {
-    return this.getChannelValues(t)[channelIndex];
-  }
 
   /**
    * The compiler's own account of the nearest LUT entry to a phase, for the
