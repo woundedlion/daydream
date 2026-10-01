@@ -51,7 +51,7 @@
  * @property {PaletteHue} hue - The hue keys and how they are derived.
  * @property {PaletteAxis} lightness - The OKLCH lightness axis.
  * @property {PaletteChromaAxis} chroma - The OKLCH chroma axis.
- * @property {number} hueTorsion - Hue drift applied along the palette.
+ * @property {number} hueTorsion - Hue torsion in radians per unit lightness.
  * @property {number} falloffStart - Where a FALLOFF domain begins to fade.
  */
 
