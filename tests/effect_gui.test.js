@@ -849,7 +849,7 @@ test('a rejected chain snapshot is reported and announces no import', () => {
 
   h.panel.build();
 
-  assert.deepEqual(h.restoredChainSnapshots, [stored], 'the snapshot never reached the engine');
+  assert.deepEqual(h.restoredChainSnapshots, [stored], 'the stored snapshot is offered to the engine exactly once');
   assert.deepEqual(h.warnings,
     ['Shader Workbench: chain snapshot was rejected: INVALID_VALUE']);
   assert.deepEqual(h.configNotices, ['The chain snapshot was rejected. Its original text remains preserved.']);
