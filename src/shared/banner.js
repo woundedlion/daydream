@@ -92,7 +92,6 @@ export function clearFatalError(message) {
 export function showFatalError(message) {
   const el = document.getElementById('fatal-error-overlay') || buildBanner();
   const slot = /** @type {HTMLElement} */ (el.querySelector('.fatal-error-message'));
-  // textContent, not innerHTML — no injection.
   slot.textContent = `⚠ ${message}`;
 }
 
