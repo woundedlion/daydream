@@ -2,6 +2,7 @@ import { fakeTimers, fakeScheduler } from './helpers/fake_timers.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement } from './helpers/fake_dom.js';
+import { pageHandlers } from './helpers/page_handlers.js';
 import { fakeColorAttribute } from './helpers/fake_three.js';
 import { repointDisplayAliases } from '../src/engine/display_aliases.js';
 import {
@@ -989,4 +990,26 @@ test('failure reporting cannot prevent teardown', () => {
   });
   assert.throws(() => handlers.onModuleFailed(new Error('boot failed')), /report failed/);
   assert.equal(disposed, true);
+});
+
+test('a startup module trap reports its remedy and stops the test walk before teardown', async () => {
+  const log = [];
+  const host = new EngineHost();
+  const reportFailure = pageHandlers(new URL('../src/app/daydream.js', import.meta.url))(
+    'reportModuleFailure', {
+      host, doc: {}, win: { location: {} }, MODULE_TRAP_NOTICE: 'module trap remedy',
+      console: { error: () => {} },
+      testAllTicker: { stop: () => log.push('stop') },
+      testAllController: { setValue: (value) => log.push(value), disable: () => log.push('disable') },
+      reportBootFailure: (message) => log.push(message),
+    });
+  const handlers = createModuleLoadHandlers({
+    teardown: () => ({ disposed: () => false, dispose: () => log.push('dispose') }),
+    start: () => { throw new WebAssembly.RuntimeError('unreachable'); },
+    discardStartup: () => assert.fail('startup did not complete'),
+    reportFailure,
+  });
+  await Promise.resolve({}).then(handlers.onModuleReady).catch(handlers.onModuleFailed);
+  assert.deepEqual(log, ['stop', false, 'disable', 'module trap remedy', 'dispose']);
+  assert.equal(host.moduleDead(), true);
 });
