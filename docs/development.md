@@ -60,7 +60,8 @@ supported resolutions are captured compatibility fixtures.
 The frozen WASM backend diagnosis records arithmetic differences at extreme
 endpoint settings separately from the published approximation-oracle budgets.
 Those budgets remain unchanged; their old and new observed metrics match.
-Same-backend extreme endpoint framebuffer parity remains under review.
+Canonical native captures remain byte-identical; WASM evaluation order can change
+framebuffer values at extreme endpoint settings.
 Default legacy preset rendering is checked against the frozen old WASM frames
 within one RGB16 code. Native endpoint archives retain their original framebuffer
 probes and seeds and verify complete typed restoration; native and WASM framebuffer
