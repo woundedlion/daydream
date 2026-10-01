@@ -15,7 +15,7 @@ export default [
   // already linted where it is pushed from.
   {
     ignores: [
-      'generated/holosphere_wasm.js', 'vendor/**', 'three.js/**', 'engine/**',
+      'generated/holosphere_wasm.js', 'generated/shader/*.mjs', 'vendor/**', 'three.js/**', 'engine/**',
       '.worktrees/**', 'engine-bundle/**', '.hs-tmp-*/**', '.claude/**', 'prompts/**',
     ],
   },
