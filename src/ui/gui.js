@@ -64,8 +64,8 @@ const optionValues = (options) => {
  * Builds an independent debounced URL-param writer with its own pending-writes
  * buffer and timer, one per DeepLinkGUI subtree. When the app's single URLSync
  * writer is present, writes funnel through it (so GUI and effect/resolution
- * changes can't clobber each other); the per-instance fallback is reached only
- * on standalone tool pages with no URLSync. Writes accumulate per key and merge
+ * changes can't clobber each other); an instance without URLSync uses its own
+ * fallback writer. Writes accumulate per key and merge
  * in one flush.
  * @param {Window} [win] - The window this writer reads and rewrites; the
  *   ambient one when omitted.
@@ -115,7 +115,7 @@ class DeepLinkGUI {
    *   existing lil-gui instance to wrap (detected by its domElement/addFolder members).
    * @param {string} [rootNamespace] - Prefix segment for every deep-link key in
    *   this root's subtree (e.g. 'fx', 'view'), keeping independent GUI roots out
-   *   of one flat key namespace. Omitted for an unnamespaced (tool-page) root.
+   *   of one flat key namespace. Omitted for an unnamespaced root.
    * @param {DeepLinkGUI} [parent] - Enclosing GUI when this is a sub-folder; a
    *   child shares its root's URL writer instead of owning one.
    * @param {Window} [win] - The window this subtree reads deep links from and
