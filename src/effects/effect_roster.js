@@ -8,7 +8,19 @@
  * documents the workbench carries, and the display metadata per resolution.
  */
 
-import { resolutionEffects } from "./effect_sequencing.js";
+/**
+ * The effect list a resolution preset offers.
+ * @param {Object<string, {favorites?: Array<string>}>} presets - Preset label to
+ *   its definition.
+ * @param {string} resolution - A preset label.
+ * @returns {Array<string>|null} That preset's list, or null when the preset is
+ *   unknown or carries none — the caller substitutes a default list rather than
+ *   leaving the sidebar and the effect switch with nothing to offer.
+ */
+export function resolutionEffects(presets, resolution) {
+  const preset = Object.hasOwn(presets, resolution) ? presets[resolution] : null;
+  return preset?.favorites ?? null;
+}
 
 export const SHADER_DOCUMENT_EFFECTS = Object.freeze([
   'alien-brain', 'kaleidoscope-hex-soft', 'alien-ocean', 'alien-core',

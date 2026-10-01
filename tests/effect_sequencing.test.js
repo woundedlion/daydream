@@ -10,9 +10,9 @@ import {
   restoreEffectControlState,
   offeredResolutions,
   resolutionCorrection,
-  resolutionEffects,
   switchFailureReport,
 } from '../src/effects/effect_sequencing.js';
+import { resolutionEffects } from '../src/effects/effect_roster.js';
 import { EffectSetResult, ResolutionSetResult } from './helpers/fake_engine.js';
 
 function makeEffectControls(values, paused = false, sinks = null) {
