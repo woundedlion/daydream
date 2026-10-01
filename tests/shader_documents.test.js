@@ -554,8 +554,6 @@ function patternFetch(files, migration = MIGRATION) {
     const name = String(url).split('/').pop();
     if (name === 'shaderball_migration.json') return migration;
     if (name === 'engine_catalog.json') return ENGINE_CATALOG;
-    if (name === 'digest_migration.v1v2.json') return readFileSync(
-      new URL('../src/workbench/shader/patterns/digest_migration.v1v2.json', import.meta.url), 'utf8');
     const source = files[name];
     if (source === undefined) throw new Error(`404 ${name}`);
     return source;
