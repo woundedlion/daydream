@@ -5,6 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parse } from 'espree';
 
 const REPO = fileURLToPath(new URL('../..', import.meta.url));
 
@@ -16,17 +17,10 @@ const REPO = fileURLToPath(new URL('../..', import.meta.url));
  * @returns {string[]} Specifiers, in source order.
  */
 export function staticSpecifiers(source) {
-  const specs = [];
-  // Statement-anchored so a specifier-shaped string inside minified code is not
-  // read as an import; the bounded gap spans a multi-line import clause.
-  for (const m of source.matchAll(
-    /^[ \t]*(?:import|export)[ \t][\s\S]{0,400}?from[ \t]*['"]([^'"]+)['"]/gm)) {
-    specs.push(m[1]);
-  }
-  for (const m of source.matchAll(/^[ \t]*import[ \t]*['"]([^'"]+)['"]/gm)) {
-    specs.push(m[1]);
-  }
-  return specs;
+  return parse(source, { ecmaVersion: 'latest', sourceType: 'module' }).body
+    .filter((node) => ['ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration'].includes(node.type)
+      && node.source)
+    .map((node) => node.source.value);
 }
 
 /**
