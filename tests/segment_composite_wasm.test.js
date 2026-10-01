@@ -9,7 +9,7 @@
 // was handed. Neither runs a clip through the rasterizer. Here each segment gets
 // its own WASM instance, as each worker does, driven through the same message
 // sequence: setResolution, setEffect, setClip, then the renders. Workers agree
-// only because they reach the same effect-load count on the same message
+// because every instance seeds from the effect's stable id on the same message
 // sequence, which is what makes the stitch meaningful and is checked below.
 //
 // Run: npm test
@@ -188,8 +188,7 @@ test('a cross-segment stateful effect keeps its full-frame clip and still stitch
 });
 
 test('two engines on the same message sequence reach the same frame', async () => {
-  // The RNG stream is reseeded per effect load, so workers agree only by
-  // reaching the same load count. Nothing else pins that they do.
+  // Every instance seeds from the effect's stable id.
   const twin = await renderWith(CLIPPED_EFFECT, FULL, FRAMES);
   assert.equal(firstDifference(twin.pixels, reference.pixels), -1,
     'a second WASM instance drew a different frame from the same sequence');
