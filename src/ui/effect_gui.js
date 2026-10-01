@@ -790,6 +790,10 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       event.preventDefault();
       event.stopPropagation();
     }, true);
+    controller.domElement.addEventListener('change', (/** @type {Event} */ event) => {
+      event.stopPropagation();
+      controller.updateDisplay();
+    }, true);
     const widget = focusWidget(controller) ?? controller.domElement;
     widget.setAttribute('aria-readonly', 'true');
     widget.setAttribute('readonly', 'readonly');
