@@ -146,6 +146,8 @@ export class VideoRecorder {
     this.onError = null;
     /** @type {((err: Error, filename: string) => void)|null} Save failure for a completed session. */
     this.onSaveError = null;
+    /** @type {((err: Error) => void)|null} Streaming save switched to Downloads. */
+    this.onSaveFallback = null;
     // Host hook fired when an explicit format falls back to the browser's
     // default container. Receives the actual file extension.
     /** @type {((ext: string) => void)|null} */
@@ -629,7 +631,7 @@ export class VideoRecorder {
             this.reportFailure('the Save dialog was cancelled, so nothing was saved.');
           }
         } else {
-          saveFailure('streaming save unavailable; buffering in memory for a Downloads save.', err);
+          this.onSaveFallback?.(new Error('Streaming save unavailable; saving to Downloads instead.', { cause: err }));
         }
       })
       .finally(() => { picked = true; });
@@ -672,7 +674,7 @@ export class VideoRecorder {
             try {
               writable = await handle.createWritable();
             } catch (err) {
-              saveFailure('the selected file could not be opened; buffering in memory for a Downloads save.', err);
+              this.onSaveFallback?.(new Error('The selected file could not be opened; saving to Downloads instead.', { cause: err }));
               handle = null;
               hold(data);
               return;
