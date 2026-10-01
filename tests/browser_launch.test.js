@@ -128,3 +128,51 @@ test('console errors, uncaught exceptions and error responses are problems', () 
     `HTTP 500: ${origin}/tools/shader.html`,
   ]);
 });
+
+for (const prefix of ['/daydream', '/nested/daydream/']) {
+  test(`expected missing assets are scoped to the app base ${prefix}`, () => {
+    const listeners = new Map();
+    const tab = { on: (name, handler) => listeners.set(name, handler) };
+    const problems = [];
+    const origin = 'http://127.0.0.1:8000';
+    const base = new URL(`${origin}${prefix.replace(/\/$/, '')}/`);
+    collectProblems(tab, `${origin}${prefix}`, problems);
+
+    const report = (url) => {
+      listeners.get('requestfailed')({
+        url: () => url,
+        failure: () => ({ errorText: 'net::ERR_ABORTED' }),
+      });
+      listeners.get('console')({
+        type: () => 'error',
+        text: () => `Failed to load ${url}`,
+        location: () => ({ url }),
+      });
+      listeners.get('response')({ status: () => 404, url: () => url });
+    };
+
+    for (const path of ['vendor/fonts/fonts.css', 'favicon.ico']) {
+      report(new URL(path, base).href);
+      report(path);
+    }
+    report(`${origin}/favicon.ico`);
+    assert.deepEqual(problems, []);
+
+    const unexpected = [
+      `${origin}/vendor/fonts/fonts.css`,
+      `${origin}/other/vendor/fonts/fonts.css`,
+      new URL('other/fonts.css', base).href,
+      'https://example.test/daydream/vendor/fonts/fonts.css',
+    ];
+    for (const url of unexpected) report(url);
+    listeners.get('pageerror')(new Error('font fallback threw'));
+    assert.deepEqual(problems, [
+      ...unexpected.flatMap((url) => [
+        `request failed: ${url} (net::ERR_ABORTED)`,
+        `console error: Failed to load ${url}`,
+        `HTTP 404: ${url}`,
+      ]),
+      'uncaught: font fallback threw',
+    ]);
+  });
+}

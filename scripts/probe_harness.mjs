@@ -161,7 +161,7 @@ export async function dragBetween(tab, from, to, options = {}) {
 // Paths the served set answers with a 404 by design: Chrome's implicit icon
 // fetch on a page that declares none, and the gitignored offline font drop the
 // tool pages link behind an onerror fallback to the font CDN.
-const ABSENT_PATHS = [/^\/favicon\.ico$/, /^\/vendor\/fonts\/fonts\.css$/];
+const ABSENT_PATHS = ['favicon.ico', 'vendor/fonts/fonts.css'];
 const ABSENT_ORIGINS = new Set([
   'https://fonts.googleapis.com',
   'https://fonts.gstatic.com',
@@ -173,18 +173,21 @@ const ABSENT_ORIGINS = new Set([
  * exception on every chip render clears every geometric assertion, so the
  * console is as load-bearing as the geometry.
  * @param {import('puppeteer-core').Page} tab - The tab to watch.
- * @param {string} origin - Origin the manifest server listens on.
+ * @param {string} origin - App base URL the manifest server serves under.
  * @param {string[]} problems - Takes one line per problem the page raises.
  * @returns {void}
  */
 export function collectProblems(tab, origin, problems) {
+  const base = new URL(origin.endsWith('/') ? origin : `${origin}/`);
+  const absentPaths = new Set([
+    '/favicon.ico', ...ABSENT_PATHS.map((path) => new URL(path, base).pathname),
+  ]);
   /** @param {string} [href] - Where the problem came from. */
   const absent = (href) => {
     if (href === undefined) return false;
-    const url = new URL(href, origin);
+    const url = new URL(href, base);
     return ABSENT_ORIGINS.has(url.origin) ||
-      (url.origin === new URL(origin).origin
-        && ABSENT_PATHS.some((re) => re.test(url.pathname)));
+      (url.origin === base.origin && absentPaths.has(url.pathname));
   };
   tab.on('console', (message) => {
     if (message.type() !== 'error' || absent(message.location()?.url)) return;
