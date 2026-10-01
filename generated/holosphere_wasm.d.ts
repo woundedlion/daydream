@@ -127,7 +127,26 @@ export interface FullConfigFieldDefinition {
   name: string;
 }
 
+/** Authoring handle invalidated by effect replacement, resizing, or engine deletion. */
+export interface ShaderChainBindings {
+  isValid(): boolean;
+  setShaderChain(entries: Array<{ instance: string; operator: string }>): { status: EnumValue; code: string; entryIndex: number };
+  setShaderChainParameters(entries: Array<{ name: string; value: number }>): EnumValue;
+  getProgram(): Array<{ instance: string; operator: string }> | null;
+  delete(): void;
+}
+
+export interface LegacyShaderBindings {
+  isValid(): boolean;
+  getFullConfigSnapshot(): FullConfigSnapshot | null;
+  restoreFullConfigSnapshot(snapshot: FullConfigSnapshot): EnumValue;
+  getFullConfigFieldDefinitions(): FullConfigFieldDefinition[] | null;
+  delete(): void;
+}
+
 export interface HolosphereEngine {
+  getShaderChainBindings(): ShaderChainBindings | null;
+  getLegacyShaderBindings(): LegacyShaderBindings | null;
   /** RESIZED tears the effect down; ALREADY_ACTIVE is a pure no-op; UNSUPPORTED keeps the old geometry. */
   setResolution(w: number, h: number): EnumValue;
   /** INSTALLED on success; UNKNOWN_EFFECT / UNSUPPORTED_RESOLUTION keep the prior effect. */
@@ -505,6 +524,10 @@ export interface PaletteOps {
 }
 
 export interface HolosphereModule {
+  LegacyShaderBindings: Function;
+  ShaderChainBindings: {
+    getShaderChainCatalog(): string;
+  };
   PaletteCompileCode: PaletteCompileCodeEnum;
   PaletteRecipeField: PaletteRecipeFieldEnum;
   DISPLAY_PROFILE: number;

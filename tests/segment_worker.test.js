@@ -1219,6 +1219,7 @@ test('the worker module graph carries no specifier an import map would resolve',
   // now fetches on every spawn, and one leaving it takes its own gate with it.
   assert.deepEqual(modules, [
     'generated/holosphere_wasm.js',
+    'src/engine/workbench_bindings.js',
     'src/segments/segment_layout.js',
     'src/segments/segment_worker.js',
     'src/segments/worker_protocol.js',

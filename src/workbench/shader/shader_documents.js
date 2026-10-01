@@ -4,6 +4,7 @@
  */
 
 import { engineHalted } from '../../shared/engine_halt.js';
+import { shaderChainCatalog } from '../../engine/workbench_bindings.js';
 import { enumConstantName, optionIndex } from '../../effects/param_sync.js';
 import { fieldOf as fieldSegment } from './chain_presentation.js';
 import { errorDetail } from '../../shared/banner.js';
@@ -814,7 +815,7 @@ export function createShaderDocumentController({
     try {
       compiler = await importCompiler();
       operatorCatalog = JSON.parse(await fetchText(CATALOG_URL));
-      const runningCatalog = JSON.parse(getModule().HolosphereEngine.getShaderChainCatalog());
+      const runningCatalog = JSON.parse(shaderChainCatalog(getModule()));
       if (JSON.stringify(operatorCatalog) !== JSON.stringify(runningCatalog))
         throw new Error('Operator catalog does not match the loaded engine');
       bakedFields = bakedTopologyFields(operatorCatalog);

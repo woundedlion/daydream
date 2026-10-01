@@ -4,6 +4,7 @@
  */
 
 
+import { callWorkbenchBinding } from '../engine/workbench_bindings.js';
 import { GlobalStatsView } from "../ui/global_stats_view.js";
 import { createDisplayCapsBinding } from "../renderer/display_caps.js";
 import createHolosphereModule from "../../generated/holosphere_wasm.js";
@@ -482,9 +483,9 @@ export function start({
     },
     config: {
       inUse: usesFullConfigSnapshot,
-      snapshot: () => host.engine.getFullConfigSnapshot(),
-      fieldDefinitions: () => host.engine.getFullConfigFieldDefinitions(),
-      restore: (snapshot) => host.engine.restoreFullConfigSnapshot(snapshot),
+      snapshot: () => callWorkbenchBinding(host.engine, 'getLegacyShaderBindings', 'getFullConfigSnapshot', []),
+      fieldDefinitions: () => callWorkbenchBinding(host.engine, 'getLegacyShaderBindings', 'getFullConfigFieldDefinitions', []),
+      restore: (snapshot) => callWorkbenchBinding(host.engine, 'getLegacyShaderBindings', 'restoreFullConfigSnapshot', [snapshot], host.module.FullConfigRestoreResult.NOT_SHADER_WORKBENCH),
       restoreResults: () => host.module.FullConfigRestoreResult,
       showImportNotice: (message) => applyNotice.show(message, CONFIG_NOTICE),
     },

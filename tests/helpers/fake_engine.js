@@ -22,6 +22,7 @@ export const ENGINE_METHODS = [
  * that grows one of them is not reported as mocking a method the engine lacks.
  */
 export const ENGINE_OPTIONAL_METHODS = [
+  'getShaderChainBindings', 'getLegacyShaderBindings',
   'getFullConfigSnapshot', 'restoreFullConfigSnapshot',
   'getFullConfigFieldDefinitions',
   'getAnimationsPaused', 'getPresetIds', 'getPoleLod',
@@ -136,6 +137,7 @@ export class FakeChainEngine {
     this.catalog = JSON.parse(CHAIN_CATALOG_TEXT);
     this.effect = null;
     this.generation = 1;
+    this.effectGeneration = 0;
     /** @type {Array<*>} Payloads handed to setShaderChain, in call order. */
     this.chainCalls = [];
     /** @type {Array<[string, number]>} Accepted setParameter writes. */
@@ -147,6 +149,7 @@ export class FakeChainEngine {
   }
 
   setEffect(name) {
+    this.effectGeneration += 1;
     this.effect = name;
     this.definitions = [];
     this.generation += 1;
@@ -207,6 +210,21 @@ export class FakeChainEngine {
     this.definitions = definitions;
     this.generation += 1;
     return { status: ChainStatus.OK, code: 'APPLIED', entryIndex: -1 };
+  }
+
+  getShaderChainBindings() {
+    if (this.effect !== 'ShaderChain') return null;
+    const generation = this.effectGeneration;
+    let released = false;
+    const isValid = () => !released && this.effectGeneration === generation;
+    return {
+      isValid,
+      setShaderChain: (entries) => isValid() ? this.setShaderChain(entries)
+        : { code: 'NOT_CHAIN_EFFECT', status: ChainStatus.NOT_CHAIN_EFFECT, entryIndex: -1 },
+      setShaderChainParameters: (writes) => isValid() ? this.setShaderChainParameters(writes)
+        : ParamSetResult.NO_EFFECT,
+      delete: () => { released = true; },
+    };
   }
 
   getParameterDefinitions() {

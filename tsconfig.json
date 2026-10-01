@@ -25,6 +25,7 @@
     "generated/shader/shader_workbench.d.mts",
     "src/types/file_system_access.d.ts",
     "src/engine/engine_host.js",
+    "src/engine/workbench_bindings.js",
     "src/renderer/frame_constants.js",
     "src/ui/global_stats_view.js",
     "src/effects/param_sync.js",
