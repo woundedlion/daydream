@@ -186,9 +186,10 @@ function fakeDataset(element) {
 }
 
 // A CSS <length>/<percentage>, or a bare zero, which needs no unit.
-const LENGTH = '(?:0|-?\\d+(?:\\.\\d+)?(?:px|em|rem|%|vw|vh))';
+const CSS_NUMBER = '-?(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:[eE][+-]?\\d+)?';
+const LENGTH = `(?:0|${CSS_NUMBER}(?:px|em|rem|%|vw|vh))`;
 // One grid track: a size, a fraction, or a content keyword.
-const TRACK = `(?:auto|min-content|max-content|${LENGTH}|-?\\d+(?:\\.\\d+)?fr)`;
+const TRACK = `(?:auto|min-content|max-content|${LENGTH}|${CSS_NUMBER}fr)`;
 const TRACK_SIZE = `(?:${TRACK}|minmax\\(\\s*${TRACK}\\s*,\\s*${TRACK}\\s*\\))`;
 const TRACKS = `(?:${TRACK_SIZE}(?:\\s+${TRACK_SIZE})*)`;
 // A track list, `repeat()` included. The repetition count is a positive
