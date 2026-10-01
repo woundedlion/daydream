@@ -642,6 +642,7 @@ export class SegmentController {
         if (msg.sharedModule) {
           this.moduleWarmer.discard();
           if (!this.#ready && this.bootAttempt < MAX_BOOT_RETRIES) {
+            console.warn(`[Segmented] seg ${i} shared module rejected (attempt ${this.bootAttempt}/${MAX_BOOT_RETRIES}): ${msg.reason}; rebuilding pool`);
             const next = this.bootAttempt + 1;
             this.destroy();
             this.retryTimer = setTimeout(() => {
