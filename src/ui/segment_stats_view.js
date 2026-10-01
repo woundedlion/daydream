@@ -12,13 +12,7 @@
 import { SLOW_FRAME_MS } from "../renderer/frame_constants.js";
 import { formatKB } from "../shared/kb_format.js";
 
-// Sentinel segIds for pool-wide faults with no single worker to blame:
-// FAULT_POOL for a module-load/init timeout, FAULT_RENDER for any fault raised
-// on the render path: a watchdog stall, a display-buffer geometry mismatch, or a
-// rejected render. The overlay headline distinguishes them, the detail line says
-// which.
-export const FAULT_POOL = -1;
-export const FAULT_RENDER = -2;
+import { FAULT_RENDER } from "../segments/worker_protocol.js";
 
 /**
  * Write a node's text only when it moved: an unchanged textContent write

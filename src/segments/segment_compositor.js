@@ -4,7 +4,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 import { compositeSegment, computeSegmentRange, stampBoundaries } from './segment_layout.js';
-import { FAULT_RENDER } from '../ui/segment_stats_view.js';
+import { FAULT_RENDER } from './worker_protocol.js';
 import { errorDetail } from '../shared/banner.js';
 
 /**
