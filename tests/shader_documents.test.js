@@ -974,7 +974,7 @@ function compiledBuildEngine() {
  * FakeChainEngine, with the workbench mounts present and kaleidoscope_hex_bright loaded over
  * the scratch document the page opens on.
  * @param {{source?: string|null, migration?: string, hash?: string,
- *   paused?: boolean}} [seams] - source null
+ *   paused?: boolean, selectEffect?: () => boolean}} [seams] - source null
  *   leaves the scratch document loaded.
  * @returns {Promise<Object>} The controller and everything it wrote to.
  */
