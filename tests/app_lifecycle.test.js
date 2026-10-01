@@ -787,6 +787,21 @@ test('a key with no element target still reaches the simulation', () => {
     'only a node in the document can own the key');
 });
 
+test('chain chip selection and roaming do not drive global playback', () => {
+  let paused = false;
+  const handler = createGlobalKeydownHandler({ dispatch: () => { paused = !paused; } });
+  const strip = fakeElement('div');
+  strip.className = 'chain-strip-region';
+  const chip = fakeElement('div');
+  chip.className = 'chain-chip';
+  strip.appendChild(chip);
+
+  for (const key of [' ', 'ArrowLeft', 'ArrowRight']) {
+    handler({ key, target: chip });
+    assert.equal(paused, false);
+  }
+});
+
 // The Test All ticker walks the resolution's effect list on a timer. Its index
 // is its own: a rejected switch reverts the effect, so an index re-derived from
 // the live one would retry the rejected slot forever.
