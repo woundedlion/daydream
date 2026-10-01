@@ -233,7 +233,12 @@ export class EffectSidebar {
     this.setRovingTabbable(newBtn);
     if (newBtn !== this.scrolledBtn) {
       this.scrolledBtn = newBtn;
-      newBtn.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
+      const button = newBtn.getBoundingClientRect();
+      const list = this.listEl.getBoundingClientRect();
+      if (button.left < list.left) this.listEl.scrollLeft += button.left - list.left;
+      else if (button.right > list.right) this.listEl.scrollLeft += button.right - list.right;
+      if (button.top < list.top) this.listEl.scrollTop += button.top - list.top;
+      else if (button.bottom > list.bottom) this.listEl.scrollTop += button.bottom - list.bottom;
     }
   }
 
