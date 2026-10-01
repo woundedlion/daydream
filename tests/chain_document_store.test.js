@@ -885,11 +885,22 @@ test('an injected compiler handles store validation', async () => {
         `from '${new URL('../generated/shader/shader_workbench.mjs', import.meta.url).href}'`));
     const isolated = await import(pathToFileURL(path).href);
     let imports = 0;
+    let validations = 0;
     const store = await isolated.createChainDocumentStore({
       document: structuredClone(BASE.document), catalog: CATALOG,
-      importCompiler: async () => { imports++; return compiler; },
+      importCompiler: async () => {
+        imports++;
+        return { ...compiler, validateShaderDocument: (...args) => {
+          validations++;
+          return compiler.validateShaderDocument(...args);
+        } };
+      },
     });
     assert.equal(imports, 1);
+    assert.ok(validations > 0);
+    const constructionValidations = validations;
+    assert.equal(store.replaceSpan(1, 0, [{ operator: 'sphere.lens.mobius.v2' }]).ok, true);
+    assert.ok(validations > constructionValidations);
     assertGreen(store);
   } finally {
     rmSync(directory, { recursive: true, force: true });
