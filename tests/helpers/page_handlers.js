@@ -11,13 +11,13 @@ export function pageHandlers(url) {
   const source = readFileSync(url, 'utf8');
   const parsed = parse(source, { ecmaVersion: 'latest', sourceType: 'module', range: true });
   return (name, context) => {
-    let declaration;
+    const matches = [];
     const visit = (node) => {
       if (!node || typeof node !== 'object') return;
-      if (node.type === 'FunctionDeclaration' && node.id?.name === name) declaration = node;
+      if (node.type === 'FunctionDeclaration' && node.id?.name === name) matches.push(node);
       if (node.type === 'VariableDeclarator' && node.id?.name === name
           && ['ArrowFunctionExpression', 'FunctionExpression'].includes(node.init?.type)) {
-        declaration = node.init;
+        matches.push(node.init);
       }
       for (const value of Object.values(node)) {
         if (Array.isArray(value)) value.forEach(visit);
@@ -25,7 +25,9 @@ export function pageHandlers(url) {
       }
     };
     visit(parsed);
-    assert.ok(declaration, `missing handler ${name}`);
+    assert.ok(matches.length, `missing handler ${name}`);
+    assert.equal(matches.length, 1, `ambiguous handler ${name}`);
+    const [declaration] = matches;
     return runInNewContext(`"use strict"; (${source.slice(...declaration.range)})`, context);
   };
 }
