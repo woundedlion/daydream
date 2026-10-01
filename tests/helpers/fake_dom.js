@@ -20,6 +20,8 @@ import { afterEach } from 'node:test';
 // connected only if it is in here, so isConnected derives from the parent chain
 // and a fresh element reads disconnected as in the DOM.
 const rooted = new WeakSet();
+const NON_BUBBLING = new Set(['focus', 'blur', 'mouseenter', 'mouseleave',
+  'pointerenter', 'pointerleave', 'load', 'scroll']);
 
 // The ownerDocument every fake element carries, as every element in a browser
 // does: enough of a document for a module that builds a node of its own.
@@ -344,8 +346,9 @@ function fakeStyle() {
  * non-capture listeners back up to the root. The event carries `target` (the
  * dispatching node unless the caller names one), `currentTarget`,
  * stopPropagation() and stopImmediatePropagation(); the two stop methods are
- * the event's own and overwrite any the caller passed. Events bubble unless the
- * caller passes {bubbles: false}. A disabled form control runs none of its own
+ * the event's own and overwrite any the caller passed. Focus, blur, enter/leave,
+ * load and scroll do not bubble by default; callers can set `bubbles` explicitly.
+ * A disabled form control runs none of its own
  * listeners for an activation, pointer, keyboard or value-change event, as in
  * the DOM, while focus-related events, custom events and every ancestor
  * listener are unaffected.
@@ -541,7 +544,7 @@ export function fakeElement(tag = 'div', options = {}) {
       // they overwrite anything the caller supplied rather than the reverse.
       const dispatched = {
         target: this,
-        bubbles: true,
+        bubbles: !NON_BUBBLING.has(type),
         ...event,
         type,
         currentTarget: null,
