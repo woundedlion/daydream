@@ -18,7 +18,7 @@ export const runtimePath = (path) => RUNTIME_PATHS.has(path)
 const REQUIRED_PATHS = new Set(['README.md', 'generated/holosphere_wasm.js', 'generated/holosphere_wasm.wasm',
   'generated/holosphere_wasm.sha', 'generated/holosphere_wasm.wasm.sha256', 'generated/holosphere_wasm.toolchain',
   'generated/pov_segment_map.json', 'generated/shader/shader_workbench.mjs', 'generated/shader/sha256.mjs',
-  'generated/shader/engine_catalog.json']);
+  'generated/shader/engine_catalog.json', 'generated/shader/patterns/shaderball_migration.json']);
 
 export const ownedPath = runtimePath;
 
