@@ -236,10 +236,10 @@ test('rollback restores an unflushed control value to runtime sinks and URL', ()
  * black canvas), so the value is rejected against the option list. Because the
  * value was rejected, the bound default is left in place and the applyOnLoad
  * replay does NOT fire — replaying would push the default back through onChange,
- * spuriously re-persisting it to the URL.
+ * while the URL writer canonicalizes the rejected token to the default.
  */
 test('DeepLinkGUI.add ignores an out-of-list URL value for a dropdown', () => {
-  installWindowAt('?resolution=GARBAGE');
+  const url = installRecordingWindow('?resolution=GARBAGE');
   // Rejecting the value rewrites the URL through the 200ms debounce; drive it
   // under mock timers so the pending write can't fire after afterEach drops window.
   mock.timers.enable({ apis: ['setTimeout'] });
@@ -252,6 +252,8 @@ test('DeepLinkGUI.add ignores an out-of-list URL value for a dropdown', () => {
     });
 
     assert.equal(obj.resolution, 'Phantasm (288x144)');
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
+    assert.equal(new URL(url.written(), 'http://x').searchParams.get('resolution'), obj.resolution);
     assert.deepEqual(replayed, []);
     assert.equal(warnings.length, 1, 'the rejection is reported exactly once');
     assert.match(warnings[0], /ignoring out-of-range URL value "GARBAGE" for "resolution"/);
@@ -484,7 +486,7 @@ test('DeepLinkGUI.addSession keeps a session control out of the URL', () => {
  * a malformed deep link never reaches the engine as NaN.
  */
 test('DeepLinkGUI.add rejects a non-numeric URL value for a slider', () => {
-  installWindowAt('?speed=fast');
+  const url = installRecordingWindow('?speed=fast');
   // Rejecting the value strips it from the URL through the 200ms debounce; drive
   // it under mock timers so the pending write can't fire after afterEach drops window.
   mock.timers.enable({ apis: ['setTimeout'] });
@@ -496,6 +498,8 @@ test('DeepLinkGUI.add rejects a non-numeric URL value for a slider', () => {
       gui.add(obj, 'speed', 0, 10).onChange((v) => replayed.push(v));
     });
     assert.equal(obj.speed, 1.0, 'NaN URL value falls back to the bound default');
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
+    assert.equal(new URL(url.written(), 'http://x').searchParams.get('speed'), '1');
     assert.deepEqual(replayed, []);
     assert.equal(warnings.length, 1, 'the rejection is reported exactly once');
     assert.match(warnings[0], /ignoring non-numeric URL value "fast" for "speed"/);
@@ -534,12 +538,14 @@ test('DeepLinkGUI.add maps boolean URL spellings for a checkbox', () => {
         assert.equal(obj.glow, false, `"${falsy}" adopted as false`);
         assert.deepEqual(replayed, [false]);
       }
-      installWindowAt('?glow=maybe');
+      const url = installRecordingWindow('?glow=maybe');
       const gui = new DeepLinkGUI({ autoPlace: false });
       const obj = { glow: false };
       const replayed = [];
       gui.add(obj, 'glow').onChange((v) => replayed.push(v));
       assert.equal(obj.glow, false, 'unrecognized boolean keeps the default');
+      mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
+      assert.equal(new URL(url.written(), 'http://x').searchParams.get('glow'), 'false');
       assert.deepEqual(replayed, []);
     });
     assert.equal(warnings.length, 1, 'only the unrecognized token warns');
