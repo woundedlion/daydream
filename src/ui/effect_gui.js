@@ -510,7 +510,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   }
 
   /**
-   * Write the live parameter values to the clipboard as a C++ brace-init list.
+   * Copy typed parameters as a C++ brace-init list, or the full config as JSON.
    * @param {EffectRecord} fx - The effect record owning the Export button.
    * @param {Array<ParameterDefinition>} params - The engine's parameter definitions.
    * @param {(label: string) => void} flashExport - Shows a transient Export label.
@@ -625,8 +625,8 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
         view.restore(activeEffect, captured);
       },
       /**
-       * Copy the current parameter values to the clipboard as a C++ brace-init
-       * list of float literals, then flash the outcome on the Export button.
+       * Copy typed parameters as a C++ brace-init list, or the full config as
+       * JSON, then flash the outcome on the Export button.
        * @returns {Promise<void>|void} Clipboard completion, or nothing when blocked.
        */
       export() { return exportParams(fx, params, flashExport); }
