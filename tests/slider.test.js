@@ -1,6 +1,4 @@
-//
-// createSlider's validation branches: NaN/order guards on min/max/step/scale,
-// and the scaled-step rounding guard that rejects a step that collapses to 0.
+// Slider validation, value snapping, accessibility and proxy controls.
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';

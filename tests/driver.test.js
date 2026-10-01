@@ -1,10 +1,4 @@
-//
-// driver.js's three.js lifecycle: the DOM-free sizing/LOD helpers, plus the
-// rebuild (setupDots) and teardown (dispose) paths driven over a fake mesh via
-// prototype.call, so no WebGL context is needed. Both paths carry an
-// ordering invariant — instanceColor.array must be nulled before
-// InstancedMesh.dispose(), because that array may alias WASM memory. The
-// context-loss handlers run against the shared fake DOM.
+// Renderer lifecycle, frame capture, playback, controls and GPU state.
 import { detachedView } from './helpers/fake_buffer.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
