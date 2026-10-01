@@ -298,6 +298,25 @@ export function start({
     engineReady: () => Boolean(host.engine),
   });
 
+  const reportModuleFailure = (err) => {
+    console.error('Failed to initialize the Holosphere renderer:', err);
+    // No engine: the Test All ticker would spin uselessly for the page lifetime.
+    testAllTicker.stop();
+    if (testAllController) {
+      testAllController.setValue(false);
+      testAllController.disable();
+    }
+    if (host.moduleDead(err)) {
+      reportBootFailure(MODULE_TRAP_NOTICE, { document: doc, location: win.location });
+      return;
+    }
+    reportBootFailure(err, {
+      document: doc,
+      location: win.location,
+      title: 'Failed to load the rendering engine.',
+    });
+  };
+
   const moduleLoad = createModuleLoadHandlers({
     teardown: () => appTeardown,
     start: (module) => {
@@ -368,20 +387,7 @@ export function start({
       host.dispose();
       daydream.recorder = null;
     },
-    reportFailure: (err) => {
-      console.error('Failed to initialize the Holosphere renderer:', err);
-      // No engine: the Test All ticker would spin uselessly for the page lifetime.
-      testAllTicker.stop();
-      if (testAllController) {
-        testAllController.setValue(false);
-        testAllController.disable();
-      }
-      reportBootFailure(err, {
-        document: doc,
-        location: win.location,
-        title: 'Failed to load the rendering engine.',
-      });
-    },
+    reportFailure: reportModuleFailure,
   });
 
   ///////////////////////////////////////////////////////////////////////////////
