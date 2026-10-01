@@ -19,7 +19,6 @@ import {
 } from './shader_deeplink.js';
 
 const MIGRATION_URL = '../../../generated/shader/patterns/shaderball_migration.json';
-const DIGEST_MIGRATION_URL = './patterns/digest_migration.v1v2.json';
 const CATALOG_URL = '../../../generated/shader/engine_catalog.json';
 const COMPILER_URL = new URL('../../../generated/shader/shader_workbench.mjs', import.meta.url).href;
 
@@ -258,7 +257,6 @@ export function createShaderDocumentController({
   /** @type {Map<string, *>} */
   let sourceCatalog = new Map();
   /** @type {Record<string, string>} */
-  let digestMigration = {};
   /** @type {*|null} */
   let operatorCatalog = null;
   /** @type {Set<string>} The catalog's topology fields, once it has loaded. */
@@ -596,12 +594,8 @@ export function createShaderDocumentController({
     // Every load previews through the interpreter, so a shipped pattern opens
     // as editable as a scratch chain; a digest match only arms the toolbar's
     // parity toggle to the promoted build.
-    const imported = typeof source === 'string' ? JSON.parse(source) : source;
-    const promotedFilename = imported.schema_version === 1
-      ? digestMigration[compiler.v1DescriptorDigest(imported)] : undefined;
     const official = [...sourceCatalog.values()].find((candidate) =>
-      candidate.descriptorDigest === compiled.descriptor_digest
-      || candidate.filename === promotedFilename) ?? null;
+      candidate.descriptorDigest === compiled.descriptor_digest) ?? null;
     // Ahead of the teardown: a refusal here must leave the editor it would
     // have replaced standing.
     try {
@@ -825,7 +819,6 @@ export function createShaderDocumentController({
       if (JSON.stringify(operatorCatalog) !== JSON.stringify(runningCatalog))
         throw new Error('Operator catalog does not match the loaded engine');
       bakedFields = bakedTopologyFields(operatorCatalog);
-      digestMigration = JSON.parse(await fetchText(DIGEST_MIGRATION_URL));
       const migration = JSON.parse(await fetchText(MIGRATION_URL));
       const entries = await Promise.all(Object.entries(migration.source_documents)
         .map(async ([effectId, filename]) => {
