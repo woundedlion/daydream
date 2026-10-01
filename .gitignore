@@ -23,6 +23,7 @@ node_modules/
 /generated/pov_segment_map.json
 /generated/shader/shader_workbench.mjs
 /generated/shader/sha256.mjs
+/generated/shader/composed_effect_roster.mjs
 /generated/shader/patterns/*.shader.json
 /generated/shader/patterns/shaderball_migration.json
 

@@ -23,6 +23,7 @@
   "files": [
     "generated/holosphere_wasm.d.ts",
     "generated/shader/shader_workbench.d.mts",
+    "generated/shader/composed_effect_roster.d.mts",
     "src/types/file_system_access.d.ts",
     "src/engine/engine_host.js",
     "src/engine/workbench_bindings.js",

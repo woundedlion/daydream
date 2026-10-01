@@ -38,6 +38,7 @@ function fixture(t, shape = () => {}) {
     'README.md', 'generated/holosphere_wasm.js', 'generated/holosphere_wasm.wasm', 'generated/holosphere_wasm.wasm.sha256',
     'generated/holosphere_wasm.toolchain', 'generated/pov_segment_map.json', 'generated/shader/shader_workbench.mjs',
     'generated/shader/sha256.mjs', 'generated/shader/engine_catalog.json',
+    'generated/shader/composed_effect_roster.mjs',
     'generated/shader/patterns/shaderball_migration.json', 'generated/shader/patterns/new.shader.json',
   ].map((path) => [path, `fresh ${path}`]));
   files['generated/holosphere_wasm.sha'] = 'b'.repeat(40);
@@ -55,6 +56,8 @@ test('install replaces stale assets and preserves consumer-owned files', (t) => 
   installEngineBundle(bundle, destination);
   assert.equal(readFileSync(join(destination, 'generated/holosphere_wasm.js'), 'utf8'),
     'fresh generated/holosphere_wasm.js');
+  assert.equal(readFileSync(join(destination, 'generated/shader/composed_effect_roster.mjs'), 'utf8'),
+    'fresh generated/shader/composed_effect_roster.mjs');
   assert.equal(existsSync(join(destination, 'generated/shader/patterns/obsolete.shader.json')), false);
   assert.equal(existsSync(join(destination, 'docs/screenshots/nested/obsolete.png')), false);
   for (const path of ['src/workbench/shader/patterns/v1/legacy.shader.json',
@@ -151,6 +154,7 @@ test('install initializes a checkout with no previous engine pin', (t) => {
 
 test('runtime mirrors include engine documents but exclude Daydream sources', () => {
   for (const path of ['README.md', 'docs/screenshots/example.png', 'generated/pov_segment_map.json', 'generated/shader/shader_workbench.mjs',
+    'generated/shader/composed_effect_roster.mjs',
     'generated/shader/sha256.mjs', 'generated/shader/patterns/kaleidoscope_flowers.shader.json',
     'generated/shader/patterns/shaderball_migration.json']) assert.equal(runtimePath(path), true, path);
   for (const path of ['generated/shader/shader_workbench.d.mts', 'generated/holosphere_wasm.d.ts',
@@ -164,4 +168,14 @@ test('a bundle missing shader migration data is refused before installation', (t
   });
   assert.throws(() => installEngineBundle(bundle, destination), /missing generated\/shader\/patterns\/shaderball_migration\.json/);
   assert.equal(readFileSync(join(destination, 'generated/holosphere_wasm.sha'), 'utf8'), 'a'.repeat(40));
+});
+
+test('a bundle missing the composed-effect roster is refused before installation', (t) => {
+  const { bundle, destination } = fixture(t, (files) => {
+    delete files['generated/shader/composed_effect_roster.mjs'];
+  });
+  assert.throws(() => installEngineBundle(bundle, destination),
+    /missing generated\/shader\/composed_effect_roster\.mjs/);
+  assert.equal(readFileSync(join(destination, 'generated/holosphere_wasm.sha'), 'utf8'), 'a'.repeat(40));
+  assert.equal(existsSync(join(destination, 'generated/holosphere_wasm.js')), false);
 });

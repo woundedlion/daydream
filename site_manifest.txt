@@ -113,6 +113,7 @@ src/workbench/solids/solids_page.js
 # local v1 expansion fixtures under src/workbench/shader/patterns/v1/ do not ship.
 generated/shader/sha256.mjs
 generated/shader/shader_workbench.mjs
+generated/shader/composed_effect_roster.mjs
 generated/shader/engine_catalog.json
 generated/shader/patterns/shaderball_migration.json
 src/workbench/shader/patterns/digest_migration.v1v2.json

@@ -7,6 +7,7 @@ export const RUNTIME_PATHS = new Set([
   'generated/holosphere_wasm.js', 'generated/holosphere_wasm.wasm', 'generated/holosphere_wasm.sha',
   'generated/holosphere_wasm.wasm.sha256', 'generated/holosphere_wasm.toolchain', 'generated/shader/engine_catalog.json',
   'generated/pov_segment_map.json', 'generated/shader/shader_workbench.mjs', 'generated/shader/sha256.mjs',
+  'generated/shader/composed_effect_roster.mjs',
   'generated/shader/patterns/shaderball_migration.json', 'README.md',
 ]);
 

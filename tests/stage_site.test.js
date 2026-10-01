@@ -18,7 +18,7 @@ function fixture(t) {
   const site = join(scratch, 'site');
   const write = (base, path, value) => { mkdirSync(dirname(join(base, path)), { recursive: true }); writeFileSync(join(base, path), value); };
   write(root, 'src/app/daydream.js', 'export const app = true;\n');
-  write(root, 'site_manifest.txt', '# source\n\nsrc/app/daydream.js\ngenerated/shader/patterns/old.shader.json\n');
+  write(root, 'site_manifest.txt', '# source\n\nsrc/app/daydream.js\ngenerated/shader/composed_effect_roster.mjs\ngenerated/shader/patterns/old.shader.json\n');
   write(root, 'generated/shader/patterns/old.shader.json', '{}');
   write(root, 'generated/holosphere_wasm.sha', 'a'.repeat(40));
   const git = (...args) => execFileSync('git', ['-C', root, ...args], { env: isolatedGitEnv(), encoding: 'utf8' }).trim();
@@ -32,6 +32,7 @@ function fixture(t) {
   const files = Object.fromEntries(['README.md', 'generated/holosphere_wasm.js', 'generated/holosphere_wasm.wasm',
     'generated/holosphere_wasm.wasm.sha256', 'generated/holosphere_wasm.toolchain', 'generated/pov_segment_map.json',
     'generated/shader/shader_workbench.mjs', 'generated/shader/sha256.mjs', 'generated/shader/engine_catalog.json',
+    'generated/shader/composed_effect_roster.mjs',
     'generated/shader/patterns/shaderball_migration.json',
     'generated/shader/patterns/new.shader.json', 'docs/screenshots/new.png'].map((path) => [path, 'new ' + path]));
   files['generated/holosphere_wasm.sha'] = pair.holosphere;
@@ -52,6 +53,8 @@ test('site staging publishes verified additions, removes stale owned entries and
   assert.equal(existsSync(join(f.site, 'generated/shader/patterns/old.shader.json')), false);
   assert.equal(readFileSync(join(f.site, 'generated/shader/patterns/new.shader.json'), 'utf8'), 'new generated/shader/patterns/new.shader.json');
   assert.equal(readFileSync(join(f.site, 'src/app/daydream.js'), 'utf8'), 'export const app = true;\n');
+  assert.equal(readFileSync(join(f.site, 'generated/shader/composed_effect_roster.mjs'), 'utf8'),
+    'new generated/shader/composed_effect_roster.mjs');
   assert.deepEqual(JSON.parse(readFileSync(join(f.site, 'deployment-pair.json'))), f.pair);
   assert.throws(() => stageSite(f.root, null, f.site, f.pair), /verified engine bundle/);
   for (const key of ['daydream', 'holosphere'])
