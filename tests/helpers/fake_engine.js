@@ -158,7 +158,7 @@ export class FakeChainEngine {
       const result = this.#setShaderChain([
         { instance: 'camera', operator: 'sphere.rotate.v2' },
         { instance: 'project', operator: 'project.stereographic.v2' },
-        { instance: 'sample', operator: 'sample.grid.v2' },
+        { instance: 'sample', operator: 'sample.grid.v3' },
         { instance: 'colorize', operator: 'colorize.generated-palette.v3' },
       ]);
       this.chainCalls.pop();

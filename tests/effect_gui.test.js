@@ -35,7 +35,7 @@ function chainSnapshot(value = 0) {
     schemaVersion: 2,
     chain: [
       {instance: 'project', operator: 'project.stereographic.v2'},
-      {instance: 'sample', operator: 'sample.grid.v2'},
+      {instance: 'sample', operator: 'sample.grid.v3'},
       {instance: 'colorize', operator: 'colorize.generated-palette.v3'},
     ],
     parameters: [{name: 'sample.pattern-freq', value}],
