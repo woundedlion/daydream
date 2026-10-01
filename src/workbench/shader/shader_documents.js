@@ -276,6 +276,7 @@ export function createShaderDocumentController({
   let linkMaxTimer = null;
   let linkPending = false;
   let linkDisposed = false;
+  let preserveRefusedLink = false;
 
   /** @param {string} message @param {boolean} [error] */
   const show = (message, error = false) => {
@@ -493,6 +494,7 @@ export function createShaderDocumentController({
           : `"${parameterId}" was refused: ${diagnostic.message}`);
         return false;
       }
+      preserveRefusedLink = false;
       if (declaresParameter) {
         const dropped = syncParity();
         applyPreset(active.presetId);
@@ -528,6 +530,7 @@ export function createShaderDocumentController({
       catalog: operatorCatalog,
       announce,
       onApply: () => {
+        preserveRefusedLink = false;
         const dropped = syncParity();
         applyPreset(active?.presetId ?? presetSelect.value);
         if (dropped) {
@@ -742,7 +745,7 @@ export function createShaderDocumentController({
   };
 
   const scheduleDeepLink = () => {
-    if (linkDisposed || !active || active.presetId === null) return;
+    if (linkDisposed || preserveRefusedLink || !active || active.presetId === null) return;
     linkGeneration += 1;
     linkPending = true;
     if (linkDebounceTimer !== null) clearTimeout(linkDebounceTimer);
@@ -878,6 +881,12 @@ export function createShaderDocumentController({
       }
       linkError = status.textContent || 'the linked state was refused';
     }
+    if (linkError) {
+      preserveRefusedLink = true;
+      clearLinkTimers();
+      linkPending = false;
+      linkGeneration += 1;
+    }
     const requested = sourceCatalog.get(initialEffect ?? '');
     let loaded;
     if (requested === undefined) loaded = await loadScratch();
@@ -902,6 +911,7 @@ export function createShaderDocumentController({
       return;
     }
     try {
+      preserveRefusedLink = false;
       const option = sourceSelect.selectedOptions[0];
       if (!option?.value) {
         if (await loadScratch()) selectLoadedSource('', SCRATCH_FILENAME, '');
@@ -923,6 +933,7 @@ export function createShaderDocumentController({
     }
   };
   const onPresetChange = () => {
+    preserveRefusedLink = false;
     if (!applyPreset(presetSelect.value)) {
       presetSelect.value = active?.presetId ?? '';
       return;
@@ -941,6 +952,7 @@ export function createShaderDocumentController({
         return;
       }
       if (!allowSourceChange()) return;
+      preserveRefusedLink = false;
       if (await loadSource(await file.text(), file.name)) {
         selectLoadedSource(null, file.name, 'Imported');
       }
@@ -954,6 +966,7 @@ export function createShaderDocumentController({
   const onAnimationToggle = () => {
     const paused = getAnimationsPaused();
     if (paused === null) return;
+    preserveRefusedLink = false;
     setAnimationsPaused(!paused);
     showAnimationState();
     invalidate();
