@@ -44,7 +44,7 @@ import { computeSegmentRange } from '../src/segments/segment_layout.js';
 const GOLDEN_URL = new URL('../generated/pov_segment_map.json', import.meta.url);
 const REGENERATE =
   'regenerate it in the engine checkout (cmake --build --preset tests --target '
-  + 'pov_segment_map_gen) and re-run the WASM install';
+  + 'pov_segment_map_gen && build/tests/tests/pov_segment_map_gen > hardware/pov_segment_map.json) and re-run the WASM install';
 
 const golden = JSON.parse(readFileSync(GOLDEN_URL, 'utf8'));
 
