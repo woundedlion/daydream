@@ -534,7 +534,8 @@ let dragStartPosition = 0.0;
 let dragEndPosition = 0.0;
 let copyFeedbackTimer = null;
 let copyRequestId = 0;
-let lockedDragStartValues = {}; // For locked slider relative movement
+let lockedDragStartValues = {};
+let lockedDragOwner = null;
 
 // Slider handles by param, so a value computed elsewhere (a locked group
 // drag, a zoom) can drive the control it belongs to.
@@ -667,6 +668,7 @@ function mountSlider(def) {
     const isLocked = lockCheckbox ? lockCheckbox.checked : false;
 
     if (isLocked) {
+      lockedDragOwner = def.param;
       lockedDragStartValues = {};
       sliderDefinitions.forEach(groupDef => {
         if (groupDef.group === def.group) {
@@ -683,18 +685,16 @@ function mountSlider(def) {
   slider.addEventListener('keydown', seedLockedDrag);
   slider.addEventListener('wheel', seedLockedDrag, { passive: true });
 
-  slider.addEventListener('mouseup', () => {
-    lockedDragStartValues = {};
-  });
-  slider.addEventListener('touchend', () => {
-    lockedDragStartValues = {};
-  });
-  slider.addEventListener('keyup', () => {
-    lockedDragStartValues = {};
-  });
-  slider.addEventListener('blur', () => {
-    lockedDragStartValues = {};
-  });
+  const releaseLockedDrag = () => {
+    if (lockedDragOwner === def.param) {
+      lockedDragStartValues = {};
+      lockedDragOwner = null;
+    }
+  };
+  slider.addEventListener('mouseup', releaseLockedDrag);
+  slider.addEventListener('touchend', releaseLockedDrag);
+  slider.addEventListener('keyup', releaseLockedDrag);
+  slider.addEventListener('blur', releaseLockedDrag);
 }
 
 /**
