@@ -161,6 +161,9 @@ export function createRecordingControls({
           : `Recording failed to start: ${detail}`);
         showRecording(false);
       };
+      recorder.onSaveFallback = (err) => {
+        showNotice(errorDetail(err));
+      };
       recorder.onSaveError = (err, filename) => {
         showNotice(`Recording save failed for ${filename}: ${errorDetail(err)}`);
       };

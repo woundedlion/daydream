@@ -2039,6 +2039,10 @@ test('createWritable rejection preserves every chunk for Downloads', async () =>
     const rec = new VideoRecorder(recordableCanvas());
     const finished = trackSinkFinish(rec);
     const downloads = [];
+    const notices = [];
+    const errors = [];
+    rec.onSaveFallback = (error) => notices.push(error);
+    rec.onSaveError = (error) => errors.push(error);
     rec.download = (encoder, chunks) => downloads.push([...chunks]);
     rec.start('fallback');
     const encoder = rec.mediaRecorder;
@@ -2050,7 +2054,9 @@ test('createWritable rejection preserves every chunk for Downloads', async () =>
     encoder.onstop();
     await finished();
     assert.deepEqual(downloads, [[first, second]]);
-    assert.match(captured.messages.join('\n'), /could not be opened; buffering in memory/);
+    assert.equal(notices.length, 1);
+    assert.match(notices[0].message, /could not be opened; saving to Downloads instead/);
+    assert.deepEqual(errors, []);
   } finally {
     captured.restore();
     restore();
