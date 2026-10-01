@@ -458,6 +458,9 @@ export function fakeElement(tag = 'div', options = {}) {
       return node;
     },
     insertBefore(node, reference) {
+      if (!node || typeof node !== 'object') {
+        throw new TypeError(`insertBefore: parameter 1 is not of type 'Node' (${typeof node})`);
+      }
       if (reference === null || reference === undefined) return this.appendChild(node);
       const at = this.childNodes.indexOf(reference);
       if (at < 0) throw new Error('insertBefore: the reference node is not a child');
