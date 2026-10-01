@@ -185,6 +185,14 @@ test('sortBy leaves focus on the sort control that drove it', () => {
   document.activeElement = sidebar.nameBtn;
 
   sidebar.nameBtn.onclick();
+  assert.equal(sidebar.sort.dir, 'desc');
+  assert.deepEqual(sidebar.listEl.children.map((button) => button.textContent.replace(/ \(.*\)$/, '')), ['Charlie', 'alpha']);
+  sidebar.nameBtn.onclick();
+  assert.equal(sidebar.sort.dir, 'asc');
+  assert.deepEqual(sidebar.listEl.children.map((button) => button.textContent.replace(/ \(.*\)$/, '')), ['alpha', 'Charlie']);
+  sidebar.sizeBtn.onclick();
+  assert.equal(sidebar.sort.key, 'size');
+  assert.equal(sidebar.sort.dir, 'desc');
 
   assert.equal(document.activeElement, sidebar.nameBtn);
   for (const btn of sidebar.buttons.values()) {
