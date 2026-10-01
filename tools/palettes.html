@@ -9,7 +9,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
-  <title>Procedural Color Palette Generator</title>
+  <title>Palette Workbench</title>
   <!-- Self-hosted fonts for offline dev; same gitignored /vendor/ story, so on
        the deploy this 404s and the onerror falls back to the canonical CDN copy
        of the same families (Inter + JetBrains Mono). -->
@@ -27,7 +27,7 @@
 
   <div class="container palette-shell" data-active-tab="procedural">
     <header class="palette-header">
-      <h1 class="font-bold text-white">Procedural Color Palette Generator</h1>
+      <h1 class="font-bold text-white">Palette Workbench</h1>
       <div id="export_flyout" class="export-flyout">
         <button id="export_toggle" class="export-trigger" type="button"
           aria-expanded="false" aria-controls="export_panel">Export</button>
