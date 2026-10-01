@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createMeshRenderer, meshStatsLine, meshCanvasLabel } from '../src/workbench/solids/solid_render.js';
+import { createMeshRenderer, meshStatsLine, meshCanvasLabel, MAX_INDEX_LABELS } from '../src/workbench/solids/solid_render.js';
 import { fakeElement } from './helpers/fake_dom.js';
 import {
   BufferGeometry,
@@ -275,15 +275,19 @@ test('index labels are built under the limit, carry their index, and are cleared
   assert.equal(labelsContainer.children.length, 0, 'stale labels would float over the new mesh');
 });
 
-test('a mesh at the label ceiling gets no labels at all', () => {
+test('index labels stop exactly at the label ceiling', () => {
   const { renderer, labelsContainer } = setup();
   const big = {
-    vertices: Array.from({ length: 1000 }, (_, i) => new Vector3(i + 1, 0, 0)),
+    vertices: Array.from({ length: MAX_INDEX_LABELS - 1 }, (_, i) => new Vector3(i + 1, 0, 0)),
     faces: [[0, 1, 2]],
   };
+  const below = renderer.render(big, view({ showIndices: true }), null);
+  assert.equal(below.labelsBuilt, true);
+  assert.equal(labelsContainer.children.length, MAX_INDEX_LABELS - 1);
+  big.vertices.push(new Vector3(MAX_INDEX_LABELS, 0, 0));
   const result = renderer.render(big, view({ showIndices: true }), null);
   assert.equal(result.labelsBuilt, false);
-  assert.equal(labelsContainer.children.length, 0, '1000 labels is past the projection budget');
+  assert.equal(labelsContainer.children.length, 0, 'the label ceiling exceeds the projection budget');
 });
 
 test('a renderer built without a labels overlay still renders with indices on', () => {
