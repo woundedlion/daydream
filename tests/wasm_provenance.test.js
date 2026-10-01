@@ -236,7 +236,10 @@ test('registry composite lowering matches expand_to_primitives', { skip: engineS
         if (op === 'truncate') { assert.match(match[2], /step\.param/); return { op, params: { t } }; }
         if (op === 'snub') {
           assert.match(match[2], /MeshOps::SNUB_DEFAULT_T, MeshOps::SNUB_DEFAULT_TWIST/);
-          return { op, params: { t: OP_DEFS.snub.params.t.val, twist: OP_DEFS.snub.params.twist.val } };
+          return { op, params: {
+            t: cppFloatConstant(committed(engineRoot, 'core/mesh/conway.h'), 'SNUB_DEFAULT_T'),
+            twist: cppFloatConstant(committed(engineRoot, 'core/mesh/conway.h'), 'SNUB_DEFAULT_TWIST'),
+          } };
         }
         return op;
       });
