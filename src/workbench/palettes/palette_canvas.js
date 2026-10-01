@@ -190,7 +190,6 @@ export function drawWaveGraph({ canvas, ctx, palette }) {
   // wave and overlay draw below goes through it or the band edges.
   const { yTop, yBottom, toY } = waveGraphBand(height);
 
-  // Background grid and center line
   ctx.fillStyle = '#1E293B';
   ctx.fillRect(0, 0, width, height);
   ctx.strokeStyle = '#475569';
