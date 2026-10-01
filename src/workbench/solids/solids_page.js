@@ -102,6 +102,7 @@ const baseThumbnails = {};
 
 // JS mesh readback for stats, index labels, and internal angles.
 let currentMesh = null;
+let currentMeshIsCurrent = false;
 // Per-face topology class ids for the Colorize Faces toggle, cached from the
 // last recompute. classifyFaces() needs the live WASM mesh, which update()
 // frees, so we compute it once per recompute and reuse it when renderMesh()
@@ -634,7 +635,10 @@ function captureSavedThumbnail() {
 function saveSolid() {
   // Nothing to save until the first successful update() has produced a mesh
   // (clicking save before then would dereference an undefined currentMesh).
-  if (!currentMesh) return;
+  if (!currentMesh || !currentMeshIsCurrent) {
+    showGateMsg("rejected: the current chain has no successful preview to save");
+    return;
+  }
 
   // A base with no ops has no exportable recipe: its generated function
   // would be named after the seed and call itself.
@@ -1268,7 +1272,7 @@ function addOp(opName) {
     showGateMsg(`rejected: a chain carries at most ${MAX_RECIPE_STEPS} ops`);
     return;
   }
-  const newOp = { op: opName, params: seedOpParams(opName, currentMesh) };
+  const newOp = { op: opName, params: seedOpParams(opName, currentMeshIsCurrent ? currentMesh : null) };
   queueCommit(async () => {
     // The grid button is usually grayed before an invalid op can be
     // clicked, but gating is async — validate the exact candidate anyway.
@@ -1339,7 +1343,7 @@ function openOpGate(reason) {
 async function refreshOpGating() {
   const buttons = [...document.querySelectorAll('#addOpGrid [data-op]')];
   const probe = await opGate.refresh(state.base, state.ops,
-    buttons.map((btn) => btn.dataset.op), currentMesh);
+    buttons.map((btn) => btn.dataset.op), currentMeshIsCurrent ? currentMesh : null);
   // A pass landing after the page stood down would re-enable the frozen grid.
   if (!probe || !wasmModule) return;
 
@@ -1423,6 +1427,7 @@ function buildContext(onError = showMeshError) {
 }
 
 function update() {
+  currentMeshIsCurrent = false;
   if (!wasmModule || !meshOpsWasm) return;
 
   const built = buildChainMesh(state.base, state.ops, buildContext());
@@ -1431,6 +1436,7 @@ function update() {
   // Cached alongside the mesh so toggling Colorize redraws from currentMesh
   // without replaying the whole WASM chain.
   currentMesh = built.meshData;
+  currentMeshIsCurrent = true;
   currentFaceClasses = built.faceClasses;
 
   renderMesh();
