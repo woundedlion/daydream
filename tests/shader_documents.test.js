@@ -1475,10 +1475,9 @@ test('preset and stage writes preserve the animation state', async () => {
   await onChange(presets)();
   assert.equal(harness.animationsPaused(), false);
   harness.elements.get('shader-parity-toggle').dispatch('click');
-  assert.equal(harness.animationsPaused(), false);
-  const toggle = harness.elements.get('shader-animation-toggle');
   assert.equal(harness.animationsPaused(), false,
     'preset writes do not leave the chain frozen');
+  const toggle = harness.elements.get('shader-animation-toggle');
   assert.equal(toggle.disabled, false);
   assert.equal(toggle.textContent, 'Pause animation');
 
