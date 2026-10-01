@@ -1,8 +1,8 @@
 # Source-owned GitHub Pages assets, one repo-relative regular file per line.
 # Deployment also publishes the verified engine bundle's pattern documents,
-# README, and every screenshot that README references. Runtime entries below
-# identify optional bundle assets. install-engine-bundle.mjs REQUIRED_PATHS
-# defines the required engine assets.
+# README, and every screenshot that README references. Runtime entries are
+# published only when the verified bundle carries them; install-engine-bundle.mjs
+# REQUIRED_PATHS lists those it must carry.
 # Tests and development scripts are excluded. Third-party libraries load
 # through vendor-importmap.js.
 

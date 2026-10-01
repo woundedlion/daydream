@@ -37,7 +37,8 @@ function fixture(t, shape = () => {}) {
   const files = Object.fromEntries([
     'README.md', 'generated/holosphere_wasm.js', 'generated/holosphere_wasm.wasm', 'generated/holosphere_wasm.wasm.sha256',
     'generated/holosphere_wasm.toolchain', 'generated/pov_segment_map.json', 'generated/shader/shader_workbench.mjs',
-    'generated/shader/sha256.mjs', 'generated/shader/engine_catalog.json', 'generated/shader/patterns/new.shader.json',
+    'generated/shader/sha256.mjs', 'generated/shader/engine_catalog.json',
+    'generated/shader/patterns/shaderball_migration.json', 'generated/shader/patterns/new.shader.json',
   ].map((path) => [path, `fresh ${path}`]));
   files['generated/holosphere_wasm.sha'] = 'b'.repeat(40);
   shape(files);
@@ -155,4 +156,12 @@ test('runtime mirrors include engine documents but exclude Daydream sources', ()
   for (const path of ['generated/shader/shader_workbench.d.mts', 'generated/holosphere_wasm.d.ts',
     'src/workbench/shader/patterns/v1/example.shader.json', 'src/workbench/shader/patterns/digest_migration.v1v2.json',
     'src/workbench/shader/shader_documents.js']) assert.equal(runtimePath(path), false, path);
+});
+
+test('a bundle missing shader migration data is refused before installation', (t) => {
+  const { bundle, destination } = fixture(t, (files) => {
+    delete files['generated/shader/patterns/shaderball_migration.json'];
+  });
+  assert.throws(() => installEngineBundle(bundle, destination), /missing generated\/shader\/patterns\/shaderball_migration\.json/);
+  assert.equal(readFileSync(join(destination, 'generated/holosphere_wasm.sha'), 'utf8'), 'a'.repeat(40));
 });
