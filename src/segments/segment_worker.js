@@ -225,7 +225,9 @@ export function installSegmentWorker() {
    * @returns {void}
    */
   function applyPreset(index, method = 'selectPreset') {
-    if (!engine || engine[method](index)) return;
+    if (!engine) return;
+    if (method === 'synchronizePreset' && engine.getPresetIndex() === index) return;
+    if (engine[method](index)) return;
     if (engine.getPresetIndex() === index) return;
     const detail = `${method}(${index}) rejected: ${engine.getPresetCount()} `
       + `presets, still on ${engine.getPresetIndex()}`;
