@@ -141,10 +141,10 @@ export const FAULT_RENDER = -2;
  * message handler.
  * @typedef {{ type: 'ready' }} ReadyMsg */
 
-/** Worker's engine rejected a resolution or effect — at init or on a later
- * setResolution/setEffect; no usable geometry. Lets the controller fault
- * immediately instead of rendering stale-geometry frames or waiting out the
- * init watchdog. Carries no segId, for the same reason as 'ready'.
+/** Fatal worker refusal: protocol or message validation, module instantiation,
+ * engine setup/configuration, or rendering without a usable effect. Lets the
+ * controller fault immediately instead of rendering stale frames or waiting
+ * out the init watchdog. Carries no segId, for the same reason as 'ready'.
  *
  * `sharedModule` marks the rejection as the controller's own compilation
  * failing to instantiate, so the controller drops it and the next pool compiles
