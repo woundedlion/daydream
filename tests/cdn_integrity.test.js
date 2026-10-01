@@ -19,8 +19,8 @@ test('CDN bytes must match the committed integrity value', async () => {
     attempts++;
     return new Response('', { status: 404 });
   }, async (ms) => { waits.push(ms); }), /HTTP 404/);
-  assert.equal(attempts, 3);
-  assert.deepEqual(waits, [250, 500]);
+  assert.equal(attempts, 4);
+  assert.deepEqual(waits, [5_000, 15_000, 45_000]);
   await assert.rejects(checkCdnIntegrity('document.head.appendChild({textContent: "{}"})'),
     /empty/);
 });
@@ -34,7 +34,7 @@ test('transient requests retry with bounded backoff and mismatches do not retry'
     return new Response(bytes, { status: attempts === 2 ? 503 : 200 });
   }, async (ms) => { waits.push(ms); }), 1);
   assert.equal(attempts, 3);
-  assert.deepEqual(waits, [250, 500]);
+  assert.deepEqual(waits, [5_000, 15_000]);
   attempts = 0;
   await assert.rejects(checkCdnIntegrity(source, async () => {
     attempts++;
