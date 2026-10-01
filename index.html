@@ -15,13 +15,15 @@
 <body>
     <h1 class="visually-hidden">Holosphere POV LED sphere simulator</h1>
     <div id="layout-container" class="layout-container">
-        <nav class="nav-tabs" aria-label="Tools">
-            <span class="nav-label">Tools:</span>
-            <a href="tools/lissajous.html" target="_blank" rel="noopener" class="tab">Lissajous <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
-            <a href="tools/mobius.html" target="_blank" rel="noopener" class="tab">Mobius <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
-            <a href="tools/palettes.html" target="_blank" rel="noopener" class="tab">Palettes <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
-            <a href="tools/shader.html" target="_blank" rel="noopener" class="tab">Shader <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
-            <a href="tools/solids.html" target="_blank" rel="noopener" class="tab">Solids <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
+        <header class="nav-tabs">
+            <nav class="tool-links" aria-label="Tools">
+                <span class="nav-label">Tools:</span>
+                <a href="tools/lissajous.html" target="_blank" rel="noopener" class="tab">Lissajous <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
+                <a href="tools/mobius.html" target="_blank" rel="noopener" class="tab">Mobius <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
+                <a href="tools/palettes.html" target="_blank" rel="noopener" class="tab">Palettes <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
+                <a href="tools/shader.html" target="_blank" rel="noopener" class="tab">Shader <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
+                <a href="tools/solids.html" target="_blank" rel="noopener" class="tab">Solids <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
+            </nav>
             <div id="global-stats-desktop">
                 <table class="global-stats global-stats--desktop">
                     <caption class="visually-hidden">Engine memory and compute</caption>
@@ -45,7 +47,7 @@
                     </tbody>
                 </table>
             </div>
-        </nav>
+        </header>
         <main class="main-area">
             <div id="effect-sidebar" class="effect-sidebar"></div>
             <div id="stats-bar" class="stats-bar">
