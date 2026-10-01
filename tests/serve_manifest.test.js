@@ -49,6 +49,16 @@ const withSite = async (body) => {
   }
 };
 
+test('origin-root asset paths are refused outside the Pages prefix', async () => {
+  const site = await serveManifest(ENTRIES, ROOT);
+  try {
+    assert.equal((await request(new URL(site.origin).origin, '/index.html')).status, 404);
+    assert.equal((await request(site.origin, '/index.html')).status, 200);
+  } finally {
+    await site.close();
+  }
+});
+
 test('serves the manifest set, and the bare root as index.html', () => withSite(async (get) => {
   const root = await get('/');
   assert.equal(root.status, 200);
