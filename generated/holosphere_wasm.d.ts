@@ -513,6 +513,10 @@ export interface PaletteOps {
 
 export interface HolosphereModule {
   ShaderChainBindings: {
+    /**
+     * The engine's operator catalog as one JSON string, byte-identical (plus
+     * the installed trailing newline) to generated/shader/engine_catalog.json.
+     */
     getShaderChainCatalog(): string;
   };
   PaletteCompileCode: PaletteCompileCodeEnum;
@@ -551,10 +555,6 @@ export interface HolosphereModule {
     isLive(): boolean;
     /** Buildable [w, h] rows; the app narrows its resolution presets to these. */
     getSupportedResolutions(): Array<[number, number]>;
-    /**
-     * The engine's operator catalog as one JSON string, byte-identical (plus
-     * the installed trailing newline) to generated/shader/engine_catalog.json.
-     */
   };
   ChainStatus: ChainStatusEnum;
   ClipSetResult: ClipSetResultEnum;
