@@ -59,16 +59,16 @@ test('shader state hashes round-trip the complete authoring state', async () => 
   assert.match(hash, /^#shader=v2\.[A-Za-z0-9_-]+$/);
   assert.deepEqual(JSON.parse(JSON.stringify(await decodeShaderStateHash(hash))), state);
   assert.equal(await decodeShaderStateHash('#unrelated'), null);
-  await assert.rejects(decodeShaderStateHash('#shader=v1.not-gzip'),
+  await assert.rejects(decodeShaderStateHash('#shader=v2.not-gzip'),
     /invalid shader link payload/);
 });
 
-test('v2 shader links retain typed runtime and palette state while v1 authoring links remain readable', async () => {
+test('v2 shader links retain typed runtime and palette state', async () => {
   const state = {
     document: {descriptor: {chain: [{label: 'source'}]}},
     preset: 'night', bypassed: [], paused: true,
     chainSnapshot: {
-      schemaVersion: 1, chain: [{instance: 'source', operator: 'sample.grid.v2'}],
+      schemaVersion: 2, chain: [{instance: 'source', operator: 'sample.grid.v2'}],
       parameters: [{name: 'source.pattern-freq', value: 1}], animationsPaused: true,
       runtime: [{instance: 'source', kind: 'source-clock-v1',
         state: {primary: 1.25, secondary: 0.5, angle: 2}}],
@@ -78,11 +78,7 @@ test('v2 shader links retain typed runtime and palette state while v1 authoring 
   };
   assert.deepEqual(JSON.parse(JSON.stringify(
     await decodeShaderStateHash(await encodeShaderStateHash(state)))), state);
-  const original = {document: state.document, preset: state.preset, bypassed: [], paused: true};
-  const payload = gzipSync(JSON.stringify({d: original.document, p: original.preset,
-    b: original.bypassed, a: original.paused})).toString('base64url');
-  assert.deepEqual(JSON.parse(JSON.stringify(await decodeShaderStateHash(`#shader=v1.${payload}`))), original);
-  await assert.rejects(encodeShaderStateHash({...state, chainSnapshot: {schemaVersion: 2}}),
+  await assert.rejects(encodeShaderStateHash({...state, chainSnapshot: {schemaVersion: 1}}),
     /invalid shader link snapshot/);
 });
 
@@ -105,7 +101,7 @@ test('shader links bound the expanded UTF-8 state including its wrapper', async 
     } else {
       await assert.rejects(encodeShaderStateHash(state), /shader link state is too large/);
       const payload = gzipSync(JSON.stringify(compact)).toString('base64url');
-      await assert.rejects(decodeShaderStateHash(`#shader=v1.${payload}`),
+      await assert.rejects(decodeShaderStateHash(`#shader=v2.${payload}`),
         /shader link state is too large/);
     }
   }
@@ -138,9 +134,9 @@ test('shader state hash replacement preserves the route and query', () => {
     history: { replaceState: (state, title, url) => writes.push(url) },
   };
 
-  assert.equal(replaceShaderStateHash('#shader=v1.payload', win), true);
+  assert.equal(replaceShaderStateHash('#shader=v2.payload', win), true);
   assert.deepEqual(writes, [
-    '/tools/shader.html?effect=KaleidoscopeStainedGlass#shader=v1.payload',
+    '/tools/shader.html?effect=KaleidoscopeStainedGlass#shader=v2.payload',
   ]);
 });
 
@@ -194,10 +190,10 @@ test('labels outside the alias table need no entry', () => {
 // mapping differs from the plain field spelling stay this frozen set. A new
 // label showing up here means an alias entry crept in for a post-spec effect.
 test('the alias table keys stay frozen to the pre-spec promoted labels', () => {
-  const migration = JSON.parse(readFileSync(
-    new URL('../generated/shader/patterns/shaderball_migration.json', import.meta.url), 'utf8'));
+  const patternCatalog = JSON.parse(readFileSync(
+    new URL('../generated/shader/patterns/catalog.json', import.meta.url), 'utf8'));
   const aliased = new Set();
-  for (const filename of Object.values(migration.source_documents)) {
+  for (const filename of Object.values(patternCatalog.source_documents)) {
     const doc = JSON.parse(readFileSync(
       new URL(`../generated/shader/patterns/${filename}`, import.meta.url), 'utf8'));
     for (const preset of doc.preset_bank.presets) {
@@ -376,7 +372,7 @@ const PATTERNS = new URL('../generated/shader/patterns/', import.meta.url);
 /** @param {string} filename */
 const promotedDocument = (filename) =>
   JSON.parse(readFileSync(new URL(filename, PATTERNS), 'utf8'));
-const PROMOTED = promotedDocument('shaderball_migration.json').source_documents;
+const PROMOTED = promotedDocument('catalog.json').source_documents;
 
 // The compiled build hard-codes these values, so it registers no control for
 // them; without the skip the apply refuses on the first one and writes nothing.
@@ -479,7 +475,7 @@ test('every baked-constant exemption is still carried by a promoted document', (
     assert.ok(carried.has(id), `no promoted document carries "${id}"`);
 });
 
-const MIGRATION = JSON.stringify({
+const PATTERN_CATALOG = JSON.stringify({
   source_documents: { KaleidoscopeFlowers: 'kaleidoscope_flowers.shader.json' },
   product_group: { children: [{ effect_id: 'KaleidoscopeFlowers', display_name: 'Kaleidoscope Flowers' }] },
 });
@@ -577,16 +573,16 @@ function workbenchMounts() {
 }
 
 /**
- * A fetchText seam over the pattern directory: the migration table, the
+ * A fetchText seam over the pattern directory: the pattern catalog, the
  * engine catalog, and the given documents by file name.
  * @param {Object<string, string>} files - Document source by file name.
- * @param {string} [migration] - The ShaderBall migration table.
+ * @param {string} [patternCatalog] - The pattern catalog.
  * @returns {(url: string) => Promise<string>} The router.
  */
-function patternFetch(files, migration = MIGRATION) {
+function patternFetch(files, patternCatalog = PATTERN_CATALOG) {
   return async (url) => {
     const name = String(url).split('/').pop();
-    if (name === 'shaderball_migration.json') return migration;
+    if (name === 'catalog.json') return patternCatalog;
     if (name === 'engine_catalog.json') return ENGINE_CATALOG;
     const source = files[name];
     if (source === undefined) throw new Error(`404 ${name}`);
@@ -723,7 +719,7 @@ test('a deep-linked document id opens that document', async () => {
     /Kaleidoscope Flowers · Noon/);
 });
 
-// §4.5: the legacy Shader route names no document, and neither does a
+// §4.5: the scratch route names no document, and neither does a
 // stale id, so both open the scratch chain.
 test('a deep link naming no catalog document opens the scratch chain', async () => {
   for (const initialEffect of ['ShaderChain', 'retired-pattern', null]) {
@@ -968,12 +964,12 @@ const KALEIDOSCOPE_STAINED_GLASS = readFileSync(
   new URL('../generated/shader/patterns/kaleidoscope_stained_glass.shader.json', import.meta.url), 'utf8');
 // No source documents: every load misses the fixed-effect digest catalog and
 // routes onto the chain engine, where the strip mounts.
-const EMPTY_MIGRATION = JSON.stringify({
+const EMPTY_PATTERN_CATALOG = JSON.stringify({
   source_documents: {}, product_group: { children: [] },
 });
 // kaleidoscope_hex_bright as a shipped pattern: loading it digests onto a promoted effect, so
 // the toolbar's parity toggle arms.
-const HEX_MIGRATION = JSON.stringify({
+const HEX_PATTERN_CATALOG = JSON.stringify({
   source_documents: { KaleidoscopeHexBright: 'kaleidoscope_hex_bright.shader.json' },
   product_group: { children: [{ effect_id: 'KaleidoscopeHexBright', display_name: 'Kaleidoscope Hex Bright' }] },
 });
@@ -1007,13 +1003,13 @@ function compiledBuildEngine() {
  * The document controller over the real compiler, the real chain store, and a
  * FakeChainEngine, with the workbench mounts present and kaleidoscope_hex_bright loaded over
  * the scratch document the page opens on.
- * @param {{source?: string|null, migration?: string, hash?: string, search?: string, initialEffect?: string|null,
+ * @param {{source?: string|null, patternCatalog?: string, hash?: string, search?: string, initialEffect?: string|null,
  *   paused?: boolean, selectEffect?: () => boolean}} [seams] - source null
  *   leaves the scratch document loaded.
  * @returns {Promise<Object>} The controller and everything it wrote to.
  */
 async function editorWorkbench({
-  source = KALEIDOSCOPE_HEX_BRIGHT, migration = EMPTY_MIGRATION, hash = '', search = '?effect=ShaderChain', initialEffect = null, paused = false,
+  source = KALEIDOSCOPE_HEX_BRIGHT, patternCatalog = EMPTY_PATTERN_CATALOG, hash = '', search = '?effect=ShaderChain', initialEffect = null, paused = false,
   selectEffect = () => true,
 } = {}) {
   const engine = new FakeChainEngine();
@@ -1082,7 +1078,7 @@ async function editorWorkbench({
     setParamFilter: (filter) => filters.push(filter),
     fetchText: patternFetch(
       { 'kaleidoscope_hex_bright.shader.json': KALEIDOSCOPE_HEX_BRIGHT,
-        'alien_core.shader.json': JSON.stringify(promotedDocument('alien_core.shader.json')) }, migration),
+        'alien_core.shader.json': JSON.stringify(promotedDocument('alien_core.shader.json')) }, patternCatalog),
     importCompiler: () => import('../generated/shader/shader_workbench.mjs'),
     download: (filename, source) => downloads.push([filename, source]),
     win,
@@ -1175,7 +1171,7 @@ test('a refused shader link leaves the source select on the scratch chain', asyn
     document, preset: 'no-such-preset', bypassed: [], paused: false,
   });
   const harness = await editorWorkbench(
-    { source: null, hash, migration: HEX_MIGRATION });
+    { source: null, hash, patternCatalog: HEX_PATTERN_CATALOG });
 
   assert.equal(harness.elements.get('shader-document-select').value, '');
   assert.match(harness.elements.get('shader-document-status').textContent,
@@ -1457,7 +1453,7 @@ test('save as flushes the last slider input before its animation frame', async (
 
 test('a malformed shader state link falls back to an editable scratch chain', async () => {
   const harness = await editorWorkbench({
-    source: null, hash: '#shader=v1.not-gzip',
+    source: null, hash: '#shader=v2.not-gzip',
   });
 
   assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator),
@@ -1526,7 +1522,7 @@ test('Kaleidoscope Stained Glass loads its effect preset into the interpreter co
 });
 
 test('preset and stage writes preserve the animation state', async () => {
-  const harness = await editorWorkbench({ migration: HEX_MIGRATION });
+  const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
   const presets = harness.elements.get('shader-preset-select');
   presets.value = presets.options.at(-1).value;
   await onChange(presets)();
@@ -1554,7 +1550,7 @@ test('preset and stage writes preserve the animation state', async () => {
 // build and disarms the toggle. A bypass is a program-shape override and a dock
 // edit writes a preset value, so neither touches the descriptor digest.
 test('the parity toggle disarms on a descriptor edit, not on a bypass', async () => {
-  const harness = await editorWorkbench({ migration: HEX_MIGRATION });
+  const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
   const toggle = harness.elements.get('shader-parity-toggle');
   assert.equal(toggle.disabled, false, 'the loaded digest matches a promoted effect');
   assert.deepEqual(harness.selections, ['ShaderChain', 'ShaderChain'],
@@ -1572,21 +1568,9 @@ test('the parity toggle disarms on a descriptor edit, not on a bypass', async ()
   assert.equal(toggle.disabled, true);
 });
 
-test('a migrated v1 expansion only arms parity when its promoted digest matches', async () => {
-  const source = readFileSync(new URL(
-    '../src/workbench/shader/patterns/v1/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8');
-  const migration = JSON.parse(HEX_MIGRATION);
-  migration.source_documents['alien-core'] = 'alien_core.shader.json';
-  const harness = await editorWorkbench({ source, migration: JSON.stringify(migration) });
-  assert.equal(harness.elements.get('shader-parity-toggle').disabled, false);
-  const alien = readFileSync(new URL(
-    '../src/workbench/shader/patterns/v1/alien_core.shader.json', import.meta.url), 'utf8');
-  await harness.controller.loadSource(alien, 'alien_core.shader.json');
-  assert.equal(harness.elements.get('shader-parity-toggle').disabled, true);
-});
 
 test('compiled stage edits reach stages bypassed in the interpreter', async () => {
-  const harness = await editorWorkbench({ migration: HEX_MIGRATION });
+  const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
   stripChips(harness).find((chip) => chip.dataset.label === 'warp2')
     .querySelector('.chain-chip-bypass').dispatch('click');
   harness.elements.get('shader-parity-toggle').dispatch('click');
@@ -1596,7 +1580,7 @@ test('compiled stage edits reach stages bypassed in the interpreter', async () =
 });
 
 test('a descriptor edit under the compiled build returns the preview to the interpreter', async () => {
-  const harness = await editorWorkbench({ migration: HEX_MIGRATION });
+  const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
   const status = harness.elements.get('shader-document-status');
   const toggle = harness.elements.get('shader-parity-toggle');
 
@@ -1821,12 +1805,6 @@ test('a chip control edit joins the structural history and coalesces per control
   'undoing the edit re-applies the restored value to the engine');
 });
 
-test('legacy custom Shader URLs preserve their state on the workbench route', () => {
-  assert.equal(
-    shaderWorkbenchUrl('https://example.test/daydream/index.html?effect=ShaderBall&fx.Speed=2#preview', 'ShaderBall'),
-    '/daydream/tools/shader.html?effect=ShaderBall&fx.Speed=2#preview',
-  );
-});
 
 test('the workbench route carries the requested shader document', () => {
   assert.equal(
@@ -1858,7 +1836,7 @@ test('shader links reject malformed compact state before it reaches the store', 
     { ...state, b: ['a', 'b', 'c'] }, { ...state, a: 'yes' },
   ]) {
     const payload = gzipSync(JSON.stringify(invalid)).toString('base64url');
-    await assert.rejects(decodeShaderStateHash(`#shader=v1.${payload}`),
+    await assert.rejects(decodeShaderStateHash(`#shader=v2.${payload}`),
       { message: 'invalid shader link state' });
   }
 });
@@ -1869,7 +1847,7 @@ test('shader links reject duplicate document keys before information is lost', a
     '{"d":{"e\\u0301":1,"\\u00e9":2},"p":"p","b":[],"a":false}',
   ]) {
     const payload = gzipSync(source).toString('base64url');
-    await assert.rejects(decodeShaderStateHash(`#shader=v1.${payload}`),
+    await assert.rejects(decodeShaderStateHash(`#shader=v2.${payload}`),
       (error) => error.cause?.code === 'DUPLICATE_KEY');
   }
 });
@@ -1967,7 +1945,7 @@ test('catalog skew refuses initialization before any chain is applied', async ()
 });
 
 test('source and file switches preserve edits when discard is refused', async () => {
-  const harness = await editorWorkbench({ migration: HEX_MIGRATION });
+  const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
   let confirmations = 0;
   harness.win.confirm = () => { confirmations += 1; return false; };
   stageEditor(harness, 'sample')('sample.pattern-freq', 3.5);
@@ -1994,7 +1972,7 @@ test('source and file switches preserve edits when discard is refused', async ()
 
 
 test('refused replacement restores the previous compiled preset after switching effects', async () => {
-  const harness = await editorWorkbench({ migration: HEX_MIGRATION });
+  const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
   harness.elements.get('shader-parity-toggle').dispatch('click');
   harness.compiledEngine.selected.length = 0;
   assert.equal(await harness.controller.loadSource(
@@ -2008,7 +1986,7 @@ test('refused replacement restores the previous compiled preset after switching 
 
 for (const compiled of [false, true]) {
   test(`an omitted parameter edit declares it and updates parity from ${compiled ? 'compiled' : 'interpreter'} preview`, async () => {
-    const harness = await editorWorkbench({ migration: HEX_MIGRATION });
+    const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
     const toggle = harness.elements.get('shader-parity-toggle');
     const original = savedValues(harness);
     const before = JSON.parse(harness.downloads.at(-1)[1]);
@@ -2038,7 +2016,7 @@ test('restored edits require discard confirmation and save to the catalog filena
   const hash = await encodeShaderStateHash({
     document, preset: document.preset_bank.presets[0].preset_id, bypassed: [], paused: false,
   });
-  const harness = await editorWorkbench({ source: null, hash, migration: HEX_MIGRATION });
+  const harness = await editorWorkbench({ source: null, hash, patternCatalog: HEX_PATTERN_CATALOG });
   let confirmations = 0;
   harness.win.confirm = () => { confirmations += 1; return false; };
   const source = harness.elements.get('shader-document-select');
@@ -2081,71 +2059,9 @@ test('noncatalog shader links have their own source option', async () => {
 });
 
 
-test('legacy imports adopt accepted state and preserve pending edits and original archive in a sidecar', async () => {
-  const fixtures = JSON.parse(readFileSync(new URL('./fixtures/legacy_shader_snapshots.json', import.meta.url)));
-  const original = structuredClone(fixtures[0].presets[9].snapshot);
-  original.requested[0] = original.accepted[0] === 0 ? 1 : 0;
-  original.pendingFieldIds = [0];
-  const text = JSON.stringify(original);
-  const search = `?effect=Shader&fx.__fullConfig=${encodeURIComponent(text)}`;
-  const harness = await editorWorkbench({source: null, search, initialEffect: 'Shader'});
-  const query = new URLSearchParams(harness.win.location.search);
-  assert.equal(query.get('fx.__fullConfig'), text);
-  const sidecar = JSON.parse(query.get('fx.__legacyShader'));
-  assert.deepEqual(sidecar.original, original);
-  assert.deepEqual(sidecar.pendingFieldIds, [0]);
-  const snapshot = JSON.parse(query.get('fx.__chainSnapshot'));
-  assert.equal(snapshot.chain.find((entry) => entry.instance === 'outer').operator, 'warp.polar-chart.v2');
-  assert.equal(harness.controller.preservesOriginalLink(), false);
-  assert.match(harness.elements.get('shader-document-status').textContent, /Pending edits remain preserved/);
-  harness.controller.save();
-  const saved = JSON.parse(harness.downloads.at(-1)[1]);
-  assert.deepEqual(validateShaderDocument(saved, {catalog: JSON.parse(ENGINE_CATALOG)}), []);
-});
 
-test('restoring an imported query snapshot retains its original legacy sidecar', async () => {
-  const fixtures = JSON.parse(readFileSync(new URL('./fixtures/legacy_shader_snapshots.json', import.meta.url)));
-  const original = structuredClone(fixtures[0].presets[9].snapshot);
-  original.requested[0] = original.accepted[0] === 0 ? 1 : 0;
-  original.pendingFieldIds = [0];
-  const initial = await editorWorkbench({source: null, initialEffect: 'Shader',
-    search: `?effect=Shader&fx.__fullConfig=${encodeURIComponent(JSON.stringify(original))}`});
-  const query = new URLSearchParams(initial.win.location.search);
-  const restored = await editorWorkbench({source: null, initialEffect: 'Shader',
-    search: initial.win.location.search});
-  const restoredQuery = new URLSearchParams(restored.win.location.search);
-  assert.equal(restoredQuery.get('fx.__legacyShader'), query.get('fx.__legacyShader'));
-  assert.equal(restoredQuery.get('fx.__fullConfig'), JSON.stringify(original));
-  assert.deepEqual(JSON.parse(restoredQuery.get('fx.__legacyShader')).pendingFieldIds, [0]);
-});
 
-test('a refused legacy archive retains its entire URL through initialization and disposal', async () => {
-  for (const text of ['{broken', JSON.stringify({schemaVersion: 9})]) {
-    const search = `?effect=ShaderBall&fx.__fullConfig=${encodeURIComponent(text)}&fx.FutureField=42`;
-    const harness = await editorWorkbench({source: null, search, initialEffect: 'ShaderBall'});
-    assert.equal(harness.controller.preservesOriginalLink(), true);
-    assert.equal(harness.win.location.search, search);
-    assert.equal(harness.urls.length, 0);
-    assert.match(harness.elements.get('shader-document-status').textContent, /could not be restored/);
-    await harness.controller.dispose();
-    ownedEditors.delete(harness.controller);
-    assert.equal(harness.win.location.search, search);
-  }
-});
 
-test('a failed document replacement keeps a refused legacy link preserved', async () => {
-  const search = '?effect=Shader&fx.__fullConfig=%7Bbroken';
-  const harness = await editorWorkbench({source: null, search, initialEffect: 'Shader'});
-  const input = harness.elements.get('shader-document-file');
-  input.files = [{name: 'broken.shader.json', size: 20, text: async () => '{broken'}];
-  await onChange(input)();
-  assert.equal(harness.controller.preservesOriginalLink(), true);
-  assert.equal(harness.win.location.search, search);
-  assert.equal(harness.urls.length, 0);
-  await harness.controller.dispose();
-  ownedEditors.delete(harness.controller);
-  assert.equal(harness.win.location.search, search);
-});
 
 test('a chain snapshot restores its program and accepted parameters into the editor', async () => {
   const engine = new FakeChainEngine();
@@ -2175,4 +2091,23 @@ test('a linked runtime snapshot that disagrees with its document retains the ori
   await harness.controller.dispose();
   ownedEditors.delete(harness.controller);
   assert.equal(harness.win.location.hash, hash);
+});
+
+
+test('retired shader hash versions are rejected', async () => {
+  for (const version of [0, 1, 3]) {
+    await assert.rejects(decodeShaderStateHash(`#shader=v${version}.payload`),
+      /unsupported shader link version/);
+  }
+});
+
+test('query snapshot import rejects retired archive versions without adopting them', async () => {
+  for (const schemaVersion of [1, 10, 11]) {
+    const search = `?effect=ShaderChain&fx.__chainSnapshot=${encodeURIComponent(JSON.stringify({schemaVersion, accepted: [], requested: []}))}`;
+    const harness = await editorWorkbench({source: null, search});
+    assert.equal(harness.controller.preservesOriginalLink(), true);
+    assert.equal(harness.win.location.search, search);
+    assert.match(harness.elements.get('shader-document-status').textContent,
+      /unsupported chain snapshot/);
+  }
 });

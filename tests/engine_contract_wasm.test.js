@@ -67,15 +67,15 @@ test('typed authoring handles track effect incarnations and reject unsupported e
   chain.delete();
 
   engine.setEffect('ShaderChain');
-  const legacy = engine.getShaderChainBindings();
-  const snapshot = legacy.getSnapshot();
-  assert.equal(legacy.restoreSnapshot(snapshot), M.ChainSnapshotRestoreResult.APPLIED);
+  const bindings = engine.getShaderChainBindings();
+  const snapshot = bindings.getSnapshot();
+  assert.equal(bindings.restoreSnapshot(snapshot), M.ChainSnapshotRestoreResult.APPLIED);
   engine.setResolution(288, 144);
   assert.equal(engine.getShaderChainBindings(), null, 'resizing leaves no effect');
-  assert.equal(legacy.isValid(), false);
-  assert.equal(legacy.getSnapshot(), null);
-  assert.equal(legacy.restoreSnapshot(snapshot), M.ChainSnapshotRestoreResult.NOT_SHADER_CHAIN);
-  legacy.delete();
+  assert.equal(bindings.isValid(), false);
+  assert.equal(bindings.getSnapshot(), null);
+  assert.equal(bindings.restoreSnapshot(snapshot), M.ChainSnapshotRestoreResult.NOT_SHADER_CHAIN);
+  bindings.delete();
   engine.setResolution(W, H);
 });
 
@@ -144,16 +144,16 @@ test('marked-dead modules reject capability acquisition and calls', async () => 
 
 test('snapshot adapters reject getter-driven replacement without touching the new effect', () => {
   engine.setEffect('ShaderChain');
-  const legacy = engine.getShaderChainBindings();
-  const snapshot = legacy.getSnapshot();
+  const bindings = engine.getShaderChainBindings();
+  const snapshot = bindings.getSnapshot();
   Object.defineProperty(snapshot, 'parameters', {
     enumerable: true,
     get() { engine.setEffect('Comets'); return []; },
   });
-  assert.notEqual(legacy.restoreSnapshot(snapshot), M.ChainSnapshotRestoreResult.APPLIED);
-  assert.equal(legacy.isValid(), false);
+  assert.notEqual(bindings.restoreSnapshot(snapshot), M.ChainSnapshotRestoreResult.APPLIED);
+  assert.equal(bindings.isValid(), false);
   assert.equal(engine.getPresetCount() > 0, true);
-  legacy.delete();
+  bindings.delete();
 });
 
 test('adapter decode rejects nested authoring and deletion from getters', async () => {
@@ -821,10 +821,6 @@ test('a rejected parameter write names its reason', () => {
 
 
 
-// A promoted fixed Shader registers no stage selectors, so shader_stages.js reads
-// its stage titles out of a JS mirror of the engine's option labels indexed by
-// the full-config snapshot. ShaderBall registers the same slot storage as enum
-// parameters, so its option lists are the mirror's source of truth.
 
 
 test('live shader rosters assign every parameter and both planar-warp slots', () => {

@@ -121,18 +121,16 @@ export interface ChainSpatialWalkState {
   position: number[];
   direction: number[];
   wander: number[];
-  rawOrientation: number[];
-  legacy: boolean;
 }
 
 export type ChainRuntimeState =
-  | {instance: string; kind: 'spatial-walk-v1'; state: ChainSpatialWalkState}
+  | {instance: string; kind: 'spatial-walk-v2'; state: ChainSpatialWalkState}
   | {instance: string; kind: 'source-clock-v1'; state: {primary: number; secondary: number; angle: number}}
   | {instance: string; kind: 'noise-clock-v1'; state: {phase: number; noiseSeed: number}}
   | {instance: string; kind: 'phase-clock-v1' | 'ripple-clock-v1'; state: {phase: number}}
   | {instance: string; kind: 'affine-clock-v1'; state: {phase: number; rotation: number}}
   | {instance: string; kind: 'color-clock-v1'; state: {oscillationPhase: number; hueNoisePhase: number; hueNoiseSeed: number}}
-  | {instance: string; kind: 'spherical-rings-v1'; state: {walk: ChainSpatialWalkState; phase: number}};
+  | {instance: string; kind: 'spherical-rings-v2'; state: {walk: ChainSpatialWalkState; phase: number}};
 
 export interface ChainSnapshot {
   schemaVersion: number;

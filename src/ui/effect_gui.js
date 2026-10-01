@@ -36,7 +36,6 @@ import {
   latticeMeltStageAssignments,
   kaleidoscopeSmoothStageAssignments,
   fixedShaderStageAssignments,
-  legacyShaderBallParamNames,
   stageControlLabel,
 } from "../effects/shader_stages.js";
 
@@ -77,21 +76,15 @@ function paramWarningTexts(params) {
 
 /**
  * The `gui` method a parameter's control is added through: a session control
- * owns no deep-link key, a migrated one accepts its former keys too, and an
- * unhydrated one owns its key but is never seeded from the URL.
+ * owns no deep-link key, and an unhydrated one owns its key without URL seeding.
  * @param {Gui} gui - The effect GUI to add to.
  * @param {ParameterDefinition} p - The parameter definition.
  * @param {boolean} hydrate - Whether a matching deep link may seed it.
- * @param {Array<string>} legacyNames - Former deep-link property names.
  * @param {boolean} persist - Whether the control owns a deep-link key.
  * @returns {(object: Record<string, any>, property: string, ...rest: Array<*>) => GuiController}
  */
-function paramAddMethod(gui, p, hydrate, legacyNames, persist) {
+function paramAddMethod(gui, p, hydrate, persist) {
   if (p.readonly || !persist) return (...args) => gui.addSession(...args);
-  if (hydrate && legacyNames.length > 0) {
-    return (object, property, ...rest) =>
-      gui.addMigrated(object, property, legacyNames, ...rest);
-  }
   if (!hydrate) return (...args) => gui.addUnhydrated(...args);
   return (...args) => gui.add(...args);
 }
@@ -119,14 +112,13 @@ export function sliderDecimals(min, max) {
  * @param {Record<string, any>} state - The GUI-bound value object.
  * @param {ParameterDefinition} p - The parameter definition.
  * @param {boolean} [hydrate=true] - Whether a matching deep link may seed it.
- * @param {Array<string>} [legacyNames=[]] - Former deep-link property names.
  * @param {boolean} [persist=true] - Whether the control owns a deep-link key.
  * @returns {GuiController} The created controller.
  */
 export function addParamControl(
-  gui, state, p, hydrate = true, legacyNames = [], persist = true) {
+  gui, state, p, hydrate = true, persist = true) {
   const kind = paramControlKind(p);
-  const add = paramAddMethod(gui, p, hydrate, legacyNames, persist);
+  const add = paramAddMethod(gui, p, hydrate, persist);
   let controller;
   if (kind === 'boolean') {
     controller = add(state, p.name);
@@ -255,7 +247,7 @@ function checkedGroup(group, members, required, defaults = /** @type {D} */ ({})
  *   engine's ChainSnapshotRestoreResult enum, which that value is judged against by
  *   identity.
  * @param {(message: string|null) => void} [deps.config.showImportNotice] - Shows
- *   or clears the migration notice.
+ *   or clears the snapshot notice.
  *
  * @param {Object} deps.host - The page the panel mounts into.
  * @param {() => Gui} deps.host.createGui - Makes an empty effect GUI root: a
@@ -883,7 +875,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       const controlGui = stage ? stageFolders.get(stage) : fx.gui;
       const controller = addParamControl(
         controlGui, state, p, !previousParamNames?.has(p.name),
-        legacyShaderBallParamNames(p.name), persistParamKeys);
+        persistParamKeys);
       if (stage) nameStageControl(controller, stage, p.name);
       fx.paramNames.push(p.name);
       fx.controllerByName.set(p.name, controller);

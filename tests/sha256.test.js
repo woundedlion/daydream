@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { sha256Hex } from '../generated/shader/sha256.mjs';
+import { scratchChainDocument } from '../src/workbench/shader/chain_document_store.js';
 import { compileShaderDocument } from '../generated/shader/shader_workbench.mjs';
 
 test('SHA-256 agrees with Node across UTF-8 block and padding boundaries', () => {
@@ -17,25 +18,21 @@ test('SHA-256 agrees with Node across UTF-8 block and padding boundaries', () =>
   }
 });
 
-test('an installed shader document keeps its recorded digests', () => {
-  const source = readFileSync(
-    new URL('../generated/shader/patterns/example.shader.json', import.meta.url),
-    'utf8',
-  );
+test('a current shader document keeps its recorded digests', () => {
   const catalog = JSON.parse(readFileSync(
     new URL('../generated/shader/engine_catalog.json', import.meta.url),
     'utf8',
   ));
-  const compiled = compileShaderDocument(source, { catalog });
+  const compiled = compileShaderDocument(scratchChainDocument(catalog), { catalog });
 
   assert.equal(compiled.status, 'VALID');
   assert.equal(
     compiled.descriptor_digest,
-    '7bfb4ca893490291c3e19f096580ea8faa1d6c9fd5c0a7d7e4648b64d46e467f',
+    'd795b7027a44f89bf080552da74b66d76ccde455d2f9c162e581298854c093c4',
   );
   assert.equal(
     compiled.preset_bank_digest,
-    'a1ca741f5ff587a5f12ef5327e0ce809d446076b8795934e30d590730840e833',
+    'b0f2e130ec19488f0e57b2b3c89839cebf89590c0969a140736c75aca6292091',
   );
   assert.equal(sha256Hex(compiled.descriptor_json), compiled.descriptor_digest);
   assert.equal(

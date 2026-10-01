@@ -462,14 +462,14 @@ test('URLSync reads initial tracked keys from the URL into state', () => {
 test('URLSync defers a tracked identity rewrite until resume', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const calls = installRecordingWindow('?effect=ShaderBall', '/sim');
-    const state = new AppState({ effect: 'ShaderBall' });
+    const calls = installRecordingWindow('?effect=ShaderChain', '/sim');
+    const state = new AppState({ effect: 'ShaderChain' });
     const sync = new URLSync(state, ['effect']);
     sync.suspend();
     state.set('effect', 'Shader');
     mock.timers.tick(1000);
     assert.equal(calls.length, 0);
-    assert.equal(globalThis.window.location.search, '?effect=ShaderBall');
+    assert.equal(globalThis.window.location.search, '?effect=ShaderChain');
 
     sync.resume();
     mock.timers.tick(1000);
@@ -484,8 +484,8 @@ test('URLSync defers a tracked identity rewrite until resume', () => {
 test('URLSync counts nested suspensions and writes on the outermost resume', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const calls = installRecordingWindow('?effect=ShaderBall', '/sim');
-    const state = new AppState({ effect: 'ShaderBall' });
+    const calls = installRecordingWindow('?effect=ShaderChain', '/sim');
+    const state = new AppState({ effect: 'ShaderChain' });
     const sync = new URLSync(state, ['effect']);
     sync.suspend();
     sync.suspend();
@@ -510,8 +510,8 @@ test('URLSync counts nested suspensions and writes on the outermost resume', () 
 test('URLSync ignores a resume with no suspension outstanding', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const calls = installRecordingWindow('?effect=ShaderBall', '/sim');
-    const state = new AppState({ effect: 'ShaderBall' });
+    const calls = installRecordingWindow('?effect=ShaderChain', '/sim');
+    const state = new AppState({ effect: 'ShaderChain' });
     const sync = new URLSync(state, ['effect']);
 
     sync.resume();
@@ -537,7 +537,7 @@ test('URLSync suspend disarms the flush the constructor already armed', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const calls = installRecordingWindow('?effect=bogus', '/sim');
-    const state = new AppState({ effect: 'ShaderBall' });
+    const state = new AppState({ effect: 'ShaderChain' });
     // Rejected by the validator, so the constructor arms a canonicalizing flush.
     const sync = new URLSync(state, ['effect'], { effect: (v) => v === 'Shader' });
     sync.suspend();
@@ -563,7 +563,7 @@ test('URLSync resume keeps a suspended retry at the ladder delay', () => {
   try {
     installRecordingWindow('?effect=bogus', '/sim');
     globalThis.window.history.replaceState = () => { throw new Error('rate limited'); };
-    const state = new AppState({ effect: 'ShaderBall' });
+    const state = new AppState({ effect: 'ShaderChain' });
     const sync = new URLSync(state, ['effect'], { effect: (v) => v === 'Shader' });
     mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
     assert.equal(sync.armedDelayMs, URL_FLUSH_RETRY_MS, 'the refusal armed the ladder');

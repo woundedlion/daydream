@@ -193,29 +193,6 @@ const WARP_SLOT_PARAMETERS = new Set([
 ]);
 
 /**
- * @param {string} name - Canonical engine parameter name.
- * @returns {Array<string>} Former names accepted from saved deep links.
- */
-export function legacyShaderBallParamNames(name) {
-  if (name === 'Camera Wander') return ['Outer Wander'];
-  if (name === 'Palette') return ['Colorizer'];
-  if (name === 'Hue Shift Amount') return ['Hue Noise Amount', 'Hue Shift'];
-  for (const [prefix, legacy] of [
-    ['Planar Warp 1', 'Outer'],
-    ['Planar Warp 2', 'Inner'],
-  ]) {
-    if (name === prefix) return [`${legacy} Warp`];
-    if (!name.startsWith(`${prefix} `)) continue;
-    const suffix = name.slice(prefix.length + 1);
-    if (['Strength', 'Scale', 'Time', 'Envelope'].includes(suffix)) {
-      return [`${legacy} Warp ${suffix}`];
-    }
-    return [`${legacy} ${suffix}`];
-  }
-  return [];
-}
-
-/**
  * @param {string} name - Engine parameter name.
  * @returns {string|undefined} The pipeline stage the shader roster gives it.
  */

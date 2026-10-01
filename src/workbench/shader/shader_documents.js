@@ -9,19 +9,18 @@ import { enumConstantName, optionIndex } from '../../effects/param_sync.js';
 import { fieldOf as fieldSegment } from './chain_presentation.js';
 import { errorDetail } from '../../shared/banner.js';
 import { applyChainDocument } from './chain_apply.js';
-import { createChainDocumentStore, scratchChainDocument } from './chain_document_store.js';
+import { createChainDocumentStore, documentFromChainSnapshot, scratchChainDocument } from './chain_document_store.js';
 import { createChainStrip } from './chain_strip.js';
 import { BAKED_CONSTANT_IDS, bakedTopologyFields, engineControlNames } from '../../../generated/shader/shader_workbench.mjs';
 export { BAKED_CONSTANT_IDS, bakedTopologyFields } from '../../../generated/shader/shader_workbench.mjs';
-import { convertLegacyShaderSnapshot, documentFromChainSnapshot } from '../../effects/legacy_shader_snapshot.js';
-import { CHAIN_SNAPSHOT_STORAGE_KEY, LEGACY_CONFIG_STORAGE_KEY, LEGACY_SIDECAR_STORAGE_KEY } from '../../effects/effect_persistence.js';
+import { CHAIN_SNAPSHOT_STORAGE_KEY } from '../../effects/effect_persistence.js';
 import { copyToClipboard } from '../../shared/copy_text.js';
 import { downloadBlob } from '../../shared/download_file.js';
 import {
   decodeShaderStateHash, encodeShaderStateHash, replaceShaderStateHash,
 } from './shader_deeplink.js';
 
-const MIGRATION_URL = '../../../generated/shader/patterns/shaderball_migration.json';
+const PATTERN_CATALOG_URL = '../../../generated/shader/patterns/catalog.json';
 const CATALOG_URL = '../../../generated/shader/engine_catalog.json';
 const COMPILER_URL = new URL('../../../generated/shader/shader_workbench.mjs', import.meta.url).href;
 
@@ -258,7 +257,6 @@ export function createShaderDocumentController({
   let selectedSource = '';
   /** @type {Map<string, *>} */
   let sourceCatalog = new Map();
-  /** @type {Record<string, string>} */
   /** @type {*|null} */
   let operatorCatalog = null;
   /** @type {Set<string>} The catalog's topology fields, once it has loaded. */
@@ -843,8 +841,8 @@ export function createShaderDocumentController({
       if (JSON.stringify(operatorCatalog) !== JSON.stringify(runningCatalog))
         throw new Error('Operator catalog does not match the loaded engine');
       bakedFields = bakedTopologyFields(operatorCatalog);
-      const migration = JSON.parse(await fetchText(MIGRATION_URL));
-      const entries = await Promise.all(Object.entries(migration.source_documents)
+      const patternCatalog = JSON.parse(await fetchText(PATTERN_CATALOG_URL));
+      const entries = await Promise.all(Object.entries(patternCatalog.source_documents)
         .map(async ([effectId, filename]) => {
           const source = await fetchText(`../../../generated/shader/patterns/${filename}`);
           const compiled = compiler.compileShaderDocument(source,
@@ -866,7 +864,7 @@ export function createShaderDocumentController({
       for (const [effectId] of entries) {
         const option = doc.createElement('option');
         option.value = effectId;
-        option.textContent = migration.product_group.children
+        option.textContent = patternCatalog.product_group.children
           .find((/** @type {*} */ child) => child.effect_id === effectId)?.display_name
           ?? effectId;
         sourceSelect.appendChild(option);
@@ -905,31 +903,22 @@ export function createShaderDocumentController({
     }
     const query = new URLSearchParams(win.location?.search ?? '');
     const chainText = query.get(`fx.${CHAIN_SNAPSHOT_STORAGE_KEY}`);
-    const legacyText = query.get(`fx.${LEGACY_CONFIG_STORAGE_KEY}`);
-    if (!linked && !linkError && (chainText !== null || legacyText !== null)) {
+    if (!linked && !linkError && chainText !== null) {
       try {
-        const original = JSON.parse(chainText ?? legacyText ?? '');
-        const conversion = chainText !== null ? { ok: true, snapshot: original }
-          : convertLegacyShaderSnapshot(original, operatorCatalog);
-        if (!conversion.ok) throw new Error(conversion.reason);
-        const imported = documentFromChainSnapshot(conversion.snapshot, operatorCatalog);
+        const snapshot = JSON.parse(chainText);
+        const imported = documentFromChainSnapshot(snapshot, operatorCatalog);
         const previous = callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'getSnapshot', []);
         if (!await loadSource(imported, 'imported.shader.json'))
           throw new Error(status.textContent || 'the imported chain could not be adopted');
-        const outcome = callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'restoreSnapshot', [conversion.snapshot]);
+        const outcome = callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'restoreSnapshot', [snapshot]);
         if (outcome !== getModule().ChainSnapshotRestoreResult.APPLIED) {
           if (previous) callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'restoreSnapshot', [previous]);
           throw new Error('the imported chain snapshot was rejected');
         }
-        if (legacyText !== null && chainText === null) {
-          query.set(`fx.${LEGACY_SIDECAR_STORAGE_KEY}`, JSON.stringify(conversion.legacy));
-          query.set(`fx.${CHAIN_SNAPSHOT_STORAGE_KEY}`, JSON.stringify(conversion.snapshot));
-          win.history?.replaceState(null, '', `${win.location.pathname}?${query}${win.location.hash ?? ''}`);
-        }
         selectLoadedSource(null, 'imported.shader.json', 'Imported');
         syncEffectGui();
         invalidate();
-        show(conversion.notice ?? 'Restored the chain snapshot.');
+        show('Restored the chain snapshot.');
         return true;
       } catch (error) {
         linkError = errorDetail(error);
@@ -938,10 +927,6 @@ export function createShaderDocumentController({
         linkPending = false;
         linkGeneration += 1;
       }
-    }
-    if (chainText === null && legacyText === null && ['Shader', 'ShaderBall', 'ShaderWorkbench'].includes(initialEffect ?? '')) {
-      preserveRefusedLink = true;
-      linkError = 'the legacy link carries no versioned snapshot; its original URL remains preserved';
     }
     const requested = sourceCatalog.get(initialEffect ?? '');
     let loaded;

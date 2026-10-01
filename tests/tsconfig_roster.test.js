@@ -183,7 +183,6 @@ const ROOT_EXEMPTIONS = {
   'scripts/browser-smoke.mjs': 'Browser automation entry point; browser harness types are not yet declared.',
   'scripts/browser.mjs': 'Browser discovery and launch helpers require typed Puppeteer options.',
   'scripts/check-cdn-integrity.mjs': 'Standalone CDN network diagnostic outside deployment staging.',
-  'scripts/generate-digest-migration.mjs': 'Offline migration generator outside deployment staging.',
   'scripts/generate-importmap.mjs': 'Generated import-map writer validated by output parity tests.',
   'scripts/lissajous-probe.mjs': 'Browser probe callbacks require DOM element narrowing.',
   'scripts/mobius-probe.mjs': 'Browser probe callbacks require DOM element narrowing.',

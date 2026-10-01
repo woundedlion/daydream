@@ -17,7 +17,6 @@ import {
   latticeMeltStageAssignments,
   kaleidoscopeSmoothStageAssignments,
   fixedShaderStageAssignments,
-  legacyShaderBallParamNames,
 } from '../src/effects/shader_stages.js';
 import { ChainSnapshotRestoreResult } from './helpers/fake_engine.js';
 
@@ -31,7 +30,20 @@ afterEach(() => { mock.timers.reset(); });
 
 const ENUM = { value: 0, requestedValue: 0, options: ['None'], animated: true };
 
-function shaderBallParams() {
+function chainSnapshot(value = 0) {
+  return {
+    schemaVersion: 2,
+    chain: [
+      {instance: 'project', operator: 'project.stereographic.v2'},
+      {instance: 'sample', operator: 'sample.grid.v2'},
+      {instance: 'colorize', operator: 'colorize.generated-palette.v3'},
+    ],
+    parameters: [{name: 'sample.pattern-freq', value}],
+    animationsPaused: true,
+  };
+}
+
+function fixedShaderParams() {
   return [
     { name: 'Function', ...ENUM },
     { name: 'Pattern Freq', value: 1, min: 0, max: 10, animated: true },
@@ -181,7 +193,7 @@ function makeHarness({
   chainSnapshotEnabled = false,
   chainSnapshot = null,
   fullConfigFieldDefinitions = null,
-  restoreFullConfigAccepted = true,
+  restoreChainSnapshotAccepted = true,
 } = {}) {
   const state = {
     params,
@@ -201,7 +213,7 @@ function makeHarness({
   };
   const writes = [];
   const warnings = [];
-  const restoredFullConfigs = [];
+  const restoredChainSnapshots = [];
   const configNotices = [];
   let paramDefinitionReads = 0;
   const guis = [];
@@ -255,8 +267,8 @@ function makeHarness({
       snapshot: () => state.chainSnapshot,
       fieldDefinitions: () => state.fullConfigFieldDefinitions,
       restore: (snapshot) => {
-        restoredFullConfigs.push(snapshot);
-        return restoreFullConfigAccepted && snapshot.schemaVersion === 1
+        restoredChainSnapshots.push(snapshot);
+        return restoreChainSnapshotAccepted && snapshot.schemaVersion === 2
           ? ChainSnapshotRestoreResult.APPLIED : ChainSnapshotRestoreResult.INVALID_VALUE;
       },
       restoreResults: () => ChainSnapshotRestoreResult,
@@ -286,7 +298,7 @@ function makeHarness({
   });
 
   return { panel, state, writes, warnings, guis, dragTarget, container, engine,
-           restoredFullConfigs, configNotices,
+           restoredChainSnapshots, configNotices,
            paramDefinitionReads: () => paramDefinitionReads,
            gui: () => guis[guis.length - 1] };
 }
@@ -641,19 +653,6 @@ test('fixed Shader warp ownership follows each explicit slot boundary', () => {
 
 
 
-test('renamed ShaderBall controls accept every legacy deep-link name', () => {
-  assert.deepEqual(legacyShaderBallParamNames('Camera Wander'), ['Outer Wander']);
-  assert.deepEqual(legacyShaderBallParamNames('Planar Warp 1'), ['Outer Warp']);
-  assert.deepEqual(legacyShaderBallParamNames('Planar Warp 1 Strength'),
-    ['Outer Warp Strength']);
-  assert.deepEqual(legacyShaderBallParamNames('Planar Warp 1 Vector Angle'),
-    ['Outer Vector Angle']);
-  assert.deepEqual(legacyShaderBallParamNames('Planar Warp 2 Noise Basis'),
-    ['Inner Noise Basis']);
-  assert.deepEqual(legacyShaderBallParamNames('Palette'), ['Colorizer']);
-  assert.deepEqual(legacyShaderBallParamNames('Hue Shift Amount'),
-    ['Hue Noise Amount', 'Hue Shift']);
-});
 
 test('an invalid param carries an actionable, on-screen warning note', () => {
   const gui = fakeGui();
@@ -741,8 +740,8 @@ test('build restores the last accepted value before replaying an invalid request
   };
   const h = makeHarness({
     params: [outer],
-    hydrated: { 'Outer Warp': 3 },
-    acceptedStored: { '__accepted.Outer Warp': 0 },
+    hydrated: { 'Planar Warp 1': 3 },
+    acceptedStored: { '__accepted.Planar Warp 1': 0 },
     onEngineParam: (name, value) => {
       outer.requestedValue = value;
       if (value !== 3) {
@@ -814,23 +813,11 @@ test('restore reaches a parameter a write revealed, probing each name once', () 
 });
 
 test('an engine-rejected unversioned snapshot is reported before session controls', () => {
-  const stored = {
-    accepted: [0, 4294967295],
-    requested: [0, 4294967295],
-    pendingFieldIds: [],
-    hasRuntime: false,
-    runtime: [],
-  };
-  const current = {
-    schemaVersion: 1,
-    accepted: [0, 4294967295],
-    requested: [0, 4294967295],
-    pendingFieldIds: [],
-    hasRuntime: false,
-    runtime: [],
-  };
+  const stored = chainSnapshot();
+  delete stored.schemaVersion;
+  const current = chainSnapshot(0);
   const h = makeHarness({
-    params: shaderBallParams(),
+    params: fixedShaderParams(),
     chainSnapshotEnabled: true,
     chainSnapshot: current,
     acceptedStored: { [CHAIN_SNAPSHOT_STORAGE_KEY]: JSON.stringify(stored) },
@@ -838,7 +825,7 @@ test('an engine-rejected unversioned snapshot is reported before session control
 
   h.panel.build();
 
-  assert.deepEqual(h.restoredFullConfigs, [stored]);
+  assert.deepEqual(h.restoredChainSnapshots, [stored]);
   assert.deepEqual(h.configNotices, ['The chain snapshot was rejected. Its original text remains preserved.']);
   assert.deepEqual(h.warnings,
     ['Shader Workbench: chain snapshot was rejected: INVALID_VALUE']);
@@ -847,26 +834,19 @@ test('an engine-rejected unversioned snapshot is reported before session control
   assert.equal(h.gui().stored['__accepted.Lens'], undefined);
 });
 
-test('a rejected full-config snapshot is reported and announces no import', () => {
-  const stored = {
-    schemaVersion: 1,
-    accepted: [0, 4294967295],
-    requested: [0, 4294967295],
-    pendingFieldIds: [],
-    hasRuntime: false,
-    runtime: [],
-  };
+test('a rejected chain snapshot is reported and announces no import', () => {
+  const stored = chainSnapshot(0);
   const h = makeHarness({
-    params: shaderBallParams(),
+    params: fixedShaderParams(),
     chainSnapshotEnabled: true,
     chainSnapshot: { ...stored },
     acceptedStored: { [CHAIN_SNAPSHOT_STORAGE_KEY]: JSON.stringify(stored) },
-    restoreFullConfigAccepted: false,
+    restoreChainSnapshotAccepted: false,
   });
 
   h.panel.build();
 
-  assert.deepEqual(h.restoredFullConfigs, [stored], 'the snapshot never reached the engine');
+  assert.deepEqual(h.restoredChainSnapshots, [stored], 'the snapshot never reached the engine');
   assert.deepEqual(h.warnings,
     ['Shader Workbench: chain snapshot was rejected: INVALID_VALUE']);
   assert.deepEqual(h.configNotices, ['The chain snapshot was rejected. Its original text remains preserved.']);
@@ -876,7 +856,7 @@ test('a stored snapshot that is not a config object never reaches the engine', (
   // JS rejects non-object URL values; the engine restore validates object members.
   for (const text of ['{not json', 'null', '[]', '"snapshot"', '7']) {
     const h = makeHarness({
-      params: shaderBallParams(),
+      params: fixedShaderParams(),
       chainSnapshotEnabled: true,
       chainSnapshot: null,
       acceptedStored: { [CHAIN_SNAPSHOT_STORAGE_KEY]: text },
@@ -884,30 +864,16 @@ test('a stored snapshot that is not a config object never reaches the engine', (
 
     h.panel.build();
 
-    assert.deepEqual(h.restoredFullConfigs, [], `restored from ${text}`);
+    assert.deepEqual(h.restoredChainSnapshots, [], `restored from ${text}`);
     assert.equal(h.warnings.length, 1, `warnings for ${text}`);
     assert.match(h.warnings[0], /invalid chain snapshot/);
   }
 });
 
 test('Lens Glitch to None persists the exhaustive snapshot bit-exactly', () => {
-  const initial = {
-    schemaVersion: 1,
-    accepted: [1, 2147483648],
-    requested: [1, 2147483648],
-    pendingFieldIds: [],
-    hasRuntime: false,
-    runtime: [],
-  };
-  const updated = {
-    schemaVersion: 1,
-    accepted: [0, 4294967295],
-    requested: [0, 4294967295],
-    pendingFieldIds: [17],
-    hasRuntime: true,
-    runtime: [1],
-  };
-  const params = shaderBallParams();
+  const initial = chainSnapshot(1);
+  const updated = chainSnapshot(0);
+  const params = fixedShaderParams();
   Object.assign(params.find((parameter) => parameter.name === 'Lens'), {
     value: 1, requestedValue: 1, options: ['None', 'Glitch'],
   });
@@ -2247,18 +2213,11 @@ test('the Export outcome is announced in a polite live region', () => {
     'a live region re-announces a repeat only after the text changes');
 });
 
-test('ShaderBall Export copies the versioned full-config snapshot', async () => {
+test('ShaderChain Export copies the versioned chain snapshot', async () => {
   mock.timers.enable({ apis: ['setTimeout'] });
-  const snapshot = {
-    schemaVersion: 1,
-    accepted: [0, 4294967295],
-    requested: [1, 4294967295],
-    pendingFieldIds: [0],
-    hasRuntime: false,
-    runtime: [],
-  };
+  const snapshot = chainSnapshot(0);
   const h = makeHarness({
-    params: shaderBallParams(), chainSnapshotEnabled: true,
+    params: fixedShaderParams(), chainSnapshotEnabled: true,
     chainSnapshot: snapshot,
   });
   h.panel.build();
@@ -2332,12 +2291,12 @@ test('Export without a copy operation reports the failure', () => {
   assert.match(h.warnings[0], /clipboard copy unavailable/);
 });
 
-test('ShaderBall Export names a missing clipboard operation', () => {
+test('ShaderChain Export names a missing clipboard operation', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   const h = makeHarness({
-    params: shaderBallParams(),
+    params: fixedShaderParams(),
     chainSnapshotEnabled: true,
-    chainSnapshot: { schemaVersion: 1 },
+    chainSnapshot: { schemaVersion: 2 },
     copyText: null,
   });
   h.panel.build();
@@ -2351,7 +2310,7 @@ test('ShaderBall Export names a missing clipboard operation', () => {
 test('chain Export fails visibly when the typed snapshot is unavailable', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   const h = makeHarness({
-    params: shaderBallParams(),
+    params: fixedShaderParams(),
     chainSnapshotEnabled: true,
     chainSnapshot: null,
   });
@@ -2552,17 +2511,10 @@ test('a slider drag defers persistence to the pointer release', () => {
   assert.deepEqual(h.gui().storedWrites, [['__accepted.Speed', 0.3]]);
 });
 
-test('a ShaderBall drag writes one full-config snapshot, at the release', () => {
-  const snapshot = (hue) => ({
-    schemaVersion: 1,
-    accepted: [hue],
-    requested: [hue],
-    pendingFieldIds: [],
-    hasRuntime: false,
-    runtime: [],
-  });
+test('a ShaderChain drag writes one chain snapshot, at the release', () => {
+  const snapshot = (hue) => chainSnapshot(hue);
   const h = makeHarness({
-    params: shaderBallParams(),
+    params: fixedShaderParams(),
     chainSnapshotEnabled: true,
     chainSnapshot: snapshot(0),
     onEngineParam: (name, value, state) => {
@@ -2615,16 +2567,9 @@ test('a schema rebuild mid-drag still lands the write the drag deferred', () => 
 });
 
 test('a schema rebuild mid-drag lands the whole workbench snapshot', () => {
-  const snapshot = (hue) => ({
-    schemaVersion: 1,
-    accepted: [hue],
-    requested: [hue],
-    pendingFieldIds: [],
-    hasRuntime: false,
-    runtime: [],
-  });
+  const snapshot = (hue) => chainSnapshot(hue);
   const h = makeHarness({
-    params: shaderBallParams(),
+    params: fixedShaderParams(),
     chainSnapshotEnabled: true,
     chainSnapshot: snapshot(0),
     generation: 3,
@@ -3009,12 +2954,12 @@ test('segmented enums follow the lagging pool values', () => {
 });
 
 
-test('an applied full-config restore clears the import notice', () => {
-  const stored = { schemaVersion: 1, accepted: [], requested: [], pendingFieldIds: [], hasRuntime: false, runtime: [] };
-  const h = makeHarness({ params: shaderBallParams(), chainSnapshotEnabled: true,
+test('an applied chain restore clears the import notice', () => {
+  const stored = chainSnapshot();
+  const h = makeHarness({ params: chainParams(), chainSnapshotEnabled: true,
     chainSnapshot: stored, acceptedStored: { [CHAIN_SNAPSHOT_STORAGE_KEY]: JSON.stringify(stored) } });
   h.panel.build();
-  assert.deepEqual(h.restoredFullConfigs, [stored]);
+  assert.deepEqual(h.restoredChainSnapshots, [stored]);
   assert.deepEqual(h.configNotices, [null]);
 });
 
@@ -3051,7 +2996,7 @@ test('preset advancement refreshes nonanimated requested selectors', () => {
 
 for (const chainSnapshotEnabled of [false, true]) test(`preset selection ${chainSnapshotEnabled ? 'keeps' : 'clears'} stored writable values (chainSnapshotEnabled=${chainSnapshotEnabled})`, () => {
   const h = makeHarness({ params: [SPEED, TELEMETRY], presetCount: 3, chainSnapshotEnabled,
-    chainSnapshot: { schemaVersion: 1, accepted: [], requested: [], pendingFieldIds: [], hasRuntime: false, runtime: [] } });
+    chainSnapshot: chainSnapshot() });
   h.panel.build();
   h.gui().storedWrites.length = 0;
   assert.equal(h.panel.movePreset(1), true);

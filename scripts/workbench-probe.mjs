@@ -5,7 +5,6 @@
  *   node scripts/workbench-probe.mjs
  */
 import { boxOf, centre, checks, isMain, runProbe } from './probe_harness.mjs';
-import { readFileSync } from 'node:fs';
 
 const PAGE = 'tools/shader.html';
 const VIEWPORT = { width: 1674, height: 543 };
@@ -688,45 +687,36 @@ export async function probeDocumentActions(tab) {
 }
 
 /** @param {import('puppeteer-core').Page} tab */
-export async function probeLegacyImport(tab) {
+export async function probeSnapshotImport(tab) {
   const { failures, check } = checks();
-  const fixtures = JSON.parse(readFileSync(
-    new URL('../tests/fixtures/legacy_shader_snapshots.json', import.meta.url), 'utf8'));
-  const original = structuredClone(fixtures[0].presets[9].snapshot);
-  original.requested[0] = original.accepted[0] === 0 ? 1 : 0;
-  original.pendingFieldIds = original.accepted.flatMap((value, index) =>
-    value === original.requested[index] ? [] : [index]);
-  const text = JSON.stringify(original);
+  await tab.waitForFunction(() => location.hash.startsWith('#shader=v2.'));
+  const snapshot = await tab.evaluate(async () => {
+    const {decodeShaderStateHash} = await import('../src/workbench/shader/shader_deeplink.js');
+    return (await decodeShaderStateHash(location.hash)).chainSnapshot;
+  });
   const url = new URL(tab.url());
   url.hash = '';
-  url.search = new URLSearchParams({effect: 'Shader', 'fx.__fullConfig': text}).toString();
+  url.search = new URLSearchParams({effect: 'ShaderChain',
+    'fx.__chainSnapshot': JSON.stringify(snapshot)}).toString();
   await tab.goto(url.href, {timeout: TIMEOUT_MS});
   await tab.waitForFunction(() => !document.getElementById('loading-overlay'));
   await tab.waitForFunction(() => location.hash.startsWith('#shader=v2.'));
   const imported = await tab.evaluate(async () => {
     const {decodeShaderStateHash} = await import('../src/workbench/shader/shader_deeplink.js');
-    const query = new URLSearchParams(location.search);
-    return {original: query.get('fx.__fullConfig'),
-      sidecar: JSON.parse(query.get('fx.__legacyShader')), state: await decodeShaderStateHash(location.hash),
-      notice: document.getElementById('shader-document-status').textContent};
+    return decodeShaderStateHash(location.hash);
   });
-  check(imported.original === text && JSON.stringify(imported.sidecar.original) === text,
-    'legacy import preserves the complete original archive in the URL and sidecar');
-  check(imported.sidecar.pendingFieldIds.includes(0) && imported.notice.includes('Pending edits'),
-    'legacy import preserves pending requested edits with a visible notice');
-  check(imported.state.chainSnapshot.chain.some((entry) => entry.operator === 'warp.polar-chart.v2'),
-    'legacy Polar Chart becomes a typed authored chain');
+  check(JSON.stringify(imported.chainSnapshot) === JSON.stringify(snapshot),
+    'query snapshot import restores the complete typed state');
   await tab.reload({timeout: TIMEOUT_MS});
   await tab.waitForFunction(() => !document.getElementById('loading-overlay'));
   const restored = await tab.evaluate(async () => {
     const {decodeShaderStateHash} = await import('../src/workbench/shader/shader_deeplink.js');
     return decodeShaderStateHash(location.hash);
   });
-  check(JSON.stringify(restored.chainSnapshot) === JSON.stringify(imported.state.chainSnapshot),
-    'reloading the imported link preserves its typed parameter and runtime snapshot');
-
-  const refused = JSON.stringify({schemaVersion: 9, retained: 'original'});
-  url.search = new URLSearchParams({effect: 'ShaderBall', 'fx.__fullConfig': refused}).toString();
+  check(JSON.stringify(restored.chainSnapshot) === JSON.stringify(imported.chainSnapshot),
+    'reloading the snapshot link preserves its typed state');
+  url.search = new URLSearchParams({effect: 'ShaderChain',
+    'fx.__chainSnapshot': JSON.stringify({...snapshot, schemaVersion: 0})}).toString();
   await tab.goto(url.href, {timeout: TIMEOUT_MS});
   await tab.waitForFunction(() => !document.getElementById('loading-overlay'));
   await tab.waitForFunction(() => document.getElementById('shader-document-status')
@@ -734,9 +724,9 @@ export async function probeLegacyImport(tab) {
   const refusal = await tab.evaluate(() => ({search: location.search, hash: location.hash,
     notice: document.getElementById('shader-document-status').textContent}));
   check(refusal.search === url.search && refusal.hash === '',
-    'a refused legacy archive retains its exact original URL');
+    'a refused chain snapshot retains its original URL');
   check(refusal.notice.includes('could not be restored'),
-    'a refused legacy archive shows an explicit restore notice');
+    'a refused chain snapshot shows an explicit restore notice');
   return failures;
 }
 
@@ -757,7 +747,7 @@ export async function probeStartupPersistence(tab, releaseCatalog = () => {}) {
 }
 
 export async function runWorkbenchSections(open, sections = [
-  probeDocumentActions, probeStripHistory, probeStrip, probeParity, probeLegacyImport, probeStartupPersistence,
+  probeDocumentActions, probeStripHistory, probeStrip, probeParity, probeSnapshotImport, probeStartupPersistence,
 ]) {
   const failures = [];
   for (const section of sections) {

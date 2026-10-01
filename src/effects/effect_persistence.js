@@ -4,11 +4,8 @@
  */
 
 import { engineParamValue, enumConstantName } from './param_sync.js';
-import { legacyShaderBallParamNames } from './shader_stages.js';
 
 export const CHAIN_SNAPSHOT_STORAGE_KEY = '__chainSnapshot';
-export const LEGACY_CONFIG_STORAGE_KEY = '__fullConfig';
-export const LEGACY_SIDECAR_STORAGE_KEY = '__legacyShader';
 
 /**
  * The value the engine last took for one parameter: what it admitted for
@@ -50,8 +47,7 @@ export function createEffectPersistence({
       else persistAcceptedParam(gui, edited.name, edited.accepted);
       return;
     }
-    if (refusedSnapshot || (gui.readStoredString(LEGACY_CONFIG_STORAGE_KEY) !== undefined
-        && gui.readStoredString(LEGACY_SIDECAR_STORAGE_KEY) === undefined)) return;
+    if (refusedSnapshot) return;
     const snapshot = getSnapshot();
     if (!snapshot) return;
     gui.writeStoredValue(CHAIN_SNAPSHOT_STORAGE_KEY, JSON.stringify(snapshot));
@@ -114,9 +110,7 @@ export function createEffectPersistence({
       for (const candidate of getParameterDefinitions()) {
         if (candidate.readonly || probed.has(candidate.name)) continue;
         probed.add(candidate.name);
-        const stored = gui.readStoredNumber(
-          acceptedStorageKey(candidate.name),
-          legacyShaderBallParamNames(candidate.name).map(acceptedStorageKey));
+        const stored = gui.readStoredNumber(acceptedStorageKey(candidate.name));
         if (stored === undefined) continue;
         restoredKeys.add(candidate.name);
         parameter = candidate;

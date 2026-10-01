@@ -86,31 +86,15 @@ test('the global GUI carries the controls a deep link names', () => {
 });
 
 test('a workbench-only effect deep link is handed to the workbench page', () => {
-  const legacy = startApp({ search: '?effect=ShaderBall' });
-
-  assert.deepEqual(legacy.replaced, ['/tools/shader.html?effect=ShaderBall'],
-    'the retired alias names an effect only the workbench offers, so the '
-    + 'simulator hands the link on instead of dropping it for its default; the '
-    + 'legacy spelling is what travels, because the page that adopts the link '
-    + 'is the one that migrates it and raises the notice');
-  assert.equal(legacy.guis.length, 0,
-    'a redirected load must build no driver, GUI or engine: the page is on its '
-    + 'way out, and what it built would never be torn down');
-  assert.deepEqual(legacy.listeners, [],
-    'a listener installed on a redirecting page outlives it');
-  assert.equal(legacy.teardown.disposed(), false);
-  legacy.teardown.dispose();
-  assert.equal(legacy.teardown.disposed(), true,
-    'nothing was built, but the caller reads disposed() on either path');
-
-  const workbench = startApp({ search: '?effect=ShaderWorkbench' });
-  assert.deepEqual(workbench.replaced, ['/tools/shader.html?effect=ShaderWorkbench'],
-    'the engine canonicalizes both retired spellings, so the second one must '
-    + 'travel to the workbench too rather than falling through to the default');
-
-  const shipped = startApp({ search: '?effect=alien-brain' });
-  assert.deepEqual(shipped.replaced, ['/tools/shader.html?effect=alien-brain'],
-    'a shipped document carries no legacy identity, so its own id travels');
+  for (const effect of ['ShaderChain', 'alien-brain']) {
+    const app = startApp({ search: `?effect=${effect}` });
+    assert.deepEqual(app.replaced, [`/tools/shader.html?effect=${effect}`]);
+    assert.equal(app.guis.length, 0);
+    assert.deepEqual(app.listeners, []);
+    assert.equal(app.teardown.disposed(), false);
+    app.teardown.dispose();
+    assert.equal(app.teardown.disposed(), true);
+  }
 });
 
 test('the workbench page builds no segmented POV controls', () => {
@@ -171,4 +155,13 @@ test('a failed engine load reports and disarms the Test All ticker', async () =>
     'without an engine the ticker would spin for the page lifetime');
   assert.ok(app.elements.get('loading-overlay').classList.contains('error'),
     'the failure must reach the overlay, not only the console');
+});
+
+
+test('retired shader identities are absent from simulator routing', () => {
+  for (const effect of ['Shader', 'ShaderBall', 'ShaderWorkbench']) {
+    const app = startApp({search: `?effect=${effect}`});
+    assert.deepEqual(app.replaced, []);
+    assert.equal(app.guis.length, 1);
+  }
 });
