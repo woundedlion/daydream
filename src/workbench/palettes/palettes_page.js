@@ -107,12 +107,12 @@ let hueKeyHandles = [];
 const fullViewport = Object.freeze({ start: 0, end: 1 });
 
 function customBaseTurns() {
-  return Number(document.getElementById('gen_seed_slider').value) / 360;
+  return Number(document.getElementById(PALETTE_CONTROL_IDS.baseHueDegrees).value) / 360;
 }
 
 function setCustomBaseTurns(turns) {
   const degrees = wrapTurns(turns) * 360;
-  document.getElementById('gen_seed_slider').value = degrees;
+  document.getElementById(PALETTE_CONTROL_IDS.baseHueDegrees).value = degrees;
   document.getElementById('gen_seed_value').textContent =
     `${Number(degrees.toFixed(1))}°`;
 }
@@ -134,7 +134,7 @@ function activateCustomHue(sourceRecipe) {
   customHueOffsets = state.offsets;
   activeHueKey = handoff.activeKey;
   setCustomBaseTurns(state.baseTurns);
-  document.getElementById('gen_hue_mode').value = 'CUSTOM';
+  document.getElementById(PALETTE_CONTROL_IDS.hueMode).value = 'CUSTOM';
   previousHueMode = PaletteV4.hueMode.CUSTOM;
   syncRecipeControlAvailability();
   return true;
@@ -290,14 +290,14 @@ function handleHueKeyNudge(event, keyIndex) {
 
 function recipeWindow() {
   return {
-    offset: Number(document.getElementById('gen_phase').value),
-    span: Number(document.getElementById('gen_width').value),
+    offset: Number(document.getElementById(PALETTE_CONTROL_IDS.offset).value),
+    span: Number(document.getElementById(PALETTE_CONTROL_IDS.span).value),
   };
 }
 
 function syncRecipeWindowControls() {
-  const phase = document.getElementById('gen_phase');
-  const width = document.getElementById('gen_width');
+  const phase = document.getElementById(PALETTE_CONTROL_IDS.offset);
+  const width = document.getElementById(PALETTE_CONTROL_IDS.span);
   const { offset, span } = clampRecipeWindow(
     Number(phase.value), Number(width.value));
   width.value = span;
@@ -308,8 +308,8 @@ function syncRecipeWindowControls() {
 }
 
 function setRecipeWindow(offset, span) {
-  const width = document.getElementById('gen_width');
-  const phase = document.getElementById('gen_phase');
+  const width = document.getElementById(PALETTE_CONTROL_IDS.span);
+  const phase = document.getElementById(PALETTE_CONTROL_IDS.offset);
   width.value = span;
   phase.max = String(1 - Number(width.value));
   phase.value = offset;
@@ -334,16 +334,16 @@ function zoomed() {
 }
 
 function axisControlElements(axisName) {
-  const { prefix, curve, label, shortLabel } = PALETTE_AXIS_CONTROLS[axisName];
+  const { minimum, maximum, curve, label, shortLabel } = PALETTE_AXIS_CONTROLS[axisName];
   return {
     label, shortLabel,
     curve: document.getElementById(curve),
-    minimum: document.getElementById(`${prefix}_minimum`),
-    maximum: document.getElementById(`${prefix}_maximum`),
-    minimumLabel: document.getElementById(`${prefix}_minimum_label`),
-    maximumLabel: document.getElementById(`${prefix}_maximum_label`),
-    minimumValue: document.getElementById(`${prefix}_minimum_value`),
-    maximumValue: document.getElementById(`${prefix}_maximum_value`),
+    minimum: document.getElementById(minimum),
+    maximum: document.getElementById(maximum),
+    minimumLabel: document.getElementById(`${minimum}_label`),
+    maximumLabel: document.getElementById(`${maximum}_label`),
+    minimumValue: document.getElementById(`${minimum}_value`),
+    maximumValue: document.getElementById(`${maximum}_value`),
   };
 }
 
@@ -416,11 +416,11 @@ function handleAxisCurveChange(axisName) {
 // Recipe fields read straight off a slider: its element, how many decimals
 // the mirror label shows, and the unit it is labelled in.
 const recipeSliderDefinitions = [
-  { id: 'gen_spread', digits: 1, suffix: '°' },
-  { id: 'gen_sweep', digits: 1, suffix: '' },
-  { id: 'gen_torsion', digits: 1, suffix: '' },
-  { id: 'gen_headroom', digits: 2, suffix: '' },
-  { id: 'gen_falloff', digits: 2, suffix: '' },
+  { id: PALETTE_CONTROL_IDS.spreadDegrees, digits: 1, suffix: '°' },
+  { id: PALETTE_CONTROL_IDS.sweepTurns, digits: 1, suffix: '' },
+  { id: PALETTE_CONTROL_IDS.hueTorsion, digits: 1, suffix: '' },
+  { id: PALETTE_CONTROL_IDS.headroom, digits: 2, suffix: '' },
+  { id: PALETTE_CONTROL_IDS.falloffStart, digits: 2, suffix: '' },
 ];
 
 function recipeSliderValue(id) {
@@ -428,9 +428,9 @@ function recipeSliderValue(id) {
 }
 
 function syncRecipeSliderLabels() {
-  const sweep = document.getElementById('gen_sweep');
-  const loopSweep = document.getElementById('gen_shape').value === 'LOOP'
-    && document.getElementById('gen_hue_mode').value === 'SWEEP';
+  const sweep = document.getElementById(PALETTE_CONTROL_IDS.sweepTurns);
+  const loopSweep = document.getElementById(PALETTE_CONTROL_IDS.domain).value === 'LOOP'
+    && document.getElementById(PALETTE_CONTROL_IDS.hueMode).value === 'SWEEP';
   sweep.step = loopSweep ? '1' : '0.5';
   if (loopSweep) sweep.value = String(loopSweepTurns(Number(sweep.value)));
   for (const { id, digits, suffix } of recipeSliderDefinitions) {
@@ -451,20 +451,20 @@ function syncRecipeControlAvailability() {
   const recipe = readPaletteRecipe();
   const availability = paletteRecipeAvailability(recipe);
   const controls = [
-    ['gen_seed_field', 'gen_seed_slider', availability.baseHue],
-    ['gen_hue_mode_field', 'gen_hue_mode', availability.hueMode],
-    ['gen_harmony_field', 'gen_harmony', availability.harmony],
-    ['gen_spread_field', 'gen_spread', availability.hueSpread],
-    ['gen_sweep_field', 'gen_sweep', availability.hueSweep],
-    ['gen_torsion_field', 'gen_torsion', availability.hueTorsion],
-    ['gen_path_field', 'gen_path', availability.colorPath],
-    ['gen_direction_field', 'gen_direction', availability.hueDirection],
-    ['gen_falloff_field', 'gen_falloff', availability.falloffStart],
-    ['gen_headroom_field', 'gen_headroom', availability.chromaHeadroom],
-    ['gen_chroma_minimum_field', 'gen_chroma_minimum', availability.chromaEndpoints],
-    ['gen_chroma_maximum_field', 'gen_chroma_maximum', availability.chromaMaximum],
-    ['gen_lightness_minimum_field', 'gen_lightness_minimum', availability.lightnessEndpoints],
-    ['gen_lightness_maximum_field', 'gen_lightness_maximum', availability.lightnessMaximum],
+    ['gen_seed_field', PALETTE_CONTROL_IDS.baseHueDegrees, availability.baseHue],
+    ['gen_hue_mode_field', PALETTE_CONTROL_IDS.hueMode, availability.hueMode],
+    ['gen_harmony_field', PALETTE_CONTROL_IDS.harmony, availability.harmony],
+    ['gen_spread_field', PALETTE_CONTROL_IDS.spreadDegrees, availability.hueSpread],
+    ['gen_sweep_field', PALETTE_CONTROL_IDS.sweepTurns, availability.hueSweep],
+    ['gen_torsion_field', PALETTE_CONTROL_IDS.hueTorsion, availability.hueTorsion],
+    ['gen_path_field', PALETTE_CONTROL_IDS.colorPath, availability.colorPath],
+    ['gen_direction_field', PALETTE_CONTROL_IDS.direction, availability.hueDirection],
+    ['gen_falloff_field', PALETTE_CONTROL_IDS.falloffStart, availability.falloffStart],
+    ['gen_headroom_field', PALETTE_CONTROL_IDS.headroom, availability.chromaHeadroom],
+    ['gen_chroma_minimum_field', PALETTE_CONTROL_IDS.chromaMinimum, availability.chromaEndpoints],
+    ['gen_chroma_maximum_field', PALETTE_CONTROL_IDS.chromaMaximum, availability.chromaMaximum],
+    ['gen_lightness_minimum_field', PALETTE_CONTROL_IDS.lightnessMinimum, availability.lightnessEndpoints],
+    ['gen_lightness_maximum_field', PALETTE_CONTROL_IDS.lightnessMaximum, availability.lightnessMaximum],
   ];
 
   for (const [fieldId, controlId, enabled] of controls) {
@@ -1133,7 +1133,7 @@ async function init() {
   buildEffectRecipePresets();
 
   // Generative palette controls.
-  const genSeedSlider = document.getElementById('gen_seed_slider');
+  const genSeedSlider = document.getElementById(PALETTE_CONTROL_IDS.baseHueDegrees);
   const genSeedValue = document.getElementById('gen_seed_value');
   if (genSeedSlider && genSeedValue) {
     genSeedSlider.addEventListener('input', () => {
@@ -1143,13 +1143,13 @@ async function init() {
   }
 
   const dropdowns = [
-    'gen_hue_mode', 'gen_harmony', 'gen_shape', 'gen_path', 'gen_direction',
-    'gen_easing',
+    PALETTE_CONTROL_IDS.hueMode, PALETTE_CONTROL_IDS.harmony, PALETTE_CONTROL_IDS.domain, PALETTE_CONTROL_IDS.colorPath, PALETTE_CONTROL_IDS.direction,
+    PALETTE_CONTROL_IDS.easing,
   ];
   dropdowns.forEach(id => {
     const el = document.getElementById(id);
     el?.addEventListener('change', () => {
-      if (id === 'gen_hue_mode') {
+      if (id === PALETTE_CONTROL_IDS.hueMode) {
         handleHueModeChange(el);
       }
       syncRecipeControlAvailability();
@@ -1165,7 +1165,7 @@ async function init() {
     syncAxisEndpointControls(axisName);
   }
 
-  for (const id of ['gen_phase', 'gen_width']) {
+  for (const id of [PALETTE_CONTROL_IDS.offset, PALETTE_CONTROL_IDS.span]) {
     document.getElementById(id).addEventListener('input', () => {
       syncRecipeWindowControls();
       scheduleUpdate();

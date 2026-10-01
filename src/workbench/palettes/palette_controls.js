@@ -408,18 +408,49 @@ export function axisFromEndpoints(minimum, maximum) {
 }
 
 /**
- * The two OKLCH axes the generative tab edits by their endpoints: the id prefix
- * their sliders share, the curve select that governs them, and how each is
+ * The generative tab's control elements, by the reading each one carries. The
+ * page hands the values over; the ids live here so a reading and the control it
+ * comes off cannot drift apart.
+ * @type {Object<string, string>}
+ */
+export const PALETTE_CONTROL_IDS = Object.freeze({
+  offset: 'gen_phase',
+  span: 'gen_width',
+  easing: 'gen_easing',
+  spreadDegrees: 'gen_spread',
+  sweepTurns: 'gen_sweep',
+  headroom: 'gen_headroom',
+  hueTorsion: 'gen_torsion',
+  falloffStart: 'gen_falloff',
+  domain: 'gen_shape',
+  colorPath: 'gen_path',
+  hueMode: 'gen_hue_mode',
+  harmony: 'gen_harmony',
+  direction: 'gen_direction',
+  baseHueDegrees: 'gen_seed_slider',
+  lightnessCurve: 'gen_brightness',
+  chromaCurve: 'gen_chroma_curve',
+  lightnessMinimum: 'gen_lightness_minimum',
+  lightnessMaximum: 'gen_lightness_maximum',
+  chromaMinimum: 'gen_chroma_minimum',
+  chromaMaximum: 'gen_chroma_maximum',
+});
+
+/**
+ * The two OKLCH axes the generative tab edits by their endpoints: the ids
+ * their sliders use, the curve select that governs them, and how each is
  * named in the labels and accessible names built from it.
- * @type {Object<string, {prefix: string, curve: string, label: string, shortLabel: string}>}
+ * @type {Object<string, {minimum: string, maximum: string, curve: string, label: string, shortLabel: string}>}
  */
 export const PALETTE_AXIS_CONTROLS = Object.freeze({
   lightness: Object.freeze({
-    prefix: 'gen_lightness', curve: 'gen_brightness',
+    minimum: PALETTE_CONTROL_IDS.lightnessMinimum, maximum: PALETTE_CONTROL_IDS.lightnessMaximum,
+    curve: PALETTE_CONTROL_IDS.lightnessCurve,
     label: 'Lightness', shortLabel: 'Lightness',
   }),
   chroma: Object.freeze({
-    prefix: 'gen_chroma', curve: 'gen_chroma_curve',
+    minimum: PALETTE_CONTROL_IDS.chromaMinimum, maximum: PALETTE_CONTROL_IDS.chromaMaximum,
+    curve: PALETTE_CONTROL_IDS.chromaCurve,
     label: 'Relative Chroma', shortLabel: 'Chroma',
   }),
 });
@@ -858,34 +889,7 @@ export function paletteRecipeFromControls(template, controls) {
   return recipe;
 }
 
-/**
- * The generative tab's control elements, by the reading each one carries. The
- * page hands the values over; the ids live here so a reading and the control it
- * comes off cannot drift apart.
- * @type {Object<string, string>}
- */
-export const PALETTE_CONTROL_IDS = Object.freeze({
-  offset: 'gen_phase',
-  span: 'gen_width',
-  easing: 'gen_easing',
-  spreadDegrees: 'gen_spread',
-  sweepTurns: 'gen_sweep',
-  headroom: 'gen_headroom',
-  hueTorsion: 'gen_torsion',
-  falloffStart: 'gen_falloff',
-  domain: 'gen_shape',
-  colorPath: 'gen_path',
-  hueMode: 'gen_hue_mode',
-  harmony: 'gen_harmony',
-  direction: 'gen_direction',
-  baseHueDegrees: 'gen_seed_slider',
-  lightnessCurve: 'gen_brightness',
-  chromaCurve: 'gen_chroma_curve',
-  lightnessMinimum: 'gen_lightness_minimum',
-  lightnessMaximum: 'gen_lightness_maximum',
-  chromaMinimum: 'gen_chroma_minimum',
-  chromaMaximum: 'gen_chroma_maximum',
-});
+
 
 /**
  * Assembles the readings paletteRecipeFromControls consumes, converting the
