@@ -193,7 +193,8 @@ export class SegmentStatsView {
     if (!state.ready) {
       const message = `Spawning ${state.count} workers…`;
       if (el.firstElementChild?.getAttribute('role') === 'status') {
-        el.firstElementChild.replaceChildren(message);
+        if (el.firstElementChild.textContent !== message)
+          el.firstElementChild.replaceChildren(message);
         return;
       }
       const box = this.doc.createElement('div');
