@@ -501,7 +501,7 @@ export interface PaletteEffectPreset {
   recipe: object;
 }
 
-/** The engine's V4 palette recipe compiler, as tools/palette_math.js drives it. */
+/** The engine's V4 palette recipe compiler, as src/workbench/palettes/palette_math.js drives it. */
 export interface PaletteOps {
   compileAndBakeV4(recipe: object): PaletteCompileResult;
   /** compileAndBakeV4 plus the per-entry diagnostics and gamut-fallback flags. */
