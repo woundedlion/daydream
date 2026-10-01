@@ -1462,3 +1462,15 @@ test('separate slider drags form separate undo entries', async () => {
   assert.equal(h.store.undo(), true);
   assert.equal(h.store.document().preset_bank.presets[0].values['sample.pattern-freq'], 5.5);
 });
+
+test('a refused socket replacement restores the selected operator', async () => {
+  const h = await makeStrip();
+  const before = h.store.document();
+  h.store.replaceSpan = () => ({ ok: false, diagnostics: [{ message: 'catalog refused edit' }] });
+  const select = chipByLabel(h, 'project').querySelector('.chain-chip-replace');
+  select.value = 'project.bonne.v2';
+  select.dispatch('change');
+  assert.equal(select.value, 'project.stereographic.v2');
+  assert.deepEqual(h.store.document(), before);
+  assert.equal(h.applied.length, 0);
+});

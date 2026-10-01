@@ -864,6 +864,7 @@ export function createChainStrip({
         const result = store.replaceSpan(choice.start, choice.deleteCount,
           choiceEntries(choice));
         if (!result.ok) {
+          event.target.value = entry.operator;
           report(result);
           return;
         }
