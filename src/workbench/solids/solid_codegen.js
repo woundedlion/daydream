@@ -424,7 +424,7 @@ const MESH_FAILURE_REMEDY = {
   UNKNOWN_NAME: 'the engine registers no solid by that name',
   CONNECTIVITY_OVERFLOW: 'the result passes the engine 16-bit element ceiling — remove an op',
   FACE_DEGREE_OVERFLOW: 'the result needs a face with more sides than the engine allows — remove an op',
-  ARENA_EXHAUSTED: 'the tooling arena is full; it has been flushed — try again',
+  ARENA_EXHAUSTED: 'the chain needs more tooling memory than the engine reserves — remove an op',
   NON_FINITE_ARG: 'an op argument was not a finite number',
   ANGLE_OUT_OF_DOMAIN: 'an angle argument sat outside its op domain',
   STALE_WRAPPER: 'a tooling-memory flush reclaimed this mesh — rebuild it from the base solid',
