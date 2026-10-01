@@ -4,8 +4,8 @@
  */
 
 /*
- * Shared design tokens and control styling for the geometry tool pages.
- * Link this before a page's own <style> block so page-specific rules win.
+ * Shared design tokens and control styling for the tool pages.
+ * Link this before a page's own styles so page-specific rules win.
  * Pages keep their own layout CSS and may add extra tokens (e.g. accent
  * colors) or override individual properties such as the slider thumb offset.
  */
@@ -158,7 +158,7 @@ input[type=range]:disabled::-webkit-slider-thumb {
  * Fixed-right-panel shell: a full-bleed canvas (`.tool-stage`) with a fixed
  * scrolling controls panel pinned to the right (`.tool-panel`), collapsing to
  * a bottom sheet on narrow screens. Used by the single-panel geometry tools
- * (lissajous). Apply the classes alongside whatever id the page's JS
+ * (lissajous and mobius). Apply the classes alongside whatever id the page's JS
  * already queries.
  */
 .tool-stage {
