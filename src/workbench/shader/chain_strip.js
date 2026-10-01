@@ -340,7 +340,8 @@ export function createChainStrip({
    * @returns {void}
    */
   const dismissPalette = (event) => {
-    if (palette === null || palette.element.contains(event.target)) return;
+    if (palette === null || palette.element.contains(event.target)
+        || palette.anchor.contains(event.target)) return;
     closePalette();
   };
 
@@ -986,7 +987,8 @@ export function createChainStrip({
     add.setAttribute('aria-label', `Add a ${title} stage`);
     add.textContent = '+';
     add.addEventListener('click',
-      () => openPalette({ kind: 'insert', index: gap, anchor: add }));
+      () => palette?.anchor === add
+        ? closePalette() : openPalette({ kind: 'insert', index: gap, anchor: add }));
     return add;
   };
 
