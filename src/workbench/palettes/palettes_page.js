@@ -150,7 +150,10 @@ function currentHueKeyState(recipe) {
 function drawHueKeyWheel(recipe) {
   if (!hueKeyWheelPainter) return;
   const { points, degrees, scale } = hueKeyWheelPainter.draw({
-    lightness: recipe.lightness.center,
+    lightness: recipe.lightness.curve === PaletteV4.curve.CUSTOM
+      ? recipe.lightness.custom.reduce((sum, value) => sum + value, 0)
+        / recipe.lightness.custom.length
+      : recipe.lightness.center,
     state: currentHueKeyState(recipe),
     activeKey: activeHueKey,
     selectedKey: selectedHueKey,

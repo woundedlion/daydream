@@ -91,3 +91,22 @@ test('the hue dropdown restores its previous mode after a refused handoff', () =
   assert.equal(select.value, 'HARMONY');
   assert.equal(context.previousHueMode, 0);
 });
+
+
+test('the hue wheel uses authored custom lightness instead of canonical center', () => {
+  const drawn = [];
+  const context = {
+    hueKeyWheelPainter: { draw: (options) => {
+      drawn.push(options);
+      return { points: [0], degrees: [0], scale: 1 };
+    } },
+    PaletteV4: { curve: { CUSTOM: 5 } },
+    currentHueKeyState: () => ({}), activeHueKey: null, selectedHueKey: 0,
+    hueKeyWheelDrawnPoints: [], hueKeyWheelScale: 1, syncHueKeyHandles: () => {},
+  };
+  const draw = handler('drawHueKeyWheel', context);
+  draw({ lightness: { curve: 5, center: 0.62, custom: [0.1, 0.4, 0.7] } });
+  assert.ok(Math.abs(drawn[0].lightness - 0.4) < 1e-12);
+  draw({ lightness: { curve: 0, center: 0.7, custom: [0, 0, 0] } });
+  assert.equal(drawn[1].lightness, 0.7);
+});
