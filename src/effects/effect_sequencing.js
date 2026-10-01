@@ -451,7 +451,7 @@ export function createApplyPipeline({
    * @returns {string} ApplyResult.APPLIED, else ApplyResult.REJECTED. REJECTED is
    *   not a no-op: only the two early rejections — an unknown preset name, and an
    *   engine setResolution rejection — leave everything as it was. A rejected
-   *   applyEffect returns REJECTED after the engine, worker pool, driver and
+   *   applyEffect returns REJECTED after the engine, driver and
    *   sidebar have already moved to the new resolution, so recovery is the
    *   caller's rollback re-apply, not a return here; reverting appState alone
    *   leaves those mutations standing.
