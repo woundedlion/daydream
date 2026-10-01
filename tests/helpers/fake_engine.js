@@ -272,11 +272,14 @@ export class FakeChainEngine {
             || snapshot.schemaVersion > 0xffffffff) return ChainSnapshotRestoreResult.INVALID_VALUE;
         if (snapshot.schemaVersion !== 2) return ChainSnapshotRestoreResult.UNSUPPORTED_VERSION;
         if (typeof snapshot.animationsPaused !== 'boolean') return ChainSnapshotRestoreResult.INVALID_VALUE;
-        if (!Array.isArray(snapshot.chain) || !Array.isArray(snapshot.parameters)
-            || snapshot.chain.length === 0 || snapshot.chain.length > this.catalog.budgets.max_chain_ops
-            || snapshot.parameters.length > this.catalog.budgets.max_params
-            || (snapshot.runtime !== undefined && (!Array.isArray(snapshot.runtime)
-              || snapshot.runtime.length > this.catalog.budgets.max_chain_ops)))
+        if (!Array.isArray(snapshot.chain) || !Array.isArray(snapshot.parameters))
+          return ChainSnapshotRestoreResult.INVALID_VALUE;
+        if (snapshot.chain.length > this.catalog.budgets.max_chain_ops
+            || snapshot.parameters.length > this.catalog.budgets.max_params)
+          return ChainSnapshotRestoreResult.INVALID_LENGTH;
+        if (snapshot.runtime !== undefined && !Array.isArray(snapshot.runtime))
+          return ChainSnapshotRestoreResult.INVALID_VALUE;
+        if (snapshot.runtime?.length > this.catalog.budgets.max_chain_ops)
           return ChainSnapshotRestoreResult.INVALID_LENGTH;
         const unsigned = (value) => Number.isInteger(value) && value >= 0 && value <= 0xffffffff;
         const spatial = (state) => state && unsigned(state.noiseSeed) && unsigned(state.walkTime)
@@ -302,14 +305,17 @@ export class FakeChainEngine {
         })) return ChainSnapshotRestoreResult.INVALID_VALUE;
         const palette = snapshot.paletteBank;
         if (palette !== undefined && (palette === null || typeof palette !== 'object'
-            || !Number.isFinite(palette.chroma) || !Array.isArray(palette.hues) || palette.hues.length !== 3
-            || !Array.isArray(palette.cycles) || palette.cycles.length !== 3))
+            || !Number.isFinite(palette.chroma) || !Array.isArray(palette.hues)
+            || !Array.isArray(palette.cycles)))
+          return ChainSnapshotRestoreResult.INVALID_VALUE;
+        if (palette !== undefined && (palette.hues.length !== 3 || palette.cycles.length !== 3))
           return ChainSnapshotRestoreResult.INVALID_LENGTH;
         if (palette !== undefined && (palette.hues.some((hue) => !Number.isInteger(hue) || hue < 0 || hue > 255)
             || palette.cycles.some((cycle) => !cycle || !unsigned(cycle.frame)
               || !unsigned(cycle.nextSequence) || typeof cycle.fadeActive !== 'boolean'
               || typeof cycle.displayDirty !== 'boolean')))
           return ChainSnapshotRestoreResult.INVALID_VALUE;
+        if (snapshot.chain.length === 0) return ChainSnapshotRestoreResult.INVALID_LENGTH;
         const outcome = this.#setShaderChain(snapshot.chain);
         if (outcome.code !== 'APPLIED') return ChainSnapshotRestoreResult.INVALID_CHAIN;
         if (this.#setShaderChainParameters(snapshot.parameters) !== ParamSetResult.APPLIED)
