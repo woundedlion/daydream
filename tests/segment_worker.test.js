@@ -188,6 +188,7 @@ let nextLive = false;
 let moduleOptions = null;
 /** Module object returned by the mocked factory. */
 let wasmModuleInstance = null;
+let exerciseInstantiation = false;
 mock.module('../generated/holosphere_wasm.js', {
   defaultExport: async (options) => {
     moduleOptions = options;
@@ -211,6 +212,11 @@ mock.module('../generated/holosphere_wasm.js', {
         }
       },
     };
+    if (exerciseInstantiation && options.instantiateWasm) {
+      return new Promise((resolve) => {
+        options.instantiateWasm({}, () => resolve(wasmModuleInstance));
+      });
+    }
     return wasmModuleInstance;
   },
 });
@@ -363,11 +369,14 @@ test('a failed instantiate of a supplied module reports instead of hanging', asy
     0, 0x61, 0x73, 0x6d, 1, 0, 0, 0,
     1, 4, 1, 0x60, 0, 0,
     2, 7, 1, 1, 0x61, 1, 0x62, 0, 0));
-  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
-                   effectName: 'Plasma', wasmModule: needsImport });
-
-  posted.length = 0;
-  moduleOptions.instantiateWasm({}, () => assert.fail('instantiation cannot succeed'));
+  exerciseInstantiation = true;
+  try {
+    await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
+                     effectName: 'Plasma', wasmModule: needsImport });
+  } finally {
+    exerciseInstantiation = false;
+  }
+  assert.equal(posted.some((entry) => entry.msg.type === 'ready'), false);
   const failed = await until(() => posted.find((p) => p.msg.type === 'engineRejected'));
   assert.equal(posted.filter((p) => p.msg.type === 'engineRejected').length, 1,
     'one rejection, not one per import the module leaves unsatisfied');
