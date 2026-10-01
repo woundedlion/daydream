@@ -28,6 +28,13 @@ test('sortItems orders by size numerically', () => {
     [3000, 2000, 1000]);
 });
 
+test('sortItems breaks equal sizes by ascending name in both directions', () => {
+  const tied = [{ name: 'Zulu', size: 1000 }, { name: 'Alpha', size: 1000 }];
+  for (const direction of ['asc', 'desc']) {
+    assert.deepEqual(sortItems(tied, 'size', direction).map(i => i.name), ['Alpha', 'Zulu']);
+  }
+});
+
 test('sortItems does not mutate its input', () => {
   const original = items();
   const snapshot = original.map(i => i.name);
