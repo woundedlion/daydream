@@ -472,6 +472,19 @@ export class SegmentController {
     this.presetIndex = mainEngine?.getPresetIndex?.() ?? null;
   }
 
+  /** @param {number} i @param {string} reason */
+  #scheduleBootRetry(i, reason) {
+    const next = this.bootAttempt + 1;
+    console.warn(`[Segmented] seg ${i} ${reason}`
+      + ` (attempt ${next}/${MAX_BOOT_RETRIES}); rebuilding pool`);
+    this.destroy();
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      if (this.active) this.create(this.count, next);
+    }, BOOT_RETRY_DELAY_MS);
+    unrefTimer(this.retryTimer);
+  }
+
   /**
    * (Re)build the worker pool at the current resolution: destroy any existing
    * pool, then spawn `numSegments` fresh workers, each loading its own WASM
@@ -643,14 +656,7 @@ export class SegmentController {
         if (msg.sharedModule) {
           this.moduleWarmer.discard();
           if (!this.#ready && this.bootAttempt < MAX_BOOT_RETRIES) {
-            console.warn(`[Segmented] seg ${i} shared module rejected (attempt ${this.bootAttempt}/${MAX_BOOT_RETRIES}): ${msg.reason}; rebuilding pool`);
-            const next = this.bootAttempt + 1;
-            this.destroy();
-            this.retryTimer = setTimeout(() => {
-              this.retryTimer = null;
-              if (this.active) this.create(this.count, next);
-            }, BOOT_RETRY_DELAY_MS);
-            unrefTimer(this.retryTimer);
+            this.#scheduleBootRetry(i, `shared module rejected: ${msg.reason}`);
             return;
           }
         }
@@ -677,18 +683,7 @@ export class SegmentController {
         ? e.message : null;
       if (!this.#ready && !message
           && this.bootAttempt < MAX_BOOT_RETRIES) {
-        const next = this.bootAttempt + 1;
-        console.warn(`[Segmented] seg ${i} module failed to load`
-          + ` (attempt ${next}/${MAX_BOOT_RETRIES}); rebuilding pool`);
-        // Tear the failing pool down before the backoff window rather than
-        // leaving its survivors instantiating WASM and able to re-enter this
-        // path; create() re-destroying is idempotent.
-        this.destroy();
-        this.retryTimer = setTimeout(() => {
-          this.retryTimer = null;
-          if (this.active) this.create(this.count, next);
-        }, BOOT_RETRY_DELAY_MS);
-        unrefTimer(this.retryTimer);
+        this.#scheduleBootRetry(i, 'module failed to load');
         return;
       }
       const detail = message || (this.#ready
