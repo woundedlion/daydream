@@ -1147,6 +1147,9 @@ test('a refused shader link leaves the source select on the scratch chain', asyn
   assert.equal(harness.elements.get('shader-document-select').value, '');
   assert.match(harness.elements.get('shader-document-status').textContent,
     /shader link could not be restored/);
+  await harness.controller.flushDeepLink();
+  await new Promise((resolve) => setTimeout(resolve, SHADER_LINK_DEBOUNCE_MS + 20));
+  assert.equal(harness.win.location.hash, hash);
 });
 
 // The chain program is written last, so a refusal between the adoption and the
