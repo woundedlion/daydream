@@ -137,7 +137,7 @@ function activateCustomHue(sourceRecipe) {
   document.getElementById('gen_hue_mode').value = 'CUSTOM';
   previousHueMode = PaletteV4.hueMode.CUSTOM;
   syncRecipeControlAvailability();
-  return handoff.kept;
+  return true;
 }
 
 function currentHueKeyState(recipe) {
