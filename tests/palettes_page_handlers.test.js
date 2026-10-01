@@ -5,6 +5,34 @@ import { fakeElement } from './helpers/fake_dom.js';
 
 const handler = pageHandlers(new URL('../src/workbench/palettes/palettes_page.js', import.meta.url));
 
+test('a previous slider blur preserves the new locked drag', () => {
+  const sliders = { red: fakeElement(), green: fakeElement() };
+  const definitions = Object.keys(sliders).map((param) => ({ param, group: 'offset', scale: 1 }));
+  for (const slider of Object.values(sliders)) Object.assign(slider, { value: '0.5', min: '0', max: '1' });
+  const input = {};
+  const context = {
+    parameters: { red: 0.5, green: 0.5 }, sliderDefinitions: definitions, sliderHandles: {},
+    lockedDragStartValues: {}, lockedDragOwner: null, sliderAriaLabel: () => '',
+    document: { getElementById: (id) => id === 'lock_offset' ? { checked: true } : sliders[id.replace('_slider', '')] },
+    createSlider: (_container, options, callback) => {
+      input[options.id] = callback;
+      return { slider: sliders[options.id], setValue: (value) => { sliders[options.id].value = String(value); } };
+    },
+    lockedGroupMove: (delta, members) => ({ values: Object.fromEntries(members.map((member) => [member.param, member.start + delta])) }),
+    scheduleUpdate: () => {},
+  };
+  const mount = handler('mountSlider', context);
+  definitions.forEach(mount);
+  sliders.red.dispatchEvent({ type: 'mousedown' });
+  sliders.green.dispatchEvent({ type: 'mousedown' });
+  sliders.red.dispatchEvent({ type: 'blur' });
+  input.green(0.6);
+  assert.equal(context.parameters.red, 0.6);
+  assert.equal(context.parameters.green, 0.6);
+  sliders.green.dispatchEvent({ type: 'blur' });
+  assert.equal(context.lockedDragOwner, null);
+});
+
 test('copy feedback ignores an older clipboard completion', async () => {
   const pending = [];
   let dismissed = 0;
