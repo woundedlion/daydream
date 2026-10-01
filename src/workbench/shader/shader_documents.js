@@ -463,9 +463,9 @@ export function createShaderDocumentController({
     if (!parameterLive(parameterId)) return false;
     try {
       if (chainUi === null || active === null || active.presetId === null) return;
-      const declaresParameter = !chainUi.store.declares(parameterId);
+      const addsDeclaration = !chainUi.store.declares(parameterId);
       const result = chainUi.store.setPresetValue(active.presetId, parameterId, value, () => {
-        if (declaresParameter && active.compiledSide) return { ok: true };
+        if (addsDeclaration && active.compiledSide) return { ok: true };
         const engine = getEngine();
         const module = getModule();
         if (!engine || !module) return { ok: true };
@@ -492,7 +492,7 @@ export function createShaderDocumentController({
         return false;
       }
       preserveRefusedLink = false;
-      if (declaresParameter) {
+      if (addsDeclaration) {
         const dropped = syncParity();
         applyPreset(active.presetId);
         if (dropped) chainUi.strip.render();
