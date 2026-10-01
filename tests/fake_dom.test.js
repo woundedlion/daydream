@@ -239,7 +239,7 @@ test('a listener an earlier handler removed does not run', () => {
   assert.deepEqual(log, ['leaf']);
 });
 
-test('a disabled control ignores a click while its ancestors still see it', () => {
+test('a disabled control prevents click propagation to ancestors', () => {
   const { leaf, log, listen } = chain();
   listen('root', 'root');
   listen('mid', 'mid');
@@ -248,7 +248,7 @@ test('a disabled control ignores a click while its ancestors still see it', () =
 
   leaf.dispatch('click');
 
-  assert.deepEqual(log, ['mid', 'root'], 'the disabled node runs none of its own');
+  assert.deepEqual(log, [], 'disabled activation never reaches an ancestor');
 });
 
 test('a disabled control still runs its listeners for events disabling never gates', () => {

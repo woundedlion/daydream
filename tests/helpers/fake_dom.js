@@ -548,6 +548,9 @@ export function fakeElement(tag = 'div', options = {}) {
         preventDefault() { if (!passive) dispatched.defaultPrevented = true; },
       };
 
+      if (this.disabled === true && DISABLEABLE_TAGS.has(this.tagName)
+          && ['click', 'auxclick', 'dblclick'].includes(type)) return dispatched;
+
       /**
        * Runs one node's listeners for this event.
        * @param {Object} node - Node the event has reached.
