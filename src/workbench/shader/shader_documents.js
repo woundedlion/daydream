@@ -342,7 +342,8 @@ export function createShaderDocumentController({
    * @returns {boolean} Whether the parity toggle is armed.
    */
   const parityArmed = () =>
-    active?.official != null && liveDigest() === active.loadedDigest;
+    active?.official != null
+    && liveDigest() === active.official.descriptorDigest;
 
   /**
    * Repaints the parity toggle and, once a descriptor edit has broken the
@@ -657,7 +658,6 @@ export function createShaderDocumentController({
       compiled,
       filename,
       official,
-      loadedDigest: compiled.descriptor_digest,
       compiledSide: false,
       presetId,
       referencePresetIds: official?.presetIds ?? [],

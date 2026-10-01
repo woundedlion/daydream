@@ -1049,7 +1049,8 @@ async function editorWorkbench({
     },
     setParamFilter: (filter) => filters.push(filter),
     fetchText: patternFetch(
-      { 'kaleidoscope_hex_bright.shader.json': KALEIDOSCOPE_HEX_BRIGHT }, migration),
+      { 'kaleidoscope_hex_bright.shader.json': KALEIDOSCOPE_HEX_BRIGHT,
+        'alien_core.shader.json': JSON.stringify(promotedDocument('alien_core.shader.json')) }, migration),
     importCompiler: () => import('../generated/shader/shader_workbench.mjs'),
     download: (filename, source) => downloads.push([filename, source]),
     win,
@@ -1510,6 +1511,19 @@ test('the parity toggle disarms on a descriptor edit, not on a bypass', async ()
   clickPlaneBandEntry(harness, 'warp.wave-shear.v2');
 
   assert.equal(toggle.disabled, true);
+});
+
+test('a migrated v1 expansion only arms parity when its promoted digest matches', async () => {
+  const source = readFileSync(new URL(
+    '../src/workbench/shader/patterns/v1/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8');
+  const migration = JSON.parse(HEX_MIGRATION);
+  migration.source_documents['alien-core'] = 'alien_core.shader.json';
+  const harness = await editorWorkbench({ source, migration: JSON.stringify(migration) });
+  assert.equal(harness.elements.get('shader-parity-toggle').disabled, false);
+  const alien = readFileSync(new URL(
+    '../src/workbench/shader/patterns/v1/alien_core.shader.json', import.meta.url), 'utf8');
+  await harness.controller.loadSource(alien, 'alien_core.shader.json');
+  assert.equal(harness.elements.get('shader-parity-toggle').disabled, true);
 });
 
 test('compiled stage edits reach stages bypassed in the interpreter', async () => {
