@@ -10,6 +10,7 @@
 
 import { srgbToLinearFloat, linearToSrgbFloat, linearRgbToHex } from '../../shared/color.js';
 import { fillColumns, formatFloatCpp } from '../../shared/cpp_format.js';
+import { PaletteV4 } from './palette_controls.js';
 
 /** @typedef {import('./palette_controls.js').PaletteRecipe} PaletteRecipe */
 
@@ -509,25 +510,10 @@ export function proceduralPaletteCpp(parameters) {
  * The inverse of palette_controls.js's PaletteV4; WASM parity tests
  * pin both to the `enum class` rosters in core/color/palette_recipe.h.
  */
-export const ENUM_NAMES = Object.freeze({
-  domain: ['STRAIGHT', 'MIRROR', 'VIGNETTE', 'FALLOFF', 'LOOP'],
-  easing: ['LINEAR', 'COSINE', 'SMOOTHSTEP'],
-  colorPath: ['OKLCH_ARC', 'OKLAB_CARTESIAN'],
-  hueMode: ['HARMONY', 'SWEEP', 'CUSTOM'],
-  harmony: [
-    'MONOCHROMATIC',
-    'ANALOGOUS',
-    'ACCENTED_ANALOGOUS',
-    'COMPLEMENTARY',
-    'SPLIT_COMPLEMENTARY',
-    'TRIADIC',
-    'TETRADIC',
-    'SQUARE',
-  ],
-  direction: ['SHORTEST', 'CLOCKWISE', 'COUNTERCLOCKWISE'],
-  curve: ['CONSTANT', 'ASCENDING', 'DESCENDING', 'BELL', 'CUP', 'CUSTOM'],
-  chromaBasis: ['LOCAL_GAMUT', 'PATH_MINIMUM', 'ABSOLUTE'],
-});
+export const ENUM_NAMES = Object.freeze(Object.fromEntries(
+  Object.entries(PaletteV4).map(([group, members]) => [group,
+    Object.entries(members).sort((a, b) => a[1] - b[1]).map(([name]) => name)]),
+));
 for (const names of Object.values(ENUM_NAMES)) Object.freeze(names);
 
 /**

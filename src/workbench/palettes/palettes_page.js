@@ -28,7 +28,7 @@ import {
   wrapTurns,
   hitTestHueKeyMarker,
   hueKeyState, customHueKeyState, moveCustomHueKey,
-  loopSweepTurns, paletteEnumOrdinal,
+  loopSweepTurns, paletteEnumOrdinal, paletteEnumName,
 } from './palette_controls.js';
 import { createColorStripPainter, drawWaveGraph } from './palette_canvas.js';
 import {
@@ -1262,7 +1262,7 @@ function handleHueModeChange(el) {
     selectedHueKey = 0;
     activeHueKey = null;
     if (!activateCustomHue(sourceRecipe))
-      el.value = Object.keys(PaletteV4.hueMode).find((name) => PaletteV4.hueMode[name] === previousHueMode);
+      el.value = paletteEnumName('hueMode', previousHueMode);
   } else {
     previousHueMode = nextMode;
   }

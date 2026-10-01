@@ -86,6 +86,7 @@ test('the hue dropdown restores its previous mode after a refused handoff', () =
     previousHueMode: 0, selectedHueKey: 0, activeHueKey: null, paletteEnumOrdinal: () => 1,
     readPaletteRecipe: () => ({ hue: {}, domain: 0 }), customBaseTurns: () => 0,
     activateCustomHue: () => false,
+    paletteEnumName: () => 'HARMONY',
   };
   handler('handleHueModeChange', context)(select);
   assert.equal(select.value, 'HARMONY');
