@@ -516,8 +516,17 @@ test('chain snapshots match fake key sets, decode refusals and runtime round tri
   assert.deepEqual(Object.keys(chainCall(fake, 'getSnapshot')).sort(), Object.keys(saved).sort());
   const missingPause = structuredClone(saved);
   delete missingPause.animationsPaused;
+  const max = fake.catalog.budgets;
   for (const snapshot of [null, { schemaVersion: 2 }, missingPause,
-    { ...saved, chain: [] }, { ...saved, runtime: null }, { ...saved, paletteBank: {} }])
+    { ...saved, chain: [] }, { ...saved, chain: null }, { ...saved, parameters: null },
+    { ...saved, runtime: null }, { ...saved, paletteBank: {} },
+    { ...saved, chain: Array(max.max_chain_ops + 1).fill(null) },
+    { ...saved, parameters: Array(max.max_params + 1).fill(null) },
+    { ...saved, runtime: Array(max.max_chain_ops + 1).fill(null) },
+    { ...saved, paletteBank: { ...saved.paletteBank, hues: null } },
+    { ...saved, paletteBank: { ...saved.paletteBank, cycles: null } },
+    { ...saved, paletteBank: { ...saved.paletteBank, hues: [] } },
+    { ...saved, paletteBank: { ...saved.paletteBank, cycles: [] } }])
     assert.equal(chainCall(fake, 'restoreSnapshot', snapshot).value,
       chainCall(engine, 'restoreSnapshot', snapshot).value);
   assert.equal(chainCall(fake, 'restoreSnapshot', saved), ChainSnapshotRestoreResult.APPLIED);
