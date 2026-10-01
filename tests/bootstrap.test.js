@@ -610,7 +610,8 @@ test('boot failure advice tolerates an absent WebAssembly global', () => {
   const wasm = globalThis.WebAssembly;
   try {
     delete globalThis.WebAssembly;
-    assert.equal(typeof bootRemedy(new Error('unavailable')), 'string');
+    assert.equal(bootRemedy(new Error('unavailable')), '');
+    assert.equal(bootRemedy(new SyntaxError('stale')), STALE_MODULE_REMEDY);
   } finally {
     globalThis.WebAssembly = wasm;
   }
