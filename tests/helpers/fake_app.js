@@ -4,7 +4,7 @@
 // on the assembly the root actually produced rather than on its source text.
 import { fakeElement, installDocument } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
-import { isViewLive } from '../../src/renderer/pixel_view.js';
+import { Daydream } from '../../src/renderer/driver.js';
 
 import { start } from '../../src/app/daydream.js';
 import { createSegmentPoolSpawner } from '../../src/ui/segmented_pov_controls.js';
@@ -262,7 +262,17 @@ export function fakeDriver() {
     recorder: null,
     pixels: null,
     dotMesh: null,
-    renderer: { setAnimationLoop(frame) { this.frame = frame; } },
+    renderer: { setAnimationLoop(frame) { this.frame = frame; }, setScissorTest() {} },
+    controls: { update() {} },
+    win: { performance },
+    xAxis: {}, yAxis: {}, zAxis: {},
+    labelPool: { activeCount: 0 },
+    renderMainView() {},
+    refreshLabels() {},
+    renderPip() {},
+    updateCullUniforms() {},
+    updateStats() {},
+    stepSimulation: Daydream.prototype.stepSimulation,
     startFrameLoop(frame) { this.renderer.setAnimationLoop(frame); },
     keys: [],
     frames: 0,
@@ -280,31 +290,8 @@ export function fakeDriver() {
       this.dotMesh = { instanceColor: fakeColorAttribute(null) };
     },
     render(adapter) {
-      if (this.contextLost) return;
       this.frames += 1;
-      const clockReady = this.advanceFrameClock();
-      const advanced = (clockReady || this.stepFrames !== 0)
-        && (!this.paused || this.stepFrames > 0);
-      if (advanced) {
-        this.stepFrames = Math.max(0, this.stepFrames - 1);
-        adapter.drawFrame();
-      }
-      if (advanced || this.paused || this.needsRender) adapter?.sync?.(advanced);
-      if (!advanced && !this.needsRender) return;
-      this.needsRender = false;
-      const captureReady = typeof adapter?.captureReady === 'function'
-        ? adapter.captureReady(advanced) : advanced;
-      const captureDue = this.recorder?.isRecording === true && captureReady;
-      if (this.dotMesh?.instanceColor && !isViewLive(this.dotMesh.instanceColor.array)) {
-        adapter?.refreshPixelView?.();
-        if (captureDue) this.heldCaptures++;
-        this.needsRender = true;
-        return;
-      }
-      const owed = this.recorder ? (captureDue ? 1 : 0) + this.heldCaptures : 0;
-      this.heldCaptures = owed > 0 ? owed - 1 : 0;
-      if (owed > 0) this.recorder.captureFrame();
-      if (this.heldCaptures > 0) this.needsRender = true;
+      Daydream.prototype.render.call(this, adapter);
     },
     dispose() { this.disposed = true; },
   };

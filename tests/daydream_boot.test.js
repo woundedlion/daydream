@@ -884,6 +884,21 @@ test('the late-bound engine controls are re-applied once the engine exists', asy
     + 'deep link shows in the GUI but never reaches the engine');
 });
 
+test('engine resolutions without a named preset are omitted and reported', async () => {
+  const capture = installConsoleCapture('warn', 'log');
+  try {
+    const app = startApp({
+      loadModule: () => Promise.resolve(fakeWasmModule({ resolutions: [[96, 20], [7, 13]] })),
+    });
+    await app.teardown.ready;
+    assert.deepEqual(resolutionControl(app).args[0], ['Holosphere (96x20)']);
+    assert.deepEqual(app.driver.resolution, HOLOSPHERE);
+    assert.ok(capture.messages.some((message) => message.includes('7x13')));
+  } finally {
+    capture.restore();
+  }
+});
+
 test('the resolution dropdown offers only what the engine reports', async () => {
   const app = await bootedApp({
     loadModule: () => Promise.resolve(fakeWasmModule({ resolutions: [[96, 20]] })),
