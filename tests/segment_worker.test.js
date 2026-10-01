@@ -837,7 +837,7 @@ test('init applies the carried params AFTER setEffect rebuilds to defaults', asy
 
 test('init restores accepted params before replaying rejected requests', async () => {
   await dispatch({
-    type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'ShaderBall',
+    type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Shader',
     params: [
       { name: 'Planar Warp 1', acceptedValue: 0, value: 6 },
       { name: 'Planar Warp 1 Scale', acceptedValue: 1, value: 100 },
@@ -849,7 +849,7 @@ test('init restores accepted params before replaying rejected requests', async (
   ]);
 });
 
-test('init restores ShaderBall full config atomically instead of replaying params', async () => {
+test('init restores Shader full config atomically instead of replaying params', async () => {
   const snapshot = {
     schemaVersion: 2,
     accepted: [1, 2], requested: [1, 7], pendingFieldIds: [1],
@@ -857,7 +857,7 @@ test('init restores ShaderBall full config atomically instead of replaying param
   };
   await dispatch({
     type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
-    effectName: 'ShaderBall', fullConfigSnapshot: snapshot,
+    effectName: 'Shader', fullConfigSnapshot: snapshot,
   });
   assert.deepEqual(engineInstance.calls.find((call) =>
     call[0] === 'restoreFullConfigSnapshot'),
@@ -936,7 +936,7 @@ test('setEffect handler rebuilds, then re-applies the carried param snapshot', a
   assert.equal(posted.find((p) => p.msg.type === 'frame').msg.paramRevision, 9);
 });
 
-test('setEffect restores ShaderBall snapshot after rebuilding', async () => {
+test('setEffect restores Shader snapshot after rebuilding', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
     effectName: 'Plasma' });
   const snapshot = {
@@ -945,11 +945,11 @@ test('setEffect restores ShaderBall snapshot after rebuilding', async () => {
     hasRuntime: false, runtime: [],
   };
   await dispatch({
-    type: 'setEffect', name: 'ShaderBall', fullConfigSnapshot: snapshot,
+    type: 'setEffect', name: 'Shader', fullConfigSnapshot: snapshot,
     paramRevision: 14,
   });
   assert.deepEqual(engineInstance.calls.slice(-2), [
-    ['setEffect', 'ShaderBall'],
+    ['setEffect', 'Shader'],
     ['restoreFullConfigSnapshot', snapshot],
   ]);
 });
@@ -1293,7 +1293,7 @@ for (const fault of ['missing restore API', 'rejected restore', 'live engine']) 
       ? FullConfigRestoreResult.INVALID_VALUE : FullConfigRestoreResult.APPLIED;
     nextLive = fault === 'live engine';
     await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
-      effectName: 'ShaderBall', fullConfigSnapshot: { schema_version: 1 }, paused: true });
+      effectName: 'Shader', fullConfigSnapshot: { schema_version: 1 }, paused: true });
     assert.equal(posted.length, 1);
     assert.equal(posted[0].msg.type, 'engineRejected');
     const reason = nextLive ? 'HolosphereEngine is already live'

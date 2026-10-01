@@ -37,7 +37,7 @@ function makeEffectRecord(name, speed, paused, writes = []) {
  * @param {() => boolean} [options.moduleDead] - Reads whether that throw trapped
  *   the engine module.
  * @param {Set<string>} [options.fullConfigEffects] - Effects the panel persists
- *   and restores whole through the full-config snapshot API (ShaderBall).
+ *   and restores whole through the full-config snapshot API.
  */
 function makeApp({
   rejectEffects = new Set(),
