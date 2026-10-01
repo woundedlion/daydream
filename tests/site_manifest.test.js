@@ -228,27 +228,21 @@ const UNREFERENCED = [
 ];
 
 const PATTERNS = 'generated/shader/patterns';
-const MIGRATION = `${PATTERNS}/shaderball_migration.json`;
-const DIGEST_MIGRATION = 'src/workbench/shader/patterns/digest_migration.v1v2.json';
-const missingCatalog = sourceOnly && !existsSync(resolve(REPO, MIGRATION));
+const CATALOG = `${PATTERNS}/catalog.json`;
+const missingCatalog = sourceOnly && !existsSync(resolve(REPO, CATALOG));
 
-// Documents in the pattern directory that are not source documents: the
-// migration listing, which the source catalog fetches by URL, and the v1-to-v2
-// digest table, published for its own sake.
+// The pattern catalog lists the published source documents.
 const PATTERN_NON_SOURCES = [
-  MIGRATION,
-  DIGEST_MIGRATION,
+  CATALOG,
 ];
 
 /**
- * Pattern documents fetched by the source catalog and legacy digest links.
+ * Pattern documents fetched by the source catalog.
  * @returns {Set<string>} Repo-relative pattern document paths.
  */
 const servedPatterns = () => new Set([
-  ...Object.values(missingCatalog ? {} : JSON.parse(read(MIGRATION)).source_documents).map(
+  ...Object.values(missingCatalog ? {} : JSON.parse(read(CATALOG)).source_documents).map(
     (/** @type {*} */ filename) => `${PATTERNS}/${filename}`),
-  ...Object.values(JSON.parse(read(DIGEST_MIGRATION))).map(
-    (filename) => `${PATTERNS}/${filename}`),
   ...PATTERN_NON_SOURCES,
 ]);
 
@@ -260,9 +254,9 @@ const patternFiles = () =>
 
 test('the site manifest publishes every source catalog document',
   { skip: missingCatalog && 'engine catalog is installed separately' }, () => {
-  const migration = JSON.parse(read('generated/shader/patterns/shaderball_migration.json'));
+  const catalog = JSON.parse(read('generated/shader/patterns/catalog.json'));
   const entries = new Set(manifestEntries());
-  const missing = Object.values(migration.source_documents)
+  const missing = Object.values(catalog.source_documents)
     .map((filename) => `generated/shader/patterns/${filename}`)
     .filter((path) => !entries.has(path));
   assert.deepEqual(missing, []);
@@ -286,7 +280,7 @@ test('the site manifest publishes nothing the served pages do not reach', () => 
       'thing keeping dev tooling off Pages');
 });
 
-test('the site manifest publishes exactly the catalog and legacy digest documents',
+test('the site manifest publishes exactly the catalog documents',
   { skip: missingCatalog && 'engine catalog is installed separately' }, () => {
   const served = new Set([...servedPatterns()].filter((entry) => entry.startsWith(`${PATTERNS}/`)));
   const listed = new Set(
@@ -294,16 +288,16 @@ test('the site manifest publishes exactly the catalog and legacy digest document
   const files = patternFiles();
 
   assert.deepEqual([...served].filter((doc) => !listed.has(doc)).sort(), [],
-    `${MANIFEST} omits pattern documents the catalog or legacy digest links fetch — ` +
+    `${MANIFEST} omits pattern documents the catalog fetches — ` +
       'they would 404 on Pages');
   assert.deepEqual([...listed].filter((doc) => !served.has(doc)).sort(), [],
-    `${MANIFEST} publishes pattern documents neither catalog nor digest migration names`);
+    `${MANIFEST} publishes pattern documents the catalog does not name`);
   assert.deepEqual(
     files.filter((doc) => !served.has(doc)).sort(), [],
-    `${PATTERNS} holds documents neither catalog nor digest migration names, so nothing demands ` +
+    `${PATTERNS} holds documents the catalog does not name, so nothing demands ` +
       `a ${MANIFEST} entry for them`);
   assert.deepEqual([...served].filter((doc) => !files.includes(doc)).sort(), [],
-    'Catalog or digest migration names documents that are not on disk');
+    'Catalog names documents that are not on disk');
 });
 
 

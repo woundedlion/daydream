@@ -223,13 +223,13 @@ export class FakeChainEngine {
       isValid,
       getProgram: () => isValid() ? structuredClone(this.program) : null,
       getSnapshot: () => isValid() ? {
-        schemaVersion: 1, chain: structuredClone(this.program),
+        schemaVersion: 2, chain: structuredClone(this.program),
         parameters: this.definitions.map((d) => ({name: d.name, value: d.acceptedValue})),
         animationsPaused: this.paused,
       } : null,
       restoreSnapshot: (snapshot) => {
         if (!isValid()) return ChainSnapshotRestoreResult.NOT_SHADER_CHAIN;
-        if (snapshot?.schemaVersion !== 1) return ChainSnapshotRestoreResult.UNSUPPORTED_VERSION;
+        if (snapshot?.schemaVersion !== 2) return ChainSnapshotRestoreResult.UNSUPPORTED_VERSION;
         const outcome = this.#setShaderChain(snapshot.chain);
         if (outcome.code !== 'APPLIED') return ChainSnapshotRestoreResult.INVALID_CHAIN;
         if (this.#setShaderChainParameters(snapshot.parameters) !== ParamSetResult.APPLIED)

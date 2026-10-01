@@ -33,7 +33,7 @@ function fixture(t) {
     'generated/holosphere_wasm.wasm.sha256', 'generated/holosphere_wasm.toolchain', 'generated/pov_segment_map.json',
     'generated/shader/shader_workbench.mjs', 'generated/shader/sha256.mjs', 'generated/shader/engine_catalog.json',
     'generated/shader/composed_effect_roster.mjs',
-    'generated/shader/patterns/shaderball_migration.json',
+    'generated/shader/patterns/catalog.json',
     'generated/shader/patterns/new.shader.json', 'docs/screenshots/new.png'].map((path) => [path, 'new ' + path]));
   files['generated/holosphere_wasm.sha'] = pair.holosphere;
   const manifest = Object.entries(files).map(([path, content]) => {

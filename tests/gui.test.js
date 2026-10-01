@@ -615,48 +615,8 @@ test('display folders do not change descendant deep-link keys', () => {
   assert.deepEqual(folder.collectUrlKeys(), ['fx.Speed']);
 });
 
-test('addMigrated rewrites a legacy deep-link key without changing its value', () => {
-  const url = installRecordingWindow('?fx.Outer+Warp=2&keep=1');
-  mock.timers.enable({ apis: ['setTimeout'] });
-  try {
-    const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
-    const folder = gui.addDisplayFolder('Planar Warp 1');
-    const state = { 'Planar Warp 1': 0 };
 
-    folder.addMigrated(state, 'Planar Warp 1', ['Outer Warp'],
-      { None: 0, Mirror: 1, Curl: 2 });
-    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
 
-    const params = new URL(url.written(), 'http://x').searchParams;
-    assert.equal(state['Planar Warp 1'], 2);
-    assert.equal(params.get('fx.Planar Warp 1'), '2');
-    assert.equal(params.has('fx.Outer Warp'), false);
-    assert.equal(params.get('keep'), '1');
-  } finally {
-    mock.timers.reset();
-  }
-});
-
-test('readStoredNumber migrates a legacy companion key', () => {
-  const url = installRecordingWindow('?fx.__accepted.Outer+Warp=6');
-  mock.timers.enable({ apis: ['setTimeout'] });
-  try {
-    const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
-    const value = gui.readStoredNumber('__accepted.Planar Warp 1',
-      ['__accepted.Outer Warp']);
-    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
-
-    const params = new URL(url.written(), 'http://x').searchParams;
-    assert.equal(value, 6);
-    assert.equal(params.get('fx.__accepted.Planar Warp 1'), '6');
-    assert.equal(params.has('fx.__accepted.Outer Warp'), false);
-  } finally {
-    mock.timers.reset();
-  }
-});
-
-// The query string is parsed once per location and copied per read, so a stale
-// copy or a shared one would hydrate controls from a URL the page has left.
 test('a parsed query string is re-read when the location moves', () => {
   installWindowAt('?fx.Speed=1');
   const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
@@ -996,4 +956,15 @@ test('a fallback URL writer hands pending keys to a newly registered URLSync', (
   assert.equal(query.get('first'), '1');
   assert.equal(query.get('second'), '2');
   write.cancel();
+});
+
+
+test('controls and accepted values ignore retired parameter names', () => {
+  installWindowAt('?fx.Outer+Warp=2&fx.__accepted.Outer+Warp=6');
+  const gui = new DeepLinkGUI({autoPlace: false}, 'fx');
+  const state = {'Planar Warp 1': 0};
+  gui.add(state, 'Planar Warp 1', {None: 0, Mirror: 1, Curl: 2});
+  assert.equal(state['Planar Warp 1'], 0);
+  assert.equal(gui.readStoredNumber('__accepted.Planar Warp 1'), undefined);
+  assert.equal(gui.urlParams().get('fx.Outer Warp'), '2');
 });

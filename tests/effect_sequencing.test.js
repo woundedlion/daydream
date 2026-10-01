@@ -775,9 +775,9 @@ test('an effect the resized engine rejects rejects the resolution change', () =>
 
 
 test('resolution rebuild restores the chain runtime before rebuilding controls or broadcasting', () => {
-  const snapshot = {schemaVersion: 1, chain: [{instance: 'camera', operator: 'sphere.rotate.v2'}],
+  const snapshot = {schemaVersion: 2, chain: [{instance: 'camera', operator: 'sphere.rotate.v2'}],
     parameters: [{name: 'camera.wander', value: 0.3}],
-    runtime: [{instance: 'camera', kind: 'spatial-walk-v1', state: {walkTime: 37}}], animationsPaused: false};
+    runtime: [{instance: 'camera', kind: 'spatial-walk-v2', state: {walkTime: 37}}], animationsPaused: false};
   const app = makeApp({chainSnapshot: snapshot, segmented: true});
   assert.equal(app.pipeline.applyResolution(), ApplyResult.APPLIED);
   assert.ok(app.log.indexOf('chain.capture') < app.log.findIndex((event) => event.startsWith('engine.setResolution')));
@@ -787,14 +787,14 @@ test('resolution rebuild restores the chain runtime before rebuilding controls o
 });
 
 test('a refused chain restore rejects a resolution transaction before rebuilding its controls', () => {
-  const app = makeApp({chainSnapshot: {schemaVersion: 1}, restoreSnapshotResult: ChainSnapshotRestoreResult.INVALID_CHAIN});
+  const app = makeApp({chainSnapshot: {schemaVersion: 2}, restoreSnapshotResult: ChainSnapshotRestoreResult.INVALID_CHAIN});
   assert.equal(app.pipeline.applyResolution(), ApplyResult.REJECTED);
   assert.equal(app.log.includes('effectGui.build'), false);
 });
 
 test('rollback captures and restores complete chain runtime without individual parameter replay', () => {
   const effect = makeEffectControls({Speed: 0.25}, true);
-  const chain = {schemaVersion: 1, runtime: [{instance: 'sample', kind: 'source-clock-v1', state: {primary: 1.25}}]};
+  const chain = {schemaVersion: 2, runtime: [{instance: 'sample', kind: 'source-clock-v1', state: {primary: 1.25}}]};
   const snapshot = snapshotEffectControlState(effect, () => true, () => structuredClone(chain));
   assert.deepEqual(snapshot.chainSnapshot, chain);
   assert.deepEqual(snapshot.paramValues, []);

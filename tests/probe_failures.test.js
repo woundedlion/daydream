@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { runWorkbenchSections, probeDocumentActions, probeLegacyImport, probeParity, probeStartupPersistence, probeStrip, probeStripHistory } from '../scripts/workbench-probe.mjs';
+import { runWorkbenchSections, probeDocumentActions, probeSnapshotImport, probeParity, probeStartupPersistence, probeStrip, probeStripHistory } from '../scripts/workbench-probe.mjs';
 import { probeHistoryRestore, probeRationalLock } from '../scripts/lissajous-probe.mjs';
 import {
   probeKeyboardEdits, probeMobilePanel, probePanel, probePresetName, probeSidebar, probeSliderDrag,
@@ -19,7 +19,7 @@ const PROBES = [
   ['workbench-probe.mjs', 'probeDocumentActions', probeDocumentActions],
   ['workbench-probe.mjs', 'probeParity', probeParity],
   ['workbench-probe.mjs', 'probeStripHistory', probeStripHistory],
-  ['workbench-probe.mjs', 'probeLegacyImport', probeLegacyImport],
+  ['workbench-probe.mjs', 'probeSnapshotImport', probeSnapshotImport],
   ['workbench-probe.mjs', 'probeStartupPersistence', probeStartupPersistence],
 
   ['palettes-probe.mjs', 'probeHueWheel', probeHueWheel],

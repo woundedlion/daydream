@@ -20,7 +20,6 @@ import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
-import { URL_FLUSH_DEBOUNCE_MS } from '../src/app/state.js';
 import { pageWarmer } from '../src/segments/module_warmer.js';
 import {
   EffectSetResult, ParamSetResult, ResolutionSetResult, ChainSnapshotRestoreResult, unpinnedEngineMethods,
@@ -111,7 +110,7 @@ test('catalog effects are offered at both simulator resolutions', async () => {
 
 test('the shader-document roster names exactly the documents that ship', () => {
   const manifest = JSON.parse(readFileSync(
-    new URL('../generated/shader/patterns/shaderball_migration.json', import.meta.url),
+    new URL('../generated/shader/patterns/catalog.json', import.meta.url),
     'utf8'));
 
   assert.deepEqual([...SHADER_DOCUMENT_EFFECTS].sort(),
@@ -299,21 +298,6 @@ async function bootedApp(options) {
   }
 }
 
-test('legacy links without a snapshot retain their original URL across rendered and failed frames', async (t) => {
-  t.mock.timers.enable({apis: ['setTimeout']});
-  for (const failingFrames of [0, 1]) {
-    const app = await bootedApp({
-      daydreamMode: 'shader-workbench', search: '?effect=ShaderBall',
-      loadModule: () => Promise.resolve(fakeWasmModule({failingFrames})),
-    });
-    t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS * 2);
-    assert.deepEqual(app.urlWrites, []);
-    captureConsole(() => app.driver.renderer.frame());
-    t.mock.timers.tick(URL_FLUSH_DEBOUNCE_MS * 2);
-    assert.deepEqual(app.urlWrites, [], 'unconverted legacy state remains available in the original URL');
-    assert.equal(app.teardown.disposed(), false);
-  }
-});
 
 /**
  * A MediaRecorder stand-in as VideoRecorder presents one: a toggle that flips

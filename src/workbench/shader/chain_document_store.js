@@ -763,3 +763,24 @@ export async function createChainDocumentStore({
     },
   };
 }
+
+/** @param {*} snapshot @param {*} catalog @returns {*} */
+export function documentFromChainSnapshot(snapshot, catalog) {
+  if (snapshot?.schemaVersion !== 2 || !Array.isArray(snapshot.chain)
+      || !Array.isArray(snapshot.parameters)) throw new Error('unsupported chain snapshot');
+  const document = scratchChainDocument(catalog, snapshot.chain.map((/** @type {*} */ entry) => ({
+    label: entry.instance, operator: entry.operator,
+  })));
+  document.document_id = 'imported-chain';
+  document.effect_id = 'imported-chain';
+  document.effect_metadata.display_name = 'Imported Chain';
+  document.effect_metadata.description = 'Imported chain snapshot.';
+  const values = document.preset_bank.presets[0].values;
+  for (const entry of snapshot.parameters) {
+    const parameter = document.descriptor.parameters.find((/** @type {*} */ p) => p.id === entry.name);
+    if (!parameter) throw new Error(`unknown chain snapshot parameter: ${entry.name}`);
+    values[entry.name] = parameter.storage === 'enum8'
+      ? parameter.domain.values[entry.value] : entry.value;
+  }
+  return document;
+}

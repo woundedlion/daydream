@@ -53,5 +53,5 @@ The engine bundle installs runtime binaries, provenance, the segment map, and
 shader modules and patterns under `generated/`. Its WASM checksum manifest uses
 filenames relative to that directory. Handwritten TypeScript declarations are
 tracked beside their generated modules for module resolution; runtime files are
-ignored. Legacy shader fixtures and digest migrations remain consumer-owned.
+ignored.
 The engine still mirrors `README.md` and `docs/screenshots/` at their public paths.

@@ -25,7 +25,7 @@ node_modules/
 /generated/shader/sha256.mjs
 /generated/shader/composed_effect_roster.mjs
 /generated/shader/patterns/*.shader.json
-/generated/shader/patterns/shaderball_migration.json
+/generated/shader/patterns/catalog.json
 
 # Linked git worktrees. A checkout of this same tree, so `git add -A` from the
 # root would otherwise commit a second copy of the repository.

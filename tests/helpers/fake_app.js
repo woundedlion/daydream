@@ -153,15 +153,6 @@ export function fakeGui(namespace = {}, optionsReplaces = false) {
       childrenElement.appendChild(c.domElement);
       return c;
     },
-    addMigrated(target, property, legacyProps, ...args) {
-      const legacy = legacyProps.find((name) => Object.hasOwn(hydrated, name));
-      if (legacy && !Object.hasOwn(hydrated, property)) target[property] = hydrated[legacy];
-      const c = gui.add(target, property, ...args);
-      if (legacy) c.replayOnChange = true;
-      c.legacyNames = legacyProps;
-      c.legacyProps = legacyProps;
-      return c;
-    },
     addUnhydrated(target, property, ...args) {
       if (!supportedProperty(target, property, args[0])) throw new TypeError(`Unsupported GUI property: ${property}`);
       const c = fakeController(gui, target, property, args, optionsReplaces);
@@ -184,12 +175,11 @@ export function fakeGui(namespace = {}, optionsReplaces = false) {
       return folder;
     },
     appendElement(element) { childrenElement.appendChild(element); },
-    readStoredNumber(prop, legacyProperties = []) {
+    readStoredNumber(prop) {
       gui.storedReads.push(prop);
       if (panel) {
         if (stored[prop] !== undefined) return stored[prop];
-        const legacy = legacyProperties.find((name) => stored[name] !== undefined);
-        return legacy ? stored[legacy] : undefined;
+        return undefined;
       }
       const value = gui.stored.get(prop);
       return typeof value === 'number' ? value : undefined;
@@ -224,7 +214,7 @@ export function fakeGui(namespace = {}, optionsReplaces = false) {
         open(open = true) { this.closed = !open; },
         close() { this.open(false); },
       };
-      for (const method of ['add', 'addMigrated', 'addUnhydrated', 'addSession'])
+      for (const method of ['add', 'addUnhydrated', 'addSession'])
         folder[method] = (...args) => {
           const control = gui[method](...args);
           if (control) control.folder = name;

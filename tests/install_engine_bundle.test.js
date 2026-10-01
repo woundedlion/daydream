@@ -30,8 +30,6 @@ function fixture(t, shape = () => {}) {
   write(destination, 'src/app/daydream.js', 'application');
   write(destination, 'generated/holosphere_wasm.sha', 'a'.repeat(40));
   write(destination, 'generated/shader/patterns/obsolete.shader.json', 'obsolete');
-  write(destination, 'src/workbench/shader/patterns/v1/legacy.shader.json', 'legacy');
-  write(destination, 'src/workbench/shader/patterns/digest_migration.v1v2.json', 'migration');
   write(destination, 'docs/screenshots/nested/obsolete.png', 'obsolete');
   write(destination, 'docs/screenshots/notes.txt', 'notes');
   const files = Object.fromEntries([
@@ -39,7 +37,7 @@ function fixture(t, shape = () => {}) {
     'generated/holosphere_wasm.toolchain', 'generated/pov_segment_map.json', 'generated/shader/shader_workbench.mjs',
     'generated/shader/sha256.mjs', 'generated/shader/engine_catalog.json',
     'generated/shader/composed_effect_roster.mjs',
-    'generated/shader/patterns/shaderball_migration.json', 'generated/shader/patterns/new.shader.json',
+    'generated/shader/patterns/catalog.json', 'generated/shader/patterns/new.shader.json',
   ].map((path) => [path, `fresh ${path}`]));
   files['generated/holosphere_wasm.sha'] = 'b'.repeat(40);
   shape(files);
@@ -60,8 +58,7 @@ test('install replaces stale assets and preserves consumer-owned files', (t) => 
     'fresh generated/shader/composed_effect_roster.mjs');
   assert.equal(existsSync(join(destination, 'generated/shader/patterns/obsolete.shader.json')), false);
   assert.equal(existsSync(join(destination, 'docs/screenshots/nested/obsolete.png')), false);
-  for (const path of ['src/workbench/shader/patterns/v1/legacy.shader.json',
-    'src/workbench/shader/patterns/digest_migration.v1v2.json', 'docs/screenshots/notes.txt'])
+  for (const path of ['docs/screenshots/notes.txt'])
     assert.equal(existsSync(join(destination, path)), true, path);
 });
 
@@ -74,8 +71,7 @@ test('corrupted generated documentation is rejected before any destination chang
 });
 
 test('bundle paths cannot overwrite assets outside the engine install set', (t) => {
-  for (const path of ['src/workbench/shader/patterns/digest_migration.v1v2.json',
-    'src/workbench/shader/patterns/v1/example.shader.json', '.git/config', 'engine/scripts/shader_workbench.mjs']) {
+  for (const path of ['src/app/daydream.js', '.git/config', 'engine/scripts/shader_workbench.mjs']) {
     const { bundle, destination } = fixture(t, (files) => { files[path] = 'unexpected'; });
     assert.throws(() => installEngineBundle(bundle, destination), /Engine bundle carries unexpected path/);
     assert.equal(readFileSync(join(destination, 'generated/holosphere_wasm.sha'), 'utf8'), 'a'.repeat(40));
@@ -156,17 +152,17 @@ test('runtime mirrors include engine documents but exclude Daydream sources', ()
   for (const path of ['README.md', 'docs/screenshots/example.png', 'generated/pov_segment_map.json', 'generated/shader/shader_workbench.mjs',
     'generated/shader/composed_effect_roster.mjs',
     'generated/shader/sha256.mjs', 'generated/shader/patterns/kaleidoscope_flowers.shader.json',
-    'generated/shader/patterns/shaderball_migration.json']) assert.equal(runtimePath(path), true, path);
+    'generated/shader/patterns/catalog.json']) assert.equal(runtimePath(path), true, path);
   for (const path of ['generated/shader/shader_workbench.d.mts', 'generated/holosphere_wasm.d.ts',
-    'src/workbench/shader/patterns/v1/example.shader.json', 'src/workbench/shader/patterns/digest_migration.v1v2.json',
+    'src/app/daydream.js',
     'src/workbench/shader/shader_documents.js']) assert.equal(runtimePath(path), false, path);
 });
 
-test('a bundle missing shader migration data is refused before installation', (t) => {
+test('a bundle missing shader catalog data is refused before installation', (t) => {
   const { bundle, destination } = fixture(t, (files) => {
-    delete files['generated/shader/patterns/shaderball_migration.json'];
+    delete files['generated/shader/patterns/catalog.json'];
   });
-  assert.throws(() => installEngineBundle(bundle, destination), /missing generated\/shader\/patterns\/shaderball_migration\.json/);
+  assert.throws(() => installEngineBundle(bundle, destination), /missing generated\/shader\/patterns\/catalog\.json/);
   assert.equal(readFileSync(join(destination, 'generated/holosphere_wasm.sha'), 'utf8'), 'a'.repeat(40));
 });
 

@@ -23,9 +23,6 @@ src/recording/recording_settings.js
 src/segments/segment_policy.js
 src/ui/segmented_pov_controls.js
 src/app/daydream.js
-src/effects/legacy_shader_import.js
-src/effects/legacy_shader_schema.js
-src/effects/legacy_shader_snapshot.js
 src/renderer/driver.js
 src/ui/effect_gui.js
 src/effects/effect_persistence.js
@@ -110,13 +107,11 @@ src/workbench/solids/solids_page.js
 
 # Shader workbench: the document compiler, the operator catalog, and the
 # selected pattern documents. Deployment includes all bundle patterns; the
-# local v1 expansion fixtures under src/workbench/shader/patterns/v1/ do not ship.
 generated/shader/sha256.mjs
 generated/shader/shader_workbench.mjs
 generated/shader/composed_effect_roster.mjs
 generated/shader/engine_catalog.json
-generated/shader/patterns/shaderball_migration.json
-src/workbench/shader/patterns/digest_migration.v1v2.json
+generated/shader/patterns/catalog.json
 
 # The project license, carrying the notices MIT requires for the PROJ-derived
 # projection code and FastNoiseLite compiled into generated/holosphere_wasm.wasm.

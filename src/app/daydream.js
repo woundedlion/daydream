@@ -48,7 +48,6 @@ import { clearFatalError, errorDetail, reportPageFailures, showFatalError } from
 import { reportBootFailure, StaleModuleError } from "./bootstrap.js";
 import { enumConstantName } from "../effects/param_sync.js";
 import { copyToClipboard } from "../shared/copy_text.js";
-import { importLegacyShaderSelection, LEGACY_SHADER_ALIASES } from "../effects/legacy_shader_import.js";
 import { createShaderDocumentController } from "../workbench/shader/shader_documents.js";
 import {
   DEFAULT_EFFECT,
@@ -108,13 +107,10 @@ export function start({
 } = {}) {
   const shaderWorkbench = doc.documentElement?.dataset.daydreamMode === 'shader-workbench';
   const requestedEffect = new URLSearchParams(win.location?.search ?? '').get('effect');
-  const requestedSelection = importLegacyShaderSelection(requestedEffect);
-  const workbenchEffect = requestedSelection.effect === 'ShaderChain' ? 'ShaderChain'
+  const workbenchEffect = requestedEffect === 'ShaderChain' ? 'ShaderChain'
     : SHADER_DOCUMENT_EFFECTS.includes(requestedEffect) ? requestedEffect : null;
   if (!shaderWorkbench && workbenchEffect) {
-    const redirectedEffect = requestedSelection.migrated
-      ? requestedEffect : workbenchEffect;
-    win.location.replace(shaderWorkbenchUrl(win.location, redirectedEffect));
+    win.location.replace(shaderWorkbenchUrl(win.location, workbenchEffect));
     // Nothing was built, but the shape is createAppTeardown's: a caller reads
     // disposed() on either path.
     let redirectDisposed = false;
@@ -142,7 +138,6 @@ export function start({
   const knownEffects = new Set(shaderWorkbench
     ? WORKBENCH_EFFECTS
     : Object.values(resolutionPresets).flatMap((preset) => preset.favorites));
-  for (const alias of LEGACY_SHADER_ALIASES) knownEffects.add(alias);
   const appState = new AppState({
     effect: shaderWorkbench ? 'ShaderChain' : DEFAULT_EFFECT,
     resolution: "Phantasm (288x144)",
@@ -151,10 +146,8 @@ export function start({
     resolution: (v) => Object.hasOwn(resolutionPresets, v),
     effect: (v) => knownEffects.has(v),
   }, win);
-  const legacySelection = importLegacyShaderSelection(appState.get('effect'));
   let workbenchUrlPending = shaderWorkbench;
   if (workbenchUrlPending) urlSync.suspend();
-  if (legacySelection.migrated) appState.set('effect', legacySelection.effect);
   const availableEffects = (resolution) => shaderWorkbench
     ? [...WORKBENCH_EFFECTS] : favoritesFor(resolution);
 
@@ -532,7 +525,7 @@ export function start({
     getAnimationsPaused: () => host.engine?.getAnimationsPaused?.() ?? null,
     setAnimationsPaused,
     setParamFilter: (filter) => { paramFilterRef.current = filter; },
-    initialEffect: requestedSelection.effect,
+    initialEffect: requestedEffect,
     win,
   }) : null;
 

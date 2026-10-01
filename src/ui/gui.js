@@ -186,27 +186,18 @@ class DeepLinkGUI {
   /**
    * Read a numeric companion value without creating a visible control.
    * @param {string} prop - Companion property name within this GUI namespace.
-   * @param {Array<string>} [legacyProps=[]] - Former companion property names.
    * @returns {number|undefined} Parsed value, or undefined when absent/invalid.
    */
-  readStoredNumber(prop, legacyProps = []) {
+  readStoredNumber(prop) {
     const key = this.getKey(prop);
     this.urlKeys.add(key);
     const params = this.urlParams();
-    const legacyKey = legacyProps
-      .map((legacyProp) => this.getKey(legacyProp))
-      .find((candidate) => params.has(candidate));
-    const sourceKey = params.has(key) ? key : legacyKey;
+    const sourceKey = params.has(key) ? key : undefined;
     if (!sourceKey) return undefined;
     const value = parseUrlNumber(params.get(sourceKey));
     if (value === null) {
       console.warn(`DeepLinkGUI: ignoring non-numeric stored value for "${sourceKey}"`);
       return undefined;
-    }
-    if (sourceKey !== key) {
-      this.urlKeys.add(sourceKey);
-      this.urlWriter(key, value);
-      this.urlWriter(sourceKey, null);
     }
     return value;
   }
@@ -286,20 +277,7 @@ class DeepLinkGUI {
    * @returns {Object} The created lil-gui controller.
    */
   add(object, prop, ...args) {
-    return this.addWithHydration(true, object, prop, [], ...args);
-  }
-
-  /**
-   * Adds a control that accepts old property names and rewrites them to the
-   * canonical deep-link key.
-   * @param {Object} object - The object holding the bound property.
-   * @param {string} prop - The canonical property name.
-   * @param {Array<string>} legacyProps - Former property names.
-   * @param {...*} args - Forwarded to lil-gui's add().
-   * @returns {Object} The created controller.
-   */
-  addMigrated(object, prop, legacyProps, ...args) {
-    return this.addWithHydration(true, object, prop, legacyProps, ...args);
+    return this.addWithHydration(true, object, prop, ...args);
   }
 
   /**
@@ -313,7 +291,7 @@ class DeepLinkGUI {
    * @returns {Object} The created lil-gui controller.
    */
   addUnhydrated(object, prop, ...args) {
-    return this.addWithHydration(false, object, prop, [], ...args);
+    return this.addWithHydration(false, object, prop, ...args);
   }
 
   /**
@@ -321,11 +299,10 @@ class DeepLinkGUI {
    * @param {boolean} hydrate - Whether a matching URL value may seed the control.
    * @param {Object} object - The object holding the bound property.
    * @param {string} prop - The property name to control.
-   * @param {Array<string>} legacyProps - Former property names.
    * @param {...*} args - Forwarded to lil-gui's add().
    * @returns {Object} The created lil-gui controller.
    */
-  addWithHydration(hydrate, object, prop, legacyProps, ...args) {
+  addWithHydration(hydrate, object, prop, ...args) {
     const supported = ['number', 'string', 'boolean', 'function'];
     if (!supported.includes(typeof object[prop]) && !optionValues(args[0])) {
       throw new TypeError(`DeepLinkGUI: unsupported property "${prop}"`);
@@ -336,10 +313,7 @@ class DeepLinkGUI {
     const params = this.urlParams();
     let urlApplied = false;
     let valClamped = false;
-    const legacyKey = legacyProps
-      .map((legacyProp) => this.getKey(legacyProp))
-      .find((candidate) => params.has(candidate));
-    const sourceKey = params.has(key) ? key : legacyKey;
+    const sourceKey = params.has(key) ? key : undefined;
     if (hydrate && !isFunction && sourceKey) {
       let val = params.get(sourceKey);
       const currentVal = object[prop];
@@ -408,12 +382,6 @@ class DeepLinkGUI {
     if (!isFunction) {
       this.urlKeys.add(key);
       this.attachUrlWriter(controller, (v) => this.urlWriter(key, v), urlApplied);
-    }
-
-    if (!isFunction && sourceKey && sourceKey !== key) {
-      this.urlKeys.add(sourceKey);
-      this.urlWriter(key, controller.getValue());
-      this.urlWriter(sourceKey, null);
     }
 
     if (!isFunction && valClamped) {
