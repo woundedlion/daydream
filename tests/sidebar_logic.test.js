@@ -5,8 +5,8 @@ import {
   sortItems,
   navTargetIndex,
   scrollArrowState,
-  resolveActiveEffect,
 } from '../src/ui/sidebar_logic.js';
+import { resolveActiveEffect } from '../src/effects/effect_roster.js';
 
 const items = () => [
   { name: 'Voronoi', size: 3000 },

@@ -9,7 +9,6 @@ import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer
 import { pixelToSpherical } from "./geometry.js";
 import { isViewLive } from "./pixel_view.js";
 import { FPS } from "./frame_constants.js";
-import { GlobalStatsView } from "../ui/global_stats_view.js";
 
 /**
  * Reuses CSS2DObject label sprites across frames so axis labels can be
@@ -151,11 +150,13 @@ export class Daydream {
    * @param {Window|typeof globalThis} [dependencies.win] - Window the pixel
    *   ratio, the reload, the resize observer and the frame timer are read off.
    * @param {Navigator} [dependencies.nav] - Navigator carrying the webdriver flag.
+   * @param {{update: Function, clear: Function}} [dependencies.statsView] - Optional frame metrics view.
    */
   constructor({
     doc = globalThis.document,
     win = globalThis,
     nav = globalThis.navigator,
+    statsView = null,
   } = {}) {
     THREE.ColorManagement.enabled = true;
 
@@ -309,7 +310,7 @@ export class Daydream {
     // Round dots until an effect binds and sets its mode (see updateCullUniforms).
     this.strobeColumns = true;
 
-    this.statsView = new GlobalStatsView(this.doc);
+    this.statsView = statsView;
   }
 
   /**
@@ -959,7 +960,7 @@ export class Daydream {
    * @param {{getArenaMetrics?: () => ?Object}} adapter - Render adapter; its getArenaMetrics() supplies arena usage when present.
    */
   updateStats(duration, adapter) {
-    this.statsView.update(duration, adapter?.getArenaMetrics?.() ?? null);
+    this.statsView?.update(duration, adapter?.getArenaMetrics?.() ?? null);
   }
 
   /**

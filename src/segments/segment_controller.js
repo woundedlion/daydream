@@ -29,8 +29,8 @@ import {
 import { SegmentCompositor } from "./segment_compositor.js";
 import { isViewLive } from "../renderer/pixel_view.js";
 import { pageWarmer } from "./module_warmer.js";
-import { FAULT_POOL, FAULT_RENDER, SegmentStatsView } from "../ui/segment_stats_view.js";
-import { PROTOCOL_VERSION } from "./worker_protocol.js";
+import { SegmentStatsView } from "../ui/segment_stats_view.js";
+import { FAULT_POOL, FAULT_RENDER, PROTOCOL_VERSION } from "./worker_protocol.js";
 import { errorDetail } from "../shared/banner.js";
 import { SEGMENT_COUNT_MAX } from "./segment_policy.js";
 

@@ -12,7 +12,7 @@
  * or a browser and the whole path is unit-testable, mirroring resolveParamSync().
  */
 
-import { resolveActiveEffect } from "../ui/sidebar_logic.js";
+import { resolveActiveEffect } from "./effect_roster.js";
 
 /** @typedef {import('../../generated/holosphere_wasm.js').HolosphereEngine} HolosphereEngine */
 /** @typedef {import('../../generated/holosphere_wasm.js').HolosphereModule} HolosphereModule */

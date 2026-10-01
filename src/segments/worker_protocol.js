@@ -6,7 +6,7 @@
  * messages exchanged between the main thread (segment_controller.js) and each
  * segment Web Worker (segment_worker.js).
  *
- * Apart from the shared `PROTOCOL_VERSION` constant this file is JSDoc `@typedef`s
+ * Apart from the shared protocol constants this file is JSDoc `@typedef`s
  * only. Both sides import the relevant unions via `@typedef {import('./worker_protocol.js').X} X`
  * and run under `// @ts-check`, so a renamed field or a message shape that drifts
  * between sender and receiver is flagged in-editor instead of failing silently at
@@ -26,6 +26,14 @@
  * @type {number}
  */
 export const PROTOCOL_VERSION = 11;
+
+// Sentinel segIds for pool-wide faults with no single worker to blame:
+// FAULT_POOL for a module-load/init timeout, FAULT_RENDER for any fault raised
+// on the render path: a watchdog stall, a display-buffer geometry mismatch, or a
+// rejected render. The overlay headline distinguishes them, the detail line says
+// which.
+export const FAULT_POOL = -1;
+export const FAULT_RENDER = -2;
 
 /**
  * One tuned effect parameter, flattened for structured-clone transport. Booleans

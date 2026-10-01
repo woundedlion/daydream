@@ -4,6 +4,7 @@
  */
 
 
+import { GlobalStatsView } from "../ui/global_stats_view.js";
 import { createDisplayCapsBinding } from "../renderer/display_caps.js";
 import createHolosphereModule from "../../generated/holosphere_wasm.js";
 import { Daydream, MOBILE_BREAKPOINT_PX } from "../renderer/driver.js";
@@ -101,7 +102,7 @@ export function start({
   doc = globalThis.document,
   win = globalThis,
   nav = globalThis.navigator,
-  createDriver = () => new Daydream({ doc, win, nav }),
+  createDriver = () => new Daydream({ doc, win, nav, statsView: new GlobalStatsView(doc) }),
   createGui = (options, namespace) => new GUI(options, namespace, null, win),
   loadModule = createHolosphereModule,
 } = {}) {
