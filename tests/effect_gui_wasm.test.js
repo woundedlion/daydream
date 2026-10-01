@@ -74,6 +74,7 @@ test('preset values survive URL reload after flushed or pending parameter edits'
 
       panel.active().controllerByName.get('Speed').setValue(0.02);
       const editedSpeed = speed();
+      assert.notEqual(editedSpeed, presetSpeed);
       sync.flush();
       reload();
       assert.equal(speed(), editedSpeed);
