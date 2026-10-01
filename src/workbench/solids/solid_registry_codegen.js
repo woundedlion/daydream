@@ -27,6 +27,7 @@ import {
   formatFloat,
   generateFuncAndRecipe,
 } from './solid_codegen.js';
+import { engineHalted } from '../../shared/engine_halt.js';
 import { COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns } from '../../shared/cpp_format.js';
 
 export { MAX_RECIPE_STEPS };
@@ -88,6 +89,8 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
       }
     } catch (error) {
       validator.noteDeath(error);
+      if (engineHalted(error, mod))
+        throw new Error('Registry validation exceeded an engine mesh limit', { cause: error });
       throw error;
     } finally {
       try { mesh?.delete(); mod.MeshOps.clearToolingMemory(); } catch { /* halted engine */ }

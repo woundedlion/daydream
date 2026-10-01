@@ -500,3 +500,18 @@ test('registry null faces preserve the engine failure before flushing', async ()
   assert.equal(reason, 0);
   assert.equal(deleted, true);
 });
+
+
+test('registry validator traps become ordinary errors', async () => {
+  const trap = new WebAssembly.RuntimeError('unreachable');
+  const deaths = [];
+  const mod = { MeshOps: { fromSolidName: () => { throw trap; }, clearToolingMemory: () => {} } };
+  const validator = { withValidator: async (task) => task(mod), noteDeath: (error) => deaths.push(error) };
+  await assert.rejects(validateRegistryFaces(validator, { base: 'cube', ops: [] }), (error) => {
+    assert.equal(error instanceof WebAssembly.RuntimeError, false);
+    assert.match(error.message, /exceeded an engine mesh limit/);
+    assert.equal(error.cause, trap);
+    return true;
+  });
+  assert.deepEqual(deaths, [trap]);
+});
