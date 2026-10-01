@@ -12,7 +12,7 @@ const TWO_PI = 2 * Math.PI;
  *
  * Writes into `out` and returns it. When `out` is omitted a fresh Spherical is
  * allocated, so the result is always an independent object. Pass a reusable
- * `out` to avoid allocation in hot loops (e.g. setupDots).
+ * `out` to avoid allocation in hot loops (e.g. Daydream.precomputeMatrices).
  *
  * The azimuth is `π/2 − θ`, not `θ`: THREE.Spherical measures theta from +Z
  * (`x = sinφ·sinθ`), but the engine's `pixel_to_vector` measures it from +X
