@@ -210,6 +210,42 @@ export class FakeChainEngine {
     }
     this.program = structuredClone(entries);
     this.definitions = definitions;
+    this.runtime = entries.flatMap(({ instance, operator }) => {
+      const stateSize = this.catalog.operators.find((entry) => entry.id === operator).blocks.state.size;
+      if (stateSize <= 1) return [];
+      let kind;
+      let state;
+      if (operator === 'sphere.rotate.v2' || operator.startsWith('project.frame.')) {
+        kind = 'spatial-walk-v2';
+        state = { noiseSeed: 1337, walkTime: 0, position: [0, 1, 0], direction: [1, 0, 0],
+          wander: [1, 0, 0, 0], angularVelocity: 0, spinPhase: 0 };
+      } else if (operator.startsWith('colorize.')) {
+        kind = 'color-clock-v1';
+        state = { oscillationPhase: 0, hueNoisePhase: 0, hueNoiseSeed: 6047 };
+      } else if (operator.startsWith('warp.affine.')) {
+        kind = 'affine-clock-v1';
+        state = { phase: 0, rotation: 0 };
+      } else if (operator.includes('noise') || operator.includes('curl') || operator.includes('displace.direct')) {
+        kind = 'noise-clock-v1';
+        state = { phase: 0, noiseSeed: 1337 };
+      } else if (operator === 'sphere.displace.ripple.v2') {
+        kind = 'ripple-clock-v1';
+        state = { phase: 0 };
+      } else if (operator === 'sample.spherical-rings.v2') {
+        kind = 'spherical-rings-v2';
+        state = { walk: { noiseSeed: 1337, walkTime: 0, position: [0, 1, 0], direction: [1, 0, 0],
+          wander: [1, 0, 0, 0], angularVelocity: 0, spinPhase: 0 }, phase: 0 };
+      } else if (operator.startsWith('sample.')) {
+        kind = 'source-clock-v1';
+        state = { primary: 0, secondary: 0, angle: 0 };
+      } else {
+        kind = 'phase-clock-v1';
+        state = { phase: 0 };
+      }
+      return [{ instance, kind, state }];
+    });
+    this.paletteBank = { chroma: 0.15, hues: [0, 1, 2], cycles: Array.from({ length: 3 },
+      () => ({ frame: 0, nextSequence: 0, fadeActive: false, displayDirty: true })) };
     this.generation += 1;
     return { status: ChainStatus.OK, code: 'APPLIED', entryIndex: -1 };
   }
@@ -226,15 +262,61 @@ export class FakeChainEngine {
         schemaVersion: 2, chain: structuredClone(this.program),
         parameters: this.definitions.map((d) => ({name: d.name, value: d.acceptedValue})),
         animationsPaused: this.paused,
+        runtime: structuredClone(this.runtime),
+        paletteBank: structuredClone(this.paletteBank),
       } : null,
       restoreSnapshot: (snapshot) => {
         if (!isValid()) return ChainSnapshotRestoreResult.NOT_SHADER_CHAIN;
-        if (snapshot?.schemaVersion !== 2) return ChainSnapshotRestoreResult.UNSUPPORTED_VERSION;
+        if (snapshot === null || typeof snapshot !== 'object' || Array.isArray(snapshot)
+            || !Number.isInteger(snapshot.schemaVersion) || snapshot.schemaVersion < 0
+            || snapshot.schemaVersion > 0xffffffff) return ChainSnapshotRestoreResult.INVALID_VALUE;
+        if (snapshot.schemaVersion !== 2) return ChainSnapshotRestoreResult.UNSUPPORTED_VERSION;
+        if (typeof snapshot.animationsPaused !== 'boolean') return ChainSnapshotRestoreResult.INVALID_VALUE;
+        if (!Array.isArray(snapshot.chain) || !Array.isArray(snapshot.parameters)
+            || snapshot.chain.length === 0 || snapshot.chain.length > this.catalog.budgets.max_chain_ops
+            || snapshot.parameters.length > this.catalog.budgets.max_params
+            || (snapshot.runtime !== undefined && (!Array.isArray(snapshot.runtime)
+              || snapshot.runtime.length > this.catalog.budgets.max_chain_ops)))
+          return ChainSnapshotRestoreResult.INVALID_LENGTH;
+        const unsigned = (value) => Number.isInteger(value) && value >= 0 && value <= 0xffffffff;
+        const spatial = (state) => state && unsigned(state.noiseSeed) && unsigned(state.walkTime)
+          && ['position', 'direction', 'wander'].every((key) => Array.isArray(state[key])
+            && state[key].length === (key === 'wander' ? 4 : 3) && state[key].every(Number.isFinite))
+          && Number.isFinite(state.angularVelocity) && Number.isFinite(state.spinPhase);
+        const runtimeFields = {
+          'source-clock-v1': ['primary', 'secondary', 'angle'],
+          'noise-clock-v1': ['phase'], 'affine-clock-v1': ['phase', 'rotation'],
+          'color-clock-v1': ['oscillationPhase', 'hueNoisePhase'],
+          'phase-clock-v1': ['phase'], 'ripple-clock-v1': ['phase'],
+        };
+        if (snapshot.runtime?.some((entry) => {
+          if (!entry || typeof entry.instance !== 'string' || typeof entry.kind !== 'string'
+              || !entry.state || Array.isArray(entry.state)) return true;
+          if (entry.kind === 'spatial-walk-v2') return !spatial(entry.state);
+          if (entry.kind === 'spherical-rings-v2')
+            return !spatial(entry.state.walk) || !Number.isFinite(entry.state.phase);
+          const fields = runtimeFields[entry.kind];
+          return !fields || fields.some((key) => !Number.isFinite(entry.state[key]))
+            || (entry.kind === 'noise-clock-v1' && !unsigned(entry.state.noiseSeed))
+            || (entry.kind === 'color-clock-v1' && !unsigned(entry.state.hueNoiseSeed));
+        })) return ChainSnapshotRestoreResult.INVALID_VALUE;
+        const palette = snapshot.paletteBank;
+        if (palette !== undefined && (palette === null || typeof palette !== 'object'
+            || !Number.isFinite(palette.chroma) || !Array.isArray(palette.hues) || palette.hues.length !== 3
+            || !Array.isArray(palette.cycles) || palette.cycles.length !== 3))
+          return ChainSnapshotRestoreResult.INVALID_LENGTH;
+        if (palette !== undefined && (palette.hues.some((hue) => !Number.isInteger(hue) || hue < 0 || hue > 255)
+            || palette.cycles.some((cycle) => !cycle || !unsigned(cycle.frame)
+              || !unsigned(cycle.nextSequence) || typeof cycle.fadeActive !== 'boolean'
+              || typeof cycle.displayDirty !== 'boolean')))
+          return ChainSnapshotRestoreResult.INVALID_VALUE;
         const outcome = this.#setShaderChain(snapshot.chain);
         if (outcome.code !== 'APPLIED') return ChainSnapshotRestoreResult.INVALID_CHAIN;
         if (this.#setShaderChainParameters(snapshot.parameters) !== ParamSetResult.APPLIED)
           return ChainSnapshotRestoreResult.INVALID_VALUE;
         this.paused = snapshot.animationsPaused;
+        if (snapshot.runtime !== undefined) this.runtime = structuredClone(snapshot.runtime);
+        if (palette !== undefined) this.paletteBank = structuredClone(palette);
         return ChainSnapshotRestoreResult.APPLIED;
       },
       setShaderChain: (entries) => isValid() ? this.bindings.setShaderChain(entries)
