@@ -41,7 +41,7 @@ restoreDocumentAfterEach();
 /**
  * A strip over a fresh store on a fresh fixture copy, plus its spies.
  * @param {{presetId?: string|null, bypassAvailable?: () => boolean,
- *   writeThrough?: boolean}} [seams] - The preset the inline controls read,
+ *   writeThrough?: boolean, parameterLive?: () => boolean, source?: Object}} [seams] - The preset the inline controls read,
  *   omitted the strip falls back to the document's first; whether a bypass
  *   reaches what is rendering; and whether inline edits reach the store as the
  *   page writes them.
