@@ -1095,7 +1095,9 @@ test('URLSync discards a failed transaction before restoring full-config hydrati
     sync.suspend();
     sync.reset(['effect']);
     sync.setParam('fx.__fullConfig', 'failed');
+    sync.retries = 15;
     sync.discardPending();
+    assert.equal(sync.retries, 0);
     const params = new URLSearchParams(window.location.search);
     sync.applyPendingReset(params);
     sync.overlayPending(params);
