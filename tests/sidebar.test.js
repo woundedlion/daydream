@@ -351,7 +351,7 @@ test('setActive toggles active/aria-selected on only the old and new buttons', (
   assert.ok(b.classList.contains('active'));
   assert.equal(b.getAttribute('aria-selected'), 'true');
   assert.equal(sidebar.activeName, 'B');
-  assert.ok(b.scrollIntoViewCalls > 0);
+  assert.equal(b.scrollIntoViewCalls, 0);
   // Exactly one tab stop: the old anchor is demoted as the new one is promoted.
   assert.equal(a.tabIndex, -1);
   assert.equal(b.tabIndex, 0);
@@ -501,4 +501,20 @@ test('dispose detaches every listener/observer and clears refs', () => {
   assert.equal(sidebar.heading.parentNode, null);
   assert.equal(sidebar.listEl.parentNode, null);
   assert.equal(sidebar.arrowRight.parentNode, null);
+});
+
+test('active effect scrolls only the list on each overflowing axis', () => {
+  const { sidebar } = makeSidebar();
+  sidebar.setEffects(['A', 'B'], {});
+  sidebar.listEl.offsetWidth = 100;
+  sidebar.listEl.offsetHeight = 80;
+  const b = sidebar.buttons.get('B');
+  b.offsetLeft = 150;
+  b.offsetTop = 90;
+  b.offsetWidth = 20;
+  b.offsetHeight = 20;
+  sidebar.setActive('B');
+  assert.equal(sidebar.listEl.scrollLeft, 70);
+  assert.equal(sidebar.listEl.scrollTop, 30);
+  assert.equal(b.scrollIntoViewCalls, 0);
 });
