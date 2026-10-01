@@ -53,9 +53,7 @@
   // document.currentScript is null when this file is loaded as an ES module
   // (type="module") or after the script has finished executing. This builder
   // must run as a classic synchronous <script> so it can detect its own URL and
-  // inject the importmap before the module graph resolves. Fail with a named
-  // cause — like shared.js / slider.js — instead of an opaque
-  // "Cannot read properties of null (reading 'src')".
+  // inject the importmap before the module graph resolves.
   const selfScript = document.currentScript;
   if (!selfScript) {
     throw new Error('vendor-importmap.js: document.currentScript is null — load ' +
