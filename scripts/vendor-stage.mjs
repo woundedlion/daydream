@@ -77,8 +77,10 @@ function linkInto(from, to) {
  */
 export function stageProbeSite() {
   const root = mkdtempSync(join(tmpdir(), 'daydream-staged-site-'));
+  let entries;
   try {
-    for (const entry of manifestEntries()) {
+    entries = manifestEntries();
+    for (const entry of entries) {
       if (entry === IMPORTMAP) continue;
       const from = join(REPO, entry);
       if (!existsSync(from)) throw new Error(`site manifest entry is missing: ${entry}`);
@@ -105,7 +107,7 @@ export function stageProbeSite() {
     readdirSync(join(root, directory), { recursive: true, withFileTypes: true })
       .filter((entry) => entry.isFile())
       .map((entry) => relative(root, join(entry.parentPath, entry.name)).replaceAll('\\', '/')));
-  return { root, entries: [...manifestEntries(), ...vendorFiles] };
+  return { root, entries: [...entries, ...vendorFiles] };
 }
 
 /**
