@@ -66,8 +66,7 @@ test('warmModules revalidates the whole worker module graph', async () => {
   assert.deepEqual(calls.map(([url]) => url).sort(),
     graph.map((file) => `http://localhost:8000/${file}`).sort(),
     'every static import of the worker, or a stale one survives the warm');
-  // 'reload' would re-download all 1.8 MB per call; 'no-cache' still refetches a
-  // rebuilt binary because the artifacts are served unversioned.
+  // Unversioned JS modules are revalidated; the binary URL changes on rebuild.
   for (const [, options] of calls) {
     assert.equal(options.cache, 'no-cache');
     assert.equal(options.signal.aborted, false);
