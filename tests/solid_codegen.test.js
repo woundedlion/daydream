@@ -153,7 +153,6 @@ test('applyOp forwards each op its engine arguments', () => {
     applyOp(stubMesh(calls), spec);
     assert.deepEqual(calls, [expected], `applyOp dispatched ${expected.op} wrongly`);
   }
-  // The degree->radian conversion is a real change of value, not an identity.
 });
 
 /** Verifies applyOp rejects an op the mesh wrapper binds no method for. */
