@@ -3,7 +3,7 @@ import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSy
 import { dirname, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { validatePair } from './deployment-pair.mjs';
-import { ownedPath, verifyEngineBundle } from './install-engine-bundle.mjs';
+import { runtimePath, verifyEngineBundle } from './install-engine-bundle.mjs';
 
 /** @param {string} root @param {string} bundle */
 export function verifiedEnginePaths(root, bundle) {
@@ -37,7 +37,7 @@ export function sitePaths(root, bundle) {
     .match(/docs\/screenshots\/[\w.-]+\.png/g) ?? []);
   const published = verified.filter((path) => entries.includes(path) || screenshots.has(path)
     || path.startsWith('generated/shader/patterns/'));
-  return [...new Set([...entries.filter((path) => !ownedPath(path)), ...published])];
+  return [...new Set([...entries.filter((path) => !runtimePath(path)), ...published])];
 }
 
 /** @param {string} root @param {string} bundle @param {string} destination @param {import('./deployment-pair.mjs').DeploymentPair} pair */
@@ -67,7 +67,7 @@ export function stageSite(root, bundle, destination, pair) {
     if (!lstatSync(source).isFile() || lstatSync(source).isSymbolicLink()
         || !realpathSync(source).startsWith(realpathSync(root) + sep))
       throw new Error(`Site entry is not a regular repository file: ${path}`);
-    if (!ownedPath(path) && !readFileSync(source).equals(committed(path)))
+    if (!runtimePath(path) && !readFileSync(source).equals(committed(path)))
       throw new Error(`Site source differs from the selected daydream commit: ${path}`);
     const target = resolve(destination, path);
     mkdirSync(dirname(target), { recursive: true });
