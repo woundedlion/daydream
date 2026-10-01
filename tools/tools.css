@@ -90,7 +90,7 @@ input[type=range]:disabled::-webkit-slider-thumb {
   color: var(--indigo-300);
 }
 
-/* Compact button base + primary/secondary fills. A page may still define its
+/* Compact button base + secondary fill. A page may still define its
  * own .btn color variants in its own <style>, which override these via the
  * cascade order. */
 .btn {
@@ -100,15 +100,6 @@ input[type=range]:disabled::-webkit-slider-thumb {
   font-size: 0.875rem;
   transition: all 0.2s;
   cursor: pointer;
-}
-
-.btn-primary {
-  background-color: var(--blue-600);
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: var(--blue-700);
 }
 
 .btn-secondary {
