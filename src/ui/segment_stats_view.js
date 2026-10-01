@@ -4,7 +4,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  *
  * SegmentStatsView — the segmented-POV stats overlay: a per-segment table of
- * compute times and arena high-water marks, plus the spawn and fault
+ * compute times, scratch high-water marks and persistent usage, plus the spawn and fault
  * states that replace it. Reads the per-segment arrays SegmentController
  * publishes each frame and owns nothing of the pipeline, so the overlay is
  * testable without a Worker and the controller without a DOM.
@@ -253,7 +253,7 @@ export class SegmentStatsView {
     const table = this.doc.createElement('table');
     const caption = this.doc.createElement('caption');
     caption.className = 'visually-hidden';
-    caption.textContent = 'Per-segment compute time and arena high-water marks';
+    caption.textContent = 'Per-segment compute time, scratch high-water marks and persistent usage';
     table.appendChild(caption);
     /** @param {string} text - Column header label. */
     const colHeader = (text) => {
