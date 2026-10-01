@@ -22,7 +22,8 @@
  * Protocol version stamped on `init` (controller → worker) and `booted`
  * (worker → controller). Each side faults on a mismatch, so a stale-cached worker
  * or glue against updated peer code fails fast instead of drifting on a
- * same-named but reshaped message. Bump on any breaking change to the messages below.
+ * same-named but reshaped message. Any typedef change bumps PROTOCOL_VERSION; the shape pin in
+ * segment_worker.test.js enforces it.
  * @type {number}
  */
 export const PROTOCOL_VERSION = 11;
@@ -70,8 +71,7 @@ export const FAULT_RENDER = -2;
  *
  * `wasmModule` is the binary the controller already compiled, for the worker to
  * instantiate instead of fetching and compiling its own copy. Optional in both
- * directions — absent it, the worker takes the glue's own load path — so it is
- * not a version-breaking field.
+ * directions — absent it, the worker takes the glue's own load path.
  * @typedef {{
  *   type: 'init', version: number, segId: number, totalSegs: number,
  *   w: number, h: number,
@@ -148,8 +148,7 @@ export const FAULT_RENDER = -2;
  *
  * `sharedModule` marks the rejection as the controller's own compilation
  * failing to instantiate, so the controller drops it and the next pool compiles
- * per worker instead of being handed the same refused module forever. Optional
- * in both directions, so it is not a version-breaking field.
+ * per worker instead of being handed the same refused module forever.
  * @typedef {{ type: 'engineRejected', reason: string,
  *   sharedModule?: boolean }} EngineRejectedMsg */
 
@@ -176,8 +175,7 @@ export const FAULT_RENDER = -2;
  * last effect install — a setParameter or preset the engine refused, leaving the
  * segment rendering a configuration its peers do not. The whole standing set is
  * re-sent every frame so the overlay's marker lasts as long as the divergence,
- * and the field is omitted while there is none. Optional in both directions, so
- * it is not a version-breaking field.
+ * and the field is omitted while there is none.
  *
  * `fullFrame` is the disposition of the worker's last setClip: false when the
  * band was installed (`APPLIED`) and the engine shaded only the rectangle, true
