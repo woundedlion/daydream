@@ -159,6 +159,16 @@ export function oklchLinearRgb(lightness, chroma, turns, out = [0, 0, 0]) {
 }
 
 /**
+ * @param {number[]} rgb - Linear RGB channels.
+ * @returns {boolean} Whether the channels meet the engine's gamut slack.
+ */
+export function linearRgbInGamut(rgb) {
+  return rgb[0] >= -1e-4 && rgb[0] <= 1.0001
+    && rgb[1] >= -1e-4 && rgb[1] <= 1.0001
+    && rgb[2] >= -1e-4 && rgb[2] <= 1.0001;
+}
+
+/**
  * The widest chroma any hue reaches inside the sRGB gamut at one lightness,
  * bisected per hue over a 360-step sweep. Scales the hue wheel's chroma axis so
  * its outer edge is the gamut's widest slice at that lightness. Uses the engine's
@@ -181,8 +191,7 @@ export function maxSrgbGamutChroma(lightness) {
     for (let iteration = 0; iteration < searchIterations; iteration++) {
       const chroma = (low + high) * 0.5;
       oklchLinearRgb(lightness, chroma, hue / hueSamples, rgb);
-      const inGamut = rgb[0] >= -1e-4 && rgb[0] <= 1.0001 && rgb[1] >= -1e-4 && rgb[1] <= 1.0001
-        && rgb[2] >= -1e-4 && rgb[2] <= 1.0001;
+      const inGamut = linearRgbInGamut(rgb);
       if (inGamut) low = chroma;
       else high = chroma;
     }
