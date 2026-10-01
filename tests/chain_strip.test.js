@@ -425,13 +425,13 @@ test('Delete opens a socket replacement palette containing only valid stages', a
   const palette = paletteOf(h);
   assert.equal(palette.getAttribute('role'), 'listbox');
   const entries = paletteEntries(h);
-  assert.equal(entries.length, 12,
+  assert.equal(entries.length, 8,
     'only the projection functions valid for this socket are shown');
   assert.equal(entries[0].dataset.remove, undefined);
-  const bonne = entries.find((entry) => entry.dataset.operator === 'project.bonne.v2');
+  const bonne = entries.find((entry) => entry.dataset.operator === 'project.bonne.v3');
   assert.equal(bonne.getAttribute('aria-disabled'), null,
     'a same-pair operator is enabled');
-  assert.equal(entries.find((entry) => entry.dataset.operator === 'sample.grid.v2'),
+  assert.equal(entries.find((entry) => entry.dataset.operator === 'sample.grid.v3'),
     undefined);
   assert.equal(h.doc.activeElement.dataset.operator, 'project.stereographic.v2',
     'focus moves to the palette\'s first enabled entry');
@@ -442,9 +442,9 @@ test('Delete opens a socket replacement palette containing only valid stages', a
   assert.deepEqual(h.applied, []);
 
   const select = chipByLabel(h, 'project').querySelector('.chain-chip-replace');
-  select.value = 'project.bonne.v2';
+  select.value = 'project.bonne.v3';
   select.dispatch('change');
-  assert.equal(h.store.chain()[PROJECT].operator, 'project.bonne.v2');
+  assert.equal(h.store.chain()[PROJECT].operator, 'project.bonne.v3');
   assert.equal(h.applied.length, 1);
   assert.equal(h.doc.activeElement.dataset.label, h.store.chain()[PROJECT].label);
 });
@@ -526,11 +526,11 @@ test('selecting the operator the socket carries keeps the instance', async () =>
   assert.equal(h.doc.activeElement.dataset.label, 'project');
 
   select = chipByLabel(h, 'project').querySelector('.chain-chip-replace');
-  select.value = 'project.bonne.v2';
+  select.value = 'project.bonne.v3';
   select.dispatch('change');
   const after = h.store.document();
   assert.deepEqual(after.descriptor.chain[PROJECT],
-    { label: 'project', operator: 'project.bonne.v2' },
+    { label: 'project', operator: 'project.bonne.v3' },
     'a different operator retires the instance and seats a fresh one');
   assert.equal('project.singularity-fade' in after.preset_bank.presets[0].values, false,
     'the old instance parameter is removed');
@@ -566,7 +566,7 @@ test('a band + appends while Insert opens the insertion palette after focus', as
 
   chipByLabel(h, 'camera').dispatch('keydown', { key: 'Insert' });
   entries = paletteEntries(h);
-  const illegal = entries.find((entry) => entry.dataset.operator === 'warp.affine.v2');
+  const illegal = entries.find((entry) => entry.dataset.operator === 'warp.affine.v3');
   assert.equal(illegal, undefined, 'invalid stages are omitted instead of greyed out');
 });
 
@@ -898,7 +898,7 @@ test('stage controls open transiently on hover and pin open on click', async () 
 
   const region = paramsOf(h, 'sample');
   assert.equal(region.getAttribute('role'), 'group');
-  assert.equal(region.getAttribute('aria-label'), 'Twin Wave · sample parameters');
+  assert.equal(region.getAttribute('aria-label'), 'Twin Wave Extended Drift · sample parameters');
   assert.deepEqual(rowsOf(h, 'sample').map((row) => row.dataset.parameter),
     h.store.parameterDeclarations().filter((parameter) =>
       parameter.id.startsWith('sample.')).map((parameter) => parameter.id),
@@ -1299,7 +1299,7 @@ test('deactivatedParameterIds follows the engine topology gates', () => {
     'colorize.brightness-top': 1,
   };
   const chain = [
-    { label: 'sample', operator: 'sample.grid.v2' },
+    { label: 'sample', operator: 'sample.grid.v3' },
     { label: 'warp1', operator: 'warp.wave-shear.v2' },
     { label: 'camera', operator: 'sphere.rotate.v2' },
     { label: 'colorize', operator: 'colorize.generated-palette.v3' },
@@ -1314,7 +1314,7 @@ test('deactivatedParameterIds follows the engine topology gates', () => {
   [], 'no gate, no deactivation');
 
   const renamed = structuredClone(CATALOG);
-  renamed.operators.find((operator) => operator.id === 'sample.grid.v2')
+  renamed.operators.find((operator) => operator.id === 'sample.grid.v3')
     .params.find((field) => field.id === 'coverage-mode').id = 'coverage-style';
   const renamedParameters = parameters.map((parameter) => ({
     ...parameter,
@@ -1490,7 +1490,7 @@ test('a refused socket replacement restores the selected operator', async () => 
   const before = h.store.document();
   h.store.replaceSpan = () => ({ ok: false, diagnostics: [{ message: 'catalog refused edit' }] });
   const select = chipByLabel(h, 'project').querySelector('.chain-chip-replace');
-  select.value = 'project.bonne.v2';
+  select.value = 'project.bonne.v3';
   select.dispatch('change');
   assert.equal(select.value, 'project.stereographic.v2');
   assert.deepEqual(h.store.document(), before);

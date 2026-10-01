@@ -313,7 +313,7 @@ test('a crossing cannot be removed, only replaced', async () => {
 
   const replacement = store.replaceSpan(PROJECT, 3, [
     { operator: 'project.equirectangular.v2' },
-    { operator: 'sample.grid.v2' },
+    { operator: 'sample.grid.v3' },
   ]);
   assert.equal(replacement.ok, true);
   assert.deepEqual(labels(store),
@@ -381,7 +381,7 @@ test('reusing a label under a new operator re-seeds it from catalog defaults', a
   const before = store.document();
   assert.notEqual(before.preset_bank.presets[0].values['sample.pattern-freq'], 1);
   assert.equal('sample.edge-width' in before.preset_bank.presets[0].values, false);
-  const result = store.replaceSpan(SAMPLE, 1, [{ label: 'sample', operator: 'sample.grid.v2' }]);
+  const result = store.replaceSpan(SAMPLE, 1, [{ label: 'sample', operator: 'sample.grid.v3' }]);
   assert.equal(result.ok, true);
   const document = store.document();
   for (const preset of document.preset_bank.presets) {
@@ -616,13 +616,13 @@ test('legality lists every operator with reasons for the illegal', async () => {
     { operator: CATALOG.operators.find((operator) => operator.id === 'warp.wave-shear.v2'), legal: true });
   assert.equal(byId.get('sphere.rotate.v2').legal, false);
   assert.match(byId.get('sphere.rotate.v2').reason, /consumes the sphere carrier/);
-  assert.equal(byId.get('sample.grid.v2').legal, false);
-  assert.match(byId.get('sample.grid.v2').reason, /produces the field carrier/);
+  assert.equal(byId.get('sample.grid.v3').legal, false);
+  assert.match(byId.get('sample.grid.v3').reason, /produces the field carrier/);
 
   const span = store.legalReplacements(PROJECT, 1);
   const spanById = new Map(span.map((entry) => [entry.operator.id, entry]));
-  assert.equal(spanById.get('project.bonne.v2').legal, true);
-  assert.equal(spanById.get('warp.affine.v2').legal, false);
+  assert.equal(spanById.get('project.bonne.v3').legal, true);
+  assert.equal(spanById.get('warp.affine.v3').legal, false);
   assert.throws(() => store.legalInsertions(99), RangeError);
 });
 
@@ -665,11 +665,11 @@ test('legalSequences bridges a span with a run of crossings', async () => {
     (operator) => operator.input === input && operator.output === output).length;
   assert.equal(expansions.length, crossings('sphere', 'field')
     + crossings('sphere', 'plane') * crossings('plane', 'field'));
-  assert.equal(expansions.includes('project.stereographic.v2 sample.grid.v2'), true);
+  assert.equal(expansions.includes('project.stereographic.v2 sample.grid.v3'), true);
   assert.equal(store.replaceSpan(PROJECT, 1, [
-    { operator: 'project.stereographic.v2' }, { operator: 'sample.grid.v2' }]).ok, true);
+    { operator: 'project.stereographic.v2' }, { operator: 'sample.grid.v3' }]).ok, true);
   assert.deepEqual(store.chain().slice(PROJECT).map((entry) => entry.operator),
-    ['project.stereographic.v2', 'sample.grid.v2', 'colorize.generated-palette.v3']);
+    ['project.stereographic.v2', 'sample.grid.v3', 'colorize.generated-palette.v3']);
   assertGreen(store);
   assert.throws(() => store.legalSequences(99, 0, 1), RangeError);
 });
@@ -686,7 +686,7 @@ test('an exhausted operator budget refuses insertion but not replacement', async
   assert.equal(insertion.ok, false);
   assert.equal(insertion.diagnostics[0].code, 'BUDGET_EXCEEDED');
   const swap = store.legalReplacements(WARP, 1);
-  assert.equal(swap.find((entry) => entry.operator.id === 'warp.affine.v2').legal, true);
+  assert.equal(swap.find((entry) => entry.operator.id === 'warp.affine.v3').legal, true);
 });
 
 test('arena accounting honors per_param_name_bytes when declared', async () => {
@@ -752,7 +752,7 @@ test('the store bills a chain the arena bytes the validator does', () => {
         ...Array.from({ length: count },
           (unused, index) => ({ label: `endo${index}`, operator })),
         { label: 'project', operator: 'project.stereographic.v2' },
-        { label: 'sample', operator: 'sample.grid.v2' },
+        { label: 'sample', operator: 'sample.grid.v3' },
         { label: 'colorize', operator: 'colorize.generated-palette.v3' },
       ]);
     }
@@ -839,7 +839,7 @@ test('the scratch document compiles clean against the catalog', async () => {
   assert.deepEqual(compiled.document.descriptor.chain, [
     { label: 'rotate', operator: 'sphere.rotate.v2' },
     { label: 'project', operator: 'project.stereographic.v2' },
-    { label: 'sample', operator: 'sample.grid.v2' },
+    { label: 'sample', operator: 'sample.grid.v3' },
     { label: 'colorize', operator: 'colorize.generated-palette.v3' },
   ]);
   assert.equal(compiled.document.preset_bank.presets.length, 1);
@@ -932,12 +932,12 @@ test('chain labels use the compiler grammar', async () => {
 
 test('radian periodicity is independent of a catalog field bound', () => {
   const catalog = structuredClone(CATALOG);
-  const rotate = catalog.operators.find((operator) => operator.id === 'project.peirce.v2');
+  const rotate = catalog.operators.find((operator) => operator.id === 'project.peirce.v3');
   const field = rotate.params.find((parameter) => parameter.curve === 'shortest-periodic');
   assert.ok(field);
   field.max = Math.PI;
   const document = scratchChainDocument(catalog, DEFAULT_SCRATCH_CHAIN.map((entry) =>
-    entry.label === 'project' ? { ...entry, operator: 'project.peirce.v2' } : entry));
+    entry.label === 'project' ? { ...entry, operator: 'project.peirce.v3' } : entry));
   const parameter = document.descriptor.parameters.find((entry) => entry.id === `project.${field.id}`);
   assert.equal(parameter.domain.maximum, Math.fround(Math.PI));
   assert.equal(parameter.interpolation.period, Math.fround(2 * Math.PI));
@@ -1034,7 +1034,7 @@ test('declaration queries follow committed replacement and undo without cloning'
     globalThis.structuredClone = clone;
   }
   assert.equal(store.replaceSpan(PROJECT, 1,
-    [{ label: 'project', operator: 'project.bonne.v2' }]).ok, true);
+    [{ label: 'project', operator: 'project.bonne.v3' }]).ok, true);
   assert.equal(store.declares('project.singularity-fade'), false);
   assert.equal(store.declares('project.central-meridian'), true);
   store.undo();

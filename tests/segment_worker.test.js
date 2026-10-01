@@ -862,7 +862,7 @@ test('init restores ShaderChain snapshot atomically instead of replaying params'
   const snapshot = {
     schemaVersion: 2,
     chain: [{instance: 'project', operator: 'project.stereographic.v2'},
-      {instance: 'sample', operator: 'sample.grid.v2'},
+      {instance: 'sample', operator: 'sample.grid.v3'},
       {instance: 'colorize', operator: 'colorize.generated-palette.v3'}],
     parameters: [{name: 'sample.pattern-freq', value: 1}],
     animationsPaused: true,
@@ -954,7 +954,7 @@ test('setEffect restores ShaderChain snapshot after rebuilding', async () => {
   const snapshot = {
     schemaVersion: 2,
     chain: [{instance: 'project', operator: 'project.stereographic.v2'},
-      {instance: 'sample', operator: 'sample.grid.v2'},
+      {instance: 'sample', operator: 'sample.grid.v3'},
       {instance: 'colorize', operator: 'colorize.generated-palette.v3'}],
     parameters: [{name: 'sample.pattern-freq', value: 1}],
     animationsPaused: true,

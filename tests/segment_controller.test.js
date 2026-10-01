@@ -2509,7 +2509,7 @@ test('snapshot-capable effects rebuild from their exhaustive state', () => {
   const snapshot = {
     schemaVersion: 2,
     chain: [{instance: 'project', operator: 'project.stereographic.v2'},
-      {instance: 'sample', operator: 'sample.grid.v2'},
+      {instance: 'sample', operator: 'sample.grid.v3'},
       {instance: 'colorize', operator: 'colorize.generated-palette.v3'}],
     parameters: [{name: 'sample.pattern-freq', value: 1}],
     animationsPaused: true,

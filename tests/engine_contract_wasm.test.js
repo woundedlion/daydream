@@ -416,7 +416,7 @@ test('getShaderChainCatalog matches the installed generated/shader/engine_catalo
 const DEFAULT_CHAIN = [
   { instance: 'camera', operator: 'sphere.rotate.v2' },
   { instance: 'project', operator: 'project.stereographic.v2' },
-  { instance: 'sample', operator: 'sample.grid.v2' },
+  { instance: 'sample', operator: 'sample.grid.v3' },
   { instance: 'colorize', operator: 'colorize.generated-palette.v3' },
 ];
 
@@ -445,7 +445,7 @@ test('setShaderChain applies a chain, registers label.field params and bumps the
   const coverage = defs.find((d) => d.name === 'sample.coverage-mode');
   assert.ok(coverage, 'the sample instance must register its topology enum');
   const catalog = JSON.parse(M.ShaderChainBindings.getShaderChainCatalog());
-  const field = catalog.operators.find((op) => op.id === 'sample.grid.v2')
+  const field = catalog.operators.find((op) => op.id === 'sample.grid.v3')
     .params.find((p) => p.id === 'coverage-mode');
   assert.deepEqual(Array.from(coverage.options), field.values,
     'a topology enum must offer the catalog values as its options, in order');
@@ -569,7 +569,7 @@ test('setShaderChain refuses transactionally and names the offending entry', () 
   const unknown = chainCall(engine, 'setShaderChain', [
     { instance: 'camera', operator: 'sphere.rotate.v2' },
     { instance: 'project', operator: 'project.unknown.v9' },
-    { instance: 'sample', operator: 'sample.grid.v2' },
+    { instance: 'sample', operator: 'sample.grid.v3' },
     { instance: 'colorize', operator: 'colorize.generated-palette.v3' },
   ]);
   assert.equal(unknown.status, M.ChainStatus.UNKNOWN_OPERATOR);
@@ -1697,4 +1697,23 @@ test('registry validation expands composite and flattened base recipes', async (
   await assert.doesNotReject(validateRegistryFaces(validator, { name: 'Flattened', base: 'authored', ops: ['dual'] }, {
     seed: 'cube', ops: [{ op: 'hankin', param: 45 * Math.PI / 180, twist: 0 }],
   }));
+});
+
+
+test('retired chain operators are absent and refuse without changing the live program', () => {
+  engine.setEffect('ShaderChain');
+  assert.equal(chainCall(engine, 'setShaderChain', DEFAULT_CHAIN).code, 'APPLIED');
+  const before = chainCall(engine, 'getSnapshot');
+  const catalog = JSON.parse(M.ShaderChainBindings.getShaderChainCatalog());
+  for (const operator of [
+    'colorize.generated-palette.v2', 'project.airocean.v2', 'project.bonne.v2',
+    'project.peirce-square-fast.v2', 'project.peirce.v2', 'sample.grid.v2',
+    'sample.twin-wave.v2', 'warp.affine.v2',
+  ]) {
+    assert.equal(catalog.operators.some((entry) => entry.id === operator), false);
+    const result = chainCall(engine, 'setShaderChain', [{instance: 'retired', operator}]);
+    assert.equal(result.status, M.ChainStatus.UNKNOWN_OPERATOR);
+    assert.equal(result.code, 'UNKNOWN_OPERATOR');
+    assert.deepEqual(chainCall(engine, 'getSnapshot'), before);
+  }
 });

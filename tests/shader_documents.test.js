@@ -68,7 +68,7 @@ test('v2 shader links retain typed runtime and palette state', async () => {
     document: {descriptor: {chain: [{label: 'source'}]}},
     preset: 'night', bypassed: [], paused: true,
     chainSnapshot: {
-      schemaVersion: 2, chain: [{instance: 'source', operator: 'sample.grid.v2'}],
+      schemaVersion: 2, chain: [{instance: 'source', operator: 'sample.grid.v3'}],
       parameters: [{name: 'source.pattern-freq', value: 1}], animationsPaused: true,
       runtime: [{instance: 'source', kind: 'source-clock-v1',
         state: {primary: 1.25, secondary: 0.5, angle: 2}}],
@@ -410,7 +410,7 @@ test('every ash-cloud preset value reaches its compiled build', () => {
 
 const derivedPeriodDocument = (period, scale = 2) => ({ document: {
   descriptor: { chain: [
-    { label: 'warp1', operator: 'warp.affine.v2' },
+    { label: 'warp1', operator: 'warp.affine.v3' },
     { label: 'cells', operator: 'sample.lattice.v2' },
   ] },
   preset_bank: { presets: [{ preset_id: 'noon', values: {
@@ -489,7 +489,7 @@ const shaderDocument = ({ digest = 'digest-equator', status = 'VALID',
   document: {
     effect_id: 'KaleidoscopeFlowers',
     effect_metadata: { display_name: 'Kaleidoscope Flowers' },
-    descriptor: { chain: [{ label: 'sample', operator: 'sample.grid.v2' }] },
+    descriptor: { chain: [{ label: 'sample', operator: 'sample.grid.v3' }] },
     preset_bank: { presets: [
       { preset_id: 'noon', display_name: 'Noon', values: { 'sample.pattern-freq': 2 } },
       { preset_id: 'dusk', display_name: 'Dusk', values: { 'sample.pattern-freq': 5 } },
@@ -714,7 +714,7 @@ test('a deep-linked document id opens that document', async () => {
 
   assert.equal(harness.elements.get('shader-document-select').value, 'KaleidoscopeFlowers');
   assert.deepEqual(harness.engine.chained.at(-1),
-    [{ instance: 'sample', operator: 'sample.grid.v2' }]);
+    [{ instance: 'sample', operator: 'sample.grid.v3' }]);
   assert.match(harness.elements.get('shader-document-status').textContent,
     /Kaleidoscope Flowers · Noon/);
 });
@@ -745,7 +745,7 @@ test('choosing a catalog source previews it through the interpreter', async () =
   assert.deepEqual(harness.engine.selected, [],
     'no fixed-effect reference preset is staged for an interpreted load');
   assert.deepEqual(harness.engine.chained.at(-1),
-    [{ instance: 'sample', operator: 'sample.grid.v2' }]);
+    [{ instance: 'sample', operator: 'sample.grid.v3' }]);
   assert.deepEqual(harness.engine.writes.slice(SCRATCH_WRITES),
     [['sample.pattern-freq', 2]]);
   const presets = harness.elements.get('shader-preset-select');
@@ -793,7 +793,7 @@ test('an imported study the catalog does not carry has no parity build', async (
   assert.deepEqual(harness.engine.selected, [],
     'the dynamic path stages no fixed-effect reference preset');
   assert.deepEqual(harness.engine.chained.at(-1),
-    [{ instance: 'sample', operator: 'sample.grid.v2' }]);
+    [{ instance: 'sample', operator: 'sample.grid.v3' }]);
   assert.deepEqual(harness.engine.writes.slice(SCRATCH_WRITES),
     [['sample.pattern-freq', 2]],
     'the preset lands by parameter id, not by alias name');
@@ -1129,7 +1129,7 @@ test('the scratch document opens as a live, editable chain', async () => {
 
   assert.deepEqual(harness.selections, ['ShaderChain']);
   assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator),
-    ['sphere.rotate.v2', 'project.stereographic.v2', 'sample.grid.v2',
+    ['sphere.rotate.v2', 'project.stereographic.v2', 'sample.grid.v3',
       'colorize.generated-palette.v3']);
   assert.deepEqual(stripChips(harness).map((chip) => chip.dataset.label),
     ['rotate', 'project', 'sample', 'colorize']);
@@ -1139,7 +1139,7 @@ test('the scratch document opens as a live, editable chain', async () => {
   assert.ok(harness.engine.writes.some(([name]) => name === 'colorize.palette-chroma'),
     'the opening preview carries the catalog defaults');
 
-  clickPlaneBandEntry(harness, 'warp.affine.v2');
+  clickPlaneBandEntry(harness, 'warp.affine.v3');
 
   assert.equal(harness.engine.chainCalls.at(-1).length, 5);
 });
@@ -1283,7 +1283,7 @@ test('a shader state link restores its document, preset, bypasses, and pause', a
 
 test('shader edits keep the full state hash current', async () => {
   const harness = await editorWorkbench({ source: null });
-  clickPlaneBandEntry(harness, 'warp.affine.v2');
+  clickPlaneBandEntry(harness, 'warp.affine.v3');
   stripChips(harness).find((chip) => chip.dataset.label === 'rotate')
     .querySelector('.chain-chip-bypass').dispatch('click');
   const value = stripChips(harness).find((chip) => chip.dataset.label === 'sample')
@@ -1457,7 +1457,7 @@ test('a malformed shader state link falls back to an editable scratch chain', as
   });
 
   assert.deepEqual(harness.engine.chainCalls.at(-1).map((entry) => entry.operator),
-    ['sphere.rotate.v2', 'project.stereographic.v2', 'sample.grid.v2',
+    ['sphere.rotate.v2', 'project.stereographic.v2', 'sample.grid.v3',
       'colorize.generated-palette.v3']);
   assert.match(harness.elements.get('shader-document-status').textContent,
     /shader link could not be restored: Error: invalid shader link payload/i);
@@ -1501,7 +1501,7 @@ test('Kaleidoscope Stained Glass loads its effect preset into the interpreter co
     'project.gnomonic.v2',
     'warp.vector-noise.v2',
     'warp.mirror-tile.v2',
-    'sample.grid.v2',
+    'sample.grid.v3',
     'colorize.generated-palette.v3',
   ]);
   for (const [label, parameterId] of [
@@ -1620,19 +1620,19 @@ test('Save As writes a new document id and leaves the loaded one alone', async (
   assert.equal(harness.controller.saveAs(), true);
   const [copyName, copySource] = harness.downloads.at(-1);
   const copy = JSON.parse(copySource);
-  assert.equal(copy.document_id, 'kaleidoscope-hex-bright-v1-copy1');
-  assert.equal(copyName, 'kaleidoscope-hex-bright-v1-copy1.shader.json');
+  assert.equal(copy.document_id, 'kaleidoscope-hex-bright-copy1');
+  assert.equal(copyName, 'kaleidoscope-hex-bright-copy1.shader.json');
   assert.equal(copySource, exportShaderDocumentJson(copy),
     'a copy is written in the same canonical serialization as Save');
 
   assert.equal(harness.controller.save(), true);
   const [savedName, savedSource] = harness.downloads.at(-1);
   assert.equal(savedName, 'study.shader.json');
-  assert.equal(JSON.parse(savedSource).document_id, 'kaleidoscope-hex-bright-v1');
+  assert.equal(JSON.parse(savedSource).document_id, 'kaleidoscope-hex-bright');
 
   assert.equal(harness.controller.saveAs(), true);
   assert.equal(JSON.parse(harness.downloads.at(-1)[1]).document_id,
-    'kaleidoscope-hex-bright-v1-copy2', 'each copy takes an id of its own');
+    'kaleidoscope-hex-bright-copy2', 'each copy takes an id of its own');
 });
 
 test('a Save As copy carries the edits made since the load', async () => {
