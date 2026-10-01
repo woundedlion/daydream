@@ -299,7 +299,7 @@
     border-color: var(--accent);
   }
 
-  /* !important: .scroll-arrow's transition is declared in a later media query. */
+  /* Later rules also declare transitions on these controls. */
   .tab,
   .effect-button,
   .sort-btn,
