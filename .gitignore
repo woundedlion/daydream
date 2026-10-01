@@ -46,6 +46,7 @@ Thumbs.db
 
 # Scratch copy the pre-push hook regenerates the import map into.
 /vendor-importmap.??????
+/tailwind.??????
 
 # Logs
 *.log
