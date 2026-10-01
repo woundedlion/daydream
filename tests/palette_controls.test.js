@@ -910,7 +910,7 @@ test('axis readouts round to their box while the sliders keep full precision', (
 test('both axes the tab edits by their endpoints are on the roster', () => {
   assert.deepEqual(Object.keys(PALETTE_AXIS_CONTROLS), ['lightness', 'chroma']);
   for (const axis of Object.values(PALETTE_AXIS_CONTROLS)) {
-    for (const id of [axis.curve, `${axis.prefix}_minimum`, `${axis.prefix}_maximum`])
+    for (const id of [axis.curve, axis.minimum, axis.maximum])
       assert.match(PALETTES_HTML, new RegExp(`\\bid="${id}"`),
         `palettes.html must carry a ${id} control`);
   }
