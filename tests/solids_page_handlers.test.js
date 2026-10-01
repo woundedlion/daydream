@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pageHandlers } from './helpers/page_handlers.js';
+import { savedChainShapeError } from '../src/workbench/solids/solid_codegen.js';
 import { createPointerDrag } from '../src/shared/pointer_drag.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
@@ -46,6 +47,7 @@ test('copying a star recipe contains bridge errors and reports engine halts', as
   let halted = false;
   const copyCode = handler('copyCode', {
     savedSolids: [{ base: 'star' }],
+    savedChainShapeError: () => null,
     registrySolidNames: new Set(['star']),
     islamicStarPatterns: ['star'],
     meshOpsWasm: { getRecipe() { throw error; } },
@@ -299,4 +301,16 @@ test('a failed rebuild invalidates cached mesh metadata and prevents saving', ()
   assert.equal(context.currentMesh, previous);
   handler('saveSolid', context)();
   assert.match(messages[0], /no successful preview/);
+});
+
+test('saved code export refuses off-grid parameters before generating code', async () => {
+  const failures = [];
+  const copyCode = handler('copyCode', {
+    savedSolids: [{ base: 'cube', ops: [{ op: 'truncate', params: { t: 0.334 } }] }],
+    savedChainShapeError,
+    showCopyFailure: (button, message) => failures.push(message),
+  });
+  await copyCode(0, 'recipe', {});
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /export failed:.*grid/);
 });
