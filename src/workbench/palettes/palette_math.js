@@ -50,10 +50,8 @@ import { PaletteV4 } from './palette_controls.js';
 const TWO_PI = 2 * Math.PI;
 
 /**
- * Mirror of the engine's fast_cosf (core/math/3dmath.h): a Bhaskara I sine
- * approximation, range-reduced to [0, 2π). ProceduralPalette::get evaluates its
- * cosine this way on the per-sample path, so the browser preview must use the
- * same approximation (not Math.cos) to predict device colors.
+ * Mirror of the engine's fast_sinf (core/math/3dmath.h): a Bhaskara I sine
+ * approximation, range-reduced to [0, 2π).
  * @param {number} x - Angle in radians.
  * @returns {number} The approximated sine.
  */
@@ -65,6 +63,7 @@ function fastSin(x) {
   return (sign * 16 * xpi) / (5 * Math.PI * Math.PI - 4 * xpi);
 }
 /**
+ * Mirror of the engine's fast_cosf used by ProceduralPalette::get.
  * @param {number} x - Angle in radians.
  * @returns {number} The approximated cosine.
  */
