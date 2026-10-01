@@ -2081,3 +2081,70 @@ test('a streaming write failure after Stop reaches the save-error UI', async () 
     restore();
   }
 });
+
+
+test('superseded recorder guards ignore fallback and memory overflow', async () => {
+  const restore = installRecorderEnv();
+  const captured = installConsoleCapture('warn');
+  try {
+    FakeMediaRecorder.isTypeSupported = () => false;
+    FakeMediaRecorder.defaultMimeType = 'video/mp4';
+    const rec = new VideoRecorder(recordableCanvas());
+    rec.format = 'webm';
+    rec.download = () => {};
+    rec.start('first');
+    const first = rec.mediaRecorder;
+    rec.stop();
+    rec.start('second');
+    const second = rec.mediaRecorder;
+    const errors = [];
+    const fallbacks = [];
+    rec.onError = (error) => errors.push(error);
+    rec.onFormatFallback = (format) => fallbacks.push(format);
+    first.onstart();
+    first.ondataavailable({ data: { size: MEMORY_BUFFER_LIMIT_BYTES + 1 } });
+    assert.equal(rec.mediaRecorder, second);
+    assert.equal(rec.isRecording, true);
+    assert.deepEqual(errors, []);
+    assert.deepEqual(fallbacks, []);
+    rec.stop();
+    await Promise.resolve();
+  } finally {
+    FakeMediaRecorder.isTypeSupported = () => true;
+    captured.restore();
+    restore();
+  }
+});
+
+test('superseded streaming recorder ignores picker cancellation and backlog overflow', async () => {
+  const restore = installRecorderEnv();
+  try {
+    let rejectFirst;
+    let picks = 0;
+    globalThis.showSaveFilePicker = () => {
+      picks++;
+      if (picks === 1) return new Promise((resolve, reject) => { rejectFirst = reject; });
+      return new Promise(() => {});
+    };
+    const rec = new VideoRecorder(recordableCanvas());
+    rec.download = () => {};
+    rec.start('first');
+    const first = rec.mediaRecorder;
+    rec.stop();
+    rec.start('second');
+    const second = rec.mediaRecorder;
+    const errors = [];
+    rec.onError = (error) => errors.push(error);
+    first.ondataavailable({ data: { size: (16 * 1_000_000 / 8) * PICKER_GRACE_SECONDS + 1 } });
+    assert.equal(rec.mediaRecorder, second);
+    assert.equal(rec.isRecording, true);
+    rejectFirst(Object.assign(new Error('cancelled'), { name: 'AbortError' }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(rec.mediaRecorder, second);
+    assert.equal(rec.isRecording, true);
+    assert.deepEqual(errors, []);
+    rec.stop();
+  } finally {
+    restore();
+  }
+});
