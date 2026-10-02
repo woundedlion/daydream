@@ -1029,7 +1029,7 @@ test('new instances remap authored interpolation groups to their own labels', as
     .interpolation.group, 'warp3.mix');
 });
 
-test('declaration queries follow committed replacement and undo without cloning', async () => {
+test('declaration queries avoid cloning and follow committed replacement and undo', async () => {
   const store = await makeStore();
   const clone = globalThis.structuredClone;
   try {
