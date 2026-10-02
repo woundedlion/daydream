@@ -22,7 +22,7 @@
 /**
  * @typedef {PaletteAxis & {basis: number, headroom: number}} PaletteChromaAxis
  *   The chroma axis, which also names the gamut its values are measured against
- *   (a PaletteV4.chromaBasis ordinal) and how much of that gamut it keeps back.
+ *   (a PaletteV4.chromaBasis ordinal) and its relative-chroma ceiling as a gamut fraction.
  */
 
 /**
