@@ -20,11 +20,6 @@
     "reason": "Tracked CLI fixture suites cover dependency reads, hashing, addon scans and import-map rewriting. Remaining gaps include malformed package metadata and filesystem/tool failures.",
     "branches": 81.48
   },
-  "scripts/vendor-stage.mjs": {
-    "lines": 91.47,
-    "reason": "Server startup and filesystem cleanup error paths require infrastructure failures; fixture tests exercise staging and normal shutdown.",
-    "branches": 72.22
-  },
   "src/workbench/shader/shader_documents.js": {
     "reason": "Halt paths are covered by shader_documents.test.js. Remaining gaps include default browser fetch/download callbacks, missing catalog selections, and optional UI mounts; these are partial unit coverage, not a claim that they are unreachable.",
     "branches": 83.7
