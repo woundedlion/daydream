@@ -2927,6 +2927,19 @@ test('readonly enum type-ahead cannot move the visible selection', () => {
   assert.equal(control.$select.dispatch('click').defaultPrevented, true);
 });
 
+test('readonly enum changes restore the display before target handlers run', () => {
+  const h = makeHarness({ params: [{ name: 'Mode', value: 0,
+    options: ['Off', 'On'], readonly: true }] });
+  h.panel.build();
+  const control = h.gui().ctrl('Mode');
+  let bubbled = false;
+  control.$select.addEventListener('change', () => { bubbled = true; });
+  const updates = control.displayUpdates;
+  control.$select.dispatch('change');
+  assert.equal(bubbled, false);
+  assert.equal(control.displayUpdates, updates + 1);
+});
+
 test('externally rendered stage parameters build no stage folders', () => {
   const params = latticeMeltParams();
   const h = makeHarness({ params, engineValues: params.map((parameter) => parameter.value) });
