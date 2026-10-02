@@ -157,8 +157,8 @@ input[type=range]:disabled::-webkit-slider-thumb {
 /*
  * Fixed-right-panel shell: a full-bleed canvas (`.tool-stage`) with a fixed
  * scrolling controls panel pinned to the right (`.tool-panel`), collapsing to
- * a bottom sheet on narrow screens. Used by the single-panel geometry tools
- * (lissajous and mobius). Apply the classes alongside whatever id the page's JS
+ * a bottom sheet on narrow screens. Used by lissajous. Apply the classes
+ * alongside whatever id the page's JS
  * already queries.
  */
 .tool-stage {
@@ -170,8 +170,7 @@ input[type=range]:disabled::-webkit-slider-thumb {
   z-index: 10;
 }
 
-.tool-panel,
-#presetSidebar {
+.tool-panel {
   position: fixed;
   top: 0;
   right: 0;
