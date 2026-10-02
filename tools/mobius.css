@@ -65,7 +65,7 @@
 }
 
 .preset-btn:hover {
-  background-color: var(--slate-700);
+  background-color: var(--slate-800);
   border-color: var(--indigo-400);
 }
 

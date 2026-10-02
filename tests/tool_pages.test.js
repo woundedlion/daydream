@@ -710,3 +710,11 @@ test('every colour a tools/ stylesheet declares clears the WCAG AA floor or says
     }
   }
 });
+
+
+test('Mobius preset descriptions retain AA contrast on hover', () => {
+  const page = SERVED_PAGES.find(({ page }) => page === 'tools/mobius.html');
+  assert.ok(page);
+  const cascade = page.sheets.map((sheet) => read(...sheet)).join('\n');
+  assert.ok(contrast(cascade, '.preset-desc', '.preset-btn:hover') >= AA_CONTRAST);
+});
