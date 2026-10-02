@@ -56,16 +56,16 @@ test('refreshPixelView: a live view of the expected length is reused', () => {
 // reallocating it, so the stale view is still attached — only its length differs.
 test('refreshPixelView: an attached view of the wrong length is re-fetched', () => {
   const stale = new Uint16Array(5760);
-  const fresh = new Uint16Array(41472);
+  const fresh = new Uint16Array(124416);
   let calls = 0;
-  const r = refreshPixelView(stale, () => { calls++; return fresh; }, 41472);
+  const r = refreshPixelView(stale, () => { calls++; return fresh; }, 124416);
   assert.equal(r.refreshed, true, 'the re-fetch went unreported');
   assert.equal(r.view, fresh, 'the short view survived the resolution change');
   assert.equal(calls, 1, 'the stale view was not re-fetched exactly once');
 });
 
 test('refreshPixelView: a shrunk buffer re-fetches an over-long view', () => {
-  const stale = new Uint16Array(41472);
+  const stale = new Uint16Array(124416);
   const fresh = new Uint16Array(5760);
   const r = refreshPixelView(stale, () => fresh, 5760);
   assert.equal(r.refreshed, true, 'the re-fetch went unreported');
