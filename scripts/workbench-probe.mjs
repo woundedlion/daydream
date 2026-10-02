@@ -730,10 +730,17 @@ export async function probeSnapshotImport(tab) {
   return failures;
 }
 
-/** @param {import('puppeteer-core').Page} tab @param {() => void} [releaseCatalog] */
-export async function probeStartupPersistence(tab, releaseCatalog = () => {}) {
+/** @param {import('puppeteer-core').Page} tab @param {() => void} [releaseCatalog] @param {Promise<boolean>} [heldCatalog] */
+export async function probeStartupPersistence(tab, releaseCatalog = () => {}, heldCatalog = Promise.resolve(true)) {
   const {failures, check} = checks();
+  let timeout;
   try {
+    const held = await Promise.race([heldCatalog, new Promise((resolve) => {
+      timeout = setTimeout(() => resolve(false), TIMEOUT_MS);
+    })]);
+    clearTimeout(timeout);
+    check(held, 'slow startup intercepted and held the catalog request');
+    if (!held) return failures;
     await new Promise((resolve) => setTimeout(resolve, 600));
     check(await tab.evaluate(() => !new URLSearchParams(location.search).has('fx.__chainSnapshot')),
       'slow workbench startup keeps factory defaults out of the original URL');
@@ -754,20 +761,24 @@ export async function runWorkbenchSections(open, sections = [
     let tab;
     let releaseCatalog = () => {};
     const catalogReady = new Promise((resolve) => { releaseCatalog = () => resolve(undefined); });
+    let signalHeld = () => {};
+    const heldCatalog = new Promise((resolve) => { signalHeld = () => resolve(true); });
     try {
       tab = await open({ viewport: VIEWPORT,
         ...(section === probeStartupPersistence ? {prepare: async (page) => {
           await page.setRequestInterception(true);
           page.on('request', async (request) => {
-            if (request.url().endsWith('/generated/shader/engine_catalog.json'))
+            if (new URL(request.url()).pathname.endsWith('/generated/shader/engine_catalog.json')) {
+              signalHeld();
               await catalogReady;
+            }
             await request.continue();
           });
         }} : {}),
       });
       await tab.waitForFunction(() => !document.getElementById('loading-overlay'));
       if (section !== probeStartupPersistence) await tab.waitForSelector('.chain-chip');
-      failures.push(...await (section === probeStartupPersistence ? section(tab, releaseCatalog) : section(tab)));
+      failures.push(...await (section === probeStartupPersistence ? section(tab, releaseCatalog, heldCatalog) : section(tab)));
     } catch (error) {
       failures.push(`${section.name}: ${error instanceof Error ? error.message : error}`);
     } finally {
