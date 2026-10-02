@@ -435,7 +435,7 @@ const MESH_FAILURE_REMEDY = {
  * Reads back why a mesh-producing MeshOps call returned null.
  * @param {WasmModule} Mod - The WASM module instance that produced the null.
  * @param {string} what - What the caller was building, used in the message.
- * @returns {{reason: string, message: string, flush: boolean, fatal: boolean}} The MeshOpResult key, a message to show, whether clearToolingMemory() is the remedy that reason calls for, and whether the reason leaves no MeshOps call that can ever succeed.
+ * @returns {{reason: string, message: string, flush: boolean, fatal: boolean}} The MeshOpResult key, a message to show, whether clearToolingMemory() is the remedy that reason calls for, and whether arena-backed mesh operations are unavailable for the instance's lifetime.
  * @details Embind enum values are singletons, so the recorded result is matched
  * by identity against Module.MeshOpResult, never by truthiness. A module that
  * binds neither the enum nor getLastResult reports reason 'UNKNOWN'.
@@ -451,8 +451,7 @@ export function meshOpFailure(Mod, what) {
     reason,
     message: `${what} failed: ${MESH_FAILURE_REMEDY[reason] ?? 'the engine rejected it'}`,
     flush: reason === 'ARENA_EXHAUSTED',
-    // The tooling block itself is unavailable: no later call can succeed, and
-    // no remedy the page can run brings it back.
+    // Arena-backed mesh operations remain unavailable for this instance.
     fatal: reason === 'ARENA_UNAVAILABLE',
   };
 }
@@ -472,7 +471,7 @@ export function meshOpFailure(Mod, what) {
  * reason (getLastResult); an unchecked null becomes a TypeError several calls
  * later. Only ARENA_EXHAUSTED is cleared by flushing the tooling arenas, so the
  * flush is applied by reason rather than on every failure. ARENA_UNAVAILABLE is
- * not recoverable at all — every later call fails the same way — so it stands
+ * not recoverable — later arena-backed operations fail the same way — so it stands
  * the tool down the way an engine halt does rather than reporting on a line the
  * next recompute overwrites.
  */
