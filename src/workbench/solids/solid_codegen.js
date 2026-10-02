@@ -122,7 +122,7 @@ export const OP_DEFS = {
  * (core/mesh/conway_graph.h); the engine-source parity test in
  * wasm_provenance.test.js pins the truncate and chamfer bounds. An empty
  * object is an op that always sweeps,
- * `null` an op with no leg kind at all, and a parameter entry the band the leg
+ * `null` an op the morph path never sweeps, and a parameter entry the band the leg
  * covers, with any excluded topology transitions. The composite ops (bevel, gyro, meta, needle, zip) are absent because
  * they lower to primitives before the check, and over the ranges this tool
  * offers every primitive they lower to sweeps.
@@ -153,7 +153,7 @@ export function unsweepableReason(o) {
   if (!(opName in MORPH_SWEEP)) return null;
   const band = MORPH_SWEEP[opName];
   if (!band) {
-    return `${opName} has no morph leg: a shape using it is generated whole `
+    return `${opName} is not swept by the morph path: a shape using it is generated whole `
       + 'rather than built on screen.';
   }
   for (const [key, { min, max, excluded }] of Object.entries(band)) {
