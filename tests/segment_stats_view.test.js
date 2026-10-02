@@ -183,6 +183,7 @@ test('a segment whose engine refused a write is marked with its notices', () => 
   assert.equal(cell(2, '').className, 'seg-label seg-diverged');
   assert.equal('title' in cell(2, ''), false,
     'the text is on a node assistive technology reads, not behind a pointer-only tooltip');
+  assert.equal(cell(2, '').getAttribute('title'), null);
   assert.equal(cell(2, '').getAttribute('aria-describedby'), notice(2).id);
   assert.equal(notice(2).id, 'seg-notice-1');
   assert.equal(notice(2).parentNode.classList.contains('visually-hidden'), true);
