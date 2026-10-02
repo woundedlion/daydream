@@ -239,6 +239,15 @@ export async function probeStrip(tab) {
       strip: box(document.getElementById('chain-strip')),
       main: box(document.querySelector('.main-area')),
       stripOpacity: getComputedStyle(document.getElementById('chain-strip')).opacity,
+      textOpacities: [...document.querySelectorAll(
+        '#chain-strip .chain-chip-function-label, #chain-strip .chain-param-name')]
+        .filter((label) => !label.closest('.chain-param[data-deactivated="true"]'))
+        .map((label) => {
+          let opacity = 1;
+          for (let ancestor = label; ancestor; ancestor = ancestor.parentElement)
+            opacity *= Number(getComputedStyle(ancestor).opacity);
+          return opacity;
+        }),
       stripPosition: getComputedStyle(document.getElementById('chain-strip')).position,
     };
   });
@@ -248,8 +257,10 @@ export async function probeStrip(tab) {
     'collapsed stage headers remain bounded while reserving their open width');
   check(layout.stripPosition === 'absolute'
       && Math.abs(layout.strip.top - layout.main.top) < 1
-      && Number(layout.stripOpacity) === 0.9,
-  'the pipeline overlays the preview at 90% opacity');
+      && Number(layout.stripOpacity) === 1
+      && layout.textOpacities.length > 0
+      && layout.textOpacities.every((opacity) => opacity === 1),
+  'the pipeline overlays the preview with fully opaque active text');
   check(layout.main.height > VIEWPORT.height * 0.8,
     `the preview retains ${Math.round(layout.main.height)}px beneath the pipeline`);
 
