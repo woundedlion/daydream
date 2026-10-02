@@ -31,7 +31,7 @@ const CHAIN_EFFECT = 'ShaderChain';
 // Digest characters the toolbar shows; the button copies all of it.
 const DIGEST_ABBREVIATION = 12;
 
-// The download name the scratch document exports under until Save As renames it.
+// The download name used by Save for the scratch document.
 const SCRATCH_FILENAME = 'scratch.shader.json';
 
 export const SHADER_LINK_DEBOUNCE_MS = 200;
