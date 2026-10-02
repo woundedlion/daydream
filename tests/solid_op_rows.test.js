@@ -191,7 +191,7 @@ test('a row marks an op the engine morph path declines', () => {
   const { el } = build({ op: 'expand', params: { t: 0.5 } });
   const flag = el.querySelector('.op-unsweepable');
   assert.equal(flag.hidden, false);
-  assert.match(flag.getAttribute('aria-label'), /^expand has no morph leg/,
+  assert.match(flag.getAttribute('aria-label'), /^expand is not swept by the morph path/,
     'the marker is a glyph, so the reason has to reach assistive tech by name');
   assert.equal(flag.getAttribute('title'), flag.getAttribute('aria-label'),
     'the pointer tooltip and the accessible name must carry the same reason');
