@@ -605,9 +605,9 @@ const PARITY_TITLE = 'Ash Cloud';
 
 /**
  * Loads a promoted document and swaps the preview onto its compiled build. The
- * swap re-applies every authored value through the effect's registered
- * controls, so one id no control takes refuses the whole preset and the status
- * reports the error instead of the side.
+ * swap re-applies writable authored values through the effect's registered
+ * controls, skipping baked constants and derived bindings. An unmatched
+ * remaining id refuses the preset and the status reports the error.
  * @param {import('puppeteer-core').Page} tab
  * @returns {Promise<string[]>} The failed checks.
  */
