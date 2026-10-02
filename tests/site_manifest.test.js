@@ -282,14 +282,11 @@ test('the published pattern document set matches its catalog',
     'Published catalog names documents missing from the pattern directory or engine bundle');
 });
 
-
-
 test('deploy manifest entries cannot recursively publish untracked files', () => {
   const workflow = read('.github/workflows/deploy.yml');
   assert.match(workflow, /node scripts\/stage-site\.mjs engine-bundle _site deployment-pair\.json/);
   assert.doesNotMatch(workflow, /cp -r/);
 });
-
 
 test('the license link publishes a text file containing the complete notices', () => {
   assert.match(read('index.html'), /href="LICENSE\.txt"/);
