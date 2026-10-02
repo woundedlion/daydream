@@ -226,8 +226,16 @@ test('an op that throws is reported rather than escaping the build', () => {
 test('an engine trap halts the build at whichever call raised it', () => {
   for (const token of ['base:cube', 'kis', 'classifyFaces', 'getVertices', 'getFaces']) {
     const boom = new WebAssembly.RuntimeError('unreachable');
+    let liveAtTrap;
+    let callsAtTrap;
     const { Mod, state } = fakeModule({
-      onOp: (t) => { if (t === token) throw boom; },
+      onOp: (t) => {
+        if (t === token) {
+          liveAtTrap = state.live;
+          callsAtTrap = [...state.calls];
+          throw boom;
+        }
+      },
     });
     const { ctx, errors, traps } = context(Mod, { trapped: true });
 
@@ -237,6 +245,8 @@ test('an engine trap halts the build at whichever call raised it', () => {
     assert.deepEqual(errors, [],
       'a halted module gets the fatal banner, not a stats-line message');
     assert.equal(state.cleared, 0, 'a torn-down module must not be called again');
+    assert.equal(state.live, liveAtTrap, 'a halted module must not delete its wrappers');
+    assert.deepEqual(state.calls, callsAtTrap, 'no mesh operation may follow the trap');
   }
 });
 
