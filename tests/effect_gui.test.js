@@ -1478,6 +1478,7 @@ test('a failed schema rebuild keeps the live panel and reports once per generati
   assert.equal(h.warnings.length, 1);
   assert.match(h.warnings[0], /parameter-schema rebuild failed/);
   assert.equal(h.guis.length, 2, 'the failed rebuild allocated one panel');
+  assert.equal(h.guis[1].destroyed, 1);
 
   h.panel.sync();
   h.panel.sync();
@@ -1492,6 +1493,7 @@ test('a failed schema rebuild keeps the live panel and reports once per generati
 
   assert.equal(h.warnings.length, 2, 'a fresh generation failing went unreported');
   assert.equal(h.guis.length, 3, 'a fresh generation never retried the rebuild');
+  assert.equal(h.guis[2].destroyed, 1);
 
   // The definitions come back: the throttle must not have latched the panel out
   // of ever rebuilding.
@@ -2964,6 +2966,7 @@ test('a failed initial panel build reports an unavailable control panel', () => 
   assert.equal(h.panel.active(), null);
   assert.deepEqual(h.configNotices, ['Effect controls could not be built.']);
   assert.match(h.warnings[0], /panel construction failed/);
+  assert.equal(h.guis[0].destroyed, 1);
 });
 
 for (const rebuild of [false, true]) test(`panel ${rebuild ? 'rebuild' : 'build'} propagates module death`, () => {
