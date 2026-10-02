@@ -139,3 +139,21 @@ test('the hue wheel uses authored custom lightness instead of canonical center',
   draw({ lightness: { curve: 0, center: 0.7, custom: [0, 0, 0] } });
   assert.equal(drawn[1].lightness, 0.7);
 });
+
+test('base hue arrow keys step in useful degrees without changing the recipe mode', () => {
+  const slider = {value: '359.25', dispatchEvent(event) { assert.equal(event.type, 'input'); }};
+  const keydown = handler('handleBaseHueKeyDown', {
+    hueKeyNudgeTurns: (key, shift) => key === 'ArrowRight' ? (shift ? 10 : 1) / 360 : key === 'ArrowLeft' ? -1 / 360 : null,
+    wrapTurns: (value) => ((value % 1) + 1) % 1, Event,
+  });
+  let prevented = 0;
+  const press = (key, shiftKey = false) => keydown({key, shiftKey, currentTarget: slider, preventDefault() { prevented++; }});
+  press('ArrowRight');
+  assert.ok(Math.abs(Number(slider.value) - 0.25) < 1e-8);
+  press('ArrowRight', true);
+  assert.ok(Math.abs(Number(slider.value) - 10.25) < 1e-8);
+  press('ArrowLeft');
+  assert.ok(Math.abs(Number(slider.value) - 9.25) < 1e-8);
+  press('Enter');
+  assert.equal(prevented, 3);
+});
