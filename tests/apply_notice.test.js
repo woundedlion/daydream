@@ -9,9 +9,6 @@ import { fakeElement } from './helpers/fake_dom.js';
 import { fakeScheduler } from './helpers/fake_timers.js';
 import { createApplyNotice } from '../src/ui/apply_notice.js';
 
-// The shared notice element: the parameter writer and the switch coordinator
-// both announce through it, so ownership decides whose message a clear drops.
-
 // Pins the ids the sink itself asks the document for against the real markup: a
 // rename on either side swallows every rejection message behind a single
 // warning. The ids are recorded from the lookup rather than restated here, so a
