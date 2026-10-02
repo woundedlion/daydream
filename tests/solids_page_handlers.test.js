@@ -233,7 +233,7 @@ test('a refused topology tick repaints the restored chain', async () => {
   assert.deepEqual(painted, [0.4]);
 });
 
-test('an accepted topology tick publishes only after validation', async () => {
+test('an accepted topology tick keeps the focused input and publishes after validation', async () => {
   let queued;
   let resolveCheck;
   const state = { base: 'cube', ops: [{ op: 'truncate', params: { t: 0.4 } }] };
@@ -247,7 +247,7 @@ test('an accepted topology tick publishes only after validation', async () => {
       assert.equal(ops[0].params.t, 0.5);
       return new Promise((resolve) => { resolveCheck = resolve; });
     },
-    showGateMsg() {}, renderOps() {}, update: () => painted.push(state.ops[0].params.t),
+    showGateMsg() {}, renderOps() { assert.fail('accepted parameter edits must retain the control nodes'); }, update: () => painted.push(state.ops[0].params.t),
   };
   handler('updateOpParam', context)(0, 't', '0.5', 1);
   const pending = queued();
@@ -313,4 +313,30 @@ test('saved code export refuses off-grid parameters before generating code', asy
   await copyCode(0, 'recipe', {});
   assert.equal(failures.length, 1);
   assert.match(failures[0], /export failed:.*grid/);
+});
+
+test('a refused topology tick restores focus to the same parameter input', async () => {
+  for (const type of ['range', 'number']) {
+    let queued;
+    const state = {base: 'cube', ops: [{op: 'truncate', params: {t: 0.4}}]};
+    const oldInput = fakeElement('input');
+    oldInput.type = type;
+    const oldRow = fakeElement('div');
+    oldRow.dataset.key = 't';
+    oldRow.appendChild(oldInput);
+    oldRow.querySelector = (selector) => selector === `input[type="${type}"]` ? oldInput : null;
+    const newInput = {focus() { focused = true; }};
+    let focused = false;
+    let rows = [oldRow];
+    const context = {state, opsRevision: 1, OP_DEFS: {}, structuredClone, parameterEdits: new Map(),
+      document: {activeElement: oldInput, getElementById: () => ({children: [{querySelectorAll: () => rows}]})},
+      opTopologyKey: (op) => op.params.t === 0.5, formatParamValue: String, syncSweepWarning() {},
+      scheduleUpdate: {cancel() {}}, queueCommit: (fn) => { queued = fn; },
+      chainIsValid: async () => ({ok: false, message: 'refused'}), showGateMsg() {}, update() {},
+      renderOps() { rows = [{dataset: {key: 't'}, querySelector(selector) { assert.equal(selector, `input[type="${type}"]`); return newInput; }}]; }};
+    handler('updateOpParam', context)(0, 't', '0.5', 1);
+    await queued();
+    assert.ok(focused, type);
+    assert.equal(state.ops[0].params.t, 0.4);
+  }
 });

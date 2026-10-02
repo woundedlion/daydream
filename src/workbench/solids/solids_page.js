@@ -1179,6 +1179,7 @@ function updateOpParam(index, key, value, revision) {
     if (input) input.value = formatParamValue(val, def);
   }
   if (item) syncSweepWarning(item, candidateOp);
+  const focusType = row && row.contains(document.activeElement) ? document.activeElement.type : null;
 
   // truncate and bevel short-circuit to ambo at t == 0.5, so a slider tick can
   // change the element census the way adding an op does. That crossing goes
@@ -1194,13 +1195,17 @@ function updateOpParam(index, key, value, revision) {
       if (revision !== opsRevision || parameterEdits.get(editKey) !== edit) return;
       if (check.ok) {
         state.ops[index].params[key] = val;
-        renderOps();
         update();
         return;
       }
       showGateMsg(`rejected: ${check.message}`);
       if (parameterEdits.get(editKey) === edit) {
         renderOps();
+        if (focusType) {
+          const restoredItem = document.getElementById('opsList').children[index];
+          const restoredRow = [...restoredItem.querySelectorAll('.op-param')].find(r => r.dataset.key === key);
+          restoredRow?.querySelector(`input[type="${focusType}"]`)?.focus();
+        }
         update();
       }
     });
