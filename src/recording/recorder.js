@@ -331,8 +331,7 @@ export class VideoRecorder {
 
     recorder.ondataavailable = (e) => {
       if (e.data.size === 0) return;
-      // sink is assigned below, after start(); a chunk arriving before that goes
-      // to the fallback buffer, which every sink's finish() drains.
+      // Chunks received before sink setup are replayed through sink.write() below.
       if (sink) sink.write(e.data);
       else chunks.push(e.data);
     };
