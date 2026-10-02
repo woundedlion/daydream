@@ -146,13 +146,22 @@ test('snapshot adapters reject getter-driven replacement without touching the ne
   engine.setEffect('ShaderChain');
   const bindings = engine.getShaderChainBindings();
   const snapshot = bindings.getSnapshot();
+  let replacementDefinitions;
+  let replacementPaused;
   Object.defineProperty(snapshot, 'parameters', {
     enumerable: true,
-    get() { engine.setEffect('Comets'); return []; },
+    get() {
+      engine.setEffect('Comets');
+      replacementDefinitions = engine.getParameterDefinitions();
+      replacementPaused = engine.getAnimationsPaused();
+      return [];
+    },
   });
   assert.notEqual(bindings.restoreSnapshot(snapshot), M.ChainSnapshotRestoreResult.APPLIED);
   assert.equal(bindings.isValid(), false);
-  assert.equal(engine.getPresetCount() > 0, true);
+  assert.ok(replacementDefinitions);
+  assert.deepEqual(engine.getParameterDefinitions(), replacementDefinitions);
+  assert.equal(engine.getAnimationsPaused(), replacementPaused);
   bindings.delete();
 });
 
