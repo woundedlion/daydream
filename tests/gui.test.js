@@ -279,8 +279,7 @@ test('DeepLinkGUI.add adopts a valid in-list URL value for a dropdown', () => {
 
 /**
  * Verifies a slider-style add() (a numeric min, not an option list) has no
- * option list, so the URL value is adopted unconditionally — list validation
- * applies only to dropdowns.
+ * option list, so a finite in-range URL value is adopted without list validation.
  */
 test('DeepLinkGUI.add leaves a non-enumerated control (no option list) untouched', () => {
   installWindowAt('?speed=2.5');
