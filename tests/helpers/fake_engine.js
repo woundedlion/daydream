@@ -111,7 +111,7 @@ export const ChainSnapshotRestoreResult = Object.freeze({
 });
 
 // The engine catalog exactly as the module's getShaderChainCatalog static
-// exports it: the committed pin carries the export plus a POSIX trailing
+// exports it: the installed file carries the export plus a POSIX trailing
 // newline, which the export itself does not.
 const CHAIN_CATALOG_TEXT = readFileSync(
   new URL('../../generated/shader/engine_catalog.json', import.meta.url), 'utf8',
