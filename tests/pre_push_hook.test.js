@@ -27,6 +27,7 @@ test('pre-push refuses a push from a tree that cannot run the suites',
     const root = mkdtempSync(join(tmpdir(), 'pre-push-hook-'));
     t.after(() => rmSync(root, { recursive: true, force: true }));
     const env = isolatedGitEnv();
+  delete env.NODE_TEST_CONTEXT;
     delete env.NODE_TEST_CONTEXT;
 
     const run = spawnSync(SH, ['-c', WITHOUT_TOOLS, HOOK], {
@@ -57,6 +58,7 @@ function runWithTools(root, tools, input = '') {
     chmodSync(path, 0o755);
   }
   const env = isolatedGitEnv();
+  delete env.NODE_TEST_CONTEXT;
   delete env.NODE_TEST_CONTEXT;
   // MSYS reads PATH as POSIX, so a drive letter would split on its colon.
   const posixBin = bin.replace(/\\/g, '/')
@@ -196,6 +198,7 @@ for (const installStatus of [0, 19]) {
     { skip: SKIP }, (t) => {
       const root = fixtureRoot(t);
       const env = isolatedGitEnv();
+  delete env.NODE_TEST_CONTEXT;
       const git = (...args) => execFileSync('git', ['-C', root, ...args], { env, encoding: 'utf8' });
       for (const directory of ['.githooks', 'tests', 'node_modules', 'bin'])
         mkdirSync(join(root, directory));
@@ -244,9 +247,11 @@ for (const installStatus of [0, 19]) {
     });
 }
 
-test('pre-push validates the pushed commit instead of a modified working tree', { skip: SKIP }, (t) => {
+for (const failure of ['none', 'lint', 'suite']) {
+test(`pre-push checks the committed snapshot and propagates ${failure} failures`, { skip: SKIP }, (t) => {
   const root = fixtureRoot(t);
   const env = isolatedGitEnv();
+  delete env.NODE_TEST_CONTEXT;
   const git = (...args) => execFileSync('git', ['-C', root, ...args], { env, encoding: 'utf8' });
   mkdirSync(join(root, '.githooks'));
   mkdirSync(join(root, 'tests'));
@@ -261,13 +266,14 @@ test('pre-push validates the pushed commit instead of a modified working tree', 
   writeFileSync(join(root, 'tools/tailwind.css'), 'css\n');
   writeFileSync(join(root, 'marker'), 'committed\n');
   for (const name of ['ci_workflow', 'deployment_pair', 'stage_site'])
-    writeFileSync(join(root, `tests/${name}.test.js`), '');
+    writeFileSync(join(root, `tests/${name}.test.js`), failure === 'suite' && name === 'ci_workflow' ? 'throw new Error("fixture suite failed");' : '');
   const calls = join(root, 'tool-calls').replace(/\\/g, '/');
   const node = join(root, 'bin/node');
   writeFileSync(node, `#!/bin/sh\nprintf '%s\\n' "node $*" >> '${calls}'\nexec '${process.execPath.replace(/\\/g, '/')}' "$@"\n`);
   chmodSync(node, 0o755);
   const npm = join(root, 'bin/npm');
   writeFileSync(npm, `#!/bin/sh\nprintf '%s\\n' "npm $*" >> '${calls}'\n` + '[ "$(cat marker)" = committed ] || exit 23\n'
+    + (failure === 'lint' ? '[ "$2" = lint ] && exit 31\n' : '')
     + 'if [ "$2" = importmap ]; then for last; do :; done; cp vendor-importmap.js "$last"; fi\n'
     + 'if [ "$2" = generate:tailwind ]; then for last; do :; done; cp tools/tailwind.css "$last"; fi\n');
   chmodSync(npm, 0o755);
@@ -280,10 +286,13 @@ test('pre-push validates the pushed commit instead of a modified working tree', 
   const result = spawnSync(SH, ['-c', `PATH="${posixBin}:$PATH"; export PATH; . "$0"`, HOOK], {
     cwd: root, env, encoding: 'utf8', input: `refs/heads/master ${sha} refs/heads/master ${'0'.repeat(40)}\n`,
   });
-  assert.equal(result.status, 0, result.stdout + result.stderr);
+  if (failure === 'none') assert.equal(result.status, 0, result.stdout + result.stderr);
+  else assert.notEqual(result.status, 0, result.stdout + result.stderr);
   const logged = readFileSync(calls, 'utf8');
-  for (const command of ['npm run lint', 'npm run typecheck', 'npm run importmap', 'npm run generate:tailwind', 'node --test'])
+  for (const command of failure === 'lint' ? ['npm run lint'] : ['npm run lint', 'npm run typecheck', 'npm run importmap', 'npm run generate:tailwind', 'node --test'])
     assert.ok(logged.includes(command), command);
   assert.equal(readFileSync(join(root, 'marker'), 'utf8'), 'working-tree-only\n');
   assert.equal(readFileSync(join(root, 'node_modules/.package-lock.json'), 'utf8'), '{}');
 });
+
+}
