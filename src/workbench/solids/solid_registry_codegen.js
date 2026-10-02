@@ -33,7 +33,7 @@ import { COLUMN_LIMIT, CPP_IDENTIFIER, fillColumns } from '../../shared/cpp_form
 export { MAX_RECIPE_STEPS };
 /** Maximum lowered primitive steps accepted by the effect. */
 export const MAX_BUILD_STEPS = 8;
-/** Maximum face count of every replay endpoint. */
+/** Maximum face count of replay endpoints and morph intermediates. */
 export const MAX_BUILD_FACES = 1152;
 /** Composite operations expanded into engine primitives.
  * @type {Record<string, (op: import('./solid_codegen.js').ChainOp) => import('./solid_codegen.js').ChainOp[]>} */
@@ -55,13 +55,13 @@ export function primitiveCount(op) {
 }
 
 /**
- * Replays flattened primitives on the sacrificial validator and checks endpoint budgets.
+ * Replays flattened primitives on the sacrificial validator and checks endpoint and bridge budgets.
  * @param {import('./solid_codegen.js').ChainValidator} validator - Sacrificial engine provider.
  * @param {import('./solid_codegen.js').SolidSpec} item - Saved solid and authored operations.
  * @param {?{seed:string, ops:Array<{op:string,param:number,twist:number}>}} baseRecipe - Flattened star-pattern base.
- * @returns {Promise<void>} Resolves when every primitive endpoint fits.
+ * @returns {Promise<void>} Resolves when every primitive endpoint and bridge fits.
  * @throws {Error} Rejects if the validator is unavailable, a mesh operation is
- *   refused, or an endpoint exceeds the face budget.
+ *   refused, or an endpoint or bridge exceeds the face budget.
  */
 export async function validateRegistryFaces(validator, item, baseRecipe = null) {
   await validator.withValidator((mod) => {
@@ -85,22 +85,35 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
           throw new Error(`Registry endpoint has ${faces} faces; maximum is ${MAX_BUILD_FACES}`);
       };
       check();
-      for (const op of ops) {
+      const primitives = ops.flatMap((op) => {
         const name = typeof op === 'string' ? op : op.op;
-        const primitives = LOWERING[name]?.(op) ?? [op];
-        for (const primitive of primitives) {
-          if (!mesh) throw new Error(meshOpFailure(mod, 'Registry mesh').message);
-          let next;
-          try {
-            next = applyOp(mesh, primitive);
-          } catch (error) {
-            if (engineHalted(error, mod)) throw error;
-            throw new Error(meshOpFailure(mod, `Op "${name}"`).message, { cause: error });
-          }
-          mesh.delete();
-          mesh = next;
-          check();
+        return LOWERING[name]?.(op) ?? [op];
+      });
+      let previousName = '';
+      for (const primitive of primitives) {
+        const name = typeof primitive === 'string' ? primitive : primitive.op;
+        if (!mesh) throw new Error(meshOpFailure(mod, 'Registry mesh').message);
+        let bridgeFaces = 0;
+        if (name === 'dual' || (name === 'kis' && previousName !== 'dual')) {
+          const faces = mesh.getFaces();
+          if (!faces) throw new Error(meshOpFailure(mod, 'Registry faces').message);
+          const edges = faces.counts.reduce((sum, count) => sum + count, 0) / 2;
+          // Closed genus-zero meshes: ambo has E+2 faces; truncate has 3E edges.
+          bridgeFaces = name === 'dual' ? edges + 2 : 3 * edges + 2;
         }
+        let next;
+        try {
+          next = applyOp(mesh, primitive);
+        } catch (error) {
+          if (engineHalted(error, mod)) throw error;
+          throw new Error(meshOpFailure(mod, `Op "${name}"`).message, { cause: error });
+        }
+        mesh.delete();
+        mesh = next;
+        check();
+        if (bridgeFaces > MAX_BUILD_FACES)
+          throw new Error(`Registry bridge has ${bridgeFaces} faces; maximum is ${MAX_BUILD_FACES}`);
+        previousName = name;
       }
     } catch (error) {
       validator.noteDeath(error);
