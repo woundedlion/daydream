@@ -311,8 +311,8 @@ function fakeStyle() {
  * event), read {passive}/{signal}, and assert removal; a {once} listener drops
  * as it fires, a listener an earlier handler removed does not fire, and removal
  * pairs on the capture flag, as in the DOM, so a capture-mismatched removal
- * leaves the listener on the list. focus() and scrollIntoView() record their
- * call counts the same way; focus() also keeps its last options bag in
+ * leaves the listener on the list. focusCalls counts focus() calls that move
+ * focus; scrollIntoViewCalls counts every call. focus() keeps its last options bag in
  * focusOptions and points the installed document's activeElement at the node,
  * and unparenting a node that holds focus drops it to the body, so a reorder
  * built out of re-appends loses focus the way it does in the DOM.
