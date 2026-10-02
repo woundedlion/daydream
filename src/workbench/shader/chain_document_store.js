@@ -41,8 +41,8 @@ const refusal = (code, path, message) => ({
 export const UNDO_DEPTH = 100;
 
 /**
- * The default scratch chain uses a camera and plane-space sampling.
- * The minimal legal chain is SampleSphere followed by Colorize.
+ * The default scratch chain uses a rotation, stereographic projection and plane-space sampling.
+ * A minimal legal chain is sample.spherical-noise.v3 followed by colorize.generated-palette.v3.
  * @type {ReadonlyArray<ChainEntry>}
  */
 export const DEFAULT_SCRATCH_CHAIN = Object.freeze([
