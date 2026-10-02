@@ -5,6 +5,8 @@
 
 // @ts-check
 
+import { replaceUrl } from '../../app/state.js';
+
 const COMPILER_URL = new URL('../../../generated/shader/shader_workbench.mjs', import.meta.url).href;
 const PREFIX = '#shader=v2.';
 const MAX_PAYLOAD_CHARS = 65536;
@@ -143,11 +145,5 @@ export async function decodeShaderStateHash(hash) {
 export function replaceShaderStateHash(hash, win = globalThis) {
   if (!win.location || !win.history?.replaceState) return false;
   const path = `${win.location.pathname}${win.location.search}${hash}`;
-  try {
-    win.history.replaceState({}, '', path);
-    return true;
-  } catch (error) {
-    console.warn('Unable to update shader link', error);
-    return false;
-  }
+  return replaceUrl(path, win);
 }
