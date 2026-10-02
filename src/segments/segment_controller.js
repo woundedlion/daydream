@@ -6,10 +6,11 @@
  * SegmentController — owns the segmented-POV worker pipeline.
  *
  * N Web Workers each instantiate their own isolated WASM engine — from one
- * compilation shared with the pool — and render a segment rectangle of the
+ * compilation shared with the pool when available — and render a segment rectangle of the
  * canvas in parallel; results are composited into the display buffer. The
  * pipeline is one-frame deep: frame N-1's results are displayed while frame N
- * renders on the workers (frame time = max(segment times), not sum).
+ * renders on the workers. Wall time spans dispatch through the last response;
+ * worker timings measure each render separately.
  *
  * The host (daydream.js) owns the main-thread WASM engine and pixel view (both
  * reassignable), so those are injected as lazy getters:
