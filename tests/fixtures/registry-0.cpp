@@ -13,6 +13,6 @@ inline constexpr Recipe CUBE_TRUNCATE33_RECIPE =
 
 // Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.
 // Until they agree, its size static_assert and the NUM_ENTRIES sum both
-// fail; the README registry table counts the entry too.
+// fail.
     {"cube_truncate33", IslamicStarPatterns::cube_truncate33, Category::Complex,
      &CUBE_TRUNCATE33_RECIPE},

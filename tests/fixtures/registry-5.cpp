@@ -25,7 +25,7 @@ inline constexpr Recipe
 
 // Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.
 // Until they agree, its size static_assert and the NUM_ENTRIES sum both
-// fail; the README registry table counts the entry too.
+// fail.
     {"truncatedCuboctahedron_truncate33_truncate33_truncate33",
      IslamicStarPatterns::
          truncatedCuboctahedron_truncate33_truncate33_truncate33,

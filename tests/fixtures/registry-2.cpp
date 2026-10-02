@@ -17,7 +17,7 @@ inline constexpr Recipe
 
 // Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.
 // Until they agree, its size static_assert and the NUM_ENTRIES sum both
-// fail; the README registry table counts the entry too.
+// fail.
     {"truncatedIcosahedron_ambo_relax100_truncate01_hk59",
      IslamicStarPatterns::truncatedIcosahedron_ambo_relax100_truncate01_hk59,
      Category::Complex,

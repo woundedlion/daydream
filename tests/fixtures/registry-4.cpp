@@ -17,7 +17,7 @@ inline constexpr Recipe TRUNCATED_TETRAHEDRON_KIS_GYRO_RECIPE = make_recipe(
 
 // Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.
 // Until they agree, its size static_assert and the NUM_ENTRIES sum both
-// fail; the README registry table counts the entry too.
+// fail.
     {"truncatedTetrahedron_kis_gyro",
      IslamicStarPatterns::truncatedTetrahedron_kis_gyro, Category::Complex,
      &TRUNCATED_TETRAHEDRON_KIS_GYRO_RECIPE},
