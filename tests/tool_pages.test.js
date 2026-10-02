@@ -21,7 +21,7 @@ test('every tool page inherits the reduced-motion stylesheet fence', () => {
     assert.match(headOf(pageSrc(page)), /href="tools\.css"/, page);
 });
 
-test('the solids rotation control is keyboard-operable', () => {
+test('the solids rotation switch starts unchecked', () => {
   const source = pageSrc('solids');
   assert.match(source,
     /<label id="toggleRotateLabel" for="toggleRotate"[^>]*>Auto Rotate<\/label>/);
