@@ -336,7 +336,6 @@ export function start({
       });
       host.adapter = renderAdapter;
 
-      // Construct the recorder now that daydream's canvas exists.
       host.recorder = new VideoRecorder(daydream.canvas);
       recording.attach(host.recorder);
 

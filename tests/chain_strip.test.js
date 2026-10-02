@@ -1,12 +1,5 @@
-//
-// src/workbench/shader/chain_strip.js renders the pipeline strip — the chain left to right as
-// chips grouped into one band per editable carrier, with crossings as socket chips on
-// the band boundaries — and translates every gesture (band + palettes, ✕
-// removal, socket selection, reorder buttons, Alt+Arrow, bypass, undo) into the
-// document store's span-replacement primitive. The fixture is the
-// real kaleidoscope_hex_bright pattern document over the pinned engine catalog and the real
-// store, so legality, reconciliation and refusal texts are the shipping ones,
-// not doubles.
+// Check chain-strip gestures against the real document store and
+// kaleidoscope_hex_bright fixture compiled with the pinned engine catalog.
 import { afterEach, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

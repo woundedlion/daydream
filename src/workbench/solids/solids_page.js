@@ -117,7 +117,6 @@ let islamicStarPatterns = [];
 // Empty until the registry loads, which leaves the saved-set check alone.
 let registrySolidNames = new Set();
 
-// Initialize
 async function init() {
   // Load WASM
   try {
@@ -311,7 +310,6 @@ async function generateThumbnails(signal) {
   // Gather all solid names from exported lists
   const thumbKeys = [...simpleSolids, ...islamicStarPatterns];
 
-  // Create offscreen renderer
   const width = 256; // High-res for larger thumbs
   const height = 256;
   const offRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
@@ -339,13 +337,7 @@ async function generateThumbnails(signal) {
 
   try {
     for (const key of thumbKeys) {
-      // Yield to the event loop before each solid. Each iteration is a full
-      // WASM build + triangulation + WebGL render + toDataURL — heavy enough
-      // that running the whole list synchronously froze first paint and input
-      // during init(). Deferring each to its own macrotask lets the page paint
-      // and stay responsive while the footer fills in progressively; this is
-      // why generateThumbnails() is async and init() deliberately does not
-      // await it.
+      // Yield between thumbnails; init() starts generation without awaiting it.
       await new Promise(resolve => setTimeout(resolve));
       if (signal.aborted || !meshOpsWasm) break;
 
@@ -383,7 +375,6 @@ async function generateThumbnails(signal) {
       // Render
       offRenderer.render(offScene, offCamera);
 
-      // Create Button
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = `thumb-btn ${state.base === key ? 'active' : ''}`;
@@ -418,7 +409,6 @@ async function generateThumbnails(signal) {
           state.base = key;
           update();
           renderBaseSolid();
-          // Update active state
           highlightBaseSolid();
         });
       });
@@ -936,7 +926,6 @@ function applyRestore(item) {
   state.showNormals = flag(item.normals, false);
   state.showIndices = flag(item.indices, false);
 
-  // Update UI
   updateToggles();
   renderOps();
 
@@ -1147,15 +1136,7 @@ const parameterEdits = new Map();
 
 function updateOpParam(index, key, value, revision) {
   if (revision !== opsRevision || !state.ops[index]) return;
-  // Snap onto the op's step grid (which also clamps to its range) and reject
-  // non-numeric input before it reaches state — the number box's
-  // min/max/step do not constrain typed input, and the WASM mesh boundary is deliberately
-  // fail-fast, so an out-of-range or NaN value typed here could kill the
-  // page or produce garbage geometry, and an off-grid one would export a
-  // coefficient no control ever shows. The grid also keeps integral-step
-  // params (e.g. relax's iter) whole, as their count-typed C++ args demand.
-  // On a bad value, fall back to the current value (the sync below restores
-  // the UI).
+  // Typed number inputs can bypass min/max/step; reject non-numbers and snap to the op grid.
   const def = OP_DEFS[state.ops[index].op]?.params?.[key];
   let val = parseFloat(value);
   if (Number.isNaN(val)) {
@@ -1226,12 +1207,7 @@ const commitQueue = createCommitQueue((error) => {
 const queueCommit = (/** @type {() => any} */ fn) =>
   commitQueue(() => (wasmModule ? fn() : undefined));
 
-// Bumped whenever the op list's membership or order changes. Row handlers close
-// over the revision that built them, and a commit queued ahead of one of them
-// can change the list before it runs -- at which point its render-time index
-// names a different op. Rejecting the stale index is what keeps a second click
-// during an in-flight gating sweep from moving or deleting whatever op now
-// occupies that slot; a param edit leaves the list alone and does not bump it.
+// Row handlers reject stale membership/order revisions; parameter edits retain the revision.
 let opsRevision = 0;
 
 /** Replaces the op list and marks every render-time index stale.
@@ -1379,11 +1355,7 @@ async function refreshOpGating() {
   }
 }
 
-// Drops the module handles and puts the page in its terminal state: every
-// gate reads them, so nothing calls the engine again, and the banner stays up
-// rather than being overwritten by the next recompute. The editing surface
-// freezes with the preview: a chain edit could still validate and land, but
-// no module remains to draw it.
+// Terminal state drops engine handles and freezes editing and preview.
 function standDown(message) {
   meshOpsWasm = null;
   wasmModule = null;
@@ -1474,7 +1446,6 @@ function renderMesh() {
   if (labelsBuilt) labelsNeedReproject = true;
   updateIndexLabelNotice(state.showIndices && meshData.vertices.length >= MAX_INDEX_LABELS);
 
-  // Update Stats
   renderBaseSolid();
   const stats = document.getElementById('meshStats');
   const statsText = meshStatsLine(meshData, edgeCount);
@@ -1537,7 +1508,6 @@ function updateLabels() {
         tempV.copy(v);
         tempV.project(camera);
 
-        // Check if behind camera frustum (NDC z)
         if (tempV.z > 1) {
           el.style.display = 'none';
         } else {

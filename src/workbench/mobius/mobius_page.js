@@ -288,12 +288,6 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
   const labelElement = makeDiv('complex-plane-label', labelId);
   container.replaceChildren(planeElement, labelElement);
 
-  // Cache the last strings written to the DOM so a preset animation (which
-  // calls applyConfig -> updateUI every frame) only touches the label/dot
-  // when their rounded values actually change. Both outputs are quantized
-  // (2-decimal text, clamped percent), so most frames are no-ops; skipping
-  // them avoids ~12 redundant text/style mutations per frame at 60 Hz while
-  // the shader uniforms keep updating every frame.
   let lastLabel = null, lastLeft = null, lastTop = null;
   const updateUI = () => {
     const re = paramObj.re;

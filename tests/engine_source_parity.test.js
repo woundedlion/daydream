@@ -372,13 +372,8 @@ function engineLeafFields(source, name) {
 }
 
 /**
- * Pins the C++ field paths generativePaletteCpp writes to the members
- * PaletteRecipe and its nested control structs actually declare. That paste is
- * the palettes page's headline deliverable and nothing else checks it: the WASM
- * bridge takes the JS-side recipe, so an engine field renamed, moved between
- * structs or added would leave every emitted paste non-compiling with the whole
- * suite green. The declared type is checked too, so an enum field emitted under
- * the wrong enum name — which does compile, as the wrong constant — fails here.
+ * Checks generativePaletteCpp field paths and enum types against the declarations
+ * of PaletteRecipe and its nested control structs.
  */
 test('generativePaletteCpp assigns the fields core/color/palette_recipe.h declares', { skip: engineSkip }, () => {
   const cpp = header(PALETTE_RECIPE_H);

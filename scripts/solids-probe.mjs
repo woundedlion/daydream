@@ -1,16 +1,8 @@
 /*
- * Drives the solids tool's op-chain reorder in headless Chrome, over the same
- * manifest server scripts/browser-smoke.mjs uses.
+ * Headless Chrome probe of solids-chain mouse/touch reordering and no-travel
+ * presses, using scripts/browser-smoke.mjs's manifest server.
  *
  *   node scripts/solids-probe.mjs
- *
- * The unit suite runs over tests/helpers/fake_dom.js, which models neither layout nor
- * pointer capture, so it cannot tell a grip that reorders from one that reorders
- * only under a mouse: the row geometry the drop slot is read from, the capture
- * the gesture rides on, and the touch-action that decides whether a finger drags
- * the row or scrolls the list all exist only in a browser. This job drags a row
- * with a real mouse and again with a real finger, and requires a press that never
- * travels to leave the chain — and the row — exactly as it found them.
  */
 import { centre, checks, dragBetween, isMain, runProbe } from './probe_harness.mjs';
 

@@ -404,13 +404,7 @@ export function createFrameLoopGuard({
   };
 }
 
-// Deadline for the main-thread WASM module load: fetch of the multi-megabyte
-// binary plus glue, instantiate, and the module's own runtime init. Sized well
-// above the segmented pool's INIT_WATCHDOG_MS, which bounds the same binary in a
-// worker but only after its boot ping has already proved the connection; nothing
-// precedes this one, so it has to cover a cold, throttled first fetch. A stalled
-// fetch fires no error of its own, so without this the loading overlay spins for
-// the page's lifetime.
+// Main-thread WASM fetch, instantiation and runtime-init deadline.
 export const MODULE_LOAD_DEADLINE_MS = 90000;
 
 /**

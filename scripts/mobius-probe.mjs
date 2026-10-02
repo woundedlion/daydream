@@ -1,17 +1,9 @@
 /*
- * Drives the Möbius tool's complex-plane pads in headless Chrome, over the same
- * manifest server scripts/browser-smoke.mjs uses.
+ * Headless Chrome probe of Möbius pad coordinates, pointer capture, clamping
+ * outside the pad and preset-animation cancellation.
+ * Uses scripts/browser-smoke.mjs's manifest server.
  *
  *   node scripts/mobius-probe.mjs
- *
- * A pad turns a viewport point into a coefficient through its own
- * getBoundingClientRect, and keeps the gesture through pointer capture once the
- * pointer has left it. tests/helpers/fake_dom.js supplies neither: its rects are zero,
- * which the pad reads as an unlaid-out control and declines, and a move outside
- * the element never arrives. This job presses the pad at known fractions of its
- * box and requires the coefficient those fractions name, walks the pointer off
- * the pad and requires the clamped value the capture still reports, and requires
- * the press to have stopped the running preset animation.
  */
 import { boxOf, checks, isMain, runProbe, walkTo } from './probe_harness.mjs';
 

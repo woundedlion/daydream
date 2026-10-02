@@ -1,12 +1,5 @@
-// Records the source modules a test process loads. scripts/run-tests.mjs loads
-// this through NODE_OPTIONS, so every process `node --test` spawns — and every
-// script a test spawns in turn — reports the files it imported into
-// $DAYDREAM_MODULE_LOADS for the runner to gate the roster against.
-//
-// The record is what the module loader resolved, not what the test source says:
-// a module named only in a comment, a string or a path never built is never
-// loaded, so it never counts as covered. NODE_TEST_CONTEXT keeps the outer
-// runner from writing, whose reporters and its own imports are not a test's.
+// Records resolved source imports into $DAYDREAM_MODULE_LOADS via NODE_OPTIONS.
+// NODE_TEST_CONTEXT excludes the outer runner and its reporter imports.
 import { registerHooks } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';

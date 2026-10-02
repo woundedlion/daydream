@@ -56,11 +56,7 @@ const REFRESH_CONCURRENCY = 6;
 
 const RESOURCE_TIMING_ENTRIES = 1000;
 
-// Deadline for the Reload sweep. The sweep only primes the cache; the reload
-// chained behind it is the recovery, so a connection that stalls rather than
-// failing must not hold the overlay's one control. Well under the main module
-// load's deadline for that reason: there is a working outcome past this one,
-// and none past that one.
+// Reload cache-sweep deadline.
 export const REFRESH_DEADLINE_MS = 20000;
 
 /**

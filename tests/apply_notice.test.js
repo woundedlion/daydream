@@ -9,10 +9,6 @@ import { fakeElement } from './helpers/fake_dom.js';
 import { fakeScheduler } from './helpers/fake_timers.js';
 import { createApplyNotice } from '../src/ui/apply_notice.js';
 
-// Pins the ids the sink itself asks the document for against the real markup: a
-// rename on either side swallows every rejection message behind a single
-// warning. The ids are recorded from the lookup rather than restated here, so a
-// renamed query cannot pass by matching a stale literal.
 test('index provides every apply-notice element the sink resolves', () => {
   const queried = [];
   const byId = new Map();

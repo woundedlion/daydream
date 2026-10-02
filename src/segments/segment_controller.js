@@ -61,22 +61,11 @@ export const BOOT_WATCHDOG_MS = 10000;
 // to the boot/init deadlines above.
 export const RENDER_WATCHDOG_MS = 5000;
 
-// Bounded auto-retry for a transient worker module-load failure: a bare, message-
-// less error Event, which the browser fires when a `{type:'module'}` worker's
-// import graph fails to fetch — typically a burst of cold concurrent fetches of the
-// large WASM glue racing after the tab's keep-alive connection dropped during idle,
-// not a deterministic worker throw. The pool rebuilds a few times with a short
-// backoff (the refetch hits a re-warmed cache/connection) before latching a fault,
-// so the sim self-heals instead of needing a manual segmented-mode toggle.
+// Retry message-less worker error Events with bounded backoff.
 export const MAX_BOOT_RETRIES = 3;
 export const BOOT_RETRY_DELAY_MS = 250;
 
-// Bound on consecutive effect-switch rebuilds of a faulted pool. Effect switches
-// can be timer-driven (the Test All ticker walks the list on an interval), so a
-// deterministic fault would otherwise respawn the whole pool — one WASM module
-// per segment — on every tick. Reset when a pool reaches ready; once spent, the
-// restart paths are the user-driven ones the fault banner names: a resolution
-// change or a segmented-mode toggle.
+// Effect-switch rebuild budget resets at ready; resolution and mode changes can restart it.
 export const MAX_FAULTED_REBUILDS = 2;
 
 /**
@@ -1088,28 +1077,18 @@ export class SegmentController {
    * @param {number} h
    */
   setResolution(w, h) {
-    // A faulted pool is broken until re-created. The rebuild is left to the
-    // setEffect() the apply pipeline runs next, which reads appState after the
-    // pipeline has corrected an effect this resolution does not offer; spawning
-    // here would seed every worker with the outgoing effect. The budget is
-    // cleared rather than spent, so the resolution change stays the unbounded
-    // restart path the fault banner names.
+    // The following setEffect() rebuilds a faulted pool with the corrected effect.
     if (this.faulted) {
       this.faultedRebuilds = 0;
       return;
     }
-    // Open a new generation: in-flight and settled results were sized to the old
-    // W/H. Drop settled results here; onmessage's fence drops in-flight ones.
+    // Fence old-resolution results into a prior generation.
     this.paramValues = null;
     this.paramRevision++;
     this.#renderGen++;
     this.#results.fill(null);
     this.#pendingFrame = false;
-    // renderInFlight/pending are left intact: the outstanding old-generation
-    // render still owns the in-flight latch and releases it via frameResolve;
-    // tick() then dispatches the re-render at the new size. A render that never
-    // replies is bounded by renderParallel's watchdog, so a resize during a hung
-    // frame faults and latches rather than wedging the pipeline.
+    // The outstanding render retains the latch until frameResolve or its watchdog.
     this.broadcast({ type: 'setResolution', w, h });
   }
 
@@ -1144,12 +1123,7 @@ export class SegmentController {
         return;
       }
 
-      // Dispatched per worker rather than broadcast: each carries back its own
-      // retired pixel buffer. `results` holds the live generation and is the only
-      // buffer composite() reads, so a `scratch` slot here is two generations old
-      // and unreferenced — transferring it away cannot detach a displayed frame.
-      // Clearing each slot as it is consumed also keeps a slot left by a
-      // fenced-out prior generation out of this one's published frame.
+      // Transfer only retired scratch buffers; live results remain attached.
       for (let s = 0; s < this.workers.length; s++) {
         const retired = this.#scratch[s];
         this.#scratch[s] = null;
@@ -1260,12 +1234,7 @@ export class SegmentController {
       // would otherwise be recorded as one.
       this.#frameComposited = blitted === this.count;
     } else if (this.hasPublishedFrame()) {
-      // Render overran this tick: re-blit the last published frame over driver's
-      // clear so the preview holds it instead of flashing black. `results` is only
-      // ever swapped whole, so this composites one coherent generation. Not a new
-      // frame, so frameComposited stays false — the recorder must not capture a
-      // duplicate. Stats are left showing the last landed generation: the next
-      // render has already zeroed the per-segment arrays this tick.
+      // Replay the last published generation without recording it again or updating stats.
       this.composite(this.#results);
       this.#frameComposited = false;
     } else {
@@ -1285,11 +1254,7 @@ export class SegmentController {
       this.#renderInFlight = true;
       const generation = this.#renderGen;
       this.renderParallel().then(() => {
-        // Publish the fully-assembled generation only if it is still current: a
-        // mid-render setResolution() bumps renderGen, and publishing anyway would
-        // composite a black or stale-sized frame next tick. The swap makes the
-        // completed staging buffer the live one atomically between ticks; the
-        // old buffer becomes next generation's scratch.
+        // Publish only the current generation; retire the previous live buffer into scratch.
         if (generation === this.#renderGen) {
           const done = this.#scratch;
           this.#scratch = this.#results;

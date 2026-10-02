@@ -1734,8 +1734,6 @@ test('the driver hands its own document to every collaborator that defaults to t
   }
 });
 
-// A context cannot keep standing in for state the driver dropped or renamed —
-// the mirror of the method-surface check fake_engine.js runs.
 /** Fields the Daydream class assigns, read from its class body.
  * @returns {Set<string>} Field names.
  */

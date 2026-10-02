@@ -1,35 +1,8 @@
-//
-// Cross-implementation equivalence between the web render-tiling layout
-// (segment_layout.js computeSegmentRange) and the firmware's physical
-// segment→canvas mapping.
-//
-// The firmware side is read from pov_segment_map.json, not reimplemented here.
-// That file is emitted by the engine's tools/pov_segment_map_export.cpp — a TU
-// compiled against hardware/pov_segment_map.h — pinned against the header by the
-// engine's unit_pov_segment_map_golden CTest, and installed into this checkout
-// alongside the WASM module from the verified engine bundle. Its checksum and
-// source revision travel with that bundle. A C++-side convention change
-// cannot leave this cross-check green: the reference table moves with the header,
-// and computeSegmentRange is then measured against the new convention.
-//
-// The two decompositions are NOT pixel-identical, and that is deliberate:
-//   - computeSegmentRange tiles the canvas into NUM_ARMS=2 vertical halves
-//     (arm A = left, arm B = right) each split into Y-bands, so each web worker
-//     renders a disjoint sub-rectangle.
-//   - the firmware map assigns each physical segment's LEDs to canvas columns;
-//     over a full rotation BOTH arms read the entire width, with arm B reading a
-//     w/2-shifted column. So the column decompositions intentionally differ.
-//
-// What the two MUST agree on is the shared convention:
-//   1. Arm partition: segments [0, N/2) are arm A; [N/2, N) are arm B.
-//   2. Arm placement: each arm's web rect starts at the canvas column the
-//      firmware samples at rotation column 0 — x = 0 for arm A, x = floor(w/2)
-//      for arm B.
-//   3. Per-segment row coverage: the web rect's row span [y0, y1) equals the SET
-//      of canvas rows the firmware segment's PPS LEDs touch (the bottom strip
-//      runs reversed, so only the covered set is equal, not the traversal order).
-//
-// Run: npm test
+// Cross-check segment_layout.js against the installed pov_segment_map.json,
+// exported from hardware/pov_segment_map.h by tools/pov_segment_map_export.cpp.
+// Arm partitions and starting columns agree, as do each segment's covered row sets.
+// Web workers tile disjoint rectangles; firmware arms traverse the full width,
+// and reversed LED strips have the same row coverage with a different traversal order.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

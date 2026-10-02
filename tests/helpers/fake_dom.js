@@ -1,19 +1,6 @@
-//
-// Shared DOM double for the suites that run without a browser: one element
-// stand-in plus the globalThis.document and window install/restore helpers.
-// Covers the surface the daydream modules actually touch — extend this instead
-// of hand-rolling another one-off fake.
-//
-// Not modelled: layout and the box model, CSS, hit-testing.
-// Numeric-input value sanitization is checked in solids-probe.mjs.
-// So these ship green here and only a real browser catches them: zero-width or
-// overflowing chips, off-screen flyouts, scroll arrows that never appear,
-// scrollTop clamping, a renamed or deleted CSS rule, a display:none control that
-// still takes a click, a drag that
-// loses pointer capture or ignores pointercancel. The seven probes
-// browser-smoke.yml drives are what catch them: scripts/browser-smoke.mjs,
-// workbench-probe.mjs, panel-probe.mjs, solids-probe.mjs, palettes-probe.mjs,
-// mobius-probe.mjs and lissajous-probe.mjs.
+// Shared element, document and window doubles with install/restore helpers.
+// Layout, CSS, hit-testing and browser input behavior are not modeled;
+// scripts/*-probe.mjs and browser-smoke.mjs exercise those surfaces.
 import { afterEach } from 'node:test';
 
 // Nodes standing in for ones the page already carries. A parentless node is

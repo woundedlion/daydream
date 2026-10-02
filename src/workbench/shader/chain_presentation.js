@@ -53,12 +53,8 @@ export const nudgeStep = (declaration) => {
 export const fieldOf = (id) => id.slice(id.indexOf('.') + 1);
 
 /**
- * The parameter ids the current topology selections deactivate. Edge widths
- * require an edge-fade mode, hue controls require their corresponding hue mode,
- * brightness endpoints and depth require a brightness envelope, and the
- * projection spin and wander rates require the spin-wander frame. Deactivation
- * changes what the engine reads, never what the document carries, so these
- * controls render dimmed rather than dropping out of the union schema.
+ * The parameter ids deactivated by the catalog's topology-field gates.
+ * Deactivated controls render dimmed; their values remain in the document.
  * @param {ParameterDeclaration[]} parameters - The document's declarations.
  * @param {Object<string, *>} values - The active preset's values.
  * @param {ChainEntry[]} chain - The document's operator instances.
