@@ -204,7 +204,8 @@ test('refresh() is a no-op before the load and after dispose()', () => {
 
 test('dispose() releases the recorder before the engine and leaves the host inert', () => {
   const order = [];
-  const host = new EngineHost();
+  const onViewRefreshed = () => {};
+  const host = new EngineHost(onViewRefreshed);
   host.adapter = { drawFrame() {} };
   host.module = {};
   host.recorder = { dispose() { order.push('recorder'); } };
@@ -217,6 +218,7 @@ test('dispose() releases the recorder before the engine and leaves the host iner
   host.dispose();
 
   assert.deepEqual(order, ['recorder', 'engine adapter=null']);
+  assert.notEqual(host.onViewRefreshed, onViewRefreshed);
   assert.equal(host.recorder, null);
   assert.equal(host.adapter, null);
   assert.equal(host.engine, null);
