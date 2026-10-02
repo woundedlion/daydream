@@ -12,10 +12,10 @@ after(() => engine.delete());
 test('typed snapshots preserve evolving walk, noise, source and palette state across effect replacement', () => {
   engine.setResolution(96, 20);
   engine.setEffect('ShaderChain');
-  callWorkbenchBinding(engine, 'getShaderChainBindings', 'setShaderChainParameters', [[
+  assert.equal(callWorkbenchBinding(engine, 'getShaderChainBindings', 'setShaderChainParameters', [[
     {name: 'camera.wander', value: 0.1}, {name: 'project.projection-wander', value: 0.2},
     {name: 'sample.speed', value: 0.004}, {name: 'colorize.hue-noise-speed', value: 0.003},
-  ]]);
+  ]]), module.ParamSetResult.APPLIED);
   engine.setAnimationsPaused(false);
   for (let frame = 0; frame < 713; frame += 1) engine.drawFrame();
   const snapshot = capture();
