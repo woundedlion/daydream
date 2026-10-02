@@ -1494,6 +1494,7 @@ test('a refused socket replacement restores the selected operator', async () => 
   assert.equal(select.value, 'project.stereographic.v2');
   assert.deepEqual(h.store.document(), before);
   assert.equal(h.applied.length, 0);
+  assert.equal(lastAnnounced(h), 'catalog refused edit');
 });
 
 test('band insertion closes after pointer focusout and retains keyboard toggles', async () => {
