@@ -541,8 +541,8 @@ function workbenchEngine() {
     },
   };
   const bindings = {
-    setShaderChain: engine.bindings?.setShaderChain ?? engine.setShaderChain,
-    setShaderChainParameters: engine.bindings?.setShaderChainParameters ?? engine.setShaderChainParameters,
+    setShaderChain: engine.setShaderChain,
+    setShaderChainParameters: engine.setShaderChainParameters,
     getSnapshot: () => null,
     delete: () => {},
   };
