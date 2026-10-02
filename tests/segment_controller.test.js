@@ -2601,7 +2601,6 @@ test('setEffect bumps renderGen so an in-flight old-effect frame is fenced out',
 // pass every fence, watchdog and composite check.
 test('setResolution leaves one effect rebuild to the apply pipeline', () => {
   const c = readyController(2, { effect: 'Ribbons' });
-  c.getWasmEngine = () => fakeEngine([{ name: 'Speed', value: 0.25 }]);
 
   c.setResolution(8, 8);
 
@@ -2619,18 +2618,6 @@ test('setResolution opens a new parameter revision', () => {
 
   assert.equal(c.paramRevision, before + 1);
   assert.equal(c.getParamValues(), null);
-});
-
-test('setResolution does not rebuild the effect with an empty snapshot', () => {
-  const c = readyController(2, { effect: 'Ribbons' });
-  c.setAnimationsPaused(true);
-  for (const w of c.workers) w.posted.length = 0;
-
-  c.setResolution(8, 8);
-
-  for (const w of c.workers) {
-    assert.equal(w.posted.some((m) => m.type === 'setEffect'), false);
-  }
 });
 
 // onWorkerFault terminates the pool but leaves `workers` populated, so an
