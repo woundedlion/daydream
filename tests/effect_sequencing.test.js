@@ -780,6 +780,8 @@ test('resolution rebuild restores the chain runtime before rebuilding controls o
     runtime: [{instance: 'camera', kind: 'spatial-walk-v2', state: {walkTime: 37}}], animationsPaused: false};
   const app = makeApp({chainSnapshot: snapshot, segmented: true});
   assert.equal(app.pipeline.applyResolution(), ApplyResult.APPLIED);
+  assert.ok(app.log.includes('chain.capture'));
+  assert.ok(app.log.includes('chain.restore'));
   assert.ok(app.log.indexOf('chain.capture') < app.log.findIndex((event) => event.startsWith('engine.setResolution')));
   assert.ok(app.log.indexOf('chain.restore') < app.log.indexOf('effectGui.build'));
   assert.ok(app.log.indexOf('chain.restore') < app.log.findIndex((event) => event.startsWith('segments.setEffect')));
