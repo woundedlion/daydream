@@ -695,9 +695,7 @@ test('mobius preset parity (mobius_transform)', () => {
 /**
  * Pins the Mobius map to analytically derived images, so a drift copied into
  * both ports cannot pass. Identity fixes every point; f(z) = 1/z is a 180°
- * rotation about x under this stereographic convention, and its coefficients
- * (a=0, b=1, c=1, d=0) are asymmetric in every adjacent argument pair, so a
- * transposed eight-float ordering fails here.
+ * rotation about x under this stereographic convention.
  */
 test('mobius golden images (absolute pin)', () => {
   for (const [x, y, z] of MOBIUS_POINTS) {
