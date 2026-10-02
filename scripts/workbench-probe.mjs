@@ -466,10 +466,8 @@ export async function probeStrip(tab) {
     `animation is running after preset/control writes (${animation.text})`);
 
   const panels = await boxOf(tab, '#gui-container');
-  for (const region of ['#shader-toolbar']) {
-    const box = await boxOf(tab, region);
-    check(!overlaps(panels, box), `global controls clear ${region}`);
-  }
+  const toolbar = await boxOf(tab, '#shader-toolbar');
+  check(!overlaps(panels, toolbar), 'global controls clear #shader-toolbar');
 
   await tab.setViewport({ width: 700, height: VIEWPORT.height });
   await tab.waitForFunction(() => window.innerWidth === 700);
