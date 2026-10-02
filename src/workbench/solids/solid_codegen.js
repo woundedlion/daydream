@@ -1482,8 +1482,9 @@ export function createOpGate(validator, retries = 3) {
       if (complete) {
         lastSignature = signature;
         failures = 0;
-      } else if (++failures >= retries) {
-        abandoned = true;
+      } else {
+        lastSignature = null;
+        if (++failures >= retries) abandoned = true;
       }
       return { blocked: bad, complete, abandoned };
     }
