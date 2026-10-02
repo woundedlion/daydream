@@ -11,10 +11,9 @@ import { fakeElement } from './helpers/fake_dom.js';
 
 import { SLOW_FRAME_MS } from '../src/renderer/frame_constants.js';
 
-import { FAULT_POOL, FAULT_RENDER } from "../src/segments/worker_protocol.js";
+import { FAULT_POOL, FAULT_RENDER } from '../src/segments/worker_protocol.js';
 
-const { SegmentStatsView } =
-  await import('../src/ui/segment_stats_view.js');
+import { SegmentStatsView } from '../src/ui/segment_stats_view.js';
 
 test('index provides every container the stats view resolves', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
