@@ -1035,8 +1035,6 @@ test('setParameter handler forwards name/value and advances the frame revision',
   assert.equal(posted.find((p) => p.msg.type === 'frame').msg.paramRevision, 12);
 });
 
-// The controller has no reply channel for a rejected setParameter, and only
-// segment 0 mirrors its values back, so this log is the whole diagnostic.
 test('a consecutive rejected setParameter repeat is logged once', async () => {
   await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
   engineInstance.paramResult = ParamSetResult.UNKNOWN_PARAM;
@@ -1114,8 +1112,6 @@ test('selectPreset forwards the index and publishes preset state', async () => {
   assert.equal(frame.paramRevision, 13);
 });
 
-// A refused index leaves this segment on another preset than its peers, which
-// nothing else reports: the controller has no reply channel for one.
 test('a preset index the engine refuses is logged', async () => {
   await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4,
     effectName: 'Plasma' });
