@@ -1324,7 +1324,8 @@ for (const fault of ['missing restore API', 'rejected restore', 'live engine']) 
       ? ChainSnapshotRestoreResult.INVALID_VALUE : ChainSnapshotRestoreResult.APPLIED;
     nextLive = fault === 'live engine';
     await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
-      effectName: 'ShaderChain', chainSnapshot: { schema_version: 1 }, paused: true });
+      effectName: 'ShaderChain', chainSnapshot: { schema_version: 1 }, paused: true,
+      params: [{ name: 'Speed', value: 0.5 }] });
     assert.equal(posted.length, 1);
     assert.equal(posted[0].msg.type, 'engineRejected');
     const reason = nextLive ? 'HolosphereEngine is already live'
@@ -1332,6 +1333,9 @@ for (const fault of ['missing restore API', 'rejected restore', 'live engine']) 
         : 'Shader chain snapshot restore rejected: INVALID_VALUE';
     assert.equal(posted[0].msg.reason, reason);
     if (nextLive) assert.equal(engineInstance, null);
-    else assert.ok(!engineInstance.calls.some(([name]) => name === 'setAnimationsPaused'));
+    else {
+      assert.ok(!engineInstance.calls.some(([name]) => name === 'setAnimationsPaused'));
+      assert.deepEqual(engineInstance.params, []);
+    }
   });
 }
