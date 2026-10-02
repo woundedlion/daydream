@@ -1605,7 +1605,7 @@ test('unsweepableReason names the ops the engine morph path declines', () => {
   assert.equal(unsweepableReason({ op: 'notanop', params: {} }), null,
     'an op off the table is a different defect, reported by savedChainShapeError');
 
-  assert.match(unsweepableReason({ op: 'expand', params: { t: 0.5 } }), /^expand has no morph leg/,
+  assert.match(unsweepableReason({ op: 'expand', params: { t: 0.5 } }), /^expand is not swept by the morph path/,
     'expand has a leg kind but no sweep coverage, so a shape using it is generated whole');
 
   const { min, max } = MORPH_SWEEP.chamfer.t;
