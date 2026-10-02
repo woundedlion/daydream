@@ -1265,8 +1265,8 @@ export function createChainValidator(createModule) {
         for (const o of candidate) {
           what = `Op "${typeof o === 'string' ? o : o.op}"`;
           const next = applyOp(mesh, o);
-          // Read before any other bridge call — every MeshOps entry point clears
-          // the flag on the way in, so even a getVertices first reads false.
+          // Read before another checked mesh call clears the flag; getVertices
+          // also resets it before reading back the mesh.
           const adjusted = Ops.getLastAdjusted?.() === true;
           mesh.delete();
           mesh = next;

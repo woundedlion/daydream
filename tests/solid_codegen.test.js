@@ -1176,8 +1176,8 @@ test('createChainValidator carries each rejection reason out to the caller', asy
 /**
  * Verifies a chain the engine saturated an argument for is refused. The op
  * succeeds, so only getLastAdjusted() says the rendered mesh came from a value
- * the chain does not hold — and every MeshOps entry point clears that flag, so
- * the read has to sit between the op and the next bridge call.
+ * the chain does not hold. The next checked mesh call clears that flag, so the
+ * read has to precede it.
  */
 test('createChainValidator refuses a chain whose argument the engine clamped', async () => {
   const calls = [];
