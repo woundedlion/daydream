@@ -1256,7 +1256,7 @@ test('the worker module graph carries no specifier an import map would resolve',
  */
 function typedefShapes(source) {
   const shapes = [];
-  for (const m of source.matchAll(/^[ \t]*\*[ \t]*@typedef\s+\{/gm)) {
+  for (const m of source.matchAll(/^[ \t]*(?:\/\*\*|\*)[ \t]*@typedef\s+\{/gm)) {
     const open = m.index + m[0].length - 1;
     let depth = 0;
     let end = open;
@@ -1279,12 +1279,17 @@ function typedefShapes(source) {
 // together.
 const PROTOCOL_SHAPE_PIN = {
   version: 12,
-  sha256: 'e1af8cf18de64138da789f8f2a31ebbc93058e351f2a890fe6521dce3136cd38',
+  sha256: '44b46801a887f746a431444fed75b9ccfa1f048a53c038c7f773c42ac624833b',
 };
+
+test('protocol typedef scanning includes single-line aliases', () => {
+  assert.deepEqual(typedefShapes('/** @typedef {OldType} Alias */'), ['Alias={OldType}']);
+  assert.notDeepEqual(typedefShapes('/** @typedef {NewType} Alias */'), ['Alias={OldType}']);
+});
 
 test('a reshaped protocol message forces a PROTOCOL_VERSION bump', () => {
   const shapes = typedefShapes(readFileSync(join(REPO, 'src/segments/worker_protocol.js'), 'utf8'));
-  assert.ok(shapes.length >= 12, 'every protocol message is a @typedef in that file');
+  assert.equal(shapes.length, 19, 'every protocol typedef is included');
   const digest = createHash('sha256').update(shapes.join('\n')).digest('hex');
   assert.equal(digest, PROTOCOL_SHAPE_PIN.sha256,
     'a protocol message shape changed: bump PROTOCOL_VERSION so a stale cached '
