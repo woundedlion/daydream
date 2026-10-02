@@ -30,8 +30,7 @@ const SKIP_DIRS = new Set([
 ]);
 
 /**
- * Reads tsconfig.json, which carries `//` comments JSON.parse rejects. Only
- * whole-line comments are used, so dropping those lines is enough.
+ * Reads both typecheck configs, accepting whole-line comments in tsconfig.json.
  * @returns {Object} The parsed config.
  */
 function readTsconfig() {
@@ -179,7 +178,8 @@ test('the typecheck roster stays inside its stated scope', () => {
   }
 });
 
-const ROOT_EXEMPTIONS = {
+const SOURCE_EXEMPTIONS = {
+  'src/workbench/shared.js': 'Imports Three.js and its renderer addons, whose types are unavailable under noResolve.',
   'scripts/browser-smoke.mjs': 'Browser automation entry point; browser harness types are not yet declared.',
   'scripts/browser.mjs': 'Browser discovery and launch helpers require typed Puppeteer options.',
   'scripts/check-cdn-integrity.mjs': 'Standalone CDN network diagnostic outside deployment staging.',
@@ -222,9 +222,7 @@ test('every source module is typechecked or has a written exemption', () => {
   };
   collect('src/');
   collect('scripts/');
-  const exemptions = { ...ROOT_EXEMPTIONS, ...TOOL_PAGE_EXEMPTIONS,
-    'src/workbench/shared.js': 'Imports Three.js and its renderer addons, whose types are unavailable under noResolve.',
-  };
+  const exemptions = { ...SOURCE_EXEMPTIONS, ...TOOL_PAGE_EXEMPTIONS };
   assert.deepEqual(modules.filter((file) => !roster.includes(file)).sort(),
     Object.keys(exemptions).sort(),
     'add each source module to tsconfig.json or explain its exemption; remove stale exemptions');
