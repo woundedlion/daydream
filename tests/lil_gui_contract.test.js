@@ -11,7 +11,7 @@
 // after logging. A double that hands back a controller for every property turns
 // a browser-side `TypeError: … reading 'onChange'` into a green run.
 import { GUI as DeepLinkGUI } from '../src/ui/gui.js';
-import { fakeGui } from './helpers/fake_app.js';
+import { fakePanelGui } from './helpers/fake_app.js';
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
@@ -266,7 +266,7 @@ for (const search of ['', '?test.value=x']) {
       setTimeout: () => 1,
       clearTimeout: () => {},
     });
-    const fake = fakeGui(search ? { value: 'x' } : {});
+    const fake = fakePanelGui({ hydrated: search ? { value: 'x' } : {} });
     for (const factory of [() => ({}), () => ({ value: null }),
       () => ({ value: undefined }), () => ({ value: {} })]) {
       for (const target of [gui, fake]) {

@@ -106,18 +106,24 @@ const supportedProperty = (target, property, choices) =>
   Object(choices) === choices || ['number', 'boolean', 'string', 'function'].includes(typeof target[property]);
 
 /**
- * A DeepLinkGUI (gui.js) root or folder: records the controllers, folders, and
- * stored values built on it.
- * @param {string|Object} [namespace] - Namespace, or panel hydration values.
- * @param {boolean|Object} [optionsReplaces=false] - Base options() behavior,
- *   or the panel's stored values when hydration values are supplied.
- * @returns {Object} The GUI double.
+ * @param {string} [namespace=''] - Root namespace.
+ * @param {{optionsReplaces?: boolean}} [options={}] - Controller replacement behavior.
+ * @returns {Object} Deep-link GUI double.
  */
-export function fakeGui(namespace = {}, optionsReplaces = false) {
-  const panel = typeof namespace !== 'string';
-  const hydrated = panel ? namespace : {};
-  const stored = panel && typeof optionsReplaces === 'object' ? optionsReplaces : {};
-  if (panel) optionsReplaces = false;
+export function fakeGui(namespace = '', { optionsReplaces = false } = {}) {
+  if (typeof namespace !== 'string') throw new TypeError('GUI namespace must be a string');
+  return buildGui(namespace, optionsReplaces, false, {}, {});
+}
+
+/**
+ * @param {{hydrated?: Object, stored?: Object}} [values={}] - Saved panel values.
+ * @returns {Object} Effect-panel GUI double.
+ */
+export function fakePanelGui({ hydrated = {}, stored = {} } = {}) {
+  return buildGui('', false, true, hydrated, stored);
+}
+
+function buildGui(namespace, optionsReplaces, panel, hydrated, stored) {
   const childrenElement = fakeElement('div');
   childrenElement.ownerDocument = { createElement: (tag) => fakeElement(tag) };
   childrenElement.classList.add('lil-children');
@@ -162,14 +168,14 @@ export function fakeGui(namespace = {}, optionsReplaces = false) {
       return c;
     },
     addFolder(title) {
-      const folder = fakeGui(title, optionsReplaces);
+      const folder = fakeGui(title, { optionsReplaces });
       gui.folders.push(folder);
       return folder;
     },
     // A display folder prefixes no deep-link key, so its controls answer to the
     // same names they would at the root.
     addDisplayFolder(title) {
-      const folder = fakeGui(title, optionsReplaces);
+      const folder = fakeGui(title, { optionsReplaces });
       folder.display = true;
       gui.folders.push(folder);
       return folder;
@@ -369,7 +375,7 @@ export function startApp({
     nav,
     createDriver: () => driver,
     createGui: (options, namespace) => {
-      const gui = fakeGui(namespace, optionsReplaces);
+      const gui = fakeGui(namespace, { optionsReplaces });
       guis.push(gui);
       return gui;
     },

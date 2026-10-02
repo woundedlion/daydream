@@ -1,4 +1,4 @@
-import { fakeGui } from './helpers/fake_app.js';
+import { fakePanelGui } from './helpers/fake_app.js';
 import { CHAIN_SNAPSHOT_STORAGE_KEY } from '../src/effects/effect_persistence.js';
 import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -275,7 +275,7 @@ function makeHarness({
     },
     host: {
       createGui: () => {
-        const gui = fakeGui(hydrated, acceptedStored);
+        const gui = fakePanelGui({ hydrated, stored: acceptedStored });
         guis.push(gui);
         return gui;
       },
@@ -335,7 +335,7 @@ const wiring = () => ({
     setParam: () => {},
   },
   host: {
-    createGui: () => fakeGui(),
+    createGui: () => fakePanelGui(),
     container: () => null,
     isMobile: () => false,
     applyEffect: () => {},
@@ -392,7 +392,7 @@ test('construction rejects a drag target that listens to nothing', () => {
 // addParamControl maps one engine parameter definition onto a lil-gui control.
 
 test('a numeric param becomes a slider bounded by the definition', () => {
-  const gui = fakeGui();
+  const gui = fakePanelGui();
   const state = { Speed: 0.1 };
   const controller = addParamControl(gui, state, SPEED);
 
@@ -402,7 +402,7 @@ test('a numeric param becomes a slider bounded by the definition', () => {
 });
 
 test('a narrow numeric range displays its nonzero slider steps', () => {
-  const gui = fakeGui();
+  const gui = fakePanelGui();
   const speed = {
     name: 'Hue Noise Speed', value: 0.000016, min: -0.008, max: 0.008,
     animated: true,
@@ -438,7 +438,7 @@ test('slider decimals fall back on a degenerate range', () => {
 });
 
 test('an integer param becomes a slider stepped to whole values', () => {
-  const gui = fakeGui();
+  const gui = fakePanelGui();
   const controller = addParamControl(gui, { Burst: 4 },
     { name: 'Burst', value: 4, min: 1, max: 32, step: 1 });
 
@@ -448,7 +448,7 @@ test('an integer param becomes a slider stepped to whole values', () => {
 });
 
 test('a boolean param becomes a toggle with no range arguments', () => {
-  const gui = fakeGui();
+  const gui = fakePanelGui();
   const controller = addParamControl(gui, { Glow: false }, GLOW);
 
   assert.deepEqual(controller.args, []);
@@ -456,7 +456,7 @@ test('a boolean param becomes a toggle with no range arguments', () => {
 });
 
 test('an enumerated param becomes a dropdown of labels to engine indices', () => {
-  const gui = fakeGui();
+  const gui = fakePanelGui();
   const controller = addParamControl(gui, { Mode: 0 },
     { name: 'Mode', value: 0, options: ['Off', 'On', 'Auto'] });
 
@@ -639,7 +639,7 @@ test('fixed Shader warp ownership follows each explicit slot boundary', () => {
 });
 
 test('an invalid param carries an actionable, on-screen warning note', () => {
-  const gui = fakeGui();
+  const gui = fakePanelGui();
   const warning = 'Legacy Stereo Noise requires Projection = Stereographic.';
   const controller = addParamControl(gui, { Projection: 3 }, {
     name: 'Projection',
@@ -664,7 +664,7 @@ test('an invalid param carries an actionable, on-screen warning note', () => {
 });
 
 test('warning ids separate names that differ only in punctuation or case', () => {
-  const gui = fakeGui();
+  const gui = fakePanelGui();
   const warned = (name) => addParamControl(gui, { [name]: 0 },
     { name, value: 0, min: 0, max: 1, warning: `${name} is out of range.` });
 
@@ -680,7 +680,7 @@ test('warning ids separate names that differ only in punctuation or case', () =>
 });
 
 test('a param without a warning carries no invalid state or description', () => {
-  const gui = fakeGui();
+  const gui = fakePanelGui();
   const controller = addParamControl(gui, { Speed: 0.1 }, SPEED);
 
   assert.equal(controller.$input.getAttribute('aria-invalid'), null);
@@ -689,7 +689,7 @@ test('a param without a warning carries no invalid state or description', () => 
 });
 
 test('a boolean carrying option labels stays a toggle', () => {
-  const gui = fakeGui();
+  const gui = fakePanelGui();
   const controller = addParamControl(gui, { Glow: true },
     { name: 'Glow', value: true, options: ['Off', 'On'] });
 
