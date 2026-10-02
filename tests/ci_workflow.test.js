@@ -333,9 +333,8 @@ test('actionlint enumerates both workflow extensions', () => {
   assert.ok(suite.includes("git ls-files -- '.github/workflows/*.yml' '.github/workflows/*.yaml'"));
 });
 
-test('old engine pins warn and expired bundles explain the producing-run remedy', () => {
+test('expiring bundles warn and expired bundles explain the producing-run remedy', () => {
   const gate = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/engine-bundle.yml`), 'utf8').replaceAll('\r\n', '\n');
-  assert.match(gate, /::warning::Engine pin/);
   assert.match(gate, /::warning::Engine bundle expires/);
   assert.match(gate, /if \[ "\$expired" = true \]/);
   assert.match(gate, /gh run rerun \$run_id --repo woundedlion\/pov/);
@@ -502,7 +501,7 @@ test('engine bundle polling retries transient queries and artifact calls', (t) =
           if [ "$FIRST_FAIL" = true ]; then return 1; fi
           if [ "$n" = 1 ]; then return 0; fi
           if [ "$n" = 2 ]; then return 1; fi
-          printf '12\\tcompleted\\tsuccess\\t2026-09-30\\t%s\\n' "$PIN" ;;
+          printf '12\\tcompleted\\tsuccess\\t%s\\n' "$PIN" ;;
         artifact)
           if [ "$n" -lt 3 ]; then return 1; fi
           printf '42\\tfalse\\t2030-01-01\\n' ;;
