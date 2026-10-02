@@ -2118,7 +2118,7 @@ test('abandoning a refused link reports its release once', async () => {
 });
 
 
-test('retired shader hash versions are rejected', async () => {
+test('unsupported shader hash versions are rejected', async () => {
   for (const version of [0, 1, 3]) {
     await assert.rejects(decodeShaderStateHash(`#shader=v${version}.payload`),
       /unsupported shader link version/);
