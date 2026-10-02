@@ -193,7 +193,6 @@ function makeHarness({
   presetSyncAccepted = true,
   chainSnapshotEnabled = false,
   chainSnapshot = null,
-  fullConfigFieldDefinitions = null,
   restoreChainSnapshotAccepted = true,
 } = {}) {
   installDocument({ body: fakeElement('body', { connected: true }), activeElement: null });
@@ -211,7 +210,6 @@ function makeHarness({
     presetIndex,
     hostPresetIndex: presetIndex,
     chainSnapshot,
-    fullConfigFieldDefinitions,
   };
   const writes = [];
   const warnings = [];
@@ -267,7 +265,6 @@ function makeHarness({
     config: {
       inUse: () => chainSnapshotEnabled,
       snapshot: () => state.chainSnapshot,
-      fieldDefinitions: () => state.fullConfigFieldDefinitions,
       restore: (snapshot) => {
         restoredChainSnapshots.push(snapshot);
         return restoreChainSnapshotAccepted && snapshot.schemaVersion === 2
@@ -613,7 +610,7 @@ test('KaleidoscopeSmooth controls use the fixed pipeline modes as folders', () =
 
 
 
-test('fixed Shader controls retain stage folders without dynamic metadata', () => {
+test('fixed Shader controls file each slot parameter into its stage folder', () => {
   const params = [
     'Camera Wander', 'Singularity Fade', 'Planar Warp 1 Speed', 'Warp Strength',
     'Planar Warp 2 Speed', 'Mirror Rotation', 'Pattern Freq',
@@ -622,8 +619,6 @@ test('fixed Shader controls retain stage folders without dynamic metadata', () =
   const h = makeHarness({
     params,
     engineValues: params.map(() => 0),
-    chainSnapshot: null,
-    fullConfigFieldDefinitions: null,
   });
 
   h.panel.build();
