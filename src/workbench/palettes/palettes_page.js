@@ -1136,6 +1136,7 @@ async function init() {
   const genSeedSlider = document.getElementById(PALETTE_CONTROL_IDS.baseHueDegrees);
   const genSeedValue = document.getElementById('gen_seed_value');
   if (genSeedSlider && genSeedValue) {
+    genSeedSlider.addEventListener('keydown', handleBaseHueKeyDown);
     genSeedSlider.addEventListener('input', () => {
       genSeedValue.textContent = `${Number(Number(genSeedSlider.value).toFixed(1))}°`;
       scheduleUpdate();
@@ -1231,6 +1232,7 @@ async function init() {
     paletteOps = null;
     wasmModule = null;
     teardownExportFlyout();
+    genSeedSlider?.removeEventListener('keydown', handleBaseHueKeyDown);
     scheduleUpdate.cancel();
     scheduleViewportRedraw.cancel();
     window.removeEventListener('resize', scheduleViewportRedraw);
@@ -1245,6 +1247,15 @@ async function init() {
 }
 
 bootstrapTool(init, 'palette tool');
+
+function handleBaseHueKeyDown(event) {
+  const delta = hueKeyNudgeTurns(event.key, event.shiftKey);
+  if (delta === null) return;
+  event.preventDefault();
+  const slider = event.currentTarget;
+  slider.value = wrapTurns(Number(slider.value) / 360 + delta) * 360;
+  slider.dispatchEvent(new Event('input', {bubbles: true}));
+}
 
 function handleHueModeChange(el) {
   const nextMode = paletteEnumOrdinal('hueMode', el.value);
