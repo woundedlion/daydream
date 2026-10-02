@@ -1238,7 +1238,7 @@ test('precomputeMatrices places one dot per pixel on the sphere surface', () => 
 
 /**
  * Reference world position of a pixel's dot, written out independently of
- * geometry.js: polar angle y/(H-1) from +Y, azimuth from +X toward +Z, on the
+ * geometry.js: polar angle π*y/(H-1) from +Y, azimuth from +X toward +Z, on the
  * sphere the camera frames.
  * @param {number} x - Pixel column index in [0, w).
  * @param {number} y - Pixel row index in [0, h).
