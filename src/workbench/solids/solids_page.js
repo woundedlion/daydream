@@ -855,18 +855,22 @@ async function copyCode(index, lang, btn) {
   // has to flatten against the base's own authored chain.
   let code;
   try {
-    let baseRecipe = null;
-    if (baseIsStar) {
-      baseRecipe = meshOpsWasm ? meshOpsWasm.getRecipe(item.base) : null;
-      if (!baseRecipe) {
-        showCopyFailure(btn, `export failed: no authored chain for "${item.base}" — `
-          + 'its Recipe mirror cannot be generated');
-        return;
-      }
-    }
     if (lang === 'recipe_cpp') {
       code = generateRecipeCpp(item, seedNs);
     } else if (lang === 'registry') {
+      let baseRecipe = null;
+      if (baseIsStar) {
+        if (!meshOpsWasm) {
+          showCopyFailure(btn, 'export failed: the engine has stood down; reload to export a registry');
+          return;
+        }
+        baseRecipe = meshOpsWasm.getRecipe(item.base);
+        if (!baseRecipe) {
+          showCopyFailure(btn, `export failed: no authored chain for "${item.base}" — `
+            + 'its Recipe mirror cannot be generated');
+          return;
+        }
+      }
       code = generateRegistryCpp(item, baseRecipe);
       await validateRegistryFaces(validator, item, baseRecipe);
     } else {
