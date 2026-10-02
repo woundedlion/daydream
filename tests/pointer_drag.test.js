@@ -59,7 +59,7 @@ test('onStart returning false declines the drag, leaving the default intact', ()
   assert.equal(calls.start.length, 1);
   assert.equal(element.capturedPointers.size, 0);
   assert.equal(event.defaultPrevented, false);
-  // Declining leaves no drag behind, so the next press is free to start one.
+  // A declined press leaves pointer moves as hover events.
   element.dispatch('pointermove', { pointerId: 7 });
   assert.equal(calls.move.length, 0);
   assert.equal(calls.hover.length, 1);
