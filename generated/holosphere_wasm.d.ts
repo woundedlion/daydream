@@ -330,7 +330,7 @@ export interface MeshOpsStatics {
   getRecipe(name: string): SolidRecipe | null;
   /** Result of the last mesh operation; getRegistry() preserves the previous result. */
   getLastResult(): EnumValue;
-  /** Whether the last call clamped an out-of-domain argument. */
+  /** Whether the last mesh operation clamped an out-of-domain argument; getRegistry() preserves the flag. */
   getLastAdjusted(): boolean;
   /** Reclaims the tooling arenas, staling every outstanding MeshHandle. */
   clearToolingMemory(): void;

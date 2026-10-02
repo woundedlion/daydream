@@ -50,8 +50,7 @@ export function fakeModule({ rejects = new Set(), reason = 'ARENA_EXHAUSTED',
     MeshOpResult,
     MeshOps: {
       fromSolidName(name) { return call(`base:${name}`) ? null : makeMesh(); },
-      // The reason a failure recorded survives only until the next call, so a
-      // read after the flush reports nothing.
+      // Flushing tooling memory clears the recorded failure reason.
       clearToolingMemory() { state.cleared++; lastResult = MeshOpResult.OK; },
       getLastResult() { return lastResult; },
     },
