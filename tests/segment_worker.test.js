@@ -1059,7 +1059,7 @@ test('a consecutive rejected setParameter repeat is logged once', async () => {
   assert.match(logged[2], /setParameter\(Ghost\) rejected: UNKNOWN_PARAM/);
 });
 
-// The latch is module-scoped and the worker outlives every effect switch, so a
+// The latch lives for the worker session, which outlives every effect switch, so a
 // name:outcome silenced under one effect would stay silenced under the next.
 test('an effect switch clears the rejected-parameter latch', async () => {
   await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
