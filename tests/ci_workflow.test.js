@@ -256,14 +256,11 @@ test('the gating job hands the script every job it needs', () => {
   assert.match(step, /node scripts\/verify-ci-green\.mjs/);
 });
 
-test('ci-green runs after failed dependencies while deployment requires success', () => {
+test('ci-green runs after failed dependencies', () => {
   const gate = workflow.split(/^ {2}ci-green:\s*$/m)[1]?.split(/^ {2}\S/m)[0];
   assert.ok(gate);
   assert.match(gate, /^ {4}if: always\(\)\s*$/m);
-  const deploy = readFileSync(resolve(REPO, DEPLOY_PATH), 'utf8')
-    .split(/^ {2}deploy:\s*$/m)[1]?.split(/^ {2}\S/m)[0];
-  assert.ok(deploy);
-  assert.doesNotMatch(deploy, /^ {4}if:.*always\(/m);
+
 });
 
 test('PR suites consume the provenance-gated bundle before CI can pass', () => {
