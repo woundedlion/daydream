@@ -112,3 +112,30 @@ test('a throwing snapshot accessor leaves the current program usable', () => {
   assert.deepEqual(capture(), previous);
   assert.equal(restore(previous), module.ChainSnapshotRestoreResult.APPLIED);
 });
+
+test('chain handle deletion from a snapshot accessor traps and marks the module unusable', async () => {
+  const isolated = await createModule({print: () => {}, printErr: () => {}});
+  const temporary = new isolated.HolosphereEngine();
+  temporary.setEffect('ShaderChain');
+  const bindings = temporary.getShaderChainBindings();
+  const snapshot = bindings.getSnapshot();
+  const parameters = snapshot.parameters;
+  Object.defineProperty(snapshot, 'parameters', {
+    enumerable: true, get() { bindings.delete(); return parameters; },
+  });
+  assert.throws(() => bindings.restoreSnapshot(snapshot), WebAssembly.RuntimeError);
+  assert.equal(isolated.HS_MODULE_DEAD, true);
+});
+
+test('a snapshot accessor may rebuild geometry without trapping internal handles', () => {
+  engine.setEffect('ShaderChain');
+  const bindings = engine.getShaderChainBindings();
+  const snapshot = bindings.getSnapshot();
+  const parameters = snapshot.parameters;
+  Object.defineProperty(snapshot, 'parameters', {
+    enumerable: true, get() { engine.setDisplayCaps(3, 4); return parameters; },
+  });
+  assert.equal(bindings.restoreSnapshot(snapshot), module.ChainSnapshotRestoreResult.NOT_SHADER_CHAIN);
+  bindings.delete();
+  engine.setDisplayCaps(0, 0);
+});
