@@ -43,8 +43,9 @@ Snapshot schema version 2 uses `chain: [{instance, operator}]` and
 state kind. Omit runtime to initialize fresh state; when present, it must include
 every stateful instance exactly once. `ChainRuntimeState` in the module declarations
 defines the walk, source, noise, affine, phase, ring and color state shapes.
-The engine validates a replacement before applying it, so a rejected snapshot
-preserves the active program and runtime.
+The engine validates a replacement before applying it, so refusal commits no
+snapshot state. Caller-accessor side effects during WASM payload cloning are
+not rolled back.
 
 ## Validation
 
