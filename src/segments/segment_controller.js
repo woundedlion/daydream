@@ -196,7 +196,7 @@ export class SegmentController {
    * @param {() => (Uint16Array|null)} deps.getMemoryView - Returns the current Uint16Array view of the display buffer.
    * @param {(view: Uint16Array) => void} deps.repointDisplayAliases - Re-points BOTH display aliases (Three.js instanceColor.array + driver.pixels) at the given view. Required: only the host knows the mesh, and an implementation that moves one alias leaves the composite in a buffer the GPU never reads.
    * @param {(view: Uint16Array) => boolean} deps.displayAliasesDiverged - Reports whether either display alias has stopped referencing the given view. Required, and the twin of repointDisplayAliases: the host owns both halves of the alias pair, so the detector and the heal must be supplied together rather than half injected and half reached for.
-   * @param {(message: string) => void} [deps.onFault] - Reports the first latched pool fault.
+   * @param {(message: string) => void} [deps.onFault] - Reports the first fault since the pool was (re)built.
    * @param {Document} [deps.statsDoc] - DOM document the stats overlay renders into; defaults to the global `document`.
    * @param {import('./module_warmer.js').ModuleWarmer} [deps.moduleWarmer] - Warmer whose compilation the spawn hands to its workers; defaults to the page's, so every pool on a page shares one compile.
    * @throws {TypeError} When repointDisplayAliases or displayAliasesDiverged is
@@ -254,7 +254,7 @@ export class SegmentController {
     // `pending` never reaches 0. Latch, settle the in-flight frame, stop dispatching.
     this.faulted = false;
     /** @type {{ segId: number, message: string } | null} */
-    this.faultInfo = null;     // first fault this session
+    this.faultInfo = null;     // first fault since the pool was (re)built
     // Effect-switch rebuilds of a faulted pool since the last pool reached ready.
     // Not cleared by destroy(): the faulted rebuild runs through create(), which
     // destroys first, so clearing it there would unbound the count.
@@ -869,7 +869,7 @@ export class SegmentController {
    * against the pool that was dispatched to; destroy() clears it on the rebuild.
    * Recovery is by re-creating the pool (effect switch / resolution change /
    * mode toggle), which clears the latch via destroy(); the effect-switch path is
-   * bounded by MAX_FAULTED_REBUILDS. Only the first fault per session is recorded
+   * bounded by MAX_FAULTED_REBUILDS. Only the first fault since the pool was (re)built is recorded
    * for the UI.
    * @param {number} segId - Index of the worker segment that faulted.
    * @param {string} message - Human-readable fault message for the UI/console.
