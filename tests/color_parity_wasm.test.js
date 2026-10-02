@@ -12,7 +12,7 @@ import createHolosphereModule from '../generated/holosphere_wasm.js';
 import * as C from '../src/shared/color.js';
 import * as P from '../src/workbench/palettes/palette_math.js';
 import {
-  defaultPaletteRecipe, hueKeyState, maxSrgbGamutChroma, oklchLinearRgb, PaletteV4,
+  defaultPaletteRecipe, hueKeyState, paletteEnumName, maxSrgbGamutChroma, oklchLinearRgb, PaletteV4,
 } from '../src/workbench/palettes/palette_controls.js';
 import * as L from '../src/workbench/lissajous/lissajous_math.js';
 import * as MB from '../src/workbench/mobius/mobius_transforms.js';
@@ -321,7 +321,8 @@ test('Palette V4 enum spellings and ordinals match the shipped engine', () => {
       Object.entries(PALETTE_V4_ENUM_CONTRACT)) {
       const roster = members.map(([name, ordinal]) => [name, ordinal]);
       assert.deepEqual(Object.entries(PaletteV4[group]), roster, `${group} public roster`);
-      assert.deepEqual(P.ENUM_NAMES[group], roster.map(([name]) => name),
+      assert.deepEqual(roster.map(([, ordinal]) => paletteEnumName(group, ordinal)),
+        roster.map(([name]) => name),
         `${group} inverse roster`);
 
       const engineMembers = members.map(([name, ordinal]) => {

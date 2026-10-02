@@ -322,7 +322,7 @@ test('generativePaletteCpp names every supported color harmony', () => {
 test('generativePaletteCpp rejects unknown enum values', () => {
   const recipe = defaultPaletteRecipe();
   recipe.domain = 99;
-  assert.throws(() => generativePaletteCpp(recipe), /unknown domain enum value 99/);
+  assert.throws(() => generativePaletteCpp(recipe), /Unknown domain value: 99/);
 });
 
 test('compilePaletteRecipe selects the requested bridge operation and owns its buffers', () => {
