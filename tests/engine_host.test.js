@@ -103,12 +103,14 @@ test('invalidateView() forces the next refresh() to re-fetch', () => {
 });
 
 test('refresh() re-fetches when the held view no longer spans the engine buffer', () => {
-  const stale = new Uint16Array(5760);
-  const fresh = new Uint16Array(41472);
+  const POV_CHANNELS = 96 * 20 * 3;
+  const PHANTASM_CHANNELS = 288 * 144 * 3;
+  const stale = new Uint16Array(POV_CHANNELS);
+  const fresh = new Uint16Array(PHANTASM_CHANNELS);
   let notified = null;
   const host = new EngineHost((view) => { notified = view; });
   host.pixelView = stale;
-  host.engine = pixelEngine(() => fresh, () => 41472);
+  host.engine = pixelEngine(() => fresh, () => PHANTASM_CHANNELS);
 
   assert.equal(host.refresh(), true);
 
