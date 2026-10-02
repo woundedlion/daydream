@@ -21,19 +21,14 @@ import {
   createChainDocumentStore,
   scratchChainDocument,
 } from '../src/workbench/shader/chain_document_store.js';
-import {
-  chainArenaBytes,
-  compileShaderDocument,
-  validateShaderDocument,
-} from '../generated/shader/shader_workbench.mjs';
 
 const CATALOG = JSON.parse(readFileSync(
   new URL('../generated/shader/engine_catalog.json', import.meta.url), 'utf8'));
-const BASE = compileShaderDocument(readFileSync(
+const BASE = compiler.compileShaderDocument(readFileSync(
   new URL('../generated/shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8'),
 { catalog: CATALOG });
 assert.equal(BASE.status, 'VALID');
-const STAINED_GLASS = compileShaderDocument(readFileSync(
+const STAINED_GLASS = compiler.compileShaderDocument(readFileSync(
   new URL('../generated/shader/patterns/kaleidoscope_stained_glass.shader.json', import.meta.url), 'utf8'),
 { catalog: CATALOG });
 assert.equal(STAINED_GLASS.status, 'VALID');
@@ -59,7 +54,7 @@ const makeStore = ({ mutate, catalog = CATALOG } = {}) => {
 
 /** Asserts the store's current document passes the v2 validator. */
 const assertGreen = (store) =>
-  assert.deepEqual(validateShaderDocument(store.document(), { catalog: CATALOG }), []);
+  assert.deepEqual(compiler.validateShaderDocument(store.document(), { catalog: CATALOG }), []);
 
 /** Adds a STAGGERED_ORDERED policy scheduling every interpolation group. */
 const addStaggered = (document) => {
@@ -197,7 +192,7 @@ test('insertion bounds accommodate binary32 catalog defaults', async () => {
   assert.equal(parameter.domain.maximum, stored);
   assert.equal(parameter.default, 0.15);
   assert.equal(document.preset_bank.presets[0].values['displace.strength'], 0.15);
-  assert.deepEqual(validateShaderDocument(document, { catalog }), []);
+  assert.deepEqual(compiler.validateShaderDocument(document, { catalog }), []);
 });
 
 test('a shortest-turn field backfills as a period-1 periodic parameter', async () => {
@@ -694,8 +689,8 @@ test('arena accounting honors per_param_name_bytes when declared', async () => {
   const operators = new Map(catalog.operators.map((operator) => [operator.id, operator]));
   const baseOps = BASE.document.descriptor.chain.map((entry) => operators.get(entry.operator));
   const insertionOps = [...baseOps, operators.get('warp.wave-shear.v2')];
-  const budget = Math.floor((chainArenaBytes(baseOps, catalog.budgets)
-    + chainArenaBytes(insertionOps, catalog.budgets)) / 2);
+  const budget = Math.floor((compiler.chainArenaBytes(baseOps, catalog.budgets)
+    + compiler.chainArenaBytes(insertionOps, catalog.budgets)) / 2);
   catalog.budgets.arena_bytes = budget;
   const store = await makeStore({ catalog });
   const entry = store.legalInsertions(WARP)
@@ -725,7 +720,7 @@ test('the store bills a chain the arena bytes the validator does', () => {
   const operators = new Map(CATALOG.operators.map(
     (operator) => [operator.id, operator]));
   const validatorBytes = (chain) => {
-    const diagnostic = validateShaderDocument(
+    const diagnostic = compiler.validateShaderDocument(
       scratchChainDocument(probe, chain), { catalog: probe })
       .find((entry) => entry.message.includes('arena bytes'));
     assert.ok(diagnostic, 'the validator reports an arena figure');
@@ -759,7 +754,7 @@ test('the store bills a chain the arena bytes the validator does', () => {
   }
   for (const chain of chains) {
     const ops = chain.map((entry) => operators.get(entry.operator));
-    assert.equal(chainArenaBytes(ops, probe.budgets), validatorBytes(chain),
+    assert.equal(compiler.chainArenaBytes(ops, probe.budgets), validatorBytes(chain),
       chain.map((entry) => entry.operator).join(' -> '));
   }
 });
@@ -832,7 +827,7 @@ test('a malformed span or sequence is refused without side effects', async () =>
 // construction — the builder is the only thing between a cold page and a
 // rendering chain.
 test('the scratch document compiles clean against the catalog', async () => {
-  const compiled = compileShaderDocument(scratchChainDocument(CATALOG),
+  const compiled = compiler.compileShaderDocument(scratchChainDocument(CATALOG),
     { catalog: CATALOG });
   assert.equal(compiled.status, 'VALID');
   assert.deepEqual(compiled.diagnostics, []);
@@ -952,7 +947,7 @@ test('radian periodicity is independent of a catalog field bound', () => {
   const parameter = document.descriptor.parameters.find((entry) => entry.id === `project.${field.id}`);
   assert.equal(parameter.domain.maximum, Math.fround(Math.PI));
   assert.equal(parameter.interpolation.period, Math.fround(2 * Math.PI));
-  assert.deepEqual(validateShaderDocument(document, { catalog }), []);
+  assert.deepEqual(compiler.validateShaderDocument(document, { catalog }), []);
 });
 
 
