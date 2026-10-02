@@ -12,7 +12,8 @@ import { dirname, join } from 'node:path';
 import { MIME, serveManifest } from '../scripts/serve-manifest.mjs';
 import { request } from './helpers/http_request.js';
 
-const ENTRIES = ['index.html', 'engine.wasm', 'styles/index.css', 'styles/fonts/pin.woff2', 'gone.js', '../outside.txt', 'styles/fonts'];
+const ENTRIES = ['index.html', 'engine.wasm', 'styles/index.css', 'styles/fonts/pin.woff2', 'gone.js', '../outside.txt', 'styles/fonts',
+  'styles/../scripts/run-tests.mjs', 'styles/../../outside.txt'];
 
 const FILES = {
   'index.html': '<!doctype html>\n',
@@ -107,10 +108,10 @@ test('nothing outside the manifest set is served', () => withSite(async (get) =>
 
 test('a path that escapes the site root is refused', () => withSite(async (get) => {
   assert.equal((await get('/styles/%2e%2e%2fscripts/run-tests.mjs')).status, 404,
-    'encoded traversal inside the site root bypassed the manifest');
+    'a listed path containing .. was served inside the site root');
   // The URL parser resolves a plain `..` segment away before the server sees
   // it, so the traversal a served path could carry is the encoded one.
   assert.equal((await get('/styles/%2e%2e%2f%2e%2e%2foutside.txt')).status, 404,
-    'a reference under a manifest entry escaped the site root');
+    'a listed path containing .. escaped the site root');
   assert.equal((await get('/%2e%2e%2foutside.txt')).status, 404);
 }));
