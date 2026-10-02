@@ -30,6 +30,7 @@ export const COLUMN_LIMIT = 80;
  * @returns {string[]} The filled lines.
  */
 export function fillColumns(words, firstIndent, restIndent = firstIndent, limit = COLUMN_LIMIT) {
+  if (words.length === 0) return [];
   const lines = [];
   let line = firstIndent + words[0];
   for (const word of words.slice(1)) {
