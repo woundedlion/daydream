@@ -1495,3 +1495,22 @@ test('a refused socket replacement restores the selected operator', async () => 
   assert.deepEqual(h.store.document(), before);
   assert.equal(h.applied.length, 0);
 });
+
+test('band insertion closes after pointer focusout and retains keyboard toggles', async () => {
+  for (const target of ['anchor', 'null']) {
+    const h = await makeStrip();
+    const add = h.container.querySelector('.chain-band-add');
+    add.dispatch('click');
+    const option = h.doc.activeElement;
+    add.dispatch('pointerdown');
+    option.dispatch('focusout', {relatedTarget: target === 'anchor' ? add : null});
+    add.dispatch('click');
+    assert.equal(add.getAttribute('aria-expanded'), 'false', target);
+    assert.equal(paletteOf(h), null);
+    add.dispatch('click');
+    assert.equal(add.getAttribute('aria-expanded'), 'true', 'keyboard click clears the pointer decision');
+    h.doc.activeElement.dispatch('focusout', {relatedTarget: add});
+    add.dispatch('click');
+    assert.equal(add.getAttribute('aria-expanded'), 'false');
+  }
+});

@@ -463,7 +463,7 @@ export function createChainStrip({
     element.addEventListener('focusout', (/** @type {*} */ event) => {
       if (palette?.element !== element) return;
       const next = event.relatedTarget ?? null;
-      if (next !== null && element.contains(next)) return;
+      if (next !== null && (element.contains(next) || palette.anchor.contains(next))) return;
       closePalette();
     });
 
@@ -986,9 +986,14 @@ export function createChainStrip({
     add.setAttribute('aria-expanded', 'false');
     add.setAttribute('aria-label', `Add a ${title} stage`);
     add.textContent = '+';
-    add.addEventListener('click',
-      () => palette?.anchor === add
-        ? closePalette() : openPalette({ kind: 'insert', index: gap, anchor: add }));
+    let openOnPointerDown = null;
+    add.addEventListener('pointerdown', () => { openOnPointerDown = palette?.anchor === add; });
+    add.addEventListener('click', () => {
+      const wasOpen = openOnPointerDown ?? (palette?.anchor === add);
+      openOnPointerDown = null;
+      if (wasOpen) closePalette();
+      else openPalette({ kind: 'insert', index: gap, anchor: add });
+    });
     return add;
   };
 
