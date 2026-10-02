@@ -71,7 +71,7 @@ test('a palette compiles only against an explicitly installed bridge', () => {
 
 /**
  * Verifies ProceduralPalette.get clamps and linearizes the cosine output, and
- * that getChannelValue exposes the raw cosine. t=0 and t=0.5 land on the sRGB
+ * that getChannelValues exposes the raw cosine. t=0 and t=0.5 land on the sRGB
  * transfer's fixpoints, where it is the identity; t=0.25 samples the mid-range,
  * where dropping the linearization changes the result.
  */
