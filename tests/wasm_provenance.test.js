@@ -155,8 +155,14 @@ test('the JS unit suite arms the engine-parity and hook cases', () => {
 
 test('CI checks source parity after installing the selected runtime', () => {
   const suite = text('.github/workflows/js-unit-suite.yml');
-  assert.ok(suite.indexOf('name: Install the verified engine package') < suite.indexOf('name: Resolve engine pin'));
-  assert.ok(suite.indexOf('name: Resolve engine pin') < suite.indexOf('name: Checkout the pinned engine'));
+  const install = suite.indexOf('name: Install the verified engine package');
+  const resolve = suite.indexOf('name: Resolve engine pin');
+  const checkout = suite.indexOf('name: Checkout the pinned engine');
+  assert.ok(install >= 0, 'verified package install step exists');
+  assert.ok(resolve >= 0, 'engine pin resolution step exists');
+  assert.ok(checkout >= 0, 'pinned engine checkout step exists');
+  assert.ok(install < resolve);
+  assert.ok(resolve < checkout);
   assert.match(suite, /HOLOSPHERE_ENGINE_REQUIRED: '1'/);
 });
 
