@@ -107,9 +107,8 @@ const SERVED_PAGES = servedPages().map((page) => ({
   scripts: scriptsOf(page),
 }));
 
-// Each served page's whole script-src, token by token. 'unsafe-inline' covers
-// the import map vendor-importmap.js injects; the directive bounds where the
-// external controllers are fetched from, and the origin list is the whole of it.
+// 'unsafe-inline' admits font links' onerror fallback handlers and the import
+// map injected by vendor-importmap.js on pages that load it.
 const SCRIPT_SRC = {
   'tools/lissajous.html': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
   'tools/mobius.html': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
