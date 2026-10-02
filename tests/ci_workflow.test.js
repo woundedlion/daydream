@@ -51,7 +51,7 @@ test('the reusable JavaScript suite runs all required checks', () => {
   assert.match(suite, /name: Verify committed import map\s+run: \|\s+npm run importmap\s+git diff --exit-code/);
 });
 
-// No workflow is a tracked *.sh file, so the shell gate above cannot see the
+// No workflow is a tracked *.sh file, so the Lint shell step cannot see the
 // bash inside the `run:` blocks; actionlint is what pipes it through shellcheck.
 test('the reusable suite lints the workflow YAML and the bash inside it', () => {
   const suite = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/js-unit-suite.yml`), 'utf8').replaceAll('\r\n', '\n');
