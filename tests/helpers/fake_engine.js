@@ -215,7 +215,7 @@ export class FakeChainEngine {
       if (stateSize <= 1) return [];
       let kind;
       let state;
-      if (operator === 'sphere.rotate.v2' || operator.startsWith('project.frame.')) {
+      if (operator === 'sphere.rotate.v2' || operator.startsWith('project.')) {
         kind = 'spatial-walk-v2';
         state = { noiseSeed: 1337, walkTime: 0, position: [0, 1, 0], direction: [1, 0, 0],
           wander: [1, 0, 0, 0], angularVelocity: 0, spinPhase: 0 };
@@ -316,10 +316,31 @@ export class FakeChainEngine {
               || typeof cycle.displayDirty !== 'boolean')))
           return ChainSnapshotRestoreResult.INVALID_VALUE;
         if (snapshot.chain.length === 0) return ChainSnapshotRestoreResult.INVALID_LENGTH;
+        const candidate = new FakeChainEngine();
+        candidate.effect = 'ShaderChain';
+        if (candidate.#setShaderChain(snapshot.chain).code !== 'APPLIED')
+          return ChainSnapshotRestoreResult.INVALID_CHAIN;
+        const names = new Set();
+        for (const write of snapshot.parameters) {
+          const definition = candidate.definitions.find((d) => d.name === write?.name);
+          if (!definition || names.has(write.name) || !Number.isFinite(write.value)
+              || write.value < definition.min || write.value > definition.max
+              || (definition.options && !Number.isInteger(write.value)))
+            return ChainSnapshotRestoreResult.INVALID_CHAIN;
+          names.add(write.name);
+        }
+        if (snapshot.runtime !== undefined) {
+          const remaining = new Map(candidate.runtime.map((entry) => [entry.instance, entry.kind]));
+          for (const entry of snapshot.runtime) {
+            if (remaining.get(entry.instance) !== entry.kind)
+              return ChainSnapshotRestoreResult.INVALID_CHAIN;
+            remaining.delete(entry.instance);
+          }
+          if (remaining.size) return ChainSnapshotRestoreResult.INVALID_CHAIN;
+        }
         const outcome = this.#setShaderChain(snapshot.chain);
         if (outcome.code !== 'APPLIED') return ChainSnapshotRestoreResult.INVALID_CHAIN;
-        if (this.#setShaderChainParameters(snapshot.parameters) !== ParamSetResult.APPLIED)
-          return ChainSnapshotRestoreResult.INVALID_VALUE;
+        this.#setShaderChainParameters(snapshot.parameters);
         this.paused = snapshot.animationsPaused;
         if (snapshot.runtime !== undefined) this.runtime = structuredClone(snapshot.runtime);
         if (palette !== undefined) this.paletteBank = structuredClone(palette);
