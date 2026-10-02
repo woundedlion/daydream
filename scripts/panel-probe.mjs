@@ -743,7 +743,7 @@ export async function probeKeyboardEdits(tab) {
 
 if (isMain(import.meta.url)) await runProbe({
   name: 'panel-probe',
-  minimumChecks: 56,
+  minimumChecks: 63,
   page: PAGE,
   timeoutMs: TIMEOUT_MS,
   success: 'the effect panel restored what it captured, and the sidebar measured '

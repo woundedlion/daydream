@@ -794,7 +794,7 @@ export async function runWorkbenchSections(open, sections = [
 
 if (isMain(import.meta.url)) await runProbe({
   name: 'workbench-probe',
-  minimumChecks: 60,
+  minimumChecks: 78,
   page: PAGE,
   timeoutMs: TIMEOUT_MS,
   success: 'every pipeline control behaved.',
