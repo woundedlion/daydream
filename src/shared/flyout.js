@@ -44,14 +44,21 @@ export function wireFlyout({ root, trigger, documentTarget = document }) {
     trigger.focus();
   };
 
+  /** @param {FocusEvent} event */
+  const dismissWithFocus = (event) => {
+    if (event.relatedTarget && !root.contains(/** @type {Node} */ (event.relatedTarget))) setOpen(false);
+  };
+
   setOpen(false);
   trigger.addEventListener('click', toggle);
   root.addEventListener('keydown', dismissWithEscape);
+  root.addEventListener('focusout', dismissWithFocus);
   documentTarget.addEventListener('pointerdown', dismissOutside);
 
   return () => {
     trigger.removeEventListener('click', toggle);
     root.removeEventListener('keydown', dismissWithEscape);
+    root.removeEventListener('focusout', dismissWithFocus);
     documentTarget.removeEventListener('pointerdown', dismissOutside);
     setOpen(false);
   };
