@@ -145,7 +145,6 @@ test('thumbnail build errors stay in the thumbnail status area', () => {
   assert.equal(status.textContent, 'Thumbnail for cube failed');
 });
 
-
 test('index cap notice changes only on entry and exit without touching gate feedback', () => {
   let value = '';
   const writes = [];
@@ -159,7 +158,6 @@ test('index cap notice changes only on entry and exit without touching gate feed
   assert.deepEqual(writes, ['Vertex indices require fewer than 1000 vertices.', '']);
 });
 
-
 test('persistence failure retains collision feedback and clears after a later successful write', () => {
   const status = { textContent: '' };
   let failing = true;
@@ -172,7 +170,6 @@ test('persistence failure retains collision feedback and clears after a later su
   persist();
   assert.equal(status.textContent, '');
 });
-
 
 test('canvas tap cancels interrupted gestures and detaches on teardown', () => {
   const canvas = fakeElement('canvas');

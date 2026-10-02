@@ -1571,7 +1571,6 @@ test('the parity toggle disarms on a descriptor edit, not on a bypass', async ()
   assert.equal(toggle.disabled, true);
 });
 
-
 test('compiled stage edits reach stages bypassed in the interpreter', async () => {
   const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
   stripChips(harness).find((chip) => chip.dataset.label === 'warp2')
@@ -1808,7 +1807,6 @@ test('a chip control edit joins the structural history and coalesces per control
   'undoing the edit re-applies the restored value to the engine');
 });
 
-
 test('the workbench route carries the requested shader document', () => {
   assert.equal(
     shaderWorkbenchUrl('https://example.test/daydream/index.html?effect=alien-brain', 'alien-brain'),
@@ -1870,7 +1868,6 @@ test('a rejected file read is announced and the same file can be picked again', 
   await onChange(input)();
   assert.equal(input.value, '');
 });
-
 
 test('an oversized file is rejected before reading and clears the picker', async () => {
   const { controller, elements, selections } = workbench();
@@ -1973,7 +1970,6 @@ test('source and file switches preserve edits when discard is refused', async ()
   assert.equal(confirmations, 2, 'saving clears the dirty marker');
 });
 
-
 test('refused replacement restores the previous compiled preset after switching effects', async () => {
   const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
   harness.elements.get('shader-parity-toggle').dispatch('click');
@@ -1985,7 +1981,6 @@ test('refused replacement restores the previous compiled preset after switching 
   assert.deepEqual(harness.compiledEngine.selected, ['hex-twin-wave']);
   assert.match(harness.elements.get('shader-document-status').textContent, /missing-stage/);
 });
-
 
 for (const compiled of [false, true]) {
   test(`an omitted parameter edit declares it and updates parity from ${compiled ? 'compiled' : 'interpreter'} preview`, async () => {
@@ -2012,7 +2007,6 @@ for (const compiled of [false, true]) {
   });
 }
 
-
 test('restored edits require discard confirmation and save to the catalog filename', async () => {
   const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
   document.preset_bank.presets[0].values['sample.pattern-freq'] = 7.25;
@@ -2031,7 +2025,6 @@ test('restored edits require discard confirmation and save to the catalog filena
   harness.controller.save();
   assert.equal(harness.downloads.at(-1)[0], 'kaleidoscope_hex_bright.shader.json');
 });
-
 
 test('imported documents have a named source and can switch directly to scratch', async () => {
   const harness = await editorWorkbench({ source: null });
@@ -2060,11 +2053,6 @@ test('noncatalog shader links have their own source option', async () => {
   assert.equal(source.selectedOptions[0].disabled, true);
   assert.notEqual(source.value, '');
 });
-
-
-
-
-
 
 test('a chain snapshot restores its program and accepted parameters into the editor', async () => {
   const engine = new FakeChainEngine();
@@ -2117,7 +2105,6 @@ test('abandoning a refused link reports its release once', async () => {
   assert.equal(await harness.controller.loadSource(KALEIDOSCOPE_HEX_BRIGHT), true);
   assert.equal(releases, 1);
 });
-
 
 test('unsupported shader hash versions are rejected', async () => {
   for (const version of [0, 1, 3]) {
