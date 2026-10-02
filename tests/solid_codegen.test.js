@@ -762,9 +762,10 @@ test('uniqueEdges deduplicates shared edges across faces', () => {
 
 /** Verifies the lo*vertexCount+hi edge key never aliases two distinct edges. */
 test('uniqueEdges keys stay unique at the vertex-count radix', () => {
-  // (lo,hi) = (0,5) and (1,0) would collide on a radix below 6.
-  const edges = uniqueEdges([[0, 5], [1, 0]], 6);
-  assert.deepEqual(edges, [[0, 5], [0, 1]]);
+  for (const vertexCount of [6, 1004]) {
+    const faces = [[0, vertexCount - 1], [1, 3]];
+    assert.deepEqual(uniqueEdges(faces, vertexCount), faces);
+  }
 });
 
 /** Verifies a degenerate 2-gon face yields one edge rather than a self-pair. */
