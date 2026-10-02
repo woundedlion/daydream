@@ -329,10 +329,10 @@ export function createSwitchCoordinator({
  * Build the effect and resolution apply path — the two functions every switch,
  * rollback, and initial hydration routes through.
  *
- * A rejected apply returns ApplyResult.REJECTED and leaves the engine, the
- * driver, and the worker pool as they were, so createSwitchCoordinator() can put
- * the previous state back; nothing here writes appState except the off-list
- * effect correction planResolutionApply() asks for.
+ * A rejected apply returns ApplyResult.REJECTED and may leave a new effect or
+ * resolution installed. createSwitchCoordinator() recovers by re-applying the
+ * previous state. Only the off-list effect correction from planResolutionApply()
+ * writes appState here.
  *
  * @param {Object} deps - Injected app collaborators.
  * @param {{get: Function, set: Function}} deps.appState - The applied state.
@@ -416,9 +416,9 @@ export function createApplyPipeline({
    * @param {boolean} [broadcast=true] - Publish the accepted effect to workers.
    * @param {*} [chainSnapshot=null] - Snapshot restored after switching the effect.
    *   A refused restore returns REJECTED after the engine has switched.
-   * @returns {string} ApplyResult.REJECTED when the engine rejected the effect
-   *   (the caller must revert appState so UI/URL don't advertise an unapplied
-   *   effect), else ApplyResult.APPLIED.
+   * @returns {string} ApplyResult.REJECTED when effect selection or snapshot
+   *   restoration rejects; the caller must roll back the apply and appState.
+   *   Otherwise ApplyResult.APPLIED.
    */
   function applyEffect(preserveParams = false, broadcast = true, chainSnapshot = null) {
     // A rejected effect leaves the engine unchanged, so return before the worker
