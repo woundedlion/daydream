@@ -757,7 +757,6 @@ test('the strip roves between chips and exposes their controls to Tab', async ()
       .filter((value) => value !== '-1'),
     ['0'], 'exactly one chip carries the tab stop');
 
-  // The bypass toggle is the one header control with no chip-level gesture.
   chipByLabel(h, 'lens').dispatch('keydown', { key: 'b' });
   assert.deepEqual(h.applied.at(-1),
     ['camera', 'project', 'warp2', 'sample', 'colorize']);
