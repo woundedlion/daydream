@@ -21,7 +21,7 @@
 /**
  * Protocol version stamped on `init` (controller → worker) and `booted`
  * (worker → controller). Each side faults on a mismatch, so a stale-cached worker
- * or glue against updated peer code fails fast instead of drifting on a
+ * or controller against updated peer code fails fast instead of drifting on a
  * same-named but reshaped message. Any typedef change bumps PROTOCOL_VERSION; the shape pin in
  * segment_worker.test.js enforces it.
  * @type {number}
