@@ -27,9 +27,8 @@ import {
 } from './helpers/fake_engine.js';
 import { captureConsole, installConsoleCapture } from './helpers/fake_console.js';
 import { createRecordingControls } from '../src/recording/recording_controls.js';
-import { createSegmentPoolSpawner } from '../src/ui/segmented_pov_controls.js';
+import { createSegmentPoolSpawner, createSegmentedPovControls } from '../src/ui/segmented_pov_controls.js';
 import { SHADER_DOCUMENT_EFFECTS } from '../src/effects/effect_roster.js';
-import { createSegmentedPovControls } from '../src/ui/segmented_pov_controls.js';
 import {
   fakeGui,
   startApp as startUntrackedApp,
