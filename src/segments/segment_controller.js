@@ -47,7 +47,7 @@ export const INIT_WATCHDOG_MS = 20000;
 // instantiate is separately bounded by INIT_WATCHDOG_MS.
 export const BOOT_WATCHDOG_MS = 10000;
 
-// Per-worker liveness deadline for a dispatched parallel render. A worker that
+// Pool-wide render-liveness deadline for a dispatched parallel render. A worker that
 // accepts 'render' but hangs without throwing fires no onerror and never settles
 // `pending`, freezing the pipeline; this bound latches a fault instead. It is
 // re-armed on every distinct segment 'frame' while `pending > 0`, so it bounds the
@@ -777,7 +777,7 @@ export class SegmentController {
   }
 
   /**
-   * (Re)arm the per-worker render-liveness deadline. Called at dispatch and on
+   * (Re)arm the pool-wide render-liveness deadline. Called at dispatch and on
    * every distinct segment 'frame' while `pending > 0`, so the deadline bounds the
    * gap between reports; a stall (no segment reports for RENDER_WATCHDOG_MS) faults.
    */
