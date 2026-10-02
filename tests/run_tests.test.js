@@ -299,3 +299,35 @@ test('CI rejects a failing todo test', () => {
     cwd: root, env: { ...env, CI: 'true' },
   }), /CI must execute every test without todos/);
 });
+
+test('object exemptions require a finite floor below the global threshold', () => {
+  for (const metric of ['lines', 'branches']) {
+    const globalFloor = metric === 'lines' ? 95 : 90;
+    for (const floor of [null, '80', 0, -1, globalFloor, 100]) {
+      writeFileSync(join(root, EXEMPT), JSON.stringify({
+        'lib.mjs': { [metric]: floor, reason: 'Fixture baseline.' },
+      }));
+      assert.match(failOutput(PATTERN), /use a valid floor/);
+    }
+  }
+  writeFileSync(join(root, EXEMPT), JSON.stringify({ 'lib.mjs': { reason: 'Fixture baseline.' } }));
+  assert.match(failOutput(PATTERN), /use a valid floor/);
+});
+
+test('branch baselines hold, reject a drop, and become redundant', () => {
+  dilutedCoverage();
+  writeFileSync(join(root, 'padding.mjs'),
+    Array.from({ length: 30 }, (_, i) => `function f${i}() { return 1; } f${i}();`).join('\n'));
+  writeFileSync(join(root, 'lib.mjs'),
+    'export const value = 4;\nexport function pick(n) { return n ? 1 : 2; }\npick(true);\n');
+  writeFileSync(join(root, EXEMPT), JSON.stringify({
+    'lib.mjs': { branches: 1, reason: 'Fixture branch baseline.' },
+  }));
+  assert.match(run(PATTERN), /source modules were loaded/);
+  writeFileSync(join(root, EXEMPT), JSON.stringify({
+    'lib.mjs': { branches: 89, reason: 'Fixture branch baseline.' },
+  }));
+  assert.match(failOutput(PATTERN), /lib\.mjs branch coverage .* below its 89% floor/);
+  appendFileSync(join(root, 'lib.mjs'), 'pick(false);\n');
+  assert.match(failOutput(PATTERN), /covered after all[\s\S]*lib\.mjs \(branches\)/);
+});
