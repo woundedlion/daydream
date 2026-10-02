@@ -478,8 +478,9 @@ export interface PaletteCompileStatus {
 /**
  * One compile and bake. The buffers are absent when the recipe did not compile,
  * and `diagnostics`/`fallback` also when the bake skipped them. All three alias
- * the module's memory rather than copying it: the next call into any PaletteOps
- * rebakes them in place, and heap growth detaches them.
+ * the module's memory rather than copying it. Successful compileAndBakeV4() and
+ * inspectV4() calls on any instance overwrite the LUT; only inspectV4() also
+ * overwrites diagnostics and fallback. Heap growth detaches all three views.
  */
 export interface PaletteCompileResult {
   status: PaletteCompileStatus;
