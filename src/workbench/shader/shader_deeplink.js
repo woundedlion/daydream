@@ -26,8 +26,8 @@ function normalizedState(value) {
       && (!value.chainSnapshot || typeof value.chainSnapshot !== 'object'
         || value.chainSnapshot.schemaVersion !== 2 || !Array.isArray(value.chainSnapshot.chain)
         || !Array.isArray(value.chainSnapshot.parameters)
-        || value.chainSnapshot.chain.some((entry) => !entry || typeof entry !== 'object' || Array.isArray(entry))
-        || value.chainSnapshot.parameters.some((entry) => !entry || typeof entry !== 'object' || Array.isArray(entry) || typeof entry.name !== 'string')))
+        || value.chainSnapshot.chain.some((/** @type {*} */ entry) => !entry || typeof entry !== 'object' || Array.isArray(entry))
+        || value.chainSnapshot.parameters.some((/** @type {*} */ entry) => !entry || typeof entry !== 'object' || Array.isArray(entry) || typeof entry.name !== 'string')))
     throw new Error('invalid shader link snapshot');
   return {
     document: value.document,
