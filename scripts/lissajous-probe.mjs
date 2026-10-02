@@ -1,18 +1,9 @@
 /*
- * Drives the Lissajous tool's rational lock in headless Chrome, over the same
- * manifest server scripts/browser-smoke.mjs uses.
+ * Headless Chrome probe of Lissajous rational lock, frequency dragging and the
+ * coupled Domain control; verifies rational frequencies and their closing period.
+ * Uses scripts/browser-smoke.mjs's manifest server.
  *
  *   node scripts/lissajous-probe.mjs
- *
- * The lock couples three controls: the checkbox, the frequency slider the
- * pointer is on, and the Domain slider it disables and then drives from the
- * snapped ratio. Only a real browser closes that loop, and tests/helpers/fake_dom.js
- * reaches no part of it: a range input turns a pointer x into a value through
- * its own layout, which the fake has none of, and it is the UA — not the page —
- * that refuses input on a disabled control. This job drags each frequency thumb
- * with a real mouse and requires what the page exports to be a closed curve:
- * C1/C2 an exact simple rational, and the domain the period that ratio closes
- * on.
  */
 import { BROWSER_ARGS } from './browser.mjs';
 import { boxOf, checks, dragBetween, isMain, runProbe } from './probe_harness.mjs';

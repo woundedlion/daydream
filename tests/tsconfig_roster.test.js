@@ -1,12 +1,5 @@
-//
-// tsconfig.json's `files` roster is hand-maintained and `noResolve: true` means
-// imports are never followed, so a module the roster misses degrades to `any`
-// with no diagnostic — the typecheck stays green while checking nothing about
-// it, and a `// @ts-check` pragma on an unrostered file is inert for the same
-// reason. These cases keep the roster closed under the pipeline's own imports,
-// over every file that claims the pragma, and over src/, which is rostered
-// apart from browser page controllers and modules a bare third-party import
-// puts out of reach.
+// Check the noResolve typecheck roster against pipeline imports, @ts-check files
+// and eligible src/ modules.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';

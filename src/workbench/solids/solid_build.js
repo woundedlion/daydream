@@ -177,13 +177,7 @@ export function buildChainMesh(base, ops, ctx) {
     return null;
   }
 
-  // Per-face topology class ids for the Colorize Faces toggle. Runs engine-side
-  // (it reuses the tooling scratch arenas, which are free between ops); the
-  // returned Int32Array is a fresh JS copy, so it stays valid after the wrapper
-  // is deleted and the arenas are flushed below. Colorize-only data: a null
-  // leaves the render intact, and the arena remedy is the flush below, once the
-  // mesh is read out — so the reason is carried out to be reported after the
-  // draw, which rewrites the line it shares.
+  // Face classes are a JS-owned copy valid after mesh deletion and arena flushing.
   let faceClasses = null;
   let classifyFailure = null;
   try {

@@ -1,17 +1,8 @@
 /*
- * Stages the published site into a scratch tree whose three.js and lil-gui come
- * out of node_modules, and serves that tree to the headless probes.
- *
- * The committed import map resolves both libraries from cdn.jsdelivr.net, which
- * is what the Pages deploy serves and what a fresh checkout gets. Loading them
- * over the network on every probe navigation would put the required browser
- * gate — and the deploy behind it — at the mercy of a CDN incident, so the gate
- * runs against a locally generated `local` map instead. `npm ci` has already
- * fetched the pinned versions; nothing here changes what the deploy serves.
- *
- * The manifest set is hard-linked rather than copied: only the import map is
- * written into the staged tree, and it is generated there rather than linked so
- * the shared inode cannot rewrite the committed file.
+ * Stages the publication manifest into a scratch site with three.js and lil-gui
+ * from node_modules for the headless probes.
+ * Manifest files are hard-linked; generate the local import map into a separate
+ * inode so writing it cannot change the committed map.
  */
 import { execFileSync } from 'node:child_process';
 import {

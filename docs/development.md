@@ -82,6 +82,9 @@ The controls persist as `view.topCap` and `view.bottomCap` in shared URLs.
 
 Daydream applies the percentages to the engine and every segmented worker with
 `setDisplayCaps`, then reads `getDisplayNorthPhi` and `getDisplaySouthPhi` for
-LED placement. Changes preserve effect configuration and reset geometry-dependent
-simulation history. Settings survive effect and resolution changes, and update
-the preview while paused. Firmware retains its compiled physical profile.
+LED placement. Changes preserve effect configuration and reconstruct geometry-dependent
+caches. Ordinary effects restart their animation and simulation history;
+`ShaderChain` restores its complete executable snapshot, including its program,
+parameters, typed runtime, palette state, clocks and seeds. Settings survive effect
+and resolution changes, and update the preview while paused. Firmware retains its
+compiled physical profile.

@@ -105,11 +105,7 @@ export class SegmentCompositor {
       return 0;
     }
 
-    // No clear: driver.render() already zero-filled this buffer; we blit over it.
-    // That elision holds only while dst is the buffer render() cleared, and a
-    // refresh that re-fetched hands back one it never was. The refresh re-points
-    // both aliases with it, so the divergence check below sees nothing wrong —
-    // this report is the only signal.
+    // A refreshed destination has not been cleared by driver.render().
     if (refreshed) dst.fill(0);
 
     // On a divergence, self-heal rather than fault the render loop (mirrors the

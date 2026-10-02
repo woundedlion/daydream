@@ -621,11 +621,7 @@ export class VideoRecorder {
       .catch((err) => {
         if (err?.name === 'AbortError') {
           aborted = true;
-          // Cancelling the Save dialog ends the session; without this the recorder
-          // keeps capturing frames that finish() will only discard. Guard against a
-          // superseding session: only stop if this recorder is still the live one.
-          // The host hook fires too, or the UI stays latched on a dead session and
-          // the next click starts a second recording instead of stopping this one.
+          // Stop and notify the host only if this recorder still owns the cancelled session.
           if (this.mediaRecorder === recorder) {
             this.stop();
             this.reportFailure('the Save dialog was cancelled, so nothing was saved.');
@@ -636,11 +632,7 @@ export class VideoRecorder {
       })
       .finally(() => { picked = true; });
 
-    // One serialized chain; each link awaits the picker, so chunks that arrive
-    // before the file opens are written in order once it does. The writable is
-    // created on the first chunk, not at pick time, so a session that streams no
-    // data never truncates the user's chosen file. A chunk that cannot stream
-    // (picker cancelled/unavailable) falls back to the blob buffer.
+    // Serialize chunks; create the writable on the first chunk, preserving files for empty sessions.
     let chain = Promise.resolve();
     return {
       write: (data) => {

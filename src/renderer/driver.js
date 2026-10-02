@@ -494,11 +494,7 @@ export class Daydream {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
 
-    // Fit the orbit radius to the sphere while the radius still sits at the
-    // last fitted value; once the user zooms away from it, later resizes
-    // (DPR change, sidebar toggle, devtools) preserve their zoom. Rotation
-    // leaves the radius unchanged, so it doesn't block re-fitting.
-    // setLength rescales only the orbit radius, leaving azimuth/polar intact.
+    // Preserve user zoom; refit only while the radius equals the previous fit.
     const orbitOffset = this.camera.position.clone().sub(this.controls.target);
     const orbitRadius = orbitOffset.length();
     if (
@@ -514,7 +510,6 @@ export class Daydream {
       this.camera.position.copy(this.controls.target).add(orbitOffset);
     }
 
-    // Refresh the current DPR whenever the canvas is resized.
     this.renderer.setPixelRatio(Math.min(this.win.devicePixelRatio, 1));
     this.renderer.setSize(width, height);
     this.labelRenderer.setSize(width, height);

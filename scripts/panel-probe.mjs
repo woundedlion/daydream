@@ -1,23 +1,9 @@
 /*
- * Drives the effect panel's scroll and focus restoration, and the sidebar's two
- * layout-derived computations, in headless Chrome over the same manifest server
- * scripts/browser-smoke.mjs uses.
+ * Headless Chrome probe of panel scroll/focus restoration, sidebar grid navigation
+ * and scroll arrows, preset accessible names and slider drag ownership.
+ * Uses scripts/browser-smoke.mjs's manifest server.
  *
  *   node scripts/panel-probe.mjs
- *
- * The unit suite runs over tests/helpers/fake_dom.js, where scrollTop is a plain
- * expando: any number written to it reads back. A browser clamps it to
- * scrollHeight - clientHeight, so a panel that has not laid out takes 0 whatever
- * was written. Only a real layout decides whether the offset survives a rebuild.
- * The sidebar reads gridTemplateRows for its arrow-key column stride and
- * scrollLeft/scrollWidth/clientWidth for its scroll arrows — quantities the fake
- * DOM answers from hand-written style objects, so only a real grid decides
- * whether either one is measuring the layout that shipped.
- * The same suite has no accessibility tree, so the preset dropdown's computed
- * name is read out of the browser's.
- * A slider drag is lil-gui's own mouse gesture, which the fake DOM does not
- * raise and cannot interleave a second pointer with, so only a browser says
- * whether the panel's drag latch tracks the pointer that opened it.
  */
 import { checks, isMain, runProbe } from './probe_harness.mjs';
 

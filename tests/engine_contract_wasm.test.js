@@ -369,9 +369,7 @@ function assertDeclaredShape(name, value) {
   }
 }
 
-// The method roster above is pinned by embind's own prototype; the object
-// shapes those same calls return are not, so a renamed member type-checks and
-// contract-tests green while every read of it answers undefined.
+// Return-value shapes for the engine binding methods.
 test('generated/holosphere_wasm.d.ts declares the object shapes the engine returns', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
 
@@ -909,10 +907,7 @@ test('strobeColumns and effect metadata return the shapes daydream consumes', ()
     'an effect with no authored presets must report zero, not be absent');
 });
 
-// daydream.js's per-resolution favorites rosters and its seeded default are
-// hand-written engine class names that nothing else resolves: a renamed effect
-// leaves a sidebar button that cannot install and a deep link that falls
-// through to the default effect.
+// Effect identities used by per-resolution favorites and the seeded default.
 test('the favorites rosters and the seeded default name installable effects', () => {
   const registered = new Set(Object.keys(engine.getEffectSizes()));
   assert.ok(registered.has(DEFAULT_EFFECT),

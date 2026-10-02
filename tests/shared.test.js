@@ -1,12 +1,5 @@
-//
-// shared.js exports initScene, capPixelRatio and getCssColor; other exports
-// covered by their source modules' tests (banner.test.js, clipboard.test.js,
-// kb_format.test.js). three + three/addons are redirected onto fake_three.js
-// by loader hooks, so initScene builds a whole scene here without a WebGL
-// context and dispose() can be checked step by step. dispose() carries an
-// ordering invariant: the frame loop and the resize listener must both be
-// stopped before any GPU object is released, or a queued frame renders against
-// disposed resources.
+// Check shared.js scene utilities over fake_three.js and fake_dom.js.
+// Disposal stops the frame loop and resize listener before releasing GPU objects.
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { register } from 'node:module';

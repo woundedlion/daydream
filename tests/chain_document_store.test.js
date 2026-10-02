@@ -1,12 +1,5 @@
-//
-// src/workbench/shader/chain_document_store.js is the chain editor's document state machine:
-// one span-replacement primitive generates insert, remove, replace and move,
-// every commit reconciles the whole document (preset backfill, serialization
-// fields, staggered groups, degenerate transition edges) and must leave it
-// green under the v2 validator, undo restores a whole structural edit, and the
-// session bypass set shapes the engine program without ever touching the
-// document or its digest. The fixture is a real multi-preset pattern document
-// compiled against the pinned engine catalog.
+// Check transactional chain edits, reconciliation, undo and session bypass
+// against a multi-preset pattern fixture and the pinned engine catalog.
 import { test } from 'node:test';
 import * as compiler from '../generated/shader/shader_workbench.mjs';
 import assert from 'node:assert/strict';

@@ -1,14 +1,5 @@
-//
-// Pins the three surface tests/helpers/fake_three.js stands in for, so the double the
-// scene suites run over cannot drift from the library the tool pages load.
-// shared.test.js redirects `three` and its OrbitControls addon to the fake;
-// this one imports the real modules and drives them over tests/helpers/fake_dom.js,
-// which is enough DOM for OrbitControls to connect.
-//
-// A rename is what this catches. The double keeps answering the old name, so a
-// browser-side `TypeError: … is not a function` — or, for a field, an
-// assignment that lands nowhere and is not an error at all — reads here as a
-// green run.
+// Check the real Three.js and OrbitControls contracts modeled by fake_three.js
+// over fake_dom.js, including construction, mutable fields and disposal.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -233,8 +224,7 @@ test('Float32BufferAttribute carries the array and item size, on both', () => {
   }
 });
 
-// The suites read the built objects back by constructor name, so a renamed
-// class would read as a missing object rather than as a rename.
+// Scene suites identify built objects by constructor name.
 test('the geometry objects hold what they were constructed with, on both', () => {
   for (const [label, module] of [['three', THREE], ['fake_three', fake]]) {
     for (const name of ['Mesh', 'Points', 'LineSegments']) {

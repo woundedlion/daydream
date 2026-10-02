@@ -775,8 +775,7 @@ test('a control value no enum member carries is refused, not marshalled', () => 
   /Unknown curve member: S_CURVE/);
 });
 
-// The marshal reads these option values straight through, so a renamed member
-// or a typo in the markup only shows up as a refused recipe at export time.
+// Palette select-option parity with the recipe enums.
 const ENUM_SELECT_GROUPS = {
   gen_shape: 'domain',
   gen_path: 'colorPath',

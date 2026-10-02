@@ -1,31 +1,13 @@
 /*
- * Bakes the local-vs-CDN vendoring decision into vendor-importmap.js at build
- * time.
+ * Generates the local/CDN decisions, package.json version pins and sha384 hashes
+ * in vendor-importmap.js's GENERATED block; page-relative resolution is unchanged.
+ * Hashes require matching pinned packages installed in node_modules.
  *
- *   node scripts/generate-importmap.mjs            # all-CDN (default, deploy-safe)
- *   node scripts/generate-importmap.mjs --local    # local where vendored, else CDN
- *   node scripts/generate-importmap.mjs --out F    # write to F instead of vendor-importmap.js
- *   node scripts/generate-importmap.mjs --vendor-root D  # probe D for the vendored dirs
- *   node scripts/generate-importmap.mjs --root D   # read package and tracked imports from D
- *
- * `--local` checks the filesystem for the vendored library entry points and
- * sets each library to 'local' only when present, so a partial vendoring
- * (e.g. node_modules but no three.js/) still resolves correctly. `--vendor-root`
- * aims those probes at a tree other than the repository, which is how
- * scripts/vendor-stage.mjs bakes a map for the scratch site the browser probes
- * are served out of.
- *
- * Only the GENERATED block in vendor-importmap.js is rewritten: the vendoring
- * decision, the version pins, and the Subresource Integrity hashes. The version
- * pins are read from package.json so the importmap and the dependency manifest
- * share one source of truth. The rest of the file (page-relative resolution) is
- * untouched.
- *
- * Every CDN-resolved module gets a sha384 hash computed from the installed
- * node_modules copy, which jsDelivr serves byte-for-byte from the same npm
- * tarball. Hashing therefore requires the pinned versions to be installed, and
- * the script refuses to run against a missing or mismatched node_modules rather
- * than baking a hash that would block the module on the deployed site.
+ *   node scripts/generate-importmap.mjs            # all-CDN (default)
+ *   node scripts/generate-importmap.mjs --local    # local entry points present, else CDN
+ *   node scripts/generate-importmap.mjs --out F    # alternate output
+ *   node scripts/generate-importmap.mjs --vendor-root D  # vendored entry-point probe root
+ *   node scripts/generate-importmap.mjs --root D   # package and tracked-import source root
  */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';

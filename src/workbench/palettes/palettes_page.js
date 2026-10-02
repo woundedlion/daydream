@@ -90,11 +90,7 @@ const paletteViewport = createPaletteViewport();
 let hueKeyWheelCanvas, hueKeyWheelCtx;
 let hueKeyWheelPainter = null;
 let hueKeyWheelScale = 1;
-// Marker positions of the last wheel actually painted. The wheel draws the
-// canonical recipe, which clamps and rounds what the controls hold, and a
-// recipe that failed to compile leaves the previous wheel on screen — so a
-// grab must be tested against what the user can see, not against a state
-// recomputed from the controls.
+// Hit-test the last painted canonical recipe, including when compilation leaves the prior wheel visible.
 let hueKeyWheelDrawnPoints = [];
 let activeHueKey = null;
 let hueKeyDrag = null;
@@ -557,11 +553,7 @@ let colorStripCanvas, colorStripCtx, waveGraphCanvas, waveGraphCtx,
 // (updatePalette); a size change is detected by the painter itself.
 let colorStripPainter = null;
 
-// Spoken names for the coefficient groups and the RGB channels. The visible
-// slider labels are single letters repeated across all four groups, so each
-// control's accessible name is built from its group and channel instead —
-// "Offset red" rather than a fourth control called "R". The group names match
-// the <h3> each group's role="group" is labelled by.
+// Accessible names combine the coefficient group and channel.
 const GROUP_NAMES = {
   A: 'Offset', B: 'Amplitude', C: 'Frequency', D: 'Phase',
 };
@@ -664,11 +656,7 @@ function mountSlider(def) {
   sliderHandles[def.param] = handles;
   const { slider } = handles;
 
-  // Seed the per-group start values a locked relative drag works from. Must
-  // fire on mouse, touch, and keyboard input: touch drags and arrow-key
-  // presses emit `input` with no preceding `mousedown`, so without a seed the
-  // locked branch above sees an empty map and the Lock checkbox silently does
-  // nothing.
+  // Seed on input too: touch and keyboard edits need not emit mousedown.
   const seedLockedDrag = () => {
     const lockCheckbox = document.getElementById(`lock_${def.group}`);
     const isLocked = lockCheckbox ? lockCheckbox.checked : false;

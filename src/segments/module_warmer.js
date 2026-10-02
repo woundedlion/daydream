@@ -10,11 +10,7 @@ import { raceDeadline } from '../shared/deadline.js';
 // step, so the segment-count slider warms several times a second.
 export const WARM_INTERVAL_MS = 10000;
 
-// Deadline for one warm. Everything the warm produces is best-effort — a primed
-// cache and a shared compilation each worker falls back to producing for itself
-// — but the pool spawn waits on it, so a stalled re-fetch would leave segmented
-// mode enabled with no workers, no watchdog and nothing on screen to say so.
-// Sized alongside the worker init watchdog, which bounds the same binary.
+// Best-effort warming deadline; pool creation waits for warming to settle.
 export const WARM_DEADLINE_MS = 20000;
 
 /**

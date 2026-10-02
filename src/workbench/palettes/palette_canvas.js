@@ -216,7 +216,7 @@ export function drawWaveGraph({ canvas, ctx, palette }) {
   ctx.moveTo(0, yCenter);
   ctx.lineTo(width, yCenter);
   ctx.stroke();
-  ctx.setLineDash([]); // Reset dashed line
+  ctx.setLineDash([]);
 
   // Sample all three channels per column up front: a generative palette
   // reconstructs its whole LUT entry per sample, so asking one channel at a

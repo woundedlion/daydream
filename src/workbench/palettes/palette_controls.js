@@ -843,15 +843,7 @@ export function loopSweepTurns(turns) {
 
 /**
  * Marshals the generative tab's control readings into a V4 recipe.
- *
- * Every C++ recipe export and every preview repaint goes through this, and the
- * enum members it reads are the string values the page's <select> options carry
- * — so the mapping is where a renamed option is caught, as a RangeError naming
- * the group and the value rather than an `undefined` enum. It stays free of the
- * DOM: the page reads the controls and hands the values over.
- *
- * A CUSTOM-curve axis keeps the template's own custom points, so its endpoint
- * readings are ignored rather than overwriting them.
+ * A CUSTOM-curve axis retains the template's custom points and ignores endpoint readings.
  * @param {PaletteRecipe} template - Recipe the reading is applied over; deep-cloned, never mutated.
  * @param {PaletteControlReadings} controls - The control readings.
  * @returns {PaletteRecipe} The recipe.

@@ -1,17 +1,8 @@
 /*
- * Drives the palette tool's strip zoom and hue-key wheel in headless Chrome,
- * over the same manifest server scripts/browser-smoke.mjs uses.
+ * Headless Chrome probe of palette strip zoom, out-of-bounds drag cancellation
+ * and hue-key wheel dragging, using scripts/browser-smoke.mjs's manifest server.
  *
  *   node scripts/palettes-probe.mjs
- *
- * Both gestures read the pointer through getBoundingClientRect and ride on
- * pointer capture, neither of which tests/helpers/fake_dom.js has: its rects are zero,
- * so every strip position collapses onto 0 and every wheel hit test misses, and
- * a drag that leaves the element stops arriving. This job drags the strip with a
- * real mouse and requires the phase window it swept, walks the pointer out of
- * the strip's vertical bounds and requires the zoom to be abandoned, and drags a
- * wheel marker and requires the key it gripped to take the hue under the
- * pointer.
  */
 import { centre, checks, dragBetween, isMain, paddingBoxOf, runProbe } from './probe_harness.mjs';
 
