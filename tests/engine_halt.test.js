@@ -43,7 +43,6 @@ test('a page detail is appended after the shared notice', () => {
   assert.match(seen, /halted — reload the page\. \(The op that caused this/);
 });
 
-
 test('liveness checks tolerate an absent WebAssembly global', () => {
   const wasm = globalThis.WebAssembly;
   try {

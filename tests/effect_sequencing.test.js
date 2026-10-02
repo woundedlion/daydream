@@ -773,7 +773,6 @@ test('an effect the resized engine rejects rejects the resolution change', () =>
   assert.equal(app.log.includes('driver.stepOnce'), false);
 });
 
-
 test('resolution rebuild restores the chain runtime before rebuilding controls or broadcasting', () => {
   const snapshot = {schemaVersion: 2, chain: [{instance: 'camera', operator: 'sphere.rotate.v2'}],
     parameters: [{name: 'camera.wander', value: 0.3}],

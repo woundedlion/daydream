@@ -640,7 +640,6 @@ test('a node moved between parents stays connected; remove() disconnects it', ()
   assert.equal(moved.isConnected, false);
 });
 
-
 /**
  * A <select> populated with options carrying the given values.
  * @param {Array<string>} values - One option per entry, text and value alike.
@@ -910,7 +909,6 @@ test('child and sibling navigation follows insertions, moves and removals', () =
   assert.equal(newest.parentElement, null);
   assert.equal(newest.nextSibling, null);
 });
-
 
 test('focus respects native tags, tabindex, and disabled state', () => {
   const doc = installDocument(documentEvents());
