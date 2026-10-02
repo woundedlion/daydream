@@ -46,17 +46,22 @@ export const LOWERING = {
     ? 'ambo' : { op: 'truncate', params: typeof op === 'string' ? {} : (op.params ?? {}) }],
 };
 
-/** @param {string} op @returns {number} Lowered primitive count. */
+/**
+ * @param {string} op - Operation name.
+ * @returns {number} Lowered primitive count.
+ */
 export function primitiveCount(op) {
   return LOWERING[op]?.(op).length ?? 1;
 }
 
 /**
  * Replays flattened primitives on the sacrificial validator and checks endpoint budgets.
- * @param {import('./solid_codegen.js').ChainValidator} validator
- * @param {import('./solid_codegen.js').SolidSpec} item
- * @param {?{seed:string, ops:Array<{op:string,param:number,twist:number}>}} baseRecipe
+ * @param {import('./solid_codegen.js').ChainValidator} validator - Sacrificial engine provider.
+ * @param {import('./solid_codegen.js').SolidSpec} item - Saved solid and authored operations.
+ * @param {?{seed:string, ops:Array<{op:string,param:number,twist:number}>}} baseRecipe - Flattened star-pattern base.
  * @returns {Promise<void>} Resolves when every primitive endpoint fits.
+ * @throws {Error} Rejects if the validator is unavailable, a mesh operation is
+ *   refused, or an endpoint exceeds the face budget.
  */
 export async function validateRegistryFaces(validator, item, baseRecipe = null) {
   await validator.withValidator((mod) => {
@@ -294,7 +299,12 @@ function definitionHeadCpp(type, declarator, breakAfterBrace = false) {
   };
 }
 
-/** @param {string} name @param {string} seed @param {string} steps */
+/**
+ * @param {string} name - Recipe identifier.
+ * @param {string} seed - Qualified seed expression.
+ * @param {string} steps - Primitive-step array expression.
+ * @returns {string} Formatted C++ recipe definition.
+ */
 function recipeDefinitionCpp(name, seed, steps) {
   const declaration = `inline constexpr Recipe ${name} =`;
   const call = `make_recipe(${seed}, ${steps});`;
