@@ -1806,7 +1806,7 @@ test('ad-hoc contexts use fields assigned by the driver', () => {
 
 test('dispose during a real Three animation callback cancels the rearmed frame', async () => {
   const { WebGLAnimation } = await import(
-    '../node_modules/three/src/renderers/webgl/WebGLAnimation.js');
+    'three/src/renderers/webgl/WebGLAnimation.js');
   const animation = WebGLAnimation();
   const requests = new Map();
   let id = 0;
