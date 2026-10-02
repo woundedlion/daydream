@@ -949,10 +949,9 @@ test('a failed workbench init reports without the page-failure banner', () => {
     'init() is async and the surrounding catch only sees a synchronous throw, '
     + 'so a dropped rejection reaches the page-failure listener and covers a '
     + 'running simulator with the fatal banner');
-  assert.match(sliceTo(at, 'WORKBENCH_NOTICE);'),
-    /workbench could not be initialized: \$\{[^}]+\}`,\s*$/,
-    'the workbench half must report through the shader config notice, the '
-    + 'owner tag its other messages carry');
+  assert.match(sliceTo(at, '\n        });'),
+    /workbench could not be initialized: \$\{[^}]+\}`,\s*WORKBENCH_NOTICE\);/,
+    'the workbench half must report through its own WORKBENCH_NOTICE owner');
 });
 
 
