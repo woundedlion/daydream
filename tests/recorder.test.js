@@ -1228,57 +1228,57 @@ test('a host hook that throws does not poison the streaming write chain', async 
  * as a contiguous prefix after the session ends at that limit.
  */
 for (const bitrate of [1, 0]) {
-test(`an unanswered save dialog bounds backlog with configured bitrate ${bitrate}`, async () => {
-  const restore = installRecorderEnv();
-  const writes = [];
-  let closed = false;
-  const writable = { write: async (d) => { writes.push(d); }, close: async () => { closed = true; } };
-  let answerPicker = () => {};
-  globalThis.showSaveFilePicker = () => new Promise((resolve) => {
-    answerPicker = () => resolve({ createWritable: async () => writable });
+  test(`an unanswered save dialog bounds backlog with configured bitrate ${bitrate}`, async () => {
+    const restore = installRecorderEnv();
+    const writes = [];
+    let closed = false;
+    const writable = { write: async (d) => { writes.push(d); }, close: async () => { closed = true; } };
+    let answerPicker = () => {};
+    globalThis.showSaveFilePicker = () => new Promise((resolve) => {
+      answerPicker = () => resolve({ createWritable: async () => writable });
+    });
+    const captured = installConsoleCapture('error');
+    try {
+      const rec = new VideoRecorder(recordableCanvas());
+      const sinkFinished = trackSinkFinish(rec);
+      rec.bitrateMbps = bitrate;
+      let downloaded = false;
+      rec.download = () => { downloaded = true; };
+      const notified = [];
+      rec.onError = (err) => notified.push(err);
+
+      rec.start('unanswered');
+      const recorder = rec.mediaRecorder;
+      const expectedBitrate = (bitrate || 16) * 1_000_000;
+      assert.equal(recorder.options.videoBitsPerSecond, expectedBitrate);
+      const sessionChunks = rec.chunks;
+      const held = (expectedBitrate / 8) * PICKER_GRACE_SECONDS - 1_000_000;
+      recorder.ondataavailable({ data: { size: held } });
+      assert.equal(rec.isRecording, true, 'a backlog under the bound keeps recording');
+
+      recorder.ondataavailable({ data: { size: 2_000_000 } });
+      assert.equal(rec.isRecording, false, 'the session stops when the backlog passes the bound');
+      assert.equal(notified.length, 1, 'the host is told the session ended');
+      assert.match(captured.messages.join(' '), /Save dialog/,
+        'the stop is reported, not silent');
+
+      recorder.ondataavailable({ data: { size: 3_000_000 } });
+      recorder.onstop();
+      assert.equal(notified.length, 1, 'the bound is reported once, not per chunk');
+
+      answerPicker();
+      await sinkFinished();
+
+      assert.deepEqual(writes, [{ size: held }],
+        'the chunks held under the bound still reach the chosen file, in order');
+      assert.equal(closed, true, 'the file is closed once the late pick lands');
+      assert.equal(downloaded, false, 'no in-memory blob download of the dropped tail');
+      assert.deepEqual(sessionChunks, [], 'the dropped chunks are not retained in RAM');
+    } finally {
+      captured.restore();
+      restore();
+    }
   });
-  const captured = installConsoleCapture('error');
-  try {
-    const rec = new VideoRecorder(recordableCanvas());
-    const sinkFinished = trackSinkFinish(rec);
-    rec.bitrateMbps = bitrate;
-    let downloaded = false;
-    rec.download = () => { downloaded = true; };
-    const notified = [];
-    rec.onError = (err) => notified.push(err);
-
-    rec.start('unanswered');
-    const recorder = rec.mediaRecorder;
-    const expectedBitrate = (bitrate || 16) * 1_000_000;
-    assert.equal(recorder.options.videoBitsPerSecond, expectedBitrate);
-    const sessionChunks = rec.chunks;
-    const held = (expectedBitrate / 8) * PICKER_GRACE_SECONDS - 1_000_000;
-    recorder.ondataavailable({ data: { size: held } });
-    assert.equal(rec.isRecording, true, 'a backlog under the bound keeps recording');
-
-    recorder.ondataavailable({ data: { size: 2_000_000 } });
-    assert.equal(rec.isRecording, false, 'the session stops when the backlog passes the bound');
-    assert.equal(notified.length, 1, 'the host is told the session ended');
-    assert.match(captured.messages.join(' '), /Save dialog/,
-      'the stop is reported, not silent');
-
-    recorder.ondataavailable({ data: { size: 3_000_000 } });
-    recorder.onstop();
-    assert.equal(notified.length, 1, 'the bound is reported once, not per chunk');
-
-    answerPicker();
-    await sinkFinished();
-
-    assert.deepEqual(writes, [{ size: held }],
-      'the chunks held under the bound still reach the chosen file, in order');
-    assert.equal(closed, true, 'the file is closed once the late pick lands');
-    assert.equal(downloaded, false, 'no in-memory blob download of the dropped tail');
-    assert.deepEqual(sessionChunks, [], 'the dropped chunks are not retained in RAM');
-  } finally {
-    captured.restore();
-    restore();
-  }
-});
 }
 
 for (const stalledAt of ['opening', 'writing']) {
