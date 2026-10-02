@@ -881,7 +881,7 @@ test('dropSlotIndex handles rows of unequal height', () => {
   assert.equal(dropSlotIndex(45, items), 2);
 });
 
-/** Verifies a slot below the dragged op maps straight through, since removal shifts nothing before it. */
+/** Verifies a slot at or before the dragged op maps straight through, since removal shifts nothing before it. */
 test('dropTargetIndex passes slots at or above the drag source through', () => {
   assert.equal(dropTargetIndex(0, 2), 0);
   assert.equal(dropTargetIndex(2, 2), 2);
