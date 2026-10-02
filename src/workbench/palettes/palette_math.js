@@ -10,7 +10,7 @@
 
 import { srgbToLinearFloat, linearToSrgbFloat, linearRgbToHex } from '../../shared/color.js';
 import { fillColumns, formatFloatCpp } from '../../shared/cpp_format.js';
-import { PaletteV4 } from './palette_controls.js';
+import { paletteEnumName } from './palette_controls.js';
 
 /** @typedef {import('./palette_controls.js').PaletteRecipe} PaletteRecipe */
 
@@ -487,29 +487,6 @@ export function proceduralPaletteCpp(parameters) {
 }
 
 /**
- * The C++ enumerator each V4 recipe enum value serializes as, indexed by value.
- * The inverse of palette_controls.js's PaletteV4; WASM parity tests
- * pin both to the `enum class` rosters in core/color/palette_recipe.h.
- */
-export const ENUM_NAMES = Object.freeze(Object.fromEntries(
-  Object.entries(PaletteV4).map(([group, members]) => [group,
-    Object.entries(members).sort((a, b) => a[1] - b[1]).map(([name]) => name)]),
-));
-for (const names of Object.values(ENUM_NAMES)) Object.freeze(names);
-
-/**
- * @param {keyof typeof ENUM_NAMES} group - Which enum the value belongs to.
- * @param {number} value - The ordinal a recipe carries.
- * @returns {string} The C++ enumerator's name.
- * @throws {Error} When the group has no name for that ordinal.
- */
-function enumName(group, value) {
-  const name = ENUM_NAMES[group]?.[value];
-  if (!name) throw new Error(`unknown ${group} enum value ${value}`);
-  return name;
-}
-
-/**
  * @param {number[]} values - The array's elements.
  * @returns {string} A C++ brace-initializer of `f`-suffixed floats.
  */
@@ -531,22 +508,22 @@ export function generativePaletteCpp(recipe) {
 recipe.schema_version = ${recipe.schemaVersion};
 recipe.input.offset = ${f(recipe.input.offset)};
 recipe.input.span = ${f(recipe.input.span)};
-recipe.domain = PaletteDomain::${enumName('domain', recipe.domain)};
-recipe.easing = SegmentEase::${enumName('easing', recipe.easing)};
-recipe.color_path = ColorPath::${enumName('colorPath', recipe.colorPath)};
-recipe.hue.mode = HueMode::${enumName('hueMode', recipe.hue.mode)};
-recipe.hue.harmony = PaletteHarmony::${enumName('harmony', recipe.hue.harmony)};
-recipe.hue.direction = HueDirection::${enumName('direction', recipe.hue.direction)};
+recipe.domain = PaletteDomain::${paletteEnumName('domain', recipe.domain)};
+recipe.easing = SegmentEase::${paletteEnumName('easing', recipe.easing)};
+recipe.color_path = ColorPath::${paletteEnumName('colorPath', recipe.colorPath)};
+recipe.hue.mode = HueMode::${paletteEnumName('hueMode', recipe.hue.mode)};
+recipe.hue.harmony = PaletteHarmony::${paletteEnumName('harmony', recipe.hue.harmony)};
+recipe.hue.direction = HueDirection::${paletteEnumName('direction', recipe.hue.direction)};
 recipe.hue.base_turns = ${f(recipe.hue.baseTurns)};
 recipe.hue.spread_turns = ${f(recipe.hue.spreadTurns)};
 recipe.hue.sweep_turns = ${f(recipe.hue.sweepTurns)};
 recipe.hue.custom_turns = ${cppFloatArray(recipe.hue.customTurns)};
-recipe.lightness.curve = AxisCurve::${enumName('curve', recipe.lightness.curve)};
+recipe.lightness.curve = AxisCurve::${paletteEnumName('curve', recipe.lightness.curve)};
 recipe.lightness.center = ${f(recipe.lightness.center)};
 recipe.lightness.range = ${f(recipe.lightness.range)};
 recipe.lightness.custom = ${cppFloatArray(recipe.lightness.custom)};
-recipe.chroma.axis.curve = AxisCurve::${enumName('curve', recipe.chroma.curve)};
-recipe.chroma.basis = ChromaBasis::${enumName('chromaBasis', recipe.chroma.basis)};
+recipe.chroma.axis.curve = AxisCurve::${paletteEnumName('curve', recipe.chroma.curve)};
+recipe.chroma.basis = ChromaBasis::${paletteEnumName('chromaBasis', recipe.chroma.basis)};
 recipe.chroma.axis.center = ${f(recipe.chroma.center)};
 recipe.chroma.axis.range = ${f(recipe.chroma.range)};
 recipe.chroma.headroom = ${f(recipe.chroma.headroom)};
