@@ -804,9 +804,10 @@ function points(flat) {
   return out;
 }
 
-/** Verifies n = 1 emits the untouched triangle, so an unsubdivided mesh is unchanged. */
-test('geodesicTriangleVertices at n=1 emits the single input triangle', () => {
-  const flat = geodesicTriangleVertices(...OCTANT, 1);
+/** Verifies n = 1 emits one triangle with its corners projected onto the unit sphere. */
+test('geodesicTriangleVertices at n=1 projects the single triangle onto the unit sphere', () => {
+  const corners = [{ x: 2, y: 0, z: 0 }, { x: 0, y: 3, z: 0 }, { x: 0, y: 0, z: 4 }];
+  const flat = geodesicTriangleVertices(...corners, 1);
   assert.equal(flat.length, 9);
   assert.deepEqual(points(flat), OCTANT);
 });
