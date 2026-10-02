@@ -113,13 +113,17 @@ test('a faces-only render builds exactly the mesh and its edge lines', () => {
 });
 
 test('the render leaves the caller\'s mesh untouched', () => {
-  const { renderer } = setup();
-  const mesh = tetrahedron();
-  const keysBefore = Object.keys(mesh).sort();
-  const result = renderer.render(mesh, view(), null);
-  assert.equal(result.edgeCount, 6,
-    'the edge count is reported back, not written onto the mesh');
-  assert.deepEqual(Object.keys(mesh).sort(), keysBefore);
+  for (const showGeodesics of [false, true]) {
+    const { renderer } = setup();
+    const mesh = tetrahedron();
+    mesh.vertices.forEach((vertex) => vertex.multiplyScalar(2));
+    const before = structuredClone(mesh);
+    const result = renderer.render(mesh, view({
+      showGeodesics, showNormals: true, showVertices: true, showIndices: true,
+    }), null);
+    assert.equal(result.edgeCount, 6);
+    assert.deepEqual(structuredClone(mesh), before);
+  }
 });
 
 test('the stats line reports vertices, edges, faces and indices', () => {
