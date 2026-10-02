@@ -14,7 +14,7 @@ test('a previous slider blur preserves the new locked drag', () => {
     parameters: { red: 0.5, green: 0.5 }, sliderDefinitions: definitions, sliderHandles: {},
     lockedDragStartValues: {}, lockedDragOwner: null, sliderAriaLabel: () => '',
     document: { getElementById: (id) => id === 'lock_offset' ? { checked: true } : sliders[id.replace('_slider', '')] },
-    createSlider: (_container, options, callback) => {
+    createSlider: (container, options, callback) => {
       input[options.id] = callback;
       return { slider: sliders[options.id], setValue: (value) => { sliders[options.id].value = String(value); } };
     },
