@@ -964,9 +964,9 @@ const trackSinkFinish = (rec) => {
 };
 
 /**
- * With the File System Access API present, each chunk streams straight to the
- * writable as it arrives and the file is closed at stop — nothing is buffered in
- * RAM and no blob download is assembled.
+ * With the File System Access API present, chunks are queued for ordered writes
+ * and released after writing. Stopping closes the file after those writes;
+ * no blob download is assembled on a successful streaming save.
  */
 test('streams chunks to disk when the File System Access API is present', async () => {
   const restore = installRecorderEnv();
