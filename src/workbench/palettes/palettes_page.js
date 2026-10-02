@@ -130,7 +130,12 @@ function activateCustomHue(sourceRecipe) {
   const handoff = hueKeyHandoff(
     hueKeyState(sourceRecipe), state, selectedHueKey, activeHueKey);
   selectedHueKey = handoff.selectedKey;
-  if (!handoff.kept) return false;
+  if (!handoff.kept) {
+    document.getElementById('hue_key_status').textContent =
+      'This hue key is omitted when the harmony is resampled to three custom keys. Choose another key.';
+    return false;
+  }
+  document.getElementById('hue_key_status').textContent = '';
   customHueOffsets = state.offsets;
   activeHueKey = handoff.activeKey;
   setCustomBaseTurns(state.baseTurns);
