@@ -10,6 +10,7 @@ import {
   paramGenerationStale,
   selectorControlValue,
   enumConstantName,
+  optionIndex,
 } from '../src/effects/param_sync.js';
 
 // resolveParamSync is the DOM-free core of sync()'s per-controller "fight-the-
@@ -144,17 +145,17 @@ test('a boolean carrying labels stays a toggle', () => {
 // engineParamValue coerces a GUI value to the float setParameter takes, for both
 // the deep-link seeding pass and the per-change write.
 
-test('a boolean becomes 1.0/0.0', () => {
-  assert.equal(engineParamValue(true), 1.0);
-  assert.equal(engineParamValue(false), 0.0);
-});
-
 test('numeric enum labels retain engine order', () => {
   const choices = enumChoices(['10', '2', '1']);
   assert.deepEqual(Object.keys(choices), ['10', '2', '1']);
   assert.deepEqual(Object.values(choices), [0, 1, 2]);
   assert.deepEqual(Object.keys(enumChoices(['Auto', '2', '10'])), ['Auto', '2', '10'],
     'integer-like labels are not hoisted ahead of the rest');
+});
+
+test('a boolean becomes 1.0/0.0', () => {
+  assert.equal(engineParamValue(true), 1.0);
+  assert.equal(engineParamValue(false), 0.0);
 });
 
 test('a number passes through unchanged', () => {
@@ -240,8 +241,7 @@ test('an engine enum value is logged by its constant name', () => {
 });
 
 
-test('document enum options normalize case, whitespace, and hyphens', async () => {
-  const { optionIndex } = await import('../src/effects/param_sync.js');
+test('document enum options normalize case, whitespace, and hyphens', () => {
   const definition = { options: ['Solid Fill', 'Point Cloud'] };
   assert.equal(optionIndex(definition, '  point-cloud  '), 1);
   assert.equal(optionIndex(definition, 'SOLID   FILL'), 0);
