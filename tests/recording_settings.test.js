@@ -5,10 +5,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRecordingSettings } from '../src/recording/recording_settings.js';
 
-// The recording settings share the Pole LOD binding's problem: the GUI mounts at
-// module scope, the recorder is built only when the module load resolves, and
-// the recorder latches every one of these at start().
-
 /**
  * Build the recording settings over a recorder that appears only when made to.
  * @returns {Object} The block, the recorder double, the warnings, and the load.

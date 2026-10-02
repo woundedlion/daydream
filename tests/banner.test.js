@@ -147,11 +147,7 @@ test('reportPageFailures listens for both uncaught errors and unhandled rejectio
   assert.deepEqual(target.types().sort(), ['error', 'unhandledrejection']);
 });
 
-/**
- * The simulator installs this surface at module scope and drops it on a page
- * discard. Returning the pairs it registered is what lets that teardown remove
- * the same functions; a handler surviving the discard reports into a dead page.
- */
+/** Verifies the registered listener pairs can be removed at page teardown. */
 test('reportPageFailures returns the pairs its caller needs to deregister', () => {
   const { bodyEl } = fakeDocument();
   const target = fakeTarget();
