@@ -429,7 +429,7 @@ test('the CI gate CLI rejects an ungated job before evaluating results', () => {
 
 test('required suite steps execute without suppression', () => {
   const suite = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/js-unit-suite.yml`), 'utf8').replaceAll('\r\n', '\n');
-  const required = ['Lint JavaScript', 'Verify committed import map', 'Lint shell', 'Lint workflows', 'Test'];
+  const required = ['Lint JavaScript', 'Typecheck', 'Verify committed import map', 'Verify generated Tailwind styles', 'Verify CDN integrity', 'Lint shell', 'Lint workflows', 'Test'];
   const blocks = suite.split(/(?=^ {6}- )/m);
   assert.doesNotMatch(suite, /\|\|\s*true/);
   for (const name of required) {
