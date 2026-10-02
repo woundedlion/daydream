@@ -173,6 +173,8 @@ test('a device cap moves with the memory hint and the mobile layout', () => {
   assert.equal(maxSegmentCount({ deviceMemory: 8 }, false), 8);
   assert.equal(maxSegmentCount({ deviceMemory: 4 }, false), 4);
   assert.equal(maxSegmentCount({ deviceMemory: 0.5 }, false), 2);
+  assert.equal(maxSegmentCount({ deviceMemory: 2 }, false), 2);
+  assert.equal(maxSegmentCount({ deviceMemory: 3 }, false), 4);
   // Without deviceMemory the narrow layout is the only phone signal there is.
   assert.equal(maxSegmentCount({}, true), 4);
   assert.equal(maxSegmentCount({ deviceMemory: 8 }, true), 4,
