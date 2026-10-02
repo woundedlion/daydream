@@ -15,9 +15,6 @@ function fakeDriver() {
   return { pixels: null, dotMesh: { instanceColor: fakeColorAttribute(null) } };
 }
 
-// Display aliases: the Three.js instanceColor attribute, its array, and the
-// driver's own pixel handle must all reference one WASM view.
-
 test('re-pointing aliases the view everywhere and flags the upload', () => {
   const driver = fakeDriver();
   const view = new Uint16Array(4);
