@@ -1,4 +1,4 @@
-# Source-owned GitHub Pages assets, one repo-relative regular file per line.
+# GitHub Pages assets, one repo-relative regular file per line.
 # Deployment also publishes the verified engine bundle's pattern documents,
 # README, and every screenshot that README references. Runtime entries are
 # published only when the verified bundle carries them; install-engine-bundle.mjs
@@ -113,8 +113,8 @@ generated/shader/composed_effect_roster.mjs
 generated/shader/engine_catalog.json
 generated/shader/patterns/catalog.json
 
-# The project license, carrying the notices MIT requires for the PROJ-derived
-# projection code and FastNoiseLite compiled into generated/holosphere_wasm.wasm.
+# The project license and notices for the PROJ-derived projection code,
+# FastNoiseLite, Tailwind CSS, and modern-normalize.
 LICENSE.txt
 
 # Documentation supplied by the verified engine bundle.
