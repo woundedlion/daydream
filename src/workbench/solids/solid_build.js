@@ -130,10 +130,12 @@ export function buildBaseMesh(name, what, ctx) {
  * @param {MeshBuildContext} ctx - The live wiring.
  * @returns {SolidBuildResult?} What to draw, or null when there is nothing to draw.
  * @details Every failure the bridge foresees — unknown solid name, tooling arena
- * exhaustion, 16-bit connectivity or face-degree overflow, a non-finite or
- * out-of-domain argument — is a null with the reason in getLastResult(), which
+ * exhaustion, 16-bit connectivity or face-degree overflow, or a non-finite
+ * argument — is a null with the reason in getLastResult(), which
  * requireMeshResult reports for the base solid and meshOpFailure for an op
- * applyOp rejected mid-chain. An engine invariant trap is not recoverable: the
+ * applyOp rejected mid-chain. Fraction operators and relax clamp finite arguments
+ * into their domains and report the adjustment through getLastAdjusted().
+ * An engine invariant trap is not recoverable: the
  * module is built with exceptions disabled, so it aborts and reaches the catches
  * as a WebAssembly.RuntimeError over a torn-down module, which onTrap turns
  * fatal. What is left for the catches is Embind marshalling errors.

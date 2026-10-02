@@ -363,7 +363,7 @@ export const CATALAN_BASES = new Set([
  * @details Single source of truth for op dispatch: the live-preview module and
  * the sacrificial validator module must run byte-identical chains or validation
  * proves the wrong thing. The bridge answers a soft reject — an out-of-bounds
- * result, or a non-finite/out-of-domain argument — with null rather than a mesh,
+ * result or a non-finite argument — with null rather than a mesh,
  * which throws before the caller swaps its live wrapper. The KNOWN_OPS gate runs
  * first: the wrapper also binds lifetime methods (delete, clone), so an op name
  * off the table would otherwise reach one of them.
