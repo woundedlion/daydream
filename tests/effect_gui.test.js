@@ -2378,6 +2378,7 @@ test('Export reports a parameter formatting failure', () => {
   assert.equal(h.gui().ctrl('export').label, '\u2717');
   assert.match(h.warnings[0], /parameter formatting failed/);
   assert.deepEqual(h.state.copyText.copied, []);
+  h.panel.destroy();
 });
 
 test('the Export flash reverts to the default label', () => {
