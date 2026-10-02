@@ -1040,7 +1040,7 @@ test('setParameter handler forwards name/value and advances the frame revision',
 
 // The controller has no reply channel for a rejected setParameter, and only
 // segment 0 mirrors its values back, so this log is the whole diagnostic.
-test('a rejected setParameter is logged once per outcome', async () => {
+test('a consecutive rejected setParameter repeat is logged once', async () => {
   await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
   engineInstance.paramResult = ParamSetResult.UNKNOWN_PARAM;
 
@@ -1050,13 +1050,15 @@ test('a rejected setParameter is logged once per outcome', async () => {
     await dispatch({ type: 'setParameter', name: 'Ghost', value: 0.5 });
     await dispatch({ type: 'setParameter', name: 'Ghost', value: 0.6 });
     await dispatch({ type: 'setParameter', name: 'Phantom', value: 0.7 });
+    await dispatch({ type: 'setParameter', name: 'Ghost', value: 0.8 });
   } finally {
     capture.restore();
   }
 
-  assert.equal(logged.length, 2, 'the repeat of an already-reported outcome stays quiet');
+  assert.equal(logged.length, 3, 'only consecutive repeats stay quiet');
   assert.match(logged[0], /segment 1 setParameter\(Ghost\) rejected: UNKNOWN_PARAM/);
   assert.match(logged[1], /setParameter\(Phantom\) rejected: UNKNOWN_PARAM/);
+  assert.match(logged[2], /setParameter\(Ghost\) rejected: UNKNOWN_PARAM/);
 });
 
 // The latch is module-scoped and the worker outlives every effect switch, so a
