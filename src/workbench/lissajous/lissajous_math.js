@@ -218,11 +218,10 @@ export const domainClosureWarning = (c2, domain, tol = 1e-4) => {
 export const lissajousCodeString = (c1, c2, a, domain) => {
   const f = formatFloatCpp;
 
-  // Full precision: a rational lock like 8/7 has no exact short decimal, and a
-  // rounded frequency reopens the curve the tool just closed.
+  // Every literal round-trips to the engine float precision.
   const c1Str = f(c1);
   const c2Str = f(c2);
-  const aStr = f(a, 3);
+  const aStr = f(a);
 
   // Emit exact 2π multiples against PI_F to match the engine's source form.
   let domainStr;
@@ -230,7 +229,7 @@ export const lissajousCodeString = (c1, c2, a, domain) => {
   if (Math.abs(multiple - Math.round(multiple)) < 0.001 && Math.round(multiple) > 0) {
     domainStr = `${2 * Math.round(multiple)} * math::PI_F`;
   } else {
-    domainStr = f(domain, 3);
+    domainStr = f(domain);
   }
 
   return `math::LissajousParams{${c1Str}, ${c2Str}, ${aStr}, ${domainStr}}`;
