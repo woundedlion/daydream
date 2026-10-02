@@ -1,7 +1,5 @@
 import { captureTimeouts } from './helpers/fake_timers.js';
 import { installConsoleCapture } from './helpers/fake_console.js';
-//
-// Run: npm test
 import { test, mock, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
