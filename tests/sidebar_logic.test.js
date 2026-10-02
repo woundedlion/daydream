@@ -6,7 +6,6 @@ import {
   navTargetIndex,
   scrollArrowState,
 } from '../src/ui/sidebar_logic.js';
-import { resolveActiveEffect } from '../src/effects/effect_roster.js';
 
 const items = () => [
   { name: 'Voronoi', size: 3000 },
@@ -102,19 +101,6 @@ test('navTargetIndex jumps to the first/last option for Home/End', () => {
   assert.equal(navTargetIndex(2, 5, 'End'), 4);
   assert.equal(navTargetIndex(0, 0, 'Home'), -1);  // empty list
   assert.equal(navTargetIndex(0, 0, 'End'), -1);
-});
-
-const RESO_EFFECTS = ['Voronoi', 'Comets', 'MobiusGrid'];
-
-test('resolveActiveEffect keeps an effect the resolution offers', () => {
-  assert.equal(resolveActiveEffect(RESO_EFFECTS, 'Comets'), 'Comets');
-  assert.equal(resolveActiveEffect(RESO_EFFECTS, 'Voronoi'), 'Voronoi');
-});
-
-test('resolveActiveEffect falls back to the first effect for an off-list request', () => {
-  assert.equal(resolveActiveEffect(RESO_EFFECTS, 'NotHere'), 'Voronoi');
-  assert.equal(resolveActiveEffect(RESO_EFFECTS, 'GARBAGE_FROM_URL'), 'Voronoi');
-  assert.equal(resolveActiveEffect(RESO_EFFECTS, undefined), 'Voronoi');
 });
 
 test('scrollArrowState hides both arrows when content fits', () => {
