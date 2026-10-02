@@ -874,7 +874,8 @@ test('an effect the preview engine rejects leaves the export disabled', async ()
   assert.equal(harness.controller.save(), false);
 });
 
-// README §9: unknown or invalid semantics leave the current preview untouched,
+// Holosphere docs/effects.md, Shader Authoring Workbench: invalid semantics
+// leave the current preview untouched,
 // so a compiler that throws on the input rather than diagnosing it must not
 // take the loaded document down with it either.
 test('a compile that throws is reported and leaves the loaded document previewing', async () => {
