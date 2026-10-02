@@ -240,7 +240,7 @@ function checkedGroup(group, members, required, defaults = /** @type {D} */ ({})
  *   accepted-value surface.
  * @param {() => boolean} [deps.config.inUse] - Whether the active effect
  *   persists through the snapshot API.
- * @param {() => {accepted: number[]}|null} [deps.config.snapshot] - Captures that state.
+ * @param {() => import('../../generated/holosphere_wasm.js').ChainSnapshot|null} [deps.config.snapshot] - Captures that state.
  * @param {(snapshot: Object) => unknown} [deps.config.restore] - Atomically
  *   restores a captured state, returning one ChainSnapshotRestoreResult value.
  * @param {() => Record<string, unknown>} [deps.config.restoreResults] - The
