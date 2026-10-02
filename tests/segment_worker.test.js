@@ -146,6 +146,7 @@ class FakeEngine {
   // `fullFrame` models a needs_full_frame() effect: the bounds are accepted but
   // the clip stays at the full canvas.
   setClip(x0, x1, y0, y1) {
+    this.calls.push(['setClip', x0, x1, y0, y1]);
     if (!this.effect) return ClipSetResult.NO_EFFECT;
     if (!this.clipOk) return ClipSetResult.INVALID_BOUNDS;
     if (this.fullFrame) return ClipSetResult.FULL_FRAME_KEPT;
@@ -324,6 +325,7 @@ test('state-changing messages before init explicitly reject instead of disappear
     { type: 'setAnimationsPaused', paused: true },
     { type: 'selectPreset', index: 1 },
     { type: 'setPoleLod', value: 0.5 },
+    { type: 'setDisplayCaps', topCap: 0, bottomCap: 0 },
   ];
   for (const message of messages) {
     posted.length = 0;
@@ -923,7 +925,11 @@ test('worker cap changes preserve tuning and restore the segment clip', async ()
   await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4,
     effectName: 'Plasma', topCap: 2, bottomCap: 3, params: [{ name: 'Speed', value: 0.5 }] });
   assert.deepEqual(engineInstance.calls[0], ['setDisplayCaps', 2, 3]);
+  engineInstance.calls.length = 0;
   await dispatch({ type: 'setDisplayCaps', topCap: 4, bottomCap: 5 });
+  assert.deepEqual(engineInstance.calls, [
+    ['setDisplayCaps', 4, 5], ['setClip', 4, 8, 2, 4],
+  ]);
   assert.deepEqual(engineInstance.caps, [4, 5]);
   assert.deepEqual(engineInstance.params, [['Speed', 0.5]]);
   assert.deepEqual(engineInstance.clip, { y0: 2, y1: 4, x0: 4, x1: 8 });
@@ -963,9 +969,10 @@ test('setEffect restores ShaderChain snapshot after rebuilding', async () => {
     type: 'setEffect', name: 'ShaderChain', chainSnapshot: snapshot,
     paramRevision: 14,
   });
-  assert.deepEqual(engineInstance.calls.slice(-2), [
+  assert.deepEqual(engineInstance.calls.slice(-3), [
     ['setEffect', 'ShaderChain'],
     ['restoreSnapshot', snapshot],
+    ['setClip', 0, 4, 0, 4],
   ]);
 });
 
@@ -979,10 +986,11 @@ for (const paused of [false, true]) test(`setEffect restores pause=${paused} aft
   assert.equal(engineInstance.effect, 'Waves');
   assert.deepEqual(engineInstance.params, [['Freq', 0.25]]);
   assert.equal(engineInstance.paused, paused);
-  assert.deepEqual(engineInstance.calls.slice(-3), [
+  assert.deepEqual(engineInstance.calls.slice(-4), [
     ['setEffect', 'Waves'],
     ['setParameter', 'Freq', 0.25],
     ['setAnimationsPaused', paused],
+    ['setClip', 0, 4, 0, 4],
   ]);
 });
 
