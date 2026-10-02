@@ -32,7 +32,7 @@ function setDisplayGrid(width, height) {
 }
 
 
-const {
+import {
   SegmentController,
   MAX_BOOT_RETRIES,
   MAX_FAULTED_REBUILDS,
@@ -40,9 +40,9 @@ const {
   BOOT_WATCHDOG_MS,
   INIT_WATCHDOG_MS,
   RENDER_WATCHDOG_MS,
-} = await import('../src/segments/segment_controller.js');
+} from '../src/segments/segment_controller.js';
 import { ModuleWarmer, warmModules, pageWarmer, EMPTY_WASM } from './fixtures/module_warmer_fixture.js';
-const { PROTOCOL_VERSION, FAULT_POOL, FAULT_RENDER } = await import('../src/segments/worker_protocol.js');
+import { PROTOCOL_VERSION, FAULT_POOL, FAULT_RENDER } from '../src/segments/worker_protocol.js';
 
 const EXPECTED_CONSOLE_MESSAGES = {
   log: [
