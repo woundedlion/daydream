@@ -28,17 +28,17 @@ const LOCAL_GIT_ENV = [
 ];
 
 /**
- * Locates a POSIX shell: PATH first, then the copy Git for Windows ships
- * alongside its exec path (git is a prerequisite of every hook anyway).
- * @returns {string|null} Interpreter to spawn, or null if none was found.
+ * Locates a shell on PATH or in Git for Windows.
+ * @param {string} name - Interpreter basename.
+ * @returns {string|null} Interpreter to spawn, or null when unavailable.
  */
-export const findSh = () => {
-  if (spawnSync('sh', ['-c', 'exit 0']).status === 0) return 'sh';
+const findShell = (name) => {
+  if (spawnSync(name, ['-c', 'exit 0']).status === 0) return name;
   try {
     const execPath = execFileSync('git', ['--exec-path'], {
       encoding: 'utf8',
     }).trim();
-    const candidate = resolve(execPath, '../../../usr/bin/sh.exe');
+    const candidate = resolve(execPath, `../../../usr/bin/${name}.exe`);
     if (existsSync(candidate)) return candidate;
   } catch {
     /* fall through to the skip */
@@ -46,24 +46,10 @@ export const findSh = () => {
   return null;
 };
 
-/**
- * Locates Bash: PATH first, then the copy Git for Windows ships
- * alongside its exec path (git is a prerequisite of every hook anyway).
- * @returns {string|null} Interpreter to spawn, or null if none was found.
- */
-export const findBash = () => {
-  if (spawnSync('bash', ['-c', 'exit 0']).status === 0) return 'bash';
-  try {
-    const execPath = execFileSync('git', ['--exec-path'], {
-      encoding: 'utf8',
-    }).trim();
-    const candidate = resolve(execPath, '../../../usr/bin/bash.exe');
-    if (existsSync(candidate)) return candidate;
-  } catch {
-    /* fall through to the skip */
-  }
-  return null;
-};
+/** @returns {string|null} POSIX shell interpreter. */
+export const findSh = () => findShell('sh');
+/** @returns {string|null} Bash interpreter. */
+export const findBash = () => findShell('bash');
 
 // A config path that never exists, so no operator setting reaches a fixture: a
 // global core.excludesFile or core.autocrlf would steer ls-files and add, and a
