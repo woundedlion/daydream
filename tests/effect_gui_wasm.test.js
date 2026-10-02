@@ -6,11 +6,6 @@ import { AppState, URLSync } from '../src/app/state.js';
 import { fakeGui } from './helpers/fake_app.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
-function widgets() {
-  const root = fakeGui('widgets');
-  return root;
-}
-
 test('preset values survive URL reload after flushed or pending parameter edits', async () => {
   const { default: createModule } = await import('../generated/holosphere_wasm.js');
   const module = await createModule({ print: () => {} });
@@ -44,7 +39,7 @@ test('preset values survive URL reload after flushed or pending parameter edits'
       segments: { ownsDisplay: () => false, paramValues: () => null, setParam: () => {} },
       host: {
         logWarn: (...args) => warnings.push(args),
-        createGui: () => new GUI(widgets(), 'fx', null, win),
+        createGui: () => new GUI(fakeGui('widgets'), 'fx', null, win),
         container: () => null,
         isMobile: () => false,
         applyEffect: () => {},
