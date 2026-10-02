@@ -418,8 +418,8 @@ const AA_CONTRAST = 4.5;
 // Sheet -> text rule -> the rule painting the surface under it, front to back
 // where the nearer fill is translucent. Every rule a tools/ stylesheet declares
 // `color` on is listed here or in CONTRAST_EXEMPT, so a colour added to a sheet
-// is measured instead of joining the gate unread. tailwind.css is a vendored
-// prebuilt drop: its rules stay in the cascade but out of the sweep.
+// is measured instead of joining the gate unread. tailwind.css is generated
+// from the page and source classes: its rules stay in the cascade but out of the sweep.
 const CONTRAST_SURFACES = {
   'tools.css': {
     'body': 'body',
