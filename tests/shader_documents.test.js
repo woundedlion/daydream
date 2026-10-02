@@ -1284,6 +1284,23 @@ test('a shader state link restores its document, preset, bypasses, and pause', a
     .querySelector('.chain-chip-bypass').getAttribute('aria-pressed'), 'true');
 });
 
+test('an oversized document clears the previous shader state hash', async () => {
+  const harness = await editorWorkbench({ source: null });
+  assert.match(harness.win.location.hash, /^#shader=/);
+  const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
+  document.preset_bank.presets = Array.from({ length: 140 }, (_, index) => ({
+    ...document.preset_bank.presets[0], preset_id: `large-${index}`, description: 'x'.repeat(4000),
+  }));
+  document.preset_bank.edges = [];
+  document.preset_bank.choreography = {
+    generated_order: document.preset_bank.presets.map((preset) => preset.preset_id),
+  };
+  assert.equal(await harness.controller.loadSource(JSON.stringify(document), 'large.shader.json'), true,
+    harness.elements.get('shader-document-status').textContent);
+  await harness.controller.flushDeepLink();
+  assert.equal(harness.win.location.hash, '');
+});
+
 test('shader edits keep the full state hash current', async () => {
   const harness = await editorWorkbench({ source: null });
   clickPlaneBandEntry(harness, 'warp.affine.v3');

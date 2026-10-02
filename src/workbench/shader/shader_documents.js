@@ -756,6 +756,7 @@ export function createShaderDocumentController({
       if (generation === linkGeneration) replaceShaderStateHash(hash, win);
     }).catch((error) => {
       if (generation !== linkGeneration) return;
+      replaceShaderStateHash('', win);
       const detail = errorDetail(error);
       show(`The shader link could not be updated: ${detail}.`, true);
     });
