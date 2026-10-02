@@ -19,7 +19,7 @@
        palettes.css so the page-specific rules there win. -->
   <link rel="stylesheet" href="tools.css">
   <link rel="stylesheet" href="palettes.css">
-  <!-- Linked last: utilities must outrank tools.css and the rules above. -->
+  <!-- Linked last: utilities outrank equal-specificity rules. -->
   <link rel="stylesheet" href="tailwind.css">
 </head>
 
@@ -67,13 +67,13 @@
 
         <div id="tab-content-procedural" class="tab-content active" role="tabpanel"
           aria-labelledby="tab-btn-procedural">
-          <h2 class="text-2xl font-semibold text-white mb-4">Cosine Palette Parameters: C(t) = A + B &middot; cos(2 &pi; (Ct + D))
+          <h2 class="font-semibold text-white">Cosine Palette Parameters: C(t) = A + B &middot; cos(2 &pi; (Ct + D))
           </h2>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
             <!-- PARAMETER A: OFFSET -->
             <div class="param-group space-y-2" role="group" aria-labelledby="group_A_heading">
-              <h3 id="group_A_heading" class="text-lg font-bold text-blue-300">Offset (A)</h3>
+              <h3 id="group_A_heading" class="font-bold text-blue-300">Offset (A)</h3>
               <div class="flex items-center space-x-2 text-sm text-gray-300">
                 <input type="checkbox" id="lock_A" aria-label="Lock R, G, B (Offset)"
                   class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
@@ -86,7 +86,7 @@
 
             <!-- PARAMETER B: AMPLITUDE -->
             <div class="param-group space-y-2" role="group" aria-labelledby="group_B_heading">
-              <h3 id="group_B_heading" class="text-lg font-bold text-green-400">Amplitude (B)</h3>
+              <h3 id="group_B_heading" class="font-bold text-green-400">Amplitude (B)</h3>
               <div class="flex items-center space-x-2 text-sm text-gray-300">
                 <input type="checkbox" id="lock_B" aria-label="Lock R, G, B (Amplitude)"
                   class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
@@ -99,7 +99,7 @@
 
             <!-- PARAMETER C: FREQUENCY -->
             <div class="param-group space-y-2" role="group" aria-labelledby="group_C_heading">
-              <h3 id="group_C_heading" class="text-lg font-bold text-red-300">Frequency (C)</h3>
+              <h3 id="group_C_heading" class="font-bold text-red-300">Frequency (C)</h3>
               <div class="flex items-center space-x-2 text-sm text-gray-300">
                 <input type="checkbox" id="lock_C" aria-label="Lock R, G, B (Frequency)"
                   class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
@@ -112,7 +112,7 @@
 
             <!-- PARAMETER D: PHASE -->
             <div class="param-group space-y-2" role="group" aria-labelledby="group_D_heading">
-              <h3 id="group_D_heading" class="text-lg font-bold text-yellow-400">Phase (D)</h3>
+              <h3 id="group_D_heading" class="font-bold text-yellow-400">Phase (D)</h3>
               <div class="flex items-center space-x-2 text-sm text-gray-300">
                 <input type="checkbox" id="lock_D" aria-label="Lock R, G, B (Phase)"
                   class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
@@ -375,7 +375,7 @@
     <!-- 3. RESULTING PALETTE (STATIC STRIP) -->
     <section class="param-group visualization-card strip-panel">
       <div class="flex justify-between items-center">
-        <h2 id="palette_range_heading" class="text-xl font-semibold text-white">sRGB Palette (t &isin; [0, 1])</h2> <button type="button"
+        <h2 id="palette_range_heading" class="font-semibold text-white">sRGB Palette (t &isin; [0, 1])</h2> <button type="button"
           id="resetZoomButton"
           class="hidden px-3 py-1 bg-blue-600 text-white hover:bg-blue-700 rounded-md text-sm font-medium transition-all shadow-lg">Reset
           Zoom</button>
