@@ -90,7 +90,7 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
         return LOWERING[name]?.(op) ?? [op];
       });
       let previousName = '';
-      for (const primitive of primitives) {
+      for (const [index, primitive] of primitives.entries()) {
         const name = typeof primitive === 'string' ? primitive : primitive.op;
         if (!mesh) throw new Error(meshOpFailure(mod, 'Registry mesh').message);
         let bridgeFaces = 0;
@@ -100,8 +100,10 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
           let indices = 0;
           for (const count of faces.counts) indices += count;
           const edges = indices / 2;
+          const next = primitives[index + 1];
+          const nextName = typeof next === 'string' ? next : next?.op;
           // Closed genus-zero meshes: ambo has E+2 faces; truncate has 3E edges.
-          bridgeFaces = name === 'dual' ? edges + 2 : 3 * edges + 2;
+          bridgeFaces = name === 'dual' && nextName !== 'kis' ? edges + 2 : 3 * edges + 2;
         }
         let next;
         try {

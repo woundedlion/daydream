@@ -514,7 +514,7 @@ test('registry validator traps become ordinary errors', async () => {
 });
 
 
-test('registry validation checks standalone kis and dual bridge intermediates', async () => {
+test('registry validation checks standalone kis, dual and dt bridge intermediates', async () => {
   const validatorFor = (edges, endpointEdges, endpointFaces) => {
     const mesh = (e, f) => ({
       getFaces: () => ({ counts: [2 * e, ...Array(f - 1).fill(0)] }),
@@ -533,6 +533,8 @@ test('registry validation checks standalone kis and dual bridge intermediates', 
     { base: 'custom', ops: ['kis'] }), /bridge has 1622 faces/);
   await assert.rejects(validateRegistryFaces(validatorFor(1152, 1152, 32),
     { base: 'custom', ops: ['dual'] }), /bridge has 1154 faces/);
-  await assert.doesNotReject(validateRegistryFaces(validatorFor(540, 540, 1080),
+  await assert.rejects(validateRegistryFaces(validatorFor(540, 540, 1080),
+    { base: 'custom', ops: ['dual', 'kis'] }), /bridge has 1622 faces/);
+  await assert.doesNotReject(validateRegistryFaces(validatorFor(180, 540, 1080),
     { base: 'custom', ops: ['dual', 'kis'] }));
 });
