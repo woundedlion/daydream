@@ -428,7 +428,7 @@ export async function probeStrip(tab) {
   check(sphereAfter.join() === [...sphereBefore].reverse().join(),
     `reorder buttons move stages (${sphereAfter.join(', ')})`);
 
-  // Reorder is button-driven only; a real press dragged over a second stage in
+  // Reorder uses buttons or Alt+Arrow; a real press dragged over a second stage in
   // the same band is how a drop target would show itself.
   const sphereLabels = await tab.$$eval('.chain-band[data-carrier="sphere"] .chain-chip',
     (nodes) => nodes.map((node) => (node instanceof HTMLElement ? node.dataset.label ?? '' : '')));
