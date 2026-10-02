@@ -171,8 +171,8 @@ export async function probeColorStrip(tab) {
   // a border width short of it and phase 0 is unreachable.
   await dragBetween(tab, at(0), at(0.5), { steps: DRAG_STEPS });
   const fromEdge = await headingRange(tab);
-  check(fromEdge.start === 0,
-    `a drag from the strip's leading edge reaches phase 0 (${fromEdge.start})`);
+  check(fromEdge.start === 0 && Math.abs(fromEdge.end - 0.5) < POSITION_TOLERANCE,
+    `a drag from the strip's leading edge reaches phase 0 and zooms to 0.5 (${fromEdge.start}, ${fromEdge.end})`);
   await tab.$eval(RESET, (node) => node.click());
 
   // The bound only a real layout carries: a pointer that leaves the strip
