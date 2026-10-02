@@ -109,6 +109,7 @@ test('pre-push refuses a stale working-tree import map', { skip: SKIP }, (t) => 
   writeFileSync(join(root, 'node_modules', '.package-lock.json'), '{}\n');
   writeFileSync(join(root, 'vendor-importmap.js'), 'stale\n');
   const git = spawnSync(SH, ['-c', 'command -v git'], { encoding: 'utf8' }).stdout.trim();
+  assert.ok(git, 'git must resolve inside the shell');
   const run = runWithTools(root, {
     node: 'exit 0',
     npm: 'if [ "$2" = importmap ]; then for last; do :; done; echo fresh > "$last"; fi',
