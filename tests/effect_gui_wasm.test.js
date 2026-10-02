@@ -86,3 +86,24 @@ test('preset values survive URL reload after flushed or pending parameter edits'
     }
   }
 });
+
+test('authored stage rosters recognize the engine parameter definitions', async () => {
+  const {default: createModule} = await import('../generated/holosphere_wasm.js');
+  const {latticeMeltStageAssignments, kaleidoscopeSmoothStageAssignments} = await import('../src/effects/shader_stages.js');
+  const module = await createModule({print: () => {}});
+  const engine = new module.HolosphereEngine();
+  try {
+    for (const resolution of [[96, 20], [288, 144]]) {
+      engine.setResolution(...resolution);
+      for (const [effect, recognize] of [['LatticeMelt', latticeMeltStageAssignments], ['KaleidoscopeSmooth', kaleidoscopeSmoothStageAssignments]]) {
+        engine.setEffect(effect);
+        const parameters = engine.getParameterDefinitions();
+        const assignments = recognize(parameters);
+        assert.ok(assignments, effect);
+        assert.equal(assignments.size, parameters.length);
+        if (effect === 'KaleidoscopeSmooth')
+          assert.equal(assignments.get('Mirror Rotation'), 'Planar Warp 2');
+      }
+    }
+  } finally { engine.delete(); }
+});
