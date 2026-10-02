@@ -235,7 +235,7 @@ function outOfRangeParam(opName, params) {
  * @param {*} base - The persisted seed-solid name.
  * @param {*} ops - The persisted op chain.
  * @returns {?string} A message naming the first defect, or null when the pair is restorable.
- * @details The chain validator resolves true when its sacrificial module cannot
+ * @details The chain validator resolves `{ok: true}` when its sacrificial module cannot
  * spawn, so a restore path cannot lean on it to reject a hand-edited or
  * stale-format localStorage entry. An op name off the table leaves OP_DEFS[op]
  * undefined and the op-row builder throws reading its params; a declared param

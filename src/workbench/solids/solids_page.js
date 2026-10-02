@@ -903,7 +903,7 @@ function showCopyFailure(button, message) {
 function restoreSolid(item) {
   // localStorage is user-writable and its entries outlive any op-table
   // change, so the shape is checked against OP_DEFS before anything is
-  // touched. The engine validator cannot stand in for this: it answers true
+  // touched. The engine validator cannot stand in for this: it resolves {ok: true}
   // when its module fails to spawn, and an unrecognized op would then reach
   // renderOps as an undefined OP_DEFS entry and throw into the commit
   // queue's error handler, leaving the page showing the previous chain.
