@@ -447,7 +447,7 @@ export function generateRegistryCpp(item, baseRecipe = null) {
     + `${recipeDefinitionCpp(recipeName, `SEED_${upperSnake(seedName)}`, stepsName)}\n\n`
     + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'
     + '// Until they agree, its size static_assert and the NUM_ENTRIES sum both\n'
-    + '// fail; the README registry table counts the entry too.\n'
+    + '// fail.\n'
     + fillCpp([
       `{"${funcName}",`,
       `IslamicStarPatterns::${funcName},`,

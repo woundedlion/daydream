@@ -10,7 +10,7 @@ inline constexpr Recipe ICOSAHEDRON_KIS_GYRO_HK54_RECIPE =
 
 // Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.
 // Until they agree, its size static_assert and the NUM_ENTRIES sum both
-// fail; the README registry table counts the entry too.
+// fail.
     {"icosahedron_kis_gyro_hk54",
      IslamicStarPatterns::icosahedron_kis_gyro_hk54, Category::Complex,
      &ICOSAHEDRON_KIS_GYRO_HK54_RECIPE},
