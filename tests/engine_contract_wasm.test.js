@@ -1009,7 +1009,7 @@ test('getParamGeneration and setPoleLod stay exported', () => {
     'setPoleLod must stay callable (display_controls.js binds the Pole LOD slider to it)');
   assert.equal(engine.getPoleLod(), 0,
     'a fresh engine must start undecimated (HS_POLE_LOD_DEFAULT)');
-  // display_controls.js's slider spans [0, 2]; the setting is what the segmented
+  // daydream.js's Pole LOD slider spans [0, 2]; the setting is what the segmented
   // controller has to forward to every worker, so it has to be readable back.
   for (const v of [0, 1, 2]) {
     engine.setPoleLod(v);
