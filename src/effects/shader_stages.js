@@ -261,9 +261,8 @@ export function fixedShaderStageAssignments(params) {
 }
 
 /**
- * The label one control carries inside its stage folder: the stage's own
- * selector reads as its role, and a parameter named after its stage drops the
- * prefix the folder title already carries.
+ * Drops the stage-name prefix from a control label, or Projection under
+ * Projection Frame, Mirror under Planar Warp, and Lattice under Function.
  * @param {string} stage - The pipeline stage the control was grouped under.
  * @param {string} name - Engine parameter name.
  * @returns {string} The control's displayed name.
