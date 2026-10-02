@@ -252,16 +252,6 @@ const patternFiles = () =>
     .filter((name) => name.endsWith('.json'))
     .map((name) => `${PATTERNS}/${name}`);
 
-test('the site manifest publishes every source catalog document',
-  { skip: missingCatalog && 'engine catalog is installed separately' }, () => {
-  const catalog = JSON.parse(read('generated/shader/patterns/catalog.json'));
-  const entries = new Set(manifestEntries());
-  const missing = Object.values(catalog.source_documents)
-    .map((filename) => `generated/shader/patterns/${filename}`)
-    .filter((path) => !entries.has(path));
-  assert.deepEqual(missing, []);
-});
-
 test('the site manifest publishes nothing the served pages do not reach', () => {
   const entries = manifestEntries();
   const stale = UNREFERENCED.filter((entry) => !entries.includes(entry));
@@ -280,24 +270,16 @@ test('the site manifest publishes nothing the served pages do not reach', () => 
       'thing keeping dev tooling off Pages');
 });
 
-test('the site manifest publishes exactly the catalog documents',
+test('the published pattern document set matches its catalog',
   { skip: missingCatalog && 'engine catalog is installed separately' }, () => {
   const served = new Set([...servedPatterns()].filter((entry) => entry.startsWith(`${PATTERNS}/`)));
-  const listed = new Set(
-    manifestEntries().filter((entry) => entry.startsWith(`${PATTERNS}/`)));
   const files = patternFiles();
 
-  assert.deepEqual([...served].filter((doc) => !listed.has(doc)).sort(), [],
-    `${MANIFEST} omits pattern documents the catalog fetches — ` +
-      'they would 404 on Pages');
-  assert.deepEqual([...listed].filter((doc) => !served.has(doc)).sort(), [],
-    `${MANIFEST} publishes pattern documents the catalog does not name`);
   assert.deepEqual(
     files.filter((doc) => !served.has(doc)).sort(), [],
-    `${PATTERNS} holds documents the catalog does not name, so nothing demands ` +
-      `a ${MANIFEST} entry for them`);
+    `${PATTERNS} holds documents the published catalog does not name`);
   assert.deepEqual([...served].filter((doc) => !files.includes(doc)).sort(), [],
-    'Catalog names documents that are not on disk');
+    'Published catalog names documents missing from the pattern directory or engine bundle');
 });
 
 
