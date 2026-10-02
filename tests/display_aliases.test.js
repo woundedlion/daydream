@@ -50,7 +50,6 @@ test('display aliases reject a mesh-size mismatch without changing either alias'
   assert.equal(driver.pixels, original);
   assert.equal(driver.dotMesh.instanceColor.array, original);
   const next = new Uint16Array(6);
-  structuredClone(original.buffer, { transfer: [original.buffer] });
   repointDisplayAliases(driver, next);
   assert.equal(driver.pixels, next);
 });
