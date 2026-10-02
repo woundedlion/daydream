@@ -193,7 +193,7 @@ test('pre-push accepts a ref deletion without running source checks', { skip: SK
 });
 
 for (const installStatus of [0, 19]) {
-  test(`pre-push installs snapshot dependencies and propagates install status ${installStatus}`,
+  test(`pre-push installs snapshot dependencies and rejects failed installs (status ${installStatus})`,
     { skip: SKIP }, (t) => {
       const root = fixtureRoot(t);
       const env = isolatedGitEnv();
