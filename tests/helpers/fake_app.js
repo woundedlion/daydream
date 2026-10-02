@@ -19,6 +19,7 @@ const isOptionList = (arg) =>
  * @param {Object} object - The value object the controller is bound to.
  * @param {string} property - The bound property name.
  * @param {Array<any>} args - Range/options arguments add() was called with.
+ * @param {boolean} [optionsReplaces=false] - Whether options() replaces the controller.
  * @returns {Object} The controller double.
  */
 function fakeController(owner, object, property, args = [], optionsReplaces = false) {
