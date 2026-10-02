@@ -1144,14 +1144,11 @@ export function createCommitQueue(onError = console.error) {
 /**
  * Builds the sacrificial-module chain validator.
  *
- * The engine fail-fast contract means an op chain that outgrows an engine
- * ceiling — 16-bit vertex/index ranges, hankin's compile bound, classifyFaces'
- * range — traps and permanently wedges the module it ran on. Rather than mirror
- * every ceiling in JS (the op set's growth rules are engine-specific and would
- * drift), each candidate chain is proven on a SACRIFICIAL module instance before
- * the live module ever sees it: a trap kills only the validator, which is
- * respawned, and the mutation is rejected. The engine stays the single authority
- * on its own invariants.
+ * The bridge refuses foreseeable capacity and argument failures. An engine
+ * invariant trap permanently halts the module it ran on, so candidate chains
+ * run on a sacrificial instance before reaching the live module. A trap kills
+ * only the validator, which is respawned, and the mutation is rejected. The
+ * engine stays the authority on its own invariants.
  * @param {() => Promise<WasmModule>} createModule - Spawns a fresh WASM module instance.
  * @returns {ChainValidator} The validator handle.
  */
@@ -1315,8 +1312,8 @@ export function opTopologyKey(o) {
 }
 
 /**
- * Builds the add-op availability gate: which of the offered ops would trap if
- * appended to the current chain.
+ * Builds the add-op availability gate: which offered ops would be refused or
+ * trap if appended to the current chain.
  *
  * Every candidate is applied (and classified, which committing would do too) on
  * the sacrificial validator, so the answer comes from the engine rather than
@@ -1349,8 +1346,8 @@ export function createOpGate(validator, retries = 3) {
    *   the OP_DEFS defaults.
    * @param {number} started - Refresh generation.
    * @returns {Promise<{bad: Set<string>, complete: boolean}>} The ops that would
-   *   trap, and whether the sweep ever got a full pass against a live module.
-   *   Where it did not, `bad` is only a lower bound on what would trap.
+   *   be refused or trap, and whether the sweep got a full pass against a live module.
+   *   Where it did not, `bad` is only a lower bound on blocked candidates.
    */
   function probe(base, ops, candidates, seedMesh, started) {
     return validator.withValidator(async (Mod) => {
