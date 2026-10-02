@@ -2144,3 +2144,28 @@ test('shader links refuse null snapshot entries before initializing a candidate'
     await assert.rejects(decodeShaderStateHash(`#shader=v2.${payload}`), /invalid shader link snapshot/);
   }
 });
+
+test('the descriptor digest button copies the full digest and announces failures', async () => {
+  const harness = await editorWorkbench();
+  const button = harness.elements.get('shader-document-digest');
+  const status = harness.elements.get('shader-document-status');
+  const digest = button.dataset.digest;
+  assert.ok(digest.length > button.textContent.length);
+  const copied = [];
+  const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const clipboard = { writeText: async (text) => { copied.push(text); } };
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { clipboard } });
+  const onClick = button.listeners.find((entry) => entry.type === 'click').handler;
+  try {
+    await onClick();
+    assert.deepEqual(copied, [digest]);
+    assert.equal(status.textContent, `Copied the descriptor digest ${digest}.`);
+    clipboard.writeText = async () => { throw new Error('clipboard refused'); };
+    document.execCommand = () => false;
+    await onClick();
+    assert.equal(status.textContent, 'The descriptor digest could not be copied.');
+  } finally {
+    if (navigatorDescriptor) Object.defineProperty(globalThis, 'navigator', navigatorDescriptor);
+    else delete globalThis.navigator;
+  }
+});
