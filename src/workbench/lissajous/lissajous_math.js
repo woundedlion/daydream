@@ -125,7 +125,7 @@ export const findBestRationalRatio = (value, maxTerm = MAX_RATIONAL_TERM, accept
  * the domain T = 2π·N / passiveC after which the curve closes.
  * @param {number} activeC - The intended (raw) active frequency value.
  * @param {number} passiveC - The passive (held) frequency value.
- * @param {number} [maxTerm] - Max numerator/denominator for the ratio.
+ * @param {number} [maxTerm] - Maximum denominator in the closing check and ratio search.
  * @param {?{min: number, max: number}} [range] - Optional inclusive bounds on the
  *   snapped active frequency. The ratio search then prefers ratios landing inside
  *   them, so a caller that has to keep the value in a control's range does not
