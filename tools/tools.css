@@ -158,8 +158,7 @@ input[type=range]:disabled::-webkit-slider-thumb {
  * Fixed-right-panel shell: a full-bleed canvas (`.tool-stage`) with a fixed
  * scrolling controls panel pinned to the right (`.tool-panel`), collapsing to
  * a bottom sheet on narrow screens. Used by lissajous. Apply the classes
- * alongside whatever id the page's JS
- * already queries.
+ * alongside whatever id the page's JS already queries.
  */
 .tool-stage {
   position: fixed;
@@ -179,9 +178,6 @@ input[type=range]:disabled::-webkit-slider-thumb {
   -webkit-backdrop-filter: blur(8px);
   overflow-y: auto;
   border-left: 1px solid var(--slate-700);
-}
-
-.tool-panel {
   height: 100vh;
   z-index: 20;
   width: 420px;
