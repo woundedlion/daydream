@@ -210,7 +210,6 @@ test('--out without a path fails', () => {
   assert.match(runExpectingFailure('--out', '--local'), /--out requires a path/);
 });
 
-
 test('computed addon imports cannot bypass the integrity inventory', () => {
   installModules();
   writeFileSync(join(root, 'computed.js'), "const base = 'three/addons/'; import(base + 'controls/OrbitControls.js');");
@@ -227,7 +226,6 @@ test('escaped literal addon specifiers are included in the integrity inventory',
   execFileSync('git', ['add', 'escaped.js'], { cwd: root, env });
   assert.ok(run().includes("'renderers/CSS2DRenderer.js'"));
 });
-
 
 test('--root requires a path', () => {
   assert.match(expectFailure(process.execPath, [SCRIPT_SRC, '--root'], { env }),

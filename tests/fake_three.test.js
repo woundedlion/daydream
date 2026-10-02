@@ -18,8 +18,6 @@ import {
   SphereGeometry,
 } from './helpers/fake_three.js';
 
-
-
 test('a null-backed attribute takes its size from the first array it binds', () => {
   const attribute = fakeColorAttribute(null);
   assert.equal(attribute.array, null);
