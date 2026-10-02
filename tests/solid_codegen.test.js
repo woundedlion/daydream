@@ -1712,3 +1712,23 @@ test('long star seeds match formatter-derived namespace continuations', () => {
       readFileSync(new URL(`./fixtures/recipe-${offset + 3}.cpp`, import.meta.url), 'utf8').trimEnd());
   }
 });
+
+test('createOpGate re-sweeps the last complete chain after an incomplete verdict', async () => {
+  const healthy = fakeModule().Mod;
+  const trapped = fakeModule((op) => { if (op === 'ambo') throw new WebAssembly.RuntimeError('trap'); }).Mod;
+  let pass = 0;
+  const modules = [healthy, trapped, null, healthy];
+  const validator = {
+    withValidator: (fn) => fn(modules[pass++]),
+    acquire: async () => modules[pass++],
+    noteDeath() {},
+  };
+  const gate = createOpGate(validator);
+  assert.equal((await gate.refresh('cube', [], CANDIDATES)).complete, true);
+  const incomplete = await gate.refresh('tetrahedron', [], CANDIDATES);
+  assert.equal(incomplete.complete, false);
+  assert.ok(incomplete.blocked.size > 0);
+  const restored = await gate.refresh('cube', [], CANDIDATES);
+  assert.equal(restored.complete, true);
+  assert.equal(restored.blocked.size, 0);
+});
