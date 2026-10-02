@@ -938,8 +938,8 @@ test('chain labels use the compiler grammar', async () => {
 
 test('radian periodicity is independent of a catalog field bound', () => {
   const catalog = structuredClone(CATALOG);
-  const rotate = catalog.operators.find((operator) => operator.id === 'project.peirce.v3');
-  const field = rotate.params.find((parameter) => parameter.curve === 'shortest-periodic');
+  const peirce = catalog.operators.find((operator) => operator.id === 'project.peirce.v3');
+  const field = peirce.params.find((parameter) => parameter.curve === 'shortest-periodic');
   assert.ok(field);
   field.max = Math.PI;
   const document = scratchChainDocument(catalog, DEFAULT_SCRATCH_CHAIN.map((entry) =>
