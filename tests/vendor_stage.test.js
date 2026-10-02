@@ -8,7 +8,9 @@
 // which the shared inode behind a hard-linked file would quietly break.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import fs, { existsSync, readFileSync, rmSync } from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
 import { serveStagedSite, stageProbeSite } from '../scripts/vendor-stage.mjs';
@@ -80,4 +82,48 @@ test('the staged site serves the libraries, and drops its tree on close', async 
   }
   assert.equal(existsSync(site.root), false, 'the scratch tree outlived its server');
   assert.ok(existsSync(staged.root), 'closing the server preserves another staged tree');
+});
+
+
+test('staging copies files when hard links cross filesystem boundaries', (t) => {
+  const source = fileURLToPath(new URL('../index.html', import.meta.url));
+  const original = readFileSync(source, 'utf8');
+  const link = fs.linkSync;
+  let refused = 0;
+  t.mock.method(fs, 'linkSync', (from, to) => {
+    if (from === source) {
+      refused++;
+      throw Object.assign(new Error('Cross-device link'), { code: 'EXDEV' });
+    }
+    return link(from, to);
+  });
+  t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports(); });
+  syncBuiltinESMExports();
+
+  const copy = stageProbeSite();
+  t.after(() => rmSync(copy.root, { recursive: true, force: true }));
+  const target = join(copy.root, 'index.html');
+  assert.equal(refused, 1);
+  assert.equal(readFileSync(target, 'utf8'), original);
+  fs.writeFileSync(target, 'changed staged content');
+  assert.equal(readFileSync(source, 'utf8'), original);
+});
+
+test('staging reports a missing dependency and removes its partial tree', (t) => {
+  const dependency = fileURLToPath(new URL('../node_modules/three/build', import.meta.url));
+  const exists = fs.existsSync;
+  const makeTemp = fs.mkdtempSync;
+  let partial;
+  t.mock.method(fs, 'existsSync', (path) => path === dependency ? false : exists(path));
+  t.mock.method(fs, 'mkdtempSync', (...args) => {
+    partial = makeTemp(...args);
+    return partial;
+  });
+  t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports(); });
+  syncBuiltinESMExports();
+
+  assert.throws(() => stageProbeSite(), /three\/build is missing.*npm ci/);
+  assert.ok(partial);
+  assert.equal(exists(partial), false);
+  assert.equal(exists(dependency), true);
 });
