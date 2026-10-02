@@ -881,11 +881,7 @@ export class Daydream {
    * sphere and orient the dot to face outward from the center. Also allocates
    * zeroed instanceColor placeholder, replaced by the view from the engine host.
    *
-   * The matrices are a function of the grid alone, so they are composed once per
-   * grid and replayed afterwards: this runs synchronously inside the resolution
-   * handler over W*H instances, and toggling back to a preset would otherwise
-   * redo every spherical conversion, lookAt and compose to reach the same
-   * matrices.
+   * Placements are cached by grid dimensions and LED-center latitude endpoints.
    * @param {boolean} [resetColors=true] - Allocate colors for a new pixel grid.
    */
   precomputeMatrices(resetColors = true) {
