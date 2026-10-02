@@ -90,7 +90,7 @@ test('a nested node_modules fails', () => {
   assert.match(fail(), /shadows the pinned root install/);
 });
 
-// The root install is allowed under both root and tests-only globs.
+// The root install is allowed under a repository-wide test glob.
 test('the root node_modules is allowed', () => {
   mkdirSync(join(root, 'node_modules'));
   writePkg('**/*.test.js');
