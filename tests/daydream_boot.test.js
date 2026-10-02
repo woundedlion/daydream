@@ -1005,8 +1005,6 @@ test('global cap edits survive module loading, paused redraw and resolution swit
   assert.equal(app.driver.dotMesh, null);
   const module = fakeWasmModule();
   module.ChainSnapshotRestoreResult = ChainSnapshotRestoreResult;
-  module.HolosphereEngine.prototype.getSnapshot = () => null;
-  module.HolosphereEngine.prototype.restoreSnapshot = () => ChainSnapshotRestoreResult.NOT_SHADER_CHAIN;
   resolve(module);
   await app.teardown.ready;
   assert.deepEqual(module.caps, [[2, 3]]);
