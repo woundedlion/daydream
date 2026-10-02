@@ -1704,7 +1704,9 @@ const DRIVER_SOURCE = readFileSync(new URL('../src/renderer/driver.js', import.m
 test('the driver hands its own document to every collaborator that defaults to the global', () => {
   // Every class the driver could build whose constructor takes an optional doc,
   // derived from its own module rather than listed here.
-  const modules = [...DRIVER_SOURCE.matchAll(/^import \{([^}]*)\} from "(\.{1,2}\/[^"]+)"/gmu)]
+  const imports = [...DRIVER_SOURCE.matchAll(/^import \{([^}]*)\} from ['"](\.{1,2}\/[^'"]+)['"]/gmu)];
+  assert.ok(imports.length > 0, 'the relative named import scan stopped matching');
+  const modules = imports
     .flatMap(([, names, path]) => {
       const source = readFileSync(new URL(path, new URL('../src/renderer/driver.js', import.meta.url)), 'utf8');
       return names.split(',').map((n) => n.trim())
