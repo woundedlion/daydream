@@ -784,7 +784,7 @@ test('a chip selects by click', async () => {
   assert.deepEqual(h.applied, [], 'a selection is no structural edit');
 });
 
-test('reorder buttons replace the chip drag affordance', async () => {
+test('endomorphisms carry reorder buttons enabled only toward a same-band neighbour', async () => {
   const h = await makeStrip();
   assert.equal(chipByLabel(h, 'camera').querySelectorAll('.chain-chip-move').length, 2);
   assert.equal(chipByLabel(h, 'lens').querySelectorAll('.chain-chip-move').length, 2);
