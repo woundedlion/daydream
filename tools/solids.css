@@ -394,7 +394,8 @@ body {
 }
 
 .del-btn:hover {
-  background-color: #ef4444;
+  background-color: #dc2626;
+  color: white;
   border-color: #f87171;
 }
 
