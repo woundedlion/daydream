@@ -94,8 +94,8 @@ export function readbackMesh(wasmMesh, ctx) {
 }
 
 /**
- * Builds one registered solid and reads it back, freeing the wrapper and the
- * tooling arenas either way.
+ * Builds one registered solid and reads it back. Frees the wrapper and tooling
+ * arenas after success or a recoverable readback failure; leaves a halted module alone.
  * @param {string} name - Registry name of the solid.
  * @param {string} what - What the caller was building, used in a failure message.
  * @param {MeshBuildContext} ctx - The live wiring.
@@ -123,8 +123,8 @@ export function buildBaseMesh(name, what, ctx) {
 
 /**
  * Builds a base solid, applies an op chain to it, classifies its faces and reads
- * the result back, freeing the wrapper and the 16 MB tooling arenas on the way
- * out of every path.
+ * the result back. Frees wrappers and tooling arenas after success or recoverable
+ * post-build failure; leaves a halted module alone.
  * @param {string} base - Registry name of the base solid.
  * @param {ChainOp[]} ops - Ops to apply, in order.
  * @param {MeshBuildContext} ctx - The live wiring.
