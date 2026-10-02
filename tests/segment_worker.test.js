@@ -1148,6 +1148,9 @@ test('the index a presetless effect refuses is not logged', async () => {
   try {
     await dispatch({ type: 'setEffect', name: 'Plasma', presetIndex: 0,
       paramRevision: 15 });
+    await dispatch({ type: 'selectPreset', index: 0 });
+    posted.length = 0;
+    await dispatch({ type: 'render' });
   } finally {
     capture.restore();
   }
@@ -1155,6 +1158,8 @@ test('the index a presetless effect refuses is not logged', async () => {
   assert.deepEqual(logged, [], 'the ordinary effect-switch path is silent');
   assert.equal(engineInstance.calls.some(([method]) => method === 'synchronizePreset'), false,
     'the engine is not called for the already-active index');
+  assert.ok(engineInstance.calls.some(([method, index]) => method === 'selectPreset' && index === 0));
+  assert.equal(posted.find((entry) => entry.msg.type === 'frame').msg.warnings, undefined);
 });
 
 // console.error reaches no one on a worker thread; the frame's warnings are the
