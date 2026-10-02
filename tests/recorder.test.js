@@ -811,6 +811,7 @@ test('an encoder error finalizes the session, reports it, and clears the recorde
 
 test('an encoder error event without an Error cause is normalized', () => {
   const restore = installRecorderEnv();
+  const captured = installConsoleCapture('error');
   try {
     const rec = new VideoRecorder(recordableCanvas());
     const notified = [];
@@ -823,7 +824,9 @@ test('an encoder error event without an Error cause is normalized', () => {
     assert.equal(notified.length, 1);
     assert.ok(notified[0] instanceof Error);
     assert.match(notified[0].message, /recording failed/);
+    rec.dispose();
   } finally {
+    captured.restore();
     restore();
   }
 });
