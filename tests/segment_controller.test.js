@@ -754,7 +754,7 @@ test('a latched fault terminates the pool so no worker heap stays resident', () 
     c.workers.every((w) => w.onmessage === null && w.onerror === null
       && w.onmessageerror === null),
     'handlers detached so a late report cannot log success under the overlay');
-  assert.equal(c.workers.length, 2, 'the pool array stays populated for the recovery gate');
+  assert.equal(c.workers.length, 2, 'the terminated pool stays populated for the fault report');
   assert.equal(c.faulted, true, 'the latch is held so the UI still reports the fault');
   assert.deepEqual(c.faultInfo, { segId: 0, message: 'boom' });
 });
