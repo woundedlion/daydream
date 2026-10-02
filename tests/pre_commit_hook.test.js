@@ -102,4 +102,23 @@ test('pre-commit checks the staged tree', { skip: SKIP }, async (t) => {
     assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
     assert.doesNotMatch(accepted.stdout + accepted.stderr, /staged-eslint-failed/);
   });
+
+  await t.test('staged JavaScript deletion does not invoke eslint', () => {
+    const eslint = join(root, 'node_modules', '.bin', 'eslint');
+    writeFileSync(eslint, '#!/bin/sh\necho eslint-called >&2\nexit 1\n');
+    chmodSync(eslint, 0o755);
+    git('rm', '-f', 'app.js');
+    const deleted = runHook();
+    assert.equal(deleted.status, 0, deleted.stdout + deleted.stderr);
+    assert.doesNotMatch(deleted.stdout + deleted.stderr, /eslint-called/);
+  });
+
+  await t.test('JavaScript edits require the pinned eslint install', () => {
+    rmSync(join(root, 'node_modules'), { recursive: true, force: true });
+    writeFileSync(join(root, 'new.js'), 'GOOD\n');
+    git('add', 'new.js');
+    const missing = runHook();
+    assert.notEqual(missing.status, 0);
+    assert.match(missing.stdout + missing.stderr, /node_modules is missing; run npm ci/);
+  });
 });
