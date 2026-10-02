@@ -399,7 +399,7 @@ function seedConstantCpp(seedName) {
  * @param {import('./solid_codegen.js').SolidSpec} item - The solid spec (see generateFuncAndRecipe).
  * @param {?{seed: string, ops: Array<{op: string, param: number, twist: number}>}} [baseRecipe] - The base's authored chain from MeshOps.getRecipe(); null when the base is itself a simple_registry seed.
  * @returns {string} The C++ paste.
- * @throws {Error} When the spec or base chain is invalid, the seed is not a simple_registry solid, a base chain step cannot be re-emitted, or the flattened chain exceeds MAX_RECIPE_STEPS.
+ * @throws {Error} When the spec or base chain is invalid, the seed is not a simple_registry solid, a base chain step cannot be re-emitted, the flattened chain exceeds MAX_RECIPE_STEPS or MAX_BUILD_STEPS, or the mesh exceeds MAX_BUILD_FACES.
  */
 export function generateRegistryCpp(item, baseRecipe = null) {
   const { funcName } = generateFuncAndRecipe(item);
