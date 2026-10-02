@@ -551,10 +551,9 @@ test('hankin controls start at one degree', () => {
 });
 
 /**
- * Verifies the hankin angle the tool seeds from the mesh is single-valued: the
- * value in state, the range input, the number box, the generated funcName suffix,
- * the emitted recipe literal and the angle the live preview hands the engine all
- * describe the same angle.
+ * Verifies the seeded hankin angle lies on the control's step grid and reaches
+ * the generated funcName suffix, emitted recipe literal and live preview
+ * unchanged.
  */
 test('a seeded hankin angle agrees across the control, the funcName and the recipe', () => {
   // A face whose interior angle at its second vertex is arccos(-1/3) = 109.4712
@@ -575,7 +574,6 @@ test('a seeded hankin angle agrees across the control, the funcName and the reci
   // The range input: exactly on the step grid, so the thumb reads the state value.
   assert.equal((angle - def.min) % def.step, 0);
   assert.ok(angle >= def.min && angle <= def.max);
-  // The number box, which the page renders with toFixed(2).
   assert.equal(Number(angle.toFixed(2)), angle);
 
   const { funcName, recipe } = generateFuncAndRecipe(
