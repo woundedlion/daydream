@@ -672,7 +672,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
 
   /**
    * Add the "Pause Animation" toggle when the effect has an animated param or
-   * multiple presets available for manual selection.
+   * any preset available for manual selection (selecting one pauses animation).
    * @param {EffectRecord} fx - The effect record being built.
    * @param {Array<ParameterDefinition>} params - The engine's parameter definitions.
    * @param {boolean} [initialPause=false] - Initial pause state.
