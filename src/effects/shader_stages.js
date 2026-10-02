@@ -56,7 +56,7 @@ export const KALEIDOSCOPE_SMOOTH_STAGE_TITLES = new Map([
 const LATTICE_MELT_ROSTER = new Set([
   'Camera Wander', 'Surface Noise Scale', 'Surface Noise Strength',
   'Surface Noise Speed', 'Projection Spin Speed', 'Projection Wander',
-  'Singularity Fade', 'Central Meridian', 'Lattice Cell Scale', 'Lattice Shape',
+  'Central Meridian', 'Lattice Cell Scale', 'Lattice Shape',
   'Lattice Softness', 'Lattice Radius', 'Palette Chroma', 'Palette Mapping',
   'Mapping Frequency', 'Mapping Phase', 'Phase Oscillation Depth',
   'Phase Oscillation Speed', 'Brightness Bottom', 'Brightness Top',
@@ -65,9 +65,9 @@ const LATTICE_MELT_ROSTER = new Set([
 ]);
 const KALEIDOSCOPE_SMOOTH_ROSTER = new Set([
   'Camera Wander', 'Projection Spin Speed', 'Projection Wander',
-  'Singularity Fade', 'Planar Warp 2 Speed', 'Planar Warp 2 Rotation',
-  'Planar Warp 2 Cell X', 'Planar Warp 2 Cell Y', 'Planar Warp 2 Offset X',
-  'Planar Warp 2 Offset Y', 'Pattern Freq', 'Speed', 'Source Angle Speed',
+  'Singularity Fade', 'Planar Warp 2 Speed', 'Mirror Rotation',
+  'Mirror Cell X', 'Mirror Cell Y', 'Mirror Offset X',
+  'Mirror Offset Y', 'Pattern Freq', 'Speed', 'Source Angle Speed',
   'Complexity', 'Pattern Mix', 'Drift', 'Palette Chroma', 'Palette Mapping',
   'Mapping Frequency', 'Mapping Phase', 'Phase Oscillation Depth',
   'Phase Oscillation Speed', 'Opacity at Value 0', 'Opacity at Value 1',
@@ -211,9 +211,11 @@ function stageOf(name) {
 function rosterStageAssignments(params, roster) {
   if (params.length !== roster.size) return null;
   const assignments = new Map();
+  let warpStage = null;
   for (const parameter of params) {
     if (!roster.has(parameter.name)) return null;
-    const stage = stageOf(parameter.name);
+    warpStage = WARP_STAGE_BOUNDARIES.get(parameter.name) ?? warpStage;
+    const stage = stageOf(parameter.name) ?? (WARP_SLOT_PARAMETERS.has(parameter.name) ? warpStage : null);
     if (!stage) return null;
     assignments.set(parameter.name, stage);
   }
@@ -271,6 +273,7 @@ export function stageControlLabel(stage, name) {
   if (stage === 'Projection Frame' && name.startsWith('Projection ')) {
     return name.slice('Projection '.length);
   }
+  if (stage.startsWith('Planar Warp ') && name.startsWith('Mirror ')) return name.slice('Mirror '.length);
   if (stage === 'Function' && name.startsWith('Lattice ')) {
     return name.slice('Lattice '.length);
   }

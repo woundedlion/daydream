@@ -75,7 +75,6 @@ function latticeMeltParams() {
     'Lattice Shape',
     'Lattice Softness',
     'Lattice Radius',
-    'Singularity Fade',
     'Central Meridian',
     'Projection Spin Speed',
     'Projection Wander',
@@ -112,11 +111,11 @@ function kaleidoscopeSmoothParams() {
     'Projection Wander',
     'Camera Wander',
     'Planar Warp 2 Speed',
-    'Planar Warp 2 Rotation',
-    'Planar Warp 2 Cell X',
-    'Planar Warp 2 Cell Y',
-    'Planar Warp 2 Offset X',
-    'Planar Warp 2 Offset Y',
+    'Mirror Rotation',
+    'Mirror Cell X',
+    'Mirror Cell Y',
+    'Mirror Offset X',
+    'Mirror Offset Y',
     'Palette Chroma',
     'Palette Mapping',
     'Mapping Frequency',
@@ -604,8 +603,8 @@ test('KaleidoscopeSmooth controls use the fixed pipeline modes as folders', () =
   assert.equal(h.gui().ctrl('Camera Wander').folder, 'Camera');
   assert.equal(h.gui().ctrl('Projection Spin Speed').folder, 'Spin + Wander');
   assert.equal(h.gui().ctrl('Singularity Fade').folder, 'Stereographic');
-  assert.equal(h.gui().ctrl('Planar Warp 2 Cell Y').folder, 'Mirror Tile');
-  assert.equal(h.gui().ctrl('Planar Warp 2 Cell Y').label, 'Cell Y');
+  assert.equal(h.gui().ctrl('Mirror Cell Y').folder, 'Mirror Tile');
+  assert.equal(h.gui().ctrl('Mirror Cell Y').label, 'Cell Y');
   assert.equal(h.gui().ctrl('Pattern Mix').folder, 'Grid');
   assert.equal(h.gui().ctrl('Hue Noise Speed').folder, 'Generated Analogous');
 });
@@ -2868,7 +2867,7 @@ test('destroy on an unbuilt panel is a no-op', () => {
   assert.deepEqual(h.warnings, []);
 });
 
-// ── The chain editor's external-parameter filter ────────────────────────────
+// â”€â”€ The chain editor's external-parameter filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function chainParams() {
   return [
@@ -2880,8 +2879,8 @@ function chainParams() {
   ];
 }
 
-// §4.4: the chain's parameters render on the pipeline strip's chips, so the
-// panel builds none of them — but the value stream is positional, so every one
+// Â§4.4: the chain's parameters render on the pipeline strip's chips, so the
+// panel builds none of them â€” but the value stream is positional, so every one
 // still claims its slot.
 test('the external filter builds no parameter controls', () => {
   const params = chainParams();
