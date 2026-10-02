@@ -995,7 +995,7 @@ test('editing a control writes the engine and the worker pool as floats', () => 
   ]);
 });
 
-test('the pause toggle is offered for animated params or multiple presets', () => {
+test('the pause toggle is offered for animated params or any preset', () => {
   const animated = makeHarness({ params: [SPEED] });
   animated.panel.build();
   assert.equal(animated.gui().ctrl('pause').label, 'Pause Animation');
@@ -1005,6 +1005,10 @@ test('the pause toggle is offered for animated params or multiple presets', () =
   staticNoPresets.panel.build();
   assert.equal(staticNoPresets.gui().ctrl('pause'), undefined);
   assert.equal(staticNoPresets.panel.active().pause.controller, null);
+
+  const singlePreset = makeHarness({ presetCount: 1 });
+  singlePreset.panel.build();
+  assert.equal(singlePreset.gui().ctrl('pause').label, 'Pause Animation');
 
   const staticPresets = makeHarness({ presetCount: 2 });
   staticPresets.panel.build();
