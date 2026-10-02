@@ -29,9 +29,7 @@ test('the solids rotation switch starts unchecked', () => {
     /<button id="toggleRotate" type="button"[^>]*role="switch"[^>]*aria-checked="false"/);
 });
 
-// A button's accessible name comes from aria-labelledby, aria-label, its own
-// text subtree or its title — never from a <label for>. These carry a knob div
-// and no text, so without the association all seven announce as unnamed.
+// Knob-only switches carry explicit aria-labelledby associations for robust names.
 test('every solids visualization switch carries an accessible name', () => {
   const source = pageSrc('solids');
   const switches = [...source.matchAll(/<button\b[^>]*role="switch"[^>]*>/g)]
