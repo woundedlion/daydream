@@ -56,8 +56,8 @@ const LIGHTNESS_STEPS = 64;
 
 /**
  * Paints the OKLCH gamut slice at one lightness into an RGBA pixel buffer: hue
- * around the wheel, chroma out from the center, scaled so the rim is the widest
- * in-gamut chroma at that lightness.
+ * around the wheel, chroma out from the center, with the rim scaled to the
+ * sampled maximum from maxSrgbGamutChroma().
  * @param {Uint8ClampedArray|number[]} data - RGBA bytes, `width * height * 4` long, filled in place.
  * @param {number} width - Raster width, in pixels.
  * @param {number} height - Raster height, in pixels.

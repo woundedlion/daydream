@@ -169,12 +169,11 @@ export function linearRgbInGamut(rgb) {
 }
 
 /**
- * The widest chroma any hue reaches inside the sRGB gamut at one lightness,
- * bisected per hue over a 360-step sweep. Scales the hue wheel's chroma axis so
- * its outer edge is the gamut's widest slice at that lightness. Uses the engine's
+ * Estimates the widest sRGB-gamut chroma at one lightness by bisecting 360
+ * sampled hues. The estimate scales the hue wheel's chroma axis. Uses the engine's
  * 1e-4 channel slack and 2e-5 chroma margin.
  * @param {number} lightness - OKLCH L to search at.
- * @returns {number} The maximum in-gamut chroma over all hues.
+ * @returns {number} The largest sampled chroma, minus the margin.
  */
 export function maxSrgbGamutChroma(lightness) {
   lightness = Math.max(0, Math.min(1, lightness));
