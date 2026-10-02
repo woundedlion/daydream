@@ -42,7 +42,7 @@ const {
   RENDER_WATCHDOG_MS,
 } = await import('../src/segments/segment_controller.js');
 import { ModuleWarmer, warmModules, pageWarmer, EMPTY_WASM } from './fixtures/module_warmer_fixture.js';
-const { PROTOCOL_VERSION } = await import('../src/segments/worker_protocol.js');
+const { PROTOCOL_VERSION, FAULT_POOL, FAULT_RENDER } = await import('../src/segments/worker_protocol.js');
 
 const EXPECTED_CONSOLE_MESSAGES = {
   log: [
@@ -1259,7 +1259,7 @@ test('the boot watchdog names the segments that never booted', () => {
     assert.equal(c.faulted, true);
     assert.match(c.faultInfo.message, /1\/4 booted/);
     assert.match(c.faultInfo.message, /never booted: 1, 2, 3/);
-    assert.equal(c.faultInfo.segId, -1, 'multiple missing -> pool-wide segId');
+    assert.equal(c.faultInfo.segId, FAULT_POOL, 'multiple missing -> pool-wide segId');
   } finally {
     clock.restore();
   }
@@ -1293,7 +1293,7 @@ test('the render watchdog faults when a worker accepts render but stops progress
     assert.equal(c.faulted, true);
     assert.match(c.faultInfo.message, /render stalled/);
     assert.match(c.faultInfo.message, /1\/2 segments responded/);
-    assert.equal(c.faultInfo.segId, -2,
+    assert.equal(c.faultInfo.segId, FAULT_RENDER,
       'render-timeout sentinel, distinct from the pool-init -1');
     assert.equal(c.frameState.pending, 0, 'fault settles pending so the loop cannot deadlock');
     assert.equal(c.renderWatchdog, null);
@@ -2790,7 +2790,7 @@ test('create with an unknown resolution latches a pool fault', () => {
   c.create(4);
 
   assert.equal(c.faulted, true);
-  assert.equal(c.faultInfo.segId, -1, 'no single worker to blame');
+  assert.equal(c.faultInfo.segId, FAULT_POOL, 'no single worker to blame');
   assert.match(c.faultInfo.message, /unknown resolution "nope"/);
   assert.equal(c.ownsDisplay, true, 'the fault overlay owns the display');
   assert.deepEqual(c.workers, [], 'no workers were spawned');
@@ -2808,7 +2808,7 @@ test('create with a layout-illegal or oversized segment count latches a pool fau
     c.create(bad);
 
     assert.equal(c.faulted, true, `count ${bad} faults`);
-    assert.equal(c.faultInfo.segId, -1, 'no single worker to blame');
+    assert.equal(c.faultInfo.segId, FAULT_POOL, 'no single worker to blame');
     assert.match(c.faultInfo.message, /invalid segment count/);
     assert.deepEqual(c.workers, [], 'no workers were spawned');
     // The recovery rebuilds re-create() at `count`, so the banner has to name
