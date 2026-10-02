@@ -506,8 +506,6 @@ test('dispose leaves no dangling mesh or pixel buffer', () => {
 // stepSimulation / render: the detached-pixel-view contract
 // ---------------------------------------------------------------------------
 
-
-
 /** Minimal `this` for stepSimulation: a running sim over the given color array.
  * @param {Uint16Array} colors - Array the dot mesh's instanceColor aliases.
  * @returns {Object} Context object for prototype.call.
@@ -1360,8 +1358,6 @@ test('a re-pointed engine view keeps the normalized read-back', () => {
   assert.ok(Math.abs(ctx.dotMesh.instanceColor.getY(2) - 32768 / 65535) < 1e-9);
 });
 
-
-
 test('precomputeMatrices flags both instance attributes for upload', () => {
   const ctx = matricesCtx(8, 5);
   Daydream.prototype.precomputeMatrices.call(ctx);
@@ -1841,8 +1837,6 @@ test('running display frames between simulation ticks do not poll the panel', ()
   assert.equal(syncs, 0);
 });
 
-
-
 test('dot shader injection uses the current Three chunk and refuses a missing one', () => {
   const ctx = setupCtx(null, []);
   Daydream.prototype.setupDots.call(ctx);
@@ -1894,7 +1888,6 @@ test('cap slider changes bound the matrix cache and update live placement', () =
   assert.equal(ctx.matrixCache.size, 0);
 });
 
-
 test('render shows axes and labels before the inset view', () => {
   const log = [];
   const ctx = renderCtx(new Uint16Array(4), log);
@@ -1906,10 +1899,9 @@ test('render shows axes and labels before the inset view', () => {
   assert.ok(log.indexOf('labelRenderer.render') < log.indexOf('renderPip'));
 });
 
-
 test('stepOnce always queues at least one frame', () => {
   const ctx = { paused: true, stepFrames: 0, invalidate() {} };
-  Daydream.prototype.stepOnce.call(ctx, 0);
+  Daydream.prototype.stepOnce.call(ctx);
   assert.equal(ctx.stepFrames, 1);
 });
 
