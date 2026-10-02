@@ -2,21 +2,21 @@
 # Source checks are local; CI tests the resolved daydream/engine pair.
 
 for name in $(git rev-parse --local-env-vars); do
-	unset "$name"
+  unset "$name"
 done
 
 if ! command -v node >/dev/null 2>&1; then
-	echo "pre-push: node not found; install Node.js to run the required suites." >&2
-	exit 1
+  echo "pre-push: node not found; install Node.js to run the required suites." >&2
+  exit 1
 fi
 
 if ! command -v npm >/dev/null 2>&1; then
-	echo "pre-push: npm not found; install Node.js to run the required suites." >&2
-	exit 1
+  echo "pre-push: npm not found; install Node.js to run the required suites." >&2
+  exit 1
 fi
 if [ ! -f node_modules/.package-lock.json ]; then
-	echo "pre-push: node_modules is missing. Run npm ci in this worktree." >&2
-	exit 1
+  echo "pre-push: node_modules is missing. Run npm ci in this worktree." >&2
+  exit 1
 fi
 
 if [ "${DAYDREAM_PUSH_SNAPSHOT:-0}" != 1 ]; then
@@ -59,16 +59,16 @@ npm run importmap -- --out "$tmp" || exit 1
 # The suites above all run over the working tree, so the freshness check
 # compares the file they loaded rather than the staged copy.
 if ! git -c core.autocrlf=false diff --no-index --ignore-cr-at-eol --exit-code -- vendor-importmap.js "$tmp"; then
-	echo "pre-push: vendor-importmap.js is stale; regenerate and commit it." >&2
-	exit 1
+  echo "pre-push: vendor-importmap.js is stale; regenerate and commit it." >&2
+  exit 1
 fi
 rm -f "$tmp"
 
 tmp=$(mktemp ./tailwind.XXXXXX) || exit 1
 npm run generate:tailwind -- --output "$tmp" || exit 1
 if ! git -c core.autocrlf=false diff --no-index --ignore-cr-at-eol --exit-code -- tools/tailwind.css "$tmp"; then
-	echo "pre-push: tools/tailwind.css is stale; regenerate and commit it." >&2
-	exit 1
+  echo "pre-push: tools/tailwind.css is stale; regenerate and commit it." >&2
+  exit 1
 fi
 rm -f "$tmp"
 
