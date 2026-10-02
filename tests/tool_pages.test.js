@@ -486,6 +486,7 @@ const CONTRAST_SURFACES = {
     '#arenaStats': ['#arenaStats', 'body'],
     '.action-btn': '.action-btn',
     '.action-btn:hover': '.action-btn:hover',
+    '.del-btn:hover': '.del-btn:hover',
   },
 };
 
