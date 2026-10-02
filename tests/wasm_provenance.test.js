@@ -224,6 +224,7 @@ test('Mobius projection constants match the pinned engine sources', { skip: engi
 
 test('registry composite lowering matches expand_to_primitives', { skip: engineSkip }, () => {
   assert.ok(engineRoot, engineMissing);
+  const conway = committed(engineRoot, 'core/mesh/conway.h');
   const recipe = committed(engineRoot, 'core/mesh/recipe.h').toString('utf8');
   const body = recipe.slice(recipe.indexOf('inline size_t expand_to_primitives'));
   for (const [name, lower] of Object.entries(LOWERING)) {
@@ -243,8 +244,8 @@ test('registry composite lowering matches expand_to_primitives', { skip: engineS
         if (op === 'snub') {
           assert.match(match[2], /MeshOps::SNUB_DEFAULT_T, MeshOps::SNUB_DEFAULT_TWIST/);
           return { op, params: {
-            t: cppFloatConstant(committed(engineRoot, 'core/mesh/conway.h'), 'SNUB_DEFAULT_T'),
-            twist: cppFloatConstant(committed(engineRoot, 'core/mesh/conway.h'), 'SNUB_DEFAULT_TWIST'),
+            t: cppFloatConstant(conway, 'SNUB_DEFAULT_T'),
+            twist: cppFloatConstant(conway, 'SNUB_DEFAULT_TWIST'),
           } };
         }
         return op;
