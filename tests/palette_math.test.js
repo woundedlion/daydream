@@ -273,6 +273,7 @@ test('GenerativePalette.get clamps to the final LUT entry', () => {
     const beyond = pal.get(1.5);
     const justBelow = pal.get(0.99999);
 
+    assert.deepEqual(atOne, [1, 0, 0.21586050011389926]);
     assert.equal(atOne.length, 3);
     for (const ch of atOne) {
       assert.ok(Number.isFinite(ch), `channel finite at t=1.0`);
