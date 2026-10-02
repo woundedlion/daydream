@@ -232,9 +232,8 @@ test('rollback restores an unflushed control value to runtime sinks and URL', ()
 /**
  * Verifies a garbage ?resolution= does not survive DeepLinkGUI hydration. add()
  * re-reads the raw URL; an out-of-list value would re-inject an invalid
- * resolution into appState (where applyResolution() silently no-ops, leaving a
- * black canvas), so the value is rejected against the option list. Because the
- * value was rejected, the bound default is left in place and the applyOnLoad
+ * resolution into appState, so the value is rejected against the option list.
+ * Because the value was rejected, the bound default is left in place and the applyOnLoad
  * replay does NOT fire — replaying would push the default back through onChange,
  * while the URL writer canonicalizes the rejected token to the default.
  */
@@ -281,7 +280,7 @@ test('DeepLinkGUI.add adopts a valid in-list URL value for a dropdown', () => {
  * Verifies a slider-style add() (a numeric min, not an option list) has no
  * option list, so a finite in-range URL value is adopted without list validation.
  */
-test('DeepLinkGUI.add leaves a non-enumerated control (no option list) untouched', () => {
+test('DeepLinkGUI.add adopts an in-range numeric URL value without an option list', () => {
   installWindowAt('?speed=2.5');
   const gui = new DeepLinkGUI({ autoPlace: false });
   const obj = { speed: 1.0 };
@@ -486,7 +485,7 @@ test('DeepLinkGUI.addSession keeps a session control out of the URL', () => {
  */
 test('DeepLinkGUI.add rejects a non-numeric URL value for a slider', () => {
   const url = installRecordingWindow('?speed=fast');
-  // Rejecting the value strips it from the URL through the 200ms debounce; drive
+  // Rejecting the value rewrites it to the default through the 200ms debounce; drive
   // it under mock timers so the pending write can't fire after afterEach drops window.
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
@@ -514,7 +513,7 @@ test('DeepLinkGUI.add rejects a non-numeric URL value for a slider', () => {
  * does not replay.
  */
 test('DeepLinkGUI.add maps boolean URL spellings for a checkbox', () => {
-  // The unrecognized-token case strips the param from the URL through the 200ms
+  // The unrecognized-token case writes the default through the 200ms
   // debounce; drive all writes under mock timers so none fire after afterEach.
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
