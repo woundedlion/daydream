@@ -149,11 +149,20 @@ test('every workflow pins the Node version package.json requires', () => {
     `every setup-node pin must read ${required}`);
 });
 
+const setupNodeCount = (source) =>
+  [...source.matchAll(/^\s*(?:-\s*)?uses:\s*actions\/setup-node@/gm)].length;
+
+test('the setup-node scan includes named steps without version pins', () => {
+  const source = '- name: Set up Node\n  uses: actions/setup-node@abc\n';
+  assert.equal(setupNodeCount(source), 1);
+  assert.equal([...source.matchAll(/node-version:/g)].length, 0);
+});
+
 test('every setup-node action supplies a Node version pin', () => {
   let setups = 0;
   for (const file of readdirSync(resolve(REPO, WORKFLOW_DIR)).filter((name) => /\.ya?ml$/.test(name))) {
     const source = readFileSync(resolve(REPO, WORKFLOW_DIR, file), 'utf8');
-    setups += [...source.matchAll(/^\s*- uses: actions\/setup-node@/gm)].length;
+    setups += setupNodeCount(source);
   }
   assert.ok(setups > 0);
   assert.equal(nodePins(WORKFLOW_DIR).length, setups);
