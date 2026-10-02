@@ -78,7 +78,8 @@ export function meshStatsLine(meshData, edgeCount) {
 export function meshCanvasLabel(title, ops, meshData, edgeCount) {
   const chain = ops.length > 0 ? `${title} after ${ops.join(', ')}` : title;
   return `Real-time 3D preview of ${chain}: ${meshData.vertices.length} vertices, `
-    + `${edgeCount} edges, ${meshData.faces.length} faces.`;
+    + `${edgeCount} edges, ${meshData.faces.length} faces. `
+    + 'Use arrow keys to pan and Shift plus arrow keys to orbit.';
 }
 
 /**

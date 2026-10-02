@@ -130,9 +130,11 @@ test('the stats line reports vertices, edges, faces and indices', () => {
 
 test('the canvas name says which solid is on screen', () => {
   assert.equal(meshCanvasLabel('Tetrahedron', [], tetrahedron(), 6),
-    'Real-time 3D preview of Tetrahedron: 4 vertices, 6 edges, 4 faces.');
+    'Real-time 3D preview of Tetrahedron: 4 vertices, 6 edges, 4 faces. '
+      + 'Use arrow keys to pan and Shift plus arrow keys to orbit.');
   assert.equal(meshCanvasLabel('Cube', ['kis', 'dual'], tetrahedron(), 6),
-    'Real-time 3D preview of Cube after kis, dual: 4 vertices, 6 edges, 4 faces.');
+    'Real-time 3D preview of Cube after kis, dual: 4 vertices, 6 edges, 4 faces. '
+      + 'Use arrow keys to pan and Shift plus arrow keys to orbit.');
 });
 
 test('hiding faces drops the mesh but keeps the edge cage', () => {
