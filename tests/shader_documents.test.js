@@ -1227,7 +1227,7 @@ test('a load whose preset the engine refuses puts the program back', async () =>
   const presets = harness.elements.get('shader-preset-select').options.map((o) => o.value);
   const program = harness.engine.chainCalls.at(-1);
 
-  const write = harness.engine.bindings.setShaderChainParameters.bind(harness.engine);
+  const write = harness.engine.bindings.setShaderChainParameters;
   let refuse = true;
   harness.engine.bindings.setShaderChainParameters = (writes) => {
     if (!refuse) return write(writes);
