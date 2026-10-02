@@ -72,8 +72,7 @@ class FakeEngine {
     this.clip = null;
     // Allocated once per size and handed back by every getPixels(), like the
     // real engine's view into WASM memory. A fresh array per call would hide a
-    // regression that transferred the buffer -- which in a browser detaches the
-    // whole heap, not just this view.
+  // regression that transferred the buffer, which a real WASM heap refuses.
     this.pixelView = new Uint16Array(w * h * 3);
     for (let i = 0; i < this.pixelView.length; i++) {
       this.pixelView[i] = (i * 7) & 0xffff;
@@ -616,8 +615,8 @@ test('the worker never transfers the engine pixel view', async () => {
   posted.length = 0;
   await dispatch({ type: 'render' });
   assert.ok(posted.some((p) => p.msg.type === 'frame'), 'a frame was posted');
-  // Transferring this buffer detaches the whole WASM heap in a browser, not
-  // just this view, so the extraction must copy out of it.
+  // A real WASM heap buffer cannot be transferred, so extraction must copy out
+  // into a transferable buffer.
   assert.equal(view.byteLength, 8 * 4 * 3 * 2, 'the engine view is still attached');
   assert.deepEqual(
     posted.flatMap((p) => p.transfer ?? []).filter((b) => b === view.buffer), [],
