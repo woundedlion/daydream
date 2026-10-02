@@ -32,7 +32,11 @@ export function fakeModule({ rejects = new Set(), reason = 'ARENA_EXHAUSTED',
     state.live++;
     const mesh = {
       deleted: false,
-      delete() { this.deleted = true; state.live--; },
+      delete() {
+        if (this.deleted) throw new Error('Mesh already deleted');
+        this.deleted = true;
+        state.live--;
+      },
       classifyFaces() { return call('classifyFaces') ? null : Int32Array.from([0]); },
       getVertices() { return call('getVertices') ? null : vertices; },
       getFaces() { return call('getFaces') ? null : FACES(); },

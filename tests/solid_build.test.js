@@ -346,3 +346,15 @@ for (const error of [new Error('base refused'), 'base refused']) {
     assert.deepEqual(errors, ['Base solid failed: base refused']);
   });
 }
+
+
+test('fake mesh deletion refuses a double free without balancing a live mesh', () => {
+  const { Mod, state } = fakeModule();
+  const first = Mod.MeshOps.fromSolidName('cube');
+  const second = Mod.MeshOps.fromSolidName('cube');
+  first.delete();
+  assert.throws(() => first.delete(), /already deleted/);
+  assert.equal(state.live, 1);
+  second.delete();
+  assert.equal(state.live, 0);
+});
