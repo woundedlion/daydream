@@ -339,10 +339,13 @@ test('a move is an m-for-m replacement that keeps instance values', async () => 
 
 test('a move that breaks carrier agreement is refused', async () => {
   const store = await makeStore();
+  const before = store.document();
   const [project, warp] = store.chain().slice(PROJECT, PROJECT + 2);
   const result = store.replaceSpan(PROJECT, 2, [warp, project]);
   assert.equal(result.ok, false);
   assert.ok(result.diagnostics.length > 0);
+  assert.deepEqual(store.document(), before);
+  assert.equal(store.canUndo(), false);
 });
 
 test('removing and reinserting one operator preserves its descriptor digest', async () => {
