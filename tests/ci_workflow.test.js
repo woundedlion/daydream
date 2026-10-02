@@ -60,7 +60,7 @@ test('the reusable suite lints the workflow YAML and the bash inside it', () => 
   assert.ok(suite.indexOf('sha256sum --check --strict') < suite.indexOf('tar -xzf'));
   assert.doesNotMatch(suite, /pip install[^\n]*actionlint/);
   assert.match(suite, /actionlint -verbose -oneline/);
-  assert.match(suite, /Rule "shellcheck" was disabled/,
+  assert.match(suite, /Rule "shellcheck" was disabled[^\n]*\r?\n[^\n]*\r?\n\s*exit 1/,
     'a silently dropped shellcheck would leave every run: body unchecked');
 });
 
@@ -303,7 +303,7 @@ test('workflow trigger parsing cannot hide flow or quoted declarations', () => {
 
 test('shell lint has no workflow-wide excluded diagnostics', () => {
   const suite = readFileSync(resolve(REPO, `${WORKFLOW_DIR}/js-unit-suite.yml`), 'utf8').replaceAll('\r\n', '\n');
-  assert.doesNotMatch(suite, /shellcheck[^\n]*--exclude/);
+  assert.doesNotMatch(suite, /shellcheck[^\n]*(?:\s-e\b|--exclude)|SHELLCHECK_OPTS/);
 });
 
 test('engine bundle API failures stop the gate instead of entering its poll timeout', () => {
