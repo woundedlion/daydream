@@ -95,13 +95,15 @@
         <a href="LICENSE.txt" class="license-link" target="_blank" rel="noopener">Licenses<span class="visually-hidden"> (opens in a new window)</span></a>
     </div>
     <script>
-        window.addEventListener('error', (event) => {
+        const handleModuleSyntaxError = (event) => {
             const overlay = document.getElementById('loading-overlay');
             if (!overlay || overlay.classList.contains('error') || !(event.error instanceof SyntaxError)) return;
+            window.removeEventListener('error', handleModuleSyntaxError);
             overlay.classList.add('error');
             overlay.setAttribute('role', 'alert');
             overlay.textContent = 'Unable to load the application. Hard-reload the page (Ctrl+Shift+R / Cmd+Shift+R) to fetch the current version.';
-        }, { once: true });
+        };
+        window.addEventListener('error', handleModuleSyntaxError);
     </script>
     <script type="module" src="src/app/main.js" onerror="const overlay = document.getElementById('loading-overlay'); overlay.classList.add('error'); overlay.setAttribute('role', 'alert'); overlay.textContent = 'Unable to load the application. Hard-reload the page (Ctrl+Shift+R / Cmd+Shift+R) to fetch the current version.';"></script>
 </body>
