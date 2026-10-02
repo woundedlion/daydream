@@ -28,9 +28,7 @@ import {
   fixedShaderStageAssignments,
 } from '../src/effects/shader_stages.js';
 
-// The module's stdout, captured rather than dropped: the WASM bridge answers an
-// out-of-domain op argument by clamping it and logging, so this is the only
-// channel that reports one.
+// Capture the bridge's diagnostics for clamped MeshOps arguments.
 const moduleLogs = [];
 const sink = (line) => moduleLogs.push(line);
 const M = await createHolosphereModule({ print: sink, printErr: sink });
