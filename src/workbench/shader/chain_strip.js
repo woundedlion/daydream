@@ -461,7 +461,7 @@ export function createChainStrip({
     });
 
     element.addEventListener('focusout', (/** @type {*} */ event) => {
-      if (palette?.element !== element) return;
+      if (!palette || palette.element !== element) return;
       const next = event.relatedTarget ?? null;
       if (next !== null && (element.contains(next) || palette.anchor.contains(next))) return;
       closePalette();
@@ -986,6 +986,7 @@ export function createChainStrip({
     add.setAttribute('aria-expanded', 'false');
     add.setAttribute('aria-label', `Add a ${title} stage`);
     add.textContent = '+';
+    /** @type {boolean|null} */
     let openOnPointerDown = null;
     add.addEventListener('pointerdown', () => { openOnPointerDown = palette?.anchor === add; });
     add.addEventListener('click', () => {
