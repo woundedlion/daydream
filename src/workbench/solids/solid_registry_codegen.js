@@ -97,7 +97,9 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
         if (name === 'dual' || (name === 'kis' && previousName !== 'dual')) {
           const faces = mesh.getFaces();
           if (!faces) throw new Error(meshOpFailure(mod, 'Registry faces').message);
-          const edges = faces.counts.reduce((sum, count) => sum + count, 0) / 2;
+          let indices = 0;
+          for (const count of faces.counts) indices += count;
+          const edges = indices / 2;
           // Closed genus-zero meshes: ambo has E+2 faces; truncate has 3E edges.
           bridgeFaces = name === 'dual' ? edges + 2 : 3 * edges + 2;
         }
