@@ -3,7 +3,7 @@
 // and the C++ headers they are transcribed from.
 //
 // tests/color_parity_wasm.test.js runs the tools against the shipped WASM, which
-// reaches only what wasm.cpp exports, and only at the engine SHA the committed
+// reaches only what wasm.cpp exports, and only at the engine SHA the installed
 // binary was built from (holosphere_wasm.sha). Reading the headers covers the
 // values no export reaches — the projection constants, the compile-status
 // rosters, the recipe field paths, the seed constants and the build-step cap —
