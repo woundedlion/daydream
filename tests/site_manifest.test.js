@@ -285,7 +285,7 @@ test('the published pattern document set matches its catalog',
 test('deploy manifest entries cannot recursively publish untracked files', () => {
   const workflow = read('.github/workflows/deploy.yml');
   assert.match(workflow, /node scripts\/stage-site\.mjs engine-bundle _site deployment-pair\.json/);
-  assert.doesNotMatch(workflow, /cp -r/);
+  assert.doesNotMatch(workflow, /\bcp\s+-[A-Za-z]*[rRa]|\brsync\b/);
 });
 
 test('the license link publishes a text file containing the complete notices', () => {
