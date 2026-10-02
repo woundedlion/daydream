@@ -23,40 +23,40 @@ while read -r _old new ref; do
     echo "reference-transaction: REFUSED malformed reference transaction." >&2
     exit 1
   fi
-	[ "$ref" = "refs/heads/master" ] || continue
-	cur=$(git rev-parse --verify -q "$ref" 2>/dev/null) || cur=''
-	[ -z "$cur" ] && continue                                # creation
-	case "$new" in
+  [ "$ref" = "refs/heads/master" ] || continue
+  cur=$(git rev-parse --verify -q "$ref" 2>/dev/null) || cur=''
+  [ -z "$cur" ] && continue                                # creation
+  case "$new" in
         "$z") kind='deletion'; target=$cur ;;
-		*)
-			git merge-base --is-ancestor "$cur" "$new" 2>/dev/null && continue
-			kind='rewind'; target=$new ;;
-	esac
+    *)
+      git merge-base --is-ancestor "$cur" "$new" 2>/dev/null && continue
+      kind='rewind'; target=$new ;;
+  esac
 
-	ts=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
-	tok=''
-	[ -f "$tokfile" ] && tok=$(tr -d ' \t\r\n' < "$tokfile")
-	granted=0
-	case "$tok" in
-		ANY) granted=1 ;;
-		???????*) case "$target" in "$tok"*) granted=1 ;; esac ;;
-	esac
+  ts=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
+  tok=''
+  [ -f "$tokfile" ] && tok=$(tr -d ' \t\r\n' < "$tokfile")
+  granted=0
+  case "$tok" in
+    ANY) granted=1 ;;
+    ???????*) case "$target" in "$tok"*) granted=1 ;; esac ;;
+  esac
 
-	if [ "$granted" = 1 ]; then
-		rm -f "$tokfile"
-		echo "$ts OVERRIDE $kind master $cur -> $new (token=$tok)" >> "$logfile"
-		continue
-	fi
+  if [ "$granted" = 1 ]; then
+    rm -f "$tokfile"
+    echo "$ts OVERRIDE $kind master $cur -> $new (token=$tok)" >> "$logfile"
+    continue
+  fi
 
-	echo "$ts REFUSED $kind master $cur -> $new" >> "$logfile"
-	if [ "$kind" = 'deletion' ]; then
-		echo "reference-transaction: REFUSED deletion of master (at $cur)." >&2
-	else
-		echo "reference-transaction: REFUSED non-fast-forward update of master ($cur -> $new)." >&2
-	fi
-	echo "  Authorize this exact change, then retry (one-shot):" >&2
-	echo "    git rev-parse $target > \"$tokfile\"" >&2
-	echo "  Write ANY into that file for a blind override. Routine landings cannot override." >&2
-	exit 1
+  echo "$ts REFUSED $kind master $cur -> $new" >> "$logfile"
+  if [ "$kind" = 'deletion' ]; then
+    echo "reference-transaction: REFUSED deletion of master (at $cur)." >&2
+  else
+    echo "reference-transaction: REFUSED non-fast-forward update of master ($cur -> $new)." >&2
+  fi
+  echo "  Authorize this exact change, then retry (one-shot):" >&2
+  echo "    git rev-parse $target > \"$tokfile\"" >&2
+  echo "  Write ANY into that file for a blind override. Routine landings cannot override." >&2
+  exit 1
 done
 exit 0
