@@ -2135,3 +2135,12 @@ test('query snapshot import rejects retired archive versions without adopting th
       /unsupported chain snapshot/);
   }
 });
+
+test('shader links refuse null snapshot entries before initializing a candidate', async () => {
+  for (const [chain, parameters] of [[[], [null]], [[null], []], [[], [{name: 42}]]]) {
+    const compact = {d: {descriptor: {chain: []}}, p: 'night', b: [], a: true,
+      s: {schemaVersion: 2, chain, parameters}};
+    const payload = gzipSync(JSON.stringify(compact)).toString('base64url');
+    await assert.rejects(decodeShaderStateHash(`#shader=v2.${payload}`), /invalid shader link snapshot/);
+  }
+});
