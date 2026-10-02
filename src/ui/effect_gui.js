@@ -770,9 +770,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   }
 
   /**
-   * Present an engine-written telemetry control. `disabled` would take it out of
-   * the accessibility tree and the tab order, so the value the control exists to
-   * show could not be read at all; read-only leaves it reachable and inert.
+   * Present engine-written telemetry as a focusable read-only control.
    * @param {GuiController} controller - The controller to present.
    * @returns {void}
    */

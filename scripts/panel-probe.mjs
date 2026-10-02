@@ -354,9 +354,8 @@ export async function probeStageNames(tab) {
 }
 
 /*
- * Engine-written telemetry. A `disabled` control takes no focus and the
- * accessibility tree ignores it, so the fake DOM — where focus() is a counter
- * and there is no tree at all — cannot tell read-only from unavailable.
+ * Checks engine-written telemetry for keyboard focus and read-only accessibility
+ * state, which the fake DOM does not model.
  * @param {import('puppeteer-core').Page} tab
  */
 export async function probeTelemetry(tab) {
