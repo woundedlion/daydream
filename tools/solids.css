@@ -149,7 +149,7 @@ body {
   padding: 0.2rem 0.3rem;
 }
 
-/* Ops the validator proved would trap an engine invariant on the current
+/* Ops the validator refused or trapped on the current
    mesh (see chainIsValid). */
 #addOpGrid .btn:disabled,
 #addOpGrid .btn[aria-disabled="true"] {
