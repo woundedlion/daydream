@@ -1416,7 +1416,7 @@ test('SIMPLE_SEEDS mirrors simple_registry, whose index a Recipe seed is', () =>
     'SIMPLE_SEEDS entry, so none of the registry just matched');
 });
 
-// MeshOps.getRecipe has no daydream call site; it is pinned here as intended API.
+// solids_page.js flattens star-pattern bases through MeshOps.getRecipe for registry export.
 test('MeshOps.getRecipe returns an authored chain for every Complex solid', () => {
   assert.equal(typeof M.MeshOps.getRecipe, 'function',
     'MeshOps is missing class function getRecipe');
