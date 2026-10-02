@@ -858,7 +858,7 @@ test('init restores accepted params before replaying rejected requests', async (
   ]);
 });
 
-test('init restores ShaderChain snapshot atomically instead of replaying params', async () => {
+test('init restores a ShaderChain snapshot', async () => {
   const snapshot = {
     schemaVersion: 2,
     chain: [{instance: 'project', operator: 'project.stereographic.v2'},
