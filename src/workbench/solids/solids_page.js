@@ -1203,15 +1203,13 @@ function updateOpParam(index, key, value, revision) {
         return;
       }
       showGateMsg(`rejected: ${check.message}`);
-      if (parameterEdits.get(editKey) === edit) {
-        renderOps();
-        if (focusType) {
-          const restoredItem = document.getElementById('opsList').children[index];
-          const restoredRow = [...restoredItem.querySelectorAll('.op-param')].find(r => r.dataset.key === key);
-          restoredRow?.querySelector(`input[type="${focusType}"]`)?.focus();
-        }
-        update();
+      renderOps();
+      if (focusType) {
+        const restoredItem = document.getElementById('opsList').children[index];
+        const restoredRow = [...restoredItem.querySelectorAll('.op-param')].find(r => r.dataset.key === key);
+        restoredRow?.querySelector(`input[type="${focusType}"]`)?.focus();
       }
+      update();
     });
     return;
   }
