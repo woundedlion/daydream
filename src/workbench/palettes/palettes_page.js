@@ -118,7 +118,7 @@ function setCustomBaseTurns(turns) {
  * handoff starts from.
  * @param {Object} sourceRecipe - The recipe the keys are resampled from.
  * @returns {boolean} False when the resample dropped the hue the user was
- *   acting on — a four-key harmony resamples to three — since acting on
+ *   acting on — a four-key harmony or LOOP sweep resamples to three — since acting on
  *   whatever key took that index would silently move a different key.
  */
 function activateCustomHue(sourceRecipe) {
@@ -128,7 +128,7 @@ function activateCustomHue(sourceRecipe) {
   selectedHueKey = handoff.selectedKey;
   if (!handoff.kept) {
     document.getElementById('hue_key_status').textContent =
-      'This hue key is omitted when the harmony is resampled to three custom keys. Choose another key.';
+      'This hue key is omitted when these keys are resampled to three custom keys. Choose another key.';
     return false;
   }
   document.getElementById('hue_key_status').textContent = '';
