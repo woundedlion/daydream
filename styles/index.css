@@ -13,6 +13,7 @@
   --button-border-hover: #777;
   --bright-text: rgb(var(--bright-text-rgb));
   --muted-text: #8a8a8a;
+  --readonly-label-text: #aaa;
   --error-text: #e66;
   --warning-text: #facc15;
   --record-indicator: rgb(var(--record-indicator-rgb));
@@ -858,7 +859,7 @@
 /* Engine-written telemetry: inert to the pointer, but still focusable and in
    the accessibility tree, which a disabled control would not be. */
 .gui-container .effect-gui .lil-controller.param-readonly > .lil-name {
-  color: #aaa;
+  color: var(--readonly-label-text);
 }
 
 .gui-container .effect-gui .lil-controller.param-readonly > .lil-name::after {
