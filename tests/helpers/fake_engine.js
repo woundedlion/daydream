@@ -122,7 +122,7 @@ const CHAIN_CATALOG_TEXT = readFileSync(
  * setShaderChain with the module's payload-shape checks, parameter definitions
  * rebuilt from the pinned catalog on every APPLIED (with the generation bump
  * the real engine makes), and an injectable refusal. Every method it mocks is
- * pinned in ENGINE_METHODS.
+ * pinned in ENGINE_METHODS or ENGINE_OPTIONAL_METHODS.
  */
 export class FakeChainEngine {
   /** The pinned operator catalog, byte-identical to the module export. */
