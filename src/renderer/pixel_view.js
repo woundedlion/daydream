@@ -13,7 +13,7 @@
  */
 
 /**
- * Whether a pixel view still aliases live WASM memory.
+ * Whether a pixel view has a nonempty backing buffer.
  *
  * Emscripten grows the heap by detaching the old ArrayBuffer in place: its
  * byteLength drops to 0 while the typed-array view stays truthy. Presence alone
@@ -21,8 +21,8 @@
  * fill()/read on it throws or reads nothing — so the backing buffer must also be
  * non-detached.
  * @param {ArrayBufferView|null|undefined} view - The pixel view to test.
- * @returns {view is ArrayBufferView} True when view is a typed array whose
- *   buffer is not detached.
+ * @returns {view is ArrayBufferView} True for an ArrayBufferView with a nonempty
+ *   backing buffer; this does not verify WASM ownership.
  */
 export function isViewLive(view) {
   return ArrayBuffer.isView(view) && view.buffer.byteLength !== 0;
