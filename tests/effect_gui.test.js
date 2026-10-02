@@ -2852,7 +2852,7 @@ test('destroy on an unbuilt panel is a no-op', () => {
   assert.deepEqual(h.warnings, []);
 });
 
-// â”€â”€ The chain editor's external-parameter filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// The chain editor's external-parameter filter.
 
 function chainParams() {
   return [
@@ -2864,9 +2864,7 @@ function chainParams() {
   ];
 }
 
-// Â§4.4: the chain's parameters render on the pipeline strip's chips, so the
-// panel builds none of them â€” but the value stream is positional, so every one
-// still claims its slot.
+// External parameters retain their slots in the positional value stream.
 test('the external filter builds no parameter controls', () => {
   const params = chainParams();
   const h = makeHarness({
