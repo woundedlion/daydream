@@ -82,8 +82,8 @@ test('preset values survive URL reload after flushed or pending parameter edits'
       panel.destroy();
       sync.dispose();
       engine.delete();
-      assert.deepEqual(warnings, []);
     }
+    assert.deepEqual(warnings, []);
   }
 });
 
