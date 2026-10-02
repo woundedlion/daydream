@@ -29,8 +29,6 @@ import * as MB from '../src/workbench/mobius/mobius_transforms.js';
 import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS } from '../src/workbench/solids/solid_codegen.js';
 import { MAX_BUILD_FACES, MAX_BUILD_STEPS, upperSnake, primitiveCount, LOWERING } from '../src/workbench/solids/solid_registry_codegen.js';
 
-
-
 const enginePin = readFileSync(new URL('../generated/holosphere_wasm.sha', import.meta.url), 'utf8').trim();
 
 const STEREO_H = 'core/math/stereographic.h';
@@ -463,7 +461,6 @@ test('MAX_BUILD_STEPS matches the pinned shared build budget', { skip: engineSki
   assert.equal(MAX_BUILD_STEPS, Number(match[1]));
 });
 
-
 test('every operator primitive count matches the installed engine lowering', { skip: engineSkip }, () => {
   const body = functionBody(header('core/mesh/recipe.h'), 'lowered_step_count');
   const counts = new Map();
@@ -519,7 +516,6 @@ test('closingDomain follows the pinned Comets traversal', { skip: engineSkip }, 
     assert.equal(closingDomain(m2, domain), engineClosingDomain({ m2, domain }));
   }
 });
-
 
 test('gyro lowering uses the engine snub defaults', { skip: engineSkip }, () => {
   const path = 'core/mesh/conway.h';

@@ -467,12 +467,6 @@ test('an enumerated param becomes a dropdown of labels to engine indices', () =>
   assert.equal(controller.isContinuous, false);
 });
 
-
-
-
-
-
-
 test('stage controls sharing a visible label keep distinct accessible names', () => {
   const params = latticeMeltParams();
   const h = makeHarness({
@@ -606,10 +600,6 @@ test('KaleidoscopeSmooth controls use the fixed pipeline modes as folders', () =
   assert.equal(h.gui().ctrl('Hue Noise Speed').folder, 'Generated Analogous');
 });
 
-
-
-
-
 test('fixed Shader controls file each slot parameter into its stage folder', () => {
   const params = [
     'Camera Wander', 'Singularity Fade', 'Planar Warp 1 Speed', 'Warp Strength',
@@ -647,9 +637,6 @@ test('fixed Shader warp ownership follows each explicit slot boundary', () => {
   assert.equal(assignments.get('Planar Warp 2 Speed'), 'Planar Warp 2');
   assert.equal(assignments.get('Mirror Cell X'), 'Planar Warp 2');
 });
-
-
-
 
 test('an invalid param carries an actionable, on-screen warning note', () => {
   const gui = fakeGui();
@@ -2914,7 +2901,6 @@ test('a filter change rebuilds the panel on the next sync', () => {
     'clearing the filter restores the unfiltered panel');
 });
 
-
 test('readonly enum type-ahead cannot move the visible selection', () => {
   const h = makeHarness({ params: [{ name: 'Mode', value: 0,
     options: ['Off', 'On', 'Auto'], readonly: true }] });
@@ -2963,7 +2949,6 @@ test('segmented enums follow the lagging pool values', () => {
   assert.equal(h.gui().ctrl('Mode').getValue(), 2);
 });
 
-
 test('an applied chain restore clears the import notice', () => {
   const stored = chainSnapshot();
   const h = makeHarness({ params: chainParams(), chainSnapshotEnabled: true,
@@ -2992,7 +2977,6 @@ for (const rebuild of [false, true]) test(`panel ${rebuild ? 'rebuild' : 'build'
   dead = true;
   assert.throws(() => rebuild ? panel.sync() : panel.build(), (error) => error === trap);
 });
-
 
 test('preset advancement refreshes nonanimated requested selectors', () => {
   const mode = { name: 'Mode', value: 0, requestedValue: 0, options: ['Off', 'On'], animated: false };

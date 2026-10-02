@@ -839,16 +839,6 @@ test('a rejected parameter write names its reason', () => {
     'setParameter must report NON_FINITE for a NaN value');
 });
 
-
-
-
-
-
-
-
-
-
-
 test('live shader rosters assign every parameter and both planar-warp slots', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(Object.hasOwn(engine.getEffectSizes(), 'Shader'), false,
@@ -1492,7 +1482,6 @@ test('PaletteOps compiles a palette recipe', () => {
   }
 });
 
-
 // solids.html and palettes.html run on these two classes, so they are the
 // tools' half of the boundary; embind's own prototypes are what pins them.
 test('generated/holosphere_wasm.d.ts declares the MeshOps bridge the solids tool drives', () => {
@@ -1677,9 +1666,6 @@ test('display caps preserve tuning, pause, clipping and resolution-independent p
   }
 });
 
-
-
-
 test('display caps preserve MobiusGrid after topology rebuilds', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)));
   assert.equal(engine.setEffect('MobiusGrid'), M.EffectSetResult.INSTALLED);
@@ -1695,7 +1681,6 @@ test('display caps preserve MobiusGrid after topology rebuilds', () => {
   }
 });
 
-
 test('registry export rejects oversized intermediate primitive endpoints', async () => {
   const validator = createChainValidator(() => createHolosphereModule({ print: sink, printErr: sink }));
   await assert.rejects(validateRegistryFaces(validator, {
@@ -1705,7 +1690,6 @@ test('registry export rejects oversized intermediate primitive endpoints', async
     name: 'Small', base: 'cube', ops: ['kis'], fCount: 24,
   });
 });
-
 
 test('registry validation expands composite and flattened base recipes', async () => {
   const validator = createChainValidator(() => createHolosphereModule({ print: sink, printErr: sink }));
@@ -1717,7 +1701,6 @@ test('registry validation expands composite and flattened base recipes', async (
     seed: 'cube', ops: [{ op: 'hankin', param: 45 * Math.PI / 180, twist: 0 }],
   }));
 });
-
 
 test('retired chain operators are absent and refuse without changing the live program', () => {
   engine.setEffect('ShaderChain');
