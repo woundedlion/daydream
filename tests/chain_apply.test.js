@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import { applyChainDocument } from '../src/workbench/shader/chain_apply.js';
 import {
-  FakeChainEngine, ChainStatus, ParamSetResult, unpinnedEngineMethods,
+  FakeChainEngine, ChainStatus, ParamSetResult, ChainSnapshotRestoreResult, unpinnedEngineMethods,
 } from './helpers/fake_engine.js';
 
 const MODULE = { ParamSetResult };
@@ -257,4 +257,35 @@ test('fake parameter batches distinguish malformed and oversized payloads', () =
   assert.equal(engine.bindings.setShaderChainParameters([{ name: 'camera.wander', value: NaN }]),
     ParamSetResult.NON_FINITE);
   assert.deepEqual(engine.getParameterDefinitions(), before);
+});
+
+test('FakeChainEngine refuses invalid snapshot writes and runtime atomically', () => {
+  const engine = new FakeChainEngine();
+  engine.setEffect('ShaderChain');
+  const bindings = engine.getShaderChainBindings();
+  const before = bindings.getSnapshot();
+  const target = structuredClone(before);
+  target.chain[0].instance = 'replacement';
+  target.parameters = target.parameters.map((write) => ({
+    ...write, name: write.name.replace(/^camera\./, 'replacement.'),
+  }));
+  target.runtime[0].instance = 'replacement';
+  const numeric = target.parameters.find((write) => write.name.endsWith('.speed'))
+    ?? target.parameters[0];
+  const invalid = [
+    { ...target, parameters: [...target.parameters, target.parameters[0]] },
+    { ...target, parameters: [{ name: 'unknown', value: 0 }] },
+    { ...target, parameters: [{ ...numeric, value: 1e9 }] },
+    { ...target, runtime: [] },
+    { ...target, runtime: [...target.runtime, target.runtime[0]] },
+    { ...target, runtime: [...target.runtime, { ...target.runtime[0], instance: 'unknown' }] },
+  ];
+  const enumDefinition = engine.definitions.find((definition) => definition.options);
+  if (enumDefinition) invalid.push({ ...before, parameters: [{ name: enumDefinition.name, value: 0.5 }] });
+  for (const snapshot of invalid) {
+    assert.equal(bindings.restoreSnapshot(snapshot), ChainSnapshotRestoreResult.INVALID_CHAIN);
+    assert.deepEqual(bindings.getSnapshot(), before);
+  }
+  assert.equal(bindings.restoreSnapshot(target), ChainSnapshotRestoreResult.APPLIED);
+  assert.deepEqual(bindings.getSnapshot(), target);
 });
