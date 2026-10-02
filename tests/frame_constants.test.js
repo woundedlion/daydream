@@ -18,10 +18,6 @@ test('the simulation cadence matches the physical sphere', () => {
   assert.equal(statedFps, FPS);
 });
 
-test('the slow-frame threshold is the frame budget rounded to a whole ms', () => {
-  const budgetMs = 1000 / FPS;
-  assert.ok(SLOW_FRAME_MS >= budgetMs);
-  assert.ok(Number.isInteger(SLOW_FRAME_MS), 'the threshold is a whole millisecond');
-  assert.ok(Math.abs(SLOW_FRAME_MS - budgetMs) <= 0.5,
-    `the threshold rounds to the nearest ms, got ${SLOW_FRAME_MS} for a ${budgetMs}ms budget`);
+test('the slow-frame threshold is the exact frame budget', () => {
+  assert.equal(SLOW_FRAME_MS, 1000 / FPS);
 });
