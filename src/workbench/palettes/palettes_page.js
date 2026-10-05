@@ -285,6 +285,10 @@ function handleHueKeyNudge(event, keyIndex) {
     event.preventDefault();
     return;
   }
+  if (selectedHueKey !== keyIndex) {
+    drawHueKeyWheel(readPaletteRecipe());
+    hueKeyHandles[selectedHueKey].focus();
+  }
   const base = customBaseTurns();
   const current = base + customHueOffsets[selectedHueKey];
   customHueOffsets = moveCustomHueKey(
