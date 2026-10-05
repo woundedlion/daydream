@@ -86,6 +86,7 @@ export class ModuleWarmer {
       const protocolJs = drain('./worker_protocol.js');
       const haltJs = drain('../shared/engine_halt.js');
       const bindingsJs = drain('../engine/workbench_bindings.js');
+      const paramsJs = drain('../effects/param_sync.js');
       const binary = glueJs.then((bytes) => {
         const source = new TextDecoder().decode(bytes);
         const path = source.match(/new URL\(["'](holosphere_wasm\.wasm\?v=[a-f0-9]+)["']/)?.[1];
@@ -99,6 +100,7 @@ export class ModuleWarmer {
         protocolJs,
         haltJs,
         bindingsJs,
+        paramsJs,
         binary,
         binary.then((bytes) => WebAssembly.compile(bytes).then(
           publish,
