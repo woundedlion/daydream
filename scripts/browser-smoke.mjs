@@ -15,9 +15,7 @@ import { collectProblems, closeProbeResources } from './probe_harness.mjs';
 import { serveStagedSite } from './vendor-stage.mjs';
 
 const VIEWPORT = { width: 1280, height: 900 };
-// Every page is waited on four times, and a page that never paints has to be
-// reported as one failed page rather than spend the workflow's whole budget:
-// these bound the run at a few minutes against a healthy 4s per page.
+// Navigation, readiness, drawing and network-idle waits are individually bounded.
 const LOAD_TIMEOUT_MS = 30_000;
 const READY_TIMEOUT_MS = 30_000;
 
