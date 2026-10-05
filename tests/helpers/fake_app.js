@@ -185,19 +185,18 @@ function buildGui(namespace, optionsReplaces, panel, hydrated, stored) {
     appendElement(element) { childrenElement.appendChild(element); },
     readStoredNumber(prop) {
       gui.storedReads.push(prop);
-      if (panel) {
-        if (stored[prop] !== undefined) return stored[prop];
-        return undefined;
-      }
-      const value = gui.stored.get(prop);
-      return typeof value === 'number' ? value : undefined;
+      const value = panel ? stored[prop] : gui.stored.get(prop);
+      return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
     },
     readStoredString(prop) {
       const value = panel ? stored[prop] : gui.stored.get(prop);
-      return value === undefined ? undefined : String(value);
+      return value == null ? undefined : String(value);
     },
     writeStoredValue(prop, value) {
-      if (panel) stored[prop] = value;
+      if (value == null) {
+        if (panel) delete stored[prop];
+        else gui.stored.delete(prop);
+      } else if (panel) stored[prop] = value;
       else gui.stored.set(prop, value);
       gui.storedWrites.push([prop, value]);
     },
