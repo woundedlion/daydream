@@ -324,7 +324,7 @@ test('generateRecipeCpp wraps the recipe in a FLASHMEM function with V/F/I comme
 /**
  * The tool keeps generated pastes within the target header's 80-column format.
  */
-test('generateRecipeCpp wraps a long function the way solid_generators.h carries it', () => {
+test('generateRecipeCpp wraps a long function at the target header column limit', () => {
   const cpp = generateRecipeCpp({
     base: 'truncatedIcosahedron',
     ops: [{ op: 'hankin', params: { angle: 58 } }, { op: 'chamfer', params: { t: 0.63 } }],
