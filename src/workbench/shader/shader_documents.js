@@ -353,7 +353,7 @@ export function createShaderDocumentController({
     const paused = getAnimationsPaused();
     animationToggle.disabled = paused === null;
     animationToggle.setAttribute('aria-pressed', String(paused === true));
-    animationToggle.textContent = paused ? 'Resume animation' : 'Pause animation';
+    animationToggle.textContent = 'Pause animation';
   };
 
   /** @param {CompiledDocument} compiled */
