@@ -337,3 +337,28 @@ test('a refused topology tick restores focus to the same parameter input', async
     assert.equal(state.ops[0].params.t, 0.4);
   }
 });
+
+
+test('a row drag cannot rebuild controls after the engine stands down', () => {
+  let drag;
+  const context = { wasmModule: {}, DRAG_SLOP_PX: 4,
+    createPointerDrag: (options) => { drag = options; },
+    dropSlotGen: 0, dropSlotChecks: new Map(),
+    getDragTargetIndex: () => 0, checkDropSlot: async () => ({ok: true}),
+    reorderPreviewShift: () => 0, console,
+    renderOps: () => assert.fail('rebuilt controls without an engine') };
+  const grip = fakeElement('div');
+  const row = fakeElement('div');
+  row.offsetHeight = 10;
+  const list = {children: [row]};
+  handler('wireRowDrag', context)(grip, 0, row, list, 1);
+  drag.onStart({clientY: 0});
+  drag.onMove({clientY: 10});
+  context.wasmModule = null;
+  drag.onEnd({clientY: 10});
+  assert.equal(row.classList.contains('dragging'), false);
+  drag.onStart({clientY: 0});
+  drag.onMove({clientY: 10});
+  drag.onEnd({clientY: 10});
+  assert.equal(row.classList.contains('dragging'), false);
+});
