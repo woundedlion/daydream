@@ -76,7 +76,7 @@ import { engineHalted } from '../../shared/engine_halt.js';
  */
 
 /**
- * Mirror of solid_generators.h `inline constexpr float D2R = PI_F / 180.0f`
+ * Mirror of procedural_solids.h `inline constexpr float D2R = PI_F / 180.0f`
  * with PI_F = float(PI). The preview and the emitted C++ both convert a hankin
  * angle through it, so the preview must round the product to float32 the way
  * the engine's float multiply does — at 54 and 73 degrees a double PI/180
@@ -349,7 +349,7 @@ export const DEFINED_SEED_CONSTANTS = new Set([
 export const PLATONIC_SOLIDS = SIMPLE_SEEDS.slice(0, 5);
 
 /**
- * The Catalan seeds, mirrored from `namespace Catalan` in solid_generators.h. That
+ * The Catalan seeds, mirrored from `namespace Catalan` in procedural_solids.h. That
  * namespace sees Archimedean/Platonic via using-directives but is NOT itself
  * visible from them, so a generated registry entry on a Catalan base must
  * qualify with `Catalan::`; `Archimedean::<catalan base>` would not compile.
@@ -701,7 +701,7 @@ function doxygenCpp(tags) {
 
 /**
  * The function's signature, wrapped the way clang-format wraps the ones
- * already in solid_generators.h: both parameters on the declarator's line
+ * already in procedural_solids.h: both parameters on the declarator's line
  * where they fit, else the second aligned under the first; each shape tried
  * first with the return type leading the line and then with it on its own,
  * and last both parameters indented one level below a bare declarator.
@@ -730,7 +730,7 @@ const CHAIN_CALL = /\.(?=[A-Za-z_]\w*\()/;
 
 /**
  * The return statement, wrapped the way clang-format wraps the recipes already
- * in solid_generators.h: one line where it fits, else one builder call per
+ * in procedural_solids.h: one line where it fits, else one builder call per
  * line at the continuation indent.
  * @param {string} recipe - The SolidBuilder call chain.
  * @returns {string} The statement, ending in ';'.
@@ -771,7 +771,7 @@ function returnRecipeCpp(recipe) {
 
 /**
  * Emits the full FLASHMEM C++ function for a solid, led by a doxygen block in
- * the form of the Platonic generators' in solid_generators.h, whose briefs
+ * the form of the Platonic generators' in procedural_solids.h, whose briefs
  * record the solid's vertex/face/index counts. Output is pasted verbatim into
  * the engine and must clear its clang-format gate, so the exact text and
  * wrapping are byte-for-byte significant.
