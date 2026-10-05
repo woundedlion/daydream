@@ -225,3 +225,7 @@ input[type=range]:disabled::-webkit-slider-thumb {
   outline: 2px solid var(--indigo-300);
   outline-offset: 2px;
 }
+
+input[type=checkbox] {
+  accent-color: var(--blue-500);
+}
