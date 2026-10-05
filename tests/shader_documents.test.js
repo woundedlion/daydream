@@ -596,7 +596,7 @@ function patternFetch(files, patternCatalog = PATTERN_CATALOG) {
 
 /**
  * Builds the workbench document controller over the shader.html control set.
- * @param {{files?: Object, engine?: *, selectEffect?: (effect: string) => boolean,
+ * @param {{files?: Object, engine?: *, patternCatalog?: string, selectEffect?: (effect: string) => boolean,
  *   initialEffect?: string|null, wrapImportCompiler?: (importer: Function) => Function}} [seams]
  * @returns {Object} The controller and everything it wrote to.
  */
@@ -1026,7 +1026,7 @@ function compiledBuildEngine() {
  * FakeChainEngine, with the workbench mounts present and kaleidoscope_hex_bright loaded over
  * the scratch document the page opens on.
  * @param {{source?: string|null, patternCatalog?: string, hash?: string, search?: string, initialEffect?: string|null,
- *   paused?: boolean, selectEffect?: () => boolean}} [seams] - source null
+ *   paused?: boolean, selectEffect?: () => boolean, onOriginalLinkReleased?: () => void}} [seams] - source null
  *   leaves the scratch document loaded.
  * @returns {Promise<Object>} The controller and everything it wrote to.
  */
