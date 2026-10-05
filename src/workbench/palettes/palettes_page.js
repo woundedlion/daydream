@@ -744,7 +744,7 @@ function handleDragMove(event) {
 }
 
 /**
- * Handles the end of a drag (zoom) or a simple click (set phase).
+ * Handles the end of a drag (zoom) or a simple click (copy color).
  */
 function handleDragEnd(event) {
   if (!colorStripCanvas) return;
