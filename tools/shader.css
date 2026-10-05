@@ -530,3 +530,7 @@ select.chain-param-control {
   outline: 3px solid var(--bright-text);
   outline-offset: 3px;
 }
+
+#canvas:focus-visible:not(.keyboard-focus) {
+  outline: none;
+}
