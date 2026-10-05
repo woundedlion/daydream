@@ -28,8 +28,7 @@ export const BROWSER_CANDIDATES = [
   'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
 ];
 
-// Software rasterization because a runner has no GPU and every workbench page
-// renders through WebGL. The probes are served scripts/vendor-stage.mjs's tree,
+// Software rasterization for the pages that use WebGL. The probes are served scripts/vendor-stage.mjs's tree,
 // where three.js and lil-gui resolve out of node_modules, so nothing they load
 // has any business reaching jsdelivr: the resolver rule turns a page that
 // regressed to the CDN into a failed request rather than a green run that a CDN
