@@ -90,9 +90,7 @@ input[type=range]:disabled::-webkit-slider-thumb {
   color: var(--indigo-300);
 }
 
-/* Compact button base + secondary fill. A page may still define its
- * own .btn color variants in its own <style>, which override these via the
- * cascade order. */
+/* Compact button base + secondary fill. */
 .btn {
   padding: 0.4rem 0.6rem;
   border-radius: 0.25rem;
