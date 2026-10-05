@@ -171,9 +171,9 @@ export const FAULT_RENDER = -2;
  * the effect's param list) so the GUI can track rendered changes the
  * un-stepped main engine cannot supply; null on every other segment.
  *
- * `warnings` carries the divergence notices standing on this worker since its
- * last effect install — a setParameter or preset the engine refused, leaving the
- * segment rendering a configuration its peers do not. The whole standing set is
+ * `warnings` carries unresolved parameter and preset refusals on this worker.
+ * A successful write to the same parameter or a successful preset selection
+ * clears its notice; an effect install clears every notice. The standing set is
  * re-sent every frame so the overlay's marker lasts as long as the divergence,
  * and the field is omitted while there is none.
  *

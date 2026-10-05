@@ -1157,7 +1157,7 @@ test('the index a presetless effect refuses is not logged', async () => {
 
 // console.error reaches no one on a worker thread; the frame's warnings are the
 // only channel by which the pool learns this segment has diverged.
-test('a refused parameter marks every later frame until the effect changes', async () => {
+test('a refused parameter marks frames until a successful write or effect change', async () => {
   await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
 
   posted.length = 0;
@@ -1186,6 +1186,21 @@ test('a refused parameter marks every later frame until the effect changes', asy
   }
 
   engineInstance.paramResult = ParamSetResult.APPLIED;
+  await dispatch({ type: 'setParameter', name: 'Ghost', value: 0.7 });
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  assert.equal(posted.find((p) => p.msg.type === 'frame').msg.warnings, undefined,
+    'a successful write retires the parameter notice');
+  engineInstance.paramResult = ParamSetResult.UNKNOWN_PARAM;
+  const recapture = installConsoleCapture('error');
+  try {
+    await dispatch({ type: 'setParameter', name: 'Ghost', value: 0.8 });
+  } finally { recapture.restore(); }
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  assert.deepEqual(posted.find((p) => p.msg.type === 'frame').msg.warnings,
+    ['setParameter(Ghost) rejected: UNKNOWN_PARAM']);
+  engineInstance.paramResult = ParamSetResult.APPLIED;
   await dispatch({ type: 'setEffect', name: 'Waves', paramRevision: 3 });
   posted.length = 0;
   await dispatch({ type: 'render' });
@@ -1208,6 +1223,10 @@ test('a refused preset index reaches the frame as a warning', async () => {
   await dispatch({ type: 'render' });
   assert.deepEqual(posted.find((p) => p.msg.type === 'frame').msg.warnings,
     ['selectPreset(9) rejected: 3 presets, still on 0']);
+  await dispatch({ type: 'selectPreset', index: 2, paramRevision: 15 });
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  assert.equal(posted.find((p) => p.msg.type === 'frame').msg.warnings, undefined);
 });
 
 // ---------------------------------------------------------------------------
