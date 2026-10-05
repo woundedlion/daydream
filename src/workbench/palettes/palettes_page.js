@@ -27,7 +27,7 @@ import {
   stripDragIntent,
   wrapTurns,
   hitTestHueKeyMarker,
-  hueKeyState, customHueKeyState, moveCustomHueKey,
+  hueKeyState, customHueKeyState, customHueSweepRepresentable, moveCustomHueKey,
   loopSweepTurns, paletteEnumOrdinal, paletteEnumName,
 } from './palette_controls.js';
 import { createColorStripPainter, drawWaveGraph } from './palette_canvas.js';
@@ -117,11 +117,15 @@ function setCustomBaseTurns(turns) {
  * Switch the controls into CUSTOM hue mode, authoring the three keys the
  * handoff starts from.
  * @param {Object} sourceRecipe - The recipe the keys are resampled from.
- * @returns {boolean} False when the resample dropped the hue the user was
- *   acting on — a four-key harmony or LOOP sweep resamples to three — since acting on
- *   whatever key took that index would silently move a different key.
+ * @returns {boolean} False when resampling cannot preserve the selected hue
+ *   key or the LOOP sweep's closing hue.
  */
 function activateCustomHue(sourceRecipe) {
+  if (!customHueSweepRepresentable(sourceRecipe)) {
+    document.getElementById('hue_key_status').textContent =
+      'This loop sweep cannot be preserved by three custom hue keys. Reduce the sweep before switching to CUSTOM.';
+    return false;
+  }
   const state = customHueKeyState(sourceRecipe);
   const handoff = hueKeyHandoff(
     hueKeyState(sourceRecipe), state, selectedHueKey, activeHueKey);

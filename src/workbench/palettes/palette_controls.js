@@ -699,9 +699,7 @@ export function customHueKeyState(recipe) {
       : recipe.hue.direction === PaletteV4.direction.COUNTERCLOCKWISE
         ? Math.abs(recipe.hue.sweepTurns)
         : recipe.hue.sweepTurns;
-    // Three keys spaced as core/color/generative_palette.h resolve_hues spaces
-    // them for a three-key recipe: sweep*i/key_count under a LOOP, which closes
-    // on base+sweep, and sweep*i/(key_count-1) under every other domain.
+    // Three-key spacing mirrors core/color/generative_palette.h resolve_hues.
     const step = sweep / (recipe.domain === PaletteV4.domain.LOOP ? 3 : 2);
     turns = [recipe.hue.baseTurns, recipe.hue.baseTurns + step,
       recipe.hue.baseTurns + 2 * step];
@@ -710,6 +708,19 @@ export function customHueKeyState(recipe) {
   }
 
   return hueKeyStateFromTurns(turns);
+}
+
+/**
+ * @param {PaletteRecipe} recipe - The recipe before switching to CUSTOM.
+ * @returns {boolean} Whether CUSTOM preserves a LOOP sweep's closing hue.
+ */
+export function customHueSweepRepresentable(recipe) {
+  if (recipe.hue.mode !== PaletteV4.hueMode.SWEEP
+      || recipe.domain !== PaletteV4.domain.LOOP) return true;
+  const { offsets } = customHueKeyState(recipe);
+  const closing = offsets[2] + directedTurnDelta(-offsets[2], recipe.hue.direction);
+  const sweep = hueKeyState(recipe).offsets[1] * 2;
+  return Math.abs(closing - sweep) < 1e-12;
 }
 
 /**
