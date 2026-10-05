@@ -11,11 +11,11 @@ const { pixelToSpherical } = await import('../src/renderer/geometry.js');
 const W = 288, H = 144;
 
 /**
- * Reference implementation of the engine's pixel_to_vector (core/math/pixel_mapping.h,
- * README §2), with azimuth (theta) measured from +X.
+ * Double-precision analytic reference for the engine's coordinate convention
+ * (core/math/pixel_mapping.h, README §2), with azimuth measured from +X.
  * @param {number} x - Pixel column index in [0, W).
  * @param {number} y - Pixel row index in [0, H).
- * @returns {Array<number>} The world-space unit vector [x, y, z] the engine renders for that pixel.
+ * @returns {Array<number>} The analytic world-space unit vector [x, y, z].
  */
 function engineVector(x, y) {
   const phi = (y * Math.PI) / (H - 1);
@@ -24,10 +24,10 @@ function engineVector(x, y) {
 }
 
 /**
- * Verifies that pixelToSpherical reproduces the engine's world vector across a
- * spread of columns/rows, requiring sub-1e-12 agreement with engineVector so the
- * sim places each dot exactly where the engine renders it (azimuth from +X, not
- * its x<->z mirror).
+ * Verifies sub-1e-12 agreement with the double-precision analytic convention
+ * across a spread of columns/rows, detecting an x<->z mirror. The engine uses
+ * float arithmetic and trigonometric lookup tables; this is not a precision
+ * comparison against its rendered vectors.
  */
 test('pixelToSpherical matches the engine convention (theta from +X)', () => {
   const daydream = makeDaydream();
