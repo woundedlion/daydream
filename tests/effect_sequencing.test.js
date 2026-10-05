@@ -95,21 +95,21 @@ test('effect state restoration updates controls through their setters', () => {
   assert.equal(sinks.events[0], 'pause:true');
 });
 
-test('one effect snapshot survives nested effect and resolution rollback', () => {
+test('a snapshot replays identically into successive rebuilt records', () => {
   const snapshot = snapshotEffectControlState(
     makeEffectControls({ Speed: 0.9, Glow: true }, false));
-  const effectSinks = makeSinks();
-  const resolutionSinks = makeSinks();
-  const effectRollback = makeEffectControls({ Speed: 0.1, Glow: false }, true, effectSinks);
-  const resolutionRollback = makeEffectControls(
-    { Speed: 0.2, Glow: false }, true, resolutionSinks);
+  const firstSinks = makeSinks();
+  const secondSinks = makeSinks();
+  const firstRestore = makeEffectControls({ Speed: 0.1, Glow: false }, true, firstSinks);
+  const secondRestore = makeEffectControls(
+    { Speed: 0.2, Glow: false }, true, secondSinks);
 
-  restoreEffectControlState(effectRollback, snapshot);
-  restoreEffectControlState(resolutionRollback, snapshot);
-  assert.deepEqual(effectSinks.events, ['param:Speed', 'param:Glow', 'pause:false']);
-  assert.deepEqual(resolutionSinks.events, effectSinks.events);
+  restoreEffectControlState(firstRestore, snapshot);
+  restoreEffectControlState(secondRestore, snapshot);
+  assert.deepEqual(firstSinks.events, ['param:Speed', 'param:Glow', 'pause:false']);
+  assert.deepEqual(secondSinks.events, firstSinks.events);
 
-  for (const restored of [effectRollback, resolutionRollback]) {
+  for (const restored of [firstRestore, secondRestore]) {
     assert.deepEqual(restored.state, { Speed: 0.9, Glow: true });
     assert.equal(restored.pause.animationState.pause, false);
   }
