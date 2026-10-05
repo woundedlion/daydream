@@ -61,7 +61,7 @@ test('an op name carrying markup lands as text, never as parsed markup', () => {
   assert.equal(el.querySelector('.remove-op-btn').getAttribute('aria-label'),
     `Remove ${hostile} at position 1`);
   assert.equal(el.querySelector('.move-op-up').getAttribute('aria-label'),
-    `Move ${hostile} up`);
+    `Move ${hostile} at position 1 up`);
 });
 
 test('parameter controls preserve a hostile value as text', () => {
@@ -88,7 +88,7 @@ test('parameter rows carry the OP_DEFS range and the current value', () => {
   assert.equal(range(tRow).step, '0.01');
   assert.equal(range(tRow).value, '0.5');
   assert.equal(number(twistRow).value, '0.28');
-  assert.equal(number(twistRow).getAttribute('aria-label'), 'snub twist (radians) value');
+  assert.equal(number(twistRow).getAttribute('aria-label'), 'snub at position 1 twist (radians) value');
   assert.equal(twistRow.children.at(-1).textContent, 'rad');
   assert.equal(tRow.children[0].htmlFor, range(tRow).id);
 });
@@ -98,7 +98,7 @@ test('every op parameter control is named by its op, not by the bare key', () =>
   for (const row of el.querySelectorAll('.op-param')) {
     const range = row.children.find((c) => c.type === 'range');
     assert.equal(range.getAttribute('aria-label'),
-      row.dataset.key === 'twist' ? 'snub twist (radians)' : 'snub t',
+      row.dataset.key === 'twist' ? 'snub at position 1 twist (radians)' : 'snub at position 1 t',
       'a chain of truncate + chamfer + bevel otherwise announces three sliders '
       + 'all called "t"');
   }
