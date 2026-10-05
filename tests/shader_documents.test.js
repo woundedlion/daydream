@@ -27,6 +27,7 @@ import {
   restoreDocumentAfterEach,
 } from './helpers/fake_dom.js';
 
+// Section references identify Holosphere docs/specs/shader_workbench_chain_spec.md.
 const ownedEditors = new Set();
 afterEach(async () => {
   for (const controller of ownedEditors) await controller.dispose();
