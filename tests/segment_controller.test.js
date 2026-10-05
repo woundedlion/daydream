@@ -327,7 +327,7 @@ async function publishGeneration(controller, bands) {
  * @param {number} [overrides.x1] - Exclusive right display-buffer column.
  * @param {number} [overrides.y0] - Inclusive top display-buffer row.
  * @param {number} [overrides.y1] - Exclusive bottom display-buffer row.
- * @param {number} [overrides.elapsed] - Simulated elapsed time for the frame.
+ * @param {number} [overrides.elapsed] - Worker drawFrame wall time in ms (the segment's Compute timing).
  * @param {Object} [overrides.arenaMetrics] - Optional arena-metrics payload.
  * @param {number[]} [overrides.paramValues] - Post-frame param values the worker reports.
  * @param {number} [overrides.paramRevision] - Parameter write revision paired with the frame.
