@@ -77,8 +77,8 @@ test('OKLab golden values (absolute pin)', () => {
  * same body as the matrix, so it is compared against the engine fed the same
  * (a, b); it draws the palettes page's hue wheel and every gamut bisection, so
  * a drift there moves the colors the tool tells you to paste into the engine.
- * The sweep covers the wheel at three lightnesses and out to a chroma no sRGB
- * hue reaches, where the arithmetic is furthest from the neutral axis.
+ * The sweep covers the wheel at three lightnesses and out to chroma 0.2,
+ * including out-of-gamut samples.
  */
 test('OKLCh transform parity (oklab_to_linear_rgb)', () => {
   for (const lightness of [0.15, 0.5, 0.85]) {
