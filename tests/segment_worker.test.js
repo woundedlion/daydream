@@ -72,7 +72,7 @@ class FakeEngine {
     this.clip = null;
     // Allocated once per size and handed back by every getPixels(), like the
     // real engine's view into WASM memory. A fresh array per call would hide a
-  // regression that transferred the buffer, which a real WASM heap refuses.
+    // regression that transferred the buffer, which a real WASM heap refuses.
     this.pixelView = new Uint16Array(w * h * 3);
     for (let i = 0; i < this.pixelView.length; i++) {
       this.pixelView[i] = (i * 7) & 0xffff;
