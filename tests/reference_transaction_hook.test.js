@@ -114,11 +114,11 @@ describe(
       rmSync(root, { recursive: true, force: true });
     });
 
-    test('malformed records fail closed without an audit entry', () => {
+    test('malformed records fail closed and append an audit entry', () => {
       const result = runHook([`${mid} refs/heads/master`]);
       assert.equal(result.status, 1);
       assert.match(result.stderr, /malformed reference transaction/);
-      assert.equal(existsSync(logPath()), false);
+      assert.match(readLog(), /REFUSED malformed reference transaction/);
     });
 
     test('refuses deletion of master', () => {

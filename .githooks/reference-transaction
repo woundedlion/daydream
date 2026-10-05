@@ -21,6 +21,8 @@ logfile="$gitdir/hs-nonff.log"
 while read -r _old new ref; do
   if [ -z "$ref" ] || [ -z "$new" ]; then
     echo "reference-transaction: REFUSED malformed reference transaction." >&2
+    ts=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
+    printf '%s\n' "$ts REFUSED malformed reference transaction" >> "$logfile"
     exit 1
   fi
   [ "$ref" = "refs/heads/master" ] || continue
