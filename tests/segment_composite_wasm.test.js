@@ -84,6 +84,8 @@ async function renderWith(effect, rect, frames, width = W, height = H) {
  * @param {string} effect - Effect name to install in every worker.
  * @param {number} total - Segment count.
  * @param {number} frames - Renders to draw.
+ * @param {number} [width] - Resolution width; the segmented default.
+ * @param {number} [height] - Resolution height; the segmented default.
  * @returns {Promise<{canvas: Uint16Array, clips: string[], compacts: Uint16Array[],
  *   rects: Array<Object>}>} The composited canvas and the per-segment pieces.
  */
