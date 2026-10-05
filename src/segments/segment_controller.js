@@ -53,7 +53,7 @@ export const BOOT_WATCHDOG_MS = 10000;
 // `pending`, freezing the pipeline; this bound latches a fault instead. It is
 // re-armed on every distinct segment 'frame' while `pending > 0`, so it bounds the
 // gap between reports rather than the whole render — a legitimately slow effect on
-// a throttled GPU keeps extending it as segments land, and only a true stall (no
+// a throttled CPU keeps extending it as segments land, and only a true stall (no
 // segment reports for this long) faults. Absolute rather than a multiple of the
 // display cadence: the fault is unrecoverable without a user-driven rebuild, and
 // the widest gap it legitimately sees is the first frame after an effect switch
