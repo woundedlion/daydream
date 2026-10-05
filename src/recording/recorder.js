@@ -17,7 +17,7 @@
  * a mid-recording resolution change cannot change the encoded track dimensions.
  *
  * Only canvas pixels reach the file: the CSS2D axis labels are DOM nodes over the
- * canvas, so a recording made with "Label Axes" on carries no labels.
+ * canvas, so a recording made with "Show Axes" on carries no labels.
  */
 
 import { FPS } from "../renderer/frame_constants.js";
