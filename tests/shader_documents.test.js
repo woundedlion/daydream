@@ -596,14 +596,15 @@ function patternFetch(files, patternCatalog = PATTERN_CATALOG) {
 /**
  * Builds the workbench document controller over the shader.html control set.
  * @param {{files?: Object, engine?: *, selectEffect?: (effect: string) => boolean,
- *   initialEffect?: string|null}} [seams]
+ *   initialEffect?: string|null, wrapImportCompiler?: (importer: Function) => Function}} [seams]
  * @returns {Object} The controller and everything it wrote to.
  */
 function workbench({ files = { 'kaleidoscope_flowers.shader.json': shaderDocument() },
                      engine = workbenchEngine(),
                      patternCatalog = PATTERN_CATALOG,
                      selectEffect = () => true,
-                     initialEffect = null } = {}) {
+                     initialEffect = null,
+                     wrapImportCompiler = (f) => f } = {}) {
   const elements = workbenchMounts();
   elements.get('shader-document-save').disabled = true;
 
@@ -623,7 +624,7 @@ function workbench({ files = { 'kaleidoscope_flowers.shader.json': shaderDocumen
     fetchText: patternFetch(files, patternCatalog),
     // The fixtures are compiler results already; a document object is the
     // scratch build, which the fake passes through as its own compile.
-    importCompiler: async () => ({
+    importCompiler: wrapImportCompiler(async () => ({
       DEFAULT_LIMITS,
       fixedDerivedBinding: () => null,
       compileShaderDocument: (s) => typeof s === 'string'
@@ -633,7 +634,7 @@ function workbench({ files = { 'kaleidoscope_flowers.shader.json': shaderDocumen
       // them; the real module's export is pinned in editorWorkbench.
       exportShaderDocumentJson: (document) =>
         `${JSON.stringify(document, null, 2)}\n`,
-    }),
+    })),
     download: (filename, source) => downloads.push([filename, source]),
     initialEffect,
   });
@@ -810,8 +811,13 @@ test('an imported study the catalog does not carry has no parity build', async (
 });
 
 test('overlapping loads are serialized in request order', async () => {
-  const harness = workbench();
-  await harness.controller.init();
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  let imports = 0;
+  const harness = workbench({ wrapImportCompiler: (importer) => async () => {
+    if (++imports === 1) await gate;
+    return importer();
+  } });
   const second = JSON.parse(shaderDocument({ digest: 'digest-second' }));
   second.document.preset_bank.presets[0].values['sample.pattern-freq'] = 9;
 
@@ -819,7 +825,10 @@ test('overlapping loads are serialized in request order', async () => {
     shaderDocument({ digest: 'digest-first' }), 'first.shader.json');
   const secondLoad = harness.controller.loadSource(
     JSON.stringify(second), 'second.shader.json');
+  await new Promise((resolve) => setImmediate(resolve));
+  release();
   assert.deepEqual(await Promise.all([firstLoad, secondLoad]), [true, true]);
+  assert.equal(imports, 1);
 
   assert.deepEqual(harness.engine.writes.at(-1), ['sample.pattern-freq', 9]);
   assert.equal(harness.controller.save(), true);
