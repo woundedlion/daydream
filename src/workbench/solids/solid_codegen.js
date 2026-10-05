@@ -231,6 +231,17 @@ function outOfRangeParam(opName, params) {
 }
 
 /**
+ * Checks whether a saved card has an exportable recipe.
+ * @param {string} base - Seed solid.
+ * @param {ChainOp[]} ops - Authored operations.
+ * @returns {?string} Refusal reason, or null for an exportable shape.
+ */
+export function savedSolidExportError(base, ops) {
+  return savedChainShapeError(base, ops)
+    ?? (ops.length === 0 ? 'its op chain is empty; a saved solid needs at least one op' : null);
+}
+
+/**
  * Shape-checks a persisted base+chain against the op table, without the engine.
  * @param {*} base - The persisted seed-solid name.
  * @param {*} ops - The persisted op chain.
