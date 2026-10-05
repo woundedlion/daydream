@@ -1447,7 +1447,7 @@ function cullCtx() {
 /** Stable serialization of a context: own keys in order, Vector3s flattened.
  * three.js objects defeat structuredClone, so compare projections instead.
  * @param {Object} ctx - Context object to project.
- * @returns {string} String that differs if any reachable field changed.
+ * @returns {string} JSON serialization with Vector3 coordinates flattened.
  */
 function cullCtxProjection(ctx) {
   return JSON.stringify(ctx, (key, value) =>
