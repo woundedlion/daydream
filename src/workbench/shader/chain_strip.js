@@ -829,7 +829,8 @@ export function createChainStrip({
     chip.setAttribute('aria-expanded', String(expanded));
     chip.setAttribute('tabindex', tabLabel === entry.label ? '0' : '-1');
     chip.setAttribute('aria-keyshortcuts',
-      'ArrowLeft ArrowRight Alt+ArrowLeft Alt+ArrowRight Enter Space b Delete Backspace Insert');
+      crossing ? 'ArrowLeft ArrowRight Enter Space Delete Backspace Insert'
+        : 'ArrowLeft ArrowRight Alt+ArrowLeft Alt+ArrowRight Enter Space b Delete Backspace Insert');
     chip.setAttribute('aria-label', `${op.name} · ${entry.label}`
       + (crossing ? `, ${op.input} to ${op.output}` : '')
       + (isBypassed ? ', bypassed' : ''));
