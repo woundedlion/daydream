@@ -1094,8 +1094,8 @@ export class SegmentController {
 
   /**
    * Dispatch parallel render to all workers.
-   * @returns {Promise<void>} Resolves when all workers have responded (last
-   *   response measures wall time), or when the render watchdog latches a fault.
+   * @returns {Promise<void>} Resolves when all workers have responded, the pool
+   *   is empty, a fault is latched, or the pool is destroyed.
    */
   renderParallel() {
     return new Promise((resolve) => {
