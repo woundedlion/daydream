@@ -2116,11 +2116,14 @@ test('a linked runtime snapshot that disagrees with its document retains the ori
   const seed = await editorWorkbench({source: null});
   const state = await decodeShaderStateHash(seed.win.location.hash);
   state.chainSnapshot.parameters[0].value += 1;
+  state.paused = true;
+  state.chainSnapshot.animationsPaused = true;
   const hash = await encodeShaderStateHash(state);
   const harness = await editorWorkbench({source: null, hash});
   assert.equal(harness.controller.preservesOriginalLink(), true);
   assert.equal(harness.win.location.hash, hash);
   assert.match(harness.elements.get('shader-document-status').textContent, /does not match/);
+  assert.equal(harness.animationsPaused(), false, 'a refused link preserves the fallback pause state');
   await harness.controller.dispose();
   ownedEditors.delete(harness.controller);
   assert.equal(harness.win.location.hash, hash);

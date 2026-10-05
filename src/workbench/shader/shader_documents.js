@@ -685,7 +685,6 @@ export function createShaderDocumentController({
     if (saveAsButton) saveAsButton.disabled = false;
     showDigest();
     syncParity();
-    if (session) setAnimationsPaused(session.paused);
     if (!applyPreset(presetId)) return abandon(true);
     if (session?.chainSnapshot) {
       const expected = callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'getSnapshot', []);
@@ -702,6 +701,9 @@ export function createShaderDocumentController({
         show('The shader link runtime snapshot was rejected.', true);
         return abandon(true);
       }
+    }
+    if (session) {
+      setAnimationsPaused(session.paused);
       showAnimationState();
       syncEffectGui();
       invalidate();
