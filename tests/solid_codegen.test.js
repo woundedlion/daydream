@@ -1260,7 +1260,7 @@ test('savedChainShapeError accepts the chains the tool itself saves', () => {
 
 /**
  * Verifies each way a stored entry can be unrestorable is named rather than
- * passed through. The validator resolves true when its module cannot spawn, so
+ * passed through. The validator returns an accepting verdict when its module cannot spawn, so
  * anything this misses reaches renderOps and throws into the commit queue.
  */
 test('savedChainShapeError rejects every unrestorable stored shape', () => {
