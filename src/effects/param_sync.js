@@ -96,8 +96,7 @@ export function selectorControlValue(parameter) {
  *   null prototype.
  */
 export function enumChoices(options) {
-  // Null prototype: `choices.__proto__ = i` on a plain object reassigns the
-  // prototype instead of adding a key, so that option would vanish silently.
+  // A plain object's inherited __proto__ setter discards numeric option values.
   /** @type {Object<string, number>} */
   const choices = Object.create(null);
   /** @type {string[]} */

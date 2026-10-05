@@ -98,8 +98,7 @@ test('enum: a label matching an Object.prototype member keeps its own name', () 
   assert.deepEqual(Object.keys(choices), ['toString', 'Warp', 'valueOf']);
 });
 
-// On a plain object `choices.__proto__ = i` reassigns the prototype instead of
-// adding a key, so the option disappears from both the table and the dropdown.
+// A plain object's inherited __proto__ setter discards numeric option values.
 test('enum: a __proto__ label is an option like any other', () => {
   const choices = enumChoices(['Warp', '__proto__', 'Sparkle']);
   assert.deepEqual(Object.keys(choices), ['Warp', '__proto__', 'Sparkle']);
