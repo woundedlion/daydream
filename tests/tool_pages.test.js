@@ -346,9 +346,9 @@ test('tool pages link tailwind.css last so utilities outrank page rules', () => 
 });
 
 // Behavior-only hooks need no stylesheet. The banner's two are inline-styled
-// because it has to render when a page stylesheet fails. The chain strip's undo
-// and redo are painted by `.chain-strip-actions button`, its replace options by
-// the <select> around them, and --stage is the chip look --socket departs from.
+// because it has to render when a page stylesheet fails. The chain strip's replace
+// options are painted by the <select> around them, and --stage is the chip look
+// --socket departs from.
 const CLASS_EXEMPTIONS = new Set([
   'op-param', 'move-op-up', 'move-op-down', 'remove-op-btn',
   'fatal-error-message', 'fatal-error-dismiss',
