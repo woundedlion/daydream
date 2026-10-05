@@ -139,7 +139,7 @@ test('the engine checkout can fetch a pin after master advances', () => {
   assert.match(checkout, /^\s+ref: \$\{\{ steps\.engine\.outputs\.pin \}\}$/m);
 });
 
-// The engine-parity cases above and the hook cases skip without their flag, so
+// The engine-parity cases in this file and the hook cases skip without their flag, so
 // the workflow's declaration of the flags is what keeps a run that lost its
 // engine checkout or its shell from passing on nothing.
 test('the JS unit suite arms the engine-parity and hook cases', () => {
