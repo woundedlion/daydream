@@ -33,6 +33,7 @@ function makeEffectRecord(name, speed, paused, writes = []) {
  * @param {Object} [options]
  * @param {Set<string>} [options.rejectEffects] - Effects applyEffect() rejects.
  * @param {Set<string>} [options.rejectResolutions] - Resolutions applyResolution() rejects.
+ * @param {Object<string, string>} [options.offListCorrection] - Effect correction per resolution.
  * @param {Error} [options.throwOnEffect] - Thrown by applyEffect() for any effect.
  * @param {() => boolean} [options.moduleDead] - Reads whether that throw trapped
  *   the engine module.
@@ -42,6 +43,7 @@ function makeEffectRecord(name, speed, paused, writes = []) {
 function makeApp({
   rejectEffects = new Set(),
   rejectResolutions = new Set(),
+  offListCorrection = {},
   throwOnEffect = null,
   moduleDead = () => false,
   fullConfigEffects = new Set(),
@@ -92,6 +94,8 @@ function makeApp({
       fn: 'applyResolution', resolution, preserveParams,
       restoring: app.switches.isRestoring(),
     });
+    if (offListCorrection[resolution])
+      app.switches.mute(() => appState.set('effect', offListCorrection[resolution]));
     if (rejectResolutions.has(resolution)) return ApplyResult.REJECTED;
     app.applied.resolution = resolution;
     return applyEffect(preserveParams);
@@ -327,14 +331,20 @@ test('a resolution rollback that is itself rejected raises the fatal banner',
 
 test('a resolution rollback restores the effect the pre-switch resolution offered',
   async () => {
-    const app = makeApp({ rejectResolutions: new Set(['Hi']) });
+    const app = makeApp({ rejectResolutions: new Set(['Hi']),
+      offListCorrection: { Hi: 'Gamma' } });
     app.appState.set('effect', 'Beta');
+    const observed = [];
+    app.appState.subscribe((key, value) => observed.push({ key, value,
+      effect: app.appState.get('effect'), resolution: app.appState.get('resolution') }));
 
     app.appState.set('resolution', 'Hi');
     await Promise.resolve();
 
-    // update() writes both keys before notifying, so the rollback's effect and
-    // resolution are never observed apart.
+    assert.ok(observed.some(({ effect, resolution }) => effect === 'Gamma' && resolution === 'Hi'),
+      'the rejected apply corrected the effect off-list');
+    assert.ok(observed.every(({ effect, resolution }) => resolution !== 'Lo' || effect === 'Beta'),
+      'subscribers observe the restored effect and resolution together');
     assert.deepEqual(
       { effect: app.appState.get('effect'), resolution: app.appState.get('resolution') },
       { effect: 'Beta', resolution: 'Lo' });
