@@ -4,7 +4,7 @@
 //
 // The C++ runs the math in float; the JS ports run it in double, so float
 // outputs are compared within a small tolerance. LUT-quantized palette outputs
-// allow one LUT step when float and double inputs fall in adjacent cells.
+// allow one 16-bit linear LSB for float-versus-double rounding.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -144,7 +144,7 @@ test('HSV sextant golden bytes (hsv_to_rgb, absolute pin)', () => {
  * get() clamps the cosine to sRGB then quantizes through the interpolated linear
  * LUT; the JS port computes the same clamped sRGB cosine, so feeding it through
  * the engine's srgb_to_linear_interp must land on the engine's 16-bit linear
- * value (within one LUT step from the float-vs-double cosine input).
+ * value (within one 16-bit linear LSB from float-versus-double rounding).
  */
 test('ProceduralPalette cosine parity (procedural_palette_linear)', () => {
   const a = [0.5, 0.5, 0.5], b = [0.5, 0.5, 0.5], c = [1, 1, 1], d = [0, 0.33, 0.67];
@@ -156,7 +156,7 @@ test('ProceduralPalette cosine parity (procedural_palette_linear)', () => {
     for (let ch = 0; ch < 3; ch++) {
       const srgb = Math.max(0, Math.min(1, pal.getChannelValues(t)[ch]));
       const jsLinear = M.srgb_to_linear_interp(srgb);
-      // Within one 16-bit LUT step: the only divergence is float-vs-double cosine rounding.
+      // Within one 16-bit linear LSB for float-versus-double cosine rounding.
       assert.ok(Math.abs(jsLinear - wCh[ch]) <= 1,
         `palette t=${t} ch=${ch}: wasm=${wCh[ch]} js=${jsLinear}`);
     }
