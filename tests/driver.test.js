@@ -1237,7 +1237,7 @@ test('precomputeMatrices places one dot per pixel on the sphere surface', () => 
 
 /**
  * Reference world position of a pixel's dot, written out independently of
- * geometry.js: polar angle Ï€*y/(H-1) from +Y, azimuth from +X toward +Z, on the
+ * geometry.js: polar angle π*y/(H-1) from +Y, azimuth from +X toward +Z, on the
  * sphere the camera frames.
  * @param {number} x - Pixel column index in [0, w).
  * @param {number} y - Pixel row index in [0, h).
@@ -1318,7 +1318,7 @@ test('precomputeMatrices allocates a zeroed color buffer the driver aliases', ()
 /**
  * The engine writes 16-bit linear channels straight into this buffer, so the
  * attribute is what scales them to the shader's [0,1]. Dropping the normalized
- * flag uploads the same bytes as raw 0..65535 â€” every lit dot saturates, with
+ * flag uploads the same bytes as raw 0..65535 — every lit dot saturates, with
  * no change to the instance count or the draw call.
  */
 test('the color buffer uploads as normalized Uint16, so full scale reads as 1', () => {
@@ -1698,7 +1698,7 @@ const DRIVER_SOURCE = readFileSync(new URL('../src/renderer/driver.js', import.m
  * The constructor requires a WebGL context, so its wiring is read
  * rather than run. A collaborator that defaults its document to the global is
  * the one construction that can silently bind the wrong page: nothing throws,
- * and the driver's stated contract â€” it reads no globals of its own â€” is gone.
+ * and the driver's stated contract — it reads no globals of its own — is gone.
  */
 test('the driver hands its own document to every collaborator that defaults to the global', () => {
   // Every class the driver could build whose constructor takes an optional doc,

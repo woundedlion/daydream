@@ -69,6 +69,7 @@
     "src/shared/export_params.js",
     "src/shared/flyout.js",
     "src/shared/kb_format.js",
+    "src/shared/layout.js",
     "src/workbench/lissajous/lissajous_math.js",
     "src/workbench/mobius/mobius_transforms.js",
     "src/shared/page_lifecycle.js",
