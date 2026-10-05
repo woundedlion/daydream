@@ -86,9 +86,7 @@ const STAGE_BY_PARAMETER = new Map([
   ['Lattice Radius', 'Function'],
   ['Singularity Fade', 'Projection'],
   ['Central Meridian', 'Projection'],
-  ['Gnomonic Hemisphere', 'Projection'],
   ['Peirce Layout', 'Projection'],
-  ['Projection Scale', 'Projection'],
   ['Projection Spin Speed', 'Projection Frame'],
   ['Projection Wander', 'Projection Frame'],
   ['Camera Wander', 'Camera'],
@@ -96,9 +94,6 @@ const STAGE_BY_PARAMETER = new Map([
   ['Surface Noise Strength', 'Surface Noise'],
   ['Surface Noise Speed', 'Surface Noise'],
   ['Surface Noise Direction', 'Surface Noise'],
-  ['Surface Noise Basis', 'Surface Noise'],
-  ['Surface Noise Integrator', 'Surface Noise'],
-  ['Surface Noise Placement', 'Surface Noise'],
   ['Mobius A Re', 'Lens'],
   ['Mobius A Im', 'Lens'],
   ['Mobius B Re', 'Lens'],
@@ -107,51 +102,11 @@ const STAGE_BY_PARAMETER = new Map([
   ['Mobius C Im', 'Lens'],
   ['Mobius D Re', 'Lens'],
   ['Mobius D Im', 'Lens'],
-  ['Mobius A Real', 'Lens'],
-  ['Mobius A Imag', 'Lens'],
-  ['Mobius B Real', 'Lens'],
-  ['Mobius B Imag', 'Lens'],
-  ['Mobius C Real', 'Lens'],
-  ['Mobius C Imag', 'Lens'],
-  ['Mobius D Real', 'Lens'],
-  ['Mobius D Imag', 'Lens'],
-  ['Planar Warp 1 Angular Phase', 'Planar Warp 1'],
-  ['Planar Warp 1 Cell X', 'Planar Warp 1'],
-  ['Planar Warp 1 Cell Y', 'Planar Warp 1'],
-  ['Planar Warp 1 Edge Width', 'Planar Warp 1'],
-  ['Planar Warp 1 Envelope', 'Planar Warp 1'],
-  ['Planar Warp 1 Field Angle', 'Planar Warp 1'],
-  ['Planar Warp 1 Frequency', 'Planar Warp 1'],
-  ['Planar Warp 1 Noise Basis', 'Planar Warp 1'],
-  ['Planar Warp 1 Offset X', 'Planar Warp 1'],
-  ['Planar Warp 1 Offset Y', 'Planar Warp 1'],
-  ['Planar Warp 1 Polar Harmonic', 'Planar Warp 1'],
-  ['Planar Warp 1 Polar Mode', 'Planar Warp 1'],
-  ['Planar Warp 1 Radial Phase', 'Planar Warp 1'],
-  ['Planar Warp 1 Radial Scale', 'Planar Warp 1'],
-  ['Planar Warp 1 Rotation', 'Planar Warp 1'],
-  ['Planar Warp 1 Scale', 'Planar Warp 1'],
-  ['Planar Warp 1 Scale X', 'Planar Warp 1'],
-  ['Planar Warp 1 Scale Y', 'Planar Warp 1'],
-  ['Planar Warp 1 Shear', 'Planar Warp 1'],
-  ['Planar Warp 1 Strength', 'Planar Warp 1'],
-  ['Planar Warp 1 Translation X', 'Planar Warp 1'],
-  ['Planar Warp 1 Translation Y', 'Planar Warp 1'],
-  ['Planar Warp 1 Vector Angle', 'Planar Warp 1'],
-  ['Planar Warp 2 Cell X', 'Planar Warp 2'],
-  ['Planar Warp 2 Cell Y', 'Planar Warp 2'],
-  ['Planar Warp 2 Field Angle', 'Planar Warp 2'],
-  ['Planar Warp 2 Frequency', 'Planar Warp 2'],
-  ['Planar Warp 2 Offset X', 'Planar Warp 2'],
-  ['Planar Warp 2 Offset Y', 'Planar Warp 2'],
-  ['Planar Warp 2 Rotation', 'Planar Warp 2'],
-  ['Planar Warp 2 Strength', 'Planar Warp 2'],
   ['Iso Level', 'Value Transfer'],
   ['Iso Width', 'Value Transfer'],
   ['Cutout Threshold', 'Coverage'],
   ['Cutout Softness', 'Coverage'],
   ['Edge Width', 'Coverage'],
-  ['Edge Fade Width', 'Coverage'],
   ['Palette Chroma', 'Colorize'],
   ['Palette Mapping', 'Colorize'],
   ['Mapping Frequency', 'Colorize'],
@@ -239,11 +194,11 @@ export function kaleidoscopeSmoothStageAssignments(params) {
 }
 
 /**
- * @param {Array<{name: string}>} params - Fixed Shader parameter definitions in
+ * @param {Array<{name: string}>} params - Composed-effect parameter definitions in
  *   engine registration order.
  * @returns {Map<string, string>|null} Parameter name to fixed pipeline stage.
  */
-export function fixedShaderStageAssignments(params) {
+export function composedStageAssignments(params) {
   const names = new Set(params.map((parameter) => parameter.name));
   if (!names.has('Camera Wander') || !names.has('Palette Chroma')
       || !names.has('Mapping Frequency')) {
