@@ -122,10 +122,14 @@ test('NAMED_PROCEDURAL_PALETTES all render across the domain', () => {
   for (const entry of NAMED_PROCEDURAL_PALETTES) {
     const pal = new ProceduralPalette(entry.a, entry.b, entry.c, entry.d);
     const ramp = [];
-    for (let i = 0; i <= 32; i++) ramp.push(...pal.get(i / 32));
-    const bad = ramp.find((ch) => !(Number.isFinite(ch) && ch >= 0 && ch <= 1));
+    for (let i = 0; i <= 32; i++) ramp.push(pal.get(i / 32));
+    const bad = ramp.flat().find((ch) => !(Number.isFinite(ch) && ch >= 0 && ch <= 1));
     assert.equal(bad, undefined, `${entry.name} renders ${bad} outside [0, 1]`);
-    assert.ok(Math.max(...ramp) - Math.min(...ramp) > 0.05, `${entry.name} renders a flat ramp`);
+    const spans = [0, 1, 2].map((channel) => {
+      const samples = ramp.map((rgb) => rgb[channel]);
+      return Math.max(...samples) - Math.min(...samples);
+    });
+    assert.ok(Math.max(...spans) > 0.05, `${entry.name} renders a flat ramp`);
   }
 });
 
