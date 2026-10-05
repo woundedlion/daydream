@@ -14,10 +14,8 @@ import {
 } from "../app/state.js";
 
 /**
- * The last query string parsed per window, with its parse. A panel build reads
- * the params once per control added and once per stored value, and persistence
- * writes one entry per writable parameter, so re-parsing makes a build
- * quadratic in the parameter count; copying an existing parse is not.
+ * The last query string parsed per window. Repeated reads clone the cached
+ * entries without decoding the query string again.
  * @type {WeakMap<Window, {search: string, params: URLSearchParams}>}
  */
 const parsedSearchCache = new WeakMap();
