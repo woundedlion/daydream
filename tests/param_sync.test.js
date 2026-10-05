@@ -248,3 +248,14 @@ test('document enum options normalize case, whitespace, and hyphens', () => {
   assert.equal(optionIndex(definition, 'SOLID   FILL'), 0);
   assert.equal(optionIndex(definition, 'unknown'), -1);
 });
+
+
+test('coupled replay stops when no refused write can advance', async () => {
+  const { replayParameterWrites } = await import('../src/effects/param_sync.js');
+  const results = { APPLIED: 0, INADMISSIBLE: 1 };
+  const calls = [];
+  const refused = replayParameterWrites([{ name: 'A', value: 1 }, { name: 'B', value: 2 }],
+    (name) => { calls.push(name); return results.INADMISSIBLE; }, results);
+  assert.deepEqual(calls, ['A', 'B']);
+  assert.deepEqual(refused, [{ name: 'A', result: 1 }, { name: 'B', result: 1 }]);
+});

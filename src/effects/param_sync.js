@@ -190,3 +190,29 @@ export function optionIndex(definition, label) {
   const wanted = key(label);
   return definition.options?.findIndex((option) => key(option) === wanted) ?? -1;
 }
+
+/**
+ * Replay coupled parameter writes until admission stops making progress.
+ * @param {{name: string, value: number}[]} writes - Requested writes.
+ * @param {(name: string, value: number) => unknown} setParameter - Engine writer.
+ * @param {{APPLIED: unknown, INADMISSIBLE: unknown}} results - Engine outcomes.
+ * @returns {{name: string, result: unknown}[]} Writes that never applied.
+ */
+export function replayParameterWrites(writes, setParameter, results) {
+  let pending = writes;
+  const rejected = [];
+  while (pending.length) {
+    const refused = [];
+    for (const write of pending) {
+      const result = setParameter(write.name, write.value);
+      if (result === results.INADMISSIBLE) refused.push(write);
+      else if (result !== results.APPLIED) rejected.push({ name: write.name, result });
+    }
+    if (refused.length === pending.length) {
+      rejected.push(...refused.map(({ name }) => ({ name, result: results.INADMISSIBLE })));
+      break;
+    }
+    pending = refused;
+  }
+  return rejected;
+}

@@ -11,6 +11,7 @@
  * share arrives with `init` when the controller has one.
  */
 
+import { replayParameterWrites } from '../effects/param_sync.js';
 import { callWorkbenchBinding } from '../engine/workbench_bindings.js';
 import createHolosphereModule from "../../generated/holosphere_wasm.js";
 import { computeSegmentRange, extractSegment } from "./segment_layout.js";
@@ -204,12 +205,14 @@ export function installSegmentWorker() {
    * @returns {void}
    */
   function replayParams(params) {
-    if (!params) return;
-    for (const p of params) {
-      if (typeof p.acceptedValue === 'number') applyParam(p.name, p.acceptedValue);
-    }
-    for (const p of params) {
-      if (typeof p.value === 'number') applyParam(p.name, p.value);
+    if (!params || !engine || !wasmModule) return;
+    const writer = engine.setParameter.bind(engine);
+    for (const field of /** @type {const} */ (['acceptedValue', 'value'])) {
+      const writes = params.flatMap((p) => typeof p[field] === 'number'
+        ? [{ name: p.name, value: p[field] }] : []);
+      for (const { name, result } of replayParameterWrites(writes, writer, wasmModule.ParamSetResult)) {
+        reportParamRejected(name, result);
+      }
     }
   }
 
