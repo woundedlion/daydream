@@ -190,11 +190,10 @@ class DeepLinkGUI {
     const key = this.getKey(prop);
     this.urlKeys.add(key);
     const params = this.urlParams();
-    const sourceKey = params.has(key) ? key : undefined;
-    if (!sourceKey) return undefined;
-    const value = parseUrlNumber(params.get(sourceKey));
+    if (!params.has(key)) return undefined;
+    const value = parseUrlNumber(params.get(key));
     if (value === null) {
-      console.warn(`DeepLinkGUI: ignoring non-numeric stored value for "${sourceKey}"`);
+      console.warn(`DeepLinkGUI: ignoring non-numeric stored value for "${key}"`);
       return undefined;
     }
     return value;
@@ -311,15 +310,14 @@ class DeepLinkGUI {
     const params = this.urlParams();
     let urlApplied = false;
     let valClamped = false;
-    const sourceKey = params.has(key) ? key : undefined;
-    if (hydrate && !isFunction && sourceKey) {
-      let val = params.get(sourceKey);
+    if (hydrate && !isFunction && params.has(key)) {
+      let val = params.get(key);
       const currentVal = object[prop];
       urlApplied = true;
       if (typeof currentVal === 'number') {
         const num = parseUrlNumber(val);
         if (num === null) {
-          console.warn(`DeepLinkGUI: ignoring non-numeric URL value "${params.get(sourceKey)}" for "${sourceKey}"`);
+          console.warn(`DeepLinkGUI: ignoring non-numeric URL value "${params.get(key)}" for "${key}"`);
           val = currentVal;
           urlApplied = false;
           valClamped = true;
@@ -344,7 +342,7 @@ class DeepLinkGUI {
       } else if (typeof currentVal === 'boolean') {
         const flag = parseUrlBoolean(val);
         if (flag === null) {
-          console.warn(`DeepLinkGUI: ignoring unrecognized boolean URL value "${params.get(sourceKey)}" for "${sourceKey}"`);
+          console.warn(`DeepLinkGUI: ignoring unrecognized boolean URL value "${params.get(key)}" for "${key}"`);
           val = currentVal;
           urlApplied = false;
           valClamped = true;
@@ -361,7 +359,7 @@ class DeepLinkGUI {
         let idx = allowed.indexOf(val);
         if (idx < 0) idx = allowed.findIndex((opt) => String(opt) === String(val));
         if (idx < 0) {
-          console.warn(`DeepLinkGUI: ignoring out-of-range URL value "${params.get(sourceKey)}" for "${sourceKey}"`);
+          console.warn(`DeepLinkGUI: ignoring out-of-range URL value "${params.get(key)}" for "${key}"`);
           urlApplied = false;
           valClamped = true;
         } else {
