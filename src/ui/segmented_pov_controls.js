@@ -8,6 +8,7 @@
  * and the device-bounded spawn callback they drive.
  */
 
+import { MOBILE_BREAKPOINT_PX } from "../renderer/driver.js";
 import { pageWarmer } from "../segments/module_warmer.js";
 import {
   createSegmentSpawnGuard,
@@ -38,24 +39,27 @@ export function createSegmentPoolSpawner(segments, requestedCount, nav, isMobile
  *   folder is added under.
  * @param {import('../segments/segment_controller.js').SegmentController} deps.segments - The SegmentController the controls drive.
  * @param {Navigator | {deviceMemory?: number}} deps.nav - Source of the device hint.
- * @param {{isMobile: boolean}} deps.driver - The driver, read for the live layout.
+ * @param {Window | typeof globalThis} [deps.win] - Window supplying the page layout media query.
  * @param {(message: string) => void} deps.showNotice - Owner-tagged sink for the
  *   fallback report.
- * @returns {ReturnType<typeof createSegmentSpawnGuard>} The spawn guard, whose
+ * @returns {ReturnType<typeof createSegmentSpawnGuard> & {dispose: () => void}} The spawn guard, whose
  *   strand() the page teardown runs.
  */
 export function createSegmentedPovControls({
   gui,
   segments,
   nav,
-  driver,
+  win = globalThis,
   showNotice,
 }) {
   // The folder name and the segState property names are deep-link key segments
   // (view.Segmented POV.<prop>); renaming either invalidates links already shared.
   const segFolder = gui.addFolder('Segmented POV');
   segFolder.close();
-  const segMax = maxSegmentCount(nav, driver.isMobile);
+  const layout = win.matchMedia?.(`(max-width: ${MOBILE_BREAKPOINT_PX}px)`);
+  const isMobile = () => layout?.matches ?? false;
+  const segmentMax = () => maxSegmentCount(nav, isMobile());
+  const segMax = segmentMax();
   const segState = {
     segmented: segments.active,
     segments: Math.min(segments.count, segMax),
@@ -65,7 +69,7 @@ export function createSegmentedPovControls({
   // the warmModules() await.
   let segCount = segState.segments;
   // Assigned below, after the toggle whose deep-linked handler can reconcile it.
-  /** @type {{updateDisplay: () => void, setValue: (value: number) => void, onChange: Function}} */
+  /** @type {{updateDisplay: () => void, setValue: (value: number) => void, onChange: Function, max: (value: number) => *, name: (label: string) => *}} */
   let segCountCtrl;
   const syncSegmentCount = () => {
     const live = segments.count;
@@ -76,7 +80,7 @@ export function createSegmentedPovControls({
   const segSpawn = createSegmentSpawnGuard({
     warmModules: () => pageWarmer.warm(),
     spawn: createSegmentPoolSpawner(
-      segments, () => segCount, nav, () => driver.isMobile),
+      segments, () => segCount, nav, isMobile),
     isActive: () => segments.active,
   });
   // Declared ahead of the fallback, and assigned before its handler is wired: a
@@ -106,9 +110,7 @@ export function createSegmentedPovControls({
     }
   });
   const segLabel = segMax >= 6 ? 'Segments (6 = sim only)' : `Segments (max ${segMax} here)`;
-  segCountCtrl = (segMax === 2
-    ? segFolder.add(segState, 'segments', [2])
-    : segFolder.add(segState, 'segments', 2, segMax, 2)).name(segLabel);
+  segCountCtrl = segFolder.add(segState, 'segments', 2, segMax, 2).name(segLabel);
   segCountCtrl.onChange(async (/** @type {number} */ v) => {
     // A reconcile writes the value the handler already acted on.
     if (v === segCount) return;
@@ -122,5 +124,14 @@ export function createSegmentedPovControls({
   segFolder.addSession(segState, 'boundaries').name('Show Boundaries').onChange((/** @type {boolean} */ v) => {
     segments.showBoundaries = v;
   });
-  return segSpawn;
+  const layoutChanged = () => {
+    const max = segmentMax();
+    segCountCtrl.max(max).name(max >= 6 ? 'Segments (6 = sim only)' : `Segments (max ${max} here)`);
+    if (segCount > max) segCountCtrl.setValue(max);
+  };
+  layout?.addEventListener?.('change', layoutChanged);
+  return { ...segSpawn, dispose: () => {
+    layout?.removeEventListener?.('change', layoutChanged);
+    segSpawn.strand();
+  } };
 }

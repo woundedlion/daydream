@@ -592,7 +592,7 @@ export function start({
     gui: guiInstance,
     segments,
     nav,
-    driver: daydream,
+    win,
     showNotice: (message) => applyNotice.show(message, SEGMENT_NOTICE),
   });
 
@@ -645,7 +645,7 @@ export function start({
     sidebar,
     driver: daydream,
     segments,
-    strandSegmentWork: () => segSpawn?.strand(),
+    strandSegmentWork: () => segSpawn?.dispose(),
     removeOverlay: () => recording.removeOverlay(),
   });
 

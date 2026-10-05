@@ -86,8 +86,7 @@ export class LabelPool {
 
 
 
-/** Canvas-container width (px) at and below which rendering uses its compact layout.
- *  CSS rearranges the surrounding page independently based on viewport width. */
+/** Breakpoint shared by the page layout and compact canvas rendering. */
 export const MOBILE_BREAKPOINT_PX = 900;
 
 /**
@@ -291,7 +290,7 @@ export class Daydream {
 
     this.mainViewport = { x: 0, y: 0, width: 0, height: 0 };
     this.pipViewport = { x: 0, y: 0, width: 0, height: 0 };
-    this.isMobile = false;
+    this.compactViewport = false;
     this.fittedDistance = 0;
     this.setCanvasSize();
 
@@ -348,7 +347,7 @@ export class Daydream {
       const reason = e.statusMessage || "no reason reported";
       console.error(`[daydream] WebGL context lost: ${reason}`);
       this.contextLostDetail.textContent =
-        `${reason}. The GPU process was likely reset — reload to recover.`;
+        `${reason}. The GPU process was likely reset â€” reload to recover.`;
       overlay.style.display = "flex";
       overlay.focus({ preventScroll: true });
       // The canvas feeds no more frames into the capture stream, so end any
@@ -446,8 +445,8 @@ export class Daydream {
    * @param {(delta: number) => boolean} [movePreset] - Selects an adjacent preset.
    */
   keydown(e, movePreset = () => false) {
-    // An Alt/Ctrl/Meta chord is the browser's or the OS's — Ctrl+Space and
-    // Cmd+Space among them — so no playback shortcut claims one.
+    // An Alt/Ctrl/Meta chord is the browser's or the OS's â€” Ctrl+Space and
+    // Cmd+Space among them â€” so no playback shortcut claims one.
     if (e.altKey || e.ctrlKey || e.metaKey) return;
     if (e.key === ' ') {
       e.preventDefault();
@@ -473,10 +472,10 @@ export class Daydream {
     const container = this.canvasParent;
     const width = container.clientWidth;
     const height = container.clientHeight;
-    // Skip a 0×0 container: aspect = 0/0 = NaN would poison the projection matrix.
+    // Skip a 0Ã—0 container: aspect = 0/0 = NaN would poison the projection matrix.
     // The ResizeObserver re-invokes once laid out.
     if (width <= 0 || height <= 0) return;
-    this.isMobile = width <= MOBILE_BREAKPOINT_PX;
+    this.compactViewport = width <= MOBILE_BREAKPOINT_PX;
     this.mainViewport.x = 0;
     this.mainViewport.y = 0;
     this.mainViewport.width = width;
@@ -536,7 +535,7 @@ export class Daydream {
   /**
    * Animation-loop body, called once per animation frame with the active render
    * adapter. Advances the fixed-timestep simulation if an interval has accrued,
-   * updates controls, and repaints the main view, labels, and PiP — but only
+   * updates controls, and repaints the main view, labels, and PiP â€” but only
    * when the sim stepped, the camera moved, or invalidate() was called. Hands
    * this.recorder each newly completed frame the adapter reports capture-ready.
    * @param {{drawFrame: () => void, sync?: (advanced: boolean) => void,
@@ -559,7 +558,7 @@ export class Daydream {
       (clockReady || this.stepFrames !== 0) && this.stepSimulation(adapter);
     if (advanced || this.paused || this.needsRender) adapter?.sync?.(advanced);
 
-    // Services live pointer interaction; emits 'change' (→ needsRender).
+    // Services live pointer interaction; emits 'change' (â†’ needsRender).
     this.controls.update();
 
     if (!advanced && !this.needsRender) return;
@@ -572,7 +571,7 @@ export class Daydream {
     // Three throws if an attribute's array byteLength differs from the size it gave
     // the GPU buffer, and a mid-frame heap growth detaches the aliased instanceColor
     // array (byteLength 0). needsUpdate only ever bumps version, so a flagged upload
-    // cannot be cancelled — refresh the alias before retrying the repaint.
+    // cannot be cancelled â€” refresh the alias before retrying the repaint.
     if (this.dotMesh?.instanceColor && !isViewLive(this.dotMesh.instanceColor.array)) {
       adapter?.refreshPixelView?.();
       // The tick advanced and cannot be un-run, and the track is locked one frame
@@ -674,7 +673,7 @@ export class Daydream {
     this.labelPool.reset();
 
     if (this.labelAxes) {
-      // position is a unit direction, so position·cameraPos == |cameraPos|·cos(angle);
+      // position is a unit direction, so positionÂ·cameraPos == |cameraPos|Â·cos(angle);
       // scaling the cutoff by the live distance keeps the visible set zoom-independent.
       const facingThreshold =
         Daydream.LABEL_VISIBILITY_FRAMING_RATIO * this.camera.position.length();
@@ -750,7 +749,7 @@ export class Daydream {
    *   off), so on a large grid the toggle roughly halves the per-frame draw cost.
    */
   renderPip() {
-    if (!this.showPip || this.isMobile || this.nav.webdriver ||
+    if (!this.showPip || this.compactViewport || this.nav.webdriver ||
         this.recorder?.isRecording) return;
 
     this.renderer.setViewport(
@@ -827,10 +826,10 @@ export class Daydream {
              // Column gap-fill (persist effects, uColumnFillArc > 0): extend each
              // dot east-west into a PILL whose STRAIGHT (full-radius) middle
              // reaches the column-cell boundary, so a run of lit columns tiles
-             // flush — flat seams, no scalloping — and only the run's terminal
+             // flush â€” flat seams, no scalloping â€” and only the run's terminal
              // caps stay rounded. The dot's local +x is the longitude (sweep)
              // tangent after the per-instance lookAt. We TRANSLATE the two
-             // x-halves apart by ext (not scale — scaling a sphere yields an
+             // x-halves apart by ext (not scale â€” scaling a sphere yields an
              // oval): the bridge between them becomes a full-radius cylinder and
              // the original rounded caps ride OUT past the cell boundary into the
              // neighbour cell. Where the neighbour is lit, its own straight body
