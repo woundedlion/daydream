@@ -257,8 +257,8 @@ function checkedGroup(group, members, required, defaults = /** @type {D} */ ({})
  * @param {() => boolean} deps.host.isMobile - Whether to mount the panel collapsed.
  * @param {((text: string) => Promise<boolean>)|null} deps.host.copyText - Copies text
  *   using the browser's available clipboard path, null where there is none.
- * @param {() => void} deps.host.applyEffect - Rebuilds the panel from engine
- *   state (the Reset button).
+ * @param {() => void} deps.host.applyEffect - Reinstalls the active effect at
+ *   defaults, clears its URL params, and rebuilds the panel (the Reset button).
  * @param {EventTarget}
  *   deps.host.dragTarget - Where the drag-end listeners live (the window): a
  *   lil-gui drag continues outside the control's own DOM.
@@ -608,8 +608,8 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     /** @type {{reset: () => void, export: () => Promise<void>|void, presetIndex?: number, previousPreset?: () => boolean, nextPreset?: () => boolean}} */
     const effectActions = {
       /**
-       * Rebuild the effect GUI from the engine's current state, discarding
-       * edits. The rebuild discards the panel this button lives in, so the
+       * Reinstall the active effect at defaults, clear its URL params, and
+       * rebuild the panel. The rebuild discards this button, so the
        * keyboard focus and scroll offset are carried across it.
        * @returns {void}
        */
