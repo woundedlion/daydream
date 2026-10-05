@@ -98,10 +98,8 @@ export const URL_FLUSH_DEBOUNCE_MS = 200;
 // waiting out.
 export const URL_FLUSH_RETRY_MS = 2000;
 
-// Consecutive refused writes before the retry gives up and the buffer is
-// dropped. The product outlasts WebKit's 30 s rate-limit window, which is the
-// refusal a wait clears; a sandboxed iframe or a file:// document refuses every
-// write for the page's lifetime, and no number of retries reaches one.
+// Consecutive refused writes before the buffer is dropped. The retry window
+// outlasts WebKit's 30 s rate limit; persistent refusals still exhaust it.
 export const URL_FLUSH_MAX_RETRIES = 20;
 
 /**
