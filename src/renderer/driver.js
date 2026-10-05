@@ -466,8 +466,8 @@ export class Daydream {
   /**
    * Fit renderer, label layer, and both cameras to the container size. Switches
    * to mobile layout at MOBILE_BREAKPOINT_PX, sizes the square PiP viewport to 30% of
-   * the smaller dimension, and re-fits the camera distance so the sphere fills
-   * ~85% of the view.
+   * the smaller dimension, and re-fits the camera distance while it still equals
+   * the previous fit, so the sphere fills ~85% of the view. User zoom is preserved.
    */
   setCanvasSize() {
     const container = this.canvasParent;
