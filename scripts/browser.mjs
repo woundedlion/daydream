@@ -49,7 +49,7 @@ export const BROWSER_ARGS = [
  *   CHROME_PATH from; the process environment by default.
  * @param {string[]} [candidates] - Locations to search when no CHROME_PATH is
  *   declared; the standard install paths by default.
- * @returns {string} An existing executable path.
+ * @returns {string} An existing declared path or browser candidate.
  * @throws {Error} When neither $CHROME_PATH nor any candidate exists.
  */
 export function resolveBrowser(env = process.env, candidates = BROWSER_CANDIDATES) {

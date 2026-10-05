@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createPoleLodBinding } from '../src/renderer/pole_lod.js';
 
-// The Pole LOD control is registered during module evaluation and DeepLinkGUI
+// The Pole LOD control is registered during start() and DeepLinkGUI
 // replays a URL-hydrated value's onChange right there, while the engine is
 // still null — so the binding is the value's only durable home until the
 // module load resolves.
