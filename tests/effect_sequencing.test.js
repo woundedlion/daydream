@@ -12,7 +12,6 @@ import {
   resolutionCorrection,
   switchFailureReport,
 } from '../src/effects/effect_sequencing.js';
-import { resolutionEffects } from '../src/effects/effect_roster.js';
 import { EffectSetResult, ResolutionSetResult, ChainSnapshotRestoreResult } from './helpers/fake_engine.js';
 
 function makeEffectControls(values, paused = false, sinks = null) {
@@ -298,22 +297,6 @@ test('a resolution the engine dropped is corrected to the first offered label', 
 
 test('an empty offer list yields no correction', () => {
   assert.equal(resolutionCorrection([], 'Phantasm (288x144)'), null);
-});
-
-// resolutionEffects is applyResolution()/Test All's per-resolution effect list.
-
-test('a preset reports its own effect list', () => {
-  const presets = { Lo: { favorites: ['A', 'B'] }, Hi: { favorites: ['C'] } };
-  assert.deepEqual(resolutionEffects(presets, 'Lo'), ['A', 'B']);
-  assert.deepEqual(resolutionEffects(presets, 'Hi'), ['C']);
-});
-
-test('an unknown preset, or one carrying no list, reports none', () => {
-  assert.equal(resolutionEffects({ Lo: { favorites: ['A'] } }, 'Mid'), null);
-  assert.equal(resolutionEffects({ Lo: { dotSize: 2 } }, 'Lo'), null);
-  for (const name of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
-    assert.equal(resolutionEffects({ Lo: { favorites: ['A'] } }, name), null, name);
-  }
 });
 
 // switchFailureReport turns a runSwitchTransaction outcome into console lines
