@@ -669,11 +669,8 @@ export function generateFuncAndRecipe(item, baseNamespace = '') {
 }
 
 /**
- * Renders one stored mesh count for the doc comment. The counts come from
- * user-writable localStorage and land in text a human pastes into a C++ header,
- * so anything that is not a non-negative integer becomes 0 rather than reaching
- * the output; a count carrying a newline or a comment terminator would
- * otherwise splice arbitrary code around the generated function.
+ * Converts a persisted mesh count to a truncated non-negative integer for the
+ * generated doc comment. Nonfinite or negative results become 0.
  * @param {*} value - The persisted count.
  * @returns {number} The count as a non-negative integer, or 0.
  */
