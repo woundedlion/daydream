@@ -705,12 +705,8 @@ test('arena accounting honors per_param_name_bytes when declared', async () => {
 });
 
 test('the store bills a chain the arena bytes the validator does', () => {
-  // The validator's cursor lives inside validateChain and is not exported, so
-  // the agreement is pinned against the figure it prints rather than a third
-  // copy of the formula: a zero arena budget makes it print one for every
-  // chain. Padding depends on everything ahead of a block, so runs of blocks
-  // whose size is not a multiple of their alignment are what separate a cursor
-  // from per-block rounding.
+  // The validator reports the shared cursor's cost. A mixed-alignment fixture
+  // below pins that cost independently of the helper it reports.
   const probe = structuredClone(CATALOG);
   probe.budgets.arena_bytes = 0;
   const operators = new Map(CATALOG.operators.map(
@@ -722,6 +718,22 @@ test('the store bills a chain the arena bytes the validator does', () => {
     assert.ok(diagnostic, 'the validator reports an arena figure');
     return Number(/needs (\d+) arena bytes/.exec(diagnostic.message)[1]);
   };
+  const aligned = structuredClone(probe);
+  aligned.budgets.per_op_overhead_bytes = 1;
+  aligned.budgets.per_param_name_bytes = 0;
+  for (const operator of aligned.operators) operator.blocks = {};
+  const alignedOperators = new Map(aligned.operators.map((operator) => [operator.id, operator]));
+  alignedOperators.get('sphere.rotate.v2').blocks = {
+    param: { size: 5, align: 8 },
+    prepared: { size: 3, align: 16 },
+    state: { size: 7, align: 4 },
+  };
+  alignedOperators.get('project.stereographic.v2').blocks = {
+    param: { size: 2, align: 32 },
+  };
+  // Block ends: 5, 19, 27; overhead -> 28; projection -> 34; overheads -> 37.
+  assert.equal(compiler.chainArenaBytes(DEFAULT_SCRATCH_CHAIN.map(
+    (entry) => alignedOperators.get(entry.operator)), aligned.budgets), 37);
   const chains = [
     DEFAULT_SCRATCH_CHAIN,
     BASE.document.descriptor.chain,

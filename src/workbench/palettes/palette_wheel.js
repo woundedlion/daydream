@@ -186,7 +186,7 @@ function separateLabels(labels) {
  * @param {number} y - Canvas y, in pixels.
  * @param {number} width - Canvas width, in pixels.
  * @param {number} height - Canvas height, in pixels.
- * @returns {number} The hue, in turns, wrapped onto [0, 1).
+ * @returns {number} The hue, nominally in [0, 1); rounding near the seam may yield 1.
  */
 export function wheelTurnAt(x, y, width, height) {
   return wrapTurns(

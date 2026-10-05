@@ -86,8 +86,8 @@ async function drainBody(response) {
  * its freshly fetched importers.
  * @param {{performance?: Performance, fetch?: typeof globalThis.fetch,
  *   origin?: string, signal?: AbortSignal}} [dependencies]
- * @returns {Promise<void>} Resolves once every re-fetch has been read to the end
- *   of its body and the cache entry it replaces is written.
+ * @returns {Promise<void>} Resolves after the attempted re-fetches settle,
+ *   including failed requests and body reads.
  */
 export async function refreshModuleCache({
   performance: timeline = globalThis.performance,

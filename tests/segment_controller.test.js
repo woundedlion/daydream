@@ -2349,8 +2349,7 @@ test('the fault overlay is an alert that never takes focus', () => {
 });
 
 test('a fault latched outside tick() paints the overlay without waiting for one', () => {
-  // tick() is unreachable while the host is paused, so the fault path must paint
-  // the banner itself.
+  // A paused host need not tick, so the fault path paints the banner itself.
   const stats = fakeElement();
   const c = makeController();
   c.statsView.doc = {
