@@ -204,11 +204,6 @@
 }
 
 @media (max-width: 768px) {
-  :root {
-    --panel-height: 260px;
-    --sidebar-width: 0px;
-  }
-
   #canvasContainer {
     width: 100vw;
     height: 50vh;
