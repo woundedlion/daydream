@@ -53,9 +53,9 @@ test('sRGB transfer parity (srgb_to_linear / linear_to_srgb)', () => {
 
 /**
  * Pins the engine's OKLab transform to fixed golden values in both directions.
- * A WASM-versus-JS comparison can miss a coordinated drift shared by both
- * ports (e.g. a mistyped Ottosson coefficient copied into each) would slip
- * through; these absolutes catch a systematic shift in the matrices. The forward
+ * A coordinated drift shared by both ports (e.g. a mistyped Ottosson coefficient
+ * copied into each) would slip through a WASM-versus-JS comparison; these
+ * absolutes catch a systematic shift in the matrices. The forward
  * red golden is Ottosson's published reference (L≈0.628, a≈0.225, b≈0.126), so it
  * also pins the engine to the canonical OKLab definition, not just to itself.
  */
