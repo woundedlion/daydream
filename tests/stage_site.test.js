@@ -114,5 +114,9 @@ test('stage CLI uses the verified bundle and pair file', (t) => {
   delete env.HOLOSPHERE_BUNDLE_PIN;
   const result = spawnSync(process.execPath, [cli, f.bundle, f.site, 'pair.json'], { cwd: f.root, env, encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(spawnSync(process.execPath, [cli], { cwd: f.root, env }).status, 1);
+  assert.deepEqual(JSON.parse(readFileSync(join(f.site, 'deployment-pair.json'), 'utf8')), f.pair);
+  const missing = spawnSync(process.execPath, [cli], { cwd: f.root, env, encoding: 'utf8' });
+  assert.equal(missing.status, 1);
+  assert.equal(missing.stdout, '');
+  assert.match(missing.stderr, /Usage: stage-site\.mjs bundle destination pair\.json/);
 });
