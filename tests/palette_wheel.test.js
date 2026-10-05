@@ -333,3 +333,32 @@ test('the wheel caps display density at two and caches the resized raster', (t) 
   assert.equal(canvas.width, 320);
   assert.equal(ctx.rasters, 2);
 });
+
+
+test('a keyboard resample follows the selected hue key through later nudges', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { runInNewContext } = await import('node:vm');
+  const source = readFileSync(new URL('../src/workbench/palettes/palettes_page.js', import.meta.url), 'utf8');
+  const handler = source.slice(source.indexOf('function handleHueKeyNudge('), source.indexOf('\nfunction recipeWindow()'));
+  let mode = 'HARMONY';
+  let focused = 1;
+  const moved = [];
+  const context = {
+    selectedHueKey: 1, customHueOffsets: [0, 0.25, 0.5],
+    hueKeyNudgeTurns, wrapTurns: value => value % 1,
+    PaletteV4: { hueMode: { CUSTOM: 'CUSTOM' } },
+    readPaletteRecipe: () => ({ hue: { mode } }),
+    activateCustomHue: () => { context.selectedHueKey = 2; mode = 'CUSTOM'; return true; },
+    drawHueKeyWheel: () => {},
+    hueKeyHandles: [0, 1, 2].map(index => ({ focus: () => { focused = index; } })),
+    customBaseTurns: () => 0,
+    moveCustomHueKey: (_base, offsets, index) => { moved.push(index); return offsets; },
+    scheduleUpdate: () => {},
+  };
+  runInNewContext(handler, context);
+  const event = { key: 'ArrowRight', shiftKey: false, preventDefault() {} };
+  context.handleHueKeyNudge(event, focused);
+  assert.equal(focused, 2);
+  context.handleHueKeyNudge(event, focused);
+  assert.deepEqual(moved, [2, 2]);
+});
