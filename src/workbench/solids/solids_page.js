@@ -1326,7 +1326,7 @@ function openOpGate(reason) {
   showGateMsg(`op availability is no longer checked: ${reason}`);
 }
 
-  // Gray out add-op buttons whose op would be refused or trap on the current mesh; the
+// Gray out add-op buttons whose op would be refused or trap on the current mesh; the
 // sweep itself is createOpGate in solid_codegen.js.
 async function refreshOpGating() {
   const buttons = [...document.querySelectorAll('#addOpGrid [data-op]')];
@@ -1343,7 +1343,7 @@ async function refreshOpGating() {
   for (const btn of buttons) {
     btn.dataset.authoredDescription ??= btn.getAttribute('aria-describedby') ?? '';
     const blocked = probe.blocked.has(btn.dataset.op);
-  // An incomplete pass names only a lower bound on blocked candidates, so an
+    // An incomplete pass names only a lower bound on blocked candidates, so an
     // op it does not name stays where the last complete pass left it.
     if (!blocked && !probe.complete) continue;
     btn.setAttribute('aria-disabled', String(blocked));
