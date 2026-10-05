@@ -39,7 +39,8 @@ import {
   stageControlLabel,
 } from "../effects/shader_stages.js";
 
-/** @typedef {{name: string, value: number|boolean, min: number, max: number, animated?: boolean, readonly?: boolean, warning?: string, options?: string[], step?: number, acceptedValue?: number|boolean, requestedValue?: number|boolean}} ParameterDefinition */
+/** Engine toggles omit the range fields.
+ * @typedef {{name: string, value: number|boolean, min?: number, max?: number, animated?: boolean, readonly?: boolean, warning?: string, options?: string[], step?: number, acceptedValue?: number|boolean, requestedValue?: number|boolean}} ParameterDefinition */
 /** @typedef {import("./effect_panel_view.js").PanelController & Record<string, any>} GuiController */
 /** @typedef {import("./effect_panel_view.js").PanelFolder & Record<string, any>} Gui */
 /** @typedef {Record<string, any> & {gui: Gui, pause: {animationState: {pause: boolean}, controller: GuiController|null, setPaused: (value: boolean) => void}, paramNames: string[], controllerByName: Map<string, GuiController>}} EffectRecord */
@@ -130,7 +131,7 @@ export function addParamControl(
     controller = add(state, p.name, p.min, p.max, 1).decimals(0);
   } else {
     controller = add(state, p.name, p.min, p.max)
-      .decimals(sliderDecimals(p.min, p.max));
+      .decimals(sliderDecimals(/** @type {number} */ (p.min), /** @type {number} */ (p.max)));
   }
   controller.isBoolean = (kind === 'boolean');
   controller.isEnum = (kind === 'enum');
