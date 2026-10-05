@@ -130,7 +130,7 @@ const declares = (method) => new RegExp(
     + `(?:=\\s*(?:async\\s+)?(?:function|\\()|\\()`,
   'm');
 
-test('WebGLRenderer still assigns the methods initScene calls', () => {
+test('WebGLRenderer still assigns the methods initScene and the driver call', () => {
   const source = THREE.WebGLRenderer.toString();
   for (const method of ['setSize', 'setPixelRatio', 'render', 'dispose', 'forceContextLoss',
     'setScissorTest', 'setViewport', 'setScissor', 'setAnimationLoop']) {
