@@ -9,6 +9,7 @@
 // object[prop]` and returns undefined for anything it has no controller for,
 // after logging. A double that hands back a controller for every property turns
 // a browser-side `TypeError: … reading 'onChange'` into a green run.
+import { enumChoices } from '../src/effects/param_sync.js';
 import { GUI as DeepLinkGUI } from '../src/ui/gui.js';
 import { fakePanelGui } from './helpers/fake_app.js';
 import { test, afterEach } from 'node:test';
@@ -283,3 +284,18 @@ for (const search of ['', '?test.value=x']) {
     assert.ok(fake.add({}, 'value', ['a', 'b']));
   });
 }
+
+
+test('real lil-gui maps the third sparse option to numeric ID six', async () => {
+  const gui = await realGUI();
+  const state = { Pattern: 6 };
+  const controller = gui.add(state, 'Pattern',
+    enumChoices(['Cubic', 'Octet Truss', 'Shells'], [0, 1, 6]));
+  assert.equal(controller.getValue(), 6);
+  assert.equal(controller.$select.selectedIndex, 2);
+  controller.setValue(0);
+  assert.equal(controller.$select.selectedIndex, 0);
+  controller.$select.selectedIndex = 2;
+  controller.$select.dispatch('change');
+  assert.equal(state.Pattern, 6);
+});

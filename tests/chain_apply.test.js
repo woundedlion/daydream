@@ -1,7 +1,7 @@
 //
 // src/workbench/shader/chain_apply.js applies a compiled chain document to the chain engine
 // in one fixed order: setShaderChain, then the preset values by parameter id
-// (enum8s as the option index the post-APPLIED definitions resolve), then the
+// (enum8s as the engine value the post-APPLIED definitions resolve), then the
 // GUI resync and repaint. The engine double is tests/helpers/fake_engine.js's
 // FakeChainEngine, which rebuilds definitions from the pinned catalog and
 // bumps the param generation on every APPLIED exactly as the module does.
@@ -304,4 +304,25 @@ test('FakeChainEngine refuses invalid snapshot writes and runtime atomically', (
   }
   assert.equal(bindings.restoreSnapshot(target), ChainSnapshotRestoreResult.APPLIED);
   assert.deepEqual(bindings.getSnapshot(), target);
+});
+
+
+test('chain presets write sparse option IDs and refuse numeric gaps before writing', () => {
+  for (const value of ['Shells', 6, 2]) {
+    const { engine, run } = harness();
+    engine.getParameterDefinitions = () => [{ name: 'sample.pattern',
+      options: ['Cubic', 'Octet Truss', 'Shells'], optionValues: [0, 1, 6] }];
+    engine.bindings.setShaderChainParameters = writes => {
+      engine.writes.push(...writes.map(({ name, value }) => [name, value]));
+      return ParamSetResult.APPLIED;
+    };
+    const result = run(compiledDocument({ 'sample.pattern': value }));
+    if (value === 2) {
+      assert.match(result, /has no option value 2/);
+      assert.deepEqual(engine.writes, []);
+    } else {
+      assert.equal(result, null);
+      assert.deepEqual(engine.writes, [['sample.pattern', 6]]);
+    }
+  }
 });

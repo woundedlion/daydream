@@ -13,7 +13,7 @@ import {
   URL_FLUSH_DEBOUNCE_MS,
   getActiveURLSync,
 } from '../src/app/state.js';
-import { engineParamValue } from '../src/effects/param_sync.js';
+import { engineParamValue, enumChoices } from '../src/effects/param_sync.js';
 import { createDisplayCapsBinding } from '../src/renderer/display_caps.js';
 import {
   snapshotEffectControlState,
@@ -966,4 +966,22 @@ test('a control hydrates only from its own exact key', () => {
   assert.equal(gui.readStoredNumber('__accepted.Planar Warp 1'), undefined);
   assert.equal(gui.urlParams().get('fx.Planar Warp'), '2');
   assert.equal(gui.urlParams().get('fx.planar warp 1'), '1');
+});
+
+
+test('sparse enum deep links hydrate numeric IDs and reject ordinal gaps', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  for (const value of [0, 1, 6, 2]) {
+    installWindowAt(`?Pattern=${value}`);
+    const gui = new DeepLinkGUI({ autoPlace: false });
+    const state = { Pattern: 0 };
+    const replayed = [];
+    const warnings = captureWarnings(() => {
+      gui.add(state, 'Pattern', enumChoices(['Cubic', 'Octet Truss', 'Shells'], [0, 1, 6]))
+        .onChange(current => replayed.push(current));
+    });
+    assert.equal(state.Pattern, value === 2 ? 0 : value);
+    assert.deepEqual(replayed, value === 2 ? [] : [value]);
+    assert.equal(warnings.length, value === 2 ? 1 : 0);
+  }
 });

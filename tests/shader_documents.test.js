@@ -2199,3 +2199,22 @@ test('the descriptor digest button copies the full digest and announces failures
     else delete globalThis.navigator;
   }
 });
+
+
+test('fixed document presets preserve sparse option IDs and refuse numeric gaps', () => {
+  for (const value of ['Shells', 6, 2]) {
+    const engine = fixedEngine(() => true);
+    engine.getParameterDefinitions = () => [{ name: 'Pattern Freq',
+      options: ['Cubic', 'Octet Truss', 'Shells'], optionValues: [0, 1, 6] }];
+    const compiled = fixedDocument();
+    compiled.document.preset_bank.presets[0].values = { 'sample.pattern-freq': value };
+    const result = applyFixedShaderDocument(engine, MODULE, compiled, 'noon', ['noon'], BAKED, fixedDerivedBinding);
+    if (value === 2) {
+      assert.match(result, /has no option value 2/);
+      assert.deepEqual(engine.writes, []);
+    } else {
+      assert.equal(result, null);
+      assert.deepEqual(engine.writes, [['Pattern Freq', 6]]);
+    }
+  }
+});

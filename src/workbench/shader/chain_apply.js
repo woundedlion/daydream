@@ -5,9 +5,9 @@
  */
 
 import { callWorkbenchBinding } from '../../engine/workbench_bindings.js';
-import { enumConstantName, optionIndex } from '../../effects/param_sync.js';
+import { enumConstantName, optionValue } from '../../effects/param_sync.js';
 
-/** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[]}} ParameterDefinition */
+/** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[], optionValues?: number[]}} ParameterDefinition */
 /** @typedef {{document: *, descriptor_digest?: string}} CompiledDocument */
 
 /**
@@ -18,12 +18,9 @@ import { enumConstantName, optionIndex } from '../../effects/param_sync.js';
  * is a trust boundary, not UX: it is surfaced verbatim with its {code,
  * entryIndex} rather than translated.
  *
- * Every APPLIED setShaderChain bumps the engine's param generation and
- * rebuilds the parameter definitions, so the definitions are snapshot only
- * after the chain lands; enum8 values (topology fields included) are written
- * as the option index that snapshot resolves them to. Every value is resolved
- * against that snapshot before the first write, so a value the engine would
- * refuse aborts the apply with no value written at all.
+ * Parameter definitions are read after setShaderChain applies. Enum8 labels
+ * resolve to engine values in that snapshot. chain_apply.test.js pins resolution
+ * of preset values before the first parameter write.
  *
  * A session bypass compiles a program shape that omits document entries; the
  * omitted instances register no engine parameters, so their preset values are
@@ -83,12 +80,14 @@ export function applyChainDocument({
     if (definition.readonly) return refuse(`"${parameterId}" is read-only`);
     let stored = value;
     if (typeof value === 'string') {
-      const index = optionIndex(definition, value);
-      if (index < 0) return refuse(`"${parameterId}" has no option "${value}"`);
-      stored = index;
+      const resolved = optionValue(definition, value);
+      if (resolved === null) return refuse(`"${parameterId}" has no option "${value}"`);
+      stored = resolved;
     }
     if (typeof stored !== 'number' || !Number.isFinite(stored))
       return refuse(`"${parameterId}" has no numeric value`);
+    if (definition.optionValues && !definition.optionValues.includes(stored))
+      return refuse(`"${parameterId}" has no option value ${stored}`);
     writes.push({ name: parameterId, value: stored });
   }
 

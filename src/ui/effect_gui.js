@@ -40,7 +40,7 @@ import {
 } from "../effects/shader_stages.js";
 
 /** Engine toggles omit the range fields.
- * @typedef {{name: string, value: number|boolean, min?: number, max?: number, animated?: boolean, readonly?: boolean, warning?: string, options?: string[], step?: number, acceptedValue?: number|boolean, requestedValue?: number|boolean}} ParameterDefinition */
+ * @typedef {{name: string, value: number|boolean, min?: number, max?: number, animated?: boolean, readonly?: boolean, warning?: string, options?: string[], optionValues?: number[], step?: number, acceptedValue?: number|boolean, requestedValue?: number|boolean}} ParameterDefinition */
 /** @typedef {import("./effect_panel_view.js").PanelController & Record<string, any>} GuiController */
 /** @typedef {import("./effect_panel_view.js").PanelFolder & Record<string, any>} Gui */
 /** @typedef {Record<string, any> & {gui: Gui, pause: {animationState: {pause: boolean}, controller: GuiController|null, setPaused: (value: boolean) => void}, paramNames: string[], controllerByName: Map<string, GuiController>}} EffectRecord */
@@ -124,8 +124,7 @@ export function addParamControl(
   if (kind === 'boolean') {
     controller = add(state, p.name);
   } else if (kind === 'enum') {
-    // Dropdown of labels whose values are the option indices the engine expects.
-    controller = add(state, p.name, enumChoices(p.options ?? []));
+    controller = add(state, p.name, enumChoices(p.options ?? [], p.optionValues));
   } else if (kind === 'integer') {
     // The engine truncates a fractional write, so offer only what it can hold.
     controller = add(state, p.name, p.min, p.max, 1).decimals(0);
@@ -136,6 +135,7 @@ export function addParamControl(
   controller.isBoolean = (kind === 'boolean');
   controller.isEnum = (kind === 'enum');
   controller.enumOptions = p.options;
+  controller.enumOptionValues = p.optionValues;
   controller.isContinuous = (kind === 'number' || kind === 'integer');
   if (p.warning) {
     const widget = focusWidget(controller) ?? controller.domElement;
@@ -465,7 +465,8 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       if (!c) continue;
       if (c.isEnum && !segmentsOwnDisplay()) continue;
       const liveValue = c.isEnum
-        ? selectorControlValue({ value: values[i], options: c.enumOptions })
+        ? selectorControlValue({ value: values[i], options: c.enumOptions,
+          optionValues: c.enumOptionValues })
         : values[i];
 
       const isEditing = c.dragging
@@ -909,7 +910,12 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       }
       controller.onChange((/** @type {number|boolean} */ v) => {
         const value = engineParamValue(v);
-        const accepted = setEngineParam(p.name, value) !== false;
+        const offered = !p.optionValues || p.optionValues.includes(value);
+        const accepted = offered && setEngineParam(p.name, value) !== false;
+        if (!offered) {
+          controller.object[controller.property] = acceptedControlValue;
+          controller.updateDisplay();
+        }
         if (accepted) acceptedControlValue = v;
         controller.acceptUrlValue?.(acceptedControlValue);
         const edited = { name: p.name, accepted: acceptedControlValue };
