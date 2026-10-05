@@ -2,7 +2,7 @@
 // module. MeshOps reports a recoverable failure as a null plus a reason in
 // getLastResult(), and the flush that follows overwrites that reason — so the
 // stand-in clears its recorded reason on clearToolingMemory(), which turns any
-// sequence that reads the reason too late into an 'UNKNOWN' message rather than
+// sequence that reads the reason too late into a generic rejection message rather than
 // a passing test.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
