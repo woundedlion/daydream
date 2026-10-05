@@ -127,6 +127,21 @@ test('a setShaderChain refusal is surfaced verbatim and stops the apply', () => 
     'a refused chain writes no values and repaints nothing');
 });
 
+test('an injected APPLIED cannot report success without applying the chain', () => {
+  const { engine, order, run } = harness();
+  const generation = engine.generation;
+  const program = engine.program;
+  const definitions = engine.definitions;
+  const compiled = compiledDocument();
+  compiled.document.descriptor.chain.shift();
+  engine.nextChainResult = { code: 'APPLIED', entryIndex: -1 };
+  assert.throws(() => run(compiled), /Injected chain results must be refusals/);
+  assert.equal(engine.generation, generation);
+  assert.equal(engine.program, program);
+  assert.equal(engine.definitions, definitions);
+  assert.deepEqual(order, ['setShaderChain']);
+});
+
 test('an entry-level refusal names the offending chain entry', () => {
   for (const index of [0, 1]) {
     const { run } = harness();
