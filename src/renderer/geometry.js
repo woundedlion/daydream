@@ -17,7 +17,7 @@ const TWO_PI = 2 * Math.PI;
  * The azimuth is `π/2 − θ`, not `θ`: THREE.Spherical measures theta from +Z
  * (`x = sinφ·sinθ`), but the engine's `pixel_to_vector` measures it from +X
  * (`x = sinφ·cosθ`, README §2: column x=0 sits at +X). The `π/2 − θ` complement
- * makes THREE reproduce the engine vector exactly, avoiding an x↔z mirror
+ * makes THREE use the engine's coordinate convention, avoiding an x↔z mirror
  * (det=−1 reflection) that would render chiral content opposite-handed.
  *
  * Latitude endpoints are LED-center angles exported by the engine.
