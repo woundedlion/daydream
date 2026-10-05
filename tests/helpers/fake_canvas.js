@@ -1,6 +1,7 @@
 /**
- * Recording stand-in for a CanvasRenderingContext2D. Every drawing call lands in
- * `ops` in order, and every state assignment is a plain property.
+ * Recording stand-in for a CanvasRenderingContext2D. Drawing calls accumulate in
+ * `ops`; putImageData stores the last image in `painted`. State assignments are
+ * plain properties.
  * @returns {Object} The context double.
  */
 export function fakeContext() {
