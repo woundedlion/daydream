@@ -358,10 +358,8 @@ test('URLSync holds its ad-hoc buffer through a refused history write', () => {
 });
 
 /**
- * The rate limit the retry waits out clears on its own. A sandboxed iframe or a
- * file:// document refuses every write for the page's lifetime, and an unbounded
- * retry answers that with a 2-second timer and a console line per iteration,
- * forever, holding a buffer nothing will ever land.
+ * Persistent history-write refusals exhaust the retry budget and release the
+ * buffered URL changes.
  */
 test('URLSync bounds its retries of a refused history write', () => {
   const written = [];
