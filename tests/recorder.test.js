@@ -192,7 +192,6 @@ test('blitToOffscreen clears the whole offscreen before drawing into it', () => 
   assert.deepEqual(log, ['clear:0,0,100,100', 'draw:0,25,100,50']);
 });
 
-
 // ---------------------------------------------------------------------------
 // MediaRecorder session lifecycle, behind a fake MediaRecorder/captureStream.
 // ---------------------------------------------------------------------------
@@ -2092,7 +2091,6 @@ test('a streaming write failure after Stop reaches the save-error UI', async () 
     restore();
   }
 });
-
 
 test('superseded recorder guards ignore fallback and memory overflow', async () => {
   const restore = installRecorderEnv();

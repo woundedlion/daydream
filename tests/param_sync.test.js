@@ -152,8 +152,6 @@ test('a boolean carrying labels stays a toggle', () => {
 // engineParamValue coerces a GUI value to the float setParameter takes, for both
 // the deep-link seeding pass and the per-change write.
 
-
-
 test('a boolean becomes 1.0/0.0', () => {
   assert.equal(engineParamValue(true), 1.0);
   assert.equal(engineParamValue(false), 0.0);
@@ -241,14 +239,12 @@ test('an engine enum value is logged by its constant name', () => {
     'a value the mirrored table lacks still names something in the log line');
 });
 
-
 test('document enum options normalize case, whitespace, and hyphens', () => {
   const definition = { options: ['Solid Fill', 'Point Cloud'] };
   assert.equal(optionIndex(definition, '  point-cloud  '), 1);
   assert.equal(optionIndex(definition, 'SOLID   FILL'), 0);
   assert.equal(optionIndex(definition, 'unknown'), -1);
 });
-
 
 test('coupled replay stops when no refused write can advance', async () => {
   const { replayParameterWrites } = await import('../src/effects/param_sync.js');
@@ -259,7 +255,6 @@ test('coupled replay stops when no refused write can advance', async () => {
   assert.deepEqual(calls, ['A', 'B']);
   assert.deepEqual(refused, [{ name: 'A', result: 1 }, { name: 'B', result: 1 }]);
 });
-
 
 test('selector indices round and clamp to available options', () => {
   assert.equal(selectorControlValue({ value: 1.6, options: ['A', 'B', 'C'] }), 2);
