@@ -964,5 +964,5 @@ test('a control hydrates only from its own exact key', () => {
   gui.add(state, 'Planar Warp 1', {None: 0, Mirror: 1, Curl: 2});
   assert.equal(state['Planar Warp 1'], 0);
   assert.equal(gui.readStoredNumber('__accepted.Planar Warp 1'), undefined);
-  assert.equal(gui.urlParams().get('fx.Outer Warp'), '2');
+  assert.equal(gui.urlParams().get('fx.Other Name'), '2');
 });
