@@ -726,6 +726,7 @@ function renderSavedList() {
     const el = document.createElement('div');
     el.className = 'saved-item relative pr-6';
     const funcName = savedFuncName(item);
+    const cardName = `${funcName ?? item.title} (card ${savedSolids.length - index})`;
     const inRegistry = funcName !== null && registrySolidNames.has(funcName);
     if (funcName && (inRegistry || nameCounts.get(funcName) > 1)) {
       el.classList.add('name-clash');
@@ -784,7 +785,7 @@ function renderSavedList() {
       copyButton.type = 'button';
       copyButton.className = 'action-btn';
       copyButton.dataset.copy = kind;
-      copyButton.setAttribute('aria-label', ariaLabel);
+      copyButton.setAttribute('aria-label', `${ariaLabel} for ${cardName}`);
       copyButton.textContent = 'C++';
       row.append(rowLabel, copyButton);
       actionStack.appendChild(row);
@@ -793,7 +794,7 @@ function renderSavedList() {
     el.append(deleteButton, restoreButton, actions);
 
     restoreButton.addEventListener('click', () => restoreSolid(item));
-    deleteButton.setAttribute('aria-label', `Delete ${item.title}`);
+    deleteButton.setAttribute('aria-label', `Delete ${cardName}`);
     deleteButton.addEventListener('click', () => {
       deleteSolid(index);
     });
