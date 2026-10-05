@@ -40,6 +40,19 @@ const fail = (...args) => {
   return expectFailure(process.execPath, [SCRIPT, ...args], { cwd: root, env });
 };
 
+// The runner reports the floor on the spec stream rather than on stderr.
+const failOutput = (...args) => {
+  trackFixture();
+  try {
+    execFileSync(process.execPath, [SCRIPT, ...args], {
+      cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (error) {
+    return `${error.stdout}${error.stderr}`;
+  }
+  return assert.fail('the command was expected to exit non-zero');
+};
+
 test('a passing suite that loads every source module passes', () => {
   assert.match(run(PATTERN), /source modules were loaded by tests/);
 });
@@ -124,19 +137,6 @@ test('a redundant exemption fails', () => {
 test('no test pattern fails', () => {
   assert.match(fail('--experimental-test-module-mocks'), /pass the test file patterns/);
 });
-
-// The runner reports the floor on the spec stream rather than on stderr.
-const failOutput = (...args) => {
-  trackFixture();
-  try {
-    execFileSync(process.execPath, [SCRIPT, ...args], {
-      cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'],
-    });
-  } catch (error) {
-    return `${error.stdout}${error.stderr}`;
-  }
-  return assert.fail('the command was expected to exit non-zero');
-};
 
 // Loading a module is not executing it: the roster gate passes on a module one
 // import touches, and only the floor answers for the body that never ran.
@@ -265,7 +265,6 @@ test('malformed exemption JSON fails instead of waiving the roster', () => {
   writeFileSync(join(root, EXEMPT), '{broken');
   assert.match(fail(PATTERN), /uncovered-modules\.json is unreadable/);
 });
-
 
 test('assertion accounting preserves callback-style asynchronous tests', () => {
   writeFileSync(join(root, 'tests/sample.test.js'),

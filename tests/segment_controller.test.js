@@ -14,24 +14,6 @@ import { FakeWorker } from './helpers/fake_worker.js';
 import { displayAliasesDiverged, repointDisplayAliases } from '../src/engine/display_aliases.js';
 import { Daydream } from '../src/renderer/driver.js';
 import { createRenderAdapter } from '../src/app/app_lifecycle.js';
-
-// Stand-in for the injected Daydream renderer: the grid and display buffer the
-// compositor reads, plus the dot mesh the second display alias lives on.
-const driver = {
-  W: 0, H: 0, pixels: null,
-  dotMesh: { instanceColor: fakeColorAttribute(null) },
-  invalidations: 0,
-  invalidate() { this.invalidations++; },
-};
-
-
-/** @param {number} width - Columns. @param {number} height - Rows. */
-function setDisplayGrid(width, height) {
-  driver.W = width; driver.H = height;
-  driver.pixels = new Uint16Array(width * height * 3);
-}
-
-
 import {
   SegmentController,
   MAX_BOOT_RETRIES,
@@ -43,6 +25,21 @@ import {
 } from '../src/segments/segment_controller.js';
 import { ModuleWarmer, warmModules, pageWarmer, EMPTY_WASM } from './fixtures/module_warmer_fixture.js';
 import { PROTOCOL_VERSION, FAULT_POOL, FAULT_RENDER } from '../src/segments/worker_protocol.js';
+
+// Stand-in for the injected Daydream renderer: the grid and display buffer the
+// compositor reads, plus the dot mesh the second display alias lives on.
+const driver = {
+  W: 0, H: 0, pixels: null,
+  dotMesh: { instanceColor: fakeColorAttribute(null) },
+  invalidations: 0,
+  invalidate() { this.invalidations++; },
+};
+
+/** @param {number} width - Columns. @param {number} height - Rows. */
+function setDisplayGrid(width, height) {
+  driver.W = width; driver.H = height;
+  driver.pixels = new Uint16Array(width * height * 3);
+}
 
 const EXPECTED_CONSOLE_MESSAGES = {
   log: [
@@ -319,7 +316,6 @@ async function publishGeneration(controller, bands) {
   bands.forEach((band, segId) => deliverFrame(controller, segId, band));
   await flush();
 }
-
 
 /**
  * Deliver a worker->controller 'frame' message to segment `segId`.

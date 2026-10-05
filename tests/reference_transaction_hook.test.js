@@ -77,13 +77,6 @@ describe(
       return { status: run.status, stderr: run.stderr };
     };
 
-    test('malformed records fail closed without an audit entry', () => {
-      const result = runHook([`${mid} refs/heads/master`]);
-      assert.equal(result.status, 1);
-      assert.match(result.stderr, /malformed reference transaction/);
-      assert.equal(existsSync(logPath()), false);
-    });
-
     const tokenPath = () => join(repo, '.git', 'hs-allow-nonff');
     const logPath = () => join(repo, '.git', 'hs-nonff.log');
     const writeToken = (value) => writeFileSync(tokenPath(), `${value}\n`);
@@ -119,6 +112,13 @@ describe(
 
     after(() => {
       rmSync(root, { recursive: true, force: true });
+    });
+
+    test('malformed records fail closed without an audit entry', () => {
+      const result = runHook([`${mid} refs/heads/master`]);
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /malformed reference transaction/);
+      assert.equal(existsSync(logPath()), false);
     });
 
     test('refuses deletion of master', () => {
