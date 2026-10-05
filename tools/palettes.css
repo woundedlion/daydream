@@ -326,10 +326,6 @@ body {
   background: var(--slate-900);
 }
 
-input[type=checkbox] {
-  accent-color: var(--blue-500);
-}
-
 .r-thumb::-webkit-slider-thumb {
   background: #EF4444; /* Red */
 }
