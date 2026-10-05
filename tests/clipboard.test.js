@@ -1,6 +1,6 @@
 //
-// copyWithFeedback's transient label swap. Key invariant: a second copy within
-// revertMs must not latch the element on "Copied!".
+// Clipboard writes, execCommand fallbacks, focus restoration, copy-block wiring,
+// and copyWithFeedback's transient label swap.
 import { test, mock, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
