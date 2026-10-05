@@ -1034,10 +1034,12 @@ function wireRowDrag(grip, index, el, list, revision) {
   createPointerDrag({
     element: grip,
     onStart: (e) => {
+      if (!wasmModule) return;
       originY = e.clientY;
       dragging = false;
     },
     onMove: (e) => {
+      if (!wasmModule) return;
       if (!dragging) {
         if (Math.abs(e.clientY - originY) < DRAG_SLOP_PX) return;
         dragging = true;
@@ -1075,6 +1077,7 @@ function wireRowDrag(grip, index, el, list, revision) {
       if (!dragging) return;
       dragging = false;
       clearPreview();
+      if (!wasmModule) return;
 
       const rawTarget = getDragTargetIndex(e, list);
       const toIndex = dropTargetIndex(rawTarget, index);
