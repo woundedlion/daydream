@@ -1614,12 +1614,23 @@ test('the glue honours instantiateWasm, and shared-module instances stay isolate
   }
 });
 
-test('simulator consumes the WASM display geometry', async () => {
+test('simulator consumes the active WASM display geometry', async () => {
   const { pixelToSpherical } = await import('../src/renderer/geometry.js');
-  const dims = { W: 288, H: 144, DISPLAY_PROFILE: M.DISPLAY_PROFILE,
-    DISPLAY_NORTH_PHI: M.DISPLAY_NORTH_PHI, DISPLAY_SOUTH_PHI: M.DISPLAY_SOUTH_PHI };
-  assert.equal(pixelToSpherical(0, 0, dims).phi, M.DISPLAY_NORTH_PHI);
-  assert.ok(Math.abs(pixelToSpherical(0, 143, dims).phi - M.DISPLAY_SOUTH_PHI) < 1e-12);
+  const { createDisplayCapsBinding } = await import('../src/renderer/display_caps.js');
+  const dims = { W: 288, H: 144, DISPLAY_NORTH_PHI: 0, DISPLAY_SOUTH_PHI: Math.PI };
+  const caps = createDisplayCapsBinding({ getEngine: () => engine,
+    onChange: geometry => Object.assign(dims, geometry) });
+  assert.equal(caps.apply(), true);
+  assert.equal(pixelToSpherical(0, 0, dims).phi, 0);
+  assert.ok(Math.abs(pixelToSpherical(0, dims.H - 1, dims).phi - Math.PI) < 1e-6);
+  try {
+    Object.assign(caps.state, { topCap: 2, bottomCap: 3 });
+    assert.equal(caps.apply(), true);
+    assert.ok(Math.abs(pixelToSpherical(0, 0, dims).phi - Math.PI * 0.02) < 1e-6);
+    assert.ok(Math.abs(pixelToSpherical(0, dims.H - 1, dims).phi - Math.PI * 0.97) < 1e-6);
+  } finally {
+    engine.setDisplayCaps(0, 0);
+  }
 });
 
 test('display caps default to full coverage and validate requests without rebuilding', () => {
