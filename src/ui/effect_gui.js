@@ -359,8 +359,11 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     return false;
   }
 
-  /** Update the pause controller without writing back to the engine. */
-  /** @param {EffectRecord} fx @param {boolean|undefined} paused */
+  /**
+   * Update the pause controller without writing back to the engine.
+   * @param {EffectRecord} fx
+   * @param {boolean|undefined} paused
+   */
   function adoptPauseDisplay(fx, paused) {
     if (paused === undefined || paused === fx.pause.animationState.pause) return;
     fx.pause.animationState.pause = paused;
@@ -368,8 +371,12 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     fx.gui.writeStoredValue('pause', paused);
   }
 
-  /** Update the preset controller and its visibility from live engine state. */
-  /** @param {EffectRecord} fx @param {number} count @param {number} index */
+  /**
+   * Update the preset controller and its visibility from live engine state.
+   * @param {EffectRecord} fx
+   * @param {number} count
+   * @param {number} index
+   */
   function adoptPresetDisplay(fx, count, index) {
     if (!fx.preset || count <= 0) return;
     if (fx.preset.state.presetIndex === index) return;
