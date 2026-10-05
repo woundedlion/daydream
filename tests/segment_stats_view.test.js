@@ -33,7 +33,7 @@ const pageElement = (tag) => fakeElement(tag, { connected: true });
 
 /**
  * Overlay document stand-in: the stats container plus the two global stat bars
- * the overlay hides. Every element it creates throws on an innerHTML write, so
+ * the overlay hides. Every element it creates throws on a non-empty innerHTML write, so
  * a regression from text nodes to markup assignment fails the test rather than
  * passing silently.
  * @returns {{doc: Object, stats: Object, desktop: Object, mobile: Object}} Document and its elements.
