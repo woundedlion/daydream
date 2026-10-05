@@ -1588,8 +1588,8 @@ test('preset and stage writes preserve the animation state', async () => {
 });
 
 // §4.6/§4.8: a descriptor edit breaks the match with the promoted
-// build and disarms the toggle. A bypass is a program-shape override and a dock
-// edit writes a preset value, so neither touches the descriptor digest.
+// build and disarms the toggle. A bypass is a program-shape override and a chip
+// control edit writes a preset value, so neither touches the descriptor digest.
 test('the parity toggle disarms on a descriptor edit, not on a bypass', async () => {
   const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
   const toggle = harness.elements.get('shader-parity-toggle');
