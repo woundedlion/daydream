@@ -333,10 +333,14 @@ for (const baseUrl of ['not a URL', 'file:///tmp/src/segments/module_warmer.js']
   });
 }
 
-test('warm without fetch is a no-op', async () => {
+test('warm without fetch is a no-op', async (t) => {
   const warmer = new ModuleWarmer();
-  await warmer.warm({ fetch: null });
+  const warn = t.mock.method(console, 'warn', () => {});
+  await warmer.warm({ fetch: null,
+    baseUrl: 'http://localhost:8000/src/segments/segment_controller.js' });
   assert.equal(warmer.module, null);
+  assert.equal(warmer.lastWarmKey, null, 'no warm was started');
+  assert.equal(warn.mock.callCount(), 0);
 });
 
 test('an HTTP error reports its status and re-arms the warm window', async (t) => {
