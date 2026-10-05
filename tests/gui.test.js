@@ -957,8 +957,8 @@ test('a fallback URL writer hands pending keys to a newly registered URLSync', (
 });
 
 
-test('controls and accepted values ignore retired parameter names', () => {
-  installWindowAt('?fx.Outer+Warp=2&fx.__accepted.Outer+Warp=6');
+test('a control hydrates only from its own exact key', () => {
+  installWindowAt('?fx.Other+Name=2&fx.__accepted.Other+Name=6');
   const gui = new DeepLinkGUI({autoPlace: false}, 'fx');
   const state = {'Planar Warp 1': 0};
   gui.add(state, 'Planar Warp 1', {None: 0, Mirror: 1, Curl: 2});
