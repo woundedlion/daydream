@@ -256,9 +256,9 @@ function balancedParens(text) {
  * text that was written. Two layers decide that: a per-property grammar for the
  * properties the modules compute a value for, and, for every property including
  * the ones with no grammar, a check that the value carries no interpolated
- * `undefined`/`NaN` and closes its parentheses. A dashed property name reaches
- * nothing in a browser, where the declaration is keyed camelCase, so it throws
- * rather than storing a declaration no read will ever find. An undeclared
+ * `undefined`/`NaN` and closes its parentheses. This fixture requires camelCase
+ * property names and throws on dashed names; browsers also accept dashed names.
+ * An undeclared
  * property reads back as the empty string, as CSSStyleDeclaration yields, so a
  * module branching on `=== ''` takes the same path here as in a browser.
  * @returns {Object} The style view.
