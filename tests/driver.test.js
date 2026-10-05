@@ -1696,7 +1696,7 @@ test('an unavailable preset leaves the running arrow key unclaimed', () => {
 const DRIVER_SOURCE = readFileSync(new URL('../src/renderer/driver.js', import.meta.url), 'utf8');
 
 /**
- * The constructor reaches WebGL on its first statement, so its wiring is read
+ * The constructor requires a WebGL context, so its wiring is read
  * rather than run. A collaborator that defaults its document to the global is
  * the one construction that can silently bind the wrong page: nothing throws,
  * and the driver's stated contract — it reads no globals of its own — is gone.
