@@ -11,7 +11,7 @@
 
 /**
  * One axis of a V4 recipe: a curve over [0, 1] given by its center and width,
- * or the three authored points a CUSTOM curve reads instead.
+ * or the authored points (one per hue key, two to four) a CUSTOM curve reads instead.
  * @typedef {object} PaletteAxis
  * @property {number} curve - A PaletteV4.curve ordinal.
  * @property {number} center - Midpoint of the axis' range.
