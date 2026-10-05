@@ -1,6 +1,6 @@
 //
-// Executed parity between the browser tools' hand-ported color math and the
-// engine functions they mirror, run against the real shipped WASM module.
+// Browser tools' colour, Lissajous and Mobius math parity and goldens,
+// run against the real shipped WASM module.
 //
 // The C++ runs the math in float; the JS ports run it in double, so float
 // outputs are compared within a small tolerance. LUT-quantized palette outputs
