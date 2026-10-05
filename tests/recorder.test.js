@@ -202,8 +202,8 @@ const makeFakeTrack = () => ({ requestFrame() {}, stop() { this.stopped = true; 
 
 /**
  * A fake capture stream exposing the one video track, tagged with the frame rate
- * it was opened at. Only rate 0 is manual-frame mode, so a stream opened at any
- * other rate carries a track without requestFrame, as a browser would.
+ * it was opened at. This fixture omits requestFrame for nonzero rates to exercise
+ * the recorder's capability fallback.
  * @param {number} [fps] - Frame rate captureStream was called with.
  * @returns {Object} The stream.
  */
