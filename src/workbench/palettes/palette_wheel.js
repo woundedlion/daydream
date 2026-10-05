@@ -274,8 +274,8 @@ export function hueKeyHandoff(previous, next, selectedKey, activeKey) {
 /**
  * Builds the hue-key wheel painter, which owns the gamut raster cache.
  *
- * The raster is rebuilt only when the quantized lightness changes, so a drag on
- * another control repaints the markers over the raster already in hand.
+ * The raster is rebuilt when quantized lightness or backing-store dimensions
+ * change. Other control changes reuse it.
  * @param {object} opts - Painter context.
  * @param {HTMLCanvasElement} opts.canvas - The wheel canvas.
  * @param {CanvasRenderingContext2D} opts.ctx - Its 2D context.
