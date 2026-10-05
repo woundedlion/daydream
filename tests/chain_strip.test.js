@@ -1083,9 +1083,15 @@ test('the readout carries no step grid and nudges by arrow key', async () => {
   value.dispatch('keydown', { key: 'ArrowDown', preventDefault: () => {} });
   assert.equal(Math.fround(Number(value.value)), Math.fround(before));
 
+  const editsBefore = h.edits.length;
+  const commitsBefore = h.commits.length;
+  let prevented = 0;
   value.value = '5.5';
-  value.dispatch('keydown', { key: 'Enter', preventDefault: () => {} });
+  value.dispatch('keydown', { key: 'Enter', preventDefault: () => { prevented++; } });
   assert.equal(value.value, '5.5', 'other keys are left to the input');
+  assert.equal(prevented, 0);
+  assert.equal(h.edits.length, editsBefore);
+  assert.equal(h.commits.length, commitsBefore);
 });
 
 // A browser's number input reports content it cannot parse as the empty
