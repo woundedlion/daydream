@@ -170,9 +170,8 @@ test('CI checks source parity after installing the selected runtime', () => {
 for (const name of ['shader_workbench.mjs', 'sha256.mjs', 'composed_effect_roster.mjs']) {
   test(`shader mirror ${name} matches the pinned engine`, { skip: engineSkip }, () => {
     assert.ok(engineRoot, engineMissing);
-    const pin = text('generated/holosphere_wasm.sha').trim();
     assert.equal(text(`generated/shader/${name}`),
-      committed(engineRoot, `scripts/${name}`, pin).toString('utf8').replaceAll('\r\n', '\n'));
+      committed(engineRoot, `scripts/${name}`).toString('utf8').replaceAll('\r\n', '\n'));
   });
 }
 
@@ -225,7 +224,7 @@ test('Mobius projection constants match the pinned engine sources', { skip: engi
 
 test('registry composite lowering matches expand_to_primitives', { skip: engineSkip }, () => {
   assert.ok(engineRoot, engineMissing);
-  const conway = committed(engineRoot, 'core/mesh/conway.h');
+  const conway = committed(engineRoot, 'core/mesh/conway.h').toString('utf8');
   const recipe = committed(engineRoot, 'core/mesh/recipe.h').toString('utf8');
   const body = recipe.slice(recipe.indexOf('inline size_t expand_to_primitives'));
   for (const [name, lower] of Object.entries(LOWERING)) {
