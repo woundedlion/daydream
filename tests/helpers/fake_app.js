@@ -99,6 +99,7 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
     },
     enable() { controller.enabled = true; controller.disabled = false; return controller; },
     disable() { controller.enabled = false; controller.disabled = true; return controller; },
+    max(value) { controller.args[1] = value; return controller; },
     listen() { return controller; },
   };
   return controller;

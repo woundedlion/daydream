@@ -622,7 +622,7 @@ test('a segmented-POV failure is announced and returns the toggle', async (t) =>
     gui,
     segments,
     nav: { hardwareConcurrency: 8 },
-    driver: { isMobile: false },
+    win: {},
     showNotice: (message) => notices.push(message),
   });
   const enabled = gui.folders.find((f) => f.namespace === 'Segmented POV')
@@ -645,7 +645,8 @@ test('a segmented-POV failure is announced and returns the toggle', async (t) =>
 test('segmented controls reconcile a mobile spawn and resize without a second pool', async (t) => {
   const gui = fakeGui('view');
   const created = [];
-  const driver = { isMobile: false };
+  const layout = { matches: false };
+  const win = { matchMedia: () => layout };
   const segments = {
     active: false, count: 8, showBoundaries: false,
     destroyed: 0,
@@ -655,14 +656,14 @@ test('segmented controls reconcile a mobile spawn and resize without a second po
   let finishWarm;
   t.mock.method(pageWarmer, 'warm', () => new Promise(resolve => { finishWarm = resolve; }));
   const notices = [];
-  createSegmentedPovControls({ gui, segments, nav: { hardwareConcurrency: 8 }, driver,
+  createSegmentedPovControls({ gui, segments, nav: { hardwareConcurrency: 8 }, win,
     showNotice: message => notices.push(message) });
   const controls = gui.folders[0].controllers;
   const enabled = controls.find(control => control.property === 'segmented');
   const count = controls.find(control => control.property === 'segments');
   enabled.object.segmented = true;
   const start = enabled.changed(true);
-  driver.isMobile = true;
+  layout.matches = true;
   finishWarm();
   await start;
   assert.deepEqual(created, [4]);
@@ -798,7 +799,7 @@ test('the segment-count slider carries the device cap as its own maximum', () =>
     + "the max passed to add(), and the pool's memory cost is what it bounds");
 
   const tight = segmentCountControl(startApp({ nav: { deviceMemory: 2 } }));
-  assert.deepEqual(tight.args, [[2]],
+  assert.deepEqual(tight.args, [2, 2, 2],
     'the cap must read the device hints, not a constant');
   assert.ok(tight.object.segments <= 2,
     'the initial value must sit inside the range, or a capped device opens the '
@@ -1128,4 +1129,37 @@ test('the preset selector preserves state on refusal and pauses an accepted pres
   assert.equal(module.engine.getAnimationsPaused(), true);
   assert.equal(panel.ctrl('pause').getValue(), true);
   assert.equal(noticeText(app), '');
+});
+
+
+test('segmented slider and pool follow viewport layout changes and release the listener', async (t) => {
+  const gui = fakeGui('view');
+  let changed;
+  let removed;
+  const query = {
+    matches: false,
+    addEventListener(_type, handler) { changed = handler; },
+    removeEventListener(_type, handler) { removed = handler; },
+  };
+  const created = [];
+  const segments = { active: false, count: 8, showBoundaries: false,
+    create(count) { this.count = count; created.push(count); }, destroy() {} };
+  t.mock.method(pageWarmer, 'warm', async () => {});
+  const spawn = createSegmentedPovControls({ gui, segments, nav: { hardwareConcurrency: 8 },
+    win: { matchMedia: () => query }, showNotice() {} });
+  const controls = gui.folders[0].controllers;
+  const count = controls.find(control => control.property === 'segments');
+  assert.equal(count.args[1], 8);
+  query.matches = true;
+  changed();
+  assert.equal(count.args[1], 4);
+  assert.equal(count.object.segments, 4);
+  segments.active = true;
+  await spawn.respawn();
+  assert.deepEqual(created, [4]);
+  query.matches = false;
+  changed();
+  assert.equal(count.args[1], 8);
+  spawn.dispose();
+  assert.equal(removed, changed);
 });
