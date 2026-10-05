@@ -715,3 +715,31 @@ test('Mobius preset descriptions retain AA contrast on hover', () => {
   const cascade = page.sheets.map((sheet) => read(...sheet)).join('\n');
   assert.ok(contrast(cascade, '.preset-desc', '.preset-btn:hover') >= AA_CONTRAST);
 });
+
+
+test('the entry script and syntax failures share the guarded load failure overlay', async () => {
+  const { runInNewContext } = await import('node:vm');
+  const { fakeElement } = await import('./helpers/fake_dom.js');
+  const source = read('index.html');
+  const inline = source.match(/<script>([\s\S]*?)<\/script>/)[1];
+  const overlay = fakeElement('div');
+  const listeners = [];
+  let current = overlay;
+  const context = {
+    SyntaxError, document: { getElementById: () => current },
+    window: { addEventListener: (_type, fn) => listeners.push(fn), removeEventListener() {} },
+  };
+  runInNewContext(inline + '\nthis.showFailure = showLoadFailure;', context);
+  assert.match(source, /src="src\/app\/main\.js" onerror="showLoadFailure\(\)"/);
+  listeners[0]({ error: new Error('ordinary') });
+  assert.equal(overlay.classList.contains('error'), false);
+  listeners[0]({ error: new SyntaxError('bad module') });
+  assert.equal(overlay.classList.contains('error'), true);
+  assert.equal(overlay.getAttribute('role'), 'alert');
+  assert.match(overlay.textContent, /Unable to load the application/);
+  overlay.textContent = 'existing failure';
+  context.showFailure();
+  assert.equal(overlay.textContent, 'existing failure');
+  current = null;
+  assert.doesNotThrow(() => context.showFailure());
+});
