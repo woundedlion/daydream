@@ -558,9 +558,18 @@ test('a band + appends while Insert opens the insertion palette after focus', as
   assert.equal(h.store.chain()[3].operator, 'sphere.lens.glitch.v2');
 
   chipByLabel(h, 'camera').dispatch('keydown', { key: 'Insert' });
+  assert.ok(paletteOf(h));
   entries = paletteEntries(h);
+  assert.ok(entries.length > 0);
   const illegal = entries.find((entry) => entry.dataset.operator === 'warp.affine.v3');
   assert.equal(illegal, undefined, 'invalid stages are omitted instead of greyed out');
+  const applied = h.applied.length;
+  entries.find((entry) => entry.dataset.operator === 'sphere.lens.glitch.v2')
+    .dispatch('click');
+  assert.equal(h.store.chain()[0].label, 'camera');
+  assert.equal(h.store.chain()[1].operator, 'sphere.lens.glitch.v2');
+  assert.equal(h.store.chain()[2].label, 'lens');
+  assert.equal(h.applied.length, applied + 1);
 });
 
 /**
