@@ -201,7 +201,8 @@ export class VideoRecorder {
   }
 
   /**
-   * Begins a recording session. No-op if already recording or unsupported.
+   * Begins a recording session. No-op if already recording; unsupported
+   * browsers and setup failures are reported through onError.
    * @param {string} effectName - Base name used for the downloaded file.
    * @returns {void}
    */
