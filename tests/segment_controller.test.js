@@ -970,12 +970,23 @@ test('a shared module a worker refuses is dropped before the next spawn', async 
   c.destroy();
 });
 
-test('a refused shared compilation automatically retries without the module', () => {
+test('a refused shared compilation automatically retries without the module', async () => {
+  const warmer = new ModuleWarmer();
+  await warmer.warm({
+    baseUrl: 'http://localhost:8000/shared/segment_controller.js',
+    minIntervalMs: 0,
+    fetch: (url) => Promise.resolve({
+      arrayBuffer: () => Promise.resolve(
+        url.pathname.endsWith('.wasm') ? EMPTY_WASM.buffer : new ArrayBuffer(0)),
+    }),
+  });
   const clock = installFakeTimers();
-  const c = makeController();
+  const c = makeController({ moduleWarmer: warmer });
   try {
     c.active = true;
     c.create(2);
+    assert.ok(c.workers[0].posted.find((m) => m.type === 'init').wasmModule
+      instanceof WebAssembly.Module, 'the initial pool receives the shared compilation');
     c.workers[0].onmessage({ data: {
       type: 'engineRejected', sharedModule: true, reason: 'LinkError',
     } });
