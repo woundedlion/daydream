@@ -18,7 +18,7 @@ const {
   PALETTE_RECIPE_PRESETS, loopSweepTurns,
   paletteRecipeAvailability, wrapTurns, signedTurnDelta, equivalentTurnNear,
   hitTestHueKeyMarker, oklchLinearRgb, maxSrgbGamutChroma,
-  hueKeyState, customHueKeyState, customHueTurns, moveCustomHueKey,
+  hueKeyState, customHueKeyState, customHueSweepRepresentable, customHueTurns, moveCustomHueKey,
 } =
   await import('../src/workbench/palettes/palette_controls.js');
 
@@ -288,6 +288,20 @@ test('a LOOP sweep resamples onto the thirds the engine spaces a loop at', () =>
 
   // The wheel keeps drawing a sweep's own two keys, spaced at sweep/key_count.
   assert.deepEqual(hueKeyState(recipe).offsets, [0, 0.5]);
+});
+
+test('CUSTOM preserves only representable LOOP sweep closures', () => {
+  const recipe = PALETTE_RECIPE_PRESETS.isolightSpectralLoop();
+  for (const direction of Object.values(PaletteV4.direction)) {
+    recipe.hue.direction = direction;
+    for (const sign of [-1, 1]) {
+      recipe.hue.sweepTurns = sign * 2;
+      assert.equal(customHueSweepRepresentable(recipe),
+        direction !== PaletteV4.direction.SHORTEST);
+      recipe.hue.sweepTurns = sign * 3;
+      assert.equal(customHueSweepRepresentable(recipe), false);
+    }
+  }
 });
 
 test('custom hue state preserves unwrapped offsets from existing custom recipes', () => {
