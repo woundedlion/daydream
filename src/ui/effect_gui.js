@@ -35,7 +35,7 @@ import {
   STAGE_ORDER,
   latticeMeltStageAssignments,
   kaleidoscopeSmoothStageAssignments,
-  fixedShaderStageAssignments,
+  composedStageAssignments,
   stageControlLabel,
 } from "../effects/shader_stages.js";
 
@@ -742,7 +742,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    *   order: Array<string>}|null} The grouping, or null when none claims the list.
    */
   function stageGrouping(params) {
-    const fixedShader = fixedShaderStageAssignments(params);
+    const fixedShader = composedStageAssignments(params);
     const fixedGrouping = () => {
       const claimed = new Set(fixedShader?.values());
       return {

@@ -25,7 +25,7 @@ import { PaletteCompileCode, PaletteRecipeField } from './helpers/fake_palette.j
 import { DEFAULT_EFFECT, resolutionPresets } from '../src/effects/effect_roster.js';
 import {
   kaleidoscopeSmoothStageAssignments, latticeMeltStageAssignments,
-  fixedShaderStageAssignments,
+  composedStageAssignments,
 } from '../src/effects/shader_stages.js';
 
 // Capture the bridge's diagnostics for clamped MeshOps arguments.
@@ -861,7 +861,7 @@ test('live shader rosters assign every parameter and both planar-warp slots', ()
       ++checked;
       const assignments = latticeMeltStageAssignments(definitions)
         ?? kaleidoscopeSmoothStageAssignments(definitions)
-        ?? fixedShaderStageAssignments(definitions);
+        ?? composedStageAssignments(definitions);
       for (const definition of definitions) {
         if (!assignments?.has(definition.name)) {
           unassigned.push(`${effect} preset ${preset}: ${definition.name}`);

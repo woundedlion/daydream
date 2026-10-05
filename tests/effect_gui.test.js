@@ -18,7 +18,7 @@ import {
   KALEIDOSCOPE_SMOOTH_STAGE_ORDER,
   latticeMeltStageAssignments,
   kaleidoscopeSmoothStageAssignments,
-  fixedShaderStageAssignments,
+  composedStageAssignments,
 } from '../src/effects/shader_stages.js';
 import { ChainSnapshotRestoreResult } from './helpers/fake_engine.js';
 
@@ -629,7 +629,7 @@ test('fixed Shader warp ownership follows each explicit slot boundary', () => {
     'Planar Warp 1 Speed', 'Mirror Rotation',
     'Planar Warp 2 Speed', 'Mirror Cell X',
   ];
-  const assignments = fixedShaderStageAssignments(
+  const assignments = composedStageAssignments(
     names.map((name) => ({ name })));
 
   assert.equal(assignments.get('Planar Warp 1 Speed'), 'Planar Warp 1');
