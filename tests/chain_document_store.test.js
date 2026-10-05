@@ -707,7 +707,7 @@ test('arena accounting honors per_param_name_bytes when declared', async () => {
     .find((candidate) => candidate.operator.id === 'warp.wave-shear.v2').legal, true);
 });
 
-test('the store bills a chain the arena bytes the validator does', () => {
+test('chainArenaBytes matches a mixed-alignment golden and validator diagnostic wiring', () => {
   // The validator reports the shared cursor's cost. A mixed-alignment fixture
   // below pins that cost independently of the helper it reports.
   const probe = structuredClone(CATALOG);
