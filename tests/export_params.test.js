@@ -93,3 +93,20 @@ test('formatExportParams: preserves small-magnitude significand', () => {
   const params = [{ name: 'Tiny' }];
   assert.equal(formatExportParams(params, [0.00001]), '{ 0.00001f }');
 });
+
+
+test('sparse enum exports resolve numeric IDs to symbols and refuse gaps', () => {
+  const params = [{ name: 'Pattern', optionValues: [0, 1, 6],
+    exportOptions: ['Pattern::CUBIC', 'Pattern::OCTET', 'Pattern::SHELLS'] }];
+  for (const [value, symbol] of [[0, 'CUBIC'], [1, 'OCTET'], [6, 'SHELLS']])
+    assert.equal(formatExportParams(params, [value]), `{ Pattern::${symbol} }`);
+  assert.throws(() => formatExportParams(params, [2]), /No enum option for Pattern value 2/);
+  assert.equal(formatExportParams([{ name: 'Pattern', step: 1, optionValues: [0, 1, 6] }], [6]), '{ 6 }');
+});
+
+
+test('numeric sparse enums without export symbols still reject gaps', () => {
+  const params = [{ name: 'Pattern', step: 1, optionValues: [0, 1, 6] }];
+  assert.equal(formatExportParams(params, [6]), '{ 6 }');
+  assert.throws(() => formatExportParams(params, [2]), /No enum option for Pattern value 2/);
+});

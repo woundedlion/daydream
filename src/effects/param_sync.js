@@ -74,13 +74,16 @@ export function engineParamValue(value) {
 /**
  * The state an interactive selector must display: the latest requested value
  * when the definition carries one, otherwise the renderer-owned value. `??`
- * rather than `||` because 0 is a valid enum index.
- * @param {{value: *, requestedValue?: *, options?: string[]}} parameter - Engine parameter definition.
+ * rather than `||` because 0 is a valid enum value.
+ * @param {{value: *, requestedValue?: *, options?: string[], optionValues?: number[]}} parameter - Engine parameter definition.
  * @returns {*} The value to display.
  */
 export function selectorControlValue(parameter) {
   const value = parameter.requestedValue ?? parameter.value;
   if (typeof value === 'number' && parameter.options?.length) {
+    if (parameter.optionValues) {
+      return parameter.optionValues.includes(value) ? value : parameter.optionValues[0];
+    }
     return Math.max(0, Math.min(parameter.options.length - 1, Math.round(value)));
   }
   return value;
@@ -88,14 +91,17 @@ export function selectorControlValue(parameter) {
 
 /**
  * Build the lil-gui choices object for an enumerated engine parameter: option
- * label -> option index, the float value the engine expects from setParameter.
+ * label -> engine value, using dense indices when explicit values are absent.
  *
  * @param {string[]} options - Option labels from the parameter definition,
- *   indexed by the engine-side option value.
+ *   in engine declaration order.
+ * @param {number[]} [optionValues] - Explicit engine values parallel to labels.
  * @returns {Object<string, number>} Choices object for lil-gui's add(), with a
  *   null prototype.
  */
-export function enumChoices(options) {
+export function enumChoices(options, optionValues) {
+  if (optionValues && optionValues.length !== options.length)
+    throw new RangeError('Enum labels and option values have different lengths');
   // A plain object's inherited __proto__ setter discards numeric option values.
   /** @type {Object<string, number>} */
   const choices = Object.create(null);
@@ -106,7 +112,7 @@ export function enumChoices(options) {
     // index unselectable; disambiguate rather than drop it.
     let key = label;
     while (Object.hasOwn(choices, key)) key = `${key} (${i})`;
-    choices[key] = i;
+    choices[key] = optionValues?.[i] ?? i;
     labels.push(key);
   });
   // Object.keys hoists integer-like labels ("2", "10") ahead of the rest in
@@ -189,6 +195,18 @@ export function optionIndex(definition, label) {
   const key = (value) => String(value).toLowerCase().replace(/[\s-]+/g, ' ').trim();
   const wanted = key(label);
   return definition.options?.findIndex((option) => key(option) === wanted) ?? -1;
+}
+
+/**
+ * Resolve an authored option label to its engine value.
+ * @param {{options?: string[], optionValues?: number[]}} definition - Engine definition.
+ * @param {*} label - Authored option label.
+ * @returns {number|null} Engine value, or null for an unknown option.
+ */
+export function optionValue(definition, label) {
+  const index = optionIndex(definition, label);
+  if (index < 0) return null;
+  return definition.optionValues ? definition.optionValues[index] ?? null : index;
 }
 
 /**

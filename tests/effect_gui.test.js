@@ -3002,3 +3002,31 @@ for (const chainSnapshotEnabled of [false, true]) test(`preset selection ${chain
   const cleared = h.gui().storedWrites.filter(([, value]) => value === null).map(([name]) => name);
   assert.deepEqual(cleared, chainSnapshotEnabled ? [] : ['Speed']);
 });
+
+
+test('sparse enum controls roundtrip numeric IDs and reject gaps before a write', () => {
+  const parameter = { name: 'Pattern', value: 0, requestedValue: 6, acceptedValue: 0,
+    options: ['Cubic', 'Octet Truss', 'Shells'], optionValues: [0, 1, 6], animated: true };
+  const h = makeHarness({ params: [parameter], engineValues: [6] });
+  h.panel.build();
+  const controller = h.gui().ctrl('Pattern');
+  assert.deepEqual({ ...controller.args[0] }, { Cubic: 0, 'Octet Truss': 1, Shells: 6 });
+  assert.equal(controller.getValue(), 6);
+  for (const value of [0, 1, 6]) {
+    controller.setValue(value);
+    assert.equal(controller.getValue(), value);
+  }
+  assert.ok(h.writes.includes('engine:Pattern=6'));
+  assert.ok(h.writes.includes('worker:Pattern=6'));
+  const before = h.writes.length;
+  controller.setValue(2);
+  assert.equal(controller.getValue(), 6);
+  assert.equal(h.writes.length, before);
+  parameter.requestedValue = 1;
+  h.panel.sync();
+  assert.equal(controller.getValue(), 1);
+  h.state.ownsDisplay = true;
+  h.state.segmentValues = [6];
+  h.panel.sync();
+  assert.equal(controller.getValue(), 6);
+});

@@ -11,6 +11,7 @@ import {
   selectorControlValue,
   enumConstantName,
   optionIndex,
+  optionValue,
   replayParameterWrites,
 } from '../src/effects/param_sync.js';
 
@@ -68,7 +69,7 @@ test('boolean: a NaN engine value never flips the toggle', () => {
 });
 
 // enumChoices maps engine enum labels to the lil-gui choices object whose
-// values are the option indices setParameter expects. It carries a null
+// values are the numeric IDs setParameter expects. It carries a null
 // prototype, so the expected tables below are spread into plain objects.
 
 test('enum: labels map to their option indices in order', () => {
@@ -274,4 +275,27 @@ test('selector indices round and clamp to available options', () => {
   assert.equal(selectorControlValue({ value: -3, options: ['A', 'B'] }), 0);
   assert.equal(selectorControlValue({ value: 0, requestedValue: 7, options: ['A', 'B'] }), 1);
   assert.equal(selectorControlValue({ value: true, options: ['A'] }), true);
+});
+
+
+test('sparse enum labels, requests and rendered values preserve numeric IDs', () => {
+  const definition = { options: ['Cubic', 'Octet Truss', 'Shells'], optionValues: [0, 1, 6] };
+  assert.deepEqual({ ...enumChoices(definition.options, definition.optionValues) },
+    { Cubic: 0, 'Octet Truss': 1, Shells: 6 });
+  for (const [index, value] of definition.optionValues.entries()) {
+    assert.equal(optionValue(definition, definition.options[index]), value);
+    assert.equal(selectorControlValue({ ...definition, value }), value);
+    assert.equal(selectorControlValue({ ...definition, value: 0, requestedValue: value }), value);
+  }
+  assert.equal(optionValue(definition, 'unavailable'), null);
+  assert.equal(optionValue({ options: definition.options }, 'Shells'), 2);
+  assert.equal(selectorControlValue({ ...definition, value: 2 }), 0);
+  assert.throws(() => enumChoices(definition.options, [0, 1]), /different lengths/);
+});
+
+
+test('dense option label lookup refuses unknown labels and mapped values may be negative', () => {
+  assert.equal(optionValue({ options: ['Off', 'On'] }, 'On'), 1);
+  assert.equal(optionValue({ options: ['Off', 'On'] }, 'unavailable'), null);
+  assert.equal(optionValue({ options: ['Reverse'], optionValues: [-1] }, 'Reverse'), -1);
 });

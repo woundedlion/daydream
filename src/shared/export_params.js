@@ -14,13 +14,13 @@ import { formatFloatCpp } from './cpp_format.js';
  *
  * Each literal matches the member's declared type, since a brace-init narrowing
  * conversion is a compile error: an enum carrying exportOptions emits the
- * symbolic entry matching its live numeric index, a toggle emits `true`/`false`,
+ * symbolic entry matching its live numeric engine value, a toggle emits `true`/`false`,
  * a whole-number param (`step` of 1) emits an integer literal, and everything
  * else a float literal. Effects that interleave unrepresented members still
  * produce a list that must be edited by hand.
  * @param {Array<{name?: string, readonly?: boolean, preset?: boolean,
  *   value?: number|boolean, step?: number,
- *   exportOptions?: Array<string>}>} params - Definitions parallel to values.
+ *   exportOptions?: Array<string>, optionValues?: number[]}>} params - Definitions parallel to values.
  * @param {ArrayLike<number>} values - Live value per param, same order as
  *   params; the engine streams a toggle as 0 or 1.
  * @returns {string} A C++ brace-init list, e.g. "{ 0.85f, 4, true }".
@@ -30,8 +30,11 @@ export function formatExportParams(params, values) {
   for (let i = 0; i < params.length; i++) {
     const param = params[i];
     if (param.readonly || param.preset === false) continue;
+    if (param.optionValues && !param.optionValues.includes(values[i]))
+      throw new RangeError(`No enum option for ${param.name ?? i} value ${values[i]}`);
     if (param.exportOptions) {
-      const exportValue = param.exportOptions[values[i]];
+      const index = param.optionValues ? param.optionValues.indexOf(values[i]) : values[i];
+      const exportValue = param.exportOptions[index];
       if (exportValue === undefined) {
         throw new RangeError(`No export option for ${param.name ?? i} index ${values[i]}`);
       }

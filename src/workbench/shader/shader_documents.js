@@ -5,7 +5,7 @@
 
 import { engineHalted } from '../../shared/engine_halt.js';
 import { callWorkbenchBinding, shaderChainCatalog } from '../../engine/workbench_bindings.js';
-import { enumConstantName, optionIndex } from '../../effects/param_sync.js';
+import { enumConstantName, optionValue } from '../../effects/param_sync.js';
 import { fieldOf as fieldSegment } from './chain_presentation.js';
 import { errorDetail } from '../../shared/banner.js';
 import { applyChainDocument } from './chain_apply.js';
@@ -37,7 +37,7 @@ const SCRATCH_FILENAME = 'scratch.shader.json';
 export const SHADER_LINK_DEBOUNCE_MS = 200;
 export const SHADER_LINK_MAX_WAIT_MS = 1000;
 
-/** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[]}} ParameterDefinition */
+/** @typedef {{name: string, value?: *, readonly?: boolean, options?: string[], optionValues?: number[]}} ParameterDefinition */
 /** @typedef {{document: *, descriptor_digest?: string, diagnostics?: *, status?: string}} CompiledDocument */
 
 /** @param {string} parameterId @returns {string} The primary engine control name. */
@@ -58,10 +58,12 @@ function resolveEngineValue(definitions, name, value) {
   if (!definition) return `the engine has no parameter "${name}"`;
   if (definition.readonly) return `"${name}" is read-only`;
   if (definition.options && typeof value !== 'number') {
-    const stored = optionIndex(definition, value);
-    if (stored < 0) return `"${name}" has no option "${value}"`;
+    const stored = optionValue(definition, value);
+    if (stored === null) return `"${name}" has no option "${value}"`;
     return { name, stored };
   }
+  if (definition.optionValues && !definition.optionValues.includes(value))
+    return `"${name}" has no option value ${value}`;
   return { name, stored: value };
 }
 
