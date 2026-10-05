@@ -58,8 +58,8 @@ import { applyOp, meshOpFailure, requireMeshResult } from './solid_codegen.js';
  * @param {MeshBuildContext} ctx - The live wiring.
  * @returns {SolidMeshData?} The copy, or null when either readback was refused.
  * @details A wrapper held across a clearToolingMemory() aliases reclaimed arena
- * storage, so the bridge refuses it (STALE_WRAPPER). A NaN component is a
- * rejected readback the bridge reports as a success, so it is refused here
+ * storage, so the bridge refuses it (STALE_WRAPPER). A NaN component means
+ * the geometry degenerated, so it is refused here
  * rather than passed on to save and export.
  */
 export function readbackMesh(wasmMesh, ctx) {
