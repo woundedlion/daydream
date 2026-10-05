@@ -314,7 +314,7 @@ const pointerUp = (pointerId = 3) => ({ pointerId });
 /**
  * A wiring createEffectGui accepts, carrying every member it demands and none
  * of the optional config group.
- * @returns {Object} The four collaborators.
+ * @returns {Object} The three demanded collaborators (engine, segments, host).
  */
 const wiring = () => ({
   engine: {
