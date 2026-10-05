@@ -4,7 +4,6 @@ import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
-restoreDocumentAfterEach();
 import {
   createEffectGui,
   addParamControl,
@@ -21,6 +20,8 @@ import {
   composedStageAssignments,
 } from '../src/effects/shader_stages.js';
 import { ChainSnapshotRestoreResult } from './helpers/fake_engine.js';
+
+restoreDocumentAfterEach();
 
 // createEffectGui owns the effect panel: which control an engine parameter maps
 // to, which value stream feeds the sliders each frame, what an Export may copy,
