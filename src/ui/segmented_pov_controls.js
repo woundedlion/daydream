@@ -8,7 +8,7 @@
  * and the device-bounded spawn callback they drive.
  */
 
-import { MOBILE_BREAKPOINT_PX } from "../renderer/driver.js";
+import { MOBILE_BREAKPOINT_PX } from "../shared/layout.js";
 import { pageWarmer } from "../segments/module_warmer.js";
 import {
   createSegmentSpawnGuard,
