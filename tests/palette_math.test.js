@@ -356,6 +356,16 @@ test('compilePaletteRecipe selects the requested bridge operation and owns its b
     assert.notEqual(inspected.fallback, fallback);
     assert.notEqual(inspected.canonicalRecipe, recipe);
     assert.deepEqual(compiled.lut, lut);
+    const savedLut = Uint8Array.from(inspected.lut);
+    const savedDiagnostics = Float32Array.from(inspected.diagnostics);
+    const savedFallback = Uint8Array.from(inspected.fallback);
+    lut.fill(0);
+    diagnostics.fill(0);
+    fallback.fill(0);
+    assert.deepEqual(inspected.lut, savedLut);
+    assert.deepEqual(inspected.diagnostics, savedDiagnostics);
+    assert.deepEqual(inspected.fallback, savedFallback);
+    assert.deepEqual(compiled.lut, savedLut);
   });
 });
 
