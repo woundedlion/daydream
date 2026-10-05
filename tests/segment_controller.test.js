@@ -202,6 +202,8 @@ test('dispose drops the held compilation that destroy keeps for the next pool',
  * @param {string} [config.effect] - Initial app-state effect name.
  * @param {Object} [config.presets] - Resolution-preset map keyed by resolution name.
  * @param {Object} [config.moduleWarmer] - Warmer whose compilation the spawn hands to its workers; omitted leaves the page's.
+ * @param {(message: string) => void} [config.onFault] - Host pool-fault callback.
+ * @param {Object} [config.driver] - Alternate render driver.
  * @returns {SegmentController} Controller wired to fake injected deps.
  */
 function makeController({ resolution = 'lo', effect = 'TestEffect',
@@ -331,6 +333,9 @@ async function publishGeneration(controller, bands) {
  * @param {Object} [overrides.arenaMetrics] - Optional arena-metrics payload.
  * @param {number[]} [overrides.paramValues] - Post-frame param values the worker reports.
  * @param {number} [overrides.paramRevision] - Parameter write revision paired with the frame.
+ * @param {number} [overrides.presetCount] - Preset count reported by the worker.
+ * @param {number} [overrides.presetIndex] - Current preset index reported by the worker.
+ * @param {string[]} [overrides.warnings] - Divergence warnings reported by the worker.
  * @param {boolean} [overrides.fullFrame] - Whether the worker shaded the whole canvas.
  * @returns {void}
  */
@@ -2463,11 +2468,14 @@ test('turning segmented mode off hands the global stat bars back', () => {
 // ---------------------------------------------------------------------------
 
 /**
- * Minimal stand-in for the WASM engine exposing just getParameterDefinitions().
+ * Stand-in for engine parameter definitions and preset metadata.
  * @param {Array<{name: string, value: number|boolean,
  *   requestedValue?: number|boolean,
  *   acceptedValue?: number|boolean, readonly?: boolean}>} defs - Param defs.
- * @returns {{ getParameterDefinitions: () => Array }} Fake engine.
+ * @param {number} [presetCount=0] - Reported preset count.
+ * @param {number} [presetIndex=0] - Reported current preset index.
+ * @returns {{getParameterDefinitions: () => Array, getPresetCount: () => number,
+ *   getPresetIndex: () => number}} Fake engine.
  */
 function fakeEngine(defs, presetCount = 0, presetIndex = 0) {
   return {
