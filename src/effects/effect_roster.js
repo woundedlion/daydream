@@ -25,9 +25,8 @@ export function resolutionEffects(presets, resolution) {
   return preset?.favorites ?? null;
 }
 
-// Every effect the workbench page may hold: the scratch shader, the chain
-// interpreter each dynamically previewed document is programmed onto
-// (src/workbench/shader/shader_documents.js), and the shipped documents.
+// Workbench effects: ShaderChain hosts scratch authoring and dynamic document
+// previews (src/workbench/shader/shader_documents.js), alongside shipped documents.
 export const WORKBENCH_EFFECTS = Object.freeze([
   'ShaderChain', ...SHADER_DOCUMENT_EFFECTS,
 ]);
