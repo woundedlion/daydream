@@ -958,11 +958,12 @@ test('a fallback URL writer hands pending keys to a newly registered URLSync', (
 
 
 test('a control hydrates only from its own exact key', () => {
-  installWindowAt('?fx.Other+Name=2&fx.__accepted.Other+Name=6');
+  installWindowAt('?fx.Planar+Warp=2&fx.planar+warp+1=1&fx.__accepted.Planar+Warp=6');
   const gui = new DeepLinkGUI({autoPlace: false}, 'fx');
   const state = {'Planar Warp 1': 0};
   gui.add(state, 'Planar Warp 1', {None: 0, Mirror: 1, Curl: 2});
   assert.equal(state['Planar Warp 1'], 0);
   assert.equal(gui.readStoredNumber('__accepted.Planar Warp 1'), undefined);
-  assert.equal(gui.urlParams().get('fx.Other Name'), '2');
+  assert.equal(gui.urlParams().get('fx.Planar Warp'), '2');
+  assert.equal(gui.urlParams().get('fx.planar warp 1'), '1');
 });
