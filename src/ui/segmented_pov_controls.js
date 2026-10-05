@@ -110,7 +110,9 @@ export function createSegmentedPovControls({
     }
   });
   const segLabel = segMax >= 6 ? 'Segments (6 = sim only)' : `Segments (max ${segMax} here)`;
-  segCountCtrl = segFolder.add(segState, 'segments', 2, segMax, 2).name(segLabel);
+  segCountCtrl = (segMax === 2
+    ? segFolder.add(segState, 'segments', [2])
+    : segFolder.add(segState, 'segments', 2, segMax, 2)).name(segLabel);
   segCountCtrl.onChange(async (/** @type {number} */ v) => {
     // A reconcile writes the value the handler already acted on.
     if (v === segCount) return;
