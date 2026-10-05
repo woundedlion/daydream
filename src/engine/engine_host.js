@@ -45,9 +45,9 @@ export class EngineHost {
   /**
    * Whether the WASM module has trapped. HS_CHECK sets Module.HS_MODULE_DEAD
    * before its __builtin_trap(), and the trap unwinds nothing: the shadow stack
-   * pointer keeps whatever the aborted frame left it at, so every later call
-   * runs on a permanently shortened stack and hands back plausible results
-   * while writing past its end. No call recovers, so the state is terminal and
+   * pointer keeps whatever the aborted frame left it at. Later calls can exhaust
+   * the remaining stack or observe partial state without trapping. No call
+   * restores the module's invariants, so the state is terminal and
    * latches here: a read after dispose() has dropped the module reference still
    * reports dead. A plain property read, cheap enough for a per-frame caller.
    * @param {*} [error] - Error from an engine call.
