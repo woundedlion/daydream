@@ -6,6 +6,7 @@ static_assert(
     std::string_view(simple_registry[SEED_TRUNCATED_CUBOCTAHEDRON].name) ==
     "truncatedCuboctahedron");
 
+// clang-format off
 /** Step table for truncatedCuboctahedron_truncate33_truncate33_truncate33. */
 inline constexpr OpStep
     TRUNCATED_CUBOCTAHEDRON_TRUNCATE33_TRUNCATE33_TRUNCATE33_STEPS[] = {
@@ -13,6 +14,7 @@ inline constexpr OpStep
         {Op::TRUNCATE, 0.33f},
         {Op::TRUNCATE, 0.33f},
 };
+// clang-format on
 /**
  * Recipe mirror of
  * IslamicStarPatterns::truncatedCuboctahedron_truncate33_truncate33_truncate33.

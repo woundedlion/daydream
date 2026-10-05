@@ -453,13 +453,10 @@ export function generateRegistryCpp(item, baseRecipe = null) {
     throw new Error(`generateRegistryCpp: the flattened chain lowers to ${lowered} `
       + `primitive steps; IslamicStars supports at most ${MAX_BUILD_STEPS}`);
   }
-  // The step table's trailing comma holds clang-format to one step per line;
-  // without it a table short enough to fit gets packed onto fewer lines and the
-  // paste no longer matches the formatted header.
   const table = definitionHeadCpp('OpStep', `${stepsName}[]`, true);
   return seedConstant
-    + `${docCommentCpp(`Step table for ${funcName}.`)}\n`
-    + `${table.prefix}${stepList.join(`,\n${' '.repeat(table.indent)}`)},\n};\n`
+    + `// clang-format off\n${docCommentCpp(`Step table for ${funcName}.`)}\n`
+    + `${table.prefix}${stepList.join(`,\n${' '.repeat(table.indent)}`)},\n};\n// clang-format on\n`
     + `${docCommentCpp(`Recipe mirror of IslamicStarPatterns::${funcName}.`)}\n`
     + `${recipeDefinitionCpp(recipeName, `SEED_${upperSnake(seedName)}`, stepsName)}\n\n`
     + '// Append this Entry to islamic_registry and raise ISLAMIC_COUNT by one.\n'

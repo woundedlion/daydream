@@ -1,3 +1,4 @@
+// clang-format off
 /** Step table for truncatedIcosahedron_ambo_relax100_truncate01_hk59. */
 inline constexpr OpStep
     TRUNCATED_ICOSAHEDRON_AMBO_RELAX100_TRUNCATE01_HK59_STEPS[] = {
@@ -6,6 +7,7 @@ inline constexpr OpStep
         {Op::TRUNCATE, 0.01f},
         {Op::HANKIN, 59.0f * IslamicStarPatterns::D2R},
 };
+// clang-format on
 /**
  * Recipe mirror of
  * IslamicStarPatterns::truncatedIcosahedron_ambo_relax100_truncate01_hk59.
