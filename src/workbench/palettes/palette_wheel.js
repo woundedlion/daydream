@@ -123,7 +123,7 @@ export function hueKeyDegrees(state) {
 }
 
 /**
- * Lays out one caption per key: outboard of its marker, inside the canvas, and
+ * Lays out one caption per key: beside its marker, inside the canvas, and
  * pushed clear of any earlier box it would overlap.
  * @param {Array<{x: number, y: number}>} points - Marker centers, in key order.
  * @param {number[]} degrees - Each key's hue, in whole degrees.

@@ -119,7 +119,7 @@ test('key hues are reported in whole degrees, wrapped past the seam', () => {
     'a hue that rounds to a full turn reads as zero, not 360');
 });
 
-test('key labels sit outboard of their markers, inside the canvas', () => {
+test('key labels sit beside their markers, inside the canvas', () => {
   const bounds = { width: 256, height: 256, measure: (text) => text.length * 10 };
   const labels = hueKeyLabelBoxes(
     [{ x: 40, y: 128 }, { x: 220, y: 128 }], [10, 20], bounds);
