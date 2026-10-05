@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pageHandlers } from './helpers/page_handlers.js';
-import { savedChainShapeError } from '../src/workbench/solids/solid_codegen.js';
+import { savedChainShapeError, savedSolidExportError } from '../src/workbench/solids/solid_codegen.js';
 import { createPointerDrag } from '../src/shared/pointer_drag.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
@@ -279,9 +279,10 @@ test('a topology commit cannot overwrite an edit returning to the same value', a
 
 test('saved solids discard non-object entries', () => {
   const load = handler('loadSavedSolids', { SAVED_SOLIDS_KEY: 'saved',
-    localStorage: { getItem: () => '[null, 1, false, "bad", [], {"base":"cube"}]' },
+    savedSolidExportError,
+    localStorage: { getItem: () => '[null, 1, false, "bad", [], {"base":"cube","ops":[]}, {"base":"cube","ops":[{"op":"dual","params":{}}]}]' },
   });
-  assert.equal(JSON.stringify(load()), '[{"base":"cube"}]');
+  assert.equal(JSON.stringify(load()), '[{"base":"cube","ops":[{"op":"dual","params":{}}]}]');
 });
 
 test('a failed rebuild invalidates cached mesh metadata and prevents saving', () => {
@@ -370,10 +371,23 @@ test('saved-solid imports name invalid entries and the first refusal reason', ()
     [ [{base: 'cube', ops: [{op: 'truncate', params: {t: 50}}]}], /out-of-range/ ]]) {
     const messages = [];
     handler('importSavedSolids', { savedSolids: [], SAVED_SOLIDS_MAX: 100,
-      savedChainShapeError, showGateMsg: (message) => messages.push(message),
+      savedSolidExportError, showGateMsg: (message) => messages.push(message),
     })(JSON.stringify(entries));
     assert.match(messages[0], /invalid entries/);
     assert.match(messages[0], reason);
     assert.doesNotMatch(messages[0], /op table does not recognize/);
   }
+});
+
+
+test('saved-solid imports reject bare seeds while accepting an exportable recipe', () => {
+  const savedSolids = [];
+  const messages = [];
+  handler('importSavedSolids', { savedSolids, SAVED_SOLIDS_MAX: 100,
+    savedSolidExportError, importedSavedSolid: entry => entry,
+    persistSavedSolids() {}, renderSavedList() {}, showGateMsg: message => messages.push(message),
+  })(JSON.stringify([{ base: 'cube', ops: [] }, { base: 'cube', ops: [{ op: 'dual', params: {} }] }]));
+  assert.equal(savedSolids.length, 1);
+  assert.equal(JSON.stringify(savedSolids[0].ops), '[{"op":"dual","params":{}}]');
+  assert.match(messages[0], /imported 1 solid.*op chain is empty/);
 });

@@ -12,7 +12,7 @@ import {
   SAVED_SOLIDS_MAX,
   captureSavedSolidThumbnail,
   queueSavedSolidRestore,
-  savedChainShapeError,
+  savedChainShapeError, savedSolidExportError,
   CATALAN_BASES,
   formatSolidName,
   generateFuncAndRecipe,
@@ -499,7 +499,8 @@ function loadSavedSolids() {
   try {
     const parsed = JSON.parse(localStorage.getItem(SAVED_SOLIDS_KEY) || '[]');
     return Array.isArray(parsed)
-      ? parsed.filter((entry) => entry !== null && typeof entry === 'object' && !Array.isArray(entry))
+      ? parsed.filter((entry) => entry !== null && typeof entry === 'object' && !Array.isArray(entry)
+        && !savedSolidExportError(entry.base, entry.ops))
       : [];
   } catch (error) {
     console.warn('Could not restore saved solids:', error);
@@ -563,8 +564,7 @@ function importedSavedSolid(entry) {
  * @param {string} text - The file's contents.
  * @returns {void}
  * @details An exported file is as user-writable as localStorage and outlives
- * any op-table change, so every entry goes through savedChainShapeError — the
- * same check a restore passes — and a refused one is counted, not imported.
+ * any op-table change. savedSolidExportError checks each card before import.
  */
 function importSavedSolids(text) {
   let parsed;
@@ -585,7 +585,7 @@ function importSavedSolids(text) {
   const before = savedSolids.length;
   for (const entry of parsed) {
     const reason = !entry || typeof entry !== 'object' || Array.isArray(entry)
-      ? 'entry is not a saved-solid object' : savedChainShapeError(entry.base, entry.ops);
+      ? 'entry is not a saved-solid object' : savedSolidExportError(entry.base, entry.ops);
     if (reason) {
       refused++;
       firstRefusal ??= reason;
@@ -701,9 +701,7 @@ function saveSolid() {
   renderSavedList();
 }
 
-// The C++ function name a saved item exports as, or null when it can't be
-// generated — generateFuncAndRecipe only throws on an invalid base/op, which
-// the registry-backed state should never produce.
+// The exported C++ function name, or null for an unexportable recipe.
 function savedFuncName(item) {
   try {
     return generateFuncAndRecipe(item).funcName;

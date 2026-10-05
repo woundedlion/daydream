@@ -1254,7 +1254,7 @@ test('savedChainShapeError accepts the chains the tool itself saves', () => {
     assert.equal(savedChainShapeError('truncatedIcosahedron', [o]), null,
       `a saved "${o.op}" must stay restorable`);
   }
-  assert.equal(savedChainShapeError('cube', []), null, 'a bare seed is a valid save');
+  assert.equal(savedChainShapeError('cube', []), null, 'a bare seed can be restored without exporting a card');
 });
 
 /**
