@@ -136,6 +136,7 @@ test('the engine checkout can fetch a pin after master advances', () => {
     /- name: Checkout the pinned engine\n[\s\S]*?(?=\n\s{6}- )/,
   )?.[0] ?? '';
   assert.match(checkout, /fetch-depth: 1/);
+  assert.match(checkout, /^\s+ref: \$\{\{ steps\.engine\.outputs\.pin \}\}$/m);
 });
 
 // The engine-parity cases above and the hook cases skip without their flag, so
