@@ -52,8 +52,8 @@ export function createSegmentedPovControls({
   win = globalThis,
   showNotice,
 }) {
-  // The folder name and the segState property names are deep-link key segments
-  // (view.Segmented POV.<prop>); renaming either invalidates links already shared.
+  // The folder name and segmented/segments properties form shared URL keys
+  // (view.Segmented POV.<prop>); boundaries is session-only.
   const segFolder = gui.addFolder('Segmented POV');
   segFolder.close();
   const layout = win.matchMedia?.(`(max-width: ${MOBILE_BREAKPOINT_PX}px)`);
