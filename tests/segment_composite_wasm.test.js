@@ -56,8 +56,8 @@ function enumName(type, value) {
  * @param {string} effect - Effect name to install.
  * @param {{x0:number,x1:number,y0:number,y1:number}} rect - Clip to apply.
  * @param {number} frames - Renders to draw.
- * @param {number} [width] - Resolution width; the segmented default.
- * @param {number} [height] - Resolution height; the segmented default.
+ * @param {number} [width] - Resolution width; the suite default (W).
+ * @param {number} [height] - Resolution height; the suite default (H).
  * @returns {Promise<{clip: string, pixels: Uint16Array}>} The clip result's
  *   name and a detached copy of the full canvas readback.
  */
@@ -84,8 +84,8 @@ async function renderWith(effect, rect, frames, width = W, height = H) {
  * @param {string} effect - Effect name to install in every worker.
  * @param {number} total - Segment count.
  * @param {number} frames - Renders to draw.
- * @param {number} [width] - Resolution width; the segmented default.
- * @param {number} [height] - Resolution height; the segmented default.
+ * @param {number} [width] - Resolution width; the suite default (W).
+ * @param {number} [height] - Resolution height; the suite default (H).
  * @returns {Promise<{canvas: Uint16Array, clips: string[], compacts: Uint16Array[],
  *   rects: Array<Object>}>} The composited canvas and the per-segment pieces.
  */
