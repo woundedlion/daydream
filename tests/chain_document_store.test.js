@@ -384,9 +384,12 @@ test('reusing a label under a new operator re-seeds it from catalog defaults', a
 });
 
 test('relabel rewrites every derived id in place', async () => {
-  const store = await makeStore({ mutate: addStaggered });
-  const rotationBefore =
-    store.document().preset_bank.presets[0].values['warp2.rotation'];
+  const store = await makeStore({ mutate: (document) => {
+    addStaggered(document);
+    presetsDifferBy(document, { 'warp2.rotation': 1.5 });
+  } });
+  const rotationBefore = new Map(store.document().preset_bank.presets
+    .map((preset) => [preset.preset_id, preset.values['warp2.rotation']]));
   assert.equal(store.setSelectedLabel('warp2'), true);
   const result = store.relabel('warp2', 'mirror');
   assert.equal(result.ok, true);
@@ -401,7 +404,7 @@ test('relabel rewrites every derived id in place', async () => {
   assert.equal(staggered.groups.some(stray), false);
   for (const preset of document.preset_bank.presets) {
     assert.equal(Object.keys(preset.values).some(stray), false);
-    assert.equal(preset.values['mirror.rotation'], rotationBefore);
+    assert.equal(preset.values['mirror.rotation'], rotationBefore.get(preset.preset_id));
   }
   assert.equal(store.selectedLabel(), 'mirror');
   assertGreen(store);
