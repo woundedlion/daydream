@@ -129,9 +129,9 @@ export function buildBaseMesh(name, what, ctx) {
  * @param {ChainOp[]} ops - Ops to apply, in order.
  * @param {MeshBuildContext} ctx - The live wiring.
  * @returns {SolidBuildResult?} What to draw, or null when there is nothing to draw.
- * @details Every failure the bridge foresees — unknown solid name, tooling arena
- * exhaustion, 16-bit connectivity or face-degree overflow, or a non-finite
- * argument — is a null with the reason in getLastResult(), which
+ * @details Every failure the bridge foresees returns null with a MeshOpResult
+ * reason in getLastResult(). ARENA_UNAVAILABLE is fatal; the other results are
+ * recoverable. The reason is what
  * requireMeshResult reports for the base solid and meshOpFailure for an op
  * applyOp rejected mid-chain. Fraction operators and relax clamp finite arguments
  * into their domains and report the adjustment through getLastAdjusted().
