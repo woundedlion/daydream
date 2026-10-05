@@ -710,8 +710,8 @@ test('generateFuncAndRecipe rejects non-finite or out-of-range op params', () =>
 /**
  * Verifies the emit path applies the same OP_DEFS bands the restore path does.
  * A stale or hand-edited stored card is refused by savedChainShapeError, but its
- * "copy C++" button reaches generateFuncAndRecipe directly, and a param past its
- * band pastes a literal the engine's always-on operator asserts halt on.
+ * "copy C++" button reaches generateFuncAndRecipe directly. The emitter also
+ * refuses parameters outside the tool's bands.
  */
 test('generateFuncAndRecipe rejects every param savedChainShapeError calls out of range', () => {
   const cases = [
