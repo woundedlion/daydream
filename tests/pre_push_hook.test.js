@@ -45,6 +45,7 @@ test('pre-push refuses a push from a tree that cannot run the suites',
  * would also stop the shell itself from being resolved.
  * @param {string} root - Working directory the hook runs in.
  * @param {Object<string, string>} tools - Stand-in name to shell body.
+ * @param {string} [input] - Text fed to hook stdin (pre-push ref records).
  * @returns {Object} The spawnSync result.
  */
 function runWithTools(root, tools, input = '') {
@@ -69,7 +70,11 @@ function runWithTools(root, tools, input = '') {
   });
 }
 
-/** A fixture root removed when the case ends. @returns {string} The root. */
+/**
+ * A fixture root removed when the case ends.
+ * @param {import('node:test').TestContext} t - Case whose after() removes the root.
+ * @returns {string} The root.
+ */
 function fixtureRoot(t) {
   const root = mkdtempSync(join(tmpdir(), 'pre-push-hook-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
