@@ -62,9 +62,9 @@
 const clampUnit = (value) => Math.max(0, Math.min(1, value));
 
 /**
- * Wraps a hue onto the [0, 1) fundamental domain.
+ * Subtracts whole turns from a hue.
  * @param {number} turns - A hue in turns (one turn is 360°).
- * @returns {number} The equivalent hue in [0, 1).
+ * @returns {number} The equivalent hue in [0, 1); rounding near the seam may yield 1.
  */
 export const wrapTurns = (turns) => turns - Math.floor(turns);
 
