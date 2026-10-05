@@ -323,7 +323,6 @@ test('generateRecipeCpp wraps the recipe in a FLASHMEM function with V/F/I comme
 
 /**
  * The tool keeps generated pastes within the target header's 80-column format.
- * Existing Islamic-star builders do not otherwise establish this output shape.
  */
 test('generateRecipeCpp wraps a long function the way solid_generators.h carries it', () => {
   const cpp = generateRecipeCpp({
