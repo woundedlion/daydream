@@ -9,7 +9,6 @@ export function fakeContext() {
   return {
     ops,
     rasters: 0,
-    canvasFor: null,
     clearRect: (...a) => ops.push(['clearRect', ...a]),
     setLineDash: (a) => ops.push(['setLineDash', a.join(',')]),
     drawImage: (...a) => ops.push(['drawImage', ...a]),
