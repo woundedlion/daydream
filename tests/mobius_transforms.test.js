@@ -237,7 +237,7 @@ test('stereo keeps the pole cap azimuth at the sentinel magnitude', () => {
       `cap point (${ux},${uz}) lost its azimuth`);
   }
 
-  // Only the exact pole, whose azimuth is undefined, falls back to +real.
+  // The exact pole uses the real-axis sentinel.
   assertComplex(stereo({ x: 0, y: 1, z: 0 }), STEREO_INF, 0, 'stereo at the pole');
 });
 

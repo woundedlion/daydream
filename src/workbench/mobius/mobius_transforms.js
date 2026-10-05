@@ -58,7 +58,7 @@ export const STEREO_INF = 1e4;
  */
 export const STEREO_POLE_EPS = 2 / (STEREO_INF * STEREO_INF);
 
-/** (x,z) radius below which the north-pole azimuth is undefined. */
+/** (x,z) radius below which the north-pole azimuth uses the real-axis sentinel. */
 export const STEREO_AZIMUTH_EPS = 1e-12;
 
 /**
@@ -74,8 +74,8 @@ export const STEREO_UNDERFLOW_LIFT = 79228162514264337593543950336.0;
  * @param {{x:number, y:number, z:number}} v - Point on the unit sphere.
  * @returns {{re:number, im:number}} The projected complex-plane coordinate.
  * @details Inside the north-pole cap the result carries the STEREO_INF sentinel
- * magnitude along the (x,z) azimuth; only the exact pole, where the azimuth is
- * undefined, lands on the real axis.
+ * magnitude along the (x,z) azimuth; radii below STEREO_AZIMUTH_EPS use the
+ * real-axis sentinel.
  */
 export function stereo(v) {
   const denom = 1.0 - v.y;
