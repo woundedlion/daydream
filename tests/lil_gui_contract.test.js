@@ -1,8 +1,7 @@
 //
 // Pins the behaviour of the lil-gui build package.json pins, so the doubles the
 // GUI suites run over cannot drift from the library the browser loads. Every
-// other suite
-// substitutes a stand-in for lil-gui; this one imports the real module and
+// other suite substitutes a stand-in for lil-gui; this one imports the real module and
 // drives it over tests/helpers/fake_dom.js, which is enough DOM for panel and
 // controller construction.
 //
