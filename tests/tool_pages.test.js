@@ -428,6 +428,7 @@ const CONTRAST_SURFACES = {
   },
   'mobius.css': {
     '.preset-btn': '.preset-btn',
+    '.preset-btn.active': ['.preset-btn.active', '#presetSidebar', 'body'],
     '.preset-desc': '.preset-btn',
     '.complex-plane-label': '.param-group',
   },
@@ -493,10 +494,6 @@ const CONTRAST_SURFACES = {
 // Sheet -> text rule -> why no pair measures it. An empty reason is no
 // exemption: the sweep falls back to demanding a surface for it.
 const CONTRAST_EXEMPT = {
-  'mobius.css': {
-    '.preset-btn.active': 'pressed fill is 20% blue over the translucent sidebar, which the '
-      + 'live canvas backs',
-  },
   'shader.css': {
     '.shader-toolbar button:disabled':
       'inactive control, which SC 1.4.3 exempts from the contrast floor',
