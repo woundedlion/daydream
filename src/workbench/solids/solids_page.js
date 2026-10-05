@@ -1349,7 +1349,7 @@ async function refreshOpGating() {
     btn.setAttribute('aria-disabled', String(blocked));
     if (blocked) {
       btn.title = 'Would exceed an engine mesh limit on the current solid';
-      btn.setAttribute('aria-describedby', [btn.dataset.authoredDescription, 'opGateMsg'].filter(Boolean).join(' '));
+      btn.setAttribute('aria-describedby', [btn.dataset.authoredDescription, 'opBlockedReason'].filter(Boolean).join(' '));
     } else {
       if (btn.dataset.authoredDescription) btn.setAttribute('aria-describedby', btn.dataset.authoredDescription);
       else btn.removeAttribute('aria-describedby');

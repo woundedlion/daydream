@@ -126,7 +126,7 @@ for (const op of ['ambo', 'meta']) test(`${op} gate preserves authored descripti
   await handler('refreshOpGating', context)();
   assert.equal(button.disabled, false);
   assert.equal(attributes.get('aria-disabled'), 'true');
-  assert.equal(attributes.get('aria-describedby'), [authored, 'opGateMsg'].filter(Boolean).join(' '));
+  assert.equal(attributes.get('aria-describedby'), [authored, 'opBlockedReason'].filter(Boolean).join(' '));
   handler('activateAddOp', context)({ target: { closest: () => button } });
   assert.equal(added.length, 0);
   assert.match(messages[0], /exceed an engine mesh limit/);
