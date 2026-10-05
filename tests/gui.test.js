@@ -219,7 +219,7 @@ test('rollback restores an unflushed control value to runtime sinks and URL', ()
 
     const rebuilt = makeEffect();
     restoreEffectControlState(rebuilt.effect, snapshot);
-    mock.timers.tick(200);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
 
     assert.equal(rebuilt.model.Speed, 0.75);
     assert.deepEqual(rebuilt.runtime, { engine: 0.75, workers: 0.75 });
@@ -323,7 +323,7 @@ test('DeepLinkGUI.add clamps an out-of-range numeric URL value to the slider min
     guiHi.add(objHi, 'speed', 0, 10).onChange((v) => hi.push(v));
     assert.equal(objHi.speed, 10, 'value above max clamps to max');
     assert.deepEqual(hi, [10], 'the clamped value replays through onChange');
-    mock.timers.tick(200);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
     assert.equal(new URL(lastUrl, 'http://x').searchParams.get('speed'), '10',
       'the clamped value replaces the out-of-range one in the URL');
 
@@ -335,7 +335,7 @@ test('DeepLinkGUI.add clamps an out-of-range numeric URL value to the slider min
     guiLo.add(objLo, 'speed', 0, 10).onChange((v) => lo.push(v));
     assert.equal(objLo.speed, 0, 'value below min clamps to min');
     assert.deepEqual(lo, [0]);
-    mock.timers.tick(200);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
     assert.equal(new URL(lastUrl, 'http://x').searchParams.get('speed'), '0',
       'the clamped low value replaces the out-of-range one in the URL');
   } finally {
@@ -361,7 +361,7 @@ test('DeepLinkGUI.add snaps a numeric URL value to the control step', () => {
       .onChange((v) => replayed.push(v));
     assert.equal(obj.speed, 2.5, 'the URL value snaps to a step multiple');
     assert.deepEqual(replayed, [2.5], 'the snapped value replays through onChange');
-    mock.timers.tick(200);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
     assert.equal(new URL(offGrid.written(), 'http://x').searchParams.get('speed'), '2.5',
       'the snapped value replaces the off-grid one in the URL');
 
@@ -369,7 +369,7 @@ test('DeepLinkGUI.add snaps a numeric URL value to the control step', () => {
     const gridObj = { speed: 1 };
     new DeepLinkGUI({ autoPlace: false }).add(gridObj, 'speed', 0, 1, 0.1);
     assert.ok(Math.abs(gridObj.speed - 0.3) < 1e-9, 'an on-grid value survives the snap');
-    mock.timers.tick(200);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
     assert.equal(onGrid.written(), '/', 'an on-grid value triggers no URL rewrite');
   } finally {
     mock.timers.reset();
@@ -391,7 +391,7 @@ test('DeepLinkGUI.add fans a change out to every registered onChange handler', (
     controller.onChange((v) => first.push(v));
     controller.onChange((v) => second.push(v));
     controller.setValue(5);
-    mock.timers.tick(200);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
 
     assert.deepEqual(first, [5], 'the first-registered handler still fires');
     assert.deepEqual(second, [5], 'the second-registered handler fires too');
@@ -468,7 +468,7 @@ test('DeepLinkGUI.addSession keeps a session control out of the URL', () => {
     const obj = { Cycle: false, Record: false };
     gui.addSession(obj, 'Cycle');
     gui.addSession(obj, 'Record').setValue(true);
-    mock.timers.tick(200);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
 
     assert.equal(obj.Cycle, false, 'a session control is not seeded from the URL');
     assert.deepEqual(gui.collectUrlKeys(), [], 'no session key is deep-linked');
@@ -704,7 +704,7 @@ test('makeUrlParamWriter merges multiple keys changed within the debounce window
   try {
     setUrlParam('a', 0.5);
     setUrlParam('b', 'two'); // before the first timer fires
-    mock.timers.tick(200);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
   } finally {
     mock.timers.reset();
   }
@@ -729,7 +729,7 @@ test('makeUrlParamWriter preserves location.hash in the fallback commit', () => 
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     setUrlParam('a', 'one');
-    mock.timers.tick(200);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
   } finally {
     mock.timers.reset();
   }
@@ -755,7 +755,7 @@ test('makeUrlParamWriter serializes numbers and deletions like URLSync', () => {
     write('count', 42);
     write('stale', NaN);  // non-finite has no URL form
     write('gone', null);  // deletion marker
-    mock.timers.tick(200);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
   } finally {
     mock.timers.reset();
   }
@@ -799,7 +799,7 @@ test('destroying a child folder leaves the shared root URL writer armed', () => 
     assert.equal(folder.gui.destroyed, true, 'the folder panel is torn down');
     assert.equal(root.gui.destroyed, false, 'the root panel survives a child destroy');
 
-    mock.timers.tick(200);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
     assert.equal(new URL(url.written(), 'http://x').searchParams.get('Shape.sides'), '5',
       'the root writer still flushes the pending deep link');
   } finally {
@@ -821,7 +821,7 @@ test('destroying the root cancels its pending URL write', () => {
     root.destroy();
     assert.equal(root.gui.destroyed, true, 'the root panel is torn down');
 
-    mock.timers.tick(200);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
     assert.equal(url.written(), '/', 'the discarded GUI writes nothing');
   } finally {
     mock.timers.reset();
