@@ -1,4 +1,4 @@
-# npm dependencies — restored with `npm install`, never committed.
+# npm dependencies — restored with `npm ci`, never committed.
 # Match at any depth so a stray install under tests/ is never committed.
 node_modules/
 
