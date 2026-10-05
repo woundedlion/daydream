@@ -230,9 +230,7 @@ test('a page with no callbacks at all still captures and releases', () => {
   assert.equal(element.capturedPointers.size, 0);
 });
 
-// Tailwind's preflight gives the tool canvases a 1px border, which the border
-// box carries and the bitmap does not: a pointer scaled by the rect misses both
-// ends of the surface it is scrubbing.
+// Tool canvas borders belong to the border box, not the drawable surface.
 test('innerRect reports the padding box, not the bordered rect', () => {
   const element = fakeElement('canvas');
   element.offsetLeft = 40;
