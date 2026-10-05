@@ -182,7 +182,8 @@ export class FakeChainEngine {
     if (this.nextChainResult !== null) {
       const injected = this.nextChainResult;
       this.nextChainResult = null;
-      return { ...injected, status: ChainStatus[injected.code === 'APPLIED' ? 'OK' : injected.code] };
+      if (injected.code === 'APPLIED') throw new Error('Injected chain results must be refusals');
+      return { ...injected, status: ChainStatus[injected.code] };
     }
     if (entries.length === 0) return refusal('EMPTY');
     const instances = new Set();
