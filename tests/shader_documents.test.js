@@ -405,7 +405,10 @@ test('every ash-cloud preset value reaches its compiled build', () => {
   assert.equal(applyFixedShaderDocument(
     engine, MODULE, { document: ashCloud }, 'ash-cloud', ['ash-cloud'], BAKED, fixedDerivedBinding), null);
   assert.equal(engine.writes.some(([name]) => name === 'Camera Spin Speed'), false);
-  assert.equal(engine.writes.length, definitions.length);
+  const expectedWrites = Object.entries(ashCloud.preset_bank.presets[0].values)
+    .map(([id, value]) => [engineParameterName(id), value])
+    .filter(([name]) => definitions.some((definition) => definition.name === name));
+  assert.deepEqual(engine.writes, expectedWrites);
 });
 
 const derivedPeriodDocument = (period, scale = 2) => ({ document: {
