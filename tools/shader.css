@@ -430,7 +430,6 @@
   color: var(--panel-text);
   font: inherit;
   font-size: 0.625rem;
-  accent-color: var(--accent);
 }
 
 .chain-chip-rename {
