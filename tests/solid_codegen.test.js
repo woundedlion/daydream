@@ -65,7 +65,7 @@ function recordingOp(op) {
 
 /**
  * A mesh wrapper whose every method records its call as {op, args} and returns
- * another such wrapper, so applyOp runs without WASM and the arguments it hands
+ * the same wrapper, so applyOp runs without WASM and the arguments it hands
  * the engine stay observable.
  * @param {Array<{op: string, args: Array<*>}>} [calls] - Sink for the recorded calls.
  */
