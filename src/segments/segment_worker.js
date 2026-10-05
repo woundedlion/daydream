@@ -85,9 +85,6 @@ export function installSegmentWorker() {
   /**
    * Name an engine enum value for a fault message. The fallback keeps the raw
    * value, which a rejection needs to identify a result this build does not map.
-   * Duplicated rather than imported from param_sync.js: that copy's fallback names
-   * an unrecognized result instead, and importing it would add a leaf to the
-   * worker's pinned module graph.
    * @param {Record<string, unknown>} values - A Module enum object, constant name
    * to value.
    * @param {unknown} result - One of that enum's values.

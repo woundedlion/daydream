@@ -233,7 +233,7 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
         center.divideScalar(f.length);
         faceCenters.push(center);
 
-        faceNormals.push(new THREE.Vector3().copy(faceNormal(meshData.vertices, f)));
+        faceNormals.push(new THREE.Vector3().copy(faceNormal(meshData.vertices, f)).normalize());
       });
 
       if (view.showFaces) {

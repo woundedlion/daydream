@@ -862,7 +862,7 @@ export function seedOpParams(opName, mesh) {
 }
 
 /**
- * Newell unit normal for an ordered face; zero for a degenerate face.
+ * Newell area normal for an ordered face; zero for a degenerate face.
  * @param {Array<{x:number, y:number, z:number}>} vertices - Mesh vertices.
  * @param {Array<number>} face - Ordered vertex indices.
  * @returns {{x:number, y:number, z:number}} The face normal.
@@ -879,9 +879,7 @@ export function faceNormal(vertices, face) {
     nz += (a.x - b.x) * (a.y + b.y);
   }
 
-  const length = Math.hypot(nx, ny, nz);
-  return length === 0 ? { x: 0, y: 0, z: 0 }
-    : { x: nx / length, y: ny / length, z: nz / length };
+  return { x: nx, y: ny, z: nz };
 }
 
 /**
