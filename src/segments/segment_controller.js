@@ -188,7 +188,7 @@ export class SegmentController {
    * @param {(view: Uint16Array) => boolean} deps.displayAliasesDiverged - Reports whether either display alias has stopped referencing the given view. Required, and the twin of repointDisplayAliases: the host owns both halves of the alias pair, so the detector and the heal must be supplied together rather than half injected and half reached for.
    * @param {(message: string) => void} [deps.onFault] - Reports the first fault since the pool was (re)built.
    * @param {Document} [deps.statsDoc] - DOM document the stats overlay renders into; defaults to the global `document`.
-   * @param {import('./module_warmer.js').ModuleWarmer} [deps.moduleWarmer] - Warmer whose compilation the spawn hands to its workers; defaults to the page's, so every pool on a page shares one compile.
+   * @param {import('./module_warmer.js').ModuleWarmer} [deps.moduleWarmer] - Warmer whose compilation the spawn hands to its workers; defaults to the page's, so pools reuse its held compilation when available.
    * @throws {TypeError} When repointDisplayAliases or displayAliasesDiverged is
    *   not a function.
    */
@@ -839,8 +839,7 @@ export class SegmentController {
 
   /**
    * Release the pool and the warmer's held compilation. For page teardown only:
-   * destroy() alone keeps the warm, so toggling segmented mode back on rebuilds
-   * the pool on one compile rather than one per worker.
+   * destroy() alone keeps the warm, so the next pool can reuse a held compilation.
    */
   dispose() {
     this.destroy();

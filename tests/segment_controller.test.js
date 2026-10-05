@@ -2596,9 +2596,8 @@ test('setEffect bumps renderGen so an in-flight old-effect frame is fenced out',
     'a stale in-flight frame now fails inflightGen === renderGen');
 });
 
-// A resize drops the worker's effect and its clip, and the worker cannot re-clip
-// without one; a pool left that way renders correctly-sized black frames that
-// pass every fence, watchdog and composite check.
+// A resize drops the worker's effect and its clip; rendering faults until the
+// apply pipeline reinstalls the effect.
 test('setResolution leaves one effect rebuild to the apply pipeline', () => {
   const c = readyController(2, { effect: 'Ribbons' });
 

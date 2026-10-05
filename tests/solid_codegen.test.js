@@ -1098,7 +1098,7 @@ test('solids validator resolves the module factory after async initialization', 
 });
 
 /**
- * Verifies every page gate binds the verdict and reads its fields. The verdict
+ * Verifies every page gate binds the verdict instead of negating the call. The verdict
  * is an object and therefore always truthy, so a gate left testing the call's
  * result directly would pass every chain.
  */

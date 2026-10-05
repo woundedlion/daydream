@@ -476,13 +476,54 @@ test('control readings marshal into a recipe by enum name', () => {
  * template's value.
  */
 test('every recipe field a control carries is marshalled', () => {
-  const recipe = paletteRecipeFromControls(defaultPaletteRecipe(), CONTROL_READINGS);
+  const template = defaultPaletteRecipe();
+  const expected = {
+    ...template,
+    input: { offset: 0.1, span: 0.8 },
+    domain: PaletteV4.domain.MIRROR,
+    easing: PaletteV4.easing.SMOOTHSTEP,
+    colorPath: PaletteV4.colorPath.OKLAB_CARTESIAN,
+    hue: {
+      ...template.hue,
+      mode: PaletteV4.hueMode.HARMONY,
+      harmony: PaletteV4.harmony.TRIADIC,
+      direction: PaletteV4.direction.CLOCKWISE,
+      baseTurns: 0.25,
+      spreadTurns: 0.11,
+      sweepTurns: 2.5,
+    },
+    lightness: {
+      ...template.lightness,
+      curve: PaletteV4.curve.ASCENDING, center: 0.5, range: 0.6000000000000001,
+    },
+    chroma: {
+      ...template.chroma,
+      curve: PaletteV4.curve.BELL, center: 0.4, range: 0.2, headroom: 0.8,
+    },
+    hueTorsion: 1.5,
+  };
+  assert.deepEqual(paletteRecipeFromControls(template, CONTROL_READINGS), expected);
 
-  assert.equal(recipe.easing, PaletteV4.easing.SMOOTHSTEP);
-  assert.equal(recipe.hue.spreadTurns, 0.11);
-  assert.equal(recipe.hue.sweepTurns, 2.5);
-  assert.equal(recipe.chroma.headroom, 0.8);
-  assert.equal(recipe.hueTorsion, 1.5);
+  const customTemplate = structuredClone(template);
+  customTemplate.lightness.custom = [0.1, 0.2, 0.3, 0.4];
+  customTemplate.chroma.custom = [0.2, 0.3, 0.4, 0.5];
+  customTemplate.hue.customTurns[3] = 0.6;
+  const custom = paletteRecipeFromControls(customTemplate, {
+    ...CONTROL_READINGS,
+    domain: 'FALLOFF', hueMode: 'CUSTOM',
+    lightnessCurve: 'CUSTOM', chromaCurve: 'CUSTOM',
+  });
+  assert.deepEqual(custom, {
+    ...expected,
+    domain: PaletteV4.domain.FALLOFF,
+    falloffStart: 0.85,
+    hue: {
+      ...expected.hue, mode: PaletteV4.hueMode.CUSTOM,
+      baseTurns: 0, customTurns: [0.25, 0.32, 0.39, 0.6],
+    },
+    lightness: { ...customTemplate.lightness, curve: PaletteV4.curve.CUSTOM },
+    chroma: { ...customTemplate.chroma, curve: PaletteV4.curve.CUSTOM, headroom: 0.8 },
+  });
 });
 
 /**
@@ -523,7 +564,7 @@ test('the generative tab opens on the default recipe', () => {
   assert.deepEqual(actual, defaults);
 });
 
-/** Verifies the two fields the engine canonicalizes are canonical before it sees them. */
+/** Verifies the recipe fields the engine canonicalizes are canonical before it sees them. */
 test('a falloff start and a loop sweep are canonicalized by domain', () => {
   const straight = paletteRecipeFromControls(defaultPaletteRecipe(), CONTROL_READINGS);
   assert.equal(straight.falloffStart, 0.9, 'only a FALLOFF domain carries its own start');

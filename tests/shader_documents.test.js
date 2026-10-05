@@ -296,7 +296,7 @@ test('a preset the effect does not carry falls back to its first reference', () 
   assert.deepEqual(engine.writes, [['Pattern Freq', 5]]);
 });
 
-// Every id is resolved before the first write: a refusal after one write would
+// Every writable id is resolved before the first write: a refusal after one write would
 // leave the engine on a state that is neither the reference preset nor the
 // document's, and the parity toggle would show neither build's answer.
 test('an unmatched id refuses the fixed apply before any value is written', () => {
@@ -598,6 +598,7 @@ function patternFetch(files, patternCatalog = PATTERN_CATALOG) {
  */
 function workbench({ files = { 'kaleidoscope_flowers.shader.json': shaderDocument() },
                      engine = workbenchEngine(),
+                     patternCatalog = PATTERN_CATALOG,
                      selectEffect = () => true,
                      initialEffect = null } = {}) {
   const elements = workbenchMounts();
@@ -616,7 +617,7 @@ function workbench({ files = { 'kaleidoscope_flowers.shader.json': shaderDocumen
     selectEffect: (effect) => { selections.push(effect); return selectEffect(effect); },
     syncEffectGui: () => { ran.gui += 1; },
     invalidate: () => { ran.invalidated += 1; },
-    fetchText: patternFetch(files),
+    fetchText: patternFetch(files, patternCatalog),
     // The fixtures are compiler results already; a document object is the
     // scratch build, which the fake passes through as its own compile.
     importCompiler: async () => ({
@@ -922,7 +923,9 @@ test('saving exports the document, harvesting nothing from the engine', async ()
 // selects but the roster omits survives the load and is dropped on the next
 // reload or resolution change.
 test('the workbench roster admits every effect the controller selects', async () => {
-  const harness = workbench();
+  const harness = workbench({
+    patternCatalog: PATTERN_CATALOG.replaceAll('KaleidoscopeFlowers', 'kaleidoscope-flowers'),
+  });
   await harness.controller.init();
   await harness.controller.loadSource(
     shaderDocument({ digest: 'digest-study' }), 'study.shader.json');
@@ -930,7 +933,12 @@ test('the workbench roster admits every effect the controller selects', async ()
   select.value = '';
   await onChange(select)();
 
-  assert.deepEqual(harness.selections, ['ShaderChain', 'ShaderChain', 'ShaderChain']);
+  select.value = 'kaleidoscope-flowers';
+  await onChange(select)();
+  harness.elements.get('shader-parity-toggle').dispatch('click');
+  assert.deepEqual(harness.selections, [
+    'ShaderChain', 'ShaderChain', 'ShaderChain', 'ShaderChain', 'kaleidoscope-flowers',
+  ]);
   for (const effect of harness.selections) {
     assert.ok(WORKBENCH_EFFECTS.includes(effect),
       `the workbench page must know the effect "${effect}"`);

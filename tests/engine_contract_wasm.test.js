@@ -1558,7 +1558,7 @@ test('generated/holosphere_wasm.d.ts declares the PaletteOps bridge the palette 
 });
 
 /**
- * The segmented pool compiles the binary once and hands every worker the
+ * When shared compilation succeeds, the segmented pool hands every worker the
  * WebAssembly.Module, which each instantiates through the glue's instantiateWasm
  * hook. Two things must hold for that to be safe, and neither is visible from
  * the mocked worker tests: the glue must honour the hook (or the pool silently
@@ -1693,15 +1693,35 @@ test('registry export rejects oversized intermediate primitive endpoints', async
   });
 });
 
-test('registry validation expands composite and flattened base recipes', async () => {
+test('registry validation expands composite and flattened base recipes', async (t) => {
   const validator = createChainValidator(() => createHolosphereModule({ print: sink, printErr: sink }));
-  for (const op of ['meta', 'needle', 'zip', 'gyro',
-    { op: 'bevel', params: { t: 0.5 } }, { op: 'bevel', params: { t: 0.25 } }]) {
-    await assert.doesNotReject(validateRegistryFaces(validator, { name: 'Composite', base: 'cube', ops: [op] }));
+  const module = await validator.acquire();
+  assert.ok(module);
+  const calls = [];
+  for (const name of KNOWN_OPS) {
+    const original = module.MeshOps.prototype[name];
+    t.mock.method(module.MeshOps.prototype, name, function (...args) {
+      calls.push(name);
+      return original.apply(this, args);
+    });
   }
+  for (const [op, primitives] of [
+    ['meta', ['ambo', 'dual', 'kis']],
+    ['needle', ['dual', 'kis']],
+    ['zip', ['kis', 'dual']],
+    ['gyro', ['snub', 'dual']],
+    [{ op: 'bevel', params: { t: 0.5 } }, ['ambo', 'ambo']],
+    [{ op: 'bevel', params: { t: 0.25 } }, ['ambo', 'truncate']],
+  ]) {
+    calls.length = 0;
+    await assert.doesNotReject(validateRegistryFaces(validator, { name: 'Composite', base: 'cube', ops: [op] }));
+    assert.deepEqual(calls, primitives);
+  }
+  calls.length = 0;
   await assert.doesNotReject(validateRegistryFaces(validator, { name: 'Flattened', base: 'authored', ops: ['dual'] }, {
     seed: 'cube', ops: [{ op: 'hankin', param: 45 * Math.PI / 180, twist: 0 }],
   }));
+  assert.deepEqual(calls, ['hankin', 'dual']);
 });
 
 test('retired chain operators are absent and refuse without changing the live program', () => {

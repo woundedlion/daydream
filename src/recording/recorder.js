@@ -77,8 +77,7 @@ export function selectMimeType(
 }
 
 /**
- * A canvas capture track. Manual frame-request mode adds requestFrame(); the
- * timed fallback the browser drops back to has no such method.
+ * A canvas capture track, with requestFrame() when the browser supports it.
  * @typedef {MediaStreamTrack & {requestFrame?: () => void}} CaptureTrack
  */
 
@@ -432,7 +431,7 @@ export class VideoRecorder {
   captureFrame() {
     if (this.mediaRecorder?.state !== 'recording' || !this.track) return;
     this.blitToOffscreen();
-    // Timed-fallback tracks have no requestFrame; the stream samples on its own.
+    // Without requestFrame(), the timed stream samples on its own.
     if (typeof this.track.requestFrame === 'function') this.track.requestFrame();
   }
 

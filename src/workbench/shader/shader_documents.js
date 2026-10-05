@@ -99,9 +99,9 @@ function writeEngineValue(engine, module, definitions, name, value) {
  * @param {string} presetId
  * @param {Set<string>} baked - The topology fields the effect bakes in.
  * @param {Set<string>} derived - Validated fields computed by the fixed effect.
- * @returns {string|null} Refusal reason, or null once every value is written.
- *   Every value is resolved before the first write, so an id the engine does
- *   not register refuses without a partial write.
+ * @returns {string|null} Refusal reason, or null once every writable value is written.
+ *   Baked and derived values are skipped. Remaining ids are resolved before
+ *   the first write, so an unregistered id refuses without a partial write.
  */
 function applyDocumentValues(engine, module, compiled, presetId, baked, derived) {
   const preset = compiled.document.preset_bank.presets

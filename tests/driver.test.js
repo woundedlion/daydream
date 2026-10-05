@@ -753,7 +753,7 @@ test('a tick whose repaint a heap growth held captures on the next repaint', () 
   ctx.timeAccumulator = 0;
   Daydream.prototype.render.call(ctx, null);
 
-  // The track is locked one frame per tick; dropping one shortens the video.
+  // The pending capture is retained for a later repaint.
   assert.equal(ctx.recorder.frames, 2, 'an advanced tick produced no video frame');
   assert.equal(ctx.heldCaptures, 0);
   assert.equal(ctx.needsRender, false, 'kept repainting past an empty backlog');
