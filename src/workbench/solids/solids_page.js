@@ -580,12 +580,15 @@ function importSavedSolids(text) {
   }
 
   let refused = 0;
+  let firstRefusal = null;
   let full = 0;
   const before = savedSolids.length;
   for (const entry of parsed) {
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)
-      || savedChainShapeError(entry.base, entry.ops)) {
+    const reason = !entry || typeof entry !== 'object' || Array.isArray(entry)
+      ? 'entry is not a saved-solid object' : savedChainShapeError(entry.base, entry.ops);
+    if (reason) {
       refused++;
+      firstRefusal ??= reason;
       continue;
     }
     if (savedSolids.length >= SAVED_SOLIDS_MAX) {
@@ -601,7 +604,7 @@ function importSavedSolids(text) {
     renderSavedList();
   }
   const skipped = [];
-  if (refused > 0) skipped.push(`${refused} the op table does not recognize`);
+  if (refused > 0) skipped.push(`${refused} invalid entries (${firstRefusal})`);
   if (full > 0) skipped.push(`${full} past the ${SAVED_SOLIDS_MAX}-card limit`);
   showGateMsg(`imported ${added} solid${added === 1 ? '' : 's'}`
     + (skipped.length > 0 ? ` — skipped ${skipped.join(' and ')}` : ''));

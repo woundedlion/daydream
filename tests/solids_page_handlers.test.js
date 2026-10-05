@@ -364,3 +364,16 @@ test('a row drag cannot rebuild controls after the engine stands down', () => {
   drag.onEnd({clientY: 10});
   assert.equal(row.classList.contains('dragging'), false);
 });
+
+test('saved-solid imports name invalid entries and the first refusal reason', () => {
+  for (const [entries, reason] of [[ [null, {}], /not a saved-solid object/ ],
+    [ [{base: 'cube', ops: [{op: 'truncate', params: {t: 50}}]}], /out-of-range/ ]]) {
+    const messages = [];
+    handler('importSavedSolids', { savedSolids: [], SAVED_SOLIDS_MAX: 100,
+      savedChainShapeError, showGateMsg: (message) => messages.push(message),
+    })(JSON.stringify(entries));
+    assert.match(messages[0], /invalid entries/);
+    assert.match(messages[0], reason);
+    assert.doesNotMatch(messages[0], /op table does not recognize/);
+  }
+});
