@@ -10,9 +10,7 @@ restoreDocumentAfterEach();
 /**
  * The flyout as the pages build it: a root holding the trigger button and the
  * panel it exposes, with a link inside the panel to press Escape from. Escape
- * reaches the root by bubbling, as it does in a browser where focus sits on
- * whatever the reader tabbed to, so a listener attached anywhere but the root
- * misses it here too.
+ * bubbles from the link through the panel and root.
  * @returns {Object} The nodes, the document stand-in, and the installed document.
  */
 function harness() {
