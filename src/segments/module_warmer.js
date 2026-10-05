@@ -43,8 +43,8 @@ export class ModuleWarmer {
   /**
    * Prime the module graph's HTTP cache and compile its binary.
    * @param {{fetch?: typeof globalThis.fetch, baseUrl?: string|URL, minIntervalMs?: number, now?: () => number, deadlineMs?: number, timers?: {setTimeout: Function, clearTimeout: Function}}} [dependencies]
-   * @returns {Promise<void>} Resolves once the graph is warm, or once the
-   *   deadline abandons it; never rejects, so the spawn behind it always runs.
+   * @returns {Promise<void>} Resolves when best-effort warming settles or is
+   *   skipped; never rejects, so the spawn behind it always runs.
    */
   warm({
     fetch: fetchResource = globalThis.fetch,

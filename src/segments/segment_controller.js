@@ -887,8 +887,8 @@ export class SegmentController {
       this.#frameResolve = null;
       resolve();
     }
-    // tick() is unreachable while the host is paused and never ran at all for a
-    // create()-time fault, so the overlay is painted here rather than left to it.
+    // A paused host need not tick, and a create()-time fault can precede the
+    // first tick, so paint the overlay here.
     this.updateStats();
     if (firstFault) this.onFault(message);
   }

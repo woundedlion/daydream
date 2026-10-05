@@ -1041,8 +1041,8 @@ test('getPresetIds names the presets selectPresetById answers to', () => {
       malformed.push(`${name}: getPresetIds returned ${typeof ids}`);
       continue;
     }
-    // A fixed-pipeline effect carries no stable metadata and reports none; an
-    // effect that reports any must name every preset it navigates.
+    // An effect without stable preset metadata reports none; one that reports
+    // any must name every preset it navigates.
     if (ids.length === 0) continue;
     if (ids.length !== engine.getPresetCount()) {
       malformed.push(`${name}: ${ids.length} ids for ${engine.getPresetCount()} presets`);

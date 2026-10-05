@@ -1470,8 +1470,6 @@ test('a failed schema rebuild keeps the live panel and reports once per generati
   h.panel.mount();
   const live = h.gui();
 
-  // A definitions read yielding no list is what a torn-down engine hands back
-  // across an async effect change.
   h.state.params = null;
   h.state.generation = 4;
   h.panel.sync();

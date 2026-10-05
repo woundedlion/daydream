@@ -527,7 +527,7 @@ export class Daydream {
    * callers that mutate the visible scene without advancing the simulation or
    * moving the camera (e.g. toggling axes/back-face culling, changing
    * resolution) must call this, otherwise the change won't show until the next
-   * sim tick — or never, while paused.
+   * sim tick, which a paused host without queued steps does not provide.
    */
   invalidate() {
     this.needsRender = true;
@@ -634,7 +634,7 @@ export class Daydream {
    * Advance the simulation one frame when running or single-stepping: clear the
    * pixel buffer, draw the effect, refresh stats.
    * @param {{drawFrame: () => void}} adapter - Render adapter whose drawFrame() paints the pixel buffer.
-   * @returns {boolean} Whether the simulation actually advanced (false while paused), so the caller can gate the recorder on the same decision.
+   * @returns {boolean} Whether the simulation actually advanced (false while paused without a queued step), so the caller can gate the recorder on the same decision.
    */
   stepSimulation(adapter) {
     const advanced = !this.paused || this.stepFrames !== 0;

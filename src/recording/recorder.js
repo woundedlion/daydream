@@ -82,8 +82,8 @@ export function selectMimeType(
  */
 
 /**
- * Where a session's chunks go. The streaming variant's finish() returns the
- * promise that settles once the file is flushed and closed.
+ * Where a session's chunks go. The streaming variant's finish() returns a
+ * promise that settles after the save or finalization attempt.
  * @typedef {{write: (data: Blob) => void, finish: () => (void|Promise<void>)}} VideoSink
  */
 

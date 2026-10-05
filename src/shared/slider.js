@@ -81,7 +81,7 @@ export function createSlider(containerId, cfg, onInput) {
 
   /**
    * Puts a display value onto the scaled grid the input actually accepts:
-   * `min + k*step`, clamped to the range. `<input type=range>` re-snaps
+   * `scaledMin + k*sliderStep`, within the rounded scaled bounds. `<input type=range>` re-snaps
    * anything off that grid, so a value merely rounded to scaled units would
    * leave the thumb somewhere the readout does not name whenever
    * `step * scale > 1`.
@@ -155,7 +155,7 @@ export function createSlider(containerId, cfg, onInput) {
    * Drives the control from code: thumb, readout, and `aria-valuetext` all move
    * together, so a page that computes a value elsewhere cannot leave one of the
    * three behind. Fires no `input` event — the caller owns its own state.
-   * @param {number} display - The value in display space; clamped to [min, max].
+   * @param {number} display - Display value, mapped onto the rounded scaled bounds and grid.
    * @returns {number} The value now shown, clamped and snapped to the step grid.
    */
   const setValue = (display) => {
