@@ -1439,6 +1439,28 @@ test('repeated effect switches on a refaulting pool spawn a bounded worker count
   assert.equal(c.faulted, true, 'the pool stays latched once the budget is spent');
 });
 
+test('toggling mode restores the rebuild budget before a new pool reaches ready', () => {
+  const c = makeController();
+  c.active = true;
+  c.create(2);
+  faultSegZero(c);
+  for (let i = 0; i <= MAX_FAULTED_REBUILDS; i++) {
+    c.setEffect(`Effect${i}`);
+    if (!c.faulted) faultSegZero(c);
+  }
+  assert.ok(c.faultedRebuilds >= MAX_FAULTED_REBUILDS);
+  c.active = false;
+  c.destroy();
+  assert.equal(c.faultedRebuilds, 0);
+  c.active = true;
+  c.create(2);
+  faultSegZero(c);
+  const spawnedBefore = FakeWorker.constructionCount;
+  c.setEffect('AfterToggle');
+  assert.equal(c.faulted, false);
+  assert.equal(FakeWorker.constructionCount - spawnedBefore, 2);
+});
+
 test('a pool that reaches ready restores the faulted effect-switch budget', () => {
   const c = makeController();
   c.active = true;

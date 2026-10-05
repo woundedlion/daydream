@@ -383,7 +383,10 @@ export class SegmentController {
         + `${typeof on}`);
     }
     this.#active = on;
-    if (!on) this.updateStats();
+    if (!on) {
+      this.faultedRebuilds = 0;
+      this.updateStats();
+    }
   }
 
   /**
