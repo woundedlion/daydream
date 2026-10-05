@@ -87,11 +87,10 @@ function captureFlag(options) {
 }
 
 /**
- * Matches one node against a single compound-free selector. Class, attribute-
- * presence, and tag selectors are supported; anything else throws rather than
- * silently matching nothing.
+ * Matches class, attribute-presence, tag and tag-plus-attribute selectors.
+ * Other selector forms throw.
  * @param {Object} node - Candidate element.
- * @param {string} selector - '.class', '[attr]', or a tag name.
+ * @param {string} selector - '.class', '[attr]', a tag name, or 'tag[attr]'.
  * @returns {boolean} True when the node matches.
  */
 function matchesOne(node, selector) {
