@@ -1016,10 +1016,12 @@ test('getParamGeneration and setPoleLod stay exported', () => {
     assert.equal(engine.getPoleLod(), v, `setPoleLod(${v}) must read back`);
   }
   for (const v of [-1, Number.NaN, -Infinity]) {
+    engine.setPoleLod(1);
     engine.setPoleLod(v);
     assert.equal(engine.getPoleLod(), 0, `setPoleLod(${v}) must clamp to 0`);
   }
   for (const v of [9, 1000, Infinity]) {
+    engine.setPoleLod(1);
     engine.setPoleLod(v);
     assert.equal(engine.getPoleLod(), 8, `setPoleLod(${v}) must saturate at 8`);
   }
