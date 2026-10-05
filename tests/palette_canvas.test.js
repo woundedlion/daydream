@@ -300,7 +300,8 @@ test('a one-column wave graph samples phase 0 instead of dividing by zero', () =
   const { toY } = waveGraphBand(100);
   const curveMoves = ctx.ops.filter(([n, x]) => n === 'moveTo' && x === 0)
     .map(([, , y]) => y);
-  assert.ok(curveMoves.includes(toY(0)), 'the lone column must plot the phase-0 sample');
+  assert.deepEqual(curveMoves.slice(-3), [toY(0), toY(1), toY(-0.5)],
+    'the three channel curves must start at their phase-0 samples');
 });
 
 test('the dashed reference line is reset so the channel curves stay solid', () => {
