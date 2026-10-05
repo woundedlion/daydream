@@ -404,7 +404,7 @@
 
 /* A field the current topology value deactivates stays present and editable;
    only the engine stops reading it. */
-.chain-param[data-deactivated="true"] {
+.chain-param[data-deactivated="true"] > :not(.chain-param-note) {
   opacity: 0.45;
 }
 
