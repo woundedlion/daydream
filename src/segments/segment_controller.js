@@ -484,9 +484,9 @@ export class SegmentController {
    * instance from the warmer's shared compilation when held, else compiling its
    * own, initialized with this engine's tuned params and paused state.
    * Latches a pool fault (leaving an empty controller) if the segment count is
-   * not layout-legal or the resolution key is unknown.
+   * not layout-legal, exceeds SEGMENT_COUNT_MAX, or the resolution key is unknown.
    * @param {number} numSegments - Pool size; must satisfy segment_layout's
-   *   isValidSegmentCount (a positive even integer).
+   *   isValidSegmentCount (a positive even integer) and be <= SEGMENT_COUNT_MAX.
    * @param {number} [bootAttempt] - Retry index; 0 for a user-driven spawn, bumped by the transient-module-load auto-retry.
    */
   create(numSegments, bootAttempt = 0) {
