@@ -258,7 +258,8 @@ test('addColor and addFolder hand back the shapes the GUI layer wraps', async ()
 });
 
 for (const search of ['', '?test.value=x']) {
-  test(`DeepLinkGUI and its double reject unsupported values with URL ${search}`, async () => {
+  test(`DeepLinkGUI and its double reject unsupported values with URL ${search}`, async (t) => {
+    const logged = t.mock.method(console, 'error', () => {});
     const real = await realGUI();
     const gui = new DeepLinkGUI(real, 'test', null, {
       location: { search, pathname: '/', hash: '' },
@@ -266,8 +267,9 @@ for (const search of ['', '?test.value=x']) {
       clearTimeout: () => {},
     });
     const fake = fakePanelGui({ hydrated: search ? { value: 'x' } : {} });
-    for (const factory of [() => ({}), () => ({ value: null }),
-      () => ({ value: undefined }), () => ({ value: {} })]) {
+    const factories = [() => ({}), () => ({ value: null }),
+      () => ({ value: undefined }), () => ({ value: {} })];
+    for (const factory of factories) {
       for (const target of [gui, fake]) {
         const object = factory();
         const before = object.value;
@@ -276,6 +278,7 @@ for (const search of ['', '?test.value=x']) {
         assert.throws(() => target.addSession(object, 'value'), TypeError);
       }
     }
+    assert.equal(logged.mock.callCount(), factories.length);
     assert.ok(gui.add({}, 'value', ['a', 'b']));
     assert.ok(fake.add({}, 'value', ['a', 'b']));
   });
