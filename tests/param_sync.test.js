@@ -11,6 +11,7 @@ import {
   selectorControlValue,
   enumConstantName,
   optionIndex,
+  replayParameterWrites,
 } from '../src/effects/param_sync.js';
 
 // resolveParamSync is the DOM-free core of sync()'s per-controller "fight-the-
@@ -246,14 +247,25 @@ test('document enum options normalize case, whitespace, and hyphens', () => {
   assert.equal(optionIndex(definition, 'unknown'), -1);
 });
 
-test('coupled replay stops when no refused write can advance', async () => {
-  const { replayParameterWrites } = await import('../src/effects/param_sync.js');
+test('coupled replay stops when no refused write can advance', () => {
   const results = { APPLIED: 0, INADMISSIBLE: 1 };
   const calls = [];
   const refused = replayParameterWrites([{ name: 'A', value: 1 }, { name: 'B', value: 2 }],
     (name) => { calls.push(name); return results.INADMISSIBLE; }, results);
   assert.deepEqual(calls, ['A', 'B']);
   assert.deepEqual(refused, [{ name: 'A', result: 1 }, { name: 'B', result: 1 }]);
+});
+
+test('replay reports non-admission errors without retrying them', () => {
+  const results = { APPLIED: 0, INADMISSIBLE: 1, OUT_OF_RANGE: 2 };
+  const calls = [];
+  const rejected = replayParameterWrites([{ name: 'A', value: 1 }, { name: 'B', value: 2 }],
+    (name) => {
+      calls.push(name);
+      return name === 'A' ? results.OUT_OF_RANGE : results.APPLIED;
+    }, results);
+  assert.deepEqual(calls, ['A', 'B']);
+  assert.deepEqual(rejected, [{ name: 'A', result: results.OUT_OF_RANGE }]);
 });
 
 test('selector indices round and clamp to available options', () => {
