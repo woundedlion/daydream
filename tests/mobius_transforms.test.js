@@ -38,7 +38,7 @@ function determinant({ A, B, C, D }) {
 
 // --- snapComplex ----------------------------------------------------------
 
-/** Values within threshold of zero collapse to exactly 0. */
+/** Values within twice the threshold of zero collapse to exactly 0. */
 test('snapComplex snaps near-zero values to exactly 0', () => {
   assert.equal(snapComplex(0.05), 0);
   assert.equal(snapComplex(-0.09), 0);
