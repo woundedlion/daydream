@@ -406,7 +406,8 @@ export class FakeChainEngine {
 }
 
 /**
- * Method names an object exposes that ENGINE_METHODS does not pin — a fake
+ * Method names an object exposes that neither ENGINE_METHODS nor
+ * ENGINE_OPTIONAL_METHODS pins — a fake
  * mocking one of these would pass its own tests against a method the real
  * engine never had. Walks the prototype chain up to Object.prototype, so an
  * instance is checked together with the class it came from and a per-instance
