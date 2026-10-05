@@ -499,8 +499,7 @@ export function installSegmentWorker() {
 
         const allPixels = engine.getPixels();
         const { x0, x1, y0, y1, w: qw, h: qh } = segRange;
-        // extractSegment's row subarrays clamp rather than throw, so a short source
-        // would silently zero-fill the tail; fault on a stride/length mismatch.
+        // A short source leaves the destination tail unchanged, including recycled pixels.
         const expectedLen = canvasW * canvasH * 3;
         if (allPixels.length !== expectedLen) {
           throw new Error(
