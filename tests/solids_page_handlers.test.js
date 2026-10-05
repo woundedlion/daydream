@@ -306,8 +306,10 @@ test('saved code export refuses off-grid parameters before generating code', asy
     savedSolids: [{ base: 'cube', ops: [{ op: 'truncate', params: { t: 0.334 } }] }],
     savedChainShapeError,
     showCopyFailure: (button, message) => failures.push(message),
+    registrySolidNames: new Set(['cube']),
+    generateRecipeCpp: () => assert.fail('generated before the shape gate'),
   });
-  await copyCode(0, 'recipe', {});
+  await copyCode(0, 'recipe_cpp', {});
   assert.equal(failures.length, 1);
   assert.match(failures[0], /export failed:.*grid/);
 });
