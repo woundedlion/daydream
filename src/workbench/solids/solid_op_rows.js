@@ -93,14 +93,15 @@ export function formatParamValue(value, def) {
  * @param {number} value - Current value.
  * @param {string} controlId - Unique id prefix for the row's controls.
  * @param {string} opName - Op the parameter belongs to, used in both inputs' accessible names.
+ * @param {number} index - The op's position in the chain.
  * @returns {{row: HTMLElement, range: HTMLInputElement, number: HTMLInputElement}} The row and its two inputs.
  */
-function buildParamRow(doc, key, def, value, controlId, opName) {
+function buildParamRow(doc, key, def, value, controlId, opName, index) {
   const row = doc.createElement('div');
   row.className = 'op-param flex items-center text-[0.6rem] space-x-1';
   row.dataset.key = key;
   const unitText = key === 'angle' ? 'degrees' : key === 'twist' ? 'radians' : '';
-  const accessibleName = `${opName} ${key}${unitText ? ` (${unitText})` : ''}`;
+  const accessibleName = `${opName} at position ${index + 1} ${key}${unitText ? ` (${unitText})` : ''}`;
 
   const name = doc.createElement('label');
   name.className = 'w-12 text-slate-400 capitalize truncate';
@@ -110,8 +111,6 @@ function buildParamRow(doc, key, def, value, controlId, opName) {
   const range = doc.createElement('input');
   range.type = 'range';
   range.id = `${controlId}-range`;
-  // The visible label is the bare key, which repeats across the chain; the
-  // aria-label overrides it so each op's slider is named by its own op.
   range.setAttribute('aria-label', accessibleName);
   range.className = 'flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer min-w-0';
   range.min = String(def.min);
@@ -179,9 +178,9 @@ export function buildOpRow(op, index, { opDef, count, on, doc = document }) {
   headerLeft.className = 'flex items-center';
 
   const handle = buildDragHandle(doc);
-  const upButton = buildButton(doc, 'move-op-btn move-op-up', '↑', `Move ${op.op} up`);
+  const upButton = buildButton(doc, 'move-op-btn move-op-up', '↑', `Move ${op.op} at position ${index + 1} up`);
   upButton.disabled = index === 0;
-  const downButton = buildButton(doc, 'move-op-btn move-op-down', '↓', `Move ${op.op} down`);
+  const downButton = buildButton(doc, 'move-op-btn move-op-down', '↓', `Move ${op.op} at position ${index + 1} down`);
   downButton.disabled = index === count - 1;
 
   const label = doc.createElement('span');
@@ -204,7 +203,7 @@ export function buildOpRow(op, index, { opDef, count, on, doc = document }) {
     controls.className = 'mt-1 space-y-1';
     for (const key of paramKeys) {
       const { row, range, number } = buildParamRow(
-        doc, key, opDef.params[key], op.params[key], `op-${index}-${key}`, op.op);
+        doc, key, opDef.params[key], op.params[key], `op-${index}-${key}`, op.op, index);
       controls.appendChild(row);
 
       const readValue = (/** @type {Event} */ e) =>
