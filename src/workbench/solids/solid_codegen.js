@@ -332,14 +332,13 @@ export const DEFINED_SEED_CONSTANTS = new Set([
 
 /**
  * The Platonic seeds, the leading run of simple_registry (solids.h pins the
- * count with PLATONIC_COUNT). The WASM registry reports only Simple/Complex, so
- * the page splits its Simple entries into Platonic and Archimedean against this
- * list.
+ * count with PLATONIC_COUNT). engine_contract_wasm.test.js pins this list
+ * against the registry.
  */
 export const PLATONIC_SOLIDS = SIMPLE_SEEDS.slice(0, 5);
 
 /**
- * The Catalan seeds, mirrored from `namespace Catalan` in solids.h. That
+ * The Catalan seeds, mirrored from `namespace Catalan` in solid_generators.h. That
  * namespace sees Archimedean/Platonic via using-directives but is NOT itself
  * visible from them, so a generated registry entry on a Catalan base must
  * qualify with `Catalan::`; `Archimedean::<catalan base>` would not compile.
