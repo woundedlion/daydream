@@ -155,8 +155,7 @@ body {
   padding: 0.2rem 0.3rem;
 }
 
-/* Ops the validator refused or trapped on the current
-   mesh (see chainIsValid). */
+/* Ops blocked by createOpGate, or the whole grid after freezeEditing. */
 #addOpGrid .btn:disabled,
 #addOpGrid .btn[aria-disabled="true"] {
   opacity: 0.35;
