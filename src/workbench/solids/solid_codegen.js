@@ -862,15 +862,12 @@ export function seedOpParams(opName, mesh) {
 }
 
 /**
- * Tests whether an ordered planar face has a consistent turn direction.
- *
+ * Newell unit normal for an ordered face; zero for a degenerate face.
  * @param {Array<{x:number, y:number, z:number}>} vertices - Mesh vertices.
- * @param {Array<number>} face - Ordered vertex indices for one face.
- * @returns {boolean} True when the face is convex or has fewer than four vertices.
+ * @param {Array<number>} face - Ordered vertex indices.
+ * @returns {{x:number, y:number, z:number}} The face normal.
  */
-export function isConvexFace(vertices, face) {
-  if (face.length < 4) return true;
-
+export function faceNormal(vertices, face) {
   let nx = 0;
   let ny = 0;
   let nz = 0;
@@ -881,6 +878,23 @@ export function isConvexFace(vertices, face) {
     ny += (a.z - b.z) * (a.x + b.x);
     nz += (a.x - b.x) * (a.y + b.y);
   }
+
+  const length = Math.hypot(nx, ny, nz);
+  return length === 0 ? { x: 0, y: 0, z: 0 }
+    : { x: nx / length, y: ny / length, z: nz / length };
+}
+
+/**
+ * Tests whether an ordered planar face has a consistent turn direction.
+ *
+ * @param {Array<{x:number, y:number, z:number}>} vertices - Mesh vertices.
+ * @param {Array<number>} face - Ordered vertex indices for one face.
+ * @returns {boolean} True when the face is convex or has fewer than four vertices.
+ */
+export function isConvexFace(vertices, face) {
+  if (face.length < 4) return true;
+
+  const { x: nx, y: ny, z: nz } = faceNormal(vertices, face);
 
   const normalLengthSquared = nx * nx + ny * ny + nz * nz;
   if (normalLengthSquared === 0) return true;

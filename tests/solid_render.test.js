@@ -313,3 +313,21 @@ test('teardown disposes whatever is currently built', () => {
     assert.equal(object.geometry.disposals, 1, `${object.constructor.name} survived teardown`);
   }
 });
+
+
+test('a reflex-first face normal points outwards and degenerate faces remain finite', () => {
+  for (const degenerate of [false, true]) {
+    const { renderer, scene, materials } = setup();
+    const xy = degenerate ? [[0, 0], [0, 0], [0, 0]]
+      : [[0.2, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]];
+    const mesh = { vertices: xy.map(([x, y]) => new Vector3(x, y, 1)),
+      faces: [xy.map((_, i) => i)] };
+    renderer.render(mesh, view({ showFaces: false, showNormals: true }), null);
+    const [center, end] = scene.children.find((o) => o.material === materials.normal).geometry.points;
+    const outward = (end.x - center.x) * center.x + (end.y - center.y) * center.y
+      + (end.z - center.z) * center.z;
+    if (degenerate) assert.equal(outward, 0);
+    else assert.ok(outward > 0);
+    assert.ok([end.x, end.y, end.z].every(Number.isFinite));
+  }
+});

@@ -16,6 +16,7 @@
 
 import {
   fanTriangulateFace,
+  faceNormal,
   uniqueEdges,
   geodesicSegments,
   geodesicTriangleVertices,
@@ -232,12 +233,7 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
         center.divideScalar(f.length);
         faceCenters.push(center);
 
-        // Normal
-        const v0 = meshData.vertices[f[0]];
-        const v1 = meshData.vertices[f[1]];
-        const v2 = meshData.vertices[f[f.length - 1]];
-        const n = new THREE.Vector3().crossVectors(new THREE.Vector3().subVectors(v1, v0), new THREE.Vector3().subVectors(v2, v0)).normalize();
-        faceNormals.push(n);
+        faceNormals.push(new THREE.Vector3().copy(faceNormal(meshData.vertices, f)));
       });
 
       if (view.showFaces) {
