@@ -258,9 +258,9 @@ function balancedParens(text) {
  * the ones with no grammar, a check that the value carries no interpolated
  * `undefined`/`NaN` and closes its parentheses. This fixture requires camelCase
  * property names and throws on dashed names; browsers also accept dashed names.
- * An undeclared
- * property reads back as the empty string, as CSSStyleDeclaration yields, so a
- * module branching on `=== ''` takes the same path here as in a browser.
+ * An undeclared property reads back as the empty string, as CSSStyleDeclaration
+ * yields, so a module branching on `=== ''` takes the same path here as in a
+ * browser.
  * @returns {Object} The style view.
  */
 function fakeStyle() {
@@ -297,12 +297,13 @@ function fakeStyle() {
  * event), read {passive}/{signal}, and assert removal; a {once} listener drops
  * as it fires, a listener an earlier handler removed does not fire, and removal
  * pairs on the capture flag, as in the DOM, so a capture-mismatched removal
- * leaves the listener on the list. focusCalls counts accepted focus() calls; scrollIntoViewCalls counts every call. focus() keeps its last options bag in
+ * leaves the listener on the list. focusCalls counts accepted focus() calls;
+ * scrollIntoViewCalls counts every call. focus() keeps its last options bag in
  * focusOptions and points the installed document's activeElement at the node,
  * and unparenting a node that holds focus drops it to the body, so a reorder
  * built out of re-appends loses focus the way it does in the DOM.
- * Removing a listener
- * that was never added throws rather than no-opping as the DOM does, so a
+ * Removing a listener that was never added throws rather than no-opping as the
+ * DOM does, so a
  * fixture that omits the add cannot hide a removal that never happens; pass
  * {allowRedundantRemoval: true} where the second removal is the thing under
  * test, as it is for an idempotent disposal.

@@ -79,7 +79,8 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
     // built from an options list is an OptionController, whose options() updates
     // its <select> in place and hands back the same controller; any other
     // controller is destroyed and a replacement carrying the copied name is
-    // appended to the end of the panel. The real options behavior is exercised in tests/lil_gui_contract.test.js.
+    // appended to the end of the panel. The real options behavior is exercised
+    // in tests/lil_gui_contract.test.js.
     options(choices) {
       if (!optionsReplaces && isOptionList(controller.args[0])) {
         controller.args = [choices];
