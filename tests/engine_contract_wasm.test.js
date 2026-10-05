@@ -892,7 +892,7 @@ test('strobeColumns and effect metadata return the shapes daydream consumes', ()
   assert.equal(typeof engine.strobeColumns(), 'boolean',
     'strobeColumns must return a boolean');
 
-  // daydream.js reads this map to label sidebar entries.
+  // effect_sequencing.js's applyResolution reads this map to label sidebar entries.
   const sizes = engine.getEffectSizes();
   const names = Object.keys(sizes);
   assert.ok(names.includes('DisplacementField'),
@@ -1006,7 +1006,7 @@ test('getParamGeneration and setPoleLod stay exported', () => {
     'cannot be detected');
 
   assert.equal(typeof engine.setPoleLod, 'function',
-    'setPoleLod must stay callable (display_controls.js binds the Pole LOD slider to it)');
+    'setPoleLod must stay callable (pole_lod.js binds the Pole LOD slider to it)');
   assert.equal(engine.getPoleLod(), 0,
     'a fresh engine must start undecimated (HS_POLE_LOD_DEFAULT)');
   // daydream.js's Pole LOD slider spans [0, 2]; the setting is what the segmented
@@ -1026,9 +1026,8 @@ test('getParamGeneration and setPoleLod stay exported', () => {
   engine.setPoleLod(0);
 });
 
-// getPresetIds is the persisted identity behind selectPresetById: daydream.js
-// restores a preset by ID rather than by index, so an ID roster that stops
-// matching the navigation order silently restores a different preset.
+// shader_documents.js selects a document reference preset by ID; an ID roster
+// that stops matching navigation order selects a different preset.
 test('getPresetIds names the presets selectPresetById answers to', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
 
