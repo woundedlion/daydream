@@ -1233,6 +1233,7 @@ test('the worker module graph carries no specifier an import map would resolve',
   // now fetches on every spawn, and one leaving it takes its own gate with it.
   assert.deepEqual(modules, [
     'generated/holosphere_wasm.js',
+    'src/effects/param_sync.js',
     'src/engine/workbench_bindings.js',
     'src/segments/segment_layout.js',
     'src/segments/segment_worker.js',
@@ -1337,3 +1338,28 @@ for (const fault of ['missing restore API', 'rejected restore', 'live engine']) 
     }
   });
 }
+
+
+test('rebuild retries a coupled write after its prerequisite without reporting divergence', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  const calls = [];
+  let ready = false;
+  engineInstance.setParameter = (name, value) => {
+    calls.push([name, value]);
+    if (name === 'A' && !ready) return ParamSetResult.INADMISSIBLE;
+    if (name === 'B') ready = true;
+    return ParamSetResult.APPLIED;
+  };
+  const capture = installConsoleCapture('error');
+  try {
+    await dispatch({ type: 'setEffect', name: 'Waves', params: [
+      { name: 'A', acceptedValue: 1, value: 2 },
+      { name: 'B', acceptedValue: 3, value: 4 },
+    ] });
+    assert.deepEqual(calls, [['A', 1], ['B', 3], ['A', 1], ['A', 2], ['B', 4]]);
+    assert.deepEqual(capture.messages, []);
+    posted.length = 0;
+    await dispatch({ type: 'render' });
+    assert.deepEqual(posted.find((p) => p.msg.type === 'frame').msg.warnings, undefined);
+  } finally { capture.restore(); }
+});
