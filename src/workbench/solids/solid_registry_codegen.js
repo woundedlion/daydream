@@ -9,8 +9,7 @@
  * mirror a Complex entry must carry). Pure string code with no DOM and no WASM
  * dependency, so it is unit-testable; the page passes a star-pattern base's
  * authored chain in, read from MeshOps.getRecipe(). Output is pasted verbatim
- * into the engine, so the exact text and formatting are byte-for-byte
- * significant.
+ * into the engine; fixture tests pin its text and formatting.
  */
 
 import {
@@ -74,6 +73,7 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
     ];
     /** @type {import('./solid_codegen.js').MeshWrapper|null} */
     let mesh = null;
+    let halted = false;
     try {
       mesh = mod.MeshOps.fromSolidName(baseRecipe?.seed ?? item.base);
       const check = () => {
@@ -120,12 +120,15 @@ export async function validateRegistryFaces(validator, item, baseRecipe = null) 
         previousName = name;
       }
     } catch (error) {
+      halted = engineHalted(error, mod);
       validator.noteDeath(error);
-      if (engineHalted(error, mod))
+      if (halted)
         throw new Error('Registry validation exceeded an engine mesh limit', { cause: error });
       throw error;
     } finally {
-      try { mesh?.delete(); mod.MeshOps.clearToolingMemory(); } catch { /* halted engine */ }
+      if (!halted) {
+        try { mesh?.delete(); mod.MeshOps.clearToolingMemory(); } catch { /* cleanup failure */ }
+      }
     }
   });
 }

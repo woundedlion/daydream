@@ -539,3 +539,25 @@ test('registry validation checks standalone kis, dual and dt bridge intermediate
   await assert.doesNotReject(validateRegistryFaces(validatorFor(180, 540, 1080),
     { base: 'custom', ops: ['dual', 'kis'] }));
 });
+
+
+test('registry cleanup runs on healthy completion and ordinary errors but skips a halted mesh', async () => {
+  for (const outcome of ['success', 'error', 'trap']) {
+    const calls = [];
+    const mesh = {
+      getFaces() {
+        if (outcome === 'trap') throw new WebAssembly.RuntimeError('unreachable');
+        if (outcome === 'error') throw new Error('bad faces');
+        return { counts: [4, 4, 4, 4, 4, 4] };
+      },
+      delete() { calls.push('delete'); },
+    };
+    const mod = { MeshOps: { fromSolidName: () => mesh,
+      clearToolingMemory: () => calls.push('clear') } };
+    const validator = { withValidator: async task => task(mod), noteDeath() {} };
+    const result = validateRegistryFaces(validator, { base: 'cube', ops: [] });
+    if (outcome === 'success') await result;
+    else await assert.rejects(result, outcome === 'trap' ? /engine mesh limit/ : /bad faces/);
+    assert.deepEqual(calls, outcome === 'trap' ? [] : ['delete', 'clear']);
+  }
+});
