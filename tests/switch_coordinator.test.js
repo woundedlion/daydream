@@ -55,8 +55,7 @@ function makeApp({
     applied: { effect: 'Alpha', resolution: 'Lo' },
     url: '/?effect=Alpha',
     control: { resolution: 'Lo' },
-    // What the panel carried across its last rebuild, by effect name.
-    persisted: new Map(),
+    chainRestores: [],
     paramWrites: [],
     calls: [],
     errors: [],
@@ -77,13 +76,7 @@ function makeApp({
     if (throwOnEffect && !app.switches.isRestoring()) throw throwOnEffect;
     if (rejectEffects.has(effect)) return ApplyResult.REJECTED;
     app.applied.effect = effect;
-    // A successful apply rebuilds the GUI: the outgoing panel persists its state
-    // on destroy, and the new one comes up at engine defaults — except for a
-    // full-config effect, which the rebuild restores whole.
-    app.persisted.set(app.activeEffect.name, app.activeEffect.state.Speed);
-    const restored = fullConfigEffects.has(effect)
-      ? app.persisted.get(effect) ?? 0 : 0;
-    app.activeEffect = makeEffectRecord(effect, restored, false, app.paramWrites);
+    app.activeEffect = makeEffectRecord(effect, 0, false, app.paramWrites);
     return ApplyResult.APPLIED;
   };
 
@@ -118,6 +111,12 @@ function makeApp({
     // written to: the snapshot is taken before the apply, so it must describe
     // the outgoing effect.
     usesChainSnapshot: () => fullConfigEffects.has(app.applied.effect),
+    getChainSnapshot: () => ({ chain: app.activeEffect.state.Speed }),
+    restoreChainSnapshot: (snapshot) => {
+      app.chainRestores.push({ snapshot, effect: app.activeEffect.name });
+      app.activeEffect.state.Speed = snapshot.chain;
+      return true;
+    },
   });
   return app;
 }
@@ -167,6 +166,8 @@ test('a rejected switch off a full-config effect restores it without a replay', 
   assert.equal(app.applied.effect, 'Alpha');
   assert.equal(app.activeEffect.state.Speed, 0.9,
     'the rollback rebuild restored the whole config');
+  assert.deepEqual(app.chainRestores, [{ snapshot: { chain: 0.9 }, effect: 'Alpha' }],
+    'the coordinator forwards the captured snapshot after rebuilding the outgoing effect');
   assert.deepEqual(app.paramWrites, [],
     'a per-parameter replay on top of the atomic restore drives the effect '
     + 'through combinations the bridge refuses, splitting requestedValue from '
