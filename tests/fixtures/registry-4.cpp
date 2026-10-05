@@ -6,11 +6,13 @@ static_assert(
     std::string_view(simple_registry[SEED_TRUNCATED_TETRAHEDRON].name) ==
     "truncatedTetrahedron");
 
+// clang-format off
 /** Step table for truncatedTetrahedron_kis_gyro. */
 inline constexpr OpStep TRUNCATED_TETRAHEDRON_KIS_GYRO_STEPS[] = {
     {Op::KIS},
     {Op::GYRO},
 };
+// clang-format on
 /** Recipe mirror of IslamicStarPatterns::truncatedTetrahedron_kis_gyro. */
 inline constexpr Recipe TRUNCATED_TETRAHEDRON_KIS_GYRO_RECIPE = make_recipe(
     SEED_TRUNCATED_TETRAHEDRON, TRUNCATED_TETRAHEDRON_KIS_GYRO_STEPS);

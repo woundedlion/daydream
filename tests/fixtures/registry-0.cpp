@@ -3,10 +3,12 @@
 inline constexpr uint8_t SEED_CUBE = static_cast<uint8_t>(BaseMesh::CUBE);
 static_assert(std::string_view(simple_registry[SEED_CUBE].name) == "cube");
 
+// clang-format off
 /** Step table for cube_truncate33. */
 inline constexpr OpStep CUBE_TRUNCATE33_STEPS[] = {
     {Op::TRUNCATE, 0.33f},
 };
+// clang-format on
 /** Recipe mirror of IslamicStarPatterns::cube_truncate33. */
 inline constexpr Recipe CUBE_TRUNCATE33_RECIPE =
     make_recipe(SEED_CUBE, CUBE_TRUNCATE33_STEPS);

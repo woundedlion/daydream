@@ -250,6 +250,7 @@ test('no paste line exceeds the column limit solids.h is formatted at', () => {
 /** A step chain per step-table head shape: brace on the declarator line, brace
  * alone on the continuation line, declarator moved below its type. */
 const HEAD_SHAPE_CHAINS = [
+  ['ambo', 'dual', 'kis', 'ambo', 'dual'],
   ['ambo'],
   ['kis', 'gyro'],
   [{ op: 'hankin', params: { angle: 62 } }, 'ambo'],
@@ -261,14 +262,14 @@ const HEAD_SHAPE_CHAINS = [
 ];
 
 /**
- * The tool deliberately emits one step per line for readable pastes. Its
- * trailing comma keeps that format stable when clang-format runs, independent
- * of how existing engine tables happen to be packed.
+ * Format guards preserve one step per line at every table length.
  */
 test('every step table emits one step per line, last step comma-terminated', () => {
   for (const base of SIMPLE_SEEDS) {
     for (const ops of HEAD_SHAPE_CHAINS) {
       const code = generateRegistryCpp({ base, ops });
+      assert.match(code, /\/\/ clang-format off\n\/\*\*(?: |\n \* )Step table for/);
+      assert.match(code, /\n};\n\/\/ clang-format on\n/);
       const start = code.indexOf('inline constexpr OpStep');
       const close = code.indexOf('\n};\n', start);
       assert.ok(close > start,
