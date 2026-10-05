@@ -361,7 +361,7 @@ test('generateRecipeCpp breaks after the return type when the name fills the lin
   assert.match(cpp, /\nFLASHMEM static PolyMesh\ntruncatedIcosidodecahedron_truncate50_ambo_dual\(Arena &a, Arena &b\) \{\n/);
 });
 
-/** Verifies no emitted line exceeds the column limit solid_generators.h is formatted at. */
+/** Verifies no emitted line exceeds the column limit procedural_solids.h is formatted at. */
 test('generateRecipeCpp never emits a line past the column limit', () => {
   const sweeps = [
     [SIMPLE_SEEDS, ['dual']],
