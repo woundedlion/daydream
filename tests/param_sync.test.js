@@ -259,3 +259,12 @@ test('coupled replay stops when no refused write can advance', async () => {
   assert.deepEqual(calls, ['A', 'B']);
   assert.deepEqual(refused, [{ name: 'A', result: 1 }, { name: 'B', result: 1 }]);
 });
+
+
+test('selector indices round and clamp to available options', () => {
+  assert.equal(selectorControlValue({ value: 1.6, options: ['A', 'B', 'C'] }), 2);
+  assert.equal(selectorControlValue({ value: 9, options: ['A', 'B'] }), 1);
+  assert.equal(selectorControlValue({ value: -3, options: ['A', 'B'] }), 0);
+  assert.equal(selectorControlValue({ value: 0, requestedValue: 7, options: ['A', 'B'] }), 1);
+  assert.equal(selectorControlValue({ value: true, options: ['A'] }), true);
+});
