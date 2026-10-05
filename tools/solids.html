@@ -55,7 +55,7 @@
       <!-- Gate feedback: why the last op/reorder/base change was rejected. -->
       <div id="opGateMsg" class="text-[0.6rem] text-amber-400 leading-3"
         role="status" aria-atomic="true"></div>
-      <span id="opBlockedReason">Would exceed an engine mesh limit on the current solid</span>
+      <span id="opBlockedReason" class="visually-hidden">Would exceed an engine mesh limit on the current solid</span>
       <!-- Add-operation buttons carry the op name in data-op; a single delegated
            click listener (wired in init) dispatches to addOp, so no handler is
            pinned to window. -->
