@@ -73,8 +73,8 @@ export function installSegmentWorker() {
   // edges. Every 'frame' carries the whole set, so the controller's marker lasts
   // as long as the divergence. Cleared on every effect install, as
   // paramRejectedKey is.
-  /** @type {string[]} */
-  let divergenceWarnings = [];
+  /** @type {Map<string, string>} */
+  let divergenceWarnings = new Map();
   // Latched by a RESIZED setResolution, which tears the effect and its clip down.
   // The controller follows with a setEffect that reinstalls both; until then the
   // engine has nothing to shade, so a render faults instead of shipping a black
@@ -170,7 +170,7 @@ export function installSegmentWorker() {
     const outcome = enumConstantName(wasmModule.ParamSetResult, result);
     const key = `${name}:${outcome}`;
     const detail = `setParameter(${name}) rejected: ${outcome}`;
-    if (!divergenceWarnings.includes(detail)) divergenceWarnings = divergenceWarnings.concat(detail);
+    divergenceWarnings.set(`param:${name}`, detail);
     if (key === paramRejectedKey) return;
     paramRejectedKey = key;
     console.error(
@@ -188,6 +188,9 @@ export function installSegmentWorker() {
     const result = engine.setParameter(name, value);
     if (result !== wasmModule.ParamSetResult.APPLIED) {
       reportParamRejected(name, result);
+    } else {
+      divergenceWarnings.delete(`param:${name}`);
+      if (paramRejectedKey.startsWith(`${name}:`)) paramRejectedKey = '';
     }
   }
 
@@ -227,12 +230,14 @@ export function installSegmentWorker() {
    */
   function applyPreset(index, method = 'selectPreset') {
     if (!engine) return;
-    if (method === 'synchronizePreset' && engine.getPresetIndex() === index) return;
-    if (engine[method](index)) return;
-    if (engine.getPresetIndex() === index) return;
+    if ((method === 'synchronizePreset' && engine.getPresetIndex() === index)
+        || engine[method](index) || engine.getPresetIndex() === index) {
+      divergenceWarnings.delete('preset');
+      return;
+    }
     const detail = `${method}(${index}) rejected: ${engine.getPresetCount()} `
       + `presets, still on ${engine.getPresetIndex()}`;
-    if (!divergenceWarnings.includes(detail)) divergenceWarnings = divergenceWarnings.concat(detail);
+    divergenceWarnings.set('preset', detail);
     console.error(`segment_worker: segment ${segId} ${detail}`);
   }
 
@@ -274,7 +279,7 @@ export function installSegmentWorker() {
         }
 
         paramRejectedKey = '';
-        divergenceWarnings = [];
+        divergenceWarnings = new Map();
         segId = msg.segId;
         totalSegs = msg.totalSegs;
         paramRevision = msg.paramRevision;
@@ -367,7 +372,7 @@ export function installSegmentWorker() {
             break;
           }
           paramRejectedKey = '';
-          divergenceWarnings = [];
+          divergenceWarnings = new Map();
           arenaMetricsWarned = false;
           awaitingEffect = false;
           // Mirrors the engine-driven index without the pause, as in 'init'.
@@ -566,7 +571,7 @@ export function installSegmentWorker() {
           presetCount,
           presetIndex,
           fullFrame: clipFullFrame,
-          warnings: divergenceWarnings.length > 0 ? divergenceWarnings : undefined,
+          warnings: divergenceWarnings.size > 0 ? [...divergenceWarnings.values()] : undefined,
         }, [pixelsCopy.buffer]);
         break;
       }
