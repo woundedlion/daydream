@@ -1581,7 +1581,8 @@ test('preset and stage writes preserve the animation state', async () => {
 
   toggle.dispatch('click');
   assert.equal(harness.animationsPaused(), true);
-  assert.equal(toggle.textContent, 'Resume animation');
+  assert.equal(toggle.textContent, 'Pause animation');
+  assert.equal(toggle.getAttribute('aria-pressed'), 'true');
   stageEditor(harness, 'sample')('sample.pattern-freq', 8);
   assert.equal(harness.animationsPaused(), true,
     'an edit also preserves an intentional pause');
