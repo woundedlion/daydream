@@ -645,9 +645,7 @@ test('a frame guard stringifies a thrown value carrying no message', () => {
   assert.match(reported[0], /aborted/);
 });
 
-// A trapped module is the failure the re-arm cannot be trusted through: the
-// trap unwinds nothing, so drawFrame() keeps returning without throwing and the
-// clean frames that retract the banner are the corrupt ones.
+// A terminal module flag stops frames even when the simulated frame body returns normally.
 
 test('a dead module stops the frames, releases the app, and names the reload', () => {
   let frames = 0;

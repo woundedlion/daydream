@@ -274,9 +274,7 @@ test('dispose() runs on a host that never reached a module load', () => {
   assert.equal(host.recorder, null);
 });
 
-// The glue sets Module.HS_MODULE_DEAD ahead of the trap in HS_CHECK. The trap
-// unwinds nothing, so every call after it runs on a shortened shadow stack and
-// returns plausible garbage: the flag is the only signal the host gets.
+// The glue sets Module.HS_MODULE_DEAD before HS_CHECK traps; the host reads that terminal flag.
 
 test('moduleDead() reads false before the load and on a live module', () => {
   const host = new EngineHost();
