@@ -534,3 +534,9 @@ select.chain-param-control {
 #canvas:focus-visible:not(.keyboard-focus) {
   outline: none;
 }
+
+@media only screen and (width <= 900px) {
+  .chain-strip-region {
+    position: static;
+  }
+}
