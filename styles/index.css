@@ -300,7 +300,6 @@
     border-color: var(--accent);
   }
 
-  /* Later rules also declare transitions on these controls. */
   .tab,
   .effect-button,
   .sort-btn,
