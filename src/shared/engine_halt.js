@@ -14,8 +14,8 @@
  *
  * HS_CHECK sets Module.HS_MODULE_DEAD ahead of its __builtin_trap()
  * (core/platform/platform.h), and the trap unwinds nothing: the shadow stack
- * pointer keeps whatever the aborted frame left it at, so every later call runs
- * on a shortened stack and returns plausible garbage. The RuntimeError reaches
+ * pointer keeps whatever the aborted frame left it at. Later calls can exhaust
+ * the remaining stack or observe partial state without trapping. The RuntimeError reaches
  * only the caller that was on the stack when the trap fired; the flag is what
  * says so to a caller whose own throw came from somewhere else.
  * @param {*} error - The error a bridge call threw, if any.

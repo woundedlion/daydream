@@ -231,9 +231,9 @@ export function start({
 
   /**
    * Release the app when a caught failure came from a trapped module. HS_CHECK
-   * sets HS_MODULE_DEAD ahead of a trap that unwinds nothing, so every later
-   * call runs on a permanently shortened shadow stack and writes past its end
-   * unreported (-sASSERTIONS=0). No call is a recovery path.
+   * sets HS_MODULE_DEAD ahead of a trap that unwinds nothing. Later calls can
+   * exhaust the remaining shadow stack without reporting it (-sASSERTIONS=0),
+   * or observe partial state. No call is a recovery path.
    * @returns {boolean} Whether the module is dead and the app was released.
    */
   function abandonOnModuleDeath(error) {
