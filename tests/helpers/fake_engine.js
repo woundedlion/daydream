@@ -367,7 +367,7 @@ export class FakeChainEngine {
     if (typeof value !== 'number' || !Number.isFinite(value))
       return ParamSetResult.NON_FINITE;
     const accepted = Math.fround(Math.max(definition.min, Math.min(definition.max,
-      definition.options ? Math.trunc(value) : value)));
+      definition.options ? Math.round(value) : value)));
     definition.value = accepted;
     definition.requestedValue = accepted;
     definition.acceptedValue = accepted;
