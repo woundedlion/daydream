@@ -4,12 +4,8 @@
  */
 
 /**
- * The palette tool's OKLCH hue-key wheel (tools/palettes.html): the gamut raster
- * it is painted on, the key markers and the labels laid out around them, and the
- * pointer and keyboard arithmetic that moves a key. The painter takes its canvas
- * and 2D context as arguments and reads the keys only as a base turn plus
- * offsets, so a recording context double exercises it without a browser. The
- * page keeps the event wiring and the ARIA handles.
+ * The palette tool's OKLCH hue-key wheel: its gamut raster, key markers and
+ * labels, and the pointer and keyboard arithmetic that moves a key.
  */
 
 import { linearToSrgbFloat } from '../../shared/color.js';
@@ -18,7 +14,7 @@ import { linearRgbInGamut, maxSrgbGamutChroma, oklchLinearRgb, wrapTurns } from 
 /**
  * @typedef {{baseTurns: number, offsets: number[]}} HueKeyState
  *   The wheel's keys: the first key's wrapped turn and every key's signed offset
- *   from it, as palette_controls.js's hueKeyState returns them.
+ *   from it.
  */
 
 /**
@@ -35,14 +31,11 @@ import { linearRgbInGamut, maxSrgbGamutChroma, oklchLinearRgb, wrapTurns } from 
 export const HUE_KEY_NAMES = Object.freeze(['A', 'B', 'C', 'D']);
 
 /**
- * Grab radius around a key marker, in canvas pixels. The 256 px canvas is drawn
- * at 8.5rem (tools/palettes.css), where this clears the 24 CSS-px pointer
- * target WCAG 2.2 asks for.
+ * Grab radius around a key marker, in canvas pixels.
  */
 export const HUE_KEY_GRAB_RADIUS = 23;
 
-// Slate-900, so the region outside the gamut reads as a boundary rather than as
-// the canvas edge.
+// Slate-900, outside the gamut.
 const BACKDROP = Object.freeze([15, 23, 42]);
 const RASTER_RADIUS = 0.47;
 const MARKER_RADIUS = 0.405;
@@ -244,20 +237,15 @@ function resampledHueKey(previous, next, index) {
 }
 
 /**
- * Carries the selected and grabbed key through a resample onto another key set
- * — a four-key harmony hands off to three.
- *
- * A key survives only where the new set still holds its hue, and it survives at
- * that key's index rather than its own: a two-key wheel's second key becomes
- * the third of three, and the midpoint the resample invents belongs to neither.
+ * Carries the selected and grabbed key through a resample onto another key set.
+ * A key survives only where the new set still holds its hue, at that key's
+ * index: a two-key wheel's second key becomes the third of three.
  * @param {HueKeyState} previous - The keys the wheel drew.
  * @param {HueKeyState} next - The keys replacing them.
  * @param {number} selectedKey - Index the wheel had selected.
  * @param {?number} activeKey - Index the pointer had grabbed, or null.
  * @returns {{selectedKey: number, activeKey: ?number, kept: boolean}} The
- *   surviving indices, and whether both survived. Acting on a key the resample
- *   dropped would silently move a different one, so `kept` is false and the
- *   caller abandons the gesture rather than applying it.
+ *   surviving indices, and whether both survived.
  */
 export function hueKeyHandoff(previous, next, selectedKey, activeKey) {
   const selected = resampledHueKey(previous, next, selectedKey);

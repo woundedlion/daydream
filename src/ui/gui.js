@@ -24,9 +24,7 @@ const parsedSearchCache = new WeakMap();
  * Reads the current URL query string into a parsed params object, then applies
  * what the URL writer has decided but not yet flushed: the keys a scheduled
  * reset will drop, and the buffered writes that will replace their query-string
- * values. An effect switch resets and rebuilds the panel inside that one
- * debounce window, so a raw read would hydrate the incoming effect's controls
- * from the outgoing effect's params.
+ * values.
  * @param {Window} [win] - The window whose location is read.
  * @returns {URLSearchParams} The query parameters of the current location.
  */
@@ -48,7 +46,7 @@ const getUrlParams = (win = window) => {
  * Extracts the set of values lil-gui will accept for an enumerated control
  * (`add(obj, prop, $1)`): an array of choices, or an object whose values are the
  * choices. Anything else ($1 a number meaning a slider's min, or absent) is not
- * enumerated, so there is no list to validate against.
+ * enumerated.
  * @param {(Array|Object|number|undefined)} options - The third argument passed to lil-gui's add().
  * @returns {(Array|null)} The list of allowed choices, or null when not enumerated.
  */
@@ -59,12 +57,10 @@ const optionValues = (options) => {
 };
 
 /**
- * Builds an independent debounced URL-param writer with its own pending-writes
- * buffer and timer, one per DeepLinkGUI subtree. When the app's single URLSync
- * writer is present, writes funnel through it (so GUI and effect/resolution
- * changes can't clobber each other); an instance without URLSync uses its own
- * fallback writer. Writes accumulate per key and merge
- * in one flush.
+ * Builds a debounced URL-param writer with its own pending-writes buffer and
+ * timer, one per DeepLinkGUI subtree. Writes go through the app's URLSync when
+ * present, else a fallback writer; they accumulate per key and merge in one
+ * flush.
  * @param {Window} [win] - The window this writer reads and rewrites; the
  *   ambient one when omitted.
  * @returns {(key: string, value: (string|number|boolean|null|undefined)) => void}
@@ -166,7 +162,7 @@ class DeepLinkGUI {
   /**
    * Builds a control's URL param key by joining the root's namespace (when it has
    * one) and its enclosing folder names with the property, e.g.
-   * "fx.Effects.Speed", so nested controls and separate GUI roots get distinct keys.
+   * "fx.Effects.Speed".
    * @param {string} prop - The control's property name.
    * @returns {string} The dot-joined param key.
    */
@@ -225,15 +221,9 @@ class DeepLinkGUI {
 
   /**
    * Installs the deep-link URL writer as the controller's onChange and redirects
-   * any later caller onChange(fn) to user handlers that run ahead of the writer.
-   * lil-gui keeps a single onChange slot, so without this a caller doing
-   * `gui.add(...).onChange(cb)` would silently overwrite the URL writer and break
-   * deep-link persistence for that control. Every caller handler is fanned out, so
-   * repeated onChange(fn) registrations compose rather than clobber one another.
-   *
-   * Only `onChange` participates in URL persistence and load-time replay;
-   * `onFinishChange` is left untouched, so a control wired solely through
-   * `onFinishChange` is not deep-linked. A synchronous handler may call
+   * any later caller onChange(fn) to user handlers that run ahead of the writer;
+   * repeated registrations compose. Only `onChange` participates in URL
+   * persistence and load-time replay, not `onFinishChange`. A synchronous handler may call
    * `controller.acceptUrlValue(value)` to persist an accepted value while the
    * controller continues to display the proposed value.
    * @param {Object} controller - The lil-gui controller to wrap.
@@ -278,10 +268,8 @@ class DeepLinkGUI {
   }
 
   /**
-   * Adds a deep-linked control without seeding it from the current URL. Dynamic
-   * effect-schema rebuilds use this for controls that already existed in the
-   * previous schema: their engine values are newer than a debounced URL write,
-   * but subsequent edits must keep updating the same deep-link key.
+   * Adds a deep-linked control without seeding it from the current URL; later
+   * edits still write its deep-link key.
    * @param {Object} object - The object holding the bound property.
    * @param {string} prop - The property name to control.
    * @param {...*} args - Forwarded to lil-gui's add().
@@ -394,11 +382,7 @@ class DeepLinkGUI {
 
   /**
    * Adds a control that is NOT deep-linked: its value is neither seeded from nor
-   * written to the URL. Use for session/action controls (cyclers, recording
-   * settings) that must not auto-activate from a copied link, and for controls
-   * mirroring a key URLSync already owns. Render-mode controls, including the
-   * segmented worker pool, are deep-linked so a shared link reproduces the
-   * sender's view.
+   * written to the URL.
    * @param {Object} object - The object holding the bound property.
    * @param {string} prop - The property name to control.
    * @param {...*} args - Forwarded to lil-gui's add().

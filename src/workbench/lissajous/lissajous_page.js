@@ -39,10 +39,9 @@ const state = {
 
 let scene, line;
 
-// The curve's appearance never varies, so one material serves every rebuild.
+// One material serves every rebuild.
 const lineMaterial = new THREE.LineBasicMaterial({
   color: 0x818cf8,
-  // linewidth is a no-op in the WebGL renderer (always 1px); omitted.
   transparent: true,
   opacity: 0.9,
   depthWrite: false,
@@ -50,15 +49,13 @@ const lineMaterial = new THREE.LineBasicMaterial({
 });
 
 const initThree = () => {
-  // Camera moved closer than the default to make the curve fill the space.
   const result = initScene('canvasContainer', 'threeCanvas', {
     cameraPosition: [1.5, 1.5, 3],
   });
   scene = result.scene;
 
-  // The scaffold's dispose() stops the render loop and detaches the resize
-  // listener; cancelling the pending frame keeps a queued rebuild from
-  // running against the disposed scene.
+  // Cancel the pending frame so a queued rebuild cannot run against the
+  // disposed scene.
   onPageTeardown(() => {
     scheduleUpdate.cancel();
     line?.geometry.dispose();
@@ -91,9 +88,7 @@ const regenerateCurve = () => {
   scene.add(line);
 };
 
-// Coalesce rebuilds into one per animation frame: slider oninput fires on
-// every pointer tick during a drag, and each rebuild resamples up to
-// config.Samples.max curve points.
+// Coalesce rebuilds into one per animation frame.
 const scheduleUpdate = createFrameScheduler(() => {
   regenerateCurve();
   updateCodeSnippet();
@@ -113,25 +108,22 @@ const snapFrequencies = (activeId, rawNewValue) => {
   const activeConfig = config[activeId];
   const rawActiveC = rawNewValue / activeConfig.scale;
 
-  // Snap to the closest simple rational ratio and compute the closing
-  // domain. The search takes the slider's range: clamping its result
-  // afterwards would reopen the curve it just closed.
+  // Snap to the closest simple rational ratio within the slider's range and
+  // compute the closing domain.
   const { snappedActiveC, closingPeriod: newDomain } = snapToRationalRatio(
     rawActiveC, passiveC, MAX_RATIONAL_TERM,
     { min: activeConfig.min, max: activeConfig.max });
 
   state[activeId] = snappedActiveC;
 
-  // The thumb can only land on the step grid, which the rational ratio misses;
-  // the readout names the frequency in effect, which is what the export emits.
+  // The readout shows the snapped frequency, which the thumb's step grid may not hold.
   sliderHandles[activeId].setValue(snappedActiveC);
   sliderHandles[activeId].setReadout(snappedActiveC);
 
   sliderHandles.Duration.setValue(newDomain);
   state.Duration = newDomain;
-  // The thumb can only land on the step grid, which the closing period misses by
-  // up to half a step. The readout names the domain in effect — what the preview
-  // draws, what the export emits, and what the closure warning judges.
+  // The readout shows the closing domain, which the thumb's step grid may miss
+  // by up to half a step.
   sliderHandles.Duration.setReadout(state.Duration);
 
   scheduleUpdate();
@@ -142,7 +134,6 @@ const updateCodeSnippet = () => {
   const codeOutput = document.getElementById('lissajous_code_output');
   if (!codeOutput) return;
 
-  // Pure string building lives in lissajous_math.js; this stays DOM-only.
   const code = lissajousCodeString(state.C1, state.C2, state.A, state.Duration);
   if (codeOutput.textContent !== code) codeOutput.textContent = code;
 
@@ -159,14 +150,12 @@ const updateCodeSnippet = () => {
 };
 
 
-// Slider handles by config id, so code that computes a value (the rational
-// snap) can drive the control it belongs to.
+// Slider handles by config id.
 const sliderHandles = {};
 
 const mountSlider = (id, params) => {
-  // Samples is a whole count; every other readout shows 3 decimals, one order
-  // finer than its step grid, so a value the grid cannot hold still reads as
-  // the value in effect.
+  // Samples is a whole count; other readouts show 3 decimals, finer than the
+  // step grid.
   const decimals = id === 'Samples' ? 0 : 3;
   const scale = params.scale || 1;
 

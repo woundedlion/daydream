@@ -4,11 +4,8 @@
  */
 
 /**
- * The two canvas painters of the palette tool page (tools/palettes.html): the
- * gradient strip with its drag-selection overlay, and the RGB
- * wave graph. Both take their canvas and 2D context as arguments and read the
- * palette only through get()/getChannelValues(), so a recording context double
- * exercises them without a browser. The page keeps the pointer/keyboard wiring.
+ * The two canvas painters of the palette tool page: the gradient strip with its
+ * drag-selection overlay, and the RGB wave graph.
  */
 
 import { linearToSrgbFloat } from '../../shared/color.js';
@@ -46,9 +43,8 @@ function fitCanvasToDisplay(canvas, ctx) {
       canvas.height = renderHeight;
     }
   } else {
-    // An unlaid-out canvas has no display size to fit to. Its backing store is
-    // already in device pixels, so sizing it from itself would multiply by the
-    // ratio again on every call.
+    // An unlaid-out canvas has no display size; its backing store is already in
+    // device pixels.
     width = Math.max(1, Math.round(canvas.width / pixelRatio));
     height = Math.max(1, Math.round(canvas.height / pixelRatio));
   }
@@ -61,10 +57,8 @@ function fitCanvasToDisplay(canvas, ctx) {
 
 /**
  * Builds the color-strip painter, which owns the offscreen gradient cache.
- *
- * Caching the rendered gradient avoids rebuilding ImageData while a drag only
- * changes the selection overlay. Call invalidate() whenever the palette
- * changes; a canvas size change is detected here.
+ * Call invalidate() whenever the palette changes; a canvas size change is
+ * detected here.
  * @param {Object} opts - Painter context.
  * @param {HTMLCanvasElement} opts.canvas - The visible strip canvas.
  * @param {CanvasRenderingContext2D} opts.ctx - Its 2D context.
@@ -147,8 +141,7 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
       const { width, height } = fitCanvasToDisplay(canvas, ctx);
 
       // One palette sample per device pixel: the gradient is baked at the
-      // backing store's size, then blitted over the CSS-pixel box the fitted
-      // transform scales by, so a column lands on a pixel.
+      // backing store's size.
       const gradient = refreshCache(palette, canvas.width, view);
 
       // Blit the cached gradient, stretched over the strip's height and
@@ -186,8 +179,6 @@ export function drawWaveGraph({ canvas, ctx, palette }) {
   if (!ctx) return;
   const { width, height } = fitCanvasToDisplay(canvas, ctx);
 
-  // toY() is the single place the value-to-canvas-y mapping lives; every
-  // wave and overlay draw below goes through it or the band edges.
   const { yTop, yBottom, toY } = waveGraphBand(height);
 
   ctx.fillStyle = '#1E293B';
@@ -218,9 +209,7 @@ export function drawWaveGraph({ canvas, ctx, palette }) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Sample all three channels per column up front: a generative palette
-  // reconstructs its whole LUT entry per sample, so asking one channel at a
-  // time would redo that (and its pows) three times over.
+  // Sample all three channels per column up front.
   const samples = new Array(width);
   for (let x = 0; x < width; x++) {
     samples[x] = palette.getChannelValues(width === 1 ? 0 : x / (width - 1));

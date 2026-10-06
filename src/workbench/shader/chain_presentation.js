@@ -24,7 +24,7 @@
 
 const READOUT_STEPS = 1000;
 
-// Nine significant digits round-trip every binary32; seven do not.
+// Nine significant digits round-trip every binary32.
 const READOUT_DIGITS = 9;
 
 /**
@@ -149,8 +149,7 @@ export function createChainPresentation({ catalog, chain: readChain, legalSequen
 
   /**
    * The one-for-one replacement of one chip: an operator the chip already
-   * carries keeps its label, and with it every tuned value, rather than
-   * re-seating the stage on the catalog's defaults.
+   * carries keeps its label, and with it every tuned value.
    * @param {number} index - The chip's chain index.
    * @param {string} operatorId - The operator replacing it.
    * @returns {{label?: string, operator: string}} The replacement entry.

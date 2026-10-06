@@ -15,8 +15,7 @@ import { paletteEnumName } from './palette_controls.js';
 /** @typedef {import('./palette_controls.js').PaletteRecipe} PaletteRecipe */
 
 /**
- * The 12 flattened cosine coefficients the procedural sliders and the C++
- * export read: A/B/C/D per R/G/B channel.
+ * The flattened cosine coefficients: A/B/C/D per R/G/B channel.
  * @typedef {{A_R:number,A_G:number,A_B:number,B_R:number,B_G:number,B_B:number,C_R:number,C_G:number,C_B:number,D_R:number,D_G:number,D_B:number}} ProceduralParams
  */
 
@@ -75,8 +74,7 @@ let paletteOps = null;
 
 /**
  * Installs the module-lifetime PaletteOps instance every generative-palette
- * call compiles through. The page installs it once the WASM module is up, and
- * passes null to drop it.
+ * call compiles through; null drops it.
  * @param {PaletteOps?} ops - The engine bridge, or null to clear it.
  * @param {{PaletteCompileCode: Record<string, {value: number}>, PaletteRecipeField: Record<string, {value: number}>}|null} [enums] - Module enum exports.
  * @returns {void}
@@ -124,8 +122,7 @@ export class ProceduralPalette {
   }
 
   /**
-   * Raw (unclamped, sRGB) cosine values for all three channels at t, used to
-   * plot the underlying curves where over/undershoot past [0, 1] is visible.
+   * Raw (unclamped, sRGB) cosine values for all three channels at t.
    * @param {number} t - Time parameter in [0, 1].
    * @returns {number[]} Unclamped sRGB cosine values as [R, G, B].
    */
@@ -140,10 +137,9 @@ export class ProceduralPalette {
 }
 
 /**
- * The named procedural palettes shipped by the engine, mirrored from
- * HS_PROCEDURAL_PALETTE_LIST in core/color/palettes.h. Each entry's a/b/c/d are
- * the cosine-formula coefficient vec3s in that macro's order, so a gallery
- * preview and its exported code match the on-device palette.
+ * The named procedural palettes, mirrored from HS_PROCEDURAL_PALETTE_LIST in
+ * core/color/palettes.h. Each entry's a/b/c/d are the cosine-formula
+ * coefficient vec3s in that macro's order.
  * @type {{name:string, a:number[], b:number[], c:number[], d:number[]}[]}
  */
 export const NAMED_PROCEDURAL_PALETTES = [
@@ -183,7 +179,7 @@ Object.freeze(NAMED_PROCEDURAL_PALETTES);
 
 /**
  * Flattens a palette's a/b/c/d coefficient vec3s into the tool's 12-key
- * `parameters` object (A_R..D_B) the sliders and the C++ export read.
+ * `parameters` object (A_R..D_B).
  * @param {{a:number[], b:number[], c:number[], d:number[]}} palette - A {a,b,c,d} coefficient set (e.g. a NAMED_PROCEDURAL_PALETTES entry).
  * @returns {ProceduralParams} The flattened coefficients.
  */
@@ -207,15 +203,12 @@ export function prettyPaletteName(name) {
     .join(' ');
 }
 
-// A stop per device pixel across the gallery's 3rem swatch at 2x. CSS
-// interpolates between stops in gamma-encoded sRGB, so a palette with a high
-// coefficient frequency aliases visibly at a coarser sampling.
+// A stop per device pixel across the gallery's 3rem swatch at 2x.
 const GRADIENT_STOPS = 96;
 
 /**
- * A left-to-right CSS gradient previewing a named palette, sampled through the
- * same ProceduralPalette math the strip uses so the swatch matches the palette
- * it loads.
+ * A left-to-right CSS gradient previewing a named palette, sampled through
+ * ProceduralPalette.
  * @param {{a:number[], b:number[], c:number[], d:number[]}} entry - A NAMED_PROCEDURAL_PALETTES entry.
  * @param {number} [stopCount] - How many colors the gradient carries.
  * @returns {string} A `linear-gradient(...)` value for the swatch background.
@@ -235,8 +228,7 @@ export function paletteGradientCss(entry, stopCount = GRADIENT_STOPS) {
 /**
  * Re-parameterizes a procedural palette so t in [0, 1] covers only the
  * viewport's window of the original: each channel's frequency scales by the
- * window's span and its phase absorbs the window's start. A zoomed strip then
- * plots the same colors at full width without the caller remapping t.
+ * window's span and its phase absorbs the window's start.
  * @param {ProceduralParams} parameters - The 12 cosine coefficients.
  * @param {{start:number, end:number}} viewport - The visible window, in the palette's own 0..1 phase.
  * @returns {ProceduralParams} The same 12 keys, with C and D rewritten for the window.
@@ -347,8 +339,7 @@ export function compilePaletteRecipe(recipe, inspect = true) {
 
 /**
  * A compiled V4 palette: the engine's 256-entry 8-bit sRGB LUT, interpolated
- * in linear light. Interchangeable with ProceduralPalette at the
- * get/getChannelValues surface the previews draw through.
+ * in linear light. Shares ProceduralPalette's get/getChannelValues surface.
  */
 export class GenerativePalette {
   /**
@@ -388,7 +379,7 @@ export class GenerativePalette {
   }
 
   /**
-   * All three channels at a phase, in sRGB, as the wave graph plots them.
+   * All three channels at a phase, in sRGB.
    * @param {number} t - Phase in [0, 1].
    * @returns {number[]} sRGB [R, G, B].
    */
@@ -398,9 +389,7 @@ export class GenerativePalette {
 
 
   /**
-   * The compiler's own account of the nearest LUT entry to a phase, for the
-   * inspector: where the color sat in OKLCH, how much chroma the gamut allowed
-   * there, and whether it had to be mapped back into gamut.
+   * The compiler's own account of the nearest LUT entry to a phase.
    * @param {number} t - Phase in [0, 1]; the nearest of the 256 entries answers, and NaN reads the last.
    * @returns {{t:number, rgb:number[], L:number, C:number, q:number, Cmax:number, hPath:number, hFinal:number, fallbackMapped:boolean}}
    *   The entry's phase and 8-bit sRGB triple, the OKLCH lightness and chroma it
@@ -442,17 +431,15 @@ export function mapValue(value, fromMin, fromMax, toMin, toMax) {
 }
 
 /**
- * The value range the RGB wave graph plots. Wider than the [0, 1] output range
- * so a channel's out-of-range excursions — which the device clamps — stay
- * visible rather than flattening against the top or bottom of the canvas.
+ * The value range the RGB wave graph plots, wider than the [0, 1] output range
+ * so out-of-range excursions stay visible.
  * @type {{min: number, max: number}}
  */
 export const WAVE_GRAPH_VALUE_RANGE = { min: -1, max: 2 };
 
 /**
  * Maps WAVE_GRAPH_VALUE_RANGE onto a wave-graph canvas of the given height: the
- * band between 10% and 90% of the height, value increasing upward. The 10%
- * margins leave the range-boundary lines drawable inside the canvas.
+ * band between 10% and 90% of the height, value increasing upward.
  * @param {number} height - Canvas height in pixels.
  * @returns {{yTop: number, yBottom: number, toY: (value: number) => number}} The band's canvas-y edges (yTop is the max-value edge) and the value-to-canvas-y map.
  */
