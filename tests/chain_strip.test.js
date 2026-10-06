@@ -870,27 +870,25 @@ const declarationsFor = (h, label) => h.store.document().descriptor.parameters
 
 test('stage controls open transiently on hover and pin open on click', async () => {
   const h = await makeStrip();
+  assert.equal(chipByLabel(h, 'sample').getAttribute('aria-expanded'), null);
   assert.ok(paramsOf(h, 'sample'), 'an unselected chip carries its controls');
 
   const chip = chipByLabel(h, 'sample');
-  assert.equal(chip.getAttribute('aria-expanded'), 'false');
   assert.equal(chip.classList.contains('chain-chip--expanded'), false);
 
   chip.dispatch('mouseenter');
-  assert.equal(chip.getAttribute('aria-expanded'), 'true');
   assert.equal(chip.classList.contains('chain-chip--expanded'), true);
   chip.dispatch('mouseleave');
-  assert.equal(chip.getAttribute('aria-expanded'), 'false');
   assert.equal(chip.classList.contains('chain-chip--expanded'), false);
 
   chip.dispatch('click');
   const pinned = chipByLabel(h, 'sample');
-  assert.equal(pinned.getAttribute('aria-expanded'), 'true');
+  assert.equal(pinned.classList.contains('chain-chip--expanded'), true);
   pinned.dispatch('mouseleave');
   assert.equal(pinned.classList.contains('chain-chip--expanded'), true,
     'mouse leave preserves a pinned card');
   pinned.dispatch('click');
-  assert.equal(chipByLabel(h, 'sample').getAttribute('aria-expanded'), 'false');
+  assert.equal(chipByLabel(h, 'sample').classList.contains('chain-chip--expanded'), false);
 
   const region = paramsOf(h, 'sample');
   assert.equal(region.getAttribute('role'), 'group');
@@ -925,24 +923,22 @@ test('stage controls open transiently on hover and pin open on click', async () 
 test('stage controls open under keyboard focus as they do under the pointer', async () => {
   const h = await makeStrip();
   const chip = chipByLabel(h, 'sample');
-  assert.equal(chip.getAttribute('aria-expanded'), 'false');
+  assert.equal(chip.classList.contains('chain-chip--expanded'), false);
 
   chip.dispatch('focusin');
-  assert.equal(chip.getAttribute('aria-expanded'), 'true');
   assert.equal(chip.classList.contains('chain-chip--expanded'), true);
 
   const inside = paramsOf(h, 'sample').querySelector('.chain-param-control');
   chip.dispatch('focusout', { relatedTarget: inside });
-  assert.equal(chip.getAttribute('aria-expanded'), 'true',
+  assert.equal(chip.classList.contains('chain-chip--expanded'), true,
     'focus moving into the controls keeps them open');
 
   chip.dispatch('focusout', { relatedTarget: chipByLabel(h, 'camera') });
-  assert.equal(chip.getAttribute('aria-expanded'), 'false');
   assert.equal(chip.classList.contains('chain-chip--expanded'), false);
 
   chip.dispatch('click');
   chipByLabel(h, 'sample').dispatch('focusout', { relatedTarget: null });
-  assert.equal(chipByLabel(h, 'sample').getAttribute('aria-expanded'), 'true',
+  assert.equal(chipByLabel(h, 'sample').classList.contains('chain-chip--expanded'), true,
     'losing focus preserves a pinned card');
 });
 
@@ -957,7 +953,7 @@ test('a fixed stage expands to explain its parameters and allow renaming', async
 
   const chip = chipByLabel(h, label);
   assert.equal(chip.getAttribute('aria-current'), 'true');
-  assert.equal(chip.getAttribute('aria-expanded'), 'true');
+  assert.equal(chip.classList.contains('chain-chip--expanded'), true);
   assert.equal(paramsOf(h, label).querySelector('.chain-strip-note').textContent,
     'No adjustable parameters');
   assert.ok(paramsOf(h, label).querySelector('.chain-chip-rename'));
@@ -969,8 +965,8 @@ test('pinning a stage closes the previously pinned stage', async () => {
   chipByLabel(h, 'lens').dispatch('click');
 
   assert.equal(h.store.selectedLabel(), 'lens');
-  assert.equal(chipByLabel(h, 'camera').getAttribute('aria-expanded'), 'false');
-  assert.equal(chipByLabel(h, 'lens').getAttribute('aria-expanded'), 'true');
+  assert.equal(chipByLabel(h, 'camera').classList.contains('chain-chip--expanded'), false);
+  assert.equal(chipByLabel(h, 'lens').classList.contains('chain-chip--expanded'), true);
   assert.deepEqual(h.selections, ['camera', 'lens']);
 });
 
@@ -1465,12 +1461,12 @@ test('hover and focus independently keep stage controls open', async () => {
   chip.dispatch('mouseenter');
   chip.dispatch('focusin');
   chip.dispatch('mouseleave');
-  assert.equal(chip.getAttribute('aria-expanded'), 'true');
+  assert.equal(chip.classList.contains('chain-chip--expanded'), true);
   chip.dispatch('mouseenter');
   chip.dispatch('focusout', { relatedTarget: null });
-  assert.equal(chip.getAttribute('aria-expanded'), 'true');
+  assert.equal(chip.classList.contains('chain-chip--expanded'), true);
   chip.dispatch('mouseleave');
-  assert.equal(chip.getAttribute('aria-expanded'), 'false');
+  assert.equal(chip.classList.contains('chain-chip--expanded'), false);
 });
 
 
