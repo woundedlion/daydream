@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runInNewContext } from 'node:vm';
 import { servedPages } from './helpers/site_pages.js';
 import { fakeElement } from './helpers/fake_dom.js';
 import { buildOpRow } from '../src/workbench/solids/solid_op_rows.js';
@@ -707,9 +708,7 @@ test('Mobius preset descriptions retain AA contrast on hover', () => {
 });
 
 
-test('the entry script and syntax failures share the guarded load failure overlay', async () => {
-  const { runInNewContext } = await import('node:vm');
-  const { fakeElement } = await import('./helpers/fake_dom.js');
+test('the entry script and syntax failures share the guarded load failure overlay', () => {
   const source = read('index.html');
   const inline = source.match(/<script>([\s\S]*?)<\/script>/)[1];
   const overlay = fakeElement('div');
