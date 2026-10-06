@@ -263,7 +263,8 @@ test('an accepted resolution switch applies it without re-asserting the URL',
 
 test('a rejected resolution switch restores resolution, effect, URL, and control',
   async () => {
-    const app = makeApp({ rejectResolutions: new Set(['Hi']) });
+    const app = makeApp({ rejectResolutions: new Set(['Hi']),
+      offListCorrection: { Hi: 'Gamma' } });
     app.appState.set('effect', 'Beta');
     app.url = '/?effect=Beta';
     app.activeEffect.state.Speed = 0.75;
@@ -275,7 +276,7 @@ test('a rejected resolution switch restores resolution, effect, URL, and control
     assert.equal(app.appState.get('resolution'), 'Lo');
     assert.equal(app.applied.resolution, 'Lo');
     assert.equal(app.appState.get('effect'), 'Beta');
-    assert.equal(app.url, '/?effect=Beta');
+    assert.deepEqual(app.restoredUrls, ['/?effect=Beta']);
     // The dropdown must not keep advertising the resolution that was refused.
     assert.equal(app.control.resolution, 'Lo');
     assert.equal(app.activeEffect.state.Speed, 0.75);
