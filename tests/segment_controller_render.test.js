@@ -250,36 +250,41 @@ test('the boundary setter re-composites and invalidates a paused held generation
 
   const c = readyController(2);
   c.active = true; // the app sets this before create(); the setter checks it
-  c.setAnimationsPaused(true);
-  const quadL = new Uint16Array(2 * 2 * 3).fill(111);
-  const quadR = new Uint16Array(2 * 2 * 3).fill(222);
-  await publishGeneration(c, [
-    { pixels: quadL, x0: 0, x1: 2, y0: 0, y1: 2 },
-    { pixels: quadR, x0: 2, x1: 4, y0: 0, y1: 2 },
-  ]);
-  c.composite(c.frameState.results);
-  const posted = c.workers.map((worker) => worker.posted.length);
-  const uploads = driver.dotMesh.instanceColor.version;
+  driver.paused = true;
+  try {
+    const quadL = new Uint16Array(2 * 2 * 3).fill(111);
+    const quadR = new Uint16Array(2 * 2 * 3).fill(222);
+    await publishGeneration(c, [
+      { pixels: quadL, x0: 0, x1: 2, y0: 0, y1: 2 },
+      { pixels: quadR, x0: 2, x1: 4, y0: 0, y1: 2 },
+    ]);
+    c.composite(c.frameState.results);
+    const posted = c.workers.map((worker) => worker.posted.length);
+    const uploads = driver.dotMesh.instanceColor.version;
+    const invalidations = driver.invalidations;
 
-  c.showBoundaries = true;
+    c.showBoundaries = true;
 
-  assert.ok(isCyan(0, 0) && isCyan(2, 0),
-    'the held generation gains its boundaries without a simulation tick');
-  assert.equal(driver.invalidations, 1, 'the paused render loop was asked to repaint');
-  assert.equal(driver.dotMesh.instanceColor.version, uploads + 1,
-    'the seams are flagged for upload');
-  c.workers.forEach((worker, index) => {
-    assert.equal(worker.posted.length, posted[index],
-      'refreshing the overlay did not advance or dispatch the simulation');
-  });
+    assert.ok(isCyan(0, 0) && isCyan(2, 0),
+      'the held generation gains its boundaries without a simulation tick');
+    assert.equal(driver.invalidations, invalidations + 1, 'the paused render loop was asked to repaint');
+    assert.equal(driver.dotMesh.instanceColor.version, uploads + 1,
+      'the seams are flagged for upload');
+    c.workers.forEach((worker, index) => {
+      assert.equal(worker.posted.length, posted[index],
+        'refreshing the overlay did not advance or dispatch the simulation');
+    });
 
-  c.showBoundaries = false;
+    c.showBoundaries = false;
 
-  assert.equal(driver.pixels[idx(0, 0, 4)], 111, 'disabling restores the held left band');
-  assert.equal(driver.pixels[idx(2, 0, 4)], 222, 'disabling restores the held right band');
-  assert.equal(driver.invalidations, 2, 'each visible change requests one repaint');
-  assert.equal(driver.dotMesh.instanceColor.version, uploads + 2,
-    'each visible change flags one upload');
+    assert.equal(driver.pixels[idx(0, 0, 4)], 111, 'disabling restores the held left band');
+    assert.equal(driver.pixels[idx(2, 0, 4)], 222, 'disabling restores the held right band');
+    assert.equal(driver.invalidations, invalidations + 2, 'each visible change requests one repaint');
+    assert.equal(driver.dotMesh.instanceColor.version, uploads + 2,
+      'each visible change flags one upload');
+  } finally {
+    driver.paused = false;
+  }
 });
 
 test('the boundary setter composites nothing when the pool owns no display', async () => {
