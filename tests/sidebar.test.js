@@ -339,16 +339,34 @@ test('the column stride is measured once per layout, not once per keystroke', ()
 
 test('setActive toggles active/aria-selected on only the old and new buttons', () => {
   const { sidebar } = makeSidebar();
-  sidebar.setEffects(['A', 'B'], {});
+  sidebar.setEffects(['A', 'B', 'C'], {});
   sidebar.setActive('A');
   const a = sidebar.buttons.get('A');
   const b = sidebar.buttons.get('B');
+  const c = sidebar.buttons.get('C');
   assert.ok(a.classList.contains('active'));
   assert.equal(a.getAttribute('aria-selected'), 'true');
   assert.equal(sidebar.tabbableBtn, a);
   assert.equal(a.tabIndex, 0);
 
+  const bystanderWrites = [];
+  const { add, remove } = c.classList;
+  c.classList.add = (...names) => {
+    bystanderWrites.push(['add', ...names]);
+    add.apply(c.classList, names);
+  };
+  c.classList.remove = (...names) => {
+    bystanderWrites.push(['remove', ...names]);
+    remove.apply(c.classList, names);
+  };
+  const setAttribute = c.setAttribute;
+  c.setAttribute = (attr, value) => {
+    if (attr === 'aria-selected') bystanderWrites.push([attr, value]);
+    setAttribute.call(c, attr, value);
+  };
+
   sidebar.setActive('B');
+  assert.deepEqual(bystanderWrites, [], 'a button neither leaving nor taking the selection is untouched');
   assert.ok(!a.classList.contains('active'));
   assert.equal(a.getAttribute('aria-selected'), 'false');
   assert.ok(b.classList.contains('active'));
