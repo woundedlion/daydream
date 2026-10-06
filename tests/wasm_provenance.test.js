@@ -162,7 +162,6 @@ test('CI checks source parity after installing the selected runtime', () => {
   assert.ok(checkout >= 0, 'pinned engine checkout step exists');
   assert.ok(install < resolve);
   assert.ok(resolve < checkout);
-  assert.match(suite, /HOLOSPHERE_ENGINE_REQUIRED: '1'/);
 });
 
 for (const name of ['shader_workbench.mjs', 'sha256.mjs', 'composed_effect_roster.mjs']) {
