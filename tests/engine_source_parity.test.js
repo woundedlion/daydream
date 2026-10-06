@@ -21,6 +21,7 @@ import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS } from '../src/workbenc
 import { MAX_BUILD_FACES, MAX_BUILD_STEPS, upperSnake, primitiveCount, LOWERING } from '../src/workbench/solids/solid_registry_codegen.js';
 import { MAX_DISPLAY_CAP_PERCENT } from '../src/renderer/display_caps.js';
 import { FPS } from '../src/renderer/frame_constants.js';
+import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from '../src/workbench/shader/shader_deeplink.js';
 
 const enginePin = readFileSync(new URL('../generated/holosphere_wasm.sha', import.meta.url), 'utf8').trim();
 
@@ -505,4 +506,11 @@ test('FPS is the firmware show cadence', { skip: engineSkip }, () => {
   const match = /constexpr int HS_SHOW_FRAMES_PER_SECOND\s*=\s*(\d+);/.exec(header(path));
   assert.ok(match, `HS_SHOW_FRAMES_PER_SECOND not found in ${path} — the parity reader is out of date`);
   assert.equal(FPS, Number(match[1]));
+});
+
+test('CHAIN_SNAPSHOT_SCHEMA_VERSION is the engine chain snapshot schema', { skip: engineSkip }, () => {
+  const path = 'workbench/shader/chain_snapshot.h';
+  const match = /static constexpr uint32_t SCHEMA_VERSION\s*=\s*(\d+);/.exec(header(path));
+  assert.ok(match, `SCHEMA_VERSION not found in ${path} — the parity reader is out of date`);
+  assert.equal(CHAIN_SNAPSHOT_SCHEMA_VERSION, Number(match[1]));
 });

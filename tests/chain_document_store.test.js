@@ -985,7 +985,9 @@ test('an injected compiler handles store validation', async () => {
     const path = join(directory, 'store.mjs');
     writeFileSync(path, readFileSync(new URL('../src/workbench/shader/chain_document_store.js', import.meta.url), 'utf8')
       .replace("from '../../../generated/shader/shader_workbench.mjs'",
-        `from '${new URL('../generated/shader/shader_workbench.mjs', import.meta.url).href}'`));
+        `from '${new URL('../generated/shader/shader_workbench.mjs', import.meta.url).href}'`)
+      .replace("from './shader_deeplink.js'",
+        `from '${new URL('../src/workbench/shader/shader_deeplink.js', import.meta.url).href}'`));
     const isolated = await import(pathToFileURL(path).href);
     let imports = 0;
     let validations = 0;
