@@ -177,11 +177,11 @@ export function paramGenerationStale(snapshotGeneration, streamGeneration) {
  * @param {Record<string, unknown>} values - A Module enum object, constant name
  *   to value.
  * @param {unknown} result - One of that enum's values.
- * @returns {string} The enum constant's name, e.g. "READONLY".
+ * @returns {string} The enum constant's name, or the unmapped raw value.
  */
 export function enumConstantName(values, result) {
   return Object.keys(values).find((name) => values[name] === result)
-    ?? 'unrecognized result';
+    ?? `value ${String(/** @type {{value?: unknown}} */ (result)?.value ?? result)}`;
 }
 
 /**

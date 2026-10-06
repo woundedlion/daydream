@@ -11,7 +11,7 @@
  * share arrives with `init` when the controller has one.
  */
 
-import { replayParameterWrites } from '../effects/param_sync.js';
+import { enumConstantName, replayParameterWrites } from '../effects/param_sync.js';
 import { callWorkbenchBinding } from '../engine/workbench_bindings.js';
 import createHolosphereModule from "../../generated/holosphere_wasm.js";
 import { computeSegmentRange, extractSegment } from "./segment_layout.js";
@@ -81,19 +81,6 @@ export function installSegmentWorker() {
   // band. An ALREADY_ACTIVE resize tears nothing down and does not latch it.
   let awaitingEffect = false;
   let engineDead = false;
-
-  /**
-   * Name an engine enum value for a fault message. The fallback keeps the raw
-   * value, which a rejection needs to identify a result this build does not map.
-   * @param {Record<string, unknown>} values - A Module enum object, constant name
-   * to value.
-   * @param {unknown} result - One of that enum's values.
-   * @returns {string} The enum constant's name, or the unmapped raw value.
-   */
-  function enumConstantName(values, result) {
-    return Object.entries(values).find(([, value]) => value === result)?.[0]
-      ?? `value ${String(/** @type {{value?: unknown}} */ (result)?.value ?? result)}`;
-  }
 
   /**
    * Restore a complete shader-workbench snapshot after the effect has been rebuilt.
