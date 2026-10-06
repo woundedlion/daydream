@@ -149,7 +149,6 @@ export function createSlider(containerId, cfg, onInput) {
   /**
    * Drives the control from code: thumb, readout, and `aria-valuetext` all move
    * together. Fires no `input` event.
-
    * @param {number} display - Display value, mapped onto the rounded scaled bounds and grid.
    * @returns {number} The value now shown, clamped and snapped to the step grid.
    */

@@ -30,7 +30,6 @@ const HALT_NOTICE = 'The WASM engine hit an internal invariant and is halted —
 
 /**
  * Reports whether an error halted the engine and, if so, stands the page down.
-
  * @param {*} error - The error a bridge call threw, if any.
  * @param {?{HS_MODULE_DEAD?: boolean}} module - The instance the call ran on.
  * @param {(message: string) => void} standDown - Drops the page's handles and shows the fatal banner.

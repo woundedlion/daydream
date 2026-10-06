@@ -58,7 +58,6 @@ export function createEffectPanelView({ focusedElement, guiContainer, isMobile }
 
   /**
    * Which control holds keyboard focus.
-
    * @param {PanelRecord|null} fx - The effect record about to be replaced.
    * @returns {string|null} The bound property, or null when focus is elsewhere.
    */

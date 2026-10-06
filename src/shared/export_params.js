@@ -40,7 +40,6 @@ export function formatExportParams(params, values) {
       items.push(values[i] > 0.5 ? 'true' : 'false');
     } else if (param.step === 1 && Number.isInteger(values[i])) {
       // A fraction under a step of 1 (float-backed enum) takes the float path.
-
       items.push(String(values[i]));
     } else {
       items.push(formatFloatCpp(values[i]));

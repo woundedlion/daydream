@@ -96,7 +96,6 @@ const SEGMENT_COUNT_MIN = 2;
 export function maxSegmentCount(nav = globalThis.navigator, isMobile = false) {
   let cap = SEGMENT_COUNT_MAX;
   // deviceMemory is a Chromium extension, absent from the DOM lib.
-
   const gib = /** @type {{deviceMemory?: number} | undefined} */ (nav)?.deviceMemory;
   if (typeof gib === 'number' && gib > 0) {
     if (gib <= 2) cap = SEGMENT_COUNT_MIN;

@@ -6,7 +6,6 @@
 
 /**
  * Dependency-free anchor-click blob download.
-
  */
 
 // The click consumes the blob synchronously; the URL only needs to outlive it.

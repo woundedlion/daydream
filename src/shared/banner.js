@@ -137,7 +137,6 @@ export function reportPageFailures(label, target = window) {
  * console plus a fatal banner. Accepts a synchronous or an async init: a thrown
  * error and a rejected promise take the same path. Also installs
  * reportPageFailures, so failures after init reach the same banner.
-
  *
  * @param {Function} init - The page's initializer; may return a promise.
  * @param {string} label - Page name used in both messages, e.g. 'Lissajous tool'.

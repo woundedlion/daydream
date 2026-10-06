@@ -1079,7 +1079,6 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     /**
      * Tear down the active effect GUI and clear the effect record, draining the
      * drag-end listeners on the drag target first.
-
      * @returns {void}
      */
     destroy() {

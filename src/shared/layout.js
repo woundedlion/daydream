@@ -4,5 +4,4 @@
  */
 
 /** Viewport width below which the mobile layout applies. */
-
 export const MOBILE_BREAKPOINT_PX = 900;
