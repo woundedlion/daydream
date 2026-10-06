@@ -161,7 +161,7 @@ test('index cap notice changes only on entry and exit without touching gate feed
 test('persistence failure is reported and clears after a later successful write', () => {
   const status = { textContent: '' };
   let failing = true;
-  const persist = handler('persistSavedSolids', { savedSolids: [], SAVED_SOLIDS_KEY: 'saved',
+  const persist = handler('persistSavedSolids', { savedSolids: [], savedStorage: { rejected: [], notice: '' }, SAVED_SOLIDS_KEY: 'saved',
     console: { warn() {} }, document: { getElementById: () => status },
     localStorage: { setItem() { if (failing) throw new Error('quota'); } } });
   persist();
@@ -282,7 +282,10 @@ test('saved solids discard non-object entries', () => {
     savedSolidExportError,
     localStorage: { getItem: () => '[null, 1, false, "bad", [], {"base":"cube","ops":[]}, {"base":"cube","ops":[{"op":"dual","params":{}}]}]' },
   });
-  assert.equal(JSON.stringify(load()), '[{"base":"cube","ops":[{"op":"dual","params":{}}]}]');
+  const result = load();
+  assert.equal(JSON.stringify(result.entries), '[{"base":"cube","ops":[{"op":"dual","params":{}}]}]');
+  assert.equal(result.rejected.length, 6);
+  assert.match(result.notice, /6 saved solids could not be loaded: not a saved-solid object/);
 });
 
 test('a failed rebuild invalidates cached mesh metadata and prevents saving', () => {
@@ -390,4 +393,48 @@ test('saved-solid imports reject bare seeds while accepting an exportable recipe
   assert.equal(savedSolids.length, 1);
   assert.equal(JSON.stringify(savedSolids[0].ops), '[{"op":"dual","params":{}}]');
   assert.match(messages[0], /imported 1 solid.*op chain is empty/);
+});
+
+
+test('stale saved cards are reported and backed up before the live list is overwritten', () => {
+  const valid = {base: 'cube', ops: [{op: 'dual', params: {}}]};
+  const stale = {base: 'cube', ops: [{op: 'truncate', params: {t: 50}}]};
+  const storage = new Map([['saved', JSON.stringify([valid, stale])], ['rejected', '[{"older":true}]']]);
+  const writes = [];
+  let refusingBackup = true;
+  const localStorage = {getItem: key => storage.get(key), setItem(key, value) {
+    writes.push(key);
+    if (key === 'rejected' && refusingBackup) throw new Error('quota');
+    storage.set(key, value);
+  }};
+  const savedStorage = handler('loadSavedSolids', {localStorage, SAVED_SOLIDS_KEY: 'saved', savedSolidExportError})();
+  assert.equal(savedStorage.entries.length, 1);
+  assert.equal(savedStorage.rejected.length, 1);
+  assert.match(savedStorage.notice, /1 saved solids.*out-of-range/);
+  const status = {textContent: savedStorage.notice};
+  const persist = handler('persistSavedSolids', {savedStorage, savedSolids: savedStorage.entries,
+    localStorage, SAVED_SOLIDS_KEY: 'saved', REJECTED_SOLIDS_KEY: 'rejected',
+    document: {getElementById: () => status}, console: {warn() {}}});
+  persist();
+  assert.deepEqual(JSON.parse(storage.get('saved')), [valid, stale]);
+  assert.deepEqual(writes, ['rejected']);
+  assert.match(status.textContent, /Changes apply to this session only/);
+  assert.equal(savedStorage.rejected.length, 1);
+  refusingBackup = false;
+  persist();
+  assert.deepEqual(writes, ['rejected', 'rejected', 'saved']);
+  assert.deepEqual(JSON.parse(storage.get('saved')), [valid]);
+  assert.deepEqual(JSON.parse(storage.get('rejected')), [{older: true}, stale]);
+  assert.equal(savedStorage.rejected.length, 0);
+  assert.equal(status.textContent, savedStorage.notice);
+  persist();
+  assert.deepEqual(JSON.parse(storage.get('rejected')), [{older: true}, stale], 'later writes do not duplicate the backup');
+});
+
+test('a fully valid saved list needs no recovery notice or rejected backup', () => {
+  const localStorage = {getItem: () => '[{"base":"cube","ops":[{"op":"dual","params":{}}]}]'};
+  const loaded = handler('loadSavedSolids', {localStorage, SAVED_SOLIDS_KEY: 'saved', savedSolidExportError})();
+  assert.equal(loaded.entries.length, 1);
+  assert.equal(loaded.rejected.length, 0);
+  assert.equal(loaded.notice, '');
 });
