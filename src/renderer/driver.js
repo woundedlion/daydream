@@ -348,6 +348,8 @@ export class Daydream {
     this.onContextRestored = () => {
       this.contextLost = false;
       console.warn("[daydream] WebGL context restored");
+      if (overlay.contains(this.doc.activeElement))
+        this.canvas.focus({ preventScroll: true });
       overlay.style.display = "none";
       // Repaint so instanceColor/instanceMatrix re-upload even while paused.
       this.needsRender = true;

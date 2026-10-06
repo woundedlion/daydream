@@ -1018,7 +1018,10 @@ function contextLossCtx(recorder = null) {
     doc: { createElement: (tag) => fakeElement(tag) },
     win: { location: { reload: () => {} } },
     canvasParent: fakeElement(),
-    canvas: { addEventListener: (type, fn) => { handlers[type] = fn; } },
+    canvas: {
+      addEventListener: (type, fn) => { handlers[type] = fn; },
+      focus: () => {},
+    },
   };
 }
 
@@ -1089,6 +1092,23 @@ test('a restored context clears the flag and forces a repaint', () => {
   assert.equal(ctx.contextLost, false);
   assert.equal(ctx.contextLostOverlay.style.display, 'none');
   assert.equal(ctx.needsRender, true, 'the canvas would stay dark while paused');
+});
+
+test('a restored context returns overlay focus to the canvas without stealing other focus', () => {
+  for (const inside of [false, true]) {
+    const ctx = contextLossCtx();
+    Daydream.prototype.setupContextLossHandling.call(ctx);
+    ctx.doc.activeElement = inside ? ctx.contextLostOverlay : fakeElement();
+    let focused = 0;
+    ctx.canvas.focus = options => {
+      assert.equal(options.preventScroll, true);
+      assert.equal(ctx.contextLostOverlay.style.display, 'flex');
+      focused++;
+    };
+    ctx.contextLostOverlay.style.display = 'flex';
+    captureConsole(() => ctx.handlers.webglcontextrestored());
+    assert.equal(focused, inside ? 1 : 0);
+  }
 });
 
 // ---------------------------------------------------------------------------
