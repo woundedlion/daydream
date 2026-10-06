@@ -61,7 +61,6 @@ export function watchMediaMatch(query, run) {
  *
  * A back/forward-cache freeze (`event.persisted`) is skipped: that page is
  * restored intact.
-
  *
  * @param {Function} teardown - Releases the page's resources. Called with no arguments.
  * @returns {void}

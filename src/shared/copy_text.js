@@ -19,7 +19,6 @@ export async function copyToClipboard(text) {
   }
 
   // execCommand('copy') needs the textarea focused; focus is handed back after.
-
   const previouslyFocused = /** @type {?HTMLElement} */ (document.activeElement);
 
   const textarea = document.createElement('textarea');

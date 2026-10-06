@@ -141,7 +141,6 @@ export const FAULT_RENDER = -2;
  * `fullFrame` is the disposition of the worker's last setClip: true when the
  * effect reports `needs_full_frame() || persists_pixels()` (`FULL_FRAME_KEPT`)
  * and the engine shaded the whole canvas rather than the rectangle.
-
  * @typedef {{
  *   type: 'frame', segId: number,
  *   x0: number, x1: number, y0: number, y1: number,

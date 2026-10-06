@@ -1157,7 +1157,6 @@ export class SegmentController {
         if (generation !== this.#renderGen && this.driver.paused) this.tick();
       }).catch((error) => {
         // A rejection would otherwise strand renderInFlight with no watchdog armed.
-
         this.onWorkerFault(FAULT_RENDER, `render failed: ${errorDetail(error)}`);
       });
     }

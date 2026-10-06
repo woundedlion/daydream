@@ -66,7 +66,6 @@ function fixedDecimal(n, prec) {
  *
  * `digits` is a floor, not a cap: precision widens until the literal reads back
  * as the same float32.
-
  * @param {number} n - The value to format.
  * @param {number} [digits=6] - Minimum fractional digits before trimming.
  * @returns {string} The C++ float literal (e.g. "1.5f").

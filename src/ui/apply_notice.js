@@ -25,7 +25,6 @@ const APPLY_NOTICE_MS = 8000;
  * @returns {{show: (message: string|null, owner: string) => void,
  *   clear: () => void, owner: () => string|null}} The sink. clear() drops the
  *   notice whoever raised it; owner() reports who holds the element.
-
  */
 export function createApplyNotice({
   doc,

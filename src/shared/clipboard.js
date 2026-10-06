@@ -81,9 +81,7 @@ export function showCopyFeedback(success, opts = {}) {
 
 /**
  * Default copied/failed/idle color classes for the tool pages' copy prompts.
- * Spread into a copyWithFeedback opts
-
- * object: `copyWithFeedback(text, { element, revertText: '', ...COPY_FEEDBACK })`.
+ * Spread into a copyWithFeedback opts object: `copyWithFeedback(text, { element, revertText: '', ...COPY_FEEDBACK })`.
  */
 export const COPY_FEEDBACK = {
   copiedClasses: ['text-green-400'],

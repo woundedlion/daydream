@@ -45,7 +45,6 @@ export class GlobalStatsView {
    * @param {number} duration - Frame draw time in milliseconds.
    * @param {?ArenaMetrics} metrics - Arena metrics for the frame, or null when the
    *   effect publishes none. A row whose arena is absent keeps its last text.
-
    * @returns {void}
    */
   update(duration, metrics) {

@@ -149,7 +149,6 @@ export function compositeSegment(canvas, compact, canvasW, rect) {
  * Stamp the segment-boundary overlay into a composited canvas: a full-width
  * cyan row at each y in `ys` and a full-height cyan column at each x in `xs`.
  * Coordinates outside the canvas are skipped.
-
  * @param {Uint16Array} canvas - Full canvas buffer (canvasW*canvasH*3).
  * @param {number} canvasW - Canvas width in pixels.
  * @param {number} canvasH - Canvas height in pixels.

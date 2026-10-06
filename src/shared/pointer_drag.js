@@ -120,7 +120,6 @@ export function createPointerDrag({
    * @returns {void}
    * @details An implicit release — the element detached, the gesture taken over
    *   by the browser — raises no pointerup on the element.
-
    */
   const handleLostCapture = (event) => finish(event, cancelHandler);
 
