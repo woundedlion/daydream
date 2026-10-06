@@ -1,4 +1,4 @@
-import { test, mock, afterEach } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
@@ -14,8 +14,6 @@ restoreDocumentAfterEach();
 
 // createEffectGui's per-frame sync, schema rebuilds and presets, driven over
 // doubles for every injected collaborator.
-
-afterEach(() => { mock.timers.reset(); });
 
 // sync() is the per-frame poll that mirrors engine-written values back into the
 // panel without fighting the user.
