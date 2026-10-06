@@ -56,8 +56,6 @@ jobs:
           echo "pin=$pin" >> "$GITHUB_OUTPUT"
       - name: Download the verified engine bundle
         env:
-          # The engine repository is public, so the run token is sufficient.
-          # POV_TOKEN remains available for a future private-repo migration.
           GH_TOKEN: ${{ secrets.POV_TOKEN || github.token }}
           PIN: ${{ steps.engine.outputs.pin }}
         run: |

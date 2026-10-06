@@ -6,26 +6,22 @@
 import { raceDeadline } from '../shared/deadline.js';
 import { errorDetail, showFatalError } from '../shared/banner.js';
 
-// The vendored libraries index.html loads from the CDN, and the remedy for a
-// page that cannot reach it. refreshModuleCache is same-origin only, so a
-// Reload re-attempts the CDN fetch but never repairs a cached vendor module.
+// Remedy for an unreachable CDN. refreshModuleCache is same-origin only, so
+// Reload never repairs a cached vendor module.
 export const VENDOR_REMEDY = 'three and lil-gui load from cdn.jsdelivr.net. If '
   + 'this machine is offline or the CDN is blocked, run `npm run importmap:local` '
   + 'to serve the vendored copies instead (README §10.8).';
 
-// A module the browser fetched but could not link against its importers: the
-// deploy moved under a copy this browser still holds. The Reload sweep is the
-// repair, so the remedy names the control the overlay already offers.
+// Remedy for a fetched module that failed to link: a cached copy against a
+// newer deploy.
 export const STALE_MODULE_REMEDY = 'A page module did not link against the rest '
   + 'of the deploy — usually a stale copy left in the browser cache. Reload '
   + 're-fetches the whole module graph.';
 
 /**
- * A module-evaluation guard's report that the graph is mixing generations —
- * a cached module against a newer deploy, which links but no longer agrees.
- * The engines raise the same skew as a SyntaxError only when the mismatch is
- * an export name, so a guard that reads a version has to say so itself for the
- * boot failure to reach the stale-cache remedy.
+ * A module-evaluation guard's report that the graph mixes a cached module with
+ * a newer deploy. Browsers raise such skew as a SyntaxError only for an
+ * export-name mismatch.
  */
 export class StaleModuleError extends Error {
   /** @param {string} message - What did not agree, and what repairs it. */
@@ -35,10 +31,8 @@ export class StaleModuleError extends Error {
   }
 }
 
-// A module the browser could not fetch at all, across the three engines'
-// wordings. Chrome reports the entry module's URL rather than the one that
-// actually failed, so a blocked CDN and a missing same-origin module are the
-// same string: the vendor remedy is the widest one that still fits both.
+// A module fetch failure, across browser wordings. Chrome reports the entry
+// module's URL, so a blocked CDN and a missing same-origin module look alike.
 const MODULE_FETCH_FAILURE = new RegExp([
   'Failed to fetch dynamically imported module',
   'error loading dynamically imported module',
@@ -46,10 +40,8 @@ const MODULE_FETCH_FAILURE = new RegExp([
   'Failed to resolve module specifier',
 ].join('|'), 'i');
 
-// Extensions refreshModuleCache re-fetches. The WASM binary is in because the
-// deploy binds it to its glue by content hash, so a cached binary against fresh
-// glue is the canonical skew a Reload has to clear. '.mjs' does not end in
-// '.js', so the shader workbench and its digest module need their own entry.
+// Extensions refreshModuleCache re-fetches. The deploy binds the WASM binary
+// to its glue by content hash.
 const REFRESHED_EXTENSIONS = ['.js', '.mjs', '.wasm', '.css', '.json'];
 
 const REFRESH_CONCURRENCY = 6;
@@ -81,9 +73,7 @@ async function drainBody(response) {
 /**
  * Re-fetch every same-origin module the page has already loaded, bypassing the
  * HTTP cache and replacing each cache entry with the server's current copy.
- * A plain reload only revalidates the top-level document, so a module held in
- * cache from an earlier deploy stays stale and keeps failing to link against
- * its freshly fetched importers.
+ * A plain reload only revalidates the top-level document.
  * @param {{performance?: Performance, fetch?: typeof globalThis.fetch,
  *   origin?: string, signal?: AbortSignal}} [dependencies]
  * @returns {Promise<void>} Resolves after the attempted re-fetches settle,
@@ -105,17 +95,14 @@ export async function refreshModuleCache({
     modules.add(name);
     if (path.endsWith('.wasm')) binaries.add(name);
   }
-  // The binary is the slowest re-fetch and the skew the sweep exists to clear,
-  // yet the page pulls it in last, so load order alone would leave it the
-  // likeliest casualty of the deadline. It leads; the rest keep load order.
+  // The WASM binary leads, ahead of the deadline; the rest keep load order.
   const queue = [...binaries, ...[...modules].filter((url) => !binaries.has(url))];
   const init = signal ? { cache: 'reload', signal } : { cache: 'reload' };
   const lanes = Array.from(
     { length: Math.min(REFRESH_CONCURRENCY, queue.length) },
     async () => {
       for (let url = queue.shift(); url !== undefined; url = queue.shift()) {
-        // An abort rejects every remaining re-fetch in turn; emptying the queue
-        // here settles the sweep on the deadline rather than lanes later.
+        // Settle on abort rather than rejecting each remaining re-fetch.
         if (signal?.aborted) return;
         // A failed re-fetch leaves its stale entry; the rest of the sweep runs.
         try { await drainBody(await fetchResource(url, init)); }
@@ -126,20 +113,15 @@ export async function refreshModuleCache({
 }
 
 /**
- * Run the module-cache sweep under a deadline, so a re-fetch that stalls rather
- * than failing cannot hold the reload chained behind it.
- *
- * The deadline aborts the sweep's re-fetches and settles this promise, so the
- * page always reaches the reload, with whatever cache entries the sweep did
- * replace. The timer is cleared once the race settles, and the sweep's own
- * rejection is absorbed rather than escaping as an unhandled one.
+ * Run the module-cache sweep under a deadline that aborts its re-fetches and
+ * settles this promise. The sweep's rejection is absorbed.
  *
  * @param {(dependencies?: {signal?: AbortSignal}) => Promise<void>} refresh -
  *   Starts the sweep on the deadline's signal.
  * @param {{ms?: number, timers?: {setTimeout: Function, clearTimeout: Function},
  *   createController?: () => AbortController}} [dependencies]
  * @returns {Promise<void>} Resolves once the sweep settles or the deadline
- *   aborts it; never rejects, since the reload runs either way.
+ *   aborts it; never rejects.
  */
 export function refreshWithDeadline(refresh, {
   ms = REFRESH_DEADLINE_MS,
@@ -156,10 +138,8 @@ export function refreshWithDeadline(refresh, {
  * @param {unknown} error Boot failure.
  * @returns {string} Remedy text, empty when no advice fits the cause.
  * @details A fetch failure may be the CDN-hosted vendor libraries; a link or
- *   parse failure, and a version guard that raised StaleModuleError, are a
- *   cached module against a newer deploy. Everything else
- *   — the engine, the initial apply — failed past a module graph that had
- *   already loaded, and neither remedy applies.
+ *   parse failure, or StaleModuleError, is a cached module against a newer
+ *   deploy. Anything else gets no remedy.
  */
 export function bootRemedy(error) {
   const detail = errorDetail(error);
@@ -212,16 +192,9 @@ export function showBootstrapFailure(error, {
   reload.className = 'context-lost-reload';
   reload.textContent = 'Reload';
   reload.addEventListener('click', () => {
-    // The sweep re-fetches the whole module graph, the multi-megabyte binary
-    // included, so it needs a progress report and exactly one run per click.
-    // Relabel before disabling: the name change on the focused control is what
-    // carries the state, and a disabled button drops focus.
+    // Relabel before disabling: a disabled button drops focus.
     reload.textContent = 'Reloading…';
     reload.disabled = true;
-    // Deadlined: a stalled re-fetch would otherwise leave this button
-    // relabelled, disabled and inert for the page's lifetime. The overlay
-    // carries no other control, so a reload the page refuses has to hand this
-    // one back rather than dead-end on an unhandled rejection.
     return refreshWithDeadline(refresh)
       .then(() => pageLocation?.reload())
       .catch((failure) => {
@@ -237,8 +210,7 @@ export function showBootstrapFailure(error, {
   overlay.setAttribute('role', 'alert');
   overlay.replaceChildren(...(remedy ? [title, detail, remedy, reload]
     : [title, detail, reload]));
-  // A role swap on a live node is not reliably announced; focus carries it, and
-  // leaves the keyboard user on the one control the overlay offers.
+  // A role swap on a live node is not reliably announced; focus carries it.
   reload.focus({ preventScroll: true });
   return true;
 }
@@ -278,8 +250,8 @@ export async function bootstrap({
   fatal = showFatalError,
   performance: timeline = globalThis.performance,
 } = {}) {
-  // Widened before the application module pulls its graph in, so every module
-  // refreshModuleCache has to re-fetch is still in the buffer to be found.
+  // Widened before the application graph loads, so refreshModuleCache finds
+  // every module.
   timeline?.setResourceTimingBufferSize?.(RESOURCE_TIMING_ENTRIES);
   try {
     await loader();

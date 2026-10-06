@@ -17,16 +17,15 @@ export { SHADER_DOCUMENT_EFFECTS };
  *   its definition.
  * @param {string} resolution - A preset label.
  * @returns {Array<string>|null} That preset's list, or null when the preset is
- *   unknown or carries none — the caller substitutes a default list rather than
- *   leaving the sidebar and the effect switch with nothing to offer.
+ *   unknown or carries none.
  */
 export function resolutionEffects(presets, resolution) {
   const preset = Object.hasOwn(presets, resolution) ? presets[resolution] : null;
   return preset?.favorites ?? null;
 }
 
-// Workbench effects: ShaderChain hosts scratch authoring and dynamic document
-// previews (src/workbench/shader/shader_documents.js), alongside shipped documents.
+// Workbench effects: ShaderChain (scratch authoring and dynamic document
+// previews) plus the shipped documents.
 export const WORKBENCH_EFFECTS = Object.freeze([
   'ShaderChain', ...SHADER_DOCUMENT_EFFECTS,
 ]);
@@ -114,9 +113,8 @@ const LoResFavorites = [
 export const DEFAULT_EFFECT = 'IslamicStars';
 
 // Display metadata (dot size), geometry, and the effect list offered per
-// resolution. The dropdown offers only the subset the engine reports through
-// getSupportedResolutions(). Null prototype: a URL string indexes this table, and
-// an inherited key ("constructor", "toString") would answer as a preset.
+// resolution. Null prototype: a URL string indexes this table, and an inherited
+// key ("constructor", "toString") would answer as a preset.
 /** @type {Record<string, {h: number, w: number, dotSize: number, favorites: string[]}>} */
 export const resolutionPresets = Object.assign(Object.create(null), {
   "Holosphere (96x20)": { h: 20, w: 96, dotSize: 2, favorites: LoResFavorites },
@@ -142,8 +140,7 @@ export function favoritesFor(resolution) {
  * Resolve which effect should be active for a resolution's offered list. The
  * requested effect (from app state, including a `?effect=` deep link) is kept
  * when the resolution offers it; otherwise it falls back to the list's first
- * entry. The fallback is what stops an off-list request — a different-resolution
- * effect or a stale/garbage deep link — from leaving the canvas black.
+ * entry.
  * @param {Array<string>} availableEffects - Effects offered at this resolution.
  * @param {string} currentEffect - The requested/active effect name.
  * @returns {string} The effect to activate: currentEffect if offered, else the

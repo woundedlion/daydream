@@ -3,23 +3,11 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-/**
- * DOM-free parameter-stream logic for the effect panel: the per-frame
- * "fight-the-slider" poll decision, the parameter-definition to lil-gui control
- * mapping, the coercion setParameter expects, and the guards that decide whether
- * the engine's live value stream may be paired with the GUI's cached param-name
- * list at all. Extracted so every rule can be unit-tested without lil-gui, a
- * WASM module, or a browser, and so the panel reads them from one place.
- */
+/** DOM-free parameter-stream logic for the effect panel. */
 
 /**
  * Decide whether a single GUI controller should adopt the engine's latest value
  * for its parameter, and what value to write.
- *
- * The engine streams animation-driven parameter values back every frame; the
- * GUI should track them, but must never clobber a controller the user is
- * actively editing (a focused input or an in-progress drag), and should avoid a
- * redundant write when the value is unchanged.
  *
  * @param {number|boolean} current - The controller's current value
  *   (c.getValue()); a boolean for a toggle, a number for a slider.
@@ -31,9 +19,8 @@
  * @param {boolean} isEditing - Whether the user is actively editing this
  *   controller (focused or dragging) — such a controller must not be overwritten.
  * @returns {{update: boolean, value: number|boolean}} Whether to write, and the
- *   coerced value to write (a boolean when isBoolean). `value` is always the
- *   coerced incoming value even when `update` is false, so callers never need to
- *   re-coerce.
+ *   coerced value to write (a boolean when isBoolean). `value` is the coerced
+ *   incoming value even when `update` is false.
  */
 export function resolveParamSync(current, incoming, isBoolean, isEditing) {
   const value = isBoolean ? incoming > 0.5 : incoming;
@@ -73,8 +60,7 @@ export function engineParamValue(value) {
 
 /**
  * The state an interactive selector must display: the latest requested value
- * when the definition carries one, otherwise the renderer-owned value. `??`
- * rather than `||` because 0 is a valid enum value.
+ * when the definition carries one, otherwise the renderer-owned value.
  * @param {{value: *, requestedValue?: *, options?: string[], optionValues?: number[]}} parameter - Engine parameter definition.
  * @returns {*} The value to display.
  */
@@ -108,8 +94,7 @@ export function enumChoices(options, optionValues) {
   /** @type {string[]} */
   const labels = [];
   options.forEach((label, i) => {
-    // Duplicate labels would collapse to one object key, making the earlier
-    // index unselectable; disambiguate rather than drop it.
+    // Duplicate labels would collapse to one object key; disambiguate them.
     let key = label;
     while (Object.hasOwn(choices, key)) key = `${key} (${i})`;
     choices[key] = optionValues?.[i] ?? i;
@@ -123,8 +108,7 @@ export function enumChoices(options, optionValues) {
 
 /**
  * Whether the cached param-name list has drifted out of length with the engine's
- * per-frame value stream. A skew means the two can no longer be paired by index,
- * so sync() and exportParams() must skip rather than mis-bind sliders.
+ * per-frame value stream. A skew means the two can no longer be paired by index.
  * @param {number} namesLength - Length of the effect's cached paramNames list.
  * @param {number} valuesLength - Length of the engine's live value stream.
  * @returns {boolean} True when the lengths differ (do not pair them).
@@ -134,11 +118,8 @@ export function paramValueSkew(namesLength, valuesLength) {
 }
 
 /**
- * Why the Export action cannot copy the live parameter values, if it cannot. A
- * heap-growth detach leaves the value view zero-length, the segmented source is
- * null before the first frame, as is a read that no longer matches the GUI's
- * snapshot, and the copy operation can be absent in a non-browser host. Any of
- * those would copy an all-zero, foreign, or unwritable preset.
+ * Why the Export action cannot copy the live parameter values, if it cannot: an
+ * empty or missing stream, a length skew, or no copy operation.
  * @param {ArrayLike<number>|null|undefined} values - The live value stream.
  * @param {number} expectedLength - Length of the effect's cached paramNames list.
  * @param {boolean} canCopy - Whether a clipboard copy operation is available.
@@ -158,11 +139,8 @@ export function paramExportBlocker(values, expectedLength, canCopy) {
 /**
  * Whether the engine's live value stream still describes the effect the GUI's
  * parameter-definition snapshot was taken from. The engine bumps a generation
- * counter on every effect load, so an unequal pair means a load landed between
- * the snapshot and this read and the values must not be bound by index. Length
- * alone cannot decide it: equal parameter counts are common across the roster,
- * so a switch between two same-sized effects passes paramValueSkew() while
- * describing different parameters.
+ * counter on every effect load; length alone cannot decide it, since two
+ * same-sized effects pass paramValueSkew().
  * @param {number|undefined} snapshotGeneration - Generation recorded when the
  *   parameter definitions were read.
  * @param {number|undefined} streamGeneration - Generation read alongside the values.

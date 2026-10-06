@@ -157,11 +157,11 @@ function stageOf(name) {
 
 /**
  * Stage every parameter of a named fixed pipeline, recognized by exact roster
- * match: a list carrying a name the roster does not claim, or missing one it
- * does, is some other effect's and is left to the generic recognizer.
+ * match.
  * @param {Array<{name: string}>} params - Engine parameter definitions in stream order.
  * @param {Set<string>} roster - The pipeline's complete parameter roster.
- * @returns {Map<string, string>|null} Parameter name to pipeline stage.
+ * @returns {Map<string, string>|null} Parameter name to pipeline stage, or null
+ *   when the list is not exactly the roster.
  */
 function rosterStageAssignments(params, roster) {
   if (params.length !== roster.size) return null;

@@ -10,14 +10,10 @@
  *
  * Codec priority: MP4/H.264 > WebM/VP9 > WebM/VP8.
  *
- * Capture always goes through an offscreen canvas so the recorded track's frame
- * size stays fixed for the whole session: when a target resolution is set the
- * offscreen scales to it; at native resolution the offscreen is pinned to the
- * source's start-time size. Either way the source renderer is never resized, and
- * a mid-recording resolution change cannot change the encoded track dimensions.
+ * Capture goes through an offscreen canvas pinned to the session's start-time
+ * size (or target resolution), so the encoded track dimensions stay fixed.
  *
- * Only canvas pixels reach the file: the CSS2D axis labels are DOM nodes over the
- * canvas, so a recording made with "Show Axes" on carries no labels.
+ * Only canvas pixels reach the file; the CSS2D axis labels are not recorded.
  */
 
 import { FPS } from "../renderer/frame_constants.js";
@@ -34,14 +30,11 @@ const DEFAULT_BITRATE_MBPS = 16;
 export const PICKER_GRACE_SECONDS = 120;
 
 // Bytes the in-memory fallback sink may accumulate before it ends the session.
-// Browsers without the File System Access API (Firefox, Safari) hold the whole
-// video here until stop, so the alternative to a bound is an OOM that loses the
-// recording outright rather than saving its prefix.
 export const MEMORY_BUFFER_LIMIT_BYTES = 512_000_000;
 
 // Container subtype of a MediaRecorder MIME type to the file extension, and the
-// extension back to the canonical MIME type. Maps, not object literals, so a
-// subtype like `constructor` finds nothing rather than Object.prototype.
+// extension back to the canonical MIME type. Maps, so a subtype like
+// `constructor` finds nothing.
 const CONTAINER_EXTENSIONS = new Map([
   ['mp4', 'mp4'], ['webm', 'webm'], ['x-matroska', 'mkv'], ['ogg', 'ogv'],
 ]);
@@ -54,10 +47,9 @@ const EXTENSION_MIME_TYPES = new Map([
  * Pick the best-supported MIME type for the requested output format. Codec
  * priority: MP4/H.264 > WebM/VP9 > WebM/VP8. Returns '' if nothing in the
  * candidate list is supported (MediaRecorder then falls back to its default).
- * The support probe is injected so this stays pure and unit-testable.
  * @param {'auto'|'mp4'|'webm'} format - Requested output container/codec family.
  * @param {(mimeType: string) => boolean} isTypeSupported - Probe returning whether
- *   a MIME type is supported by MediaRecorder; injected to keep this function pure.
+ *   a MIME type is supported by MediaRecorder.
  * @returns {string} The best-supported MIME type, or '' if none of the candidates match.
  */
 export function selectMimeType(
@@ -137,10 +129,7 @@ export class VideoRecorder {
     /** @type {CanvasRenderingContext2D|null} */
     this.offCtx = null;
     // Host hook fired whenever a session ends without the host asking for it: a
-    // failure to start, an encoder fault, or a cancelled Save dialog. The reason is
-    // passed so the UI can report it, and the UI drops its recording state; the
-    // record button's label is set on click and would otherwise keep reading "Stop"
-    // over a dead session.
+    // failure to start, an encoder fault, or a cancelled Save dialog.
     /** @type {((err: Error) => void)|null} */
     this.onError = null;
     /** @type {((err: Error, filename: string) => void)|null} Save failure for a completed session. */
@@ -215,8 +204,7 @@ export class VideoRecorder {
     }
 
     // Each session pins its capture size at start. Drop an offscreen left by a
-    // prior session whose async onstop cleanup has not run yet, so a resolution
-    // change between stop and start re-sizes instead of encoding at stale dims.
+    // prior session whose async onstop cleanup has not run yet.
     if (this.offscreen) {
       this.offscreen.width = 0;
       this.offscreen.height = 0;
@@ -255,8 +243,7 @@ export class VideoRecorder {
       return;
     }
 
-    // No video track means captureFrame would silently no-op the whole session
-    // (it guards on !this.track); surface it instead of recording nothing.
+    // No video track means captureFrame would silently no-op the whole session.
     if (!track) {
       stream.getTracks().forEach(t => t.stop());
       this.cleanup();
@@ -279,8 +266,8 @@ export class VideoRecorder {
       return;
     }
 
-    // An explicitly-chosen container with no supported codec means we fall back
-    // to the browser default below; warn so the format choice isn't silently ignored.
+    // An explicitly-chosen container with no supported codec falls back to the
+    // browser default.
     if (!mimeType && this.format !== 'auto') {
       console.warn(`VideoRecorder: requested format "${this.format}" is unsupported; using the browser default.`);
     }
@@ -325,13 +312,12 @@ export class VideoRecorder {
     this.mediaRecorder = recorder;
     this.stream = stream;
     this.track = track;
-    // Alias of the live session buffer; the recorder never reads it back, it exists
-    // so the active buffer is observable from outside.
+    // Alias of the live session buffer, for outside observation only.
     this.chunks = chunks;
 
     recorder.ondataavailable = (e) => {
       if (e.data.size === 0) return;
-      // Chunks received before sink setup are replayed through sink.write() below.
+      // Chunks received before sink setup are replayed through sink.write().
       if (sink) sink.write(e.data);
       else chunks.push(e.data);
     };
@@ -356,8 +342,7 @@ export class VideoRecorder {
       if (live) this.onError?.(error);
     };
 
-    // Timeslice so ondataavailable delivers chunks incrementally; without it the
-    // encoder buffers the whole recording in memory until stop().
+    // Timeslice so ondataavailable delivers chunks incrementally.
     try {
       recorder.start(RECORDER_TIMESLICE_MS);
       this.elapsedSeconds = 0;
@@ -408,10 +393,8 @@ export class VideoRecorder {
   }
 
   /**
-   * Ends an active session on an external fault (e.g. a lost WebGL context, after
-   * which the source canvas produces no more frames): the onstop handler still
-   * flushes the partial file, and the host hook fires so the UI drops its
-   * recording state instead of offering to stop a session that is frozen.
+   * Ends an active session on an external fault (e.g. a lost WebGL context): the
+   * onstop handler still flushes the partial file, and the host hook fires.
    * @param {string} message - Failure description, logged and sent to the host hook.
    * @returns {void}
    */
@@ -493,10 +476,8 @@ export class VideoRecorder {
    * Creates the offscreen capture canvas, at the target height and the source
    * canvas's start-time aspect ratio when a targetHeight is set, otherwise at the
    * source's start-time native size; both dimensions round up to even values
-   * (required by video codecs). It sizes only on creation and never tracks a later
-   * source resize: the captured track's frame size must stay fixed for the whole
-   * session, so a resized source scales into this fixed buffer (captureFrame)
-   * rather than changing the track size.
+   * (required by video codecs). Sized only on creation; a later source resize
+   * scales into this fixed buffer.
    * @returns {HTMLCanvasElement|null} The offscreen canvas pinned to its
    *   start-time size, or null when no 2D context could be acquired for it.
    */
@@ -515,8 +496,7 @@ export class VideoRecorder {
       }
       this.offscreen = this.doc.createElement('canvas');
       this.offCtx = this.offscreen.getContext('2d');
-      // A null 2d context must not latch the canvas; drop it so a later start()
-      // retries creation rather than reusing a context-less buffer forever.
+      // A null 2d context must not latch the canvas; a later start() retries.
       if (!this.offCtx) {
         this.offscreen = null;
         return null;
@@ -529,8 +509,7 @@ export class VideoRecorder {
 
   /**
    * A blob-download buffer bounded at MEMORY_BUFFER_LIMIT_BYTES. Past the bound
-   * the session stops and reports: a stopped recording the user is told about,
-   * and can save, beats an OOM that loses all of it.
+   * the session stops and reports.
    * @param {MediaRecorder} recorder - Session recorder; a superseded one never
    *   stops the live session.
    * @param {Blob[]} chunks - Per-session buffer to fill.
@@ -560,16 +539,12 @@ export class VideoRecorder {
 
   /**
    * Builds the per-session data sink. With the File System Access API present,
-   * streams each chunk straight to a user-chosen file as it arrives, so once the
-   * file is open a long recording never buffers the whole video in RAM; chunks
-   * awaiting the picker, file opening, or writes are held in the chain, bounded at
-   * PICKER_GRACE_SECONDS of video at the latched bitrate — past that the session
-   * stops and reports, and what was held still reaches the file if one is picked
-   * later. Otherwise it accumulates chunks for a single blob download at stop,
-   * bounded at MEMORY_BUFFER_LIMIT_BYTES on the same terms: a stopped recording
-   * the user is told about, and can save, beats an OOM that loses all of it.
-   * The save dialog is raised here (under start()'s user gesture) so its
-   * transient activation is preserved.
+   * streams each chunk to a user-chosen file; chunks awaiting the picker, file
+   * opening, or writes are bounded at PICKER_GRACE_SECONDS of video at the
+   * latched bitrate, past which the session stops and reports. Otherwise it
+   * accumulates chunks for a single blob download at stop, bounded at
+   * MEMORY_BUFFER_LIMIT_BYTES. The save dialog is raised here, under start()'s
+   * user gesture.
    * @param {MediaRecorder} recorder - Session recorder, queried for its container type.
    * @param {string} effectName - Base name for the suggested file.
    * @param {Blob[]} chunks - Per-session buffer; the fallback path fills it, the
@@ -653,8 +628,7 @@ export class VideoRecorder {
         backlogBytes += data.size;
         chain = chain.then(async () => {
           await opened;
-          // Save dialog cancelled: finish() discards the buffer, so drop chunks
-          // instead of hoarding a whole recording that will be thrown away.
+          // Save dialog cancelled: finish() discards the buffer, so drop chunks.
           if (aborted) return;
           // No file handle (picker unavailable, or createWritable failed):
           // buffer every chunk for the blob-download fallback.
@@ -684,9 +658,8 @@ export class VideoRecorder {
             }
           }
         }).catch((err) => {
-          // A link that throws past its own handling — a host hook raising from
-          // stop()/onSaveError — would otherwise reject `chain` for good and
-          // drop every later chunk without a word.
+          // A throwing link (e.g. a host hook) would otherwise reject `chain` for
+          // good and drop every later chunk.
           console.error(
             'VideoRecorder: a streaming write link failed; the recording continues.',
             err);
@@ -696,8 +669,7 @@ export class VideoRecorder {
         return chain
           .then(async () => {
             await opened;
-            // User cancelled the Save dialog: honor Cancel and discard the
-            // buffered chunks instead of writing to the default Downloads folder.
+            // User cancelled the Save dialog: discard the buffered chunks.
             if (aborted) return;
             // No writable opened — the picker was unavailable (chunks buffered)
             // or the session streamed no data (the chosen file was never
@@ -708,8 +680,7 @@ export class VideoRecorder {
               return;
             }
             // Mid-stream write failed: only the on-disk prefix is contiguous.
-            // Flush it and report truncation rather than downloading the
-            // post-failure tail as if it were a complete video.
+            // Flush it and report truncation.
             if (failed) {
               if (!failureReported) {
                 failureReported = true;
@@ -720,8 +691,7 @@ export class VideoRecorder {
               console.error('VideoRecorder: streaming write failed mid-session; the saved file is truncated to the data written before the failure.');
               return;
             }
-            // Streaming succeeded; a close() failure can still leave the file
-            // unflushed/truncated, so report it rather than claiming success.
+            // A close() failure can still leave the file unflushed or truncated.
             try {
               await writable.close();
             } catch (err) {
@@ -755,7 +725,7 @@ export class VideoRecorder {
 
   /**
    * Canonical container MIME type for a file extension, used for both the blob
-   * type and the save picker's accept filter so the two never disagree.
+   * type and the save picker's accept filter.
    * @param {string} ext - File extension without dot.
    * @returns {string} The matching MIME type, defaulting to 'video/webm'.
    */
@@ -784,8 +754,7 @@ export class VideoRecorder {
 
   /**
    * Buffered fallback save: assembles captured chunks into a blob and downloads
-   * it under a timestamped name via an anchor click. Used when the File System
-   * Access API is unavailable; the streaming sink handles the file otherwise.
+   * it under a timestamped name via an anchor click.
    * @param {MediaRecorder} recorder - Recorder used to derive the extension.
    * @param {Blob[]} chunks - Captured data chunks.
    * @param {string} effectName - Base name for the file.
@@ -820,9 +789,8 @@ export class VideoRecorder {
 
   /**
    * Stop any active recording and release the stream tracks and offscreen canvas.
-   * Idempotent; call on teardown so a mid-recording discard does not leak the
-   * captured stream/track (onstop, which normally cleans up, cannot flush on a
-   * synchronous page discard).
+   * Idempotent. A recording in progress is not flushed: onstop cannot complete
+   * under a synchronous page discard.
    * @returns {void}
    */
   dispose() {

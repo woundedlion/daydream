@@ -111,8 +111,7 @@ export function start({
     : SHADER_DOCUMENT_EFFECTS.includes(requestedEffect) ? requestedEffect : null;
   if (!shaderWorkbench && workbenchEffect) {
     win.location.replace(shaderWorkbenchUrl(win.location, workbenchEffect));
-    // Nothing was built, but the shape is createAppTeardown's: a caller reads
-    // disposed() on either path.
+    // Same shape as createAppTeardown's handle.
     let redirectDisposed = false;
     return {
       dispose() { redirectDisposed = true; },
@@ -133,8 +132,8 @@ export function start({
   // Centralized State
   ///////////////////////////////////////////////////////////////////////////////
 
-  // Seed plain defaults; URLSync is the single URL reader and hydrates these from
-  // the query string through the same validators below.
+  // Seed plain defaults; URLSync hydrates these from the query string through
+  // its validators.
   const knownEffects = new Set(shaderWorkbench
     ? WORKBENCH_EFFECTS
     : Object.values(resolutionPresets).flatMap((preset) => preset.favorites));
@@ -230,10 +229,8 @@ export function start({
   let appTeardown = null;
 
   /**
-   * Release the app when a caught failure came from a trapped module. HS_CHECK
-   * sets HS_MODULE_DEAD ahead of a trap that unwinds nothing. Later calls can
-   * exhaust the remaining shadow stack without reporting it (-sASSERTIONS=0),
-   * or observe partial state. No call is a recovery path.
+   * Release the app when a caught failure came from a trapped module, which has
+   * no recovery path.
    * @returns {boolean} Whether the module is dead and the app was released.
    */
   function abandonOnModuleDeath(error) {
@@ -269,8 +266,8 @@ export function start({
     const corrected = resolutionCorrection(labels, current);
     if (corrected !== null) {
       console.warn(`Resolution "${current}" is not supported by the engine; using "${corrected}".`);
-      // Muted: the onChange still carries the correction into appState and the URL,
-      // but the apply is applyInitialState's single preserving one below.
+      // Muted: the onChange carries the correction into appState and the URL;
+      // applyInitialState performs the apply.
       switches.mute(() => resolutionController.setValue(corrected));
     }
     return true;
@@ -317,16 +314,14 @@ export function start({
         throw new Error('HolosphereEngine is already live.');
       host.engine = new module.HolosphereEngine();
 
-      // Push the Pole LOD value the GUI settled on during the async WASM-load
-      // window; its onChange no-op'd while host.engine was null.
+      // Push the Pole LOD value set while host.engine was null.
       poleLod.replay();
       if (!displayCaps.replay()) throw new Error('Engine rejected display cap settings.');
 
       if (!syncResolutionOptions(module)) return;
 
-      // Resolution and effect are both applied once via applyResolution(true) below,
-      // before first paint: it sets the hydrated resolution and validates the hydrated
-      // effect against this resolution's allow-list.
+      // applyResolution(true) applies the hydrated resolution and validates the
+      // hydrated effect against its allow-list, before first paint.
 
       const renderAdapter = createRenderAdapter({
         host,
@@ -393,8 +388,7 @@ export function start({
   }
 
   const setResolution = (v) => appState.set('resolution', v);
-  // Reassigned by syncResolutionOptions, which narrows the offered rows through
-  // lil-gui's options().
+  // Reassigned when syncResolutionOptions narrows the offered rows.
   let resolutionController = guiInstance
     .addSession({ resolution: appState.get('resolution') }, 'resolution', Object.keys(resolutionPresets))
     .name('Resolution')
@@ -419,8 +413,8 @@ export function start({
     return callWorkbenchBinding(host.engine, 'getShaderChainBindings', 'isValid', [], false);
   }
 
-  // The shader-document controller (created below, after the panel it filters)
-  // publishes the chain editor's selected-instance filter through this slot.
+  // The shader-document controller publishes the chain editor's selected-instance
+  // filter through this slot.
   const paramFilterRef = { current: null };
 
   const effectGui = createEffectGui({

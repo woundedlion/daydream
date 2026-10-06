@@ -3,10 +3,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-/**
- * The Pole LOD control's binding, which holds the near-pole decimation setting
- * until the engine the module load builds exists to take it.
- */
+/** The Pole LOD control's binding. */
 
 /**
  * Bind the Pole LOD control to an engine that does not exist yet.

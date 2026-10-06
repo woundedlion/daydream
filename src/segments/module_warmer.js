@@ -6,8 +6,7 @@
 
 import { raceDeadline } from '../shared/deadline.js';
 
-// Minimum spacing between two actual warms. lil-gui fires onChange per drag
-// step, so the segment-count slider warms several times a second.
+// Minimum spacing between two actual warms.
 export const WARM_INTERVAL_MS = 10000;
 
 // Best-effort warming deadline; pool creation waits for warming to settle.
@@ -119,9 +118,7 @@ export class ModuleWarmer {
         }
       });
     } catch (error) {
-      // Reported like the compile and deadline failures below; the dedupe
-      // window stays shut, since nothing was warmed for a later caller to be
-      // handed.
+      // The dedupe window stays shut: nothing was warmed.
       console.warn('[Segmented] module warm could not be started; each worker '
         + 'will fetch and compile its own', error);
       return Promise.resolve();

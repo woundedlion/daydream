@@ -3,9 +3,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-// index.html's entry module: the one place the simulator is started. bootstrap.js
-// stays importable — daydream.js pulls its failure overlay — and importing it
-// must not stand up a second WebGL context, URLSync and engine.
+// index.html's entry module; importing bootstrap.js alone does not start the simulator.
 import { bootstrap } from './bootstrap.js';
 
 void bootstrap();

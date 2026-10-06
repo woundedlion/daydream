@@ -93,7 +93,7 @@ export class LabelPool {
  * Browser-side simulator: drives the three.js scene that renders the LED
  * sphere as instanced dots, on a fixed-timestep sim clock with on-demand
  * repainting. Holds all rendering config (camera, resolution, axes, PiP) and
- * the pixel color buffer alias refreshed through pixel_view.js.
+ * the pixel color buffer alias.
  */
 export class Daydream {
   static SCENE_ANTIALIAS = true;
@@ -112,8 +112,7 @@ export class Daydream {
   static KEY_ZOOM_STEP = 1.1;
 
   static SPHERE_RADIUS = 30;
-  // The use site rescales this by the live camera distance so the visible label
-  // set doesn't drift with orbit distance.
+  // Rescaled by the live camera distance at use.
   static LABEL_VISIBILITY_FRAMING_RATIO = Daydream.SPHERE_RADIUS / Daydream.CAMERA_Z;
   static DEFAULT_H = 20;
   static DEFAULT_W = 96;
@@ -171,8 +170,7 @@ export class Daydream {
     // Null until precomputeMatrices allocates a zeroed RGB16 placeholder;
     // the engine host then supplies the WASM view.
     this.pixels = null;
-    // Composed instance matrices per grid, keyed by resolution and latitude endpoints. Entries come
-    // from the resolution-preset table, so the map holds a couple of grids.
+    // Composed instance matrices per grid, keyed by resolution and latitude endpoints.
     /** @type {Map<string, Float32Array>} */
     this.matrixCache = new Map();
 
@@ -191,8 +189,7 @@ export class Daydream {
       alpha: Daydream.SCENE_ALPHA,
     });
 
-    // Cap at CSS resolution: the sphere is coarse LED dots, so rendering above
-    // 1x device-pixel-ratio only costs fill rate without adding visible detail.
+    // Cap at CSS resolution.
     this.renderer.setPixelRatio(Math.min(this.win.devicePixelRatio, 1));
 
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -234,8 +231,7 @@ export class Daydream {
     this.scene.background = new THREE.Color(Daydream.SCENE_BACKGROUND_COLOR);
     this.paused = false;
     this.stepFrames = 0;
-    // Video capture sink, injected by the app while recording is armed and
-    // nulled when it is torn down; null disables capture entirely. Must expose
+    // Injected video capture sink; null disables capture. Must expose
     // captureFrame(), abort(message), and an isRecording flag (which also
     // suppresses the PiP corner).
     this.recorder = null;
@@ -249,8 +245,7 @@ export class Daydream {
 
     this.labelPool = new LabelPool(this.scene, Daydream.SPHERE_RADIUS, this.doc);
 
-    // Built by the first updateResolution(), which the app runs before its first
-    // paint; every reader of the mesh treats null as "nothing to draw".
+    // Built by updateResolution(); null means nothing to draw.
     /** @type {THREE.InstancedMesh|null} */
     this.dotMesh = null;
 
@@ -322,8 +317,7 @@ export class Daydream {
     overlay.setAttribute("role", "alert");
     overlay.tabIndex = -1;
     overlay.style.display = "none";
-    // Same element vocabulary as the bootstrap load-failure overlay, which
-    // shares these classes.
+    // Shares classes with bootstrap's load-failure overlay.
     const title = this.doc.createElement("span");
     title.className = "load-error-title";
     title.textContent = "GPU context lost";
@@ -347,8 +341,7 @@ export class Daydream {
         `${reason}. The GPU process was likely reset — reload to recover.`;
       overlay.style.display = "flex";
       overlay.focus({ preventScroll: true });
-      // The canvas feeds no more frames into the capture stream, so end any
-      // session rather than leaving it silently frozen.
+      // The canvas feeds no more frames into the capture stream.
       this.recorder?.abort(`WebGL context lost (${reason}); recording stopped.`);
     };
 
@@ -519,11 +512,8 @@ export class Daydream {
   }
 
   /**
-   * Request a repaint on the next animation frame. For on-demand rendering:
-   * callers that mutate the visible scene without advancing the simulation or
-   * moving the camera (e.g. toggling axes/back-face culling, changing
-   * resolution) must call this, otherwise the change won't show until the next
-   * sim tick, which a paused host without queued steps does not provide.
+   * Request a repaint on the next animation frame. Required after any visible
+   * scene change that neither advances the simulation nor moves the camera.
    */
   invalidate() {
     this.needsRender = true;
@@ -537,8 +527,8 @@ export class Daydream {
    * this.recorder each newly completed frame the adapter reports capture-ready.
    * @param {{drawFrame: () => void, sync?: (advanced: boolean) => void,
    *   getArenaMetrics?: () => ?Object, captureReady?: (advanced: boolean) => boolean,
-   *   refreshPixelView?: () => void}} adapter - Per-frame render adapter (see
-   *   createRenderAdapter): drawFrame() paints the pixel buffer,
+   *   refreshPixelView?: () => void}} adapter - Per-frame render adapter:
+   *   drawFrame() paints the pixel buffer,
    *   sync(advanced) reconciles the effect panel and is told whether the sim
    *   stepped this frame, getArenaMetrics() feeds the stats
    *   overlay, and captureReady() gates the recorder. Optional methods default
@@ -638,10 +628,8 @@ export class Daydream {
 
     if (this.stepFrames !== 0) this.stepFrames--;
 
-    // A WASM-detached Uint16Array is still truthy but fill() on it throws, so skip
-    // it (isViewLive checks byteLength); the next drawFrame heals the view. On the
-    // rare heap-growth (detach) frame the buffer is not cleared, so an additive/
-    // persist effect may blend one stale frame; it self-heals the next frame.
+    // A WASM-detached Uint16Array is still truthy but fill() on it throws; the
+    // next drawFrame heals the view.
     if (isViewLive(this.pixels))
       this.pixels.fill(0);
 
@@ -737,13 +725,8 @@ export class Daydream {
 
   /**
    * Render the picture-in-picture corner view: the sphere seen from the antipode
-   * of the main camera, so the corner shows the hemisphere the main view hides.
-   * Skipped while the showPip toggle
-   * is off, on mobile, under headless automation (Playwright/Puppeteer/Selenium
-   * set navigator.webdriver), and while recording, so clean screenshots/videos
-   * aren't obscured by the PiP corner.
-   * @details A second full pass over the instanced mesh (no LOD, frustum culling
-   *   off), so on a large grid the toggle roughly halves the per-frame draw cost.
+   * of the main camera. Skipped while showPip is off, on mobile, under headless
+   * automation (navigator.webdriver), and while recording.
    */
   renderPip() {
     if (!this.showPip || this.compactViewport || this.nav.webdriver ||
@@ -908,9 +891,6 @@ export class Daydream {
       this.matrixCache.set(key, composed);
       matrices = composed;
     }
-    // The cache holds the instanceMatrix layout itself, so the upload is one
-    // typed-array copy; round-tripping each matrix through an Object3D would
-    // read and write the same 16 floats an element at a time.
     this.dotMesh.instanceMatrix.array.set(matrices);
 
     if (resetColors) {
@@ -994,10 +974,8 @@ export class Daydream {
    * animation loop, the ResizeObserver, the simulation timer, the context-loss
    * and canvas-keyboard listeners, the WebGL program/geometry/material
    * resources and drawing context, the OrbitControls, and the label and
-   * context-lost layers. Call before discarding a Daydream (e.g. on SPA
-   * navigation away) so it leaves behind no live observer firing into a dead
-   * scene and no leaked GPU material, geometry, or context. A fresh instance
-   * requires a new canvas because this method deliberately loses the old context.
+   * context-lost layers. A fresh instance requires a new canvas: this method
+   * loses the old context.
    */
   dispose() {
     this.statsView?.clear();
@@ -1030,15 +1008,13 @@ export class Daydream {
     if (this.dotMesh) {
       this.scene.remove(this.dotMesh);
       this.dotMesh.geometry?.dispose();
-      // Detach the possibly WASM-aliased instanceColor buffer before dispose()
-      // (see setupDots()).
+      // Detach the possibly WASM-aliased instanceColor buffer before dispose().
       if (this.dotMesh.instanceColor) this.dotMesh.instanceColor.array = null;
       this.dotMesh.dispose();
       this.dotMesh = null;
     }
     this.pixels = null;
-    // Injected sink the engine host disposes on the same teardown; holding it
-    // here would leave the render path a disposed recorder to capture through.
+    // Injected sink; not disposed here.
     this.recorder = null;
     this.matrixCache.clear();
     this.dotMaterial?.dispose();

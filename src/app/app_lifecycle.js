@@ -3,14 +3,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-/**
- * The composition root's frame, timer, and teardown wiring: the per-frame adapter
- * the driver calls, the global keydown shortcuts, the Test All walk, the module
- * load deadline, and the dispose path a page discard runs. Every collaborator is
- * injected, so the segmented/single-engine frame split, the walk, the load race,
- * and the teardown order are unit-testable without Three.js, a WASM engine, or a
- * browser.
- */
+/** The composition root's frame, timer, and teardown wiring, over injected collaborators. */
 
 import { raceDeadline } from '../shared/deadline.js';
 import { errorDetail } from '../shared/banner.js';
@@ -61,13 +54,11 @@ export function createRenderAdapter({
         // buffer) and dispatch the next.
         segments.tick();
       } else {
-        // A pool that is still spawning paints nothing; keep rendering here so
-        // the sphere stays live, and report the spawn in the segment overlay.
+        // A still-spawning pool paints nothing; render here and report the spawn.
         if (segments.active) segments.updateStats();
         host.engine.drawFrame();
         host.refresh();
-        // All three aliases must point at the one WASM view; log once and
-        // re-point rather than throw (throwing here halts the render loop).
+        // Log once and re-point: a throw here halts the render loop.
         const view = host.view();
         if (view === null) return;
         if (displayAliasesDiverged(driver, view)) {
@@ -112,11 +103,9 @@ export function createRenderAdapter({
 /**
  * Wire the page-discard teardown and register its pagehide listener.
  *
- * Order is the contract: the state subscription is released before the GUI and
- * scene teardown (a later set() would otherwise re-enter the apply path against
- * a disposed renderer), the engine host is released before driver.dispose()
- * drops the WebGL context the recorder captures its stream from, and the pool is
- * stranded before it is destroyed.
+ * Order is the contract: listeners go before the GUI and scene teardown, the
+ * engine host before driver.dispose() drops the WebGL context the recorder
+ * captures from, and the pool is stranded before it is destroyed.
  *
  * @param {Object} deps - Injected app collaborators.
  * @param {{addEventListener: Function, removeEventListener: Function}}
@@ -135,9 +124,8 @@ export function createRenderAdapter({
  * @param {{dispose: Function}} deps.urlSync - The URL writer.
  * @param {{dispose: Function}} deps.sidebar - The effect sidebar.
  * @param {{dispose: Function}} deps.driver - The Daydream driver.
- * @param {{active: boolean, dispose: Function}} deps.segments - The pool, released
- *   through dispose() so the page discard also drops the warmer's held
- *   compilation, which destroy() keeps for the next pool the page builds.
+ * @param {{active: boolean, dispose: Function}} deps.segments - The pool;
+ *   dispose() also drops the warmer's held compilation.
  * @param {() => void} deps.strandSegmentWork - Bumps the segmented epoch so an
  *   in-flight spawn continuation cannot land in a discarded page.
  * @param {() => void} deps.removeOverlay - Removes the app's canvas overlays.
@@ -166,12 +154,7 @@ export function createAppTeardown({
   let appDisposed = false;
 
   /**
-   * Run one release step. dispose() latches before the first step and runs once,
-   * so a step that throws would otherwise strand every later release — the URL
-   * debounce still armed on a dead page, the WebGL context (the browser caps
-   * them near 16) still held, the worker pool still spawning — with no retry
-   * left. Each step is independent of the others' success, so a failure is
-   * reported and the rest still run.
+   * Run one release step; a throw is reported and later steps still run.
    * @param {string} what - Names the step in the log line.
    * @param {() => void} step - The release to attempt.
    * @returns {void}
@@ -185,9 +168,7 @@ export function createAppTeardown({
   }
 
   /**
-   * Release the listeners, timers, and worker pool the app owns so a page
-   * discard leaves nothing firing into a dead scene. Symmetric with
-   * Daydream.dispose() and EffectSidebar.dispose().
+   * Release the listeners, timers, and worker pool the app owns. Runs once.
    * @returns {void}
    */
   function dispose() {
@@ -208,8 +189,7 @@ export function createAppTeardown({
     release('the URL writer', () => urlSync.dispose());
     release('the sidebar', () => sidebar.dispose());
     release('the driver', () => driver.dispose());
-    // Strand any in-flight warmModules() continuation: its post-await guard reads
-    // both, so without this it spawns a worker pool into the discarded page.
+    // Strand any in-flight warmModules() continuation; its post-await guard reads both.
     release('clearing the segmented-mode flag', () => { segments.active = false; });
     release('stranding the segment spawn', strandSegmentWork);
     release('the segment pool', () => segments.dispose());
@@ -239,10 +219,8 @@ export const INTERACTIVE_KEY_TARGET =
 /**
  * Build the window keydown handler for the global playback shortcuts.
  *
- * A key typed into a GUI control, the sidebar, or any text field is that
- * element's, so it never also drives the simulation. The target is only a node
- * for a key that landed in the document; anything else falls through to the
- * shortcuts.
+ * A key landing in an INTERACTIVE_KEY_TARGET element is ignored; a non-node
+ * target falls through to the shortcuts.
  *
  * @param {Object} deps - Injected app collaborators.
  * @param {(e: KeyboardEvent) => void} deps.dispatch - Runs the shortcut.
@@ -261,10 +239,9 @@ export function createGlobalKeydownHandler({ dispatch }) {
  * Build the "Test All" ticker: the timer that walks the current resolution's
  * effect list, one entry per interval.
  *
- * The index is the ticker's own, not one re-derived from the live effect: a
- * rejected switch reverts the state to the predecessor, so re-deriving would
- * recompute the same rejected slot forever. The list is re-read every tick, so a
- * resolution change mid-walk continues through what the new one offers.
+ * The index is the ticker's own: a rejected switch reverts the live effect, so
+ * re-deriving it would retry the rejected slot forever. The list is re-read
+ * every tick.
  *
  * @param {Object} deps - Injected app collaborators.
  * @param {number} deps.intervalMs - Dwell time per effect.
@@ -277,7 +254,7 @@ export function createGlobalKeydownHandler({ dispatch }) {
  * @param {(fn: () => void, ms: number) => any} [deps.schedule] - Timer source.
  * @param {(handle: any) => void} [deps.cancel] - Timer sink.
  * @returns {{start: () => void, stop: () => void, running: () => boolean}} The
- *   ticker; start() is idempotent, so a re-entered toggle cannot arm two timers.
+ *   ticker; start() is idempotent.
  */
 export function createTestAllTicker({
   intervalMs,
@@ -339,7 +316,7 @@ export const MODULE_TRAP_NOTICE = 'The rendering engine hit an unrecoverable'
  * @param {(message: string) => void} [deps.clearReport] - Clears a recovered failure.
  * @param {(...args: *) => void} [deps.logError] - Console sink for the throw.
  * @param {(error?: *) => boolean} [deps.moduleDead] - Reads the engine module's death
- *   flag; polled before and after the frame, so it has to stay a cheap read.
+ *   flag; polled before and after every frame, so it must be cheap.
  * @param {() => void} [deps.onModuleDead] - Releases the app once the module is
  *   dead. Runs after the banner, which the release leaves standing.
  * @returns {() => void} The guarded callback for setAnimationLoop.
@@ -370,8 +347,7 @@ export function createFrameLoopGuard({
    */
   function checkDead(/** @type {*} */ error = undefined) {
     if (dead || !moduleDead(error)) return;
-    // Latched before the release, so a release that throws still leaves the
-    // loop stopped rather than resuming into a dead module.
+    // Latched before the release, so a throwing release still stops the loop.
     dead = true;
     logError('Render loop stopped: the rendering engine trapped.');
     reportNotice(MODULE_TRAP_NOTICE);
@@ -408,22 +384,16 @@ export function createFrameLoopGuard({
 export const MODULE_LOAD_DEADLINE_MS = 90000;
 
 /**
- * Race a module load against a deadline, so a fetch that stalls rather than
- * failing still reaches the load-failure path.
- *
- * The timer is cleared once the race settles, so a load that beats the deadline
- * leaves nothing pending; the deadline promise then never rejects. A load that
- * loses the race stays attached to the race, so its own later rejection is
- * handled rather than escaping as an unhandled one.
+ * Race a module load against a deadline. The timer is cleared once the race
+ * settles; a losing load's later rejection is handled.
  *
  * @param {() => Promise<Object>} load - Starts the module load.
  * @param {Object} [deps] - Injected collaborators.
  * @param {number} [deps.ms] - The deadline, in milliseconds.
  * @param {{setTimeout: Function, clearTimeout: Function}} [deps.timers] - Timer
- *   source; the page (or, under test, whatever stands in for it).
+ *   source.
  * @returns {Promise<Object>} The loaded module, or a rejection carrying the
- *   deadline that expired or whatever load() raised — a synchronous throw
- *   included, so every failure reaches the caller through the same catch.
+ *   deadline that expired or whatever load() raised, synchronous throws included.
  */
 export function loadWithDeadline(load, {
   ms = MODULE_LOAD_DEADLINE_MS,
@@ -438,17 +408,12 @@ export function loadWithDeadline(load, {
  * Build the handlers for the main WASM module promise, guarded against a page
  * discard that settles first.
  *
- * The teardown's pagehide listener is registered during app startup, so a
- * discard can win the race with the module load. Startup is skipped once the app
- * is disposed; a disposal that lands while startup is running instead releases
- * what startup built, since dispose() runs once and will not revisit it. A load
- * failure disposes the app so no listener or animation loop outlives the
- * failure UI.
+ * Startup is skipped once the app is disposed; a disposal that lands during
+ * startup releases what startup built. A load failure disposes the app.
  *
  * @param {Object} deps - Injected app collaborators.
  * @param {() => ?{dispose: Function, disposed: () => boolean}} deps.teardown -
- *   Reads the app teardown, which the composition root builds after these
- *   handlers, and reads null when app startup never got that far.
+ *   Reads the app teardown; null when startup never built it.
  * @param {(module: Object) => void} deps.start - Brings the app up on the
  *   loaded module.
  * @param {() => void} deps.discardStartup - Releases the engine, recorder, and

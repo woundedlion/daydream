@@ -14,11 +14,8 @@ import { errorDetail } from "../shared/banner.js";
 
 /**
  * Build the recording controls: the Recording folder and its settings, the
- * record toggle, and the duration overlay the frame loop writes.
- *
- * The recorder is constructed only once the WASM load resolves and the canvas
- * exists, so the controls are wired against one that does not exist yet and
- * attach() hands them the one the load built.
+ * record toggle, and the duration overlay the frame loop writes. The recorder
+ * does not exist yet; attach() hands it over once built.
  *
  * @param {Object} deps - Injected app collaborators.
  * @param {Document} deps.doc - Document the duration overlay mounts into.
@@ -34,7 +31,7 @@ import { errorDetail } from "../shared/banner.js";
  *   session and fault reports.
  * @returns {{attach: (recorder: import("./recorder.js").VideoRecorder) => void, tick: () => void,
  *   removeOverlay: () => void}} The post-load hookup, the per-frame duration
- *   readout, and the overlay release the page teardown runs.
+ *   readout, and the overlay release.
  */
 export function createRecordingControls({
   doc,
@@ -108,8 +105,7 @@ export function createRecordingControls({
     // A start that never began a session has already reported why through onError;
     // there was no session to stop, and the same owner tag would overwrite it.
     if (!wasRecording && !isRecording) return;
-    // The canvas tint, the duration readout, and the button label are all visual;
-    // the notice region is what carries the state change to assistive tech.
+    // The notice region carries the state change to assistive tech.
     const axisWarning = isRecording && driver.labelAxes
       ? ' Axis labels are page overlays, not canvas pixels; the recording will not carry them.'
       : '';
@@ -151,9 +147,7 @@ export function createRecordingControls({
         showNotice(`${startNotice} ${recSettings.recFormat} is unsupported in this`
           + ` browser; recording as ${label}.${filenameNote}`);
       };
-      // A fault ends the session on its own; drop the recording UI so the button
-      // doesn't keep offering to stop a session that is already gone, and report
-      // the reason through the same notice the record toggle writes.
+      // A fault ends the session on its own; drop the recording UI and report why.
       recorder.onError = (err) => {
         const detail = errorDetail(err);
         showNotice(recordingShown

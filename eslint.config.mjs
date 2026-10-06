@@ -1,18 +1,9 @@
-// Lint config for the repo's JavaScript, enforced by the `lint` step in
-// .github/workflows/js-unit-suite.yml.
-//
-// The recommended set only -- the rules that catch defects (undeclared names,
-// unreachable code, duplicate keys, unused bindings). No stylistic rules and no
-// formatter: the tree passes this unmodified, so the gate reports real breakage
-// rather than layout opinions.
+// Lint config: eslint's recommended rules only, no stylistic rules.
 import js from '@eslint/js';
 import globals from 'globals';
 
 export default [
-  // eslint reads no .gitignore. generated/holosphere_wasm.js is Emscripten glue built in
-  // the engine repo; vendor/ and three.js/ are third-party drops the tool pages
-  // load offline; .worktrees/ holds linked checkouts of this same tree, each
-  // already linted where it is pushed from.
+  // eslint reads no .gitignore; these are generated, third-party or linked-checkout trees.
   {
     ignores: [
       'generated/holosphere_wasm.js', 'generated/shader/*.mjs', 'vendor/**', 'three.js/**', 'engine/**',

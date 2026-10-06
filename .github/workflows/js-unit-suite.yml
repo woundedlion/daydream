@@ -99,7 +99,6 @@ jobs:
           mkdir -p "$RUNNER_TEMP/bin"
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP/bin" actionlint
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
-      # Lint workflow expressions and embedded shell with actionlint and shellcheck.
       - name: Lint workflows
         run: |
           mapfile -t FILES < <(git ls-files -- '.github/workflows/*.yml' '.github/workflows/*.yaml')
