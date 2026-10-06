@@ -1353,11 +1353,11 @@ export function createOpGate(validator, retries = 3) {
    */
   async function refresh(base, ops, candidates, mesh = null) {
     const signature = `${base}|${ops.map(opTopologyKey).join(',')}`;
-    if (pending?.signature === signature) return pending.promise;
+    if (pending?.signature === signature && pending.started === generation) return pending.promise;
     const started = ++generation;
     if (abandoned || signature === lastSignature) return null;
     const promise = settle();
-    pending = { signature, promise };
+    pending = { signature, promise, started };
     try { return await promise; }
     finally { if (pending?.promise === promise) pending = null; }
 
