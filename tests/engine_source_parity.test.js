@@ -3,8 +3,8 @@
 // and the C++ headers they are transcribed from, at the engine revision
 // recorded alongside the installed WASM.
 //
-// Without an engine checkout the cases skip, unless HOLOSPHERE_ENGINE_REQUIRED
-// is set, under which a missing tree fails.
+// Without an engine checkout the cases skip, unless HOLOSPHERE_ENGINE_REQUIRED=1,
+// under which a missing tree fails.
 import { constructorToObject, glslConstants } from './helpers/source_transpile.js';
 import { engineRoot, engineMissing, engineSkip } from './helpers/engine_checkout.js';
 import * as paletteEnums from './helpers/fake_palette.js';
