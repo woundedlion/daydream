@@ -60,7 +60,7 @@ export function getCssColor(name) {
  * @param {number} [opts.sphereOpacity=0.2] - Opacity of reference sphere wireframe
  * @param {number} [opts.sphereRadius=1] - Radius of the reference sphere
  * @param {boolean} [opts.showSphere=true] - Whether to show a reference sphere
- * @param {number} [opts.cameraDistance=3] - Initial camera distance (ignored if cameraPosition is set)
+ * @param {number} [opts.cameraDistance=3] - Scale d of the default camera offset (d/2, d/2, d); ignored if cameraPosition is set
  * @param {number[]} [opts.cameraPosition] - Explicit initial camera position [x, y, z]
  * @param {number} [opts.near=0.1] - Camera near plane
  * @param {number} [opts.far=1000] - Camera far plane
