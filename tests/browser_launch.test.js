@@ -1,6 +1,7 @@
 //
 // Tests for scripts/browser.mjs, which picks the browser the headless-Chrome
-// probes drive and fails loudly when none is installed.
+// probes drive and fails loudly when none is installed, and for the probe
+// harness's problem collector.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
