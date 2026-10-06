@@ -94,6 +94,22 @@ function writeEngineValue(engine, module, definitions, name, value) {
   return typeof write === 'string' ? write : performEngineWrite(engine, module, write);
 }
 
+
+/**
+ * @param {string} parameterId
+ * @param {ParameterDefinition[]} definitions
+ * @param {Set<string>} baked
+ * @returns {{name: string|null, refusal: string|null}} Compiled control or refusal.
+ */
+function compiledControlFor(parameterId, definitions, baked) {
+  if (BAKED_CONSTANT_IDS.has(parameterId) || baked.has(fieldSegment(parameterId)))
+    return { name: null, refusal: null };
+  const name = engineControlNames(parameterId)
+    .find((candidate) => definitions.some((definition) => definition.name === candidate));
+  return name ? { name, refusal: null }
+    : { name: null, refusal: `no engine parameter matches "${parameterId}"` };
+}
+
 /**
  * @param {*} engine @param {*} module @param {CompiledDocument} compiled
  * @param {string} presetId
@@ -111,12 +127,9 @@ function applyDocumentValues(engine, module, compiled, presetId, baked, derived)
   const writes = [];
   for (const [parameterId, value] of Object.entries(preset?.values ?? {})) {
     if (derived.has(parameterId)) continue;
-    if (BAKED_CONSTANT_IDS.has(parameterId)) continue;
-    if (baked.has(fieldSegment(parameterId))) continue;
-    const name = engineControlNames(parameterId)
-      .find((candidate) => definitions.some(
-        (/** @type {ParameterDefinition} */ definition) => definition.name === candidate));
-    if (!name) return `no engine parameter matches "${parameterId}"`;
+    const { name, refusal } = compiledControlFor(parameterId, definitions, baked);
+    if (refusal) return refusal;
+    if (name === null) continue;
     const write = resolveEngineValue(definitions, name, value);
     if (typeof write === 'string') return write;
     writes.push(write);
@@ -429,17 +442,15 @@ export function createShaderDocumentController({
    * constant ids in.
    * @param {string} parameterId - A chain parameter id.
    * @param {ParameterDefinition[]} definitions - The engine's definitions.
-   * @returns {string|null} The control name, or null where none takes the value.
+   * @returns {{name: string|null, refusal: string|null}} The control or refusal.
    */
   const engineControlName = (parameterId, definitions) => {
     const label = parameterId.slice(0, parameterId.indexOf('.'));
     if (active?.compiledSide !== true) {
-      return chainUi?.store.bypassedLabels().includes(label) ? null : parameterId;
+      return { name: chainUi?.store.bypassedLabels().includes(label) ? null : parameterId,
+        refusal: null };
     }
-    if (BAKED_CONSTANT_IDS.has(parameterId)) return null;
-    if (bakedFields.has(fieldSegment(parameterId))) return null;
-    return engineControlNames(parameterId).find((candidate) =>
-      definitions.some((definition) => definition.name === candidate)) ?? null;
+    return compiledControlFor(parameterId, definitions, bakedFields);
   };
 
   /** @param {string} parameterId @returns {boolean} */
@@ -467,10 +478,10 @@ export function createShaderDocumentController({
         const module = getModule();
         if (!engine || !module) return { ok: true };
         const definitions = engine.getParameterDefinitions();
-        const name = engineControlName(parameterId, definitions);
+        const control = engineControlName(parameterId, definitions);
         const paused = getAnimationsPaused();
-        const refusal = name === null ? null
-          : writeEngineValue(engine, module, definitions, name, value);
+        const refusal = control.refusal ?? (control.name === null ? null
+          : writeEngineValue(engine, module, definitions, control.name, value));
         if (paused !== null) {
           setAnimationsPaused(paused);
           syncEffectGui();
