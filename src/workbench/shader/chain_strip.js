@@ -21,23 +21,11 @@ import {
 import { createFrameScheduler } from '../../shared/page_lifecycle.js';
 
 /**
- * The pipeline strip: the loaded document's operator chain read left to right in
- * execution order as chips grouped into one band per editable carrier family, with the
- * family crossings drawn as socket chips on the band boundaries. The terminal
- * carrier is the pipeline's output type rather than an editable band, and is
- * conveyed by its incoming socket. Every structural gesture — palette insertion, ✕
- * removal, socket selection, and button or Alt+Arrow reorder — funnels into the
- * document store's one span-replacement primitive, so the strip can commit
- * nothing the store's validator refuses; it only decides which spans the
- * gestures name. Undo and redo go to the store's history instead. Selection
- * and the session bypass set live in the store too: the strip is a view plus
- * gesture translation, rebuilt whole after every committed edit with keyboard
- * focus restored to the edited chip.
- *
- * Every chip carries its stage's controls inline, built from the document's
- * declarations and catalog defaults over the active preset's values, so a stage is tuned
- * where it sits in the pipeline. A chip discloses them transiently under the
- * pointer and under keyboard focus alike, and pinned open by selection.
+ * The pipeline strip: the document's operator chain in execution order as chips
+ * grouped into one band per editable carrier family, with carrier crossings as
+ * socket chips on band boundaries. Structural gestures commit through the
+ * store's span replacement; the strip is rebuilt whole after every committed
+ * edit. Each chip carries its stage's controls inline.
  */
 
 /** @typedef {{severity: string, phase: string, code: string, path: string, message: string}} Diagnostic */
@@ -72,8 +60,6 @@ const PALETTE_GAP = 4;
 
 const DEACTIVATED_REASON = 'Deactivated by the current topology selection';
 
-// A bypass is a program-shape override, and only the interpreter is sent a
-// program shape; the compiled build takes the document chain whole.
 const BYPASS_UNAVAILABLE = 'Bypass applies to the interpreter only: '
   + 'the compiled build renders the whole chain.';
 
@@ -84,9 +70,7 @@ const SCROLL_STEP_RATIO = 0.75;
 const WHEEL_LINE_PX = 16;
 
 /**
- * A socket's function name, by the carrier the crossing produces. A band holds
- * at most one socket and no two bands produce the same carrier, so these stay
- * distinct within a strip.
+ * A socket's function name, by the carrier the crossing produces.
  * @type {Record<string, {name: string, accessibleName: string}>}
  */
 const SOCKET_FUNCTIONS = {
@@ -102,12 +86,10 @@ const SOCKET_FUNCTIONS = {
  * @param {*} options.container - Element the strip owns.
  * @param {ChainStore} options.store - The chain document store.
  * @param {OperatorCatalog} options.catalog - The operator catalog.
- * @param {(message: string) => void} options.announce - Writes the workbench's
- *   one shared live status region; every refusal reports through it, and a
- *   committed edit clears it.
+ * @param {(message: string) => void} options.announce - Writes the shared live
+ *   status region; refusals report through it, and a committed edit clears it.
  * @param {() => void} options.onApply - Runs after every committed structural
- *   edit, undo/redo and bypass toggle; the caller re-applies the program shape
- *   through the engine.
+ *   edit, undo/redo and bypass toggle.
  * @param {(label: string|null) => void} [options.onSelect] - Runs when the
  *   selected instance changes, which is also what expands the chip's controls.
  * @param {() => string|null} [options.presetId] - The preset the inline stage
@@ -118,8 +100,7 @@ const SOCKET_FUNCTIONS = {
  * @param {() => void} [options.onCommitParameter] - Runs once an inline control
  *   edit completes: a slider release, a chosen option, an entered value.
  * @param {() => boolean} [options.bypassAvailable] - Whether a bypass reaches
- *   what is rendering. False disables the toggles and states why, rather than
- *   leaving a control that commits store state the render ignores.
+ *   what is rendering. False disables the toggles and states why.
  * @param {(parameterId: string) => boolean} [options.parameterLive] - Whether a parameter reaches the active build.
  * @returns {Object} The strip.
  */
@@ -134,8 +115,7 @@ export function createChainStrip({
 
   /** @type {string|null} Roving-tabindex position, by instance label. */
   let focusedLabel = null;
-  // A rebuild puts the focus back where it was; that is not a disclosure
-  // gesture, so it must not open the chip it lands on.
+  // Focus restored by a rebuild must not open the chip it lands on.
   let restoringFocus = false;
   /** @type {string|null} The last selection onSelect was told about. */
   let notifiedSelection = null;
@@ -334,8 +314,7 @@ export function createChainStrip({
   };
 
   /**
-   * Dismisses an open palette on a press outside it. The document outlives the
-   * strip, so destroy() must take this back off.
+   * Dismisses an open palette on a press outside it.
    * @param {*} event - A pointerdown anywhere in the document.
    * @returns {void}
    */
@@ -467,9 +446,8 @@ export function createChainStrip({
       closePalette();
     });
 
-    // After the anchor, so the palette reads in place; childNodes is walked by
-    // index because fake and real child lists share indexOf only through the
-    // array prototype.
+    // Inserted after the anchor; childNodes is indexed through the array
+    // prototype because fake child lists lack indexOf.
     const parent = anchor.parentNode;
     const at = Array.prototype.indexOf.call(parent.childNodes, anchor);
     parent.insertBefore(element, parent.childNodes[at + 1] ?? null);
@@ -515,8 +493,7 @@ export function createChainStrip({
         focusChip(forward ? index + 1 : index - 1);
         return;
       }
-      // The same span the '←'/'→' move buttons disable themselves outside of: a
-      // crossing has no reorder, and a band edge has no neighbour to swap with.
+      // A crossing has no reorder, and a band edge has no neighbour to swap with.
       if (crossing || !sharesBand(index, forward ? 1 : -1)) return;
       moveChip(index, forward ? index + 2 : index - 1);
       return;
@@ -526,8 +503,6 @@ export function createChainStrip({
       select(entry.label);
       return;
     }
-    // The b key is a chip-level bypass shortcut alongside the tabbable
-    // header controls.
     if ((key === 'b' || key === 'B')
       && !event.altKey && !event.ctrlKey && !event.metaKey) {
       event.preventDefault();
@@ -569,10 +544,8 @@ export function createChainStrip({
   };
 
   /**
-   * Repaints each parameter row's deactivated controls and the
-   * reason beside them. The row is `display: contents`, so it generates no box
-   * for a tooltip to hang off: the reason is a node, reaching a pointer and
-   * assistive technology alike.
+   * Repaints each parameter row's deactivated controls and the reason node
+   * beside them.
    */
   const markDeactivated = () => {
     const off = deactivatedParameterIds(declarations, values, store.chain(), catalog);
@@ -582,7 +555,6 @@ export function createChainStrip({
       for (const control of row.querySelectorAll('input, select')) control.disabled = !live;
       const reason = live ? DEACTIVATED_REASON : 'This parameter is baked into the compiled build';
       if (!live || off.has(id)) {
-        // The workbench stylesheet reads this attribute.
         row.dataset.deactivated = 'true';
         if (shown !== null) { shown.textContent = reason; continue; }
         const note = el('span', 'chain-param-note');
@@ -664,9 +636,7 @@ export function createChainStrip({
     slider.type = 'range';
     slider.min = String(minimum);
     slider.max = String(maximum);
-    // A range input re-snaps its value onto its step grid, so any grid at all
-    // rewrites the authored value the moment the control is touched. Arrow keys
-    // stay usable without one: a step-free range nudges by a hundredth of span.
+    // Any step grid would re-snap the authored value on first touch.
     slider.step = 'any';
     slider.value = String(values[declaration.id]);
     slider.addEventListener('input', (/** @type {*} */ event) => {
@@ -684,9 +654,8 @@ export function createChainStrip({
   };
 
   /**
-   * The instance label as an editable field. The label is canonical and
-   * digest-bearing — every parameter id namespaces under it — so a rename is a
-   * document edit through the store, and a refusal restores the field.
+   * The instance label as an editable field. A rename is a document edit
+   * through the store; a refusal restores the field.
    * @param {ChainEntry} entry - The expanded chain entry.
    * @returns {*} The rename row.
    */
@@ -752,15 +721,12 @@ export function createChainStrip({
         slider.setAttribute('aria-label', name);
         readout.min = slider.min;
         readout.max = slider.max;
-        // A step grid is based at the input's min, and a stored binary32 lands
-        // on it only by accident, so any grid at all reports the readout
-        // stepMismatch. Its arrow keys carry the increment instead.
+        // Any step grid would report a stored binary32 as stepMismatch.
         readout.step = 'any';
         readout.setAttribute('aria-label', `${name} value`);
         /** @param {string} raw - The entered text. @returns {void} */
         const enterValue = (raw) => {
-          // A number input reports content it cannot parse as the empty string,
-          // which Number() reads as a finite 0 rather than as no value.
+          // Unparseable number-input content reads as '', which Number() makes 0.
           const trimmed = raw.trim();
           const typed = trimmed === '' ? Number.NaN : Number(trimmed);
           const current = Number(values[declaration.id]);
@@ -822,8 +788,7 @@ export function createChainStrip({
       + (isBypassed ? ' chain-chip--bypassed' : ''));
     chip.dataset.label = entry.label;
     chip.dataset.index = String(index);
-    // Not a listbox option: an option's children are presentational, which
-    // hides the chip's inline stage controls from assistive technology.
+    // Not role=option: an option's children are presentational to assistive technology.
     chip.setAttribute('role', 'group');
     if (isSelected) chip.setAttribute('aria-current', 'true');
     chip.setAttribute('aria-expanded', String(expanded));
@@ -1065,8 +1030,6 @@ export function createChainStrip({
     actions.appendChild(undoButton);
     actions.appendChild(redoButton);
     history = { undo: undoButton, redo: redoButton };
-    // The disabled toggles carry no reason of their own, and a title on a
-    // 1.125rem button is not one.
     if (!bypassAvailable()) {
       const note = el('p', 'chain-strip-note');
       note.textContent = BYPASS_UNAVAILABLE;
@@ -1109,10 +1072,8 @@ export function createChainStrip({
       if (delta === 0) return;
       const width = Number(viewport.clientWidth ?? 0);
       const overflow = Number(viewport.scrollWidth ?? 0) - width;
-      // Nothing to scroll: the wheel belongs to whatever encloses the strip.
       if (overflow <= 0) return;
-      // deltaMode counts pixels, lines or pages; a line-mode browser sends 3
-      // where a pixel-mode one sends 100.
+      // deltaMode counts pixels, lines or pages.
       const scale = event.deltaMode === 1 ? WHEEL_LINE_PX
         : event.deltaMode === 2 ? Math.max(MIN_SCROLL_STEP, width) : 1;
       viewport.scrollLeft = Math.min(overflow,
@@ -1128,8 +1089,7 @@ export function createChainStrip({
 
     container.replaceChildren(actions, scrollButton(viewport, -1), viewport,
       scrollButton(viewport, 1));
-    // The strip is rebuilt whole after every committed edit; the horizontal
-    // offset is view state, not document state, so it outlives the rebuild.
+    // The horizontal scroll offset outlives the rebuild.
     if (scrolled > 0) viewport.scrollLeft = scrolled;
     markDeactivated();
 
@@ -1157,8 +1117,7 @@ export function createChainStrip({
   };
 
   /**
-   * The container's history shortcut. The container outlives the strip, so
-   * destroy() must take it back off.
+   * The container's history shortcut.
    * @param {*} event - A keydown anywhere in the strip.
    * @returns {void}
    */
@@ -1176,9 +1135,7 @@ export function createChainStrip({
       redo();
     }
   };
-  // After the first render: a strip that throws before it returns hands the
-  // caller no destroy(), so listeners bound ahead of it would outlive it on the
-  // container the next successful load renders into.
+  // Bound after the first render: a throwing render returns no destroy().
   render();
   container.addEventListener('keydown', historyKeydown);
   doc.addEventListener('pointerdown', dismissPalette);
@@ -1187,9 +1144,8 @@ export function createChainStrip({
     render,
 
     /**
-     * Repaints the Undo/Redo buttons a value edit moved, which a rebuild would
-     * do too — but a rebuild during a slider drag would replace the control
-     * under the pointer.
+     * Repaints the Undo/Redo buttons without a rebuild, which would replace the
+     * control under a dragging pointer.
      * @returns {void}
      */
     syncHistory() {
@@ -1201,9 +1157,7 @@ export function createChainStrip({
     flushParameterEdit: commitSliderEdit,
 
     /**
-     * Detaches the strip's listeners and empties its container. Every other
-     * listener sits on an element the strip built inside the container, so
-     * emptying it drops them.
+     * Detaches the strip's listeners and empties its container.
      * @returns {void}
      */
     destroy() {

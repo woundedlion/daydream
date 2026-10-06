@@ -1,6 +1,5 @@
 //
-// Clipboard writes, execCommand fallbacks, focus restoration, copy-block wiring,
-// and copyWithFeedback's transient label swap.
+// Tests for the clipboard helpers.
 import { test, mock, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';

@@ -4,17 +4,12 @@
  */
 
 /**
- * The solids tool's WASM MeshOps orchestration (tools/solids.html): building a
- * mesh from a base solid and an op chain, classifying its faces, reading it back
- * into JS, and freeing the tooling arenas.
+ * The solids tool's WASM MeshOps orchestration: building a mesh from a base
+ * solid and an op chain, classifying its faces, reading it back into JS, and
+ * freeing the tooling arenas.
  *
  * MeshOps answers a recoverable failure with null and records the reason in
- * getLastResult(); an unchecked null becomes a TypeError several calls later, or
- * a mesh built from the wrong wrapper. Every null in these sequences has its
- * reason read before the next call overwrites it: through requireMeshResult, or
- * through meshOpFailure when applyOp throws on an op the bridge rejected. The
- * module instance, the vertex constructor and the error line are injected, so
- * the sequences run against a stand-in without a DOM.
+ * getLastResult(), which the next call overwrites.
  */
 
 import { applyOp, meshOpFailure, requireMeshResult } from './solid_codegen.js';
@@ -57,10 +52,8 @@ import { applyOp, meshOpFailure, requireMeshResult } from './solid_codegen.js';
  * @param {MeshWrapper} wasmMesh - The wrapper to read back.
  * @param {MeshBuildContext} ctx - The live wiring.
  * @returns {SolidMeshData?} The copy, or null when either readback was refused.
- * @details A wrapper held across a clearToolingMemory() aliases reclaimed arena
- * storage, so the bridge refuses it (STALE_WRAPPER). A NaN component means
- * the geometry degenerated, so it is refused here
- * rather than passed on to save and export.
+ * @details The bridge refuses a wrapper held across clearToolingMemory()
+ * (STALE_WRAPPER). A NaN component is refused as degenerate geometry.
  */
 export function readbackMesh(wasmMesh, ctx) {
   const vArray = requireMeshResult(wasmMesh.getVertices(), 'Mesh vertex readback', ctx);
@@ -130,15 +123,9 @@ export function buildBaseMesh(name, what, ctx) {
  * @param {MeshBuildContext} ctx - The live wiring.
  * @returns {SolidBuildResult?} What to draw, or null when there is nothing to draw.
  * @details Every failure the bridge foresees returns null with a MeshOpResult
- * reason in getLastResult(). ARENA_UNAVAILABLE is fatal; the other results are
- * recoverable. The reason is what
- * requireMeshResult reports for the base solid and meshOpFailure for an op
- * applyOp rejected mid-chain. Fraction operators and relax clamp finite arguments
- * into their domains and report the adjustment through getLastAdjusted().
- * An engine invariant trap is not recoverable: the
- * module is built with exceptions disabled, so it aborts and reaches the catches
- * as a WebAssembly.RuntimeError over a torn-down module, which onTrap turns
- * fatal. What is left for the catches is Embind marshalling errors.
+ * reason in getLastResult(); ARENA_UNAVAILABLE is fatal, the rest recoverable.
+ * An engine invariant trap reaches the catches as a WebAssembly.RuntimeError
+ * over a torn-down module, which onTrap turns fatal.
  */
 export function buildChainMesh(base, ops, ctx) {
   let mesh;
@@ -162,10 +149,8 @@ export function buildChainMesh(base, ops, ctx) {
   } catch (e) {
     console.error('WASM Op Error:', e);
     if (ctx.onTrap(e)) return null;
-    // Read before the flush below overwrites the recorded reason. A throw that
-    // is not a bridge rejection leaves the last result OK and keeps its own
-    // message. A half-applied solid is not drawn; `mesh` is the last valid op
-    // result, since the failing op threw before the swap.
+    // Read before the flush overwrites the recorded reason. `mesh` is the last
+    // valid op result: the failing op threw before the swap.
     const failure = meshOpFailure(ctx.Mod, `Op "${failing}"`);
     if (mesh) mesh.delete();
     ctx.meshOps.clearToolingMemory();
@@ -208,8 +193,7 @@ export function buildChainMesh(base, ops, ctx) {
   }
   mesh.delete();
   ctx.meshOps.clearToolingMemory();
-  // A rejected readback leaves no geometry to draw; readbackMesh already
-  // reported it, so draw nothing rather than clearing the last good mesh.
+  // readbackMesh already reported a rejected readback.
   if (!meshData) return null;
 
   return { meshData, faceClasses, classifyFailure };

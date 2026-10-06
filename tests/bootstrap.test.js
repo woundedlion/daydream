@@ -21,8 +21,7 @@ function fakeDocument() {
   return {
     doc,
     overlay,
-    // The click handler returns the refresh-then-reload chain, so the caller is
-    // handed it to await rather than dispatching and losing it.
+    // Returns the click handler's refresh-then-reload chain for the caller to await.
     click: (element) => element.listeners.find(({ type }) => type === 'click')?.handler(),
   };
 }
@@ -184,9 +183,6 @@ test('the reload button reports the sweep and cannot be re-fired', async () => {
   const reload = childWithClass(overlay, 'context-lost-reload');
   await click(reload);
 
-  // Every run re-fetches the whole module graph including the WASM binary, so a
-  // second click would start a second sweep over the first with nothing on
-  // screen to say the first was running.
   assert.equal(reload.textContent, 'Reloading…');
   assert.equal(reload.disabled, true);
   assert.equal(refreshes, 1);
@@ -237,8 +233,7 @@ test('the reload sweep runs on the deadline’s abort signal', async () => {
   assert.equal(signal.aborted, false, 'a sweep that finished was never aborted');
 });
 
-// A stalled connection fires no error of its own, so without the deadline the
-// overlay's one control stays relabelled, disabled and inert for good.
+// A stalled connection fires no error of its own.
 test('refreshWithDeadline aborts a stalled sweep and releases the reload', async () => {
   let expire = null;
   let cleared = 0;
@@ -329,20 +324,16 @@ test('refreshModuleCache re-fetches same-origin scripts past the cache', async (
       'http://localhost:8000/effect_sequencing.js',
       'http://localhost:8000/effect_sequencing.js',
       'http://localhost:8000/tools/shared.js?v=2',
-      // '.mjs' does not end in '.js': the workbench compiler and the digest
-      // module it is hash-coupled to load through the same main.js path.
+      // '.mjs' does not end in '.js'.
       'http://localhost:8000/shader/shader_workbench.mjs',
       'http://localhost:8000/shader/sha256.mjs',
-      // Glue and binary are bound by content hash, so a cached binary against
-      // fresh glue is exactly the skew Reload exists to clear. The glue appends
-      // that hash as a query, which the extension test has to look past.
+      // The glue appends the binary's content hash as a query.
       'http://localhost:8000/generated/holosphere_wasm.wasm?v=fd73baf',
     ),
     fetch: (url, options) => { calls.push([url, options]); return Promise.resolve(); },
   });
 
-  // The binary leads: it is the slowest re-fetch and the skew the sweep exists
-  // to clear, and the page loads it last. The rest keep load order.
+  // The binary leads; the rest keep load order.
   assert.deepEqual(calls.map(([url]) => url), [
     'http://localhost:8000/generated/holosphere_wasm.wasm?v=fd73baf',
     'http://localhost:8000/daydream.js',
@@ -354,8 +345,6 @@ test('refreshModuleCache re-fetches same-origin scripts past the cache', async (
   for (const [, options] of calls) assert.deepEqual(options, { cache: 'reload' });
 });
 
-// The whole module graph at once only queues past the browser's per-host
-// connection limit, leaving the binary the sweep exists for behind the queue.
 test('refreshModuleCache bounds how many re-fetches are in flight', async () => {
   const urls = Array.from({ length: 30 }, (_, i) => `http://localhost:8000/m${i}.js`);
   const release = [];
@@ -385,8 +374,7 @@ test('refreshModuleCache bounds how many re-fetches are in flight', async () => 
   assert.ok(peak <= 6, `${peak} re-fetches were in flight at once`);
 });
 
-// A response whose body is never read is aborted when it is collected, so the
-// cache entry the sweep exists to replace survives the reload.
+// An unread response body is aborted on collection and leaves the cache entry stale.
 function fakeBody(chunks, gate = Promise.resolve()) {
   const body = { pending: chunks, drained: false };
   body.response = {
@@ -475,8 +463,7 @@ test('refreshModuleCache re-fetches on the signal and drops the queue on abort',
     },
   });
 
-  // The abort lands before any other lane takes its first url, so the eleven
-  // behind it are dropped rather than each rejecting in turn.
+  // The abort lands before any other lane takes its first url.
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0][1], { cache: 'reload', signal: controller.signal });
 });
@@ -565,9 +552,7 @@ test('bootstrap leaves the fatal banner alone when the overlay renders', async (
   assert.equal(childWithClass(overlay, 'load-error-detail').textContent, 'Error: boom');
 });
 
-// Booting is the entry module's job alone. As an import-time side effect here it
-// would stand up a second simulator — WebGL context, URLSync, engine — for any
-// module that reached bootstrap.js for its overlay, daydream.js included.
+// Booting is the entry module's job alone; bootstrap.js has no import-time boot.
 test('index boots through the entry module and bootstrap.js stays importable', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /<link href="\.\/favicon\.svg" rel="icon"/);

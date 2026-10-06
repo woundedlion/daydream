@@ -18,12 +18,7 @@ import {
 } from '../src/app/app_lifecycle.js';
 import { EngineHost } from '../src/engine/engine_host.js';
 
-// app_lifecycle.js is the composition root's frame, timer, and teardown wiring.
-// The contracts under test are the ones a browser would only reveal as a black
-// sphere, a stuck walk, or a leak: a segmented frame is composited instead of
-// drawn, dispose releases in an order that cannot re-enter the apply path or
-// reach a freed engine, the Test All walk advances its own index, and a throwing
-// frame does not take the render loop down with it.
+// Tests for app_lifecycle.js: the composition root's frame, timer, and teardown wiring.
 
 /**
  * Driver double carrying the two display aliases and the dispose sink.
@@ -89,8 +84,7 @@ test('a single-engine frame renders and republishes the view', () => {
 
   assert.deepEqual(a.calls, ['engine.drawFrame', 'host.refresh']);
   assert.equal(a.driver.pixels, a.view);
-  // The re-point raises the flag; the per-frame upload is the driver's, flagged
-  // there behind the live-view guard rather than raised again here.
+  // The re-point raises the flag once.
   assert.equal(a.driver.dotMesh.instanceColor.version, 1);
 });
 
@@ -174,8 +168,7 @@ function makeTeardown({
 } = {}) {
   const errors = [];
   const log = [];
-  // Records a step, or throws in its place when the case asked that collaborator
-  // to fail.
+  // Records a step, or throws when the case asked that collaborator to fail.
   const note = (entry) => {
     if (failing.has(entry) || (entry.startsWith('segments.dispose ') && failing.has('segments.dispose')))
       throw new Error(`${entry} failed`);
@@ -191,12 +184,10 @@ function makeTeardown({
     ['unhandledrejection', onUnhandledRejection],
     ['click', onNoticeDismiss, noticeTarget],
   ];
-  // Registered as the app registers them; dispose's removal loop is only
-  // observable against listeners that are actually on the target.
+  // Registered as the app registers them.
   for (const [type, handler, target = pageTarget] of listeners) {
     target.addEventListener(type, handler);
   }
-  // The real host, so the teardown's release order is the one its dispose() runs.
   const host = new EngineHost();
   host.adapter = { drawFrame() {} };
   host.engine = engine
@@ -475,8 +466,7 @@ test('a load that beats the deadline resolves and cancels the timer', async () =
 });
 
 test('a timer handle that carries unref is unref-ed', async () => {
-  // The fake above answers with a number, as a browser does; Node answers with a
-  // Timeout object, and an armed deadline holding one keeps the process alive.
+  // Node answers with a Timeout object, which keeps the process alive while armed.
   const handle = { unrefs: 0, unref() { this.unrefs += 1; } };
   const cleared = [];
   const timers = {
@@ -530,8 +520,7 @@ test('the deadline preserves the cold-load window', () => {
     'a slow-but-working first fetch of the multi-megabyte binary must not trip it');
 });
 
-// The render loop guard: Three.js re-arms the frame request only after the
-// callback returns, so a throw that escapes it freezes the page for good.
+// The render loop guard: a throw escaping the frame callback stops Three.js re-arming it.
 
 /**
  * Guard under test over a frame body the test drives, plus the sinks it writes to.
@@ -758,8 +747,7 @@ test('a canvas hotkey reaches the simulation', () => {
 test('a hotkey typed mid-text-edit never reaches the simulation', () => {
   const h = makeKeydownHandler();
 
-  // The window listener sees the event after it bubbles, still carrying the
-  // field as its target — the case a listener bound to the canvas cannot show.
+  // The window listener sees the event after it bubbles, still targeting the field.
   h.handler({ key: ' ', target: h.textField });
   h.handler({ key: ' ', target: h.note });
 
@@ -805,9 +793,8 @@ test('chain chip selection and roaming do not drive global playback', () => {
   }
 });
 
-// The Test All ticker walks the resolution's effect list on a timer. Its index
-// is its own: a rejected switch reverts the effect, so an index re-derived from
-// the live one would retry the rejected slot forever.
+// The Test All ticker walks the resolution's effect list on a timer with its own
+// index: a rejected switch reverts the effect.
 
 /**
  * Build the ticker over a fake interval timer and a recording effect switch.

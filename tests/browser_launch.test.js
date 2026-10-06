@@ -1,9 +1,6 @@
 //
-// scripts/browser.mjs picks the browser the seven headless-Chrome probes drive.
-// Nothing is ever downloaded, so a machine or a runner image with no Chrome must
-// fail loudly: a resolver that quietly answered nothing would let
-// scripts/browser-smoke.mjs and the six page probes report a green run over
-// zero pages and zero gestures.
+// Tests for scripts/browser.mjs, which picks the browser the headless-Chrome
+// probes drive and fails loudly when none is installed.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -21,9 +18,7 @@ test('a declared CHROME_PATH that does not exist is a refusal, not a fallback', 
     'falling back would drive a browser the caller did not ask for');
 });
 
-// Driven over a candidate list of their own, so a runner that happens to carry
-// Chrome covers the refusal this module exists for and one that does not still
-// covers the first-match walk.
+// Driven over their own candidate lists, independent of the machine's Chrome.
 test('with no CHROME_PATH and no candidate installed, nothing is answered', () => {
   assert.throws(
     () => resolveBrowser({}, ['/no/such/chrome', '/no/such/edge']),
@@ -88,8 +83,6 @@ test('font fallback failures are expected but other request failures are not', (
   ]);
 });
 
-// The console predicate is what turns a swallowed page exception into a probe
-// failure, so it is driven alongside the other three listeners.
 test('console errors, uncaught exceptions and error responses are problems', () => {
   const listeners = new Map();
   const tab = { on: (name, handler) => listeners.set(name, handler) };

@@ -1,10 +1,7 @@
 //
-// src/workbench/shader/chain_apply.js applies a compiled chain document to the chain engine
-// in one fixed order: setShaderChain, then the preset values by parameter id
-// (enum8s as the engine value the post-APPLIED definitions resolve), then the
-// GUI resync and repaint. The engine double is tests/helpers/fake_engine.js's
-// FakeChainEngine, which rebuilds definitions from the pinned catalog and
-// bumps the param generation on every APPLIED exactly as the module does.
+// Tests for src/workbench/shader/chain_apply.js, which applies a compiled chain
+// document to the chain engine: setShaderChain, then the preset values by
+// parameter id, then the GUI resync and repaint.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 

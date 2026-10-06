@@ -121,8 +121,7 @@ test('the strip lays the chain out as editable carrier bands with sockets betwee
 
   const all = chips(h);
   assert.equal(all.length, 6);
-  // A strip of groups, not a listbox of options: an option's children are
-  // presentational, so every inline stage control would go unexposed.
+  // Groups, not listbox options: an option's children are presentational.
   for (const chip of all) {
     assert.equal(chip.getAttribute('role'), 'group');
     assert.equal(chip.getAttribute('aria-selected'), null);
@@ -456,8 +455,6 @@ test('a palette carries its listbox selection on the focused option', async () =
     'the selection follows the arrow-key focus');
 });
 
-// A palette left open over a chain the strip has since rebuilt commits against
-// stale indices, so every way out of it has to close it.
 test('an open palette is dismissed by an outside press and by losing focus', async () => {
   const h = await makeStrip();
   chipByLabel(h, 'project').dispatch('keydown', { key: 'Delete' });
@@ -718,8 +715,6 @@ test('bypass toggles the program shape without touching the document', async () 
   assert.equal(chipByLabel(h, 'lens').classList.contains('chain-chip--bypassed'), false);
 });
 
-// Only the interpreter is handed a program shape, so a bypass on the compiled
-// side of the parity A/B would commit store state the render ignores.
 test('a bypass unavailable to the render is disabled, with the reason in text', async () => {
   let compiledSide = false;
   const h = await makeStrip({ bypassAvailable: () => !compiledSide });
@@ -774,8 +769,6 @@ test('the strip roves between chips and exposes their controls to Tab', async ()
   assert.equal(h.applied.at(-1).includes('lens'), true);
 });
 
-// A press that travels off a chip is a real-layout gesture, and no chip binds
-// a pointer listener to observe it: scripts/workbench-probe.mjs owns it.
 test('a chip selects by click', async () => {
   const h = await makeStrip();
   assert.equal(h.store.selectedLabel(), null);

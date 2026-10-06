@@ -5,12 +5,8 @@
 
 /**
  * Op dispatch plus the pure code-generation, geometry, and op-chain sequencing
- * helpers of the solids tool page (tools/solids.html), unit-testable without a
- * DOM or WASM runtime. The C++ source strings are pasted verbatim into the
- * engine (SolidBuilder recipes, FLASHMEM functions), so their output formatting
- * must stay byte-for-byte stable. computeInternalAngle uses plain {x, y, z}
- * vector math (a THREE.Vector3 satisfies that shape) to avoid a three.js
- * dependency; the chain validator takes the WASM module factory by injection.
+ * helpers of the solids tool page. The C++ source strings are pasted verbatim
+ * into the engine, so their output formatting must stay byte-for-byte stable.
  */
 
 import {
@@ -39,8 +35,7 @@ import { engineHalted } from '../../shared/engine_halt.js';
  */
 
 /**
- * A live WASM MeshOps mesh wrapper. Its op methods are bound by the module, so
- * the surface is reached by name rather than declared here.
+ * A live WASM MeshOps mesh wrapper.
  * @typedef {Object<string, any>} MeshWrapper
  */
 
@@ -77,26 +72,17 @@ import { engineHalted } from '../../shared/engine_halt.js';
 
 /**
  * Mirror of procedural_solids.h `inline constexpr float D2R = PI_F / 180.0f`
- * with PI_F = float(PI). The preview and the emitted C++ both convert a hankin
- * angle through it, so the preview must round the product to float32 the way
- * the engine's float multiply does — at 54 and 73 degrees a double PI/180
- * lands one ulp away.
+ * with PI_F = float(PI). Round products through it to float32: at 54 and 73
+ * degrees a double PI/180 lands one ulp away.
  */
 export const D2R_F32 = Math.fround(Math.fround(Math.PI) / 180);
 
 /**
  * Per-op parameter table for the Conway/SolidBuilder operators, shared by the
- * live preview (applyOp) and the C++ generator (generateFuncAndRecipe) so the
- * two cannot drift. Each params entry names a parameter both paths consume, in
- * call-argument order, and carries the tool's slider default and range;
- * solid_codegen.test.js pins both paths against these key sequences. The op set
- * must match what the WASM MeshOps class binds, and every range must stay inside
- * the engine's domain for that operator — the bridge clamps an out-of-domain
- * argument and renders from the clamped value, so the preview would hide a bound
- * the generated C++ carries into an always-on engine assert. The clamp itself is
- * reported by MeshOps.getLastAdjusted(), which the chain validator reads, so
- * these ranges are the first gate rather than the only one.
- * engine_contract_wasm.test.js pins both.
+ * live preview (applyOp) and the C++ generator (generateFuncAndRecipe). Each
+ * params entry is in call-argument order and carries the slider default and
+ * range. The op set must match what the WASM MeshOps class binds, and every
+ * range must stay inside the engine's domain for that operator.
  * @type {Object<string, {params: Object<string, OpParamDef>}>}
  */
 export const OP_DEFS = {
@@ -119,13 +105,10 @@ export const OP_DEFS = {
 /**
  * Which authored ops the engine's morph path can build on screen, mirrored from
  * Solids::is_morphable_step (core/mesh/recipe.h) and the sweep clamps it reads
- * (core/mesh/conway_graph.h); the engine-source parity test in
- * wasm_provenance.test.js pins the truncate and chamfer bounds. An empty
- * object is an op that always sweeps,
- * `null` an op the morph path never sweeps, and a parameter entry the band the leg
- * covers, with any excluded topology transitions. The composite ops (bevel, gyro, meta, needle, zip) are absent because
- * they lower to primitives before the check, and over the ranges this tool
- * offers every primitive they lower to sweeps.
+ * (core/mesh/conway_graph.h). An empty object is an op that always sweeps,
+ * `null` an op that never sweeps, and a parameter entry the band the leg
+ * covers, with any excluded topology transitions. Composite ops are absent:
+ * they lower to primitives before the check.
  * @type {Object<string, ?Object<string, {min: number, max: number, excluded?: number[]}>>}
  */
 export const MORPH_SWEEP = {
@@ -141,10 +124,8 @@ export const MORPH_SWEEP = {
 };
 
 /**
- * Why the engine's morph path would decline a chain step. A declined step drops
- * the whole entry to IslamicStars' whole-generate fallback, so the shape appears
- * finished instead of being built op by op — a property of the authored chain
- * that no engine-domain check reports.
+ * Why the engine's morph path would decline a chain step, which makes the entry
+ * generate whole instead of op by op.
  * @param {ChainOp} o - The op as the chain holds it.
  * @returns {?string} A sentence naming the reason, or null when the step sweeps.
  */
@@ -175,16 +156,12 @@ export function unsweepableReason(o) {
 export const KNOWN_OPS = new Set(Object.keys(OP_DEFS));
 
 /**
- * Longest step table a Recipe can describe: its count field is a uint8_t, so a
- * 256-step table would emit a count of 0. The tool's add-op path stops a chain
- * here and savedChainShapeError refuses one past it.
+ * Longest step table a Recipe can describe: its count field is a uint8_t.
  */
 export const MAX_RECIPE_STEPS = 255;
 
 /**
- * Ops that read a params object, derived from the shared op table. The
- * string|object op contract permits a bare string, but for these that leaves
- * o.params undefined, so both applyOp and generateFuncAndRecipe reject it.
+ * Ops that read a params object; a bare-string op among these is rejected.
  */
 export const PARAMETERIZED_OPS = new Set(
   Object.keys(OP_DEFS).filter(op => Object.keys(OP_DEFS[op].params).length > 0));
@@ -246,20 +223,10 @@ export function savedSolidExportError(base, ops) {
  * @param {*} base - The persisted seed-solid name.
  * @param {*} ops - The persisted op chain.
  * @returns {?string} A message naming the first defect, or null when the pair is restorable.
- * @details The chain validator resolves `{ok: true}` when its sacrificial module cannot
- * spawn, so a restore path cannot lean on it to reject a hand-edited or
- * stale-format localStorage entry. An op name off the table leaves OP_DEFS[op]
- * undefined and the op-row builder throws reading its params; a declared param
- * that is missing, non-numeric, or outside its current range reaches the WASM
- * bridge as invalid state; and a value off the param's step grid — which no
- * control can produce — splits the generated funcName from the recipe it names,
- * since the name suffix rounds where the emitted call does not. A chain past
- * MAX_RECIPE_STEPS, which no control can build, would replay every op on the
- * main thread before the export refused it. All are caught here, before any
- * state is mutated.
- * The tool's live chain holds {op,
- * params} objects, so a bare-string op — which applyOp accepts — is not a
- * restorable entry.
+ * @details Refuses unknown ops, missing, non-numeric, out-of-range or off-grid
+ * params, chains past MAX_RECIPE_STEPS, and bare-string ops. An off-grid value
+ * would split the generated funcName from its recipe: the name suffix rounds
+ * where the emitted call does not.
  */
 export function savedChainShapeError(base, ops) {
   if (typeof base !== 'string' || !base) return 'it names no base solid';
@@ -317,7 +284,6 @@ export function queueSavedSolidRestore(item, queue) {
 /**
  * simple_registry's entry order, mirrored from solids.h. Recipe::seed is an
  * index into that array, so a seed's position here is its SEED_* value.
- * engine_contract_wasm.test.js pins the order against the engine's registry.
  */
 export const SIMPLE_SEEDS = [
   // Platonic
@@ -331,9 +297,7 @@ export const SIMPLE_SEEDS = [
 ];
 
 /**
- * The seeds solids.h already declares a `SEED_*` constant for. The rest of
- * SIMPLE_SEEDS have none, so a generated Recipe naming one has to carry the
- * constant's definition alongside it.
+ * The seeds solids.h declares a `SEED_*` constant for.
  */
 export const DEFINED_SEED_CONSTANTS = new Set([
   'octahedron', 'dodecahedron', 'icosahedron', 'truncatedOctahedron',
@@ -342,18 +306,13 @@ export const DEFINED_SEED_CONSTANTS = new Set([
 ]);
 
 /**
- * The Platonic seeds, the leading run of simple_registry (solids.h pins the
- * count with PLATONIC_COUNT). engine_contract_wasm.test.js pins this list
- * against the registry.
+ * The Platonic seeds, the leading run of simple_registry.
  */
 export const PLATONIC_SOLIDS = SIMPLE_SEEDS.slice(0, 5);
 
 /**
- * The Catalan seeds, mirrored from `namespace Catalan` in procedural_solids.h. That
- * namespace sees Archimedean/Platonic via using-directives but is NOT itself
- * visible from them, so a generated registry entry on a Catalan base must
- * qualify with `Catalan::`; `Archimedean::<catalan base>` would not compile.
- * engine_contract_wasm.test.js pins both lists against the registry.
+ * The Catalan seeds, mirrored from `namespace Catalan` in procedural_solids.h.
+ * A generated registry entry on a Catalan base must qualify with `Catalan::`.
  */
 export const CATALAN_BASES = new Set([
   'triakisTetrahedron', 'rhombicDodecahedron', 'triakisOctahedron',
@@ -370,13 +329,9 @@ export const CATALAN_BASES = new Set([
  * @param {ChainOp} o - The op to apply, as a bare op name or an {op, params} object.
  * @returns {MeshWrapper} The new mesh wrapper.
  * @throws {Error} When the op name is not a known operator, when the module binds no method for it, or when the op soft-rejects.
- * @details Single source of truth for op dispatch: the live-preview module and
- * the sacrificial validator module must run byte-identical chains or validation
- * proves the wrong thing. The bridge answers a soft reject — an out-of-bounds
- * result or a non-finite argument — with null rather than a mesh,
- * which throws before the caller swaps its live wrapper. The KNOWN_OPS gate runs
- * first: the wrapper also binds lifetime methods (delete, clone), so an op name
- * off the table would otherwise reach one of them.
+ * @details A soft reject (null from the bridge) throws before the caller swaps
+ * its live wrapper. The KNOWN_OPS gate keeps op names off the wrapper's
+ * lifetime methods (delete, clone).
  */
 export function applyOp(mesh, o) {
   const opName = typeof o === 'string' ? o : o.op;
@@ -414,7 +369,6 @@ function dispatchOp(mesh, o, opName) {
 
 /**
  * The set of MeshOpResult keys the WASM bridge binds.
- * @details engine_contract_wasm.test.js pins this list against the module enum.
  */
 export const MESH_OP_RESULT_NAMES = [
   'OK',
@@ -446,8 +400,7 @@ const MESH_FAILURE_REMEDY = {
  * @param {WasmModule} Mod - The WASM module instance that produced the null.
  * @param {string} what - What the caller was building, used in the message.
  * @returns {{reason: string, message: string, flush: boolean, fatal: boolean}} The MeshOpResult key, a message to show, whether clearToolingMemory() is the remedy that reason calls for, and whether arena-backed mesh operations are unavailable for the instance's lifetime.
- * @details Embind enum values are singletons, so the recorded result is matched
- * by identity against Module.MeshOpResult, never by truthiness. A module that
+ * @details Embind enum values are singletons matched by identity. A module that
  * binds neither the enum nor getLastResult reports reason 'UNKNOWN'.
  */
 export function meshOpFailure(Mod, what) {
@@ -461,7 +414,6 @@ export function meshOpFailure(Mod, what) {
     reason,
     message: `${what} failed: ${MESH_FAILURE_REMEDY[reason] ?? 'the engine rejected it'}`,
     flush: reason === 'ARENA_EXHAUSTED',
-    // Arena-backed mesh operations remain unavailable for this instance.
     fatal: reason === 'ARENA_UNAVAILABLE',
   };
 }
@@ -477,13 +429,8 @@ export function meshOpFailure(Mod, what) {
  * @param {(message: string) => void} ctx.onError - Surfaces the failure message to the user.
  * @param {(message: string) => void} [ctx.onFatal] - Stands the tool down for a failure nothing can recover from.
  * @returns {MeshWrapper?} The result, or null when it was a failure.
- * @details MeshOps answers a recoverable failure with null and records the
- * reason (getLastResult); an unchecked null becomes a TypeError several calls
- * later. Only ARENA_EXHAUSTED is cleared by flushing the tooling arenas, so the
- * flush is applied by reason rather than on every failure. ARENA_UNAVAILABLE is
- * not recoverable — later arena-backed operations fail the same way — so it stands
- * the tool down the way an engine halt does rather than reporting on a line the
- * next recompute overwrites.
+ * @details Flushes the tooling arenas only for ARENA_EXHAUSTED. ARENA_UNAVAILABLE
+ * is unrecoverable and goes to onFatal.
  */
 export function requireMeshResult(result, what, { Mod, meshOps, onError, onFatal }) {
   if (result) return result;
@@ -495,9 +442,7 @@ export function requireMeshResult(result, what, { Mod, meshOps, onError, onFatal
 }
 
 // Op params become C++ literals, so reject anything that would emit NaN/Inf or a
-// malformed token. requireFinite covers fractional params; requireCount also
-// enforces a positive integer (e.g. a relax iteration count — the engine's
-// apply_step refuses a bake-less RELAX below one iteration).
+// malformed token.
 /**
  * @param {string} opName - The op the param belongs to.
  * @param {string} param - The param's name.
@@ -524,8 +469,7 @@ function requireCount(opName, param, val) {
   }
 }
 
-// Generated functions are pasted into `namespace IslamicStarPatterns`, which
-// carries no using-directive, so the seed call must name its own namespace.
+// The seed call must name its namespace: IslamicStarPatterns has no using-directive.
 /**
  * @param {string} where - Caller name used in the error message.
  * @param {string} ns - The namespace to check.
@@ -556,14 +500,9 @@ export function formatSolidName(name) {
 }
 
 /**
- * Builds a stable, unambiguous suffix for a fractional op parameter (0..1+).
- * Quantizes to hundredths and pads to two digits so 0.05 -> "05" and 0.5 -> "50"
- * stay distinct and self-describing in generated funcNames.
- *
- * Names are unique per on-grid chain.
- *
- * A negative value is rejected: its `-` prefix would taint the funcName into an
- * invalid C++ identifier.
+ * Builds a stable, unambiguous suffix for a fractional op parameter (0..1+),
+ * quantized to hundredths and padded to two digits (0.05 -> "05", 0.5 -> "50").
+ * A negative value is rejected: its `-` would make an invalid C++ identifier.
  * @param {number} val - The fractional parameter value (typically 0..1+).
  * @returns {string} A two-or-more digit percent suffix.
  */
@@ -576,16 +515,9 @@ export function pctSuffix(val) {
 
 /**
  * Derives the C++ funcName and SolidBuilder recipe expression for a solid spec.
- * The funcName is the base plus one suffix per op (encoding parameters where two
- * solids could otherwise collide); the recipe is the chained
- * SolidBuilder(...).build() call, which is solids.h's own chaining form.
- *
- * Naming picks one of the several suffix dialects solids.h carries: hundredths
- * plus the short `_hk` for hankin (`_bevel20` for 0.2, `_hk58`). The tenths
- * (`_bevel2` for the same 0.2), thousandths (`_truncate033`), `d`-suffixed
- * (`_truncate50d`) and spelled-out (`_hankin62`) names also there are not
- * generated, so a generated name need not match a hand-written one for the
- * same chain.
+ * The funcName is the base plus one suffix per op, in hundredths plus `_hk` for
+ * hankin (`_bevel20`, `_hk58`); the recipe is the chained
+ * SolidBuilder(...).build() call.
  * @param {SolidSpec} item - The solid spec; its op chain must be non-empty.
  * @param {string} [baseNamespace] - Namespace qualifying the seed call (e.g. "Archimedean"). Omit only when the caller wants the funcName alone; a recipe pasted into the engine must carry it.
  * @returns {{funcName: string, recipe: string}} The generated C++ function name and SolidBuilder recipe expression.
@@ -640,8 +572,6 @@ export function generateFuncAndRecipe(item, baseNamespace = '') {
       chain += `.hankin(${formatFloat(params.angle)} * D2R)`;
       nameParts.push(`_hk${Math.round(params.angle)}`);
     } else if (opName === 'snub') {
-      // The twist suffix keeps two snubs that share a `t` but differ in twist
-      // from colliding on one funcName.
       requireFinite(opName, 't', params.t);
       requireFinite(opName, 'twist', params.twist);
       chain += `.snub(${formatFloat(params.t)}, ${formatFloat(params.twist)})`;
@@ -655,15 +585,13 @@ export function generateFuncAndRecipe(item, baseNamespace = '') {
       chain += `.bevel(${formatFloat(params.t)})`;
       nameParts.push(`_bevel${pctSuffix(params.t)}`);
     } else {
-      // Parameterless ops: dual, kis, ambo, gyro, meta, needle, zip.
+      // Parameterless ops.
       chain += `.${opName}()`;
       nameParts.push(`_${opName}`);
     }
 
-    // Runs after the per-op emit so the finiteness, count and negative-suffix
-    // checks each still name their own defect. A value the sliders cannot reach
-    // — a stale or hand-edited store — would otherwise be pasted straight past
-    // the engine's always-on operator asserts.
+    // After the per-op emit, so the finiteness, count and negative-suffix
+    // checks name their own defect.
     const banded = outOfRangeParam(opName, params);
     if (banded) {
       throw new Error(`generateFuncAndRecipe: ${opName} param "${banded.key}" must be `
@@ -700,11 +628,11 @@ function doxygenCpp(tags) {
 }
 
 /**
- * The function's signature, wrapped the way clang-format wraps the ones
- * already in procedural_solids.h: both parameters on the declarator's line
- * where they fit, else the second aligned under the first; each shape tried
- * first with the return type leading the line and then with it on its own,
- * and last both parameters indented one level below a bare declarator.
+ * The function's signature, wrapped as clang-format does: both parameters on
+ * the declarator's line where they fit, else the second aligned under the
+ * first; each shape tried first with the return type leading the line and then
+ * with it on its own, and last both parameters indented one level below a bare
+ * declarator.
  * @param {string} funcName - The generated function's name.
  * @returns {string} The signature through its opening brace.
  */
@@ -729,9 +657,8 @@ function signatureCpp(funcName) {
 const CHAIN_CALL = /\.(?=[A-Za-z_]\w*\()/;
 
 /**
- * The return statement, wrapped the way clang-format wraps the recipes already
- * in procedural_solids.h: one line where it fits, else one builder call per
- * line at the continuation indent.
+ * The return statement, wrapped as clang-format does: one line where it fits,
+ * else one builder call per line at the continuation indent.
  * @param {string} recipe - The SolidBuilder call chain.
  * @returns {string} The statement, ending in ';'.
  */
@@ -770,11 +697,9 @@ function returnRecipeCpp(recipe) {
 }
 
 /**
- * Emits the full FLASHMEM C++ function for a solid, led by a doxygen block in
- * the form of the Platonic generators' in procedural_solids.h, whose briefs
- * record the solid's vertex/face/index counts. Output is pasted verbatim into
- * the engine and must clear its clang-format gate, so the exact text and
- * wrapping are byte-for-byte significant.
+ * Emits the full FLASHMEM C++ function for a solid, led by a doxygen block whose
+ * brief records the solid's vertex/face/index counts. Output is pasted verbatim
+ * into the engine and must clear its clang-format gate.
  * @param {SolidSpec} item - The solid spec (see generateFuncAndRecipe), optionally with vCount, fCount, and iCount counts.
  * @param {string} baseNamespace - Namespace qualifying the seed call (e.g. "Archimedean"); required, since the emitted function is pasted where the seed is not visible unqualified.
  * @returns {string} The complete C++ function source including its doc comment.
@@ -796,12 +721,6 @@ export function generateRecipeCpp(item, baseNamespace) {
 /**
  * Snaps a computed value onto an op parameter's step grid and clamps it into
  * range, so it is exactly representable by the control that edits it.
- *
- * A parameter is single-valued only if every view of it agrees: an unsnapped
- * value leaves the range input on the nearest step, the number box on its own
- * rounding, and the generated funcName suffix on a third. Snapping at the source
- * — where a value is derived rather than typed — keeps all of them equal.
- *
  * @param {number} value - The unsnapped value.
  * @param {{min: number, max: number, step: number}} def - The parameter's OP_DEFS range.
  * @returns {number} The nearest step from `min`, clamped to [min, max].
@@ -851,11 +770,8 @@ export function computeInternalAngle(mesh) {
  * @param {?SolidMesh} mesh - The mesh the op would run on, or null.
  * @returns {Object<string, number>} The OP_DEFS defaults, except hankin's
  *   angle, which follows the half-internal angle of `mesh`.
- * @details The half-internal angle is snapped to the control's whole-degree
- * step so the slider, the number box, the _hk suffix and the emitted recipe
- * all carry one value. computeInternalAngle returns 0 for a null or
- * load-failed mesh, which keeps the OP_DEFS default rather than seeding a
- * degenerate 0deg angle.
+ * @details The derived angle is snapped to the control's step; a 0 angle (null
+ * or degenerate mesh) keeps the OP_DEFS default.
  */
 export function seedOpParams(opName, mesh) {
   /** @type {Object<string, number>} */
@@ -933,19 +849,14 @@ export function isConvexFace(vertices, face) {
 
 /**
  * Fan-triangulates one polygon face, calling emit() once per triangle with its
- * three corners in the face's winding order.
- *
- * A convex face fans from its first corner (face.length - 2 triangles); anything
- * else fans from the centroid (face.length triangles), because a corner fan
- * spills outside a non-convex star face.
+ * three corners in the face's winding order. A convex face fans from its first
+ * corner; anything else fans from the centroid.
  *
  * @param {Array<{x:number, y:number, z:number}>} vertices - Mesh vertices.
  * @param {Array<number>} face - Ordered vertex indices for one face.
  * @param {(a: {x:number, y:number, z:number}, b: {x:number, y:number, z:number}, c: {x:number, y:number, z:number}) => void} emit - Receives each triangle; the centroid corner is a plain {x, y, z}.
  * @param {boolean} [forceCentroid=false] - Always take the centroid fan, even on a convex face.
- * @details forceCentroid exists for the geodesic tessellation, which needs one
- * fan triangle per face edge so shared edges subdivide identically from both
- * sides. The centroid scales by the reciprocal count, matching
+ * @details The centroid scales by the reciprocal count, matching
  * THREE.Vector3.divideScalar().
  */
 export function fanTriangulateFace(vertices, face, emit, forceCentroid = false) {
@@ -977,8 +888,6 @@ export function fanTriangulateFace(vertices, face, emit, forceCentroid = false) 
  * @param {Array<Array<number>>} faces - Ordered vertex indices per face.
  * @param {number} vertexCount - Vertex count of the mesh, used as the key radix.
  * @returns {Array<[number, number]>} One [lo, hi] pair per undirected edge, in first-seen order.
- * @details Keys are numeric (lo * vertexCount + hi) rather than `${a}_${b}`
- * template strings, so no per-half-edge string is allocated.
  */
 export function uniqueEdges(faces, vertexCount) {
   const seen = new Set();
@@ -1004,10 +913,7 @@ export function uniqueEdges(faces, vertexCount) {
  * @param {number} maxArc - Largest edge arc in radians over all fan triangles.
  * @param {number} triCount - Total fan triangles the mesh would emit unsubdivided.
  * @returns {number} Segments per triangle side, uniform across the whole mesh.
- * @details The level must be UNIFORM across the mesh: any shared edge — polygon
- * boundaries and internal fan diagonals alike — is then split into identical
- * points from both sides, so the tessellation is watertight. A per-triangle
- * level cracks along every count mismatch.
+ * @details The level must be uniform across the mesh or shared edges crack.
  */
 export function geodesicSegments(maxArc, triCount) {
   const nArc = Math.ceil(maxArc / (Math.PI / 60));
@@ -1024,9 +930,8 @@ export function geodesicSegments(maxArc, triCount) {
  * @param {number} wb - Weight on b.
  * @param {number} wc - Weight on c.
  * @returns {[number, number, number]} The normalized point's coordinates.
- * @details Scales by the reciprocal length, matching THREE.Vector3.normalize()
- * (divideScalar -> multiplyScalar(1/s)), so the tessellation is bit-identical to
- * the same grid built out of Vector3s. A zero-length mix keeps its coordinates.
+ * @details Scales by the reciprocal length, bit-matching THREE.Vector3.normalize().
+ * A zero-length mix keeps its coordinates.
  */
 function normalizedBarycentric(a, b, c, wa, wb, wc) {
   let x = a.x * wa;
@@ -1043,14 +948,12 @@ function normalizedBarycentric(a, b, c, wa, wb, wc) {
 }
 
 /**
- * Tessellates one fan triangle into n² spherical sub-triangles: the triangle is
- * split on a barycentric grid of n segments per side and every grid point is
- * projected onto the unit sphere, so the rendered surface curves instead of
- * showing flat plateaus with ridges along the (curved) edge overlay.
+ * Tessellates one fan triangle into n² spherical sub-triangles on a barycentric
+ * grid of n segments per side, each grid point projected onto the unit sphere.
  *
  * Grid point P(gi, gj) = normalize(a·(1 − (gi+gj)/n) + b·(gi/n) + c·(gj/n)), rows
- * shrinking toward the b corner (gi + gj <= n). Pick n with geodesicSegments():
- * it must be uniform across the mesh or shared edges crack.
+ * shrinking toward the b corner (gi + gj <= n). n must be uniform across the
+ * mesh or shared edges crack.
  *
  * @param {{x:number, y:number, z:number}} a - Fan apex (typically the face centroid).
  * @param {{x:number, y:number, z:number}} b - Second corner.
@@ -1094,8 +997,8 @@ export function geodesicTriangleVertices(a, b, c, n) {
  * @param {number} pointerY - Pointer y in the list's own coordinate space (client y minus the list's top, plus its scrollTop).
  * @param {Array<{offsetTop: number, offsetHeight: number}>} items - The list's item elements, in document order.
  * @returns {number} The slot index.
- * @details Reads the STATIC layout (offsetTop/offsetHeight), so the drag
- * preview's translateY transforms do not feed back into the target it computes.
+ * @details Reads the static layout (offsetTop/offsetHeight), which ignores the
+ * drag preview's translateY transforms.
  */
 export function dropSlotIndex(pointerY, items) {
   for (let i = 0; i < items.length; i++) {
@@ -1146,8 +1049,7 @@ export function movedOps(ops, from, to) {
 
 /**
  * Builds a serializer for validated state mutations: each commit sees the state
- * its predecessors left, so two rapid clicks can't validate against the same
- * snapshot and then both land.
+ * its predecessors left.
  * @param {(reason: any) => void} [onError] - Handler for a rejected commit; defaults to console.error.
  * @returns {(commit: () => any) => Promise<void>} Enqueues a commit and resolves once it (or its error handler) has run.
  */
@@ -1160,26 +1062,20 @@ export function createCommitQueue(onError = console.error) {
 }
 
 /**
- * Builds the sacrificial-module chain validator.
- *
- * The bridge refuses foreseeable capacity and argument failures. An engine
- * invariant trap permanently halts the module it ran on, so candidate chains
- * run on a sacrificial instance before reaching the live module. A trap kills
- * only the validator, which is respawned, and the mutation is rejected. The
- * engine stays the authority on its own invariants.
+ * Builds the sacrificial-module chain validator. An engine invariant trap
+ * permanently halts the module it ran on, so candidate chains run on a
+ * sacrificial instance, respawned after a trap, before reaching the live module.
  * @param {() => Promise<WasmModule>} createModule - Spawns a fresh WASM module instance.
  * @returns {ChainValidator} The validator handle.
  */
 export function createChainValidator(createModule) {
   /** @type {?Promise<WasmModule>} */
   let modulePromise = null;
-  // The instance behind modulePromise, so a task that never got the module
-  // handed to it can still read the halt flag off it.
+  // The instance behind modulePromise, for reading the halt flag.
   /** @type {?WasmModule} */
   let moduleInstance = null;
-  // Serializes all validator use: tasks hold the single instance (and sometimes
-  // a live mesh wrapper) across awaits, and an interleaved clearToolingMemory
-  // from another task would invalidate that wrapper.
+  // Serializes validator use: tasks hold live mesh wrappers across awaits that
+  // an interleaved clearToolingMemory would invalidate.
   let queue = Promise.resolve();
 
   /**
@@ -1231,14 +1127,9 @@ export function createChainValidator(createModule) {
    * @param {string} base - Registry name of the seed solid.
    * @param {ChainOp[]} ops - The candidate op chain.
    * @returns {Promise<{ok: boolean, message: string}>} Whether the whole chain is safe for the live module, and why it is not when it is not.
-   * @details A missing validator (module failed to spawn) resolves ok: true;
-   * the tool remains usable without validation. The
-   * result is an object, so callers must test `.ok` — an object is truthy, and
-   * a call site left testing the result itself reads every chain as valid.
-   * A chain is also refused when the engine saturated one of its arguments
-   * (getLastAdjusted): the op succeeded, but on a value the tool did not pass,
-   * so the generated C++ would carry the out-of-domain one into a firmware
-   * assert.
+   * @details A missing validator (module failed to spawn) resolves ok: true.
+   * Test `.ok`: the result object is always truthy. A chain is also refused when
+   * the engine saturated one of its arguments (getLastAdjusted).
    */
   function chainIsValid(base, ops) {
     const candidate = structuredClone(ops);
@@ -1249,8 +1140,7 @@ export function createChainValidator(createModule) {
       let mesh = null;
       // What the replay was building, named in whatever failure it hits.
       let what = `Base solid "${base}"`;
-      // Reads the reason the module recorded before any further bridge call can
-      // overwrite it, then frees the mesh and the arenas.
+      // Reads the recorded reason before freeing the mesh and the arenas.
       const rejected = (/** @type {any} */ e = null) => {
         const failure = meshOpFailure(Mod, what);
         // A reason of OK means the bridge recorded no rejection and the throw
@@ -1261,9 +1151,7 @@ export function createChainValidator(createModule) {
         try { if (mesh) mesh.delete(); Ops.clearToolingMemory(); } catch { /* best effort */ }
         return { ok: false, message };
       };
-      // A saturated argument is a success the tool cannot export: the engine
-      // rendered from a value it moved into the operator's domain, not from the
-      // one the chain holds. Frees the mesh and the arenas like a rejection.
+      // A saturated argument: the engine drew a clamped value, not the chain's.
       const saturated = () => {
         try { if (mesh) mesh.delete(); Ops.clearToolingMemory(); } catch { /* best effort */ }
         return {
@@ -1273,8 +1161,6 @@ export function createChainValidator(createModule) {
         };
       };
       try {
-        // A null from any bridge call is a recoverable reject (getLastResult
-        // names it), so the chain is not safe for the live module either.
         mesh = Ops.fromSolidName(base);
         if (!mesh) return rejected();
         for (const o of candidate) {
@@ -1297,8 +1183,7 @@ export function createChainValidator(createModule) {
       } catch (e) {
         const halted = engineHalted(e, Mod);
         noteDeath(e);
-        // A trap tears the instance down: it records no reason and cannot be
-        // called again, so neither the reason nor the cleanup is attempted.
+        // A halted instance records no reason and cannot be called again.
         if (halted) {
           return { ok: false, message: `${what} exceeded an engine mesh limit` };
         }
@@ -1310,10 +1195,8 @@ export function createChainValidator(createModule) {
   return { acquire, noteDeath, withValidator, chainIsValid };
 }
 
-// truncate short-circuits to ambo at exactly t == 0.5 (core/mesh/conway.h), and
-// bevel forwards its own t to that truncate, so for these two the resulting
-// element census turns on the parameter as well as the op name. 0.5 is each
-// one's slider max, so the aliased census is one drag away.
+// truncate short-circuits to ambo at exactly t == 0.5, and bevel forwards its t
+// to that truncate.
 const AMBO_ALIASING_OPS = new Set(['truncate', 'bevel']);
 const AMBO_ALIAS_T = 0.5;
 
@@ -1331,18 +1214,11 @@ export function opTopologyKey(o) {
 
 /**
  * Builds the add-op availability gate: which offered ops would be refused or
- * trap if appended to the current chain.
- *
- * Every candidate is applied (and classified, which committing would do too) on
- * the sacrificial validator, so the answer comes from the engine rather than
- * from a JS mirror of its ceilings. A trap kills only the validator, which is
- * respawned mid-sweep and the chain rebuilt on it.
- *
- * Gating depends only on the mesh's topology, so a pass whose base and chain
- * topology repeat the last complete one is skipped; opTopologyKey names what a
- * chain entry contributes to that.
+ * trap if appended to the current chain. Each candidate is applied and
+ * classified on the sacrificial validator; a pass whose base and chain topology
+ * repeat the last complete one is skipped.
  * @param {ChainValidator} validator - A createChainValidator handle.
- * @param {number} [retries=3] - Incomplete passes tolerated before probing stops. A validator that never spawns would otherwise be retried on every recompute.
+ * @param {number} [retries=3] - Incomplete passes tolerated before probing stops.
  * @returns {{refresh: (base: string, ops: ChainOp[], candidates: string[], mesh?: ?SolidMesh) => Promise<?OpGateVerdict>}} The gate.
  */
 export function createOpGate(validator, retries = 3) {
@@ -1377,8 +1253,7 @@ export function createOpGate(validator, retries = 3) {
        * @param {WasmModule} M - The live validator instance.
        * @returns {MeshWrapper} The chain's mesh.
        * @throws {Error} When the base or an op is rejected. Unless the instance
-       *   halted, the mesh the op was applied to and the arenas are freed first,
-       *   as chainIsValid's rejection path frees them.
+       *   halted, the mesh the op was applied to and the arenas are freed first.
        */
       const build = (M) => {
         let mesh = M.MeshOps.fromSolidName(base);
@@ -1414,8 +1289,7 @@ export function createOpGate(validator, retries = 3) {
        * @param {WasmModule} mod - The live validator instance.
        * @param {{op: string, params: Object<string, number>}} candidate - The op to probe.
        * @returns {string} 'ok', 'bad', 'exhausted' when the tooling arena filled, or 'trapped' when the instance died.
-       * @details The recorded reason is read back before any further bridge
-       * call can overwrite it, so the mesh is freed after the verdict.
+       * @details The mesh is freed after the verdict reads the recorded reason.
        */
       const attempt = (mod, candidate) => {
         let out = null;
@@ -1431,8 +1305,6 @@ export function createOpGate(validator, retries = 3) {
           validator.noteDeath(e);
           if (halted) return 'trapped';
           out?.delete();
-          // applyOp raises a soft reject as a throw; of the reasons behind one,
-          // only a full arena is cleared by flushing it.
           return meshOpFailure(mod, `Op "${candidate.op}"`).flush ? 'exhausted' : 'bad';
         }
       };
@@ -1447,8 +1319,7 @@ export function createOpGate(validator, retries = 3) {
         const candidate = { op, params: seedOpParams(op, seedMesh) };
         let verdict = attempt(Mod, candidate);
         if (verdict === 'exhausted') {
-          // A full arena rejects every later candidate too, so reclaim it and
-          // judge this one on an arena it does not share with its predecessors.
+          // Reclaim the full arena and retry on a fresh one.
           try { mesh.delete(); Mod.MeshOps.clearToolingMemory(); mesh = build(Mod); }
           catch (e) { validator.noteDeath(e); return { bad, complete: false }; }
           verdict = attempt(Mod, candidate);

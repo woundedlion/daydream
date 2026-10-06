@@ -4,13 +4,8 @@
  */
 
 /**
- * DOM construction for one row of the solids tool's op chain
- * (tools/solids.html), unit-testable without a browser.
- *
- * An op's name and parameter values survive a localStorage round-trip, so every
- * row is assembled node-by-node — createElement plus textContent/setAttribute,
- * never innerHTML — and carries no inline event-handler attribute; the callers'
- * handlers are wired with addEventListener here.
+ * DOM construction for one row of the solids tool's op chain. Op names and
+ * values come from localStorage, so rows are built node-by-node, never via innerHTML.
  */
 
 import { unsweepableReason } from './solid_codegen.js';
@@ -74,9 +69,8 @@ function buildButton(doc, className, text, ariaLabel) {
 }
 
 /**
- * Formats a parameter value for its number box, at the precision its step grid
- * can reach: whole for an integer-stepped parameter (whose C++ argument is a
- * count or a whole degree), two decimals otherwise.
+ * Formats a parameter value for its number box: whole for an integer-stepped
+ * parameter, two decimals otherwise.
  * @param {number|string} value - The value to display.
  * @param {{step: number}} [def] - The parameter's OP_DEFS range.
  * @returns {string} The formatted value, or 'NaN' for a non-numeric one.
@@ -121,8 +115,7 @@ function buildParamRow(doc, key, def, value, controlId, opName, index) {
   const number = doc.createElement('input');
   number.type = 'number';
   number.setAttribute('aria-label', `${accessibleName} value`);
-  // At 0.6rem on the row's --slate-800, slate-300/400 are the darkest pair that
-  // keeps the value ahead of its unit and both over the 4.5:1 WCAG AA floor.
+  // slate-300/400 on --slate-800 at 0.6rem clears the 4.5:1 WCAG AA floor.
   number.className = 'w-12 bg-transparent text-right font-mono text-slate-300 focus:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
   number.min = String(def.min);
   number.max = String(def.max);
@@ -139,8 +132,7 @@ function buildParamRow(doc, key, def, value, controlId, opName, index) {
 }
 
 /**
- * Writes a row's morph-sweep marker for the op's current parameters. A slider
- * can cross the band without the row being rebuilt, so the caller re-runs this
+ * Writes a row's morph-sweep marker for the op's current parameters; re-run
  * after a parameter write.
  * @param {HTMLElement} el - The row buildOpRow returned.
  * @param {ChainOpRow} op - The op's current state.

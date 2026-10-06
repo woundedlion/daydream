@@ -544,14 +544,10 @@ test('ending a value run gives the next drag its own undo entry', async () => {
   assert.equal(presetValue(store, 'hex-twin-wave', 'sample.pattern-freq'), opening);
 });
 
-// Every entry is a whole document clone, so an unbounded history is a session
-// that grows until the tab dies.
 test('the history keeps UNDO_DEPTH entries and drops the oldest past it', async () => {
   const store = await makeStore();
   const overflow = 5;
-  // The controls alternate so each write opens its own entry rather than
-  // coalescing into the one before it; after each, the value the history should
-  // walk back through.
+  // The controls alternate so each write opens its own entry.
   const walked = [];
   const refused = [];
   for (let step = 0; step < UNDO_DEPTH + overflow; step += 1) {
@@ -637,9 +633,7 @@ test('legalSequences bridges a span with a run of crossings', async () => {
   const ids = (entries) => entries.map(({ operators }) =>
     operators.map((operator) => operator.id).join(' '));
 
-  // A plane endomorphism's span takes the removal and every plane-to-plane
-  // operator; a longer run would have to return to the plane carrier, which
-  // makes it an insertion into a shorter run rather than another bridge.
+  // A plane endomorphism's span takes the removal and every plane-to-plane operator.
   const endomorphism = store.legalSequences(WARP, 1, 3);
   assert.equal(ids(endomorphism)[0], '');
   assert.equal(endomorphism.every(({ operators }) => operators.length <= 1), true);
@@ -708,8 +702,7 @@ test('arena accounting honors per_param_name_bytes when declared', async () => {
 });
 
 test('chainArenaBytes matches a mixed-alignment golden and validator diagnostic wiring', () => {
-  // The validator reports the shared cursor's cost. A mixed-alignment fixture
-  // below pins that cost independently of the helper it reports.
+  // The validator reports the shared cursor's cost.
   const probe = structuredClone(CATALOG);
   probe.budgets.arena_bytes = 0;
   const operators = new Map(CATALOG.operators.map(
@@ -834,9 +827,7 @@ test('a malformed span or sequence is refused without side effects', async () =>
 });
 
 
-// §4.5: the workbench opens on this document, so it has to be valid by
-// construction — the builder is the only thing between a cold page and a
-// rendering chain.
+// The workbench opens on this document, so it must be valid by construction.
 test('the scratch document compiles clean against the catalog', async () => {
   const compiled = compiler.compileShaderDocument(scratchChainDocument(CATALOG),
     { catalog: CATALOG });

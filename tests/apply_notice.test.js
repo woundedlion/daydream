@@ -1,7 +1,5 @@
 //
-// The shared notice element: several subsystems announce through the one
-// element, so ownership decides whose message a clear drops, and the live
-// region has to be exposed before its text is written.
+// Tests for the shared notice element: ownership of clears and live-region exposure.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -110,8 +108,7 @@ test('the live region is unhidden before its text is written', () => {
   });
 
   h.notice.show('Effect change was rejected.', 'switch');
-  // Hidden content is outside the accessibility tree: a write followed by the
-  // unhide leaves the unhide as the only mutation assistive tech sees.
+  // Hidden content is outside the accessibility tree, so the unhide must precede the write.
   assert.deepEqual(writes, [{ value: 'Effect change was rejected.', hidden: false }]);
 
   h.notice.show(null, 'switch');

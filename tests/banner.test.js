@@ -8,11 +8,9 @@ import { fakeElement, installDocument, restoreDocumentAfterEach } from './helper
 
 restoreDocumentAfterEach();
 
-// Minimal fake DOM: getElementById resolves against whatever was appended and
-// still attached, so both idempotent reuse and dismissal can be observed. body
-// defaults present; pass {body: null} to exercise the no-body guard, and
-// {documentElement: true} to model the pre-<body> parse state where <html>
-// exists but <body> does not.
+// Minimal fake DOM: getElementById resolves against attached appended nodes.
+// Pass {body: null} for the no-body guard, and {documentElement: true} for the
+// pre-<body> parse state.
 function fakeDocument({ body = true, documentElement = false } = {}) {
   const byId = new Map();
   const created = [];
@@ -231,8 +229,7 @@ test('bootstrapTool still banners a synchronous and an async init failure', asyn
   captureConsole(() => target.dispatch('load'));
   assert.match(messageOf(bodyEl.children[0]), /failed to initialize/);
 
-  // Every tool page's initializer is async: its failure arrives as a rejection
-  // the load handler has already returned from.
+  // An async initializer fails as a rejection after the load handler returned.
   const asyncTarget = fakeTarget();
   const asyncPage = fakeDocument();
   const captured = installConsoleCapture('error', 'warn');
