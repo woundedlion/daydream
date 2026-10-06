@@ -38,7 +38,7 @@ export const LOWERING = {
   needle: () => ['dual', 'kis'],
   zip: () => ['kis', 'dual'],
   gyro: () => [{ op: 'snub', params: { t: 0.5, twist: 0 } }, 'dual'],
-  bevel: (op) => ['ambo', typeof op !== 'string' && op.params?.t === 0.5
+  bevel: (op) => ['ambo', typeof op !== 'string' && Math.fround(op.params?.t) === 0.5
     ? 'ambo' : { op: 'truncate', params: typeof op === 'string' ? {} : (op.params ?? {}) }],
 };
 

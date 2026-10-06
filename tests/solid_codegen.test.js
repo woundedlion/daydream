@@ -1500,6 +1500,17 @@ test('opTopologyKey separates only the params that pick a lowering', () => {
   assert.equal(opTopologyKey('truncate'), 'truncate');
 });
 
+test('restored float32 ambo aliases use the engine topology and bevel lowering', async () => {
+  const { LOWERING } = await import('../src/workbench/solids/solid_registry_codegen.js');
+  for (const op of ['truncate', 'bevel']) {
+    const alias = { op, params: { t: 0.499999995 } };
+    assert.equal(savedChainShapeError('cube', [alias]), null);
+    assert.equal(opTopologyKey(alias), `${op}:ambo`);
+    assert.equal(opTopologyKey({ op, params: { t: 0.49999 } }), op);
+    if (op === 'bevel') assert.deepEqual(LOWERING.bevel(alias), ['ambo', 'ambo']);
+  }
+});
+
 /** Verifies a pass the chain outran reports nothing rather than gating on stale probes. */
 test('createOpGate discards a pass the chain changed under', async () => {
   const { Mod } = fakeModule();
