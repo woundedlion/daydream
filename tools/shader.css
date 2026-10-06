@@ -65,7 +65,7 @@
   color: var(--bright-text);
 }
 
-.shader-document-digest {
+.shader-toolbar .shader-document-digest {
   font-family: monospace;
   letter-spacing: 0.04em;
 }
