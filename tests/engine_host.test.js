@@ -61,7 +61,7 @@ test('refresh() reuses a live view without re-fetching or re-notifying', () => {
     () => live.length,
   );
 
-  host.refresh();
+  assert.equal(host.refresh(), false);
 
   assert.equal(host.view(), live);
   assert.equal(getPixelsCalls, 0);
@@ -114,22 +114,6 @@ test('refresh() re-fetches when the held view no longer spans the engine buffer'
 
   assert.equal(host.view(), fresh);
   assert.equal(notified, fresh);
-});
-
-test('refresh() reuses a view that matches the engine buffer length', () => {
-  const live = new Uint16Array(5760);
-  let getPixelsCalls = 0;
-  const host = new EngineHost();
-  host.pixelView = live;
-  host.engine = pixelEngine(
-    () => { getPixelsCalls++; return new Uint16Array(5760); },
-    () => 5760,
-  );
-
-  assert.equal(host.refresh(), false);
-
-  assert.equal(host.view(), live);
-  assert.equal(getPixelsCalls, 0);
 });
 
 test('refresh() survives a resolution change without invalidateView()', () => {
