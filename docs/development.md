@@ -74,6 +74,19 @@ and test-discovery checks validate these references and module coverage.
 After changing Tailwind classes in HTML or browser source, run
 `npm run generate:tailwind` and commit `tools/tailwind.css` with the source change.
 
+Before landing a refactor, search for retired identifiers and words describing
+the old behavior with `rg -n -F -- '<retired term>' src tests docs tools styles`.
+Inspect each match in context, update stale comments and maintained documentation
+in the same commit, then repeat the search. Include behavior terms even when
+the refactor leaves identifiers unchanged.
+
+For every new or strengthened behavioral test, identify a concrete production
+mutation that would make it fail. Exercise that mutation when practical, verify
+that the intended assertion fails, restore production code, and run the affected
+suite. Record the mutation and result with validation evidence; if it cannot be
+exercised, record that limitation. Observe the action under test before calling
+helpers that can perform that action themselves.
+
 ## Display geometry
 
 The global **Top cap (%)** and **Bottom cap (%)** controls adjust the missing
