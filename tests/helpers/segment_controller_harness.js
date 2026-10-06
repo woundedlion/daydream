@@ -198,7 +198,7 @@ export async function publishGeneration(controller, bands) {
  * @param {SegmentController} controller - Controller owning the worker pool.
  * @param {number} segId - Index of the worker delivering the frame.
  * @param {Object} [overrides] - Per-field overrides for the frame payload.
- * @param {Uint16Array} [overrides.pixels] - RGB16 quadrant pixel buffer.
+ * @param {Uint16Array} [overrides.pixels] - RGB16 segment-rectangle pixel buffer.
  * @param {number} [overrides.x0] - Inclusive left display-buffer column.
  * @param {number} [overrides.x1] - Exclusive right display-buffer column.
  * @param {number} [overrides.y0] - Inclusive top display-buffer row.

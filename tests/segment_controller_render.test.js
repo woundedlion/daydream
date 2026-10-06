@@ -45,13 +45,13 @@ const isCyan = (x, y) => {
          driver.pixels[i + 2] === 65535;
 };
 
-test('composite() blits each quadrant to its display-buffer offset', () => {
+test('composite() blits each segment rectangle to its display-buffer offset', () => {
   setDisplayGrid(4, 2);
 
   const c = readyController(2);
   c.showBoundaries = false;
-  const quad = new Uint16Array(2 * 2 * 3).fill(111);
-  const staged = [null, { pixels: quad, x0: 2, x1: 4, y0: 0, y1: 2 }];
+  const band = new Uint16Array(2 * 2 * 3).fill(111);
+  const staged = [null, { pixels: band, x0: 2, x1: 4, y0: 0, y1: 2 }];
 
   c.composite(staged);
 
@@ -87,8 +87,8 @@ test('composite() faults on a rectangle that overflows the current display buffe
 
   const c = makeController();
   c.showBoundaries = false;
-  const quad = new Uint16Array(2 * 2 * 3).fill(222);
-  const staged = [{ pixels: quad, x0: 0, x1: 99, y0: 0, y1: 2 }]; // x1=99 overshoots W=4
+  const band = new Uint16Array(2 * 2 * 3).fill(222);
+  const staged = [{ pixels: band, x0: 0, x1: 99, y0: 0, y1: 2 }]; // x1=99 overshoots W=4
 
   const blitted = c.composite(staged);
   assert.equal(blitted, 0, 'a leading out-of-bounds rect blits nothing');
@@ -125,8 +125,8 @@ test('composite() faults on an empty/inverted segment rect', () => {
 
   const c = makeController();
   c.showBoundaries = false;
-  const quad = new Uint16Array(2 * 2 * 3).fill(123);
-  const staged = [{ pixels: quad, x0: 2, x1: 2, y0: 0, y1: 2 }]; // x1 == x0
+  const band = new Uint16Array(2 * 2 * 3).fill(123);
+  const staged = [{ pixels: band, x0: 2, x1: 2, y0: 0, y1: 2 }]; // x1 == x0
 
   const blitted = c.composite(staged);
   assert.equal(blitted, 0, 'an empty/inverted rect blits nothing');
@@ -160,8 +160,8 @@ test('composite() faults on a rect that is not that segment\'s band of the layou
   const c = readyController(4);
   c.showBoundaries = false;
   // Segment 1's band is [0,2)-[2,4); this is segment 3's, and the same size.
-  const quad = new Uint16Array(2 * 2 * 3).fill(123);
-  const staged = [null, { pixels: quad, x0: 2, x1: 4, y0: 2, y1: 4 }];
+  const band = new Uint16Array(2 * 2 * 3).fill(123);
+  const staged = [null, { pixels: band, x0: 2, x1: 4, y0: 2, y1: 4 }];
 
   const blitted = c.composite(staged);
   assert.equal(blitted, 0, 'a misplaced band blits nothing');
@@ -211,11 +211,11 @@ test('composite() marks both the internal split and the x=0 wrap seam', () => {
 
   const c = readyController(2);
   c.showBoundaries = true;
-  const quadL = new Uint16Array(2 * 2 * 3).fill(111);
-  const quadR = new Uint16Array(2 * 2 * 3).fill(222);
+  const bandL = new Uint16Array(2 * 2 * 3).fill(111);
+  const bandR = new Uint16Array(2 * 2 * 3).fill(222);
   const staged = [
-    { pixels: quadL, x0: 0, x1: 2, y0: 0, y1: 2 },
-    { pixels: quadR, x0: 2, x1: 4, y0: 0, y1: 2 },
+    { pixels: bandL, x0: 0, x1: 2, y0: 0, y1: 2 },
+    { pixels: bandR, x0: 2, x1: 4, y0: 0, y1: 2 },
   ];
 
   c.composite(staged);
@@ -252,11 +252,11 @@ test('the boundary setter re-composites and invalidates a paused held generation
   c.active = true; // the app sets this before create(); the setter checks it
   driver.paused = true;
   try {
-    const quadL = new Uint16Array(2 * 2 * 3).fill(111);
-    const quadR = new Uint16Array(2 * 2 * 3).fill(222);
+    const bandL = new Uint16Array(2 * 2 * 3).fill(111);
+    const bandR = new Uint16Array(2 * 2 * 3).fill(222);
     await publishGeneration(c, [
-      { pixels: quadL, x0: 0, x1: 2, y0: 0, y1: 2 },
-      { pixels: quadR, x0: 2, x1: 4, y0: 0, y1: 2 },
+      { pixels: bandL, x0: 0, x1: 2, y0: 0, y1: 2 },
+      { pixels: bandR, x0: 2, x1: 4, y0: 0, y1: 2 },
     ]);
     c.composite(c.frameState.results);
     const posted = c.workers.map((worker) => worker.posted.length);
@@ -551,9 +551,9 @@ test('the next tick() composites the armed frame and dispatches the following on
   c.showBoundaries = false;
   c.tick();
 
-  const quad = () => new Uint16Array(2 * 2 * 3).fill(111);
-  deliverFrame(c, 0, { pixels: quad(), x0: 0, x1: 2, y0: 0, y1: 2 });
-  deliverFrame(c, 1, { pixels: quad(), x0: 2, x1: 4, y0: 0, y1: 2 });
+  const band = () => new Uint16Array(2 * 2 * 3).fill(111);
+  deliverFrame(c, 0, { pixels: band(), x0: 0, x1: 2, y0: 0, y1: 2 });
+  deliverFrame(c, 1, { pixels: band(), x0: 2, x1: 4, y0: 0, y1: 2 });
   await flush();
   assert.equal(c.frameState.pendingFrame, true);
 
@@ -561,7 +561,7 @@ test('the next tick() composites the armed frame and dispatches the following on
 
   assert.equal(c.frameState.pendingFrame, false, 'pending frame was composited and cleared');
   assert.ok(driver.pixels.some((v) => v === 111),
-    'the composited quadrants reached the display buffer');
+    'the composited segments reached the display buffer');
   assert.equal(c.frameState.renderInFlight, true, 'the following frame was dispatched');
   assert.equal(c.frameState.pending, 2);
 });
@@ -612,9 +612,9 @@ test('tick() re-blits the last composite when a render overruns the tick (previe
   c.showBoundaries = false;
   c.tick();
 
-  const quad = () => new Uint16Array(2 * 2 * 3).fill(111);
-  deliverFrame(c, 0, { pixels: quad(), x0: 0, x1: 2, y0: 0, y1: 2 });
-  deliverFrame(c, 1, { pixels: quad(), x0: 2, x1: 4, y0: 0, y1: 2 });
+  const band = () => new Uint16Array(2 * 2 * 3).fill(111);
+  deliverFrame(c, 0, { pixels: band(), x0: 0, x1: 2, y0: 0, y1: 2 });
+  deliverFrame(c, 1, { pixels: band(), x0: 2, x1: 4, y0: 0, y1: 2 });
   await flush();
   c.tick(); // composite the armed frame, dispatch the next (now in flight)
   assert.equal(c.frameState.pendingFrame, false);
@@ -632,7 +632,7 @@ test('tick() re-blits the last composite when a render overruns the tick (previe
 });
 
 test('an overrun re-blit shows one whole generation, never a half-updated mix', async () => {
-  // While the next generation is only partially in, its quadrants live in
+  // While the next generation is only partially in, its segments live in
   // `scratch`; an overrun re-blit must composite the last WHOLE generation from
   // `results`, never a mix of the two.
   setDisplayGrid(4, 2);
@@ -662,8 +662,8 @@ test('an overrun re-blit shows one whole generation, never a half-updated mix', 
 
     assert.ok(!driver.pixels.some((v) => v === 222),
       'the partially-arrived generation B never leaks into the re-blit');
-    assert.equal(driver.pixels[idx(0, 0, 4)], 111, 'quadrant 0 holds generation A');
-    assert.equal(driver.pixels[idx(2, 0, 4)], 111, 'quadrant 1 holds generation A');
+    assert.equal(driver.pixels[idx(0, 0, 4)], 111, 'segment 0 holds generation A');
+    assert.equal(driver.pixels[idx(2, 0, 4)], 111, 'segment 1 holds generation A');
     assert.equal(c.frameComposited, false, 're-blit is not a new frame');
   } finally {
     restore();
@@ -677,9 +677,9 @@ test('a composite short one segment is not handed to the recorder as a frame', a
   c.showBoundaries = false;
   c.tick();
 
-  const quad = () => new Uint16Array(2 * 2 * 3).fill(111);
-  deliverFrame(c, 0, { pixels: quad(), x0: 0, x1: 2, y0: 0, y1: 2 });
-  deliverFrame(c, 1, { pixels: quad(), x0: 2, x1: 4, y0: 0, y1: 2 });
+  const band = () => new Uint16Array(2 * 2 * 3).fill(111);
+  deliverFrame(c, 0, { pixels: band(), x0: 0, x1: 2, y0: 0, y1: 2 });
+  deliverFrame(c, 1, { pixels: band(), x0: 2, x1: 4, y0: 0, y1: 2 });
   await flush();
 
   // The whole-array swap publishes only generations that filled every slot, so
@@ -700,9 +700,9 @@ test('destroy() clears frameComposited so a respawning pool cannot capture black
   c.showBoundaries = false;
   c.tick();
 
-  const quad = () => new Uint16Array(2 * 2 * 3).fill(111);
-  deliverFrame(c, 0, { pixels: quad(), x0: 0, x1: 2, y0: 0, y1: 2 });
-  deliverFrame(c, 1, { pixels: quad(), x0: 2, x1: 4, y0: 0, y1: 2 });
+  const band = () => new Uint16Array(2 * 2 * 3).fill(111);
+  deliverFrame(c, 0, { pixels: band(), x0: 0, x1: 2, y0: 0, y1: 2 });
+  deliverFrame(c, 1, { pixels: band(), x0: 2, x1: 4, y0: 0, y1: 2 });
   await flush();
   c.tick();
   assert.equal(c.frameComposited, true, 'a real composite latched the flag');
