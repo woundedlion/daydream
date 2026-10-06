@@ -216,7 +216,7 @@ input[type=range]:disabled::-webkit-slider-thumb {
 }
 
 
-:focus-visible,
+:root :focus-visible,
 .focus-ring-within:focus-within,
 .focus-ring-group:focus-within .focus-ring-target {
   outline: 2px solid var(--indigo-300);

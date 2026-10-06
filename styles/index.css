@@ -49,10 +49,8 @@
   margin: 0;
 }
 
-/* Keyboard focus ring; the UA default is near-invisible over the dark theme.
-   Unscoped so anything focusable added later inherits it. :where() holds the
-   selector at one-class specificity. #canvas opts out — see the inset rule. */
-:focus-visible:not(:where(#canvas)) {
+/* Keyboard focus ring; #canvas uses an inset ring. */
+:root :focus-visible:not(:where(#canvas)) {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
