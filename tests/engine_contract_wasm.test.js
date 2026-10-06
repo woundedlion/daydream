@@ -867,7 +867,7 @@ test('live shader rosters assign every parameter and both planar-warp slots', ()
 test('strobeColumns and effect metadata return the shapes daydream consumes', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
-    'setEffect must succeed after the readonly scan');
+    'setEffect must succeed for a registered effect');
   assert.equal(typeof engine.strobeColumns(), 'boolean',
     'strobeColumns must return a boolean');
 
