@@ -189,10 +189,10 @@ test('initScene gives the canvas a focused keyboard route to OrbitControls', () 
   const s = mountScene();
 
   assert.equal(s.canvas.tabIndex, 0);
-  assert.equal(s.controls._domElementKeyEvents, s.canvas);
+  assert.deepEqual(s.canvas.listeners.map((l) => l.type), ['keydown']);
 
   s.dispose();
-  assert.equal(s.controls._domElementKeyEvents, null);
+  assert.deepEqual(s.canvas.listeners, []);
 });
 
 test('initScene returns the light rig it added when lights are requested', () => {
