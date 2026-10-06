@@ -108,6 +108,7 @@ test('deleting saved solids preserves focus in reverse display order or on save'
 
 for (const op of ['ambo', 'meta']) test(`${op} gate preserves authored descriptions`, async () => {
   const authored = op === 'meta' ? 'tip-meta' : '';
+  const reason = 'Would exceed an engine mesh limit from the shared description';
   const attributes = new Map(authored ? [['aria-describedby', authored]] : []);
   const button = {
     dataset: { op }, disabled: false,
@@ -119,13 +120,17 @@ for (const op of ['ambo', 'meta']) test(`${op} gate preserves authored descripti
   const added = [];
   const context = {
     wasmModule: {}, state: { base: 'cube', ops: [] }, currentMesh: {}, currentMeshIsCurrent: true,
-    document: { querySelectorAll: () => [button] },
+    document: {
+      querySelectorAll: () => [button],
+      getElementById: (id) => { assert.equal(id, 'opBlockedReason'); return { textContent: reason }; },
+    },
     opGate: { refresh: async () => ({ blocked: new Set([op]), complete: true }) },
     showGateMsg: (message) => messages.push(message), addOp: (op) => added.push(op),
   };
   await handler('refreshOpGating', context)();
   assert.equal(button.disabled, false);
   assert.equal(attributes.get('aria-disabled'), 'true');
+  assert.equal(button.title, reason);
   assert.equal(attributes.get('aria-describedby'), [authored, 'opBlockedReason'].filter(Boolean).join(' '));
   handler('activateAddOp', context)({ target: { closest: () => button } });
   assert.equal(added.length, 0);

@@ -1315,7 +1315,7 @@ async function refreshOpGating() {
     if (!blocked && !probe.complete) continue;
     btn.setAttribute('aria-disabled', String(blocked));
     if (blocked) {
-      btn.title = 'Would exceed an engine mesh limit on the current solid';
+      btn.title = document.getElementById('opBlockedReason').textContent;
       btn.setAttribute('aria-describedby', [btn.dataset.authoredDescription, 'opBlockedReason'].filter(Boolean).join(' '));
     } else {
       if (btn.dataset.authoredDescription) btn.setAttribute('aria-describedby', btn.dataset.authoredDescription);
