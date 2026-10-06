@@ -149,7 +149,6 @@ async function init() {
   // Start Memory Metrics Loop.
   let arenaMetricsTimer = null;
   function updateArenaMetrics() {
-    // The engine nulls meshOpsWasm on halt; stop rather than reschedule forever.
     if (!meshOpsWasm) return;
     arenaMetricsTimer = null;
     try {
