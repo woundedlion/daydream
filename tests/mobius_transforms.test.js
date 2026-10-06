@@ -376,7 +376,7 @@ test('tumble at theta=pi/2 gives B=-1, C=1', () => {
   assertComplex(c.D, 0, 0, 'D');
 });
 
-/** parabolic(2.5): B.re = t * 0.8 = 2; A, C and D stay at the identity. */
+/** parabolic(2.5): B.re = 2 - |((0.8t + 2) mod 8) - 4| = 2; A, C and D are identity. */
 test('parabolic at t=2.5 translates by 2 along the real axis', () => {
   const c = parabolic(2.5);
   assertComplex(c.A, 1, 0, 'A');
