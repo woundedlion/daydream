@@ -1063,6 +1063,7 @@ export function createChainStrip({
 
     const viewport = el('div', 'chain-strip-viewport');
     viewport.setAttribute('tabindex', '0');
+    viewport.setAttribute('role', 'group');
     viewport.setAttribute('aria-label', 'Scrollable shader chain');
     viewport.appendChild(strip);
     viewport.addEventListener('wheel', (/** @type {*} */ event) => {
