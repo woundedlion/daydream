@@ -36,7 +36,8 @@
  * @property {number} baseTurns - The anchor hue, in turns.
  * @property {number} spreadTurns - Angular spread between a harmony's anchors.
  * @property {number} sweepTurns - Total travel of a SWEEP, in turns.
- * @property {number[]} customTurns - The three authored key hues, in turns.
+ * @property {number[]} customTurns - Four key hues, in turns; CUSTOM reads the
+ *   first three and the engine zeroes the fourth.
  */
 
 /**
