@@ -228,6 +228,15 @@ test('auto labels take the operator stem, numbered only where it is taken', asyn
   assertGreen(store);
 });
 
+test('auto labels within one sequence do not collide with each other', async () => {
+  const store = await makeStore();
+  assert.deepEqual(store.replaceSpan(WARP, 0, [
+    { operator: 'warp.wave-shear.v2' }, { operator: 'warp.wave-shear.v2' },
+  ]), { ok: true });
+  assert.deepEqual(labels(store).slice(WARP, WARP + 3), ['warp', 'warp1', 'warp2']);
+  assertGreen(store);
+});
+
 test('auto labels reuse the label the replaced span releases', async () => {
   const store = await makeStore();
 
