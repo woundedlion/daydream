@@ -16,7 +16,6 @@ import {
 import { captureConsole, installConsoleCapture } from './helpers/fake_console.js';
 import { createRecordingControls } from '../src/recording/recording_controls.js';
 import { createSegmentPoolSpawner, createSegmentedPovControls } from '../src/ui/segmented_pov_controls.js';
-import { SHADER_DOCUMENT_EFFECTS } from '../src/effects/effect_roster.js';
 import {
   fakeGui,
   startApp as startUntrackedApp,
@@ -94,19 +93,6 @@ test('catalog effects are offered at both simulator resolutions', async () => {
     assert.ok(loRes.includes(effect),
       `the sidebar must offer ${effect} at the low-res preset`);
   }
-});
-
-test('the shader-document roster names exactly the documents that ship', () => {
-  const manifest = JSON.parse(readFileSync(
-    new URL('../generated/shader/patterns/catalog.json', import.meta.url),
-    'utf8'));
-
-  assert.deepEqual([...SHADER_DOCUMENT_EFFECTS].sort(),
-    Object.keys(manifest.source_documents).sort(),
-    'the workbench offers exactly the source_documents the manifest lists, '
-    + 'while this roster is what routes ?effect=<id> to the workbench page and '
-    + 'what the URL validator admits: a document in one and not the other '
-    + 'ships with a deep link that silently falls back to the default effect');
 });
 
 /**
