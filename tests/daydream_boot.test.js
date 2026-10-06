@@ -15,6 +15,7 @@ import {
 } from './helpers/fake_engine.js';
 import { captureConsole, installConsoleCapture } from './helpers/fake_console.js';
 import { createRecordingControls } from '../src/recording/recording_controls.js';
+import { Daydream } from '../src/renderer/driver.js';
 import { createSegmentPoolSpawner, createSegmentedPovControls } from '../src/ui/segmented_pov_controls.js';
 import {
   fakeGui,
@@ -218,6 +219,14 @@ test('a booted render reconciles live panel values', async () => {
   app.driver.renderer.frame();
   const controls = app.guis.flatMap((gui) => gui.controllers);
   assert.equal(controls.find((control) => control.property === 'Speed').getValue(), 0.75);
+});
+
+test('a booted recorder captures at the driver frame rate', async () => {
+  const app = await bootedApp({ loadModule: async () => fakeWasmModule() });
+  const { recorder } = app.driver;
+  assert.ok(recorder, 'the module load did not hand the driver a recorder');
+  assert.equal(recorder.frameInterval, 1 / Daydream.FPS);
+  assert.equal(Math.round(1 / recorder.frameInterval), Daydream.FPS);
 });
 
 test('the boot double mocks only methods the engine has', () => {
