@@ -220,3 +220,27 @@ test('a keyboard resample follows the selected hue key through later nudges', ()
   assert.deepEqual(moved, [2, 2]);
   assert.equal(context.selectedHueKey, 2);
 });
+
+test('loading a recipe clears a stale hue-key refusal', () => {
+  const status = { textContent: 'Choose another key.' };
+  const fields = new Map();
+  const context = {
+    document: {
+      getElementById: (id) => {
+        if (id === 'hue_key_status') return status;
+        if (!fields.has(id)) fields.set(id, {});
+        return fields.get(id);
+      },
+    },
+    structuredClone, recipeTemplate: null, customHueOffsets: null, previousHueMode: null,
+    PALETTE_CONTROL_IDS: new Proxy({}, { get: (_, name) => String(name) }),
+    paletteControlsFromRecipe: () => ({
+      spreadTurns: 0, customHueOffsets: [], baseTurns: 0, window: { offset: 0, span: 1 },
+    }),
+    syncRecipeSliderLabels: () => {}, setCustomBaseTurns: () => {}, setRecipeWindow: () => {},
+    setAxisEndpoints: () => {}, syncRecipeControlAvailability: () => {}, scheduleUpdate: () => {},
+  };
+  context.clearHueKeyStatus = handler('clearHueKeyStatus', context);
+  handler('loadRecipe', context)({ hue: { mode: 0 } });
+  assert.equal(status.textContent, '');
+});
