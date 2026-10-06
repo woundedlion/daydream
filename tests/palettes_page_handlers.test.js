@@ -3,8 +3,34 @@ import assert from 'node:assert/strict';
 import { pageHandlers } from './helpers/page_handlers.js';
 import { fakeElement } from './helpers/fake_dom.js';
 import { hueKeyNudgeTurns } from '../src/workbench/palettes/palette_wheel.js';
+import { replaceUrl } from '../src/app/state.js';
 
 const handler = pageHandlers(new URL('../src/workbench/palettes/palettes_page.js', import.meta.url));
+
+test('tab switches rebuild the palette when browser URL updates are refused', () => {
+  for (const refused of [false, true]) {
+    const button = fakeElement();
+    button.dataset.tab = 'generative';
+    const panel = fakeElement();
+    panel.id = 'tab-content-generative';
+    let updated = 0;
+    const win = { history: { replaceState() { if (refused) throw new Error('rate limit'); } } };
+    const context = {
+      activeTab: 'procedural', window: { location: { href: 'https://example.test/tools/palettes.html' } },
+      document: {
+        getElementById: () => fakeElement(), querySelector: () => fakeElement(),
+        querySelectorAll: selector => selector === '.tab-btn' ? [button] : [panel],
+      },
+      paletteTabUrl: (url, tab) => `${url}?tab=${tab}`,
+      replaceUrl: url => replaceUrl(url, win), updatePalette: () => { updated++; },
+    };
+    handler('switchTab', context)('generative');
+    assert.equal(updated, 1);
+    assert.equal(button.tabIndex, 0);
+    assert.equal(panel.hidden, false);
+    assert.equal(context.activeTab, 'generative');
+  }
+});
 
 test('a previous slider blur preserves the new locked drag', () => {
   const sliders = { red: fakeElement(), green: fakeElement() };
