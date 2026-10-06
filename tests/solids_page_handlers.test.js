@@ -69,15 +69,24 @@ for (const [count, index, expected] of [[3, 1, 1], [3, 2, 1], [1, 0, 'add']]) {
     let pending;
     let focused;
     const rows = () => state.ops.map((op, i) => ({
-      querySelector: () => ({ focus: () => { focused = i; } }),
+      querySelector: (selector) => {
+        assert.equal(selector, '.remove-op-btn');
+        return { focus: () => { focused = i; } };
+      },
     }));
     const removeOp = handler('removeOp', {
       state, opsRevision: 1, queueCommit: (fn) => { pending = fn(); },
       chainIsValid: async () => ({ ok: true }), setOps: (ops) => { state.ops = ops; },
       renderOps() {}, update() {},
       document: {
-        getElementById: () => ({ children: rows() }),
-        querySelector: () => ({ focus: () => { focused = 'add'; } }),
+        getElementById: (id) => {
+          assert.equal(id, 'opsList');
+          return { children: rows() };
+        },
+        querySelector: (selector) => {
+          assert.equal(selector, '#addOpGrid [data-op]:not(:disabled)');
+          return { focus: () => { focused = 'add'; } };
+        },
       },
     });
     removeOp(index, 1);
@@ -92,11 +101,16 @@ test('deleting saved solids preserves focus in reverse display order or on save'
   let focused;
   const deleteSolid = handler('deleteSolid', {
     savedSolids, persistSavedSolids() {}, renderSavedList() {},
-    document: { getElementById: (id) => id === 'saveBtn'
-      ? { focus: () => { focused = 'save'; } }
-      : { children: savedSolids.map((item, i) => ({
-        querySelector: () => ({ focus: () => { focused = i; } }),
-      })) } },
+    document: { getElementById: (id) => {
+      if (id === 'saveBtn') return { focus: () => { focused = 'save'; } };
+      assert.equal(id, 'savedList');
+      return { children: savedSolids.map((item, i) => ({
+        querySelector: (selector) => {
+          assert.equal(selector, '.del-btn');
+          return { focus: () => { focused = i; } };
+        },
+      })) };
+    } },
   });
   deleteSolid(2);
   assert.equal(focused, 0);
