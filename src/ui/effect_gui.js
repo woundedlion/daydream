@@ -724,11 +724,11 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    *   order: Array<string>}|null} The grouping, or null when none claims the list.
    */
   function stageGrouping(params) {
-    const fixedShader = composedStageAssignments(params);
-    const fixedGrouping = () => {
-      const claimed = new Set(fixedShader?.values());
+    const composed = composedStageAssignments(params);
+    const composedGrouping = () => {
+      const claimed = new Set(composed?.values());
       return {
-        assignments: /** @type {Map<string, string>} */ (fixedShader),
+        assignments: /** @type {Map<string, string>} */ (composed),
         titles: null,
         order: STAGE_ORDER.filter((stage) => claimed.has(stage)),
       };
@@ -749,7 +749,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
         order: KALEIDOSCOPE_SMOOTH_STAGE_ORDER,
       };
     }
-    return fixedShader ? fixedGrouping() : null;
+    return composed ? composedGrouping() : null;
   }
 
   /**
