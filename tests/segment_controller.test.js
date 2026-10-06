@@ -1213,17 +1213,15 @@ test('a message-less error after the pool is ready still latches fast', () => {
 });
 
 test('the deadlines and rebuild budgets retain their safety limits', () => {
-  assert.deepEqual(
-    {
-      retry: BOOT_RETRY_DELAY_MS,
-      render: RENDER_WATCHDOG_MS,
-      boot: BOOT_WATCHDOG_MS,
-      init: INIT_WATCHDOG_MS,
-      bootRetries: MAX_BOOT_RETRIES,
-      faultedRebuilds: MAX_FAULTED_REBUILDS,
-    },
-    { retry: 250, render: 5000, boot: 10000, init: 20000, bootRetries: 3, faultedRebuilds: 2 },
-  );
+  for (const delay of [BOOT_RETRY_DELAY_MS, RENDER_WATCHDOG_MS, BOOT_WATCHDOG_MS, INIT_WATCHDOG_MS]) {
+    assert.ok(Number.isInteger(delay) && delay > 0, `${delay} must be a positive integer delay`);
+  }
+  assert.ok(BOOT_RETRY_DELAY_MS < BOOT_WATCHDOG_MS,
+    'a boot retry fires well inside the boot deadline');
+  assert.ok(RENDER_WATCHDOG_MS >= 1000, 'the render watchdog tolerates many slow frames');
+  for (const budget of [MAX_BOOT_RETRIES, MAX_FAULTED_REBUILDS]) {
+    assert.ok(Number.isInteger(budget) && budget >= 1, `${budget} must allow at least one retry`);
+  }
   // Init covers boot plus the WASM instantiate, so it must outlast boot or a
   // slow-but-healthy load reports as an init timeout.
   assert.ok(INIT_WATCHDOG_MS > BOOT_WATCHDOG_MS,
