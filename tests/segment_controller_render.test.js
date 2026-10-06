@@ -838,7 +838,7 @@ test('an init-phase fault still reaches the fault overlay (faulted checked befor
 });
 
 test('the fault overlay is an alert that never takes focus', () => {
-  const stats = fakeElement();
+  const stats = fakeElement('div', { connected: true });
   const c = makeController();
   c.statsView.doc = {
     getElementById: (id) => id === 'segment-stats' ? stats : null,
