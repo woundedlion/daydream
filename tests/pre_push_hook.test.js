@@ -17,23 +17,9 @@ const SKIP = SH || process.env.DAYDREAM_HOOK_SH_REQUIRED
   ? false
   : MISSING_SH;
 
-// PATH is emptied inside the shell rather than in the spawn environment, which
-// would also stop the shell itself from being resolved.
-const WITHOUT_TOOLS = 'PATH=""; export PATH; . "$0"';
-
 test('pre-push refuses a push from a tree that cannot run the suites',
   { skip: SKIP }, (t) => {
-    assert.ok(SH, MISSING_SH);
-    const root = mkdtempSync(join(tmpdir(), 'pre-push-hook-'));
-    t.after(() => rmSync(root, { recursive: true, force: true }));
-    const env = isolatedGitEnv();
-    delete env.NODE_TEST_CONTEXT;
-
-    const run = spawnSync(SH, ['-c', WITHOUT_TOOLS, HOOK], {
-      cwd: root,
-      env,
-      encoding: 'utf8',
-    });
+    const run = runWithTools(fixtureRoot(t), {});
     assert.notEqual(run.status, 0, `${run.stdout}${run.stderr}`);
     assert.match(run.stderr, /node not found/);
   });
@@ -60,8 +46,7 @@ function runWithTools(root, tools, input = '') {
   const env = isolatedGitEnv();
   delete env.NODE_TEST_CONTEXT;
   // MSYS reads PATH as POSIX, so a drive letter would split on its colon.
-  const posixBin = bin.replace(/\\/g, '/')
-    .replace(/^([A-Za-z]):/, (all, drive) => `/${drive.toLowerCase()}`);
+  const posixBin = posixPath(bin);
   return spawnSync(SH, ['-c', `PATH="${posixBin}"; export PATH; . "$0"`, HOOK], {
     cwd: root,
     env,
@@ -79,6 +64,43 @@ function fixtureRoot(t) {
   const root = mkdtempSync(join(tmpdir(), 'pre-push-hook-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   return root;
+}
+
+/** @param {string} path @returns {string} MSYS-compatible path. */
+function posixPath(path) {
+  return path.replace(/\\/g, '/')
+    .replace(/^([A-Za-z]):/, (all, drive) => `/${drive.toLowerCase()}`);
+}
+
+/**
+ * Create the committed snapshot checked by the push hook.
+ * @param {import('node:test').TestContext} t - Case owning the fixture.
+ * @param {{marker?: boolean, suiteFailure?: boolean}} [options] - Snapshot contents.
+ * @returns {{root: string, env: NodeJS.ProcessEnv, sha: string}} Fixture state.
+ */
+function snapshotFixture(t, { marker = false, suiteFailure = false } = {}) {
+  const root = fixtureRoot(t);
+  const env = isolatedGitEnv();
+  delete env.NODE_TEST_CONTEXT;
+  for (const directory of ['.githooks', 'tests', 'node_modules', 'bin', 'tools'])
+    mkdirSync(join(root, directory));
+  writeFileSync(join(root, '.githooks/pre-push'), readFileSync(HOOK));
+  writeFileSync(join(root, 'node_modules/.package-lock.json'), '{}');
+  writeFileSync(join(root, 'package.json'), '{}');
+  writeFileSync(join(root, 'package-lock.json'), '{}');
+  writeFileSync(join(root, 'vendor-importmap.js'), 'map\n');
+  writeFileSync(join(root, 'tools/tailwind.css'), 'css\n');
+  if (marker) writeFileSync(join(root, 'marker'), 'committed\n');
+  for (const name of ['ci_workflow', 'deployment_pair', 'stage_site'])
+    writeFileSync(join(root, `tests/${name}.test.js`),
+      suiteFailure && name === 'ci_workflow' ? 'throw new Error("fixture suite failed");' : '');
+  const git = (...args) => execFileSync('git', ['-C', root, ...args], { env, encoding: 'utf8' });
+  git('init', '-q');
+  git('add', '.githooks/pre-push', 'tests', 'package.json', 'package-lock.json',
+    'vendor-importmap.js', 'tools/tailwind.css', ...(marker ? ['marker'] : []));
+  git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test',
+    '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture');
+  return { root, env, sha: git('rev-parse', 'HEAD').trim() };
 }
 
 test('pre-push refuses a push from a tree that cannot install the suites',
@@ -200,21 +222,7 @@ test('pre-push accepts a ref deletion without running source checks', { skip: SK
 for (const installStatus of [0, 19]) {
   test(`pre-push installs snapshot dependencies and rejects failed installs (status ${installStatus})`,
     { skip: SKIP }, (t) => {
-      const root = fixtureRoot(t);
-      const env = isolatedGitEnv();
-      delete env.NODE_TEST_CONTEXT;
-      const git = (...args) => execFileSync('git', ['-C', root, ...args], { env, encoding: 'utf8' });
-      for (const directory of ['.githooks', 'tests', 'node_modules', 'bin'])
-        mkdirSync(join(root, directory));
-      writeFileSync(join(root, '.githooks/pre-push'), readFileSync(HOOK));
-      writeFileSync(join(root, 'node_modules/.package-lock.json'), '{}');
-      writeFileSync(join(root, 'package.json'), '{}');
-      writeFileSync(join(root, 'package-lock.json'), '{}');
-      writeFileSync(join(root, 'vendor-importmap.js'), 'map\n');
-      mkdirSync(join(root, 'tools'));
-      writeFileSync(join(root, 'tools/tailwind.css'), 'css\n');
-      for (const name of ['ci_workflow', 'deployment_pair', 'stage_site'])
-        writeFileSync(join(root, `tests/${name}.test.js`), '');
+      const { root, env, sha } = snapshotFixture(t);
       const log = join(root, 'calls.log').replace(/\\/g, '/');
       const npm = join(root, 'bin/npm');
       writeFileSync(npm, '#!/bin/sh\n'
@@ -223,15 +231,9 @@ for (const installStatus of [0, 19]) {
         + 'if [ "$2" = importmap ]; then for last; do :; done; cp vendor-importmap.js "$last"; fi\n'
         + 'if [ "$2" = generate:tailwind ]; then for last; do :; done; cp tools/tailwind.css "$last"; fi\n');
       chmodSync(npm, 0o755);
-      git('init', '-q');
-      git('add', '.githooks/pre-push', 'tests', 'package.json', 'package-lock.json', 'vendor-importmap.js', 'tools/tailwind.css');
-      git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test',
-        '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture');
-      const sha = git('rev-parse', 'HEAD').trim();
       const changedPackage = '{"private":true}\n';
       writeFileSync(join(root, 'package.json'), changedPackage);
-      const posixBin = join(root, 'bin').replace(/\\/g, '/')
-        .replace(/^([A-Za-z]):/, (all, drive) => `/${drive.toLowerCase()}`);
+      const posixBin = posixPath(join(root, 'bin'));
       const result = spawnSync(SH, ['-c', `PATH="${posixBin}:$PATH"; export PATH; . "$0"`, HOOK], {
         cwd: root, env, encoding: 'utf8',
         input: `refs/heads/master ${sha} refs/heads/master ${'0'.repeat(40)}\n`,
@@ -253,24 +255,7 @@ for (const installStatus of [0, 19]) {
 
 for (const failure of ['none', 'lint', 'suite']) {
   test(`pre-push checks the committed snapshot and propagates ${failure} failures`, { skip: SKIP }, (t) => {
-    const root = fixtureRoot(t);
-    const env = isolatedGitEnv();
-    delete env.NODE_TEST_CONTEXT;
-    const git = (...args) => execFileSync('git', ['-C', root, ...args], { env, encoding: 'utf8' });
-    mkdirSync(join(root, '.githooks'));
-    mkdirSync(join(root, 'tests'));
-    mkdirSync(join(root, 'node_modules'));
-    mkdirSync(join(root, 'bin'));
-    writeFileSync(join(root, '.githooks/pre-push'), readFileSync(HOOK));
-    writeFileSync(join(root, 'node_modules/.package-lock.json'), '{}');
-    writeFileSync(join(root, 'package.json'), '{}');
-    writeFileSync(join(root, 'package-lock.json'), '{}');
-    writeFileSync(join(root, 'vendor-importmap.js'), 'map\n');
-    mkdirSync(join(root, 'tools'));
-    writeFileSync(join(root, 'tools/tailwind.css'), 'css\n');
-    writeFileSync(join(root, 'marker'), 'committed\n');
-    for (const name of ['ci_workflow', 'deployment_pair', 'stage_site'])
-      writeFileSync(join(root, `tests/${name}.test.js`), failure === 'suite' && name === 'ci_workflow' ? 'throw new Error("fixture suite failed");' : '');
+    const { root, env, sha } = snapshotFixture(t, { marker: true, suiteFailure: failure === 'suite' });
     const calls = join(root, 'tool-calls').replace(/\\/g, '/');
     const node = join(root, 'bin/node');
     writeFileSync(node, `#!/bin/sh\nprintf '%s\\n' "node $*" >> '${calls}'\nexec '${process.execPath.replace(/\\/g, '/')}' "$@"\n`);
@@ -281,12 +266,8 @@ for (const failure of ['none', 'lint', 'suite']) {
       + 'if [ "$2" = importmap ]; then for last; do :; done; cp vendor-importmap.js "$last"; fi\n'
       + 'if [ "$2" = generate:tailwind ]; then for last; do :; done; cp tools/tailwind.css "$last"; fi\n');
     chmodSync(npm, 0o755);
-    git('init', '-q');
-    git('add', '.githooks/pre-push', 'tests', 'package.json', 'package-lock.json', 'vendor-importmap.js', 'tools/tailwind.css', 'marker');
-    git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture');
-    const sha = git('rev-parse', 'HEAD').trim();
     writeFileSync(join(root, 'marker'), 'working-tree-only\n');
-    const posixBin = join(root, 'bin').replace(/\\/g, '/').replace(/^([A-Za-z]):/, (all, drive) => `/${drive.toLowerCase()}`);
+    const posixBin = posixPath(join(root, 'bin'));
     const result = spawnSync(SH, ['-c', `PATH="${posixBin}:$PATH"; export PATH; . "$0"`, HOOK], {
       cwd: root, env, encoding: 'utf8', input: `refs/heads/master ${sha} refs/heads/master ${'0'.repeat(40)}\n`,
     });
