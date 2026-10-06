@@ -23,7 +23,7 @@ const SKIP_DIRS = new Set([
 
 /**
  * Reads both typecheck configs, accepting whole-line comments in tsconfig.json.
- * @returns {Object} The parsed config.
+ * @returns {Object} Main compiler options, the union of both rosters, and each entry's source config.
  */
 function readTsconfig() {
   const text = readFileSync(new URL('tsconfig.json', ROOT), 'utf8');
@@ -33,6 +33,10 @@ function readTsconfig() {
     .join('\n');
   const config = JSON.parse(stripped);
   const scripts = JSON.parse(readFileSync(new URL('tsconfig.scripts.json', ROOT), 'utf8'));
+  config.fileSources = new Map([
+    ...config.files.map((file) => [file, 'tsconfig.json']),
+    ...scripts.files.map((file) => [file, 'tsconfig.scripts.json']),
+  ]);
   config.files.push(...scripts.files);
   return config;
 }
@@ -60,7 +64,7 @@ function importsOf(file) {
 
 /**
  * Every module reachable from the roster, the roster included.
- * @param {string[]} roster - tsconfig.json's `files`.
+ * @param {string[]} roster - The combined typecheck `files` rosters.
  * @returns {Set<string>} The transitive closure, minus what is not checked.
  */
 function reachableFrom(roster) {
@@ -115,9 +119,10 @@ test('every `// @ts-check` module is on the typecheck roster', () => {
 });
 
 test('the typecheck roster lists no module that has gone away', () => {
-  for (const file of readTsconfig().files) {
+  const { files, fileSources } = readTsconfig();
+  for (const file of files) {
     assert.ok(existsSync(fileURLToPath(new URL(file, ROOT))),
-      `tsconfig.json "files" lists ${file}, which no longer exists`);
+      `${fileSources.get(file)} "files" lists ${file}, which no longer exists`);
   }
 });
 
@@ -131,7 +136,7 @@ test('the typecheck checks nullability and implicit any', () => {
 });
 
 test('every not-checked module has a declaration file on the roster', () => {
-  const roster = readTsconfig().files;
+  const { files: roster, fileSources } = readTsconfig();
   for (const file of NOT_CHECKED) {
     const declaration = file.endsWith('.mjs')
       ? file.replace(/\.mjs$/, '.d.mts') : file.replace(/\.js$/, '.d.ts');
@@ -140,7 +145,7 @@ test('every not-checked module has a declaration file on the roster', () => {
       + `without ${declaration} on tsconfig.json "files" the import is an `
       + 'unresolved-module error under noResolve, not a silent `any`');
     assert.ok(existsSync(fileURLToPath(new URL(declaration, ROOT))),
-      `tsconfig.json "files" lists ${declaration}, which does not exist`);
+      `${fileSources.get(declaration)} "files" lists ${declaration}, which does not exist`);
   }
 });
 
@@ -152,11 +157,12 @@ const TOOL_PAGE_EXEMPTIONS = {
 };
 
 test('the typecheck roster stays inside its stated scope', () => {
-  for (const file of readTsconfig().files) {
+  const { files, fileSources } = readTsconfig();
+  for (const file of files) {
     assert.ok(!file.startsWith('tests/'),
-      `tsconfig.json "files" lists ${file}: tests/ is deliberately out of scope`);
+      `${fileSources.get(file)} "files" lists ${file}: tests/ is deliberately out of scope`);
     assert.ok(!NOT_CHECKED.has(file),
-      `tsconfig.json "files" lists ${file}, which is a generated install output`);
+      `${fileSources.get(file)} "files" lists ${file}, which is a generated install output`);
   }
 });
 
