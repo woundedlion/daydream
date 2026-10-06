@@ -299,6 +299,36 @@ test('removing an instance drops the staggered groups it shared', async () => {
   assertGreen(store);
 });
 
+test('shared interpolation groups schedule once and survive unrelated edits', async () => {
+  /** @type {string[]} */
+  let sharers = [];
+  const store = await makeStore({ mutate: (document) => {
+    const shared = document.descriptor.parameters
+      .filter((parameter) => parameter.id.startsWith('warp2.')
+        && parameter.storage === 'binary32')
+      .slice(0, 2);
+    sharers = shared.map((parameter) => parameter.id.slice('warp2.'.length));
+    for (const parameter of shared)
+      parameter.interpolation = { ...parameter.interpolation, group: 'warp2.mix' };
+    addStaggered(document);
+  } });
+  assert.equal(sharers.length, 2);
+  const staggeredGroups = () => store.document().descriptor.path_policies
+    .find((policy) => policy.id === 'staggered').groups;
+  const operator = store.chain().find((entry) => entry.label === 'warp2').operator;
+
+  assert.equal(store.replaceSpan(WARP, 0, [{ label: 'warp3', operator }]).ok, true);
+  assert.equal(staggeredGroups().filter((group) => group === 'warp3.mix').length, 1);
+  for (const field of sharers)
+    assert.equal(staggeredGroups().includes(`warp3.${field}`), false, field);
+  assertGreen(store);
+
+  assert.equal(store.replaceSpan(1, 1, []).ok, true);
+  assert.ok(staggeredGroups().includes('warp2.mix'));
+  assert.ok(staggeredGroups().includes('warp3.mix'));
+  assertGreen(store);
+});
+
 test('a crossing cannot be removed, only replaced', async () => {
   const store = await makeStore();
   const before = store.document();
