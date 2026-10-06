@@ -299,7 +299,7 @@
 }
 
 .chain-chip--bypassed .chain-chip-name {
-  opacity: 0.45;
+  color: var(--muted-text);
   text-decoration: line-through;
 }
 
@@ -404,11 +404,11 @@
 
 /* Topology-deactivated fields stay editable; baked fields are disabled. */
 .chain-param[data-deactivated="true"] > :not(.chain-param-note) {
-  opacity: 0.45;
+  color: var(--muted-text);
 }
 
 /* The row generates no box, so its reason is a node of its own, on a line
-   under the control it dims. */
+   under the deactivated control. */
 .chain-param-note {
   grid-column: 1 / -1;
   max-width: 12rem;
