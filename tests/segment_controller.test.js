@@ -53,7 +53,7 @@ const EXPECTED_CONSOLE_MESSAGES = {
   error: [
     /^\[Segmented\] Worker seg \d+ error:/,
     /^\[Segmented\] Worker seg \d+ message deserialization failed$/,
-    /^SegmentController\.composite: display-buffer alias diverged /,
+    /^SegmentCompositor\.composite: display-buffer alias diverged /,
   ],
 };
 const PASSTHROUGH_CONSOLE_MESSAGES = {
