@@ -515,9 +515,10 @@ export function pctSuffix(val) {
 
 /**
  * Derives the C++ funcName and SolidBuilder recipe expression for a solid spec.
- * The funcName is the base plus one suffix per op, in hundredths plus `_hk` for
- * hankin (`_bevel20`, `_hk58`); the recipe is the chained
- * SolidBuilder(...).build() call.
+ * The funcName is the base plus one suffix per op: `t`-valued params in
+ * hundredths (`_bevel20`, `_snub50_tw00`), hankin in whole degrees (`_hk58`),
+ * relax in iterations (`_relax100`), parameterless ops by name (`_kis`). The
+ * recipe is the chained SolidBuilder(...).build() call.
  * @param {SolidSpec} item - The solid spec; its op chain must be non-empty.
  * @param {string} [baseNamespace] - Namespace qualifying the seed call (e.g. "Archimedean"). Omit only when the caller wants the funcName alone; a recipe pasted into the engine must carry it.
  * @returns {{funcName: string, recipe: string}} The generated C++ function name and SolidBuilder recipe expression.
