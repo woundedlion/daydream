@@ -25,6 +25,7 @@ const {
   computeInternalAngle,
   snapToStep,
   seedOpParams,
+  faceNormal,
   isConvexFace,
   fanTriangulateFace,
   uniqueEdges,
@@ -615,6 +616,19 @@ test('the preview converts a hankin angle in the float precision the paste uses'
     assert.equal(calls[0].args[0], Math.fround(angle * D2R_F32));
     assert.notEqual(calls[0].args[0], Math.fround(angle * (Math.PI / 180)));
   }
+});
+
+/** Verifies the Newell normal of a triangle off every coordinate plane is its edge cross product. */
+test('faceNormal of a tilted triangle is its edge cross product', () => {
+  const vertices = [{ x: 1, y: 2, z: 3 }, { x: 4, y: 0, z: 5 }, { x: 2, y: 6, z: 1 }];
+  const [a, b, c] = vertices;
+  const u = { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z };
+  const v = { x: c.x - a.x, y: c.y - a.y, z: c.z - a.z };
+  assert.deepEqual(faceNormal(vertices, [0, 1, 2]), {
+    x: u.y * v.z - u.z * v.y,
+    y: u.z * v.x - u.x * v.z,
+    z: u.x * v.y - u.y * v.x,
+  });
 });
 
 test('isConvexFace accepts a convex face', () => {
