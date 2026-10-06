@@ -237,8 +237,9 @@ test('an engine reporting no generation is never stale', () => {
 test('an engine enum value is logged by its constant name', () => {
   const RESULTS = { OK: 0, READONLY: 1, OUT_OF_RANGE: 2 };
   assert.equal(enumConstantName(RESULTS, 1), 'READONLY');
-  assert.equal(enumConstantName(RESULTS, 9), 'unrecognized result',
+  assert.equal(enumConstantName(RESULTS, 9), 'value 9',
     'a value the mirrored table lacks still names something in the log line');
+  assert.equal(enumConstantName(RESULTS, { value: 9 }), 'value 9');
 });
 
 test('document enum options normalize case, whitespace, and hyphens', () => {
