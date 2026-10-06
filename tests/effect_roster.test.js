@@ -1,6 +1,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { favoritesFor, resolutionEffects, resolveActiveEffect } from '../src/effects/effect_roster.js';
+import { readFileSync } from 'node:fs';
+import { favoritesFor, resolutionEffects, resolveActiveEffect, SHADER_DOCUMENT_EFFECTS } from '../src/effects/effect_roster.js';
+
+test('the shader-document roster names exactly the documents that ship', () => {
+  const manifest = JSON.parse(readFileSync(
+    new URL('../generated/shader/patterns/catalog.json', import.meta.url),
+    'utf8'));
+
+  assert.deepEqual([...SHADER_DOCUMENT_EFFECTS].sort(),
+    Object.keys(manifest.source_documents).sort(),
+    'the workbench offers exactly the source_documents the manifest lists, '
+    + 'while this roster is what routes ?effect=<id> to the workbench page and '
+    + 'what the URL validator admits: a document in one and not the other '
+    + 'ships with a deep link that silently falls back to the default effect');
+});
 
 test('unknown resolutions use the high-resolution favorites', (t) => {
   const messages = [];
