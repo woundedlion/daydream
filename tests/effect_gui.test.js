@@ -486,8 +486,8 @@ test('a schema rebuild keeps the stage folders the user collapsed', () => {
   h.state.generation = 8;
   h.panel.sync();
 
-  assert.deepEqual(h.gui().folders.map((f) => f.name), ['Camera', 'Curl', 'Spin + Wander', 'Folded Sinusoidal', 'Primitive Lattice', 'Generated Triadic'],
-    'the panel was rebuilt');
+  assert.equal(h.guis.length, 2, 'the panel was rebuilt');
+  assert.deepEqual(h.gui().folders.map((f) => f.name), ['Camera', 'Curl', 'Spin + Wander', 'Folded Sinusoidal', 'Primitive Lattice', 'Generated Triadic']);
   assert.equal(folder('Curl').closed, true);
   assert.equal(folder('Generated Triadic').closed, true);
   assert.equal(folder('Primitive Lattice').closed, false, 'the rest stay open');
@@ -2384,7 +2384,7 @@ test('destroy cancels a pending Export flash', () => {
   mock.timers.tick(FLASH_MS);
 
   assert.equal(stale.ctrl('export').label, '\u2717',
-    'the flash timer fired into no destroyed controller');
+    'the flash timer fired into a destroyed controller');
 });
 
 // mount() places the built panel in the page.
