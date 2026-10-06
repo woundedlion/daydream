@@ -483,19 +483,19 @@ test('repeated repaints write stat-bar visibility only when it changes', () => {
   assert.equal(displayWrites, 4, 'an inactive repaint has nothing left to restore');
 });
 
-test('a spawning pool reports the worker count instead of a table', () => {
+test('a spawning pool reports warm-up without a stale worker count', () => {
   const { doc, stats } = makeDoc();
   const view = new SegmentStatsView(doc);
   view.update(readyState(4, { ready: false }));
 
   const box = stats.firstElementChild;
   assert.equal(box.getAttribute('role'), 'status');
-  assert.deepEqual(box.childNodes, ['Spawning 4 workers…']);
+  assert.deepEqual(box.childNodes, ['Spawning workers…']);
   assert.deepEqual(box.children, [], 'the count is a text node, not an element');
 
   view.update(readyState(8, { ready: false }));
   assert.equal(stats.firstElementChild, box);
-  assert.deepEqual(box.childNodes, ['Spawning 8 workers…']);
+  assert.deepEqual(box.childNodes, ['Spawning workers…']);
 });
 
 test('each fault code names its own source in the headline', () => {

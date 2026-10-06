@@ -179,7 +179,7 @@ export class SegmentStatsView {
 
     // Spawning: the pool has no timings to show yet.
     if (!state.ready) {
-      const message = `Spawning ${state.count} workers…`;
+      const message = 'Spawning workers…';
       if (el.firstElementChild?.getAttribute('role') === 'status') {
         if (el.firstElementChild.textContent !== message)
           el.firstElementChild.replaceChildren(message);
