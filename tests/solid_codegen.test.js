@@ -837,7 +837,8 @@ test('geodesicTriangleVertices reuses grid points across sub-triangles', () => {
 test('geodesicTriangleVertices survives a triangle collapsed on the origin', () => {
   const origin = { x: 0, y: 0, z: 0 };
   const flat = geodesicTriangleVertices(origin, origin, origin, 2);
-  assert.ok(flat.every(Number.isFinite));
+  assert.equal(flat.length, 9 * 2 * 2, 'every cell of the n=2 subdivision is still emitted');
+  assert.ok(flat.every((v) => v === 0), 'the collapsed vertices keep the origin');
 });
 
 /** A list of uniform 20px rows, the layout the op-chain reorder math reads. */
