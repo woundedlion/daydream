@@ -268,24 +268,24 @@ test('OrbitControls carries the tuning fields initScene assigns', () => {
     'the camera is held as `object`');
 });
 
-test('listenToKeyEvents records the target under the same name on both', () => {
+test('listenToKeyEvents routes keydown on the target and dispose() removes it, on both', () => {
   const real = realControls();
   const double = new fake.OrbitControls(new THREE.PerspectiveCamera(45, 1, 0.1, 1000),
     controlsCanvas());
-  const target = fakeElement('canvas', { allowRedundantRemoval: true });
+  const realTarget = fakeElement('canvas', { allowRedundantRemoval: true });
+  const doubleTarget = fakeElement('canvas');
 
-  real.listenToKeyEvents(target);
-  double.listenToKeyEvents(target);
-  assert.equal(real._domElementKeyEvents, target);
-  assert.equal(double._domElementKeyEvents, target, 'the double records it elsewhere');
-  assert.deepEqual(target.listeners.map((l) => l.type), ['keydown'],
+  real.listenToKeyEvents(realTarget);
+  double.listenToKeyEvents(doubleTarget);
+  assert.deepEqual(realTarget.listeners.map((l) => l.type), ['keydown'],
     'the real controls take the keyboard route the canvas focuses into');
+  assert.deepEqual(doubleTarget.listeners.map((l) => l.type), ['keydown'],
+    'the double takes the same keyboard route');
 
   real.dispose();
   double.dispose();
-  assert.equal(real._domElementKeyEvents, null);
-  assert.equal(double._domElementKeyEvents, null, 'the double kept the key-events target');
-  assert.deepEqual(target.listeners, [], 'dispose() gives the keyboard route back');
+  assert.deepEqual(realTarget.listeners, [], 'dispose() gives the keyboard route back');
+  assert.deepEqual(doubleTarget.listeners, [], 'the double kept the keyboard route');
 });
 
 test('the basic material exposes the dot shader injection chunk exactly once', () => {

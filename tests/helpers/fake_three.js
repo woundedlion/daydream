@@ -220,18 +220,26 @@ export class AmbientLight extends Object3D {}
 export class DirectionalLight extends Object3D {}
 export class SpotLight extends Object3D {}
 
-// The state names are three's own (`object`, `_domElementKeyEvents`), so a test
-// reading them reads what a browser would. `updates` is this double's counter.
+// `object` is three's own state name, so a test reading it reads what a browser
+// would. `updates` is this double's counter.
 export class OrbitControls {
+  #keyTarget = null;
+  #onKeyDown = () => {};
   /** @param {PerspectiveCamera} camera @param {Object} domElement */
   constructor(camera, domElement) {
     this.object = camera;
     this.domElement = domElement;
-    this._domElementKeyEvents = null;
     this.updates = 0;
   }
   /** @param {Object} domElement */
-  listenToKeyEvents(domElement) { this._domElementKeyEvents = domElement; }
+  listenToKeyEvents(domElement) {
+    domElement.addEventListener('keydown', this.#onKeyDown);
+    this.#keyTarget = domElement;
+  }
   update() { this.updates += 1; }
-  dispose() { this._domElementKeyEvents = null; log.push('controls.dispose'); }
+  dispose() {
+    this.#keyTarget?.removeEventListener('keydown', this.#onKeyDown);
+    this.#keyTarget = null;
+    log.push('controls.dispose');
+  }
 }
