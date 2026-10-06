@@ -175,7 +175,7 @@ test('a fully resolved panel is looked up once, not every frame', () => {
   const first = lookups.length;
   view.update(2, null);
 
-  assert.equal(first, 10, 'expected one lookup per desktop/mobile cell');
+  assert.equal(first, Object.values(STATS_CELL_IDS).flat().length, 'expected one lookup per desktop/mobile cell');
   assert.equal(lookups.length, first, 'the resolved panel was re-queried');
 });
 
@@ -185,7 +185,7 @@ test('a partially mounted panel keeps re-querying and warns once', () => {
 
   const messages = captureWarnings(() => { view.update(1, null); view.update(2, null); });
 
-  assert.ok(lookups.length > 10, 'gave up on a cell that had not mounted yet');
+  assert.ok(lookups.length > Object.values(STATS_CELL_IDS).flat().length, 'gave up on a cell that had not mounted yet');
   assert.equal(messages.length, 1, 'the absent-cell warning repeats every frame');
   assert.match(messages[0], /stat-stack-m/);
   // The cells that did resolve still repaint while the missing one is awaited.
@@ -242,7 +242,7 @@ test('clear resolves a partially mounted panel and warns once without throwing',
   const warnings = captureWarnings(() => {view.clear(); view.clear();});
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /stat-stack-m/);
-  assert.ok(lookups.length > 10);
+  assert.ok(lookups.length > Object.values(STATS_CELL_IDS).flat().length);
   for (const cell of Object.values(byId)) assert.equal(cell.textContent, 'Unavailable');
   byId['stat-stack-m'] = fakeElement('span');
   view.clear();
