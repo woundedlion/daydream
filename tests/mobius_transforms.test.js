@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { constructorToObject, glslConstants } from './helpers/source_transpile.js';
 
 const {
-  cmult, cadd, snapComplex,
+  cmult, cadd, snapCoefficientComponent,
   elliptic, hyperbolic, loxodromic, parabolic, inversion, tumble, cayley,
   glslComplexFunctions, glslProjectionFunctions, mobiusCodeString,
   stereo, projectDiv, STEREO_INF, STEREO_POLE_EPS, STEREO_AZIMUTH_EPS,
@@ -37,36 +37,36 @@ function determinant({ A, B, C, D }) {
   return { re: ad.re - bc.re, im: ad.im - bc.im };
 }
 
-// --- snapComplex ----------------------------------------------------------
+// --- snapCoefficientComponent ----------------------------------------------------------
 
 /** Values within twice the threshold of zero collapse to exactly 0. */
-test('snapComplex snaps near-zero values to exactly 0', () => {
-  assert.equal(snapComplex(0.05), 0);
-  assert.equal(snapComplex(-0.09), 0);
-  assert.equal(snapComplex(0), 0);
+test('snapCoefficientComponent snaps near-zero values to exactly 0', () => {
+  assert.equal(snapCoefficientComponent(0.05), 0);
+  assert.equal(snapCoefficientComponent(-0.09), 0);
+  assert.equal(snapCoefficientComponent(0), 0);
 });
 
 /** Values within threshold of an integer snap to that integer. */
-test('snapComplex snaps to the nearest integer within threshold', () => {
-  assert.equal(snapComplex(0.98), 1);
-  assert.equal(snapComplex(1.03), 1);
-  assert.equal(snapComplex(-2.02), -2);
-  assert.equal(snapComplex(1.96, 0.05), 2);
+test('snapCoefficientComponent snaps to the nearest integer within threshold', () => {
+  assert.equal(snapCoefficientComponent(0.98), 1);
+  assert.equal(snapCoefficientComponent(1.03), 1);
+  assert.equal(snapCoefficientComponent(-2.02), -2);
+  assert.equal(snapCoefficientComponent(1.96, 0.05), 2);
 });
 
 /** Values farther than threshold from an integer pass through unchanged. */
-test('snapComplex leaves values outside threshold untouched', () => {
-  assert.equal(snapComplex(0.5), 0.5);
-  assert.equal(snapComplex(1.2), 1.2);
-  assert.equal(snapComplex(-1.5), -1.5);
+test('snapCoefficientComponent leaves values outside threshold untouched', () => {
+  assert.equal(snapCoefficientComponent(0.5), 0.5);
+  assert.equal(snapCoefficientComponent(1.2), 1.2);
+  assert.equal(snapCoefficientComponent(-1.5), -1.5);
   // 1.93 is 0.07 from 2, just outside the 0.05 default threshold.
-  assert.equal(snapComplex(1.93), 1.93);
+  assert.equal(snapCoefficientComponent(1.93), 1.93);
 });
 
 /** A caller-supplied threshold overrides the default snap distance. */
-test('snapComplex respects an explicit threshold', () => {
-  assert.equal(snapComplex(1.09, 0.1), 1);
-  assert.equal(snapComplex(1.09, 0.05), 1.09);
+test('snapCoefficientComponent respects an explicit threshold', () => {
+  assert.equal(snapCoefficientComponent(1.09, 0.1), 1);
+  assert.equal(snapCoefficientComponent(1.09, 0.05), 1.09);
 });
 
 // --- complex arithmetic ---------------------------------------------------

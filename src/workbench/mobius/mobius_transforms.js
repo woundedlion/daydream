@@ -177,7 +177,7 @@ export const glslProjectionFunctions = `
  * @param {number} [threshold=0.05] - Maximum distance to the nearest integer for snapping.
  * @returns {number} The snapped value.
  */
-export function snapComplex(value, threshold = 0.05) {
+export function snapCoefficientComponent(value, threshold = 0.05) {
   let v = value;
   if (Math.abs(v) < threshold * 2) v = 0.0;
   if (Math.abs(v - Math.round(v)) < threshold) v = Math.round(v);
