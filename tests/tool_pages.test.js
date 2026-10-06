@@ -462,6 +462,7 @@ const CONTRAST_SURFACES = {
     '.chain-chip': '.chain-chip',
     '.chain-chip:hover, .chain-chip:focus-visible': '.chain-chip',
     '.chain-chip[aria-current="true"]': '.chain-chip[aria-current="true"]',
+    '.chain-chip--bypassed .chain-chip-name': '.chain-chip',
     '.chain-chip-remove, .chain-chip-bypass, .chain-chip-move': '.chain-chip',
     ['.chain-chip-remove:hover, .chain-chip-remove:focus-visible,'
       + ' .chain-chip-bypass:hover:not(:disabled), .chain-chip-bypass:focus-visible,'
@@ -472,6 +473,7 @@ const CONTRAST_SURFACES = {
     '.chain-chip-rename': '.chain-chip-rename',
     '.chain-param-name': '.chain-chip',
     '.chain-param-note': '.chain-chip',
+    '.chain-param[data-deactivated="true"] > :not(.chain-param-note)': '.chain-chip',
     '.chain-param-control': '.chain-chip',
     '.chain-param-option': '.chain-param-option',
     '.chain-param-value': '.chain-param-value',
