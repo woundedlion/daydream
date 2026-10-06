@@ -209,7 +209,6 @@ test('_closed tracks the collapse state open() and close() set', async () => {
   assert.equal(folder._closed, false);
 });
 
-// '.lil-children' and '.lil-display' are not reachable through a controller property.
 test('the panel classes the scroll restore and the stylesheet select on hold',
   async () => {
     const gui = await realGUI();
