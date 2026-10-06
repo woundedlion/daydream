@@ -1223,7 +1223,7 @@ export function opTopologyKey(o) {
  */
 export function createOpGate(validator, retries = 3) {
   let generation = 0;
-  /** @type {{signature: string, promise: Promise<?OpGateVerdict>}|null} */
+  /** @type {{signature: string, promise: Promise<?OpGateVerdict>, started: number}|null} */
   let pending = null;
   /** @type {?string} */
   let lastSignature = null;
