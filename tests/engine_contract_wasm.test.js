@@ -464,6 +464,8 @@ test('applied chain definitions and parameter pause behavior match the fake engi
   for (const [method, args] of [
     ['setParameter', ['camera.wander', 0.2]],
     ['setParameter', ['sample.coverage-mode', 2]],
+    ['setParameter', ['sample.coverage-mode', 1.6]],
+    ['setShaderChainParameters', [[{ name: 'sample.coverage-mode', value: 0.6 }]]],
     ['setShaderChainParameters', [[{ name: 'sample.pattern-freq', value: 1.3 }]]],
   ]) {
     engine.setAnimationsPaused(false);
