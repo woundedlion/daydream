@@ -71,13 +71,15 @@ async function renderWith(effect, rect, frames, width = W, height = H) {
  * @param {number} [width] - Resolution width; the suite default (W).
  * @param {number} [height] - Resolution height; the suite default (H).
  * @returns {Promise<{canvas: Uint16Array, clips: string[], compacts: Uint16Array[],
- *   rects: Array<Object>}>} The composited canvas and the per-segment pieces.
+ *   rects: Array<Object>, readbacks: Uint16Array[]}>} The composited canvas, the
+ *   per-segment pieces, and each worker's full-canvas readback.
  */
 async function compositeSegments(effect, total, frames, width = W, height = H) {
   const canvas = new Uint16Array(width * height * 3);
   const clips = [];
   const compacts = [];
   const rects = [];
+  const readbacks = [];
   for (let id = 0; id < total; id++) {
     const rect = computeSegmentRange(id, total, width, height);
     const { clip, pixels } = await renderWith(effect, rect, frames, width, height);
@@ -87,8 +89,9 @@ async function compositeSegments(effect, total, frames, width = W, height = H) {
     clips.push(clip);
     compacts.push(compact);
     rects.push(rect);
+    readbacks.push(pixels);
   }
-  return { canvas, clips, compacts, rects };
+  return { canvas, clips, compacts, rects, readbacks };
 }
 
 /**
@@ -101,6 +104,28 @@ function firstDifference(a, b) {
   assert.equal(a.length, b.length, 'buffers must be the same length to compare');
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return i;
   return -1;
+}
+
+/**
+ * Asserts each worker's readback outside its band differs from the unclipped
+ * frame, so a clip reported as narrowed did not draw the whole canvas.
+ * @param {Uint16Array[]} readbacks - Each worker's full-canvas readback.
+ * @param {Array<Object>} rects - Each worker's segment rectangle.
+ * @param {Uint16Array} full - The unclipped reference readback.
+ * @param {number} width - Canvas width in pixels.
+ */
+function assertBandsNarrowed(readbacks, rects, full, width) {
+  readbacks.forEach((pixels, id) => {
+    const { x0, x1, y0, y1 } = rects[id];
+    let differs = false;
+    for (let i = 0; i < pixels.length && !differs; i++) {
+      const p = Math.floor(i / 3);
+      const x = p % width, y = Math.floor(p / width);
+      const inside = x >= x0 && x < x1 && y >= y0 && y < y1;
+      differs = !inside && pixels[i] !== full[i];
+    }
+    assert.ok(differs, `segment ${id} of ${rects.length} drew the unclipped frame outside its band`);
+  });
 }
 
 // One unclipped reference frame shared across cases; building a module is the
@@ -116,10 +141,12 @@ test('the reference frame is a real image, not a constant the stitch cannot fail
 });
 
 test('four clipped segment renders stitch into the unclipped frame', async () => {
-  const { canvas, clips, compacts, rects } = await compositeSegments(CLIPPED_EFFECT, 4, FRAMES);
+  const { canvas, clips, compacts, rects, readbacks } =
+    await compositeSegments(CLIPPED_EFFECT, 4, FRAMES);
 
   assert.deepEqual(clips, ['APPLIED', 'APPLIED', 'APPLIED', 'APPLIED'],
     'every band must narrow, or the workers are each drawing the whole canvas');
+  assertBandsNarrowed(readbacks, rects, reference.pixels, W);
   const at = firstDifference(canvas, reference.pixels);
   assert.equal(at, -1, at < 0 ? '' : `component ${at}: `
     + `composited ${canvas[at]} vs full-frame ${reference.pixels[at]}`);
@@ -136,9 +163,11 @@ test('four clipped segment renders stitch into the unclipped frame', async () =>
 
 test('the stitch holds at device-backed and simulator-only segment counts', async () => {
   for (const total of [2, 6, 8]) {
-    const { canvas, clips } = await compositeSegments(CLIPPED_EFFECT, total, FRAMES);
+    const { canvas, clips, rects, readbacks } =
+      await compositeSegments(CLIPPED_EFFECT, total, FRAMES);
     assert.equal(clips.filter((c) => c === 'APPLIED').length, total,
       `every one of the ${total} bands must narrow`);
+    assertBandsNarrowed(readbacks, rects, reference.pixels, W);
     const at = firstDifference(canvas, reference.pixels);
     assert.equal(at, -1, at < 0 ? '' : `${total} segments differ at component ${at}: `
       + `composited ${canvas[at]} vs full-frame ${reference.pixels[at]}`);
@@ -151,9 +180,10 @@ test('production resolution stitches at every supported segment count', async ()
     { x0: 0, x1: width, y0: 0, y1: height }, FRAMES, width, height);
   assert.ok(new Set(full.pixels).size > 1);
   for (const total of [2, 4, 6, 8]) {
-    const { canvas, clips } = await compositeSegments(
+    const { canvas, clips, rects, readbacks } = await compositeSegments(
       CLIPPED_EFFECT, total, FRAMES, width, height);
     assert.equal(clips.filter(clip => clip === 'APPLIED').length, total);
+    assertBandsNarrowed(readbacks, rects, full.pixels, width);
     assert.equal(firstDifference(canvas, full.pixels), -1, `${total} segments at ${width}x${height}`);
   }
 });
