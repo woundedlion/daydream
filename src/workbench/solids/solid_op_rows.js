@@ -192,7 +192,7 @@ export function buildOpRow(op, index, { opDef, count, on, doc = document }) {
   sweep.setAttribute('role', 'img');
   headerLeft.append(handle, upButton, downButton, label, sweep);
 
-  const removeButton = buildButton(doc, 'remove-op-btn text-slate-500 hover:text-white',
+  const removeButton = buildButton(doc, 'remove-op-btn text-slate-400 hover:text-white',
     '×', `Remove ${op.op} at position ${index + 1}`);
   header.append(headerLeft, removeButton);
   el.appendChild(header);
