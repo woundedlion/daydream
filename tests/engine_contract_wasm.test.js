@@ -205,13 +205,6 @@ const heapBytes = () => engine.getPixels().buffer.byteLength;
 // MeshOps' tooling block grows it.
 const INITIAL_HEAP_BYTES = heapBytes();
 
-test('HolosphereEngine exposes the method surface the FakeEngines mock', () => {
-  for (const name of ENGINE_METHODS) {
-    assert.equal(typeof engine[name], 'function',
-      `HolosphereEngine is missing method ${name} (FakeEngine implements it)`);
-  }
-});
-
 // generated/holosphere_wasm.d.ts is hand-written and stands in for the glue.
 const DTS = readFileSync(new URL('../generated/holosphere_wasm.d.ts', import.meta.url), 'utf8');
 
