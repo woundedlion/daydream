@@ -42,8 +42,8 @@ export function createSegmentPoolSpawner(segments, requestedCount, nav, isMobile
  * @param {Window | typeof globalThis} [deps.win] - Window supplying the page layout media query.
  * @param {(message: string) => void} deps.showNotice - Owner-tagged sink for the
  *   fallback report.
- * @returns {ReturnType<typeof createSegmentSpawnGuard> & {dispose: () => void}} The spawn guard, whose
- *   strand() the page teardown runs.
+ * @returns {ReturnType<typeof createSegmentSpawnGuard> & {dispose: () => void}} The spawn guard plus dispose(),
+ *   which page teardown runs to detach the layout listener and strand pending spawns.
  */
 export function createSegmentedPovControls({
   gui,
