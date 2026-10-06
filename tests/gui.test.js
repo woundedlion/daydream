@@ -234,8 +234,6 @@ test('rollback restores an unflushed control value to runtime sinks and URL', ()
  */
 test('DeepLinkGUI.add ignores an out-of-list URL value for a dropdown', () => {
   const url = installRecordingWindow('?resolution=GARBAGE');
-  // Rejecting the value rewrites the URL through the 200ms debounce; drive it
-  // under mock timers so the pending write can't fire after afterEach drops window.
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const obj = { resolution: 'Phantasm (288x144)' };
@@ -476,8 +474,6 @@ test('DeepLinkGUI.addSession keeps a session control out of the URL', () => {
  */
 test('DeepLinkGUI.add rejects a non-numeric URL value for a slider', () => {
   const url = installRecordingWindow('?speed=fast');
-  // Rejecting the value rewrites it to the default through the 200ms debounce; drive
-  // it under mock timers so the pending write can't fire after afterEach drops window.
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const obj = { speed: 1.0 };
@@ -504,8 +500,6 @@ test('DeepLinkGUI.add rejects a non-numeric URL value for a slider', () => {
  * does not replay.
  */
 test('DeepLinkGUI.add maps boolean URL spellings for a checkbox', () => {
-  // The unrecognized-token case writes the default through the 200ms
-  // debounce; drive all writes under mock timers so none fire after afterEach.
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const warnings = captureWarnings(() => {
