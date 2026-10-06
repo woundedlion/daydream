@@ -272,6 +272,8 @@ test('a loaded plane-skipping chain reaches the plane vocabulary through Delete'
 test('pipeline arrows, wheel and background arrow keys scroll the viewport', async () => {
   const h = await makeStrip();
   const viewport = h.container.querySelector('.chain-strip-viewport');
+  assert.equal(viewport.getAttribute('role'), 'group');
+  assert.equal(viewport.getAttribute('aria-label'), 'Scrollable shader chain');
   const buttons = h.container.querySelectorAll('.chain-scroll-button');
   viewport.clientWidth = 400;
   viewport.scrollWidth = 1600;
