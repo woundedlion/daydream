@@ -180,7 +180,7 @@ export class SegmentController {
     /** @type {SegmentStatsView} */
     this.statsView = new SegmentStatsView(statsDoc);
 
-    // Segment count create() last requested, reused by a rebuild. Matches the
+    // Last legal segment count create() accepted, reused by a rebuild. Matches the
     // per-segment array lengths only while a pool stands.
     this.count = 4;
     // Carried into a freshly-spawned pool.
