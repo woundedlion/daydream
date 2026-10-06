@@ -236,8 +236,13 @@ for (const operation of ['selectEffect', 'setShaderChainParameters', 'stage edit
     assert.equal(MODULE.HS_MODULE_DEAD, true);
     assert.equal(calls, 1);
     assert.match(harness.elements.get('shader-document-status').textContent, /engine halted/);
-    await harness.controller.loadSource(KALEIDOSCOPE_STAINED_GLASS, 'later.shader.json');
+    const selections = harness.selections.length;
+    const chainCalls = harness.engine.chainCalls.length;
+    assert.equal(await harness.controller.loadSource(
+      KALEIDOSCOPE_STAINED_GLASS, 'later.shader.json'), false);
     assert.equal(calls, 1);
+    assert.equal(harness.selections.length, selections, 'the later load selected no effect');
+    assert.equal(harness.engine.chainCalls.length, chainCalls, 'the later load wrote no chain');
   });
 }
 const BAKED = bakedTopologyFields(JSON.parse(ENGINE_CATALOG));
