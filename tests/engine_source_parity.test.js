@@ -14,6 +14,7 @@
 // skipping; only a local run without a checkout skips. That every case here can
 // skip is why the workflow's own declaration of the flag is pinned by a case
 // in tests/wasm_provenance.test.js that never skips.
+import { constructorToObject, glslConstants } from './helpers/source_transpile.js';
 import { engineRoot, engineMissing, engineSkip } from './helpers/engine_checkout.js';
 import * as paletteEnums from './helpers/fake_palette.js';
 import { test } from 'node:test';
@@ -121,6 +122,7 @@ test('glslProjectionFunctions constants match core/math/stereographic.h', { skip
   const src = header(STEREO_H);
   const inf = engineConstant(src, 'STEREO_INF', STEREO_H);
   const glsl = MB.glslProjectionFunctions;
+  const { values } = glslConstants(glsl);
   for (const [name, value] of [
     ['STEREO_INF', inf],
     ['STEREO_POLE_EPS', engineConstant(src, 'STEREO_POLE_EPS', STEREO_H, { STEREO_INF: inf })],
@@ -128,7 +130,7 @@ test('glslProjectionFunctions constants match core/math/stereographic.h', { skip
   ]) {
     const m = glsl.match(new RegExp(`const float ${name}\\s*=\\s*([^;]+);`));
     assert.ok(m, `glslProjectionFunctions does not declare ${name}`);
-    assert.equal(Function(`const STEREO_INF = ${inf}; return ${m[1]};`)(), value,
+    assert.equal(values[name], value,
       `the shader's ${name} drifted from the engine`);
   }
 });
@@ -151,33 +153,6 @@ const ENGINE_CPP_TO_JS = [
 ];
 
 /**
- * Rewrites every `Complex(re, im)` construction in a C++ fragment as the
- * {re, im} object literal the JS port returns. The arguments can nest parens, so
- * the split is on the top-level comma rather than by regex.
- * @param {string} text - The fragment.
- * @returns {string} The fragment with each construction rewritten.
- */
-function complexToObject(text) {
-  let source = text;
-  let at = 0;
-  while ((at = source.indexOf('Complex(', at)) !== -1) {
-    const open = at + 'Complex'.length;
-    let depth = 0, comma = -1, close = -1;
-    for (let i = open; i < source.length; i++) {
-      if (source[i] === '(') depth += 1;
-      else if (source[i] === ')' && (depth -= 1) === 0) { close = i; break; }
-      else if (source[i] === ',' && depth === 1) comma = i;
-    }
-    assert.ok(comma > open && close > comma,
-      `unreadable Complex(...) at "${source.slice(at, at + 60)}"`);
-    source = `${source.slice(0, at)}({ re: (${source.slice(open + 1, comma)}), `
-      + `im: (${source.slice(comma + 1, close)}) })${source.slice(close + 1)}`;
-    at = 0;
-  }
-  return source;
-}
-
-/**
  * Transpiles one `inline Complex NAME(...)` engine body into a JS function, so
  * the comparison runs the header's own arithmetic rather than a second
  * transcription of it. Both sides then evaluate in doubles, which makes the
@@ -194,7 +169,7 @@ function transpileEngineComplex(src, name, params, bindings) {
   for (const [pattern, replacement] of ENGINE_CPP_TO_JS) {
     body = body.replace(pattern, /** @type {string} */ (replacement));
   }
-  body = complexToObject(body);
+  body = constructorToObject(body, 'Complex');
   assert.doesNotMatch(body, /::|\b(?:sqrtf|fminf|fmaxf|float|Complex)\b/,
     `${name} still holds C++ this reader cannot translate: ${body}`);
   return Function(...Object.keys(bindings),
