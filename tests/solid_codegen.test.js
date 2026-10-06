@@ -204,6 +204,8 @@ test('pctSuffix quantizes to hundredths and pads to two digits', () => {
   assert.equal(pctSuffix(0.5), '50');
   assert.equal(pctSuffix(0.3), '30');
   assert.equal(pctSuffix(0.30000000000000004), '30');
+  assert.equal(pctSuffix(0.29), '29', '0.29 * 100 lands just under 29 and must round up');
+  assert.equal(pctSuffix(0.256), '26');
   assert.equal(pctSuffix(1), '100');
 });
 
@@ -234,6 +236,14 @@ test('generateFuncAndRecipe handles hankin (angle * D2R) and relax (iter)', () =
   const { funcName, recipe } = generateFuncAndRecipe(item);
   assert.equal(funcName, 'cube_hk30_relax200');
   assert.equal(recipe, 'SolidBuilder(cube(a, b), a, b).hankin(30.0f * D2R).relax(200).build()');
+});
+
+/** Verifies the hankin funcName suffix names the nearest whole degree. */
+test('generateFuncAndRecipe rounds a hankin angle to the nearest degree in the funcName', () => {
+  const name = (angle) => generateFuncAndRecipe({ base: 'cube', ops: [{ op: 'hankin', params: { angle } }] }).funcName;
+  assert.equal(name(54.6), 'cube_hk55');
+  assert.equal(name(54.4), 'cube_hk54');
+  assert.equal(name(0.29 * 100), 'cube_hk29');
 });
 
 /** Verifies a relax with zero iterations is rejected: the engine's apply_step refuses a bake-less RELAX below one iteration. */
