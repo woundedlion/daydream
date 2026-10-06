@@ -4,6 +4,8 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { servedPages } from './helpers/site_pages.js';
+import { fakeElement } from './helpers/fake_dom.js';
+import { buildOpRow } from '../src/workbench/solids/solid_op_rows.js';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PAGES = servedPages()
@@ -756,4 +758,18 @@ test('shared keyboard rings outrank Firefox preflight without changing styleshee
     assert.match(body, new RegExp(`outline: 2px solid var\\(${token}\\)`));
     assert.match(body, /outline-offset: 2px/);
   }
+});
+
+
+test('the rendered solids remove glyph clears AA against its op-row fill', () => {
+  const row = buildOpRow({op: 'dual', params: {}}, 0, {opDef: {params: {}}, count: 1,
+    on: {wireDrag() {}, move() {}, remove() {}, setParam() {}},
+    doc: {createElement: tag => fakeElement(tag), createElementNS: (ns, tag) => fakeElement(tag)}});
+  const remove = row.querySelector('.remove-op-btn');
+  const textClass = remove.className.split(/\s+/).find(name => /^text-slate-/.test(name));
+  assert.ok(textClass, 'the remove glyph has no text color');
+  const cascade = ['tools.css', 'solids.css', 'tailwind.css'].map(name => read('tools', name)).join('\n');
+  assert.ok(contrast(cascade, `.${textClass}`, '.op-item') >= AA_CONTRAST);
+  assert.ok(contrast(`${cascade} .dim {color: #64748b}`, '.dim', '.op-item') < AA_CONTRAST,
+    'the contrast guard must reject the former dim glyph');
 });
