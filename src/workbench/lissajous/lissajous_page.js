@@ -49,9 +49,7 @@ const lineMaterial = new THREE.LineBasicMaterial({
 });
 
 const initThree = () => {
-  const result = initScene('canvasContainer', 'threeCanvas', {
-    cameraPosition: [1.5, 1.5, 3],
-  });
+  const result = initScene('canvasContainer', 'threeCanvas');
   scene = result.scene;
 
   // Cancel the pending frame so a queued rebuild cannot run against the
