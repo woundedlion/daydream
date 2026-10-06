@@ -130,8 +130,7 @@ body {
   padding: 0.625rem;
 }
 
-.tab-content .param-group > h3,
-.tab-content .param-group > label {
+.tab-content .param-group > h3 {
   font-size: 0.9375rem;
   line-height: 1.25rem;
 }
@@ -146,11 +145,6 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
-}
-
-.recipe-group > h3 {
-  font-size: 0.9375rem;
-  line-height: 1.25rem;
 }
 
 .hue-card-content {
