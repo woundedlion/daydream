@@ -224,3 +224,33 @@ test('the view reads only the injected document', () => {
 
   assert.equal(byId['perf-stats'].textContent, '1.000 ms');
 });
+
+
+test('clear replaces every desktop and mobile metric while retaining its last perf class', () => {
+  const {doc, byId} = makeDoc();
+  const view = new GlobalStatsView(doc);
+  view.update(SLOW_FRAME_MS + 1, metrics());
+  for (const ids of Object.values(STATS_CELL_IDS))
+    for (const id of ids) assert.notEqual(byId[id].textContent, 'Unavailable', id);
+  view.clear();
+  for (const ids of Object.values(STATS_CELL_IDS))
+    for (const id of ids) assert.equal(byId[id].textContent, 'Unavailable', id);
+  for (const id of STATS_CELL_IDS.perf) assert.equal(byId[id].className, 'perf-time slow');
+  view.update(1, metrics());
+  for (const ids of Object.values(STATS_CELL_IDS))
+    for (const id of ids) assert.notEqual(byId[id].textContent, 'Unavailable', id);
+  for (const id of STATS_CELL_IDS.perf) assert.equal(byId[id].className, 'perf-time');
+});
+
+test('clear resolves a partially mounted panel and warns once without throwing', () => {
+  const {doc, byId, lookups} = makeDoc(['stat-stack-m']);
+  const view = new GlobalStatsView(doc);
+  const warnings = captureWarnings(() => {view.clear(); view.clear();});
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /stat-stack-m/);
+  assert.ok(lookups.length > 10);
+  for (const cell of Object.values(byId)) assert.equal(cell.textContent, 'Unavailable');
+  byId['stat-stack-m'] = fakeElement('span');
+  view.clear();
+  assert.equal(byId['stat-stack-m'].textContent, 'Unavailable');
+});
