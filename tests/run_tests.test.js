@@ -1,11 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { appendFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, isAbsolute, join, matchesGlob, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expectFailure, fixtureRepo, isolatedGitEnv } from './helpers/fixture_repo.js';
-import { COVERAGE, lineCoverage } from '../scripts/run-tests.mjs';
+import { BRANCH_FLOOR, COVERAGE, LINE_FLOOR, lineCoverage } from '../scripts/run-tests.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = resolve(HERE, '../scripts/run-tests.mjs');
@@ -145,7 +145,7 @@ test('a loaded module the suite never executes fails the line floor', () => {
     (_, index) => `  if (n === ${index}) return ${index};`).join('\n');
   writeFileSync(join(root, 'lib.mjs'),
     `export const value = 4;\nexport function unreached(n) {\n${branches}\n  return -1;\n}\n`);
-  assert.match(failOutput(PATTERN), /line coverage does not meet threshold of 95%/);
+  assert.match(failOutput(PATTERN), /lib\.mjs line coverage .* below its 95% floor/);
 });
 
 // Every guard line runs, so the line floor holds while forty consequents never do.
@@ -155,24 +155,39 @@ test('a loaded module whose branches the suite never takes fails the branch floo
   writeFileSync(join(root, 'lib.mjs'),
     `export const value = 4;\nexport function pick(n) {\n${guards}\n  return -1;\n}\npick(-1);\n`);
   const output = failOutput(PATTERN);
-  assert.doesNotMatch(output, /line coverage does not meet/);
-  assert.match(output, /branch coverage does not meet threshold of 90%/);
+  assert.doesNotMatch(output, /line coverage .* below/);
+  assert.match(output, /lib\.mjs branch coverage .* below its 90% floor/);
 });
 
-// Pins both floors and every exclusion.
-test('the coverage floors exclude only the code no unit test executes', () => {
-  assert.deepEqual(COVERAGE, [
-    '--experimental-test-coverage',
-    '--test-coverage-lines=95',
-    '--test-coverage-branches=90',
-    '--test-coverage-exclude=tests/**',
-    `--test-coverage-exclude=${fileURLToPath(new URL('../scripts/record-module-loads.mjs', import.meta.url))}`,
-    '--test-coverage-exclude=generated/shader/**',
-    '--test-coverage-exclude=generated/holosphere_wasm.js',
-    '--test-coverage-exclude=scripts/browser-smoke.mjs',
-    '--test-coverage-exclude=scripts/probe_harness.mjs',
-    '--test-coverage-exclude=scripts/*-probe.mjs',
-  ]);
+test('the coverage floors are 95% of lines and 90% of branches', () => {
+  assert.equal(LINE_FLOOR, 95);
+  assert.equal(BRANCH_FLOOR, 90);
+});
+
+const REPO = resolve(HERE, '..');
+const IMPORT = /(?:\bfrom|\bimport)\s*\(?\s*['"](\.{1,2}\/[^'"]+)['"]/g;
+
+const importsUnder = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+  const path = join(dir, entry.name);
+  if (entry.isDirectory()) return entry.name === 'node_modules' ? [] : importsUnder(path);
+  if (!/\.m?js$/.test(entry.name)) return [];
+  return [...readFileSync(path, 'utf8').matchAll(IMPORT)]
+    .map((match) => relative(REPO, resolve(dirname(path), match[1])).replaceAll('\\', '/'));
+});
+
+test('coverage excludes no tracked module a unit test imports', () => {
+  const tracked = new Set(execFileSync('git', ['ls-files', '-z'], { cwd: REPO, encoding: 'utf8' })
+    .split('\0').filter(Boolean));
+  const imported = [...new Set(importsUnder(join(REPO, 'tests')))]
+    .filter((path) => tracked.has(path) && !path.startsWith('tests/'));
+  assert.ok(imported.includes('scripts/run-tests.mjs'), 'the import scan missed a known import');
+  const globs = COVERAGE
+    .filter((flag) => flag.startsWith('--test-coverage-exclude='))
+    .map((flag) => flag.slice('--test-coverage-exclude='.length))
+    .map((glob) => (isAbsolute(glob) ? relative(REPO, glob) : glob).replaceAll('\\', '/'));
+  assert.deepEqual(imported.flatMap((path) => globs
+    .filter((glob) => matchesGlob(path, glob))
+    .map((glob) => `${path} matches ${glob}`)), []);
 });
 
 test('a case that executes no assertion fails', () => {

@@ -12,22 +12,21 @@ const SKIP_DIRS = new Set([
   'node_modules', '.git', '.worktrees', 'vendor', 'three.js', 'engine',
 ]);
 
-// Execution floors over the modules the roster gate proves were loaded, set
-// under a measurement of this suite. The exclusions are the code no unit test
-// executes: the suites themselves, the engine's installed shader mirror, the
-// generated Emscripten glue, and the scripts a browser runs.
-// tests/run_tests.test.js pins the list.
+// Per-file execution floors over the modules the roster gate proves were
+// loaded; tests/uncovered-modules.json may lower one file's floor with a reason.
+export const LINE_FLOOR = 95;
+export const BRANCH_FLOOR = 90;
+
+// Coverage measurement for the suite. The exclusions are code no unit test
+// imports: the suites themselves, the engine's installed shader mirror, the
+// generated Emscripten glue, and the scripts only a browser workflow runs.
 export const COVERAGE = [
   '--experimental-test-coverage',
-  '--test-coverage-lines=95',
-  '--test-coverage-branches=90',
   '--test-coverage-exclude=tests/**',
   `--test-coverage-exclude=${fileURLToPath(new URL('./record-module-loads.mjs', import.meta.url))}`,
   '--test-coverage-exclude=generated/shader/**',
   '--test-coverage-exclude=generated/holosphere_wasm.js',
   '--test-coverage-exclude=scripts/browser-smoke.mjs',
-  '--test-coverage-exclude=scripts/probe_harness.mjs',
-  '--test-coverage-exclude=scripts/*-probe.mjs',
 ];
 
 export function lineCoverage(report, column = 0) {
@@ -161,7 +160,7 @@ const main = () => {
       return typeof reason !== 'string' || reason.trim() === ''
         || (typeof entry !== 'string'
           && ((!('lines' in entry) && !('branches' in entry))
-            || Object.entries({ lines: 95, branches: 90 }).some(([metric, limit]) =>
+            || Object.entries({ lines: LINE_FLOOR, branches: BRANCH_FLOOR }).some(([metric, limit]) =>
               metric in entry && (!Number.isFinite(entry[metric])
                 || entry[metric] <= 0 || entry[metric] >= limit))));
     })
@@ -172,15 +171,15 @@ const main = () => {
   const redundant = Object.keys(exempt).flatMap((file) =>
     typeof exempt[file] === 'string' ? (loaded.has(file) ? [file] : [])
       : Object.keys(exempt[file]).filter((key) => key !== 'reason')
-        .filter((key) => key === 'lines' ? coverage.get(file) >= 95 : branches.get(file) >= 90)
+        .filter((key) => key === 'lines' ? coverage.get(file) >= LINE_FLOOR : branches.get(file) >= BRANCH_FLOOR)
         .map((key) => `${file} (${key})`)).sort();
   const failures = [];
   for (const [file, lines] of coverage) {
     if (!roster.includes(file)) continue;
-    const floor = exempt[file]?.lines ?? 95;
+    const floor = exempt[file]?.lines ?? LINE_FLOOR;
     if (lines < floor)
       failures.push(`run-tests: ${file} line coverage ${lines}% is below its ${floor}% floor.`);
-    const branchFloor = exempt[file]?.branches ?? 90;
+    const branchFloor = exempt[file]?.branches ?? BRANCH_FLOOR;
     if (branches.get(file) < branchFloor)
       failures.push(`run-tests: ${file} branch coverage ${branches.get(file)}% is below its ${branchFloor}% floor.`);
   }
