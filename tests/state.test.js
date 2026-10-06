@@ -737,6 +737,15 @@ test('URLSync construction disposes the previous writer', () => {
   }
 });
 
+test('disposing a superseded URLSync leaves the current writer active', () => {
+  installRecordingWindow('');
+  const s = new AppState({});
+  const first = new URLSync(s, ['effect']);
+  const second = new URLSync(s, ['effect']);
+  first.dispose();
+  assert.equal(getActiveURLSync(), second);
+});
+
 test('URLSync.dispose stops a later setParam from re-arming the flush', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
@@ -1028,6 +1037,41 @@ test('URLSync auto-flushes a tracked-key change once after the debounce', () => 
     assert.equal(calls.length, 1, 'exactly one debounced write at 200 ms');
     const params = new URLSearchParams(calls[0].split('?')[1]);
     assert.equal(params.get('effect'), 'Moire', 'the new value is written');
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+test('URLSync writes nothing for a change to an untracked key', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const calls = installRecordingWindow('?effect=Voronoi', '/sim');
+    const s = new AppState({ effect: 'Voronoi', paused: false });
+    new URLSync(s, ['effect']);
+
+    s.set('paused', true);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS * 2);
+    assert.equal(calls.length, 0);
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+test('URLSync restarts the debounce on a tracked change inside the window', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const calls = installRecordingWindow('?effect=Voronoi', '/sim');
+    const s = new AppState({ effect: 'Voronoi' });
+    new URLSync(s, ['effect']);
+
+    s.set('effect', 'Moire');
+    mock.timers.tick(150);
+    s.set('effect', 'Plot');
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS - 1);
+    assert.equal(calls.length, 0, 'the second change pushed the write back');
+    mock.timers.tick(1);
+    assert.equal(calls.length, 1);
+    assert.equal(new URLSearchParams(calls[0].split('?')[1]).get('effect'), 'Plot');
   } finally {
     mock.timers.reset();
   }
