@@ -1615,6 +1615,9 @@ test('unsweepableReason names the ops the engine morph path declines', () => {
     'a composite lowers to primitives the engine sweeps');
   assert.equal(unsweepableReason({ op: 'notanop', params: {} }), null,
     'an op off the table is a different defect, reported by savedChainShapeError');
+  assert.equal(unsweepableReason({ op: 'truncate', params: {} }), null,
+    'a missing param is a different defect, reported by savedChainShapeError');
+  assert.equal(unsweepableReason('truncate'), null);
 
   assert.match(unsweepableReason({ op: 'expand', params: { t: 0.5 } }), /^expand is not swept by the morph path/,
     'expand has a leg kind but no sweep coverage, so a shape using it is generated whole');
