@@ -2310,13 +2310,20 @@ test('a fault latched by the overrun re-blit paints the overlay on the same tick
 
     // Corrupt the published generation so the overrun re-blit's pre-pass faults.
     c.frameState.results[1] = { ...c.frameState.results[1], x1: 99 };
-    let statsShown = 0;
-    c.updateStats = () => { statsShown++; };
+    const stats = fakeElement();
+    c.statsView.doc = {
+      getElementById: (id) => id === 'segment-stats' ? stats : null,
+      createElement: (tag) => fakeElement(tag),
+    };
+    c.active = true;
+    const workers = [...c.workers];
+    const posted = workers.map((w) => w.posted.length);
 
     c.tick(); // overrun branch: composite() latches the fault mid-tick
     assert.equal(c.faulted, true, 'the re-blit pre-pass latched the fault');
-    // onWorkerFault paints as it latches; tick()'s post-composite guard paints again.
-    assert.equal(statsShown, 2, 'the overlay painted on the faulting tick, not the next one');
+    assert.equal(stats.firstElementChild?.getAttribute('role'), 'alert',
+      'the overlay painted on the faulting tick, not the next one');
+    assert.deepEqual(workers.map((w) => w.posted.length), posted, 'the faulting tick dispatched no render');
   } finally {
     restore();
   }
