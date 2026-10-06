@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { MIME, serveManifest } from '../scripts/serve-manifest.mjs';
+import { serveManifest } from '../scripts/serve-manifest.mjs';
 import { request } from './helpers/http_request.js';
 
 const ENTRIES = ['index.html', 'engine.wasm', 'styles/index.css', 'styles/fonts/pin.woff2', 'gone.js', '../outside.txt', 'styles/fonts',
@@ -87,7 +87,6 @@ test('a .wasm is served as application/wasm', () => withSite(async (get) => {
   assert.equal(wasm.status, 200);
   assert.equal(wasm.type, 'application/wasm',
     'any other type drops Emscripten to the ArrayBuffer path');
-  assert.equal(MIME['.wasm'], 'application/wasm');
 }));
 
 test('nothing outside the manifest set is served', () => withSite(async (get) => {
