@@ -39,5 +39,39 @@
   "src/ui/effect_panel_view.js": {
     "reason": "Browser probes exercise focused controller DOM paths.",
     "branches": 81.82
+  },
+  "scripts/probe_harness.mjs": {
+    "reason": "runProbe and the page-side measurement helpers need a launched Chrome and a served site; tests/probe_failures.test.js and tests/browser_launch.test.js cover the check accounting, teardown and launch arguments, and .github/workflows/browser-smoke.yml runs every probe through runProbe.",
+    "lines": 74.29
+  },
+  "scripts/lissajous-probe.mjs": {
+    "reason": "Its page.evaluate and $eval callbacks and its runProbe entry run only against a live Chrome page; tests/probe_failures.test.js drives each exported probe interaction against a fake page, and .github/workflows/browser-smoke.yml runs the probe in Chrome.",
+    "lines": 50.74,
+    "branches": 27.27
+  },
+  "scripts/mobius-probe.mjs": {
+    "reason": "Its page.evaluate and $eval callbacks and its runProbe entry run only against a live Chrome page; tests/probe_failures.test.js drives each exported probe interaction against a fake page, and .github/workflows/browser-smoke.yml runs the probe in Chrome.",
+    "lines": 87.97,
+    "branches": 73.91
+  },
+  "scripts/palettes-probe.mjs": {
+    "reason": "Its page.evaluate and $eval callbacks and its runProbe entry run only against a live Chrome page; tests/probe_failures.test.js drives each exported probe interaction against a fake page, and .github/workflows/browser-smoke.yml runs the probe in Chrome.",
+    "lines": 39.66,
+    "branches": 56.52
+  },
+  "scripts/panel-probe.mjs": {
+    "reason": "Its page.evaluate and $eval callbacks and its runProbe entry run only against a live Chrome page; tests/probe_failures.test.js drives each exported probe interaction against a fake page, and .github/workflows/browser-smoke.yml runs the probe in Chrome.",
+    "lines": 36.95,
+    "branches": 29.09
+  },
+  "scripts/solids-probe.mjs": {
+    "reason": "Its page.evaluate and $eval callbacks and its runProbe entry run only against a live Chrome page; tests/probe_failures.test.js drives each exported probe interaction against a fake page, and .github/workflows/browser-smoke.yml runs the probe in Chrome.",
+    "lines": 29.48,
+    "branches": 50
+  },
+  "scripts/workbench-probe.mjs": {
+    "reason": "Its page.evaluate and $eval callbacks and its runProbe entry run only against a live Chrome page; tests/probe_failures.test.js drives each exported probe interaction against a fake page, and .github/workflows/browser-smoke.yml runs the probe in Chrome.",
+    "lines": 34.65,
+    "branches": 22.97
   }
 }
