@@ -126,8 +126,8 @@ test('glslProjectionFunctions constants match core/math/stereographic.h', { skip
 // with the JS the mobius_transforms port writes them as. Comments are stripped
 // first so a `//` cannot swallow a later substitution.
 const ENGINE_CPP_TO_JS = [
-  [/std::numeric_limits<float>::min\(\)/g, '(2 ** -1022)'],
   [/\/\/[^\n]*/g, ''],
+  [/std::numeric_limits<float>::min\(\)/g, '(2 ** -1022)'],
   [/\bconst(?:expr)? float\b/g, 'const'],
   [/\bfloat\b/g, 'let'],
   [/\bstd::(max|min|abs)\(/g, 'Math.$1('],
