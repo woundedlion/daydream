@@ -11,7 +11,7 @@ import { createPointerDrag, innerRect } from '../../shared/pointer_drag.js';
 import { createSliderProxy } from '../../shared/slider.js';
 import {
   elliptic, hyperbolic, loxodromic, parabolic,
-  inversion, tumble, cayley, snapComplex,
+  inversion, tumble, cayley, snapCoefficientComponent,
   glslComplexFunctions, glslProjectionFunctions, mobiusCodeString,
 } from './mobius_transforms.js';
 
@@ -331,8 +331,8 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
     let im = ny * maxExtent;
     re = Math.max(-maxExtent, Math.min(maxExtent, re));
     im = Math.max(-maxExtent, Math.min(maxExtent, im));
-    re = snapComplex(re);
-    im = snapComplex(im);
+    re = snapCoefficientComponent(re);
+    im = snapCoefficientComponent(im);
 
     paramObj.re = re;
     paramObj.im = im;
@@ -377,8 +377,8 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
     let im = home ? 0 : paramObj.im + (axis === 'im' ? delta : 0);
     // Scale the snap band to the key step so a single nudge escapes the
     // zero band (2*threshold) instead of latching back onto 0.
-    re = snapComplex(Math.max(-maxExtent, Math.min(maxExtent, re)), step / 4);
-    im = snapComplex(Math.max(-maxExtent, Math.min(maxExtent, im)), step / 4);
+    re = snapCoefficientComponent(Math.max(-maxExtent, Math.min(maxExtent, re)), step / 4);
+    im = snapCoefficientComponent(Math.max(-maxExtent, Math.min(maxExtent, im)), step / 4);
     paramObj.re = re;
     paramObj.im = im;
     updateUI();
