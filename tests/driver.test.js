@@ -1548,7 +1548,7 @@ test('refreshLabels acquires only the camera-facing axis ends', () => {
 });
 
 test('refreshLabels keeps the visible set the same at any orbit distance', () => {
-  const direction = new THREE.Vector3(0.25, 1, 0.4).normalize();
+  const direction = new THREE.Vector3(0.2, 1, 0.4).normalize();
 
   const near = labelCtx(direction.clone().setLength(140));
   Daydream.prototype.refreshLabels.call(near);
@@ -1557,6 +1557,7 @@ test('refreshLabels keeps the visible set the same at any orbit distance', () =>
 
   assert.deepEqual(labelTexts(far), labelTexts(near));
   const visible = labelTexts(near);
+  assert.ok(visible.includes('X'), 'the near X axis discriminates a fixed CAMERA_Z cutoff');
   assert.ok(visible.length > 0, 'no axis label was placed at all');
   assert.ok(visible.length < 6, 'every axis end was labelled, so nothing was culled');
 });
@@ -1938,4 +1939,17 @@ test('orbit bounds keep cap tops strictly inside both clipping planes at every d
     assert.ok(ctx.controls.maxDistance > Daydream.CAMERA_Z);
   }
   assert.equal(updates, 3, 'a resolution change reclamps the live orbit');
+});
+
+
+test('refreshLabels culls an axis below the scaled facing cutoff at both orbit distances', () => {
+  const direction = new THREE.Vector3(0.1, 1, 0.4).normalize();
+  for (const distance of [140, 900]) {
+    const ctx = labelCtx(direction.clone().setLength(distance));
+    Daydream.prototype.refreshLabels.call(ctx);
+    const visible = labelTexts(ctx);
+    assert.ok(!visible.includes('X'), 'a raw ratio cutoff would expose X');
+    assert.ok(visible.includes('Y'));
+    assert.ok(visible.includes('Z'));
+  }
 });
