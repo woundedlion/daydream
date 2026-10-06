@@ -28,8 +28,6 @@ restoreDocumentAfterEach();
 
 afterEach(() => { mock.timers.reset(); });
 
-const ENUM = { value: 0, requestedValue: 0, options: ['None'], animated: true };
-
 function chainSnapshot(value = 0) {
   return {
     schemaVersion: 2,
@@ -43,27 +41,9 @@ function chainSnapshot(value = 0) {
   };
 }
 
-function fixedShaderParams() {
-  return [
-    { name: 'Function', ...ENUM },
-    { name: 'Pattern Freq', value: 1, min: 0, max: 10, animated: true },
-    { name: 'Projection', ...ENUM },
-    { name: 'Singularity Fade', value: 1, min: 0, max: 2, animated: true },
-    { name: 'Projection Frame', ...ENUM },
-    { name: 'Projection Wander', value: 0, min: 0, max: 1, animated: true },
-    { name: 'Camera Wander', value: 1, min: 0, max: 1, animated: true },
-    { name: 'Surface Noise', ...ENUM },
-    { name: 'Surface Noise Scale', value: 1, min: 0, max: 8, animated: true },
-    { name: 'Lens', ...ENUM },
-    { name: 'Planar Warp 1', ...ENUM },
-    { name: 'Planar Warp 1 Strength', value: 1, min: 0, max: 4, animated: true },
-    { name: 'Planar Warp 2', ...ENUM },
-    { name: 'Signal Weight', ...ENUM },
-    { name: 'Value Transfer', ...ENUM },
-    { name: 'Coverage', ...ENUM },
-    { name: 'Palette', ...ENUM },
-    { name: 'Hue Shift Mode', ...ENUM },
-    { name: 'Hue Shift Amount', value: 0, min: 0, max: 1, animated: true },
+function chainSnapshotParams() {
+  return [...chainParams(),
+    { name: 'colorize.hue-shift', value: 0, min: 0, max: 1, animated: true },
   ];
 }
 
@@ -799,7 +779,7 @@ test('an engine-rejected unversioned snapshot is reported before session control
   delete stored.schemaVersion;
   const current = chainSnapshot(0);
   const h = makeHarness({
-    params: fixedShaderParams(),
+    params: chainSnapshotParams(),
     chainSnapshotEnabled: true,
     chainSnapshot: current,
     acceptedStored: { [CHAIN_SNAPSHOT_STORAGE_KEY]: JSON.stringify(stored) },
@@ -811,15 +791,15 @@ test('an engine-rejected unversioned snapshot is reported before session control
   assert.deepEqual(h.configNotices, ['The chain snapshot was rejected. Its original text remains preserved.']);
   assert.deepEqual(h.warnings,
     ['Shader Workbench: chain snapshot was rejected: INVALID_VALUE']);
-  assert.equal(h.gui().ctrl('Lens').session, true);
+  assert.equal(h.gui().ctrl('sample.coverage-mode').session, true);
   assert.equal(h.gui().stored[CHAIN_SNAPSHOT_STORAGE_KEY], JSON.stringify(stored));
-  assert.equal(h.gui().stored['__accepted.Lens'], undefined);
+  assert.equal(h.gui().stored['__accepted.sample.coverage-mode'], undefined);
 });
 
 test('a rejected chain snapshot is reported and announces no import', () => {
   const stored = chainSnapshot(0);
   const h = makeHarness({
-    params: fixedShaderParams(),
+    params: chainSnapshotParams(),
     chainSnapshotEnabled: true,
     chainSnapshot: { ...stored },
     acceptedStored: { [CHAIN_SNAPSHOT_STORAGE_KEY]: JSON.stringify(stored) },
@@ -838,7 +818,7 @@ test('a stored snapshot that is not a config object never reaches the engine', (
   // JS rejects non-object URL values; the engine restore validates object members.
   for (const text of ['{not json', 'null', '[]', '"snapshot"', '7']) {
     const h = makeHarness({
-      params: fixedShaderParams(),
+      params: chainSnapshotParams(),
       chainSnapshotEnabled: true,
       chainSnapshot: null,
       acceptedStored: { [CHAIN_SNAPSHOT_STORAGE_KEY]: text },
@@ -852,28 +832,28 @@ test('a stored snapshot that is not a config object never reaches the engine', (
   }
 });
 
-test('Lens Glitch to None persists the exhaustive snapshot bit-exactly', () => {
+test('Coverage weight to none persists the exhaustive snapshot bit-exactly', () => {
   const initial = chainSnapshot(1);
   const updated = chainSnapshot(0);
-  const params = fixedShaderParams();
-  Object.assign(params.find((parameter) => parameter.name === 'Lens'), {
-    value: 1, requestedValue: 1, options: ['None', 'Glitch'],
+  const params = chainSnapshotParams();
+  Object.assign(params.find((parameter) => parameter.name === 'sample.coverage-mode'), {
+    value: 1, requestedValue: 1, options: ['none', 'weight'],
   });
   const h = makeHarness({
     params,
     chainSnapshotEnabled: true,
     chainSnapshot: initial,
     onEngineParam: (name, value, state) => {
-      if (name === 'Lens' && value === 0) state.chainSnapshot = updated;
+      if (name === 'sample.coverage-mode' && value === 0) state.chainSnapshot = updated;
     },
   });
   h.panel.build();
   h.gui().storedWrites.length = 0;
   h.writes.length = 0;
 
-  h.gui().ctrl('Lens').setValue(0);
+  h.gui().ctrl('sample.coverage-mode').setValue(0);
 
-  assert.deepEqual(h.writes, ['engine:Lens=0', 'worker:Lens=0']);
+  assert.deepEqual(h.writes, ['engine:sample.coverage-mode=0', 'worker:sample.coverage-mode=0']);
   assert.deepEqual(h.gui().storedWrites, [
     [CHAIN_SNAPSHOT_STORAGE_KEY, JSON.stringify(updated)],
   ]);
@@ -2202,7 +2182,7 @@ test('ShaderChain Export copies the versioned chain snapshot', async () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   const snapshot = chainSnapshot(0);
   const h = makeHarness({
-    params: fixedShaderParams(), chainSnapshotEnabled: true,
+    params: chainSnapshotParams(), chainSnapshotEnabled: true,
     chainSnapshot: snapshot,
   });
   h.panel.build();
@@ -2279,7 +2259,7 @@ test('Export without a copy operation reports the failure', () => {
 test('ShaderChain Export names a missing clipboard operation', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   const h = makeHarness({
-    params: fixedShaderParams(),
+    params: chainSnapshotParams(),
     chainSnapshotEnabled: true,
     chainSnapshot: { schemaVersion: 2 },
     copyText: null,
@@ -2295,7 +2275,7 @@ test('ShaderChain Export names a missing clipboard operation', () => {
 test('chain Export fails visibly when the typed snapshot is unavailable', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   const h = makeHarness({
-    params: fixedShaderParams(),
+    params: chainSnapshotParams(),
     chainSnapshotEnabled: true,
     chainSnapshot: null,
   });
@@ -2500,15 +2480,15 @@ test('a slider drag defers persistence to the pointer release', () => {
 test('a ShaderChain drag writes one chain snapshot, at the release', () => {
   const snapshot = (hue) => chainSnapshot(hue);
   const h = makeHarness({
-    params: fixedShaderParams(),
+    params: chainSnapshotParams(),
     chainSnapshotEnabled: true,
     chainSnapshot: snapshot(0),
     onEngineParam: (name, value, state) => {
-      if (name === 'Hue Shift Amount') state.chainSnapshot = snapshot(value);
+      if (name === 'colorize.hue-shift') state.chainSnapshot = snapshot(value);
     },
   });
   h.panel.build();
-  const controller = h.gui().ctrl('Hue Shift Amount');
+  const controller = h.gui().ctrl('colorize.hue-shift');
   h.gui().storedWrites.length = 0;
 
   controller.domElement.dispatch('pointerdown', pointerDown());
@@ -2555,17 +2535,17 @@ test('a schema rebuild mid-drag still lands the write the drag deferred', () => 
 test('a schema rebuild mid-drag lands the whole workbench snapshot', () => {
   const snapshot = (hue) => chainSnapshot(hue);
   const h = makeHarness({
-    params: fixedShaderParams(),
+    params: chainSnapshotParams(),
     chainSnapshotEnabled: true,
     chainSnapshot: snapshot(0),
     generation: 3,
     onEngineParam: (name, value, state) => {
-      if (name === 'Hue Shift Amount') state.chainSnapshot = snapshot(value);
+      if (name === 'colorize.hue-shift') state.chainSnapshot = snapshot(value);
     },
   });
   h.panel.build();
   h.panel.mount();
-  const controller = h.gui().ctrl('Hue Shift Amount');
+  const controller = h.gui().ctrl('colorize.hue-shift');
   const dragged = h.gui();
   dragged.storedWrites.length = 0;
 
