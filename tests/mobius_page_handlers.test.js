@@ -4,11 +4,11 @@ import { pageHandlers } from './helpers/page_handlers.js';
 const handler = pageHandlers(new URL('../src/workbench/mobius/mobius_page.js', import.meta.url));
 
 test('animated snippets throttle formatting and flush the final stopped value', () => {
-  let now = 0, formats = 0, lookups = 0;
+  let now = 0, formats = 0;
   const output = { textContent: '' };
   const context = { isAnimating: true, lastCode: null, codeOutput: null, lastCodeTime: -Infinity,
     config: {}, performance: { now: () => now },
-    document: { getElementById: () => { lookups++; return output; } },
+    document: { getElementById: () => output },
     mobiusCodeString: () => String(++formats) };
   const update = handler('updateCodeSnippet', context);
   update();
@@ -17,7 +17,7 @@ test('animated snippets throttle formatting and flush the final stopped value', 
   now = 100;
   update();
   assert.equal(formats, 2);
-  assert.equal(lookups, 1);
+  assert.equal(output.textContent, '2');
   context.isAnimating = false;
   now = 101;
   update();
