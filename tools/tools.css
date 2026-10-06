@@ -7,7 +7,7 @@
  * Shared design tokens and control styling for the tool pages.
  * Link this before a page's own styles so page-specific rules win.
  * Pages keep their own layout CSS and may add extra tokens (e.g. accent
- * colors) or override individual properties such as the slider thumb offset.
+ * colors).
  */
 
 :root {
