@@ -120,7 +120,7 @@ test('every per-segment metric renders under its own column header', () => {
   new SegmentStatsView(doc).update(readyState(3));
 
   const { head, cell } = grid(stats);
-  assert.deepEqual(head, ['', 'Range', 'Compute', 'Scr A', 'Scr B', 'Persist']);
+  assert.deepEqual(head, ['', 'Range', 'Compute', 'Scr A KiB', 'Scr B KiB', 'Persist KiB']);
 
   for (let s = 0; s < 3; s++) {
     const row = s + 1; // row 0 is the header
@@ -128,9 +128,9 @@ test('every per-segment metric renders under its own column header', () => {
     assert.equal(cell(row, 'Range').textContent,
       `x[${s * 10}–${s * 10 + 9}] y[${100 + s}–${200 + s}]`);
     assert.equal(cell(row, 'Compute').textContent, `${(s + 1).toFixed(1)} ms`);
-    assert.equal(cell(row, 'Scr A').textContent, `${(s + 1).toFixed(1)}`);
-    assert.equal(cell(row, 'Scr B').textContent, `${(2 * (s + 1)).toFixed(1)}`);
-    assert.equal(cell(row, 'Persist').textContent, `${(4 * (s + 1)).toFixed(1)}`);
+    assert.equal(cell(row, 'Scr A KiB').textContent, `${(s + 1).toFixed(1)}`);
+    assert.equal(cell(row, 'Scr B KiB').textContent, `${(2 * (s + 1)).toFixed(1)}`);
+    assert.equal(cell(row, 'Persist KiB').textContent, `${(4 * (s + 1)).toFixed(1)}`);
   }
 
   assert.equal(cell(4, '').textContent, 'max');
@@ -148,9 +148,9 @@ test('a segment with no frame yet shows ? for its range and - for its arenas', (
 
   const { cell } = grid(stats);
   assert.equal(cell(2, 'Range').textContent, '?');
-  assert.equal(cell(2, 'Scr A').textContent, '-');
-  assert.equal(cell(2, 'Scr B').textContent, '-');
-  assert.equal(cell(2, 'Persist').textContent, '-');
+  assert.equal(cell(2, 'Scr A KiB').textContent, '-');
+  assert.equal(cell(2, 'Scr B KiB').textContent, '-');
+  assert.equal(cell(2, 'Persist KiB').textContent, '-');
 });
 
 test('a worker that shaded the whole canvas is not reported as a band render', () => {
