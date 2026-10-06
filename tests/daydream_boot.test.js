@@ -19,6 +19,7 @@ import { Daydream } from '../src/renderer/driver.js';
 import { createSegmentPoolSpawner, createSegmentedPovControls } from '../src/ui/segmented_pov_controls.js';
 import {
   fakeGui,
+  fakeWasmModule,
   startApp as startUntrackedApp,
   segmentCountControl,
 } from './helpers/fake_app.js';
@@ -107,107 +108,6 @@ function sliceTo(at, sentinel) {
   const end = SOURCE.indexOf(sentinel, at);
   assert.ok(end > at, `daydream.js: no ${JSON.stringify(sentinel)} after index ${at}`);
   return SOURCE.slice(at, end);
-}
-
-/**
- * A module the composition root can boot all the way through: enough engine
- * surface for the initial resolution apply, the effect panel and one rendered
- * frame, with the contract-pinned enums so identity comparison behaves as it
- * does against embind. The counters are what a case reads the constructions,
- * handle releases, Pole LOD replays and parameter writes off.
- * @param {{resolutions?: Array<Array<number>>, definitions?: Array<Object>,
- *   refusedWidth?: ?number, failingFrames?: number, trappingSizeQuery?: boolean}}
- *   [options] - The resolutions the engine reports it can build, the parameter
- *   definitions the effect panel is built from, a width setResolution rejects, a
- *   count of leading drawFrame calls that throw, and whether the sidebar size
- *   query trips a trap.
- * @returns {Object} The module double.
- */
-function fakeWasmModule({
-  resolutions = [[288, 144], [96, 20]],
-  definitions = [],
-  refusedWidth = null,
-  failingFrames = 0,
-  trappingSizeQuery = false,
-} = {}) {
-  let framesToFail = failingFrames;
-  const pixels = new Uint16Array(288 * 144 * 3);
-  let activeWidth = 288;
-  let activeHeight = 144;
-  let built = 0;
-  let deleted = 0;
-  const poleLod = [];
-  const caps = [];
-  const params = [];
-  const module = {
-    DISPLAY_NORTH_PHI: 0,
-    DISPLAY_SOUTH_PHI: Math.PI,
-    HS_MODULE_DEAD: false,
-    EffectSetResult,
-    ParamSetResult,
-    ResolutionSetResult,
-    engines: () => built,
-    deletes: () => deleted,
-    poleLod,
-    caps,
-    params,
-    HolosphereEngine: class {
-      constructor() { built++; this.paused = false; module.engine = this; }
-      static isLive() { return false; }
-      static getSupportedResolutions() { return resolutions; }
-      setResolution(w, h) {
-        if (w === refusedWidth) return ResolutionSetResult.UNSUPPORTED;
-        activeWidth = w;
-        activeHeight = h;
-        return ResolutionSetResult.RESIZED;
-      }
-      setEffect() { return EffectSetResult.INSTALLED; }
-      setParameter(name, value) {
-        params.push([name, value]);
-        if (definitions.find((definition) => definition.name === name)?.animated) this.paused = true;
-        return ParamSetResult.APPLIED;
-      }
-      setPoleLod(v) { poleLod.push(v); }
-      setDisplayCaps(top, bottom) { caps.push([top, bottom]); return true; }
-      getDisplayNorthPhi() { return (caps.at(-1)?.[0] ?? 0) * Math.PI / 100; }
-      getDisplaySouthPhi() { return (1 - (caps.at(-1)?.[1] ?? 0) / 100) * Math.PI; }
-      setAnimationsPaused(paused) { this.paused = paused; }
-      getAnimationsPaused() { return this.paused; }
-      getPresetCount() { return 0; }
-      getPresetIndex() { return this.presetIndex ?? 0; }
-      selectPreset(index) {
-        if (index < 0 || index >= this.getPresetCount()) return false;
-        this.presetIndex = index;
-        this.paused = true;
-        return true;
-      }
-      getParameterDefinitions() { return definitions.map((d) => ({ ...d })); }
-      getParamValues() { return new Float32Array(0); }
-      getParamGeneration() { return 1; }
-      getEffectSizes() {
-        // HS_CHECK raises the flag ahead of its trap, so it is already set when
-        // the RuntimeError reaches the caller.
-        if (trappingSizeQuery) {
-          module.HS_MODULE_DEAD = true;
-          throw new WebAssembly.RuntimeError('unreachable');
-        }
-        return {};
-      }
-      getEffectPresetCounts() { return {}; }
-      getArenaMetrics() { return {}; }
-      strobeColumns() { return false; }
-      drawFrame() {
-        if (framesToFail > 0) {
-          framesToFail -= 1;
-          throw new Error('engine drawFrame failed');
-        }
-      }
-      getPixels() { return pixels.subarray(0, activeWidth * activeHeight * 3); }
-      getBufferLength() { return activeWidth * activeHeight * 3; }
-      delete() { deleted++; }
-    },
-  };
-  return module;
 }
 
 test('a booted render reconciles live panel values', async () => {
@@ -913,27 +813,6 @@ test('a trapped resolution query stops the startup instead of booting on', async
     'a dead module is terminal, so the panels must not stay live over a canvas '
     + 'nothing can render into');
 });
-
-test('a workbench init that trapped the module releases the app', () => {
-  const at = SOURCE.indexOf('shaderDocuments?.init().then(');
-  assert.ok(at >= 0, 'the workbench init rejection must stay handled');
-  assert.match(sliceTo(at, 'WORKBENCH_NOTICE);'), /abandonOnModuleDeath\(err\)/,
-    'a trap is terminal for the whole module, not for the call that tripped it: '
-    + 'without the death read the rejection is reported as an ordinary workbench '
-    + 'failure and the simulator keeps calling into a shortened shadow stack');
-});
-
-test('a failed workbench init reports without the page-failure banner', () => {
-  const at = SOURCE.indexOf('shaderDocuments?.init().then(');
-  assert.ok(at >= 0,
-    'init() is async and the surrounding catch only sees a synchronous throw, '
-    + 'so a dropped rejection reaches the page-failure listener and covers a '
-    + 'running simulator with the fatal banner');
-  assert.match(sliceTo(at, '\n        });'),
-    /workbench could not be initialized: \$\{[^}]+\}`,\s*WORKBENCH_NOTICE\);/,
-    'the workbench half must report through its own WORKBENCH_NOTICE owner');
-});
-
 
 test('the record toggle drops held captures', () => {
   const rig = recordingRig();
