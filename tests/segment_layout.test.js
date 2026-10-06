@@ -66,13 +66,38 @@ test('an uneven height remainder spreads one row per band', () => {
 
 // The slowest worker bounds the frame, so a remainder piled onto one band inflates
 // every parallel render by its excess.
-test('no band exceeds another by more than one row', () => {
+test('each arm tiles top-down with its spare rows on the northmost bands', () => {
   for (const { total, h } of [{ total: 6, h: 20 }, { total: 8, h: 15 },
                               { total: 4, h: 21 }, { total: 6, h: 100 }]) {
-    const heights = [];
-    for (let id = 0; id < total; id++) heights.push(computeSegmentRange(id, total, 96, h).h);
-    assert.ok(Math.max(...heights) - Math.min(...heights) <= 1,
-      `band heights ${heights} for ${total} segments over h=${h}`);
+    const bands = total / 2;
+    const q = Math.floor(h / bands);
+    for (let arm = 0; arm < 2; arm++) {
+      const rows = [];
+      for (let slot = 0; slot < bands; slot++) {
+        const r = computeSegmentRange(arm * bands + slot, total, 96, h);
+        rows.push([r.y0, r.y1]);
+      }
+      rows.sort((a, b) => a[0] - b[0]);
+      // North to south: the h % bands spare rows land one each on the northmost bands.
+      const want = [];
+      for (let band = 0, y = 0; band < bands; band++) {
+        const height = q + (band < h % bands ? 1 : 0);
+        want.push([y, y + height]);
+        y += height;
+      }
+      assert.deepEqual(rows, want, `arm ${arm}, ${total} segments over h=${h}`);
+    }
+  }
+});
+
+// Three bands per arm give the north half one band and the south half two.
+test('three bands per arm tile north then south from the pole inward', () => {
+  const slotRows = [[0, 20], [40, 60], [20, 40]];
+  for (let arm = 0; arm < 2; arm++) {
+    for (let slot = 0; slot < 3; slot++) {
+      const r = computeSegmentRange(arm * 3 + slot, 6, 96, 60);
+      assert.deepEqual([r.y0, r.y1], slotRows[slot], `rows for arm=${arm} slot=${slot}`);
+    }
   }
 });
 
