@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { constructorToObject, glslConstants } from './helpers/source_transpile.js';
 
 const {
   cmult, cadd, snapComplex,
@@ -90,24 +91,6 @@ test('cadd computes (a+bi)+(c+di)', () => {
 // implementations cannot silently diverge.
 
 /**
- * Transpiles the `const float NAME = VALUE;` declarations of a GLSL source into
- * a JS declaration preamble, so a transpiled body reads the constants the shader
- * itself compiles rather than a hand-copied second set.
- * @param {string} src - The GLSL source to scan.
- * @returns {{js: string, values: Object<string, number>}} The preamble and the values it evaluates to.
- * @details The values come from evaluating the preamble, so a constant the
- * shader derives from an earlier one is read as the shader computes it rather
- * than parsed as a literal.
- */
-function glslConstants(src) {
-  const decls = [...src.matchAll(/const\s+float\s+(\w+)\s*=\s*([^;]+);/g)];
-  const js = decls.map(([, name, value]) => `const ${name} = ${value};`).join('\n');
-  const names = decls.map(([, name]) => name);
-  const values = new Function(`${js}\nreturn { ${names.join(', ')} };`)();
-  return { js, values };
-}
-
-/**
  * Transpiles the body of one `CNum NAME(...) { ... return CNum(RE, IM); }`
  * GLSL function from `src` into a JS function over its arguments.
  * @param {string} src - The GLSL source containing the function.
@@ -127,25 +110,9 @@ function transpileGlslCNum(src, name, params = ['p', 'q']) {
   // their `Math.` prefix, and `CNum(re, im)` constructors become `{ re, im }`
   // objects. Constructors can nest parens, so split args by the top-level comma
   // rather than with a regex.
-  const toObj = (s) => {
-    let i = 0;
-    while ((i = s.indexOf('CNum(', i)) !== -1) {
-      let depth = 0, j = i + 4, start = j + 1, comma = -1, end2 = -1;
-      for (; j < s.length; j++) {
-        if (s[j] === '(') depth++;
-        else if (s[j] === ')') { if (--depth === 0) { end2 = j; break; } }
-        else if (s[j] === ',' && depth === 1) comma = j;
-      }
-      s = s.slice(0, i)
-        + `({ re: (${s.slice(start, comma)}), im: (${s.slice(comma + 1, end2)}) })`
-        + s.slice(end2 + 1);
-      i = 0;
-    }
-    return s;
-  };
-  const js = toObj(body.slice(open + 1, end)
+  const js = constructorToObject(body.slice(open + 1, end)
     .replace(/\bfloat\b/g, 'let')
-    .replace(/\b(sqrt|abs|max|min)\(/g, 'Math.$1('));
+    .replace(/\b(sqrt|abs|max|min)\(/g, 'Math.$1('), 'CNum');
   return new Function(...params, `${glslConstants(src).js}\n${js}`);
 }
 
