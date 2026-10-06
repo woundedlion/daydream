@@ -365,6 +365,7 @@ test('a row drag cannot rebuild controls after the engine stands down', () => {
   assert.equal(row.classList.contains('dragging'), false);
   drag.onStart({clientY: 0});
   drag.onMove({clientY: 10});
+  assert.equal(row.classList.contains('dragging'), false);
   drag.onEnd({clientY: 10});
   assert.equal(row.classList.contains('dragging'), false);
 });
