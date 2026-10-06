@@ -1,6 +1,6 @@
 import { fakePanelGui } from './helpers/fake_app.js';
 import { CHAIN_SNAPSHOT_STORAGE_KEY } from '../src/effects/effect_persistence.js';
-import { test, mock, afterEach } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
@@ -32,8 +32,6 @@ restoreDocumentAfterEach();
 
 // createEffectGui's effect panel, driven over doubles for every injected
 // collaborator.
-
-afterEach(() => { mock.timers.reset(); });
 
 // Collaborators are checked once, where the page is composed.
 
