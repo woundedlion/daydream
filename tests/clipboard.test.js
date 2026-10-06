@@ -81,7 +81,6 @@ test('revertText: "" still restores the idle class on revert', async () => {
 
 /** A rejected clipboard write flashes the failure label and reverts, never latching "Copied!". */
 test('a rejected clipboard write flashes the failure label, not "Copied!"', async () => {
-  const restore = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
   // Reject the async path and fail the execCommand fallback so the copy reports failure.
   Object.defineProperty(globalThis, 'navigator', {
     value: { clipboard: { writeText: async () => { throw new Error('denied'); } } },
@@ -93,24 +92,19 @@ test('a rejected clipboard write flashes the failure label, not "Copied!"', asyn
     execCommand: () => false,
   });
 
-  try {
-    const el = fakeButton('Copy');
-    const ok = await copyWithFeedback('x', {
-      element: el, copiedText: 'Copied!', failedText: 'Copy failed', revertMs: 1500,
-    });
-    assert.equal(ok, false, 'copy reports failure');
-    assert.equal(el.textContent, 'Copy failed', 'failure label flashed, not "Copied!"');
+  const el = fakeButton('Copy');
+  const ok = await copyWithFeedback('x', {
+    element: el, copiedText: 'Copied!', failedText: 'Copy failed', revertMs: 1500,
+  });
+  assert.equal(ok, false, 'copy reports failure');
+  assert.equal(el.textContent, 'Copy failed', 'failure label flashed, not "Copied!"');
 
-    mock.timers.tick(2000);
-    assert.equal(el.textContent, 'Copy', 'element reverts to idle');
-  } finally {
-    Object.defineProperty(globalThis, 'navigator', restore);
-  }
+  mock.timers.tick(2000);
+  assert.equal(el.textContent, 'Copy', 'element reverts to idle');
 });
 
 /** Verifies the legacy textarea path copies and removes its temporary node. */
 test('copyToClipboard falls back to execCommand', async () => {
-  const restore = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
   Object.defineProperty(globalThis, 'navigator', {
     value: {},
     configurable: true,
@@ -133,21 +127,16 @@ test('copyToClipboard falls back to execCommand', async () => {
     },
   });
 
-  try {
-    assert.equal(await copyToClipboard('legacy text'), true);
-    assert.equal(command, 'copy');
-    assert.equal(textarea.value, 'legacy text');
-    assert.equal(textarea.focused, true);
-    assert.equal(textarea.selected, true);
-    assert.equal(body.children.length, 0);
-  } finally {
-    Object.defineProperty(globalThis, 'navigator', restore);
-  }
+  assert.equal(await copyToClipboard('legacy text'), true);
+  assert.equal(command, 'copy');
+  assert.equal(textarea.value, 'legacy text');
+  assert.equal(textarea.focused, true);
+  assert.equal(textarea.selected, true);
+  assert.equal(body.children.length, 0);
 });
 
 /** The fallback's temporary textarea must hand focus back to the trigger. */
 test('copyToClipboard restores focus after the execCommand fallback', async () => {
-  const restore = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
   Object.defineProperty(globalThis, 'navigator', { value: {}, configurable: true });
   const trigger = fakeElement('button');
   let refocused = false;
@@ -167,16 +156,11 @@ test('copyToClipboard restores focus after the execCommand fallback', async () =
     },
   });
 
-  try {
-    assert.equal(await copyToClipboard('legacy text'), true);
-    assert.equal(refocused, true, 'the trigger regained focus');
-  } finally {
-    Object.defineProperty(globalThis, 'navigator', restore);
-  }
+  assert.equal(await copyToClipboard('legacy text'), true);
+  assert.equal(refocused, true, 'the trigger regained focus');
 });
 
 test('copyToClipboard falls back after an async clipboard rejection', async () => {
-  const restore = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
   Object.defineProperty(globalThis, 'navigator', {
     value: {
       clipboard: { writeText: async () => { throw new Error('denied'); } },
@@ -198,18 +182,13 @@ test('copyToClipboard falls back after an async clipboard rejection', async () =
     },
   });
 
-  try {
-    assert.equal(await copyToClipboard('fallback text'), true);
-    assert.equal(command, 'copy');
-  } finally {
-    Object.defineProperty(globalThis, 'navigator', restore);
-  }
+  assert.equal(await copyToClipboard('fallback text'), true);
+  assert.equal(command, 'copy');
 });
 
 /** Verifies both wireCopyBlock triggers copy the source and flash the prompt. */
 test('wireCopyBlock wires the button and block triggers', async () => {
   const writes = [];
-  const restore = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
   Object.defineProperty(globalThis, 'navigator', {
     value: { clipboard: { writeText: async (text) => { writes.push(text); } } },
     configurable: true,
@@ -221,30 +200,26 @@ test('wireCopyBlock wires the button and block triggers', async () => {
   const block = fakeElement('pre');
   const prompt = fakeElement('span');
 
-  try {
-    const detach = wireCopyBlock({ source, button, prompt, block });
-    button.dispatch('click');
-    await Promise.resolve();
-    block.dispatch('click');
-    await Promise.resolve();
+  const detach = wireCopyBlock({ source, button, prompt, block });
+  button.dispatch('click');
+  await Promise.resolve();
+  block.dispatch('click');
+  await Promise.resolve();
 
-    assert.equal(block.tabIndex, -1);
-    assert.equal(block.getAttribute('role'), null);
-    assert.equal(block.getAttribute('aria-label'), null);
-    let prevented = 0;
-    for (const key of ['Enter', ' ', 'Tab']) {
-      if (block.dispatch('keydown', { key }).defaultPrevented) prevented++;
-      await Promise.resolve();
-    }
-    assert.equal(prevented, 0);
-    assert.deepEqual(writes, Array(2).fill('generated output'));
-    assert.equal(prompt.textContent, 'Copied!');
-    detach();
-    button.dispatch('click');
-    block.dispatch('click');
+  assert.equal(block.tabIndex, -1);
+  assert.equal(block.getAttribute('role'), null);
+  assert.equal(block.getAttribute('aria-label'), null);
+  let prevented = 0;
+  for (const key of ['Enter', ' ', 'Tab']) {
+    if (block.dispatch('keydown', { key }).defaultPrevented) prevented++;
     await Promise.resolve();
-    assert.equal(writes.length, 2);
-  } finally {
-    Object.defineProperty(globalThis, 'navigator', restore);
   }
+  assert.equal(prevented, 0);
+  assert.deepEqual(writes, Array(2).fill('generated output'));
+  assert.equal(prompt.textContent, 'Copied!');
+  detach();
+  button.dispatch('click');
+  block.dispatch('click');
+  await Promise.resolve();
+  assert.equal(writes.length, 2);
 });
