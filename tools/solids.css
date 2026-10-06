@@ -403,6 +403,10 @@ body {
 
 /* Small screens: stack the columns and let the page scroll. */
 @media (max-width: 900px) {
+  :root {
+    --main-width: 100vw;
+  }
+
   body {
     flex-direction: column;
     height: auto;
