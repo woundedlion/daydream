@@ -390,7 +390,11 @@ test('PaletteOps enforces exact mirror and loop seams', () => {
   try {
     const mirror = defaultPaletteRecipe();
     mirror.domain = PaletteV4.domain.MIRROR;
-    const mirrored = Uint8Array.from(ops.compileAndBakeV4(mirror).lut);
+    const mirrorBake = ops.compileAndBakeV4(mirror);
+    assert.equal(mirrorBake.status.code, M.PaletteCompileCode.OK);
+    const mirrored = Uint8Array.from(mirrorBake.lut);
+    assert.notDeepEqual(Array.from(mirrored.slice(0, 3)), Array.from(mirrored.slice(127 * 3, 128 * 3)),
+      'the mirrored palette rises before it returns');
     for (let index = 0; index < 128; index += 1) {
       assert.deepEqual(
         Array.from(mirrored.slice(index * 3, index * 3 + 3)),
@@ -400,7 +404,11 @@ test('PaletteOps enforces exact mirror and loop seams', () => {
     const loop = defaultPaletteRecipe();
     loop.domain = PaletteV4.domain.LOOP;
     loop.hue.mode = PaletteV4.hueMode.SWEEP;
-    const looped = Uint8Array.from(ops.compileAndBakeV4(loop).lut);
+    const loopBake = ops.compileAndBakeV4(loop);
+    assert.equal(loopBake.status.code, M.PaletteCompileCode.OK);
+    const looped = Uint8Array.from(loopBake.lut);
+    assert.notDeepEqual(Array.from(looped.slice(384, 387)), Array.from(looped.slice(0, 3)),
+      'the looped palette varies between its seams');
     assert.deepEqual(Array.from(looped.slice(765)), Array.from(looped.slice(0, 3)));
   } finally {
     ops.delete();
