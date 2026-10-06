@@ -177,7 +177,8 @@ function makeTeardown({
   // Records a step, or throws in its place when the case asked that collaborator
   // to fail.
   const note = (entry) => {
-    if (failing.has(entry)) throw new Error(`${entry} failed`);
+    if (failing.has(entry) || (entry.startsWith('segments.dispose ') && failing.has('segments.dispose')))
+      throw new Error(`${entry} failed`);
     log.push(entry);
   };
   const pageTarget = fakeElement('window');
@@ -218,7 +219,7 @@ function makeTeardown({
     host,
     urlSync: { dispose() { note('urlSync.dispose'); } },
     sidebar: { dispose() { note('sidebar.dispose'); } },
-    driver: fakeDriver(log),
+    driver: { dispose() { note('driver.dispose'); } },
     segments,
     strandSegmentWork: () => { epoch += 1; note('strandSegmentWork'); },
     removeOverlay: () => note('removeOverlay'),
@@ -340,7 +341,7 @@ test('a step that throws does not strand the releases behind it', () => {
 test('every dispose step is independent of the ones before it', () => {
   const failing = new Set([
     'switches.dispose', 'stopTimers', 'effectGui.destroy', 'shaderDocuments.dispose', 'globalGui.destroy',
-    'urlSync.dispose', 'sidebar.dispose', 'strandSegmentWork', 'removeOverlay',
+    'urlSync.dispose', 'sidebar.dispose', 'driver.dispose', 'strandSegmentWork', 'segments.dispose', 'removeOverlay',
   ]);
   const t = makeTeardown({ failing });
 
