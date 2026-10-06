@@ -4,9 +4,9 @@
  */
 
 /**
- * Op dispatch plus the pure code-generation, geometry, and op-chain sequencing
- * helpers of the solids tool page. The C++ source strings are pasted verbatim
- * into the engine, so their output formatting must stay byte-for-byte stable.
+ * Solids op dispatch, C++ generation, geometry, drag-slot math, saved-card
+ * capacity, commit queue, and stateful chain validation and op gating.
+ * Generated C++ strings are pasted verbatim into the engine.
  */
 
 import {
