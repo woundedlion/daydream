@@ -227,7 +227,7 @@ test('_closed tracks the collapse state open() and close() set', async () => {
   assert.equal(folder._closed, false);
 });
 
-// effect_gui.js finds the panel's scroll container by class ('.lil-children')
+// effect_panel_view.js finds the panel's scroll container by class ('.lil-children')
 // to carry a scroll offset across a rebuild, and styles/index.css sizes the
 // preset dropdown through '.lil-display'. Neither is reachable through a
 // controller property, so a rename surfaces only as a null scroller and an
