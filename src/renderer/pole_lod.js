@@ -20,9 +20,8 @@
  *   sink, and the post-load replay.
  */
 export function createPoleLodBinding({ getEngine, onChange }) {
-  // Near-pole azimuthal shading decimation. 1.0 is the physically-neutral
-  // setting: one shade per run of columns sharing an LED footprint. Higher
-  // trades fidelity for render time; 0 disables.
+  // Near-pole azimuthal shading decimation: runs of aggressiveness / sin(phi)
+  // columns share one shade; 0 disables.
   const state = { poleLod: 0 };
   return {
     state,
