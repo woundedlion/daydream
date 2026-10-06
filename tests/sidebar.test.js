@@ -524,11 +524,13 @@ test('dispose detaches every listener/observer and clears refs', () => {
   assert.equal(sidebar.arrowRight.parentNode, null);
 });
 
-test('active effect scrolls only the list on each overflowing axis', () => {
-  const { sidebar } = makeSidebar();
+test('active effect scrolls the list horizontally and the container vertically', () => {
+  const { sidebar, container } = makeSidebar();
   sidebar.setEffects(['A', 'B'], {});
   sidebar.listEl.offsetWidth = 100;
-  sidebar.listEl.offsetHeight = 80;
+  sidebar.listEl.offsetHeight = 200;
+  container.offsetWidth = 120;
+  container.offsetHeight = 80;
   const b = sidebar.buttons.get('B');
   b.offsetLeft = 150;
   b.offsetTop = 90;
@@ -536,6 +538,7 @@ test('active effect scrolls only the list on each overflowing axis', () => {
   b.offsetHeight = 20;
   sidebar.setActive('B');
   assert.equal(sidebar.listEl.scrollLeft, 70);
-  assert.equal(sidebar.listEl.scrollTop, 30);
+  assert.equal(sidebar.listEl.scrollTop, 0);
+  assert.equal(container.scrollTop, 30);
   assert.equal(b.scrollIntoViewCalls, 0);
 });
