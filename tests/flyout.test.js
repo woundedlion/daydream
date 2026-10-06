@@ -91,6 +91,8 @@ test('flyout closes when keyboard focus leaves its panel and trigger', () => {
   h.trigger.dispatch('click');
   h.item.dispatch('focusout', {relatedTarget: h.trigger});
   assert.equal(h.trigger.getAttribute('aria-expanded'), 'true');
+  h.item.dispatch('focusout', {relatedTarget: null});
+  assert.equal(h.trigger.getAttribute('aria-expanded'), 'true');
   h.item.dispatch('focusout', {relatedTarget: h.outside});
   assert.equal(h.trigger.getAttribute('aria-expanded'), 'false');
   assert.ok(!h.root.classList.contains('is-open'));
