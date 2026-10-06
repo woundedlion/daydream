@@ -8,6 +8,7 @@ const COMPILER_URL = new URL('../../../generated/shader/shader_workbench.mjs', i
 
 import { LABEL_PATTERN, declarationFromCatalogField as parameterFromField }
   from '../../../generated/shader/shader_workbench.mjs';
+import { CHAIN_SNAPSHOT_SCHEMA_VERSION } from './shader_deeplink.js';
 
 /** @typedef {{id: string, name: string|null, min: number, max: number, default: *, curve?: string, topology?: false}} CatalogNumericField */
 /** @typedef {{id: string, topology: true, values: string[], default: *}} CatalogTopologyField */
@@ -762,7 +763,7 @@ export async function createChainDocumentStore({
 
 /** @param {*} snapshot @param {*} catalog @returns {*} */
 export function documentFromChainSnapshot(snapshot, catalog) {
-  if (snapshot?.schemaVersion !== 2 || !Array.isArray(snapshot.chain)
+  if (snapshot?.schemaVersion !== CHAIN_SNAPSHOT_SCHEMA_VERSION || !Array.isArray(snapshot.chain)
       || !Array.isArray(snapshot.parameters)) throw new Error('unsupported chain snapshot');
   const document = scratchChainDocument(catalog, snapshot.chain.map((/** @type {*} */ entry) => ({
     label: entry.instance, operator: entry.operator,
