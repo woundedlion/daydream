@@ -62,9 +62,8 @@
   outline-offset: -2px;
 }
 
-/* lil-gui injects `.lil-gui input, .lil-gui button { outline: none }`, which
-   outranks the one-class rule above; the class plus pseudo-class here outranks
-   it back. Inset because the panel's .lil-children clips an outset ring. */
+/* Inset ring inside lil-gui panels: .lil-children clips an outset ring.
+   Equal specificity with the global focus rule; this rule follows it. */
 .lil-gui :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
