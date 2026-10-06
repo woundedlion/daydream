@@ -1209,7 +1209,7 @@ const AMBO_ALIAS_T = 0.5;
 export function opTopologyKey(o) {
   const opName = typeof o === 'string' ? o : o?.op;
   if (!AMBO_ALIASING_OPS.has(opName)) return String(opName);
-  return opParams(o).t === AMBO_ALIAS_T ? `${opName}:ambo` : String(opName);
+  return Math.fround(opParams(o).t) === AMBO_ALIAS_T ? `${opName}:ambo` : String(opName);
 }
 
 /**
