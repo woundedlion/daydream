@@ -193,8 +193,6 @@ test('AppState.notify carries past a throwing subscriber', () => {
 test('URL-write retries outlast the rate-limit window', () => {
   assert.ok((URL_FLUSH_MAX_RETRIES - 1) * URL_FLUSH_RETRY_MS > 30000);
   assert.ok(URL_FLUSH_DEBOUNCE_MS < URL_FLUSH_RETRY_MS);
-  assert.equal(roundUrlNumber(1.23456789), 1.2346, 'five significant digits');
-  assert.equal(roundUrlNumber(123456789), 123460000, 'five significant digits');
 });
 
 // --- URLSync (needs a minimal window stub) ---
@@ -401,9 +399,6 @@ test('URLSync bounds its retries of a refused history write', () => {
   }
 });
 
-/**
- * The bounded ladder is sized to outlast a 30-second rate-limit window.
- */
 test('URLSync will not let a concurrent write shorten an armed retry', () => {
   const written = [];
   let refuse = true;
@@ -976,6 +971,8 @@ test('roundUrlNumber resolves every step of the engine\'s tightest param range',
 });
 
 test('roundUrlNumber is a fixed point under re-serialization', () => {
+  assert.equal(roundUrlNumber(1.23456789), 1.2346, 'five significant digits');
+  assert.equal(roundUrlNumber(123456789), 123460000, 'five significant digits');
   for (const v of [1.23456, 0.000012345, 5e-5, 1234.5678, 0.30000000000000004, 0, 2000]) {
     const once = roundUrlNumber(v);
     assert.equal(roundUrlNumber(Number(String(once))), once, `${v} is not stable`);
