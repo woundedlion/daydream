@@ -688,6 +688,8 @@ test('legalSequences bridges a span with a run of crossings', async () => {
   assert.equal(expansions.length, crossings('sphere', 'field')
     + crossings('sphere', 'plane') * crossings('plane', 'field'));
   assert.equal(expansions.includes('project.stereographic.v2 sample.grid.v3'), true);
+  assert.deepEqual(ids(store.legalSequences(PROJECT, 1, 2)), expansions,
+    'a run exactly maxLength crossings long is enumerated');
   assert.equal(store.replaceSpan(PROJECT, 1, [
     { operator: 'project.stereographic.v2' }, { operator: 'sample.grid.v3' }]).ok, true);
   assert.deepEqual(store.chain().slice(PROJECT).map((entry) => entry.operator),
