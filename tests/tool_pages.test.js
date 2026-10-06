@@ -743,3 +743,17 @@ test('the entry script and syntax failures share the guarded load failure overla
   current = null;
   assert.doesNotThrow(() => context.showFailure());
 });
+
+
+test('shared keyboard rings outrank Firefox preflight without changing stylesheet order', () => {
+  assert.match(read('tools', 'tailwind.css'), /:-moz-focusring\{outline:auto\}/);
+  for (const [path, selector, token] of [
+    [['tools', 'tools.css'], ':root :focus-visible', '--indigo-300'],
+    [['styles', 'index.css'], ':root :focus-visible:not(:where(#canvas))', '--focus-ring'],
+  ]) {
+    const body = rules(read(...path)).find(([names]) => names.split(/,\s*/).includes(selector))?.[1];
+    assert.ok(body, `${path.join("/")} has no scoped keyboard ring`);
+    assert.match(body, new RegExp(`outline: 2px solid var\\(${token}\\)`));
+    assert.match(body, /outline-offset: 2px/);
+  }
+});
