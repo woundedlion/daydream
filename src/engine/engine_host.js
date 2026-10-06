@@ -93,8 +93,9 @@ export class EngineHost {
   /**
    * Release the recorder, render adapter, engine handle, cached view, view
    * callback, and module reference, leaving the host inert. Idempotent. A
-   * recording in progress is ended but not flushed. A collaborator that throws is
-   * reported and the remaining references are still dropped.
+   * recording in progress is finalized and saved by onstop on a live page; a
+   * synchronous page discard cannot complete that callback. A collaborator that
+   * throws is reported and the remaining references are still dropped.
    * @returns {void}
    */
   dispose() {

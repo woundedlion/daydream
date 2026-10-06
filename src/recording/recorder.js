@@ -789,8 +789,8 @@ export class VideoRecorder {
 
   /**
    * Stop any active recording and release the stream tracks and offscreen canvas.
-   * Idempotent. A recording in progress is not flushed: onstop cannot complete
-   * under a synchronous page discard.
+   * Idempotent. On a live page, onstop finalizes and saves an active recording.
+   * A synchronous page discard cannot complete that callback.
    * @returns {void}
    */
   dispose() {
