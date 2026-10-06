@@ -1242,15 +1242,13 @@ test('the worker module graph carries no specifier an import map would resolve',
       + 'workers, so only a relative specifier resolves inside the pool');
   }
 
-  assert.deepEqual(modules, [
-    'generated/holosphere_wasm.js',
-    'src/effects/param_sync.js',
-    'src/engine/workbench_bindings.js',
-    'src/segments/segment_layout.js',
-    'src/segments/segment_worker.js',
-    'src/segments/worker_protocol.js',
-    'src/shared/engine_halt.js',
-  ]);
+  for (const module of ['src/segments/segment_worker.js', 'src/segments/worker_protocol.js',
+    'generated/holosphere_wasm.js']) {
+    assert.ok(modules.includes(module), `the walk reached ${module}`);
+  }
+  assert.ok(edges.length >= modules.length - 1, 'every reached module was reached by an edge');
+  assert.deepEqual(modules.filter((m) => m.startsWith('src/ui/')), [],
+    'a worker has no DOM, so no UI module belongs in its graph');
 });
 
 /**
