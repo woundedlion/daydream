@@ -29,8 +29,8 @@
 export const PROTOCOL_VERSION = 12;
 
 // Sentinel segIds for pool-wide faults with no single worker to blame:
-// FAULT_POOL for a module-load/init timeout, FAULT_RENDER for any fault raised
-// on the render path: a watchdog stall, a display-buffer geometry mismatch, or a
+// FAULT_POOL for pool-creation faults: invalid segment count, unknown resolution,
+// or module-load/init timeout. FAULT_RENDER for any fault raised on the render path: a watchdog stall, a display-buffer geometry mismatch, or a
 // rejected render. The overlay headline distinguishes them, the detail line says
 // which.
 export const FAULT_POOL = -1;
