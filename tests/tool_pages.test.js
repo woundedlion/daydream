@@ -773,3 +773,16 @@ test('the rendered solids remove glyph clears AA against its op-row fill', () =>
   assert.ok(contrast(`${cascade} .dim {color: #64748b}`, '.dim', '.op-item') < AA_CONTRAST,
     'the contrast guard must reject the former dim glyph');
 });
+
+
+test('disabled slider thumbs are muted in separate WebKit and Firefox rules', () => {
+  const css = read('tools', 'tools.css');
+  for (const pseudo of ['::-webkit-slider-thumb', '::-moz-range-thumb']) {
+    const enabled = ruleBody(css, `input[type=range]${pseudo}`);
+    const disabled = ruleBody(css, `input[type=range]:disabled${pseudo}`);
+    assert.match(enabled, /background: var\(--blue-500\)/);
+    assert.match(enabled, /cursor: pointer/);
+    assert.match(disabled, /background: var\(--slate-800\)/);
+    assert.match(disabled, /cursor: default/);
+  }
+});
