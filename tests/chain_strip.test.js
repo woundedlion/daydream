@@ -417,7 +417,9 @@ test('Delete opens a socket replacement palette containing only valid stages', a
   const palette = paletteOf(h);
   assert.equal(palette.getAttribute('role'), 'listbox');
   const entries = paletteEntries(h);
-  assert.equal(entries.length, 8,
+  assert.deepEqual(entries.map((entry) => entry.dataset.operator).sort(),
+    CATALOG.operators.filter((operator) => operator.input === 'sphere'
+      && operator.output === 'plane').map((operator) => operator.id).sort(),
     'only the projection functions valid for this socket are shown');
   assert.equal(entries[0].dataset.remove, undefined);
   const bonne = entries.find((entry) => entry.dataset.operator === 'project.bonne.v3');
