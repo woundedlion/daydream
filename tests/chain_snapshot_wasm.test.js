@@ -11,18 +11,26 @@ after(() => engine.delete());
 
 test('typed snapshots preserve evolving walk, noise, source and palette state across effect replacement', () => {
   engine.setResolution(96, 20);
-  engine.setEffect('ShaderChain');
-  assert.equal(callWorkbenchBinding(engine, 'getShaderChainBindings', 'setShaderChainParameters', [[
-    {name: 'camera.wander', value: 0.1}, {name: 'project.projection-wander', value: 0.2},
-    {name: 'sample.speed', value: 0.004}, {name: 'colorize.hue-noise-speed', value: 0.003},
-  ]]), module.ParamSetResult.APPLIED);
-  engine.setAnimationsPaused(false);
+  const install = () => {
+    engine.setEffect('ShaderChain');
+    assert.equal(callWorkbenchBinding(engine, 'getShaderChainBindings', 'setShaderChainParameters', [[
+      {name: 'camera.wander', value: 0.1}, {name: 'project.projection-wander', value: 0.2},
+      {name: 'sample.speed', value: 0.004}, {name: 'colorize.hue-noise-speed', value: 0.003},
+    ]]), module.ParamSetResult.APPLIED);
+    engine.setAnimationsPaused(false);
+  };
+  install();
   for (let frame = 0; frame < 713; frame += 1) engine.drawFrame();
   const snapshot = capture();
   assert.ok(snapshot.runtime.find((entry) => entry.instance === 'camera').state.walkTime > 0);
   assert.ok(snapshot.paletteBank.cycles.some((cycle) => cycle.frame > 0));
   const frames = [];
   for (let frame = 0; frame < 5; frame += 1) { engine.drawFrame(); frames.push(Uint16Array.from(engine.getPixels())); }
+  assert.ok(frames.some((pixels) => pixels.some((value) => value !== 0)), 'reference frames are not black');
+  install();
+  engine.drawFrame();
+  assert.notDeepEqual(Uint16Array.from(engine.getPixels()), frames[0],
+    'a fresh chain with the same parameters renders differently, so parity needs the restored state');
   engine.setEffect('ShaderChain');
   assert.equal(restore(snapshot), module.ChainSnapshotRestoreResult.APPLIED);
   for (const expected of frames) { engine.drawFrame(); assert.deepEqual(engine.getPixels(), expected); }
