@@ -412,7 +412,7 @@ test('generateRecipeCpp wraps a long star seed constructor argument', () => {
 
 /**
  * The counts ride in from localStorage, which a user can hand-edit, and the
- * output is pasted into solid_generators.h; a count carrying a newline or a
+ * output is pasted into a namespace of procedural_solids.h; a count carrying a newline or a
  * comment terminator must not be able to splice C++ around the generated
  * function.
  */
