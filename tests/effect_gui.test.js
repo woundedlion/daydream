@@ -288,7 +288,7 @@ test('KaleidoscopeSmooth controls use the fixed pipeline modes as folders', () =
   assert.equal(h.gui().ctrl('Hue Noise Speed').folder, 'Generated Analogous');
 });
 
-test('fixed Shader controls file each slot parameter into its stage folder', () => {
+test('composed-effect controls file each slot parameter into its stage folder', () => {
   const params = [
     'Camera Wander', 'Singularity Fade', 'Planar Warp 1 Speed', 'Warp Strength',
     'Planar Warp 2 Speed', 'Mirror Rotation', 'Pattern Freq',
@@ -308,10 +308,10 @@ test('fixed Shader controls file each slot parameter into its stage folder', () 
   assert.equal(h.gui().ctrl('Mirror Rotation').folder, 'Planar Warp 2');
   assert.equal(h.gui().ctrl('Edge Width').folder, 'Coverage');
   assert.deepEqual(h.warnings, [],
-    'the Shader stage rules file every name they are given');
+    'the composed stage rules file every name they are given');
 });
 
-test('fixed Shader warp ownership follows each explicit slot boundary', () => {
+test('composed-effect warp ownership follows each explicit slot boundary', () => {
   const names = [
     'Camera Wander', 'Palette Chroma', 'Mapping Frequency',
     'Planar Warp 1 Speed', 'Mirror Rotation',
