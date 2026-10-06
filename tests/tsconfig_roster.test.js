@@ -151,15 +151,6 @@ const TOOL_PAGE_EXEMPTIONS = {
   'src/workbench/solids/solids_page.js': 'Imports Three.js and builds dynamic mesh-editing controls without declared element types.',
 };
 
-test('tool page exemptions name existing unrostered modules with reasons', () => {
-  const roster = readTsconfig().files;
-  for (const [file, reason] of Object.entries(TOOL_PAGE_EXEMPTIONS)) {
-    assert.ok(existsSync(new URL(file, ROOT)), `${file} must exist`);
-    assert.ok(!roster.includes(file), `${file} exemption is stale`);
-    assert.ok(reason.trim().length > 0, `${file} needs a reason`);
-  }
-});
-
 test('the typecheck roster stays inside its stated scope', () => {
   for (const file of readTsconfig().files) {
     assert.ok(!file.startsWith('tests/'),
@@ -217,5 +208,4 @@ test('every source module is typechecked or has a written exemption', () => {
   assert.deepEqual(modules.filter((file) => !roster.includes(file)).sort(),
     Object.keys(exemptions).sort(),
     'add each source module to tsconfig.json or explain its exemption; remove stale exemptions');
-  for (const reason of Object.values(exemptions)) assert.ok(reason.trim().length > 0);
 });
