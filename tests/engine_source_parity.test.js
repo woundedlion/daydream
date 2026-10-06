@@ -20,6 +20,7 @@ import * as MB from '../src/workbench/mobius/mobius_transforms.js';
 import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS } from '../src/workbench/solids/solid_codegen.js';
 import { MAX_BUILD_FACES, MAX_BUILD_STEPS, upperSnake, primitiveCount, LOWERING } from '../src/workbench/solids/solid_registry_codegen.js';
 import { MAX_DISPLAY_CAP_PERCENT } from '../src/renderer/display_caps.js';
+import { FPS } from '../src/renderer/frame_constants.js';
 
 const enginePin = readFileSync(new URL('../generated/holosphere_wasm.sha', import.meta.url), 'utf8').trim();
 
@@ -497,4 +498,11 @@ test('MAX_DISPLAY_CAP_PERCENT is the bound setDisplayCaps enforces', { skip: eng
   assert.deepEqual(bounds.map(([, side]) => side), ['top', 'bottom'],
     `setDisplayCaps bounds not found in ${path} — the parity reader is out of date`);
   for (const [, side, bound] of bounds) assert.equal(MAX_DISPLAY_CAP_PERCENT, Number(bound), side);
+});
+
+test('FPS is the firmware show cadence', { skip: engineSkip }, () => {
+  const path = 'targets/effects.h';
+  const match = /constexpr int HS_SHOW_FRAMES_PER_SECOND\s*=\s*(\d+);/.exec(header(path));
+  assert.ok(match, `HS_SHOW_FRAMES_PER_SECOND not found in ${path} — the parity reader is out of date`);
+  assert.equal(FPS, Number(match[1]));
 });
