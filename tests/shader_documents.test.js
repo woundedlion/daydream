@@ -1000,8 +1000,7 @@ const KALEIDOSCOPE_HEX_BRIGHT = readFileSync(
   new URL('../generated/shader/patterns/kaleidoscope_hex_bright.shader.json', import.meta.url), 'utf8');
 const KALEIDOSCOPE_STAINED_GLASS = readFileSync(
   new URL('../generated/shader/patterns/kaleidoscope_stained_glass.shader.json', import.meta.url), 'utf8');
-// No source documents: every load misses the fixed-effect digest catalog and
-// routes onto the chain engine, where the strip mounts.
+// No source documents: no load matches a promoted digest, so parity stays disarmed.
 const EMPTY_PATTERN_CATALOG = JSON.stringify({
   source_documents: {}, product_group: { children: [] },
 });
