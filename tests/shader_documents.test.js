@@ -1640,6 +1640,18 @@ test('compiled stage edits reach stages bypassed in the interpreter', async () =
   assert.deepEqual(harness.compiledEngine.writes, [['Planar Warp 2 Speed', 0.01]]);
 });
 
+test('a compiled edit refuses an unregistered control', async () => {
+  const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
+  harness.elements.get('shader-parity-toggle').dispatch('click');
+  const definitions = harness.compiledEngine.getParameterDefinitions();
+  definitions.length = 0;
+  harness.compiledEngine.writes.length = 0;
+  stageEditor(harness, 'warp2')('warp2.speed', 0.01);
+  assert.deepEqual(harness.compiledEngine.writes, []);
+  assert.match(harness.elements.get('shader-document-status').textContent,
+    /no engine parameter matches "warp2.speed"/);
+});
+
 test('a descriptor edit under the compiled build returns the preview to the interpreter', async () => {
   const harness = await editorWorkbench({ patternCatalog: HEX_PATTERN_CATALOG });
   const status = harness.elements.get('shader-document-status');
