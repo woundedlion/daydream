@@ -38,8 +38,17 @@ test('typed snapshots preserve evolving walk, noise, source and palette state ac
 
 test('snapshot validation refuses malformed state transactionally', () => {
   engine.setEffect('ShaderChain');
+  assert.equal(callWorkbenchBinding(engine, 'getShaderChainBindings', 'setShaderChainParameters', [[
+    {name: 'camera.wander', value: 0.1}, {name: 'sample.speed', value: 0.004},
+  ]]), module.ParamSetResult.APPLIED);
+  engine.setAnimationsPaused(false);
+  for (let frame = 0; frame < 64; frame += 1) engine.drawFrame();
+  const advanced = capture();
+  engine.setEffect('ShaderChain');
   engine.setAnimationsPaused(true);
   const previous = capture();
+  for (const section of ['parameters', 'runtime', 'paletteBank'])
+    assert.notDeepEqual(advanced[section], previous[section], `${section} differ, so a partial apply is observable`);
   const result = module.ChainSnapshotRestoreResult;
   const changes = [
     [(value) => { value.schemaVersion = 1; }, result.UNSUPPORTED_VERSION],
@@ -51,7 +60,7 @@ test('snapshot validation refuses malformed state transactionally', () => {
     [(value) => { value.paletteBank.cycles[0].frame = -1; }, result.INVALID_VALUE],
   ];
   for (const [change, expected] of changes) {
-    const candidate = structuredClone(previous);
+    const candidate = structuredClone(advanced);
     change(candidate);
     assert.equal(restore(candidate), expected);
     assert.deepEqual(capture(), previous);
