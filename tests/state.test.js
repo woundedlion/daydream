@@ -190,11 +190,9 @@ test('AppState.notify carries past a throwing subscriber', () => {
     'the caught error itself reaches the console');
 });
 
-// Default URL-write timing and retry limits.
-test('URL-write limits retain their defaults', () => {
-  assert.equal(URL_FLUSH_DEBOUNCE_MS, 200);
-  assert.equal(URL_FLUSH_RETRY_MS, 2000);
-  assert.equal(URL_FLUSH_MAX_RETRIES, 20);
+test('URL-write retries outlast the rate-limit window', () => {
+  assert.ok((URL_FLUSH_MAX_RETRIES - 1) * URL_FLUSH_RETRY_MS > 30000);
+  assert.ok(URL_FLUSH_DEBOUNCE_MS < URL_FLUSH_RETRY_MS);
   assert.equal(roundUrlNumber(1.23456789), 1.2346, 'five significant digits');
   assert.equal(roundUrlNumber(123456789), 123460000, 'five significant digits');
 });
