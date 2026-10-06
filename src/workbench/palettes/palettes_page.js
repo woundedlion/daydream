@@ -279,8 +279,8 @@ function handleHueKeyNudge(event, keyIndex) {
   const recipe = readPaletteRecipe();
   if (recipe.hue.mode !== PaletteV4.hueMode.CUSTOM
       && !activateCustomHue(recipe)) {
-    // The resample dropped the selected key; redraw on the clamped
-    // selection rather than nudging the neighbour it landed on.
+    // CUSTOM cannot preserve the sweep's closing hue or the selected key;
+    // redraw without nudging.
     scheduleUpdate();
     event.preventDefault();
     return;
