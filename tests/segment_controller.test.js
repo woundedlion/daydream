@@ -2611,12 +2611,46 @@ test('setEffect drops the outgoing effect param values so the rebuilt GUI is not
     'stale values are cleared until segment 0 reports the new effect first frame');
 });
 
-test('setEffect bumps renderGen so an in-flight old-effect frame is fenced out', () => {
+/**
+ * Delivers one old-effect generation filled with 111 to both segments of a 4x2 grid.
+ * @param {SegmentController} c - Controller with a render in flight.
+ * @returns {Promise<void>} Resolves once the render settles.
+ */
+async function deliverOldEffectFrames(c) {
+  deliverFrame(c, 0, { x0: 0, x1: 2, y0: 0, y1: 2,
+                       pixels: new Uint16Array(2 * 2 * 3).fill(111) });
+  deliverFrame(c, 1, { x0: 2, x1: 4, y0: 0, y1: 2,
+                       pixels: new Uint16Array(2 * 2 * 3).fill(111) });
+  await flush();
+}
+
+test('setEffect fences out an old-effect frame still in flight', async () => {
+  setDisplayGrid(4, 2);
   const c = readyController(2);
-  const before = c.frameState.renderGen;
+  c.showBoundaries = false;
+  c.tick();
+
   c.setEffect('NewEffect');
-  assert.equal(c.frameState.renderGen, before + 1,
-    'a stale in-flight frame now fails inflightGen === renderGen');
+  await deliverOldEffectFrames(c);
+  c.tick();
+
+  assert.equal(c.frameComposited, false, 'the fenced generation composited nothing');
+  assert.ok(!driver.pixels.includes(111), 'no old-effect pixel reached the display');
+});
+
+test('setEffect drops an old-effect generation that settled but never composited', async () => {
+  setDisplayGrid(4, 2);
+  const c = readyController(2);
+  c.showBoundaries = false;
+  c.tick();
+  await deliverOldEffectFrames(c);
+  assert.equal(c.frameState.pendingFrame, true, 'the old generation is held for the compositor');
+
+  c.setEffect('NewEffect');
+  c.tick();
+
+  assert.equal(c.frameComposited, false, 'the dropped generation composited nothing');
+  assert.ok(!driver.pixels.includes(111), 'no old-effect pixel reached the display');
 });
 
 // A resize drops the worker's effect and its clip; rendering faults until the
