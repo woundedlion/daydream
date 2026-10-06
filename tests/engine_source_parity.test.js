@@ -514,3 +514,33 @@ test('CHAIN_SNAPSHOT_SCHEMA_VERSION is the engine chain snapshot schema', { skip
   assert.ok(match, `SCHEMA_VERSION not found in ${path} — the parity reader is out of date`);
   assert.equal(CHAIN_SNAPSHOT_SCHEMA_VERSION, Number(match[1]));
 });
+
+test('palettes.html recipe sliders stay inside the limits the engine compiler accepts', { skip: engineSkip }, () => {
+  const path = 'core/color/generative_palette.h';
+  const cpp = header(path);
+  const html = readFileSync(new URL('../tools/palettes.html', import.meta.url), 'utf8');
+  /** @param {string} id @returns {{min: number, max: number}} The slider's declared range. */
+  const slider = (id) => {
+    const m = new RegExp(`<input type="range" id="${id}" min="([^"]+)" max="([^"]+)"`).exec(html);
+    assert.ok(m, `palettes.html has no ${id} range slider`);
+    return { min: Number(m[1]), max: Number(m[2]) };
+  };
+  /** @param {string} name @returns {number} A static constexpr float limit, in double precision. */
+  const limit = (name) => {
+    const m = new RegExp(`static constexpr float ${name}\\s*=\\s*([^;]+);`).exec(cpp);
+    assert.ok(m, `${name} not found in ${path} — the parity reader is out of date`);
+    const expr = m[1].replace(/math::PI_F/g, 'Math.PI').replace(/(\d)f\b/g, '$1');
+    assert.match(expr, /^[\d\s.*/+\-()]*(Math\.PI)?[\d\s.*/+\-()]*$/, `${name} = ${expr} is not plain arithmetic`);
+    return Function(`return ${expr};`)();
+  };
+  for (const [id, name] of [['gen_sweep', 'MAX_SWEEP_TURNS'], ['gen_torsion', 'MAX_ABS_TORSION']]) {
+    const { min, max } = slider(id);
+    const bound = limit(name);
+    assert.ok(-bound <= min && max <= bound, `${id} [${min}, ${max}] exceeds ±${name} = ${bound}`);
+  }
+  const falloff = /recipe\.falloff_start > ([\d.]+)f \/ ([\d.]+)f && recipe\.falloff_start < ([\d.]+)f/.exec(cpp);
+  assert.ok(falloff, `the falloff_start bounds were not found in ${path} — the parity reader is out of date`);
+  const { min, max } = slider('gen_falloff');
+  assert.ok(Number(falloff[1]) / Number(falloff[2]) < min && max < Number(falloff[3]),
+    `gen_falloff [${min}, ${max}] leaves the open falloff_start interval`);
+});
