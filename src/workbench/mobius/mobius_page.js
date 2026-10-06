@@ -127,14 +127,8 @@ const updateDegenerateWarning = () => {
   const detRe = (A.re * D.re - A.im * D.im) - (B.re * C.re - B.im * C.im);
   const detIm = (A.re * D.im + A.im * D.re) - (B.re * C.im + B.im * C.re);
   const degenerate = Math.hypot(detRe, detIm) < 1e-3;
-  if (degenerate) {
-    el.classList.remove('hidden');
-    if (el.textContent !== DEGENERATE_WARNING)
-      el.textContent = DEGENERATE_WARNING;
-  } else {
-    el.textContent = '';
-    el.classList.add('hidden');
-  }
+  const text = degenerate ? DEGENERATE_WARNING : '';
+  if (el.textContent !== text) el.textContent = text;
 };
 
 const applyConfig = (newVals) => {

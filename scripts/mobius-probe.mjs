@@ -130,13 +130,13 @@ export async function probePad(tab) {
     const plane = await boxOf(tab, `#${key}_plane`);
     await tab.mouse.click(plane.x + plane.width / 2, plane.y + plane.height / 2);
   }
-  check(await tab.$eval('#degenerateWarning', (node) => !node.classList.contains('hidden')),
+  check(await tab.$eval('#degenerateWarning', (node) => (node.textContent ?? '') !== ''),
     'a zero determinant displays the degenerate warning');
   for (const key of ['A', 'D']) {
     const plane = await boxOf(tab, `#${key}_plane`);
     await tab.mouse.click(plane.x + plane.width * 0.75, plane.y + plane.height / 2);
   }
-  check(await tab.$eval('#degenerateWarning', (node) => node.classList.contains('hidden')),
+  check(await tab.$eval('#degenerateWarning', (node) => (node.textContent ?? '') === ''),
     'a nonsingular map clears the degenerate warning');
   return failures;
 }
