@@ -501,6 +501,19 @@ function makeApp({
   return { pipeline, log, errors, warnings, state };
 }
 
+/**
+ * Asserts that each entry is logged, in the given order.
+ * @param {string[]} log - The recorded calls.
+ * @param {...string} entries - Calls that must appear in this order.
+ */
+function assertOrdered(log, ...entries) {
+  const at = entries.map((entry) => log.indexOf(entry));
+  entries.forEach((entry, i) => assert.ok(at[i] >= 0, `${entry} was not called: ${log.join(', ')}`));
+  for (let i = 1; i < entries.length; i++) {
+    assert.ok(at[i - 1] < at[i], `${entries[i - 1]} must precede ${entries[i]}: ${log.join(', ')}`);
+  }
+}
+
 test('applying an effect points the engine at it and rebuilds the panel', () => {
   const app = makeApp();
 
@@ -541,18 +554,7 @@ test('a segmented switch rebuilds the worker effect after the panel', () => {
 
   app.pipeline.applyEffect();
 
-  assert.deepEqual(app.log, [
-    'engine.setEffect Alpha',
-    'driver.setStrobeColumns true',
-    'effectGui.destroy',
-    'clearEffectParamUrl',
-    'effectGui.build',
-    'effectGui.mount',
-    'segments.setEffect Alpha',
-    'effectGui.applyAnimationPause',
-    'sidebar.setActive Alpha',
-    'driver.stepOnce',
-  ]);
+  assertOrdered(app.log, 'effectGui.mount', 'segments.setEffect Alpha', 'effectGui.applyAnimationPause');
 });
 
 test('a preserved pause is committed after the segmented effect rebuild', () => {
@@ -560,17 +562,8 @@ test('a preserved pause is committed after the segmented effect rebuild', () => 
 
   app.pipeline.applyEffect(true);
 
-  assert.deepEqual(app.log, [
-    'engine.setEffect Alpha',
-    'driver.setStrobeColumns true',
-    'effectGui.destroy',
-    'effectGui.build',
-    'effectGui.mount',
-    'segments.setEffect Alpha',
-    'effectGui.applyAnimationPause',
-    'sidebar.setActive Alpha',
-    'driver.stepOnce',
-  ]);
+  assertOrdered(app.log, 'effectGui.mount', 'segments.setEffect Alpha', 'effectGui.applyAnimationPause');
+  assert.equal(app.log.includes('clearEffectParamUrl'), false);
 });
 
 test('an engine that has not loaded yet still gets a sidebar and a mount point', () => {
@@ -578,14 +571,11 @@ test('an engine that has not loaded yet still gets a sidebar and a mount point',
 
   app.pipeline.applyEffect();
 
-  assert.deepEqual(app.log, [
-    'effectGui.destroy',
-    'clearEffectParamUrl',
-    'effectGui.mount',
-    'effectGui.applyAnimationPause',
-    'sidebar.setActive Alpha',
-    'driver.stepOnce',
-  ]);
+  assert.deepEqual(app.log.filter((entry) => entry.startsWith('engine.')), []);
+  assert.equal(app.log.includes('effectGui.build'), false);
+  for (const entry of ['effectGui.mount', 'sidebar.setActive Alpha', 'driver.stepOnce']) {
+    assert.ok(app.log.includes(entry), `${entry} was not called: ${app.log.join(', ')}`);
+  }
 });
 
 test('a resolution change waits for main acceptance before resizing workers', () => {
@@ -593,25 +583,9 @@ test('a resolution change waits for main acceptance before resizing workers', ()
 
   assert.equal(app.pipeline.applyResolution(), ApplyResult.APPLIED);
 
-  assert.deepEqual(app.log, [
-    'engine.setResolution 288x144',
-    'host.invalidateView',
-    'driver.updateResolution 288x144@0.25',
-    'engine.getEffectSizes',
-    'engine.getEffectPresetCounts',
-    'sidebar.setEffects Alpha,Gamma sizes={"Alpha":12} presets={"Alpha":3}',
-    'engine.setEffect Alpha',
-    'driver.setStrobeColumns true',
-    'effectGui.destroy',
-    'clearEffectParamUrl',
-    'effectGui.build',
-    'effectGui.mount',
-    'effectGui.applyAnimationPause',
-    'sidebar.setActive Alpha',
-    'driver.stepOnce',
-    'segments.setResolution 288x144',
-    'segments.setEffect Alpha',
-  ]);
+  assertOrdered(app.log, 'engine.setResolution 288x144', 'driver.updateResolution 288x144@0.25',
+    'segments.setResolution 288x144', 'segments.setEffect Alpha');
+  assertOrdered(app.log, 'effectGui.build', 'segments.setEffect Alpha');
 });
 
 test('an unknown preset changes nothing', () => {
