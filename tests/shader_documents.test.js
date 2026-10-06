@@ -861,17 +861,19 @@ test('overlapping loads are serialized in request order', async () => {
 
 test('a setShaderChain refusal is surfaced with its code', async () => {
   const engine = workbenchEngine();
+  const harness = workbench({ engine });
+  assert.equal(await harness.controller.init(), true);
+  const initialWrites = harness.engine.writes.length;
+  const status = harness.elements.get('shader-document-status');
+  assert.doesNotMatch(status.textContent, /ARENA_OVERFLOW/);
   engine.bindings.setShaderChain = (entries) => {
     engine.chained.push(entries);
     return { code: 'ARENA_OVERFLOW', entryIndex: -1 };
   };
-  const harness = workbench({ engine });
-  await harness.controller.init();
 
   assert.equal(await harness.controller.loadSource(
     shaderDocument({ digest: 'digest-study' }), 'study.shader.json'), false);
-  assert.deepEqual(harness.engine.writes, []);
-  const status = harness.elements.get('shader-document-status');
+  assert.deepEqual(harness.engine.writes.slice(initialWrites), []);
   assert.equal(status.dataset.status, 'error');
   assert.match(status.textContent, /ARENA_OVERFLOW/);
 });
