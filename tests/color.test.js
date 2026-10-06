@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-// src/shared/color.js mirrors the engine's perceptual pipeline (core/color/color_space.h).
+// src/shared/color.js mirrors the engine's sRGB transfer function (core/color/color_space.h).
 const {
   srgbToLinearFloat, linearToSrgbFloat,
   linearRgbToHex,
