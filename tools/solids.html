@@ -11,14 +11,12 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <title>Solids Generator</title>
   <script src="../vendor-importmap.js"></script>
-  <!-- The families tools.css styles for. Self-hosted for offline dev out of the
-       gitignored /vendor/, so on the deploy this 404s and the onerror falls back
-       to the canonical CDN copy. -->
+  <!-- Self-hosted fonts from the gitignored /vendor/; onerror falls back to the CDN. -->
   <link rel="stylesheet" href="../vendor/fonts/fonts.css"
     onerror="this.onerror=null;this.href='https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono&display=swap'">
   <link rel="stylesheet" href="tools.css">
   <link rel="stylesheet" href="solids.css">
-  <!-- Linked last: utilities must outrank tools.css and the rules above. -->
+  <!-- Linked last: utilities outrank equal-specificity rules. -->
   <link rel="stylesheet" href="tailwind.css">
 </head>
 
@@ -30,9 +28,8 @@
       <p class="text-xs text-indigo-300">Conway Mesh Operators</p>
     </div>
 
-    <!-- Operations Queue. The source solid renders as the pinned first card of
-         the stack (not a draggable op row — it lives outside #opsList so the
-         drag/drop index math stays 1:1 with state.ops). -->
+    <!-- Operations Queue. The source-solid card sits outside #opsList so drop
+         indices map 1:1 to state.ops. -->
     <div role="complementary" aria-label="Solid operations" class="space-y-2 flex-1 overflow-hidden flex flex-col">
       <div class="flex-1 min-h-[140px] overflow-y-auto pr-2">
         <div class="flex items-center space-x-2 bg-slate-800 border border-slate-700 rounded px-1.5 py-1 mb-1">
@@ -56,9 +53,7 @@
       <div id="opGateMsg" class="text-[0.6rem] text-amber-400 leading-3"
         role="status" aria-atomic="true"></div>
       <span id="opBlockedReason" class="visually-hidden">Would exceed an engine mesh limit on the current solid</span>
-      <!-- Add-operation buttons carry the op name in data-op; a single delegated
-           click listener (wired in init) dispatches to addOp, so no handler is
-           pinned to window. -->
+      <!-- Add-operation buttons carry the op name in data-op. -->
       <div id="addOpGrid" class="grid grid-cols-3 gap-1 pt-1">
         <button type="button" data-op="kis" class="btn btn-secondary text-[0.65rem]">Kis</button>
         <button type="button" data-op="ambo" class="btn btn-secondary text-[0.65rem]">Ambo</button>
@@ -154,8 +149,7 @@
       <!-- Saved items go here -->
     </div>
 
-    <!-- Visualization Options (kept out of the left sidebar so the op stack
-         retains its vertical space on short viewports) -->
+    <!-- Visualization Options -->
     <div class="space-y-2 border-t border-slate-700 pt-4 mt-4 flex-shrink-0">
       <h2 class="text-xs uppercase font-semibold text-slate-400">Visualization</h2>
 
