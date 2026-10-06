@@ -81,6 +81,11 @@ input[type=range]:disabled::-webkit-slider-thumb {
   cursor: default;
 }
 
+input[type=range]:disabled::-moz-range-thumb {
+  background: var(--slate-800);
+  cursor: default;
+}
+
 /* Every slider's numeric readout, on the --slate-700 of .param-group. The lighter
  * indigo is what carries that pairing over the 4.5:1 WCAG AA floor at 14px. */
 .slider-label {
