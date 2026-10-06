@@ -17,8 +17,9 @@ export const CPP_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 export const COLUMN_LIMIT = 80;
 
 /**
- * Greedy fill of `words` at the column limit, as clang-format packs comment
- * bodies and initializer lists.
+ * Greedy fill of `words` at the column limit. Initializer lists match
+ * clang-format packing; comment bodies remain as emitted with the engine
+ * setting `ReflowComments: false`.
  * @param {string[]} words - The space-separated words, in order.
  * @param {string} firstIndent - Text the first line starts with.
  * @param {string} [restIndent] - Text every later line starts with; the first
