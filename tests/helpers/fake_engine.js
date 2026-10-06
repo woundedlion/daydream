@@ -35,7 +35,7 @@ export const SHADER_CHAIN_BINDING_METHODS = [
 ];
 
 /**
- * Mirror of the module-level ParamSetResult embind enum (targets/wasm/wasm.cpp)
+ * Mirror of the module-level ParamSetResult embind enum (targets/wasm/engine_bindings.h)
  * that setParameter returns. Values are distinct frozen objects so identity
  * comparison behaves like embind's cached enum instances; consumers must
  * compare against these values, never by truthiness (every value is a truthy
@@ -54,7 +54,7 @@ export const ParamSetResult = Object.freeze({
 });
 
 /**
- * Mirror of the module-level ClipSetResult embind enum (targets/wasm/wasm.cpp)
+ * Mirror of the module-level ClipSetResult embind enum (targets/wasm/engine_bindings.h)
  * that setClip returns, under the same identity-comparison contract as
  * ParamSetResult above. engine_contract_wasm.test.js pins the name roster
  * against the real module.
