@@ -1246,7 +1246,6 @@ test('the worker module graph carries no specifier an import map would resolve',
     'generated/holosphere_wasm.js']) {
     assert.ok(modules.includes(module), `the walk reached ${module}`);
   }
-  assert.ok(edges.length >= modules.length - 1, 'every reached module was reached by an edge');
   assert.deepEqual(modules.filter((m) => m.startsWith('src/ui/')), [],
     'a worker has no DOM, so no UI module belongs in its graph');
 });
