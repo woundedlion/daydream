@@ -644,23 +644,6 @@ test('the discard path releases what the refused startup had already built', asy
     + 'canvas the teardown has already released');
 });
 
-test('the segmented POV deep-link keys keep the names shared links carry', () => {
-  const consequence = 'a deep link carries view.Segmented POV.<prop>, built from '
-    + "the root namespace, the folder's display name and the bound property: "
-    + 'changing any of the three silently invalidates every link already shared';
-  const { guis } = startApp();
-
-  assert.equal(guis[0].namespace, 'view', consequence);
-  const segFolder = guis[0].folders.find((folder) => folder.namespace === 'Segmented POV');
-  assert.ok(segFolder, consequence);
-  for (const prop of ['segmented', 'segments']) {
-    const control = segFolder.controllers.find((c) => c.property === prop);
-    assert.ok(control, `${consequence}; '${prop}' must stay bound`);
-    assert.equal(control.session, undefined,
-      `${consequence}; '${prop}' must also stay deep-linked (add, not addSession)`);
-  }
-});
-
 test('the segment-count control marks the count no hardware produces', () => {
   const roomy = segmentCountControl(startApp({ nav: { hardwareConcurrency: 8 } }));
   assert.match(roomy.label, /^Segments \(6\b/,

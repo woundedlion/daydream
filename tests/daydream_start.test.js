@@ -75,6 +75,9 @@ test('the global GUI carries the controls a deep link names', () => {
   assert.ok(segments, 'the segmented folder name is a deep-link key segment');
   assert.deepEqual(segments.controllers.map((c) => c.property),
     ['segmented', 'segments', 'boundaries']);
+  for (const prop of ['segmented', 'segments'])
+    assert.equal(segments.controllers.find((c) => c.property === prop).session, undefined,
+      `'${prop}' must stay deep-linked (add, not addSession)`);
   const recording = root.folders.find((f) => f.namespace === 'Recording');
   assert.deepEqual(recording.controllers.map((c) => c.property),
     ['recQuality', 'recResolution', 'recFormat', 'record']);
