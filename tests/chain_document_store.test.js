@@ -487,6 +487,16 @@ test('bypass is pruned by removal and not restored by undo', async () => {
   assert.deepEqual(store.bypassedLabels(), []);
 });
 
+test('a bypassed label reused by a crossing loses its bypass', async () => {
+  const store = await makeStore();
+  assert.equal(store.setBypassed('warp2', true).ok, true);
+  assert.equal(store.replaceSpan(PROJECT, 2,
+    [{ label: 'warp2', operator: 'project.equirectangular.v2' }]).ok, true);
+  assert.deepEqual(labels(store), ['camera', 'lens', 'warp2', 'sample', 'colorize']);
+  assert.deepEqual(store.bypassedLabels(), []);
+  assert.ok(store.programShape().some((entry) => entry.instance === 'warp2'));
+});
+
 const presetValue = (store, presetId, parameterId) => store.document()
   .preset_bank.presets.find((preset) => preset.preset_id === presetId)
   .values[parameterId];
