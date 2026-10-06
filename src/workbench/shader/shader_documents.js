@@ -1049,7 +1049,20 @@ export function createShaderDocumentController({
     syncParity();
     // The side decides whether the strip's bypass toggles do anything.
     chainUi?.strip.render();
-    applyPreset(active.presetId ?? presetSelect.value);
+    const presetId = active.presetId ?? presetSelect.value;
+    if (!applyPreset(presetId)) {
+      const refusal = status?.textContent ?? 'The preset could not be applied.';
+      const previousEffect = compiledSide ? CHAIN_EFFECT : active.official.effectId;
+      if (!selectEffect(previousEffect)) {
+        announce(`The preview engine rejected effect "${previousEffect}".`);
+        return;
+      }
+      active.compiledSide = !compiledSide;
+      syncParity();
+      chainUi?.strip.render();
+      applyPreset(presetId);
+      show(refusal, true);
+    }
   };
   const onDigest = async () => {
     const digest = digestButton?.dataset.digest;
