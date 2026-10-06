@@ -12,15 +12,13 @@ import { test } from 'node:test';
 import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
+import { generativePaletteCpp } from '../src/workbench/palettes/palette_math.js';
+import { defaultPaletteRecipe } from '../src/workbench/palettes/palette_controls.js';
 import { closingDomain, lissajousCodeString } from '../src/workbench/lissajous/lissajous_math.js';
 import * as MB from '../src/workbench/mobius/mobius_transforms.js';
 import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS } from '../src/workbench/solids/solid_codegen.js';
 import { MAX_BUILD_FACES, MAX_BUILD_STEPS, upperSnake, primitiveCount, LOWERING } from '../src/workbench/solids/solid_registry_codegen.js';
-
-const REPO = fileURLToPath(new URL('..', import.meta.url));
 
 const enginePin = readFileSync(new URL('../generated/holosphere_wasm.sha', import.meta.url), 'utf8').trim();
 
@@ -330,16 +328,19 @@ function engineLeafFields(source, name) {
 }
 
 /**
- * Checks generativePaletteCpp field paths and enum types against the declarations
- * of PaletteRecipe and its nested control structs.
+ * Checks the C++ generativePaletteCpp emits for a canonical recipe against the
+ * declarations of PaletteRecipe and its nested control structs.
  */
 test('generativePaletteCpp assigns the fields core/color/palette_recipe.h declares', { skip: engineSkip }, () => {
   const cpp = header(PALETTE_RECIPE_H);
-  const js = readFileSync(resolve(REPO, 'src/workbench/palettes/palette_math.js'), 'utf8');
   const want = engineLeafFields(cpp, 'PaletteRecipe');
   assert.ok(want.size >= 20, `read only ${want.size} recipe fields — the reader is out of date`);
 
-  const emitted = new Map([...functionBody(js, 'generativePaletteCpp')
+  const recipe = defaultPaletteRecipe();
+  recipe.domain = 4;
+  recipe.hue.harmony = 5;
+  recipe.lightness.curve = 1;
+  const emitted = new Map([...generativePaletteCpp(recipe)
     .matchAll(/^recipe\.([\w.]+) = (.+);$/gm)].map(([, path, value]) => [path, value]));
   assert.deepEqual([...emitted.keys()].sort(), [...want.keys()].sort(),
     'the emitted paste no longer assigns exactly the PaletteRecipe fields the engine declares');
@@ -347,11 +348,25 @@ test('generativePaletteCpp assigns the fields core/color/palette_recipe.h declar
   for (const [path, type] of want) {
     const value = /** @type {string} */ (emitted.get(path));
     if (new RegExp(`enum class ${type}\\s*:`).test(cpp)) {
-      assert.ok(value.startsWith(`${type}::`),
-        `recipe.${path} is a ${type} but the paste assigns "${value}"`);
+      const enumerator = value.match(new RegExp(`^${type}::([A-Z0-9_]+)$`));
+      assert.ok(enumerator, `recipe.${path} is a ${type} but the paste assigns "${value}"`);
+      const { roster } = engineValuedEnumerators(cpp, type);
+      assert.ok([...roster.values()].includes(enumerator[1]),
+        `recipe.${path} assigns ${value}, which enum class ${type} does not declare`);
     } else if (type.startsWith('std::array<')) {
-      assert.match(value, /^\$\{cppFloatArray\(/,
-        `recipe.${path} is a ${type} but the paste does not brace-initialize it`);
+      const extent = type.match(/^std::array<float,\s*(\w+)>$/);
+      assert.ok(extent, `recipe.${path} has an unreadable array type ${type}`);
+      const size = /^\d+$/.test(extent[1]) ? Number(extent[1])
+        : Number(cpp.match(new RegExp(`inline constexpr \\w+ ${extent[1]}\\s*=\\s*(\\d+);`))?.[1]);
+      assert.ok(size > 0, `the extent ${extent[1]} of recipe.${path} was not found`);
+      const braced = value.match(/^\{([^}]*)\}$/);
+      assert.ok(braced, `recipe.${path} is a ${type} but the paste assigns "${value}"`);
+      const elements = braced[1].split(',').map((element) => element.trim());
+      assert.equal(elements.length, size, `recipe.${path} brace-initializes ${elements.length} of ${size} elements`);
+      for (const element of elements) {
+        assert.match(element, /^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?f$/,
+          `recipe.${path} element "${element}" is not a float literal`);
+      }
     }
   }
 });
