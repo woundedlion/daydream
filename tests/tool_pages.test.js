@@ -729,7 +729,7 @@ test('the entry script and syntax failures share the guarded load failure overla
   let current = overlay;
   const context = {
     SyntaxError, document: { getElementById: () => current },
-    window: { addEventListener: (_type, fn) => listeners.push(fn), removeEventListener() {} },
+    window: { addEventListener: (type, fn) => listeners.push(fn), removeEventListener() {} },
   };
   runInNewContext(inline + '\nthis.showFailure = showLoadFailure;', context);
   assert.match(source, /src="src\/app\/main\.js" onerror="showLoadFailure\(\)"/);
