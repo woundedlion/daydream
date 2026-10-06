@@ -606,10 +606,13 @@ test('URLSync coerces a URL value to a numeric default key', () => {
 });
 
 test('URLSync keeps a numeric default when the URL value is non-finite', () => {
-  installRecordingWindow('?count=abc');
-  const s = new AppState({ count: 7 });
-  new URLSync(s, ['count']);
-  assert.strictEqual(s.get('count'), 7);
+  for (const raw of ['abc', '1e999', '-1e999']) {
+    installRecordingWindow(`?count=${encodeURIComponent(raw)}`);
+    const s = new AppState({ count: 7 });
+    new URLSync(s, ['count']);
+    assert.strictEqual(s.get('count'), 7, `"${raw}" keeps the default`);
+    getActiveURLSync().dispose();
+  }
 });
 
 test('URLSync keeps a numeric default for an empty URL value', () => {
@@ -630,7 +633,7 @@ test('URLSync keeps a numeric default when the URL value has trailing garbage', 
 });
 
 test('URLSync coerces well-formed numeric URL values', () => {
-  for (const [raw, want] of [['42', 42], ['-3.5', -3.5], ['.25', 0.25], ['1e3', 1000], [' 8 ', 8]]) {
+  for (const [raw, want] of [['42', 42], ['-3.5', -3.5], ['.25', 0.25], ['1e3', 1000], ['1.', 1], [' 8 ', 8]]) {
     installRecordingWindow(`?count=${encodeURIComponent(raw)}`);
     const s = new AppState({ count: 7 });
     new URLSync(s, ['count']);
