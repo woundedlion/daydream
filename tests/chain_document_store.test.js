@@ -997,6 +997,29 @@ test('an injected compiler handles store validation', async () => {
   }
 });
 
+test('a thrown document error refuses the edit with its diagnostic', async () => {
+  /** @type {Error|null} */
+  let failure = null;
+  const store = await createChainDocumentStore({
+    document: structuredClone(BASE.document), catalog: CATALOG,
+    importCompiler: async () => ({ ...compiler, validateShaderDocument: (...args) => {
+      if (failure !== null) throw failure;
+      return compiler.validateShaderDocument(...args);
+    } }),
+  });
+  const before = store.document();
+  const documentError = new compiler.ShaderDocumentError(
+    'parse', 'STRING_LIMIT', '$.descriptor', 'The document string limit was exceeded.');
+  failure = documentError;
+  assert.deepEqual(store.replaceSpan(WARP, 0, [{ operator: 'warp.wave-shear.v2' }]),
+    { ok: false, diagnostics: [documentError.diagnostic()] });
+  assert.deepEqual(store.document(), before);
+  assert.equal(store.canUndo(), false);
+  failure = new Error('validator crashed');
+  assert.throws(() => store.replaceSpan(WARP, 0, [{ operator: 'warp.wave-shear.v2' }]),
+    /validator crashed/);
+});
+
 test('renaming a bypassed stage carries its bypass onto the new label', async () => {
   const store = await makeStore();
   assert.equal(store.setBypassed('lens', true).ok, true);
