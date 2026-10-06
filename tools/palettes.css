@@ -328,19 +328,19 @@ body {
   background: var(--slate-900);
 }
 
-.r-thumb::-webkit-slider-thumb {
+input.r-thumb::-webkit-slider-thumb {
   background: #EF4444; /* Red */
 }
 
-.g-thumb::-webkit-slider-thumb {
+input.g-thumb::-webkit-slider-thumb {
   background: #22C55E; /* Green */
 }
 
-.r-thumb::-moz-range-thumb {
+input.r-thumb::-moz-range-thumb {
   background: #EF4444;
 }
 
-.g-thumb::-moz-range-thumb {
+input.g-thumb::-moz-range-thumb {
   background: #22C55E;
 }
 
