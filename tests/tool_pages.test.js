@@ -773,7 +773,7 @@ test('the rendered solids remove glyph clears AA against its op-row fill', () =>
   const cascade = ['tools.css', 'solids.css', 'tailwind.css'].map(name => read('tools', name)).join('\n');
   assert.ok(contrast(cascade, `.${textClass}`, '.op-item') >= AA_CONTRAST);
   assert.ok(contrast(`${cascade} .dim {color: #64748b}`, '.dim', '.op-item') < AA_CONTRAST,
-    'the contrast guard must reject the former dim glyph');
+    'slate-500 text on the op-row fill must measure under the AA floor');
 });
 
 
