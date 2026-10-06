@@ -149,23 +149,51 @@ test('every workflow pins the Node version package.json requires', () => {
     `every setup-node pin must read ${required}`);
 });
 
-const setupNodeCount = (source) =>
-  [...source.matchAll(/^\s*(?:-\s*)?uses:\s*actions\/setup-node@/gm)].length;
+/** @param {string} source @returns {string[]} setup-node step blocks. */
+function setupNodeSteps(source) {
+  const lines = source.split(/\r?\n/);
+  const steps = [];
+  for (let i = 0; i < lines.length; i++) {
+    const start = /^([ \t]*)-\s+\w+:/.exec(lines[i]);
+    if (!start) continue;
+    let end = i + 1;
+    while (end < lines.length) {
+      const line = lines[end];
+      if (line.trim() && !line.trimStart().startsWith('#')
+          && line.search(/\S/) <= start[1].length) break;
+      end++;
+    }
+    const step = lines.slice(i, end).join('\n');
+    if (/^\s*(?:-\s*)?uses:\s*actions\/setup-node@/m.test(step)) steps.push(step);
+  }
+  return steps;
+}
 
-test('the setup-node scan includes named steps without version pins', () => {
-  const source = '- name: Set up Node\n  uses: actions/setup-node@abc\n';
-  assert.equal(setupNodeCount(source), 1);
-  assert.equal([...source.matchAll(/node-version:/g)].length, 0);
+/** @param {string} step @returns {boolean} Whether the action's with mapping pins Node. */
+function hasNodePin(step) {
+  const mapping = /^([ \t]+)with:[ \t]*\n((?:\1[ \t]+[^\n]*(?:\n|$))+)/m.exec(step)?.[2];
+  return mapping !== undefined && /^\s+node-version:[ \t]*\S/m.test(mapping);
+}
+
+test('setup-node pins are scoped to their own step and with mapping', () => {
+  const source = '- name: Set up Node\n  uses: actions/setup-node@abc\n'
+    + '- uses: actions/setup-node@abc\n  with:\n    node-version: 24.13.0\n';
+  const steps = setupNodeSteps(source);
+  assert.equal(steps.length, 2);
+  assert.deepEqual(steps.map(hasNodePin), [false, true]);
+  assert.equal(hasNodePin(steps[0] + '  # node-version: 24.13.0\n'), false);
+  assert.equal(hasNodePin(steps[0] + '  env:\n    node-version: 24.13.0\n'), false);
 });
 
 test('every setup-node action supplies a Node version pin', () => {
   let setups = 0;
   for (const file of readdirSync(resolve(REPO, WORKFLOW_DIR)).filter((name) => /\.ya?ml$/.test(name))) {
     const source = readFileSync(resolve(REPO, WORKFLOW_DIR, file), 'utf8');
-    setups += setupNodeCount(source);
+    const steps = setupNodeSteps(source);
+    setups += steps.length;
+    for (const step of steps) assert.ok(hasNodePin(step), `${file}: ${step}`);
   }
   assert.ok(setups > 0);
-  assert.equal(nodePins(WORKFLOW_DIR).length, setups);
 });
 
 test('deployment has no job condition that can bypass dependency success', () => {
