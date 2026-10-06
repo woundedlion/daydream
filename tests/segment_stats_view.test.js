@@ -2,7 +2,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { fakeElement } from './helpers/fake_dom.js';
+import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
+
+restoreDocumentAfterEach();
 
 import { SLOW_FRAME_MS } from '../src/renderer/frame_constants.js';
 
@@ -42,7 +44,7 @@ function makeDoc() {
     'stats-bar': mobile,
   };
   return {
-    doc: { getElementById: (id) => byId[id] || null, createElement },
+    doc: installDocument({ getElementById: (id) => byId[id] || null, createElement }),
     stats,
     desktop,
     mobile,
