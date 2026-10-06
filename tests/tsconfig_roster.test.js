@@ -161,7 +161,7 @@ test('the typecheck roster stays inside its stated scope', () => {
 });
 
 const SOURCE_EXEMPTIONS = {
-  'src/workbench/shared.js': 'Imports Three.js and its renderer addons, whose types are unavailable under noResolve.',
+  'src/workbench/shared.js': 'Imports Three.js and the OrbitControls addon, whose types are unavailable under noResolve.',
   'scripts/browser-smoke.mjs': 'Browser automation entry point; browser harness types are not yet declared.',
   'scripts/browser.mjs': 'Browser discovery and launch helpers require typed Puppeteer options.',
   'scripts/check-cdn-integrity.mjs': 'Standalone CDN network diagnostic outside deployment staging.',
