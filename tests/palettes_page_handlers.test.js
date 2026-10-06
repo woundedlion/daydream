@@ -172,7 +172,7 @@ test('a keyboard resample follows the selected hue key through later nudges', ()
     drawHueKeyWheel: () => {},
     hueKeyHandles: [0, 1, 2].map(index => ({ focus: () => { focused = index; } })),
     customBaseTurns: () => 0,
-    moveCustomHueKey: (_base, offsets, index) => { moved.push(index); return offsets; },
+    moveCustomHueKey: (base, offsets, index) => { moved.push(index); return offsets; },
     scheduleUpdate: () => {},
   };
   const nudge = handler('handleHueKeyNudge', context);
