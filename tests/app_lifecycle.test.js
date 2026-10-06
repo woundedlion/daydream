@@ -21,15 +21,13 @@ import { EngineHost } from '../src/engine/engine_host.js';
 // Tests for app_lifecycle.js: the composition root's frame, timer, and teardown wiring.
 
 /**
- * Driver double carrying the two display aliases and the dispose sink.
- * @param {Array<string>} [log] - Ordered teardown sink.
+ * Driver double carrying the two display aliases.
  * @returns {Object} The driver double.
  */
-function fakeDriver(log = []) {
+function fakeDriver() {
   return {
     pixels: null,
     dotMesh: { instanceColor: fakeColorAttribute(null) },
-    dispose() { log.push('driver.dispose'); },
   };
 }
 
