@@ -767,7 +767,8 @@ test('a bool parameter stores its accepted value as a float', () => {
   h.gui().ctrl('Glow').setValue(true);
 
   assert.equal(h.gui().stored['__accepted.Glow'], 1);
-  const nonNumeric = h.gui().storedWrites.filter(([, v]) => !Number.isFinite(Number(v)));
+  const nonNumeric = h.gui().storedWrites.filter(([key, v]) =>
+    key.startsWith('__accepted.') && (typeof v !== 'number' || !Number.isFinite(v)));
   assert.deepEqual(nonNumeric, []);
 });
 
