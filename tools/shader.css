@@ -57,8 +57,6 @@
   cursor: default;
 }
 
-/* Armed only while the loaded descriptor still digests to a promoted effect;
-   pressed means the compiled build, not the interpreter, is on the canvas. */
 .shader-parity-toggle[aria-pressed="true"]:not(:disabled),
 #shader-animation-toggle[aria-pressed="true"]:not(:disabled) {
   border-color: var(--accent);
