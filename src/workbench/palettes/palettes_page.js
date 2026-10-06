@@ -112,6 +112,10 @@ function setCustomBaseTurns(turns) {
     `${Number(degrees.toFixed(1))}°`;
 }
 
+function clearHueKeyStatus() {
+  document.getElementById('hue_key_status').textContent = '';
+}
+
 /**
  * Switch the controls into CUSTOM hue mode, authoring the three keys the
  * handoff starts from.
@@ -134,7 +138,7 @@ function activateCustomHue(sourceRecipe) {
       'This hue key is omitted when these keys are resampled to three custom keys. Choose another key.';
     return false;
   }
-  document.getElementById('hue_key_status').textContent = '';
+  clearHueKeyStatus();
   customHueOffsets = state.offsets;
   activeHueKey = handoff.activeKey;
   setCustomBaseTurns(state.baseTurns);
@@ -483,6 +487,7 @@ function syncRecipeControlAvailability() {
 }
 
 function loadRecipe(recipe) {
+  clearHueKeyStatus();
   recipeTemplate = structuredClone(recipe);
   const controls = paletteControlsFromRecipe(recipe);
   const write = (name, value) => {
@@ -1133,6 +1138,7 @@ async function init() {
   dropdowns.forEach(id => {
     const el = document.getElementById(id);
     el?.addEventListener('change', () => {
+      clearHueKeyStatus();
       if (id === PALETTE_CONTROL_IDS.hueMode) {
         handleHueModeChange(el);
       }
@@ -1159,6 +1165,7 @@ async function init() {
 
   for (const { id } of recipeSliderDefinitions) {
     document.getElementById(id).addEventListener('input', () => {
+      clearHueKeyStatus();
       syncRecipeSliderLabels();
       scheduleUpdate();
     });
