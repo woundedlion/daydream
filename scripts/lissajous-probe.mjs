@@ -136,7 +136,7 @@ export async function probeRationalLock(tab) {
   const dimmed = () =>
     tab.$eval(DOMAIN_GROUP, (node) => node.classList.contains('opacity-50'));
   const warned = async () =>
-    !await tab.$eval(WARNING, (node) => node.classList.contains('hidden'));
+    await tab.$eval(WARNING, (node) => (node.textContent ?? '') !== '');
 
   const track = await boxOf(tab, '#C1_slider');
   check(track.width > 0 && track.height > 0,
