@@ -3,12 +3,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-/**
- * DOM-free logic for the effect sidebar, extracted from sidebar.js so the sort
- * comparator, keyboard-navigation index math, and scroll-arrow visibility rules
- * can be unit-tested without a DOM. EffectSidebar wires these into element
- * mutations; the decisions themselves live here.
- */
+/** DOM-free decision logic for the effect sidebar. */
 
 /**
  * Order effect items by the given key and direction, returning a new array

@@ -11,21 +11,16 @@ import { enumConstantName, optionValue } from '../../effects/param_sync.js';
 /** @typedef {{document: *, descriptor_digest?: string}} CompiledDocument */
 
 /**
- * Applies a compiled chain document to the chain engine, in the one fixed
- * order: setShaderChain with the document's chain, the named preset's values
- * by parameter id, then the GUI resync and a repaint. The engine re-validates
- * the chain the document layer already validated, so a setShaderChain refusal
- * is a trust boundary, not UX: it is surfaced verbatim with its {code,
- * entryIndex} rather than translated.
+ * Applies a compiled chain document to the chain engine, in order:
+ * setShaderChain with the document's chain, the named preset's values by
+ * parameter id, then the GUI resync and a repaint. A setShaderChain refusal is
+ * surfaced verbatim with its {code, entryIndex}.
  *
  * Parameter definitions are read after setShaderChain applies. Enum8 labels
- * resolve to engine values in that snapshot. chain_apply.test.js pins resolution
- * of preset values before the first parameter write.
+ * resolve to engine values in that snapshot, before the first parameter write.
  *
- * A session bypass compiles a program shape that omits document entries; the
- * omitted instances register no engine parameters, so their preset values are
- * skipped rather than refused — the document still carries them, which is what
- * keeps a bypass an A/B toggle instead of a document edit.
+ * Preset values of instances a session bypass omits from the program shape are
+ * skipped, not refused.
  *
  * Preset values are admitted atomically so cross-field constraints see the
  * complete candidate. A refusal still resyncs the newly installed chain.

@@ -27,10 +27,7 @@ function columnStride(listEl) {
 
 /**
  * Self-contained sidebar managing the effect list, sort controls, and keyboard navigation.
- * Owns its container element and maintains persistent button references across a
- * SORT: sortBy() reorders the existing button DOM nodes rather than destroying and
- * recreating them. The roster itself is a separate operation — setEffects() rebuilds
- * every button from scratch (innerHTML = ''), since the effect set has changed.
+ * sortBy() reorders the existing button nodes; setEffects() rebuilds every button.
  */
 export class EffectSidebar {
   /**
@@ -119,9 +116,7 @@ export class EffectSidebar {
   /**
    * Release everything this sidebar owns and detach what it appended: the
    * ResizeObserver, the keydown/scroll listeners, every button's click closure,
-   * and the nodes added to the container. Symmetric with the constructor so the
-   * container is left clean and reusable. Mirrors Daydream.dispose(); call before
-   * discarding the sidebar so no observer keeps firing into a dead DOM subtree.
+   * and the nodes added to the container, leaving the container reusable.
    */
   dispose() {
     this.win.cancelAnimationFrame(this.scrollArrowsRaf);
@@ -265,9 +260,7 @@ export class EffectSidebar {
 
   /**
    * Glyph for a sort button: the directional arrow when this key is the active
-   * sort, else the neutral both-ways glyph. Shared by the initial render and
-   * the update path so the button shows the correct arrow from the first paint
-   * (the Name-ascending default is active immediately, not only after a click).
+   * sort, else the neutral both-ways glyph.
    * @param {string} key - Sort key this button controls ('name' or 'size').
    * @returns {string} '▲' / '▼' if active, otherwise '⇅'.
    */
@@ -295,9 +288,7 @@ export class EffectSidebar {
   /**
    * Build a sort-control button for `key` labelled `label`. Clicking toggles
    * direction when this key is already active, else activates it (size defaults
-   * to descending, others to ascending). The label and the glyph are separate
-   * children so the direction arrow can stay presentational; the direction
-   * itself reaches assistive tech through the accessible name (syncSortBtn).
+   * to descending, others to ascending).
    * @param {'name'|'size'} key - Sort key this button controls.
    * @param {string} label - Human-readable button label.
    * @returns {HTMLElement} The created sort-control button.
@@ -329,8 +320,7 @@ export class EffectSidebar {
 
   /**
    * Apply this.sort to one sort control: active class, pressed state, the
-   * presentational direction glyph, and the accessible name. The active button
-   * names the direction it sorted in, which the aria-hidden glyph cannot convey.
+   * presentational direction glyph, and the accessible name.
    * @param {HTMLElement} btn - Sort-control button to sync.
    * @param {'name'|'size'} key - Sort key this button controls.
    */
@@ -353,8 +343,7 @@ export class EffectSidebar {
 
   /**
    * Reorder the existing button DOM nodes to match the current sort key and
-   * direction. Re-appending moves nodes in place rather than recreating them,
-   * so their click handlers survive; focus does not, and sortBy hands it back.
+   * direction. Moved nodes keep their click handlers but lose focus.
    */
   applySortOrder() {
     const sorted = sortItems(this.items, this.sort.key, this.sort.dir);

@@ -5,9 +5,7 @@
  *
  * SegmentStatsView — the segmented-POV stats overlay: a per-segment table of
  * compute times, scratch high-water marks and persistent usage, plus the spawn and fault
- * states that replace it. Reads the per-segment arrays SegmentController
- * publishes each frame and owns nothing of the pipeline, so the overlay is
- * testable without a Worker and the controller without a DOM.
+ * states that replace it.
  */
 import { SLOW_FRAME_MS } from "../renderer/frame_constants.js";
 import { formatKB } from "../shared/kb_format.js";
@@ -15,8 +13,8 @@ import { formatKB } from "../shared/kb_format.js";
 import { FAULT_RENDER } from "../segments/worker_protocol.js";
 
 /**
- * Write a node's text only when it moved: an unchanged textContent write
- * dirties layout anyway, and most of these figures hold still across frames.
+ * Write a node's text only when it changed; an unchanged textContent write
+ * still dirties layout.
  * @param {HTMLElement} cell - Node to update.
  * @param {string} text - Text the cell should carry.
  * @returns {void}
@@ -89,11 +87,8 @@ export class SegmentStatsView {
   }
 
   /**
-   * The overlay element of the given id, cached across repaints. These are
-   * page-owned containers this view does not create, so a cached node that has
-   * left the document is dropped and re-resolved: writing into a detached node
-   * stops the overlay updating in silence, and showStatBars() would hand the
-   * display back to the detached bar and leave the live one hidden.
+   * The overlay element of the given id, cached across repaints. A cached node
+   * that has left the document is dropped and re-resolved.
    * @param {string} id - Element id to resolve.
    * @returns {HTMLElement | null} The element, or null while it is absent.
    */
@@ -182,8 +177,7 @@ export class SegmentStatsView {
       return;
     }
 
-    // Spawning: the pool has no timings to show yet, and the warm + per-worker
-    // WASM instantiate window runs to the controller's init watchdog.
+    // Spawning: the pool has no timings to show yet.
     if (!state.ready) {
       const message = `Spawning ${state.count} workers…`;
       if (el.firstElementChild?.getAttribute('role') === 'status') {
@@ -243,8 +237,7 @@ export class SegmentStatsView {
 
   /**
    * (Re)build the stats-table DOM and cache references to the cells update()
-   * mutates each frame, so the steady-state path is textContent writes rather
-   * than an innerHTML re-parse.
+   * mutates each frame.
    * @param {number} numSegs - Number of segment rows to build.
    * @param {HTMLElement} el - Container element the table is mounted into.
    * @returns {SegmentStatsCells} The cached cell references.

@@ -95,9 +95,8 @@ let hueKeyWheelDrawnPoints = [];
 let activeHueKey = null;
 let hueKeyDrag = null;
 let selectedHueKey = 0;
-// Off-screen role="slider" proxies, one per hue key. The wheel is a canvas,
-// so a key's live position is announced through its own handle's
-// aria-valuenow/aria-valuetext, which a screen reader re-reads on change.
+// Off-screen role="slider" proxies, one per hue key, announcing its position
+// through aria-valuenow/aria-valuetext.
 let hueKeyHandles = [];
 
 const fullViewport = Object.freeze({ start: 0, end: 1 });
@@ -172,9 +171,7 @@ function drawHueKeyWheel(recipe) {
 
 /**
  * Build one off-screen slider handle per hue key and attach them to the
- * wheel's group. Focusing a handle selects its key, so focus and the
- * highlighted marker stay the same thing; the draw hides the handles the
- * current key count does not reach.
+ * wheel's group. Focusing a handle selects its key.
  * @param {HTMLElement} group - The wheel's role="group" wrapper.
  * @returns {void}
  */
@@ -197,8 +194,7 @@ function mountHueKeyHandles(group) {
 /**
  * Republish each key's hue on its slider handle, and take the handles a
  * shorter key set no longer has out of the tab order and the accessibility
- * tree. Focus is handed to the last surviving handle before its own is
- * hidden, so a resample never drops focus to the document body.
+ * tree. Focus moves to the last surviving handle before its own is hidden.
  * @param {number[]} degrees - Every drawn key's hue, in whole degrees.
  * @returns {void}
  */
@@ -547,8 +543,7 @@ let copyRequestId = 0;
 let lockedDragStartValues = {};
 let lockedDragOwner = null;
 
-// Slider handles by param, so a value computed elsewhere (a locked group
-// drag, a zoom) can drive the control it belongs to.
+// Slider handles by param.
 const sliderHandles = {};
 
 // DOM elements, resolved in init() once the document has loaded.
@@ -556,9 +551,7 @@ let colorStripCanvas, colorStripCtx, waveGraphCanvas, waveGraphCtx,
   resetZoomButton, paletteRangeHeading, copyFeedback, copyFeedbackSwatch,
   copyFeedbackStatus, copyFeedbackHex;
 
-// Owns the strip's offscreen gradient cache; built in init() once the canvas
-// and its context resolve. Invalidated on every palette change
-// (updatePalette); a size change is detected by the painter itself.
+// Owns the strip's offscreen gradient cache; built in init().
 let colorStripPainter = null;
 
 // Accessible names combine the coefficient group and channel.
@@ -585,13 +578,11 @@ const sliderDefinitions = [
   { param: 'B_R', container: 'B_R_container', label: 'R', color: 'text-red-300', thumb: 'r-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'B' },
   { param: 'B_G', container: 'B_G_container', label: 'G', color: 'text-green-500', thumb: 'g-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'B' },
   { param: 'B_B', container: 'B_B_container', label: 'B', color: 'text-blue-300', thumb: '', min: 0, max: 1, step: 0.001, scale: 1000, group: 'B' },
-  // C (Frequency): Range [-5, 5] — engine palettes run the cosine backwards
-  // with negative frequencies.
+  // C (Frequency): Range [-5, 5]
   { param: 'C_R', container: 'C_R_container', label: 'R', color: 'text-red-300', thumb: 'r-thumb', min: -5, max: 5, step: 0.001, scale: 1000, group: 'C' },
   { param: 'C_G', container: 'C_G_container', label: 'G', color: 'text-green-500', thumb: 'g-thumb', min: -5, max: 5, step: 0.001, scale: 1000, group: 'C' },
   { param: 'C_B', container: 'C_B_container', label: 'B', color: 'text-blue-300', thumb: '', min: -5, max: 5, step: 0.001, scale: 1000, group: 'C' },
-  // D (Phase): Range [-1, 2] — a full period either side of [0, 1], so an
-  // engine phase past 1 (or a negative one) stays representable.
+  // D (Phase): Range [-1, 2]
   { param: 'D_R', container: 'D_R_container', label: 'R', color: 'text-red-300', thumb: 'r-thumb', min: -1, max: 2, step: 0.001, scale: 1000, group: 'D' },
   { param: 'D_G', container: 'D_G_container', label: 'G', color: 'text-green-500', thumb: 'g-thumb', min: -1, max: 2, step: 0.001, scale: 1000, group: 'D' },
   { param: 'D_B', container: 'D_B_container', label: 'B', color: 'text-blue-300', thumb: '', min: -1, max: 2, step: 0.001, scale: 1000, group: 'D' }
@@ -701,7 +692,6 @@ function mountSlider(def) {
 
 /**
  * Updates all slider positions and value spans from the 'parameters' object.
- * Called when loading a named palette.
  */
 function updateAllSliders() {
   sliderDefinitions.forEach(def => {
@@ -901,10 +891,9 @@ function drawColorStrip(selectionRange = null) {
 }
 
 /**
- * Plots the wave graph over the phase window the strip and the C++ export
- * show, by re-parameterizing the coefficients through the procedural
- * viewport exactly as the export does. The generative palette carries its
- * window in its own recipe, so it plots as baked.
+ * Plots the wave graph over the strip's phase window by re-parameterizing the
+ * coefficients through the procedural viewport. The generative palette carries
+ * its window in its own recipe, so it plots as baked.
  */
 function drawPaletteWaveGraph() {
   let plotted = palette;
@@ -1031,10 +1020,7 @@ function updatePalette() {
   updatePaletteCodeOutput();
 }
 
-// Coalesce updatePalette() into one recompute per animation frame: without
-// this, every slider pointer tick re-bakes the generative palette's
-// 256-entry LUT and redraws the wave graph (three channels reconstructed per
-// canvas column) on the main thread.
+// Coalesce updatePalette() into one recompute per animation frame.
 const scheduleUpdate = createFrameScheduler(updatePalette);
 const scheduleViewportRedraw = createFrameScheduler(redrawForViewport);
 
@@ -1059,9 +1045,8 @@ function engineTrapped(error) {
  * Initialize the sliders and the first visualization.
  */
 async function init() {
-  // Load the engine module first so GenerativePalette can bake its LUT with
-  // the exact C++ color math (PaletteOps). The generative tab can't render
-  // without it, so fail loudly rather than silently fall back.
+  // Load the engine module first: GenerativePalette bakes its LUT through
+  // PaletteOps.
   try {
     const { default: createHolosphereModule } = await import('../../../generated/holosphere_wasm.js');
     const wasm = await createHolosphereModule();
@@ -1112,10 +1097,7 @@ async function init() {
     ctx: hueKeyWheelCtx,
   });
 
-  // Tab buttons. Wired here via listeners rather than inline onclick
-  // attributes, which a `<script type="module">` (module scope, not global)
-  // cannot reach. The roving tabindex switchTab maintains leaves arrow keys
-  // as the only way into the unselected tab, so activation follows focus.
+  // Tab buttons; activation follows focus.
   const tabButtons = Array.from(document.querySelectorAll('.tab-btn[data-tab]'));
   tabButtons.forEach((btn, index) => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));

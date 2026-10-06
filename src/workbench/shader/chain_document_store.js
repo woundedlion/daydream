@@ -34,8 +34,8 @@ const refusal = (code, path, message) => ({
 });
 
 /**
- * Undo entries one session keeps. Each is a whole document clone, so this is
- * what bounds the editor's memory; the oldest is dropped past it.
+ * Undo entries one session keeps, each a whole document clone; the oldest is
+ * dropped past it.
  * @type {number}
  */
 export const UNDO_DEPTH = 100;
@@ -56,10 +56,9 @@ const SCRATCH_PRESET_ID = 'catalog-defaults';
 
 /**
  * Builds the workbench's scratch document: the given chain over catalog
- * operators carrying one preset of the catalog's own defaults, so the workbench
- * opens on a valid, rendering document rather than an empty page. The parameter
+ * operators carrying one preset of the catalog's own defaults. The parameter
  * declarations come from the same catalog-field mapping a structural insert
- * backfills with, so a scratch stage and an inserted one are indistinguishable.
+ * backfills with.
  * @param {*} catalog - The operator catalog the document validates against.
  * @param {ReadonlyArray<ChainEntry>} [chain] - The chain to build over.
  * @returns {*} A complete v2 document.
@@ -321,10 +320,8 @@ export async function createChainDocumentStore({
    * span, shortest first and in catalog order within a length. A sequence is
    * either the empty removal, one operator the span's neighbors accept, or a
    * run of crossings carrying the chain from the span's entry carrier to its
-   * exit while crossing each carrier at most once — a run that revisits a
-   * carrier is an insertion into a shorter run, not another way to bridge the
-   * span, so leaving those out keeps the enumeration bounded by the carrier
-   * count. Every candidate is costed against the declared budgets.
+   * exit while crossing each carrier at most once. Every candidate is costed
+   * against the declared budgets.
    * @param {number} start - First chain index of the span.
    * @param {number} deleteCount - Entries the span covers (0 = insertion).
    * @param {number} maxLength - Longest sequence to enumerate.
@@ -590,8 +587,7 @@ export async function createChainDocumentStore({
 
   /**
    * Writes one preset's value for one parameter through the same validator and
-   * the same history as a structural edit: a stage-control edit is a document
-   * edit, and the engine write is its side effect. Consecutive writes to the
+   * the same history as a structural edit. Consecutive writes to the
    * same control collapse into one undo entry, so undoing a drag restores the
    * value the run started from; any other edit, undo or redo ends the run.
    * @param {string} presetId - The preset the value belongs to.

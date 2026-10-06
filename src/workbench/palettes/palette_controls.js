@@ -4,9 +4,9 @@
  */
 
 /*
- * Pure state and geometry behind the palette tool's controls (palettes.html):
- * hue-wheel math, the strip's zoom window, and the V4 recipe values the engine's
- * palette compiler consumes. No DOM, so every export is testable headless.
+ * Pure state and geometry behind the palette tool's controls: hue-wheel math,
+ * the strip's zoom window, and the V4 recipe values the engine's palette
+ * compiler consumes.
  */
 
 /**
@@ -116,9 +116,7 @@ export function hitTestHueKeyMarker(x, y, points, radius) {
 }
 
 /**
- * Fills a three-element array in place. Keeping the component writes out of
- * oklchLinearRgb's body leaves that body as the matrix arithmetic exercised by
- * the output parity sweep.
+ * Fills a three-element array in place.
  * @param {number[]} out - Destination array.
  * @param {number} r - First component.
  * @param {number} g - Second component.
@@ -138,8 +136,7 @@ function writeTriple(out, r, g, b) {
  * @param {number} lightness - OKLCH L, nominally in [0, 1].
  * @param {number} chroma - OKLCH C.
  * @param {number} turns - OKLCH hue, in turns.
- * @param {number[]} [out] - Filled in place and returned, so a per-pixel caller
- *   can carry one array across the whole raster instead of allocating per sample.
+ * @param {number[]} [out] - Filled in place and returned.
  * @returns {number[]} Linear [R, G, B]; a channel outside [0, 1] is out of gamut.
  */
 export function oklchLinearRgb(lightness, chroma, turns, out = [0, 0, 0]) {
@@ -170,8 +167,7 @@ export function linearRgbInGamut(rgb) {
 
 /**
  * Estimates the widest sRGB-gamut chroma at one lightness by bisecting 360
- * sampled hues. The estimate scales the hue wheel's chroma axis. Uses the engine's
- * 1e-4 channel slack and 2e-5 chroma margin.
+ * sampled hues. Uses the engine's 1e-4 channel slack and 2e-5 chroma margin.
  * @param {number} lightness - OKLCH L to search at.
  * @returns {number} The largest sampled chroma, minus the margin.
  */
@@ -258,8 +254,7 @@ export function tablistKeyTarget(key, current, count) {
  * Owns the phase window shown by the palette strip.
  *
  * Pointer positions stay local to the visible strip while palette phases stay
- * in the original 0..1 domain. Keeping that mapping here gives Procedural and
- * Generative palettes identical copy and nested-zoom behavior.
+ * in the original 0..1 domain.
  *
  * @returns {PaletteViewport} The viewport.
  */
@@ -325,8 +320,7 @@ export function clampRecipeWindow(offset, span) {
 
 /**
  * Narrows a recipe's phase window to the span between two strip positions, in
- * either drag direction. The generative palette bakes its own window, so its
- * zoom composes here rather than in a viewport.
+ * either drag direction.
  * @param {{offset: number, span: number}} window - The window now shown.
  * @param {number} firstPosition - One end of the drag, as a 0..1 strip position.
  * @param {number} secondPosition - The other end.
@@ -416,9 +410,7 @@ export function axisFromEndpoints(minimum, maximum) {
 }
 
 /**
- * The generative tab's control elements, by the reading each one carries. The
- * page hands the values over; the ids live here so a reading and the control it
- * comes off cannot drift apart.
+ * The generative tab's control element ids, by the reading each one carries.
  * @type {Object<string, string>}
  */
 export const PALETTE_CONTROL_IDS = Object.freeze({
@@ -499,11 +491,8 @@ export function axisControlState({ curve, minimum, maximum, label, shortLabel })
 
 /**
  * Caps the shared delta a locked R/G/B group moves by so no member leaves its
- * own range, and reports each member's resulting value.
- *
- * All three channels move rigidly, so the group can only travel as far as its
- * most constrained member: the first channel to hit a bound stops the whole
- * group instead of clipping alone and breaking the lock.
+ * own range, and reports each member's resulting value. The first channel to
+ * hit a bound stops the whole group.
  *
  * @param {number} rawDelta - Delta the dragged slider asks for, in raw (scaled integer) units.
  * @param {Array<{param: string, start: number, min: number, max: number}>} members - The group's sliders, with their drag-start values and raw bounds. A member whose start value is not finite is ignored (the page could not read it).
@@ -527,10 +516,8 @@ export function lockedGroupMove(rawDelta, members) {
 }
 
 /**
- * The V4 recipe enumerants. The ordinals are what a recipe carries across the
- * WASM boundary, so they mirror the `enum class` rosters in core/color/palette_recipe.h
- * in declaration order; paletteEnumName resolves ordinals to member names, and the
- * WASM parity tests pin both to the engine.
+ * The V4 recipe enumerants. The ordinals mirror the `enum class` rosters in
+ * core/color/palette_recipe.h in declaration order.
  * @type {Object<string, Object<string, number>>}
  */
 export const PaletteV4 = Object.freeze({
@@ -682,10 +669,9 @@ export function hueKeyState(recipe) {
 }
 
 /**
- * The three keys a switch into CUSTOM hue mode should author, so the handoff
- * starts on the shape the wheel already showed: a harmony's anchors resampled
- * to three, a sweep resampled to three keys, or the existing custom keys
- * untouched.
+ * The three keys a switch into CUSTOM hue mode authors: a harmony's anchors
+ * resampled to three, a sweep resampled to three keys, or the existing custom
+ * keys untouched.
  * @param {PaletteRecipe} recipe - A V4 palette recipe.
  * @returns {{baseTurns:number, offsets:number[]}} The base turn and the three keys' offsets from it.
  */
@@ -799,14 +785,12 @@ export function defaultPaletteRecipe() {
 
 /**
  * The ordinal a PaletteV4 member name stands for — the inverse of
- * paletteEnumName, and the one gate every control reading passes through.
+ * paletteEnumName.
  * @param {string} group - A PaletteV4 enum name.
  * @param {string} name - The member name a <select> option carries.
  * @returns {number} The member's ordinal.
- * @throws {RangeError} When the group has no such member, which would otherwise
- *   marshal as an `undefined` the engine bridge rejects far from its cause. Own
- *   members only: an inherited name ("constructor", "toString") resolves under
- *   plain property access and would pass every reading handed to it.
+ * @throws {RangeError} When the group has no such own member; an inherited
+ *   name ("constructor", "toString") does not resolve.
  */
 export function paletteEnumOrdinal(group, name) {
   const members = PaletteV4[group];
@@ -818,10 +802,8 @@ export function paletteEnumOrdinal(group, name) {
 
 /**
  * The whole-turn sweep a LOOP domain closes on. The engine rejects a fractional
- * loop sweep rather than rounding it (core/color/generative_palette.h
- * canonicalize), so the sweep slider's half-notches are rounded here first — as
- * roundf rounds, half away from zero. Math.round would send -0.5 to a zero-turn
- * loop where +0.5 gives a whole turn.
+ * loop sweep (core/color/generative_palette.h canonicalize); this rounds as
+ * roundf does, half away from zero.
  * @param {number} turns - The authored sweep, in turns.
  * @returns {number} The nearest whole turn, ties away from zero.
  */
@@ -908,8 +890,7 @@ export function paletteRecipeFromControls(template, controls) {
  * @param {(id: string) => (string|undefined)} readControl - Reads one control's value by element id.
  * @param {number[]} customHueOffsets - The wheel's per-key hue offsets, which no control holds.
  * @returns {PaletteControlReadings} The readings.
- * @throws {RangeError} When a control the recipe needs is not on the page, which
- *   would otherwise marshal as a NaN or an undefined enum the engine rejects.
+ * @throws {RangeError} When a control the recipe needs is not on the page.
  */
 export function paletteControlReadings(readControl, customHueOffsets) {
   /**
@@ -963,8 +944,7 @@ export function paletteControlReadings(readControl, customHueOffsets) {
  * @param {string} group - A PaletteV4 enum name.
  * @param {number} value - The ordinal a recipe carries.
  * @returns {string} The member's name.
- * @throws {RangeError} When the group has no member with that ordinal, which
- *   would otherwise leave the select on whatever it already showed.
+ * @throws {RangeError} When the group has no member with that ordinal.
  */
 export function paletteEnumName(group, value) {
   const members = PaletteV4[group];
@@ -977,7 +957,7 @@ export function paletteEnumName(group, value) {
 
 /**
  * The inverse of paletteRecipeFromControls: the readings that reproduce a
- * recipe, for loading a preset into the tab's controls.
+ * recipe.
  *
  * customHueOffsets is meaningful only in CUSTOM mode. Other modes preserve
  * their authored baseTurns; a handoff into CUSTOM uses customHueKeyState().
@@ -1020,10 +1000,9 @@ const SPREAD_HARMONIES = new Set([
 ]);
 
 /**
- * Which control groups can still change the palette a recipe describes, so the
- * page disables the rest instead of offering sliders with no effect: a palette
- * with no chroma has no hue to steer, a monochromatic harmony has no direction
- * or color path, and a custom curve authors its own endpoints.
+ * Which control groups can still change the palette a recipe describes: a
+ * palette with no chroma has no hue to steer, a monochromatic harmony has no
+ * direction or color path, and a custom curve authors its own endpoints.
  * @param {PaletteRecipe} recipe - A V4 palette recipe.
  * @returns {Object<string, boolean>} One enabled flag per control group.
  */
@@ -1058,8 +1037,7 @@ export function paletteRecipeAvailability(recipe) {
 }
 
 /**
- * The tool's starting points, each a factory so a preset hands out a fresh
- * recipe rather than a shared one the page would edit in place.
+ * The tool's starting points, each a factory returning a fresh recipe.
  * @type {Object<string, () => PaletteRecipe>}
  */
 export const PALETTE_RECIPE_PRESETS = Object.freeze({

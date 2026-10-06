@@ -11,19 +11,16 @@ const TWO_PI = 2 * Math.PI;
 
 /**
  * The largest denominator the ratio search admits, and its default numerator
- * cap. The closing period is 2π·N/passiveC, so the denominator is what the
- * Domain control's range budgets.
+ * cap. The closing period is 2π·N/passiveC.
  * @type {number}
  */
 export const MAX_RATIONAL_TERM = 8;
 
-// Numerators the range-bounded search will walk, so a control range far wider
-// than the passive frequency cannot spin the grid unboundedly.
+// Cap on numerators the range-bounded search walks.
 const MAX_SEARCH_NUMERATOR = 1024;
 
 /**
- * Greatest common divisor of two non-negative integers (Euclid). Used to reduce
- * a found ratio to lowest terms.
+ * Greatest common divisor of two non-negative integers (Euclid).
  * @param {number} a - First integer (>= 0).
  * @param {number} b - Second integer (>= 0).
  * @returns {number} gcd(a, b); gcd(0, 0) is 0.
@@ -51,9 +48,7 @@ const closingRatio = (ratio, maxTerm, tol = 1e-9) => {
 
 /**
  * The spherical Lissajous parametric curve (on the unit sphere, R = 1).
- * Argument order mirrors the engine's lissajous(m1, m2, a, t) (core/math/spherical.h)
- * so the preview, the exported snippet, and the engine all agree on which
- * slider maps to which parameter. t is last in every case.
+ * Argument order mirrors the engine's lissajous(m1, m2, a, t) (core/math/spherical.h).
  * @param {number} m1 - Axial frequency C₁.
  * @param {number} m2 - Orbital frequency C₂.
  * @param {number} a - Phase shift A (radians).
@@ -72,7 +67,7 @@ export const lissajous = (m1, m2, a, t) => {
 /**
  * Finds the simplest rational approximation (M/N) for a given value (ratio).
  * A negative target returns a negative numerator (sign carried on M, N stays
- * positive); the search grid itself is positive, so the sign is split off first.
+ * positive).
  * @param {number} value - The ratio to approximate (e.g., C1/C2), may be negative.
  * @param {number} [maxTerm] - Maximum denominator, and the default maximum
  *   numerator (the search grid is then square: M, N each range over [1, maxTerm]).
@@ -128,8 +123,7 @@ export const findBestRationalRatio = (value, maxTerm = MAX_RATIONAL_TERM, accept
  * @param {number} [maxTerm] - Maximum denominator in the closing check and ratio search.
  * @param {?{min: number, max: number}} [range] - Optional inclusive bounds on the
  *   snapped active frequency. The ratio search then prefers ratios landing inside
- *   them, so a caller that has to keep the value in a control's range does not
- *   clamp the ratio back open afterwards.
+ *   them.
  * @returns {{ snappedActiveC: number, m: number, n: number, closingPeriod: number }} The
  *   snapped active frequency, the rational ratio m/n, and the curve's closing period T.
  */
@@ -140,8 +134,7 @@ export const snapToRationalRatio = (activeC, passiveC, maxTerm = MAX_RATIONAL_TE
 
   const targetRatio = activeC / passiveC;
   // A pair that already closes within the denominator budget is left exactly
-  // where it was authored; re-snapping it would move a closed curve off its
-  // own ratio.
+  // where it was authored.
   const closing = closingRatio(targetRatio, maxTerm);
   if (closing !== null) {
     return { snappedActiveC: activeC, m: closing.M, n: closing.N,
@@ -183,9 +176,6 @@ export const closingDomain = (m2, domain) => {
 
 /**
  * Describes the gap between an authored domain and what the engine traverses.
- * Comets re-snaps the exported domain to closingDomain(), so an unclosed domain
- * previews a different arc than it renders; Fishbowl does not snap and
- * pinches at the seam instead.
  * @param {number} c2 - Frequency C₂ (m2).
  * @param {number} domain - The authored domain.
  * @param {number} [tol] - Relative tolerance below which the domain counts as closed.
@@ -200,14 +190,8 @@ export const domainClosureWarning = (c2, domain, tol = 1e-4) => {
 };
 
 /**
- * Builds the export snippet string for the current curve parameters. Pure: it
- * takes plain numbers and returns the string the page writes into the DOM.
- *
- * The snippet is a C++ `LissajousParams` aggregate initializer — the form the
- * engine's Lissajous effects (Fishbowl, Comets) actually consume
- * (core/math/spherical.h: `struct LissajousParams { float m1, m2, a, domain; }`).
- * Phase A is emitted in radians and fed to the engine as-is: the tool's
- * radians-labelled slider matches `lissajous()`'s phase with no π scaling.
+ * Builds the export snippet: a C++ `LissajousParams` aggregate initializer
+ * (core/math/spherical.h). Phase A is emitted in radians with no π scaling;
  * C₁/C₂ map to m1/m2.
  * @param {number} c1 - Frequency C₁ (m1).
  * @param {number} c2 - Frequency C₂ (m2).

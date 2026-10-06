@@ -4,11 +4,9 @@
  */
 
 /*
- * Möbius transform preset generators. Each preset
- * generator maps elapsed time `t` to the four complex Mobius coefficients
- * {A, B, C, D} of f(z) = (Az + B) / (Cz + D); these feed the live shader
- * uniforms, so the coefficients must stay bit-for-bit identical to what the
- * shader expects.
+ * Möbius transform math for the workbench: complex helpers, projection, and
+ * preset generators mapping time `t` to the coefficients {A, B, C, D} of
+ * f(z) = (Az + B) / (Cz + D).
  */
 
 import { formatFloatCpp } from '../../shared/cpp_format.js';
@@ -36,9 +34,7 @@ export function cadd(p, q) {
   return { re: p.re + q.re, im: p.im + q.im };
 }
 
-// GLSL port of cmult/cadd consumed by the mobius.html fragment shader. Single
-// source of truth for the shader; tests/mobius_transforms.test.js pins this
-// against the JS functions above so the two cannot silently diverge.
+// GLSL port of cmult/cadd for the mobius.html fragment shader.
 export const glslComplexFunctions = `
         struct CNum { float re; float im; };
         CNum cmult(CNum p, CNum q) { return CNum(p.re * q.re - p.im * q.im, p.re * q.im + p.im * q.re); }
@@ -94,12 +90,10 @@ export function stereo(v) {
  * @param {{re:number, im:number}} num - Numerator.
  * @param {{re:number, im:number}} den - Divisor.
  * @returns {{re:number, im:number}} num/den, except a quotient whose magnitude would reach STEREO_INF collapses to the sentinel along the numerator's direction.
- * @details Not general complex division: the guard is relative, so a
- * near-singular divisor still yields a finite point carrying the numerator's
- * azimuth rather than a fixed constant. Only an exactly zero numerator is the
- * indeterminate 0/0 form, which returns (0,0). A nonzero divisor whose square
- * is subnormal or zero is lifted by STEREO_UNDERFLOW_LIFT along with the
- * numerator rather than read as an exact pole.
+ * @details The guard is relative, so a near-singular divisor yields a finite
+ * point carrying the numerator's azimuth. An exactly zero numerator returns
+ * (0,0). A nonzero divisor whose square is subnormal or zero is lifted by
+ * STEREO_UNDERFLOW_LIFT along with the numerator.
  */
 export function projectDiv(num, den) {
   let denRe = den.re;
@@ -132,9 +126,7 @@ export function projectDiv(num, den) {
   };
 }
 
-// GLSL port of stereo/projectDiv, appended after glslComplexFunctions (which
-// declares CNum). tests/mobius_transforms.test.js pins both the constants and
-// the bodies against the JS above.
+// GLSL port of stereo/projectDiv; requires glslComplexFunctions (declares CNum).
 export const glslProjectionFunctions = `
         const float STEREO_INF = 1e4;
         const float STEREO_POLE_EPS = 2.0 / (STEREO_INF * STEREO_INF);
@@ -181,8 +173,6 @@ export const glslProjectionFunctions = `
 /**
  * Snaps a scalar to zero (within twice `threshold`) and then to the nearest
  * integer (within `threshold`), so dragged coefficients latch onto grid lines.
- * Zero gets the wider band so coefficients settle onto an exact 0 more readily;
- * deriving it from `threshold` keeps the two bands proportional.
  * @param {number} value - The scalar coefficient component to snap.
  * @param {number} [threshold=0.05] - Maximum distance to the nearest integer for snapping.
  * @returns {number} The snapped value.

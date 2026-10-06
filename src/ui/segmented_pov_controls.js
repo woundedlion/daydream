@@ -68,7 +68,7 @@ export function createSegmentedPovControls({
   // Requested size; segments.count follows the live pool and lags this across
   // the warmModules() await.
   let segCount = segState.segments;
-  // Assigned below, after the toggle whose deep-linked handler can reconcile it.
+  // Unset until after the Enabled toggle, whose deep-linked handler may call syncSegmentCount.
   /** @type {{updateDisplay: () => void, setValue: (value: number) => void, onChange: Function, max: (value: number) => *, name: (label: string) => *}} */
   let segCountCtrl;
   const syncSegmentCount = () => {
@@ -83,9 +83,8 @@ export function createSegmentedPovControls({
       segments, () => segCount, nav, isMobile),
     isActive: () => segments.active,
   });
-  // Declared ahead of the fallback, and assigned before its handler is wired: a
-  // deep-linked `segmented` replays that handler synchronously at registration,
-  // and a throw there reaches the fallback's showToggle.
+  // Assigned before its handler is wired: a deep-linked `segmented` replays the
+  // handler synchronously at registration, and a throw reaches showToggle.
   /** @type {{setValue: (value: boolean) => void, onChange: Function}} */
   let segEnabledCtrl;
   const segmentedFailed = createSegmentedFallback({

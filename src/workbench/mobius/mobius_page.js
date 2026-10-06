@@ -28,8 +28,7 @@ let isAnimating = false;
 let activePreset = null;
 let animationTime = 0;
 // Timestamp (ms) of the previous animated frame; 0 means "seed on next
-// frame". Used to advance animationTime by real elapsed time so preset
-// flow speed is independent of the display refresh rate.
+// frame". animationTime advances by real elapsed time.
 let lastAnimTime = 0;
 
 let scene, sphereMesh;
@@ -116,9 +115,7 @@ const updateCodeSnippet = () => {
 };
 
 // A Möbius transform (az+b)/(cz+d) is invertible only when its complex
-// determinant ad − bc ≠ 0; at det ≈ 0 the map collapses to a constant and
-// the shader paints a flat field with no on-screen cue. Surface that as a
-// warning so a degenerate parameter set isn't read as a rendering bug.
+// determinant ad − bc ≠ 0; at det ≈ 0 the map collapses to a constant.
 const DEGENERATE_WARNING =
   '⚠ Degenerate transform (ad − bc ≈ 0): the map collapses to a constant.';
 
@@ -216,16 +213,14 @@ const stopAnimation = () => {
     b.classList.remove('active');
     b.setAttribute('aria-pressed', 'false');
   });
-  // Clear the mobile dropdown back to its placeholder. <select> fires
-  // 'change' only on a value change, so without this the just-stopped
-  // preset stays selected and can't be re-tapped on mobile (where the
-  // dropdown is the only preset UI).
+  // Clear the mobile dropdown back to its placeholder: <select> fires
+  // 'change' only on a value change, so the stopped preset must be deselected.
   const presetSelect = document.getElementById('presetSelect');
   if (presetSelect) presetSelect.value = '';
 };
 
 const startPreset = (preset) => {
-  stopAnimation(); // Stop any existing animation
+  stopAnimation();
   activePreset = preset;
   document.querySelectorAll('.preset-btn').forEach(b => {
     const selected = b.dataset.id === preset.id;
@@ -261,10 +256,9 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
     return el;
   };
 
-  // The mouse/touch-only pad is exposed as a group of two per-axis sliders:
-  // each off-screen handle takes the arrow keys for its own part and carries
-  // the announced value in aria-valuenow/aria-valuetext, which a screen
-  // reader re-reads on every change.
+  // The pad is exposed as a group of two per-axis sliders: each off-screen
+  // handle takes the arrow keys for its own part and carries the value in
+  // aria-valuenow/aria-valuetext.
   const makeAxis = (axisId, axisLabel, keyshortcuts, vertical) => {
     return createSliderProxy({ id: axisId, label: axisLabel,
       min: -maxExtent, max: maxExtent, keys: keyshortcuts,
@@ -321,9 +315,8 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
   uiUpdaters[id] = updateUI;
 
   const handleInput = (clientX, clientY) => {
-    // The dot rides .complex-plane-inner, which spans the pad's padding box, so
-    // the pointer has to be normalized against that box rather than the border
-    // box getBoundingClientRect() reports.
+    // The dot rides .complex-plane-inner, which spans the pad's padding box,
+    // not the border box getBoundingClientRect() reports.
     const rect = innerRect(planeElement);
     if (rect.width <= 0 || rect.height <= 0) return;
     if (activePreset) stopAnimation();
@@ -426,7 +419,7 @@ const initThree = () => {
   scene = result.scene;
 
   // Each struct uniform keeps its own stable value object; updateMobiusUniforms
-  // mutates these in place so Three.js re-uploads without per-tick allocation.
+  // mutates these in place.
   const uniforms = {
     u_a: { value: { re: config.A.re, im: config.A.im } },
     u_b: { value: { re: config.B.re, im: config.B.im } },
