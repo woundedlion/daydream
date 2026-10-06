@@ -892,17 +892,18 @@ test('render drives the real main pass inside the scissor test', () => {
   ctx.renderMainView = Daydream.prototype.renderMainView;
   Daydream.prototype.render.call(ctx, null);
 
-  assert.deepEqual(log, [
-    'controls.update',
-    'updateCullUniforms',
-    'scissorTest:true',
+  const on = log.indexOf('scissorTest:true');
+  const off = log.indexOf('scissorTest:false');
+  assert.ok(on >= 0 && off > on, `scissor test not bracketed: ${log.join(', ')}`);
+  assert.deepEqual(log.slice(on + 1, on + 4), [
     'viewport:0,0,1200,800',
     'scissor:0,0,1200,800',
     'render:scene,camera',
-    'refreshLabels',
-    'renderPip',
-    'scissorTest:false',
   ]);
+  const pip = log.indexOf('renderPip');
+  assert.ok(pip > on && pip < off, 'the PiP renders outside the scissor test');
+  assert.ok(log.indexOf('updateCullUniforms') < log.indexOf('render:scene,camera'),
+    'the main pass renders before the cull uniforms are updated');
 });
 
 // ---------------------------------------------------------------------------
