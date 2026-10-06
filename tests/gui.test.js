@@ -969,8 +969,8 @@ test('a control hydrates only from its own exact key', () => {
 });
 
 
-test('sparse enum deep links hydrate numeric IDs and reject ordinal gaps', () => {
-  mock.timers.enable({ apis: ['setTimeout'] });
+test('sparse enum deep links hydrate numeric IDs and reject ordinal gaps', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   for (const value of [0, 1, 6, 2]) {
     installWindowAt(`?Pattern=${value}`);
     const gui = new DeepLinkGUI({ autoPlace: false });
