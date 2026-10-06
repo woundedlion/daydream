@@ -356,7 +356,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   }
 
   /**
-   * Update the preset controller and its visibility from live engine state.
+   * Mirror the live preset index into the preset control.
    * @param {EffectRecord} fx
    * @param {number} count
    * @param {number} index
