@@ -1434,7 +1434,7 @@ test('createChainValidator serializes overlapping tasks', async () => {
   assert.deepEqual(log, ['a:in', 'a:out', 'b:in', 'b:out']);
 });
 
-// The add-op buttons the solids page offers.
+// A sample of the add-op candidates the solids page passes to the gate.
 const CANDIDATES = ['kis', 'ambo', 'dual'];
 
 /** Concurrent requests for the same signature share one validator sweep. */
