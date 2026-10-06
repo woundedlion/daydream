@@ -292,7 +292,7 @@ export class SegmentStatsView {
     notices.className = 'visually-hidden';
 
     mkRow([colHeader(''), colHeader('Range'), colHeader('Compute'),
-           colHeader('Scr A'), colHeader('Scr B'), colHeader('Persist')]);
+           colHeader('Scr A KiB'), colHeader('Scr B KiB'), colHeader('Persist KiB')]);
 
     const rows = [];
     for (let s = 0; s < numSegs; s++) {
