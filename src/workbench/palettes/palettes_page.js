@@ -5,6 +5,7 @@
  * Page module for tools/palettes.html.
  */
 import { copyToClipboard, wireCopyBlock } from '../../shared/clipboard.js';
+import { replaceUrl } from '../../app/state.js';
 import { createSlider, createSliderProxy } from '../../shared/slider.js';
 import { showFatalError, bootstrapTool } from '../../shared/banner.js';
 import { linearRgbToHex } from '../../shared/color.js';
@@ -63,8 +64,7 @@ function switchTab(tabName, updateUrl = true) {
   if (palettesPanel) palettesPanel.style.display = (tabName === 'procedural') ? '' : 'none';
 
   if (updateUrl)
-    history.replaceState(history.state, '',
-      paletteTabUrl(window.location.href, tabName));
+    replaceUrl(paletteTabUrl(window.location.href, tabName));
 
   updatePalette();
 }
