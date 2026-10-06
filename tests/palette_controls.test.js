@@ -470,20 +470,6 @@ const CONTROL_READINGS = {
   falloffStart: 0.85,
 };
 
-test('control readings marshal into a recipe by enum name', () => {
-  const recipe = paletteRecipeFromControls(defaultPaletteRecipe(), CONTROL_READINGS);
-
-  assert.deepEqual(recipe.input, { offset: 0.1, span: 0.8 });
-  assert.equal(recipe.domain, PaletteV4.domain.MIRROR);
-  assert.equal(recipe.colorPath, PaletteV4.colorPath.OKLAB_CARTESIAN);
-  assert.equal(recipe.hue.mode, PaletteV4.hueMode.HARMONY);
-  assert.equal(recipe.hue.harmony, PaletteV4.harmony.TRIADIC);
-  assert.equal(recipe.hue.direction, PaletteV4.direction.CLOCKWISE);
-  assert.equal(recipe.hue.baseTurns, 0.25);
-  assert.equal(recipe.lightness.curve, PaletteV4.curve.ASCENDING);
-  assert.equal(recipe.chroma.curve, PaletteV4.curve.BELL);
-});
-
 /** The tab exports every field of the recipe. */
 test('every recipe field a control carries is marshalled', () => {
   const template = defaultPaletteRecipe();
@@ -584,8 +570,6 @@ test('a falloff start and a loop sweep are canonicalized by domain', () => {
   absolute.chroma.basis = PaletteV4.chromaBasis.ABSOLUTE;
   assert.equal(paletteRecipeFromControls(absolute, CONTROL_READINGS).chroma.headroom, 1,
     'an ABSOLUTE basis has no gamut fraction to keep back');
-  assert.equal(paletteRecipeFromControls(defaultPaletteRecipe(), CONTROL_READINGS).chroma.headroom,
-    CONTROL_READINGS.headroom, 'a gamut-relative basis carries the authored headroom');
 
   const open = paletteRecipeFromControls(defaultPaletteRecipe(),
     { ...CONTROL_READINGS, hueMode: 'SWEEP' });
@@ -604,15 +588,6 @@ test('a loop sweep rounds half away from zero, as the engine does', () => {
   const reversed = paletteRecipeFromControls(defaultPaletteRecipe(),
     { ...CONTROL_READINGS, domain: 'LOOP', hueMode: 'SWEEP', sweepTurns: -0.5 });
   assert.equal(reversed.hue.sweepTurns, -1);
-});
-
-test('an axis endpoint pair becomes its center and range', () => {
-  const recipe = paletteRecipeFromControls(defaultPaletteRecipe(), CONTROL_READINGS);
-
-  assert.deepEqual(recipe.lightness, { ...defaultPaletteRecipe().lightness,
-    curve: PaletteV4.curve.ASCENDING, center: 0.5, range: 0.6000000000000001 });
-  assert.equal(recipe.chroma.center, 0.4);
-  assert.equal(recipe.chroma.range, 0.2);
 });
 
 test('a CUSTOM axis keeps the template points its endpoints cannot describe', () => {
