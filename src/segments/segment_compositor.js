@@ -69,15 +69,16 @@ export class SegmentCompositor {
   /**
    * Composite segment results into the display buffer (segment-rectangle model).
    * @returns {number} How many segment rectangles were actually blitted this
-   *   call. 0 means either every result was null/empty (a fully-fenced frame),
-   *   so the display buffer still holds only driver.render()'s fill(0), or a
-   *   check latched a fault: the destination view's length against the driver
+   *   call. 0 means either every result was null/empty (a fully-fenced frame)
+   *   or a check latched a fault: the destination view's length against the driver
    *   grid, or the per-segment pre-pass (out-of-bounds/empty/inverted rect, a
    *   pixel-length mismatch, or a rect that is not that segment's band of the
    *   current layout). -1 means there was no display buffer to blit into (the
    *   engine view is missing before the WASM load and after dispose), so nothing
    *   was read or written and the caller must keep the generation pending. The
-   *   caller uses this to avoid marking a black buffer as a real composited frame.
+   *   Daydream.stepSimulation() clears the display buffer on advancing ticks.
+   *   Boundary toggles and paused completions composite over previous contents.
+   *   The caller uses this to avoid marking an unblitted buffer as a composited frame.
    * @param {number} count
    * @param {boolean} showBoundaries
    * @param {Array<FrameResult | null>} results - One whole generation, indexed
@@ -105,12 +106,13 @@ export class SegmentCompositor {
       return 0;
     }
 
-    // A refreshed destination has not been cleared by driver.render().
+    // A refreshed destination missed Daydream.stepSimulation()'s per-tick clear.
+    // Off-tick composites otherwise retain previous contents in unblitted bands.
     if (refreshed) dst.fill(0);
 
     // On a divergence, self-heal rather than fault the render loop (mirrors the
     // single-engine path): re-point both display aliases at the composite target.
-    // driver.render() re-clears driver.pixels next frame, restoring the elision.
+    // Daydream.stepSimulation() clears driver.pixels on the next advancing tick.
     if (this.displayAliasesDiverged(dst)) {
       if (!this.#aliasDivergenceLogged) {
         console.error(
