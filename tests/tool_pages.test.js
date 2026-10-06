@@ -54,7 +54,7 @@ const SPECIFIER = /(?:from|import)\s*\(?\s*['"](\.[^'"]+\.js)['"]/g;
 /**
  * The modules a page ends up loading, its own and the src/ ones alike. The
  * walk follows every relative specifier, so a module a page reaches only
- * through another (index.html pulls the banner via bootstrap.js) is found.
+ * through another is found.
  * @param {string} page - Repo-relative page path.
  * @returns {string[][]} Path segments of each module, sorted.
  */
@@ -98,9 +98,7 @@ const sheetsOf = (page) => {
   return found;
 };
 
-// Every page the app serves, paired with the stylesheets it links. The CSP and
-// undefined-class gates run over all of them — index.html is the most-loaded
-// page, so it is the one least able to afford being ungated.
+// Every page the app serves, paired with the stylesheets it links.
 const SERVED_PAGES = servedPages().map((page) => ({
   page,
   sheets: sheetsOf(page),
@@ -204,12 +202,10 @@ const callArgs = (src, open) => {
 };
 
 /**
- * Class tokens a script puts on the elements it builds. Reads the four forms
- * the tool modules use — `className =`, `classList.add`/`toggle`, the
- * `…Class`/`…Classes` options a caller can override, and the class argument
- * of an `el(tag, classes)` builder — each of which names its value as a
- * class list; a class assembled some other way (passed positionally, built by
- * interpolation) is out of reach and simply goes ungated.
+ * Class tokens a script puts on the elements it builds, read from
+ * `className =`, `classList.add`/`toggle`, `…Class`/`…Classes` options, and
+ * the class argument of an `el(tag, classes)` builder. A class assembled any
+ * other way goes ungated.
  * @param {string} src - Script source.
  * @returns {Set<string>} Referenced class tokens.
  */
@@ -230,8 +226,7 @@ const scriptClasses = (src) => {
     /\b\w*[Cc]lass(?:es)?\s*[:=]\s*(\[[^\]]*\]|(['"`])[^'"`]*\2)/g)) {
     for (const value of literals(binding)) addTokens(tokens, value);
   }
-  // An `el(tag, classes)` builder assigns a variable, which the className
-  // form above cannot read; the class list is the call's second argument.
+  // An `el(tag, classes)` builder's class list is the call's second argument.
   for (const match of src.matchAll(/\bel\(\s*(['"`])[a-z]+\1\s*,/g)) {
     for (const value of literals(callArgs(src, match.index + 2)).slice(1)) {
       addTokens(tokens, value);
@@ -277,10 +272,8 @@ test('every served page carries a CSP permitting no Tailwind CDN origin or blank
 });
 
 /**
- * Every served page forbids form submission. `default-src` does not cover
- * `form-action`, and a meta-delivered policy is the only vehicle these pages
- * have: GitHub Pages serves no response headers of their own, which is also why
- * `frame-ancestors` is absent -- it is stripped from a meta policy.
+ * Every served page forbids form submission; `default-src` does not cover
+ * `form-action`. `frame-ancestors` is absent because a meta policy strips it.
  */
 test('every served page CSP forbids form submission', () => {
   for (const { page } of SERVED_PAGES) {
@@ -293,10 +286,7 @@ test('every served page CSP forbids form submission', () => {
 });
 
 /**
- * Pins each served page's script-src to its exact token list. `default-src`
- * alone leaves the directive that actually decides where scripts load from
- * ungated, so an origin added to any page passes CI on the strength of a
- * default it overrides.
+ * Pins each served page's script-src to its exact token list.
  */
 test('every served page\'s script-src is exactly its committed token list', () => {
   assert.deepEqual(Object.keys(SCRIPT_SRC).sort(), SERVED_PAGES.map(({ page }) => page).sort(),
@@ -312,10 +302,9 @@ test('every served page\'s script-src is exactly its committed token list', () =
 });
 
 /**
- * tools.css names Inter and JetBrains Mono for every page it styles, so a page
- * that links no font stylesheet renders in the system fallback instead. The
- * vendored stylesheet lives in the gitignored /vendor/, so on the deploy the
- * link 404s and only its onerror swap to the CDN copy loads any fonts at all.
+ * A page tools.css styles has to link the font families it names, or it renders
+ * in the system fallback. The vendored stylesheet is gitignored, so on the
+ * deploy only the link's onerror swap to the CDN copy loads fonts.
  */
 test('every tool page links the font families tools.css styles for', () => {
   for (const name of PAGES) {
@@ -390,8 +379,7 @@ test('every served page\'s stylesheets define every class it uses', () => {
   }
 });
 
-// A module that builds no element carries no class. Skipping on a token yield
-// of zero instead would excuse exactly the modules whose classes are unreadable.
+// A module that builds no element carries no class.
 const BUILDS_ELEMENTS = /\bcreateElement\(|\.className\b|\.classList\b/;
 
 test('every shared or workbench module that builds an element can render on a served page', () => {
@@ -414,13 +402,12 @@ test('tailwind.css keeps its upstream license banner', () => {
 });
 
 // WCAG 2.1 SC 1.4.3, normal-size text: anything under 18.66px, or under 24px
-// and not bold. Every rule swept below is well inside that.
+// and not bold.
 const AA_CONTRAST = 4.5;
 
 // Sheet -> text rule -> the rule painting the surface under it, front to back
 // where the nearer fill is translucent. Every rule a tools/ stylesheet declares
-// `color` on is listed here or in CONTRAST_EXEMPT, so a colour added to a sheet
-// is measured instead of joining the gate unread. tailwind.css is generated
+// `color` on is listed here or in CONTRAST_EXEMPT. tailwind.css is generated
 // from the page and source classes: its rules stay in the cascade but out of the sweep.
 const CONTRAST_SURFACES = {
   'tools.css': {
@@ -524,7 +511,7 @@ const CONTRAST_EXEMPT = {
 
 /**
  * Every rule in a stylesheet, comments dropped and selector whitespace
- * collapsed to the single spaces the tables above spell them with.
+ * collapsed to the single spaces the tables spell them with.
  * @param {string} css - Stylesheet text.
  * @returns {string[][]} `[selector, declarations]` per rule, in source order.
  */
@@ -684,8 +671,7 @@ test('CSS readers ignore comments and honor later declarations', () => {
 
 /**
  * Sweeps every colour the tools/ stylesheets declare against the WCAG AA floor,
- * each in the cascade its page builds, so a token retuned for looks fails here
- * wherever the pages that load it sit text on too near a fill.
+ * each in the cascade its page builds.
  */
 test('every colour a tools/ stylesheet declares clears the WCAG AA floor or says why not', () => {
   for (const { page, sheets } of SERVED_PAGES) {

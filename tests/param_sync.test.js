@@ -15,9 +15,8 @@ import {
   replayParameterWrites,
 } from '../src/effects/param_sync.js';
 
-// resolveParamSync is the DOM-free core of sync()'s per-controller "fight-the-
-// slider" decision: coerce the engine's raw value, never clobber a controller the
-// user is editing, and skip a redundant write when the value is unchanged.
+// resolveParamSync coerces the engine's raw value, never clobbers a controller
+// the user is editing, and skips a redundant write when the value is unchanged.
 
 test('numeric: a changed value updates', () => {
   assert.deepEqual(resolveParamSync(0.5, 0.8, false, false),
@@ -69,8 +68,7 @@ test('boolean: a NaN engine value never flips the toggle', () => {
 });
 
 // enumChoices maps engine enum labels to the lil-gui choices object whose
-// values are the numeric IDs setParameter expects. It carries a null
-// prototype, so the expected tables below are spread into plain objects.
+// values are the numeric IDs setParameter expects. It carries a null prototype.
 
 test('enum: labels map to their option indices in order', () => {
   assert.deepEqual({ ...enumChoices(['None', 'Warp', 'Sparkle']) },
@@ -141,7 +139,7 @@ test('a unit step with no labels is an integer control', () => {
 });
 
 test('labels outrank a step, so a stepped enum stays a dropdown', () => {
-  // The engine emits step 1 for every whole-number target, enums included.
+  // Whole-number targets, enums included, carry step 1.
   assert.equal(
     paramControlKind({ value: 0, options: ['A', 'B'], step: 1 }), 'enum');
 });
@@ -151,8 +149,7 @@ test('a boolean carrying labels stays a toggle', () => {
   assert.equal(paramControlKind({ value: true, options: ['Off', 'On'] }), 'boolean');
 });
 
-// engineParamValue coerces a GUI value to the float setParameter takes, for both
-// the deep-link seeding pass and the per-change write.
+// engineParamValue coerces a GUI value to the float setParameter takes.
 
 test('a boolean becomes 1.0/0.0', () => {
   assert.equal(engineParamValue(true), 1.0);
@@ -169,8 +166,8 @@ test('an enum index passes through as its own float', () => {
   assert.equal(engineParamValue(2), 2);
 });
 
-// paramValueSkew guards sync()/exportParams() from pairing a drifted param-name
-// list with the engine's value stream by index.
+// paramValueSkew detects a param-name list that has drifted from the engine's
+// value stream.
 
 test('equal lengths do not skew', () => {
   assert.equal(paramValueSkew(3, 3), false);

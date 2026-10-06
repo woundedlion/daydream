@@ -3,9 +3,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-/* tools.css supplies body, .param-group, .slider-label and the base
-   range-slider styling shared across the tool pages; only palettes-specific
-   extras live here. */
+/* Palettes-specific extras over tools.css. */
 body {
   min-height: 100vh;
   padding: 1rem;
@@ -58,10 +56,9 @@ body {
   margin-bottom: 0.625rem;
 }
 
-/* Takes the header's free width so the status reads in full: it wraps rather
-   than ellipsizing, because the clipped tail carries a compile error's reason
-   and offending field. Below the basis the presets take the next header row,
-   so the status keeps a readable measure instead of collapsing. */
+/* Takes the header's free width and wraps, so a compile error's reason and
+   offending field read in full. Below the basis the presets take the next
+   header row. */
 .recipe-title-status {
   display: flex;
   min-width: 0;

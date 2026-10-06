@@ -1,8 +1,6 @@
-// The published set combines site_manifest.txt with verified engine assets.
-// A wildcard `cp` allowlist would publish any future root-level dev script and
-// still miss a runtime asset placed in a new directory, so the manifest is
-// checked from both sides here — every source entry is tracked and present, and every
-// asset the served pages reach is covered by an entry.
+// The published set combines site_manifest.txt with verified engine assets:
+// every source entry is tracked and present, and every asset the served pages
+// reach is covered by an entry.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs';
@@ -51,7 +49,7 @@ const JS_REF = [
   /\bimport\s*\(\s*['"](\.{1,2}\/[^'"]+)['"]\s*\)/g,
   /\bnew\s+(?:URL|Worker)\s*\(\s*['"](\.{1,2}\/[^'"]+)['"]/g,
   // A module may hold a specifier or an asset URL in a constant and pass it to
-  // import() or fetch() elsewhere, which none of the forms above see.
+  // import() or fetch() elsewhere, which the other forms do not see.
   /['"](\.{1,2}\/[^'"]*\.(?:mjs|js|json|wasm))['"]/g,
 ];
 // The Emscripten glue locates its binary by plain file name, not by specifier.
@@ -106,8 +104,6 @@ test('every site manifest entry is tracked source or an installed engine asset',
   assert.ok(entries.length > 0, `${MANIFEST} lists nothing`);
   assert.deepEqual([...new Set(entries)], entries, `${MANIFEST} repeats an entry`);
   const tracked = [...trackedFiles()];
-  // Accumulated rather than asserted per entry, so the assertion count does not
-  // track the manifest's length.
   const malformed = [];
   const absent = [];
   const untracked = [];
@@ -157,8 +153,6 @@ const walkFromPages = () => {
   const tracked = trackedFiles();
   const seen = new Set();
   const queue = [...PAGES];
-  // The walk visits every reachable file, so it accumulates its findings and
-  // its caller asserts once per class rather than once per node.
   const unpublished = [];
   const dangling = [];
   const absent = [];
@@ -195,9 +189,7 @@ const walkFromPages = () => {
 let walked;
 
 /**
- * The reference walk, run once: it re-reads the tracked tree and spawns a
- * `git check-ignore` per dangling reference, and nothing between the cases
- * below changes what it would find.
+ * The reference walk, run once and shared across cases.
  * @returns {ReturnType<typeof walkFromPages>} The shared, read-only result.
  */
 const pageWalk = () => (walked ??= walkFromPages());
@@ -218,9 +210,7 @@ test('the site manifest covers every asset the served pages reference', () => {
   assert.ok(seen.size > PAGES.length, 'the reference walk reached no modules');
 });
 
-// Entries no served page references. The manifest exists to keep tests/,
-// scripts/ and dev tooling off Pages, so this list stays short: an entry earns a
-// place here only by being published for its own sake.
+// Entries no served page references, each published for its own sake.
 const UNREFERENCED = [
   'README.md',
   ...new Set((existsSync(resolve(REPO, 'README.md')) ? read('README.md') : '')

@@ -255,9 +255,8 @@ test('the URL layer reads and writes the window it was handed', () => {
 });
 
 /**
- * The debounce is the one piece of a URLSync that can outlive a page discard,
- * so it must be armed on the window the writer was handed rather than the
- * ambient one, and dispose() must take it back down.
+ * The debounce can outlive a page discard, so it is armed on the window the
+ * writer was handed, and dispose() takes it back down.
  */
 test('URLSync arms and cancels its debounce on the window it was handed', () => {
   installRecordingWindow('?effect=Global', '/global', '');
@@ -293,8 +292,7 @@ test('URLSync.reset leaves a bare path when nothing survives', () => {
 
 /**
  * replaceState is rate-limited (WebKit throws past ~100 writes per 30 s) and the
- * URL is cosmetic: a refused write must not surface as an app failure, least of
- * all inside a switch rollback, where it would be read as unrecoverable state.
+ * URL is cosmetic: a refused write must not surface as an app failure.
  */
 test('a refused history write does not propagate out of the URL layer', () => {
   installWindow({
@@ -404,9 +402,7 @@ test('URLSync bounds its retries of a refused history write', () => {
 });
 
 /**
- * The bounded ladder is sized to outlast a 30-second rate-limit window. Letting
- * a concurrent write re-arm it at the debounce would spend all twenty attempts
- * inside that window and drop the buffer while the refusal was still standing.
+ * The bounded ladder is sized to outlast a 30-second rate-limit window.
  */
 test('URLSync will not let a concurrent write shorten an armed retry', () => {
   const written = [];
@@ -846,9 +842,8 @@ test('URLSync.reset carries an excluded ad-hoc write over the value it replaces'
 });
 
 /**
- * reset() only schedules the clear, so a reader inside the debounce window still
- * sees the params on their way out — the deep-link GUI rebuilds an effect panel
- * there, and would hydrate it from the outgoing effect's values.
+ * reset() only schedules the clear, so a reader inside the debounce window would
+ * otherwise see the params on their way out.
  */
 test('URLSync.applyPendingReset hides the params a scheduled reset will clear', () => {
   installRecordingWindow('?speed=2&keep=1', '/sim');
@@ -872,8 +867,8 @@ test('URLSync.applyPendingReset hides the params a scheduled reset will clear', 
 
 /**
  * setParam() only buffers; the write reaches the URL on the next flush. A reader
- * inside that window — the deep-link GUI rebuilding a panel — has to see the
- * buffered value, not the query-string one it is about to replace.
+ * inside that window has to see the buffered value, not the query-string one it
+ * is about to replace.
  */
 test('URLSync.overlayPending applies the writes buffered for the next flush', () => {
   installRecordingWindow('?speed=2&drop=1', '/sim');
@@ -1131,9 +1126,8 @@ test('URLSync.reset collapses into the pending debounced flush', () => {
 });
 
 /**
- * Every effect switch resets the URL, so a burst must cost one write rather than
- * one per switch: spending the browser's replaceState budget is what makes it
- * throw.
+ * A burst of resets must cost one write: spending the browser's replaceState
+ * budget is what makes it throw.
  */
 test('a burst of resets costs a single URL write', () => {
   mock.timers.enable({ apis: ['setTimeout'] });

@@ -27,8 +27,8 @@ test('pre-push refuses a push from a tree that cannot run the suites',
 /**
  * Runs the hook with PATH pointing at a directory of stand-in tools, so a
  * refusal further down the hook than the first missing tool still executes.
- * PATH is set inside the shell rather than in the spawn environment, which
- * would also stop the shell itself from being resolved.
+ * PATH is set inside the shell: in the spawn environment it would also stop
+ * the shell itself from being resolved.
  * @param {string} root - Working directory the hook runs in.
  * @param {Object<string, string>} tools - Stand-in name to shell body.
  * @param {string} [input] - Text fed to hook stdin (pre-push ref records).

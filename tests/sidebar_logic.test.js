@@ -71,9 +71,8 @@ test('navTargetIndex returns -1 for non-navigation keys and empty lists', () => 
   assert.equal(navTargetIndex(0, 0, 'ArrowDown'), -1);  // empty list
 });
 
-// The balanced 20-item mobile list is a 7-row column-flow grid, so the option
-// to the right of index i sits 7 later; without the stride both arrows would walk
-// down the column they are already in.
+// In a 20-item, 7-row column-flow grid the option to the right of index i sits
+// 7 later.
 test('navTargetIndex steps a whole column for Left/Right under a stride', () => {
   assert.equal(navTargetIndex(0, 20, 'ArrowRight', 7), 7);
   assert.equal(navTargetIndex(7, 20, 'ArrowLeft', 7), 0);

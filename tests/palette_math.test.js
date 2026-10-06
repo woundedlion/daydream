@@ -42,10 +42,7 @@ function mockPaletteOps(overrides = {}) {
 
 /**
  * Runs `body` with `ops` installed as the compiler bridge and uninstalls it
- * afterwards. The bridge is module-global, so an install that outlives its case
- * measures every later GenerativePalette assertion against a stand-in LUT
- * instead of a compiled one. The real compiler is exercised against the shipped
- * module in color_parity_wasm.test.js.
+ * afterwards; the bridge is module-global.
  * @param {Object} ops - Bridge stand-in, from mockPaletteOps().
  * @param {Function} body - Case body.
  * @returns {void}
@@ -115,8 +112,7 @@ test('NAMED_PROCEDURAL_PALETTES is a well-formed table of coefficient vec3s', ()
 /**
  * Verifies every named palette, including the negative-frequency entries,
  * renders finite in-range linear color across the domain, and that the ramp
- * carries a gradient rather than one flat color; the tightest shipped palette
- * spans 0.15.
+ * carries a gradient rather than one flat color.
  */
 test('NAMED_PROCEDURAL_PALETTES all render across the domain', () => {
   for (const entry of NAMED_PROCEDURAL_PALETTES) {
@@ -263,11 +259,9 @@ test('proceduralPaletteCpp emits a valid C++ palette-list row', () => {
 });
 
 /**
- * Verifies GenerativePalette.get's upper boundary. get clamps t to [0,1] and
- * maps it onto the 256-entry LUT: t === 1.0 lands exactly on the final entry
- * (no lo+1 overrun), and t > 1.0 clamps to that same entry — it must return the
- * final color, not NaN or a wrapped value, and be continuous with the interior
- * limit approaching it.
+ * Verifies GenerativePalette.get's upper boundary: t === 1.0 and t > 1.0 both
+ * return the final LUT entry (no lo+1 overrun, no NaN or wrap), continuous with
+ * the interior limit.
  */
 test('GenerativePalette.get clamps to the final LUT entry', () => {
   withPaletteOps(mockPaletteOps(), () => {

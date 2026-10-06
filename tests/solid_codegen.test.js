@@ -81,8 +81,7 @@ function stubMesh(calls = []) {
 
 /**
  * Verifies the live-preview dispatch reads exactly the params OP_DEFS declares
- * for every known op, in the same order — so an op that gains or reorders a
- * parameter cannot diverge silently between the table and the preview.
+ * for every known op, in the same order.
  */
 test('applyOp consumes the OP_DEFS params of every known op', () => {
   assert.ok(KNOWN_OPS.size > 0);
@@ -107,10 +106,7 @@ function emittedArguments(recipe, op) {
 
 /**
  * Verifies the C++ generator carries every declared param into the recipe it
- * pastes: one argument per declared param, and a value the emitter drops
- * silently would leave the recipe unchanged. The generator's shared band check
- * reads every declared key after the emit, so a recording proxy cannot tell
- * an emitted param from an ignored one.
+ * pastes: one argument per declared param.
  */
 test('generateFuncAndRecipe emits the OP_DEFS params of every known op', () => {
   assert.ok(KNOWN_OPS.size > 0);
@@ -132,8 +128,7 @@ test('generateFuncAndRecipe emits the OP_DEFS params of every known op', () => {
 /**
  * Verifies the live preview hands each bound method exactly the argument values
  * the engine takes, in order — the hankin angle converted from the control's
- * degrees to the engine's radians, everything else passed through untouched. The
- * params a path reads say nothing about the values it forwards.
+ * degrees to the engine's radians, everything else passed through untouched.
  */
 test('applyOp forwards each op its engine arguments', () => {
   const cases = [
@@ -185,7 +180,7 @@ test('applyOp throws when the module soft-rejects an op', () => {
     /applyOp: op "hankin" was rejected/);
 });
 
-/** formatFloat re-exports cpp_format's formatter; its behavior is pinned in cpp_format.test.js. */
+/** formatFloat re-exports cpp_format's formatFloatCpp. */
 test('formatFloat is wired to the authoritative formatFloatCpp', () => {
   assert.equal(formatFloat, formatFloatCpp);
 });
@@ -259,7 +254,7 @@ test('generateFuncAndRecipe emits snub t and twist', () => {
 /**
  * PARAMETERIZED_OPS is derived from OP_DEFS, so every op declaring a param —
  * snub and relax included — is rejected in the bare-string form by both dispatch
- * paths rather than one silently substituting a default the other cannot.
+ * paths.
  */
 test('applyOp and generateFuncAndRecipe share one parameterized-op vocabulary', () => {
   assert.deepEqual([...PARAMETERIZED_OPS].sort(),
@@ -351,7 +346,7 @@ test('generateRecipeCpp wraps a long function at the target header column limit'
 
 /**
  * A name too long to leave room for the first parameter moves the return type
- * to its own line instead, a format-stable choice made by the tool.
+ * to its own line instead.
  */
 test('generateRecipeCpp breaks after the return type when the name fills the line', () => {
   const cpp = generateRecipeCpp({
@@ -392,8 +387,8 @@ test('generateRecipeCpp never emits a line past the column limit', () => {
       }
     }
   }
-  // The widest chain overflows on the funcName alone, so the exemption above is
-  // measured against real output rather than left vacuous.
+  // The widest chain overflows on the funcName alone, so the exemption is
+  // exercised.
   assert.ok(overflowed > 0, 'no funcName reaches the limit, so nothing tested it');
 });
 
@@ -595,7 +590,7 @@ test('a seeded hankin angle agrees across the control, the funcName and the reci
 
 /**
  * The paste computes `<deg>f * D2R` in float32; a double PI/180 lands one ulp
- * away at 54 and 73 degrees, both of which solids.h ships.
+ * away at 54 and 73 degrees.
  */
 test('the preview converts a hankin angle in the float precision the paste uses', () => {
   assert.equal(new Uint32Array(new Float32Array([D2R_F32]).buffer)[0], 0x3c8efa35);
@@ -708,9 +703,6 @@ test('generateFuncAndRecipe rejects non-finite or out-of-range op params', () =>
 
 /**
  * Verifies the emit path applies the same OP_DEFS bands the restore path does.
- * A stale or hand-edited stored card is refused by savedChainShapeError, but its
- * "copy C++" button reaches generateFuncAndRecipe directly. The emitter also
- * refuses parameters outside the tool's bands.
  */
 test('generateFuncAndRecipe rejects every param savedChainShapeError calls out of range', () => {
   const cases = [
@@ -1259,8 +1251,7 @@ test('savedChainShapeError accepts the chains the tool itself saves', () => {
 
 /**
  * Verifies each way a stored entry can be unrestorable is named rather than
- * passed through. The validator returns an accepting verdict when its module cannot spawn, so
- * anything this misses reaches renderOps and throws into the commit queue.
+ * passed through.
  */
 test('savedChainShapeError rejects every unrestorable stored shape', () => {
   const cases = [
@@ -1367,7 +1358,7 @@ test('createChainValidator serializes overlapping tasks', async () => {
   assert.deepEqual(log, ['a:in', 'a:out', 'b:in', 'b:out']);
 });
 
-// The add-op buttons the solids page offers, as refreshOpGating reads them.
+// The add-op buttons the solids page offers.
 const CANDIDATES = ['kis', 'ambo', 'dual'];
 
 /** Concurrent requests for the same signature share one validator sweep. */
@@ -1470,9 +1461,7 @@ test('createOpGate skips a pass whose base and op names repeat', async () => {
 
 /**
  * Verifies the pass-skipping signature separates the two lowerings truncate and
- * bevel have. Both slide t up to 0.5, where truncate short-circuits to ambo, so
- * the census on either side of that edge differs by roughly a doubling and a
- * verdict carried across it would enable ops the engine then refuses.
+ * bevel have. Both slide t up to 0.5, where truncate short-circuits to ambo.
  */
 test('createOpGate re-sweeps when a param crosses the ambo lowering', async () => {
   for (const op of ['truncate', 'bevel']) {
@@ -1559,7 +1548,7 @@ test('createOpGate re-sweeps a chain whose last pass was incomplete', async () =
 /**
  * Verifies a chain op the bridge soft-rejects while the standing chain is
  * rebuilt frees the mesh it was applied to and the arenas, as the validator's
- * own rejection path does, rather than leaking the wrapper into the next pass.
+ * own rejection path does.
  */
 test('createOpGate frees the standing chain when its rebuild is rejected', async () => {
   const { Mod, state } = fakeModule(() => { }, { rejects: new Set(['kis']) });
@@ -1659,8 +1648,7 @@ test('a slider reaching past its swept band is reported rather than silent', () 
       `${op} offers ${key} outside its band with nothing reporting it`);
     }
   }
-  // The rows the marker case exists for; pinned so narrowing a slider retires
-  // the row rather than leaving this sweep with nothing to assert.
+  // The rows the marker case exists for.
   assert.deepEqual(overreaching, ['chamfer.t']);
 });
 

@@ -1,8 +1,6 @@
-// Cross-check segment_layout.js against the installed pov_segment_map.json,
-// exported from hardware/pov_segment_map.h by tools/pov_segment_map_export.cpp.
-// Arm partitions and starting columns agree, as do each segment's covered row sets.
-// Web workers tile disjoint rectangles; firmware arms traverse the full width,
-// and reversed LED strips have the same row coverage with a different traversal order.
+// Cross-check segment_layout.js against pov_segment_map.json, the export of
+// hardware/pov_segment_map.h: arm partitions, starting columns and each
+// segment's covered row set agree.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -71,11 +69,11 @@ function crossCheck(S, N, w) {
     const rect = computeSegmentRange(id, N, w, cfg.rows);
     const m = cfg.segments[id];
 
-    // (1) Arm partition.
+    // Arm partition.
     const webArmB = rect.x0 === halfW;
     assert.equal(webArmB, m.arm_b, `arm side agrees for id=${id} (S=${S},N=${N})`);
 
-    // (2) Each arm's web rect starts at the firmware's sampled column.
+    // Each arm's web rect starts at the firmware's sampled column.
     const cols = goldenArmCols(w);
     if (m.arm_b) {
       assert.equal(rect.x0, halfW, `arm-B rect starts at w/2 for id=${id}`);
@@ -86,7 +84,7 @@ function crossCheck(S, N, w) {
       assert.equal(cols.arm_a, 0, 'firmware arm-A offset is 0');
     }
 
-    // (3) Row coverage as a SET — the bottom strip is reversed in traversal order.
+    // Row coverage as a SET — the bottom strip is reversed in traversal order.
     assert.equal(m.y.length, cfg.pps, `golden lists PPS rows for id=${id}`);
     const cppRows = [...m.y].sort((a, b) => a - b);
     const webRows = [];
@@ -95,11 +93,7 @@ function crossCheck(S, N, w) {
   }
 }
 
-/**
- * Pins the golden's identity before anything reads it: a file that is not the
- * segment-map export (a truncated install, an unrelated JSON dropped at that
- * path) would otherwise make every lookup below fail with an opaque message.
- */
+/** Pins the golden's identity before anything reads it. */
 test('the committed golden is the pov_segment_map.h export', () => {
   assert.equal(golden.source, 'hardware/pov_segment_map.h',
     `pov_segment_map.json is not the segment-map export — ${REGENERATE}`);
@@ -111,9 +105,8 @@ test('the committed golden is the pov_segment_map.h export', () => {
 
 /**
  * Locks the canonical Phantasm config (S=288, N=4 → ROWS=144, PPS=72) against
- * the exact per-segment arm/row fixture the C++ side pins in
- * test_pov_segmented.h::test_segment_derivation, so a convention change on either
- * side trips the cross-check.
+ * the per-segment arm/row fixture test_pov_segmented.h::test_segment_derivation
+ * pins.
  */
 test('segment layout ↔ pov_segment_map: canonical N=4/S=288 fixture agrees', () => {
   const fixture = [

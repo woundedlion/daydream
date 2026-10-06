@@ -13,15 +13,15 @@ import { fakeElement } from './helpers/fake_dom.js';
 const isClass = (value) => typeof value === 'function'
   && Object.getOwnPropertyDescriptor(value, 'prototype')?.writable === false;
 
-// Derived from the double, so a class added to it is pinned with no edit here.
+// Derived from the double.
 const STOOD_IN = Object.keys(fake).filter((name) => isClass(fake[name]));
 
 // The one class the double stands in for that three itself does not export.
 const ADDONS = { OrbitControls };
 
 /**
- * The vector arithmetic src/workbench/solids/solid_render.js emits its positions with, run
- * end to end.
+ * The vector arithmetic the solids renderer emits its positions with, run end
+ * to end.
  * @param {typeof THREE.Vector3} Vector3 - The class under test.
  * @returns {number[]} Every quantity the sequence produces, in order.
  */
@@ -91,8 +91,7 @@ test('the scene graph disposes and clears through the methods initScene calls', 
   scene.clear();
   assert.deepEqual(scene.children, [], 'clear() empties the scene');
 
-  // dispose() releases the GPU resource by announcing it; a dispose that stopped
-  // announcing would leak every scene the tool pages rebuild.
+  // dispose() releases the GPU resource by announcing it.
   const disposed = [];
   geometry.addEventListener('dispose', () => disposed.push('geometry'));
   material.addEventListener('dispose', () => disposed.push('material'));
@@ -102,7 +101,7 @@ test('the scene graph disposes and clears through the methods initScene calls', 
 });
 
 // The resize path: a container that changed shape sets aspect and rebuilds the
-// projection, and a rebuild that read the old aspect would letterbox every page.
+// projection.
 test('updateProjectionMatrix rebuilds the projection from the new aspect', () => {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
   const square = camera.projectionMatrix.elements[0];
@@ -117,10 +116,8 @@ test('updateProjectionMatrix rebuilds the projection from the new aspect', () =>
     'the vertical field of view is what stays fixed');
 });
 
-// WebGLRenderer assigns its methods in the constructor and needs a live WebGL
-// context to construct, so its source is the only headless view of the surface.
-// Both spellings count: a constructor assignment, and the class field or method
-// an upstream conversion would write instead. A rename reads as neither.
+// WebGLRenderer needs a live WebGL context to construct, so its surface is read
+// from source: a constructor assignment, or a class field or method.
 const declares = (method) => new RegExp(
   `^\\s*this\\.${method}\\s*=\\s*(?:async\\s+)?function`
     + `|^\\s*${method}\\s*`
@@ -148,8 +145,7 @@ test('a fresh object sits at the origin and position.set chains, on both', () =>
 });
 
 // The upload semantics fakeColorAttribute models. `version` is what
-// WebGLAttributes compares, and a readable needsUpdate would let a test assert
-// on a flag the renderer never looks at.
+// WebGLAttributes compares.
 test('needsUpdate is write-only and only ever raises version, on both', () => {
   const real = new THREE.InstancedBufferAttribute(new Uint16Array(12), 3);
   const double = fake.fakeColorAttribute(new Uint16Array(12));

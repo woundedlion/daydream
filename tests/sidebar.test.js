@@ -3,11 +3,8 @@ import assert from 'node:assert/strict';
 import { EffectSidebar } from '../src/ui/sidebar.js';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
-// EffectSidebar's DOM-lifecycle methods (constructor, setEffects, applySortOrder,
-// setActive, updateScrollArrows, dispose) touch the DOM only through a narrow set
-// of node methods. There is no jsdom, so this file constructs a real sidebar over
-// the shared fake nodes and asserts the leak-prevention contract: dispose detaches
-// every listener/observer and clears every ref the constructor created.
+// EffectSidebar over the shared fake nodes: dispose detaches every
+// listener/observer and clears every ref the constructor created.
 
 const observers = [];
 class FakeResizeObserver {
@@ -200,9 +197,7 @@ test('sortBy leaves focus on the sort control that drove it', () => {
   }
 });
 
-// The keyboard cases all go through the listener the constructor registered, so
-// the wiring between the keydown event, the recorded option order, and the
-// roving tab stop is covered along with the handler.
+// The keyboard cases go through the listener the constructor registered.
 test('Enter on the list selects the focused option and eats the native click', () => {
   const { sidebar, selected } = makeSidebar();
   sidebar.setEffects(['A', 'B'], {});

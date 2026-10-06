@@ -1,9 +1,5 @@
-//
-// scripts/serve-manifest.mjs is the server scripts/browser-smoke.mjs loads its
-// pages over. A path it serves beyond site_manifest.txt's set would let the
-// smoke pass over a layout Pages never ships, and a .wasm labelled as anything
-// but application/wasm drops Emscripten to the ArrayBuffer path — neither shows
-// up as a smoke failure, so both are pinned here instead.
+// scripts/serve-manifest.mjs serves only site_manifest.txt's set, and labels a
+// .wasm as application/wasm.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';

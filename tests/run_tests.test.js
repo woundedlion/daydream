@@ -159,8 +159,7 @@ test('a loaded module whose branches the suite never takes fails the branch floo
   assert.match(output, /branch coverage does not meet threshold of 90%/);
 });
 
-// Both floors and every exclusion are the gate; a new exclusion would ship
-// green without this pin.
+// Pins both floors and every exclusion.
 test('the coverage floors exclude only the code no unit test executes', () => {
   assert.deepEqual(COVERAGE, [
     '--experimental-test-coverage',

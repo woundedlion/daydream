@@ -1,11 +1,7 @@
-//
-// scripts/vendor-stage.mjs is what keeps the required browser gate off
-// cdn.jsdelivr.net: it stages the published site with three.js and lil-gui
+// scripts/vendor-stage.mjs stages the published site with three.js and lil-gui
 // linked out of node_modules and an import map generated to resolve them there.
-// A staged tree that fell back to the CDN would still pass every probe on a
-// good day and red the gate on a CDN incident, so the resolution is pinned
-// here. The committed map must stay all-CDN either way — the deploy serves it —
-// which the shared inode behind a hard-linked file would quietly break.
+// The committed map must stay all-CDN, which the shared inode behind a
+// hard-linked file would break.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs, { existsSync, readFileSync, rmSync } from 'node:fs';

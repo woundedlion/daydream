@@ -90,9 +90,8 @@ test('checks() keeps the misses and drops the passes', () => {
   assert.deepEqual(failures, ['a miss is kept verbatim', 'and so is the next one']);
 });
 
-// The interaction is the probe: gutting one to `async () => []` has to be
-// visible here, which only executing it can show. A tab that refuses every
-// call must surface as a thrown refusal, never as an empty verdict.
+// A tab that refuses every call must surface as a thrown refusal, never as an
+// empty verdict.
 for (const [file, name, interaction] of PROBES) {
   test(`${name} drives the page and lets a refusal escape`, async () => {
     const { tab, calls } = throwingTab();
@@ -125,9 +124,8 @@ function scriptModules() {
 /**
  * @param {Map<string, string>} modules - The scripts/ module set.
  * @returns {string[]} The ones node is pointed at to drive a browser.
- * @details probe_harness.mjs is the browser scaffolding, so a script that takes
- *   it and that no other script imports is an entry point rather than a module
- *   of its own, and the rosters have to name it.
+ * @details A script that imports probe_harness.mjs and that no other script
+ *   imports is an entry point.
  */
 function browserEntryPoints(modules) {
   const imported = new Set();
