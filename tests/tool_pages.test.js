@@ -764,12 +764,16 @@ test('the rendered solids remove glyph clears AA against its op-row fill', () =>
 
 test('disabled slider thumbs are muted in separate WebKit and Firefox rules', () => {
   const css = read('tools', 'tools.css');
+  const page = luminance(surface(css, 'body'));
   for (const pseudo of ['::-webkit-slider-thumb', '::-moz-range-thumb']) {
-    const enabled = ruleBody(css, `input[type=range]${pseudo}`);
-    const disabled = ruleBody(css, `input[type=range]:disabled${pseudo}`);
-    assert.match(enabled, /background: var\(--blue-500\)/);
-    assert.match(enabled, /cursor: pointer/);
-    assert.match(disabled, /background: var\(--slate-800\)/);
-    assert.match(disabled, /cursor: default/);
+    const enabledSelector = `input[type=range]${pseudo}`;
+    const disabledSelector = `input[type=range]:disabled${pseudo}`;
+    assert.match(ruleBody(css, enabledSelector), /cursor: pointer/);
+    assert.match(ruleBody(css, disabledSelector), /cursor: default/);
+    const enabled = channels(fill(css, enabledSelector));
+    const disabled = channels(fill(css, disabledSelector));
+    assert.notDeepEqual(disabled, enabled, `${disabledSelector} keeps the enabled fill`);
+    assert.ok(Math.abs(luminance(disabled) - page) < Math.abs(luminance(enabled) - page),
+      `${disabledSelector} is no closer to the page background than the enabled thumb`);
   }
 });
