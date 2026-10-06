@@ -964,6 +964,19 @@ test('the scratch builder refuses an operator the catalog lacks', () => {
   assert.throws(() => scratchChainDocument(CATALOG,
     [...DEFAULT_SCRATCH_CHAIN, { label: 'ghost', operator: 'warp.nope.v2' }]),
   /carries no operator "warp\.nope\.v2"/);
+  assert.throws(() => scratchChainDocument({}), /carries no operator "sphere\.rotate\.v2"/);
+});
+
+test('the scratch document owns its chain', () => {
+  const chain = DEFAULT_SCRATCH_CHAIN.map((entry) => ({ ...entry }));
+  const document = scratchChainDocument(CATALOG, chain);
+  assert.deepEqual(document.descriptor.chain, chain);
+  document.descriptor.chain[0].label = 'spin';
+  document.descriptor.chain.pop();
+  assert.deepEqual(chain, DEFAULT_SCRATCH_CHAIN);
+  const defaults = scratchChainDocument(CATALOG);
+  assert.equal(Object.isFrozen(defaults.descriptor.chain), false);
+  assert.equal(Object.isFrozen(defaults.descriptor.chain[0]), false);
 });
 
 test('an injected compiler handles store validation', async () => {
