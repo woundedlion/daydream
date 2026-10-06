@@ -796,6 +796,22 @@ test('the parity toggle swaps the preview onto the compiled build and back', asy
 
 // A study no shipped pattern digests to has no promoted build to compare
 // against, so it loads on the interpreter with the toggle disarmed.
+test('a refused parity preset restores the interpreter and preserves the refusal', async () => {
+  const harness = workbench();
+  await chooseCatalogSource(harness);
+  harness.engine.selectPresetById = () => false;
+  const toggle = harness.elements.get('shader-parity-toggle');
+
+  toggle.dispatch('click');
+
+  assert.deepEqual(harness.selections.slice(-2), ['KaleidoscopeFlowers', 'ShaderChain']);
+  assert.equal(toggle.getAttribute('aria-pressed'), 'false');
+  assert.deepEqual(harness.engine.writes.at(-1), ['sample.pattern-freq', 2]);
+  assert.equal(harness.elements.get('shader-document-status').dataset.status, 'error');
+  assert.match(harness.elements.get('shader-document-status').textContent,
+    /refused reference preset "noon"/);
+});
+
 test('an imported study the catalog does not carry has no parity build', async () => {
   const harness = workbench();
   await harness.controller.init();
