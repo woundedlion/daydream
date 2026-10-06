@@ -791,7 +791,6 @@ export function createChainStrip({
     // Not role=option: an option's children are presentational to assistive technology.
     chip.setAttribute('role', 'group');
     if (isSelected) chip.setAttribute('aria-current', 'true');
-    chip.setAttribute('aria-expanded', String(expanded));
     chip.setAttribute('tabindex', tabLabel === entry.label ? '0' : '-1');
     chip.setAttribute('aria-keyshortcuts',
       crossing ? 'ArrowLeft ArrowRight Enter Space Delete Backspace Insert'
@@ -909,7 +908,6 @@ export function createChainStrip({
     const setTransientOpen = (/** @type {boolean} */ open) => {
       if (store.selectedLabel() === entry.label) return;
       chip.classList.toggle('chain-chip--expanded', open);
-      chip.setAttribute('aria-expanded', String(open));
       if (open) markDeactivated();
     };
     let hovered = false;
