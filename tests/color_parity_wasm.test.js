@@ -184,14 +184,6 @@ test('NAMED_PROCEDURAL_PALETTES matches the engine table (named_procedural_palet
   assert.deepEqual(M.named_procedural_palettes(), mirror);
 });
 
-const LUT_SAMPLES = [0, 32, 64, 96, 128, 160, 192, 224, 255];
-
-function sampleLut(lut) {
-  assert.equal(lut.length, 256 * 3);
-  return LUT_SAMPLES.map((index) =>
-    [lut[3 * index], lut[3 * index + 1], lut[3 * index + 2]]);
-}
-
 const PALETTE_V4_ENUM_CONTRACT = Object.freeze({
   hueMode: { field: 4, members: [
     ['HARMONY', 0, '5d91f7f1d76267a7'],
@@ -372,16 +364,24 @@ test('PaletteOps publishes every effect-owned GenerativePalette recipe', () => {
 test('PaletteOps compiles deterministic V4 recipe LUTs', () => {
   const ops = new M.PaletteOps();
   const recipe = defaultPaletteRecipe();
+  let baked;
   try {
     const first = ops.compileAndBakeV4(recipe);
     const second = ops.compileAndBakeV4(recipe);
     assert.equal(first.status.code, M.PaletteCompileCode.OK);
+    baked = Uint8Array.from(first.lut);
     assert.equal(first.canonicalRecipe.schemaVersion, 4);
     assert.equal('keyCount' in first.canonicalRecipe, false);
-    assert.deepEqual(sampleLut(Uint8Array.from(first.lut)),
-      sampleLut(Uint8Array.from(second.lut)));
+    assert.equal(first.lut.length, 256 * 3);
+    assert.deepEqual(Uint8Array.from(second.lut), Uint8Array.from(first.lut));
   } finally {
     ops.delete();
+  }
+  const fresh = new M.PaletteOps();
+  try {
+    assert.deepEqual(Uint8Array.from(fresh.compileAndBakeV4(recipe).lut), baked);
+  } finally {
+    fresh.delete();
   }
 });
 
