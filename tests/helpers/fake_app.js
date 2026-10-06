@@ -250,9 +250,8 @@ function buildGui(namespace, optionsReplaces, panel, hydrated, stored) {
  */
 export function fakeDriver() {
   return {
-    isMobile: false,
     canvas: fakeElement('canvas'),
-    frameInterval: 62.5,
+    frameInterval: 1 / Daydream.FPS,
     labelAxes: false,
     cullBackSphere: false,
     showPip: false,
