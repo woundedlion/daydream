@@ -1904,9 +1904,16 @@ test('render shows axes and labels before the inset view', () => {
 });
 
 test('stepOnce always queues at least one frame', () => {
-  const ctx = { paused: true, stepFrames: 0, invalidate() {} };
+  let invalidations = 0;
+  const ctx = { paused: true, stepFrames: 0, invalidate() { invalidations += 1; } };
   Daydream.prototype.stepOnce.call(ctx);
   assert.equal(ctx.stepFrames, 1);
+  Daydream.prototype.stepOnce.call(ctx);
+  assert.equal(ctx.stepFrames, 1);
+  ctx.stepFrames = 3;
+  Daydream.prototype.stepOnce.call(ctx);
+  assert.equal(ctx.stepFrames, 3);
+  assert.equal(invalidations, 3);
 });
 
 test('stats tolerate absent arena metrics', () => {
