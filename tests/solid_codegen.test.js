@@ -403,6 +403,29 @@ test('generateRecipeCpp never emits a line past the column limit', () => {
   assert.ok(overflowed > 0, 'no funcName reaches the limit, so nothing tested it');
 });
 
+/** Verifies a line that exactly fills the column limit stays whole and one past it wraps. */
+test('generateRecipeCpp wraps at the column limit, not one column early or late', () => {
+  const signature = generateRecipeCpp({
+    base: 'truncatedIcosidodecahedron', ops: [{ op: 'relax', params: { iter: 9 } }],
+  }, 'Archimedean').split('\n').find((line) => line.startsWith('FLASHMEM'));
+  assert.equal(signature, 'FLASHMEM static PolyMesh truncatedIcosidodecahedron_relax9(Arena &a, Arena &b) {');
+  assert.equal(signature.length, 80);
+
+  const seedLines = (base) => {
+    const lines = generateRecipeCpp({ base, ops: ['dual'] }, 'IslamicStarPatterns').split('\n');
+    const start = lines.findIndex((line) => line.startsWith('  return '));
+    return lines.slice(start, lines.indexOf('      .dual()'));
+  };
+  assert.deepEqual(seedLines('truncatedIcosidodecahedron_hk5'), [
+    '  return SolidBuilder(IslamicStarPatterns::truncatedIcosidodecahedron_hk5(a, b),',
+    '                      a, b)',
+  ]);
+  assert.deepEqual(seedLines('truncatedIcosidodecahedron_hk58'), [
+    '  return SolidBuilder(',
+    '             IslamicStarPatterns::truncatedIcosidodecahedron_hk58(a, b), a, b)',
+  ]);
+});
+
 /** Verifies generateRecipeCpp falls back to zero vertex/face/internal counts when the item omits them. */
 test('generateRecipeCpp defaults missing V/F/I counts to 0', () => {
   const cpp = generateRecipeCpp({ base: 'cube', ops: ['dual'] }, 'Archimedean');
