@@ -20,13 +20,6 @@ export class Vector3 {
   clone() { return new Vector3(this.x, this.y, this.z); }
   /** @param {Vector3} v @returns {Vector3} */
   add(v) { return this.set(this.x + v.x, this.y + v.y, this.z + v.z); }
-  /** @param {Vector3} a @param {Vector3} b @returns {Vector3} */
-  subVectors(a, b) { return this.set(a.x - b.x, a.y - b.y, a.z - b.z); }
-  /** @param {Vector3} a @param {Vector3} b @returns {Vector3} */
-  crossVectors(a, b) {
-    return this.set(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z,
-      a.x * b.y - a.y * b.x);
-  }
   /** @param {number} s @returns {Vector3} */
   multiplyScalar(s) { return this.set(this.x * s, this.y * s, this.z * s); }
   /** @param {number} s @returns {Vector3} */

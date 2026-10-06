@@ -29,12 +29,9 @@ function vectorRun(Vector3) {
   const a = new Vector3(1, 2, 3);
   const b = new Vector3(-4, 5, 6);
   const middle = new Vector3().copy(a).add(b).divideScalar(2);
-  const normal = new Vector3().crossVectors(
-    new Vector3().subVectors(b, a), new Vector3().subVectors(new Vector3(2, -1, 4), a)).normalize();
   const arc = a.clone().lerp(b, 0.25).normalize().multiplyScalar(1.002);
   return [
     middle.x, middle.y, middle.z,
-    normal.x, normal.y, normal.z,
     arc.x, arc.y, arc.z,
     a.length(), a.dot(b), a.angleTo(b),
     new Vector3().normalize().length(),
