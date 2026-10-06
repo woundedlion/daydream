@@ -1065,8 +1065,6 @@ export function createShaderDocumentController({
   saveButton.addEventListener('click', save);
   saveAsButton?.addEventListener('click', saveAs);
   animationToggle?.addEventListener('click', onAnimationToggle);
-  // A/B verification only: the toggle swaps which build renders the loaded
-  // document and touches neither the document nor the editing surface.
   parityToggle?.addEventListener('click', onParityToggle);
   digestButton?.addEventListener('click', onDigest);
 
