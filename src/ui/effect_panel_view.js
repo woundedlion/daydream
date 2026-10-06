@@ -42,8 +42,8 @@ export function createEffectPanelView({ focusedElement, guiContainer, isMobile }
 
   /**
    * Every controller a rebuilt panel can hand keyboard focus back to, keyed by
-   * the property it binds: the parameters, the pause toggle, the preset
-   * selector, then the action row's buttons.
+   * the property it binds: the parameters, the pause toggle, then the action
+   * row's controls (Reset, Export, and preset navigation including its selector).
    * @param {PanelRecord|null} fx - An effect record, or null.
    * @returns {Array<[string, PanelController]>} Property/controller pairs.
    */
