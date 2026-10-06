@@ -595,7 +595,8 @@ test('every detaching mutator disconnects the subtree it evicts', () => {
 
 // Re-appending a focused row moves it through a removal, which drops focus.
 test('focus tracks the document, and unparenting the focused node blurs it', () => {
-  const doc = installDocument({ activeElement: null });
+  const body = fakeElement('body', { connected: true });
+  const doc = installDocument({ activeElement: null, body });
   const list = fakeElement('div', { connected: true });
   const row = fakeElement('button');
   const label = fakeElement('span');
@@ -610,17 +611,17 @@ test('focus tracks the document, and unparenting the focused node blurs it', () 
     'the options bag focus() was handed is not readable');
 
   list.appendChild(row); // a move, not an insert
-  assert.equal(doc.activeElement, null, 'the re-append kept focus on the moved node');
+  assert.equal(doc.activeElement, body, 'the re-append did not drop focus to the body');
   assert.deepEqual(list.children, [row], 'the move still listed the node once');
 
   row.focus();
   list.removeChild(row);
-  assert.equal(doc.activeElement, null);
+  assert.equal(doc.activeElement, body);
 
   list.appendChild(row);
   label.focus();
   list.replaceChildren();
-  assert.equal(doc.activeElement, null, 'a focused descendant kept focus through the eviction');
+  assert.equal(doc.activeElement, body, 'a focused descendant kept focus through the eviction');
 });
 
 test('a node moved between parents stays connected; remove() disconnects it', () => {
@@ -905,7 +906,8 @@ test('child and sibling navigation follows insertions, moves and removals', () =
 });
 
 test('focus respects native tags, tabindex, and disabled state', () => {
-  const doc = installDocument(documentEvents());
+  const body = fakeElement('body', { connected: true });
+  const doc = installDocument({ ...documentEvents(), body });
   const button = fakeElement('button', { connected: true });
   const div = fakeElement('div', { connected: true });
   button.focus();
@@ -917,9 +919,9 @@ test('focus respects native tags, tabindex, and disabled state', () => {
   assert.equal(doc.activeElement, div);
   button.focus();
   button.disabled = true;
-  assert.equal(doc.activeElement, doc.body);
+  assert.equal(doc.activeElement, body);
   button.focus();
-  assert.equal(doc.activeElement, doc.body);
+  assert.equal(doc.activeElement, body);
 });
 
 test('focus before insertion leaves the active element unchanged', () => {
