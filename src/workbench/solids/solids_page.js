@@ -494,30 +494,52 @@ function wireCanvasTap(canvasEl) {
 }
 
 const SAVED_SOLIDS_KEY = 'daydream.savedSolids.v1';
+const REJECTED_SOLIDS_KEY = 'daydream.savedSolids.rejected.v1';
 const SAVED_THUMB_SIZE = 256;
 function loadSavedSolids() {
+  const entries = [], rejected = [];
+  let reason = '';
+  let raw;
   try {
-    const parsed = JSON.parse(localStorage.getItem(SAVED_SOLIDS_KEY) || '[]');
-    return Array.isArray(parsed)
-      ? parsed.filter((entry) => entry !== null && typeof entry === 'object' && !Array.isArray(entry)
-        && !savedSolidExportError(entry.base, entry.ops))
-      : [];
+    raw = localStorage.getItem(SAVED_SOLIDS_KEY) || '[]';
+    const parsed = JSON.parse(raw);
+    for (const entry of Array.isArray(parsed) ? parsed : [parsed]) {
+      const error = entry !== null && typeof entry === 'object' && !Array.isArray(entry)
+        ? savedSolidExportError(entry.base, entry.ops) : 'not a saved-solid object';
+      if (error) {
+        rejected.push(entry);
+        reason ||= error;
+      } else entries.push(entry);
+    }
   } catch (error) {
     console.warn('Could not restore saved solids:', error);
-    return [];
+    if (raw !== undefined) rejected.push(raw);
+    reason = 'invalid saved-solid JSON';
   }
+  return { entries, rejected, notice: rejected.length
+    ? `${rejected.length} saved solids could not be loaded: ${reason}. Rejected data is retained in browser storage.` : '' };
 }
 
-const savedSolids = loadSavedSolids();
+const savedStorage = loadSavedSolids();
+const savedSolids = savedStorage.entries;
+const savedStorageStatus = document.getElementById('savedStorageStatus');
+if (savedStorageStatus) savedStorageStatus.textContent = savedStorage.notice;
 
 function persistSavedSolids() {
   const status = document.getElementById('savedStorageStatus');
   try {
+    if (savedStorage.rejected.length) {
+      const previous = JSON.parse(localStorage.getItem(REJECTED_SOLIDS_KEY) || '[]');
+      if (!Array.isArray(previous)) throw new Error('Rejected-solid backup is not an array');
+      localStorage.setItem(REJECTED_SOLIDS_KEY, JSON.stringify([...previous, ...savedStorage.rejected]));
+      savedStorage.rejected.length = 0;
+    }
     localStorage.setItem(SAVED_SOLIDS_KEY, JSON.stringify(savedSolids));
-    if (status) status.textContent = '';
+    if (status) status.textContent = savedStorage.notice;
   } catch (error) {
     console.warn('Could not persist saved solids:', error);
-    if (status) status.textContent = 'Changes apply to this session only: browser storage refused the write.';
+    if (status) status.textContent = [savedStorage.notice,
+      'Changes apply to this session only: browser storage refused the write.'].filter(Boolean).join(' ');
   }
 }
 
@@ -893,12 +915,7 @@ function showCopyFailure(button, message) {
 }
 
 function restoreSolid(item) {
-  // localStorage is user-writable and its entries outlive any op-table
-  // change, so the shape is checked against OP_DEFS before anything is
-  // touched. The engine validator cannot stand in for this: it resolves {ok: true}
-  // when its module fails to spawn, and an unrecognized op would then reach
-  // renderOps as an undefined OP_DEFS entry and throw into the commit
-  // queue's error handler, leaving the page showing the previous chain.
+  // Cards are shape-checked on load/import; also guard direct callers.
   const shapeError = queueSavedSolidRestore(item, () => queueCommit(async () => {
     // Saved items were valid when saved, but the engine may have been
     // rebuilt with different limits since; validate on the way back in.
