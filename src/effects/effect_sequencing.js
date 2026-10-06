@@ -29,8 +29,7 @@ import { callWorkbenchBinding } from '../engine/workbench_bindings.js';
  *   moduleDead?: boolean}} SwitchOutcome */
 
 /**
- * Outcome of an effect/resolution apply, mirroring the engine's ParamSetResult
- * enum. Anything but APPLIED is a rejection.
+ * Outcome of an effect/resolution apply. Anything but APPLIED is a rejection.
  * @enum {string}
  */
 export const ApplyResult = Object.freeze({
