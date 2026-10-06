@@ -1208,7 +1208,6 @@ test('an effect the engine rejects leaves the loaded chain editor standing', asy
 // to fall through with it.
 test('a refused shader link leaves the source select on the scratch chain', async () => {
   const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
-  document.effect_id = 'KaleidoscopeHexBright';
   const hash = await encodeShaderStateHash({
     document, preset: 'no-such-preset', bypassed: [], paused: false,
   });
