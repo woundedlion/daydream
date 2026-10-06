@@ -441,7 +441,7 @@ const CONTRAST_SURFACES = {
     '.shader-toolbar button': ['.shader-toolbar', '.layout-container'],
     '.shader-toolbar button:hover:not(:disabled), .shader-toolbar button:focus-visible':
       ['.shader-toolbar', '.layout-container'],
-    '.shader-parity-toggle[aria-pressed="true"]:not(:disabled)':
+    '.shader-parity-toggle[aria-pressed="true"]:not(:disabled), #shader-animation-toggle[aria-pressed="true"]:not(:disabled)':
       ['.shader-toolbar', '.layout-container'],
     '.shader-document-status': ['.shader-toolbar', '.layout-container'],
     '.shader-document-status[data-status="error"]': ['.shader-toolbar', '.layout-container'],
