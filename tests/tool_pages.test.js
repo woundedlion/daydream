@@ -598,7 +598,8 @@ const fill = (css, selector) => color(css, selector,
 
 /**
  * A colour literal's channels.
- * @param {string} value - A `#rgb`, `#rrggbb`, `white`, `rgb()` or `rgba()` literal.
+ * @param {string} value - A `#rgb`, `#rrggbb`, `white`, `rgb()`, `rgba()` or
+ *   `color-mix(in srgb, #rrggbb N%, transparent)` literal.
  * @returns {number[]} `[red, green, blue]` over 255, then alpha over 1.
  */
 function channels(value) {
