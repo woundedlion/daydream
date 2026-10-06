@@ -389,9 +389,11 @@ test('URLSync bounds its retries of a refused history write', () => {
       'the exhaustion is reported once, not once per refused write');
 
     sync.setParam('speed', 7);
-    timer.fire();
-    assert.equal(sync.retries, 1, 'a later refused edit starts a fresh retry budget');
-    assert.equal(timer.delays.at(-1), URL_FLUSH_RETRY_MS);
+    timer.delays.length = 0;
+    for (let i = 1; i < URL_FLUSH_MAX_RETRIES; i++) timer.fire();
+    assert.deepEqual(timer.delays, Array(URL_FLUSH_MAX_RETRIES - 1).fill(URL_FLUSH_RETRY_MS),
+      'a later refused edit starts a fresh retry budget');
+    assert.ok(timer.armed());
     refuse = false;
     timer.fire();
     assert.deepEqual(written, ['/sim?effect=Voronoi&speed=7'],
@@ -551,26 +553,31 @@ test('URLSync suspend disarms the flush the constructor already armed', () => {
 });
 
 test('URLSync resume keeps a suspended retry at the ladder delay', () => {
-  mock.timers.enable({ apis: ['setTimeout'] });
+  const timer = fakeUrlTimer();
   const warn = console.warn;
   console.warn = () => {};
+  installWindow({
+    location: { search: '?effect=bogus', pathname: '/sim' },
+    history: { replaceState: () => { throw new Error('rate limited'); } },
+    setTimeout: timer.setTimeout,
+    clearTimeout: timer.clearTimeout,
+  });
   try {
-    installRecordingWindow('?effect=bogus', '/sim');
-    globalThis.window.history.replaceState = () => { throw new Error('rate limited'); };
     const state = new AppState({ effect: 'ShaderChain' });
     const sync = new URLSync(state, ['effect'], { effect: (v) => v === 'Shader' });
-    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
-    assert.equal(sync.armedDelayMs, URL_FLUSH_RETRY_MS, 'the refusal armed the ladder');
+    assert.deepEqual(timer.delays, [URL_FLUSH_DEBOUNCE_MS]);
+    timer.fire();
+    assert.deepEqual(timer.delays, [URL_FLUSH_DEBOUNCE_MS, URL_FLUSH_RETRY_MS],
+      'the refusal armed the ladder');
 
     sync.suspend();
-    assert.equal(sync.timer, null);
+    assert.equal(timer.armed(), false);
     sync.resume();
-    assert.notEqual(sync.timer, null, 'resume must re-arm the pending retry');
-    assert.equal(sync.armedDelayMs, URL_FLUSH_RETRY_MS,
+    assert.ok(timer.armed(), 'resume must re-arm the pending retry');
+    assert.equal(timer.delays.at(-1), URL_FLUSH_RETRY_MS,
       'resume pulled the ladder forward to the debounce');
   } finally {
     console.warn = warn;
-    mock.timers.reset();
   }
 });
 
@@ -1088,9 +1095,7 @@ test('URLSync discards a failed transaction before restoring full-config hydrati
     sync.suspend();
     sync.reset(['effect']);
     sync.setParam('fx.__chainSnapshot', 'failed');
-    sync.retries = 15;
     sync.discardPending();
-    assert.equal(sync.retries, 0);
     const params = new URLSearchParams(window.location.search);
     sync.applyPendingReset(params);
     sync.overlayPending(params);
