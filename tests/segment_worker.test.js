@@ -886,9 +886,15 @@ test('init selects the carried preset before applying tuned params', async () =>
   assert.deepEqual(engineInstance.params, [['Speed', 0.5]]);
 });
 
-test('init with paused:true pauses animations on the rebuilt engine', async () => {
-  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma', paused: true });
-  assert.equal(engineInstance.paused, true);
+for (const paused of [false, true]) test(`init restores pause=${paused} after parameter replay`, async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
+    effectName: 'Plasma', params: [{ name: 'Speed', value: 0.5 }], paused });
+  assert.equal(engineInstance.paused, paused);
+  assert.deepEqual(engineInstance.calls.slice(-3), [
+    ['setParameter', 'Speed', 0.5],
+    ['setAnimationsPaused', paused],
+    ['setClip', 0, 4, 0, 4],
+  ]);
 });
 
 /**
