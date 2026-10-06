@@ -580,8 +580,8 @@ test('snapshot-capable effects rebuild from their exhaustive state', () => {
   assert.deepEqual(c.snapshotEffectState(), { chainSnapshot: snapshot });
 });
 
-test('an effect outside the Shader workbench rebuilds from its params', () => {
-  const c = makeController({ effect: 'alien-brain' });
+test('a null chain-bindings handle rebuilds from params', () => {
+  const c = makeController();
   c.getWasmEngine = () => ({
     ...fakeEngine([{ name: 'Speed', value: 0.5 }]),
     getShaderChainBindings: () => null,
@@ -591,8 +591,8 @@ test('an effect outside the Shader workbench rebuilds from its params', () => {
   });
 });
 
-test('ShaderChain falls back to params until the snapshot API is installed', () => {
-  const c = makeController({ effect: 'ShaderChain' });
+test('an engine without the chain-bindings accessor rebuilds from params', () => {
+  const c = makeController();
   c.getWasmEngine = () => fakeEngine([{ name: 'Speed', value: 0.5 }]);
   assert.deepEqual(c.snapshotEffectState(), {
     params: [{ name: 'Speed', value: 0.5 }],
