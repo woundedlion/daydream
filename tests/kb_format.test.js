@@ -17,7 +17,7 @@ test('formatKB: defaults to one fractional digit', () => {
   assert.equal(formatKB(1536, 2), '1.50');
 });
 
-/** Sub-KB values round at the requested width. */
+/** Values round at the requested width. */
 test('formatKB: rounds at the requested width', () => {
   assert.equal(formatKB(1800, 0), '2');
   assert.equal(formatKB(100), '0.1');
