@@ -3,6 +3,9 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+/** Largest pole cap, in percent, the engine's setDisplayCaps accepts. */
+export const MAX_DISPLAY_CAP_PERCENT = 25;
+
 /**
  * Hold cap percentages until the engine loads and publish accepted geometry.
  * @param {{getEngine: () => Pick<import('../../generated/holosphere_wasm.js').HolosphereEngine,
@@ -16,7 +19,7 @@ export function createDisplayCapsBinding({ getEngine, onChange }) {
   const state = { topCap: 0, bottomCap: 0 };
   /** @returns {boolean} Whether the requested cap settings were accepted. */
   function apply() {
-    if (![state.topCap, state.bottomCap].every((v) => Number.isFinite(v) && v >= 0 && v <= 25))
+    if (![state.topCap, state.bottomCap].every((v) => Number.isFinite(v) && v >= 0 && v <= MAX_DISPLAY_CAP_PERCENT))
       return false;
     const engine = getEngine();
     if (!engine) return true;
