@@ -1,5 +1,4 @@
-# Reusable real-browser coverage for the deployed surface. One runner performs
-# setup once, then reports every probe failure before exiting.
+# Reusable real-browser coverage for the deployed surface.
 name: Browser suite
 
 on:

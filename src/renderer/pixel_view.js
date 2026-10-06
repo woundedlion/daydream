@@ -3,23 +3,13 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-/**
- * DOM-free logic for the zero-copy WASM pixel view, extracted so the
- * staleness/re-fetch contract can be unit-tested without a browser, a WASM
- * module, or Three.js. Both the driver (which clears the buffer) and
- * engine_host.js (which re-fetches it) route their "is this view still
- * usable?" decision through here so the buffer-alias contract lives in exactly
- * one tested place.
- */
+/** DOM-free staleness and re-fetch logic for the zero-copy WASM pixel view. */
 
 /**
  * Whether a pixel view has a nonempty backing buffer.
  *
- * Emscripten grows the heap by detaching the old ArrayBuffer in place: its
- * byteLength drops to 0 while the typed-array view stays truthy. Presence alone
- * is therefore not enough — a detached view is still an object, and calling
- * fill()/read on it throws or reads nothing — so the backing buffer must also be
- * non-detached.
+ * Emscripten heap growth detaches the old ArrayBuffer (byteLength 0) while the
+ * typed-array view stays truthy.
  * @param {ArrayBufferView|null|undefined} view - The pixel view to test.
  * @returns {view is ArrayBufferView} True for an ArrayBufferView with a nonempty
  *   backing buffer; this does not verify WASM ownership.
@@ -31,13 +21,9 @@ export function isViewLive(view) {
 /**
  * Decide whether the pixel view must be re-fetched, returning the view to use.
  *
- * A view is stale when it is missing, detached, or no longer the engine's buffer
- * length: the engine pre-sizes its pixel buffer, so a resolution change re-spans
- * it without reallocating and a view taken at the old resolution stays attached
- * while covering the wrong number of instances. A view of the expected length is
- * returned unchanged; anything else is re-fetched via getPixels(). The caller
- * re-points its display aliases at the returned view only when `refreshed` is
- * true, so a steady-state frame does no work.
+ * A view is stale when it is missing, detached, or not the engine's buffer
+ * length: a resolution change re-spans the pre-sized buffer without
+ * reallocating, so an old view stays attached at the wrong length.
  * @param {Uint16Array|null} view - The currently held pixel view.
  * @param {() => Uint16Array} getPixels - Fetches a fresh zero-copy view from the engine.
  * @param {number} [expectedLength] - The engine's current buffer length. Omitted

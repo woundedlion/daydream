@@ -3,14 +3,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-/**
- * daydream.js's effect and resolution apply path: the apply pipeline itself, the
- * switch/rollback transaction that drives it, the "apply the effect directly vs
- * let the effect-change subscription fire it" decision, and the resolution
- * preset and effect-list rules. Every engine, driver, GUI, and sidebar
- * collaborator arrives injected, so nothing here imports a WASM engine, lil-gui,
- * or a browser and the whole path is unit-testable, mirroring resolveParamSync().
- */
+/** The effect and resolution apply path and its switch/rollback transaction, over injected collaborators. */
 
 import { resolveActiveEffect } from "./effect_roster.js";
 import { callWorkbenchBinding } from '../engine/workbench_bindings.js';
@@ -37,8 +30,7 @@ import { callWorkbenchBinding } from '../engine/workbench_bindings.js';
 
 /**
  * Outcome of an effect/resolution apply, mirroring the engine's ParamSetResult
- * enum. Only APPLIED counts as applied, so a function that falls off its end
- * reads as a rejection rather than as success.
+ * enum. Anything but APPLIED is a rejection.
  * @enum {string}
  */
 export const ApplyResult = Object.freeze({
@@ -181,15 +173,10 @@ export function switchFailureReport(label, result) {
  *
  * Every effect/resolution change runs as a transaction: apply it, and on
  * rejection put the previous effect, resolution, URL, and effect control values
- * back. Rollback re-enters appState, so the subscription mutes itself for the
- * duration — mute() opens that window for callers who write appState and apply
- * it themselves, as applyResolution() does for an off-list effect correction.
- * Mute windows nest: an inner one restores the outer's state rather than
- * ending it.
+ * back. Rollback runs with the subscription muted; mute() opens that window for
+ * callers who write appState and apply it themselves. Mute windows nest.
  *
- * A rejected resolution switch also re-asserts the URL after the current task,
- * because the rollback's appState write lands before the URL writer has flushed
- * the rejected value.
+ * A rejected resolution switch also re-asserts the URL after the current task.
  *
  * @param {Object} deps - Injected app collaborators.
  * @param {{get: Function, set: Function, update: Function, subscribe: Function}}
@@ -212,8 +199,8 @@ export function switchFailureReport(label, result) {
  * @param {(error?: *) => boolean} [deps.moduleDead] - Reads whether the engine module
  *   trapped after an apply threw.
  * @param {() => boolean} [deps.usesChainSnapshot] - Whether the live effect
- *   persists through the exhaustive versioned snapshot API, which the panel
- *   rebuild restores whole; its parameters are then not replayed one at a time.
+ *   persists through the chain snapshot API; its parameters are then not
+ *   replayed one at a time.
  * @param {() => *} [deps.getChainSnapshot] - Captures engine-owned runtime state.
  * @param {(snapshot: *) => boolean} [deps.restoreChainSnapshot] - Restores engine-owned runtime state.
  * @returns {{isRestoring: () => boolean, mute: (write: () => void) => void,
@@ -326,18 +313,16 @@ export function createSwitchCoordinator({
 }
 
 /**
- * Build the effect and resolution apply path — the two functions every switch,
- * rollback, and initial hydration routes through.
+ * Build the effect and resolution apply path.
  *
  * A rejected apply returns ApplyResult.REJECTED and may leave a new effect or
- * resolution installed. createSwitchCoordinator() recovers by re-applying the
- * previous state. Only the off-list effect correction from planResolutionApply()
- * writes appState here.
+ * resolution installed; the caller rolls back. Only the off-list effect
+ * correction writes appState here.
  *
  * @param {Object} deps - Injected app collaborators.
  * @param {{get: Function, set: Function}} deps.appState - The applied state.
  * @param {() => HolosphereEngine|null} deps.getEngine - The main WASM engine, null until
- *   the module finishes loading (the GUI and sidebar are built either way).
+ *   the module finishes loading.
  * @param {() => HolosphereModule} deps.getModule - The loaded WASM module, for its
  *   EffectSetResult/ResolutionSetResult enums; non-null whenever getEngine()
  *   answers an engine.
@@ -366,8 +351,7 @@ export function createSwitchCoordinator({
  * @param {(message: string, error?: any) => void} [deps.logError] - Console sink.
  * @param {(message: string, error?: any) => void} [deps.logWarn] - Console sink.
  * @param {(error?: *) => boolean} [deps.moduleDead] - Reads whether the engine module
- *   trapped. A trap is terminal for the whole module, so a sidebar query that
- *   tripped one is re-thrown rather than degraded to a warning.
+ *   trapped; a sidebar query that trapped is re-thrown.
  * @returns {{applyEffect: (preserveParams?: boolean) => string,
  *   applyResolution: (preserveParams?: boolean) => string}}
  */
@@ -411,8 +395,7 @@ export function createApplyPipeline({
   /**
    * Tear down the current effect GUI and build a new one for the active effect.
    * @param {boolean} [preserveParams=false] - When true, keep the existing
-   *   per-effect param URL entries (used during initial hydration); when false,
-   *   clear them since they don't apply to the newly selected effect.
+   *   per-effect param URL entries; when false, clear them.
    * @param {boolean} [broadcast=true] - Publish the accepted effect to workers.
    * @param {*} [chainSnapshot=null] - Snapshot restored after switching the effect.
    *   A refused restore returns REJECTED after the engine has switched.
@@ -421,8 +404,8 @@ export function createApplyPipeline({
    *   Otherwise ApplyResult.APPLIED.
    */
   function applyEffect(preserveParams = false, broadcast = true, chainSnapshot = null) {
-    // A rejected effect leaves the engine unchanged, so return before the worker
-    // broadcast below: sending the rejected name would diverge them from main.
+    // A rejected effect leaves the engine unchanged; return before the worker
+    // broadcast.
     if (getEngine() && !selectEngineEffect()) return ApplyResult.REJECTED;
     if (chainSnapshot && callWorkbenchBinding(getEngine(), 'getShaderChainBindings',
       'restoreSnapshot', [chainSnapshot]) !== getModule().ChainSnapshotRestoreResult.APPLIED)
@@ -450,18 +433,12 @@ export function createApplyPipeline({
    * Apply a resolution change: resize geometry, refresh sidebar list, then
    * re-apply effect.
    * @param {boolean} [preserveParams=false] - When true, keep the active effect's
-   *   param URL entries through the re-apply (only if the effect is still
-   *   offered; an off-list effect is corrected to the list's first entry,
-   *   dropping its effect-specific URL entries regardless). They are kept
-   *   regardless while no engine exists: the URL is then their only carrier,
-   *   and the initial preserving apply is what seeds them.
-   * @returns {string} ApplyResult.APPLIED, else ApplyResult.REJECTED. REJECTED is
-   *   not a no-op: only the two early rejections — an unknown preset name, and an
-   *   engine setResolution rejection — leave everything as it was. A rejected
-   *   applyEffect returns REJECTED after the engine, driver and
-   *   sidebar have already moved to the new resolution, so recovery is the
-   *   caller's rollback re-apply, not a return here; reverting appState alone
-   *   leaves those mutations standing.
+   *   param URL entries through the re-apply. Also kept while no engine exists;
+   *   always dropped when an off-list effect is corrected.
+   * @returns {string} ApplyResult.APPLIED, else ApplyResult.REJECTED. Only an
+   *   unknown preset or an engine setResolution rejection leaves everything as it
+   *   was; a rejected applyEffect returns after the engine, driver and sidebar
+   *   have moved, so the caller must roll back.
    */
   function applyResolution(preserveParams = false) {
     const resolution = appState.get('resolution');
@@ -495,8 +472,7 @@ export function createApplyPipeline({
     /** @type {Record<string, number>|null} */
     let presetCounts = null;
     if (engine) {
-      // A sidebar query is cosmetic, but a trap is terminal for the module: no
-      // later call is a recovery path, so a dead module leaves through the throw.
+      // Sidebar queries are cosmetic, but a trapped module rethrows.
       try { effectSizes = engine.getEffectSizes(); }
       catch (e) {
         if (moduleDead(e)) throw e;
@@ -515,10 +491,8 @@ export function createApplyPipeline({
     const { nextEffect, effectChanged } =
       planResolutionApply(offered, appState.get('effect'));
     if (effectChanged) {
-      // Muted: an un-muted set opens a nested effect transaction inside this
-      // one, whose rollback re-applies an effect this resolution does not offer
-      // and so fails, reporting the unrecoverable banner. The resolution
-      // transaction's own rollback recovers instead.
+      // Muted: an un-muted set would open a nested effect transaction whose
+      // rollback fails; the resolution transaction's rollback recovers instead.
       muteSubscription(() => appState.set('effect', nextEffect));
     }
 
@@ -541,10 +515,7 @@ export function createApplyPipeline({
 /**
  * Plan how applyResolution() should re-apply the effect after a resolution
  * change. The requested effect is kept when the new resolution offers it, else
- * corrected to the list's first entry (resolveActiveEffect). The caller writes
- * the correction with the switch subscription muted and applies it itself, so a
- * refused correction rejects the resolution change instead of opening a nested
- * effect transaction inside it.
+ * corrected to the list's first entry (resolveActiveEffect).
  * @param {Array<string>} availableEffects - Effects offered at the new resolution.
  * @param {string} currentEffect - The requested/active effect name.
  * @returns {{nextEffect: string, effectChanged: boolean}} The effect to activate
@@ -564,7 +535,7 @@ export function planResolutionApply(availableEffects, currentEffect) {
  * @returns {{labels: string[], unlabeled: string[]}} The preset labels to offer,
  *   in table order, and any engine row (as `WxH`) no preset covers. Every preset
  *   is offered when the engine reports nothing, or when no preset matches a
- *   reported row — an unusable list must not empty the dropdown.
+ *   reported row.
  */
 export function offeredResolutions(presets, supported) {
   const labels = Object.keys(presets);

@@ -4,9 +4,8 @@
  */
 
 /**
- * The display buffer every renderer writes through: the Three.js instance-colour
- * attribute, its array, and the driver's own pixel handle, all of which must
- * reference the live WASM view. A stale alias shows the previous buffer.
+ * Display-buffer aliases (the Three.js instance-colour array and driver.pixels),
+ * which must reference the live WASM view. A stale alias shows the previous buffer.
  */
 
 /**
@@ -18,8 +17,7 @@
 /**
  * Re-point both display aliases (Three.js instanceColor + driver.pixels) so
  * source, displayed attribute, and driver.pixels all reference the same WASM
- * view. Shared by EngineHost.refresh(), the frame adapter's alias heal, and
- * SegmentController's composite heal.
+ * view.
  * @param {DisplayDriver} driver - The Daydream driver with a non-null dot mesh and instanceColor attribute.
  * @param {Uint16Array} view - The WASM pixel view to alias.
  * @returns {void}

@@ -9,9 +9,7 @@ export const CHAIN_SNAPSHOT_STORAGE_KEY = '__chainSnapshot';
 
 /**
  * The value the engine last took for one parameter: what it admitted for
- * rendering, else the writable target it holds, else the value it renders. A
- * definition that carries no accepted value still names a target, which is what
- * a replay writes back; the rendered value is an animation frame.
+ * rendering, else the writable target it holds, else the value it renders.
  * @param {{acceptedValue?: *, requestedValue?: *, value: *}} parameter - Engine
  *   parameter definition.
  * @returns {*} The accepted value, in the definition's own type.
@@ -36,8 +34,7 @@ export function createEffectPersistence({
    * Persist the active effect through its snapshot or accepted-value surface.
    * @param {*} gui - The effect GUI holding the stored values.
    * @param {{name: string, accepted: *}} [edited] - The one parameter an edit
-   *   moved, carrying the value the write settled on. Narrowing to it keeps a
-   *   per-keystroke persist off the whole-definition marshal.
+   *   moved, carrying the value the write settled on.
    * @param {boolean} [existingOnly=false] - Rewrite only restored companion keys.
    * @returns {void}
    */

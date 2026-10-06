@@ -109,8 +109,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     env:
-      # The engine pair the browser instantiates, staged and then served. Both
-      # steps below read this list, so neither can check a different set.
+      # Engine assets the browser instantiates, verified staged and served.
       ENGINE_ASSETS: generated/holosphere_wasm.wasm generated/holosphere_wasm.js generated/shader/shader_workbench.mjs generated/shader/sha256.mjs generated/shader/composed_effect_roster.mjs
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -137,7 +136,6 @@ jobs:
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - name: Stage site from site_manifest.txt and verified engine assets
         run: node scripts/stage-site.mjs engine-bundle _site deployment-pair.json
-      # Check staged engine assets before publishing.
       - name: Verify the staged engine assets
         run: |
           status=0
@@ -163,7 +161,6 @@ jobs:
       - id: deployment
         if: steps.current.outputs.current == 'true'
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
-      # Check the published engine MIME types.
       - name: Verify published engine MIME types
         if: steps.current.outputs.current == 'true'
         env:

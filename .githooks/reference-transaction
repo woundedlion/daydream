@@ -1,9 +1,7 @@
 #!/bin/sh
-# Refuse any non-fast-forward move or deletion of refs/heads/master so
-# concurrent code-review-fix sessions cannot clobber each other's landed work.
-#
-# The fast-forward check derives the ref's current value itself (git update-ref
-# reports a zero old-OID to this hook, so the stdin old field cannot be trusted).
+# Refuse any non-fast-forward move or deletion of refs/heads/master.
+# The stdin old OID can be zero (git update-ref), so the current value is read
+# from the ref.
 #
 # A rewind or deletion needs a deliberate, one-shot, target-scoped token:
 #   git rev-parse <target> > "$(git rev-parse --git-common-dir)/hs-allow-nonff"

@@ -3,21 +3,15 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-/**
- * The recording settings the GUI binds to, each holding its own value until the
- * recorder the module load builds exists to take it.
- */
+/** Recording settings the GUI binds to before the recorder exists. */
 
 /**
  * Build the recording settings the GUI binds to, over a recorder that does not
  * exist yet.
  *
- * The recorder is constructed only once the module load resolves and the canvas
- * exists, but the GUI mounts synchronously in start(), before the WASM load resolves — so each setting holds its own
- * value behind an accessor, pushes it at every write, and replay() carries
- * whatever accumulated (default or edited) into the recorder the load
- * builds. The recorder latches these at start(), so a write during a session is
- * reported rather than silently deferred to the next one.
+ * Each setting holds its own value behind an accessor and pushes it on write;
+ * replay() pushes the accumulated values into the newly built recorder. The
+ * recorder latches settings at start(), so a write mid-recording warns.
  *
  * @template {{isRecording: boolean}} T
  * @param {Object} deps - Injected app collaborators.
@@ -55,8 +49,7 @@ export function createRecordingSettings({
           }
         },
       });
-      // Unguarded: replay() runs immediately after the recorder is constructed,
-      // and a null-tolerant replay would drop every setting in silence.
+      // Unguarded: replay() requires a constructed recorder.
       replays.push(() => push(/** @type {T} */ (getRecorder()), value));
     },
     replay() {

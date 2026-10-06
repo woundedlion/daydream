@@ -10,15 +10,10 @@ const TWO_PI = 2 * Math.PI;
 /**
  * Converts 2D pixel coordinates to spherical coordinates on a unit sphere.
  *
- * Writes into `out` and returns it. When `out` is omitted a fresh Spherical is
- * allocated, so the result is always an independent object. Pass a reusable
- * `out` to avoid allocation in hot loops (e.g. Daydream.precomputeMatrices).
+ * Writes into `out` and returns it; a fresh Spherical is allocated when omitted.
  *
- * The azimuth is `π/2 − θ`, not `θ`: THREE.Spherical measures theta from +Z
- * (`x = sinφ·sinθ`), but the engine's `pixel_to_vector` measures it from +X
- * (`x = sinφ·cosθ`, README §2: column x=0 sits at +X). The `π/2 − θ` complement
- * makes THREE use the engine's coordinate convention, avoiding an x↔z mirror
- * (det=−1 reflection) that would render chiral content opposite-handed.
+ * The azimuth is `π/2 − θ`: THREE.Spherical measures theta from +Z, the engine's
+ * `pixel_to_vector` from +X; the complement avoids an x↔z mirror.
  *
  * Latitude endpoints are LED-center angles exported by the engine.
  * @param {number} x - The pixel x-coordinate [0, dims.W - 1].

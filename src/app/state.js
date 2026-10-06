@@ -14,9 +14,7 @@ const URL_SIGNIFICANT_DIGITS = 5;
  * dropping trailing-zero noise. Number() re-parses the rounded string so 0.50000
  * collapses back to 0.5.
  * @param {number} value - The numeric value to serialize.
- * @returns {number|null} The rounded value, or null for a non-finite input so
- *   callers drop the key rather than emit a misleading 0. Rounding preserves
- *   magnitude, so only an exact 0 serializes as 0.
+ * @returns {number|null} The rounded value, or null for a non-finite input.
  */
 export function roundUrlNumber(value) {
   if (!Number.isFinite(value)) return null;
@@ -25,12 +23,10 @@ export function roundUrlNumber(value) {
 
 /**
  * Serialize a value the way the URL stores it: numbers through roundUrlNumber,
- * everything else stringified. The one serialization rule behind every deep-link
- * write, so no writer can drift from another.
+ * everything else stringified.
  * @param {*} value - The value to serialize.
  * @returns {string|null} The param string, or null when the value has no URL
- *   representation (null/undefined, or a non-finite number) and the key is
- *   dropped instead of serializing a 0 the app never held.
+ *   representation (null/undefined, or a non-finite number).
  */
 export function canonicalUrlParam(value) {
   if (value === null || value === undefined) return null;
@@ -63,9 +59,8 @@ const URL_TRUE = new Set(['true', '1', 'yes', 'on']);
 const URL_FALSE = new Set(['false', '0', 'no', 'off']);
 
 /**
- * Parse a URL param string as a number under the one URL scalar grammar shared
- * by every deep-link reader: surrounding whitespace is allowed, the rest must be
- * a plain decimal (optionally signed, optionally exponent) and finite.
+ * Parse a URL param string as a number: surrounding whitespace is allowed, the
+ * rest must be a plain decimal (optionally signed, optionally exponent) and finite.
  * @param {string} raw - The raw URL param string.
  * @returns {number|null} The parsed number, or null when the string is not one.
  */
@@ -77,8 +72,7 @@ export function parseUrlNumber(raw) {
 }
 
 /**
- * Parse a URL param string as a boolean under the one token table shared by
- * every deep-link reader; case- and whitespace-insensitive.
+ * Parse a URL param string as a boolean; case- and whitespace-insensitive.
  * @param {string} raw - The raw URL param string.
  * @returns {boolean|null} The parsed boolean, or null for an unrecognized token.
  */
@@ -89,25 +83,21 @@ export function parseUrlBoolean(raw) {
   return null;
 }
 
-// Debounce window collapsing a burst of URL writes into one replaceState. Long
-// enough to swallow a slider drag, short enough that a copied link is current.
+// Debounce window collapsing a burst of URL writes into one replaceState.
 export const URL_FLUSH_DEBOUNCE_MS = 200;
 
-// Re-arm delay after a refused replaceState. Longer than the debounce so a retry
-// run does not spend the browser's write budget faster than the rate limit it is
-// waiting out.
+// Re-arm delay after a refused replaceState.
 export const URL_FLUSH_RETRY_MS = 2000;
 
 // Consecutive refused writes before the buffer is dropped. The retry window
-// outlasts WebKit's 30 s rate limit; persistent refusals still exhaust it.
+// outlasts WebKit's 30 s rate limit.
 export const URL_FLUSH_MAX_RETRIES = 20;
 
 /**
  * Replace the current history entry with a URL, reporting a refused write
  * instead of propagating it.
  * @details Browsers rate-limit replaceState (WebKit: ~100 per 30 s) and throw
- *   past the limit. Every URL write is cosmetic, so a throw must not escape into
- *   an apply or rollback path that would read it as a state failure.
+ *   past the limit.
  * @param {string} url - The URL to write.
  * @param {Window} [win] - The window whose history is written.
  * @returns {boolean} Whether the URL was written; false when the browser refused it.
@@ -123,9 +113,7 @@ export function replaceUrl(url, win = window) {
 }
 
 /**
- * The single assembly point for every deep-link URL write: replaceState with
- * pathname + query + the existing location.hash, which rebuilding from pathname
- * alone would drop.
+ * replaceState with pathname + query + the existing location.hash.
  * @param {URLSearchParams} params - The query params to write; empty writes a bare path.
  * @param {Window} [win] - The window whose location is read and history written.
  * @returns {boolean} Whether the URL was written; false when the browser refused it.
@@ -137,9 +125,7 @@ export function writeUrl(params, win = window) {
 }
 
 /**
- * Centralized application state with subscriber pattern and URL synchronization.
- * Separates state management from DOM manipulation — subscribers react to changes
- * independently rather than being orchestrated imperatively.
+ * Centralized application state with change subscribers.
  */
 export class AppState {
   /**
@@ -154,10 +140,7 @@ export class AppState {
     /** @type {{fn: StateListener}[]} */
     this.listeners = [];
     this.batchDepth = 0;
-    // key -> notifications dispatched since the outermost batch began. A queued
-    // tuple is compared against the count taken when its batch was captured, so
-    // a nested batch is measured from its own starting point rather than
-    // inheriting an enclosing batch's dispatches.
+    // key -> notifications dispatched since the outermost batch began.
     this.dispatchCounts = new Map();
   }
 
@@ -185,7 +168,7 @@ export class AppState {
   /**
    * Batch-sets multiple keys: all keys are written FIRST, then subscribers are
    * notified (one per changed key), so a callback reading a sibling batched key
-   * sees its post-batch value. Unlike set(), which writes+notifies per key.
+   * sees its post-batch value.
    * @param {Object} patch - Key/value pairs to merge into the state.
    * @returns {void}
    */
@@ -198,9 +181,9 @@ export class AppState {
         changes.push([key, value, old]);
       }
     }
-    // A subscriber may re-enter set()/update() while this batch drains and notify
-    // a key still queued below. Skip a queued tuple whose key went out after this
-    // batch captured it: its `old` no longer describes a transition that happened.
+    // A subscriber may re-enter set()/update() and notify a key still queued.
+    // Skip a queued tuple whose key went out after this batch captured it: its
+    // `old` no longer describes a transition that happened.
     const captured = new Map();
     for (const [key] of changes) captured.set(key, this.dispatchCounts.get(key) ?? 0);
     this.batchDepth++;
@@ -248,8 +231,7 @@ export class AppState {
     // removed during dispatch is not invoked either.
     for (const reg of this.listeners.slice()) {
       if (!this.listeners.includes(reg)) continue;
-      // A throwing subscriber must not strand the listeners after it, nor the
-      // remaining keys of an update() batch; report and carry on.
+      // Report a throwing subscriber and carry on.
       try {
         reg.fn(key, value, old);
       } catch (err) {
@@ -260,21 +242,20 @@ export class AppState {
 
 }
 
-// Single app-wide URL writer; gui.js routes its param writes through this.
+// App-wide URL writer slot.
 /** @type {URLSync|null} */
 let activeURLSync = null;
 /**
  * Returns the app-wide active URLSync instance, or null if none is constructed.
- * @returns {URLSync|null} The single registered URL writer.
+ * @returns {URLSync|null} The registered URL writer.
  */
 export const getActiveURLSync = () => activeURLSync;
 
 /**
- * URL synchronization layer — the single owner of URL writes.
- * Subscribes to an AppState for tracked keys, accepts ad-hoc param writes from
- * the GUI layer, and reads initial values from the URL on construction. All
- * writes funnel through one debounced flush (read-modify-write at fire time),
- * so concurrent AppState and GUI updates merge instead of clobbering.
+ * URL synchronization layer. Subscribes to an AppState for tracked keys, accepts
+ * ad-hoc param writes, and reads initial values from the URL on construction.
+ * Writes funnel through one debounced read-modify-write flush, so concurrent
+ * updates merge.
  */
 export class URLSync {
   /**
@@ -286,15 +267,12 @@ export class URLSync {
    * @param {Object<string, (raw: string) => boolean>} [validators] - Optional
    *   per-key predicate run against the raw URL string on the initial read; a
    *   key whose validator returns false keeps the state's existing (validated)
-   *   default instead of being overwritten. Lives here, in the sync layer, so a
-   *   garbage URL value can't poison state regardless of which consumer wires
-   *   the URLSync.
+   *   default instead of being overwritten.
    * @param {Window} [win] - The window this writer reads and writes the URL on,
-   *   and arms its debounce against, so a discarded page takes the timer with it.
+   *   and arms its debounce against.
    */
   constructor(state, trackedKeys, validators = {}, win = window) {
-    // Retire the previous writer: orphaned, it would keep its subscription and
-    // could still arm a replaceState timer with no handle left to tear it down.
+    // Retire the previous writer so no orphaned subscription or timer survives.
     if (activeURLSync) activeURLSync.dispose();
     this.state = state;
     this.trackedKeys = new Set(trackedKeys);
@@ -327,8 +305,6 @@ export class URLSync {
       // raw string; a non-finite parse keeps the default rather than seeding NaN.
       const current = state.get(key);
       if (current === undefined) {
-        // No seeded default means no target type; seeding the raw string would
-        // make "?flag=false" a truthy value.
         console.error(`URLSync: tracked key "${key}" has no seeded default; ignoring its URL value`);
         continue;
       }
@@ -350,8 +326,7 @@ export class URLSync {
 
     // Correct a URL that advertises something the app did not adopt: a rejected
     // or unseeded value, or an accepted one that serializes differently ("on" ->
-    // "true", " 8 " -> "8"). Flushing writes the canonical form, so the next load
-    // finds no mismatch and schedules nothing.
+    // "true", " 8 " -> "8").
     for (const key of this.trackedKeys) {
       if (!params.has(key)) continue;
       if (params.get(key) !== canonicalUrlParam(state.get(key))) {
@@ -372,10 +347,7 @@ export class URLSync {
   /**
    * Tear down the URLSync: drop the AppState subscription, cancel any pending
    * debounced flush, and clear the app-wide writer slot if it still points here.
-   * Without this, a pagehide discard can leave the debounce timer firing
-   * history.replaceState into a dead page. Symmetric with createAppTeardown(...).dispose().
-   * Latches: schedule(), setParam(), and reset() become no-ops afterwards, so a
-   * holder of a direct reference cannot re-arm the debounce into a discarded page.
+   * Latches: schedule(), setParam(), and reset() become no-ops afterwards.
    * @returns {void}
    */
   dispose() {
@@ -391,11 +363,8 @@ export class URLSync {
 
   /**
    * Defers tracked URL writes until resume() completes a state transaction.
-   * @details Disarms a flush already armed — the constructor's canonicalization
-   *   arms one before any caller can suspend, and left running it would write the
-   *   URL from inside the transaction the suspension exists to bracket. Its delay
-   *   is carried so resume() cannot pull a retry-ladder wait forward into the
-   *   rate-limit window it is pacing out.
+   * @details Disarms an already-armed flush, carrying its delay so resume()
+   *   cannot shorten a retry wait.
    * @returns {void}
    */
   suspend() {
@@ -422,12 +391,8 @@ export class URLSync {
   /**
    * Debounces a URL write, collapsing bursts into one flush after
    * URL_FLUSH_DEBOUNCE_MS. A no-op once disposed.
-   * @details A shorter delay never displaces an armed longer one: the retry
-   *   ladder arms at URL_FLUSH_RETRY_MS to pace the browser's write budget, and
-   *   letting a concurrent debounce pull it forward would spend the ladder
-   *   inside the rate-limit window it is waiting out. Nothing is lost by
-   *   waiting — the armed flush re-reads tracked state and merges the buffer at
-   *   fire time.
+   * @details A shorter delay never displaces an armed longer one; the armed
+   *   flush re-reads tracked state and merges the buffer at fire time.
    * @param {number} [delayMs] - Delay before the flush fires.
    * @returns {void}
    */
@@ -453,12 +418,10 @@ export class URLSync {
    * Records an ad-hoc param write from the GUI layer, merged into the single flush.
    * A no-op once disposed.
    * @details A tracked key is owned by the AppState, so it is only scheduled, never
-   *   buffered: the buffer outlives the write that filled it, and re-asserting a
-   *   value the state has since moved past would leave the URL advertising the old
-   *   one with nothing left to correct it.
+   *   buffered.
    * @param {string} key - The URL param name to write.
    * @param {*} value - The value to set; null/undefined records a deletion marker.
-   *   Numbers are rounded to significant digits to save space and avoid float jitter.
+   *   Numbers are rounded to URL_SIGNIFICANT_DIGITS significant digits.
    * @returns {void}
    */
   setParam(key, value) {
@@ -473,13 +436,9 @@ export class URLSync {
   }
 
   /**
-   * Clears every URL param except the excluded keys, on the same debounced flush
-   * every other write takes. Tracked-key state and surviving ad-hoc writes are
-   * re-asserted by that flush, so a value set inside the window is not lost.
+   * Clears every URL param except the excluded keys, on the debounced flush.
+   * Tracked-key state and surviving ad-hoc writes are re-asserted by that flush.
    * A no-op once disposed.
-   * @details Debounced rather than immediate because an effect switch calls this
-   *   on every change: writing here would let a burst of switches spend the
-   *   browser's replaceState budget on its own.
    * @param {string[]} excludedKeys - Param names to preserve through the reset.
    * @returns {void}
    */
@@ -505,9 +464,7 @@ export class URLSync {
   }
 
   /**
-   * Drop from a params object the keys a scheduled reset() will clear, so a
-   * reader running inside the debounce window does not see params the app has
-   * already discarded — the reset is scheduled, but the decision is made.
+   * Drop from a params object the keys a scheduled reset() will clear.
    * @param {URLSearchParams} params - Params to filter in place.
    * @returns {void}
    */
@@ -520,8 +477,7 @@ export class URLSync {
 
   /**
    * Overlay onto a params object the ad-hoc writes still buffered for the next
-   * flush, so a reader running inside the debounce window sees the values the
-   * app has already accepted rather than the query string they will replace.
+   * flush.
    * @param {URLSearchParams} params - Params to update in place.
    * @returns {void}
    */
@@ -534,16 +490,10 @@ export class URLSync {
 
   /**
    * Read-modify-write the URL once: re-read current params, overlay tracked
-   * state keys and surviving ad-hoc writes, then replaceState. Running at fire
-   * time (not schedule time) is what lets concurrent updates merge.
-   * @details A refused write (replaceState rate limit) leaves the URL as it was,
-   *   so the buffered ad-hoc writes and any pending reset are kept and a retry is
-   *   armed. Tracked keys are re-read from state on every flush and need no such
-   *   hold. Dropping the buffer immediately would lose a GUI param permanently,
-   *   since nothing but the next write on that same key would re-assert it — but
-   *   the ladder is bounded at URL_FLUSH_MAX_RETRIES, past which the refusal is a
-   *   standing one and the buffer is dropped rather than held by a timer that
-   *   re-arms for the page's lifetime.
+   * state keys and surviving ad-hoc writes, then replaceState. Runs at fire
+   * time so concurrent updates merge.
+   * @details A refused write keeps the ad-hoc buffer and pending reset and arms a
+   *   retry; after URL_FLUSH_MAX_RETRIES refusals the buffer is dropped.
    * @returns {void}
    */
   flush() {
@@ -568,8 +518,7 @@ export class URLSync {
       this.adhoc.clear();
       return;
     }
-    // The URL is now the store of record; clear the buffer so a stale ad-hoc entry
-    // can't re-apply on every flush.
+    // The URL is now the store of record.
     this.retries = 0;
     this.pendingReset = null;
     this.adhoc.clear();
