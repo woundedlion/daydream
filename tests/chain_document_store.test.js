@@ -635,6 +635,21 @@ test('legality lists every operator with reasons for the illegal', async () => {
   assert.throws(() => store.legalInsertions(99), RangeError);
 });
 
+test('the last entry is replaceable only by operators that exit on the color carrier', async () => {
+  const store = await makeStore();
+  const last = store.chain().length - 1;
+  const exits = CATALOG.operators
+    .filter((operator) => operator.input === 'field' && operator.output === 'color')
+    .map((operator) => operator.id);
+  assert.ok(exits.length > 0);
+  assert.deepEqual(store.legalReplacements(last, 1)
+    .filter((entry) => entry.legal).map((entry) => entry.operator.id), exits);
+  const transfer = store.legalReplacements(last, 1)
+    .find((entry) => entry.operator.id === 'field.transfer.ridge.v2');
+  assert.equal(transfer.legal, false);
+  assert.match(transfer.reason, /the chain needs color here/);
+});
+
 test('legality agrees with replaceSpan', async () => {
   const store = await makeStore();
   const entries = store.legalInsertions(WARP);
@@ -718,6 +733,33 @@ test('arena accounting honors per_param_name_bytes when declared', async () => {
   const base = await makeStore();
   assert.equal(base.legalInsertions(WARP)
     .find((candidate) => candidate.operator.id === 'warp.wave-shear.v2').legal, true);
+});
+
+test('insertion legality costs the operator at its gap, not at the chain end', async () => {
+  const operators = new Map(CATALOG.operators.map((operator) => [operator.id, operator]));
+  const baseOps = BASE.document.descriptor.chain.map((entry) => operators.get(entry.operator));
+  const bytesAt = (id, index) => compiler.chainArenaBytes(
+    [...baseOps.slice(0, index), operators.get(id), ...baseOps.slice(index)], CATALOG.budgets);
+  const legalityAt = async (id, index, arenaBytes) => {
+    const catalog = structuredClone(CATALOG);
+    catalog.budgets.arena_bytes = arenaBytes;
+    const store = await makeStore({ catalog });
+    const entry = store.legalInsertions(index).find((candidate) => candidate.operator.id === id);
+    assert.equal(store.replaceSpan(index, 0, [{ operator: id }]).ok, entry.legal);
+    return entry;
+  };
+
+  const kaleidoscope = 'sphere.lens.kaleidoscope.v2';
+  assert.ok(bytesAt(kaleidoscope, 0) > bytesAt(kaleidoscope, baseOps.length),
+    'alignment padding makes the gap dearer than the end');
+  const dearer = await legalityAt(kaleidoscope, 0, bytesAt(kaleidoscope, 0) - 1);
+  assert.equal(dearer.legal, false);
+  assert.match(dearer.reason, /arena bytes/);
+
+  const twist = 'sphere.lens.twist.v2';
+  assert.ok(bytesAt(twist, PROJECT) < bytesAt(twist, baseOps.length),
+    'alignment padding makes the end dearer than the gap');
+  assert.equal((await legalityAt(twist, PROJECT, bytesAt(twist, PROJECT))).legal, true);
 });
 
 test('chainArenaBytes matches a mixed-alignment golden and validator diagnostic wiring', () => {
