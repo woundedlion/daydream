@@ -553,21 +553,20 @@ test('bootstrap leaves the fatal banner alone when the overlay renders', async (
 });
 
 // Booting is the entry module's job alone; bootstrap.js has no import-time boot.
-test('index boots through the entry module and bootstrap.js stays importable', () => {
+test('index boots through the entry module and bootstrap.js stays importable', async (t) => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /<link href="\.\/favicon\.svg" rel="icon"/);
   assert.match(html, /<script type="module" src="src\/app\/main\.js"[^>]*><\/script>/);
   assert.equal([...html.matchAll(/<script\b[^>]*type="module"/g)].length, 1);
-  const source = readFileSync(new URL('../src/app/bootstrap.js', import.meta.url), 'utf8');
-  const body = source.replace(/export\s+async\s+function\s+bootstrap\s*\(/, 'function(');
-  const invocation = /\bbootstrap\s*(?:\?\.\s*)?(?:\(|\.(?:call|apply)\s*\()|\(\s*bootstrap\s*\)\s*\(/;
-  assert.doesNotMatch(body, invocation);
-  for (const spelling of [
-    'await bootstrap()',
-    'bootstrap?.()',
-    '(bootstrap)()',
-    'bootstrap.call(null)',
-  ]) assert.match(spelling, invocation);
+  const touched = [];
+  installDocument(new Proxy({}, {
+    get: (_target, key) => { touched.push(key); return undefined; },
+  }));
+  const widen = t.mock.method(performance, 'setResourceTimingBufferSize');
+  await import(`../src/app/bootstrap.js?probe=${Date.now()}`);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(widen.mock.callCount(), 0, 'importing bootstrap.js does not boot');
+  assert.deepEqual(touched, []);
 });
 
 test('index identifies new-window tool links and associates stats headers', () => {
