@@ -2655,21 +2655,21 @@ test('setResolution opens a new parameter revision', () => {
   assert.equal(c.getParamValues(), null);
 });
 
-// onWorkerFault terminates the pool but leaves `workers` populated, so an
-// ungated follow-up posts into dead workers and reports nothing.
-test('a faulted setResolution skips its trailing effect rebuild', () => {
-  const c = readyController(2, { effect: 'Ribbons' });
-  for (const w of c.workers) w.posted.length = 0;
-  FakeWorker.failPostAt = 1;
-  FakeWorker.failPostType = 'setResolution';
-
-  c.setResolution(8, 8);
-
-  assert.equal(c.faulted, true);
-  assert.match(c.faultInfo.message, /broadcast of 'setResolution' to seg 1 failed/);
-  for (const w of c.workers)
-    assert.equal(w.posted.some((m) => m.type === 'setEffect'), false,
-      'no setEffect follows the fault');
+test('a failed setResolution broadcast latches the fault and names the failed message', () => {
+  for (const fails of [false, true]) {
+    const c = readyController(2, { effect: 'Ribbons' });
+    for (const w of c.workers) w.posted.length = 0;
+    FakeWorker.failPostAt = fails ? c.workers[1].index : -1;
+    FakeWorker.failPostType = 'setResolution';
+    c.setResolution(8, 8);
+    assert.equal(c.faulted, fails);
+    if (fails) assert.match(c.faultInfo.message, /broadcast of 'setResolution' to seg 1 failed/);
+    else {
+      assert.equal(c.faultInfo, null);
+      for (const w of c.workers) assert.deepEqual(w.posted.map(m => m.type), ['setResolution']);
+    }
+    c.destroy();
+  }
 });
 
 test('broadcast reports whether every worker accepted the message', () => {
