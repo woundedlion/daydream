@@ -1025,6 +1025,16 @@ test('meshOpFailure reports UNKNOWN when the module records no reason', () => {
   assert.match(failure.message, /^Face classification failed: /);
 });
 
+/** Verifies a recorded value the enum does not name reads back as UNKNOWN, not as success. */
+test('meshOpFailure reports UNKNOWN for a recorded value outside the enum', () => {
+  const { Mod } = fakeModule();
+  Mod.MeshOps.getLastResult = () => Symbol('UNLISTED');
+  const failure = meshOpFailure(Mod, 'Face classification');
+  assert.equal(failure.reason, 'UNKNOWN');
+  assert.equal(failure.flush, false);
+  assert.equal(failure.fatal, false);
+});
+
 /** Verifies the null-result handler reports and flushes by reason. */
 test('requireMeshResult surfaces the reason and applies its remedy', () => {
   const { Mod, state } = fakeModule(() => { }, { rejects: new Set(['base:cube']) });
