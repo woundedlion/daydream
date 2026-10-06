@@ -4,14 +4,9 @@
  */
 
 /**
- * Scene construction for the solids tool (tools/solids.html): turns the JS-side
- * mesh copy into the face / vertex / edge / normal objects and the vertex-index
- * labels, without replaying the WASM op chain.
- *
- * The three.js namespace, the scene and the shared materials are injected rather
- * than imported, matching solid_codegen.js's three-free contract — the renderer
- * runs against a stand-in namespace in a test. Vertices are anything with
- * THREE.Vector3's shape.
+ * Scene construction for the solids tool: turns the JS-side mesh copy into the
+ * face / vertex / edge / normal objects and the vertex-index labels. The
+ * three.js namespace, the scene and the shared materials are injected.
  */
 
 import {
@@ -40,8 +35,7 @@ export const MAX_INDEX_LABELS = 1000;
  */
 
 /**
- * The three.js namespace, injected so a stand-in can serve in a test. Its
- * constructors are reached by name rather than declared here.
+ * The three.js namespace, injected so a stand-in can serve in a test.
  * @typedef {Object<string, any>} ThreeNamespace
  */
 
@@ -136,12 +130,9 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
      * @returns {{edgeCount: number, labelsBuilt: boolean}} What the render produced.
      */
     render(meshData, view, faceClassIds) {
-      // Colorize is applied only when faces are shown; otherwise the per-vertex
-      // color attribute would be built for hidden geometry.
       const faceClasses = (view.colorizeFaces && view.showFaces) ? faceClassIds : null;
 
-      // Null each handle after disposal: a toggle that leaves its object
-      // unbuilt would otherwise re-dispose the same geometry on every recompute.
+      // Null each handle after disposal so an unbuilt object is not re-disposed.
       mainMesh = discard(mainMesh);
       edgeLines = discard(edgeLines);
       vertPoints = discard(vertPoints);
@@ -160,17 +151,12 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
       /** @type {any[]} */
       const faceNormals = [];
 
-      // Geodesic mode curves the faces onto the sphere (geodesicTriangleVertices
-      // does the per-triangle tessellation); geodesicSegments() picks geoN from
-      // the mesh's widest arc and its triangle count. Geodesic mode forces the
-      // centroid fan, so a face emits f.length triangles, not f.length - 2.
+      // Geodesic mode forces the centroid fan: a face emits f.length triangles.
       let geoN = 1;
       if (view.showFaces && view.showGeodesics) {
         let triCount = 0;
         let maxArc = 0;
-        // The arcs that get subdivided are the centroid fan's: each face edge
-        // and each spoke from the face centroid, which is what the geodesic
-        // path emits.
+        // The centroid fan's arcs: each face edge and each centroid spoke.
         meshData.faces.forEach(f => {
           triCount += f.length;
           const centroid = new THREE.Vector3();
@@ -240,9 +226,7 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
         if (view.showGeodesics) {
-          // Every emitted vertex sits on the unit sphere, so its normal IS its
-          // position; computeVertexNormals on this non-indexed geometry would
-          // yield per-triangle normals and shade the tessellation as facets.
+          // Every emitted vertex sits on the unit sphere, so its normal is its position.
           geometry.setAttribute('normal', new THREE.Float32BufferAttribute(vertices, 3));
         } else {
           geometry.computeVertexNormals();
@@ -251,9 +235,7 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
           geometry.setAttribute('color', new THREE.Float32BufferAttribute(faceColors, 3));
         }
 
-        // Flat shading reads face normals in-shader (ignoring the normal
-        // attribute), which is right for the polyhedral look but would facet the
-        // sphere; geodesic mode needs the smooth normals set above.
+        // Flat shading ignores the normal attribute; geodesic mode needs smooth normals.
         const wantFlat = !view.showGeodesics;
         for (const m of [materials.face, materials.faceColorize]) {
           if (m.flatShading !== wantFlat) {
@@ -278,8 +260,7 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
 
       /** @type {number[]} */
       const linePositions = [];
-      // Two scratch vectors carry the whole cage: a geodesic edge walks 12
-      // segments and would otherwise allocate 24 vectors per edge per render.
+      // Two scratch vectors serve every edge.
       const arcStart = new THREE.Vector3();
       const arcEnd = new THREE.Vector3();
       for (const [ai, bi] of edges) {
@@ -323,9 +304,7 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
         scene.add(normalLines);
       }
 
-      // Indices. Build into a DocumentFragment and insert in a single
-      // appendChild so the whole label set costs one DOM mutation instead of
-      // one per vertex.
+      // Indices, inserted as one DocumentFragment.
       let labelsBuilt = false;
       if (view.showIndices && labelsContainer
           && meshData.vertices.length < MAX_INDEX_LABELS) {

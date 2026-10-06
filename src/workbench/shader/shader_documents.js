@@ -24,8 +24,7 @@ const PATTERN_CATALOG_URL = '../../../generated/shader/patterns/catalog.json';
 const CATALOG_URL = '../../../generated/shader/engine_catalog.json';
 const COMPILER_URL = new URL('../../../generated/shader/shader_workbench.mjs', import.meta.url).href;
 
-// The effect the dynamic path previews on: the engine's chain interpreter,
-// programmed through setShaderChain.
+// The engine's chain interpreter, programmed through setShaderChain.
 const CHAIN_EFFECT = 'ShaderChain';
 
 // Digest characters the toolbar shows; the button copies all of it.
@@ -71,8 +70,7 @@ function resolveEngineValue(definitions, name, value) {
  * Performs one resolved write.
  * @param {*} engine
  * @param {*} module - The loaded WASM module, for its ParamSetResult enum.
- *   setParameter answers one of its values; every value is a truthy object, so
- *   the outcome only reads as applied against APPLIED itself.
+ *   Every enum value is a truthy object; compare against APPLIED.
  * @param {{name: string, stored: *}} write
  * @returns {string|null} Refusal reason, or null once written.
  */
@@ -102,8 +100,7 @@ function writeEngineValue(engine, module, definitions, name, value) {
  * @param {Set<string>} baked - The topology fields the effect bakes in.
  * @param {Set<string>} derived - Validated fields computed by the fixed effect.
  * @returns {string|null} Refusal reason, or null once every writable value is written.
- *   Baked and derived values are skipped. Remaining ids are resolved before
- *   the first write, so an unregistered id refuses without a partial write.
+ *   Baked and derived values are skipped; an unregistered id refuses before any write.
  */
 function applyDocumentValues(engine, module, compiled, presetId, baked, derived) {
   const preset = compiled.document.preset_bank.presets
@@ -138,8 +135,7 @@ function applyDocumentValues(engine, module, compiled, presetId, baked, derived)
  * @param {CompiledDocument} compiled
  * @param {string} presetId
  * @param {string[]} referencePresetIds
- * @param {Set<string>} baked - The topology fields the effect bakes in, from
- *   bakedTopologyFields.
+ * @param {Set<string>} baked - The topology fields the effect bakes in.
  * @param {(descriptor: *, parameterId: string, values: *) => *} deriveBinding - Compiler binding resolver.
  * @returns {string|null} Refusal reason, or null once applied.
  */
@@ -250,8 +246,6 @@ export function createShaderDocumentController({
     doc.getElementById('shader-animation-toggle'));
   if (!sourceSelect || !presetSelect || !openButton || !saveButton
       || !fileInput || !status) return null;
-  // A page without the strip mount (or a compiler without the validator)
-  // previews documents but offers no structural editing.
   const stripMount = doc.getElementById('chain-strip');
 
   /** @type {*} */
@@ -293,8 +287,7 @@ export function createShaderDocumentController({
     status.textContent = message;
   };
 
-  // The one shared live region: the page and the strip both report through it,
-  // and an empty message clears it.
+  // The shared live region; an empty message clears it.
   /** @param {string} message */
   const announce = (message) => show(message, message !== '');
 
@@ -309,8 +302,7 @@ export function createShaderDocumentController({
 
   /**
    * Whether the loaded chain still digests to the promoted effect it opened as.
-   * Bypass is a program-shape override that never touches the document, so it
-   * leaves this true; the first descriptor-changing edit does not.
+   * Bypass never touches the document, so it leaves this true.
    * @returns {boolean} Whether the parity toggle is armed.
    */
   const parityArmed = () =>
@@ -379,10 +371,8 @@ export function createShaderDocumentController({
         show('The preview engine is not ready.', true);
         return false;
       }
-      // applyChainDocument owns the GUI resync and repaint (its apply order is
-      // fixed); the fixed path runs them here. With the editor live, the store's
-      // document is the authority (the imported compile goes stale on the first
-      // structural edit) and its program shape carries the session bypasses.
+      // With the editor live, the store's document is authoritative and its
+      // program shape carries the session bypasses.
       const store = chainUi?.store ?? null;
       const paused = getAnimationsPaused();
       const refusal = active.compiledSide
@@ -412,7 +402,6 @@ export function createShaderDocumentController({
       const title = active.compiled.document.effect_metadata?.display_name
         ?? active.compiled.document.document_id;
       const preset = presetSelect.selectedOptions[0]?.textContent ?? presetId;
-      // Only an armed toggle leaves which build is rendering in question.
       const side = !parityArmed() ? ''
         : active.compiledSide ? ' · compiled build' : ' · interpreter';
       show(`${title} · ${preset}${side}`);
@@ -436,9 +425,8 @@ export function createShaderDocumentController({
 
   /**
    * The live preview's control name for a document parameter: the interpreter
-   * registers each id verbatim, while the compiled build takes its own control
-   * names and bakes the topology fields and the constant ids in, so those reach
-   * no control there.
+   * registers each id verbatim; the compiled build bakes topology fields and
+   * constant ids in.
    * @param {string} parameterId - A chain parameter id.
    * @param {ParameterDefinition[]} definitions - The engine's definitions.
    * @returns {string|null} The control name, or null where none takes the value.
@@ -518,10 +506,9 @@ export function createShaderDocumentController({
   };
 
   /**
-   * Builds the pipeline strip over one document store, wiring every structural
-   * edit, undo and bypass toggle back through the one apply path. The stages'
-   * parameters render on the strip's chips, so the effect GUI panel is told to
-   * build none of them.
+   * Builds the pipeline strip over one document store, wiring structural
+   * edits, undo and bypass toggles back through applyPreset. The effect GUI
+   * panel builds none of the stage parameters.
    * @param {*} document - The compiled (valid) v2 document to edit.
    * @param {HTMLElement} container - Detached mount for the candidate editor.
    */
@@ -540,8 +527,7 @@ export function createShaderDocumentController({
         const dropped = syncParity();
         applyPreset(active?.presetId ?? presetSelect.value);
         if (dropped) {
-          // The return to the interpreter re-enables the bypass toggles the
-          // rebuild that led here drew disabled.
+          // Re-enables the bypass toggles on the interpreter.
           chainUi?.strip.render();
           show('The edit changed the descriptor: the preview is back on the '
             + 'interpreter and the parity toggle is disarmed.');
@@ -551,7 +537,6 @@ export function createShaderDocumentController({
       onEditParameter: writeStageEdit,
       parameterLive,
       onCommitParameter: () => { void flushDeepLink(); },
-      // Only applyChainDocument is handed the program shape a bypass overrides.
       bypassAvailable: () => active?.compiledSide !== true,
     }));
     setParamFilter({ external: true });
@@ -572,8 +557,7 @@ export function createShaderDocumentController({
     compiler ??= await importCompiler();
     let compiled = precompiled;
     if (compiled === null) {
-      // The compiler answers a malformed document with diagnostics, so anything
-      // thrown here is the compiler itself failing on this input.
+      // A malformed document yields diagnostics; a throw is a compiler failure.
       try {
         compiled = compiler.compileShaderDocument(source, { catalog: operatorCatalog });
       } catch (error) {
@@ -586,9 +570,7 @@ export function createShaderDocumentController({
       show(diagnosticText(compiled), true);
       return false;
     }
-    // Resolved before anything is built: the strip's inline chip controls render
-    // the active preset's values, so a deep link into a non-first preset would
-    // otherwise describe the first one under the render it names.
+    // Resolved before anything is built: the strip renders the active preset's values.
     const presetId = session?.preset
       ?? compiled.document.preset_bank.presets[0]?.preset_id;
     if (!presetId) {
@@ -600,14 +582,11 @@ export function createShaderDocumentController({
       show(`The shader link names no document preset "${presetId}".`, true);
       return false;
     }
-    // Every load previews through the interpreter, so a shipped pattern opens
-    // as editable as a scratch chain; a digest match only arms the toolbar's
-    // parity toggle to the promoted build.
+    // Every load previews through the interpreter; a digest match arms the parity toggle.
     const previousSnapshot = callWorkbenchBinding(getEngine(), 'getShaderChainBindings', 'getSnapshot', []);
     const official = [...sourceCatalog.values()].find((candidate) =>
       candidate.descriptorDigest === compiled.descriptor_digest) ?? null;
-    // Ahead of the teardown: a refusal here must leave the editor it would
-    // have replaced standing.
+    // Ahead of the teardown, so a refusal leaves the current editor standing.
     try {
       if (!selectEffect(CHAIN_EFFECT)) {
         show(`The preview engine rejected effect "${CHAIN_EFFECT}".`, true);
@@ -622,8 +601,6 @@ export function createShaderDocumentController({
     const candidateMount = stripMount ? doc.createElement('div') : null;
     if (candidateMount) candidateMount.style.display = 'contents';
     chainUi = null;
-    // The strip renders the active preset's values, so the document is adopted
-    // before the editor is built.
     active = {
       compiled,
       filename,
@@ -633,10 +610,8 @@ export function createShaderDocumentController({
       referencePresetIds: official?.presetIds ?? [],
     };
     /**
-     * Puts the toolbar back on the document the engine is rendering. A refusal
-     * before the program write leaves the engine untouched; applyPreset is
-     * itself the write, so a refusal from there has already moved the canvas
-     * onto the abandoned chain and the previous program is written back.
+     * Puts the toolbar back on the document the engine is rendering, writing the
+     * previous program back when the refused load had already written its own.
      * @param {boolean} [written] - Whether the program write has run.
      * @returns {boolean} The load's refusal.
      */
@@ -728,8 +703,7 @@ export function createShaderDocumentController({
 
   /**
    * The document as it stands: the store's once the editor is live, else the
-   * load-time compile. Every edit is already a document edit, so nothing is
-   * harvested back out of the engine.
+   * load-time compile.
    * @returns {*} An isolated copy.
    */
   const currentDocument = () => chainUi
@@ -784,8 +758,7 @@ export function createShaderDocumentController({
   /**
    * @param {*} document - The document to write.
    * @param {string} filename - The download name.
-   * @returns {boolean} Always true; a valid-by-construction document has no
-   *   export failure state.
+   * @returns {boolean} Always true.
    */
   const exportDocument = (document, filename) => {
     download(filename, compiler.exportShaderDocumentJson(document));
@@ -817,9 +790,7 @@ export function createShaderDocumentController({
   };
 
   /**
-   * Opens the default chain on catalog defaults through the ordinary load path,
-   * so an unnamed session authors against the same strip a loaded document
-   * gets.
+   * Opens the default chain on catalog defaults through the ordinary load path.
    * @returns {Promise<boolean>} Whether the scratch document is on screen.
    */
   const loadScratch = () =>
@@ -899,8 +870,7 @@ export function createShaderDocumentController({
       const entry = [...sourceCatalog.values()].find(
         (candidate) => candidate.compiled.document.effect_id === effectId);
       const filename = entry?.filename ?? 'linked.shader.json';
-      // Named only once the load stands: a refused link falls through to the
-      // requested effect or the scratch chain, which name themselves.
+      // Named only once the load stands.
       if (await loadSource(linked.document, filename, null, linked)) {
         active.savedDocument = entry ? JSON.stringify(entry.compiled.document) : null;
         selectLoadedSource(entry?.effectId ?? null, filename, 'Linked');
@@ -1047,7 +1017,6 @@ export function createShaderDocumentController({
     }
     active.compiledSide = compiledSide;
     syncParity();
-    // The side decides whether the strip's bypass toggles do anything.
     chainUi?.strip.render();
     const presetId = active.presetId ?? presetSelect.value;
     if (!applyPreset(presetId)) {

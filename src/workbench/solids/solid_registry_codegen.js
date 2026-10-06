@@ -6,10 +6,7 @@
 /**
  * The solids tool page's registry-paste generator: the C++ text a saved solid
  * contributes to solids.h (a registry Entry, plus the OpStep table and Recipe
- * mirror a Complex entry must carry). Pure string code with no DOM and no WASM
- * dependency, so it is unit-testable; the page passes a star-pattern base's
- * authored chain in, read from MeshOps.getRecipe(). Output is pasted verbatim
- * into the engine; fixture tests pin its text and formatting.
+ * mirror a Complex entry must carry). Output is pasted verbatim into the engine.
  */
 
 import {
@@ -145,10 +142,8 @@ export function upperSnake(name) {
 }
 
 /**
- * One solids.h OpStep initializer. HANKIN carries radians (the tool's angle is
- * degrees, emitted as the house `deg * D2R` product), SNUB a (t, twist) pair,
- * RELAX a live iteration count (the engine's shipped chains swap that for a
- * `.bake =` designator once a bake exists).
+ * One solids.h OpStep initializer. HANKIN carries radians (emitted as
+ * `deg * D2R`), SNUB a (t, twist) pair, RELAX a live iteration count.
  * @param {import('./solid_codegen.js').ChainOp} o - The op, as a bare name or an {op, params} object.
  * @returns {string} The OpStep initializer.
  * @throws {Error} When the op is unknown or a parameterized op arrives without params.
@@ -186,12 +181,8 @@ export function opStepCpp(o) {
 }
 
 /**
- * A C++ float literal for an authored param, naming the param on failure.
- *
- * A base's authored params cross the WASM boundary as values, not as source
- * text, so a re-emitted literal must land on the identical float or the pasted
- * Recipe stops mirroring its generator (solids.h proves the two bitwise equal);
- * formatFloat guarantees that round-trip.
+ * A C++ float literal for an authored param that round-trips to the identical
+ * float, naming the param on failure.
  * @param {string} where - Param name used in the error message.
  * @param {number} value - The float32 value the engine reported.
  * @returns {string} A C++ float literal.
@@ -224,8 +215,7 @@ function recipeStepCpp(step) {
     if (!(step.param > 0)) {
       throw new Error(`generateRegistryCpp: base chain hankin angle must be positive, got ${step.param}`);
     }
-    // Prefer the house `deg * D2R` product, but only where it reproduces the
-    // engine's float exactly; otherwise emit the radian value itself.
+    // `deg * D2R` only where it reproduces the engine's float exactly.
     const deg = Math.round(step.param * (180 / Math.PI));
     const angle = Math.fround(deg * D2R_F32) === Math.fround(step.param)
       ? `${formatFloat(deg)} * IslamicStarPatterns::D2R`
@@ -237,10 +227,8 @@ function recipeStepCpp(step) {
       + `${exactFloatLiteral('base chain snub twist', step.twist)}}`;
   }
   if (opName === 'relax') {
-    // A shipped RELAX step carries a RelaxBake pointer instead of a count and
-    // reports param 0. The bake's symbol does not cross the WASM boundary, so
-    // the step cannot be re-emitted; refuse rather than paste a Recipe that
-    // silently relaxes zero times.
+    // A bake-backed RELAX step reports param 0; its bake symbol does not cross
+    // the WASM boundary.
     if (!(step.param > 0)) {
       throw new Error('generateRegistryCpp: the base solid\'s chain has a '
         + 'bake-backed relax step, whose RelaxBakes symbol does not cross the '
@@ -269,8 +257,7 @@ function docCommentCpp(text) {
 }
 
 /**
- * Greedy fill of a token list at the column limit, the way clang-format packs
- * the islamic_registry entries already in solids.h.
+ * Greedy fill of a token list at the column limit, matching clang-format.
  * @param {Array<string>} tokens - The space-separated tokens, in order.
  * @param {number} first - Column the first line starts at.
  * @param {number} rest - Column every later line starts at.
@@ -286,11 +273,10 @@ function fillCpp(tokens, first, rest) {
 }
 
 /**
- * The head of a namespace-scope constant definition, wrapped the way
- * clang-format wraps the ones already in solids.h: the declarator and its open
- * brace on one line where they fit, else the brace alone on a continuation
- * line, else the declarator moved to that line too and the initializer indented
- * one level further.
+ * The head of a namespace-scope constant definition, wrapped as clang-format
+ * does: the declarator and its open brace on one line where they fit, else the
+ * brace alone on a continuation line, else the declarator moved to that line
+ * too and the initializer indented one level further.
  * @param {string} type - The declared type.
  * @param {string} declarator - The declared name plus any array suffix.
  * @param {boolean} [breakAfterBrace] - True when the initializer always breaks
@@ -350,9 +336,7 @@ function recipeDefinitionCpp(name, seed, steps) {
 
 /**
  * The registry-order static_assert that pins a SEED_* constant to the
- * simple_registry entry it names, wrapped the way clang-format wraps the ones
- * already in solids.h: one line where it fits, then the argument on its own
- * continuation line, then the whole call broken after `static_assert(`.
+ * simple_registry entry it names, wrapped as clang-format does.
  * @param {string} constName - The SEED_* constant.
  * @param {string} seedName - The simple_registry entry name it must index.
  * @returns {string} The static_assert statement.
@@ -367,8 +351,7 @@ function seedAssertCpp(constName, seedName) {
 
 /**
  * The definition a paste carries for a seed solids.h declares no SEED_*
- * constant for: the constant plus its registry-order static_assert, so a wrong
- * index fails to compile instead of replaying the recipe on another solid.
+ * constant for: the constant plus its registry-order static_assert.
  * @param {string} seedName - The simple_registry entry name.
  * @returns {string} The constant block, ending in a blank line.
  */
@@ -385,24 +368,10 @@ function seedConstantCpp(seedName) {
 }
 
 /**
- * Emits the solids.h registry paste for a saved solid.
- *
- * A saved solid is always a derived chain, and islamic_registry is the only
- * registry that takes one: simple_registry is the fixed [Platonic |
- * Archimedean] roster whose length and slice offsets are pinned by
- * static_assert, and catalan_registry is the 13 Archimedean duals. So the paste
- * is uniformly Category::Complex — a generator in namespace IslamicStarPatterns
- * plus the OpStep table and Recipe mirror every islamic_registry entry must
- * carry.
- *
- * Recipe::seed indexes simple_registry, which holds no star pattern, so a star
- * base is flattened: the seed becomes the base's own seed and the base's
- * authored chain is prepended to the tool's ops, which is what the generated
- * function builds.
- *
- * solids.h declares a SEED_* constant for only some of the simple_registry
- * entries, so a paste on any other seed leads with that constant's definition
- * rather than an identifier the engine does not have.
+ * Emits the solids.h registry paste for a saved solid: a Category::Complex
+ * islamic_registry entry with its generator, OpStep table and Recipe mirror.
+ * A star base is flattened onto its own seed with its authored chain prepended;
+ * a seed without a SEED_* constant gets that constant's definition first.
  * @param {import('./solid_codegen.js').SolidSpec} item - The solid spec (see generateFuncAndRecipe).
  * @param {?{seed: string, ops: Array<{op: string, param: number, twist: number}>}} [baseRecipe] - The base's authored chain from MeshOps.getRecipe(); null when the base is itself a simple_registry seed.
  * @returns {string} The C++ paste.
@@ -423,8 +392,7 @@ export function generateRegistryCpp(item, baseRecipe = null) {
     }
   }
 
-  // SEED_<name> indexes simple_registry, so only a simple_registry entry can be
-  // a seed, and a seed with no such constant has its definition pasted with it.
+  // SEED_<name> indexes simple_registry, so only a simple_registry entry can be a seed.
   const seedName = baseRecipe != null ? baseRecipe.seed : item.base;
   if (CATALAN_BASES.has(seedName)) {
     throw new Error(`generateRegistryCpp: seed "${seedName}" is a Catalan solid, `

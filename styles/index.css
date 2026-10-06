@@ -1,6 +1,5 @@
 :root {
-  /* Channels of the three tokens that also appear translucent. The rules that
-     need alpha read them as rgb(var(--x) / a), which stays exact. */
+  /* Channels of the tokens that also appear translucent, read as rgb(var(--x) / a). */
   --page-bg-rgb: 0 0 0;
   --bright-text-rgb: 255 255 255;
   --record-indicator-rgb: 238 34 34;
@@ -55,15 +54,14 @@
   outline-offset: 2px;
 }
 
-/* Inset: the canvas fills its container, so an outset ring would be clipped.
-   Class, not :focus-visible — see Daydream.setupKeyboardOrbit. */
+/* Inset: the canvas fills its container, so an outset ring would be clipped. */
 #canvas.keyboard-focus {
   outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
 }
 
 /* Inset ring inside lil-gui panels: .lil-children clips an outset ring.
-   Equal specificity with the global focus rule; this rule follows it. */
+   Equal specificity with the global focus rule, so it must follow it. */
 .lil-gui :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
@@ -227,10 +225,8 @@
   text-align: center;
 }
 
-/* Global engine memory/compute stats tables. The desktop header readout and the
-   mobile stats-bar share one structure; only the font size, data-cell padding,
-   and the desktop table's offset from the tab strip differ. The column divider
-   uses :not(:last-child) so the last cell in each row omits it. */
+/* Global engine memory/compute stats tables, shared by the desktop header
+   readout and the mobile stats-bar. */
 .global-stats {
   color: var(--stats-text);
   font-family: monospace;
@@ -305,7 +301,7 @@
   }
 }
 
-/* Error state when the WASM engine fails to load (see bootstrap.js showBootstrapFailure). */
+/* Error state when the WASM engine fails to load */
 .loading-overlay.error {
   color: var(--error-text);
 }
@@ -329,8 +325,7 @@
   text-align: center;
 }
 
-/* Permanently mounted live region: only its body comes and goes, so a message
-   is announced as an insertion into a region already in the accessibility tree. */
+/* Permanently mounted live region: only its body comes and goes. */
 .apply-notice {
   position: absolute;
   top: 12px;
@@ -434,8 +429,7 @@
   user-select: none;
 }
 
-/* Scrollbar styling for the sidebar and the mobile effect strip. Only the bar
-   itself differs — a width against a height — so each sizes its own below. */
+/* Scrollbar styling for the sidebar and the mobile effect strip. */
 .effect-sidebar::-webkit-scrollbar {
   width: 8px;
 }
@@ -464,8 +458,7 @@
   padding: 2px 6px 2px 0;
   background: transparent;
   border: 1px solid transparent;
-  /* Selection marker gutter, reserved at full width so activating a button
-     recolors it instead of shifting the label. */
+  /* Selection marker gutter, reserved so activation does not shift the label. */
   border-left: 3px solid transparent;
   color: var(--muted-text);
   text-align: left;
@@ -558,10 +551,8 @@
 }
 
 /* --- Mobile Styles --- */
-/* Page layout follows viewport width. The renderer separately measures its
-   canvas container, so its compact layout may switch at a different time.
-   Range syntax, so a fractional width (page zoom, fractional DPR) still lands
-   in exactly one of this query and the desktop complement below. */
+/* Page layout follows viewport width. Range syntax, so a fractional width
+   lands in exactly one of the mobile and desktop queries. */
 @media only screen and (width <= 900px) {
   /* Compact tool links; the header's stats table is covered by .stats-bar. */
   .nav-tabs {
@@ -667,8 +658,7 @@
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none; /* Firefox */
-    /* overflow-y is hidden because overflow-x scrolls, so the vertical padding
-       is what keeps the 2px focus ring at its 2px offset out of the clip. */
+    /* The vertical padding keeps the focus ring out of the overflow clip. */
     padding: 4px 6px;
   }
 
@@ -676,9 +666,7 @@
     display: none; /* Chrome / Safari */
   }
 
-  /* A mouse cannot swipe the list and the scroll arrows are decorative
-     (pointer-events: none), so a pointing device gets a real scrollbar back.
-     This layout also covers any narrowed desktop window, not just touch. */
+  /* A pointing device cannot swipe the list, so it gets a real scrollbar back. */
   @media (pointer: fine) {
     .effect-list {
       scrollbar-width: thin;
@@ -808,8 +796,7 @@
     width: auto;
     --spacing: 4px;
     --padding: 4px;
-    /* lil-gui's own .lil-children already scrolls; only its height cap is
-       missing, since that ships on .autoPlace and the panels use autoPlace:false. */
+    /* lil-gui ships the height cap only on .autoPlace. */
     max-height: 100vh;
   }
 
@@ -878,9 +865,7 @@
   text-shadow: 0 0 2px var(--page-bg);
 }
 
-/* The engine's refusal note. It takes a line of its own under the control:
-   the desktop layout makes .lil-controller display: contents, so the note is
-   a grid item spanning both columns, and the mobile flex row wraps it. */
+/* The engine's refusal note, on a line of its own under the control. */
 .gui-container .effect-gui .lil-controller.param-warning {
   flex-wrap: wrap;
 }
@@ -934,8 +919,8 @@ div.label {
   display: block;
 }
 
-/* The fault message is the string a bug report needs, so it takes hits (and so
-   selection) while the rest of the overlay stays click-through. */
+/* The fault message takes hits (and so selection); the rest of the overlay
+   stays click-through. */
 .segment-stats [role="alert"] {
   pointer-events: auto;
   user-select: text;

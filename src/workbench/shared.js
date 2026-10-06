@@ -6,9 +6,6 @@
 /**
  * Shared Three.js scene setup for tool pages.
  *
- * Centralizes the common boilerplate: renderer, camera, OrbitControls,
- * optional reference sphere / light rig, resize handling, and animation loop.
- *
  * Usage:
  *   import { initScene } from './shared.js';
  *   const { scene, camera, renderer, controls } = initScene('canvasContainer', 'threeCanvas', {
@@ -25,10 +22,7 @@ export { formatKB } from '../shared/kb_format.js';
 export { showFatalError, bootstrapTool } from '../shared/banner.js';
 
 /**
- * Caps a WebGL renderer's device-pixel ratio at CSS resolution: the tool scenes
- * are fill-bound, so a HiDPI backing store costs fill rate without adding
- * visible detail. driver.js caps the simulator the same way. The 2D painters in
- * palette_canvas.js are not fill-bound and keep the display's full density.
+ * Caps a WebGL renderer's device-pixel ratio at CSS resolution.
  *
  * @param {number} ratio - The display's devicePixelRatio.
  * @returns {number} The ratio to hand setPixelRatio, never above 1.
@@ -207,8 +201,7 @@ export function initScene(containerId, canvasId, opts = {}) {
     resizeObserver?.disconnect();
     controls.dispose();
     renderer.dispose();
-    // dispose() frees Three's own objects but leaves the WebGL context live,
-    // and a browser allows only a handful at a time.
+    // dispose() leaves the WebGL context live; browsers cap live contexts.
     renderer.forceContextLoss();
     sphere?.geometry.dispose();
     sphere?.material.dispose();

@@ -76,9 +76,7 @@ const vertMaterial = new THREE.PointsMaterial({ color: 0xa5b4fc, size: 0.05 });
 const edgeMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
 const normalMaterial = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.8 });
 
-// Coalesce update() calls into one recompute per animation frame: without
-// this, every op-slider pointer tick replays the entire WASM op chain (relax
-// alone is up to 500 iterations) on the main thread.
+// Coalesce update() calls into one recompute per animation frame.
 const scheduleUpdate = createFrameScheduler(update);
 const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
 
@@ -104,17 +102,13 @@ const baseThumbnails = {};
 let currentMesh = null;
 let currentMeshIsCurrent = false;
 // Per-face topology class ids for the Colorize Faces toggle, cached from the
-// last recompute. classifyFaces() needs the live WASM mesh, which update()
-// frees, so we compute it once per recompute and reuse it when renderMesh()
-// redraws after a presentation-only toggle.
+// last recompute: classifyFaces() needs the live WASM mesh, which update() frees.
 let currentFaceClasses = null;
 
 // Lists (populated from WASM)
 let simpleSolids = [];
 let islamicStarPatterns = [];
-// Every name the engine registry already defines. A generated funcName equal
-// to one of these is a redefinition once the C++ is pasted into solids.h.
-// Empty until the registry loads, which leaves the saved-set check alone.
+// Every name the engine registry defines; empty until the registry loads.
 let registrySolidNames = new Set();
 
 async function init() {
@@ -152,8 +146,7 @@ async function init() {
     return;
   }
 
-  // Start Memory Metrics Loop. Keep the timer handle so teardown can cancel
-  // the self-rescheduling loop.
+  // Start Memory Metrics Loop.
   let arenaMetricsTimer = null;
   function updateArenaMetrics() {
     // The engine nulls meshOpsWasm on halt; stop rather than reschedule forever.
@@ -161,8 +154,8 @@ async function init() {
     arenaMetricsTimer = null;
     try {
       const m = meshOpsWasm.getArenaMetrics();
-      // Peak over the module's life: every build ends in clearToolingMemory(),
-      // which zeroes the windowed high_water_mark before the next poll reads it.
+      // Peak over the module's life: clearToolingMemory() zeroes the windowed
+      // high_water_mark.
       const fmt = (x) => `${formatKB(x.lifetime_high_water_mark, 0)} / ${formatKB(x.capacity, 0)}KB`;
       const statsEl = document.getElementById('arenaStats');
       if (statsEl) {
@@ -202,9 +195,7 @@ async function init() {
   const stopWatchingReducedMotion = watchMediaMatch(
     reducedMotion, () => setAutoRotate(false));
 
-  // The scaffold's dispose() stops the render loop and detaches the resize
-  // listener; cancelling the pending frame keeps a queued recompute from
-  // running against the disposed scene.
+  // Cancel the pending frame so a queued recompute never runs on the disposed scene.
   onPageTeardown(() => {
     stopWatchingReducedMotion();
     scheduleUpdate.cancel();
@@ -217,9 +208,7 @@ async function init() {
     result.dispose();
   });
 
-  // Toggles
-  // These toggles change only how the cached mesh is presented, so they
-  // redraw via renderMesh() instead of update() — no WASM op-chain replay.
+  // Presentation toggles: redraw the cached mesh via renderMesh().
   document.getElementById('toggleRotate').addEventListener('click', () => {
     setAutoRotate(!state.autoRotate);
   });
@@ -272,10 +261,8 @@ async function init() {
 
   document.getElementById('saveBtn').addEventListener('click', saveSolid);
 
-  // Static control buttons — wired here rather than via inline onclick so
-  // their handlers stay module-scoped (no window.* globals). The add-op grid
-  // uses one delegated listener that reads the clicked button's data-op
-  // (closest() so a click on a tooltip span still resolves the button).
+  // Static control buttons. The add-op grid uses one delegated listener that
+  // resolves the clicked button with closest().
   document.getElementById('clearOpsBtn').addEventListener('click', resetOps);
   document.getElementById('exportSavedBtn').addEventListener('click', exportSavedSolids);
   const importFile = document.getElementById('importSavedFile');
@@ -337,12 +324,11 @@ async function generateThumbnails(signal) {
 
   try {
     for (const key of thumbKeys) {
-      // Yield between thumbnails; init() starts generation without awaiting it.
+      // Yield between thumbnails.
       await new Promise(resolve => setTimeout(resolve));
       if (signal.aborted || !meshOpsWasm) break;
 
-      // Reset to just the lights; the previous iteration's mesh/lines are
-      // detached here and their GPU buffers freed at the end of the loop body.
+      // Reset to just the lights.
       offScene.clear();
       offScene.add(light);
       offScene.add(ambient);
@@ -363,7 +349,7 @@ async function generateThumbnails(signal) {
       const mesh = new THREE.Mesh(geo, mat);
       offScene.add(mesh);
 
-      // Edges (optional, but looks nice)
+      // Edges
       const linePoints = [];
       for (const [ai, bi] of uniqueEdges(meshData.faces, meshData.vertices.length)) {
         linePoints.push(meshData.vertices[ai], meshData.vertices[bi]);
@@ -394,8 +380,7 @@ async function generateThumbnails(signal) {
       btn.dataset.solid = key; // identify the base so restoreSolid can re-highlight it
       btn.addEventListener('click', () => {
         queueCommit(async () => {
-          // The op stack is kept across a base switch, so it must be valid
-          // on the new solid too.
+          // The op stack is kept across a base switch.
           if (state.ops.length) {
             const check = await chainIsValid(key, state.ops);
             if (!check.ok) {
@@ -439,8 +424,7 @@ async function generateThumbnails(signal) {
       btn.appendChild(fullName);
       footer.appendChild(btn);
 
-      // Free the per-iteration geometry GPU buffers; the thumbnail image is
-      // already captured into dataURL above.
+      // Free the per-iteration geometry GPU buffers.
       geo.dispose();
       lineGeo.dispose();
     }
@@ -453,8 +437,7 @@ async function generateThumbnails(signal) {
 }
 
 function updateToggles() {
-  // Each toggle's on/off look is driven by the shared `.toggle-switch.is-on`
-  // CSS (tools.css), so syncing state is just toggling that one class.
+  // The on/off look is the `.toggle-switch.is-on` class.
   const toggleState = {
     toggleRotate: state.autoRotate,
     toggleGeo: state.showGeodesics,
@@ -557,10 +540,9 @@ const SAVED_FLAGS = ['geodesics', 'faces', 'colorize', 'vertices', 'normals', 'i
  * Rebuilds one imported entry as a saved card, field by field.
  * @param {Object} entry - A shape-checked entry from an exported file.
  * @returns {Object} The card to hold in the saved list.
- * @details Only the fields the card and the C++ export read are carried across,
- * and a flag the entry does not hold is left absent so applyRestore lands it on
- * the page default rather than off. A thumbnail is taken only as a data image,
- * so the card's img never points at a URL the file chose.
+ * @details Only the fields the card and the C++ export read are carried across;
+ * a flag the entry does not hold is left absent. A thumbnail is taken only as a
+ * data image.
  */
 function importedSavedSolid(entry) {
   const text = (value) => (typeof value === 'string' ? value : '');
@@ -585,8 +567,7 @@ function importedSavedSolid(entry) {
  * Merges an exported saved-solids file into the list.
  * @param {string} text - The file's contents.
  * @returns {void}
- * @details An exported file is as user-writable as localStorage and outlives
- * any op-table change. savedSolidExportError checks each card before import.
+ * @details Each card is checked with savedSolidExportError before import.
  */
 function importSavedSolids(text) {
   let parsed;
@@ -648,15 +629,13 @@ function captureSavedThumbnail() {
 }
 
 function saveSolid() {
-  // Nothing to save until the first successful update() has produced a mesh
-  // (clicking save before then would dereference an undefined currentMesh).
+  // Nothing to save until the first successful update() has produced a mesh.
   if (!currentMesh || !currentMeshIsCurrent) {
     showGateMsg("rejected: the current chain has no successful preview to save");
     return;
   }
 
-  // A base with no ops has no exportable recipe: its generated function
-  // would be named after the seed and call itself.
+  // A base with no ops has no exportable recipe.
   if (state.ops.length === 0) {
     showGateMsg('rejected: add at least one op — a bare seed has no recipe to export');
     return;
@@ -706,9 +685,7 @@ function saveSolid() {
     vCount, fCount, iCount
   };
 
-  // Names identify on-grid chains.
-  // The engine registry is the other half: a chain whose name matches an
-  // entry solids.h already carries redefines it at paste time.
+  // A name matching an engine registry entry would redefine it at paste time.
   const funcName = savedFuncName(item);
   if (funcName && registrySolidNames.has(funcName)) {
     showGateMsg(`saved: "${funcName}" is already in the engine registry — `
@@ -736,9 +713,8 @@ function renderSavedList() {
   const list = document.getElementById('savedList');
   list.replaceChildren();
 
-  // Two cards with the same funcName export definitions that overwrite each
-  // other, so flag every member of a colliding set, not just the newest. A
-  // name the engine registry already holds is flagged the same way.
+  // Flag every member of a colliding funcName set, and any name the engine
+  // registry holds.
   const nameCounts = new Map();
   savedSolids.forEach(item => {
     const name = savedFuncName(item);
@@ -831,9 +807,6 @@ function renderSavedList() {
   });
 }
 
-// These handlers are module-scoped and bound via addEventListener where the
-// generated markup needs them (saved-solids cards and op-chain rows), so no
-// function is pinned to window. Keep new handlers wired the same way.
 function deleteSolid(index) {
   const position = savedSolids.length - index - 1;
   savedSolids.splice(index, 1);
@@ -857,16 +830,13 @@ async function copyCode(index, lang, btn) {
   }
   const baseIsStar = islamicStarPatterns.includes(item.base);
 
-  // Namespace of the seed, which the emitted recipe calls. Archimedean and
-  // Platonic bases share the `Archimedean::` qualifier (it `using`s
-  // Platonic); Catalan bases need their own. The result can land in a
-  // different namespace than its seed, so this qualifies the seed only.
+  // Namespace qualifying the seed call: Platonic bases share `Archimedean::`
+  // (it `using`s Platonic); Catalan bases need their own.
   const seedNs = baseIsStar
     ? "IslamicStarPatterns"
     : (CATALAN_BASES.has(item.base) ? "Catalan" : "Archimedean");
 
-  // A star-pattern base is not in simple_registry, so the emitted Recipe
-  // has to flatten against the base's own authored chain.
+  // A star-pattern base is not in simple_registry, so the Recipe flattens its chain.
   let code;
   try {
     if (lang === 'recipe_cpp') {
@@ -917,8 +887,7 @@ function showCopyFailure(button, message) {
 function restoreSolid(item) {
   // Cards are shape-checked on load/import; also guard direct callers.
   const shapeError = queueSavedSolidRestore(item, () => queueCommit(async () => {
-    // Saved items were valid when saved, but the engine may have been
-    // rebuilt with different limits since; validate on the way back in.
+    // The engine may have changed limits since the save.
     const check = await chainIsValid(item.base, item.ops);
     if (!check.ok) {
       showGateMsg(`rejected: ${check.message}`);
@@ -935,8 +904,7 @@ function restoreSolid(item) {
 function applyRestore(item) {
   state.base = item.base;
   setOps(structuredClone(item.ops)); // Deep copy (ops are plain data)
-  // A card saved before a flag existed carries none, and lands on the page's
-  // own default for it rather than off.
+  // A flag the card lacks lands on the page default.
   const flag = (value, fallback) => !!(value ?? fallback);
   state.showGeodesics = flag(item.geodesics, true);
   state.showFaces = flag(item.faces, true);
@@ -976,8 +944,7 @@ function renderBaseSolid() {
 }
 
 function reorderOp(from, to, revision) {
-  // Ahead of the state read: a stale index can sit past the end of a list a
-  // landed commit shrank.
+  // Ahead of the state read: a stale index can sit past the end of the list.
   if (revision !== opsRevision) return;
   if (to < 0 || to >= state.ops.length || from === to) return;
   const opName = state.ops[from].op;
@@ -988,8 +955,7 @@ function reorderOp(from, to, revision) {
       showGateMsg(`rejected: ${check.message}`);
       return;
     }
-    // Re-derived from the live ops: a param edit lands outside the commit
-    // queue, so a clone taken before the await would drop it.
+    // Re-derived from the live ops: param edits land outside the commit queue.
     setOps(movedOps(state.ops, from, to));
     renderOps();
     update();
@@ -1016,8 +982,7 @@ async function checkDropSlot(fromIndex, target) {
   if (gen === dropSlotGen) dropSlotChecks.set(target, check);
 }
 
-// Pointer y in the list's own coordinate space, which dropSlotIndex compares
-// against each item's offsetTop (correct because the container is relative).
+// Pointer y in the list's own coordinate space (the container is relative).
 function getDragTargetIndex(e, list) {
   const listRect = list.getBoundingClientRect();
   const mouseY = e.clientY - listRect.top + list.scrollTop;
@@ -1027,17 +992,13 @@ function getDragTargetIndex(e, list) {
 const DRAG_SLOP_PX = 4;
 
 /**
- * Wires one row's reorder drag onto its grip. The pointer is captured on the
- * grip, so mouse, pen and touch share one path, a press that never travels
- * leaves no state behind, and a gesture the system takes away arrives as a
- * cancel rather than stranding the row.
+ * Wires one row's reorder drag onto its grip, with the pointer captured on the grip.
  * @param {HTMLElement} grip - The row's drag handle.
  * @param {number} index - The op's position in the chain.
  * @param {HTMLElement} el - The row element.
  * @param {HTMLElement} list - The #opsList container.
  * @param {number} revision - opsRevision this row was rendered against; the
- *   queued commit drops the drag when the list has changed since, because
- *   `index` then names a different op.
+ *   queued commit drops the drag when the list has changed since.
  * @returns {void}
  */
 function wireRowDrag(grip, index, el, list, revision) {
@@ -1110,7 +1071,7 @@ function wireRowDrag(grip, index, el, list, revision) {
         renderOps();
         return;
       }
-      renderOps(); // snap the drag preview back now; the commit re-renders
+      renderOps(); // snap the drag preview back
       queueCommit(async () => {
         if (revision !== opsRevision) return;
         const check = await chainIsValid(
@@ -1119,8 +1080,7 @@ function wireRowDrag(grip, index, el, list, revision) {
           showGateMsg(`rejected: ${check.message}`);
           return;
         }
-        // Re-derived from the live ops: a param edit lands outside the
-        // commit queue, so a clone taken before the await would drop it.
+        // Re-derived from the live ops: param edits land outside the commit queue.
         setOps(movedOps(state.ops, index, toIndex));
         renderOps();
         update();
@@ -1174,8 +1134,7 @@ function updateOpParam(index, key, value, revision) {
     params: { ...state.ops[index].params, [key]: val },
   };
 
-  // Sync UI elements. The row's data-key names the param it drives, so the
-  // state object's key order need not match OP_DEFS'.
+  // Sync UI elements by the row's data-key.
   const item = document.getElementById('opsList').children[index];
   const row = item && [...item.querySelectorAll('.op-param')].find(r => r.dataset.key === key);
   if (row) {
@@ -1189,9 +1148,7 @@ function updateOpParam(index, key, value, revision) {
   const focusType = row && row.contains(document.activeElement) ? document.activeElement.type : null;
 
   // truncate and bevel short-circuit to ambo at t == 0.5, so a slider tick can
-  // change the element census the way adding an op does. That crossing goes
-  // through the gate like any other mutation: the live module is the page's
-  // only one, and a trap on it costs a reload.
+  // change the topology and goes through the gate.
   if (opTopologyKey(state.ops[index]) !== opTopologyKey(candidateOp)) {
     const candidate = structuredClone(state.ops);
     candidate[index] = candidateOp;
@@ -1224,8 +1181,7 @@ const commitQueue = createCommitQueue((error) => {
   console.error(error);
   showGateMsg(`Operation failed: ${error instanceof Error ? error.message : error}`);
 });
-// Every chain mutation lands through here; once the page has stood down no
-// module remains to draw the result, so a commit still queued is dropped.
+// Once the page has stood down, a commit still queued is dropped.
 const queueCommit = (/** @type {() => any} */ fn) =>
   commitQueue(() => (wasmModule ? fn() : undefined));
 
@@ -1244,8 +1200,7 @@ function setOps(next) {
 function removeOp(index, revision) {
   queueCommit(async () => {
     if (revision !== opsRevision) return;
-    // Removing an op can invalidate the remainder (e.g. deleting the ambo
-    // between two hankins), so removal validates like any other mutation.
+    // Removing an op can invalidate the remainder (e.g. the ambo between two hankins).
     const candidate = state.ops.filter((op, i) => i !== index);
     const check = await chainIsValid(state.base, candidate);
     if (!check.ok) {
@@ -1272,17 +1227,14 @@ function activateAddOp(event) {
 }
 
 function addOp(opName) {
-  // A star base contributes its own authored steps on export, so this only
-  // bounds the tool's share of the flattened chain; generateRegistryCpp
-  // holds the real ceiling.
+  // Bounds only the tool's share of a flattened star-base chain.
   if (state.ops.length >= MAX_RECIPE_STEPS) {
     showGateMsg(`rejected: a chain carries at most ${MAX_RECIPE_STEPS} ops`);
     return;
   }
   const newOp = { op: opName, params: seedOpParams(opName, currentMeshIsCurrent ? currentMesh : null) };
   queueCommit(async () => {
-    // The grid button is usually grayed before an invalid op can be
-    // clicked, but gating is async — validate the exact candidate anyway.
+    // Gating is async, so validate the exact candidate.
     const check = await chainIsValid(state.base, [...state.ops, newOp]);
     if (!check.ok) {
       showGateMsg(`rejected: ${check.message}`);
@@ -1312,7 +1264,7 @@ function clearSavedSolids() {
 }
 
 // Candidate chains are proven on a sacrificial module instance before the
-// live module runs them; see createChainValidator in solid_codegen.js.
+// live module runs them.
 const validator = createChainValidator(() => createHolosphereModule());
 const { chainIsValid } = validator;
 const opGate = createOpGate(validator);
@@ -1327,9 +1279,7 @@ function showGateMsg(text) {
 }
 
 /**
- * Re-enables every add-op button. No later pass revises a verdict the gate
- * stopped probing for, so an unchecked gate fails open rather than stranding
- * whatever the last complete pass disabled for the rest of the session.
+ * Re-enables every add-op button: a gate that stopped probing fails open.
  * @param {string} reason - Why the sweep stopped, shown to the user.
  * @returns {void}
  */
@@ -1345,8 +1295,7 @@ function openOpGate(reason) {
   showGateMsg(`op availability is no longer checked: ${reason}`);
 }
 
-// Gray out add-op buttons whose op would be refused or trap on the current mesh; the
-// sweep itself is createOpGate in solid_codegen.js.
+// Gray out add-op buttons whose op would be refused or trap on the current mesh.
 async function refreshOpGating() {
   const buttons = [...document.querySelectorAll('#addOpGrid [data-op]')];
   const probe = await opGate.refresh(state.base, state.ops,
@@ -1362,8 +1311,7 @@ async function refreshOpGating() {
   for (const btn of buttons) {
     btn.dataset.authoredDescription ??= btn.getAttribute('aria-describedby') ?? '';
     const blocked = probe.blocked.has(btn.dataset.op);
-    // An incomplete pass names only a lower bound on blocked candidates, so an
-    // op it does not name stays where the last complete pass left it.
+    // An incomplete pass is a lower bound; unnamed ops keep their last state.
     if (!blocked && !probe.complete) continue;
     btn.setAttribute('aria-disabled', String(blocked));
     if (blocked) {
@@ -1386,18 +1334,15 @@ function standDown(message) {
   showFatalError(message);
 }
 
-// Disables every control that mutates or restores the chain: the op rows, the
-// add-op grid and clear button, the base thumbnails, the saved-card restores
-// and the save button. Export, delete and copy read saved data and stay live.
+// Disables every control that mutates or restores the chain; export, delete and
+// copy stay live.
 function freezeEditing() {
   const controls = document.querySelectorAll(
     '#sidebar button, #sidebar input, #footer .thumb-btn, #savedList .saved-restore, #saveBtn');
   for (const el of controls) el.disabled = true;
 }
 
-// The live module is unrecoverable after an engine trap (see buildChainMesh in solid_build.js); if
-// one ever escapes the validator gate, fail loudly once instead of letting
-// every later call trap the re-entrancy guard and spam the console.
+// The live module is unrecoverable after an engine trap; fail loudly once.
 function engineTrapped(e) {
   return standDownIfHalted(e, wasmModule, standDown,
     '(The op that caused this slipped past validation; please report the chain.)');
@@ -1416,8 +1361,7 @@ function showThumbnailError(message) {
   if (status) status.textContent = message;
 }
 
-// The live wiring one build runs against, assembled per call: an engine halt
-// nulls the module handles, so a context must not outlive a build.
+// Assembled per call: an engine halt nulls the module handles.
 function buildContext(onError = showMeshError) {
   return {
     Mod: wasmModule,
@@ -1436,8 +1380,6 @@ function update() {
   const built = buildChainMesh(state.base, state.ops, buildContext());
   if (!built) return;
 
-  // Cached alongside the mesh so toggling Colorize redraws from currentMesh
-  // without replaying the whole WASM chain.
   currentMesh = built.meshData;
   currentMeshIsCurrent = true;
   currentFaceClasses = built.faceClasses;
@@ -1479,10 +1421,7 @@ function renderMesh() {
 
 // Set when labels or viewport change, even if the camera pose is unchanged.
 let labelsNeedReproject = false;
-// Cached camera transform from the last projection — lets updateLabels skip
-// the ~1000-label loop on frames where the camera is identical (autorotate
-// paused and no user input). During autorotation the camera changes every
-// frame, so the loop runs as before.
+// Camera transform from the last projection; updateLabels skips unchanged frames.
 const labelCam = { px: NaN, py: NaN, pz: NaN, qx: NaN, qy: NaN, qz: NaN, qw: NaN };
 function labelCameraMoved() {
   const p = camera.position, q = camera.quaternion;
@@ -1498,19 +1437,15 @@ function labelCameraMoved() {
 // Scratch vector the per-frame projection reads the renderer's size into.
 const labelSize = new THREE.Vector2();
 
-// Project vertex-index labels onto the canvas. Runs each frame after the
-// render (via initScene's onAfterRender hook), so the labels track the
-// current camera; guarded because the loop starts before init finishes.
+// Project vertex-index labels onto the canvas after each render; guarded
+// because the loop starts before init finishes.
 function updateLabels() {
   if (state.showIndices && currentMesh && labelsContainer && labelsContainer.children.length > 0) {
     const moved = labelCameraMoved();
     if (!moved && !labelsNeedReproject) return;
     labelsNeedReproject = false;
 
-    // The renderer's own size, not a bounding rect: the loop runs after every
-    // render and a rect read here would flush layout before writing up to
-    // MAX_INDEX_LABELS label styles. setSize() drives the canvas' CSS box, so
-    // the two agree.
+    // The renderer's own size: a bounding-rect read would flush layout.
     const size = renderer.getSize(labelSize);
     const tempV = new THREE.Vector3();
     const camPos = camera.position;
