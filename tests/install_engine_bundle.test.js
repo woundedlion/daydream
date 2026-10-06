@@ -58,7 +58,7 @@ test('install replaces stale assets and preserves consumer-owned files', (t) => 
     'fresh generated/shader/composed_effect_roster.mjs');
   assert.equal(existsSync(join(destination, 'generated/shader/patterns/obsolete.shader.json')), false);
   assert.equal(existsSync(join(destination, 'docs/screenshots/nested/obsolete.png')), false);
-  for (const path of ['docs/screenshots/notes.txt'])
+  for (const path of ['docs/screenshots/notes.txt', 'src/app/daydream.js'])
     assert.equal(existsSync(join(destination, path)), true, path);
 });
 
