@@ -74,11 +74,7 @@ test('findBestRationalRatio: simplest form preferred (0.75 → 3/4 not 6/8)', ()
   assert.equal(N, 4);
 });
 
-/**
- * Verifies the input 0 returns the fraction 0/1 (its exact value), so a
- * deliberately-zeroed frequency stays zero rather than snapping up to the
- * passive frequency.
- */
+/** Verifies the input 0 returns the fraction 0/1 (its exact value). */
 test('findBestRationalRatio: value 0 returns 0/1 (stays zero, no snap-up)', () => {
   const { M, N } = findBestRationalRatio(0);
   assert.equal(M, 0);
@@ -108,9 +104,8 @@ test('snapToRationalRatio: negative ratio keeps its sign', () => {
 });
 
 /**
- * Verifies the returned fraction is always in lowest terms (gcd(M,N) === 1)
- * across a sweep of targets, so the ratio — and the closing period derived from
- * N — is never an unreduced multiple regardless of search iteration order.
+ * Verifies the returned fraction is in lowest terms (gcd(M,N) === 1) across a
+ * sweep of targets.
  */
 test('findBestRationalRatio: returned ratio is always reduced (gcd(M,N) === 1)', () => {
   const g = (a, b) => (b === 0 ? a : g(b, a % b));
@@ -161,10 +156,8 @@ test('snapToRationalRatio: 1:1 ratio closes after one full 2π/passiveC period',
 });
 
 /**
- * Verifies a zero passive frequency is guarded: the ratio and closing period
- * would otherwise divide by zero and hand the caller Infinity/NaN. The active
- * frequency must pass through unchanged with a trivial 1/1 ratio and a finite
- * zero period.
+ * Verifies a zero passive frequency is guarded: the active frequency passes
+ * through unchanged with a trivial 1/1 ratio and a finite zero period.
  */
 test('snapToRationalRatio: zero passive frequency yields finite values, not NaN/Infinity', () => {
   const { snappedActiveC, m, n, closingPeriod } = snapToRationalRatio(6, 0);
@@ -177,8 +170,7 @@ test('snapToRationalRatio: zero passive frequency yields finite values, not NaN/
 
 /**
  * Verifies a range confines the snap to ratios reachable by the control: the
- * unbounded snap of 100 against 13 overshoots to 8·13 = 104, which a caller
- * could only clamp — reopening the curve the snap just closed.
+ * unbounded snap of 100 against 13 overshoots to 8·13 = 104.
  */
 test('snapToRationalRatio: a range keeps the snapped frequency reachable', () => {
   const passiveC = 13;
@@ -230,8 +222,7 @@ test('snapToRationalRatio: a pair closing past the denominator cap still snaps',
 });
 
 /**
- * Verifies a range no ratio can satisfy still returns the closest fraction
- * rather than nothing, so the caller keeps a usable frequency.
+ * Verifies a range no ratio can satisfy still returns the closest fraction.
  */
 test('snapToRationalRatio: an unsatisfiable range falls back to the closest ratio', () => {
   const result = snapToRationalRatio(4 * Math.PI, 4, 8, { min: -2000, max: -1000 });

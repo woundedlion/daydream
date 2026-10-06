@@ -135,7 +135,7 @@ test('the addon scan pins only the addons the sources import', () => {
     'an installed but unimported addon is not pinned');
 });
 
-/** Verifies a served .mjs is scanned too: an unscanned one would ship unhashed. */
+/** Verifies a served .mjs is scanned too. */
 test('the addon scan reaches .mjs sources', () => {
   installModules();
   mkdirSync(join(root, 'node_modules', 'three', 'examples', 'jsm', 'renderers'), { recursive: true });

@@ -1,7 +1,6 @@
 //
 // Builds daydream.js's composition root against injected seams (document, page
-// target, navigator, driver, GUI factory, module loader), so a case can assert
-// on the assembly the root actually produced rather than on its source text.
+// target, navigator, driver, GUI factory, module loader).
 import { fakeElement, installDocument } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
 import { Daydream } from '../../src/renderer/driver.js';
@@ -28,7 +27,6 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
   const kind = isOptionList(args[0]) ? 'select'
     : typeof object[property] === 'function' ? 'button' : 'input';
   const widget = fakeElement(kind);
-  // The effect panel styles, labels and re-parents its rows through this.
   const domElement = fakeElement('div');
   domElement.appendChild(widget);
   const controller = {
@@ -75,12 +73,9 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
       controller.updateDisplay();
       return controller;
     },
-    // Two implementations, told apart the way lil-gui does: a controller add()
-    // built from an options list is an OptionController, whose options() updates
-    // its <select> in place and hands back the same controller; any other
-    // controller is destroyed and a replacement carrying the copied name is
-    // appended to the end of the panel. The real options behavior is exercised
-    // in tests/lil_gui_contract.test.js.
+    // As in lil-gui: an OptionController (add() given an options list) updates
+    // its <select> in place and returns itself; any other controller is
+    // destroyed and a replacement carrying the copied name is appended.
     options(choices) {
       if (!optionsReplaces && isOptionList(controller.args[0])) {
         controller.args = [choices];
@@ -328,8 +323,7 @@ export function startApp({
   const elements = new Map(ids.map((id) => [id, fakeElement('div')]));
   const docTarget = fakeElement('document');
   const docListeners = docTarget.listeners;
-  // Every id the app asks the document for, in order, so a case can pin what the
-  // wiring resolves instead of restating it.
+  // Every id the app asks the document for, in order.
   const queried = [];
   const doc = installDocument({
     getElementById: (id) => { queried.push(id); return elements.get(id) ?? null; },
@@ -360,7 +354,7 @@ export function startApp({
     setTimeout: (fn, ms) => setTimeout(fn, ms),
     clearTimeout: (id) => clearTimeout(id),
   };
-  // Browser globals the sidebar and URL sync reach for directly.
+  // Browser globals the app reads directly.
   globalThis.window = win;
   globalThis.ResizeObserver = class {
     observe() {}

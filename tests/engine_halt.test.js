@@ -1,4 +1,4 @@
-// The halted-engine predicate the tool pages gate every later bridge call on.
+// The halted-engine predicate gating later bridge calls.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { engineHalted, standDownIfHalted } from '../src/shared/engine_halt.js';

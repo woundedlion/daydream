@@ -1,9 +1,5 @@
 //
 // fake_dom.js's event propagation and value coercion, pinned on their own.
-// The DOM suites dispatch and assert through this fake, so a listener that runs
-// at the wrong attachment point, a stopPropagation that stops nothing, or a
-// property handing back a type no browser produces would all read there as
-// assertions about the module under test rather than about the harness.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -597,8 +593,7 @@ test('every detaching mutator disconnects the subtree it evicts', () => {
   assert.equal(leaf.isConnected, false);
 });
 
-// A list that reorders itself by re-appending its rows moves the focused row
-// through a removal, so the focus a real browser drops there must drop here too.
+// Re-appending a focused row moves it through a removal, which drops focus.
 test('focus tracks the document, and unparenting the focused node blurs it', () => {
   const doc = installDocument({ activeElement: null });
   const list = fakeElement('div', { connected: true });
@@ -830,8 +825,7 @@ test('documentEvents refuses a removal with no listener behind it', () => {
     /no keydown listener on the document to remove/);
 });
 
-// A browser hands every frame callback the timestamp it fires at; one that read
-// an undefined argument would compute NaN deltas here and animate here alone.
+// A browser hands every frame callback the timestamp it fires at.
 test('installAnimationFrames hands each callback a frame timestamp', () => {
   const frames = installAnimationFrames();
   try {

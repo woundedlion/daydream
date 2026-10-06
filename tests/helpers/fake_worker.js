@@ -9,7 +9,7 @@ export function fakeWorkerScope(posted) {
   };
 }
 
-/** Web Worker constructor double shared by controller suites. */
+/** Web Worker constructor double. */
 export class FakeWorker {
   static instances = [];
   static constructionCount = 0;

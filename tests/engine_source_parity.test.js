@@ -1,19 +1,10 @@
 //
 // Source-text parity between the browser tools' hand-transcribed engine values
-// and the C++ headers they are transcribed from.
+// and the C++ headers they are transcribed from, at the engine revision
+// recorded alongside the installed WASM.
 //
-// tests/color_parity_wasm.test.js runs the tools against the shipped WASM, which
-// reaches only what wasm.cpp exports, and only at the engine SHA the installed
-// binary was built from (holosphere_wasm.sha). Reading the headers covers the
-// values no export reaches — the projection constants, the compile-status
-// rosters, the recipe field paths, the seed constants and the build-step cap —
-// at the engine revision recorded alongside the installed WASM.
-//
-// The engine is a separate repository. The JS unit suite checks it out and sets
-// HOLOSPHERE_ENGINE_REQUIRED, under which a missing tree fails instead of
-// skipping; only a local run without a checkout skips. That every case here can
-// skip is why the workflow's own declaration of the flag is pinned by a case
-// in tests/wasm_provenance.test.js that never skips.
+// Without an engine checkout the cases skip, unless HOLOSPHERE_ENGINE_REQUIRED
+// is set, under which a missing tree fails.
 import { constructorToObject, glslConstants } from './helpers/source_transpile.js';
 import { engineRoot, engineMissing, engineSkip } from './helpers/engine_checkout.js';
 import * as paletteEnums from './helpers/fake_palette.js';
@@ -99,8 +90,7 @@ test('engine constant expressions reject unknown identifiers', () => {
 /**
  * Pins the stereographic-projection constants mobius_transforms.js mirrors to
  * their definitions in core/math/stereographic.h. STEREO_POLE_EPS is derived from
- * STEREO_INF on both sides, so the engine's expression is evaluated rather than
- * its value read, and a change to either the sentinel or the derivation fails.
+ * STEREO_INF on both sides, so the engine's expression is evaluated.
  */
 test('projection constants match core/math/stereographic.h', { skip: engineSkip }, () => {
   const src = header(STEREO_H);
@@ -115,8 +105,7 @@ test('projection constants match core/math/stereographic.h', { skip: engineSkip 
 
 /**
  * Pins the GLSL prelude the mobius.html shader compiles to the same engine
- * definitions. The shader is the preview's only renderer, so a constant that
- * tracked the JS module but not the header would still lie about the pole cap.
+ * definitions.
  */
 test('glslProjectionFunctions constants match core/math/stereographic.h', { skip: engineSkip }, () => {
   const src = header(STEREO_H);
@@ -153,10 +142,8 @@ const ENGINE_CPP_TO_JS = [
 ];
 
 /**
- * Transpiles one `inline Complex NAME(...)` engine body into a JS function, so
- * the comparison runs the header's own arithmetic rather than a second
- * transcription of it. Both sides then evaluate in doubles, which makes the
- * agreement exact rather than approximate.
+ * Transpiles one `inline Complex NAME(...)` engine body into a JS function.
+ * Both sides evaluate in doubles, so agreement is exact.
  * @param {string} src - The header defining this function.
  * @param {string} name - The function's C++ name.
  * @param {string[]} params - JS parameter names, in signature order.
@@ -217,12 +204,8 @@ const PROJECT_DIV_PAIRS = [
 
 /**
  * Pins mobius_transforms.js's stereo and projectDiv to the bodies of stereo and
- * project_div in stereographic.h and mobius.h. The constants above are pinned
- * separately, but these two functions are what mobius.html's shader actually
- * runs, and the WASM bridge reaches only the engine's fused mobius_transform —
- * which never calls either in isolation, so no export can separate them.
- * Comparing the header's own body, transpiled, catches a reordered guard or a
- * changed fallback that matching constants would hide.
+ * project_div in stereographic.h and mobius.h, transpiled from the headers. No
+ * WASM export reaches either in isolation.
  */
 test('stereo and projectDiv match their engine projection and Mobius headers', { skip: engineSkip }, () => {
   const src = header(STEREO_H);
@@ -398,12 +381,7 @@ function engineSeedConstants(source, bases) {
 
 /**
  * Pins solid_codegen.js's DEFINED_SEED_CONSTANTS to the constants solids.h
- * actually declares. The registry generator leads a paste with a seed
- * constant's definition exactly when the set says the engine has none, so drift
- * either way emits C++ that does not compile: a redefinition, or a Recipe
- * naming an undeclared identifier. Each constant's value is checked against
- * SIMPLE_SEEDS too, since the definition a paste carries is generated from that
- * index.
+ * declares, and each constant's value to its SIMPLE_SEEDS index.
  */
 test('DEFINED_SEED_CONSTANTS matches core/mesh/solids.h', { skip: engineSkip }, () => {
   const declared = engineSeedConstants(header(SOLIDS_H), header('core/mesh/base_mesh.h'));

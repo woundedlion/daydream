@@ -84,8 +84,6 @@ test('bundle paths cannot escape the destination', (t) => {
   assert.throws(() => installEngineBundle(bundle, destination), /Invalid engine bundle path/);
 });
 
-// The workflows hand the installer the consumer's own pin, so a bundle built
-// from any other engine commit is refused whole.
 test('a bundle from another engine commit than the declared pin is refused', (t) => {
   const { bundle, destination } = fixture(t);
   process.env.HOLOSPHERE_BUNDLE_PIN = 'c'.repeat(40);

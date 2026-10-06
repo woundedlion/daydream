@@ -25,9 +25,7 @@ function engineVector(x, y) {
 
 /**
  * Verifies sub-1e-12 agreement with the double-precision analytic convention
- * across a spread of columns/rows, detecting an x<->z mirror. The engine uses
- * float arithmetic and trigonometric lookup tables; this is not a precision
- * comparison against its rendered vectors.
+ * across a spread of columns/rows, detecting an x<->z mirror.
  */
 test('pixelToSpherical matches the engine convention (theta from +X)', () => {
   const daydream = makeDaydream();
@@ -54,9 +52,7 @@ test('physical endpoints preserve distinct longitudes on both edge rings', () =>
   assert.ok(Math.abs(pixelToSpherical(0, H - 1, dims).phi - (Math.PI - 0.07)) < 1e-12);
 });
 
-// A zero column count and a single row are what a driver reports before it has
-// been sized. The guarded arithmetic itself is unpinned: a future dimension
-// guard is free to answer any latitude, so long as it answers a point.
+// Unsized-driver dimensions: any finite point passes.
 test('degenerate dimensions keep spherical coordinates finite', () => {
   const spherical = pixelToSpherical(2, 1, { ...makeDaydream(), W: 0, H: 1 });
   assert.ok(Number.isFinite(spherical.phi), `phi is ${spherical.phi}`);
@@ -67,11 +63,9 @@ test('degenerate dimensions keep spherical coordinates finite', () => {
 });
 
 /**
- * Hardcoded golden vectors that do NOT re-run the engine formula, so the pin is
- * independent of engineVector() above (which shares pixelToSpherical's own
- * math). Row 0 is the +Y north pole and row H-1 the -Y south pole by geometry
- * alone; the (72,36) triple is raw sin/cos of phi=36π/143 with column 72's
- * azimuth landing on the +Z meridian (worldX == 0).
+ * Hardcoded golden vectors, independent of engineVector(). Row 0 is the +Y
+ * north pole and row H-1 the -Y south pole; the (72,36) triple is raw sin/cos
+ * of phi=36π/143 with column 72 on the +Z meridian (worldX == 0).
  */
 test('pixelToSpherical hits independent golden vectors', () => {
   const goldens = [

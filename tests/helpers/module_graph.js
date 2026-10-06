@@ -1,7 +1,5 @@
 //
-// The static import graph of a repo module, read from source text. Shared by
-// the suites that pin what the segment worker pulls in: the graph it resolves
-// on its own, and the set the page warms ahead of a spawn.
+// The static import graph of a repo module, read from source text.
 import { readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,9 +8,8 @@ import { parse } from 'espree';
 const REPO = fileURLToPath(new URL('../..', import.meta.url));
 
 /**
- * Static import/export-from specifiers of one module source. Dynamic `import()`
- * is out of scope: it resolves when it runs, and the generated WASM glue guards
- * a node-only one behind an environment check the worker never takes.
+ * Static import/export-from specifiers of one module source; dynamic `import()`
+ * is not collected.
  * @param {string} source - Module source text.
  * @returns {string[]} Specifiers, in source order.
  */

@@ -5,8 +5,7 @@ import assert from 'node:assert/strict';
 /**
  * Recording stand-in for the schedule/cancel pair: it keeps the last callback
  * and delay handed to schedule(), hands back a fresh handle each time, and
- * records every handle passed to cancel(). One callback is pending at a time,
- * which is the contract the factories taking this pair hold.
+ * records every handle passed to cancel(). One callback is pending at a time.
  * @returns {Object} The recorder, carrying the schedule/cancel pair to inject.
  */
 export function fakeScheduler({ repeat = false } = {}) {
@@ -34,8 +33,7 @@ export function fakeScheduler({ repeat = false } = {}) {
 /**
  * @typedef {Object} FakeTimer
  * @property {Function} fn - Callback the production code scheduled.
- * @property {number} delay - Delay it was scheduled at, which names it: each
- *   deadline in segment_controller.js has a distinct one.
+ * @property {number} delay - Delay it was scheduled at, which identifies it.
  * @property {object} handle - Token setTimeout returned, keyed on by clearTimeout.
  */
 
@@ -64,8 +62,7 @@ export const installFakeTimers = () => {
     pending.set(handle, timer);
     return handle;
   };
-  // A handle armed before the swap belongs to the real timer queue, so hand it
-  // back rather than silently dropping the cancellation.
+  // A handle armed before the swap belongs to the real timer queue.
   globalThis.clearTimeout = (handle) => {
     if (issued.has(handle)) {
       pending.delete(handle);

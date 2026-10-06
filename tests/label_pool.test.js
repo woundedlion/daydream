@@ -1,17 +1,13 @@
 //
-// LabelPool backs driver.js's zero-allocation-per-frame label reuse. It imports
-// three (resolved from node_modules in Node); LabelPool.acquire touches only
-// its injected document's createElement and the scene's add/remove, so the
-// shared fake element plus a parent-tracking scene stub exercise the real
-// pooling logic without a browser.
+// LabelPool's label reuse, against the shared fake element and a
+// parent-tracking scene stub.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { LabelPool } from '../src/renderer/driver.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
-// Parent-tracking scene stub: add/remove mirror what THREE.Object3D exposes to
-// LabelPool (parent identity and re-add), without the real removed-event DOM path.
+// Parent-tracking scene stub with THREE.Object3D's add/remove semantics.
 function stubScene() {
   return {
     add(obj) { obj.parent = this; },

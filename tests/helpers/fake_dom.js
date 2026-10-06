@@ -1,6 +1,5 @@
 // Shared element, document and window doubles with install/restore helpers.
-// Layout, CSS, hit-testing and browser input behavior are not modeled;
-// scripts/*-probe.mjs and browser-smoke.mjs exercise those surfaces.
+// Layout, CSS, hit-testing and browser input behavior are not modeled.
 import { afterEach } from 'node:test';
 
 // Nodes standing in for ones the page already carries. A parentless node is
@@ -10,8 +9,8 @@ const rooted = new WeakSet();
 const NON_BUBBLING = new Set(['focus', 'blur', 'mouseenter', 'mouseleave',
   'pointerenter', 'pointerleave', 'load', 'scroll']);
 
-// The ownerDocument every fake element carries, as every element in a browser
-// does: enough of a document for a module that builds a node of its own.
+// The ownerDocument every fake element carries: enough of a document to build
+// a node.
 const ownerDocument = { createElement: (tag) => fakeElement(tag) };
 
 /**
@@ -58,8 +57,7 @@ function reparent(nodes, parent) {
 
 /**
  * Unlinks nodes from the child list they currently sit in, so an insert moves a
- * node the way the DOM does instead of listing it twice. Re-appending a node to
- * its own parent therefore moves it to the end.
+ * node. Re-appending a node to its own parent moves it to the end.
  * @param {Array<any>} nodes - Nodes about to be inserted somewhere.
  * @returns {void}
  */
@@ -135,9 +133,7 @@ function datasetKey(name) {
 
 /**
  * DOMStringMap stand-in: a live view over the element's `data-*` attributes
- * that stringifies every write, as the platform does. Backing the map with the
- * attributes is what the DOM does too, so a dataset write is visible to
- * getAttribute and to an `[attr]` selector.
+ * that stringifies every write.
  * @param {Object} element - Element the map belongs to.
  * @returns {Object} The dataset view.
  */
@@ -204,8 +200,7 @@ const STYLE_VALUES = {
 };
 
 // Tokens no property takes: what a template literal leaves behind when the
-// number or object it interpolated was missing. Every one reaches a browser as a
-// dropped declaration, so none may read back here.
+// number or object it interpolated was missing.
 const STYLE_REJECTED = /undefined|NaN|Infinity|\[object [A-Za-z]*\]/;
 const FOCUSABLE_TAGS = new Set(['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA']);
 // Tags carrying a `disabled` IDL attribute, which reads false until written.
@@ -250,17 +245,12 @@ function balancedParens(text) {
 }
 
 /**
- * CSSStyleDeclaration stand-in. Writes are stringified, as the platform does,
- * and a value the property does not accept is dropped so the previous one
- * stands — again as the platform does, so invalid CSS cannot read back as the
- * text that was written. Two layers decide that: a per-property grammar for the
- * properties the modules compute a value for, and, for every property including
- * the ones with no grammar, a check that the value carries no interpolated
- * `undefined`/`NaN` and closes its parentheses. This fixture requires camelCase
- * property names and throws on dashed names; browsers also accept dashed names.
- * An undeclared property reads back as the empty string, as CSSStyleDeclaration
- * yields, so a module branching on `=== ''` takes the same path here as in a
- * browser.
+ * CSSStyleDeclaration stand-in. Writes are stringified, and a value the
+ * property does not accept is dropped so the previous one stands: STYLE_VALUES
+ * grammars where one exists, and for every property a check that the value
+ * carries no STYLE_REJECTED token and closes its parentheses. Requires camelCase
+ * property names and throws on dashed ones. An undeclared property reads back as
+ * the empty string.
  * @returns {Object} The style view.
  */
 function fakeStyle() {
@@ -286,60 +276,38 @@ function fakeStyle() {
 }
 
 /**
- * Element stand-in carrying the attribute, class, child, and listener surface
- * the daydream modules read and write. Non-empty innerHTML assignments throw so
- * tests cannot silently accept markup construction that a browser would parse.
- * setAttribute, textContent and dataset stringify what they are given, as the
- * platform does, so a test cannot assert a type back that a browser never
- * yields; dataset is a view over the element's `data-*` attributes, so a write
- * through it is visible to getAttribute and to an `[attr]` selector.
- * Listeners are recorded with their options bag so a test can dispatch(type,
- * event), read {passive}/{signal}, and assert removal; a {once} listener drops
- * as it fires, a listener an earlier handler removed does not fire, and removal
- * pairs on the capture flag, as in the DOM, so a capture-mismatched removal
- * leaves the listener on the list. focusCalls counts accepted focus() calls;
+ * Element stand-in carrying the attribute, class, child, and listener surface.
+ * Non-empty innerHTML assignments throw. setAttribute, textContent and dataset
+ * stringify what they are given; dataset is a view over the `data-*`
+ * attributes.
+ *
+ * Listeners are recorded with their options bag; a {once} listener drops as it
+ * fires, a listener an earlier handler removed does not fire, and removal pairs
+ * on the capture flag. Removing a listener that was never added throws unless
+ * {allowRedundantRemoval: true}. focusCalls counts accepted focus() calls;
  * scrollIntoViewCalls counts every call. focus() keeps its last options bag in
- * focusOptions and points the installed document's activeElement at the node,
- * and unparenting a node that holds focus drops it to the body, so a reorder
- * built out of re-appends loses focus the way it does in the DOM.
- * Removing a listener that was never added throws rather than no-opping as the
- * DOM does, so a
- * fixture that omits the add cannot hide a removal that never happens; pass
- * {allowRedundantRemoval: true} where the second removal is the thing under
- * test, as it is for an idempotent disposal.
+ * focusOptions and points the installed document's activeElement at the node;
+ * unparenting a node that holds focus drops it to the body.
  *
- * style drops a value its property does not take and refuses a dashed property
- * name, so neither reads back as written.
+ * The box metrics (client, offset and scroll widths, heights and offsets) are
+ * plain writable fields reading zero; getBoundingClientRect() reports the
+ * offset box.
  *
- * The box metrics -- the client, offset and scroll widths, heights and offsets
- * -- are present and read zero, as they do for an element no layout has
- * measured. They are plain writable fields, so a test that asserts over
- * geometry writes the numbers itself. getBoundingClientRect() reports the
- * offset box, which is the zero rect until a test writes one, so a module that
- * measures unconditionally -- as it may, every Element carrying the method --
- * takes the same path here as in a browser.
+ * childNodes lists every inserted node; children is the elements-only view.
+ * append() accepts strings as text nodes; appendChild() throws on a non-node.
+ * insertBefore() appends on a null reference and throws on a reference that is
+ * not a child; removeChild() throws on a node that is not a child.
  *
- * childNodes lists every inserted node; children is the elements-only view, as
- * in the DOM, so a string append lands in one and not the other. append()
- * accepts strings as text nodes; appendChild() takes a node and throws on
- * anything else, so a test cannot encode a text node where the platform demands
- * an element. insertBefore() places a node ahead of a child and appends on a
- * null reference; a reference that is not a child throws rather than appending.
- * removeChild() throws on a node that is not a child, so a removal aimed at the
- * wrong parent cannot leave the node listed by its real one.
- *
- * dispatch() propagates over the parentNode chain the way the DOM does, so a
- * listener's attachment point is observable: capture listeners run root-first,
- * then the dispatching node's capture listeners, then its bubble listeners,
- * then the non-capture listeners back up to the root. The event carries `target` (the
- * dispatching node unless the caller names one), `currentTarget`,
- * stopPropagation() and stopImmediatePropagation(); the two stop methods are
- * the event's own and overwrite any the caller passed. Focus, blur, enter/leave,
- * load and scroll do not bubble by default; callers can set `bubbles` explicitly.
+ * dispatch() propagates over the parentNode chain: capture listeners run
+ * root-first, then the dispatching node's capture listeners, then its bubble
+ * listeners, then the non-capture listeners back up to the root. The event
+ * carries `target` (the dispatching node unless the caller names one),
+ * `currentTarget`, stopPropagation() and stopImmediatePropagation(); the two
+ * stop methods are the event's own and overwrite any the caller passed. Focus,
+ * blur, enter/leave, load and scroll do not bubble unless `bubbles` is set.
  * Activation events (click, auxclick, dblclick) on a disabled form control are
- * not dispatched. Other gated pointer, keyboard and value-change events skip
- * its own listeners and still reach ancestors. Focus-related and custom events
- * are unaffected.
+ * not dispatched; other DISABLED_DEAF_EVENTS skip its own listeners and still
+ * reach ancestors.
  * @param {string} [tag] - Tag name.
  * @param {Object} [options] - Fake-element options.
  * @param {boolean} [options.allowRedundantRemoval] - Let removeEventListener
@@ -370,8 +338,6 @@ export function fakeElement(tag = 'div', options = {}) {
     // capturing node, so only the bookkeeping is modelled.
     capturedPointers: new Set(),
     // The box metrics, as an element no layout has measured reports them.
-    // Nothing here derives one from another: a test that asserts over geometry
-    // writes the numbers it is about, and everything else reads zero.
     clientWidth: 0,
     clientHeight: 0,
     clientTop: 0,
@@ -766,15 +732,12 @@ export function fakeElement(tag = 'div', options = {}) {
 }
 
 /**
- * The listener surface a document stand-in needs for a module that wires a
- * document-level handler, spread into an installDocument() surface.
+ * Document-level listener surface, spread into an installDocument() surface.
  * dispatch(type, event) runs capture listeners before bubble listeners over
  * an event whose `target` defaults to the installed document and whose `type`,
  * preventDefault(), stopPropagation() and stopImmediatePropagation() are the
- * event's own and overwrite any the caller passed, as on an element; removing a
- * listener that was never added throws, as it does on an element, so a fixture
- * that omits the add cannot hide a removal that never happens. listenerCount()
- * reports what is still attached, so a teardown is assertable.
+ * event's own and overwrite any the caller passed; removing a listener that was
+ * never added throws. listenerCount() reports what is still attached.
  * @returns {Object} addEventListener, removeEventListener, listenerCount and dispatch.
  */
 export function documentEvents() {

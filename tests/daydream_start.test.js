@@ -1,9 +1,7 @@
 //
-// daydream.js's composition root, driven for real: start(deps) builds the whole
-// app against injected seams (document, page target, navigator, driver, GUI
-// factory, module loader), so the wiring is executed here rather than read out
-// of the source. What each factory does with what it is handed is covered in
-// tests/app_lifecycle.test.js; this is the assembly.
+// daydream.js's composition root: start(deps) builds the whole app against
+// injected seams (document, page target, navigator, driver, GUI factory,
+// module loader).
 import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -58,10 +56,7 @@ test('a dismiss button that mounts after startup still clears the notice', () =>
   assert.equal(body.hidden, true);
   assert.equal(elements.get('apply-notice-text').textContent, '');
 
-  // Every id this path resolves at click time -- the delegated handler's button
-  // and the notice elements clear() writes through -- pinned against the real
-  // markup, recorded rather than restated: a rename on either side leaves an
-  // inert dismiss button and no other failure.
+  // Every id this path resolves at click time, pinned against the real markup.
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const resolved = queried.slice(before);
   assert.ok(resolved.length > 0, 'the click resolved no id, so nothing is pinned');

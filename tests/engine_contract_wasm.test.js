@@ -1,10 +1,7 @@
 //
-// Real-engine contract pin for the WASM surface. segment_worker and
-// segment_controller run against a hand-written FakeEngine; this test loads the
-// REAL shipped module and exercises exactly the methods and return shapes the
-// worker/controller rely on, so a divergence between the FakeEngine contract and
-// the engine fails here. It also pins MeshOps and PaletteOps, the classes the
-// standalone tools (solids.html, palettes.html) run on.
+// Real-engine contract pin for the WASM surface: loads the shipped module and
+// exercises the methods and return shapes FakeEngine models, plus MeshOps and
+// PaletteOps.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -37,7 +34,7 @@ const M = await createHolosphereModule({ print: sink, printErr: sink });
 const W = 96, H = 20;
 
 // One shared engine: the engine owns a single global arena, so a second
-// instantiation traps (the app itself only ever makes one).
+// instantiation traps.
 assert.equal(M.HolosphereEngine.isLive(), false);
 const chainCall = (target, method, payload) => callWorkbenchBinding(target, 'getShaderChainBindings', method, [payload]);
 const engine = new M.HolosphereEngine();
@@ -197,7 +194,7 @@ test('authoring adapter declarations match their exported methods', () => {
 });
 
 // Both non-rejections leave the requested size active; only RESIZED tears the
-// effect down. The shared engine makes either possible at most call sites.
+// effect down.
 const resolutionOk = (r) => r === M.ResolutionSetResult.RESIZED
   || r === M.ResolutionSetResult.ALREADY_ACTIVE;
 
@@ -215,8 +212,7 @@ test('HolosphereEngine exposes the method surface the FakeEngines mock', () => {
   }
 });
 
-// generated/holosphere_wasm.d.ts is hand-written and stands in for glue the typecheck
-// never reads, so nothing but this pin keeps it from drifting off the module.
+// generated/holosphere_wasm.d.ts is hand-written and stands in for the glue.
 const DTS = readFileSync(new URL('../generated/holosphere_wasm.d.ts', import.meta.url), 'utf8');
 
 /**
@@ -288,9 +284,8 @@ test('generated/holosphere_wasm.d.ts declares the engine statics the app calls',
       `the module exposes static ${name}, which generated/holosphere_wasm.d.ts does not `
       + 'declare');
   }
-  // The two-way loop above only pins the pair against each other; these name
-  // the statics the app itself depends on, which losing from both sides would
-  // otherwise leave green.
+  // Statics the app depends on, named outright: losing one from both sides
+  // passes the two-way loop.
   assert.ok(declared.has('isLive'),
     'daydream.js and segment_worker.js read this static before constructing an '
     + 'engine; a second instantiation traps and kills the module');
@@ -405,9 +400,7 @@ test('generated/holosphere_wasm.d.ts declares the object shapes the engine retur
   assertDeclaredShape('ChainSnapshot', snapshot);
 });
 
-// The catalog is the contract the document compiler, the chain editor's
-// budgets and the fake chain engine all validate against; this pin is what
-// keeps the installed copy the engine's own export rather than a hand edit.
+// The installed catalog is the engine's own export.
 test('getShaderChainCatalog matches the installed generated/shader/engine_catalog.json', () => {
   const pinned = readPinned(
     new URL('../generated/shader/engine_catalog.json', import.meta.url));
@@ -417,7 +410,7 @@ test('getShaderChainCatalog matches the installed generated/shader/engine_catalo
 });
 
 // The default ShaderChain program, spelled as the payload setShaderChain
-// takes. src/workbench/shader/chain_apply.js drives exactly this call shape.
+// takes.
 const DEFAULT_CHAIN = [
   { instance: 'camera', operator: 'sphere.rotate.v2' },
   { instance: 'project', operator: 'project.stereographic.v2' },
@@ -650,15 +643,13 @@ test('getSupportedResolutions reports buildable [w, h] rows', () => {
     `${malformed.length} reported resolutions are not numeric [w, h] pairs`);
   assert.deepEqual(unbuildable.slice(0, 5), [],
     `${unbuildable.length} reported resolutions the engine cannot build`);
-  // daydream.js narrows its preset table to these rows; a preset it offers must
-  // stay reachable.
+  // The W x H preset must stay reachable.
   assert.ok(rows.some(([w, h]) => w === W && h === H),
     `the ${W}x${H} preset must be a reported resolution`);
 });
 
 test('HolosphereEngine return shapes match what the segmented path consumes', () => {
-  // Enum results: segment_worker compares against Module.ResolutionSetResult /
-  // Module.EffectSetResult values, never by truthiness.
+  // Enum results compare by identity, never by truthiness.
   const ok = engine.setResolution(W, H);
   assert.ok(ok instanceof M.ResolutionSetResult,
     'setResolution must return a ResolutionSetResult value');
@@ -681,7 +672,6 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
   assert.equal(typeof p.name, 'string', 'param def must carry a string name');
   assert.ok(typeof p.value === 'number' || typeof p.value === 'boolean',
     'param def value must be a number or boolean');
-  // Controller flattens bools to 1/0 before calling setParameter.
   const paramResult = engine.setParameter(
     p.name, typeof p.value === 'boolean' ? (p.value ? 1 : 0) : p.value);
   assert.equal(paramResult, M.ParamSetResult.APPLIED,
@@ -698,7 +688,6 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
   assert.ok(px instanceof Uint16Array, 'getPixels must return a Uint16Array');
   assert.equal(px.length, W * H * 3, 'getPixels length must be W*H*3');
 
-  // Segment 0 streams these post-frame; the worker does Array.from() on the view.
   const paramValues = engine.getParamValues();
   assert.equal(typeof paramValues.length, 'number',
     'getParamValues must return an array-like value');
@@ -768,9 +757,8 @@ test('malformed clip bounds are rejected', () => {
     'a full-canvas clip must still be accepted after the rejects');
 });
 
-// segment_worker faults the whole pool on INVALID_BOUNDS, so NO_EFFECT — the
-// ordinary state between a resolution change and the setEffect that follows it —
-// must stay a distinct value rather than collapsing into the same rejection.
+// NO_EFFECT, the state between a resolution change and the setEffect that
+// follows it, is distinct from INVALID_BOUNDS.
 test('an effectless engine reports NO_EFFECT, not a bounds rejection', () => {
   const other = M.HolosphereEngine.getSupportedResolutions()
     .find(([w, h]) => w !== W || h !== H);
@@ -788,9 +776,7 @@ test('an effectless engine reports NO_EFFECT, not a bounds rejection', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
 });
 
-// The two non-rejections must stay distinct: only RESIZED obliges the caller to
-// re-apply setEffect/setClip, and treating ALREADY_ACTIVE as a resize would
-// needlessly tear the app's GUI and worker pool down on every same-size apply.
+// Only RESIZED obliges the caller to re-apply setEffect/setClip.
 test('a request matching the active resolution reports ALREADY_ACTIVE and keeps the effect', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
@@ -803,9 +789,8 @@ test('a request matching the active resolution reports ALREADY_ACTIVE and keeps 
 
 test('a rejected parameter write names its reason', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
-  // Every effect, not just up to the first readonly hit: stopping there made the
-  // flag coverage depend on where one happens to sit in the name order. The scan
-  // accumulates so its assertion count does not track the roster's size.
+  // Scans every effect, accumulating so the assertion count does not track the
+  // roster's size.
   let found = null;
   const uninstallable = [];
   const nonBoolean = [];
@@ -888,11 +873,9 @@ test('strobeColumns and effect metadata return the shapes daydream consumes', ()
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
     'setEffect must succeed after the readonly scan');
-  // driver.js gates the column-fill arc on `=== false`.
   assert.equal(typeof engine.strobeColumns(), 'boolean',
     'strobeColumns must return a boolean');
 
-  // effect_sequencing.js's applyResolution reads this map to label sidebar entries.
   const sizes = engine.getEffectSizes();
   const names = Object.keys(sizes);
   assert.ok(names.includes('DisplacementField'),
@@ -941,8 +924,6 @@ test('the favorites rosters and the seeded default name installable effects', ()
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
 });
 
-// engine_host.js calls getBufferLength through an optional-call guard, so a
-// dropped export is silent at the call site.
 test('getBufferLength reports the active resolution buffer length', () => {
   const wrong = [];
   for (const [w, h] of M.HolosphereEngine.getSupportedResolutions()) {
@@ -991,7 +972,6 @@ test('a resolution change leaves a held pixel view attached at the wrong length'
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
 });
 
-// EngineHost reads generation; display controls require the Pole LOD exports.
 test('getParamGeneration and setPoleLod stay exported', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
@@ -1009,8 +989,7 @@ test('getParamGeneration and setPoleLod stay exported', () => {
     'setPoleLod must stay callable (pole_lod.js binds the Pole LOD slider to it)');
   assert.equal(engine.getPoleLod(), 0,
     'a fresh engine must start undecimated (HS_POLE_LOD_DEFAULT)');
-  // daydream.js's Pole LOD slider spans [0, 2]; the setting is what the segmented
-  // controller has to forward to every worker, so it has to be readable back.
+  // The Pole LOD setting reads back across [0, 2].
   for (const v of [0, 1, 2]) {
     engine.setPoleLod(v);
     assert.equal(engine.getPoleLod(), v, `setPoleLod(${v}) must read back`);
@@ -1028,8 +1007,6 @@ test('getParamGeneration and setPoleLod stay exported', () => {
   engine.setPoleLod(0);
 });
 
-// shader_documents.js selects a document reference preset by ID; an ID roster
-// that stops matching navigation order selects a different preset.
 test('getPresetIds names the presets selectPresetById answers to', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
 
@@ -1082,9 +1059,6 @@ test('getPresetIds names the presets selectPresetById answers to', () => {
     'a rejected selectPresetById must not engage the pause');
 });
 
-// daydream.js reads the pause indicator through an optional-call guard
-// (getAnimationsPaused: () => host.engine?.getAnimationsPaused?.()), so a
-// dropped export is silent at the call site and only desyncs the GUI toggle.
 test('getAnimationsPaused reports the pause both of its writers engage', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
@@ -1099,7 +1073,6 @@ test('getAnimationsPaused reports the pause both of its writers engage', () => {
   assert.equal(engine.getAnimationsPaused(), false,
     'getAnimationsPaused must report a resume');
 
-  // effect_gui.js re-reads the pause after an apply rather than tracking it.
   engine.setAnimationsPaused(true);
   assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
     'setEffect must succeed on a reload');
@@ -1107,8 +1080,7 @@ test('getAnimationsPaused reports the pause both of its writers engage', () => {
     'the pause must be retained across a setEffect rebuild');
   engine.setAnimationsPaused(false);
 
-  // An APPLIED write to an animated param engages the same pause, so
-  // setAnimationsPaused is not the only writer the indicator has to follow.
+  // An APPLIED write to an animated param engages the same pause.
   let animated = null;
   for (const name of Object.keys(engine.getEffectSizes())) {
     assert.equal(engine.setEffect(name), M.EffectSetResult.INSTALLED,
@@ -1135,10 +1107,7 @@ test('getAnimationsPaused reports the pause both of its writers engage', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
 });
 
-// The method-surface pin above sees only that the six preset methods exist,
-// while segment_worker's FakeEngine models their semantics and
-// segment_controller.selectPreset mirrors a pause the engine engages on its own.
-// Return type, rejection and the pause are what the fakes stand in for.
+// Return type, rejection and the pause the preset-method fakes stand in for.
 test('the preset methods answer the way the segmented path assumes', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
 
@@ -1168,13 +1137,9 @@ test('the preset methods answer the way the segmented path assumes', () => {
     `setEffect must succeed for ${paged.effect}`);
   engine.setAnimationsPaused(false);
 
-  // daydream.js gates on the return by truthiness, so a void method would read
-  // as a rejection at every call site.
   assert.equal(engine.selectPreset(1), true,
     'selectPreset must report boolean success for an in-range index');
   assert.equal(engine.getPresetIndex(), 1, 'selectPreset must move the reported index');
-  // segment_controller.selectPreset writes its own animationsPaused to true on
-  // the strength of this, so a preset that stopped pausing would desync the GUI.
   assert.equal(engine.getAnimationsPaused(), true,
     'selectPreset must engage the animation pause');
 
@@ -1196,8 +1161,6 @@ test('the preset methods answer the way the segmented path assumes', () => {
   assert.equal(engine.getPresetIndex(), paged.count - 1,
     'previousPreset must wrap below the first preset');
 
-  // effect_gui's per-frame sync calls this, so a pause here would freeze every
-  // animated param the moment the GUI caught up with an external advance.
   engine.setAnimationsPaused(false);
   assert.equal(engine.synchronizePreset(0), true,
     'synchronizePreset must report boolean success for an in-range index');
@@ -1213,7 +1176,6 @@ test('the preset methods answer the way the segmented path assumes', () => {
   assert.equal(engine.getPresetIndex(), 0,
     'a setEffect rebuild must reset the preset index');
 
-  // segment_worker calls selectPreset unguarded on the index it is broadcast.
   assert.equal(engine.setEffect(presetless), M.EffectSetResult.INSTALLED,
     `setEffect must succeed for ${presetless}`);
   assert.equal(engine.getPresetCount(), 0, `${presetless} must carry no presets`);
@@ -1228,14 +1190,12 @@ test('the preset methods answer the way the segmented path assumes', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
 });
 
-// pixel_view.test.js proves refreshPixelView against a synthetic detached
-// buffer; this is the only place the real growth happens with a view
-// outstanding. MeshOps' 16 MB tooling block is allocated lazily on first use and
-// cannot fit the heap the module starts with, so that first call grows it, which
-// detaches every live view.
+// MeshOps' 16 MB tooling block is allocated lazily on first use and cannot fit
+// the heap the module starts with, so that first call grows it, which detaches
+// every live view.
 test('heap growth detaches a held pixel view and the re-fetch is live and identical', () => {
   // The growth is a one-time event, so a MeshOps case that ran first would leave
-  // this one nothing to observe. Asserted rather than left to declaration order.
+  // this one nothing to observe.
   assert.equal(heapBytes(), INITIAL_HEAP_BYTES,
     'the heap has already grown, so the tooling allocation below will not: this ' +
     'case must run ahead of every other MeshOps case in this file');
@@ -1295,10 +1255,8 @@ test('MeshOps exposes the method surface the solids tool drives', () => {
     'MeshOps must bind at least one Conway operator');
 });
 
-// A null mesh is the bridge's only recoverable failure channel, and the reason
-// behind it decides the caller's remedy — shrink the chain versus flush the
-// arenas. Pinning the roster and one live reason keeps solid_codegen.js's
-// routing table on the engine's enum rather than a stale copy of it.
+// A null mesh is the bridge's recoverable failure channel; its recorded reason
+// picks the remedy (shrink the chain versus flush the arenas).
 test('meshOpFailure routes a real bridge reject by the reason the module records', () => {
   assert.ok(M.MeshOpResult, 'the module must export MeshOpResult');
   const moduleNames = Object.keys(M.MeshOpResult)
@@ -1339,12 +1297,9 @@ function opBoundCases(def) {
   }));
 }
 
-// A bound outside the engine's domain for its operator is invisible in the
-// preview — the bridge clamps the argument and logs — while
-// generateFuncAndRecipe emits the authored value, so the exported C++ trips an
-// always-on engine assert once compiled into firmware. Replaying each endpoint
-// on the live bridge and requiring a silent, accepted call is what makes the
-// engine, not a JS mirror of it, the authority on those bounds.
+// The bridge clamps an out-of-domain argument and logs, while
+// generateFuncAndRecipe emits the authored value, which trips an always-on
+// engine assert in firmware.
 test('every OP_DEFS bound sits inside the engine domain the WASM bridge enforces', () => {
   const seed = 'cube';
   const clamped = [];
@@ -1398,7 +1353,7 @@ test('SIMPLE_SEEDS mirrors simple_registry, whose index a Recipe seed is', () =>
     `${misindexed.length} SIMPLE_SEEDS entries do not name their registry index; ` +
     'a generated SEED_* constant carries that index and would seed another solid');
   // The Catalan registry follows the simple one, so its first entry is where
-  // simple_registry ends: a nineteenth simple solid would land here.
+  // simple_registry ends.
   assert.ok(CATALAN_BASES.has(registry[SIMPLE_SEEDS.length].name),
     `SIMPLE_SEEDS stops short of simple_registry, which also holds ` +
     `"${registry[SIMPLE_SEEDS.length].name}"`);
@@ -1409,7 +1364,6 @@ test('SIMPLE_SEEDS mirrors simple_registry, whose index a Recipe seed is', () =>
     'SIMPLE_SEEDS entry, so none of the registry just matched');
 });
 
-// solids_page.js flattens star-pattern bases through MeshOps.getRecipe for registry export.
 test('MeshOps.getRecipe returns an authored chain for every Complex solid', () => {
   assert.equal(typeof M.MeshOps.getRecipe, 'function',
     'MeshOps is missing class function getRecipe');
@@ -1485,8 +1439,7 @@ test('PaletteOps compiles a palette recipe', () => {
   }
 });
 
-// solids.html and palettes.html run on these two classes, so they are the
-// tools' half of the boundary; embind's own prototypes are what pins them.
+// Pinned against embind's own prototypes.
 test('generated/holosphere_wasm.d.ts declares the MeshOps bridge the solids tool drives', () => {
   const statics = interfaceMethods('MeshOpsStatics');
   const optional = new Set([...interfaceBody('MeshOpsStatics')
@@ -1559,13 +1512,10 @@ test('generated/holosphere_wasm.d.ts declares the PaletteOps bridge the palette 
 });
 
 /**
- * When shared compilation succeeds, the segmented pool hands every worker the
- * WebAssembly.Module, which each instantiates through the glue's instantiateWasm
- * hook. Two things must hold for that to be safe, and neither is visible from
- * the mocked worker tests: the glue must honour the hook (or the pool silently
- * pays N compilations again), and instances of one compilation must not share
- * state (the binary declares its own memory rather than importing one, so each
- * gets a private heap, global arena and engine singleton).
+ * Instances of one WebAssembly.Module, each instantiated through the glue's
+ * instantiateWasm hook: the glue must honour the hook, and instances must not
+ * share state (the binary declares its own memory, so each gets a private heap,
+ * global arena and engine singleton).
  */
 test('the glue honours instantiateWasm, and shared-module instances stay isolated', async () => {
   const binary = readFileSync(new URL('../generated/holosphere_wasm.wasm', import.meta.url));

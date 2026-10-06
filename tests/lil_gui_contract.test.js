@@ -1,14 +1,9 @@
 //
-// Pins the behaviour of the lil-gui build package.json pins, so the doubles the
-// GUI suites run over cannot drift from the library the browser loads. Every
-// other suite substitutes a stand-in for lil-gui; this one imports the real module and
-// drives it over tests/helpers/fake_dom.js, which is enough DOM for panel and
-// controller construction.
+// Pins the behaviour of the lil-gui build package.json pins, driving the real
+// module over tests/helpers/fake_dom.js.
 //
-// The dispatch contract matters most: add() picks a controller off `typeof
-// object[prop]` and returns undefined for anything it has no controller for,
-// after logging. A double that hands back a controller for every property turns
-// a browser-side `TypeError: … reading 'onChange'` into a green run.
+// add() picks a controller off `typeof object[prop]` and returns undefined,
+// after logging, for anything it has no controller for.
 import { enumChoices } from '../src/effects/param_sync.js';
 import { GUI as DeepLinkGUI } from '../src/ui/gui.js';
 import { fakePanelGui } from './helpers/fake_app.js';
@@ -85,8 +80,7 @@ test('a controller carries the surface the GUI layer chains off it', async () =>
                         'decimals']) {
     assert.equal(typeof controller[method], 'function', `controller.${method}`);
   }
-  // A single onChange slot, which is why the GUI layer composes handlers itself
-  // instead of registering twice.
+  // A single onChange slot.
   const calls = [];
   controller.onChange((v) => calls.push(['first', v]));
   controller.onChange((v) => calls.push(['second', v]));
@@ -95,10 +89,6 @@ test('a controller carries the surface the GUI layer chains off it', async () =>
   assert.deepEqual(calls, [['second', 4]], 'the later registration replaced the earlier');
 });
 
-// effect_gui.js reaches past domElement for the node that takes keyboard focus
-// ($select ?? $input ?? $button) and for the Reset/Export buttons it re-labels.
-// A lil-gui rename turns those into a browser TypeError, which is invisible to a
-// double that carries every property.
 test('each controller exposes the focusable widget the GUI layer reaches for', async () => {
   const gui = await realGUI();
   const params = { count: 1, label: 'x', on: true, run() {} };
@@ -118,9 +108,6 @@ test('each controller exposes the focusable widget the GUI layer reaches for', a
   assert.equal(typeof action.$button.focus, 'function');
 });
 
-// gui.js's URL writer registers an onChange per controller and replays stored
-// values into them on boot; a write that matches the standing value must not
-// echo back into the URL.
 test('setValue() with the standing value fires no onChange', async () => {
   const gui = await realGUI();
   const controller = gui.add({ count: 1 }, 'count', 0, 10, 1);
@@ -135,8 +122,6 @@ test('setValue() with the standing value fires no onChange', async () => {
   assert.deepEqual(calls, [2], 'the repeated write notified a second time');
 });
 
-// effect_gui.js's disposeEffect re-parents its action-row controllers back into
-// the panel before destroy() for exactly this reason.
 test('destroy() throws when the controller row hangs off another parent', async () => {
   const gui = await realGUI();
   const controller = gui.add({ count: 1 }, 'count', 0, 10, 1);
@@ -161,9 +146,7 @@ test('decimals chains and rounds the display without moving the value', async ()
   assert.equal(fractional.$input.value, '3.142');
 });
 
-// options() has two implementations. daydream.js narrows the resolution dropdown
-// through it on every boot, so which one it lands on decides whether the live
-// control keeps its handler or is silently detached.
+// options() has two implementations.
 test('options() on a dropdown updates it in place and returns the same controller',
   async () => {
     const gui = await realGUI();
@@ -204,9 +187,8 @@ test('options() on a non-dropdown destroys the receiver and appends a replacemen
     assert.equal(gui.controllers.includes(plain), false, 'the receiver is destroyed');
   });
 
-// gui.js's DeepLinkGUI.closed reads _closed to carry a panel's collapse state
-// across a schema rebuild. lil-gui offers no public getter for it -- its own
-// docs spell the toggle `gui.open( gui._closed )` -- so the private is the API.
+// lil-gui offers no public getter for the collapse state; its own docs spell
+// the toggle `gui.open( gui._closed )`.
 test('_closed tracks the collapse state open() and close() set', async () => {
   const gui = await realGUI();
   const folder = gui.addFolder('Shape');
@@ -227,11 +209,7 @@ test('_closed tracks the collapse state open() and close() set', async () => {
   assert.equal(folder._closed, false);
 });
 
-// effect_panel_view.js finds the panel's scroll container by class ('.lil-children')
-// to carry a scroll offset across a rebuild, and styles/index.css sizes the
-// preset dropdown through '.lil-display'. Neither is reachable through a
-// controller property, so a rename surfaces only as a null scroller and an
-// unstyled row in the browser.
+// '.lil-children' and '.lil-display' are not reachable through a controller property.
 test('the panel classes the scroll restore and the stylesheet select on hold',
   async () => {
     const gui = await realGUI();

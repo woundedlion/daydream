@@ -1,9 +1,5 @@
 //
-// GlobalStatsView — the single-engine stats bar: which cell each metric lands
-// in, the slow-frame colouring, and the resolve-once latch that keeps a panel
-// mounted after the first frame from re-querying forever.
-//
-// Run: npm test
+// GlobalStatsView, the single-engine stats bar.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -13,8 +9,7 @@ import { captureConsole } from './helpers/fake_console.js';
 import { SLOW_FRAME_MS } from '../src/renderer/frame_constants.js';
 import { GlobalStatsView, STATS_CELL_IDS } from '../src/ui/global_stats_view.js';
 
-// Pins the module's cell ids against the real markup: a rename on either side
-// blanks the stats bar behind a single console.warn.
+// Pins the module's cell ids against the real markup.
 test('index provides every stats cell the view resolves', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   for (const [row, ids] of Object.entries(STATS_CELL_IDS))
@@ -60,8 +55,7 @@ function metrics(over = {}) {
 }
 
 /**
- * Runs `body` with console.warn captured, so the absent-cell diagnostic is
- * asserted instead of printed into the suite output.
+ * Runs `body` with console.warn captured.
  * @param {Function} body - Code to run under the capture.
  * @returns {Array<string>} One joined message per call.
  */

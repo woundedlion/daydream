@@ -6,9 +6,7 @@ const {
   createFrameScheduler, onPageTeardown, watchMediaMatch,
 } = await import('../src/shared/page_lifecycle.js');
 
-// The frame queue every case runs against, plus the globalThis.window slot
-// fakeWindow() writes into: installed fresh per case and restored after, so no
-// case inherits another's globals or its pending frames.
+// Frame queue and globalThis.window slot, installed fresh per case and restored after.
 let frames;
 let savedWindow;
 beforeEach(() => {
@@ -178,7 +176,7 @@ test('onPageTeardown supports several independent teardowns', () => {
   assert.deepEqual(order, ['timers', 'scene']);
 });
 
-/** Verifies the two helpers compose the way the pages wire them: teardown cancels the pending frame. */
+/** Verifies a teardown can cancel the scheduler's pending frame. */
 test('a teardown cancels the scheduler pending frame', () => {
   const win = fakeWindow();
   let runs = 0;
