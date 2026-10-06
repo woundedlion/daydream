@@ -89,7 +89,7 @@ export class SegmentCompositor {
     // Checked before any write: a wrong length would otherwise throw from the blit.
     if (dst.length !== w * h * 3) {
       this.onFault(FAULT_RENDER,
-        `SegmentController.composite: display buffer length ${dst.length} != ` +
+        `SegmentCompositor.composite: display buffer length ${dst.length} != ` +
         `expected ${w * h * 3} for the ${w}x${h} grid — the driver geometry ran ` +
         `ahead of the engine's active resolution`);
       return 0;
@@ -102,7 +102,7 @@ export class SegmentCompositor {
     if (this.displayAliasesDiverged(dst)) {
       if (!this.#aliasDivergenceLogged) {
         console.error(
-          "SegmentController.composite: display-buffer alias diverged " +
+          "SegmentCompositor.composite: display-buffer alias diverged " +
           "from getMemoryView() — re-pointing the display aliases at the " +
           "composite target");
         this.#aliasDivergenceLogged = true;
@@ -122,7 +122,7 @@ export class SegmentCompositor {
       if (!r || !r.pixels) continue;
       if (r.x0 < 0 || r.y0 < 0 || r.x1 > w || r.y1 > h) {
         this.onFault(s,
-          `SegmentController.composite: segment ${s} rect ` +
+          `SegmentCompositor.composite: segment ${s} rect ` +
           `[${r.x0},${r.y0})-[${r.x1},${r.y1}) is out of bounds for the ` +
           `${w}x${h} display buffer — the generation fence let a stale-resolution ` +
           `result through (layout/fence invariant violated)`);
@@ -130,7 +130,7 @@ export class SegmentCompositor {
       }
       if (r.x1 <= r.x0 || r.y1 <= r.y0) {
         this.onFault(s,
-          `SegmentController.composite: segment ${s} rect ` +
+          `SegmentCompositor.composite: segment ${s} rect ` +
           `[${r.x0},${r.y0})-[${r.x1},${r.y1}) is empty/inverted — a zero or ` +
           `negative expectedLen would mask layout corruption (segment-rect ` +
           `invariant violated)`);
@@ -139,7 +139,7 @@ export class SegmentCompositor {
       const expectedLen = (r.x1 - r.x0) * (r.y1 - r.y0) * 3;
       if (!(r.pixels instanceof Uint16Array) || r.pixels.length !== expectedLen) {
         this.onFault(s,
-          `SegmentController.composite: segment ${s} pixel buffer length ` +
+          `SegmentCompositor.composite: segment ${s} pixel buffer length ` +
           `${r.pixels.length} != expected ${expectedLen} for rect ` +
           `[${r.x0},${r.y0})-[${r.x1},${r.y1}) — a rect/buffer mismatch would ` +
           `blit a truncated row (segment-result invariant violated)`);
@@ -151,7 +151,7 @@ export class SegmentCompositor {
       if (r.x0 !== band.x0 || r.x1 !== band.x1
           || r.y0 !== band.y0 || r.y1 !== band.y1) {
         this.onFault(s,
-          `SegmentController.composite: segment ${s} rect ` +
+          `SegmentCompositor.composite: segment ${s} rect ` +
           `[${r.x0},${r.y0})-[${r.x1},${r.y1}) is not its band ` +
           `[${band.x0},${band.y0})-[${band.x1},${band.y1}) of the ${n}-segment ` +
           `${w}x${h} layout — a stale-geometry frame would composite into the ` +
@@ -196,7 +196,7 @@ export class SegmentCompositor {
         bands[s] = computeSegmentRange(s, n, w, h);
       } catch (error) {
         this.onFault(s,
-          `SegmentController.composite: no segment-${s} band exists for a ` +
+          `SegmentCompositor.composite: no segment-${s} band exists for a ` +
           `${n}-segment ${w}x${h} display buffer — ${errorDetail(error)}`);
         return null;
       }
