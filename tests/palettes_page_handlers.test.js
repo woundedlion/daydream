@@ -4,6 +4,7 @@ import { pageHandlers } from './helpers/page_handlers.js';
 import { fakeElement } from './helpers/fake_dom.js';
 import { hueKeyNudgeTurns } from '../src/workbench/palettes/palette_wheel.js';
 import { replaceUrl } from '../src/app/state.js';
+import { captureConsole } from './helpers/fake_console.js';
 
 const handler = pageHandlers(new URL('../src/workbench/palettes/palettes_page.js', import.meta.url));
 
@@ -14,7 +15,12 @@ test('tab switches rebuild the palette when browser URL updates are refused', ()
     const panel = fakeElement();
     panel.id = 'tab-content-generative';
     let updated = 0;
-    const win = { history: { replaceState() { if (refused) throw new Error('rate limit'); } } };
+    const urls = [];
+    let replaced;
+    const win = { history: { replaceState(state, title, url) {
+      urls.push(url);
+      if (refused) throw new Error('rate limit');
+    } } };
     const context = {
       activeTab: 'procedural', window: { location: { href: 'https://example.test/tools/palettes.html' } },
       document: {
@@ -22,9 +28,12 @@ test('tab switches rebuild the palette when browser URL updates are refused', ()
         querySelectorAll: selector => selector === '.tab-btn' ? [button] : [panel],
       },
       paletteTabUrl: (url, tab) => `${url}?tab=${tab}`,
-      replaceUrl: url => replaceUrl(url, win), updatePalette: () => { updated++; },
+      replaceUrl: url => { replaced = replaceUrl(url, win); }, updatePalette: () => { updated++; },
     };
-    handler('switchTab', context)('generative');
+    const captured = captureConsole(() => handler('switchTab', context)('generative'));
+    assert.deepEqual(urls, ['https://example.test/tools/palettes.html?tab=generative']);
+    assert.equal(replaced, !refused);
+    assert.deepEqual(captured.messages, refused ? ['URL update skipped: Error: rate limit'] : []);
     assert.equal(updated, 1);
     assert.equal(button.tabIndex, 0);
     assert.equal(panel.hidden, false);
