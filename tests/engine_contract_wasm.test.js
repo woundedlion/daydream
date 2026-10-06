@@ -201,8 +201,8 @@ const resolutionOk = (r) => r === M.ResolutionSetResult.RESIZED
 // The module exports no heap view, so the pixel buffer stands in for one: it
 // aliases the heap, so its ArrayBuffer is the heap's.
 const heapBytes = () => engine.getPixels().buffer.byteLength;
-// Read before any case runs. Resolution changes allocate inside this heap; only
-// MeshOps' tooling block grows it.
+// Read before any case runs; the growth case observes MeshOps' 16 MB block.
+// A resolution's first factory lookup can also grow the heap.
 const INITIAL_HEAP_BYTES = heapBytes();
 
 // generated/holosphere_wasm.d.ts is hand-written and stands in for the glue.
@@ -1187,11 +1187,10 @@ test('the preset methods answer the way the segmented path assumes', () => {
 // the heap the module starts with, so that first call grows it, which detaches
 // every live view.
 test('heap growth detaches a held pixel view and the re-fetch is live and identical', () => {
-  // The growth is a one-time event, so a MeshOps case that ran first would leave
-  // this one nothing to observe.
+  // Any earlier heap growth can leave this case nothing to observe.
   assert.equal(heapBytes(), INITIAL_HEAP_BYTES,
-    'the heap has already grown, so the tooling allocation below will not: this ' +
-    'case must run ahead of every other MeshOps case in this file');
+    'the heap has already grown after an earlier allocation (a resolution factory ' +
+    'lookup or a MeshOps case); this case requires the initial heap size');
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
     'setEffect must succeed for a registered effect');
