@@ -4,6 +4,7 @@ import { afterEach, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { restoreDocumentAfterEach } from './helpers/fake_dom.js';
 import { installConsoleCapture } from './helpers/fake_console.js';
+import { MODULE_TRAP_NOTICE } from '../src/app/app_lifecycle.js';
 
 let initFailure = null;
 let controllers = 0;
@@ -35,7 +36,7 @@ afterEach(() => {
  * Boots the workbench page with a document controller whose init() rejects
  * with what `fail` returns, and lets the rejection settle.
  * @param {(module: Object) => Error} fail - Builds the rejection reason.
- * @returns {Promise<{app: Object, module: Object}>} The booted app and module.
+ * @returns {Promise<{app: Object, module: Object, messages: string[]}>} The booted app, module and console messages.
  */
 async function bootRejectedWorkbench(fail) {
   const module = fakeWasmModule();
@@ -50,7 +51,7 @@ async function bootRejectedWorkbench(fail) {
     await app.teardown.ready;
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(controllers, before + 1, 'the workbench page builds its controller');
-    return { app, module };
+    return { app, module, messages: capture.messages };
   } finally {
     capture.restore();
   }
@@ -69,10 +70,14 @@ test('a failed workbench init reports through its notice, not the page-failure b
 });
 
 test('a workbench init that trapped the module releases the app', async () => {
-  const { app } = await bootRejectedWorkbench((module) => {
+  const { app, messages } = await bootRejectedWorkbench((module) => {
     module.HS_MODULE_DEAD = true;
     return new WebAssembly.RuntimeError('unreachable');
   });
   assert.equal(app.teardown.disposed(), true);
   assert.equal(noticeText(app), '', 'a dead module is not reported as a workbench failure');
+  assert.match(messages.join('\n'), /Startup stopped: the rendering engine trapped/);
+  const overlay = app.elements.get('loading-overlay');
+  assert.equal(overlay.classList.contains('error'), true);
+  assert.ok(overlay.children.some((child) => child.textContent === MODULE_TRAP_NOTICE));
 });
