@@ -6,8 +6,6 @@
 /*
  * Shared design tokens and control styling for the tool pages.
  * Link this before a page's own styles so page-specific rules win.
- * Pages keep their own layout CSS and may add extra tokens (e.g. accent
- * colors).
  */
 
 :root {
@@ -86,8 +84,8 @@ input[type=range]:disabled::-moz-range-thumb {
   cursor: default;
 }
 
-/* Every slider's numeric readout, on the --slate-700 of .param-group. The lighter
- * indigo is what carries that pairing over the 4.5:1 WCAG AA floor at 14px. */
+/* Slider readout on .param-group's --slate-700; this indigo keeps 4.5:1 AA
+ * contrast at 14px. */
 .slider-label {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.875rem;
@@ -159,8 +157,7 @@ input[type=range]:disabled::-moz-range-thumb {
 /*
  * Fixed-right-panel shell: a full-bleed canvas (`.tool-stage`) with a fixed
  * scrolling controls panel pinned to the right (`.tool-panel`), collapsing to
- * a bottom sheet on narrow screens. Used by lissajous. Apply the classes
- * alongside whatever id the page's JS already queries.
+ * a bottom sheet on narrow screens.
  */
 .tool-stage {
   position: fixed;

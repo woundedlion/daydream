@@ -5,8 +5,6 @@
 
 :root {
   --sidebar-width: 224px;
-  /* Grows with viewport width but never collapses (or inverts) below the
-     474px reference width; capped so it doesn't crowd the canvas. */
   --footer-height: clamp(96px, (100vw - 474px) * 0.22, 220px);
   --right-sidebar-width: 250px;
 }
@@ -43,7 +41,6 @@ body {
   position: relative;
   background: linear-gradient(to bottom, var(--slate-900), var(--slate-800));
   min-height: 0;
-  /* Allow shrinking */
   overflow: hidden;
 }
 
@@ -126,8 +123,7 @@ body {
   overflow-wrap: anywhere;
 }
 
-/* Full name at readable size, shown over the tile on hover/focus; the
-   resting label above is clamped to two lines and ellipsizes long names. */
+/* Full name at readable size, shown over the tile on hover/focus. */
 .thumb-name-full {
   position: absolute;
   inset: 0;
@@ -155,7 +151,7 @@ body {
   padding: 0.2rem 0.3rem;
 }
 
-/* Ops blocked by createOpGate, or the whole grid after freezeEditing. */
+/* Blocked ops, or the whole grid while editing is frozen. */
 #addOpGrid .btn:disabled,
 #addOpGrid .btn[aria-disabled="true"] {
   opacity: 0.35;
@@ -404,8 +400,7 @@ body {
   border-color: #f87171;
 }
 
-/* Small screens: the three side-by-side columns don't fit, so stack them
-   (canvas, then controls, then saved solids) and let the page scroll. */
+/* Small screens: stack the columns and let the page scroll. */
 @media (max-width: 900px) {
   body {
     flex-direction: column;
