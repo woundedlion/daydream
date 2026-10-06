@@ -141,7 +141,7 @@ export class EffectSidebar {
   }
 
   /**
-   * Create the option buttons once for the given effect names and metadata, then
+   * Rebuild one option button per effect name with its metadata, then
    * apply the current sort order, active highlight, and roving tabindex anchor,
    * restoring keyboard focus when it was inside the list.
    * @param {Array<string>} names - Effect names, one button per name.
