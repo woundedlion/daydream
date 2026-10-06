@@ -49,6 +49,11 @@ test('balancedColumnRows keeps the column count and fills columns evenly', () =>
   assert.equal(balancedColumnRows(0), 1);
 });
 
+test('balancedColumnRows treats a non-positive row cap as one row per column', () => {
+  assert.equal(balancedColumnRows(5, 0), 1);
+  assert.equal(balancedColumnRows(5, -3), 1);
+});
+
 test('navTargetIndex advances and wraps for Down/Right', () => {
   assert.equal(navTargetIndex(0, 3, 'ArrowDown'), 1);
   assert.equal(navTargetIndex(2, 3, 'ArrowDown'), 0);   // wrap past the end
