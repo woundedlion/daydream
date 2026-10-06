@@ -506,6 +506,7 @@ test('engine bundle polling retries transient queries and artifact calls', (t) =
       case "$kind" in
         query)
           if [ "$FIRST_FAIL" = true ]; then return 1; fi
+          if [ "$FIRST_FAIL" = transient ] && [ "$n" = 1 ]; then return 1; fi
           if [ "$n" = 1 ]; then return 0; fi
           if [ "$n" = 2 ]; then return 1; fi
           printf '12\\tcompleted\\tsuccess\\t%s\\n' "$PIN" ;;
@@ -518,7 +519,7 @@ test('engine bundle polling retries transient queries and artifact calls', (t) =
       esac
     }
   `;
-  for (const firstFail of [false, true]) {
+  for (const firstFail of [false, true, 'transient']) {
     const fixture = join(root, String(firstFail));
     mkdirSync(fixture);
     const result = spawnSync(shell, ['-e', '-s'], {
@@ -526,9 +527,10 @@ test('engine bundle polling retries transient queries and artifact calls', (t) =
       env: { ...process.env, FIXTURE_ROOT: fixture.replaceAll('\\', '/'),
         PIN: 'a'.repeat(40), FIRST_FAIL: String(firstFail) },
     });
-    assert.equal(result.status, firstFail ? 1 : 0, result.stderr + result.stdout);
-    assert.equal(readFileSync(join(fixture, 'query'), 'utf8'), firstFail ? '1' : '3');
-    if (!firstFail) {
+    const exhausted = firstFail === true;
+    assert.equal(result.status, exhausted ? 1 : 0, result.stderr + result.stdout);
+    assert.equal(readFileSync(join(fixture, 'query'), 'utf8'), exhausted ? '4' : '3');
+    if (!exhausted) {
       assert.equal(readFileSync(join(fixture, 'artifact'), 'utf8'), '3');
       assert.equal(readFileSync(join(fixture, 'zip'), 'utf8'), '3');
     }
