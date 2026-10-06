@@ -151,6 +151,7 @@ test('the segmented fallback names what failed in both the notice and the log', 
   assert.match(h.notices[0], /no workers/, 'and the reason');
   assert.match(h.notices[0], /single engine/, 'and what the app fell back to');
   assert.equal(h.logs.length, 1, 'the console gets the thrown value too');
+  assert.match(h.logs[0][0], /resize/, 'the log names the operation');
   assert.equal(h.logs[0][1], err, 'unwrapped, so its stack survives');
 });
 
