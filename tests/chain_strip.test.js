@@ -337,7 +337,7 @@ test('the viewport offset survives the rebuild a committed edit forces', async (
 
 test('clicking a chip header toggles its pinned selection', async () => {
   const h = await makeStrip();
-  chipByLabel(h, 'warp2').dispatch('click');
+  chipByLabel(h, 'warp2').querySelector('.chain-chip-name').dispatch('click');
 
   assert.equal(h.store.selectedLabel(), 'warp2');
   assert.deepEqual(h.selections, ['warp2']);
@@ -346,6 +346,11 @@ test('clicking a chip header toggles its pinned selection', async () => {
     'aria-current carries the selection a group cannot express as aria-selected');
   assert.equal(h.doc.activeElement, chip, 'the selected chip takes focus');
   assert.equal(chipByLabel(h, 'camera').getAttribute('aria-current'), null);
+
+  chipByLabel(h, 'warp2').querySelector('.chain-param-control').dispatch('click');
+  assert.equal(h.store.selectedLabel(), 'warp2', 'a click inside the parameters keeps the card pinned');
+  assert.deepEqual(h.selections, ['warp2']);
+  assert.equal(chipByLabel(h, 'warp2').getAttribute('aria-current'), 'true');
 
   chipByLabel(h, 'warp2').dispatch('click');
   assert.equal(h.store.selectedLabel(), null);
