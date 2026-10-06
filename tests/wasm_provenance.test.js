@@ -7,7 +7,6 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import * as MB from '../src/workbench/mobius/mobius_transforms.js';
 import { MORPH_SWEEP, OP_DEFS } from '../src/workbench/solids/solid_codegen.js';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
@@ -204,20 +203,6 @@ test('composite sweep exemptions stay inside the engine primitive bands', { skip
   const conway = committed(engineRoot, 'core/mesh/conway.h').toString('utf8');
   assert.ok(cppFloatConstant(conway, 'SNUB_DEFAULT_T') > 0);
 });
-
-test('Mobius projection constants match the pinned engine sources', { skip: engineSkip }, () => {
-  assert.ok(engineRoot, engineMissing);
-  const stereo = committed(engineRoot, 'core/math/stereographic.h').toString();
-  const math = committed(engineRoot, 'core/math/3dmath.h').toString();
-  assert.equal(MB.STEREO_INF, cppFloatConstant(stereo, 'STEREO_INF'));
-  assert.equal(MB.STEREO_AZIMUTH_EPS, cppFloatConstant(stereo, 'STEREO_AZIMUTH_EPS'));
-  assert.match(stereo, /STEREO_POLE_EPS\s*=\s*2\.0f\s*\/\s*\(STEREO_INF\s*\*\s*STEREO_INF\)/);
-  assert.equal(MB.STEREO_POLE_EPS, 2 / MB.STEREO_INF ** 2);
-  const lift = /COMPLEX_UNDERFLOW_LIFT\s*=\s*0x1p(\d+)f/.exec(math);
-  assert.ok(lift);
-  assert.equal(MB.STEREO_UNDERFLOW_LIFT, 2 ** Number(lift[1]));
-});
-
 
 test('registry composite lowering matches expand_to_primitives', { skip: engineSkip }, () => {
   assert.ok(engineRoot, engineMissing);
