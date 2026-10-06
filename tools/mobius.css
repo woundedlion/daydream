@@ -132,7 +132,7 @@
   touch-action: none;
 }
 
-/* Visible keyboard-focus ring for the pad's per-axis slider handles. */
+/* Highlights the axis whose off-screen slider handle has keyboard focus. */
 .complex-plane-control:has([aria-orientation="horizontal"]:focus-visible) .axis-h,
 .complex-plane-control:has([aria-orientation="vertical"]:focus-visible) .axis-v {
   background-color: var(--blue-400);
