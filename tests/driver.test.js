@@ -1039,11 +1039,11 @@ test('setupContextLossHandling starts unlost behind a hidden overlay', () => {
   assert.equal(ctx.contextLostOverlay.getAttribute('role'), 'alert');
   assert.equal(ctx.contextLostOverlay.tabIndex, -1);
   assert.equal(ctx.contextLostOverlay.style.display, 'none');
-  // An untyped button defaults to submit inside a form.
   assert.equal(ctx.contextLostOverlay.querySelector('.load-error-title').tagName, 'SPAN');
   assert.equal(ctx.contextLostDetail.tagName, 'SPAN');
   const reload = ctx.contextLostOverlay.querySelector('.context-lost-reload');
   assert.equal(reload.tagName, 'BUTTON');
+  // An untyped button defaults to submit inside a form.
   assert.equal(reload.type, 'button');
 });
 
