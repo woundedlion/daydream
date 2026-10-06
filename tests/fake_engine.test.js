@@ -29,7 +29,8 @@ test('the fake chain engine exposes status identities on every return path', () 
   engine.nextChainResult = { code: 'ARENA_OVERFLOW', entryIndex: -1 };
   assert.equal(engine.bindings.setShaderChain([]).status, ChainStatus.ARENA_OVERFLOW);
   assert.equal(engine.bindings.setShaderChain([]).status, ChainStatus.EMPTY);
-  assert.equal(engine.bindings.setShaderChain(Array.from({ length: 33 }, () => ({}))).status,
+  assert.equal(engine.bindings.setShaderChain(
+    Array.from({ length: engine.catalog.budgets.max_chain_ops + 1 }, () => ({}))).status,
     ChainStatus.TOO_LONG);
   const duplicate = { instance: 'same', operator: 'sphere.rotate.v2' };
   assert.equal(engine.bindings.setShaderChain([duplicate, duplicate]).status, ChainStatus.DUPLICATE_INSTANCE);
