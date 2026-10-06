@@ -55,7 +55,7 @@ function metrics(over = {}) {
 }
 
 /**
- * Runs `body` with console.warn captured.
+ * Runs `body` with console.error and console.warn captured.
  * @param {Function} body - Code to run under the capture.
  * @returns {Array<string>} One joined message per call.
  */
