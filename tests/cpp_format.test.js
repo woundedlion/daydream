@@ -90,10 +90,6 @@ test('formatFloatCpp: round-trips float32 across a value sweep', () => {
     `${notRoundTripped.length} of ${values.length} did not round-trip`);
 });
 
-/**
- * Non-finite input throws rather than emitting "NaNf" / "Infinityf", which the
- * C++ compiler would reject far from the GUI value that produced it.
- */
 test('formatFloatCpp: non-finite input throws', () => {
   for (const bad of [NaN, Infinity, -Infinity]) {
     assert.throws(() => formatFloatCpp(bad), /non-finite value/);

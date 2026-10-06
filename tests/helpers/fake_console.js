@@ -1,9 +1,6 @@
 //
-// Shared console capture for the suites that assert on a module's diagnostics
-// rather than letting them print into the suite output. Records both the
-// argument lists as they were passed and the same calls joined into one string
-// each, so a test can match on a message or identify the very Error object a
-// module logged.
+// Console capture: records each call's argument list and the same call joined
+// into one string.
 import { mock } from 'node:test';
 
 /**

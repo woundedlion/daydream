@@ -1,21 +1,9 @@
 //
-// daydream.js is the app's composition root. tests/daydream_start.test.js drives
-// start(deps) up to the point the WASM load is kicked off, and
-// tests/app_lifecycle.test.js drives the factories it composes. What is left
-// here is the half of the boot that only runs once a module lands — the engine
-// the load builds, the initial apply, the recorder the controls are handed, the
-// resolution dropdown narrowed to what the engine reports, and the release paths
-// a discard racing that startup takes — plus the two control blocks start()
-// lifts out, driven through their factories. Each case asserts on what the page
-// ends up showing or holding, so it survives a re-shaping of start() and reds a
-// wrong one.
+// daydream.js's composition root once its WASM module lands, plus the control
+// blocks start() lifts out, driven through their factories.
 //
-// Three cases below read the source: the owner tag the root hands the
-// segmented controls, which only a real worker pool could raise a notice
-// through; and the two halves of the workbench init rejection, whose controller
-// the fake document carries none of the element ids for. Each is anchored on the
-// call site rather than the factory definition above it, and each says which
-// failure it stands in for.
+// Cases that read the source anchor on the call site and name the failure they
+// stand in for.
 import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -246,8 +234,6 @@ test('a booted render reconciles live panel values', async () => {
   assert.equal(controls.find((control) => control.property === 'Speed').getValue(), 0.75);
 });
 
-// The double every case below boots on: a method the real engine never had
-// would let all of them pass over a surface the browser cannot answer.
 test('the boot double mocks only methods the engine has', () => {
   const { HolosphereEngine } = fakeWasmModule();
   assert.deepEqual(unpinnedEngineMethods(new HolosphereEngine()), []);
@@ -685,7 +671,7 @@ test('the segmented controls have their own notice owner', () => {
   const owners = [...SOURCE.matchAll(/const \w+_NOTICE = '([^']+)'/g)].map((match) => match[1]);
   assert.ok(owners.length > 1);
   assert.equal(new Set(owners).size, owners.length);
-  // The call site, not the definition above it: the owner tag is the root's.
+  // The call site, not the definition: the owner tag is the root's.
   const at = SOURCE.lastIndexOf('createSegmentedPovControls(');
   assert.ok(at >= 0, 'the segmented controls must stay wired to their factory');
   assert.match(sliceTo(at, '\n  });'),
@@ -871,9 +857,7 @@ test('the resolution dropdown offers only what the engine reports', async () => 
     + 'first paint, not left advertised by the GUI and the URL');
 });
 
-// Both lil-gui options() behaviours, which tests/lil_gui_contract.test.js pins
-// against the real widget: the narrowing runs on every boot, so the dropdown
-// the page is left with has to still drive a switch under either.
+// Both lil-gui options() behaviours.
 for (const optionsReplaces of [false, true]) {
   const branch = optionsReplaces ? 'a replaced' : 'an updated';
   test(`${branch} resolution dropdown still drives a switch`, async () => {

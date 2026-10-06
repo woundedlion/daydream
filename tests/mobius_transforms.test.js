@@ -85,10 +85,8 @@ test('cadd computes (a+bi)+(c+di)', () => {
 
 
 // --- GLSL/JS parity -------------------------------------------------------
-// The shader can't import the JS module, so the GLSL source for cmult/cadd
-// lives in mobius_transforms.js (glslComplexFunctions). These tests transpile
-// that GLSL body to JS and assert it agrees with the JS functions, so the two
-// implementations cannot silently diverge.
+// glslComplexFunctions' GLSL cmult/cadd, transpiled to JS and compared with the
+// JS functions.
 
 /**
  * Transpiles the body of one `CNum NAME(...) { ... return CNum(RE, IM); }`
@@ -108,8 +106,7 @@ function transpileGlslCNum(src, name, params = ['p', 'q']) {
   }
   // GLSL -> JS: `float` decls become `let`, the built-in math functions gain
   // their `Math.` prefix, and `CNum(re, im)` constructors become `{ re, im }`
-  // objects. Constructors can nest parens, so split args by the top-level comma
-  // rather than with a regex.
+  // objects. Constructors can nest parens, so split args by the top-level comma.
   const js = constructorToObject(body.slice(open + 1, end)
     .replace(/\bfloat\b/g, 'let')
     .replace(/\b(sqrt|abs|max|min)\(/g, 'Math.$1('), 'CNum');
@@ -150,10 +147,8 @@ test('GLSL complex ops match the JS implementations', () => {
 });
 
 // --- projection-domain conventions ----------------------------------------
-// These mirror core/math/stereographic.h and core/math/mobius.h (STEREO_INF, stereo, project_div). The
-// engine owns them; the shader renders what the engine will run, so a
-// divergence would make the preview lie about the pole cap and about a
-// near-singular divisor.
+// Mirrors of core/math/stereographic.h and core/math/mobius.h (STEREO_INF,
+// stereo, project_div).
 
 /** The GLSL prelude declares the same projection constants the JS module exports. */
 test('glslProjectionFunctions constants match the JS exports', () => {
@@ -296,7 +291,7 @@ test('GLSL projection ops match the JS implementations', () => {
 
 // --- preset generators ----------------------------------------------------
 
-/** Every preset generator the module exports, keyed by its export name. */
+/** Preset generators, keyed by export name. */
 const GENERATORS = { elliptic, hyperbolic, loxodromic, parabolic, inversion, tumble, cayley };
 
 /** Every preset starts from the identity coefficients (A=1, B=0, C=0, D=1). */
@@ -444,10 +439,9 @@ test('mobiusCodeString formats fractional preset coefficients', () => {
 });
 
 /**
- * Six of the presets are unimodular: AD - BC stays at 1 for every t, so a
- * negated term, a swapped coefficient or a lost reciprocal fails here. cayley
- * blends toward a non-unimodular map, so it only has to stay non-degenerate;
- * its determinant runs from 1 at p=0 to 2i at p=1.
+ * The unimodular presets keep AD - BC at 1 for every t. cayley blends toward a
+ * non-unimodular map, so it only has to stay non-degenerate; its determinant
+ * runs from 1 at p=0 to 2i at p=1.
  */
 test('preset generators hold their determinant across a range of t', () => {
   const unimodular = { elliptic, hyperbolic, loxodromic, parabolic, inversion, tumble };

@@ -623,11 +623,7 @@ test('an unknown preset changes nothing', () => {
   assert.match(app.errors[0], /Unknown resolution preset "Mid"/);
 });
 
-/**
- * The resolution comes from a hand-editable URL param, so a preset lookup must
- * see own keys only: `Object.prototype` supplies a truthy value for every one of
- * its names, and the dimensions read off it are undefined.
- */
+/** The resolution comes from a hand-editable URL param; a preset lookup sees own keys only. */
 test('an inherited property name is not a preset', () => {
   for (const name of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
     const app = makeApp({ resolution: name });
@@ -657,8 +653,7 @@ test('a failed size query still lists the effects the resolution offers', () => 
 });
 
 // HS_CHECK raises the flag ahead of a __builtin_trap() that unwinds nothing, so
-// every later call runs on a permanently shortened shadow stack. Degrading the
-// query to a warning walks the rest of the apply over that.
+// every later call runs on a permanently shortened shadow stack.
 test('a size query that trapped the module aborts the apply instead of warning', () => {
   const trap = new Error('unreachable');
   const app = makeApp({ sizesFailure: trap, moduleDead: true });
@@ -703,10 +698,7 @@ test('an off-list effect is corrected and applied exactly once', () => {
 
 /**
  * The correction is written muted, so a refused effect is reported through this
- * call's REJECTED return and the caller's resolution rollback recovers. An
- * un-muted write would open an effect transaction inside the resolution one,
- * whose rollback re-applies the off-list effect the new resolution does not
- * offer — a failure the outer rollback would have survived.
+ * call's REJECTED return and the caller's resolution rollback recovers.
  */
 test('a correction the engine refuses does not re-enter the subscription', () => {
   const app = makeApp({

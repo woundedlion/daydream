@@ -344,9 +344,7 @@ function disposeCtx(mesh, log) {
     onCanvasBlur: () => {},
   };
   // Pre-registered exactly as setupContextLossHandling() and
-  // setupKeyboardOrbit() register them, so a removal that drifts on handler
-  // identity or capture flag throws in fakeElement instead of leaving the
-  // listener on a canvas the page is done with.
+  // setupKeyboardOrbit() register them.
   const canvas = fakeElement('canvas');
   canvas.addEventListener('webglcontextlost', handlers.onContextLost, false);
   canvas.addEventListener('webglcontextrestored', handlers.onContextRestored, false);
@@ -459,8 +457,7 @@ test('dispose releases the observer, listeners, and GPU resources', () => {
     'the drawing context was released before the renderer freed its objects');
 });
 
-// The loop's stop is dispose()'s; its start belongs to the same owner, so the
-// page never reaches past the driver for the renderer.
+// The loop's stop is dispose()'s; its start belongs to the same owner.
 test('startFrameLoop drives the callback through the renderer', () => {
   const loops = [];
   const ctx = { renderer: { setAnimationLoop: (frame) => loops.push(frame) } };
@@ -530,8 +527,8 @@ test('stepSimulation flags the color upload on a normal frame', () => {
 
 test('stepSimulation adds no upload flag when a mid-frame heap growth detached the view', () => {
   const ctx = stepCtx(new Uint16Array(4));
-  // daydream.js's adapter flags the upload, then sync() -> getParamValues()
-  // grows the heap and detaches the view it just flagged.
+  // The draw flags the upload, then a heap growth detaches the view it just
+  // flagged.
   const effect = {
     drawFrame: () => {
       ctx.dotMesh.instanceColor.needsUpdate = true;
@@ -1037,8 +1034,7 @@ test('setupContextLossHandling starts unlost behind a hidden overlay', () => {
   assert.equal(ctx.contextLostOverlay.getAttribute('role'), 'alert');
   assert.equal(ctx.contextLostOverlay.tabIndex, -1);
   assert.equal(ctx.contextLostOverlay.style.display, 'none');
-  // The bootstrap load-failure overlay shares these classes, so both build the
-  // same elements; an untyped button defaults to submit inside a form.
+  // An untyped button defaults to submit inside a form.
   assert.equal(ctx.contextLostOverlay.querySelector('.load-error-title').tagName, 'SPAN');
   assert.equal(ctx.contextLostDetail.tagName, 'SPAN');
   const reload = ctx.contextLostOverlay.querySelector('.context-lost-reload');
@@ -1256,10 +1252,8 @@ function dotPosition(x, y, w, h) {
 }
 
 /**
- * Every instance carries the engine's own pixel, in the engine's frame. A
- * mirrored azimuth or a transposed index keeps the dots on the sphere, facing
- * outward, one per row and column, and draws exactly as many of them, so only
- * the position itself separates the two.
+ * Every instance carries the engine's own pixel, in the engine's frame; only
+ * the position separates a mirrored azimuth or a transposed index.
  */
 test('precomputeMatrices puts each instance on the pixel its index names', () => {
   const ctx = matricesCtx(8, 5);
@@ -1316,10 +1310,8 @@ test('precomputeMatrices allocates a zeroed color buffer the driver aliases', ()
 });
 
 /**
- * The engine writes 16-bit linear channels straight into this buffer, so the
- * attribute is what scales them to the shader's [0,1]. Dropping the normalized
- * flag uploads the same bytes as raw 0..65535 — every lit dot saturates, with
- * no change to the instance count or the draw call.
+ * The engine writes 16-bit linear channels straight into this buffer; the
+ * attribute's normalized flag scales them to the shader's [0,1].
  */
 test('the color buffer uploads as normalized Uint16, so full scale reads as 1', () => {
   const ctx = matricesCtx(8, 5);
@@ -1365,9 +1357,6 @@ test('precomputeMatrices flags both instance attributes for upload', () => {
   assert.equal(ctx.dotMesh.instanceColor.version, 1);
 });
 
-// The composition runs synchronously inside the resolution handler over W*H
-// instances, and a user toggling back to a preset asks for matrices already
-// derived once.
 test('precomputeMatrices reuses a grid it has already composed', () => {
   const first = matricesCtx(8, 5);
   Daydream.prototype.precomputeMatrices.call(first);
@@ -1694,20 +1683,17 @@ test('an unavailable preset leaves the running arrow key unclaimed', () => {
 // source-read checks
 // ---------------------------------------------------------------------------
 
-// The constructor needs a WebGL context, so every case above drives a prototype
-// method over a hand-built `this`. What the constructor itself does, and the
-// class's field roster, are read out of the source instead.
+// The constructor needs a WebGL context, so its wiring and the class's field
+// roster are read out of the source.
 const DRIVER_SOURCE = readFileSync(new URL('../src/renderer/driver.js', import.meta.url), 'utf8');
 
 /**
- * The constructor requires a WebGL context, so its wiring is read
- * rather than run. A collaborator that defaults its document to the global is
- * the one construction that can silently bind the wrong page: nothing throws,
- * and the driver's stated contract — it reads no globals of its own — is gone.
+ * The driver reads no globals of its own, so every collaborator that defaults
+ * its document to the global is handed the driver's.
  */
 test('the driver hands its own document to every collaborator that defaults to the global', () => {
   // Every class the driver could build whose constructor takes an optional doc,
-  // derived from its own module rather than listed here.
+  // derived from its own module.
   const imports = [...DRIVER_SOURCE.matchAll(/^import \{([^}]*)\} from ['"](\.{1,2}\/[^'"]+)['"]/gmu)];
   assert.ok(imports.length > 0, 'the relative named import scan stopped matching');
   const modules = imports
@@ -1723,8 +1709,7 @@ test('the driver hands its own document to every collaborator that defaults to t
     .map(([, name]) => name).filter((name) => name !== 'Daydream');
   assert.ok(local.includes('LabelPool'));
   const collaborators = [...modules, ...local];
-  // Guards the derivation, not the roster: pinning the member names would red
-  // on a reformat that leaves the threading intact.
+  // Guards the derivation, not the roster.
   assert.ok(collaborators.length > 0,
     'no doc-defaulting collaborator was derived; the patterns above stopped matching');
 
@@ -1754,7 +1739,7 @@ const CONTEXT_SINKS = new Set(['sized', 'handlers', 'classes', 'acquired']);
 
 /** Context keys that are neither driver state, a stand-in for a prototype
  *  method, nor a declared test sink.
- * @param {Object} ctx - Context object from one of the factories above.
+ * @param {Object} ctx - Context object from a context factory.
  * @returns {Array<string>} Unpinned key names, sorted.
  */
 function unpinnedContextFields(ctx) {

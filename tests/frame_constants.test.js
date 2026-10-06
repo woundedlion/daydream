@@ -6,8 +6,7 @@ import { FPS, SLOW_FRAME_MS } from '../src/renderer/frame_constants.js';
 
 const README = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
 
-// The cadence is a fact about the ring, not a tunable: the sphere draws one
-// frame per side per revolution, so the README's rotation row derives it.
+// One frame per side per revolution; the README's rotation row derives the cadence.
 test('the simulation cadence matches the physical sphere', () => {
   const rotation = README.match(
     /\| Rotation \| (\d+) RPM \((\d+) revolutions\/second\), (\d+) FPS from (\d+) sides of the ring \|/);

@@ -1,9 +1,7 @@
 //
-// Daydream.advanceFrameClock is the fixed-timestep gate for the main (non-
-// segmented) render loop: it accrues real elapsed time, clamps the backlog to
-// avoid a spiral-of-death, and consumes at most one frame interval per call. It
-// reads only this.clock/paused/timeAccumulator/frameInterval plus the static
-// backlog cap, so it runs standalone via prototype.call over a stubbed `this`.
+// Daydream.advanceFrameClock: accrues elapsed time, clamps the backlog, and
+// consumes at most one frame interval per call. Run via prototype.call over a
+// stubbed `this`.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Daydream } from '../src/renderer/driver.js';

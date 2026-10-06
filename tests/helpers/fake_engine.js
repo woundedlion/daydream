@@ -1,7 +1,6 @@
 //
 // Single source of truth for the HolosphereEngine method surface the tests
-// stand in for: engine_contract_wasm.test.js pins the real WASM module against
-// this list, and every FakeEngine is checked to mock nothing outside it.
+// stand in for, pinned against the real WASM module.
 import { readFileSync } from 'node:fs';
 
 /** Instance methods the tests' engine fakes stand in for. */
@@ -18,13 +17,12 @@ export const ENGINE_METHODS = [
 
 /**
  * The rest of the documented engine surface (README §10.2): read through
- * optional calls, or driven by no fake at all. Pinned all the same, so a fake
- * that grows one of them is not reported as mocking a method the engine lacks.
+ * optional calls, or driven by no fake at all.
  */
 export const ENGINE_OPTIONAL_METHODS = [
   'getShaderChainBindings',
   'getAnimationsPaused', 'getPresetIds', 'getPoleLod',
-  // embind's own handle release, which engine_host.js calls on teardown.
+  // embind's own handle release.
   'delete',
 ];
 
@@ -39,8 +37,7 @@ export const SHADER_CHAIN_BINDING_METHODS = [
  * that setParameter returns. Values are distinct frozen objects so identity
  * comparison behaves like embind's cached enum instances; consumers must
  * compare against these values, never by truthiness (every value is a truthy
- * object). engine_contract_wasm.test.js pins the name roster against the real
- * module.
+ * object).
  */
 export const ParamSetResult = Object.freeze({
   APPLIED: Object.freeze({ value: 0 }),
@@ -56,8 +53,7 @@ export const ParamSetResult = Object.freeze({
 /**
  * Mirror of the module-level ClipSetResult embind enum (targets/wasm/engine_bindings.h)
  * that setClip returns, under the same identity-comparison contract as
- * ParamSetResult above. engine_contract_wasm.test.js pins the name roster
- * against the real module.
+ * ParamSetResult.
  */
 export const ClipSetResult = Object.freeze({
   APPLIED: Object.freeze({ value: 0 }),
@@ -68,10 +64,9 @@ export const ClipSetResult = Object.freeze({
 
 /**
  * Mirror of the module-level ResolutionSetResult embind enum that setResolution
- * returns, under the same identity-comparison contract as ParamSetResult above.
+ * returns, under the same identity-comparison contract as ParamSetResult.
  * RESIZED and ALREADY_ACTIVE are both successes; only RESIZED tears the effect
- * down. engine_contract_wasm.test.js pins the name roster against the real
- * module.
+ * down.
  */
 export const ResolutionSetResult = Object.freeze({
   RESIZED: Object.freeze({ value: 0 }),
@@ -81,8 +76,7 @@ export const ResolutionSetResult = Object.freeze({
 
 /**
  * Mirror of the module-level EffectSetResult embind enum that setEffect
- * returns, under the same identity-comparison contract as ParamSetResult above.
- * engine_contract_wasm.test.js pins the name roster against the real module.
+ * returns, under the same identity-comparison contract as ParamSetResult.
  */
 export const EffectSetResult = Object.freeze({
   INSTALLED: Object.freeze({ value: 0 }),
@@ -124,11 +118,10 @@ const CHAIN_CATALOG_TEXT = readFileSync(
 ).replace(/\n$/, '');
 
 /**
- * Stand-in for the chain-capable engine surface src/workbench/shader/chain_apply.js drives:
- * setShaderChain with the module's payload-shape checks, parameter definitions
- * rebuilt from the pinned catalog on every APPLIED (with the generation bump
- * the real engine makes), and an injectable refusal. Every method it mocks is
- * pinned in the engine or shader binding method lists.
+ * Stand-in for the chain-capable engine surface: setShaderChain with the
+ * module's payload-shape checks, parameter definitions rebuilt from the pinned
+ * catalog on every APPLIED (with the generation bump the real engine makes),
+ * and an injectable refusal.
  */
 export class FakeChainEngine {
   /** The pinned operator catalog, byte-identical to the module export. */

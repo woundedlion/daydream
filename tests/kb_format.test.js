@@ -17,13 +17,12 @@ test('formatKB: defaults to one fractional digit', () => {
   assert.equal(formatKB(1536, 2), '1.50');
 });
 
-/** Capacities are shown whole, so sub-KB values must round rather than truncate. */
+/** Sub-KB values round at the requested width. */
 test('formatKB: rounds at the requested width', () => {
   assert.equal(formatKB(1800, 0), '2');
   assert.equal(formatKB(100), '0.1');
 });
 
-/** No unit suffix: callers compose their own separators and labels. */
 test('formatKB: appends no unit suffix', () => {
   assert.equal(formatKB(4096), '4.0');
   assert.equal(formatKB(4096, 0), '4');

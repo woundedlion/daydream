@@ -1,8 +1,5 @@
 //
-// gui.js — DeepLinkGUI URL hydration (dropdown, slider, checkbox), per-root key
-// namespacing, and the debounced URL writer, against a stubbed lil-gui.
-//
-// Run: npm test
+// gui.js's DeepLinkGUI and URL writers, against a stubbed lil-gui.
 import { fakeTimers } from './helpers/fake_timers.js';
 import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -230,12 +227,9 @@ test('rollback restores an unflushed control value to runtime sinks and URL', ()
 });
 
 /**
- * Verifies a garbage ?resolution= does not survive DeepLinkGUI hydration. add()
- * re-reads the raw URL; an out-of-list value would re-inject an invalid
- * resolution into appState, so the value is rejected against the option list.
- * Because the value was rejected, the bound default is left in place and the applyOnLoad
- * replay does NOT fire — replaying would push the default back through onChange,
- * while the URL writer canonicalizes the rejected token to the default.
+ * Verifies a garbage ?resolution= is rejected against the option list: the
+ * bound default stays, no applyOnLoad replay fires, and the URL writer
+ * canonicalizes the rejected token to the default.
  */
 test('DeepLinkGUI.add ignores an out-of-list URL value for a dropdown', () => {
   const url = installRecordingWindow('?resolution=GARBAGE');
@@ -304,10 +298,8 @@ test('DeepLinkGUI.add with no matching URL param keeps the default', () => {
 
 /**
  * Verifies the numeric (slider) path clamps an out-of-range URL value to the
- * control's registered min/max — the add(obj, prop, min, max) bounds. A deep
- * link past the slider range must land at the boundary, not drive the engine
- * out of range, the clamped value replays through onChange, and the corrected
- * value is written back to the URL so the stale out-of-range one is replaced.
+ * add(obj, prop, min, max) bounds; the clamped value replays through onChange
+ * and is written back to the URL.
  */
 test('DeepLinkGUI.add clamps an out-of-range numeric URL value to the slider min/max', () => {
   let lastUrl = '/';
@@ -457,8 +449,7 @@ test('a refused hydrated value is corrected before the next reload', () => {
 
 /**
  * addSession is the deep-link opt-out: a session control is neither seeded from
- * the URL nor written back, so a copied link cannot auto-activate a cycler or a
- * recording toggle.
+ * the URL nor written back.
  */
 test('DeepLinkGUI.addSession keeps a session control out of the URL', () => {
   const url = installRecordingWindow('?Cycle=on');
@@ -480,8 +471,7 @@ test('DeepLinkGUI.addSession keeps a session control out of the URL', () => {
 
 /**
  * Verifies a non-numeric URL value for a numeric control (e.g. ?speed=fast →
- * NaN) is rejected: the bound default is kept and no applyOnLoad replay fires, so
- * a malformed deep link never reaches the engine as NaN.
+ * NaN) is rejected: the bound default is kept and no applyOnLoad replay fires.
  */
 test('DeepLinkGUI.add rejects a non-numeric URL value for a slider', () => {
   const url = installRecordingWindow('?speed=fast');
@@ -554,10 +544,9 @@ test('DeepLinkGUI.add maps boolean URL spellings for a checkbox', () => {
 });
 
 /**
- * Pins the deep-link path an effect GUI relies on: addParamControllers() adds a
- * control and only then registers the onChange that writes the engine, so the
- * URL value reaches the engine solely through the load-time replay. Mirrors that
- * wiring — 'fx' root, add() then onChange() — for a slider and a checkbox.
+ * Verifies a control whose onChange is registered after add() receives the URL
+ * value through the load-time replay, for a slider and a checkbox on an 'fx'
+ * root.
  */
 test('a ?param=value deep link reaches the engine through the replayed handler', () => {
   installWindowAt('?fx.Speed=0.7&fx.Glow=on');
@@ -690,8 +679,7 @@ test('a display folder does not push a later real folder off its own key', () =>
 /**
  * Verifies the tool-page fallback writer (no active URLSync) merges, not
  * overwrites, params changed within the debounce window: two keys set before
- * the shared timer fires must both reach the URL so neither is lost from the
- * deep link.
+ * the shared timer fires both reach the URL.
  */
 test('makeUrlParamWriter merges multiple keys changed within the debounce window', () => {
   let lastUrl = '/';
@@ -715,9 +703,7 @@ test('makeUrlParamWriter merges multiple keys changed within the debounce window
 });
 
 /**
- * The standalone-page fallback commit must preserve location.hash: a tool page
- * using a fragment would otherwise lose it on the first GUI change (URLSync,
- * used by the main app, already preserves it).
+ * The standalone-page fallback commit preserves location.hash.
  */
 test('makeUrlParamWriter preserves location.hash in the fallback commit', () => {
   let lastUrl = '/';
@@ -738,8 +724,7 @@ test('makeUrlParamWriter preserves location.hash in the fallback commit', () => 
 });
 
 /**
- * The fallback commit must serialize exactly as URLSync does, so a tool page and
- * the app produce the same link for the same value: numbers rounded to
+ * The fallback commit serializes exactly as URLSync does: numbers rounded to
  * significant digits, and a value with no URL form dropping its param.
  */
 test('makeUrlParamWriter serializes numbers and deletions like URLSync', () => {
@@ -784,8 +769,7 @@ function installRecordingWindow(search, hash = '') {
 
 /**
  * The URL writer is shared root→children, so a child folder's destroy() must not
- * cancel a write the surviving root still owes: tearing down one folder of a
- * rebuilt panel would otherwise drop the pending deep link.
+ * cancel a write the surviving root still owes.
  */
 test('destroying a child folder leaves the shared root URL writer armed', () => {
   const url = installRecordingWindow('');
@@ -808,8 +792,7 @@ test('destroying a child folder leaves the shared root URL writer armed', () => 
 });
 
 /**
- * A discarded root must leave no armed timer: the 200 ms write would otherwise
- * fire history.replaceState into a page the GUI no longer belongs to.
+ * A discarded root leaves no armed timer.
  */
 test('destroying the root cancels its pending URL write', () => {
   const url = installRecordingWindow('');
@@ -829,8 +812,8 @@ test('destroying the root cancels its pending URL write', () => {
 });
 
 /**
- * The no-URLSync fallback — the branch every standalone tool page takes — clears
- * deep-link params, keeps the excluded ones, and preserves the fragment.
+ * The no-URLSync fallback clears deep-link params, keeps the excluded ones, and
+ * preserves the fragment.
  */
 test('resetGUI clears deep-link params except the excluded ones on a tool page', () => {
   const url = installRecordingWindow('?Speed=0.5&Sides=7&keep=1', '#tool');
@@ -871,8 +854,7 @@ test('resetGUI routes through the active URLSync', () => {
 /**
  * An effect switch resets the param URL and rebuilds the panel inside one
  * debounce window, so a control added there seeds from the engine, not from the
- * URL entry on its way out — effects share param names, and the outgoing
- * effect's value would otherwise hydrate the incoming one's slider.
+ * URL entry on its way out.
  */
 test('a control added inside a scheduled reset ignores the params it drops', () => {
   installRecordingWindow('?fx.Alpha=0.75&view.poleLod=1.5&effect=Old');

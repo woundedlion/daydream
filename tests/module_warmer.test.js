@@ -60,8 +60,7 @@ test('warmModules revalidates the whole worker module graph', async () => {
     },
   });
 
-  // Derived from the worker's own import graph plus the binary its glue
-  // streams, so a module joining the graph is one the warm must drain too.
+  // The worker's own import graph plus the binary its glue streams.
   const graph = [...GRAPH, 'generated/holosphere_wasm.wasm?v=abc123'];
   assert.deepEqual(calls.map(([url]) => url).sort(),
     graph.map((file) => `http://localhost:8000/${file}`).sort(),
@@ -71,8 +70,7 @@ test('warmModules revalidates the whole worker module graph', async () => {
     assert.equal(options.cache, 'no-cache');
     assert.equal(options.signal.aborted, false);
   }
-  // One controller for the graph: the deadline abandons the whole warm or none
-  // of it.
+  // One controller for the graph: the deadline abandons the whole warm.
   assert.equal(new Set(calls.map(([, options]) => options.signal)).size, 1);
 });
 
@@ -156,8 +154,7 @@ test('the dedupe window covers one base URL, not every caller in it', async () =
   });
   seen.length = 0;
 
-  // Another base URL is another module graph: serving it the first warm's
-  // promise would report a warm of files it never fetched.
+  // Another base URL is another module graph.
   await warmer.warm({
     ...deps,
     baseUrl: 'http://localhost:8000/second/src/segments/segment_controller.js',
@@ -188,8 +185,6 @@ test('a warm whose fetch throws synchronously does not claim the window', async 
   } finally {
     stub.mock.restore();
   }
-  // Silent here alone, where every other warm failure reports itself, a pool
-  // that spawned with no shared compilation leaves nothing to explain why.
   assert.equal(warned.length, 1, 'the refused warm is reported');
   assert.match(String(warned[0][0]), /module warm could not be started/);
   assert.match(String(warned[0][1]), /network down/);

@@ -3,15 +3,13 @@ import assert from 'node:assert/strict';
 
 const { formatExportParams } = await import('../src/shared/export_params.js');
 
-/** Each value renders through the shared formatFloatCpp (trailing zeros trimmed,
- *  whole values keep one fractional digit) inside a brace-init list. */
+/** Trailing zeros trimmed; whole values keep one fractional digit. */
 test('formatExportParams: emits a C++ float brace-init list', () => {
   const params = [{ name: 'A' }, { name: 'B' }];
   assert.equal(formatExportParams(params, [0.85, 1]), '{ 0.85f, 1.0f }');
 });
 
-/** Readonly params (e.g. MindSplatter's engine-written active_count) are dropped
- *  so their live per-frame values never bake into the preset. */
+/** Readonly params hold engine-written live values and never bake into a preset. */
 test('formatExportParams: skips readonly params', () => {
   const params = [
     { name: 'Friction' },
@@ -25,8 +23,7 @@ test('formatExportParams: skips readonly params', () => {
     '{ 0.85f, 1.0f, 0.025f, 0.2f }');
 });
 
-/** A readonly param in the middle must drop only its own value; the surviving
- *  values stay indexed by their param position, not a filtered position. */
+/** Surviving values stay indexed by their param position. */
 test('formatExportParams: skips a middle readonly param', () => {
   const params = [{ name: 'A' }, { name: 'B', readonly: true }, { name: 'C' }];
   assert.equal(formatExportParams(params, [0.1, 0.2, 0.3]), '{ 0.1f, 0.3f }');
@@ -68,8 +65,6 @@ test('formatExportParams: emits a whole-number param as an integer literal', () 
   assert.equal(formatExportParams(params, [18]), '{ 18 }');
 });
 
-/** Only a float-backed enum can hold a fraction under a step of 1, and its
- *  target is a float. */
 test('formatExportParams: keeps a fractional stepped value a float literal', () => {
   const params = [{ name: 'Shape', options: ['Star', 'Heart'], step: 1 }];
   assert.equal(formatExportParams(params, [0.5]), '{ 0.5f }');
@@ -82,7 +77,6 @@ test('formatExportParams: emits a toggle as a C++ bool literal', () => {
   assert.equal(formatExportParams(params, [0, 1]), '{ false, true }');
 });
 
-/** An all-readonly param set yields empty braces rather than a malformed list. */
 test('formatExportParams: all-readonly yields empty braces', () => {
   const params = [{ name: 'X', readonly: true }];
   assert.equal(formatExportParams(params, [1]), '{  }');

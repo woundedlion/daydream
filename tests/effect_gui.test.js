@@ -23,11 +23,8 @@ import { ChainSnapshotRestoreResult } from './helpers/fake_engine.js';
 
 restoreDocumentAfterEach();
 
-// createEffectGui owns the effect panel: which control an engine parameter maps
-// to, which value stream feeds the sliders each frame, what an Export may copy,
-// and what a destroyed panel must release. Every collaborator is injected, so
-// this suite drives the real module over doubles for lil-gui, the engine, the
-// worker pool, the clipboard copy operation, and the window.
+// createEffectGui's effect panel, driven over doubles for every injected
+// collaborator.
 
 afterEach(() => { mock.timers.reset(); });
 
@@ -345,8 +342,7 @@ const wiring = () => ({
   },
 });
 
-// The four collaborators are checked once, where the page is composed, so a
-// dropped slot cannot wait for the frame that first reaches it.
+// Collaborators are checked once, where the page is composed.
 
 test('a wiring carrying every demanded member constructs, config and all optionals absent', () => {
   const panel = createEffectGui(wiring());
@@ -748,8 +744,8 @@ test('build restores the last accepted value before replaying an invalid request
 });
 
 // The engine reports a bool param's values as JS booleans, but the companion
-// deep-link key is read back through the URL number grammar, so it must hold
-// the float form both writers already agree on.
+// deep-link key is read back through the URL number grammar, so it holds the
+// float form.
 test('a bool parameter stores its accepted value as a float', () => {
   const glow = {
     name: 'Glow', value: false, requestedValue: false, acceptedValue: false,
@@ -946,9 +942,8 @@ test('an arrow key never edits an engine-written telemetry control', () => {
   assert.equal(event.defaultPrevented, true);
 });
 
-/** The engine rejects a write to a readonly param, so its control must be kept
- * out of the deep-link layer entirely: no URL seeding and no onChange handler to
- * replay a URL value into setParameter. */
+/** The engine rejects a write to a readonly param: no URL seeding and no
+ * onChange handler to replay a URL value into setParameter. */
 test('a readonly param is a session control with no engine write-back', () => {
   const h = makeHarness({ params: [SPEED, TELEMETRY] });
   h.panel.build();

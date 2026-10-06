@@ -484,11 +484,7 @@ test('control readings marshal into a recipe by enum name', () => {
   assert.equal(recipe.chroma.curve, PaletteV4.curve.BELL);
 });
 
-/**
- * The tab exports every field of the recipe, so a reading that never reaches
- * one leaves the control it belongs to decorative and the recipe stuck at the
- * template's value.
- */
+/** The tab exports every field of the recipe. */
 test('every recipe field a control carries is marshalled', () => {
   const template = defaultPaletteRecipe();
   const expected = {
@@ -540,11 +536,7 @@ test('every recipe field a control carries is marshalled', () => {
   });
 });
 
-/**
- * The readings name their controls by element id, so an id the page does not
- * carry reads as a missing control rather than as a NaN or an undefined enum the
- * engine bridge rejects several steps later.
- */
+/** The readings name their controls by element id. */
 test('the generative tab carries every control the readings name', () => {
   const ids = Object.values(PALETTE_CONTROL_IDS);
   assert.ok(ids.length >= 20, 'the roster must still name the tab\'s controls');
@@ -554,10 +546,7 @@ test('the generative tab carries every control the readings name', () => {
   }
 });
 
-/**
- * The tab reads its recipe off the controls, so a markup default that disagrees
- * with the default recipe silently authors a different palette at load.
- */
+/** The tab reads its recipe off the controls. */
 test('the generative tab opens on the default recipe', () => {
   const values = new Map();
   for (const id of Object.values(PALETTE_CONTROL_IDS)) {

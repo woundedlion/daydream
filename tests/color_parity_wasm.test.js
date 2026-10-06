@@ -17,8 +17,7 @@ import {
 import * as L from '../src/workbench/lissajous/lissajous_math.js';
 import * as MB from '../src/workbench/mobius/mobius_transforms.js';
 
-// Top-level await fails this file loudly if the module can't instantiate,
-// rather than silently skipping the parity checks.
+// Top-level await fails this file loudly if the module can't instantiate.
 const M = await createHolosphereModule({ print() {}, printErr() {} });
 
 test('WASM parity module is present with the exports this suite pins', () => {
@@ -34,10 +33,8 @@ test('WASM parity module is present with the exports this suite pins', () => {
   }
 });
 
-// Largest divergence observed over the inputs below is 8.0e-7, on the OKLCh
-// wheel; the Mobius presets reach 6.1e-7, where the WASM side additionally
-// reads its coefficients at float precision — mobiusCodeString emits the
-// shortest literal that reads back as the same float32, not the double.
+// Float-vs-double tolerance. The Mobius WASM side also reads its coefficients
+// at float32 precision.
 const FLOAT_EPS = 5e-6;
 const near = (a, b, eps = FLOAT_EPS) => Math.abs(a - b) <= eps;
 
@@ -53,11 +50,8 @@ test('sRGB transfer parity (srgb_to_linear / linear_to_srgb)', () => {
 
 /**
  * Pins the engine's OKLab transform to fixed golden values in both directions.
- * A coordinated drift shared by both ports (e.g. a mistyped Ottosson coefficient
- * copied into each) would slip through a WASM-versus-JS comparison; these
- * absolutes catch a systematic shift in the matrices. The forward
- * red golden is Ottosson's published reference (L≈0.628, a≈0.225, b≈0.126), so it
- * also pins the engine to the canonical OKLab definition, not just to itself.
+ * The forward red golden is Ottosson's published reference (L≈0.628, a≈0.225,
+ * b≈0.126).
  */
 test('OKLab golden values (absolute pin)', () => {
   const fwd1 = M.linear_rgb_to_oklab(0.1, 0.5, 0.9);
@@ -75,9 +69,7 @@ test('OKLab golden values (absolute pin)', () => {
  * Verifies palette_controls.js's OKLCh→linear-sRGB port matches the engine's
  * inverse OKLab transform. The port folds the polar-to-Cartesian step into the
  * same body as the matrix, so it is compared against the engine fed the same
- * (a, b); it draws the palettes page's hue wheel and every gamut bisection, so
- * a drift there moves the colors the tool tells you to paste into the engine.
- * The sweep covers the wheel at three lightnesses and out to chroma 0.2,
+ * (a, b). The sweep covers the wheel at three lightnesses and out to chroma 0.2,
  * including out-of-gamut samples.
  */
 test('OKLCh transform parity (oklab_to_linear_rgb)', () => {
@@ -114,9 +106,8 @@ test('widest sRGB gamut chroma tracks the engine boundary solver', () => {
 /**
  * Pins the engine's integer HSV sextant split (hsv_to_rgb) to fixed golden bytes.
  * The C++ path splits the wheel into six 43-wide regions (primaries land on
- * 0/86/172) and mixes channels with >>8 fixed-point math; these goldens catch a
- * drift in the region boundaries or the fixed-point blend. The out-of-range rows
- * confirm the uint8_t cast wraps mod 256 rather than clamping.
+ * 0/86/172) and mixes channels with >>8 fixed-point math. The out-of-range rows
+ * confirm the uint8_t cast wraps mod 256.
  */
 test('HSV sextant golden bytes (hsv_to_rgb, absolute pin)', () => {
   const golden = [
@@ -165,9 +156,7 @@ test('ProceduralPalette cosine parity (procedural_palette_linear)', () => {
 
 /**
  * Pins the engine's procedural_palette_linear output to fixed golden 16-bit
- * linear values. The parity test above compares wasm-vs-js, so a *uniform* offset
- * shared by both sides would slip through; these absolute goldens catch a
- * systematic shift in the palette formula or the linear LUT.
+ * linear values.
  */
 test('ProceduralPalette golden linear values (absolute pin)', () => {
   const a = [0.5, 0.5, 0.5], b = [0.5, 0.5, 0.5], c = [1, 1, 1], d = [0, 0.33, 0.67];
@@ -181,12 +170,10 @@ test('ProceduralPalette golden linear values (absolute pin)', () => {
 });
 
 /**
- * Pins palette_math.js's NAMED_PROCEDURAL_PALETTES table to the engine's own
- * roster: name, order and all twelve a/b/c/d coefficients. The tool transcribes
- * core/color/palettes.h so the gallery preview and the C++ it tells you to paste
- * back match the device, and nothing but this comparison enforces it. The engine
- * returns float32, so each mirrored coefficient is rounded through Math.fround
- * before the comparison — an exact equality, not a tolerance.
+ * Pins palette_math.js's NAMED_PROCEDURAL_PALETTES table, a transcription of
+ * core/color/palettes.h, to the engine's own roster: name, order and all twelve
+ * a/b/c/d coefficients. Each mirrored coefficient is rounded through
+ * Math.fround, so the comparison is exact.
  */
 test('NAMED_PROCEDURAL_PALETTES matches the engine table (named_procedural_palettes)', () => {
   const toFloat32 = (vec3) => vec3.map((v) => Math.fround(v));
@@ -261,11 +248,9 @@ function paletteEnumProbeRecipe() {
   const recipe = defaultPaletteRecipe();
   recipe.input = { offset: 0.07, span: 0.83 };
   recipe.easing = 1;
-  // LOOP (4), so the closing travel from the last key back to the first is part
-  // of the bake. Under a harmony the spread clamp caps every key-to-key step at
-  // a half turn, which SHORTEST and COUNTERCLOCKWISE resolve identically; the
-  // closing travel is the only step that crosses the wrap, so it is what keeps
-  // those two ordinals apart. LOOP also demands a whole-turn sweep.
+  // LOOP (4) bakes the closing travel from the last key back to the first, the
+  // only step that crosses the wrap under a harmony, so SHORTEST and
+  // COUNTERCLOCKWISE bake differently. LOOP also demands a whole-turn sweep.
   recipe.domain = 4;
   recipe.hue = {
     mode: 0,
@@ -331,8 +316,7 @@ test('Palette V4 enum spellings and ordinals match the shipped engine', () => {
         return [name, ordinal, paletteResultFingerprint(ops.compileAndBakeV4(recipe))];
       });
       assert.deepEqual(engineMembers, members, `${group} engine ordinals`);
-      // A shared fingerprint would pin two ordinals the engine could swap
-      // undetected, which is the one substitution this case exists to catch.
+      // A shared fingerprint would let the engine swap two ordinals undetected.
       assert.equal(new Set(members.map(([, , mark]) => mark)).size, members.length,
         `${group} probe recipe separates every member`);
 
@@ -597,11 +581,7 @@ test('lissajous parity (lissajous)', () => {
 });
 
 /**
- * Pins the lissajous curve to fixed golden points. The parity test above is
- * wasm-vs-js only, so a phase/axis-swap or amplitude drift copied into both ports
- * would pass; these absolutes catch a systematic change in the curve formula.
- * Every golden point lies on the unit sphere (the curve is sphere-mapped), which
- * is itself an invariant a drift would break.
+ * Pins the lissajous curve to fixed golden points, each on the unit sphere.
  */
 test('lissajous golden points (absolute pin)', () => {
   const p1 = M.lissajous(3, 2, 0, 0.7);
@@ -628,11 +608,8 @@ function invStereo(w) {
 
 /**
  * Maps a sphere point through the tool's own complex arithmetic: project, apply
- * f(z) = (Az + B) / (Cz + D), unproject. This is the reference the engine's
- * fused mobius_transform must reproduce, so it runs the projection and the
- * division the shader itself runs — stereo and projectDiv, which carry the
- * engine's point-at-infinity conventions — rather than a general-purpose complex
- * division, whose absolute divisor guard the engine deliberately lacks.
+ * f(z) = (Az + B) / (Cz + D), unproject. Runs the shader's own stereo and
+ * projectDiv, which carry the engine's point-at-infinity conventions.
  * @param {number[]} p - Unit sphere point as [x, y, z].
  * @param {{A:{re:number,im:number}, B:{re:number,im:number}, C:{re:number,im:number}, D:{re:number,im:number}}} coeffs - The Mobius coefficients.
  * @returns {{x:number, y:number, z:number}} The transformed sphere point.
@@ -694,8 +671,8 @@ test('mobius preset parity (mobius_transform)', () => {
 });
 
 /**
- * Pins the Mobius map to analytically derived images, so a drift copied into
- * both ports cannot pass. Identity fixes every point; f(z) = 1/z is a 180°
+ * Pins the Mobius map to analytically derived images. Identity fixes every
+ * point; f(z) = 1/z is a 180°
  * rotation about x under this stereographic convention.
  */
 test('mobius golden images (absolute pin)', () => {

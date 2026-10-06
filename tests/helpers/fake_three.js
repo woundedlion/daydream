@@ -1,10 +1,6 @@
 //
-// Stand-in for three + three/addons/controls/OrbitControls.js, covering the
-// surface src/workbench/shared.js constructs plus the buffer-attribute double the
-// suites that drive the dot mesh share. three_loader_hooks.js redirects both
-// specifiers here, so shared.js gets these classes and the test importing this
-// module shares their `log`. tests/three_contract.test.js pins this surface
-// against the real three.
+// Stand-in for three + three/addons/controls/OrbitControls.js, plus the
+// buffer-attribute doubles. three_loader_hooks.js redirects both specifiers here.
 
 // Ordered teardown sink. Only the dispose paths append to it.
 export const log = [];
@@ -145,7 +141,7 @@ export class PerspectiveCamera extends Object3D {
 }
 
 export class WebGLRenderer {
-  /** @param {Object} params - The {canvas, antialias, alpha} bag shared.js passes. */
+  /** @param {Object} params - The {canvas, antialias, alpha} bag. */
   constructor(params) {
     this.params = params;
     this.domElement = params.canvas;
@@ -164,9 +160,7 @@ export class WebGLRenderer {
 
 /**
  * Length an array binds the GPU buffer to, or null for one that binds nothing:
- * the dispose path's null detach, and a view whose ArrayBuffer heap growth
- * detached — that one reads length 0 without anyone having re-pointed it, and
- * the driver's own liveness guard is what keeps it off the GPU.
+ * a null array, or a view whose ArrayBuffer heap growth detached (length 0).
  * @param {?Uint16Array} array - Candidate backing array.
  * @returns {?number} The bound length, or null.
  */
@@ -180,8 +174,7 @@ function uploadLengthOf(array) {
  * semantics:
  *
  * - needsUpdate is write-only and only ever bumps version, so once an upload is
- *   flagged nothing can unflag it. `version` is what WebGLAttributes compares,
- *   so tests assert on it rather than on a readable flag.
+ *   flagged nothing can unflag it. `version` is what WebGLAttributes compares.
  * - the GPU buffer is sized from the array at first upload and every later
  *   upload is a bufferSubData into it, so the array length is fixed for the
  *   attribute's lifetime. Three throws during upload if byteLength changes;
