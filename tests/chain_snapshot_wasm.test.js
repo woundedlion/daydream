@@ -40,19 +40,20 @@ test('snapshot validation refuses malformed state transactionally', () => {
   engine.setEffect('ShaderChain');
   engine.setAnimationsPaused(true);
   const previous = capture();
+  const result = module.ChainSnapshotRestoreResult;
   const changes = [
-    (value) => { value.schemaVersion = 1; },
-    (value) => { value.chain = []; },
-    (value) => { value.parameters[0].value = NaN; },
-    (value) => { value.parameters.push({...value.parameters[0]}); },
-    (value) => { value.runtime.pop(); },
-    (value) => { value.runtime[0].state.walkTime = -1; },
-    (value) => { value.paletteBank.cycles[0].frame = -1; },
+    [(value) => { value.schemaVersion = 1; }, result.UNSUPPORTED_VERSION],
+    [(value) => { value.chain = []; }, result.INVALID_LENGTH],
+    [(value) => { value.parameters[0].value = NaN; }, result.INVALID_VALUE],
+    [(value) => { value.parameters.push({...value.parameters[0]}); }, result.INVALID_VALUE],
+    [(value) => { value.runtime.pop(); }, result.INVALID_VALUE],
+    [(value) => { value.runtime[0].state.walkTime = -1; }, result.INVALID_VALUE],
+    [(value) => { value.paletteBank.cycles[0].frame = -1; }, result.INVALID_VALUE],
   ];
-  for (const change of changes) {
+  for (const [change, expected] of changes) {
     const candidate = structuredClone(previous);
     change(candidate);
-    assert.notEqual(restore(candidate), module.ChainSnapshotRestoreResult.APPLIED);
+    assert.equal(restore(candidate), expected);
     assert.deepEqual(capture(), previous);
   }
 });
@@ -104,7 +105,7 @@ test('a payload getter cannot restore into the effect it replaced', () => {
   Object.defineProperty(snapshot, 'parameters', {
     enumerable: true, get() { engine.setEffect('Comets'); return parameters; },
   });
-  assert.notEqual(restore(snapshot), module.ChainSnapshotRestoreResult.APPLIED);
+  assert.equal(restore(snapshot), module.ChainSnapshotRestoreResult.NOT_SHADER_CHAIN);
   assert.equal(engine.getShaderChainBindings(), null);
   assert.ok(engine.getPresetCount() > 0);
 });
