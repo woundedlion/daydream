@@ -3,8 +3,8 @@
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
  *
- * Pure segment-layout math, factored out of segment_worker.js so it can be
- * unit-tested in Node without loading the WASM module or a Worker global.
+ * Pure segment-layout math, testable in Node without the WASM module or a
+ * Worker global.
  */
 
 /**
@@ -15,8 +15,7 @@ const NUM_ARMS = 2;
 
 /**
  * Whether `total` is a layout-legal segment count: a positive integer multiple
- * of the arm count, i.e. a positive even number. Exported so a caller can reject
- * a count before spending work on it; computeSegmentRange enforces the same rule.
+ * of the arm count, i.e. a positive even number.
  * @param {number} total - Proposed total segment count.
  * @returns {boolean}
  */
@@ -29,39 +28,21 @@ export function isValidSegmentCount(total) {
  *
  * Layout: NUM_ARMS = 2 vertical halves — arm A is the left half, arm B the
  * w/2-shifted right half — with segments [0, total/2) on arm A and the
- * rest on arm B. Each arm splits into total/2 Y-bands of equal height, to within
- * the one row a height the band count does not divide spreads. Within an arm the
- * first floor(bands/2) segments tile the northern bands top-down and the
- * remainder tile the southern bands from the S pole inward, so four bands per
- * arm run 0, 1, 3, 2.
+ * rest on arm B. Each arm splits into total/2 Y-bands of equal height (to
+ * within one row). Within an arm the first floor(bands/2) segments tile the
+ * northern bands top-down and the remainder tile the southern bands from the
+ * S pole inward, so four bands per arm run 0, 1, 3, 2.
  *
- * Two conventions are shared with the firmware's physical segment→canvas map
- * (hardware/pov_segment_map.h::segment_map), so a per-segment overlay in the
- * simulator names the same board the hardware ID straps select: the arm
- * partition, arm B included as the w/2-shifted half, and each segment's
- * row band. Both are pinned by tests/segment_crosscheck.test.js against
- * pov_segment_map.json — the mapping emitted from that header by the engine build
- * and installed here — so a convention change on either side trips a test. The
- * firmware walks a southern band's LEDs in decreasing y; a render rectangle has
- * no direction, so only the row set matters here.
- *
- * The column split is a worker partition, not a firmware correspondence: arm A
- * holds [0, w/2) on every frame, keeping the `total` rectangles disjoint
- * so they composite into one canvas. The firmware's segment_clip() instead
- * trades the two column halves between the arms every half-revolution, and each
- * arm sweeps the full width over a rotation. A per-segment timing taken over
- * these rectangles therefore bounds one fixed column half of what its board
- * sweeps, not the costlier of the two halves.
- *
- * The firmware takes a power-of-two segment count <= 8, making `total` in
- * {2, 4, 8} the device-backed counts. `total` = 6 is simulator-only extra worker
- * parallelism and follows the same band rule.
+ * The arm partition and row bands mirror the firmware's
+ * hardware/pov_segment_map.h::segment_map (cross-checked by
+ * tests/segment_crosscheck.test.js). The column split is a worker partition
+ * only: the firmware's segment_clip() trades the column halves between the
+ * arms every half-revolution.
  *
  * @param {number} id - segment index in [0, total)
- * @param {number} total - total segment count (positive even number; the GUI
- *   exposes 2..8 in steps of 2, capped further on a low-memory device)
+ * @param {number} total - total segment count (positive even number)
  * @param {number} w - canvas width in pixels; must be even, so the two arms
- *   tile it exactly (an odd width would leave column w-1 in no segment)
+ *   tile it exactly
  * @param {number} h - canvas height in pixels
  * @returns {SegRange}
  */
@@ -104,9 +85,7 @@ export function computeSegmentRange(id, total, w, h) {
     ? armSeg
     : ySegsPerArm - 1 - (armSeg - northBands);
 
-  // A height the band count does not divide spreads its remainder one row per
-  // band from the N pole down, so no band carries more than one extra row and
-  // the slowest worker bounds the frame as tightly as the layout allows.
+  // Remainder rows go one per band from the N pole down.
   const segH = Math.floor(h / ySegsPerArm);
   const tallBands = h % ySegsPerArm;
   const y0 = bandId * segH + Math.min(bandId, tallBands);
@@ -117,11 +96,8 @@ export function computeSegmentRange(id, total, w, h) {
 
 /**
  * Blit a segment's pixel rectangle row-by-row between the full W*H*3 canvas
- * buffer and a compact, tightly-packed per-segment buffer. Each canvas row
- * [x0,x1) is contiguous, so one row moves in a single TypedArray.set — (y1-y0)
- * bulk copies instead of ~(x1-x0)*(y1-y0)*3 scalar stores. Shared by the worker
- * (extract: canvas -> compact) and the compositor (composite: compact -> canvas)
- * so the two ends of the postMessage boundary cannot drift apart.
+ * buffer and a compact, tightly-packed per-segment buffer, one TypedArray.set
+ * per row.
  * @param {Uint16Array} canvas - Full canvas buffer (W*H*3, row stride canvasW*3).
  * @param {Uint16Array} compact - Packed segment buffer ((x1-x0)*(y1-y0)*3), rows back-to-back.
  * @param {number} canvasW - Canvas width in pixels (the canvas row stride / 3).
@@ -172,9 +148,8 @@ export function compositeSegment(canvas, compact, canvasW, rect) {
 /**
  * Stamp the segment-boundary overlay into a composited canvas: a full-width
  * cyan row at each y in `ys` and a full-height cyan column at each x in `xs`.
- * Coordinates outside the canvas are skipped, so a seam list cached from a
- * larger layout cannot write out of bounds — a negative column would otherwise
- * wrap onto the end of the preceding row.
+ * Coordinates outside the canvas are skipped.
+
  * @param {Uint16Array} canvas - Full canvas buffer (canvasW*canvasH*3).
  * @param {number} canvasW - Canvas width in pixels.
  * @param {number} canvasH - Canvas height in pixels.

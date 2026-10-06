@@ -4,15 +4,8 @@
  */
 
 /**
- * A pointer-capture drag on one element, shared by the tool pages that let a
- * pointer scrub a canvas.
- *
- * The capture keeps the drag bound to the element it started on, so mouse and
- * touch share one path, the move and end handlers stay on the element rather
- * than on the document, and an interrupted gesture (an OS focus steal, a touch
- * cancelled by the system) arrives as pointercancel or lostpointercapture
- * instead of stranding the drag. An element that takes a touch drag needs
- * `touch-action: none`, which is what stops the page scrolling under it.
+ * A pointer-capture drag on one element. An element that takes a touch drag
+ * needs `touch-action: none`.
  */
 
 /**
@@ -20,9 +13,7 @@
  * carries no padding.
  *
  * getBoundingClientRect() reports the border box, but a canvas' bitmap and an
- * absolutely positioned child's percentages both start inside the border, so a
- * pointer normalized against the rect on a bordered element lands one border
- * width off and never reaches either end.
+ * absolutely positioned child's percentages both start inside the border.
  * @param {HTMLElement} element - Element the pointer is over.
  * @returns {{left: number, top: number, width: number, height: number}} The box.
  */
@@ -54,8 +45,7 @@ export function innerRect(element) {
  *   release, after the capture is dropped.
  * @param {(event: ?PointerEvent) => void} [options.onCancel] - Runs on
  *   pointercancel, on a capture the element lost or could not take, and on
- *   stop(), after the capture is dropped. Defaults to onEnd, which is what a
- *   page wants when a cancelled gesture and a release unwind the same way.
+ *   stop(), after the capture is dropped. Defaults to onEnd.
  * @returns {{stop: () => void, remove: () => void}} stop() ends a running drag
  *   as a cancel; remove() cancels it and detaches the listeners.
  */
@@ -93,9 +83,7 @@ export function createPointerDrag({
     try {
       element.setPointerCapture(event.pointerId);
     } catch {
-      // A pointer the browser has already dropped cannot be captured; onStart
-      // has run, so unwind rather than latch the element into a drag no event
-      // will ever end.
+      // An already-dropped pointer cannot be captured; onStart has run, so unwind.
       if (cancelHandler) cancelHandler(event);
       return;
     }
@@ -131,8 +119,8 @@ export function createPointerDrag({
    * @param {PointerEvent} event - The capture the element no longer holds.
    * @returns {void}
    * @details An implicit release — the element detached, the gesture taken over
-   *   by the browser — raises no pointerup on the element, so the drag would
-   *   otherwise stay latched for the rest of the session.
+   *   by the browser — raises no pointerup on the element.
+
    */
   const handleLostCapture = (event) => finish(event, cancelHandler);
 

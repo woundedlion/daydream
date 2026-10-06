@@ -3,9 +3,9 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-// Shared sRGB / linear-RGB color-space math, mirroring the engine's perceptual
-// pipeline (core/color/color_space.h: same sRGB transfer function) so the tools predict what
-// the device renders.
+// sRGB / linear-RGB color-space math, mirroring the engine's sRGB transfer
+// function (core/color/color_space.h).
+
 
 // --- sRGB transfer function (gamma) ---
 

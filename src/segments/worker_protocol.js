@@ -2,16 +2,8 @@
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
  *
- * Worker message protocol — the single source of truth for the structured-clone
- * messages exchanged between the main thread (segment_controller.js) and each
- * segment Web Worker (segment_worker.js).
- *
- * Apart from the shared protocol constants this file is JSDoc `@typedef`s
- * only. Both sides import the relevant unions via `@typedef {import('./worker_protocol.js').X} X`
- * and run under `// @ts-check`, so a renamed field or a message shape that drifts
- * between sender and receiver is flagged in-editor instead of failing silently at
- * runtime (a malformed `postMessage` is otherwise only caught when a handler
- * reads `undefined`).
+ * Worker message protocol — the source of truth for the structured-clone
+ * messages exchanged between the segment controller and each segment worker.
  *
  * Naming convention: "Inbound" is relative to the receiver — WorkerInboundMsg is
  * what the controller sends and the worker receives; ControllerInboundMsg is what
@@ -20,19 +12,14 @@
 
 /**
  * Protocol version stamped on `init` (controller → worker) and `booted`
- * (worker → controller). Each side faults on a mismatch, so a stale-cached worker
- * or controller against updated peer code fails fast instead of drifting on a
- * same-named but reshaped message. Any typedef change bumps PROTOCOL_VERSION; the shape pin in
- * segment_worker.test.js enforces it.
+ * (worker → controller); each side faults on a mismatch. Any typedef change
+ * bumps PROTOCOL_VERSION.
  * @type {number}
  */
 export const PROTOCOL_VERSION = 12;
 
 // Sentinel segIds for pool-wide faults with no single worker to blame:
-// FAULT_POOL for pool-creation faults: invalid segment count, unknown resolution,
-// or module-load/init timeout. FAULT_RENDER for any fault raised on the render path: a watchdog stall, a display-buffer geometry mismatch, or a
-// rejected render. The overlay headline distinguishes them, the detail line says
-// which.
+// FAULT_POOL for pool-creation faults, FAULT_RENDER for render-path faults.
 export const FAULT_POOL = -1;
 export const FAULT_RENDER = -2;
 
@@ -64,14 +51,9 @@ export const FAULT_RENDER = -2;
 
 /**
  * Bootstrap message: assigns the worker its segment index within the pool and the
- * canvas geometry and required effect, with optional tuned values. `paused`
- * carries the host's current pause state so a pool re-created under a paused GUI
- * doesn't start animating; `poleLod` does the same for the Pole LOD slider, whose
- * value lives per module instance and so must be re-pushed to every fresh engine.
- *
- * `wasmModule` is the binary the controller already compiled, for the worker to
- * instantiate instead of fetching and compiling its own copy. Optional in both
- * directions — absent it, the worker takes the glue's own load path.
+ * canvas geometry and required effect, with optional tuned values, pause state
+ * and Pole LOD. `wasmModule` is an already-compiled binary to instantiate;
+ * absent it, the worker takes the glue's own load path.
  * @typedef {{
  *   type: 'init', version: number, segId: number, totalSegs: number,
  *   w: number, h: number,
@@ -86,18 +68,15 @@ export const FAULT_RENDER = -2;
 
 /**
  * Switch the worker's effect. `params` (when present) carries the main engine's
- * current tuned values, applied AFTER engine.setEffect() — which rebuilds the
- * effect with defaults — so the segment matches instead of reverting to defaults.
+ * tuned values, applied after engine.setEffect() rebuilds with defaults.
  * @typedef {{ type: 'setEffect', name: string, params?: SegParam[],
  *   chainSnapshot?: ChainSnapshot,
  *   paused?: boolean, presetIndex?: number|undefined,
  *   paramRevision: number }} SetEffectMsg
  */
 
-/** Resize the worker's canvas; the worker recomputes its segment rectangle from
- * w/h but does not push it to the engine: a size change tears the effect down,
- * and the engine rejects a clip with no effect. The apply pipeline follows with
- * setEffect, which rebuilds the effect and applies the new clip.
+/** Resize the worker's canvas; the worker recomputes its segment rectangle but
+ * does not push it to the engine until the setEffect that must follow.
  * @typedef {{ type: 'setResolution', w: number, h: number }} SetResolutionMsg */
 
 /** Push one live tuned-parameter value to the worker's bound effect.
@@ -111,20 +90,16 @@ export const FAULT_RENDER = -2;
  * @typedef {{ type: 'selectPreset', index: number,
  *   paramRevision: number }} SelectPresetMsg */
 
-/** Set near-pole azimuthal shading decimation on the worker's engine. The
- * aggressiveness is a per-module-instance global, so each worker carries its own
- * copy and the slider must reach all of them or the composited preview decimates
- * differently from the single-engine one.
+/** Set near-pole azimuthal shading decimation on the worker's engine (a
+ * per-module-instance global).
  * @typedef {{ type: 'setPoleLod', value: number }} SetPoleLodMsg */
 
 /** Set missing arc percentages on the worker's engine.
  * @typedef {{ type: 'setDisplayCaps', topCap: number, bottomCap: number }} SetDisplayCapsMsg */
 
-/** Request one frame; the worker replies with a FrameMsg. `recycle` hands back
- * the retired generation's segment buffer (transferred, so the controller gives
- * up ownership) for the worker to refill in place instead of allocating and
- * detaching a fresh one every frame. The worker allocates when it is absent or
- * sized for a different rect, so a resolution change needs no coordination.
+/** Request one frame; the worker replies with a FrameMsg. `recycle` transfers
+ * the retired generation's segment buffer for the worker to refill; the worker
+ * allocates when it is absent or sized for a different rect.
  * @typedef {{ type: 'render', recycle?: Uint16Array }} RenderMsg */
 
 /**
@@ -137,52 +112,36 @@ export const FAULT_RENDER = -2;
 // --- Worker -> Controller (received by the controller) ---------------------
 
 /** Worker has finished bootstrapping (engine instantiated) and can accept work.
- * Carries no segId: the controller maps it to the worker via the per-worker
- * message handler.
+ * Carries no segId; the per-worker message handler identifies the sender.
  * @typedef {{ type: 'ready' }} ReadyMsg */
 
 /** Fatal worker refusal: protocol or message validation, module instantiation,
- * engine setup/configuration, or rendering without a usable effect. Lets the
- * controller fault immediately instead of rendering stale frames or waiting
- * out the init watchdog. Carries no segId, for the same reason as 'ready'.
- *
- * `sharedModule` marks the rejection as the controller's own compilation
- * failing to instantiate, so the controller drops it and the next pool compiles
- * per worker instead of being handed the same refused module forever.
+ * engine setup/configuration, or rendering without a usable effect. Carries no
+ * segId. `sharedModule` marks the controller's shared compilation as the one
+ * that failed to instantiate.
  * @typedef {{ type: 'engineRejected', reason: string,
  *   sharedModule?: boolean }} EngineRejectedMsg */
 
 /** Worker module body started executing — its static imports (incl. the WASM
- * glue generated/holosphere_wasm.js) all resolved. Sent before the WASM instantiate so
- * the controller can detect a missing/renamed glue file fast, ahead of the
- * slower init watchdog. Carries no segId: the controller maps it to the worker
- * via the per-worker message handler. Carries the protocol version so the
- * controller faults a stale-cached worker before init.
+ * glue) all resolved; sent before the WASM instantiate. Carries no segId, and
+ * the protocol version.
  * @typedef {{ type: 'booted', version: number }} BootedMsg */
 
 /**
  * A rendered segment. `pixels` is the segment's RGB16 rectangle ((x1-x0)*(y1-y0)*3),
  * transferred (not copied) across the boundary. The rectangle is the worker's
- * `computeSegmentRange(segId, totalSegs, w, h)`; the controller re-derives it and
- * faults on a mismatch rather than trusting it, so a worker rendering stale
- * geometry cannot composite into another segment's rows.
+ * `computeSegmentRange(segId, totalSegs, w, h)`.
  *
  * `paramValues` carries segment 0's post-frame parameter values (ordered to match
- * the effect's param list) so the GUI can track rendered changes the
- * un-stepped main engine cannot supply; null on every other segment.
+ * the effect's param list); null on every other segment.
  *
- * `warnings` carries unresolved parameter and preset refusals on this worker.
- * A successful write to the same parameter or a successful preset selection
- * clears its notice; an effect install clears every notice. The standing set is
- * re-sent every frame so the overlay's marker lasts as long as the divergence,
- * and the field is omitted while there is none.
+ * `warnings` carries the standing parameter and preset refusals on this worker,
+ * re-sent every frame and omitted while there are none.
  *
- * `fullFrame` is the disposition of the worker's last setClip: false when the
- * band was installed (`APPLIED`) and the engine shaded only the rectangle, true
- * when the effect reports `needs_full_frame() || persists_pixels()` (`FULL_FRAME_KEPT`) and the
- * engine shaded the whole canvas for the rectangle to be sliced out of. Carrying
- * it is what lets the pool tell an N-way parallel speedup from N workers each
- * computing the same full frame; `elapsed` alone cannot.
+ * `fullFrame` is the disposition of the worker's last setClip: true when the
+ * effect reports `needs_full_frame() || persists_pixels()` (`FULL_FRAME_KEPT`)
+ * and the engine shaded the whole canvas rather than the rectangle.
+
  * @typedef {{
  *   type: 'frame', segId: number,
  *   x0: number, x1: number, y0: number, y1: number,

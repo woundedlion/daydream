@@ -6,9 +6,7 @@
 /**
  * Build a labelled range slider with a live value readout.
  *
- * The factory owns only the markup and the input wiring; tool-specific
- * behaviour (state updates, re-rendering, value snapping) lives in the
- * `onInput` callback, which receives the raw (scaled) slider value.
+ * `onInput` receives the raw (scaled) slider value.
  *
  * Slider values are stored in "raw" integer space (display * scale) so that
  * `<input type=range>` can use whole-number steps; the initial readout shows
@@ -24,7 +22,7 @@
  * @param {number} cfg.value - Initial value (display space)
  * @param {number} [cfg.scale=1] - Display-to-raw multiplier
  * @param {number} [cfg.decimals=2] - Decimals for the readout
- * @param {string} [cfg.ariaLabel] - Accessible name for the input, for pages whose visible label is too short to identify the control on its own (a grid of sliders labelled only R/G/B). Overrides the visible label as the accessible name; omit it where the visible label already names the control.
+ * @param {string} [cfg.ariaLabel] - Accessible name for the input; overrides the visible label as the accessible name.
  * @param {string} [cfg.labelSuffix=':'] - Text appended to the label
  * @param {string} [cfg.labelClass] - Classes for the label span
  * @param {string} [cfg.sliderClass] - Classes for the input
@@ -81,10 +79,7 @@ export function createSlider(containerId, cfg, onInput) {
 
   /**
    * Puts a display value onto the scaled grid the input actually accepts:
-   * `scaledMin + k*sliderStep`, within the rounded scaled bounds. `<input type=range>` re-snaps
-   * anything off that grid, so a value merely rounded to scaled units would
-   * leave the thumb somewhere the readout does not name whenever
-   * `step * scale > 1`.
+   * `scaledMin + k*sliderStep`, within the rounded scaled bounds.
    * @param {number} display - The value in display space.
    * @returns {number} The value in scaled units, on the grid and in range.
    */
@@ -153,8 +148,8 @@ export function createSlider(containerId, cfg, onInput) {
 
   /**
    * Drives the control from code: thumb, readout, and `aria-valuetext` all move
-   * together, so a page that computes a value elsewhere cannot leave one of the
-   * three behind. Fires no `input` event — the caller owns its own state.
+   * together. Fires no `input` event.
+
    * @param {number} display - Display value, mapped onto the rounded scaled bounds and grid.
    * @returns {number} The value now shown, clamped and snapped to the step grid.
    */
