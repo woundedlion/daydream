@@ -101,9 +101,8 @@
 }
 
 .param-group {
-  /* Visual base (background/border-radius/box-shadow) is inherited from
-     tools.css; mobius packs param-groups into a horizontal scrolling panel,
-     so it overrides padding/margin and adds the column layout. */
+  /* Spacing and column layout for the horizontal scrolling panel; the
+     visual base comes from tools.css. */
   padding: 0.75rem;
   margin-bottom: 0;
   width: 160px;
@@ -213,8 +212,7 @@
     display: none;
   }
 
-  /* Presets stay reachable via the controls-header dropdown (the sidebar
-     list above is hidden on mobile). */
+  /* Presets stay reachable via the controls-header dropdown. */
   #presetSelect {
     display: block;
   }

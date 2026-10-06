@@ -283,9 +283,8 @@ class FakeMediaRecorder {
 
 /**
  * Installs the browser globals the recorder touches and returns a restore fn.
- * showSaveFilePicker is left undefined so the recorder buffers chunks and saves
- * via the anchor path (download), which the tests stub out per-instance; the
- * streaming test re-defines showSaveFilePicker to exercise the disk path.
+ * showSaveFilePicker is left undefined, so the recorder buffers chunks and saves
+ * via the anchor path (download).
  * @returns {() => void} A function that restores the saved globals.
  */
 const installRecorderEnv = () => {
@@ -1064,8 +1063,7 @@ test('the encoder is opened at the configured bitrate', () => {
   }
 });
 
-// The README states these bounds as numbers; the sink cases above hold them by
-// name, so only this pin notices a bound drifting from what is documented.
+// Pins the sink bounds to the numbers the README states.
 test('the documented sink bounds are the exported ones', () => {
   const restore = installRecorderEnv();
   try {
@@ -1174,9 +1172,7 @@ test('a mid-stream streaming write failure stops the session and reports truncat
 
 /**
  * The write chain is serialized, so a link that rejects rejects every link
- * queued behind it and finish()'s close along with them. A host hook is the one
- * thing in a link the sink does not control, so it is what proves the chain
- * survives its own diagnostics.
+ * queued behind it and finish()'s close along with them.
  */
 test('a host hook that throws does not poison the streaming write chain', async () => {
   const restore = installRecorderEnv();

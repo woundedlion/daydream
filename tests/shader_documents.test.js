@@ -187,9 +187,8 @@ test('labels outside the alias table need no entry', () => {
   assert.equal(engineParameterName('no-dot-id'), 'No Dot Id');
 });
 
-// Convergence pin: across every shipped pattern document, the labels whose
-// mapping differs from the plain field spelling stay this frozen set. A new
-// label showing up here means an alias entry crept in for a post-spec effect.
+// Across every shipped pattern document, the labels whose mapping differs from
+// the plain field spelling stay this frozen set.
 test('the alias table keys stay frozen to the pre-spec promoted labels', () => {
   const patternCatalog = JSON.parse(readFileSync(
     new URL('../generated/shader/patterns/catalog.json', import.meta.url), 'utf8'));
@@ -306,7 +305,7 @@ test('a preset the effect does not carry falls back to its first reference', () 
 
 // Every writable id is resolved before the first write: a refusal after one write would
 // leave the engine on a state that is neither the reference preset nor the
-// document's, and the parity toggle would show neither build's answer.
+// document's.
 test('an unmatched id refuses the fixed apply before any value is written', () => {
   const engine = fixedEngine(() => true);
   const values = { 'sample.pattern-freq': 3, 'sample.no-such-field': 1 };
@@ -339,8 +338,7 @@ test('a refused reference preset names the preset the engine rejected', () => {
 });
 
 // selectPresetById is reached through an optional call, so an engine build
-// without it answers undefined rather than throwing; only the !== true test
-// keeps that from reading as a staged preset.
+// without it answers undefined rather than throwing.
 test('an engine without selectPresetById is refused, not written through', () => {
   const engine = fixedEngine(() => true);
   delete engine.selectPresetById;
@@ -352,10 +350,8 @@ test('an engine without selectPresetById is refused, not written through', () =>
   assert.deepEqual(engine.writes, []);
 });
 
-// The skip set is the catalog's own topology flag rather than a hand list, so
-// every flagged field is skipped instead of chasing a control the fixed build
-// never registered and aborting the apply. Palette mapping is the one flagged
-// field a fixed build keeps live, as an ordinary dropdown.
+// The skip set is the catalog's own topology flag. Palette mapping is the one
+// flagged field a fixed build keeps live, as an ordinary dropdown.
 test('the fixed path skips every topology field the catalog flags', () => {
   const catalog = JSON.parse(ENGINE_CATALOG);
   const flagged = catalog.operators.flatMap((/** @type {*} */ operator) =>
@@ -383,7 +379,7 @@ const promotedDocument = (filename) =>
 const PROMOTED = promotedDocument('catalog.json').source_documents;
 
 // The compiled build hard-codes these values, so it registers no control for
-// them; without the skip the apply refuses on the first one and writes nothing.
+// them.
 test('the fixed path skips the ids the compiled build bakes in as constants', () => {
   const engine = fixedEngine(() => true);
   const values = { 'camera.spin-speed': 0.01975, 'sample.pattern-freq': 3 };
@@ -639,7 +635,7 @@ function workbench({ files = { 'kaleidoscope_flowers.shader.json': shaderDocumen
         ? JSON.parse(s)
         : { status: 'VALID', descriptor_digest: 'digest-scratch', document: s },
       // The fixtures are not whole documents, so the canonicalizer would refuse
-      // them; the real module's export is pinned in editorWorkbench.
+      // them.
       exportShaderDocumentJson: (document) =>
         `${JSON.stringify(document, null, 2)}\n`,
     })),
@@ -691,9 +687,8 @@ test('the source catalog lists each document by its product display name', async
     'the page opens rendering the scratch chain');
 });
 
-// init() reports through the status element and a return value the page drops,
-// so a catalog that never loaded is a line of prose on an otherwise live page:
-// the boolean is the only channel a caller can act on.
+// init() reports a catalog that never loaded through its boolean return as well
+// as the status element.
 test('a catalog document that fails to compile reports its diagnostic', async () => {
   const { controller, elements } = workbench({ files: {
     'kaleidoscope_flowers.shader.json': shaderDocument({
@@ -913,10 +908,8 @@ test('an effect the preview engine rejects leaves the export disabled', async ()
   assert.equal(harness.controller.save(), false);
 });
 
-// Holosphere docs/effects.md, Shader Authoring Workbench: invalid semantics
-// leave the current preview untouched,
-// so a compiler that throws on the input rather than diagnosing it must not
-// take the loaded document down with it either.
+// Invalid semantics leave the current preview untouched, so a compiler that
+// throws on the input must not take the loaded document down either.
 test('a compile that throws is reported and leaves the loaded document previewing', async () => {
   const harness = workbench();
   await harness.controller.init();
@@ -956,10 +949,8 @@ test('saving exports the document, harvesting nothing from the engine', async ()
     /Saved kaleidoscope_flowers\.shader\.json/);
 });
 
-// The workbench roster is what the page's deep-link validator and its
-// resolution correction are both built from, so an effect the controller
-// selects but the roster omits survives the load and is dropped on the next
-// reload or resolution change.
+// An effect the controller selects but the roster omits survives the load and
+// is dropped on the next reload or resolution change.
 test('the workbench roster admits every effect the controller selects', async () => {
   const harness = workbench({
     patternCatalog: PATTERN_CATALOG.replaceAll('KaleidoscopeFlowers', 'kaleidoscope-flowers'),
@@ -1377,7 +1368,7 @@ const sampleFrequencySlider = (harness) => stripChips(harness)
   .querySelector('.chain-param-control');
 
 // The chips carry the inline stage controls, and they render one preset's
-// values. Eight shipped documents have more than one.
+// values.
 test('a deep-linked preset builds the strip from the preset it renders', async () => {
   const document = JSON.parse(KALEIDOSCOPE_HEX_BRIGHT);
   document.preset_bank.presets[0].values['sample.pattern-freq'] = 1.5;

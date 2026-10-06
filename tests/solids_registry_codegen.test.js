@@ -139,8 +139,7 @@ test('generateRegistryCpp refuses a Catalan seed, which no Recipe can index', ()
 
 /**
  * The SIMPLE_SEEDS entries outside DEFINED_SEED_CONSTANTS: the seeds whose
- * paste defines its own SEED_* constant. Both rosters are the tool's own;
- * engine_source_parity.test.js pins them to solids.h.
+ * paste defines its own SEED_* constant.
  */
 const SEEDS_WITHOUT_CONSTANTS = [
   'tetrahedron', 'cube', 'truncatedTetrahedron', 'cuboctahedron',

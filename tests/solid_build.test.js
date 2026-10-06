@@ -1,9 +1,7 @@
 // The solids tool's MeshOps call sequences, run end to end against a stand-in
 // module. MeshOps reports a recoverable failure as a null plus a reason in
-// getLastResult(), and the flush that follows overwrites that reason — so the
-// stand-in clears its recorded reason on clearToolingMemory(), which turns any
-// sequence that reads the reason too late into a generic rejection message rather than
-// a passing test.
+// getLastResult(), which the following flush overwrites; the stand-in clears its
+// recorded reason on clearToolingMemory() to match.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBaseMesh, buildChainMesh, readbackMesh } from '../src/workbench/solids/solid_build.js';

@@ -1,18 +1,6 @@
-//
-// The segmented POV path's central claim, run end to end against the real
-// shipped WASM module: N clipped segment renders, stitched, are the frame one
-// unclipped engine draws.
-//
-// segment_worker.test.js drives the worker protocol against a FakeEngine whose
-// pixels are a ramp — identical under every clip, so it can only check that the
-// right rectangle was copied. segment_controller.test.js composites frames it
-// was handed. Neither runs a clip through the rasterizer. Here each segment gets
-// its own WASM instance, as each worker does, driven through the same message
-// sequence: setResolution, setEffect, setClip, then the renders. Workers agree
-// because every instance seeds from the effect's stable id on the same message
-// sequence, which is what makes the stitch meaningful and is checked below.
-//
-// Run: npm test
+// Against the shipped WASM module: N clipped segment renders, stitched, are the
+// frame one unclipped engine draws. Each segment gets its own WASM instance,
+// driven through the worker's message sequence.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import createHolosphereModule from '../generated/holosphere_wasm.js';
@@ -20,8 +8,7 @@ import {
   computeSegmentRange, extractSegment, compositeSegment,
 } from '../src/segments/segment_layout.js';
 
-// The smaller of the two shipped presets: every instance below is a whole WASM
-// module with its own arena, so the canvas is kept cheap.
+// Small canvas: every instance is a whole WASM module with its own arena.
 const W = 96, H = 20;
 const FULL = { x0: 0, x1: W, y0: 0, y1: H, w: W, h: H };
 // Enough renders that an effect's per-frame state has moved off its seed.
@@ -35,9 +22,7 @@ const FULL_FRAME_EFFECT = 'MeshFeedback';
 
 /**
  * The name an embind enum value carries. Each module instance owns its own enum
- * objects, so a caller comparing results across instances needs the name; the
- * members sit beside embind's own plumbing properties, so they are picked out
- * by instanceof.
+ * objects, so results compare across instances by name.
  * @param {Function} type - The enum constructor, e.g. M.ClipSetResult.
  * @param {Object} value - A value the engine returned.
  * @returns {string} The member's name.
@@ -79,8 +64,7 @@ async function renderWith(effect, rect, frames, width = W, height = H) {
 
 /**
  * Renders every segment of a `total`-way split on its own engine and stitches
- * the results, using the same extract/composite pair the worker and the
- * controller use across the postMessage boundary.
+ * the results with the worker's extract/composite pair.
  * @param {string} effect - Effect name to install in every worker.
  * @param {number} total - Segment count.
  * @param {number} frames - Renders to draw.
@@ -119,8 +103,8 @@ function firstDifference(a, b) {
   return -1;
 }
 
-// One unclipped reference frame, reused by the cases below: building a module
-// per comparison is the expensive part here.
+// One unclipped reference frame shared across cases; building a module is the
+// expensive part.
 const reference = await renderWith(CLIPPED_EFFECT, FULL, FRAMES);
 
 test('the reference frame is a real image, not a constant the stitch cannot fail', () => {
@@ -141,7 +125,7 @@ test('four clipped segment renders stitch into the unclipped frame', async () =>
     + `composited ${canvas[at]} vs full-frame ${reference.pixels[at]}`);
 
   // Teeth: the same pieces laid into the wrong rectangles must not match, or
-  // the comparison above is satisfied by any permutation of the segments.
+  // the comparison is satisfied by any permutation of the segments.
   const shuffled = new Uint16Array(W * H * 3);
   for (let id = 0; id < rects.length; id++) {
     compositeSegment(shuffled, compacts[(id + 1) % rects.length], W, rects[id]);

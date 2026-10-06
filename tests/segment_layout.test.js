@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeSegmentRange, extractSegment, compositeSegment, stampBoundaries } from '../src/segments/segment_layout.js';
 
-// An odd width is rejected outright (see the case below), so the exactly-once
-// tiling invariant holds for every width the layout accepts.
+// An odd width is rejected, so the exactly-once tiling invariant holds for every
+// width the layout accepts.
 test('a full segment set tiles the canvas exactly once', () => {
   const cases = [
     { w: 288, h: 144, total: 4 },
@@ -77,8 +77,7 @@ test('no band exceeds another by more than one row', () => {
 });
 
 // Four bands per arm is where the firmware's northern/southern split becomes
-// observable; the goldens are cross-checked against pov_segment_map.h in
-// tests/segment_crosscheck.test.js.
+// observable.
 test('four bands per arm tile north top-down then south from the pole inward', () => {
   const slotRows = [[0, 36], [36, 72], [108, 144], [72, 108]];
   for (let arm = 0; arm < 2; arm++) {

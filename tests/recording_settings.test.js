@@ -1,6 +1,5 @@
-//
-// The recording settings hold their values until the recorder the module load
-// builds exists to take them, and report a write the running session cannot.
+// The recording settings hold their values until the recorder exists to take
+// them, and report a write the running session cannot.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRecordingSettings } from '../src/recording/recording_settings.js';

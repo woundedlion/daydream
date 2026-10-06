@@ -4,10 +4,8 @@ import { buildOpRow, formatParamValue, syncSweepWarning } from '../src/workbench
 import { OP_DEFS } from '../src/workbench/solids/solid_codegen.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
-// fakeElement throws on any non-empty innerHTML assignment, so every assertion
-// below also proves the row was assembled from nodes rather than from parsed
-// markup — the property the op values (which survive a localStorage round-trip)
-// depend on.
+// fakeElement throws on any non-empty innerHTML assignment, so a row must be
+// assembled from nodes.
 const doc = {
   createElement: (tag) => fakeElement(tag),
   createElementNS: (ns, tag) => {
@@ -149,9 +147,8 @@ test('the header buttons call their handlers with the row index', () => {
   ]);
 });
 
-// The grip carries no listener of its own. The page captures the pointer on it
-// (src/shared/pointer_drag.js), which is what makes mouse and touch reorder over one
-// path and leaves nothing armed behind a press that never dragged.
+// The grip carries no listener of its own; the page's drag wiring captures the
+// pointer on it.
 test('the row hands its grip and itself to the page drag wiring, once', () => {
   const { el, wired } = build({ op: 'kis', params: {} }, 1, 3);
   const grip = el.querySelector('.drag-handle');

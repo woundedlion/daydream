@@ -267,8 +267,8 @@ test('index labels are built under the limit, carry their index, and are cleared
 
   assert.equal(result.labelsBuilt, true, 'the caller re-projects only labels it is told about');
   assert.equal(labelsContainer.children.length, 4);
-  // The page re-projects the labels by parseInt-ing data-index, so the index has
-  // to arrive as the string a browser stores, on an attribute a selector finds.
+  // data-index arrives as the string a browser stores, on an attribute a
+  // selector finds.
   assert.deepEqual(labelsContainer.children.map((el) => el.textContent),
     ['0', '1', '2', '3']);
   assert.deepEqual(labelsContainer.children.map((el) => el.dataset.index),

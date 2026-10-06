@@ -1,4 +1,3 @@
-//
 // The segmented pool's spawn policy: a toggle burst leaves several warm-up
 // continuations in flight against one pool, and a failed spawn or teardown has
 // to leave the app on the single engine with the user told why.
@@ -10,8 +9,7 @@ import {
   maxSegmentCount,
 } from '../src/segments/segment_policy.js';
 
-// The segmented spawn guard: spawning awaits a module warm-up, so a toggle burst
-// leaves several continuations in flight against one worker pool.
+// The segmented spawn guard.
 
 /**
  * Build the spawn guard over warm-ups the test resolves by hand.
@@ -165,8 +163,7 @@ test('the segmented fallback reports a thrown non-Error', () => {
     'a rejection carrying a bare string must not read as "[object Object]"');
 });
 
-// The pool ceiling: every member holds a WASM heap of its own, so the slider is
-// built against what the device can carry rather than failing a spawn after it.
+// The pool ceiling: every member holds a WASM heap of its own.
 test('a device cap moves with the memory hint and the mobile layout', () => {
   assert.equal(maxSegmentCount({}, false), 8,
     'no hint (Firefox/Safari) on a desktop layout keeps the full range');

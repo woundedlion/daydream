@@ -1,8 +1,6 @@
-//
-// .githooks/reference-transaction guards refs/heads/master. The hook script is
-// driven directly: `sh <hook> <stage>` with a synthesized transaction on stdin,
-// against throwaway fixture repos under the OS temp dir, so no case depends on
-// the hook being installed and none touches a real working repo.
+// .githooks/reference-transaction guards refs/heads/master, driven as
+// `sh <hook> <stage>` with a synthesized transaction on stdin against throwaway
+// fixture repos.
 import { describe, test, before, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -29,9 +27,8 @@ const ZERO = '0'.repeat(40);
 const SH = findSh();
 const REQUIRED_ENV = 'DAYDREAM_HOOK_SH_REQUIRED';
 const MISSING = 'no POSIX sh available';
-// Every case here skips without a shell, so a runner that lost its sh would
-// retire all of them and still report green. The unit-suite workflow declares
-// the flag, under which the missing shell fails instead.
+// Cases skip without a shell unless REQUIRED_ENV is set, under which a missing
+// shell fails.
 const SKIP = SH || process.env[REQUIRED_ENV] ? false : MISSING;
 
 describe(

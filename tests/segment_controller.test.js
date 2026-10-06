@@ -1,9 +1,4 @@
-//
-// SegmentController — unit coverage for the generation-fence drop, the
-// worker-fault deadlock-break latch, and worker-pool lifecycle. Driven by a
-// fake Worker and a fake driver injected as a constructor dependency.
-//
-// Run: npm test
+// SegmentController against a fake Worker and an injected fake driver.
 import { installFakeTimers } from './helpers/fake_timers.js';
 import { test, mock, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -108,9 +103,8 @@ test('a warmed binary is compiled once and handed to every worker', async () => 
   c.destroy();
 });
 
-// The artifacts are unversioned, so a warm that re-fetched and then failed to
-// compile has evidence the module it holds describes a binary the engine no
-// longer accepts. Keeping it would spawn workers on it for the rest of the page.
+// The artifacts are unversioned, so a re-fetch that fails to compile means the
+// held module no longer matches the served binary.
 test('a compile failure drops the module the previous warm left', async () => {
   const warmer = new ModuleWarmer();
   const serve = (bytes) => ({
@@ -141,9 +135,7 @@ test('a compile failure drops the module the previous warm left', async () => {
   c.destroy();
 });
 
-// A failed re-fetch is the same evidence as a failed compile: the warm went back
-// to the origin and came home with nothing, so a module held from an earlier
-// deploy can no longer be claimed to match the one being served.
+// A failed re-fetch is the same evidence as a failed compile.
 test('a failed binary re-fetch drops the module the previous warm left', async () => {
   const warmer = new ModuleWarmer();
   const serve = (binaryResponse) => ({
@@ -369,8 +361,7 @@ function deliverFrame(controller, segId, overrides = {}) {
 // The `active` flag
 // ---------------------------------------------------------------------------
 
-// The flag is read as a condition by the host's spawn guard and by ownsDisplay,
-// so a truthy non-boolean reads as enabled everywhere it is consumed.
+// A truthy non-boolean would read as enabled.
 test('active rejects a non-boolean write and keeps its prior value', () => {
   const c = makeController();
   assert.equal(c.active, false, 'a fresh controller is inactive');
@@ -391,7 +382,7 @@ test('active rejects a non-boolean write and keeps its prior value', () => {
 });
 
 // The pool stays latched across a fault so a user-driven setEffect/setResolution
-// can rebuild it; only the host clears the flag.
+// can rebuild it.
 test('destroy() and a fault leave active alone', () => {
   const c = makeController();
   c.active = true;
@@ -564,8 +555,7 @@ test('destroyed generations cannot publish into a recreated pool', async () => {
 });
 
 // ---------------------------------------------------------------------------
-// Segment-0 parameter publish — the GUI's only live param source in segmented
-// mode, since the main-thread engine is never stepped.
+// Segment-0 parameter publish
 // ---------------------------------------------------------------------------
 
 test('a segment-0 frame publishes rendered param values for the GUI', async () => {
@@ -941,10 +931,8 @@ test('an engineRejected worker message faults the pool with the reason and segId
   assert.match(c.faultInfo.message, /9000x9000 exceeds the worker arena/);
 });
 
-// Instantiating the controller's compilation is the only use a worker makes of
-// it, so a refusal is evidence about the module rather than about the pool.
-// Holding it hands the same refused artifact to every rebuild the fault overlay
-// asks the user for, and none of them can come back.
+// A worker refusing to instantiate the shared compilation is evidence about the
+// module, not the pool.
 test('a shared module a worker refuses is dropped before the next spawn', async () => {
   const warmer = new ModuleWarmer();
   await warmer.warm({
@@ -1391,10 +1379,8 @@ test('destroy() clears the fault latch so a fresh pool can recover', () => {
   assert.equal(c.faultInfo, null);
 });
 
-// applyResolution() corrects an effect the new resolution does not offer after
-// it has told the pool the new size, so a pool spawned inside setResolution
-// would build every worker on the outgoing effect and refault before the
-// correction reached it.
+// A pool spawned inside setResolution would build every worker on the outgoing
+// effect before applyResolution() corrects it.
 test('a faulted setResolution leaves the rebuild to the apply pipeline', () => {
   const c = makeController();
   c.active = true;
@@ -1436,8 +1422,8 @@ function faultSegZero(controller) {
   controller.workers[0].onerror({ message: 'x', filename: '', lineno: 0, colno: 0 });
 }
 
-// The Test All ticker switches effects on a 1 s interval, so a fault that
-// reproduces on every rebuild would respawn the pool once per tick.
+// A fault that reproduces on every rebuild must not respawn the pool on every
+// effect switch.
 test('repeated effect switches on a refaulting pool spawn a bounded worker count', () => {
   const c = makeController();
   c.active = true;
@@ -1488,8 +1474,8 @@ test('a pool that reaches ready restores the faulted effect-switch budget', () =
   }
   assert.equal(c.faulted, true, 'the budget is spent');
 
-  // A resolution change is user-driven and stays unbounded, as the fault banner
-  // says: it restores the budget the setEffect behind it then spends.
+  // A resolution change is user-driven and unbounded: it restores the budget the
+  // setEffect behind it then spends.
   c.setResolution(8, 8);
   c.setEffect('AfterResize');
   assert.equal(c.faulted, false, 'the resolution change rebuilt the latched pool');
@@ -1716,8 +1702,7 @@ test('composite() faults when the layout admits no band for a segment', () => {
   assert.match(c.faultInfo.message, /no segment-0 band exists/);
 });
 
-// The pre-pass validates against the band table on every composited frame, so
-// the table is derived once per layout rather than once per segment per frame.
+// The pre-pass's band table is derived once per layout.
 test('the band table is reused until the layout moves', () => {
   const c = makeController();
   const first = c.compositor.segmentBands(2, 4, 4);
@@ -1858,8 +1843,7 @@ test('the boundary setter composites nothing over a latched pool', async () => {
 
 test('composite() marks every internal split plus the wrap seam for an 8-segment layout', () => {
   // Eight segments are two arms of four Y-bands each: internal boundaries at
-  // x=4 and y=2,4,6 plus the wrap seam at x=0. The >2-segment case exercises
-  // production row-seam handling the 2-segment test cannot.
+  // x=4 and y=2,4,6 plus the wrap seam at x=0.
   setDisplayGrid(8, 8);
 
   const c = readyController(8);
@@ -1966,9 +1950,8 @@ test('composite() heals a diverged mesh alias even while driver.pixels is aligne
     'the heal flags the attribute for re-upload');
 });
 
-// The composite blits over driver.render()'s zero-fill instead of clearing. A
-// refresh that re-fetched moves the aliases onto a buffer the driver never
-// cleared, so the divergence check sees nothing and only the report is left.
+// The composite blits over driver.render()'s zero-fill; a refresh that
+// re-fetched moves the aliases onto a buffer the driver never cleared.
 test('composite() clears a buffer the refresh re-fetched', () => {
   setDisplayGrid(4, 2);
 
@@ -2342,8 +2325,7 @@ test('a fault latched by the overrun re-blit paints the overlay on the same tick
 });
 
 test('an init-phase fault still reaches the fault overlay (faulted checked before ready guard)', () => {
-  // A startup trap latches `faulted` but never sends 'ready'; a ready-first guard
-  // would return before the fault overlay ever painted.
+  // A startup trap latches `faulted` but never sends 'ready'.
   const c = makeController();
   c.create(2);
   assert.equal(c.frameState.ready, false);
@@ -2433,8 +2415,8 @@ test('a spawning pool reports the spawn and does not own the display', () => {
 });
 
 test('turning segmented mode off hands the global stat bars back', () => {
-  // The overlay hides page-owned elements while it stands in for them, so the
-  // hand-back rides on the flag rather than on a host remembering to repaint.
+  // The overlay hides page-owned elements while it stands in for them; the
+  // hand-back rides on the flag.
   const byId = {
     'segment-stats': fakeElement(),
     'global-stats-desktop': fakeElement(),
@@ -2509,7 +2491,7 @@ test('snapshotParams() carries accepted and requested state independently', () =
 // A request the engine refused leaves the GUI holding it while the engine
 // renders what it settled on. The worker replays the accepted value first and
 // the request after, so a pool rebuilt under a standing rejection matches the
-// main engine instead of falling back to the effect's own default.
+// main engine.
 test('a refused request ships the value the engine settled on', () => {
   const c = makeController();
   c.getWasmEngine = () => fakeEngine([

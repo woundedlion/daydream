@@ -18,8 +18,7 @@ import { staticModuleGraph } from './helpers/module_graph.js';
 // ---------------------------------------------------------------------------
 // Fakes — installed BEFORE importing the worker, which binds self.postMessage
 // and assigns self.onmessage at module-evaluation time. `globalThis.self` is
-// never restored, which is only safe because `node --test` gives each test file
-// its own process.
+// never restored; `node --test` gives each test file its own process.
 // ---------------------------------------------------------------------------
 
 const posted = [];
@@ -55,9 +54,7 @@ class FakeEngine {
     this.restoreResult = ChainSnapshotRestoreResult.APPLIED;
     this.paramResult = ParamSetResult.APPLIED;
     this.calls = [];
-    // Reused view, like the real engine's getParamValues() into WASM memory, so
-    // the worker's Array.from() copy-out is load-bearing (a passthrough would
-    // send this live buffer, not a detached snapshot).
+    // Reused view, like the real engine's getParamValues() into WASM memory.
     this.paramView = Uint16Array.of(5, 15, 25);
   }
   setResolution(w, h) {
@@ -71,8 +68,7 @@ class FakeEngine {
     this.effect = null;
     this.clip = null;
     // Allocated once per size and handed back by every getPixels(), like the
-    // real engine's view into WASM memory. A fresh array per call would hide a
-    // regression that transferred the buffer, which a real WASM heap refuses.
+    // real engine's view into WASM memory.
     this.pixelView = new Uint16Array(w * h * 3);
     for (let i = 0; i < this.pixelView.length; i++) {
       this.pixelView[i] = (i * 7) & 0xffff;
@@ -232,10 +228,8 @@ const bootedAtLoad = posted.filter((p) => p.msg.type === 'booted');
 
 /**
  * Deliver one protocol message through the worker's serialized queue and wait
- * for it to settle. onmessage returns the queue tail, so awaiting it tracks the
- * real settle point rather than a fixed number of microtask turns. The error
- * path resolves the tail (the rethrow is deferred to a fresh task), so this
- * never stalls on a thrown handler.
+ * for it to settle. onmessage returns the queue tail, which the error path also
+ * resolves (the rethrow is deferred to a fresh task).
  * @param {Object} msg - Protocol message to deliver.
  * @returns {Promise<void>}
  */
@@ -282,7 +276,7 @@ beforeEach(() => {
   nextLive = false;
 });
 
-/** The worker posts 'booted' at module load; the controller's boot watchdog depends on this ping. */
+/** The worker posts 'booted' at module load. */
 test('worker posts booted at module load', () => {
   assert.equal(bootedAtLoad.length, 1, 'exactly one booted ping emitted at load');
   assert.equal(bootedAtLoad[0].msg.version, PROTOCOL_VERSION, 'booted carries the protocol version');
@@ -392,8 +386,8 @@ test('a failed instantiate of a supplied module reports instead of hanging', asy
 });
 
 /**
- * The version gate is the first statement of the init handler, so a mismatched
- * init latches nothing: the worker keeps the segment identity it was built with,
+ * A version-mismatched init latches nothing: the worker keeps the segment
+ * identity it was built with,
  * for both the frame tag and every later segRange recompute.
  */
 test('a version-mismatched init latches no segment identity', async () => {
@@ -670,8 +664,7 @@ test('an accepted setResolution defers the clip until setEffect', async () => {
 /**
  * A RESIZED setResolution tears the effect and its clip down. Without the
  * following setEffect the engine has nothing to shade, so the render must reach
- * the controller's fault channel rather than shipping a black band under the
- * current generation, which no watchdog would ever catch.
+ * the controller's fault channel rather than shipping a black band.
  */
 test('a render after a resize with no setEffect faults instead of zero-filling', async () => {
   await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
@@ -799,9 +792,7 @@ test('a rejected clip leaves the reported clip disposition alone', async () => {
 
 /**
  * The two clip successes describe different work: APPLIED shades the band,
- * FULL_FRAME_KEPT shades the whole canvas in every worker. Nothing else in a
- * 'frame' separates them, so the pool would otherwise read N full-canvas
- * renders as an N-way speedup.
+ * FULL_FRAME_KEPT shades the whole canvas in every worker.
  */
 test('a frame reports whether the whole canvas was shaded', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
@@ -1241,11 +1232,8 @@ test('a refused preset index reaches the frame as a warning', async () => {
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 
-// A worker resolves its own import graph, and the page's import map does not
-// reach it, so a bare specifier anywhere in that graph fails the module load —
-// as a message-less error Event, which the controller can only read as the
-// transient fetch race it usually is, burning every boot retry on a failure
-// that will never resolve.
+// The page's import map does not reach a worker, so a bare specifier anywhere
+// in its graph fails the module load as a message-less error Event.
 test('the worker module graph carries no specifier an import map would resolve', () => {
   const { modules, edges } = staticModuleGraph('src/segments/segment_worker.js');
   for (const { from, specifier } of edges) {
@@ -1254,8 +1242,6 @@ test('the worker module graph carries no specifier an import map would resolve',
       + 'workers, so only a relative specifier resolves inside the pool');
   }
 
-  // Pinned, not just counted: a module joining the graph is a module the worker
-  // now fetches on every spawn, and one leaving it takes its own gate with it.
   assert.deepEqual(modules, [
     'generated/holosphere_wasm.js',
     'src/effects/param_sync.js',
@@ -1294,10 +1280,8 @@ function typedefShapes(source) {
   return shapes.sort();
 }
 
-// The typedefs are erased at runtime, so a field added on one side of the
-// postMessage boundary and read on the other fails silently; PROTOCOL_VERSION is
-// what makes a reshaped message fault instead, and only this pin ties the two
-// together.
+// The typedefs are erased at runtime; this pin ties their shapes to
+// PROTOCOL_VERSION, which makes a reshaped message fault.
 const PROTOCOL_SHAPE_PIN = {
   version: 12,
   sha256: '44b46801a887f746a431444fed75b9ccfa1f048a53c038c7f773c42ac624833b',

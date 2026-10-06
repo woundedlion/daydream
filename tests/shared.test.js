@@ -17,10 +17,9 @@ import { fakeElement, installDocument } from './helpers/fake_dom.js';
 const sizedElement = (width, height) =>
   Object.assign(fakeElement('div'), { clientWidth: width, clientHeight: height });
 
-// Same URL this file's static import above resolved, so shared.js and the
-// assertions below share one module instance — and one `log`. The hook is
-// process-wide and never deregistered, which is only safe because `node --test`
-// gives each test file its own process.
+// Same URL as this file's static import, so shared.js and the assertions share
+// one module instance — and one `log`. The hook is process-wide and never
+// deregistered; `node --test` gives each test file its own process.
 register('./helpers/three_loader_hooks.js', import.meta.url, {
   data: { fakeThreeUrl: import.meta.resolve('./helpers/fake_three.js') },
 });
@@ -96,9 +95,7 @@ function mountScene(opts = {}) {
   };
 }
 
-// A scene page reaches these through shared.js rather than their own modules,
-// so a re-export that stopped tracking its source would ship a stale function
-// no source module's test could see.
+// A scene page reaches these through shared.js rather than their own modules.
 test('the re-exports are the functions their source modules export', async () => {
   const sources = {
     '../shared/clipboard.js': ['copyWithFeedback', 'wireCopyBlock'],

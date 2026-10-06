@@ -52,10 +52,8 @@
       <div class="param-group">
         <h2 class="text-xl font-semibold text-indigo-300">Rendering</h2>
 
-        <!-- autocomplete="off": the lock lives in lissajous_page.js, which
-             starts every run with it off. Left to itself the browser restores
-             this box across a history navigation without telling the module,
-             and the page then reads locked while it behaves unlocked. -->
+        <!-- autocomplete="off": the browser would otherwise restore this box
+             across a history navigation without telling the module. -->
         <div class="flex items-center space-x-3 mt-2 mb-4">
           <input type="checkbox" id="rational_lock" autocomplete="off"
             class="h-5 w-5">

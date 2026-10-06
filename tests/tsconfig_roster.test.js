@@ -15,9 +15,8 @@ const NOT_CHECKED = new Set([
 ]);
 
 // Never entered: dependency and git metadata, the linked worktrees, the vendored
-// third-party drops, the engine checkout the parity cases read, and tests/,
-// which tsconfig.json puts out of scope on purpose. A worktree carries pragma
-// files of its own, which this roster does not own.
+// third-party drops, the engine checkout, and tests/, which tsconfig.json puts
+// out of scope.
 const SKIP_DIRS = new Set([
   'node_modules', '.git', '.worktrees', 'vendor', 'three.js', 'tests', 'engine',
 ]);
@@ -40,8 +39,7 @@ function readTsconfig() {
 
 // Relative module specifiers, covering `import`, `export … from`, a bare
 // side-effect `import`, and the parenthesized form both `import()` and a JSDoc
-// `@typedef {import('./x.js').T}` use — the latter names a module whose types
-// the roster has to carry just as a static import does.
+// `@typedef {import('./x.js').T}` use.
 const SPECIFIER = /\b(?:(?:from|import)\s*\(?|new\s+Worker\s*\(\s*new\s+URL\s*\()\s*["'](\.{1,2}\/[^"']+)["']/g;
 
 /**

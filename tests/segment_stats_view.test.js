@@ -1,9 +1,4 @@
-//
-// SegmentStatsView — the segmented-POV overlay: which column each per-segment
-// metric lands in, which source each fault code names, and the text-node-only
-// fault message.
-//
-// Run: npm test
+// SegmentStatsView, the segmented-POV overlay.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -33,9 +28,7 @@ const pageElement = (tag) => fakeElement(tag, { connected: true });
 
 /**
  * Overlay document stand-in: the stats container plus the two global stat bars
- * the overlay hides. Every element it creates throws on a non-empty innerHTML write, so
- * a regression from text nodes to markup assignment fails the test rather than
- * passing silently.
+ * the overlay hides. Every element it creates throws on a non-empty innerHTML write.
  * @returns {{doc: Object, stats: Object, desktop: Object, mobile: Object}} Document and its elements.
  */
 function makeDoc() {
@@ -198,8 +191,7 @@ test('a segment whose engine refused a write is marked with its notices', () => 
   assert.equal(notice(2).textContent, '');
 });
 
-// A worker sending no warnings field at all is the ordinary case and the
-// backward-compatible one.
+// A worker sending no warnings field at all is the ordinary case.
 test('a state carrying no warnings marks nothing', () => {
   const { doc, stats } = makeDoc();
   new SegmentStatsView(doc).update(readyState(2));
@@ -309,9 +301,8 @@ test('a steady-state repaint re-queries nothing and rewrites no class', () => {
   assert.equal(compute.className, 'seg-time slow');
 });
 
-// A spawning pool paints nothing: createRenderAdapter keeps stepping the main
-// engine until ownsDisplay turns true, so the global bars are still reporting
-// the frames on screen for the whole warm-and-instantiate window.
+// A spawning pool paints nothing: until ownsDisplay turns true the main engine
+// drives the frames on screen, so the global bars are still reporting them.
 test('the global stat bars stay up until the pool owns the display', () => {
   const { doc, desktop, mobile } = makeDoc();
   const view = new SegmentStatsView(doc);

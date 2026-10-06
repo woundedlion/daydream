@@ -1,8 +1,5 @@
-//
-// createSwitchCoordinator — the effect/resolution switch transaction daydream.js
-// subscribes to appState. Driven here against a real AppState and fake
-// apply/URL/GUI collaborators, so the rollback, mute-window, URL re-assert and
-// unsubscribe rules are checked without a WASM engine, lil-gui, or a browser.
+// createSwitchCoordinator, the effect/resolution switch transaction, against a
+// real AppState and fake apply/URL/GUI collaborators.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { AppState } from '../src/app/state.js';
@@ -376,8 +373,7 @@ test('mute() lands a state write without applying it, and reopens after', () => 
 
 /**
  * A rollback runs its restore muted, and the applyResolution() it drives mutes
- * its own off-list effect correction inside that window; an inner mute that
- * reopened the subscription would expose the rest of the rollback to it.
+ * its own off-list effect correction inside that window.
  */
 test('a nested mute() leaves the enclosing window muted', () => {
   const app = makeApp();
