@@ -1452,7 +1452,9 @@ test('ending a slider drag flushes its final link without waiting', async () => 
     slider.dispatch('input');
     harness.animationFrames.flush();
 
+    const reads = harness.pausedReads();
     slider.dispatch('change');
+    assert.ok(harness.pausedReads() > reads, 'ending the drag started the write');
     await harness.controller.flushDeepLink();
 
     assert.equal(harness.urls.length, 1);
