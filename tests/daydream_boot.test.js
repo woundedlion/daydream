@@ -1138,8 +1138,8 @@ test('segmented slider and pool follow viewport layout changes and release the l
   let removed;
   const query = {
     matches: false,
-    addEventListener(_type, handler) { changed = handler; },
-    removeEventListener(_type, handler) { removed = handler; },
+    addEventListener(type, handler) { changed = handler; },
+    removeEventListener(type, handler) { removed = handler; },
   };
   const created = [];
   const segments = { active: false, count: 8, showBoundaries: false,
