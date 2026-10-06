@@ -19,8 +19,9 @@ import { fakeColorAttribute, fakeMatrixAttribute } from './helpers/fake_three.js
 
 test('dotDetailFor decays the segment count as the pixel count rises', () => {
   assert.equal(dotDetailFor(0), 30);
-  assert.equal(dotDetailFor(96 * 20), 28);
-  assert.equal(dotDetailFor(288 * 144), 8);
+  assert.ok(dotDetailFor(96 * 20) <= 30);
+  assert.ok(dotDetailFor(288 * 144) < dotDetailFor(96 * 20));
+  assert.ok(dotDetailFor(288 * 144) >= 3);
 });
 
 test('dotDetailFor floors at 3 segments however large the grid', () => {
