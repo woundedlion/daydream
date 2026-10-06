@@ -271,7 +271,14 @@ test('the shader-document engine fakes mock nothing outside the engine surface',
     ['fixedEngine', fixedEngine(() => true)],
     ['workbenchEngine', workbenchEngine()],
     ['compiledBuildEngine', compiledBuildEngine()],
-  ]) assert.deepEqual(unpinnedEngineMethods(double), [], name);
+  ]) {
+    assert.deepEqual(unpinnedEngineMethods(double), [], name);
+    double.obsoleteEngineMethod = () => {};
+    const bindings = double.getShaderChainBindings?.() ?? {};
+    double.getShaderChainBindings = () => ({...bindings, obsoleteBindingMethod() {}});
+    assert.deepEqual(unpinnedEngineMethods(double),
+      ['ShaderChainBindings.obsoleteBindingMethod', 'obsoleteEngineMethod'], name);
+  }
 });
 
 // The writes also pin the topology skip: sample.weight-mode selects a baked

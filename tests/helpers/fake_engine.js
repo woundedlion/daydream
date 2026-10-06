@@ -28,6 +28,12 @@ export const ENGINE_OPTIONAL_METHODS = [
   'delete',
 ];
 
+/** Shader authoring handle methods pinned against the declaration and real WASM. */
+export const SHADER_CHAIN_BINDING_METHODS = [
+  'isValid', 'setShaderChain', 'setShaderChainParameters', 'getProgram',
+  'getSnapshot', 'restoreSnapshot', 'delete',
+];
+
 /**
  * Mirror of the module-level ParamSetResult embind enum (targets/wasm/wasm.cpp)
  * that setParameter returns. Values are distinct frozen objects so identity
@@ -122,7 +128,7 @@ const CHAIN_CATALOG_TEXT = readFileSync(
  * setShaderChain with the module's payload-shape checks, parameter definitions
  * rebuilt from the pinned catalog on every APPLIED (with the generation bump
  * the real engine makes), and an injectable refusal. Every method it mocks is
- * pinned in ENGINE_METHODS or ENGINE_OPTIONAL_METHODS.
+ * pinned in the engine or shader binding method lists.
  */
 export class FakeChainEngine {
   /** The pinned operator catalog, byte-identical to the module export. */
@@ -406,25 +412,32 @@ export class FakeChainEngine {
 }
 
 /**
- * Method names an object exposes that neither ENGINE_METHODS nor
- * ENGINE_OPTIONAL_METHODS pins — a fake
- * mocking one of these would pass its own tests against a method the real
- * engine never had. Walks the prototype chain up to Object.prototype, so an
- * instance is checked together with the class it came from and a per-instance
- * patch cannot slip past. Static module APIs are pinned by the real-WASM
- * contract suite rather than this instance-method audit.
- * @param {Object} obj - Prototype, instance, or object literal carrying a fake
- *   engine's methods.
- * @returns {Array<string>} Unpinned method names, sorted.
+ * @param {Object} obj - Instance or prototype to inspect.
+ * @param {string[]} methods - Pinned methods.
+ * @returns {string[]} Unpinned methods, sorted.
  */
-export function unpinnedEngineMethods(obj) {
-  const pinned = new Set([...ENGINE_METHODS, ...ENGINE_OPTIONAL_METHODS]);
+function unpinnedMethods(obj, methods) {
+  const pinned = new Set(methods);
   const names = new Set();
   for (let o = obj; o && o !== Object.prototype; o = Object.getPrototypeOf(o))
     for (const name of Object.getOwnPropertyNames(o)) names.add(name);
-  return [...names]
-    .filter((name) => name !== 'constructor'
-      && typeof obj[name] === 'function'
-      && !pinned.has(name))
-    .sort();
+  return [...names].filter(name => name !== 'constructor'
+    && typeof obj[name] === 'function' && !pinned.has(name)).sort();
+}
+
+/**
+ * Audits an engine fake and its shader authoring handle against the pinned surface.
+ * @param {Object} obj - Fake engine instance or object literal.
+ * @returns {string[]} Unpinned methods, prefixed for handle methods, sorted.
+ */
+export function unpinnedEngineMethods(obj) {
+  const methods = unpinnedMethods(obj, [...ENGINE_METHODS, ...ENGINE_OPTIONAL_METHODS]);
+  const bindings = obj.getShaderChainBindings?.();
+  if (bindings) {
+    try {
+      methods.push(...unpinnedMethods(bindings, SHADER_CHAIN_BINDING_METHODS)
+        .map(name => `ShaderChainBindings.${name}`));
+    } finally { bindings.delete?.(); }
+  }
+  return methods.sort();
 }
