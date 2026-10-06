@@ -32,10 +32,6 @@
     "reason": "The import-time LOCALAPPDATA branch depends on the host environment. Resolver fixtures cover explicit paths, candidate selection and missing executables; they do not reload the module under both Windows environment states.",
     "branches": 88.89
   },
-  "src/workbench/shared.js": {
-    "reason": "Remaining branches include optional scene callbacks, renderer teardown and browser sizing fallbacks. Mocked scene tests cover construction and disposal; live WebGL and layout behavior is exercised by browser probes.",
-    "branches": 89.19
-  },
   "src/ui/effect_panel_view.js": {
     "reason": "Browser probes exercise focused controller DOM paths.",
     "branches": 81.82
