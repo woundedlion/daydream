@@ -75,13 +75,15 @@ class FakeEngine {
     }
     return ResolutionSetResult.RESIZED;
   }
-  // Clearing params models the engine rebuilding to defaults, so the
-  // "params re-applied AFTER setEffect" ordering is observable. A rejection
-  // keeps the current effect and its params, like a failed factory build.
+  // Clearing params and the clip models the engine rebuilding to defaults, so
+  // the "params and clip re-applied AFTER setEffect" ordering is observable. A
+  // rejection keeps the current effect, its params and clip, like a failed
+  // factory build.
   setEffect(name) {
     this.calls.push(['setEffect', name]);
     if (!this.effectOk) return EffectSetResult.UNKNOWN_EFFECT;
     this.effect = name;
+    this.clip = null;
     this.params = [];
     this.presetIndex = 0;
     return EffectSetResult.INSTALLED;
@@ -769,25 +771,37 @@ test('a full-frame-kept clip does not fault the pool', async () => {
 });
 
 /**
- * A rejected clip leaves the engine on its previous one, so the reported
- * disposition must stay on that clip too — otherwise every later frame claims a
- * band render the worker never did.
+ * An installed effect resets the engine to the full-canvas clip, so a clip
+ * rejected after it must report a whole-canvas render, not the previous band.
  */
-test('a rejected clip leaves the reported clip disposition alone', async () => {
+test('a clip rejected after setEffect reports the full-canvas reset clip', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
-  engineInstance.fullFrame = true;
-  await dispatch({ type: 'setEffect', name: 'MeshFeedback' });
   posted.length = 0;
   await dispatch({ type: 'render' });
-  assert.equal(posted.find((p) => p.msg.type === 'frame').msg.fullFrame, true,
-    'the kept full-canvas clip is in force');
+  assert.equal(posted.find((p) => p.msg.type === 'frame').msg.fullFrame, false,
+    'the band clip is in force');
 
   engineInstance.clipOk = false;
   await dispatch({ type: 'setEffect', name: 'Waves' });
+  assert.equal(engineInstance.clip, null, 'the engine is back on the full canvas');
   posted.length = 0;
   await dispatch({ type: 'render' });
   assert.equal(posted.find((p) => p.msg.type === 'frame').msg.fullFrame, true,
-    'a rejected clip does not downgrade the report to a band render');
+    'the report follows the reset clip, not the rejected band');
+});
+
+/** A clip rejected without an effect rebuild leaves the engine on its previous clip. */
+test('a clip rejected by setDisplayCaps leaves the reported clip disposition alone', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  const clipBefore = { ...engineInstance.clip };
+
+  engineInstance.clipOk = false;
+  await dispatch({ type: 'setDisplayCaps', topCap: 1, bottomCap: 1 });
+  assert.deepEqual(engineInstance.clip, clipBefore, 'the engine kept its band clip');
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  assert.equal(posted.find((p) => p.msg.type === 'frame').msg.fullFrame, false,
+    'the report stays on the band clip');
 });
 
 /**

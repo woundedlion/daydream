@@ -48,8 +48,8 @@ export function installSegmentWorker() {
   let paramRevision = 0;
   /** @type {SegRange | null} */
   let segRange = null;
-  // Disposition of the last applyClip: true once the engine kept the full-canvas
-  // clip for a needs_full_frame() || persists_pixels() effect.
+  // Disposition of the engine's clip: true while it covers the full canvas, as
+  // after an installed effect or a FULL_FRAME_KEPT applyClip.
   let clipFullFrame = false;
   // Log-once latch for getArenaMetrics failures; reset per effect install and
   // geometry change.
@@ -109,7 +109,7 @@ export function installSegmentWorker() {
         reason: `setClip(${segRange.x0}, ${segRange.x1}, `
           + `${segRange.y0}, ${segRange.y1}) rejected`,
       });
-      // The engine kept its previous clip, so the latch keeps describing it.
+      // The engine kept its current clip, so the latch keeps describing it.
       return false;
     }
     if (result === wasmModule.ClipSetResult.NO_EFFECT) {
@@ -287,6 +287,7 @@ export function installSegmentWorker() {
                  reason: `setEffect(${msg.effectName}) rejected` });
           break;
         }
+        clipFullFrame = true;
         // Mirrors the engine-driven index without engaging the pause.
         if (typeof msg.presetIndex === 'number') {
           applyPreset(msg.presetIndex, 'synchronizePreset');
@@ -315,6 +316,7 @@ export function installSegmentWorker() {
           divergenceWarnings = new Map();
           arenaMetricsWarned = false;
           awaitingEffect = false;
+          clipFullFrame = true;
           // Mirrors the engine-driven index without the pause, as in 'init'.
           if (typeof msg.presetIndex === 'number') {
             applyPreset(msg.presetIndex, 'synchronizePreset');
