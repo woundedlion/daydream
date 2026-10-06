@@ -212,6 +212,7 @@ test('rollback restores an unflushed control value to runtime sinks and URL', ()
     previous.effect.controllerByName.get('Speed').setValue(0.75);
     const snapshot = snapshotEffectControlState(previous.effect);
     getActiveURLSync().discardPending();
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
     assert.equal(new URL(lastUrl, 'http://x').searchParams.get('Speed'), '0.1');
 
     const rebuilt = makeEffect();
