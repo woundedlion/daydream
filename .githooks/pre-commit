@@ -26,7 +26,7 @@ EOF
 fi
 
 if ! command -v node >/dev/null 2>&1; then
-  echo "[pre-commit] node not found; Node.js is required for documentation checks."
+  echo "[pre-commit] node not found; Node.js is required for publication checks."
   exit 1
 fi
 
@@ -45,4 +45,4 @@ INDEX_PATH="$(git rev-parse --path-format=absolute --git-path index)"
   node --test "$SNAPSHOT/tests/site_manifest.test.js"
 )
 
-echo "[pre-commit] staged whitespace, lint, and documentation checks passed."
+echo "[pre-commit] staged whitespace, lint, and publication checks passed."
