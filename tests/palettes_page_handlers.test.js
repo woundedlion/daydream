@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pageHandlers } from './helpers/page_handlers.js';
 import { fakeElement } from './helpers/fake_dom.js';
+import { hueKeyNudgeTurns } from '../src/workbench/palettes/palette_wheel.js';
 
 const handler = pageHandlers(new URL('../src/workbench/palettes/palettes_page.js', import.meta.url));
 
@@ -156,4 +157,31 @@ test('base hue arrow keys step in useful degrees without changing the recipe mod
   assert.ok(Math.abs(Number(slider.value) - 9.25) < 1e-8);
   press('Enter');
   assert.equal(prevented, 3);
+});
+
+test('a keyboard resample follows the selected hue key through later nudges', () => {
+  let mode = 'HARMONY';
+  let focused = 1;
+  const moved = [];
+  const context = {
+    selectedHueKey: 1, customHueOffsets: [0, 0.25, 0.5],
+    hueKeyNudgeTurns, wrapTurns: value => value % 1,
+    PaletteV4: { hueMode: { CUSTOM: 'CUSTOM' } },
+    readPaletteRecipe: () => ({ hue: { mode } }),
+    activateCustomHue: () => { context.selectedHueKey = 2; mode = 'CUSTOM'; return true; },
+    drawHueKeyWheel: () => {},
+    hueKeyHandles: [0, 1, 2].map(index => ({ focus: () => { focused = index; } })),
+    customBaseTurns: () => 0,
+    moveCustomHueKey: (_base, offsets, index) => { moved.push(index); return offsets; },
+    scheduleUpdate: () => {},
+  };
+  const nudge = handler('handleHueKeyNudge', context);
+  const event = { key: 'ArrowRight', shiftKey: false, preventDefault() {} };
+  nudge(event, focused);
+  assert.equal(focused, 2);
+  nudge(event, focused);
+  assert.deepEqual(moved, [2, 2]);
+  nudge({...event, key: 'Enter', preventDefault: assert.fail}, 0);
+  assert.deepEqual(moved, [2, 2]);
+  assert.equal(context.selectedHueKey, 2);
 });
