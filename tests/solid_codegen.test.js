@@ -527,6 +527,11 @@ test('computeInternalAngle guards degenerate input', () => {
   assert.equal(computeInternalAngle(null), 0);
   assert.equal(computeInternalAngle({ faces: [] }), 0);
   assert.equal(computeInternalAngle({ vertices: [], faces: [[0, 1]] }), 0);
+  const corner = [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }];
+  assert.equal(computeInternalAngle({ vertices: corner, faces: [[0, 1, 2]] }), 0,
+    'a zero-length second edge');
+  assert.equal(computeInternalAngle({ vertices: corner, faces: [[1, 2, 0]] }), 0,
+    'a zero-length first edge');
 });
 
 /** Verifies snapToStep lands on the step grid measured from min, and clamps to the range. */
