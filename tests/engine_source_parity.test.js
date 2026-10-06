@@ -19,6 +19,7 @@ import { closingDomain, lissajousCodeString } from '../src/workbench/lissajous/l
 import * as MB from '../src/workbench/mobius/mobius_transforms.js';
 import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS, KNOWN_OPS } from '../src/workbench/solids/solid_codegen.js';
 import { MAX_BUILD_FACES, MAX_BUILD_STEPS, upperSnake, primitiveCount, LOWERING } from '../src/workbench/solids/solid_registry_codegen.js';
+import { MAX_DISPLAY_CAP_PERCENT } from '../src/renderer/display_caps.js';
 
 const enginePin = readFileSync(new URL('../generated/holosphere_wasm.sha', import.meta.url), 'utf8').trim();
 
@@ -487,4 +488,13 @@ test('gyro lowering uses the engine snub defaults', { skip: engineSkip }, () => 
   const [snub] = LOWERING.gyro('gyro');
   assert.equal(snub.params.t, engineConstant(cpp, 'SNUB_DEFAULT_T', path));
   assert.equal(snub.params.twist, engineConstant(cpp, 'SNUB_DEFAULT_TWIST', path));
+});
+
+test('MAX_DISPLAY_CAP_PERCENT is the bound setDisplayCaps enforces', { skip: engineSkip }, () => {
+  const path = 'targets/wasm/engine_bindings.h';
+  const body = functionBody(header(path), 'bool setDisplayCaps');
+  const bounds = [...body.matchAll(/\b(top|bottom)_percent > ([\d.]+)/g)];
+  assert.deepEqual(bounds.map(([, side]) => side), ['top', 'bottom'],
+    `setDisplayCaps bounds not found in ${path} — the parity reader is out of date`);
+  for (const [, side, bound] of bounds) assert.equal(MAX_DISPLAY_CAP_PERCENT, Number(bound), side);
 });

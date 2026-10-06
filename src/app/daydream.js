@@ -6,7 +6,7 @@
 
 import { callWorkbenchBinding } from '../engine/workbench_bindings.js';
 import { GlobalStatsView } from "../ui/global_stats_view.js";
-import { createDisplayCapsBinding } from "../renderer/display_caps.js";
+import { MAX_DISPLAY_CAP_PERCENT, createDisplayCapsBinding } from "../renderer/display_caps.js";
 import createHolosphereModule from "../../generated/holosphere_wasm.js";
 import { Daydream, MOBILE_BREAKPOINT_PX } from "../renderer/driver.js";
 import { GUI, resetGUI } from "../ui/gui.js";
@@ -577,9 +577,9 @@ export function start({
     acceptedCaps = { ...displayCaps.state };
     if (!host.engine) segments.setDisplayCaps(displayCaps.state.topCap, displayCaps.state.bottomCap);
   };
-  capControls.push(guiInstance.add(displayCaps.state, 'topCap', 0, 25, 0.1).name('Top cap (%)')
+  capControls.push(guiInstance.add(displayCaps.state, 'topCap', 0, MAX_DISPLAY_CAP_PERCENT, 0.1).name('Top cap (%)')
     .onChange(applyDisplayCaps));
-  capControls.push(guiInstance.add(displayCaps.state, 'bottomCap', 0, 25, 0.1).name('Bottom cap (%)')
+  capControls.push(guiInstance.add(displayCaps.state, 'bottomCap', 0, MAX_DISPLAY_CAP_PERCENT, 0.1).name('Bottom cap (%)')
     .onChange(applyDisplayCaps));
 
   const segSpawn = shaderWorkbench ? null : createSegmentedPovControls({
