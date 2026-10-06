@@ -600,6 +600,7 @@ test('focus tracks the document, and unparenting the focused node blurs it', () 
   const list = fakeElement('div', { connected: true });
   const row = fakeElement('button');
   const label = fakeElement('span');
+  label.tabIndex = -1;
   list.appendChild(row);
   row.appendChild(label);
 
@@ -620,6 +621,7 @@ test('focus tracks the document, and unparenting the focused node blurs it', () 
 
   list.appendChild(row);
   label.focus();
+  assert.equal(doc.activeElement, label);
   list.replaceChildren();
   assert.equal(doc.activeElement, body, 'a focused descendant kept focus through the eviction');
 });
