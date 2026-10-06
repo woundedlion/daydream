@@ -90,6 +90,8 @@ test('navTargetIndex wraps Left/Right within the row, not into the next one', ()
   // Right past the last column returns to the first column of the same row.
   assert.equal(navTargetIndex(14, 20, 'ArrowRight', 7), 0);
   assert.equal(navTargetIndex(19, 20, 'ArrowRight', 7), 5);
+  // A full last column wraps too: index len - stride has no column to its right.
+  assert.equal(navTargetIndex(3, 6, 'ArrowRight', 3), 0);
   // Left before the first column lands on the row's last populated option; the
   // short trailing column leaves row 5 ending at 19 and row 6 at 13.
   assert.equal(navTargetIndex(5, 20, 'ArrowLeft', 7), 19);
