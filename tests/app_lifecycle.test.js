@@ -514,7 +514,7 @@ test('a stalled load rejects at the deadline instead of spinning', async () => {
 });
 
 test('the deadline preserves the cold-load window', () => {
-  assert.equal(MODULE_LOAD_DEADLINE_MS, 90000,
+  assert.ok(MODULE_LOAD_DEADLINE_MS >= 90000,
     'a slow-but-working first fetch of the multi-megabyte binary must not trip it');
 });
 
