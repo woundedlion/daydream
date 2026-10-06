@@ -87,8 +87,8 @@ const SEGMENT_COUNT_MIN = 2;
 /**
  * Largest segment count to offer on this device.
  * @details `navigator.deviceMemory` is Chromium-only and reports a power of two
- * clamped to [0.25, 8] GiB; where it is missing the mobile layout stands in for
- * a phone.
+ * clamped to [0.25, 8] GiB. The mobile-layout cap also applies; the lower
+ * cap wins, and mobile layout is the only hint when deviceMemory is absent.
  * @param {Navigator | {deviceMemory?: number}} [nav] - Source of the device hint.
  * @param {boolean} [isMobile] - Whether the app is in its mobile layout.
  * @returns {number} An even count in [2, 8].
