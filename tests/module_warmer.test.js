@@ -331,11 +331,21 @@ for (const baseUrl of ['not a URL', 'file:///tmp/src/segments/module_warmer.js']
 test('warm without fetch is a no-op', async (t) => {
   const warmer = new ModuleWarmer();
   const warn = t.mock.method(console, 'warn', () => {});
-  await warmer.warm({ fetch: null,
-    baseUrl: 'http://localhost:8000/src/segments/segment_controller.js' });
+  const request = { now: () => 0, minIntervalMs: WARM_INTERVAL_MS,
+    baseUrl: 'http://localhost:8000/src/segments/segment_controller.js' };
+  await warmer.warm({ ...request, fetch: null });
   assert.equal(warmer.module, null);
-  assert.equal(warmer.lastWarmKey, null, 'no warm was started');
   assert.equal(warn.mock.callCount(), 0);
+
+  let calls = 0;
+  await warmer.warm({
+    ...request,
+    fetch: () => {
+      calls++;
+      return Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) });
+    },
+  });
+  assert.equal(calls, GRAPH.length + 1, 'the fetch-less warm claimed the dedupe window');
 });
 
 test('an HTTP error reports its status and re-arms the warm window', async (t) => {
