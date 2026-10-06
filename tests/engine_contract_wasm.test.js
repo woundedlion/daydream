@@ -17,7 +17,7 @@ import {
   DEFINED_SEED_CONSTANTS, applyOp, meshOpFailure, MESH_OP_RESULT_NAMES,
 } from '../src/workbench/solids/solid_codegen.js';
 import {
-  FakeChainEngine, ENGINE_METHODS, ENGINE_OPTIONAL_METHODS, ParamSetResult, ClipSetResult,
+  FakeChainEngine, ENGINE_METHODS, ENGINE_OPTIONAL_METHODS, SHADER_CHAIN_BINDING_METHODS, ParamSetResult, ClipSetResult,
   ResolutionSetResult, EffectSetResult, ChainSnapshotRestoreResult, ChainStatus,
 } from './helpers/fake_engine.js';
 import { isViewLive, refreshPixelView } from '../src/renderer/pixel_view.js';
@@ -188,6 +188,7 @@ test('authoring adapter declarations match their exported methods', () => {
   for (const [name, handle] of [['ShaderChainBindings', chain]]) {
     const declared = [...interfaceBody(name).matchAll(/^\s*([A-Za-z_]\w*)\s*\(/gm)]
       .map((match) => match[1]);
+    assert.deepEqual([...SHADER_CHAIN_BINDING_METHODS].sort(), declared.toSorted());
     for (const method of declared) assert.equal(typeof handle[method], 'function');
     assert.deepEqual(Object.keys(Object.getPrototypeOf(handle)).sort(),
       declared.filter((method) => method !== 'delete').sort());

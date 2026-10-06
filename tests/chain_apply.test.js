@@ -64,7 +64,12 @@ function harness() {
 }
 
 test('FakeChainEngine mocks nothing outside the pinned engine surface', () => {
-  assert.deepEqual(unpinnedEngineMethods(new FakeChainEngine()), []);
+  const engine = new FakeChainEngine();
+  engine.setEffect('ShaderChain');
+  assert.deepEqual(unpinnedEngineMethods(engine), []);
+  const bindings = engine.getShaderChainBindings();
+  engine.getShaderChainBindings = () => ({...bindings, obsoleteBindingMethod() {}});
+  assert.deepEqual(unpinnedEngineMethods(engine), ['ShaderChainBindings.obsoleteBindingMethod']);
 });
 
 test('unknown preset refuses before installing the chain', () => {

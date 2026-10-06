@@ -166,8 +166,14 @@ class FakeEngine {
 }
 
 test('FakeEngine mocks only methods the real engine surface pins', () => {
-  assert.deepEqual(unpinnedEngineMethods(new FakeEngine()), [],
-    'engine_contract_wasm.test.js never checks these against the real module');
+  const fake = new FakeEngine();
+  assert.deepEqual(unpinnedEngineMethods(fake), []);
+  const bindings = fake.getShaderChainBindings();
+  fake.getShaderChainBindings = () => ({...bindings, obsoleteBindingMethod() {}});
+  assert.deepEqual(unpinnedEngineMethods(fake), ['ShaderChainBindings.obsoleteBindingMethod']);
+  fake.getShaderChainBindings = () => bindings;
+  fake.obsoleteEngineMethod = () => {};
+  assert.deepEqual(unpinnedEngineMethods(fake), ['obsoleteEngineMethod']);
 });
 
 /** The single engine the mocked factory hands back, so tests can configure it. */
