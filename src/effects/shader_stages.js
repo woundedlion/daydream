@@ -16,7 +16,6 @@ export const STAGE_ORDER = [
   'Planar Warp 1',
   'Planar Warp 2',
   'Function',
-  'Signal Weight',
   'Value Transfer',
   'Coverage',
   'Colorize',
