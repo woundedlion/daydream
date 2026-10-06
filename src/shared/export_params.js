@@ -3,8 +3,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-// Dependency-free formatter for the GUI's Export action, isolated from
-// daydream.js so it imports without pulling Three.js into its unit test.
+// Dependency-free formatter for the GUI's Export action.
 
 import { formatFloatCpp } from './cpp_format.js';
 
@@ -12,12 +11,10 @@ import { formatFloatCpp } from './cpp_format.js';
  * Format the live parameter set as a C++ brace-init list for pasting into a
  * PRESETS table. Readonly and non-preset params are skipped.
  *
- * Each literal matches the member's declared type, since a brace-init narrowing
- * conversion is a compile error: an enum carrying exportOptions emits the
- * symbolic entry matching its live numeric engine value, a toggle emits `true`/`false`,
- * a whole-number param (`step` of 1) emits an integer literal, and everything
- * else a float literal. Effects that interleave unrepresented members still
- * produce a list that must be edited by hand.
+ * Each literal matches the member's declared type (brace-init forbids
+ * narrowing): an enum carrying exportOptions emits its symbolic entry, a toggle
+ * `true`/`false`, a whole-number param (`step` of 1) an integer, everything
+ * else a float. Effects that interleave unrepresented members need hand edits.
  * @param {Array<{name?: string, readonly?: boolean, preset?: boolean,
  *   value?: number|boolean, step?: number,
  *   exportOptions?: Array<string>, optionValues?: number[]}>} params - Definitions parallel to values.
@@ -42,8 +39,8 @@ export function formatExportParams(params, values) {
     } else if (typeof param.value === 'boolean') {
       items.push(values[i] > 0.5 ? 'true' : 'false');
     } else if (param.step === 1 && Number.isInteger(values[i])) {
-      // Only a float-backed enum can carry a fraction under a step of 1; its
-      // target is a float, so it falls through to the float literal.
+      // A fraction under a step of 1 (float-backed enum) takes the float path.
+
       items.push(String(values[i]));
     } else {
       items.push(formatFloatCpp(values[i]));

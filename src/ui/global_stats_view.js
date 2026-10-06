@@ -4,9 +4,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  *
  * GlobalStatsView — the single-engine stats bar: the frame draw duration and,
- * when the effect reports them, each arena's usage|high-water|capacity. Owns the
- * cell ids, the resolve-once latch and the formatting, so the renderer keeps
- * none of them and the overlay is testable without Three.js or a browser.
+ * when the effect reports them, each arena's usage|high-water|capacity.
  */
 import { SLOW_FRAME_MS } from "../renderer/frame_constants.js";
 import { formatKB } from "../shared/kb_format.js";
@@ -46,8 +44,8 @@ export class GlobalStatsView {
    * Repaint both stat bars from one frame's measurements.
    * @param {number} duration - Frame draw time in milliseconds.
    * @param {?ArenaMetrics} metrics - Arena metrics for the frame, or null when the
-   *   effect publishes none (a worker pool owning the display, say). A row whose
-   *   arena is absent keeps its last text rather than throwing on the frame path.
+   *   effect publishes none. A row whose arena is absent keeps its last text.
+
    * @returns {void}
    */
   update(duration, metrics) {

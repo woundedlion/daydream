@@ -4,9 +4,7 @@
  */
 
 /**
- * The page's shared notice element. Several subsystems announce through the one
- * element, so every write names an owner and a clear lands only for the owner
- * holding it.
+ * The page's shared notice element, written per owner.
  */
 
 const APPLY_NOTICE_MS = 8000;
@@ -14,11 +12,8 @@ const APPLY_NOTICE_MS = 8000;
 /**
  * Build the page's notice sink over the shared apply-notice element.
  *
- * Several subsystems announce through that one element, so every write names an
- * owner: raising takes the element over, but a clear lands only when the caller
- * owns the notice on screen. A parameter write during a slider drag therefore
- * leaves a switch rejection standing instead of erasing the only explanation the
- * user was given.
+ * Every write names an owner: raising takes the element over, but a clear lands
+ * only when the caller owns the notice on screen.
  *
  * @param {Object} deps - Injected app collaborators.
  * @param {Document} deps.doc - Document holding the notice elements.
@@ -29,8 +24,8 @@ const APPLY_NOTICE_MS = 8000;
  *   one-shot report that the notice elements are absent.
  * @returns {{show: (message: string|null, owner: string) => void,
  *   clear: () => void, owner: () => string|null}} The sink. clear() drops the
- *   notice whoever raised it, for the dismiss button and the page teardown;
- *   owner() reports who holds the element.
+ *   notice whoever raised it; owner() reports who holds the element.
+
  */
 export function createApplyNotice({
   doc,

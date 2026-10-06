@@ -5,9 +5,8 @@
  */
 
 /**
- * The one anchor-click download the simulator and the tool pages hand a blob
- * to. Dependency-free, so the THREE-free modules can import it without pulling
- * Three.js in through shared.js.
+ * Dependency-free anchor-click blob download.
+
  */
 
 // The click consumes the blob synchronously; the URL only needs to outlive it.

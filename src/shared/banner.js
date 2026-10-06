@@ -5,10 +5,6 @@
 
 /**
  * Dependency-free page-level banner and bootstrap helpers for the tool pages.
- *
- * Kept separate from shared.js (the Three.js scene setup) so non-3D pages —
- * e.g. palettes.html — can surface a fatal error without pulling Three.js into
- * their module graph. shared.js re-exports these for its scene-based callers.
  */
 
 /**
@@ -28,10 +24,8 @@ export function errorDetail(error) {
 
 /**
  * Build the banner shell — a message slot and a dismiss button — and attach it
- * to the page. The banner is fixed across the top of the viewport, so the
- * dismiss button is what keeps a survivable failure from permanently occluding
- * a working page; dismissing removes the element, and the next failure builds a
- * fresh one.
+ * to the page. Dismissing removes the element; the next failure builds a fresh
+ * one.
  * @returns {HTMLElement} The banner element, attached when the page has a parent.
  */
 function buildBanner() {
@@ -80,11 +74,8 @@ export function clearFatalError(message) {
 }
 
 /**
- * Render a visible error banner across the top of the page. Tool pages that
- * boot a WASM engine call this from their bootstrap catch so a missing or
- * failed-to-load artifact surfaces to the user, instead of leaving a blank
- * canvas with only a console line (mirrors the segmented view's fault overlay).
- * Idempotent — repeated calls update the single banner. Dismissible.
+ * Render a visible error banner across the top of the page. Idempotent —
+ * repeated calls update the single banner. Dismissible.
  *
  * @param {string} message - Human-readable failure description.
  * @returns {void}
@@ -97,12 +88,8 @@ export function showFatalError(message) {
 
 /**
  * Route every uncaught error and unhandled rejection on the page to the console
- * plus the same fatal banner a boot failure raises. Without this a post-boot
- * throw — an event handler, an animation frame, a stray promise — leaves the
- * page frozen with nothing on screen to say why.
- *
- * preventDefault() on a rejection suppresses the browser's duplicate console
- * report; the reason is already logged here.
+ * plus the fatal banner. preventDefault() on a rejection suppresses the
+ * browser's duplicate console report.
  *
  * @param {string} label - Page name used in the messages, e.g. 'Lissajous tool'.
  * @param {EventTarget} [target=window] - Where to listen for the failures.
@@ -150,9 +137,7 @@ export function reportPageFailures(label, target = window) {
  * console plus a fatal banner. Accepts a synchronous or an async init: a thrown
  * error and a rejected promise take the same path. Also installs
  * reportPageFailures, so failures after init reach the same banner.
- *
- * addEventListener (not `window.onload =`) avoids clobbering any other load
- * handler.
+
  *
  * @param {Function} init - The page's initializer; may return a promise.
  * @param {string} label - Page name used in both messages, e.g. 'Lissajous tool'.

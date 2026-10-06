@@ -3,26 +3,9 @@
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
  *
- * SegmentController — owns the segmented-POV worker pipeline.
- *
- * N Web Workers each instantiate their own isolated WASM engine — from one
- * compilation shared with the pool when available — and render a segment rectangle of the
- * canvas in parallel; results are composited into the display buffer. The
- * pipeline is one-frame deep: frame N-1's results are displayed while frame N
- * renders on the workers. Wall time spans dispatch through the last response;
- * worker timings measure each render separately.
- *
- * The host (daydream.js) owns the main-thread WASM engine and pixel view (both
- * reassignable), so those are injected as lazy getters:
- *   - resolutionPresets:  { name -> {w,h} } resolution table
- *   - appState:           pub/sub state (reads 'resolution' and 'effect')
- *   - driver:             Daydream renderer instance (live grid + display buffer)
- *   - getWasmEngine():    current main-thread HolosphereEngine (or null)
- *   - refreshPixelView(): re-fetch the (possibly detached) WASM pixel view
- *   - getMemoryView():    current Uint16Array view of the display buffer
- *   - repointDisplayAliases(view): re-point both display aliases at a view
- *   - displayAliasesDiverged(view): whether either display alias has stopped
- *     referencing that view
+ * SegmentController — owns the segmented-POV worker pipeline. Each Web Worker
+ * runs its own WASM engine and renders one segment rectangle; results are
+ * composited one frame deep (frame N-1 displays while frame N renders).
  */
 import { callWorkbenchBinding } from '../engine/workbench_bindings.js';
 import {
@@ -38,28 +21,16 @@ import { SEGMENT_COUNT_MAX } from "./segment_policy.js";
 
 export const SEGMENT_CONTROLLER_API_VERSION = 3;
 
-// Deadline for all workers to report 'ready'. A non-throwing WASM load failure
-// fires no onerror and never sends 'ready', so this bound latches a fault instead
-// of freezing black.
+// Deadline for all workers to report 'ready'; a non-throwing WASM load failure
+// fires no onerror and never sends 'ready'.
 export const INIT_WATCHDOG_MS = 20000;
 
 // Deadline for the per-worker 'booted' ping (fetch+evaluate, not WASM
-// instantiate). Sized for a cold-cache/throttled module+glue fetch; a slow WASM
-// instantiate is separately bounded by INIT_WATCHDOG_MS.
+// instantiate).
 export const BOOT_WATCHDOG_MS = 10000;
 
-// Pool-wide render-liveness deadline for a dispatched parallel render. A worker that
-// accepts 'render' but hangs without throwing fires no onerror and never settles
-// `pending`, freezing the pipeline; this bound latches a fault instead. It is
-// re-armed on every distinct segment 'frame' while `pending > 0`, so it bounds the
-// gap between reports rather than the whole render — a legitimately slow effect on
-// a throttled CPU keeps extending it as segments land, and only a true stall (no
-// segment reports for this long) faults. Absolute rather than a multiple of the
-// display cadence: the fault is unrecoverable without a user-driven rebuild, and
-// the widest gap it legitimately sees is the first frame after an effect switch
-// (a cold effect build plus up to a full 288x144 render per worker on a
-// throttled machine), so it is sized against a hung worker, not a slow one. Peer
-// to the boot/init deadlines above.
+// Pool-wide render-liveness deadline: the longest gap between segment 'frame'
+// reports while `pending > 0`, not the whole render.
 export const RENDER_WATCHDOG_MS = 5000;
 
 // Retry message-less worker error Events with bounded backoff.
@@ -70,9 +41,7 @@ export const BOOT_RETRY_DELAY_MS = 250;
 export const MAX_FAULTED_REBUILDS = 2;
 
 /**
- * Release a pending timer's hold on the Node event loop, so an unfired watchdog
- * cannot keep the unit-test process alive. No-op in browsers, where `unref` does
- * not exist and timers do not hold the page open.
+ * Release a pending timer's hold on the Node event loop. No-op in browsers.
  * @param {ReturnType<typeof setTimeout>} timer - Handle returned by setTimeout.
  * @returns {void}
  */
@@ -111,8 +80,7 @@ export class SegmentController {
 
   /**
    * Staging buffer workers fill during a generation; swapped into `#results`
-   * only once every segment has reported, so `#results` always holds one whole
-   * generation and an overrun re-blit never composites a half-updated mix.
+   * once every segment has reported, so `#results` holds one whole generation.
    * @type {Array<FrameResult | null>}
    */
   #scratch = [];
@@ -125,17 +93,15 @@ export class SegmentController {
 
   /**
    * Per-segment clip disposition of the last reported frame: true when that
-   * worker's effect reports needs_full_frame() || persists_pixels() and it shaded the whole canvas
-   * instead of its band. The pool is only N-way parallel where this is false.
+   * worker's effect reports needs_full_frame() || persists_pixels() and it
+   * shaded the whole canvas instead of its band.
    * @type {boolean[]}
    */
   #fullFrames = [];
 
   /**
-   * Per-segment divergence notices from the last reported frame: a worker
-   * whose engine refused a parameter or a preset renders a configuration its
-   * peers do not, and the pool has no reply channel to learn of it otherwise.
-   * Null where the segment reported none.
+   * Per-segment divergence notices from the last reported frame (a parameter
+   * or preset the worker's engine refused); null where the segment reported none.
    * @type {Array<string[] | null>}
    */
   #warnings = [];
@@ -157,11 +123,9 @@ export class SegmentController {
   #ready = false;
 
   /**
-   * Generation fence: bumps wherever an in-flight frame's results stop being
-   * publishable — a resolution change (sized to a stale W/H, its x1/y1 indexing
-   * past the resized buffer), an effect switch (outgoing effect), a fault latch,
-   * and destroy(). renderParallel snapshots it into #inflightGen at dispatch; a
-   * frame whose snapshot no longer matches is dropped.
+   * Generation fence: bumped whenever in-flight results stop being publishable.
+   * renderParallel snapshots it into #inflightGen at dispatch; a frame whose
+   * snapshot no longer matches is dropped.
    */
   #renderGen = 0;
 
@@ -180,15 +144,15 @@ export class SegmentController {
    * @param {Object} deps - Host-injected dependencies.
    * @param {Object<string, {w:number, h:number}>} deps.resolutionPresets - Resolution table mapping a preset name to its pixel dimensions.
    * @param {{get: (key: string) => any}} deps.appState - Read-only view of the host's pub/sub state; reads the 'resolution' and 'effect' keys.
-   * @param {{paused?: boolean, W: number, H: number, pixels: Uint16Array|null, dotMesh: {instanceColor: {array: Uint16Array|null, needsUpdate: boolean}}|null, invalidate: () => void}} deps.driver - Renderer instance owning the live pixel grid (W/H), the display buffer the compositor blits into, and the dot mesh carrying the second display alias: composite() asks the injected detector about both aliases, and the heal re-points them.
+   * @param {{paused?: boolean, W: number, H: number, pixels: Uint16Array|null, dotMesh: {instanceColor: {array: Uint16Array|null, needsUpdate: boolean}}|null, invalidate: () => void}} deps.driver - Renderer instance owning the live pixel grid (W/H), the display buffer, and the dot mesh carrying the second display alias.
    * @param {() => (import('../../generated/holosphere_wasm.js').HolosphereEngine|null)} deps.getWasmEngine - Returns the current main-thread HolosphereEngine, or null when none is bound.
-   * @param {() => unknown} deps.refreshPixelView - Re-fetches the (possibly detached) WASM pixel view, reporting `true` when it fetched a fresh one. A refresh re-points the display aliases itself, so without that report composite() cannot tell that the buffer it is about to blit into is one the driver never cleared.
+   * @param {() => unknown} deps.refreshPixelView - Re-fetches the (possibly detached) WASM pixel view, reporting `true` when it fetched a fresh one.
    * @param {() => (Uint16Array|null)} deps.getMemoryView - Returns the current Uint16Array view of the display buffer.
-   * @param {(view: Uint16Array) => void} deps.repointDisplayAliases - Re-points BOTH display aliases (Three.js instanceColor.array + driver.pixels) at the given view. Required: only the host knows the mesh, and an implementation that moves one alias leaves the composite in a buffer the GPU never reads.
-   * @param {(view: Uint16Array) => boolean} deps.displayAliasesDiverged - Reports whether either display alias has stopped referencing the given view. Required, and the twin of repointDisplayAliases: the host owns both halves of the alias pair, so the detector and the heal must be supplied together rather than half injected and half reached for.
+   * @param {(view: Uint16Array) => void} deps.repointDisplayAliases - Re-points BOTH display aliases (Three.js instanceColor.array + driver.pixels) at the given view.
+   * @param {(view: Uint16Array) => boolean} deps.displayAliasesDiverged - Reports whether either display alias has stopped referencing the given view.
    * @param {(message: string) => void} [deps.onFault] - Reports the first fault since the pool was (re)built.
    * @param {Document} [deps.statsDoc] - DOM document the stats overlay renders into; defaults to the global `document`.
-   * @param {import('./module_warmer.js').ModuleWarmer} [deps.moduleWarmer] - Warmer whose compilation the spawn hands to its workers; defaults to the page's, so pools reuse its held compilation when available.
+   * @param {import('./module_warmer.js').ModuleWarmer} [deps.moduleWarmer] - Warmer whose held compilation spawned workers reuse; defaults to the page's.
    * @throws {TypeError} When repointDisplayAliases or displayAliasesDiverged is
    *   not a function.
    */
@@ -216,15 +180,13 @@ export class SegmentController {
     /** @type {SegmentStatsView} */
     this.statsView = new SegmentStatsView(statsDoc);
 
-    // Segment count create() last requested, and the size a rebuild reuses. It
-    // matches the length of the per-segment arrays composite() and updateStats()
-    // index only while a pool stands: this initial value and the one destroy()
-    // leaves behind stand against empty arrays.
+    // Segment count create() last requested, reused by a rebuild. Matches the
+    // per-segment array lengths only while a pool stands.
     this.count = 4;
-    // Tracked so create() can carry it into a freshly-spawned pool.
+    // Carried into a freshly-spawned pool.
     this.animationsPaused = false;
-    // Near-pole azimuthal decimation. Per-module-instance in the engine, so each
-    // worker holds its own copy and a pool rebuilt mid-session must be re-seeded.
+    // Near-pole azimuthal decimation; per engine instance, so re-seeded into
+    // every rebuilt pool.
     this.poleLod = 0;
     this.topCap = 0;
     this.bottomCap = 0;
@@ -240,14 +202,13 @@ export class SegmentController {
     /** @type {number | null} */
     this.presetIndex = null;
 
-    // Fault latch: a worker trap fires onerror but never sends its 'frame', so
-    // `pending` never reaches 0. Latch, settle the in-flight frame, stop dispatching.
+    // Fault latch: a trapped worker never sends its 'frame', so `pending` never
+    // reaches 0.
     this.faulted = false;
     /** @type {{ segId: number, message: string } | null} */
     this.faultInfo = null;     // first fault since the pool was (re)built
     // Effect-switch rebuilds of a faulted pool since the last pool reached ready.
-    // Not cleared by destroy(): the faulted rebuild runs through create(), which
-    // destroys first, so clearing it there would unbound the count.
+    // Survives destroy(), which every create() runs first.
     this.faultedRebuilds = 0;
 
     /** @type {ReturnType<typeof setTimeout> | null} */
@@ -259,9 +220,7 @@ export class SegmentController {
     /** @type {ReturnType<typeof setTimeout> | null} */
     this.renderWatchdog = null;
 
-    // Bounded transient-module-load recovery; see MAX_BOOT_RETRIES. bootAttempt is
-    // this pool's retry index (0 for a user-driven create), carried into the next
-    // create() by the retry path.
+    // This pool's transient-module-load retry index (0 for a user-driven create).
     this.bootAttempt = 0;
     /** @type {ReturnType<typeof setTimeout> | null} */
     this.retryTimer = null;
@@ -285,9 +244,8 @@ export class SegmentController {
 
   /**
    * The frame-lifecycle and fence state, for tests and diagnostics. The
-   * per-segment arrays are the controller's own, on the same terms as
-   * updateStats()'s payload: they are refilled in place as segment frames land,
-   * so a caller must read them synchronously and retain none of them.
+   * per-segment arrays are the controller's own, refilled in place as segment
+   * frames land, so a caller must read them synchronously and retain none.
    * @returns {{ready: boolean, pending: number, renderGen: number,
    *   inflightGen: number, renderInFlight: boolean, pendingFrame: boolean,
    *   frameComposited: boolean, frameSettled: boolean, wallTime: number,
@@ -330,14 +288,12 @@ export class SegmentController {
     const next = Boolean(show);
     if (next === this.#showBoundaries) return;
     this.#showBoundaries = next;
-    // The control stays live outside segmented mode, where the pool owns no
-    // display buffer: compositing there would zero the single-engine frame or
-    // latch a fault on a controller with nothing to blit. A latched pool keeps
-    // `ready` for ownsDisplay, so the fault needs its own term here.
+    // Outside segmented mode the pool owns no display buffer. A latched pool
+    // keeps `ready`, so `faulted` is checked separately.
     if (this.active && this.#ready && !this.faulted && this.hasPublishedFrame()) {
       this.composite(this.#results);
-      // No simulation tick stands behind this composite, and Three re-uploads
-      // the instance colours only on a version bump.
+      // No simulation tick stands behind this composite; Three re-uploads the
+      // instance colours only on a version bump.
       const instanceColor = this.driver.dotMesh?.instanceColor;
       if (instanceColor && isViewLive(instanceColor.array))
         instanceColor.needsUpdate = true;
@@ -346,11 +302,8 @@ export class SegmentController {
   }
 
   /**
-   * Whether segmented mode is on. Host-owned: only the host (daydream.js)
-   * writes it; the controller reads it to decide whether a pool should exist
-   * (the transient boot retry, the faulted setEffect/setResolution rebuilds,
-   * and ownsDisplay). It stays true across a fault so a user-driven
-   * setEffect/setResolution can rebuild the latched pool.
+   * Whether segmented mode is on (host-written). Stays true across a fault so
+   * a user-driven setEffect/setResolution can rebuild the latched pool.
    * @returns {boolean} True while segmented mode is on.
    */
   get active() {
@@ -358,24 +311,12 @@ export class SegmentController {
   }
 
   /**
-   * Turn segmented mode on or off.
-   *
-   * The write must land BEFORE the host awaits or tears anything down, in both
-   * directions:
-   * - Enable: set true, then await warmModules(); the spawn guard's post-await
-   *   check reads this flag and its own epoch, and calls create() only if both
-   *   still hold. A pool created while false never owns the display, and a
-   *   transient worker boot failure is never retried (the retry timer re-creates
-   *   only while active).
-   * - Disable/teardown: set false, then destroy(). A warmModules() continuation
-   *   already in flight reads the flag after its await, so it cannot spawn a pool
-   *   into a torn-down host. The write also repaints the overlay, which is what
-   *   hands the global stat bars back, so no caller has to remember to.
-   *
+   * Turn segmented mode on or off. Write it before awaiting or tearing anything
+   * down: true before awaiting warmModules(), false before destroy(), so an
+   * in-flight warm continuation re-checks it after its await. Turning it off
+   * repaints the stats overlay.
    * @param {boolean} on - Whether segmented mode is on.
-   * @throws {TypeError} When `on` is not a boolean. The flag reaches the spawn
-   *   guard and ownsDisplay as a condition, where a truthy non-boolean would read
-   *   as enabled and a pool would spawn behind a display the host still paints.
+   * @throws {TypeError} When `on` is not a boolean.
    */
   set active(on) {
     if (typeof on !== 'boolean') {
@@ -403,12 +344,7 @@ export class SegmentController {
 
   /**
    * Post the same protocol message to every worker.
-   * @details A postMessage that throws (an unclonable payload, a worker the agent
-   * already tore down) latches a fault instead of escaping to the GUI handler that
-   * triggered the broadcast, which would leave the pool half-updated and unreported.
-   * Returns false after terminating the faulted pool. Direct broadcast callers
-   * can use the flag to stop a sequence; public setters inspect the fault latch
-   * themselves and either skip the post or rebuild the pool.
+   * @details A postMessage that throws latches a fault, terminating the pool.
    * @param {WorkerInboundMsg} msg
    * @returns {boolean} True when every worker accepted the message.
    */
@@ -427,8 +363,7 @@ export class SegmentController {
 
   /**
    * Segment 0's most recent post-frame parameter values (ordered to match the
-   * effect's param list), or null before the first frame. The GUI reads these in
-   * segmented mode since the main-thread engine is never stepped.
+   * effect's param list), or null before the first frame.
    * @returns {number[] | null}
    */
   getParamValues() {
@@ -480,27 +415,21 @@ export class SegmentController {
 
   /**
    * (Re)build the worker pool at the current resolution: destroy any existing
-   * pool, then spawn `numSegments` fresh workers, each instantiating its own WASM
-   * instance from the warmer's shared compilation when held, else compiling its
-   * own, initialized with this engine's tuned params and paused state.
-   * Latches a pool fault (leaving an empty controller) if the segment count is
-   * not layout-legal, exceeds SEGMENT_COUNT_MAX, or the resolution key is unknown.
+   * pool, then spawn `numSegments` workers, each instantiating WASM from the
+   * warmer's shared compilation when held, initialized with this engine's tuned
+   * params and paused state. Latches a pool fault (leaving an empty controller)
+   * if the segment count is illegal or the resolution key is unknown.
    * @param {number} numSegments - Pool size; must satisfy segment_layout's
    *   isValidSegmentCount (a positive even integer) and be <= SEGMENT_COUNT_MAX.
-   * @param {number} [bootAttempt] - Retry index; 0 for a user-driven spawn, bumped by the transient-module-load auto-retry.
+   * @param {number} [bootAttempt] - Retry index; 0 for a user-driven spawn.
    */
   create(numSegments, bootAttempt = 0) {
     this.destroy();
     this.bootAttempt = bootAttempt;
 
-    // Ahead of the allocations and the spawn loop: a fractional count throws out
-    // of `new Array`, and an illegal one is otherwise only caught by the layout
-    // inside each worker — after N module fetches and N WASM instantiations.
+    // Ahead of the allocations: a fractional count throws out of `new Array`.
     if (!isValidSegmentCount(numSegments) || numSegments > SEGMENT_COUNT_MAX) {
-      // `count` is left at the last legal size — it is the only one a rebuild
-      // can spawn — and named here, since every recovery path (the faulted
-      // setEffect/setResolution rebuilds and the boot retry) passes it back to
-      // create() rather than the size that was asked for.
+      // `count` stays at the last legal size, which a rebuild reuses.
       this.onWorkerFault(FAULT_POOL,
         `invalid segment count ${numSegments}; must be a positive even integer `
         + `no greater than ${SEGMENT_COUNT_MAX} `
@@ -632,8 +561,7 @@ export class SegmentController {
         if (!readied[i]) { readied[i] = true; pool.readyCount++; }
         if (pool.readyCount === numSegments) {
           this.#ready = true;
-          // A live pool ends the faulted-rebuild run, so the next fault gets a
-          // fresh budget.
+          // A live pool resets the faulted-rebuild budget.
           this.faultedRebuilds = 0;
           this.clearTimers('bootWatchdog', 'initWatchdog');
           console.log(`[Segmented] All ${numSegments} workers ready`);
@@ -658,8 +586,7 @@ export class SegmentController {
       } else if (msg.type === 'frame') {
         this.#onSegmentFrame(i, msg);
       } else {
-        // The `never` binding makes an unhandled ControllerInboundMsg member a
-        // typecheck error rather than a runtime-only fault.
+        // `never` makes an unhandled ControllerInboundMsg member a typecheck error.
         /** @type {never} */
         const unhandled = msg;
         this.onWorkerFault(i, `worker seg ${i} sent unknown message type `
@@ -669,10 +596,8 @@ export class SegmentController {
 
     worker.onerror = (e) => {
       e?.preventDefault?.();
-      // A message-less error Event before the pool is ready is a module-graph
-      // load failure (a plain Event, not an ErrorEvent) — transient, so rebuild
-      // a bounded number of times before latching. A messaged error is a real
-      // worker throw and still fails fast.
+      // A message-less error Event before ready is a transient module-graph load
+      // failure, retried a bounded number of times; a messaged error fails fast.
       const message = typeof e?.message === 'string' && e.message
         ? e.message : null;
       if (!this.#ready && !message
@@ -712,9 +637,8 @@ export class SegmentController {
     // Generation fence: keep only results from the current resolution; still
     // settle the frame either way.
     if (this.#inflightGen === this.#renderGen) {
-      // Mirror segment 0's live params for GUI sync, inside the fence so a
-      // stale-generation frame can't publish params against a new descriptor
-      // list.
+      // Mirror segment 0's live params for GUI sync; fenced, since a stale
+      // frame's params index the old descriptor list.
       if (msg.segId === 0) {
         this.presetCount = msg.presetCount ?? null;
         if (msg.paramRevision >= this.presetRevision)
@@ -770,9 +694,8 @@ export class SegmentController {
   }
 
   /**
-   * (Re)arm the pool-wide render-liveness deadline. Called at dispatch and on
-   * every distinct segment 'frame' while `pending > 0`, so the deadline bounds the
-   * gap between reports; a stall (no segment reports for RENDER_WATCHDOG_MS) faults.
+   * (Re)arm the pool-wide render-liveness deadline; a stall (no segment reports
+   * for RENDER_WATCHDOG_MS) faults.
    */
   armRenderWatchdog() {
     this.clearTimers('renderWatchdog');
@@ -790,8 +713,8 @@ export class SegmentController {
 
   /**
    * Terminate every worker in the pool, leaving `workers` populated.
-   * @details Handlers are detached before terminate() so a message already queued
-   * from a surviving worker cannot run against the torn-down pool.
+   * @details Handlers are detached first so an already-queued message cannot run
+   * against the torn-down pool.
    */
   terminateWorkers() {
     for (const w of this.workers) {
@@ -804,8 +727,7 @@ export class SegmentController {
 
   /**
    * Terminate all workers and reset per-segment, frame-lifecycle, and fault
-   * state to empty. Clears the fault latch, so it doubles as the recovery reset
-   * create() runs before rebuilding the pool.
+   * state to empty, clearing the fault latch.
    */
   destroy() {
     this.terminateWorkers();
@@ -820,12 +742,10 @@ export class SegmentController {
     this.#frameSeen = [];
     this.#ready = false;
     this.#pending = 0;
-    // tick() returns on the !ready guard while the pool respawns, so a stale
-    // true here would keep captureReady() green over cleared black frames.
+    // No capture is owed while the pool respawns.
     this.#frameComposited = false;
-    // Open a new generation before settling: the in-flight render's `.then`
-    // resolves on a later microtask, after a fresh pool may exist; bumping here
-    // fails its `inflightGen === renderGen` guard so it can't arm the new pool.
+    // Bump before settling: the in-flight render's `.then` runs on a later
+    // microtask, possibly after a fresh pool exists.
     this.#renderGen++;
     // Settle any in-flight render promise so it never leaks unresolved.
     if (this.#frameResolve) {
@@ -841,8 +761,8 @@ export class SegmentController {
   }
 
   /**
-   * Release the pool and the warmer's held compilation. For page teardown only:
-   * destroy() alone keeps the warm, so the next pool can reuse a held compilation.
+   * Release the pool and the warmer's held compilation, for page teardown;
+   * destroy() alone keeps the warm compilation.
    */
   dispose() {
     this.destroy();
@@ -850,19 +770,12 @@ export class SegmentController {
   }
 
   /**
-   * Latch a worker fault and break the render-loop deadlock. The faulting worker
-   * will never send its 'frame', so we settle the in-flight frame here (resolve
-   * its promise, zero `pending`) to release `renderInFlight`; `faulted` then stops
-   * `tick()` from dispatching another doomed render. The pool is terminated here
-   * so its per-worker WASM heaps are released rather than sitting idle until the
-   * rebuild, and its handlers are detached so a message already queued from a
-   * surviving worker cannot report progress under the fault overlay. `workers`
-   * is left populated rather than cleared, so a fault message still reports
-   * against the pool that was dispatched to; destroy() clears it on the rebuild.
-   * Recovery is by re-creating the pool (effect switch / resolution change /
-   * mode toggle), which clears the latch via destroy(); the effect-switch path is
-   * bounded by MAX_FAULTED_REBUILDS. Only the first fault since the pool was (re)built is recorded
-   * for the UI.
+   * Latch a worker fault and break the render-loop deadlock: settle the
+   * in-flight frame (resolve its promise, zero `pending`), stop `tick()`
+   * dispatching, and terminate the pool with its handlers detached. `workers`
+   * stays populated so the fault reports against the dispatched pool. Recovery
+   * is a pool rebuild, which clears the latch. Only the first fault since the
+   * pool was (re)built is recorded for the UI.
    * @param {number} segId - Index of the worker segment that faulted.
    * @param {string} message - Human-readable fault message for the UI/console.
    */
@@ -870,8 +783,6 @@ export class SegmentController {
     this.clearTimers(...ALL_TIMERS);
     const firstFault = !this.faulted;
     if (!this.faulted) {
-      // Stay latched until an effect switch (bounded by MAX_FAULTED_REBUILDS),
-      // resolution change, or segmented-mode toggle rebuilds the pool.
       this.faulted = true;
       this.faultInfo = { segId, message };
     } else {
@@ -881,17 +792,15 @@ export class SegmentController {
     this.terminateWorkers();
     this.#pending = 0;
     this.#renderInFlight = false;
-    // Open a new generation before settling: the in-flight render's `.then` would
-    // otherwise pass its `inflightGen === renderGen` guard and publish the frame
-    // the faulting worker never completed.
+    // Bump before settling so the in-flight `.then` cannot publish the
+    // incomplete frame.
     this.#renderGen++;
     if (this.#frameResolve) {
       const resolve = this.#frameResolve;
       this.#frameResolve = null;
       resolve();
     }
-    // A paused host need not tick, and a create()-time fault can precede the
-    // first tick, so paint the overlay here.
+    // A paused host need not tick, so paint the overlay here.
     this.updateStats();
     if (firstFault) this.onFault(message);
   }
@@ -912,8 +821,7 @@ export class SegmentController {
     const params = [];
     for (let i = 0; i < defs.length; i++) {
       const p = defs[i];
-      // Engine-written telemetry: setParameter answers READONLY, so shipping it
-      // costs every worker two refused writes per rebuild.
+      // Engine-written telemetry; setParameter refuses it as READONLY.
       if (p.readonly) continue;
       const requestedValue = /** @type {number|boolean|undefined} */ (p.requestedValue);
       const requested = requestedValue ?? p.value;
@@ -943,24 +851,18 @@ export class SegmentController {
   }
 
   /**
-   * Tell all workers to set a new effect. The worker's engine.setEffect() rebuilds
-   * the effect with defaults, so we carry the main engine's current tuned values
-   * for the worker to re-apply AFTER the rebuild — the same setEffect-then-params
-   * ordering the init path relies on. Without this the segmented view would drop
-   * deep-linked / tuned values to defaults on every effect switch.
+   * Tell all workers to set a new effect, carrying the main engine's tuned
+   * values for each worker to re-apply after its setEffect() resets defaults.
    * @param {string} name
    */
   setEffect(name) {
-    // Drop the outgoing effect's values so getParamValues() returns null until
-    // segment 0 reports the new effect's first frame; otherwise the synchronously
-    // rebuilt GUI would bind the new effect's sliders to stale values by index.
+    // Null until segment 0 reports the new effect's first frame, so the rebuilt
+    // GUI does not bind stale values by index.
     this.paramValues = null;
     this.paramRevision++;
     this.refreshPresetState();
-    // A faulted pool is broken until re-created; rebuild (active) re-reads the
-    // effect and params from appState rather than broadcasting to dead workers.
-    // Bounded by MAX_FAULTED_REBUILDS: effect switches can arrive on a timer, and
-    // a fault that reproduces on every rebuild would respawn the pool per switch.
+    // A faulted pool is rebuilt (when active), bounded by MAX_FAULTED_REBUILDS
+    // since effect switches can arrive on a timer.
     if (this.faulted) {
       if (!this.active) return;
       this.faultedRebuilds++;
@@ -974,12 +876,8 @@ export class SegmentController {
       this.create(this.count);
       return;
     }
-    // Bump the fence so an in-flight old-effect frame fails inflightGen ===
-    // renderGen and can't republish its stale-ordered paramValues.
+    // Fence in-flight old-effect frames and drop settled ones.
     this.#renderGen++;
-    // Drop settled/pending old-effect results too; otherwise a completed
-    // old-effect frame composites once or re-blits via the overrun branch,
-    // flashing the outgoing effect on switch.
     this.#results.fill(null);
     this.#pendingFrame = false;
     this.broadcast({
@@ -1000,9 +898,7 @@ export class SegmentController {
   setParameter(name, value) {
     this.paramValues = null;
     this.paramRevision++;
-    // A faulted pool stays latched: this fires continuously during a slider drag,
-    // so rebuilding here would respawn the pool per drag event. Recovery is a
-    // resolution/effect change or a mode toggle.
+    // A faulted pool stays latched: this fires per slider-drag event.
     if (this.faulted) return;
     this.broadcast({
       type: 'setParameter', name, value,
@@ -1047,9 +943,8 @@ export class SegmentController {
    * @param {number} value
    */
   setPoleLod(value) {
-    // Recorded before the fault gate so a later rebuild carries the slider value,
-    // and the latch is held for the same reason setParameter holds it: this fires
-    // continuously during a drag.
+    // Recorded before the fault gate so a later rebuild carries it; a faulted
+    // pool stays latched (this fires per drag event).
     this.poleLod = value;
     if (this.faulted) return;
     this.broadcast({ type: 'setPoleLod', value });
@@ -1074,13 +969,12 @@ export class SegmentController {
   }
 
   /**
-   * Tell all workers to update resolution. The apply pipeline follows this with
-   * setEffect() after it has rebuilt the main engine and parameter snapshot.
+   * Tell all workers to update resolution. Callers follow this with
+   * setEffect(), which rebuilds a faulted pool.
    * @param {number} w
    * @param {number} h
    */
   setResolution(w, h) {
-    // The following setEffect() rebuilds a faulted pool with the corrected effect.
     if (this.faulted) {
       this.faultedRebuilds = 0;
       return;
@@ -1118,8 +1012,7 @@ export class SegmentController {
         resolve();
       };
 
-      // An empty pool has nothing to answer the dispatch and arms a watchdog that
-      // only fires on `pending > 0`, so settle here rather than never.
+      // An empty pool never answers, so settle immediately.
       if (this.workers.length === 0) {
         this.#frameResolve();
         this.#frameResolve = null;
@@ -1139,9 +1032,8 @@ export class SegmentController {
             this.post(this.workers[s], { type: 'render' });
           }
         } catch (error) {
-          // Mid-dispatch: the un-posted workers never reply, so `pending` never
-          // reaches 0 and no watchdog is armed yet. Fault, which settles the
-          // promise and releases the in-flight latch.
+          // Un-posted workers never reply and no watchdog is armed yet; the
+          // fault settles the promise.
           this.#scratch.fill(null);
           this.onWorkerFault(s, `render dispatch to seg ${s} failed: `
             + errorDetail(error));
@@ -1160,13 +1052,8 @@ export class SegmentController {
 
   /**
    * Repaint the per-segment stats overlay from this controller's published state.
-   * @details The payload names exactly the fields the overlay reads, not the
-   * controller, so its dependencies are the listed ones rather than whatever the
-   * class happens to expose. It is not a copy: they are the controller's own
-   * arrays — timings, arenas, fullFrames, warnings and frameSeen refilled in
-   * place as segment frames land, results swapped whole with `scratch` when a
-   * generation publishes — so this call must sit where they hold one frame's
-   * values and the view must read them synchronously and retain none of them.
+   * @details The payload arrays are the controller's own, not copies; the view
+   * must read them synchronously and retain none.
    * @returns {void}
    */
   updateStats() {
@@ -1200,9 +1087,7 @@ export class SegmentController {
 
   /**
    * Whether the worker pool owns the display buffer: it is either rendering
-   * (ready) or holding the fault overlay. False while a pool spawns, when the
-   * host keeps painting with the main-thread engine instead of leaving the
-   * driver's cleared buffer on screen for the whole warm + spawn window.
+   * (ready) or holding the fault overlay. False while a pool spawns.
    * @returns {boolean}
    */
   get ownsDisplay() {
@@ -1215,9 +1100,7 @@ export class SegmentController {
    * No-ops while workers are still spawning.
    */
   tick() {
-    // Checked before the ready guard: an init-phase fault latches `faulted` but
-    // leaves readyCount short forever, so a ready-first guard would never paint the
-    // fault overlay.
+    // Before the ready guard: an init-phase fault never reaches ready.
     if (this.faulted) {
       this.#frameComposited = false;
       this.updateStats();
@@ -1233,8 +1116,7 @@ export class SegmentController {
       // Held when there was no display buffer to blit into: the assembled
       // generation is still in `results` and composites on a later tick.
       this.#pendingFrame = blitted < 0;
-      // Only a whole generation is a frame: a band left black by a missing slot
-      // would otherwise be recorded as one.
+      // Only a whole generation counts as a frame.
       this.#frameComposited = blitted === this.count;
     } else if (this.hasPublishedFrame()) {
       // Replay the last published generation without recording it again or updating stats.
@@ -1244,10 +1126,7 @@ export class SegmentController {
       this.#frameComposited = false;
     }
 
-    // composite() can latch a fault via its bounds/length pre-pass; bail before
-    // dispatching a render to the just-halted pool. The overrun branch skips the
-    // updateStats() its sibling runs, so paint the overlay here rather than a
-    // tick late.
+    // composite() can latch a fault; paint the overlay and skip dispatch.
     if (this.faulted) {
       this.updateStats();
       return;
@@ -1277,8 +1156,8 @@ export class SegmentController {
         this.#renderInFlight = false;
         if (generation !== this.#renderGen && this.driver.paused) this.tick();
       }).catch((error) => {
-        // A rejected chain would skip the `.then` above and strand renderInFlight
-        // latched true with no watchdog armed, wedging the pipeline silently.
+        // A rejection would otherwise strand renderInFlight with no watchdog armed.
+
         this.onWorkerFault(FAULT_RENDER, `render failed: ${errorDetail(error)}`);
       });
     }

@@ -21,8 +21,7 @@ export class SegmentCompositor {
   /** Throttle for the composite alias-divergence warning. */
   #aliasDivergenceLogged = false;
 
-  // Cached boundary-overlay seam coordinates, rebuilt whenever the band table
-  // they were derived from is replaced.
+  // Boundary-overlay seam coordinates, cached per band table.
   /** @type {number[]} */
   #boundaryYs = [];
 
@@ -32,8 +31,7 @@ export class SegmentCompositor {
   /** @type {import('./segment_layout.js').SegRange[] | null} */
   #boundaryBands = null;
 
-  // Cached per-segment band rectangles composite()'s pre-pass validates
-  // against, rebuilt only when the layout the cache key names moves.
+  // Per-segment band rectangles, cached by segment count and dimensions.
   /** @type {import('./segment_layout.js').SegRange[] | null} */
   #bands = null;
 
@@ -68,36 +66,27 @@ export class SegmentCompositor {
 
   /**
    * Composite segment results into the display buffer (segment-rectangle model).
-   * @returns {number} How many segment rectangles were actually blitted this
-   *   call. 0 means either every result was null/empty (a fully-fenced frame)
-   *   or a check latched a fault: the destination view's length against the driver
-   *   grid, or the per-segment pre-pass (out-of-bounds/empty/inverted rect, a
-   *   pixel-length mismatch, or a rect that is not that segment's band of the
-   *   current layout). -1 means there was no display buffer to blit into (the
-   *   engine view is missing before the WASM load and after dispose), so nothing
-   *   was read or written and the caller must keep the generation pending. The
-   *   Daydream.stepSimulation() clears the display buffer on advancing ticks.
-   *   Boundary toggles and paused completions composite over previous contents.
-   *   The caller uses this to avoid marking an unblitted buffer as a composited frame.
+   * @returns {number} How many segment rectangles were blitted. 0 when every
+   *   result was null/empty or a check latched a fault. -1 when there is no
+   *   display buffer (no engine view): nothing was read or written and the caller
+   *   must keep the generation pending. Composites over the buffer's previous
+   *   contents except where a refreshed view is cleared.
    * @param {number} count
    * @param {boolean} showBoundaries
    * @param {Array<FrameResult | null>} results - One whole generation, indexed
-   *   by segment. Only the published generation is ever coherent: a staging
-   *   buffer mid-fill composites a half-updated mix.
+   *   by segment. Only the published generation is coherent: a staging buffer
+   *   mid-fill composites a half-updated mix.
    */
   composite(results, count, showBoundaries) {
     const refreshed = this.refreshPixelView() === true;
     const dst = this.getMemoryView();
-    // Not a fault: the view is absent only while there is no engine to fetch it
-    // from, which the single-engine path treats the same way.
+    // No engine view: not a fault.
     if (!dst) return -1;
 
     const w = this.driver.W;
     const h = this.driver.H;
 
-    // Checked before anything writes to dst: the segment pre-pass below measures
-    // every rect against w/h, so a display buffer that is not w*h*3 long would
-    // throw a raw RangeError out of the blit instead of latching a fault.
+    // Checked before any write: a wrong length would otherwise throw from the blit.
     if (dst.length !== w * h * 3) {
       this.onFault(FAULT_RENDER,
         `SegmentController.composite: display buffer length ${dst.length} != ` +
@@ -106,13 +95,10 @@ export class SegmentCompositor {
       return 0;
     }
 
-    // A refreshed destination missed Daydream.stepSimulation()'s per-tick clear.
-    // Off-tick composites otherwise retain previous contents in unblitted bands.
+    // A refreshed view missed Daydream.stepSimulation()'s per-tick clear.
     if (refreshed) dst.fill(0);
 
-    // On a divergence, self-heal rather than fault the render loop (mirrors the
-    // single-engine path): re-point both display aliases at the composite target.
-    // Daydream.stepSimulation() clears driver.pixels on the next advancing tick.
+    // Self-heal an alias divergence: re-point both display aliases at dst.
     if (this.displayAliasesDiverged(dst)) {
       if (!this.#aliasDivergenceLogged) {
         console.error(
@@ -124,15 +110,13 @@ export class SegmentCompositor {
       this.repointDisplayAliases(dst);
     }
 
-    // Iterate the configured segment count (the same source updateStats reads),
-    // not results.length, so the two can't drift after a teardown reset.
+    // The configured segment count, not results.length.
     const n = count;
 
     const bands = this.segmentBands(n, w, h);
     if (!bands) return 0;
 
-    // Pre-pass: validate every result before blitting any, so a bad segment faults
-    // cleanly (overlay + halt) like a worker fault rather than leaving a partial frame.
+    // Validate every result before blitting any, so a fault leaves no partial frame.
     for (let s = 0; s < n; s++) {
       const r = results[s];
       if (!r || !r.pixels) continue;
@@ -161,10 +145,8 @@ export class SegmentCompositor {
           `blit a truncated row (segment-result invariant violated)`);
         return 0;
       }
-      // A rect that is self-consistent but not this segment's band blits a
-      // correctly-sized frame into another segment's rows; a worker that missed a
-      // setResolution answers under the current generation, so neither the fence
-      // nor the checks above see anything wrong.
+      // A worker that missed a setResolution answers under the current
+      // generation with a self-consistent rect for the wrong band.
       const band = bands[s];
       if (r.x0 !== band.x0 || r.x1 !== band.x1
           || r.y0 !== band.y0 || r.y1 !== band.y1) {
@@ -186,9 +168,7 @@ export class SegmentCompositor {
       blitted++;
     }
 
-    // Boundary markers write into the recorded buffer, so they are baked into video.
-    // Skip on a fully generation-fenced frame (blitted === 0): the buffer is black
-    // and stamping seams would show cyan lines on an otherwise-blank sphere.
+    // Markers are baked into the recorded buffer; skipped on a fully fenced frame.
     if (showBoundaries && blitted > 0) {
       if (this.#boundaryBands !== bands) this.rebuildBoundaries(bands);
       stampBoundaries(dst, w, h, this.#boundaryXs, this.#boundaryYs);
@@ -230,8 +210,7 @@ export class SegmentCompositor {
 
   /**
    * Recompute the cached boundary-overlay seam coordinates from the band table,
-   * held against the table they came from. segmentBands() replaces that table
-   * only when the layout moves, so composite() reuses this cache until it does.
+   * keyed by that table.
    * @param {import('./segment_layout.js').SegRange[]} bands - The current layout.
    * @returns {void}
    */
@@ -239,8 +218,7 @@ export class SegmentCompositor {
     const yBounds = new Set();
     const xBounds = new Set();
     for (const band of bands) {
-      // Y does not wrap (y0 == 0 is the top edge); X wraps on the cylinder, so
-      // the x == 0 seam is added below only once the layout is split.
+      // Y does not wrap; X wraps, so x == 0 is a seam once the layout is split.
       if (band.y0 > 0) yBounds.add(band.y0);
       if (band.x0 > 0) xBounds.add(band.x0);
     }

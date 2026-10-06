@@ -6,11 +6,7 @@
 /**
  * The effect panel's whole lifecycle — build, mount, per-frame value sync,
  * Export, and teardown — with lil-gui, the engine, the worker pool, the
- * copy operation, and the document injected. daydream.js owns only the wiring
- * that names those collaborators, so the panel's rules (which control an engine
- * parameter maps to, which value stream feeds the sliders, what blocks an
- * Export, what a destroyed GUI must release) are unit-testable without a
- * browser or a WASM engine.
+ * copy operation, and the document injected.
  */
 
 import {
@@ -93,8 +89,7 @@ function paramAddMethod(gui, p, hydrate, persist) {
 /**
  * Decimal places a bounded slider must print to resolve one step of its own
  * range. lil-gui steps a bounded control by span/1000 and its arrow-key
- * increment() re-parses the *displayed* string, so a display coarser than the
- * step prints consecutive steps identically and quantizes the live value.
+ * increment() re-parses the *displayed* string.
  * @param {number} min - Range floor.
  * @param {number} max - Range ceiling.
  * @returns {number} Decimals for the controller's decimals().
@@ -106,9 +101,7 @@ export function sliderDecimals(min, max) {
 }
 
 /**
- * Add the lil-gui control one engine parameter definition calls for. A readonly
- * (engine-written telemetry) param becomes a session control: the engine refuses
- * to set it, so seeding it from a URL and writing it back is meaningless.
+ * Add the lil-gui control one engine parameter definition calls for.
  * @param {Gui} gui - The effect GUI to add to.
  * @param {Record<string, any>} state - The GUI-bound value object.
  * @param {ParameterDefinition} p - The parameter definition.
@@ -201,9 +194,6 @@ function checkedGroup(group, members, required, defaults = /** @type {D} */ ({})
 /**
  * Build the effect GUI controller for the app's active effect.
  *
- * The four collaborators are checked once here, so a mis-wired page fails where
- * it is composed rather than at the first frame that happens to call the slot.
- *
  * @param {Object} deps - Injected app collaborators, in four groups.
  * @param {(error?: *) => boolean} [deps.moduleDead] - Whether the engine module is unusable.
  * @param {Object} deps.engine - The main engine the panel reads and writes.
@@ -251,8 +241,8 @@ function checkedGroup(group, members, required, defaults = /** @type {D} */ ({})
  *   or clears the snapshot notice.
  *
  * @param {Object} deps.host - The page the panel mounts into.
- * @param {() => Gui} deps.host.createGui - Makes an empty effect GUI root: a
- *   DeepLinkGUI (gui.js), whose whole add/stored-value surface the panel uses.
+ * @param {() => Gui} deps.host.createGui - Makes an empty effect GUI root (a
+ *   DeepLinkGUI).
  * @param {() => Object|null} deps.host.container - The element the panel mounts in.
  * @param {() => boolean} deps.host.isMobile - Whether to mount the panel collapsed.
  * @param {((text: string) => Promise<boolean>)|null} deps.host.copyText - Copies text
@@ -265,11 +255,10 @@ function checkedGroup(group, members, required, defaults = /** @type {D} */ ({})
  * @param {() => Node|null} [deps.host.focusedElement] - The document's focused
  *   element. A control whose number input has focus is being typed into, so the
  *   per-frame value stream must leave it alone.
- * @param {() => {external: true}|null} [deps.host.paramFilter] - The chain
- *   editor's marker that the active effect's parameters are rendered outside
- *   this panel, on the pipeline strip's chips: when non-null, the panel builds
- *   no parameter controls, though every parameter still claims its value-stream
- *   slot. A change is detected in sync() and rebuilds the panel.
+ * @param {() => {external: true}|null} [deps.host.paramFilter] - Non-null when
+ *   the active effect's parameters are rendered outside this panel: the panel
+ *   builds no parameter controls, though every parameter still claims its
+ *   value-stream slot. A change rebuilds the panel.
  * @param {(message: string, error?: any) => void} [deps.host.logWarn] - Console sink.
  * @returns {{active: () => Object|null, liveParamValues: () => ArrayLike<number>|null,
  *   movePreset: (delta: number) => boolean, build: () => void,
@@ -306,8 +295,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   let activeEffect = null;
   // Throttle the param/value length-skew warning to once per skew episode.
   let skewLogged = false;
-  // The unstaged-parameter set last warned about. A panel rebuilds on every
-  // warning move and every preset, all over the same schema.
+  // The unstaged-parameter set last warned about.
   let unstagedWarned = '';
   /** @type {string|undefined} */
   let rebuildFailureGeneration;
@@ -316,10 +304,8 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   });
   const view = createEffectPanelView({ focusedElement, guiContainer, isMobile });
   /**
-   * Live per-frame parameter values for the active effect. Once the worker pool
-   * owns the display the main engine is no longer stepped, so its values are
-   * stale; source from segment 0's worker instead (the pool drops its values on
-   * an effect switch and fences the stream on renderGen). May be null or
+   * Live per-frame parameter values for the active effect: the worker pool's
+   * stream while it owns the display, else the main engine's. May be null or
    * zero-length if the WASM view detached on heap growth — callers must guard.
    * @returns {ArrayLike<number>|null} Null when no stream describes the GUI's
    *   current parameter snapshot.
@@ -339,10 +325,8 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
 
   /**
    * Whether the engine's parameter warnings have moved off the ones the panel
-   * was built from. A refused write raises or clears a warning without loading
-   * an effect, so the schema generation cannot report it. Deferred while an
-   * edit is in flight, pointer or keyboard: the rebuild would discard the
-   * controller under the pointer, or the input a held arrow key repeats into.
+   * was built from; a refused write changes them without a schema generation
+   * bump. Deferred while a pointer or keyboard edit is in flight.
    * @param {EffectRecord} fx - The active effect record.
    * @returns {boolean} True when the panel must be rebuilt to show them.
    */
@@ -385,14 +369,11 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   }
 
   /**
-   * Re-seat the effect's enum selectors on the requested values the engine
-   * holds. Only the definitions carry `requestedValue`, so this reads the
-   * definitions snapshot rather than the per-frame value stream — an effect
-   * with no enum control skips it and keeps sync() off that marshal.
+   * Re-seat the effect's enum selectors on the `requestedValue`s in the
+   * engine's definitions snapshot.
    * @param {EffectRecord} fx - The active effect record.
-   * @param {Node|null} focused - The document's focused element, or null. An
-   *   animated selector streams a new requested value every frame, so an open
-   *   dropdown has to be left alone like any other controller under edit.
+   * @param {Node|null} focused - The document's focused element, or null; a
+   *   focused selector is left alone.
    * @returns {void}
    */
   function adoptRequestedEnums(fx, focused) {
@@ -413,9 +394,8 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   /**
    * Push the engine's per-frame parameter values back into the effect GUI so
    * all rendered params track live without clobbering an active drag.
-   * @param {boolean} [advanced] - Whether the simulation stepped this frame.
-   *   Only the enum-definition marshal is gated on it; every other caller wants
-   *   the full pass and leaves it defaulted.
+   * @param {boolean} [advanced] - Whether the simulation stepped this frame;
+   *   gates only the enum-definition marshal.
    * @returns {void}
    */
   function sync(advanced = true) {
@@ -438,10 +418,8 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     if (!activeEffect.hasParams) return;
     // One focus read for the whole pass: at most one element has focus.
     const focused = focusedElement() ?? null;
-    // getParameterDefinitions() marshals the whole definition array, which is
-    // the panel's one per-frame allocation. Only an engine-driven selector moves
-    // its requested value on its own; every other source of one — a control, a
-    // preset, a rebuild — re-seats the selectors itself.
+    // The definitions marshal allocates; run it only when an engine-driven
+    // selector can have moved.
     if (!segmentsOwnDisplay() && advanced && activeEffect.hasEnumControls
         && (activeEffect.hasAnimatedEnums || presetAdvanced)) {
       adoptRequestedEnums(activeEffect, focused);
@@ -483,8 +461,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   /**
    * Copy text to the clipboard and report the outcome on the Export label.
    * @param {EffectRecord} fx - The effect record owning the Export button. A copy that
-   *   lands after the effect changed reports nothing: the label belongs to a
-   *   panel that is gone.
+   *   lands after the effect changed reports nothing.
    * @param {string} text - The text to copy.
    * @param {(label: string) => void} flashExport - Shows a transient Export label.
    * @returns {Promise<void>} Clipboard completion.
@@ -610,8 +587,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     const effectActions = {
       /**
        * Reinstall the active effect at defaults, clear its URL params, and
-       * rebuild the panel. The rebuild discards this button, so the
-       * keyboard focus and scroll offset are carried across it.
+       * rebuild the panel, carrying keyboard focus and scroll offset across.
        * @returns {void}
        */
       reset() {
@@ -725,9 +701,8 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
 
   /**
    * Re-seat the pause toggle on the engine's own animation state after a
-   * parameter write: the engine pauses animation-driven params implicitly when
-   * one of them is written. The toggle's transition carries the adopted state on
-   * to the worker pool, whose engines each keep their own copy.
+   * parameter write: writing an animation-driven param pauses implicitly. The
+   * toggle's transition carries the adopted state on to the worker pool.
    * @param {{animationState: {pause: boolean}, controller: GuiController|null,
    *   setPaused: (v: boolean) => void}} pause - The effect's pause toggle.
    * @param {ParameterDefinition} written - The definition of the parameter just written.
@@ -742,9 +717,8 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   }
 
   /**
-   * Pick the pipeline grouping for a parameter list. Each recognizer owns its
-   * stage assignments, folder titles, and folder order together, so the three
-   * cannot disagree; the first that claims the list wins.
+   * Pick the pipeline grouping for a parameter list; the first recognizer that
+   * claims the list wins.
    * @param {Array<ParameterDefinition>} params - The engine's parameter definitions.
    * @returns {{assignments: Map<string, string>, titles: Map<string, string>|null,
    *   order: Array<string>}|null} The grouping, or null when none claims the list.
@@ -807,10 +781,8 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   }
 
   /**
-   * Label one control inside its stage folder. The folder title already carries
-   * the stage, so the visible label drops it, and the truncated labels repeat
-   * across folders — "Mode" once per stage — so the widget takes the parameter's
-   * own name as its accessible name instead of the shared visible one.
+   * Label one control inside its stage folder: the visible label drops the
+   * stage, and the widget's accessible name is the parameter's own name.
    * @param {GuiController} controller - The stage folder's controller.
    * @param {string} stage - The pipeline stage it was grouped under.
    * @param {string} name - Engine parameter name.
@@ -826,8 +798,6 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
 
   /**
    * Build one controller per engine parameter, recording the value-stream order.
-   * A ?param=value deep link reaches the engine through the GUI's load-time
-   * onChange replay.
    * @param {EffectRecord} fx - The effect record being built.
    * @param {Array<ParameterDefinition>} params - The engine's parameter definitions.
    * @param {{animationState: {pause: boolean}, controller: GuiController|null, setPaused: (value: boolean) => void}}
@@ -839,8 +809,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     /** @type {Record<string, number|boolean>} */
     const state = {};
     const external = paramFilter() !== null;
-    // Fixed for the schema this build is committed to: no parameter write adds
-    // or drops a stage selector.
+    // Fixed for the schema this build is committed to.
     const persistParamKeys = !usesChainSnapshot();
     fx.paramNames = [];
     fx.writableParamNames = [];
@@ -928,9 +897,8 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   }
 
   /**
-   * Construct one effect record without publishing or mounting it. Keeping the
-   * old record live until this succeeds makes a schema rebuild atomic from the
-   * panel's point of view.
+   * Construct one effect record without publishing or mounting it, so a schema
+   * rebuild is atomic.
    * @param {{initialPause?: boolean, hydratePause?: boolean,
    *   restoreAccepted?: boolean,
    *   previousParamNames?: Set<string>|null}} [options] - Rebuild state.
@@ -989,8 +957,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     const dom = fx.gui.domElement;
     if (dom?.parentNode) dom.parentNode.removeChild(dom);
     // Controller.destroy() removes each domElement from the GUI's own children
-    // container; one left parented to the action row throws NotFoundError and
-    // aborts destroy(), leaving the remaining controllers' listeners attached.
+    // container; one parented elsewhere throws NotFoundError mid-destroy.
     for (const controller of fx.actionControllers ?? []) {
       fx.gui.appendElement(controller.domElement);
     }
@@ -1110,9 +1077,9 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     },
 
     /**
-     * Tear down the active effect GUI and clear the effect record. The drag's
-     * pointerup/pointercancel listeners live on the drag target, not the GUI DOM,
-     * so destroying the GUI mid-drag would leave them dangling — drain them first.
+     * Tear down the active effect GUI and clear the effect record, draining the
+     * drag-end listeners on the drag target first.
+
      * @returns {void}
      */
     destroy() {

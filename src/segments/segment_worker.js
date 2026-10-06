@@ -3,12 +3,9 @@
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
  *
- * Segment Worker — runs in a Web Worker to render one rectangular segment of
- * the canvas (an arm column subdivided into a Y-band; both axes are clipped —
- * see computeSegmentRange in segment_layout.js and the pov_segmented.h layout).
- * Each worker instantiates its own WASM engine (isolated memory space), ensuring
- * separate global arenas and effect state; the compiled binary those instances
- * share arrives with `init` when the controller has one.
+ * Segment Worker — renders one rectangular segment of the canvas (see
+ * computeSegmentRange) in its own WASM engine instance, optionally from a
+ * compiled module shared via `init`.
  */
 
 import { enumConstantName, replayParameterWrites } from '../effects/param_sync.js';
@@ -26,11 +23,8 @@ import { engineHalted } from "../shared/engine_halt.js";
 /** @typedef {import('../../generated/holosphere_wasm.js').HolosphereEngine} HolosphereEngine */
 
 /**
- * Send a protocol message back to the controller. The dedicated-worker global's
- * `postMessage(message, transfer)` overload isn't visible under the default DOM
- * lib (where `self` is typed as `Window`, whose `postMessage` takes a target
- * origin), so the call is routed through one cast; the `msg` argument is still
- * checked against the protocol union.
+ * Send a protocol message back to the controller. Cast because the DOM lib
+ * types `self` as `Window`; `msg` is still checked against the protocol union.
  * @param {ControllerInboundMsg} msg - The protocol message to send to the controller.
  * @param {Transferable[]=} transfer - Optional objects to transfer ownership of (zero-copy).
  * @returns {void}
@@ -40,8 +34,7 @@ const post = /** @type {(msg: ControllerInboundMsg, transfer?: Transferable[]) =
 
 /** Installs an isolated worker protocol session. @returns {void} */
 export function installSegmentWorker() {
-  // Sent before the WASM instantiate so the controller can fault fast on a
-  // missing/renamed glue file; a failed module fetch never runs this line.
+  // Sent before the WASM instantiate; a failed module fetch never runs this line.
   post({ type: 'booted', version: PROTOCOL_VERSION });
 
   /** @type {HolosphereModule | null} */
@@ -56,29 +49,20 @@ export function installSegmentWorker() {
   /** @type {SegRange | null} */
   let segRange = null;
   // Disposition of the last applyClip: true once the engine kept the full-canvas
-  // clip for a needs_full_frame() || persists_pixels() effect, so every 'frame' reports what this
-  // worker actually shaded rather than the rectangle it sliced out.
+  // clip for a needs_full_frame() || persists_pixels() effect.
   let clipFullFrame = false;
-  // Whether getArenaMetrics has already reported a failure, so a persistent fault
-  // logs once instead of every frame. Cleared on every effect install and
-  // resolution change: a failure under different geometry is a distinct event.
+  // Log-once latch for getArenaMetrics failures; reset per effect install and
+  // geometry change.
   let arenaMetricsWarned = false;
-  // Last `name:outcome` reported by reportParamRejected, so a held slider pushing
-  // the same rejection every frame logs once. Cleared on every effect install: the
-  // same name:outcome pair under a different effect is a distinct event.
+  // Last `name:outcome` reported by reportParamRejected (log once); reset per
+  // effect install.
   let paramRejectedKey = '';
-  // Divergence notices standing on this worker: an engine that refuses a
-  // parameter or a preset leaves this segment rendering a configuration its peers
-  // do not, which the composite shows as a content discontinuity at its band
-  // edges. Every 'frame' carries the whole set, so the controller's marker lasts
-  // as long as the divergence. Cleared on every effect install, as
-  // paramRejectedKey is.
+  // Refused parameters or presets standing on this worker, sent whole with every
+  // 'frame'; reset per effect install.
   /** @type {Map<string, string>} */
   let divergenceWarnings = new Map();
-  // Latched by a RESIZED setResolution, which tears the effect and its clip down.
-  // The controller follows with a setEffect that reinstalls both; until then the
-  // engine has nothing to shade, so a render faults instead of shipping a black
-  // band. An ALREADY_ACTIVE resize tears nothing down and does not latch it.
+  // Latched by a RESIZED setResolution, which tears the effect and its clip
+  // down; a render before the next setEffect faults.
   let awaitingEffect = false;
   let engineDead = false;
 
@@ -108,22 +92,15 @@ export function installSegmentWorker() {
   /**
    * Apply the stored segment clip rectangle to the engine. Must be called after
    * every setEffect, since rebuilding the effect resets the clip.
-   * @details setClip answers a Module.ClipSetResult enum value; compare against
-   * the enum, never by truthiness (every enum value is a truthy object). Two
-   * values are successes: APPLIED installs the band, and FULL_FRAME_KEPT means
-   * the effect reports needs_full_frame() || persists_pixels() so the clip stays at the full canvas
-   * and this worker renders the whole frame. Only INVALID_BOUNDS faults the pool:
-   * NO_EFFECT is the ordinary answer when no effect is installed to receive the
-   * clip, and the controller follows with a setEffect that re-applies it. The
-   * APPLIED/FULL_FRAME_KEPT split is latched into clipFullFrame and reported on
-   * every frame, so the two successes stay distinguishable to the pool.
+   * @details setClip answers a Module.ClipSetResult enum object (always truthy).
+   * FULL_FRAME_KEPT means the effect reports needs_full_frame() ||
+   * persists_pixels(), so this worker renders the whole frame; NO_EFFECT latches
+   * awaitingEffect.
    * @returns {boolean} False when this worker is left without usable render
-   * geometry. An INVALID_BOUNDS clip is reported before answering false; a null
-   * engine or segment range is not, and is only reachable after an init that
-   * broke early and already faulted the controller. NO_EFFECT counts as accepted.
+   * geometry; an INVALID_BOUNDS clip is reported first. NO_EFFECT counts as
+   * accepted.
    */
   function applyClip() {
-    // wasmModule is non-null whenever engine is — the engine is built from it.
     if (!wasmModule || !engine || !segRange) return false;
     const result = engine.setClip(segRange.x0, segRange.x1, segRange.y0, segRange.y1);
     if (result === wasmModule.ClipSetResult.INVALID_BOUNDS) {
@@ -144,10 +121,7 @@ export function installSegmentWorker() {
   }
 
   /**
-   * Report a live setParameter the engine did not apply. The controller has no
-   * reply channel for one, and only segment 0 mirrors its values back on a frame,
-   * so on any other segment this is the sole trace that the worker is rendering a
-   * configuration the main engine never had.
+   * Report a setParameter the engine did not apply.
    * @param {string} name - Parameter the controller pushed.
    * @param {unknown} result - The ParamSetResult the engine answered.
    * @returns {void}
@@ -183,10 +157,8 @@ export function installSegmentWorker() {
 
   /**
    * Replay a rebuild's parameter list: accepted render state first, then pending
-   * requests. setEffect rebuilds with defaults, so this must follow it. Every
-   * ParamSetResult is checked as a live setParameter's is — the engine answers the
-   * same structural refusals here, and one dropped leaves this segment rendering a
-   * configuration the main engine never had.
+   * requests, reporting each refusal. setEffect rebuilds with defaults, so this
+   * must follow it.
    * @param {import('./worker_protocol.js').SegParam[]|undefined} params - The
    * controller's parameter snapshot.
    * @returns {void}
@@ -204,15 +176,11 @@ export function installSegmentWorker() {
   }
 
   /**
-   * Select a preset, reporting an index the engine refused. A refusal leaves this
-   * segment rendering a different preset from its peers, and the controller has no
-   * reply channel for one. An index the engine is already on moves nothing and is
-   * not reported: the controller carries the fresh-effect index 0 for every
-   * effect, and an effect with no presets refuses it.
+   * Select a preset, reporting an index the engine refused. An index the engine
+   * is already on is not reported.
    * @param {number} index - Preset the controller broadcast.
    * @param {'selectPreset'|'synchronizePreset'} [method] - Engine call to apply it
-   * with. Mirroring an engine-driven index uses synchronizePreset, which does not
-   * engage the pause selectPreset carries.
+   * with; synchronizePreset does not engage the pause selectPreset carries.
    * @returns {void}
    */
   function applyPreset(index, method = 'selectPreset') {
@@ -234,14 +202,8 @@ export function installSegmentWorker() {
   }
 
   /**
-   * Process one protocol message. Only ever invoked through the serialized
-   * queue in self.onmessage below, so 'init''s long await of the WASM
-   * fetch+instantiate cannot interleave with later messages: a setResolution/
-   * setEffect/setParameter that arrives mid-init waits for init to finish
-   * instead of running against a null engine and being silently dropped (a
-   * dropped setResolution is unrecoverable — the worker keeps rendering
-   * old-geometry frames tagged with the current generation, so the
-   * controller's fence never catches them).
+   * Process one protocol message. Must run through the serialized queue, so a
+   * message arriving mid-init waits for init's WASM instantiate to finish.
    * @param {WorkerInboundMsg} msg - The inbound protocol message to process.
    * @returns {Promise<void>} Resolves once the message has been fully handled.
    */
@@ -249,10 +211,7 @@ export function installSegmentWorker() {
     if (engineDead) return;
     switch (msg.type) {
       case 'init': {
-        // A version mismatch means a stale-cached worker or controller: fault before
-        // reading any other field, so nothing from a message shape the worker does not
-        // understand is latched, and before touching WASM so the controller stops
-        // instead of drifting on reshaped fields.
+        // Version check precedes reading any other field or touching WASM.
         if (msg.version !== PROTOCOL_VERSION) {
           post({ type: 'engineRejected',
                  reason: `protocol version ${msg.version} != worker ${PROTOCOL_VERSION}`
@@ -273,8 +232,7 @@ export function installSegmentWorker() {
 
         /** @type {Parameters<typeof createHolosphereModule>[0]} */
         const options = {};
-        // Every segment runs a full engine replica, so engine logs would print
-        // once per worker; only segment 0 logs. printErr stays live everywhere.
+        // Only segment 0 prints engine logs; printErr stays live everywhere.
         if (segId !== 0) options.print = () => {};
         const compiled = msg.wasmModule;
         let failInstantiation = () => {};
@@ -287,8 +245,7 @@ export function installSegmentWorker() {
           options.instantiateWasm = (imports, onInstance) => {
             WebAssembly.instantiate(compiled, imports).then(
               (instance) => onInstance(instance, compiled),
-              // The glue's instantiate has no rejection path, so without this the
-              // await below never settles and the pool waits out its init watchdog.
+              // The glue's instantiate has no rejection path; settle the race here.
               (error) => {
                 post({ type: 'engineRejected',
                        reason: `shared module instantiate failed: ${error}`,
@@ -313,10 +270,7 @@ export function installSegmentWorker() {
         }
         // The latch tracks the live engine; a fresh one starts unlatched.
         awaitingEffect = false;
-        // A rejected resolution leaves no usable geometry: skip the canvasW/canvasH
-        // commit, segRange, and ready (symmetric with the setResolution handler's
-        // UNSUPPORTED guard), and post engineRejected so the controller faults at
-        // once instead of waiting out the full init watchdog.
+        // A rejected resolution leaves no usable geometry.
         if (engine.setResolution(msg.w, msg.h)
             === wasmModule.ResolutionSetResult.UNSUPPORTED) {
           post({ type: 'engineRejected',
@@ -333,8 +287,7 @@ export function installSegmentWorker() {
                  reason: `setEffect(${msg.effectName}) rejected` });
           break;
         }
-        // synchronizePreset, not selectPreset: this mirrors the engine-driven
-        // index, and selectPreset would engage the pause msg.paused carries.
+        // Mirrors the engine-driven index without engaging the pause.
         if (typeof msg.presetIndex === 'number') {
           applyPreset(msg.presetIndex, 'synchronizePreset');
         }
@@ -382,10 +335,8 @@ export function installSegmentWorker() {
 
       case 'setResolution': {
         if (engine && wasmModule) {
-          // Only an explicit UNSUPPORTED keeps the current geometry: RESIZED and
-          // ALREADY_ACTIVE both leave the requested size active, so both commit.
-          // They differ in what survives: RESIZED dropped the effect and the clip,
-          // leaving this worker unrenderable until the controller's setEffect.
+          // RESIZED and ALREADY_ACTIVE both commit; RESIZED also dropped the
+          // effect and the clip.
           const resolutionResult = engine.setResolution(msg.w, msg.h);
           if (resolutionResult === wasmModule.ResolutionSetResult.UNSUPPORTED) {
             post({ type: 'engineRejected',
@@ -458,16 +409,13 @@ export function installSegmentWorker() {
       }
 
       case 'render': {
-        // Same fail-fast policy as the unknown-type default below: replying to
-        // nothing leaves the controller's frame outstanding until its watchdog.
+        // Fail fast: no reply would leave the frame outstanding until the watchdog.
         if (!engine || !segRange) {
           throw new Error('segment_worker: render before a completed init '
             + `(engine=${engine ? 'set' : 'null'}, `
             + `segRange=${segRange ? 'set' : 'null'})`);
         }
-        // Reported rather than thrown: the missing setEffect is the controller's
-        // sequencing fault, and engineRejected names it in the fault banner. Both
-        // paths fault the pool.
+        // A missing setEffect is the controller's sequencing fault; report it.
         if (awaitingEffect) {
           post({
             type: 'engineRejected',
@@ -482,8 +430,7 @@ export function installSegmentWorker() {
         engine.drawFrame();
         const elapsed = performance.now() - t0;
 
-        // Segment 0 mirrors its post-frame param values back; the main engine is
-        // never stepped in this mode.
+        // Segment 0 mirrors its post-frame param values back.
         const paramValues =
           segId === 0 ? Array.from(engine.getParamValues()) : null;
         const presetCount = segId === 0 ? engine.getPresetCount() : null;
@@ -503,10 +450,8 @@ export function installSegmentWorker() {
             `segment_worker: segment rect [${x0},${y0})-[${x1},${y1}) out of ` +
             `bounds for the ${canvasW}x${canvasH} canvas`);
         }
-        // The controller transfers the retired generation's buffer back for reuse;
-        // a missing or differently-sized one (first frame, resolution change)
-        // allocates. extractSegment overwrites every element, so nothing of the
-        // previous generation survives in a reused buffer.
+        // Reuse a recycled buffer of the right size; extractSegment overwrites
+        // every element.
         const segLen = qw * qh * 3;
         const pixelsCopy = (msg.recycle && msg.recycle.length === segLen)
           ? msg.recycle : new Uint16Array(segLen);
@@ -516,10 +461,7 @@ export function installSegmentWorker() {
         let arenaMetrics;
         try {
           arenaMetrics = engine.getArenaMetrics();
-          // Convert to a plain object (embind vals can't be transferred). The
-          // engine's `stack` metric is intentionally omitted: the segmented stats
-          // view shows only the three arenas. SegArenaMetrics is the authority for
-          // the shape carried across the worker boundary.
+          // Convert to a plain SegArenaMetrics (embind vals can't be transferred).
           arenaMetrics = {
             scratch_arena_a: {
               usage: arenaMetrics.scratch_arena_a.usage,
@@ -564,11 +506,8 @@ export function installSegmentWorker() {
       }
 
       default: {
-        // Fail fast on protocol drift: a state-changing message dropped here would
-        // leave the worker rendering stale under the current generation, invisible
-        // to the fence. Throwing reaches onerror -> the controller faults.
-        // The `never` binding makes an unhandled WorkerInboundMsg member a
-        // typecheck error rather than a runtime-only throw.
+        // Fail fast on protocol drift; `never` makes an unhandled
+        // WorkerInboundMsg member a typecheck error.
         /** @type {never} */
         const unhandled = msg;
         throw new Error(`segment_worker: unknown message type ${
@@ -577,10 +516,8 @@ export function installSegmentWorker() {
     }
   }
 
-  // Serialize message handling: each message runs strictly after the previous settles
-  // (so 'init''s long await can't interleave). The catch rethrows on a fresh task so a
-  // failure reaches the global error handler instead of vanishing as an unhandled
-  // rejection, without wedging the chain.
+  // Serialize message handling. The catch rethrows on a fresh task so a failure
+  // reaches the global error handler without wedging the chain.
   let messageQueue = Promise.resolve();
   self.onmessage = (e) => {
     const msg = /** @type {WorkerInboundMsg} */ (e.data);
@@ -594,8 +531,8 @@ export function installSegmentWorker() {
         if (engineHalted(err, wasmModule)) engineDead = true;
         setTimeout(() => { throw err; });
       });
-    // The DOM worker ignores this; test harnesses await it to track the real
-    // settle point of the serialized queue.
+    // Ignored by the DOM; awaitable as the queue's settle point.
+
     return messageQueue;
   };
 

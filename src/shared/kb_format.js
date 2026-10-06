@@ -3,9 +3,8 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-// Dependency-free kilobyte formatter shared by the simulator stat bars, the
-// sidebar's effect sizes and the tool pages' arena readouts, so the THREE-free
-// modules can import it without pulling Three.js in through shared.js.
+// Dependency-free kilobyte formatter.
+
 
 /**
  * Format a byte count as kilobytes, rounded to a fixed number of fractional

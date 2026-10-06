@@ -5,10 +5,6 @@
 
 /**
  * Dependency-free clipboard helpers for the tool pages.
- *
- * Kept separate from shared.js (the Three.js scene setup) so non-3D pages —
- * e.g. palettes.html — can use the copy helpers without pulling Three.js into
- * their module graph. shared.js re-exports these for its scene-based callers.
  */
 
 import { copyToClipboard } from './copy_text.js';
@@ -23,9 +19,7 @@ export { copyToClipboard };
 
 /**
  * Copy `text`, then briefly swap an element's label to a "copied" message
- * (optionally toggling CSS classes) and restore it after `revertMs`. Shared
- * transient-feedback wrapper around copyToClipboard so tools don't each
- * reimplement it.
+ * (optionally toggling CSS classes) and restore it after `revertMs`.
  *
  * @param {string} text - Text to copy.
  * @param {Object} [opts] - Feedback options.
@@ -63,8 +57,6 @@ export function showCopyFeedback(success, opts = {}) {
     idleClasses = [],
   } = opts;
 
-  // Flash on both outcomes: a silent failure (the label never flipping) leaves
-  // the user unsure whether the copy happened.
   if (element) {
     const pending = element.copyFeedback;
     if (pending) clearTimeout(pending.timer);
@@ -72,8 +64,7 @@ export function showCopyFeedback(success, opts = {}) {
       : (revertText !== undefined ? revertText : element.textContent);
     const flashClasses = success ? copiedClasses : failedClasses;
     element.textContent = success ? copiedText : failedText;
-    // Clear both outcome class sets before flashing: a rapid failure-then-success
-    // re-entry would otherwise leave the prior outcome's classes on the element.
+    // Clear both outcome class sets so a re-entry drops the prior outcome's.
     if (copiedClasses.length) element.classList.remove(...copiedClasses);
     if (failedClasses.length) element.classList.remove(...failedClasses);
     if (flashClasses.length) element.classList.add(...flashClasses);
@@ -89,8 +80,9 @@ export function showCopyFeedback(success, opts = {}) {
 }
 
 /**
- * Default copied/idle color classes for the tool pages' copy prompts, so each
- * page doesn't redeclare the same literal. Spread into a copyWithFeedback opts
+ * Default copied/failed/idle color classes for the tool pages' copy prompts.
+ * Spread into a copyWithFeedback opts
+
  * object: `copyWithFeedback(text, { element, revertText: '', ...COPY_FEEDBACK })`.
  */
 export const COPY_FEEDBACK = {

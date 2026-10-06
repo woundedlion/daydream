@@ -18,8 +18,8 @@ export async function copyToClipboard(text) {
     // permission denied or no secure context; fall through to the textarea path
   }
 
-  // The textarea has to take focus for execCommand('copy') to see a selection,
-  // so hold the element that had it and hand focus back.
+  // execCommand('copy') needs the textarea focused; focus is handed back after.
+
   const previouslyFocused = /** @type {?HTMLElement} */ (document.activeElement);
 
   const textarea = document.createElement('textarea');
