@@ -789,8 +789,6 @@ test('the parity toggle swaps the preview onto the compiled build and back', asy
   assert.deepEqual(harness.engine.writes.at(-1), ['sample.pattern-freq', 2]);
 });
 
-// A study no shipped pattern digests to has no promoted build to compare
-// against, so it loads on the interpreter with the toggle disarmed.
 test('a refused parity preset restores the interpreter and preserves the refusal', async () => {
   const harness = workbench();
   await chooseCatalogSource(harness);
