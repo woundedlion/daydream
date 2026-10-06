@@ -1253,6 +1253,18 @@ test('createChainValidator respawns after a WebAssembly trap', async () => {
   assert.equal(spawns, 2);
 });
 
+/** Verifies an ordinary op failure leaves the instance in service. */
+test('createChainValidator keeps the instance after an op failure that is not a halt', async () => {
+  let spawns = 0;
+  const { Mod } = fakeModule((op) => {
+    if (op === 'kis') throw new Error('op refused');
+  });
+  const validator = createChainValidator(async () => { spawns++; return Mod; });
+  assert.equal((await validator.chainIsValid('cube', ['kis'])).ok, false);
+  assert.equal((await validator.chainIsValid('cube', ['dual'])).ok, true);
+  assert.equal(spawns, 1);
+});
+
 /** Verifies a healthy instance is reused across chains rather than respawned. */
 test('createChainValidator reuses a healthy instance', async () => {
   let spawns = 0;
