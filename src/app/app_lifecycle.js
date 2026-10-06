@@ -58,7 +58,6 @@ export function createRenderAdapter({
         if (segments.active) segments.updateStats();
         host.engine.drawFrame();
         host.refresh();
-        // Log once and re-point: a throw here halts the render loop.
         const view = host.view();
         if (view === null) return;
         if (displayAliasesDiverged(driver, view)) {
