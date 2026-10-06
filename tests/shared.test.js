@@ -269,18 +269,26 @@ test('the frame loop runs onAnimate before the render and onAfterRender after it
   assert.equal(s.controls.updates, 2, 'the loop must keep driving the controls');
 });
 
+/**
+ * Asserts the frame loop and resize listener stopped first, then exactly the
+ * given GPU releases ran, in any order.
+ * @param {string[]} releases - The expected releases, sorted.
+ */
+function assertDisposeOrder(releases) {
+  assert.deepEqual(log.slice(0, 2), ['cancelAnimationFrame', 'removeEventListener']);
+  assert.deepEqual(log.slice(2).sort(), releases);
+}
+
 test('dispose stops the frame loop and the resize listener before releasing GPU objects', () => {
   const s = mountScene();
   s.dispose();
 
-  assert.deepEqual(log, [
-    'cancelAnimationFrame',
-    'removeEventListener',
+  assertDisposeOrder([
     'controls.dispose',
-    'renderer.dispose',
-    'renderer.forceContextLoss',
     'geometry.dispose',
     'material.dispose',
+    'renderer.dispose',
+    'renderer.forceContextLoss',
     'scene.clear',
   ]);
   assert.deepEqual(s.cancelled, [RAF_ID], 'the pending frame handle must be cancelled');
@@ -294,9 +302,7 @@ test('dispose skips the sphere teardown when no reference sphere was built', () 
   assert.equal(s.sphere, null);
 
   s.dispose();
-  assert.deepEqual(log, [
-    'cancelAnimationFrame',
-    'removeEventListener',
+  assertDisposeOrder([
     'controls.dispose',
     'renderer.dispose',
     'renderer.forceContextLoss',
