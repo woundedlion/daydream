@@ -221,10 +221,7 @@ export class Daydream {
     );
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    // Keep the sphere between the near and far planes: closest zoom leaves the
-    // front surface outside CAMERA_NEAR, farthest keeps the back inside CAMERA_FAR.
-    this.controls.minDistance = Daydream.CAMERA_NEAR + Daydream.SPHERE_RADIUS;
-    this.controls.maxDistance = Daydream.CAMERA_FAR - Daydream.SPHERE_RADIUS;
+    this.updateOrbitLimits();
 
     // On-demand rendering: a camera 'change' marks the frame dirty so an idle
     // scene does no GPU work. Starts dirty so the first frame always paints.
@@ -953,6 +950,14 @@ export class Daydream {
     this.statsView?.update(duration, adapter?.getArenaMetrics?.() ?? null);
   }
 
+  /** Updates the zoom bounds to keep dot caps inside the clipping planes. */
+  updateOrbitLimits() {
+    const extent = Daydream.SPHERE_RADIUS + this.DOT_SIZE + 0.01;
+    this.controls.minDistance = Daydream.CAMERA_NEAR + extent;
+    this.controls.maxDistance = Daydream.CAMERA_FAR - extent;
+    this.controls.update();
+  }
+
   /**
    * Change the sphere's pixel grid to `w`x`h` with the given dot size, then
    * rebuild the dot mesh and its instance matrices/color buffer.
@@ -964,6 +969,7 @@ export class Daydream {
     this.W = w;
     this.H = h;
     this.DOT_SIZE = dotSize;
+    this.updateOrbitLimits();
 
     this.setupDots();
 

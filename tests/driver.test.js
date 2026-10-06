@@ -113,8 +113,8 @@ function sizeCtx(width, height) {
       Daydream.CAMERA_FOV, 3, Daydream.CAMERA_NEAR, Daydream.CAMERA_FAR),
     controls: {
       target: new THREE.Vector3(),
-      minDistance: Daydream.CAMERA_NEAR + Daydream.SPHERE_RADIUS,
-      maxDistance: Daydream.CAMERA_FAR - Daydream.SPHERE_RADIUS,
+      minDistance: Daydream.CAMERA_NEAR + Daydream.SPHERE_RADIUS + Daydream.DEFAULT_DOT_SIZE + 0.01,
+      maxDistance: Daydream.CAMERA_FAR - Daydream.SPHERE_RADIUS - Daydream.DEFAULT_DOT_SIZE - 0.01,
     },
     renderer: {
       pixelRatio: null,
@@ -1407,12 +1407,16 @@ test('updateResolution rebuilds the mesh and buffer at the new grid', () => {
   ctx.setupDots = Daydream.prototype.setupDots;
   ctx.precomputeMatrices = Daydream.prototype.precomputeMatrices;
   ctx.invalidate = Daydream.prototype.invalidate;
+  ctx.updateOrbitLimits = Daydream.prototype.updateOrbitLimits;
+  ctx.controls = {update() {}};
 
   Daydream.prototype.updateResolution.call(ctx, 12, 6, 5);
 
   assert.equal(ctx.W, 12);
   assert.equal(ctx.H, 6);
   assert.equal(ctx.DOT_SIZE, 5);
+  assert.ok(ctx.controls.minDistance - Daydream.SPHERE_RADIUS - 5 > Daydream.CAMERA_NEAR);
+  assert.ok(ctx.controls.maxDistance + Daydream.SPHERE_RADIUS + 5 < Daydream.CAMERA_FAR);
   assert.equal(ctx.dotMesh.count, 12 * 6);
   assert.equal(ctx.dotGeometry.parameters.radius, 5);
   assert.equal(ctx.pixels.length, 12 * 6 * 3);
@@ -1918,4 +1922,20 @@ test('dispose clears the stats view', () => {
   ctx.statsView = { clear: () => log.push('stats.clear') };
   Daydream.prototype.dispose.call(ctx);
   assert.ok(log.includes('stats.clear'));
+});
+
+
+test('orbit bounds keep cap tops strictly inside both clipping planes at every dot size', () => {
+  const ctx = {controls: {update() { updates++; }}, DOT_SIZE: 2};
+  let updates = 0;
+  for (const size of [0.25, 2, 5]) {
+    ctx.DOT_SIZE = size;
+    Daydream.prototype.updateOrbitLimits.call(ctx);
+    const capRadius = Daydream.SPHERE_RADIUS + size;
+    assert.ok(ctx.controls.minDistance - capRadius > Daydream.CAMERA_NEAR);
+    assert.ok(ctx.controls.maxDistance + capRadius < Daydream.CAMERA_FAR);
+    assert.ok(ctx.controls.minDistance < Daydream.CAMERA_Z);
+    assert.ok(ctx.controls.maxDistance > Daydream.CAMERA_Z);
+  }
+  assert.equal(updates, 3, 'a resolution change reclamps the live orbit');
 });
