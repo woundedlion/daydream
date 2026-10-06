@@ -1606,7 +1606,7 @@ test('preset and stage writes preserve the animation state', async () => {
     'an edit also preserves an intentional pause');
 });
 
-// §4.6/§4.8: a descriptor edit breaks the match with the promoted
+// §4.6: a descriptor edit breaks the match with the promoted
 // build and disarms the toggle. A bypass is a program-shape override and a chip
 // control edit writes a preset value, so neither touches the descriptor digest.
 test('the parity toggle disarms on a descriptor edit, not on a bypass', async () => {
