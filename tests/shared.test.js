@@ -35,6 +35,7 @@ const saved = {
   getComputedStyle: globalThis.getComputedStyle,
   requestAnimationFrame: globalThis.requestAnimationFrame,
   cancelAnimationFrame: globalThis.cancelAnimationFrame,
+  ResizeObserver: globalThis.ResizeObserver,
 };
 afterEach(() => {
   for (const [key, value] of Object.entries(saved)) {
@@ -73,6 +74,12 @@ function mountScene(opts = {}) {
   const container = sizedElement(640, 480);
   const listeners = { added: [], removed: [] };
   const cancelled = [];
+  const observer = { observed: [], callback: null };
+  globalThis.ResizeObserver = class {
+    constructor(callback) { observer.callback = callback; }
+    observe(element) { observer.observed.push(element); }
+    disconnect() { log.push('ResizeObserver.disconnect'); }
+  };
   let parkedFrame = null;
   stubDocument({ viewport: container, gl: canvas });
   globalThis.window = {
@@ -90,7 +97,7 @@ function mountScene(opts = {}) {
   };
   const nextFrame = () => parkedFrame();
   return {
-    canvas, container, listeners, cancelled, nextFrame,
+    canvas, container, listeners, cancelled, observer, nextFrame,
     ...initScene('viewport', 'gl', opts),
   };
 }
@@ -232,6 +239,16 @@ test('the default resize retracks the container size and re-caps the pixel ratio
   assert.deepEqual(s.renderer.size, [0, 0]);
 });
 
+test('the resize observer tracks the container and drives resize', () => {
+  const s = mountScene();
+  assert.deepEqual(s.observer.observed, [s.container]);
+  s.container.clientWidth = 900;
+  s.container.clientHeight = 300;
+  s.observer.callback();
+  assert.equal(s.camera.aspect, 3);
+  assert.deepEqual(s.renderer.size, [900, 300]);
+});
+
 test('an onResize handler replaces the default and receives the scene handles', () => {
   const seen = [];
   const s = mountScene({ onResize: (handles) => seen.push(handles) });
@@ -275,8 +292,9 @@ test('the frame loop runs onAnimate before the render and onAfterRender after it
  * @param {string[]} releases - The expected releases, sorted.
  */
 function assertDisposeOrder(releases) {
-  assert.deepEqual(log.slice(0, 2), ['cancelAnimationFrame', 'removeEventListener']);
-  assert.deepEqual(log.slice(2).sort(), releases);
+  assert.deepEqual(log.slice(0, 3),
+    ['cancelAnimationFrame', 'removeEventListener', 'ResizeObserver.disconnect']);
+  assert.deepEqual(log.slice(3).sort(), releases);
 }
 
 test('dispose stops the frame loop and the resize listener before releasing GPU objects', () => {
