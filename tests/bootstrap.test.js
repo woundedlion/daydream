@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import {
   bootRemedy, bootstrap, refreshModuleCache, refreshWithDeadline, showBootstrapFailure,
@@ -553,19 +554,30 @@ test('bootstrap leaves the fatal banner alone when the overlay renders', async (
 });
 
 // Booting is the entry module's job alone; bootstrap.js has no import-time boot.
-test('index boots through the entry module and bootstrap.js stays importable', async (t) => {
+test('index boots through the entry module and bootstrap.js stays importable', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /<link href="\.\/favicon\.svg" rel="icon"/);
   assert.match(html, /<script type="module" src="src\/app\/main\.js"[^>]*><\/script>/);
   assert.equal([...html.matchAll(/<script\b[^>]*type="module"/g)].length, 1);
-  const touched = [];
-  installDocument(new Proxy({}, {
-    get: (_target, key) => { touched.push(key); return undefined; },
-  }));
-  const widen = t.mock.method(performance, 'setResourceTimingBufferSize');
-  await import(`../src/app/bootstrap.js?probe=${Date.now()}`);
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(widen.mock.callCount(), 0, 'importing bootstrap.js does not boot');
+  // A fresh process imports the module once, outside this file's coverage.
+  const probe = `
+    let widened = 0;
+    performance.setResourceTimingBufferSize = () => { widened++; };
+    const touched = [];
+    globalThis.document = new Proxy({}, {
+      get: (_target, key) => { touched.push(String(key)); return undefined; },
+    });
+    await import(${JSON.stringify(new URL('../src/app/bootstrap.js', import.meta.url).href)});
+    await new Promise((resolve) => setImmediate(resolve));
+    process.stdout.write(JSON.stringify({ widened, touched }));
+  `;
+  const env = { ...process.env };
+  delete env.NODE_V8_COVERAGE;
+  const run = spawnSync(process.execPath, ['--input-type=module', '-e', probe],
+    { encoding: 'utf8', env });
+  assert.equal(run.status, 0, run.stderr);
+  const { widened, touched } = JSON.parse(run.stdout);
+  assert.equal(widened, 0, 'importing bootstrap.js does not boot');
   assert.deepEqual(touched, []);
 });
 
