@@ -274,9 +274,9 @@ const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
   inner.append(makeDiv('axis-h'), makeDiv('axis-v'), dotElement);
 
   const reElement = makeAxis(reId, `Parameter ${id} real part`,
-    'ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight Home', false);
+    'ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown Home', false);
   const imElement = makeAxis(imId, `Parameter ${id} imaginary part`,
-    'ArrowUp ArrowDown Shift+ArrowUp Shift+ArrowDown Home', true);
+    'ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown Home', true);
   planeElement.append(inner, reElement, imElement);
 
   const labelElement = makeDiv('complex-plane-label', labelId);
