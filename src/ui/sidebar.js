@@ -209,7 +209,8 @@ export class EffectSidebar {
   /**
    * Mark `name` as the active effect, toggling the .active class and
    * aria-selected on only the previous and new buttons, moving the roving
-   * tabindex, and scrolling a newly-active option into view.
+   * tabindex, and scrolling a newly-active option into view: horizontally
+   * within the list, vertically within the container.
    * @param {string} name - Name of the effect to mark active.
    */
   setActive(name) {
@@ -232,8 +233,9 @@ export class EffectSidebar {
       const list = this.listEl.getBoundingClientRect();
       if (button.left < list.left) this.listEl.scrollLeft += button.left - list.left;
       else if (button.right > list.right) this.listEl.scrollLeft += button.right - list.right;
-      if (button.top < list.top) this.listEl.scrollTop += button.top - list.top;
-      else if (button.bottom > list.bottom) this.listEl.scrollTop += button.bottom - list.bottom;
+      const pane = this.container.getBoundingClientRect();
+      if (button.top < pane.top) this.container.scrollTop += button.top - pane.top;
+      else if (button.bottom > pane.bottom) this.container.scrollTop += button.bottom - pane.bottom;
     }
   }
 
