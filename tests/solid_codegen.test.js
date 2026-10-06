@@ -1773,6 +1773,17 @@ test('createOpGate invalidates a pending pass when returning to its cached chain
   assert.equal(await pending, null);
 });
 
+test('createOpGate re-probes a cancelled pending signature after a skipped refresh', async () => {
+  const { Mod } = fakeModule();
+  const gate = createOpGate(createChainValidator(async () => Mod));
+  assert.notEqual(await gate.refresh('cube', [], CANDIDATES), null);
+  const pending = gate.refresh('octahedron', [], CANDIDATES);
+  assert.equal(await gate.refresh('cube', [], CANDIDATES), null);
+  const renewed = gate.refresh('octahedron', [], CANDIDATES);
+  assert.equal(await pending, null);
+  assert.equal((await renewed).complete, true);
+});
+
 test('star seed calls match formatter-derived bin-packed fixtures', () => {
   for (const [index, base] of ['dodecahedron_hk62_ambo_hk62',
     'truncatedIcosidodecahedron_hk62_ambo_hk62'].entries()) {
