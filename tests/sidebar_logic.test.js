@@ -123,6 +123,13 @@ test('scrollArrowState shows both arrows mid-scroll and only left near the end',
   assert.deepEqual(scrollArrowState(200, 300, 100), { left: true, right: false });
 });
 
+test('scrollArrowState caps the deadzone at 4px on a large overflow', () => {
+  assert.deepEqual(scrollArrowState(4, 300, 100), { left: false, right: true });
+  assert.deepEqual(scrollArrowState(5, 300, 100), { left: true, right: true });
+  assert.deepEqual(scrollArrowState(195, 300, 100), { left: true, right: true });
+  assert.deepEqual(scrollArrowState(196, 300, 100), { left: true, right: false });
+});
+
 test('scrollArrowState surfaces an arrow for a sub-deadzone overflow', () => {
   // maxScroll = 4 shrinks the deadzone to 1.5, so each end still gets an arrow.
   assert.deepEqual(scrollArrowState(0, 104, 100), { left: false, right: true });
