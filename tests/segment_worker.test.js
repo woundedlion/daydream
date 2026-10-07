@@ -240,7 +240,8 @@ async function dispatch(msg) {
   // repeat it; a test probing the mismatch path passes an explicit version.
   if (msg.type === 'init') {
     msg = { version: PROTOCOL_VERSION, paramRevision: 0, ...msg };
-  } else if (msg.type === 'setEffect' || msg.type === 'setParameter') {
+  } else if (msg.type === 'setEffect' || msg.type === 'setParameter'
+    || msg.type === 'selectPreset') {
     msg = { paramRevision: 0, ...msg };
   }
   await fakeSelf.onmessage({ data: msg });
