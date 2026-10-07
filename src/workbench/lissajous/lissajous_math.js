@@ -74,7 +74,7 @@ export const lissajous = (m1, m2, a, t) => {
  * @param {((value: number) => boolean)|null} [accept] - Optional test on the signed
  *   candidate ratio. Candidates it rejects rank behind every accepted one, so a
  *   ratio it admits always wins and an empty admissible set still returns the
- *   closest fraction.
+ *   closest fraction. The test must depend only on the candidate ratio.
  * @param {number} [maxNumerator] - Maximum numerator, when the reachable
  *   ratios run past the denominator cap.
  * @returns {{ M: number, N: number }} The best simple rational ratio.
@@ -97,6 +97,7 @@ export const findBestRationalRatio = (value, maxTerm = MAX_RATIONAL_TERM, accept
       const accepted = !accept || accept(sign * ratio);
       const diff = Math.abs(absValue - ratio);
 
+      // Equivalent fractions tie on error; smaller M + N selects lowest terms.
       const better = accepted !== bestAccepted
         ? accepted
         : (diff < minDiff || (diff === minDiff && (M + N) < (bestM + bestN)));
@@ -109,9 +110,7 @@ export const findBestRationalRatio = (value, maxTerm = MAX_RATIONAL_TERM, accept
     }
   }
 
-  // Reduce to lowest terms so 2π·N/passiveC is the true (shortest) period.
-  const g = gcd(bestM, bestN);
-  return { M: (sign * bestM) / g, N: bestN / g };
+  return { M: sign * bestM, N: bestN };
 };
 
 /**
