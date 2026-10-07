@@ -784,6 +784,8 @@ export function defaultPaletteRecipe() {
   };
 }
 
+const DEFAULT_HUE = defaultPaletteRecipe().hue;
+
 /**
  * The ordinal a PaletteV4 member name stands for — the inverse of
  * paletteEnumName.
@@ -854,6 +856,14 @@ export function paletteRecipeFromControls(template, controls) {
   recipe.hue.baseTurns = controls.baseTurns;
   recipe.hue.spreadTurns = controls.spreadTurns;
   recipe.hue.sweepTurns = controls.sweepTurns;
+  if (recipe.hue.mode !== PaletteV4.hueMode.HARMONY) {
+    recipe.hue.harmony = DEFAULT_HUE.harmony;
+    recipe.hue.spreadTurns = DEFAULT_HUE.spreadTurns;
+  } else if (!SPREAD_HARMONIES.has(recipe.hue.harmony)) {
+    recipe.hue.spreadTurns = DEFAULT_HUE.spreadTurns;
+  }
+  if (recipe.hue.mode !== PaletteV4.hueMode.SWEEP)
+    recipe.hue.sweepTurns = DEFAULT_HUE.sweepTurns;
   recipe.chroma.headroom = controls.headroom;
   recipe.hueTorsion = controls.hueTorsion;
   recipe.falloffStart = controls.falloffStart;
