@@ -991,9 +991,11 @@ test('segmented slider and pool follow viewport layout changes and release the l
   const controls = gui.folders[0].controllers;
   const count = controls.find(control => control.property === 'segments');
   assert.equal(count.args[1], 8);
+  assert.equal(count.label, 'Segments (6 = sim only)');
   query.matches = true;
   changed();
   assert.equal(count.args[1], 4);
+  assert.equal(count.label, 'Segments (max 4 here)');
   assert.equal(count.object.segments, 4);
   segments.active = true;
   await spawn.respawn();
@@ -1001,6 +1003,7 @@ test('segmented slider and pool follow viewport layout changes and release the l
   query.matches = false;
   changed();
   assert.equal(count.args[1], 8);
+  assert.equal(count.label, 'Segments (6 = sim only)');
   spawn.dispose();
   assert.equal(removed, changed);
 });

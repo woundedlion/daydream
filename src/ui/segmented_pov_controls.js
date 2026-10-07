@@ -59,6 +59,9 @@ export function createSegmentedPovControls({
   const layout = win.matchMedia?.(`(max-width: ${MOBILE_BREAKPOINT_PX}px)`);
   const isMobile = () => layout?.matches ?? false;
   const segmentMax = () => maxSegmentCount(nav, isMobile());
+  /** @param {number} max */
+  const segmentLabel = (max) => max >= 6
+    ? 'Segments (6 = sim only)' : `Segments (max ${max} here)`;
   const segMax = segmentMax();
   const segState = {
     segmented: segments.active,
@@ -108,10 +111,9 @@ export function createSegmentedPovControls({
       segmentedFailed(v ? 'enable' : 'teardown', e);
     }
   });
-  const segLabel = segMax >= 6 ? 'Segments (6 = sim only)' : `Segments (max ${segMax} here)`;
   segCountCtrl = (segMax === 2
     ? segFolder.add(segState, 'segments', [2])
-    : segFolder.add(segState, 'segments', 2, segMax, 2)).name(segLabel);
+    : segFolder.add(segState, 'segments', 2, segMax, 2)).name(segmentLabel(segMax));
   segCountCtrl.onChange(async (/** @type {number} */ v) => {
     // A reconcile writes the value the handler already acted on.
     if (v === segCount) return;
@@ -127,7 +129,7 @@ export function createSegmentedPovControls({
   });
   const layoutChanged = () => {
     const max = segmentMax();
-    segCountCtrl.max(max).name(max >= 6 ? 'Segments (6 = sim only)' : `Segments (max ${max} here)`);
+    segCountCtrl.max(max).name(segmentLabel(max));
     if (segCount > max) segCountCtrl.setValue(max);
   };
   layout?.addEventListener?.('change', layoutChanged);
