@@ -470,8 +470,8 @@ const CONTROL_READINGS = {
   falloffStart: 0.85,
 };
 
-/** The tab exports every field of the recipe. */
-test('every recipe field a control carries is marshalled', () => {
+/** The tab exports each active recipe field. */
+test('active recipe fields are marshalled from the controls', () => {
   const template = defaultPaletteRecipe();
   const expected = {
     ...template,
@@ -485,8 +485,8 @@ test('every recipe field a control carries is marshalled', () => {
       harmony: PaletteV4.harmony.TRIADIC,
       direction: PaletteV4.direction.CLOCKWISE,
       baseTurns: 0.25,
-      spreadTurns: 0.11,
-      sweepTurns: 2.5,
+      spreadTurns: template.hue.spreadTurns,
+      sweepTurns: template.hue.sweepTurns,
     },
     lightness: {
       ...template.lightness,
@@ -515,6 +515,7 @@ test('every recipe field a control carries is marshalled', () => {
     falloffStart: 0.85,
     hue: {
       ...expected.hue, mode: PaletteV4.hueMode.CUSTOM,
+      harmony: template.hue.harmony,
       baseTurns: 0, customTurns: [0.25, 0.32, 0.39, 0.6],
     },
     lightness: { ...customTemplate.lightness, curve: PaletteV4.curve.CUSTOM },
@@ -553,10 +554,22 @@ test('the generative tab opens on the default recipe', () => {
   assert.deepEqual(actual, defaults);
 });
 
-/** Verifies the recipe fields the engine canonicalizes are canonical before it sees them. */
-test('a falloff start and a loop sweep are canonicalized by domain', () => {
+/** The recipe sent to the engine carries defaults for inactive controls. */
+test('inactive controls and loop sweeps are canonicalized before compilation', () => {
+  const defaults = defaultPaletteRecipe().hue;
   const straight = paletteRecipeFromControls(defaultPaletteRecipe(), CONTROL_READINGS);
   assert.equal(straight.falloffStart, 0.9, 'only a FALLOFF domain carries its own start');
+  assert.equal(straight.hue.spreadTurns, defaults.spreadTurns);
+  assert.equal(straight.hue.sweepTurns, defaults.sweepTurns);
+
+  for (const harmony of ['MONOCHROMATIC', 'COMPLEMENTARY', 'TRIADIC', 'SQUARE']) {
+    const fixed = paletteRecipeFromControls(defaultPaletteRecipe(),
+      { ...CONTROL_READINGS, harmony });
+    assert.equal(fixed.hue.spreadTurns, defaults.spreadTurns, harmony);
+  }
+  const analogous = paletteRecipeFromControls(defaultPaletteRecipe(),
+    { ...CONTROL_READINGS, harmony: 'ANALOGOUS' });
+  assert.equal(analogous.hue.spreadTurns, CONTROL_READINGS.spreadTurns);
 
   const falloff = paletteRecipeFromControls(defaultPaletteRecipe(),
     { ...CONTROL_READINGS, domain: 'FALLOFF' });
@@ -565,6 +578,8 @@ test('a falloff start and a loop sweep are canonicalized by domain', () => {
   const loop = paletteRecipeFromControls(defaultPaletteRecipe(),
     { ...CONTROL_READINGS, domain: 'LOOP', hueMode: 'SWEEP' });
   assert.equal(loop.hue.sweepTurns, 3, 'a loop closes only on whole turns');
+  assert.equal(loop.hue.harmony, defaults.harmony);
+  assert.equal(loop.hue.spreadTurns, defaults.spreadTurns);
 
   const absolute = defaultPaletteRecipe();
   absolute.chroma.basis = PaletteV4.chromaBasis.ABSOLUTE;
