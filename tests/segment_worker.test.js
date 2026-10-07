@@ -185,14 +185,15 @@ let nextClipOk = true;
 let nextCapsRejected = false;
 let nextRestoreResult = ChainSnapshotRestoreResult.APPLIED;
 let nextRestoreMissing = false;
-let nextLive = false;
 /** Options the worker handed the module factory, where the instantiate hook lands. */
 let moduleOptions = null;
 /** Module object returned by the mocked factory. */
 let wasmModuleInstance = null;
+let moduleCreations = 0;
 let exerciseInstantiation = false;
 mock.module('../generated/holosphere_wasm.js', {
   defaultExport: async (options) => {
+    moduleCreations++;
     moduleOptions = options;
     wasmModuleInstance = {
       ParamSetResult,
@@ -201,7 +202,6 @@ mock.module('../generated/holosphere_wasm.js', {
       EffectSetResult,
       ChainSnapshotRestoreResult,
       HolosphereEngine: class {
-        static isLive() { return nextLive; }
         constructor() {
           engineInstance = new FakeEngine();
           engineInstance.resolutionOk = nextResolutionOk;
@@ -269,13 +269,13 @@ beforeEach(() => {
   engineInstance = null;
   moduleOptions = null;
   wasmModuleInstance = null;
+  moduleCreations = 0;
   nextResolutionOk = true;
   nextEffectOk = true;
   nextClipOk = true;
   nextCapsRejected = false;
   nextRestoreResult = ChainSnapshotRestoreResult.APPLIED;
   nextRestoreMissing = false;
-  nextLive = false;
 });
 
 /** The worker posts 'booted' at module load. */
@@ -597,6 +597,7 @@ test('render streams param values from segment 0 only', async () => {
   assert.deepEqual(frame0.paramValues, [5, 15, 25], 'segment 0 carries params');
   assert.equal(frame0.paramRevision, 11, 'the frame carries its applied write revision');
 
+  installSegmentWorker();
   await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
   posted.length = 0;
   await dispatch({ type: 'render' });
@@ -837,8 +838,8 @@ test('a throwing message is isolated and rethrown on a fresh task', async () => 
   assert.throws(() => captured[0](), /positive even number/);
 
   posted.length = 0;
-  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
-  assert.ok(posted.find((p) => p.msg.type === 'ready'), 'queue still processes after a failure');
+  await dispatch({ type: 'setPoleLod', value: 0.75 });
+  assert.equal(engineInstance.poleLod, 0.75, 'queue still processes after a failure');
 });
 
 // ---------------------------------------------------------------------------
@@ -1342,28 +1343,40 @@ test('render faults when getArenaMetrics traps the module', async () => {
   assert.equal(engineInstance.calls.length, calls, 'a halted session ignores later messages');
 });
 
-for (const fault of ['missing restore API', 'rejected restore', 'live engine']) {
+for (const fault of ['missing restore API', 'rejected restore']) {
   test(`init rejects ${fault} before ready or replay`, async () => {
     nextRestoreMissing = fault === 'missing restore API';
     nextRestoreResult = fault === 'rejected restore'
       ? ChainSnapshotRestoreResult.INVALID_VALUE : ChainSnapshotRestoreResult.APPLIED;
-    nextLive = fault === 'live engine';
     await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
       effectName: 'ShaderChain', chainSnapshot: { schema_version: 1 }, paused: true,
       params: [{ name: 'Speed', value: 0.5 }] });
     assert.equal(posted.length, 1);
     assert.equal(posted[0].msg.type, 'engineRejected');
-    const reason = nextLive ? 'HolosphereEngine is already live'
-      : nextRestoreMissing ? 'Shader chain snapshot restore API is unavailable'
-        : 'Shader chain snapshot restore rejected: INVALID_VALUE';
+    const reason = nextRestoreMissing ? 'Shader chain snapshot restore API is unavailable'
+      : 'Shader chain snapshot restore rejected: INVALID_VALUE';
     assert.equal(posted[0].msg.reason, reason);
-    if (nextLive) assert.equal(engineInstance, null);
-    else {
-      assert.ok(!engineInstance.calls.some(([name]) => name === 'setAnimationsPaused'));
-      assert.deepEqual(engineInstance.params, []);
-    }
+    assert.ok(!engineInstance.calls.some(([name]) => name === 'setAnimationsPaused'));
+    assert.deepEqual(engineInstance.params, []);
   });
 }
+
+test('duplicate init is refused before creating another module', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  const firstEngine = engineInstance;
+  const firstModule = wasmModuleInstance;
+  assert.deepEqual(posted.map(({ msg }) => msg), [{ type: 'ready' }]);
+
+  await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 16, h: 8, effectName: 'Waves' });
+  assert.deepEqual(posted.map(({ msg }) => msg),
+    [{ type: 'ready' }, { type: 'engineRejected', reason: 'duplicate init' }]);
+  assert.equal(moduleCreations, 1);
+  assert.equal(wasmModuleInstance, firstModule);
+  assert.equal(engineInstance, firstEngine);
+  assert.equal(firstEngine.effect, 'Plasma');
+  assert.equal(firstEngine.curW, 8);
+  assert.equal(firstEngine.curH, 4);
+});
 
 
 test('rebuild retries a coupled write after its prerequisite without reporting divergence', async () => {

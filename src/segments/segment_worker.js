@@ -218,6 +218,10 @@ export function installSegmentWorker() {
                          + ` (stale cached worker or controller)` });
           break;
         }
+        if (engine || wasmModule) {
+          post({ type: 'engineRejected', reason: 'duplicate init' });
+          break;
+        }
 
         if (typeof msg.effectName !== 'string' || !msg.effectName.trim()) {
           post({ type: 'engineRejected', reason: 'init requires an effect name' });
@@ -258,11 +262,6 @@ export function installSegmentWorker() {
         const mod = await Promise.race([createHolosphereModule(options), instantiationFailed]);
         if (!mod) break;
         wasmModule = mod;
-        if (mod.HolosphereEngine.isLive()) {
-          post({ type: 'engineRejected',
-                 reason: 'HolosphereEngine is already live' });
-          break;
-        }
         engine = new mod.HolosphereEngine();
         if (!engine.setDisplayCaps(msg.topCap ?? 0, msg.bottomCap ?? 0)) {
           post({ type: 'engineRejected', reason: 'setDisplayCaps rejected' });
