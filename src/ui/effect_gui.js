@@ -381,7 +381,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     if (!fx.hasEnumControls) return;
     for (const parameter of getParameterDefinitions()) {
       const controller = fx.controllerByName.get(parameter.name);
-      if (!controller?.isEnum) continue;
+      if (!controller?.isEnum || controller.isReadonly) continue;
       const isEditing = focused !== null
         && controller.domElement?.contains(focused) === true;
       const { update, value } = resolveParamSync(
@@ -442,14 +442,14 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     for (let i = 0; i < n; i++) {
       const c = activeEffect.controllerByName.get(names[i]);
       if (!c) continue;
-      if (c.isEnum && !segmentsOwnDisplay()) continue;
+      if (c.isEnum && !c.isReadonly && !segmentsOwnDisplay()) continue;
       const liveValue = c.isEnum
         ? selectorControlValue({ value: values[i], options: c.enumOptions,
           optionValues: c.enumOptionValues })
         : values[i];
 
-      const isEditing = c.dragging
-        || (focused !== null && c.domElement?.contains(focused) === true);
+      const isEditing = !c.isReadonly && (c.dragging
+        || (focused !== null && c.domElement?.contains(focused) === true));
 
       const { update, value } = resolveParamSync(
         c.getValue(), liveValue, c.isBoolean, isEditing);
@@ -759,6 +759,16 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    * @returns {void}
    */
   function presentReadonlyParam(controller) {
+    controller.isReadonly = true;
+    if (controller.isContinuous) {
+      const updateDisplay = controller.updateDisplay.bind(controller);
+      controller.updateDisplay = () => {
+        const inputFocused = controller._inputFocused;
+        controller._inputFocused = false;
+        try { return updateDisplay(); }
+        finally { controller._inputFocused = inputFocused; }
+      };
+    }
     controller.domElement.classList.add('param-readonly');
     controller.domElement.addEventListener('keydown', (/** @type {KeyboardEvent} */ event) => {
       if (typeof event.key === 'string' && ((controller.$select && event.key.length === 1
