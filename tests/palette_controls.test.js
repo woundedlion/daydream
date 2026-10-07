@@ -821,7 +821,7 @@ const ENUM_SELECT_GROUPS = {
   gen_chroma_curve: 'curve',
 };
 
-test('every generative <select> option names a PaletteV4 member', () => {
+test('generative <select> options match their PaletteV4 members', () => {
   let options = 0;
   for (const [id, group] of Object.entries(ENUM_SELECT_GROUPS)) {
     const block = PALETTES_HTML.match(
@@ -832,6 +832,10 @@ test('every generative <select> option names a PaletteV4 member', () => {
     for (const value of values) {
       assert.ok(Object.hasOwn(PaletteV4[group], value),
         `${id} option "${value}" is not a PaletteV4.${group} member`);
+    }
+    for (const name of Object.keys(PaletteV4[group])) {
+      assert.ok(values.includes(name),
+        `${id} is missing PaletteV4.${group} member "${name}"`);
     }
     options += values.length;
   }
