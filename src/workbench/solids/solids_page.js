@@ -609,7 +609,8 @@ function importSavedSolids(text) {
   if (refused > 0) skipped.push(`${refused} invalid entries (${firstRefusal})`);
   if (full > 0) skipped.push(`${full} past the ${SAVED_SOLIDS_MAX}-card limit`);
   showGateMsg(`imported ${added} solid${added === 1 ? '' : 's'}`
-    + (skipped.length > 0 ? ` — skipped ${skipped.join(' and ')}` : ''));
+    + (skipped.length > 0 ? ` — skipped ${skipped.join(' and ')}` : ''),
+  { persist: skipped.length > 0 });
 }
 
 function captureSavedThumbnail() {
@@ -963,7 +964,7 @@ function reorderOp(from, to, revision) {
     setOps(movedOps(state.ops, from, to));
     renderOps();
     update();
-    showGateMsg(`moved ${opName} to position ${to + 1}`);
+    showGateMsg(`moved ${opName} to position ${to + 1}`, { persist: false });
     const movedItem = document.getElementById('opsList').children[to];
     const focusTarget = [...movedItem.querySelectorAll('.move-op-btn')]
       .find(button => !button.disabled);
@@ -1279,12 +1280,12 @@ const { chainIsValid } = validator;
 const opGate = createOpGate(validator);
 
 let gateMsgTimer = null;
-function showGateMsg(text) {
+function showGateMsg(text, { persist = true } = {}) {
   const el = document.getElementById('opGateMsg');
   if (!el) return;
   el.innerText = text;
   clearTimeout(gateMsgTimer);
-  gateMsgTimer = setTimeout(() => { el.innerText = ''; }, 3000);
+  gateMsgTimer = persist ? null : setTimeout(() => { el.innerText = ''; }, 3000);
 }
 
 /**

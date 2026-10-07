@@ -7,6 +7,33 @@ import { fakeElement } from './helpers/fake_dom.js';
 
 const handler = pageHandlers(new URL('../src/workbench/solids/solids_page.js', import.meta.url));
 
+test('status messages retain failures and clear confirmations', () => {
+  const status = { innerText: '' };
+  const timers = new Map();
+  let nextTimer = 0;
+  const showGateMsg = handler('showGateMsg', {
+    gateMsgTimer: null,
+    document: { getElementById: id => id === 'opGateMsg' ? status : null },
+    setTimeout: (callback, delay) => {
+      assert.equal(delay, 3000);
+      timers.set(++nextTimer, callback);
+      return nextTimer;
+    },
+    clearTimeout: id => timers.delete(id),
+  });
+
+  showGateMsg('moved op', { persist: false });
+  assert.equal(timers.size, 1);
+  showGateMsg('import rejected: long failure reason');
+  assert.equal(timers.size, 0);
+  assert.equal(status.innerText, 'import rejected: long failure reason');
+
+  showGateMsg('imported 1 solid', { persist: false });
+  assert.equal(timers.size, 1);
+  timers.values().next().value();
+  assert.equal(status.innerText, '');
+});
+
 test('parameter changes from removed or reordered rows cannot edit the replacement', () => {
   const state = { ops: [] };
   const updateOpParam = handler('updateOpParam', { state, opsRevision: 2 });
@@ -406,13 +433,20 @@ test('saved-solid imports name invalid entries and the first refusal reason', ()
 test('saved-solid imports reject bare seeds while accepting an exportable recipe', () => {
   const savedSolids = [];
   const messages = [];
-  handler('importSavedSolids', { savedSolids, SAVED_SOLIDS_MAX: 100,
+  const persistence = [];
+  const importSavedSolids = handler('importSavedSolids', { savedSolids, SAVED_SOLIDS_MAX: 100,
     savedSolidExportError, importedSavedSolid: entry => entry,
-    persistSavedSolids() {}, renderSavedList() {}, showGateMsg: message => messages.push(message),
-  })(JSON.stringify([{ base: 'cube', ops: [] }, { base: 'cube', ops: [{ op: 'dual', params: {} }] }]));
+    persistSavedSolids() {}, renderSavedList() {},
+    showGateMsg: (message, options) => { messages.push(message); persistence.push(options.persist); },
+  });
+  importSavedSolids(JSON.stringify([{ base: 'cube', ops: [] },
+    { base: 'cube', ops: [{ op: 'dual', params: {} }] }]));
   assert.equal(savedSolids.length, 1);
   assert.equal(JSON.stringify(savedSolids[0].ops), '[{"op":"dual","params":{}}]');
   assert.match(messages[0], /imported 1 solid.*op chain is empty/);
+  assert.deepEqual(persistence, [true]);
+  importSavedSolids(JSON.stringify([{ base: 'cube', ops: [{ op: 'dual', params: {} }] }]));
+  assert.deepEqual(persistence, [true, false]);
 });
 
 
