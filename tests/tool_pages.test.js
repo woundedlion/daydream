@@ -708,6 +708,16 @@ test('Mobius preset descriptions retain AA contrast on hover', () => {
   assert.ok(contrast(cascade, '.preset-desc', '.preset-btn:hover') >= AA_CONTRAST);
 });
 
+test('Mobius preset descriptions retain AA contrast when active', () => {
+  const page = SERVED_PAGES.find(({ page }) => page === 'tools/mobius.html');
+  assert.ok(page);
+  const cascade = page.sheets.map((sheet) => read(...sheet)).join('\n');
+  const ratio = contrast(cascade, '.preset-desc',
+    ['.preset-btn.active', '#presetSidebar', 'body']);
+  assert.ok(ratio >= AA_CONTRAST,
+    `active preset description measures ${ratio.toFixed(2)}:1`);
+});
+
 
 test('the entry script and syntax failures share the guarded load failure overlay', () => {
   const source = read('index.html');
