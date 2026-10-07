@@ -5,6 +5,7 @@ import {
   chmodSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -122,3 +123,62 @@ test('pre-commit checks the staged tree', { skip: SKIP }, async (t) => {
     assert.match(missing.stdout + missing.stderr, /node_modules is missing; run npm ci/);
   });
 });
+
+const LS_FILES_MANIFEST = [
+  "const { test } = require('node:test');",
+  "const assert = require('node:assert/strict');",
+  "const { execFileSync } = require('node:child_process');",
+  "const { resolve } = require('node:path');",
+  "const repo = resolve(__dirname, '..');",
+  "const git = (...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8' });",
+  "test('tracked files match the staged tree', () => {",
+  "  assert.deepEqual(git('ls-files').split('\\n').filter(Boolean),",
+  "    ['README.md', 'staged.txt', 'tests/site_manifest.test.js']);",
+  "  const [, blob] = git('ls-files', '-s', 'staged.txt').split(/\\s+/);",
+  "  assert.equal(git('hash-object', 'staged.txt').trim(), blob);",
+  '});',
+  '',
+].join('\n');
+
+for (const layout of ['standard index', 'split index', 'linked worktree with split index']) {
+  test(`pre-commit snapshot index is readable: ${layout}`, { skip: SKIP }, (t) => {
+    const root = mkdtempSync(join(tmpdir(), 'pre-commit-index-'));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const env = isolatedGitEnv();
+    delete env.NODE_TEST_CONTEXT;
+    const source = join(root, 'source');
+    const git = (cwd, ...args) =>
+      execFileSync('git', args, { cwd, env, encoding: 'utf8' });
+
+    mkdirSync(join(source, 'tests'), { recursive: true });
+    git(source, 'init', '-q');
+    if (layout !== 'standard index') git(source, 'config', 'core.splitIndex', 'true');
+    writeFileSync(join(source, 'README.md'), 'valid\n');
+    writeFileSync(join(source, 'tests', 'site_manifest.test.js'), LS_FILES_MANIFEST);
+    git(source, 'add', 'README.md', 'tests/site_manifest.test.js');
+    git(source, 'commit', '-q', '-m', 'base');
+    git(source, 'config', 'core.hooksPath', dirname(HOOK));
+
+    let checkout = source;
+    if (layout.startsWith('linked worktree')) {
+      checkout = join(root, 'linked');
+      git(source, 'worktree', 'add', '-q', checkout);
+    }
+    writeFileSync(join(checkout, 'staged.txt'), 'staged\n');
+    git(checkout, 'add', 'staged.txt');
+    writeFileSync(join(checkout, 'staged.txt'), 'working tree\n');
+    if (layout !== 'standard index') {
+      const gitDir = git(checkout, 'rev-parse', '--absolute-git-dir').trim();
+      assert.ok(readdirSync(gitDir).some((name) => name.startsWith('sharedindex.')));
+    }
+    const indexBefore = git(checkout, 'ls-files', '-s');
+
+    const commit = spawnSync('git', ['commit', '-q', '-m', 'staged'], {
+      cwd: checkout,
+      env,
+      encoding: 'utf8',
+    });
+    assert.equal(commit.status, 0, commit.stdout + commit.stderr);
+    assert.equal(git(checkout, 'ls-files', '-s'), indexBefore);
+  });
+}
