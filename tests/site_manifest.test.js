@@ -176,8 +176,11 @@ const walkFromPages = () => {
         if (!ignored(target)) dangling.push(`${path} -> ${target}`);
         continue;
       }
-      if (!existsSync(resolve(REPO, target))) absent.push(`${path} -> ${target}`);
-      else if (!covered(target)) unpublished.push(`${path} -> ${target}`);
+      if (!existsSync(resolve(REPO, target))) {
+        absent.push(`${path} -> ${target}`);
+        continue;
+      }
+      if (!covered(target)) unpublished.push(`${path} -> ${target}`);
       if (/\.(m?js|html|css)$/.test(target)) queue.push(target);
       else seen.add(target);
     }
