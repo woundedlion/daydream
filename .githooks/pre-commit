@@ -37,11 +37,15 @@ mkdir "$SNAPSHOT"
 git checkout-index --all --force --prefix="$SNAPSHOT/"
 LOCAL_GIT_ENV="$(git rev-parse --local-env-vars)"
 INDEX_PATH="$(git rev-parse --path-format=absolute --git-path index)"
+STANDALONE_INDEX="$SNAPSHOT_ROOT/index"
+cp "$INDEX_PATH" "$STANDALONE_INDEX"
+# a split index names a shared index in the source git dir
+GIT_INDEX_FILE="$STANDALONE_INDEX" git -c core.splitIndex=false update-index --no-split-index
 
 (
   for name in $LOCAL_GIT_ENV; do unset "$name"; done
   git -C "$SNAPSHOT" init --quiet
-  cp "$INDEX_PATH" "$SNAPSHOT/.git/index"
+  cp "$STANDALONE_INDEX" "$SNAPSHOT/.git/index"
   node --test "$SNAPSHOT/tests/site_manifest.test.js"
 )
 
