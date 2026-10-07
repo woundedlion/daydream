@@ -493,7 +493,7 @@ test('a spawning pool reports warm-up without a stale worker count', () => {
   const box = stats.firstElementChild;
   assert.equal(box.getAttribute('role'), 'status');
   assert.deepEqual(box.childNodes, ['Spawning workers…']);
-  assert.deepEqual(box.children, [], 'the count is a text node, not an element');
+  assert.deepEqual(box.children, [], 'the status is a single text node, not an element');
 
   view.update(readyState(8, { ready: false }));
   assert.equal(stats.firstElementChild, box);
