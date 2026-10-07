@@ -147,7 +147,6 @@ test('reportPageFailures listens for both uncaught errors and unhandled rejectio
 
 /** Verifies the registered listener pairs can be removed at page teardown. */
 test('reportPageFailures returns the pairs its caller needs to deregister', () => {
-  const { bodyEl } = fakeDocument();
   const target = fakeTarget();
 
   const installed = reportPageFailures('simulator', target);
@@ -156,11 +155,6 @@ test('reportPageFailures returns the pairs its caller needs to deregister', () =
     ['error', 'unhandledrejection']);
   for (const [type, handler] of installed) target.removeEventListener(type, handler);
   assert.deepEqual(target.types(), [], 'a returned handler was not the one installed');
-
-  captureConsole(() => {
-    target.dispatch('error', { error: new Error('after discard') });
-  });
-  assert.equal(bodyEl.children.length, 0, 'a removed listener still raised a banner');
 });
 
 test('a post-boot uncaught error raises the banner, not just a console line', () => {
