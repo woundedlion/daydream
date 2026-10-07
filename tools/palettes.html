@@ -145,12 +145,12 @@
           <h3 id="recipe_hue_heading" class="font-bold text-blue-300">Hue</h3>
           <div class="hue-card-content">
             <div class="hue-card-controls">
-              <div id="gen_seed_field" class="recipe-field">
-                <label for="gen_seed_slider">Hue</label>
+              <div id="gen_base_hue_field" class="recipe-field">
+                <label for="gen_base_hue">Hue</label>
                 <div class="recipe-slider">
-                  <input type="range" id="gen_seed_slider" min="0" max="359.9999" step="0.0001" value="0"
+                  <input type="range" id="gen_base_hue" min="0" max="359.9999" step="0.0001" value="0"
                     aria-label="Base Hue (degrees)" title="Base Hue (degrees)">
-                  <span id="gen_seed_value" class="slider-label">0&deg;</span>
+                  <span id="gen_base_hue_value" class="slider-label">0&deg;</span>
                 </div>
               </div>
               <div id="gen_hue_mode_field" class="recipe-field">
@@ -218,8 +218,8 @@
           </div>
         </section>
 
-        <section class="param-group recipe-group" aria-labelledby="recipe_color_heading">
-          <h3 id="recipe_color_heading" class="font-bold text-yellow-400">Chroma</h3>
+        <section class="param-group recipe-group" aria-labelledby="recipe_chroma_heading">
+          <h3 id="recipe_chroma_heading" class="font-bold text-yellow-400">Chroma</h3>
           <div class="recipe-field">
             <label for="gen_chroma_curve">Curve</label>
             <select id="gen_chroma_curve" aria-label="Relative Chroma Curve" title="Relative Chroma Curve"
@@ -256,11 +256,11 @@
           </div>
         </section>
 
-        <section class="param-group recipe-group" aria-labelledby="recipe_brightness_heading">
-          <h3 id="recipe_brightness_heading" class="font-bold text-red-300">Lightness</h3>
+        <section class="param-group recipe-group" aria-labelledby="recipe_lightness_heading">
+          <h3 id="recipe_lightness_heading" class="font-bold text-red-300">Lightness</h3>
           <div class="recipe-field">
-            <label for="gen_brightness">Curve</label>
-            <select id="gen_brightness" aria-label="Lightness Curve" title="Lightness Curve"
+            <label for="gen_lightness_curve">Curve</label>
+            <select id="gen_lightness_curve" aria-label="Lightness Curve" title="Lightness Curve"
               class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
               <option value="CONSTANT">Constant</option>
               <option value="ASCENDING">Ascending</option>
@@ -286,11 +286,11 @@
           </div>
         </section>
 
-        <section class="param-group recipe-group domain-recipe-card" aria-labelledby="recipe_gradient_heading">
-          <h3 id="recipe_gradient_heading" class="font-bold text-purple-300">Domain</h3>
+        <section class="param-group recipe-group domain-recipe-card" aria-labelledby="recipe_domain_heading">
+          <h3 id="recipe_domain_heading" class="font-bold text-purple-300">Domain</h3>
           <div class="recipe-field">
-            <label for="gen_shape">Domain</label>
-            <select id="gen_shape" aria-label="Domain Mapping" title="Domain Mapping"
+            <label for="gen_domain">Domain</label>
+            <select id="gen_domain" aria-label="Domain Mapping" title="Domain Mapping"
               class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
               <option value="STRAIGHT">Straight</option>
               <option value="MIRROR">Mirror</option>
@@ -334,19 +334,19 @@
             </select>
           </div>
           <div class="recipe-field">
-            <label for="gen_phase">Offset</label>
+            <label for="gen_offset">Offset</label>
             <div class="recipe-slider">
-              <input type="range" id="gen_phase" min="0" max="0" step="any" value="0"
+              <input type="range" id="gen_offset" min="0" max="0" step="any" value="0"
                 aria-label="Input Offset" title="Input Offset">
-              <span id="gen_phase_value" class="slider-label">0.000</span>
+              <span id="gen_offset_value" class="slider-label">0.000</span>
             </div>
           </div>
           <div class="recipe-field">
-            <label for="gen_width">Span</label>
+            <label for="gen_span">Span</label>
             <div class="recipe-slider">
-              <input type="range" id="gen_width" min="0.01" max="1" step="any" value="1"
+              <input type="range" id="gen_span" min="0.01" max="1" step="any" value="1"
                 aria-label="Input Span" title="Input Span">
-              <span id="gen_width_value" class="slider-label">1.000</span>
+              <span id="gen_span_value" class="slider-label">1.000</span>
             </div>
           </div>
         </section>
