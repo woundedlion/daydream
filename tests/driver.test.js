@@ -1174,16 +1174,45 @@ test('a keyboard-focused canvas rings and orbits until it loses focus', () => {
   ctx.handlers.focus();
   assert.equal(ctx.classes.has('keyboard-focus'), true);
 
-  let propagationStopped = false;
-  ctx.handlers.keydown({
-    key: 'ArrowLeft',
-    preventDefault: () => {},
-    stopPropagation: () => { propagationStopped = true; },
-  });
+  const keydown = (key, shiftKey = false) => {
+    let prevented = false;
+    let stopped = false;
+    ctx.handlers.keydown({ key, shiftKey,
+      preventDefault: () => { prevented = true; },
+      stopPropagation: () => { stopped = true; },
+    });
+    return { prevented, stopped };
+  };
+  const spherical = () => new THREE.Spherical().setFromVector3(
+    ctx.camera.position.clone().sub(ctx.controls.target));
+
+  assert.deepEqual(keydown('ArrowLeft'), { prevented: true, stopped: true });
   assert.ok(Math.abs(ctx.camera.position.x) > 1e-6, 'arrow key did not orbit');
   assert.equal(ctx.needsRender, true);
-  assert.equal(propagationStopped, true,
-    'the window handler reads the same arrow key as a paused frame step');
+
+  ctx.paused = true;
+  const beforeStep = ctx.camera.position.clone();
+  assert.deepEqual(keydown('ArrowRight'), { prevented: false, stopped: false });
+  assert.deepEqual(ctx.camera.position, beforeStep);
+
+  assert.deepEqual(keydown('ArrowRight', true), { prevented: true, stopped: true });
+  assert.ok(ctx.camera.position.x > beforeStep.x);
+
+  const beforeUp = spherical();
+  assert.deepEqual(keydown('ArrowUp'), { prevented: true, stopped: true });
+  assert.ok(spherical().phi < beforeUp.phi);
+
+  const beforeDown = spherical();
+  assert.deepEqual(keydown('ArrowDown'), { prevented: true, stopped: true });
+  assert.ok(spherical().phi > beforeDown.phi);
+
+  const beforeIn = spherical();
+  assert.deepEqual(keydown('+'), { prevented: true, stopped: true });
+  assert.ok(spherical().radius < beforeIn.radius);
+
+  const beforeOut = spherical();
+  assert.deepEqual(keydown('-'), { prevented: true, stopped: true });
+  assert.ok(spherical().radius > beforeOut.radius);
 
   const position = ctx.camera.position.clone();
   for (const event of [{ key: ' ' }, { key: 'ArrowLeft', ctrlKey: true },
