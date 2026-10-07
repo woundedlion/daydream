@@ -323,8 +323,8 @@ export function createSwitchCoordinator({
  * @param {() => HolosphereEngine|null} deps.getEngine - The main WASM engine, null until
  *   the module finishes loading.
  * @param {() => HolosphereModule} deps.getModule - The loaded WASM module, for its
- *   EffectSetResult/ResolutionSetResult enums; non-null whenever getEngine()
- *   answers an engine.
+ *   EffectSetResult, ResolutionSetResult and ChainSnapshotRestoreResult enums;
+ *   non-null whenever getEngine() answers an engine.
  * @param {() => void} deps.invalidateEngineView - Drops the cached pixel view so
  *   the next refresh re-fetches it after a resize.
  * @param {Object<string, {w: number, h: number, dotSize: number}>} deps.presets -
@@ -432,8 +432,9 @@ export function createApplyPipeline({
    * Apply a resolution change: resize geometry, refresh sidebar list, then
    * re-apply effect.
    * @param {boolean} [preserveParams=false] - When true, keep the active effect's
-   *   param URL entries through the re-apply. Also kept while no engine exists;
-   *   always dropped when an off-list effect is corrected.
+   *   param URL entries through the re-apply. Also kept while no engine exists
+   *   or the outgoing effect restores through a chain snapshot; always dropped
+   *   when an off-list effect is corrected.
    * @returns {string} ApplyResult.APPLIED, else ApplyResult.REJECTED. Only an
    *   unknown preset or an engine setResolution rejection leaves everything as it
    *   was; a rejected applyEffect returns after the engine, driver and sidebar
