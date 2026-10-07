@@ -3,20 +3,9 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-import { engineParamValue, enumConstantName } from './param_sync.js';
+import { acceptedParamValue, engineParamValue, enumConstantName } from './param_sync.js';
 
 export const CHAIN_SNAPSHOT_STORAGE_KEY = '__chainSnapshot';
-
-/**
- * The value the engine last took for one parameter: what it admitted for
- * rendering, else the writable target it holds, else the value it renders.
- * @param {{acceptedValue?: *, requestedValue?: *, value: *}} parameter - Engine
- *   parameter definition.
- * @returns {*} The accepted value, in the definition's own type.
- */
-export function acceptedParamValue(parameter) {
-  return parameter.acceptedValue ?? parameter.requestedValue ?? parameter.value;
-}
 
 /**
  * URL storage and replay of engine-accepted effect state.

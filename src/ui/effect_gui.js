@@ -14,13 +14,14 @@ import {
   enumChoices,
   paramControlKind,
   engineParamValue,
+  acceptedParamValue,
   paramExportBlocker,
   paramGenerationStale,
   paramValueSkew,
   selectorControlValue,
   replayParameterWrites,
 } from "../effects/param_sync.js";
-import { createEffectPersistence, acceptedParamValue } from '../effects/effect_persistence.js';
+import { createEffectPersistence } from '../effects/effect_persistence.js';
 import { createEffectPanelView, focusWidget } from './effect_panel_view.js';
 import { EffectPanelEdits } from './effect_panel_edits.js';
 import { formatExportParams } from "../shared/export_params.js";
