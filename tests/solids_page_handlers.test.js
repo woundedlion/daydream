@@ -458,3 +458,40 @@ test('a fully valid saved list needs no recovery notice or rejected backup', () 
   assert.equal(loaded.rejected.length, 0);
   assert.equal(loaded.notice, '');
 });
+
+test('two adds queued at one below the op cap commit only the first', async () => {
+  const state = { base: 'cube', ops: Array.from({ length: 254 }, () => ({ op: 'dual', params: {} })) };
+  const queued = [];
+  const messages = [];
+  let validations = 0;
+  const addOp = handler('addOp', {
+    state, MAX_RECIPE_STEPS: 255, currentMeshIsCurrent: false, currentMesh: null,
+    seedOpParams: () => ({}), queueCommit: (fn) => queued.push(fn),
+    chainIsValid: async () => { validations++; return { ok: true }; },
+    setOps: (ops) => { state.ops = ops; }, renderOps() {}, update() {},
+    showGateMsg: (message) => messages.push(message),
+  });
+  addOp('dual');
+  addOp('dual');
+  assert.equal(queued.length, 2);
+  for (const task of queued) await task();
+  assert.equal(state.ops.length, 255);
+  assert.equal(validations, 1);
+  assert.deepEqual(messages, ['rejected: a chain carries at most 255 ops']);
+  assert.equal(savedChainShapeError(state.base, state.ops), null);
+});
+
+test('saving refuses a chain that restore would refuse', () => {
+  const messages = [];
+  const savedSolids = [];
+  const ops = Array.from({ length: 256 }, () => ({ op: 'dual', params: {} }));
+  handler('saveSolid', {
+    currentMesh: { vertices: [], faces: [] }, currentMeshIsCurrent: true,
+    state: { base: 'cube', ops }, savedSolids, savedChainShapeError,
+    captureSavedSolidThumbnail: () => assert.fail('captured an unrestorable card'),
+    showGateMsg: (message) => messages.push(message),
+  })();
+  assert.equal(savedSolids.length, 0);
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0], `rejected: ${savedChainShapeError('cube', ops)}`);
+});

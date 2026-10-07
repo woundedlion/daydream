@@ -639,6 +639,11 @@ function saveSolid() {
     showGateMsg('rejected: add at least one op — a bare seed has no recipe to export');
     return;
   }
+  const shapeError = savedChainShapeError(state.base, state.ops);
+  if (shapeError) {
+    showGateMsg(`rejected: ${shapeError}`);
+    return;
+  }
 
   const thumbnail = captureSavedSolidThumbnail(
     savedSolids.length, captureSavedThumbnail);
@@ -1233,6 +1238,11 @@ function addOp(opName) {
   }
   const newOp = { op: opName, params: seedOpParams(opName, currentMeshIsCurrent ? currentMesh : null) };
   queueCommit(async () => {
+    // Earlier queued adds can fill the chain before this runs.
+    if (state.ops.length >= MAX_RECIPE_STEPS) {
+      showGateMsg(`rejected: a chain carries at most ${MAX_RECIPE_STEPS} ops`);
+      return;
+    }
     // Gating is async, so validate the exact candidate.
     const check = await chainIsValid(state.base, [...state.ops, newOp]);
     if (!check.ok) {
