@@ -7,6 +7,7 @@ import { fakeElement, installDocument, restoreDocumentAfterEach } from './helper
 const {
   copyToClipboard,
   copyWithFeedback,
+  COPY_FEEDBACK,
   wireCopyBlock,
 } = await import('../src/shared/clipboard.js');
 
@@ -100,6 +101,41 @@ test('a rejected clipboard write flashes the failure label, not "Copied!"', asyn
 
   mock.timers.tick(2000);
   assert.equal(el.textContent, 'Copy', 'element reverts to idle');
+});
+
+test('copy feedback replaces the prior outcome classes on re-entry', async () => {
+  let rejectCopy = true;
+  Object.defineProperty(globalThis, 'navigator', {
+    value: { clipboard: { writeText: async () => {
+      if (rejectCopy) throw new Error('denied');
+    } } },
+    configurable: true,
+  });
+  installDocument({
+    createElement: fakeElement,
+    body: fakeElement('body'),
+    execCommand: () => false,
+  });
+  const el = fakeButton('Copy', COPY_FEEDBACK.idleClasses);
+  const opts = { element: el, revertMs: 1500, ...COPY_FEEDBACK };
+
+  assert.equal(await copyWithFeedback('a', opts), false);
+  assert.equal(el.className, 'text-amber-400');
+  mock.timers.tick(500);
+
+  rejectCopy = false;
+  assert.equal(await copyWithFeedback('b', opts), true);
+  assert.equal(el.className, 'text-green-400');
+  mock.timers.tick(500);
+
+  rejectCopy = true;
+  assert.equal(await copyWithFeedback('c', opts), false);
+  assert.equal(el.className, 'text-amber-400');
+  mock.timers.tick(1100);
+  assert.equal(el.className, 'text-amber-400');
+  mock.timers.tick(400);
+  assert.equal(el.className, 'text-gray-300');
+  assert.equal(el.textContent, 'Copy');
 });
 
 /** Verifies the legacy textarea path copies and removes its temporary node. */
