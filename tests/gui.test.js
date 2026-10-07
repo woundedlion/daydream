@@ -945,6 +945,18 @@ test('a control hydrates only from its own exact key', () => {
   assert.equal(gui.urlParams().get('fx.planar warp 1'), '1');
 });
 
+test('DeepLinkGUI.readStoredNumber rejects a non-numeric companion value', () => {
+  installWindowAt('?fx.__accepted.Foo=abc');
+  const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
+  let value;
+  const warnings = captureWarnings(() => {
+    value = gui.readStoredNumber('__accepted.Foo');
+  });
+  assert.equal(value, undefined);
+  assert.deepEqual(warnings,
+    ['DeepLinkGUI: ignoring non-numeric stored value for "fx.__accepted.Foo"']);
+});
+
 
 test('sparse enum deep links hydrate numeric IDs and reject ordinal gaps', (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
