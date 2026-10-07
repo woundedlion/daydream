@@ -6,6 +6,83 @@ import { AppState, URLSync } from '../src/app/state.js';
 import { fakeGui } from './helpers/fake_app.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
+for (const scenario of ['raw', 'companions', 'singular']) {
+  test(`coupled Mobius URL hydration settles before canonicalization (${scenario})`, async () => {
+    const { default: createModule } = await import('../generated/holosphere_wasm.js');
+    const module = await createModule({ print: () => {} });
+    const engine = new module.HolosphereEngine();
+    engine.setResolution(96, 20);
+    engine.setEffect('MobiusGrid');
+    const target = {
+      'Mobius A Re': 0, 'Mobius A Im': 0,
+      'Mobius B Re': scenario === 'singular' ? 0 : 1, 'Mobius B Im': 0,
+      'Mobius C Re': scenario === 'singular' ? 0 : -1, 'Mobius C Im': 0,
+      'Mobius D Re': 0, 'Mobius D Im': 0,
+    };
+    const url = new URL('https://example.test/?effect=MobiusGrid');
+    for (const [name, value] of Object.entries(target)) url.searchParams.set(`fx.${name}`, value);
+    if (scenario === 'companions') {
+      for (const [name, value] of Object.entries(target)) url.searchParams.set(`fx.__accepted.${name}`, value);
+    }
+    const win = {
+      location: url, setTimeout, clearTimeout,
+      history: { replaceState(state, title, next) { win.location = new URL(next, win.location); } },
+    };
+    const sync = new URLSync(new AppState({ effect: 'MobiusGrid' }), ['effect'], {}, win);
+    const writes = [];
+    const panel = createEffectGui({
+      engine: {
+        getParameterDefinitions: () => engine.getParameterDefinitions(),
+        paramGeneration: () => engine.getParamGeneration(),
+        paramValues: () => engine.getParamValues(),
+        setParam: (name, value) => {
+          const accepted = engine.setParameter(name, value) === module.ParamSetResult.APPLIED;
+          writes.push({ name, value, accepted });
+          return accepted;
+        },
+        setAnimationsPaused: (value) => engine.setAnimationsPaused(value),
+        animationsPaused: () => engine.getAnimationsPaused(),
+        getPresetCount: () => engine.getPresetCount(),
+        getPresetIndex: () => engine.getPresetIndex(),
+        synchronizePreset: (index) => engine.synchronizePreset(index),
+        selectPreset: (index) => engine.selectPreset(index),
+      },
+      segments: { ownsDisplay: () => false, paramValues: () => null, setParam: () => {} },
+      host: {
+        createGui: () => new GUI(fakeGui('widgets'), 'fx', null, win),
+        container: () => fakeElement('div'), isMobile: () => false,
+        applyEffect: () => {}, dragTarget: fakeElement('window'),
+      },
+    });
+    try {
+      panel.build();
+      panel.mount();
+      sync.flush();
+      const actual = Object.fromEntries(engine.getParameterDefinitions()
+        .filter(p => Object.hasOwn(target, p.name)).map(p => [p.name, p.acceptedValue]));
+      if (scenario !== 'singular') {
+        assert.deepEqual(actual, target);
+        assert.equal(win.location.searchParams.get('fx.Mobius A Im'), '0');
+        assert.equal(win.location.searchParams.get('fx.__accepted.Mobius A Im'), '0');
+        if (scenario === 'raw') {
+          assert.deepEqual(writes.filter(w => w.name === 'Mobius A Im').map(w => w.accepted), [false, true]);
+        }
+      } else {
+        assert.notDeepEqual(actual, target);
+        assert.ok(writes.some(w => !w.accepted));
+        assert.ok(writes.length <= Object.keys(target).length ** 2);
+        for (const [name, value] of Object.entries(actual)) {
+          assert.ok(Math.abs(Number(win.location.searchParams.get(`fx.${name}`)) - value) < 0.00001);
+        }
+      }
+    } finally {
+      panel.destroy();
+      sync.dispose();
+      engine.delete();
+    }
+  });
+}
+
 test('preset values survive URL reload after flushed or pending parameter edits', async () => {
   const { default: createModule } = await import('../generated/holosphere_wasm.js');
   const module = await createModule({ print: () => {} });
