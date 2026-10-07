@@ -53,6 +53,51 @@ test('sync leaves a control whose input has focus alone', () => {
   assert.equal(h.gui().ctrl('Glow').getValue(), true, 'other controls still track');
 });
 
+for (const ownsDisplay of [false, true]) {
+  test(`focused readonly telemetry follows changing values (worker=${ownsDisplay})`, () => {
+    const h = makeHarness({
+      params: [{ name: 'Unfinished Rays', value: 0, min: 0, max: 42050, readonly: true }, SPEED],
+      engineValues: [12, 0.9], segmentValues: [12, 0.9], ownsDisplay,
+    });
+    h.panel.build();
+    const telemetry = h.gui().ctrl('Unfinished Rays');
+    h.state.focused = telemetry.$input;
+    h.gui().ctrl('Speed').dragging = true;
+    h.panel.sync();
+    assert.equal(telemetry.getValue(), 12);
+    assert.equal(telemetry.$input.getAttribute('readonly'), 'readonly');
+    assert.equal(h.gui().ctrl('Speed').getValue(), SPEED.value);
+
+    h.state.engineValues = [27, 0.9];
+    h.state.segmentValues = [27, 0.9];
+    h.panel.sync();
+    assert.equal(telemetry.getValue(), 27);
+    assert.equal(h.state.focused, telemetry.$input);
+    assert.deepEqual(h.writes, []);
+  });
+
+  test(`focused readonly enums follow rendered values (worker=${ownsDisplay})`, () => {
+    const h = makeHarness({
+      params: [{
+        name: 'Status', value: 0, requestedValue: 0, readonly: true,
+        options: ['Idle', 'Working', 'Done'], optionValues: [0, 12, 27], animated: true,
+      }],
+      engineValues: [12], segmentValues: [12], ownsDisplay,
+    });
+    h.panel.build();
+    const telemetry = h.gui().ctrl('Status');
+    h.state.focused = telemetry.$select;
+    h.panel.sync();
+    assert.equal(telemetry.getValue(), 12);
+    h.state.engineValues = [27];
+    h.state.segmentValues = [27];
+    h.panel.sync();
+    assert.equal(telemetry.getValue(), 27);
+    assert.equal(telemetry.$select.getAttribute('aria-readonly'), 'true');
+    assert.deepEqual(h.writes, []);
+  });
+}
+
 test('sync tracks every control when the focus is outside the panel', () => {
   const h = makeHarness({ params: [SPEED], engineValues: [0.9] });
   h.panel.build();

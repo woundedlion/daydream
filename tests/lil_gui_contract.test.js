@@ -6,6 +6,7 @@
 // after logging, for anything it has no controller for.
 import { enumChoices } from '../src/effects/param_sync.js';
 import { GUI as DeepLinkGUI } from '../src/ui/gui.js';
+import { createEffectGui } from '../src/ui/effect_gui.js';
 import { fakePanelGui } from './helpers/fake_app.js';
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -44,6 +45,53 @@ async function realGUI() {
   const container = installHost();
   const { GUI } = await import('lil-gui');
   return new GUI({ container, autoPlace: false, injectStyles: false });
+}
+
+for (const ownsDisplay of [false, true]) {
+  test(`readonly numeric text refreshes during lil-gui focus (worker=${ownsDisplay})`, async () => {
+    const gui = await realGUI();
+    let values = [12, 0.9];
+    const win = { location: new URL('https://example.test/'), setTimeout, clearTimeout };
+    const panel = createEffectGui({
+      engine: {
+        getParameterDefinitions: () => [
+          { name: 'Unfinished Rays', value: 0, min: 0, max: 42050, step: 1, readonly: true },
+          { name: 'Speed', value: 0.1, min: 0, max: 1 },
+        ],
+        paramGeneration: () => 1, paramValues: () => values, setParam: () => true,
+        setAnimationsPaused: () => {}, animationsPaused: () => false,
+        getPresetCount: () => 0, getPresetIndex: () => 0,
+        synchronizePreset: () => true, selectPreset: () => true,
+      },
+      segments: { ownsDisplay: () => ownsDisplay, paramValues: () => values, setParam: () => {} },
+      host: {
+        createGui: () => new DeepLinkGUI(gui, 'fx', null, win), container: () => null,
+        isMobile: () => false, applyEffect: () => {}, dragTarget: fakeElement('window'),
+        focusedElement: () => document.activeElement,
+      },
+    });
+    try {
+      panel.build();
+      const telemetry = panel.active().controllerByName.get('Unfinished Rays');
+      document.activeElement = telemetry.$input;
+      telemetry.$input.dispatch('focus', {});
+      panel.sync();
+      assert.equal(telemetry.$input.value, '12');
+      values = [27, 0.8];
+      panel.sync();
+      assert.equal(telemetry.$input.value, '27');
+      assert.equal(document.activeElement, telemetry.$input);
+      assert.equal(telemetry.$input.getAttribute('readonly'), 'readonly');
+
+      const speed = panel.active().controllerByName.get('Speed');
+      document.activeElement = speed.$input;
+      speed.$input.dispatch('focus', {});
+      values = [33, 0.2];
+      panel.sync();
+      assert.equal(speed.getValue(), 0.8);
+      assert.equal(Number(speed.$input.value), 0.8);
+    } finally { panel.destroy(); }
+  });
 }
 
 test('add() dispatches on the seeded value type', async () => {
