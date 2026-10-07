@@ -182,15 +182,13 @@ test('adapter decode rejects nested authoring and deletion from getters', async 
 test('authoring adapter declarations match their exported methods', () => {
   engine.setEffect('ShaderChain');
   const chain = engine.getShaderChainBindings();
-  for (const [name, handle] of [['ShaderChainBindings', chain]]) {
-    const declared = [...interfaceBody(name).matchAll(/^\s*([A-Za-z_]\w*)\s*\(/gm)]
-      .map((match) => match[1]);
-    assert.deepEqual([...SHADER_CHAIN_BINDING_METHODS].sort(), declared.toSorted());
-    for (const method of declared) assert.equal(typeof handle[method], 'function');
-    assert.deepEqual(Object.keys(Object.getPrototypeOf(handle)).sort(),
-      declared.filter((method) => method !== 'delete').sort());
-    handle.delete();
-  }
+  const declared = [...interfaceBody('ShaderChainBindings').matchAll(/^\s*([A-Za-z_]\w*)\s*\(/gm)]
+    .map((match) => match[1]);
+  assert.deepEqual(SHADER_CHAIN_BINDING_METHODS.toSorted(), declared.toSorted());
+  for (const method of declared) assert.equal(typeof chain[method], 'function');
+  assert.deepEqual(Object.keys(Object.getPrototypeOf(chain)).toSorted(),
+    declared.filter((method) => method !== 'delete').toSorted());
+  chain.delete();
 });
 
 // Both non-rejections leave the requested size active; only RESIZED tears the
