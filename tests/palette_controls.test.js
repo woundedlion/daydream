@@ -811,13 +811,13 @@ test('a control value no enum member carries is refused, not marshalled', () => 
 
 // Palette select-option parity with the recipe enums.
 const ENUM_SELECT_GROUPS = {
-  gen_shape: 'domain',
+  gen_domain: 'domain',
   gen_path: 'colorPath',
   gen_hue_mode: 'hueMode',
   gen_harmony: 'harmony',
   gen_direction: 'direction',
   gen_easing: 'easing',
-  gen_brightness: 'curve',
+  gen_lightness_curve: 'curve',
   gen_chroma_curve: 'curve',
 };
 

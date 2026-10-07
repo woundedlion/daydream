@@ -108,7 +108,7 @@ function customBaseTurns() {
 function setCustomBaseTurns(turns) {
   const degrees = wrapTurns(turns) * 360;
   document.getElementById(PALETTE_CONTROL_IDS.baseHueDegrees).value = degrees;
-  document.getElementById('gen_seed_value').textContent =
+  document.getElementById('gen_base_hue_value').textContent =
     `${Number(degrees.toFixed(1))}°`;
 }
 
@@ -305,23 +305,23 @@ function recipeWindow() {
 }
 
 function syncRecipeWindowControls() {
-  const phase = document.getElementById(PALETTE_CONTROL_IDS.offset);
-  const width = document.getElementById(PALETTE_CONTROL_IDS.span);
+  const offsetSlider = document.getElementById(PALETTE_CONTROL_IDS.offset);
+  const spanSlider = document.getElementById(PALETTE_CONTROL_IDS.span);
   const { offset, span } = clampRecipeWindow(
-    Number(phase.value), Number(width.value));
-  width.value = span;
-  phase.max = String(1 - span);
-  phase.value = offset;
-  document.getElementById('gen_phase_value').textContent = offset.toFixed(3);
-  document.getElementById('gen_width_value').textContent = span.toFixed(3);
+    Number(offsetSlider.value), Number(spanSlider.value));
+  spanSlider.value = span;
+  offsetSlider.max = String(1 - span);
+  offsetSlider.value = offset;
+  document.getElementById('gen_offset_value').textContent = offset.toFixed(3);
+  document.getElementById('gen_span_value').textContent = span.toFixed(3);
 }
 
 function setRecipeWindow(offset, span) {
-  const width = document.getElementById(PALETTE_CONTROL_IDS.span);
-  const phase = document.getElementById(PALETTE_CONTROL_IDS.offset);
-  width.value = span;
-  phase.max = String(1 - Number(width.value));
-  phase.value = offset;
+  const spanSlider = document.getElementById(PALETTE_CONTROL_IDS.span);
+  const offsetSlider = document.getElementById(PALETTE_CONTROL_IDS.offset);
+  spanSlider.value = span;
+  offsetSlider.max = String(1 - Number(spanSlider.value));
+  offsetSlider.value = offset;
   syncRecipeWindowControls();
 }
 
@@ -460,7 +460,7 @@ function syncRecipeControlAvailability() {
   const recipe = readPaletteRecipe();
   const availability = paletteRecipeAvailability(recipe);
   const controls = [
-    ['gen_seed_field', PALETTE_CONTROL_IDS.baseHueDegrees, availability.baseHue],
+    ['gen_base_hue_field', PALETTE_CONTROL_IDS.baseHueDegrees, availability.baseHue],
     ['gen_hue_mode_field', PALETTE_CONTROL_IDS.hueMode, availability.hueMode],
     ['gen_harmony_field', PALETTE_CONTROL_IDS.harmony, availability.harmony],
     ['gen_spread_field', PALETTE_CONTROL_IDS.spreadDegrees, availability.hueSpread],
@@ -1121,12 +1121,12 @@ async function init() {
   buildEffectRecipePresets();
 
   // Generative palette controls.
-  const genSeedSlider = document.getElementById(PALETTE_CONTROL_IDS.baseHueDegrees);
-  const genSeedValue = document.getElementById('gen_seed_value');
-  if (genSeedSlider && genSeedValue) {
-    genSeedSlider.addEventListener('keydown', handleBaseHueKeyDown);
-    genSeedSlider.addEventListener('input', () => {
-      genSeedValue.textContent = `${Number(Number(genSeedSlider.value).toFixed(1))}°`;
+  const baseHueSlider = document.getElementById(PALETTE_CONTROL_IDS.baseHueDegrees);
+  const baseHueValue = document.getElementById('gen_base_hue_value');
+  if (baseHueSlider && baseHueValue) {
+    baseHueSlider.addEventListener('keydown', handleBaseHueKeyDown);
+    baseHueSlider.addEventListener('input', () => {
+      baseHueValue.textContent = `${Number(Number(baseHueSlider.value).toFixed(1))}°`;
       scheduleUpdate();
     });
   }
@@ -1222,7 +1222,7 @@ async function init() {
     paletteOps = null;
     wasmModule = null;
     teardownExportFlyout();
-    genSeedSlider?.removeEventListener('keydown', handleBaseHueKeyDown);
+    baseHueSlider?.removeEventListener('keydown', handleBaseHueKeyDown);
     scheduleUpdate.cancel();
     scheduleViewportRedraw.cancel();
     window.removeEventListener('resize', scheduleViewportRedraw);
