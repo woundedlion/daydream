@@ -18,6 +18,7 @@ import {
   paramGenerationStale,
   paramValueSkew,
   selectorControlValue,
+  replayParameterWrites,
 } from "../effects/param_sync.js";
 import { createEffectPersistence, acceptedParamValue } from '../effects/effect_persistence.js';
 import { createEffectPanelView, focusWidget } from './effect_panel_view.js';
@@ -808,6 +809,8 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   function addParamControllers(fx, params, pause, previousParamNames = null) {
     /** @type {Record<string, number|boolean>} */
     const state = {};
+    /** @type {{name: string, value: number, apply: () => boolean, persist: () => void}[]} */
+    const hydrationWrites = [];
     const external = paramFilter() !== null;
     // Fixed for the schema this build is committed to.
     const persistParamKeys = !usesChainSnapshot();
@@ -877,7 +880,12 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       if (kind === 'boolean') {
         acceptedControlValue = engineParamValue(acceptedControlValue) > 0.5;
       }
-      controller.onChange((/** @type {number|boolean} */ v) => {
+      const persistValue = () => {
+        controller.acceptUrlValue?.(acceptedControlValue);
+        const edited = { name: p.name, accepted: acceptedControlValue };
+        fx.edits.persist(controller, edited);
+      };
+      const applyValue = (/** @type {number|boolean} */ v) => {
         const value = engineParamValue(v);
         const offered = !p.optionValues || p.optionValues.includes(value);
         const accepted = offered && setEngineParam(p.name, value) !== false;
@@ -886,14 +894,32 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
           controller.updateDisplay();
         }
         if (accepted) acceptedControlValue = v;
-        controller.acceptUrlValue?.(acceptedControlValue);
-        const edited = { name: p.name, accepted: acceptedControlValue };
-        fx.edits.persist(controller, edited);
         if (accepted) setWorkerParam(p.name, value);
         if (!fx.hydrating) adoptEnginePause(pause, p);
         fx.warningsDirty = true;
+        return accepted;
+      };
+      controller.onChange((/** @type {number|boolean} */ v) => {
+        if (fx.hydrating) {
+          hydrationWrites.push({
+            name: p.name,
+            value: engineParamValue(v),
+            apply: () => applyValue(v),
+            persist: () => {
+              persistValue();
+              if (persistParamKeys) fx.gui.writeStoredValue(p.name, acceptedControlValue);
+            },
+          });
+          return;
+        }
+        applyValue(v);
+        persistValue();
       });
     });
+    const hydrationByName = new Map(hydrationWrites.map(write => [write.name, write]));
+    replayParameterWrites(hydrationWrites,
+      (name) => hydrationByName.get(name)?.apply() ?? false, { APPLIED: true, INADMISSIBLE: false });
+    for (const write of hydrationWrites) write.persist();
   }
 
   /**
