@@ -465,12 +465,12 @@ export function createShaderDocumentController({
    * the source of truth and the engine write is its side effect.
    * @param {string} parameterId - The edited parameter's id.
    * @param {*} value - The document value: a number, or an enum8 option id.
-   * @returns {boolean|void}
+   * @returns {boolean}
    */
   const writeStageEdit = (parameterId, value) => {
     if (!parameterLive(parameterId)) return false;
     try {
-      if (chainUi === null || active === null || active.presetId === null) return;
+      if (chainUi === null || active === null || active.presetId === null) return false;
       const addsDeclaration = !chainUi.store.declares(parameterId);
       const result = chainUi.store.setPresetValue(active.presetId, parameterId, value, () => {
         if (addsDeclaration && active.compiledSide) return { ok: true };
