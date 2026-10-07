@@ -179,16 +179,11 @@ export class SegmentStatsView {
 
     // Spawning: the pool has no timings to show yet.
     if (!state.ready) {
-      const message = 'Spawning workers…';
-      if (el.firstElementChild?.getAttribute('role') === 'status') {
-        if (el.firstElementChild.textContent !== message)
-          el.firstElementChild.replaceChildren(message);
-        return;
-      }
+      if (el.firstElementChild?.getAttribute('role') === 'status') return;
       const box = this.doc.createElement('div');
       box.setAttribute('role', 'status');
       box.className = 'seg-status';
-      box.append(message);
+      box.append('Spawning workers…');
       el.replaceChildren(box);
       this.statsTable = null; // force a rebuild once the pool reports ready
       return;
