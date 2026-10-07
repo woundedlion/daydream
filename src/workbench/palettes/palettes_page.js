@@ -527,7 +527,7 @@ function buildEffectRecipePresets() {
     const option = document.createElement('option');
     option.value = String(index);
     option.textContent = preset.randomHue
-      ? `${preset.name} (random hue)`
+      ? `${preset.name} (varying hue)`
       : preset.name;
     select.appendChild(option);
   }
