@@ -3,7 +3,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-/** DOM-free parameter-stream logic for the effect panel. */
+/** DOM-free parameter logic for the panel, persistence, and segment controller. */
 
 /**
  * Decide whether a single GUI controller should adopt the engine's latest value
@@ -48,14 +48,26 @@ export function paramControlKind(param) {
 }
 
 /**
- * Coerce a GUI value to the float setParameter expects. The engine takes every
- * parameter as a float, so a toggle's boolean becomes 1.0/0.0.
+ * Coerce a parameter value to the float setParameter expects. The engine takes
+ * every parameter as a float, so a toggle's boolean becomes 1.0/0.0.
  *
- * @param {number|boolean} value - A controller value, or a URL-hydrated one.
+ * @param {number|boolean} value - A controller, restored, or engine definition
+ *   value.
  * @returns {number} The float to write.
  */
 export function engineParamValue(value) {
   return (typeof value === 'boolean') ? (value ? 1.0 : 0.0) : value;
+}
+
+/**
+ * The value the engine last took for one parameter: what it admitted for
+ * rendering, else the writable target it holds, else the value it renders.
+ * @param {{acceptedValue?: *, requestedValue?: *, value: *}} parameter - Engine
+ *   parameter definition.
+ * @returns {*} The accepted value, in the definition's own type.
+ */
+export function acceptedParamValue(parameter) {
+  return parameter.acceptedValue ?? parameter.requestedValue ?? parameter.value;
 }
 
 /**

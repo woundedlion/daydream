@@ -8,6 +8,7 @@
  * composited one frame deep (frame N-1 displays while frame N renders).
  */
 import { callWorkbenchBinding } from '../engine/workbench_bindings.js';
+import { acceptedParamValue, engineParamValue } from '../effects/param_sync.js';
 import {
   isValidSegmentCount,
 } from "./segment_layout.js";
@@ -824,12 +825,8 @@ export class SegmentController {
       // Engine-written telemetry; setParameter refuses it as READONLY.
       if (p.readonly) continue;
       const requestedValue = /** @type {number|boolean|undefined} */ (p.requestedValue);
-      const requested = requestedValue ?? p.value;
-      const v = (typeof requested === 'boolean') ? (requested ? 1.0 : 0.0) : requested;
-      const acceptedValue = /** @type {number|boolean|undefined} */ (p.acceptedValue);
-      const accepted = acceptedValue ?? requested;
-      const acceptedV = (typeof accepted === 'boolean')
-        ? (accepted ? 1.0 : 0.0) : accepted;
+      const v = engineParamValue(requestedValue ?? p.value);
+      const acceptedV = engineParamValue(acceptedParamValue(p));
       params.push(acceptedV === v
         ? { name: p.name, value: v }
         : { name: p.name, value: v, acceptedValue: acceptedV });

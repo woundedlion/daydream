@@ -149,7 +149,7 @@ test('a boolean carrying labels stays a toggle', () => {
   assert.equal(paramControlKind({ value: true, options: ['Off', 'On'] }), 'boolean');
 });
 
-// engineParamValue coerces a GUI value to the float setParameter takes.
+// engineParamValue coerces a parameter value to the float setParameter takes.
 
 test('a boolean becomes 1.0/0.0', () => {
   assert.equal(engineParamValue(true), 1.0);
