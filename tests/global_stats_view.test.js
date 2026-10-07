@@ -145,7 +145,9 @@ test('update marks arena rows unavailable when the effect reports none', () => {
   view.update(2, null);
 
   assert.equal(byId['perf-stats'].textContent, '2.000 ms');
-  assert.equal(byId['stat-scratch-a'].textContent, 'Unavailable');
+  for (const row of ['scratchA', 'scratchB', 'persist', 'stack'])
+    for (const id of STATS_CELL_IDS[row])
+      assert.equal(byId[id].textContent, 'Unavailable', id);
 });
 
 test('update omits the stack row when the metrics carry no stack', () => {
