@@ -62,8 +62,8 @@ export async function probeStrip(tab) {
       && draggable === null,
   `the main area mounts ${regions} beside no stage library or draggable chip`);
 
-  const initialStages = await tab.$$eval('.chain-chip[aria-expanded]', (nodes) => nodes.map(
-    (node) => ({ expanded: node.getAttribute('aria-expanded'),
+  const initialStages = await tab.$$eval('.chain-chip', (nodes) => nodes.map(
+    (node) => ({ expanded: String(node.classList.contains('chain-chip--expanded')),
       controls: getComputedStyle(node.querySelector('.chain-chip-params')).display,
       controlsHeight: node.querySelector('.chain-chip-params').getBoundingClientRect().height,
       controlsVisibility: getComputedStyle(
@@ -129,7 +129,7 @@ export async function probeStrip(tab) {
     (node) => getComputedStyle(node).backgroundColor);
   await (await tab.waitForSelector(hoverHeader)).hover();
   await tab.waitForFunction(() => document.querySelector(
-    '.chain-chip[data-label="project"]')?.getAttribute('aria-expanded') === 'true');
+    '.chain-chip[data-label="project"]')?.classList.contains('chain-chip--expanded') === true);
   const hoverCard = await boxOf(tab, '.chain-chip[data-label="project"]');
   const openHeader = await boxOf(tab, hoverHeader);
   check(Math.abs(hoverCard.width - closedCard.width) < 1
@@ -142,7 +142,7 @@ export async function probeStrip(tab) {
   'an open transition card keeps the same selector-only header');
   await tab.mouse.move(0, 0);
   check(await tab.waitForFunction(() => document.querySelector(
-    '.chain-chip[data-label="project"]')?.getAttribute('aria-expanded') === 'false')
+    '.chain-chip[data-label="project"]')?.classList.contains('chain-chip--expanded') === false)
     .then(() => true, () => false),
   'mouse leave closes a transient stage card');
 
@@ -150,7 +150,7 @@ export async function probeStrip(tab) {
   // the card here.
   await tab.$eval('.chain-chip[data-label="rotate"]', (node) => node.focus());
   const focusOpened = await tab.$eval('.chain-chip[data-label="rotate"]', (node) => ({
-    expanded: node.getAttribute('aria-expanded'),
+    expanded: String(node.classList.contains('chain-chip--expanded')),
     controlsHeight: node.querySelector('.chain-chip-params').getBoundingClientRect().height,
     controlsVisibility: getComputedStyle(node.querySelector('.chain-chip-params')).visibility,
   }));
@@ -161,13 +161,13 @@ export async function probeStrip(tab) {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   });
   check(await tab.$eval('.chain-chip[data-label="rotate"]',
-    (node) => node.getAttribute('aria-expanded') === 'false'),
+    (node) => node.classList.contains('chain-chip--expanded') === false),
   'losing focus closes the card again');
 
   await tab.mouse.click(closedCard.x + 2, closedCard.y + closedCard.height / 2);
   await tab.mouse.move(0, 0);
   check(await tab.$eval('.chain-chip[data-label="project"]',
-    (node) => node.getAttribute('aria-expanded') === 'true'),
+    (node) => node.classList.contains('chain-chip--expanded') === true),
   'click pins a stage card open after mouse leave');
   const pinnedCard = await boxOf(tab, '.chain-chip[data-label="project"]');
   check(await tab.$eval('.chain-chip[data-label="project"]',
@@ -176,7 +176,7 @@ export async function probeStrip(tab) {
   `a pinned stage keeps its opaque ${closedBackground} panel`);
   await tab.mouse.click(pinnedCard.x + 2, pinnedCard.y + pinnedCard.height / 2);
   check(await tab.$eval('.chain-chip[data-label="project"]',
-    (node) => node.getAttribute('aria-expanded') === 'false'),
+    (node) => node.classList.contains('chain-chip--expanded') === false),
   'clicking a pinned stage header closes it');
 
   await tab.mouse.click(closedCard.x + 2, closedCard.y + closedCard.height / 2);
@@ -203,7 +203,7 @@ export async function probeStrip(tab) {
   await (await tab.waitForSelector(
     '.chain-chip[data-label="rotate"] .chain-chip-header')).hover();
   await tab.waitForFunction(() => document.querySelector(
-    '.chain-chip[data-label="rotate"]')?.getAttribute('aria-expanded') === 'true');
+    '.chain-chip[data-label="rotate"]')?.classList.contains('chain-chip--expanded') === true);
   const openDomain = await tab.$eval('.chain-band[data-carrier="sphere"]', (node) => ({
     band: node.getBoundingClientRect().height,
     frame: Number.parseFloat(getComputedStyle(node, '::before').height),
@@ -327,7 +327,7 @@ export async function probeStrip(tab) {
     (nodes) => nodes.map((node) => ({
       name: node.querySelector('.chain-chip-name')?.textContent ?? '',
       current: node.getAttribute('aria-current'),
-      expanded: node.getAttribute('aria-expanded'),
+      expanded: String(node.classList.contains('chain-chip--expanded')),
     })));
   const landed = planeChips.find((chip) => chip.name === 'Wave Shear');
   check(landed?.current === 'true' && landed?.expanded === 'true',
