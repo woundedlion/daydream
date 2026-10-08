@@ -19,6 +19,7 @@ import {
   generateRecipeCpp,
   snapToStep,
   seedOpParams,
+  opsFromRecipe,
   fanTriangulateFace,
   uniqueEdges,
   dropSlotIndex,
@@ -363,6 +364,7 @@ async function generateThumbnails(signal) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = `thumb-btn ${state.base === key ? 'active' : ''}`;
+      if (islamicStarPatterns.includes(key)) btn.classList.add('thumb-star');
       btn.setAttribute('role', 'radio');
       btn.setAttribute('aria-checked', state.base === key ? 'true' : 'false');
       btn.tabIndex = state.base === key ? 0 : -1;
@@ -377,25 +379,7 @@ async function generateThumbnails(signal) {
         next.click();
       });
       btn.dataset.solid = key; // identify the base so restoreSolid can re-highlight it
-      btn.addEventListener('click', () => {
-        queueCommit(async () => {
-          // The op stack is kept across a base switch.
-          if (state.ops.length) {
-            const check = await chainIsValid(key, state.ops);
-            if (!check.ok) {
-              showGateMsg(`rejected: the op stack fails on this solid — ${check.message}`);
-              if (document.activeElement === btn) {
-                document.querySelector('.thumb-btn[aria-checked="true"]')?.focus();
-              }
-              return;
-            }
-          }
-          state.base = key;
-          update();
-          renderBaseSolid();
-          highlightBaseSolid();
-        });
-      });
+      btn.addEventListener('click', () => selectBaseSolid(key, btn));
 
       const img = document.createElement('img');
       img.alt = '';
@@ -433,6 +417,51 @@ async function generateThumbnails(signal) {
     offRenderer.dispose();
     offRenderer.forceContextLoss();
   }
+}
+
+/**
+ * Applies a footer thumbnail click.
+ * @param {string} key - Registry name of the clicked solid.
+ * @param {HTMLElement} btn - The clicked thumbnail.
+ * @returns {void}
+ * @details A simple solid becomes the base under the current op stack. A star
+ * pattern replaces both with its authored seed and chain.
+ */
+function selectBaseSolid(key, btn) {
+  queueCommit(async () => {
+    let base = key;
+    let ops = state.ops;
+    if (islamicStarPatterns.includes(key)) {
+      const recipe = meshOpsWasm.getRecipe(key);
+      if (!recipe) {
+        showGateMsg(`rejected: "${formatSolidName(key)}" has no authored chain to load`);
+        return;
+      }
+      base = recipe.seed;
+      ops = opsFromRecipe(recipe.ops);
+    }
+    if (ops.length) {
+      const check = await chainIsValid(base, ops);
+      if (!check.ok) {
+        showGateMsg(ops === state.ops
+          ? `rejected: the op stack fails on this solid — ${check.message}`
+          : `rejected: ${check.message}`);
+        if (document.activeElement === btn) {
+          document.querySelector('.thumb-btn[aria-checked="true"]')?.focus();
+        }
+        return;
+      }
+    }
+    showGateMsg('');
+    state.base = base;
+    if (ops !== state.ops) {
+      setOps(ops);
+      renderOps();
+    }
+    update();
+    renderBaseSolid();
+    highlightBaseSolid();
+  });
 }
 
 function updateToggles() {
@@ -907,6 +936,7 @@ function restoreSolid(item) {
 }
 
 function applyRestore(item) {
+  showGateMsg('');
   state.base = item.base;
   setOps(structuredClone(item.ops)); // Deep copy (ops are plain data)
   // A flag the card lacks lands on the page default.

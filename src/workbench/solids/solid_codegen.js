@@ -789,6 +789,51 @@ export function seedOpParams(opName, mesh) {
 }
 
 /**
+ * The shortest decimal that rounds to the same float32 as `value`.
+ * @param {number} value - A float32 value read across the WASM boundary.
+ * @returns {number} That decimal.
+ */
+function float32Decimal(value) {
+  for (let digits = 1; digits < 17; digits++) {
+    const decimal = Number(value.toPrecision(digits));
+    if (Math.fround(decimal) === Math.fround(value)) return decimal;
+  }
+  return value;
+}
+
+/**
+ * Editor ops for a registry solid's authored chain.
+ * @param {Array<{op: string, param: number, twist: number}>} steps - The chain
+ *   in the engine-native units MeshOps.getRecipe() reports.
+ * @returns {ChainOp[]} The chain in editor units: hankin in degrees, every
+ *   other param at the shortest decimal of its float32.
+ * @throws {Error} When a step names an op the editor does not know.
+ * @details Values off the editor's slider grid are kept as authored, so the
+ * chain rebuilds the registry mesh. A bake-backed relax step (param 0) takes
+ * the editor's maximum iteration count.
+ */
+export function opsFromRecipe(steps) {
+  return Array.from(steps, (step) => {
+    const opName = step.op;
+    if (!KNOWN_OPS.has(opName)) throw new Error(`opsFromRecipe: unknown op "${opName}"`);
+    if (opName === 'hankin') {
+      const deg = Math.round(step.param * (180 / Math.PI));
+      const exact = Math.fround(deg * D2R_F32) === Math.fround(step.param);
+      return { op: opName, params: { angle: exact ? deg : float32Decimal(step.param * (180 / Math.PI)) } };
+    }
+    if (opName === 'relax') {
+      const iter = step.param > 0 ? step.param : OP_DEFS.relax.params.iter.max;
+      return { op: opName, params: { iter } };
+    }
+    if (opName === 'snub') {
+      return { op: opName, params: { t: float32Decimal(step.param), twist: float32Decimal(step.twist) } };
+    }
+    if (OP_DEFS[opName].params.t) return { op: opName, params: { t: float32Decimal(step.param) } };
+    return { op: opName, params: {} };
+  });
+}
+
+/**
  * Newell area normal for an ordered face; zero for a degenerate face.
  * @param {Array<{x:number, y:number, z:number}>} vertices - Mesh vertices.
  * @param {Array<number>} face - Ordered vertex indices.
