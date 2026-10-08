@@ -391,6 +391,44 @@ test('a refused topology tick restores focus to the same parameter input', async
 });
 
 
+test('a row drag retains its grab offset across scrolling and clears on cancellation', () => {
+  let drag;
+  const context = { wasmModule: {}, DRAG_SLOP_PX: 4,
+    createPointerDrag: (options) => { drag = options; },
+    dropSlotGen: 0, dropSlotChecks: new Map(),
+    getDragTargetIndex: () => 2, checkDropSlot: async () => {},
+    reorderPreviewShift: () => -1, console };
+  const grip = fakeElement('div');
+  const row = fakeElement('div');
+  const neighbor = fakeElement('div');
+  row.offsetHeight = 30;
+  const rect = { top: 120, left: 20 };
+  const list = { children: [row, neighbor], scrollTop: 0, scrollLeft: 0,
+    getBoundingClientRect: () => rect };
+  handler('wireRowDrag', context)(grip, 0, row, list, 1);
+  drag.onStart({ clientX: 30, clientY: 160 });
+  drag.onMove({ clientX: 35, clientY: 170 });
+  assert.equal(row.style.transform, 'translate(5px, 10px)');
+  assert.equal(neighbor.style.transform, 'translateY(-34px)');
+
+  rect.top = 100;
+  rect.left = 18;
+  list.scrollTop = 7;
+  list.scrollLeft = 2;
+  context.dropSlotChecks.set(2, { ok: false });
+  drag.onMove({ clientX: 40, clientY: 190 });
+  assert.equal(row.style.transform, 'translate(14px, 57px)');
+  assert.equal(neighbor.style.transform, '');
+  assert.equal(grip.classList.contains('drop-blocked'), true);
+
+  drag.onCancel();
+  assert.equal(row.style.transform, '');
+  assert.equal(row.classList.contains('dragging'), false);
+  assert.equal(grip.classList.contains('drop-blocked'), false);
+  context.wasmModule = null;
+  assert.equal(drag.onStart({ clientX: 30, clientY: 160 }), false);
+});
+
 test('a row drag cannot rebuild controls after the engine stands down', () => {
   let drag;
   const context = { wasmModule: {}, DRAG_SLOP_PX: 4,
@@ -402,7 +440,8 @@ test('a row drag cannot rebuild controls after the engine stands down', () => {
   const grip = fakeElement('div');
   const row = fakeElement('div');
   row.offsetHeight = 10;
-  const list = {children: [row]};
+  const list = {children: [row], scrollTop: 0, scrollLeft: 0,
+    getBoundingClientRect: () => ({top: 0, left: 0})};
   handler('wireRowDrag', context)(grip, 0, row, list, 1);
   drag.onStart({clientY: 0});
   drag.onMove({clientY: 10});
