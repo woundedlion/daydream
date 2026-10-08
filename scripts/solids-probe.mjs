@@ -102,6 +102,7 @@ export async function probeChain(tab) {
   await tab.click('#toggleRotate');
   check(await tab.$eval('#toggleRotate', (node) => node.getAttribute('aria-checked')) === 'true',
     'the rotation switch can explicitly start motion');
+  await tab.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
 
   for (const [i, op] of OPS.entries()) await addOp(tab, op, i + 1);
   const built = await chainNames(tab);
@@ -141,6 +142,9 @@ export async function probeChain(tab) {
   await dragTo(tab, first, below, false, async () => {
     check(await tab.$('#opsList .op-item.dragging') !== null,
       'the moving row carries drag styling before release');
+    const grip = centre(await grips[0].boundingBox());
+    check(Math.abs(grip.y - below) < 2 && Math.abs(grip.x - first.x) < 2,
+      'the dragged grip stays under the mouse before release');
   });
   const afterMouse = await settledNames(tab, mouseWant);
   check(afterMouse.join() === mouseWant.join(),
@@ -154,7 +158,12 @@ export async function probeChain(tab) {
   const touchGrips = await tab.$$(GRIP);
   const touchFrom = centre(await touchGrips[0].boundingBox());
   const touchWant = [afterMouse[1], afterMouse[2], afterMouse[0]];
-  await dragTo(tab, touchFrom, below, true);
+  await dragTo(tab, touchFrom, below, true, async () => {
+    await tab.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const grip = centre(await touchGrips[0].boundingBox());
+    check(Math.abs(grip.y - below) < 2,
+      `the dragged grip stays under the finger before release (${grip.y}, expected ${below})`);
+  });
   const afterTouch = await settledNames(tab, touchWant);
   check(afterTouch.join() === touchWant.join(),
     `a touch drag moves the op it grips (${afterTouch.join(', ')})`);
@@ -215,7 +224,7 @@ export async function probeNumericInputs(tab) {
 
 if (isMain(import.meta.url)) await runProbe({
   name: 'solids-probe',
-  minimumChecks: 18,
+  minimumChecks: 20,
   page: PAGE,
   timeoutMs: TIMEOUT_MS,
   success: 'the op chain reorders under both a mouse and a finger, and numeric inputs sanitize values.',

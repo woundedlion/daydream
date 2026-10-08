@@ -190,8 +190,8 @@ body {
 }
 
 .op-item.dragging {
-  opacity: 0.2;
-  transform: scale(0.98);
+  opacity: 0.8;
+  transition: none;
   border-style: dashed;
   z-index: 10;
 }

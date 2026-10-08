@@ -1037,7 +1037,10 @@ const DRAG_SLOP_PX = 4;
  * @returns {void}
  */
 function wireRowDrag(grip, index, el, list, revision) {
+  let originX = 0;
   let originY = 0;
+  let originListTop = 0;
+  let originListLeft = 0;
   let dragging = false;
 
   const clearPreview = () => {
@@ -1049,8 +1052,12 @@ function wireRowDrag(grip, index, el, list, revision) {
   createPointerDrag({
     element: grip,
     onStart: (e) => {
-      if (!wasmModule) return;
+      if (!wasmModule) return false;
+      const rect = list.getBoundingClientRect();
+      originX = e.clientX;
       originY = e.clientY;
+      originListTop = rect.top - list.scrollTop;
+      originListLeft = rect.left - list.scrollLeft;
       dragging = false;
     },
     onMove: (e) => {
@@ -1062,6 +1069,11 @@ function wireRowDrag(grip, index, el, list, revision) {
         dropSlotGen += 1;
         dropSlotChecks = new Map();
       }
+
+      const rect = list.getBoundingClientRect();
+      const dx = e.clientX - originX + originListLeft - rect.left + list.scrollLeft;
+      const dy = e.clientY - originY + originListTop - rect.top + list.scrollTop;
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
 
       const targetIndex = getDragTargetIndex(e, list);
       void checkDropSlot(index, targetIndex).catch(console.error);
