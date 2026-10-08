@@ -25,6 +25,7 @@ const {
   computeInternalAngle,
   snapToStep,
   seedOpParams,
+  opsFromRecipe,
   faceNormal,
   isConvexFace,
   fanTriangulateFace,
@@ -1746,6 +1747,31 @@ test('seedOpParams handles parameterless, ordinary and missing-mesh seeds', () =
   assert.deepEqual(seedOpParams('dual', null), {});
   assert.deepEqual(seedOpParams('truncate', null), { t: OP_DEFS.truncate.params.t.val });
   assert.deepEqual(seedOpParams('hankin', null), { angle: OP_DEFS.hankin.params.angle.val });
+});
+
+test('opsFromRecipe maps engine-native steps to editor units', () => {
+  const rad = (deg) => Math.fround(deg * D2R_F32);
+  const ops = opsFromRecipe([
+    { op: 'hankin', param: rad(62), twist: 0 },
+    { op: 'ambo', param: 0, twist: 0 },
+    { op: 'truncate', param: Math.fround(0.33), twist: 0 },
+    { op: 'truncate', param: rad(5), twist: 0 },
+    { op: 'snub', param: Math.fround(0.5), twist: 0 },
+    { op: 'relax', param: 0, twist: 0 },
+    { op: 'relax', param: 100, twist: 0 },
+  ]);
+  assert.deepEqual(ops, [
+    { op: 'hankin', params: { angle: 62 } },
+    { op: 'ambo', params: {} },
+    { op: 'truncate', params: { t: 0.33 } },
+    { op: 'truncate', params: { t: ops[3].params.t } },
+    { op: 'snub', params: { t: 0.5, twist: 0 } },
+    { op: 'relax', params: { iter: OP_DEFS.relax.params.iter.max } },
+    { op: 'relax', params: { iter: 100 } },
+  ]);
+  // Off-grid params are kept at the authored float, not snapped.
+  assert.equal(Math.fround(ops[3].params.t), rad(5));
+  assert.throws(() => opsFromRecipe([{ op: 'warp', param: 0, twist: 0 }]), /unknown op "warp"/);
 });
 
 

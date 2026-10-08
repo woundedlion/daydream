@@ -98,6 +98,17 @@ body {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
 }
 
+/* Star patterns load their own seed and op chain. */
+.thumb-btn.thumb-star {
+  background-color: color-mix(in srgb, var(--indigo-400) 10%, var(--slate-800));
+  border-color: color-mix(in srgb, var(--indigo-400) 35%, var(--slate-700));
+}
+
+.thumb-btn.thumb-star:hover {
+  border-color: var(--blue-500);
+  background-color: color-mix(in srgb, var(--indigo-400) 14%, var(--slate-700));
+}
+
 .thumb-btn.active {
   border-color: var(--blue-500);
   background-color: color-mix(in srgb, var(--blue-500) 15%, transparent);

@@ -529,3 +529,63 @@ test('saving refuses a chain that restore would refuse', () => {
   assert.equal(messages.length, 1);
   assert.equal(messages[0], `rejected: ${savedChainShapeError('cube', ops)}`);
 });
+
+function baseSelectContext(overrides = {}) {
+  const calls = [];
+  const queued = [];
+  const context = {
+    state: { base: 'cube', ops: [{ op: 'dual', params: {} }] },
+    islamicStarPatterns: ['star'],
+    meshOpsWasm: { getRecipe: () => ({ seed: 'dodecahedron', ops: [{ op: 'hankin', param: 1, twist: 0 }] }) },
+    opsFromRecipe: (steps) => steps.map(({ op }) => ({ op, params: { angle: 57 } })),
+    formatSolidName: (name) => name,
+    queueCommit: (fn) => queued.push(fn),
+    chainIsValid: async () => ({ ok: true }),
+    showGateMsg: (message) => calls.push(['msg', message]),
+    setOps: (ops) => { context.state.ops = ops; calls.push(['setOps']); },
+    renderOps: () => calls.push(['renderOps']),
+    update: () => calls.push(['update']),
+    renderBaseSolid() {}, highlightBaseSolid() {},
+    document: { activeElement: null, querySelector: () => null },
+    ...overrides,
+  };
+  return { context, calls, run: async () => { for (const task of queued.splice(0)) await task(); } };
+}
+
+test('a simple base keeps the op stack and clears an earlier rejection', async () => {
+  const { context, calls, run } = baseSelectContext();
+  const select = handler('selectBaseSolid', context);
+  context.chainIsValid = async () => ({ ok: false, message: 'overflow' });
+  select('tetrahedron', {});
+  await run();
+  assert.equal(context.state.base, 'cube');
+  assert.match(calls.at(-1)[1], /^rejected: the op stack fails on this solid/);
+
+  context.chainIsValid = async () => ({ ok: true });
+  select('octahedron', {});
+  await run();
+  assert.equal(context.state.base, 'octahedron');
+  assert.deepEqual(context.state.ops, [{ op: 'dual', params: {} }]);
+  assert.ok(calls.some(([kind, message]) => kind === 'msg' && message === ''));
+  assert.ok(!calls.some(([kind]) => kind === 'setOps'));
+});
+
+test('a star pattern replaces the base and op stack with its authored chain', async () => {
+  const { context, calls, run } = baseSelectContext();
+  const validated = [];
+  context.chainIsValid = async (base, ops) => { validated.push([base, ops]); return { ok: true }; };
+  handler('selectBaseSolid', context)('star', {});
+  await run();
+  assert.equal(context.state.base, 'dodecahedron');
+  assert.deepEqual(context.state.ops, [{ op: 'hankin', params: { angle: 57 } }]);
+  assert.deepEqual(validated, [['dodecahedron', context.state.ops]]);
+  assert.ok(calls.some(([kind]) => kind === 'renderOps'));
+});
+
+test('a star pattern without a recipe leaves the chain alone', async () => {
+  const { context, calls, run } = baseSelectContext({ meshOpsWasm: { getRecipe: () => null } });
+  handler('selectBaseSolid', context)('star', {});
+  await run();
+  assert.equal(context.state.base, 'cube');
+  assert.match(calls.at(-1)[1], /no authored chain/);
+});
