@@ -130,14 +130,17 @@ test('NAMED_PROCEDURAL_PALETTES all render across the domain', () => {
 });
 
 /**
- * Verifies the cosine's range reduction handles negative frequencies: POPPED_PEACH
- * is PEACH_POP with C negated and D advanced by C, i.e. the same sweep reversed,
- * so it must equal PEACH_POP sampled at 1 - t.
+ * Verifies the cosine's range reduction handles negative frequencies: PEACH_POP
+ * with C negated and D advanced by C is the same sweep reversed, so it must
+ * equal PEACH_POP sampled at 1 - t.
  */
 test('ProceduralPalette negative frequency reverses the positive-frequency twin', () => {
-  const byName = (name) => NAMED_PROCEDURAL_PALETTES.find(entry => entry.name === name);
-  const forward = byName('PEACH_POP');
-  const reverse = byName('POPPED_PEACH');
+  const forward = NAMED_PROCEDURAL_PALETTES.find(entry => entry.name === 'PEACH_POP');
+  const reverse = {
+    ...forward,
+    c: forward.c.map(c => -c),
+    d: forward.d.map((d, i) => d + forward.c[i]),
+  };
   const fwd = new ProceduralPalette(forward.a, forward.b, forward.c, forward.d);
   const rev = new ProceduralPalette(reverse.a, reverse.b, reverse.c, reverse.d);
   for (let i = 0; i <= 16; i++) {

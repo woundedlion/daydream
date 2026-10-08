@@ -302,7 +302,7 @@ export const SIMPLE_SEEDS = [
 export const DEFINED_SEED_CONSTANTS = new Set([
   'octahedron', 'dodecahedron', 'icosahedron', 'truncatedOctahedron',
   'rhombicuboctahedron', 'icosidodecahedron', 'truncatedIcosahedron',
-  'truncatedIcosidodecahedron', 'snubDodecahedron',
+  'truncatedIcosidodecahedron', 'snubDodecahedron', 'truncatedCube',
 ]);
 
 /**
