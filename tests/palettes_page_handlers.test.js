@@ -4,6 +4,7 @@ import { pageHandlers } from './helpers/page_handlers.js';
 import { fakeElement } from './helpers/fake_dom.js';
 import { hueKeyNudgeTurns } from '../src/workbench/palettes/palette_wheel.js';
 import { replaceUrl } from '../src/app/state.js';
+import { PaletteV4, defaultPaletteRecipe, paletteRecipeFromControls, paletteControlsFromRecipe, paletteEnumName, paletteEnumOrdinal, customHueKeyState, customHueSweepRepresentable } from '../src/workbench/palettes/palette_controls.js';
 import { captureConsole } from './helpers/fake_console.js';
 
 const handler = pageHandlers(new URL('../src/workbench/palettes/palettes_page.js', import.meta.url));
@@ -148,7 +149,9 @@ test('the hue dropdown restores its previous mode after a refused handoff', () =
   const context = {
     PaletteV4: { hueMode: { HARMONY: 0, CUSTOM: 1, SWEEP: 2 }, domain: { LOOP: 1 } },
     previousHueMode: 0, selectedHueKey: 0, activeHueKey: null, paletteEnumOrdinal: () => 1,
-    readPaletteRecipe: () => ({ hue: {}, domain: 0 }), customBaseTurns: () => 0,
+    paletteRecipeFromControls: () => ({ hue: {}, domain: 0 }),
+    recipeTemplate: {}, paletteControlReadings: () => ({}), controlValue: () => {}, customHueOffsets: [],
+    customBaseTurns: () => 0,
     activateCustomHue: () => false,
     paletteEnumName: () => 'HARMONY',
   };
@@ -243,4 +246,36 @@ test('loading a recipe clears a stale hue-key refusal', () => {
   context.clearHueKeyStatus = handler('clearHueKeyStatus', context);
   handler('loadRecipe', context)({ hue: { mode: 0 } });
   assert.equal(status.textContent, '');
+});
+
+test('the hue dropdown resamples authored harmony and rejects a multi-turn loop sweep', () => {
+  for (const mode of [PaletteV4.hueMode.HARMONY, PaletteV4.hueMode.SWEEP]) {
+    const recipe = defaultPaletteRecipe();
+    Object.assign(recipe.hue, {
+      mode, harmony: PaletteV4.harmony.SPLIT_COMPLEMENTARY, spreadTurns: 0.2,
+      sweepTurns: 3, baseTurns: 0.25,
+    });
+    if (mode === PaletteV4.hueMode.SWEEP) recipe.domain = PaletteV4.domain.LOOP;
+    const controls = { ...paletteControlsFromRecipe(recipe), hueMode: 'CUSTOM' };
+    const select = { value: 'CUSTOM' };
+    let source;
+    const context = {
+      PaletteV4, paletteRecipeFromControls, paletteEnumName, paletteEnumOrdinal,
+      recipeTemplate: recipe, paletteControlReadings: () => controls,
+      controlValue: () => {}, customHueOffsets: [], previousHueMode: mode,
+      customBaseTurns: () => recipe.hue.baseTurns, selectedHueKey: 2, activeHueKey: 1,
+      activateCustomHue: value => { source = value; return customHueSweepRepresentable(value); },
+    };
+    handler('handleHueModeChange', context)(select);
+    assert.equal(source.hue.mode, mode);
+    assert.equal(source.hue.baseTurns, recipe.hue.baseTurns);
+    if (mode === PaletteV4.hueMode.HARMONY) {
+      assert.deepEqual(customHueKeyState(source), customHueKeyState(recipe));
+      assert.equal(source.hue.spreadTurns, 0.2);
+      assert.equal(select.value, 'CUSTOM');
+    } else {
+      assert.equal(source.hue.sweepTurns, 3);
+      assert.equal(select.value, 'SWEEP');
+    }
+  }
 });
