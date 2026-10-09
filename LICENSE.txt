@@ -2,7 +2,7 @@ Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
 
 Scope: These terms cover this repository's simulator and tool sources, and the
 Holosphere rendering engine, math, scan/raster, hardware drivers, and test
-harness. The visual effects, including
+harness, and shader workbench. The visual effects, including
 their compiled form linked into the `holosphere_wasm.wasm` artifact distributed
 with this repository, are Copyright 2025 Gabriel Levy. All rights reserved.
 They are not covered by the license below — no rights to use, copy, modify, or
@@ -13,8 +13,6 @@ below refer to the Holosphere repository, not this repository):
 
 - `core/engine/effects_legacy.h` — retired effect sources, All Rights Reserved
   on the same terms as `effects/`.
-- `workbench/` — the shader workbench and chain-interpreter surfaces, All
-  Rights Reserved on the same terms as `effects/`.
 - `core/math/projections.h` — derived from PROJ; MIT, Copyright Frank
   Warmerdam, Gerald I. Evenden, Kristian Evers, Toby C Wilkinson and the PROJ
   contributors.
