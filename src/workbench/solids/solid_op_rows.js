@@ -8,7 +8,7 @@
  * values come from localStorage, so rows are built node-by-node, never via innerHTML.
  */
 
-import { unsweepableReason } from './solid_codegen.js';
+import { authoredParamRange, unsweepableReason } from './solid_codegen.js';
 
 /** @typedef {import('./solid_codegen.js').OpParamDef} OpParamDef */
 
@@ -91,6 +91,7 @@ export function formatParamValue(value, def) {
  * @returns {{row: HTMLElement, range: HTMLInputElement, number: HTMLInputElement}} The row and its two inputs.
  */
 function buildParamRow(doc, key, def, value, controlId, opName, index) {
+  def = authoredParamRange(def, value);
   const row = doc.createElement('div');
   row.className = 'op-param flex items-center text-[0.6rem] space-x-1';
   row.dataset.key = key;

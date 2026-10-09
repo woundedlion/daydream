@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildOpRow, formatParamValue, syncSweepWarning } from '../src/workbench/solids/solid_op_rows.js';
-import { OP_DEFS } from '../src/workbench/solids/solid_codegen.js';
+import { authoredParamRange, OP_DEFS, snapToStep } from '../src/workbench/solids/solid_codegen.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
 // fakeElement throws on any non-empty innerHTML assignment, so a row must be
@@ -211,4 +211,16 @@ test('the sweep marker follows a slider across its band', () => {
   syncSweepWarning(el, op);
   assert.equal(flag.hidden, true);
   assert.equal(flag.getAttribute('aria-label'), '');
+});
+
+test('authored truncate values widen both input bounds and the edit range', () => {
+  const value = 0.87266463;
+  const { el } = build({ op: 'truncate', params: { t: value } });
+  const row = el.querySelector('.op-param');
+  const inputs = row.children.filter(c => c.type === 'range' || c.type === 'number');
+  assert.equal(inputs.length, 2);
+  for (const input of inputs) {
+    assert.equal(Number(input.max), value);
+  }
+  assert.equal(snapToStep(0.87, authoredParamRange(OP_DEFS.truncate.params.t, value)), 0.87);
 });
