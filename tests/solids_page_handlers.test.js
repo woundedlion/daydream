@@ -36,6 +36,21 @@ test('star thumbnails are load buttons while base solids retain radio selection'
   assert.equal(star.getAttribute('aria-checked'), null);
 });
 
+test('a base with no radio leaves the first radio as the group tab stop', () => {
+  const state = { base: 'cube_hankin' };
+  const radios = ['cube', 'tetrahedron'].map(solid => {
+    const radio = fakeElement('button');
+    radio.dataset.solid = solid;
+    radio.tabIndex = -1;
+    return radio;
+  });
+  handler('highlightBaseSolid', {
+    state, document: { querySelectorAll: () => radios },
+  })();
+  assert.deepEqual(radios.map(radio => radio.tabIndex), [0, -1]);
+  assert.deepEqual(radios.map(radio => radio.getAttribute('aria-checked')), ['false', 'false']);
+});
+
 test('status messages retain failures and clear confirmations', () => {
   const status = { innerText: '' };
   const timers = new Map();

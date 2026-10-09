@@ -393,7 +393,12 @@ async function generateThumbnails(signal) {
       btn.appendChild(img);
       btn.appendChild(span);
       btn.appendChild(fullName);
-      (islamicStarPatterns.includes(key) ? starPatterns : baseSolids).appendChild(btn);
+      if (islamicStarPatterns.includes(key)) {
+        starPatterns.appendChild(btn);
+      } else {
+        baseSolids.appendChild(btn);
+        highlightBaseSolid();
+      }
 
       // Free the per-iteration geometry GPU buffers.
       geo.dispose();
@@ -967,11 +972,14 @@ function applyRestore(item) {
 }
 
 function highlightBaseSolid() {
-  document.querySelectorAll('.thumb-btn[role="radio"]').forEach(b => {
+  const radios = [...document.querySelectorAll('.thumb-btn[role="radio"]')];
+  // With no radio checked, the first radio is the group's tab stop.
+  const stop = radios.find(b => b.dataset.solid === state.base) ?? radios[0];
+  radios.forEach(b => {
     const selected = b.dataset.solid === state.base;
     b.classList.toggle('active', selected);
     b.setAttribute('aria-checked', selected ? 'true' : 'false');
-    b.tabIndex = selected ? 0 : -1;
+    b.tabIndex = b === stop ? 0 : -1;
   });
 }
 
