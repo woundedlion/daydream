@@ -595,6 +595,19 @@ const sliderDefinitions = [
 
 
 /**
+ * The committed raw slider values of one coefficient group.
+ * @param {string} group - A sliderDefinitions group key.
+ * @returns {Object<string, number>} Raw value keyed by param.
+ */
+function groupRawValues(group) {
+  const values = {};
+  for (const groupDef of sliderDefinitions) {
+    if (groupDef.group === group) values[groupDef.param] = parameters[groupDef.param] * groupDef.scale;
+  }
+  return values;
+}
+
+/**
  * Creates the HTML structure for a single parameter slider.
  */
 function mountSlider(def) {
@@ -616,12 +629,13 @@ function mountSlider(def) {
     const lockCheckbox = document.getElementById(`lock_${def.group}`);
     const isLocked = lockCheckbox ? lockCheckbox.checked : false;
 
-    if (isLocked && Object.keys(lockedDragStartValues).length > 0) {
-      const startRawValue = lockedDragStartValues[def.param];
-      if (startRawValue === undefined) {
-        handles.setValue(parameters[def.param]);
-        return;
-      }
+    if (isLocked) {
+      // An input with no seeding event (assistive tech, programmatic) moves
+      // the group from its pre-change state.
+      const startValues = def.param in lockedDragStartValues
+        ? lockedDragStartValues
+        : groupRawValues(def.group);
+      const startRawValue = startValues[def.param];
 
       // Read the group's raw bounds off the live sliders, cap the shared
       // delta so no channel leaves its range (lockedGroupMove), then write
@@ -633,7 +647,7 @@ function mountSlider(def) {
         if (!groupSlider) continue;
         members.push({
           param: groupDef.param,
-          start: lockedDragStartValues[groupDef.param],
+          start: startValues[groupDef.param],
           min: parseFloat(groupSlider.min),
           max: parseFloat(groupSlider.max),
         });
@@ -660,7 +674,6 @@ function mountSlider(def) {
   sliderHandles[def.param] = handles;
   const { slider } = handles;
 
-  // Seed on input too: touch and keyboard edits need not emit mousedown.
   const seedLockedDrag = () => {
     const lockCheckbox = document.getElementById(`lock_${def.group}`);
     const isLocked = lockCheckbox ? lockCheckbox.checked : false;
