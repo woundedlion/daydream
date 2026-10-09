@@ -595,7 +595,9 @@ test('saving refuses a chain that restore would refuse', () => {
   })();
   assert.equal(savedSolids.length, 0);
   assert.equal(messages.length, 1);
-  assert.equal(messages[0], `rejected: ${savedChainShapeError('cube', ops)}`);
+  assert.equal(messages[0],
+    `rejected: the loaded or edited chain cannot be saved: ${savedChainShapeError('cube', ops)}; `
+    + "pattern values may fall outside the editor's save grid");
 });
 
 function baseSelectContext(overrides = {}) {
