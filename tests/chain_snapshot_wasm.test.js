@@ -72,10 +72,13 @@ test('snapshot capability handles reject stale effect and geometry instances', (
   const bindings = engine.getShaderChainBindings();
   const snapshot = bindings.getSnapshot();
   engine.setDisplayCaps(3, 4);
-  assert.equal(bindings.getSnapshot(), null);
-  assert.equal(bindings.restoreSnapshot(snapshot), module.ChainSnapshotRestoreResult.NOT_SHADER_CHAIN);
-  bindings.delete();
-  engine.setDisplayCaps(0, 0);
+  try {
+    assert.equal(bindings.getSnapshot(), null);
+    assert.equal(bindings.restoreSnapshot(snapshot), module.ChainSnapshotRestoreResult.NOT_SHADER_CHAIN);
+  } finally {
+    bindings.delete();
+    engine.setDisplayCaps(0, 0);
+  }
   engine.setEffect('Comets');
   assert.equal(engine.getShaderChainBindings(), null);
 });
@@ -153,7 +156,10 @@ test('a snapshot accessor may rebuild geometry without trapping internal handles
   Object.defineProperty(snapshot, 'parameters', {
     enumerable: true, get() { engine.setDisplayCaps(3, 4); return parameters; },
   });
-  assert.equal(bindings.restoreSnapshot(snapshot), module.ChainSnapshotRestoreResult.NOT_SHADER_CHAIN);
-  bindings.delete();
-  engine.setDisplayCaps(0, 0);
+  try {
+    assert.equal(bindings.restoreSnapshot(snapshot), module.ChainSnapshotRestoreResult.NOT_SHADER_CHAIN);
+  } finally {
+    bindings.delete();
+    engine.setDisplayCaps(0, 0);
+  }
 });
