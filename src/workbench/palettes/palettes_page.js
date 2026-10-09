@@ -1199,7 +1199,7 @@ async function init() {
     onEnd: handleDragEnd,
     onCancel: handleDragCancel,
   });
-  colorStripCanvas.addEventListener('keydown', handleStripKeyDown); // keyboard parity (a11y)
+  colorStripCanvas.addEventListener('keydown', handleStripKeyDown);
   updateStripView();
 
   if (resetZoomButton) {
