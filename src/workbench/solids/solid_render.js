@@ -209,7 +209,6 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
 
         if (!view.showNormals) return;
 
-        // Center/Normal for other viz
         const center = new THREE.Vector3();
         f.forEach(idx => {
           let v = new THREE.Vector3().copy(meshData.vertices[idx]);
