@@ -2,29 +2,15 @@
 // daydream.js's composition root: start(deps) builds the whole app against
 // injected seams (document, page target, navigator, driver, GUI factory,
 // module loader).
-import { afterEach, test } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { installConsoleCapture } from './helpers/fake_console.js';
 import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
-import { startApp as startUntrackedApp } from './helpers/fake_app.js';
+import { trackedStartApp } from './helpers/fake_app.js';
 
 restoreDocumentAfterEach();
-const startedApps = [];
-afterEach(() => {
-  while (startedApps.length > 0) {
-    const app = startedApps.pop();
-    app.teardown.dispose();
-    app.restore();
-  }
-});
-
-/** Starts an app registered for per-case cleanup. @returns {Object} The app fakes. */
-function startApp(options) {
-  const app = startUntrackedApp(options);
-  startedApps.push(app);
-  return app;
-}
+const startApp = trackedStartApp();
 
 test('start assembles the app and hands back its teardown', () => {
   const { teardown, guis, listeners } = startApp();
