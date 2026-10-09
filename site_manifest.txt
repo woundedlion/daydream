@@ -97,6 +97,7 @@ src/shared/page_lifecycle.js
 src/workbench/palettes/palette_canvas.js
 src/workbench/palettes/palette_controls.js
 src/workbench/palettes/palette_math.js
+src/workbench/palettes/palette_recipe_model.js
 src/workbench/palettes/palette_wheel.js
 src/workbench/palettes/palettes_page.js
 src/shared/pointer_drag.js

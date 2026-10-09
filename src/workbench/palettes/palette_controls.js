@@ -399,15 +399,15 @@ export function axisEndpoints({ center, range }) {
  * The center-and-range form of an axis the user edited by its endpoints.
  * @param {number} minimum - One endpoint.
  * @param {number} maximum - The other; the two may arrive in either order.
- * @returns {{center:number, range:number}} The axis values, with a non-negative range.
+ * @param {{center:number, range:number}} [out] - Object the center and range are written into.
+ * @returns {{center:number, range:number}} `out`, or a new axis value, with a non-negative range.
  */
-export function axisFromEndpoints(minimum, maximum) {
+export function axisFromEndpoints(minimum, maximum, out = { center: 0, range: 0 }) {
   const low = Math.min(minimum, maximum);
   const high = Math.max(minimum, maximum);
-  return {
-    center: (low + high) * 0.5,
-    range: high - low,
-  };
+  out.center = (low + high) * 0.5;
+  out.range = high - low;
+  return out;
 }
 
 /**
@@ -717,14 +717,30 @@ export function customHueSweepRepresentable(recipe) {
 /**
  * Rebuilds a recipe's customTurns array from the wheel's base-plus-offsets form.
  * @param {number} baseTurns - The base hue, wrapped into [0, 1) before the offsets are added.
- * @param {number[]} offsets - The three keys' offsets from the base.
- * @param {number[]} [template] - Array the untouched fourth slot is carried over from.
- * @returns {number[]} The four turns a recipe's hue.customTurns holds.
+ * @param {ReadonlyArray<number>} offsets - The three keys' offsets from the base.
+ * @param {ReadonlyArray<number>} [template] - Array the untouched fourth slot is carried over from.
+ * @param {number[]} [out] - Array the turns are written into; it may be `template` itself.
+ * @returns {number[]} `out`: the four turns a recipe's hue.customTurns holds.
  */
-export function customHueTurns(baseTurns, offsets, template = [0, 0, 0, 0]) {
-  const turns = [...template];
-  for (let i = 0; i < 3; i++) turns[i] = wrapTurns(baseTurns) + offsets[i];
-  return turns;
+export function customHueTurns(baseTurns, offsets, template = [0, 0, 0, 0],
+  out = [...template]) {
+  for (let i = 0; i < 3; i++) out[i] = wrapTurns(baseTurns) + offsets[i];
+  return out;
+}
+
+/**
+ * The offset a custom hue key takes when moved onto the turn a drag landed on:
+ * the representative of `wrappedTurn` nearest where the key already was, so a
+ * drag across the seam does not spin it the long way round, clamped to ±2
+ * turns so it cannot wind up unboundedly.
+ * @param {number} baseTurns - The keys' base hue.
+ * @param {number} offset - The moved key's current offset from the base.
+ * @param {number} wrappedTurn - The pointed-at hue, as read off the wheel.
+ * @returns {number} The key's new offset.
+ */
+export function movedHueKeyOffset(baseTurns, offset, wrappedTurn) {
+  const nextTurn = equivalentTurnNear(wrappedTurn, baseTurns + offset);
+  return Math.max(-2, Math.min(2, nextTurn - baseTurns));
 }
 
 /**
@@ -733,16 +749,12 @@ export function customHueTurns(baseTurns, offsets, template = [0, 0, 0, 0]) {
  * @param {number[]} offsets - The keys' current offsets from the base.
  * @param {number} keyIndex - Which key moved.
  * @param {number} wrappedTurn - The pointed-at hue, as read off the wheel.
- * @returns {number[]} A new offsets array; the other keys are unchanged. The
- *   moved key takes the representative of `wrappedTurn` nearest where it
- *   already was, so a drag across the seam does not spin it the long way round,
- *   and its offset is clamped to ±2 turns so it cannot wind up unboundedly.
+ * @returns {number[]} A new offsets array; the other keys are unchanged and
+ *   the moved key takes movedHueKeyOffset.
  */
 export function moveCustomHueKey(baseTurns, offsets, keyIndex, wrappedTurn) {
   const nextOffsets = [...offsets];
-  const currentTurn = baseTurns + nextOffsets[keyIndex];
-  const nextTurn = equivalentTurnNear(wrappedTurn, currentTurn);
-  nextOffsets[keyIndex] = Math.max(-2, Math.min(2, nextTurn - baseTurns));
+  nextOffsets[keyIndex] = movedHueKeyOffset(baseTurns, offsets[keyIndex], wrappedTurn);
   return nextOffsets;
 }
 
@@ -849,8 +861,30 @@ export function loopSweepTurns(turns) {
  * @throws {RangeError} When a reading names no PaletteV4 member of its group.
  */
 export function paletteRecipeFromControls(template, controls) {
-  const recipe = structuredClone(template);
-  recipe.input = { ...controls.window };
+  return applyPaletteControls(structuredClone(template), controls);
+}
+
+/**
+ * @param {PaletteAxis} axis - A recipe axis.
+ * @param {{readonly minimum: number, readonly maximum: number}} endpoints - Its endpoint readings.
+ * @returns {void}
+ */
+function applyAxisEndpoints(axis, endpoints) {
+  if (axis.curve !== PaletteV4.curve.CUSTOM)
+    axisFromEndpoints(endpoints.minimum, endpoints.maximum, axis);
+}
+
+/**
+ * paletteRecipeFromControls in place: overwrites the reading-driven fields of
+ * a recipe that already holds the template, without allocating.
+ * @param {PaletteRecipe} recipe - A copy of the template; rewritten in place.
+ * @param {Readonly<PaletteControlReadings>} controls - The control readings.
+ * @returns {PaletteRecipe} `recipe`.
+ * @throws {RangeError} When a reading names no PaletteV4 member of its group.
+ */
+export function applyPaletteControls(recipe, controls) {
+  recipe.input.offset = controls.window.offset;
+  recipe.input.span = controls.window.span;
   recipe.domain = paletteEnumOrdinal('domain', controls.domain);
   recipe.easing = paletteEnumOrdinal('easing', controls.easing);
   recipe.colorPath = paletteEnumOrdinal('colorPath', controls.colorPath);
@@ -872,18 +906,15 @@ export function paletteRecipeFromControls(template, controls) {
   recipe.hueTorsion = controls.hueTorsion;
   recipe.falloffStart = controls.falloffStart;
   if (recipe.hue.mode === PaletteV4.hueMode.CUSTOM) {
-    recipe.hue.customTurns = customHueTurns(
-      recipe.hue.baseTurns, controls.customHueOffsets, recipe.hue.customTurns);
+    customHueTurns(recipe.hue.baseTurns, controls.customHueOffsets,
+      recipe.hue.customTurns, recipe.hue.customTurns);
     // The keys carry the base hue; the engine canonicalizes the field away.
     recipe.hue.baseTurns = 0;
   }
   recipe.lightness.curve = paletteEnumOrdinal('curve', controls.lightnessCurve);
   recipe.chroma.curve = paletteEnumOrdinal('curve', controls.chromaCurve);
-  for (const axis of /** @type {Array<'lightness'|'chroma'>} */ (['lightness', 'chroma'])) {
-    if (recipe[axis].curve === PaletteV4.curve.CUSTOM) continue;
-    const { minimum, maximum } = controls[axis];
-    Object.assign(recipe[axis], axisFromEndpoints(minimum, maximum));
-  }
+  applyAxisEndpoints(recipe.lightness, controls.lightness);
+  applyAxisEndpoints(recipe.chroma, controls.chroma);
   // The engine canonicalizes a falloff start outside a FALLOFF domain and the
   // headroom of an ABSOLUTE chroma basis.
   if (recipe.domain !== PaletteV4.domain.FALLOFF)
@@ -898,60 +929,6 @@ export function paletteRecipeFromControls(template, controls) {
 }
 
 
-
-/**
- * Assembles the readings paletteRecipeFromControls consumes, converting the
- * units the controls are labelled in (degrees) to the recipe's own (turns).
- * @param {(id: string) => (string|undefined)} readControl - Reads one control's value by element id.
- * @param {number[]} customHueOffsets - The wheel's per-key hue offsets, which no control holds.
- * @returns {PaletteControlReadings} The readings.
- * @throws {RangeError} When a control the recipe needs is not on the page.
- */
-export function paletteControlReadings(readControl, customHueOffsets) {
-  /**
-   * @param {string} name - A PALETTE_CONTROL_IDS key.
-   * @returns {string} The control's value.
-   */
-  const read = (name) => {
-    const id = PALETTE_CONTROL_IDS[name];
-    const value = readControl(id);
-    if (value === undefined || value === null)
-      throw new RangeError(`Palette control ${id} is missing`);
-    return value;
-  };
-  /**
-   * @param {string} name - A PALETTE_CONTROL_IDS key.
-   * @returns {number} The control's value as a number.
-   */
-  const number = (name) => Number(read(name));
-
-  return {
-    window: { offset: number('offset'), span: number('span') },
-    easing: read('easing'),
-    spreadTurns: number('spreadDegrees') / 360,
-    sweepTurns: number('sweepTurns'),
-    headroom: number('headroom'),
-    hueTorsion: number('hueTorsion'),
-    falloffStart: number('falloffStart'),
-    domain: read('domain'),
-    colorPath: read('colorPath'),
-    hueMode: read('hueMode'),
-    harmony: read('harmony'),
-    direction: read('direction'),
-    baseTurns: number('baseHueDegrees') / 360,
-    customHueOffsets,
-    lightnessCurve: read('lightnessCurve'),
-    chromaCurve: read('chromaCurve'),
-    lightness: {
-      minimum: number('lightnessMinimum'),
-      maximum: number('lightnessMaximum'),
-    },
-    chroma: {
-      minimum: number('chromaMinimum'),
-      maximum: number('chromaMaximum'),
-    },
-  };
-}
 
 /**
  * The PaletteV4 member name an ordinal stands for — the value the matching
