@@ -6,7 +6,7 @@
  */
 import { copyToClipboard, wireCopyBlock } from '../../shared/clipboard.js';
 import { replaceUrl } from '../../app/state.js';
-import { createSlider, createSliderProxy } from '../../shared/slider.js';
+import { createSliderProxy } from '../../shared/slider.js';
 import { showFatalError, bootstrapTool } from '../../shared/banner.js';
 import { linearRgbToHex } from '../../shared/color.js';
 import {
@@ -19,7 +19,6 @@ import {
 import {
   createPaletteViewport,
   axisControlState, PALETTE_AXIS_CONTROLS,
-  lockedGroupMove,
   paletteTabFromSearch, paletteTabUrl, tablistKeyTarget,
   PaletteV4, PALETTE_CONTROL_IDS,
   PALETTE_RECIPE_PRESETS, paletteRecipeAvailability,
@@ -29,6 +28,7 @@ import {
   hueKeyState, customHueKeyState, customHueSweepRepresentable,
 } from './palette_controls.js';
 import { PaletteRecipeModel } from './palette_recipe_model.js';
+import { mountProceduralSliders } from './procedural_sliders.js';
 import { createColorStripPainter, drawWaveGraph } from './palette_canvas.js';
 import {
   createHueKeyWheelPainter, canvasPoint, wheelTurnAt,
@@ -75,7 +75,7 @@ const defaultParams = {
   D_R: 0.000, D_G: 0.330, D_B: 0.670  // Phase (-1.0 to 2.0)
 };
 
-let parameters = { ...defaultParams };
+let proceduralSliders = null;
 let palette;
 let paletteOps = null;
 let wasmModule = null;
@@ -476,12 +476,6 @@ let dragStartPosition = 0.0;
 let dragEndPosition = 0.0;
 let copyFeedbackTimer = null;
 let copyRequestId = 0;
-let lockedDragStartValues = {};
-let lockedDragOwner = null;
-
-// Slider handles by param.
-const sliderHandles = {};
-
 // DOM elements, resolved in init() once the document has loaded.
 let colorStripCanvas, colorStripCtx, waveGraphCanvas, waveGraphCtx,
   resetZoomButton, paletteRangeHeading, copyFeedback, copyFeedbackSwatch,
@@ -489,164 +483,6 @@ let colorStripCanvas, colorStripCtx, waveGraphCanvas, waveGraphCtx,
 
 // Owns the strip's offscreen gradient cache; built in init().
 let colorStripPainter = null;
-
-// Accessible names combine the coefficient group and channel.
-const GROUP_NAMES = {
-  A: 'Offset', B: 'Amplitude', C: 'Frequency', D: 'Phase',
-};
-const CHANNEL_NAMES = { R: 'red', G: 'green', B: 'blue' };
-
-/**
- * The accessible name for one procedural slider.
- * @param {{param: string, group: string}} def - A sliderDefinitions entry; its param is `<group>_<channel>`.
- * @returns {string} The group and channel name, e.g. "Offset red".
- */
-function sliderAriaLabel(def) {
-  return `${GROUP_NAMES[def.group]} ${CHANNEL_NAMES[def.param.split('_')[1]]}`;
-}
-
-const sliderDefinitions = [
-  // A (Base): Range [0, 1]
-  { param: 'A_R', container: 'A_R_container', label: 'R', color: 'text-red-300', thumb: 'r-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'A' },
-  { param: 'A_G', container: 'A_G_container', label: 'G', color: 'text-green-500', thumb: 'g-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'A' },
-  { param: 'A_B', container: 'A_B_container', label: 'B', color: 'text-blue-300', thumb: '', min: 0, max: 1, step: 0.001, scale: 1000, group: 'A' },
-  // B (Amplitude): Range [0, 1]
-  { param: 'B_R', container: 'B_R_container', label: 'R', color: 'text-red-300', thumb: 'r-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'B' },
-  { param: 'B_G', container: 'B_G_container', label: 'G', color: 'text-green-500', thumb: 'g-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'B' },
-  { param: 'B_B', container: 'B_B_container', label: 'B', color: 'text-blue-300', thumb: '', min: 0, max: 1, step: 0.001, scale: 1000, group: 'B' },
-  // C (Frequency): Range [-5, 5]
-  { param: 'C_R', container: 'C_R_container', label: 'R', color: 'text-red-300', thumb: 'r-thumb', min: -5, max: 5, step: 0.001, scale: 1000, group: 'C' },
-  { param: 'C_G', container: 'C_G_container', label: 'G', color: 'text-green-500', thumb: 'g-thumb', min: -5, max: 5, step: 0.001, scale: 1000, group: 'C' },
-  { param: 'C_B', container: 'C_B_container', label: 'B', color: 'text-blue-300', thumb: '', min: -5, max: 5, step: 0.001, scale: 1000, group: 'C' },
-  // D (Phase): Range [-1, 2]
-  { param: 'D_R', container: 'D_R_container', label: 'R', color: 'text-red-300', thumb: 'r-thumb', min: -1, max: 2, step: 0.001, scale: 1000, group: 'D' },
-  { param: 'D_G', container: 'D_G_container', label: 'G', color: 'text-green-500', thumb: 'g-thumb', min: -1, max: 2, step: 0.001, scale: 1000, group: 'D' },
-  { param: 'D_B', container: 'D_B_container', label: 'B', color: 'text-blue-300', thumb: '', min: -1, max: 2, step: 0.001, scale: 1000, group: 'D' }
-];
-
-
-/**
- * The committed raw slider values of one coefficient group.
- * @param {string} group - A sliderDefinitions group key.
- * @returns {Object<string, number>} Raw value keyed by param.
- */
-function groupRawValues(group) {
-  const values = {};
-  for (const groupDef of sliderDefinitions) {
-    if (groupDef.group === group) values[groupDef.param] = parameters[groupDef.param] * groupDef.scale;
-  }
-  return values;
-}
-
-/**
- * Creates the HTML structure for a single parameter slider.
- */
-function mountSlider(def) {
-  const handles = createSlider(def.container, {
-    id: def.param,
-    label: def.label,
-    min: def.min,
-    max: def.max,
-    step: def.step,
-    value: parameters[def.param],
-    scale: def.scale,
-    decimals: 3,
-    ariaLabel: sliderAriaLabel(def),
-    labelSuffix: '',
-    labelClass: `w-4 h-4 text-center font-bold ${def.color}`,
-    sliderClass: def.thumb,
-    valueClass: 'slider-label w-16 text-right',
-  }, (rawValue) => {
-    const lockCheckbox = document.getElementById(`lock_${def.group}`);
-    const isLocked = lockCheckbox ? lockCheckbox.checked : false;
-
-    if (isLocked) {
-      // An input with no seeding event (assistive tech, programmatic) moves
-      // the group from its pre-change state.
-      const startValues = def.param in lockedDragStartValues
-        ? lockedDragStartValues
-        : groupRawValues(def.group);
-      const startRawValue = startValues[def.param];
-
-      // Read the group's raw bounds off the live sliders, cap the shared
-      // delta so no channel leaves its range (lockedGroupMove), then write
-      // the results back to state and the readouts.
-      const group = sliderDefinitions.filter(groupDef => groupDef.group === def.group);
-      const members = [];
-      for (const groupDef of group) {
-        const groupSlider = document.getElementById(`${groupDef.param}_slider`);
-        if (!groupSlider) continue;
-        members.push({
-          param: groupDef.param,
-          start: startValues[groupDef.param],
-          min: parseFloat(groupSlider.min),
-          max: parseFloat(groupSlider.max),
-        });
-      }
-      const { values } = lockedGroupMove(rawValue - startRawValue, members);
-
-      for (const groupDef of group) {
-        const finalRawValue = values[groupDef.param];
-        if (finalRawValue === undefined) continue;
-
-        const finalNewValue = finalRawValue / groupDef.scale;
-        parameters[groupDef.param] = finalNewValue;
-        sliderHandles[groupDef.param].setValue(finalNewValue);
-      }
-
-    } else {
-      // The factory already wrote the readout.
-      parameters[def.param] = rawValue / def.scale;
-    }
-
-    scheduleUpdate();
-  });
-
-  sliderHandles[def.param] = handles;
-  const { slider } = handles;
-
-  const seedLockedDrag = () => {
-    const lockCheckbox = document.getElementById(`lock_${def.group}`);
-    const isLocked = lockCheckbox ? lockCheckbox.checked : false;
-
-    if (isLocked) {
-      lockedDragOwner = def.param;
-      lockedDragStartValues = {};
-      sliderDefinitions.forEach(groupDef => {
-        if (groupDef.group === def.group) {
-          const groupSlider = document.getElementById(`${groupDef.param}_slider`);
-          if (groupSlider) {
-            lockedDragStartValues[groupDef.param] = parseFloat(groupSlider.value);
-          }
-        }
-      });
-    }
-  };
-  slider.addEventListener('mousedown', seedLockedDrag);
-  slider.addEventListener('touchstart', seedLockedDrag, { passive: true });
-  slider.addEventListener('keydown', seedLockedDrag);
-  slider.addEventListener('wheel', seedLockedDrag, { passive: true });
-
-  const releaseLockedDrag = () => {
-    if (lockedDragOwner === def.param) {
-      lockedDragStartValues = {};
-      lockedDragOwner = null;
-    }
-  };
-  slider.addEventListener('mouseup', releaseLockedDrag);
-  slider.addEventListener('touchend', releaseLockedDrag);
-  slider.addEventListener('keyup', releaseLockedDrag);
-  slider.addEventListener('blur', releaseLockedDrag);
-}
-
-/**
- * Updates all slider positions and value spans from the 'parameters' object.
- */
-function updateAllSliders() {
-  sliderDefinitions.forEach(def => {
-    sliderHandles[def.param].setValue(parameters[def.param]);
-  });
-}
 
 /**
  * The normalized (0-1) X coordinate of a pointer event over the strip.
@@ -848,7 +684,7 @@ function drawColorStrip(selectionRange = null) {
 function drawPaletteWaveGraph() {
   let plotted = palette;
   if (activeTab === 'procedural') {
-    const view = proceduralParamsForViewport(parameters, paletteViewport.value);
+    const view = proceduralParamsForViewport(proceduralSliders.values(), paletteViewport.value);
     plotted = new ProceduralPalette(
       [view.A_R, view.A_G, view.A_B],
       [view.B_R, view.B_G, view.B_B],
@@ -882,7 +718,7 @@ function updatePaletteCodeOutput() {
 
   if (activeTab === 'procedural') {
     codeOutput.textContent = proceduralPaletteCpp(
-      proceduralParamsForViewport(parameters, paletteViewport.value));
+      proceduralParamsForViewport(proceduralSliders.values(), paletteViewport.value));
   } else {
     codeOutput.textContent = generativePaletteCpp(
       palette?.canonicalRecipe ?? recipeModel.recipe());
@@ -895,11 +731,10 @@ function updatePaletteCodeOutput() {
  * @param {{name:string, a:number[], b:number[], c:number[], d:number[]}} entry - The palette to load.
  */
 function loadNamedPalette(entry) {
-  parameters = { ...proceduralPaletteParams(entry) };
+  proceduralSliders.setAll(proceduralPaletteParams(entry));
   paletteViewport.reset();
   syncResetZoomButton();
   updateStripView();
-  updateAllSliders();
   updatePalette();
 }
 
@@ -939,6 +774,7 @@ function buildPaletteGallery() {
 function updatePalette() {
   if (engineHalted) return;
   if (activeTab === 'procedural') {
+    const parameters = proceduralSliders.values();
     const A = [parameters.A_R, parameters.A_G, parameters.A_B];
     const B = [parameters.B_R, parameters.B_G, parameters.B_B];
     const C = [parameters.C_R, parameters.C_G, parameters.C_B];
@@ -1063,7 +899,7 @@ async function init() {
     });
   });
 
-  sliderDefinitions.forEach(mountSlider);
+  proceduralSliders = mountProceduralSliders({ defaults: defaultParams, scheduleUpdate });
 
   buildPaletteGallery();
   buildEffectRecipePresets();
@@ -1154,23 +990,24 @@ async function init() {
   switchTab(paletteTabFromSearch(window.location.search), false);
 
   onPageTeardown(() => {
-    setPaletteOps(null);
-    if (wasmModule?.HS_MODULE_DEAD !== true)
-      paletteOps?.delete();
-    paletteOps = null;
-    wasmModule = null;
-    teardownExportFlyout();
-    baseHueSlider.removeEventListener('keydown', handleBaseHueKeyDown);
     scheduleUpdate.cancel();
     scheduleViewportRedraw.cancel();
-    window.removeEventListener('resize', scheduleViewportRedraw);
     copyRequestId += 1;
     if (copyFeedbackTimer !== null) clearTimeout(copyFeedbackTimer);
+    proceduralSliders.dispose();
+    teardownExportFlyout();
+    baseHueSlider.removeEventListener('keydown', handleBaseHueKeyDown);
+    window.removeEventListener('resize', scheduleViewportRedraw);
     stripDrag.remove();
     colorStripCanvas.removeEventListener('keydown', handleStripKeyDown);
     hueKeyDrag.remove();
     for (const handle of hueKeyHandles) handle.remove();
     hueKeyHandles = [];
+    setPaletteOps(null);
+    if (wasmModule?.HS_MODULE_DEAD !== true)
+      paletteOps?.delete();
+    paletteOps = null;
+    wasmModule = null;
   });
 }
 

@@ -43,62 +43,6 @@ test('tab switches rebuild the palette when browser URL updates are refused', ()
   }
 });
 
-test('a previous slider blur preserves the new locked drag', () => {
-  const sliders = { red: fakeElement(), green: fakeElement() };
-  const definitions = Object.keys(sliders).map((param) => ({ param, group: 'offset', scale: 1 }));
-  for (const slider of Object.values(sliders)) Object.assign(slider, { value: '0.5', min: '0', max: '1' });
-  const input = {};
-  const context = {
-    parameters: { red: 0.5, green: 0.5 }, sliderDefinitions: definitions, sliderHandles: {},
-    lockedDragStartValues: {}, lockedDragOwner: null, sliderAriaLabel: () => '',
-    document: { getElementById: (id) => id === 'lock_offset' ? { checked: true } : sliders[id.replace('_slider', '')] },
-    createSlider: (container, options, callback) => {
-      input[options.id] = callback;
-      return { slider: sliders[options.id], setValue: (value) => { sliders[options.id].value = String(value); } };
-    },
-    lockedGroupMove: (delta, members) => ({ values: Object.fromEntries(members.map((member) => [member.param, member.start + delta])) }),
-    scheduleUpdate: () => {},
-  };
-  context.groupRawValues = handler('groupRawValues', context);
-  const mount = handler('mountSlider', context);
-  definitions.forEach(mount);
-  sliders.red.dispatch('mousedown');
-  sliders.green.dispatch('mousedown');
-  sliders.red.dispatch('blur');
-  input.green(0.6);
-  assert.equal(context.parameters.red, 0.6);
-  assert.equal(context.parameters.green, 0.6);
-  sliders.green.dispatch('blur');
-  assert.equal(context.lockedDragOwner, null);
-});
-
-test('an unseeded slider input moves the whole locked group', () => {
-  const sliders = { red: fakeElement(), green: fakeElement() };
-  const definitions = Object.keys(sliders).map((param) => ({ param, group: 'offset', scale: 1000 }));
-  for (const slider of Object.values(sliders)) Object.assign(slider, { value: '500', min: '0', max: '1000' });
-  const input = {};
-  const context = {
-    parameters: { red: 0.5, green: 0.5 }, sliderDefinitions: definitions, sliderHandles: {},
-    lockedDragStartValues: {}, lockedDragOwner: null, sliderAriaLabel: () => '',
-    document: { getElementById: (id) => id === 'lock_offset' ? { checked: true } : sliders[id.replace('_slider', '')] },
-    createSlider: (container, options, callback) => {
-      input[options.id] = callback;
-      return { slider: sliders[options.id], setValue: (value) => { sliders[options.id].value = String(value * 1000); } };
-    },
-    lockedGroupMove: (delta, members) => ({ values: Object.fromEntries(members.map((member) => [member.param, member.start + delta])) }),
-    scheduleUpdate: () => {},
-  };
-  context.groupRawValues = handler('groupRawValues', context);
-  definitions.forEach(handler('mountSlider', context));
-  sliders.red.value = '600';
-  input.red(600);
-  assert.equal(context.parameters.red, 0.6);
-  assert.equal(context.parameters.green, 0.6);
-  assert.equal(sliders.green.value, '600');
-  input.red(700);
-  assert.equal(context.parameters.green, 0.7);
-});
-
 test('copy feedback ignores an older clipboard completion', async () => {
   const pending = [];
   let dismissed = 0;
