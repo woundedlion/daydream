@@ -1540,7 +1540,7 @@ test('updateCullUniforms gap-fills columns only for a persisting effect', () => 
   assert.ok(Math.abs(ctx.cullUniforms.uColumnFillArc.value - arc * 2) < 1e-9);
 });
 
-test('updateCullUniforms is a no-op before the material has compiled', () => {
+test('updateCullUniforms is a no-op before setupDots builds the dot material', () => {
   const ctx = cullCtx();
   ctx.cullUniforms = null;
   const before = cullCtxProjection(ctx);
