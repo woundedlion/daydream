@@ -74,12 +74,14 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
       controller.updateDisplay();
       return controller;
     },
-    // As in lil-gui: an OptionController (add() given an options list) updates
-    // its <select> in place and returns itself; any other controller is
-    // destroyed and a replacement carrying the copied name is appended.
+    // As in lil-gui: an OptionController (add() given an options list) rebuilds
+    // its <select> in place, updates its display and returns itself; any other
+    // controller is destroyed and a replacement carrying the copied name is
+    // appended.
     options(choices) {
       if (!optionsReplaces && isOptionList(controller.args[0])) {
         controller.args = [choices];
+        controller.updateDisplay();
         return controller;
       }
       controller.destroyed = true;
