@@ -72,11 +72,11 @@ test('refreshPixelView: a shrunk buffer re-fetches an over-long view', () => {
   assert.equal(r.view, fresh, 'the over-long view survived the shrink');
 });
 
-test('refreshPixelView: an omitted length leaves detachment the only trigger', () => {
+test('refreshPixelView: a non-number length leaves detachment the only trigger', () => {
   const live = new Uint16Array(4);
   let calls = 0;
-  const r = refreshPixelView(live, () => { calls++; return new Uint16Array(8); }, undefined);
-  assert.equal(r.refreshed, false, 'an omitted length was treated as a mismatch');
+  const r = refreshPixelView(live, () => { calls++; return new Uint16Array(8); }, null);
+  assert.equal(r.refreshed, false, 'a non-number length was treated as a mismatch');
   assert.equal(r.view, live, 'the live view was replaced');
-  assert.equal(calls, 0, 'an omitted length triggered a re-fetch');
+  assert.equal(calls, 0, 'a non-number length triggered a re-fetch');
 });
