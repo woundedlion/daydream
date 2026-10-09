@@ -686,7 +686,7 @@ test('overlayUrlParam serializes a boolean through String(val)', () => {
 test('overlayUrlParam rounds numbers and deletes values with no URL form', () => {
   const params = new URLSearchParams('keep=1&speed=9');
   overlayUrlParam(params, 'speed', 1.234567);
-  assert.equal(params.get('speed'), '1.2346', 'a float is cut to 5 significant digits');
+  assert.equal(params.get('speed'), '1.234567', 'a float is cut to 7 significant digits');
   overlayUrlParam(params, 'count', 42);
   assert.equal(params.get('count'), '42', 'an integer keeps no decimal tail');
   for (const empty of [null, undefined, NaN, Infinity]) {
@@ -762,13 +762,13 @@ test('URLSync.flush writes tracked state and ad-hoc params to the URL', () => {
   const s = new AppState({ effect: 'Voronoi' });
   const sync = new URLSync(s, ['effect']);
 
-  sync.setParam('speed', 1.23456); // rounded to 5 significant digits
+  sync.setParam('speed', 1.23456);
   sync.flush();
 
   assert.equal(calls.length, 1);
   const params = new URLSearchParams(calls[0].split('?')[1]);
   assert.equal(params.get('effect'), 'Voronoi');
-  assert.equal(params.get('speed'), '1.2346');
+  assert.equal(params.get('speed'), '1.23456');
   assert.ok(calls[0].startsWith('/sim?'));
 });
 
@@ -954,25 +954,23 @@ test('URLSync.setParam keeps a small non-zero value instead of collapsing it to 
   assert.equal(params.get('keep'), '1', 'unrelated params survive');
 });
 
-/**
- * The engine's tightest slider ranges (GSReactionDiffusion's dA/dB are [0, 0.05])
- * carry a lil-gui implicit step of a thousandth of the range. Every step must
- * reach the URL as a distinct value, or a shared link silently snaps elsewhere.
- */
-test('roundUrlNumber resolves every step of the engine\'s tightest param range', () => {
-  const min = 0, max = 0.05, step = (max - min) / 1000;
-  const seen = new Set();
-  for (let k = 0; k <= 1000; k++) {
-    const rounded = roundUrlNumber(min + k * step);
-    assert.notEqual(rounded, null, `step ${k} has no URL representation`);
-    seen.add(String(rounded));
+test('roundUrlNumber resolves narrow sliders near zero and one', () => {
+  for (const [min, max] of [[0, 0.05], [0.999, 1]]) {
+    const step = (max - min) / 1000;
+    const seen = new Set();
+    for (let k = 0; k <= 1000; k++) {
+      const rounded = roundUrlNumber(min + k * step);
+      assert.notEqual(rounded, null, `step ${k} has no URL representation`);
+      seen.add(String(rounded));
+    }
+    assert.equal(seen.size, 1001, 'adjacent slider steps must not share a URL value');
   }
-  assert.equal(seen.size, 1001, 'adjacent slider steps must not share a URL value');
+  assert.equal(roundUrlNumber(0.999437), 0.999437);
 });
 
 test('roundUrlNumber is a fixed point under re-serialization', () => {
-  assert.equal(roundUrlNumber(1.23456789), 1.2346, 'five significant digits');
-  assert.equal(roundUrlNumber(123456789), 123460000, 'five significant digits');
+  assert.equal(roundUrlNumber(1.23456789), 1.234568, 'seven significant digits');
+  assert.equal(roundUrlNumber(123456789), 123456800, 'seven significant digits');
   for (const v of [1.23456, 0.000012345, 5e-5, 1234.5678, 0.30000000000000004, 0, 2000]) {
     const once = roundUrlNumber(v);
     assert.equal(roundUrlNumber(Number(String(once))), once, `${v} is not stable`);

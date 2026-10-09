@@ -7,7 +7,7 @@
 /** @typedef {(key: string, value: *, old: *) => void} StateListener */
 
 // Significant digits kept by roundUrlNumber.
-const URL_SIGNIFICANT_DIGITS = 5;
+const URL_SIGNIFICANT_DIGITS = 7;
 
 /**
  * Round a numeric URL-param value to URL_SIGNIFICANT_DIGITS significant digits,
