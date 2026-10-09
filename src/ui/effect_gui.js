@@ -41,7 +41,36 @@ import {
  * @typedef {{name: string, value: number|boolean, min?: number, max?: number, animated?: boolean, readonly?: boolean, warning?: string, options?: string[], optionValues?: number[], step?: number, acceptedValue?: number|boolean, requestedValue?: number|boolean}} ParameterDefinition */
 /** @typedef {import("./effect_panel_view.js").PanelController & Record<string, any>} GuiController */
 /** @typedef {import("./effect_panel_view.js").PanelFolder & Record<string, any>} Gui */
-/** @typedef {Record<string, any> & {gui: Gui, pause: {animationState: {pause: boolean}, controller: GuiController|null, setPaused: (value: boolean) => void}, paramNames: string[], controllerByName: Map<string, GuiController>}} EffectRecord */
+/** @typedef {{animationState: {pause: boolean}, controller: GuiController|null, setPaused: (value: boolean) => void}} PauseToggle */
+/**
+ * One built effect panel.
+ * @typedef {Object} EffectRecord
+ * @property {Gui} gui - The panel's lil-gui root.
+ * @property {EffectPanelEdits} edits - In-flight pointer and keyboard edits.
+ * @property {number|undefined} paramGeneration - Effect-load generation the
+ *   definitions were read at.
+ * @property {string[]} paramNames - Value-stream order of every parameter.
+ * @property {string[]} writableParamNames - Parameters the panel writes.
+ * @property {Map<string, GuiController>} controllerByName - Parameter controllers.
+ * @property {boolean} hasParams - Whether the panel shows parameter controls.
+ * @property {boolean} hasEnumControls - Whether any parameter control is a selector.
+ * @property {boolean} hasAnimatedEnums - Whether any selector is animation-driven.
+ * @property {Map<string, string>} paramWarnings - Warnings the panel was built with.
+ * @property {boolean} paramsExternal - Whether parameters render outside the panel.
+ * @property {Map<string, Gui>} stageFolders - Pipeline stage folders.
+ * @property {PauseToggle} pause - The pause toggle.
+ * @property {boolean} hydrating - True until construction finishes.
+ * @property {boolean} animationPauseApplied - Whether pause transitions reach
+ *   the engine.
+ * @property {boolean} warningsDirty - Whether the warnings must be re-read.
+ * @property {HTMLElement|null} actionRow - The action button row.
+ * @property {GuiController[]} actionControllers - Action row controllers.
+ * @property {ReturnType<typeof setTimeout>|undefined} exportFlashTimer -
+ *   Pending Export label revert.
+ * @property {{state: {presetIndex?: number}, controller: GuiController}} [preset] -
+ *   The preset selector, on an effect with presets.
+ * @property {(delta: number) => boolean} [movePreset] - Relative preset selection.
+ */
 
 // How long a transient button label (Export status) stays before reverting.
 export const FLASH_MS = 1500;
@@ -883,7 +912,9 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
         return;
       }
       fx.writableParamNames.push(p.name);
-      if (controller.isContinuous) fx.edits.trackDrag(controller);
+      if (controller.isContinuous) {
+        fx.edits.trackDrag(/** @type {GuiController & {dragging: boolean}} */ (controller));
+      }
       fx.edits.trackKeyboard(controller);
 
       const kind = paramControlKind(p);
@@ -989,7 +1020,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   function disposeEffect(fx) {
     if (!fx?.gui) return;
     clearTimeout(fx.exportFlashTimer);
-    fx.exportFlashTimer = null;
+    fx.exportFlashTimer = undefined;
     fx.edits.dispose();
     const dom = fx.gui.domElement;
     if (dom?.parentNode) dom.parentNode.removeChild(dom);
