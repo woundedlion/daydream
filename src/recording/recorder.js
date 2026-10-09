@@ -128,8 +128,8 @@ export class VideoRecorder {
     this.offscreen = null;
     /** @type {CanvasRenderingContext2D|null} */
     this.offCtx = null;
-    // Host hook fired whenever a session ends without the host asking for it: a
-    // failure to start, an encoder fault, or a cancelled Save dialog.
+    // Host hook fired whenever a session fails or ends early, at start or
+    // mid-recording; a partial recording may still be saved.
     /** @type {((err: Error) => void)|null} */
     this.onError = null;
     /** @type {((err: Error, filename: string) => void)|null} Save failure for a completed session. */
@@ -177,8 +177,8 @@ export class VideoRecorder {
   }
 
   /**
-   * Reports a failure that ends a session before it produces video: logs it and
-   * notifies the host hook, so an abort is not console-only.
+   * Reports a failure that ends a session early (at start or mid-recording):
+   * logs it and notifies onError.
    * @param {string} message - Failure description, logged with the class prefix.
    * @param {*} [cause] - Underlying error, when the failure came from a throw.
    * @returns {void}
