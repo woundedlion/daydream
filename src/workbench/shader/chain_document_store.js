@@ -127,9 +127,10 @@ export function scratchChainDocument(catalog, chain = DEFAULT_SCRATCH_CHAIN) {
 
 /**
  * Creates the chain editor's document state machine: a validated chain
- * document, a selection, a session bypass set and an undo history, mutated
- * through one span-replacement primitive that reconciles the whole document
- * atomically and never commits anything the v2 validator refuses.
+ * document, a selection, a session bypass set and an undo history. Every
+ * mutation (`replaceSpan`, the one structural chain edit, plus `relabel` and
+ * `setPresetValue`) builds a whole candidate document and commits it
+ * atomically through one step that refuses anything the v2 validator rejects.
  * @param {Object} options - Store dependencies.
  * @param {*} options.document - A compiled (post-expansion, valid) v2 document.
  * @param {*} options.catalog - The operator catalog the document validates against.
