@@ -1004,11 +1004,14 @@ function updatePalette() {
       palette = new GenerativePalette(readPaletteRecipe());
       const adjusted = paletteAdjustmentSummary(palette.status);
       const status = document.getElementById('gen_status');
+      status.dataset.status = 'valid';
       const message = adjusted ? `Recipe valid — ${adjusted}` : 'Recipe valid';
       if (status.textContent !== message) status.textContent = message;
     } catch (error) {
       if (engineTrapped(error)) return;
-      document.getElementById('gen_status').textContent = error.message;
+      const status = document.getElementById('gen_status');
+      status.dataset.status = 'error';
+      status.textContent = error.message;
       return;
     }
   }

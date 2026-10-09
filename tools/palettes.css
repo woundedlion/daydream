@@ -73,11 +73,17 @@ body {
   line-height: 1.5rem;
 }
 
-#gen_status {
+#gen_status,
+#hue_key_status {
   min-width: 0;
   color: #94A3B8;
   font-size: 0.6875rem;
   line-height: 1rem;
+}
+
+#gen_status[data-status="error"],
+#hue_key_status {
+  color: var(--error-text);
 }
 
 .recipe-preset {
