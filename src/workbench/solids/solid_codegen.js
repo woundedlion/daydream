@@ -1226,7 +1226,7 @@ export function createChainValidator(createModule) {
           const next = applyOp(mesh, o);
           // Read before another checked mesh call clears the flag; getVertices
           // also resets it before reading back the mesh.
-          const adjusted = Ops.getLastAdjusted?.() === true;
+          const adjusted = Ops.getLastAdjusted();
           mesh.delete();
           mesh = next;
           if (adjusted) return saturated();

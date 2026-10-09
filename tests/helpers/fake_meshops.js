@@ -53,6 +53,7 @@ export function fakeModule({ rejects = new Set(), reason = 'ARENA_EXHAUSTED',
       // Flushing tooling memory clears the recorded failure reason.
       clearToolingMemory() { state.cleared++; lastResult = MeshOpResult.OK; },
       getLastResult() { return lastResult; },
+      getLastAdjusted() { return false; },
     },
   };
   return { Mod, state };

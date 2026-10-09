@@ -1783,7 +1783,7 @@ test('queued chain validation snapshots array membership and nested parameters',
   const calls = [];
   const mesh = stubMesh(calls);
   const validator = createChainValidator(async () => ({
-    MeshOps: { fromSolidName: () => mesh, clearToolingMemory() {} },
+    MeshOps: { fromSolidName: () => mesh, clearToolingMemory() {}, getLastAdjusted: () => false },
   }));
   const ops = [{ op: 'truncate', params: { t: 0.3 } }];
   const pending = validator.chainIsValid('cube', ops);
