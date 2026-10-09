@@ -187,11 +187,13 @@ export function createChainStrip({
    * Rebuilds the strip after a committed edit, restores focus, and re-applies
    * the program through the caller.
    * @param {string|null} focusLabel - Chip to hand keyboard focus back to.
+   * @param {string|null} [focusControl] - Selector of the chip control to
+   *   focus instead of the chip itself.
    * @returns {true} Always true, for tail-calling.
    */
-  const commit = (focusLabel) => {
+  const commit = (focusLabel, focusControl = null) => {
     announce('');
-    render({ focusLabel });
+    render({ focusLabel, focusControl });
     notifySelection();
     onApply();
     return true;
@@ -260,7 +262,7 @@ export function createChainStrip({
       return;
     }
     announce('');
-    render({ focusLabel: label, focusBypass: true });
+    render({ focusLabel: label, focusControl: '.chain-chip-bypass' });
     onApply();
   };
 
@@ -834,7 +836,7 @@ export function createChainStrip({
           report(result);
           return;
         }
-        commit(store.chain()[choice.start]?.label ?? null);
+        commit(store.chain()[choice.start]?.label ?? null, '.chain-chip-replace');
       });
       functionLabel.appendChild(replacement);
       header.appendChild(functionLabel);
@@ -983,12 +985,12 @@ export function createChainStrip({
 
   /**
    * Rebuilds the whole strip from the store. Keyboard focus is restored to the
-   * named chip (its bypass toggle when asked), or to the roving-tabindex chip
-   * when the strip held focus before the rebuild.
-   * @param {{focusLabel?: string|null, focusBypass?: boolean}} [options]
+   * named chip (or the chip control matching `focusControl`), or to the
+   * roving-tabindex chip when the strip held focus before the rebuild.
+   * @param {{focusLabel?: string|null, focusControl?: string|null}} [options]
    * @returns {void}
    */
-  const render = ({ focusLabel = null, focusBypass = false } = {}) => {
+  const render = ({ focusLabel = null, focusControl = null } = {}) => {
     const active = doc.activeElement ?? null;
     const hadFocus = active !== null && container.contains(active);
     const scrolled = Number(
@@ -1097,9 +1099,9 @@ export function createChainStrip({
     try {
       if (target) {
         focusedLabel = focusLabel;
-        if (focusBypass) {
-          const toggle = target.querySelector('.chain-chip-bypass');
-          (toggle ?? target).focus();
+        if (focusControl !== null) {
+          const control = target.querySelector(focusControl);
+          (control ?? target).focus();
         } else {
           target.focus();
         }

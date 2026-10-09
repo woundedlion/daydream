@@ -447,7 +447,9 @@ test('Delete opens a socket replacement palette containing only valid stages', a
   select.dispatch('change');
   assert.equal(h.store.chain()[PROJECT].operator, 'project.bonne.v3');
   assert.equal(h.applied.length, 1);
-  assert.equal(h.doc.activeElement.dataset.label, h.store.chain()[PROJECT].label);
+  assert.equal(h.doc.activeElement,
+    chipByLabel(h, h.store.chain()[PROJECT].label).querySelector('.chain-chip-replace'),
+    'focus stays on the rebuilt socket select so arrow browsing can continue');
 });
 
 test('a palette carries its listbox selection on the focused option', async () => {
@@ -522,7 +524,8 @@ test('selecting the operator the socket carries keeps the instance', async () =>
   assert.deepEqual(h.store.document(), before,
     'label, values, presets and serialization fields are all untouched');
   assert.equal(h.store.canUndo(), false, 'an edit that changes nothing has nothing to undo');
-  assert.equal(h.doc.activeElement.dataset.label, 'project');
+  assert.equal(h.doc.activeElement,
+    chipByLabel(h, 'project').querySelector('.chain-chip-replace'));
 
   select = chipByLabel(h, 'project').querySelector('.chain-chip-replace');
   select.value = 'project.bonne.v3';
