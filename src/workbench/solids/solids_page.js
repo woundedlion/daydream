@@ -20,8 +20,6 @@ import {
   authoredParamRange, snapToStep,
   seedOpParams,
   opsFromRecipe,
-  fanTriangulateFace,
-  uniqueEdges,
   dropSlotIndex,
   dropTargetIndex,
   reorderPreviewShift,
@@ -31,6 +29,7 @@ import {
   createChainValidator,
   createOpGate,
 } from './solid_codegen.js';
+import { fanTriangulateFace, uniqueEdges } from './solid_geometry.js';
 import { buildBaseMesh, buildChainMesh } from './solid_build.js';
 import { generateRegistryCpp, validateRegistryFaces, MAX_RECIPE_STEPS } from './solid_registry_codegen.js';
 import { buildOpRow, formatParamValue, syncSweepWarning } from './solid_op_rows.js';
