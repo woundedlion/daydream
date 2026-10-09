@@ -40,7 +40,7 @@ const fail = (...args) => {
   return expectFailure(process.execPath, [SCRIPT, ...args], { cwd: root, env });
 };
 
-// The runner reports the floor on the spec stream rather than on stderr.
+// Test-run output (spec reporter) goes to stdout and gate failures to stderr; read both.
 const failOutput = (...args) => {
   trackFixture();
   try {
