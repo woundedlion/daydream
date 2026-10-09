@@ -30,8 +30,7 @@ const moduleLogs = [];
 const sink = (line) => moduleLogs.push(line);
 const M = await createHolosphereModule({ print: sink, printErr: sink });
 
-// Mirrors effect_roster.js resolutionPresets' "Holosphere (96x20)" entry.
-const W = 96, H = 20;
+const { w: W, h: H } = resolutionPresets['Holosphere (96x20)'];
 
 // One shared engine: the engine owns a single global arena, so a second
 // instantiation traps.
