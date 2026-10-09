@@ -1694,16 +1694,16 @@ test('keydown leaves a modifier chord to the browser and the OS', () => {
   const movePreset = (delta) => { moves.push(delta); return true; };
 
   for (const modifier of ['altKey', 'ctrlKey', 'metaKey']) {
-    const running = { paused: false, stepFrames: 0 };
+    const ctxRunning = { paused: false, stepFrames: 0 };
     const chord = { ...keyEvent(' '), [modifier]: true };
-    Daydream.prototype.keydown.call(running, chord, movePreset);
-    assert.equal(running.paused, false, `${modifier}+Space toggled pause`);
+    Daydream.prototype.keydown.call(ctxRunning, chord, movePreset);
+    assert.equal(ctxRunning.paused, false, `${modifier}+Space toggled pause`);
     assert.equal(chord.prevented, false, `${modifier}+Space was swallowed`);
 
-    const paused = { paused: true, stepFrames: 0 };
+    const ctxPaused = { paused: true, stepFrames: 0 };
     const step = { ...keyEvent('ArrowRight'), [modifier]: true };
-    Daydream.prototype.keydown.call(paused, step, movePreset);
-    assert.equal(paused.stepFrames, 0, `${modifier}+ArrowRight queued a frame step`);
+    Daydream.prototype.keydown.call(ctxPaused, step, movePreset);
+    assert.equal(ctxPaused.stepFrames, 0, `${modifier}+ArrowRight queued a frame step`);
     assert.equal(step.prevented, false, `${modifier}+ArrowRight was swallowed`);
   }
   assert.deepEqual(moves, [], 'a chord reached the preset walk');
@@ -1829,7 +1829,7 @@ test('ad-hoc contexts use fields assigned by the driver', () => {
   const tree = parse(source, { ecmaVersion: 'latest', sourceType: 'module' });
   const visit = (node) => {
     if (!node || typeof node !== 'object') return;
-    if (node.type === 'VariableDeclarator' && node.id.name === 'ctx'
+    if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier' && /^ctx/.test(node.id.name)
         && node.init?.type === 'ObjectExpression') {
       const fields = Object.fromEntries(node.init.properties
         .filter((property) => property.type === 'Property')
