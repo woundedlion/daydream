@@ -980,13 +980,13 @@ export class Daydream {
    * loses the old context.
    */
   dispose() {
-    this.statsView?.clear();
     // Stop the rAF callback first so it never fires into the nulled dotMesh /
     // disposed renderer on a real page discard.
     const renderer = this.renderer;
     renderer?.setAnimationLoop(null);
     // Three re-arms rAF after an in-progress callback returns.
     if (renderer) queueMicrotask(() => renderer.setAnimationLoop(null));
+    this.statsView?.clear();
     this.resizeObserver?.disconnect();
     this.clock?.dispose();
 

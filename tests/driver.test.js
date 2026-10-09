@@ -358,6 +358,7 @@ function disposeCtx(mesh, log) {
     canvas,
     ...handlers,
     contextLostOverlay: { remove: () => log.push('overlay.remove') },
+    statsView: { clear: () => log.push('stats.clear') },
     scene: { remove: (obj) => log.push(`scene.remove:${obj?.name ?? 'dotMesh'}`) },
     dotMesh: mesh,
     pixels: mesh.instanceColor.array,
@@ -1963,7 +1964,6 @@ test('stats tolerate absent arena metrics', () => {
 test('dispose clears the stats view', () => {
   const log = [];
   const ctx = disposeCtx(fakeMesh(log), log);
-  ctx.statsView = { clear: () => log.push('stats.clear') };
   Daydream.prototype.dispose.call(ctx);
   assert.ok(log.includes('stats.clear'));
 });
