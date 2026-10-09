@@ -17,7 +17,7 @@ import {
   formatSolidName,
   generateFuncAndRecipe,
   generateRecipeCpp,
-  snapToStep,
+  authoredParamRange, snapToStep,
   seedOpParams,
   opsFromRecipe,
   fanTriangulateFace,
@@ -666,7 +666,8 @@ function saveSolid() {
   }
   const shapeError = savedChainShapeError(state.base, state.ops);
   if (shapeError) {
-    showGateMsg(`rejected: ${shapeError}`);
+    showGateMsg(`rejected: the loaded or edited chain cannot be saved: ${shapeError}; `
+      + "pattern values may fall outside the editor's save grid");
     return;
   }
 
@@ -1164,7 +1165,8 @@ function updateOpParam(index, key, value, revision) {
   if (Number.isNaN(val)) {
     val = state.ops[index].params[key];
   } else if (def) {
-    val = snapToStep(val, def);
+    val = val === state.ops[index].params[key]
+      ? val : snapToStep(val, authoredParamRange(def, state.ops[index].params[key]));
   }
   const editKey = `${revision}:${index}:${key}`;
   const edit = Symbol();

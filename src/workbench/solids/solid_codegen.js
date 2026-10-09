@@ -720,6 +720,17 @@ export function generateRecipeCpp(item, baseNamespace) {
 }
 
 /**
+ * @param {OpParamDef} def - Editor range.
+ * @param {number} value - Authored value.
+ * @returns {OpParamDef} Range covering the authored value.
+ */
+export function authoredParamRange(def, value) {
+  return Number.isFinite(value)
+    ? { ...def, min: Math.min(def.min, value), max: Math.max(def.max, value) }
+    : def;
+}
+
+/**
  * Snaps a computed value onto an op parameter's step grid and clamps it into
  * range, so it is exactly representable by the control that edits it.
  * @param {number} value - The unsnapped value.
