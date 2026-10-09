@@ -10,14 +10,12 @@
  */
 
 import {
-  resolveParamSync,
   enumChoices,
   paramControlKind,
   engineParamValue,
   acceptedParamValue,
   paramExportBlocker,
   paramGenerationStale,
-  paramValueSkew,
   selectorControlValue,
   replayParameterWrites,
 } from "../effects/param_sync.js";
@@ -31,6 +29,7 @@ import {
   presentReadonlyParam,
   stageGrouping,
 } from './effect_param_controls.js';
+import { createParamValueSync } from './effect_param_values.js';
 import { formatExportParams } from "../shared/export_params.js";
 
 /** @typedef {import("./effect_param_controls.js").ParameterDefinition} ParameterDefinition */
@@ -228,8 +227,6 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   }
   /** @type {EffectRecord|null} */
   let activeEffect = null;
-  // Throttle the param/value length-skew warning to once per skew episode.
-  let skewLogged = false;
   // The unstaged-parameter set last warned about.
   let unstagedWarned = '';
   /** @type {string|undefined} */
@@ -238,6 +235,9 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     getParameterDefinitions, setEngineParam, usesChainSnapshot, getSnapshot, restoreSnapshot, chainSnapshotRestoreResults, showConfigImportNotice, logWarn
   });
   const view = createEffectPanelView({ focusedElement, guiContainer, isMobile });
+  const valueSync = createParamValueSync({
+    liveParamValues, segmentsOwnDisplay, getParameterDefinitions, focusedElement, logWarn,
+  });
   /**
    * Live per-frame parameter values for the active effect: the worker pool's
    * stream while it owns the display, else the main engine's. May be null or
@@ -304,31 +304,9 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   }
 
   /**
-   * Re-seat the effect's enum selectors on the `requestedValue`s in the
-   * engine's definitions snapshot.
-   * @param {EffectRecord} fx - The active effect record.
-   * @param {Node|null} focused - The document's focused element, or null; a
-   *   focused selector is left alone.
-   * @returns {void}
-   */
-  function adoptRequestedEnums(fx, focused) {
-    if (!fx.hasEnumControls) return;
-    for (const parameter of getParameterDefinitions()) {
-      const controller = fx.controllerByName.get(parameter.name);
-      if (!controller?.isEnum || controller.isReadonly) continue;
-      const isEditing = focused !== null
-        && controller.domElement?.contains(focused) === true;
-      const { update, value } = resolveParamSync(
-        controller.getValue(), selectorControlValue(parameter), false, isEditing);
-      if (!update) continue;
-      controller.object[controller.property] = value;
-      controller.updateDisplay();
-    }
-  }
-
-  /**
-   * Push the engine's per-frame parameter values back into the effect GUI so
-   * all rendered params track live without clobbering an active drag.
+   * Bring the panel up to date with the engine: follow a preset change,
+   * rebuild a stale schema, then push the live parameter values into the
+   * controllers without clobbering an active edit.
    * @param {boolean} [advanced] - Whether the simulation stepped this frame;
    *   gates only the enum-definition marshal.
    * @returns {void}
@@ -336,7 +314,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   function sync(advanced = true) {
     if (!activeEffect || !activeEffect.controllerByName) return;
     const presetIndex = activeEffect.preset ? getPresetIndex() : null;
-    const presetAdvanced = activeEffect.preset
+    const presetAdvanced = activeEffect.preset !== undefined
       && activeEffect.preset.state.presetIndex !== presetIndex;
     const presetSynced = !activeEffect.preset || synchronizePreset(/** @type {number} */ (presetIndex));
     const filterStale =
@@ -350,47 +328,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     if (!presetSynced) return;
     adoptPauseDisplay(activeEffect, engineAnimationsPaused());
     if (activeEffect.preset) adoptPresetDisplay(activeEffect, getPresetCount(), getPresetIndex());
-    if (!activeEffect.hasParams) return;
-    // One focus read for the whole pass: at most one element has focus.
-    const focused = focusedElement() ?? null;
-    // The definitions marshal allocates; run it only when an engine-driven
-    // selector can have moved.
-    if (!segmentsOwnDisplay() && advanced && activeEffect.hasEnumControls
-        && (activeEffect.hasAnimatedEnums || presetAdvanced)) {
-      adoptRequestedEnums(activeEffect, focused);
-    }
-
-    const values = liveParamValues();
-    if (!values || values.length === 0) return;
-
-    const names = activeEffect.paramNames;
-    if (paramValueSkew(names.length, values.length)) {
-      if (!skewLogged) {
-        logWarn(`Effect GUI: param/value length skew (${names.length} vs ${values.length}); skipping sync`);
-        skewLogged = true;
-      }
-      return;
-    }
-    skewLogged = false;
-    const n = names.length;
-    for (let i = 0; i < n; i++) {
-      const c = activeEffect.controllerByName.get(names[i]);
-      if (!c) continue;
-      if (c.isEnum && !c.isReadonly && !segmentsOwnDisplay()) continue;
-      const liveValue = c.isEnum
-        ? selectorControlValue({ value: values[i], options: c.enumOptions,
-          optionValues: c.enumOptionValues })
-        : values[i];
-
-      const isEditing = !c.isReadonly && (c.dragging
-        || (focused !== null && c.domElement?.contains(focused) === true));
-
-      const { update, value } = resolveParamSync(
-        c.getValue(), liveValue, c.isBoolean, isEditing);
-      if (!update) continue;
-      c.object[c.property] = value;
-      c.updateDisplay();
-    }
+    valueSync.syncValues(activeEffect, advanced, presetAdvanced);
   }
 
   /**
@@ -565,7 +503,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
         persistence.persist(fx.gui);
         adoptPresetDisplay(fx, count, index);
         adoptPauseDisplay(fx, engineAnimationsPaused() ?? true);
-        adoptRequestedEnums(fx, focusedElement() ?? null);
+        valueSync.adoptRequestedEnums(fx, focusedElement() ?? null);
         return true;
       };
       preset.onChange(choose);
@@ -892,7 +830,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     disposeEffect(previous);
     activeEffect = next;
     rebuildFailureGeneration = undefined;
-    skewLogged = false;
+    valueSync.resetSkew();
     if (wasMounted) {
       view.mount(next, captured.closed);
       view.restore(next, captured);
@@ -950,7 +888,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       }
       persistence.persist(activeEffect.gui, undefined, true);
       rebuildFailureGeneration = undefined;
-      skewLogged = false;
+      valueSync.resetSkew();
     },
 
     /**
