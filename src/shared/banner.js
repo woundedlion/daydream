@@ -4,7 +4,8 @@
  */
 
 /**
- * Dependency-free page-level banner and bootstrap helpers for the tool pages.
+ * Dependency-free fatal-error banners and failure reporting for the simulator
+ * and tool pages. bootstrapTool() is the tool-page entry.
  */
 
 /**
