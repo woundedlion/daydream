@@ -6,6 +6,34 @@ import { AppState, URLSync, roundUrlNumber } from '../src/app/state.js';
 import { fakeGui } from './helpers/fake_app.js';
 import { fakeElement } from './helpers/fake_dom.js';
 
+function realEngineDeps(module, engine, win, { onWrite = () => {}, warnings }) {
+  return {
+    engine: {
+      getParameterDefinitions: () => engine.getParameterDefinitions(),
+      paramGeneration: () => engine.getParamGeneration(),
+      paramValues: () => engine.getParamValues(),
+      setParam: (name, value) => {
+        const accepted = engine.setParameter(name, value) === module.ParamSetResult.APPLIED;
+        onWrite({ name, value, accepted });
+        return accepted;
+      },
+      setAnimationsPaused: (value) => engine.setAnimationsPaused(value),
+      animationsPaused: () => engine.getAnimationsPaused(),
+      getPresetCount: () => engine.getPresetCount(),
+      getPresetIndex: () => engine.getPresetIndex(),
+      synchronizePreset: (index) => engine.getPresetIndex() === index || engine.synchronizePreset(index),
+      selectPreset: (index) => engine.selectPreset(index),
+    },
+    segments: { ownsDisplay: () => false, paramValues: () => null, setParam: () => {} },
+    host: {
+      logWarn: (...args) => warnings.push(args),
+      createGui: () => new GUI(fakeGui('widgets'), 'fx', null, win),
+      container: () => fakeElement('div'), isMobile: () => false,
+      applyEffect: () => {}, dragTarget: fakeElement('window'),
+    },
+  };
+}
+
 for (const scenario of ['raw', 'companions', 'singular']) {
   test(`coupled Mobius URL hydration settles before canonicalization (${scenario})`, async () => {
     const { default: createModule } = await import('../generated/holosphere_wasm.js');
@@ -30,34 +58,15 @@ for (const scenario of ['raw', 'companions', 'singular']) {
     };
     const sync = new URLSync(new AppState({ effect: 'MobiusGrid' }), ['effect'], {}, win);
     const writes = [];
-    const panel = createEffectGui({
-      engine: {
-        getParameterDefinitions: () => engine.getParameterDefinitions(),
-        paramGeneration: () => engine.getParamGeneration(),
-        paramValues: () => engine.getParamValues(),
-        setParam: (name, value) => {
-          const accepted = engine.setParameter(name, value) === module.ParamSetResult.APPLIED;
-          writes.push({ name, value, accepted });
-          return accepted;
-        },
-        setAnimationsPaused: (value) => engine.setAnimationsPaused(value),
-        animationsPaused: () => engine.getAnimationsPaused(),
-        getPresetCount: () => engine.getPresetCount(),
-        getPresetIndex: () => engine.getPresetIndex(),
-        synchronizePreset: (index) => engine.synchronizePreset(index),
-        selectPreset: (index) => engine.selectPreset(index),
-      },
-      segments: { ownsDisplay: () => false, paramValues: () => null, setParam: () => {} },
-      host: {
-        createGui: () => new GUI(fakeGui('widgets'), 'fx', null, win),
-        container: () => fakeElement('div'), isMobile: () => false,
-        applyEffect: () => {}, dragTarget: fakeElement('window'),
-      },
-    });
+    const warnings = [];
+    const panel = createEffectGui(realEngineDeps(module, engine, win, {
+      onWrite: (write) => writes.push(write), warnings,
+    }));
     try {
       panel.build();
       panel.mount();
       sync.flush();
+      assert.deepEqual(warnings, []);
       const actual = Object.fromEntries(engine.getParameterDefinitions()
         .filter(p => Object.hasOwn(target, p.name)).map(p => [p.name, p.acceptedValue]));
       if (scenario !== 'singular') {
@@ -100,29 +109,7 @@ test('preset values survive URL reload after flushed or pending parameter edits'
     const engine = new module.HolosphereEngine();
     engine.setResolution(96, 20);
     engine.setEffect('AlienBrain');
-    const panel = createEffectGui({
-      engine: {
-        getParameterDefinitions: () => engine.getParameterDefinitions(),
-        paramGeneration: () => engine.getParamGeneration(),
-        paramValues: () => engine.getParamValues(),
-        setParam: (name, value) => engine.setParameter(name, value) === module.ParamSetResult.APPLIED,
-        setAnimationsPaused: (value) => engine.setAnimationsPaused(value),
-        animationsPaused: () => engine.getAnimationsPaused(),
-        getPresetCount: () => engine.getPresetCount(),
-        getPresetIndex: () => engine.getPresetIndex(),
-        synchronizePreset: (index) => engine.synchronizePreset(index),
-        selectPreset: (index) => engine.selectPreset(index),
-      },
-      segments: { ownsDisplay: () => false, paramValues: () => null, setParam: () => {} },
-      host: {
-        logWarn: (...args) => warnings.push(args),
-        createGui: () => new GUI(fakeGui('widgets'), 'fx', null, win),
-        container: () => null,
-        isMobile: () => false,
-        applyEffect: () => {},
-        dragTarget: fakeElement('window'),
-      },
-    });
+    const panel = createEffectGui(realEngineDeps(module, engine, win, { warnings }));
     const speed = () => engine.getParameterDefinitions()
       .find((parameter) => parameter.name === 'Speed').acceptedValue;
     const reload = () => {
