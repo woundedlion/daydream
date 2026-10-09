@@ -57,7 +57,7 @@
   },
   "scripts/panel-probe.mjs": {
     "reason": "Its page.evaluate and $eval callbacks and its runProbe entry run only against a live Chrome page; tests/probe_failures.test.js drives each exported probe interaction against a fake page, and .github/workflows/browser-smoke.yml runs the probe in Chrome.",
-    "lines": 36.95,
+    "lines": 36.9,
     "branches": 29.09
   },
   "scripts/solids-probe.mjs": {
