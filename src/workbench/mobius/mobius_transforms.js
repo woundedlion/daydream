@@ -91,9 +91,9 @@ export function stereo(v) {
  * Projection-domain complex division for the stereographic/Mobius maps.
  * @param {{re:number, im:number}} num - Numerator.
  * @param {{re:number, im:number}} den - Divisor.
- * @returns {{re:number, im:number}} num/den, except a quotient whose magnitude would reach STEREO_INF collapses to the sentinel along the numerator's direction.
+ * @returns {{re:number, im:number}} num/den, except a quotient whose magnitude would reach STEREO_INF collapses to the sentinel along the quotient's direction (the numerator's when the divisor is zero).
  * @details The guard is relative, so a near-singular divisor yields a finite
- * point carrying the numerator's azimuth. An exactly zero numerator returns
+ * point carrying the quotient's azimuth. An exactly zero numerator returns
  * (0,0). A nonzero divisor whose square is subnormal or zero is lifted by
  * STEREO_UNDERFLOW_LIFT along with the numerator.
  */
@@ -112,13 +112,21 @@ export function projectDiv(num, den) {
   }
   const numMag = numRe * numRe + numIm * numIm;
   if (numMag >= denom * (STEREO_INF * STEREO_INF)) {
-    // Normalize by the peak component first: a numerator squared far above the
-    // sentinel overflows to infinity and one far below it underflows to zero,
-    // and either collapses the direction onto the origin.
+    // Normalize each operand by its peak component first: a value squared far
+    // above the sentinel overflows to infinity and one far below it underflows
+    // to zero, and either collapses the direction onto the origin.
     const peak = Math.max(Math.abs(num.re), Math.abs(num.im));
     if (peak === 0.0) return { re: 0.0, im: 0.0 };
-    const re = num.re / peak;
-    const im = num.im / peak;
+    let re = num.re / peak;
+    let im = num.im / peak;
+    const denPeak = Math.max(Math.abs(den.re), Math.abs(den.im));
+    if (denPeak > 0.0) {
+      const dRe = den.re / denPeak;
+      const dIm = den.im / denPeak;
+      const qRe = re * dRe + im * dIm;
+      im = im * dRe - re * dIm;
+      re = qRe;
+    }
     const scale = STEREO_INF / Math.sqrt(re * re + im * im);
     return { re: re * scale, im: im * scale };
   }
@@ -163,6 +171,14 @@ export const glslProjectionFunctions = `
             if (peak == 0.0) return CNum(0.0, 0.0);
             float re = num.re / peak;
             float im = num.im / peak;
+            float den_peak = max(abs(den.re), abs(den.im));
+            if (den_peak > 0.0) {
+              float d_re = den.re / den_peak;
+              float d_im = den.im / den_peak;
+              float q_re = re * d_re + im * d_im;
+              im = im * d_re - re * d_im;
+              re = q_re;
+            }
             float scale = STEREO_INF / sqrt(re * re + im * im);
             return CNum(re * scale, im * scale);
           }
