@@ -222,7 +222,7 @@ export class SegmentController {
     /** @type {ReturnType<typeof setTimeout> | null} */
     this.renderWatchdog = null;
 
-    // This pool's transient-module-load retry index (0 for a user-driven create).
+    // This pool's pre-ready boot retry index (0 for a user-driven create).
     this.bootAttempt = 0;
     /** @type {ReturnType<typeof setTimeout> | null} */
     this.retryTimer = null;
