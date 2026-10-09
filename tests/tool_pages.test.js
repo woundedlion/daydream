@@ -106,8 +106,6 @@ const SERVED_PAGES = servedPages().map((page) => ({
   scripts: scriptsOf(page),
 }));
 
-// 'unsafe-inline' admits font links' onerror fallback handlers and the import
-// map injected by vendor-importmap.js on pages that load it.
 const SCRIPT_SRC = {
   'tools/lissajous.html': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
   'tools/mobius.html': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
