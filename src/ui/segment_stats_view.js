@@ -241,7 +241,7 @@ export class SegmentStatsView {
     const table = this.doc.createElement('table');
     const caption = this.doc.createElement('caption');
     caption.className = 'visually-hidden';
-    caption.textContent = 'Per-segment compute time, scratch high-water marks and persistent usage';
+    caption.textContent = 'Per-segment range, compute time, scratch high-water marks and persistent usage';
     table.appendChild(caption);
     /** @param {string} text - Column header label. */
     const colHeader = (text) => {
@@ -279,7 +279,7 @@ export class SegmentStatsView {
     const notices = this.doc.createElement('div');
     notices.className = 'visually-hidden';
 
-    mkRow([colHeader(''), colHeader('Range'), colHeader('Compute'),
+    mkRow([colHeader('Segment'), colHeader('Range'), colHeader('Compute'),
            colHeader('Scr A KiB'), colHeader('Scr B KiB'), colHeader('Persist KiB')]);
 
     const rows = [];
