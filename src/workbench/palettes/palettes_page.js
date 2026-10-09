@@ -6,7 +6,6 @@
  */
 import { copyToClipboard, wireCopyBlock } from '../../shared/clipboard.js';
 import { replaceUrl } from '../../app/state.js';
-import { createSliderProxy } from '../../shared/slider.js';
 import { showFatalError, bootstrapTool } from '../../shared/banner.js';
 import { linearRgbToHex } from '../../shared/color.js';
 import {
@@ -20,20 +19,16 @@ import {
   createPaletteViewport,
   axisControlState, PALETTE_AXIS_CONTROLS,
   paletteTabFromSearch, paletteTabUrl, tablistKeyTarget,
-  PaletteV4, PALETTE_CONTROL_IDS,
+  PALETTE_CONTROL_IDS,
   PALETTE_RECIPE_PRESETS, paletteRecipeAvailability,
   zoomRecipeWindow, paletteStripView, waveGraphLabel,
   stripDragIntent,
-  hitTestHueKeyMarker,
-  hueKeyState, customHueKeyState, customHueSweepRepresentable,
 } from './palette_controls.js';
 import { PaletteRecipeModel } from './palette_recipe_model.js';
 import { mountProceduralSliders } from './procedural_sliders.js';
 import { createColorStripPainter, drawWaveGraph } from './palette_canvas.js';
-import {
-  createHueKeyWheelPainter, canvasPoint, wheelTurnAt,
-  hueKeyNudgeTurns, hueKeyHandoff, HUE_KEY_NAMES, HUE_KEY_GRAB_RADIUS,
-} from './palette_wheel.js';
+import { createHueKeyWheelPainter } from './palette_wheel.js';
+import { createHueKeyWheel } from './hue_key_wheel_controller.js';
 import { standDownIfHalted } from '../../shared/engine_halt.js';
 import { wireFlyout } from '../../shared/flyout.js';
 import { createFrameScheduler, onPageTeardown } from '../../shared/page_lifecycle.js';
@@ -84,193 +79,9 @@ let effectPalettePresets = [];
 const paletteViewport = createPaletteViewport();
 
 let hueKeyWheelCanvas, hueKeyWheelCtx;
-let hueKeyWheelPainter = null;
-let hueKeyWheelScale = 1;
-// Hit-test the last painted canonical recipe, including when compilation leaves the prior wheel visible.
-let hueKeyWheelDrawnPoints = [];
-let activeHueKey = null;
-let hueKeyDrag = null;
-let selectedHueKey = 0;
-// Off-screen role="slider" proxies, one per hue key, announcing its position
-// through aria-valuenow/aria-valuetext.
-let hueKeyHandles = [];
+let hueKeyWheel = null;
 
 const fullViewport = Object.freeze({ start: 0, end: 1 });
-
-function clearHueKeyStatus() {
-  document.getElementById('hue_key_status').textContent = '';
-}
-
-/**
- * Switch the recipe into CUSTOM hue mode, authoring the three keys the
- * handoff starts from.
- * @returns {boolean} False when resampling cannot preserve the selected hue
- *   key or the LOOP sweep's closing hue.
- */
-function activateCustomHue() {
-  const sourceRecipe = recipeModel.recipe();
-  if (!customHueSweepRepresentable(sourceRecipe)) {
-    document.getElementById('hue_key_status').textContent =
-      'This loop sweep cannot be preserved by three custom hue keys. Reduce the sweep before switching to CUSTOM.';
-    return false;
-  }
-  const handoff = hueKeyHandoff(hueKeyState(sourceRecipe),
-    customHueKeyState(sourceRecipe), selectedHueKey, activeHueKey);
-  selectedHueKey = handoff.selectedKey;
-  if (!handoff.kept) {
-    document.getElementById('hue_key_status').textContent =
-      'This hue key is omitted when these keys are resampled to three custom keys. Choose another key.';
-    return false;
-  }
-  clearHueKeyStatus();
-  recipeModel.activateCustomHues();
-  activeHueKey = handoff.activeKey;
-  renderRecipeControls();
-  return true;
-}
-
-function currentHueKeyState(recipe) {
-  if (recipe.hue.mode === PaletteV4.hueMode.CUSTOM) {
-    return { baseTurns: recipeModel.baseHueTurns, offsets: recipeModel.customHueOffsets() };
-  }
-  return hueKeyState(recipe);
-}
-
-function drawHueKeyWheel(recipe) {
-  if (!hueKeyWheelPainter) return;
-  const state = currentHueKeyState(recipe);
-  const lightnessKeys = recipe.lightness.custom.slice(0, state.offsets.length);
-  const { points, degrees, scale } = hueKeyWheelPainter.draw({
-    lightness: recipe.lightness.curve === PaletteV4.curve.CUSTOM
-      ? lightnessKeys.reduce((sum, value) => sum + value, 0) / lightnessKeys.length
-      : recipe.lightness.center,
-    state,
-    activeKey: activeHueKey,
-    selectedKey: selectedHueKey,
-  });
-  hueKeyWheelDrawnPoints = points;
-  hueKeyWheelScale = scale;
-  selectedHueKey = Math.min(selectedHueKey, points.length - 1);
-  syncHueKeyHandles(degrees);
-}
-
-/**
- * Build one off-screen slider handle per hue key and attach them to the
- * wheel's group. Focusing a handle selects its key.
- * @param {HTMLElement} group - The wheel's role="group" wrapper.
- * @returns {void}
- */
-function mountHueKeyHandles(group) {
-  hueKeyHandles = HUE_KEY_NAMES.map((name, index) => {
-    const handle = createSliderProxy({ label: `Hue key ${name}`, min: 0, max: 360,
-      keys: 'ArrowLeft ArrowRight ArrowUp ArrowDown '
-        + 'Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown' });
-    handle.hidden = true;
-    handle.addEventListener('focus', () => {
-      selectedHueKey = index;
-      scheduleUpdate();
-    });
-    handle.addEventListener('keydown', (event) => handleHueKeyNudge(event, index));
-    group.appendChild(handle);
-    return handle;
-  });
-}
-
-/**
- * Republish each key's hue on its slider handle, and take the handles a
- * shorter key set no longer has out of the tab order and the accessibility
- * tree. Focus moves to the last surviving handle before its own is hidden.
- * @param {number[]} degrees - Every drawn key's hue, in whole degrees.
- * @returns {void}
- */
-function syncHueKeyHandles(degrees) {
-  hueKeyHandles.forEach((handle, index) => {
-    if (index < degrees.length) {
-      handle.hidden = false;
-      handle.setAttribute('aria-valuenow', String(degrees[index]));
-      handle.setAttribute('aria-valuetext', `${degrees[index]} degrees`);
-      return;
-    }
-    if (handle === document.activeElement && degrees.length > 0)
-      hueKeyHandles[degrees.length - 1].focus();
-    handle.hidden = true;
-  });
-}
-
-function wheelPointerPosition(event) {
-  return canvasPoint(event.clientX, event.clientY,
-    innerRect(hueKeyWheelCanvas),
-    hueKeyWheelCanvas.width, hueKeyWheelCanvas.height);
-}
-
-function updateHueKeyFromPointer(event) {
-  if (activeHueKey === null) return;
-  const position = wheelPointerPosition(event);
-  const pointerTurn = wheelTurnAt(position.x, position.y,
-    hueKeyWheelCanvas.width, hueKeyWheelCanvas.height);
-  recipeModel.moveHueKey(activeHueKey, pointerTurn);
-  scheduleUpdate();
-}
-
-function handleHueWheelPointerDown(event) {
-  const position = wheelPointerPosition(event);
-  activeHueKey = hitTestHueKeyMarker(position.x, position.y,
-    hueKeyWheelDrawnPoints, HUE_KEY_GRAB_RADIUS * hueKeyWheelScale);
-  if (activeHueKey === null) return false;
-  selectedHueKey = activeHueKey;
-  hueKeyWheelCanvas.style.cursor = 'grabbing';
-  scheduleUpdate();
-}
-
-function handleHueWheelPointerMove(event) {
-  if (recipeModel.recipe().hue.mode !== PaletteV4.hueMode.CUSTOM
-      && !activateCustomHue()) {
-    hueKeyDrag.stop();
-    return;
-  }
-  updateHueKeyFromPointer(event);
-}
-
-function handleHueWheelPointerHover(event) {
-  const position = wheelPointerPosition(event);
-  const marker = hitTestHueKeyMarker(position.x, position.y,
-    hueKeyWheelDrawnPoints, HUE_KEY_GRAB_RADIUS * hueKeyWheelScale);
-  hueKeyWheelCanvas.style.cursor = marker === null ? 'default' : 'grab';
-}
-
-function handleHueWheelPointerEnd() {
-  activeHueKey = null;
-  hueKeyWheelCanvas.style.cursor = 'default';
-  scheduleUpdate();
-}
-
-/**
- * Nudge one hue key from its own slider handle.
- * @param {KeyboardEvent} event - The handle's keydown.
- * @param {number} keyIndex - Which key the handle stands for.
- * @returns {void}
- */
-function handleHueKeyNudge(event, keyIndex) {
-  const delta = hueKeyNudgeTurns(event.key, event.shiftKey);
-  if (delta === null) return;
-  selectedHueKey = keyIndex;
-
-  if (recipeModel.recipe().hue.mode !== PaletteV4.hueMode.CUSTOM
-      && !activateCustomHue()) {
-    // CUSTOM cannot preserve the sweep's closing hue or the selected key;
-    // redraw without nudging.
-    scheduleUpdate();
-    event.preventDefault();
-    return;
-  }
-  if (selectedHueKey !== keyIndex) {
-    drawHueKeyWheel(recipeModel.recipe());
-    hueKeyHandles[selectedHueKey].focus();
-  }
-  recipeModel.nudgeHueKey(selectedHueKey, delta);
-  scheduleUpdate();
-  event.preventDefault();
-}
 
 function renderRecipeWindow() {
   const offsetSlider = document.getElementById(PALETTE_CONTROL_IDS.offset);
@@ -442,7 +253,7 @@ function renderRecipeControls() {
 }
 
 function loadRecipe(recipe) {
-  clearHueKeyStatus();
+  hueKeyWheel.clearStatus();
   recipeModel.loadRecipe(recipe);
   renderRecipeControls();
   scheduleUpdate();
@@ -702,7 +513,7 @@ function redrawForViewport() {
   drawColorStrip();
   drawPaletteWaveGraph();
   if (activeTab === 'generative' && palette?.canonicalRecipe)
-    drawHueKeyWheel(palette.canonicalRecipe);
+    hueKeyWheel.draw(palette.canonicalRecipe);
   updateStripView();
   updatePaletteCodeOutput();
   syncResetZoomButton();
@@ -801,7 +612,7 @@ function updatePalette() {
 
   drawPaletteWaveGraph();
   if (activeTab === 'generative')
-    drawHueKeyWheel(palette.canonicalRecipe);
+    hueKeyWheel.draw(palette.canonicalRecipe);
   drawColorStrip();
   updateStripView();
   syncResetZoomButton();
@@ -881,9 +692,14 @@ async function init() {
     canvas: colorStripCanvas,
     ctx: colorStripCtx,
   });
-  hueKeyWheelPainter = createHueKeyWheelPainter({
+  hueKeyWheel = createHueKeyWheel({
+    model: recipeModel,
+    scheduleUpdate,
+    onRecipeChange: renderRecipeControls,
     canvas: hueKeyWheelCanvas,
-    ctx: hueKeyWheelCtx,
+    group: document.getElementById('hueKeyWheelGroup'),
+    status: document.getElementById('hue_key_status'),
+    painter: createHueKeyWheelPainter({ canvas: hueKeyWheelCanvas, ctx: hueKeyWheelCtx }),
   });
 
   // Tab buttons; activation follows focus.
@@ -906,13 +722,13 @@ async function init() {
 
   // Generative palette controls.
   const baseHueSlider = document.getElementById(PALETTE_CONTROL_IDS.baseHueDegrees);
-  baseHueSlider.addEventListener('keydown', handleBaseHueKeyDown);
+  baseHueSlider.addEventListener('keydown', hueKeyWheel.onBaseHueKeyDown);
   baseHueSlider.addEventListener('input', handleBaseHueInput);
 
   for (const reading of RECIPE_SELECT_READINGS) {
     document.getElementById(PALETTE_CONTROL_IDS[reading]).addEventListener('change', (event) => {
-      clearHueKeyStatus();
-      if (reading === 'hueMode') handleHueModeChange(event.target.value);
+      hueKeyWheel.clearStatus();
+      if (reading === 'hueMode') hueKeyWheel.onHueModeChange(event.target.value);
       else recipeModel.setChoice(reading, event.target.value);
       renderRecipeControls();
       scheduleUpdate();
@@ -939,7 +755,7 @@ async function init() {
 
   for (const { reading, id, scale } of recipeSliderDefinitions) {
     document.getElementById(id).addEventListener('input', (event) => {
-      clearHueKeyStatus();
+      hueKeyWheel.clearStatus();
       recipeModel.setAmount(reading, Number(event.target.value) / scale);
       renderRecipeControls();
       scheduleUpdate();
@@ -954,14 +770,6 @@ async function init() {
 
   window.addEventListener('resize', scheduleViewportRedraw);
 
-  hueKeyDrag = createPointerDrag({
-    element: hueKeyWheelCanvas,
-    onStart: handleHueWheelPointerDown,
-    onMove: handleHueWheelPointerMove,
-    onHover: handleHueWheelPointerHover,
-    onEnd: handleHueWheelPointerEnd,
-  });
-  mountHueKeyHandles(document.getElementById('hueKeyWheelGroup'));
 
   stripDrag = createPointerDrag({
     element: colorStripCanvas,
@@ -996,13 +804,11 @@ async function init() {
     if (copyFeedbackTimer !== null) clearTimeout(copyFeedbackTimer);
     proceduralSliders.dispose();
     teardownExportFlyout();
-    baseHueSlider.removeEventListener('keydown', handleBaseHueKeyDown);
+    baseHueSlider.removeEventListener('keydown', hueKeyWheel.onBaseHueKeyDown);
     window.removeEventListener('resize', scheduleViewportRedraw);
     stripDrag.remove();
     colorStripCanvas.removeEventListener('keydown', handleStripKeyDown);
-    hueKeyDrag.remove();
-    for (const handle of hueKeyHandles) handle.remove();
-    hueKeyHandles = [];
+    hueKeyWheel.dispose();
     setPaletteOps(null);
     if (wasmModule?.HS_MODULE_DEAD !== true)
       paletteOps?.delete();
@@ -1017,29 +823,4 @@ function handleBaseHueInput(event) {
   recipeModel.setBaseHue(Number(event.target.value) / 360);
   renderBaseHue();
   scheduleUpdate();
-}
-
-function handleBaseHueKeyDown(event) {
-  const delta = hueKeyNudgeTurns(event.key, event.shiftKey);
-  if (delta === null) return;
-  event.preventDefault();
-  recipeModel.nudgeBaseHue(delta);
-  renderBaseHue();
-  scheduleUpdate();
-}
-
-/**
- * Apply the hue distribution the select chose. Entering CUSTOM resamples the
- * keys from the first one; a refused handoff keeps the previous mode.
- * @param {string} mode - A PaletteV4.hueMode member name.
- * @returns {void}
- */
-function handleHueModeChange(mode) {
-  if (mode === 'CUSTOM' && recipeModel.reading('hueMode') !== 'CUSTOM') {
-    selectedHueKey = 0;
-    activeHueKey = null;
-    activateCustomHue();
-  } else {
-    recipeModel.applyHueModeTransition(mode);
-  }
 }
