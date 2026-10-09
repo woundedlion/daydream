@@ -723,7 +723,7 @@ test('URLSync construction disposes the previous writer', () => {
     assert.equal(first.unsubscribe, null, 'the orphan dropped its subscription');
 
     s.set('effect', 'Moire');
-    mock.timers.tick(200);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
     assert.equal(calls.length, 1, 'only the live writer flushes');
   } finally {
     mock.timers.reset();
@@ -749,7 +749,7 @@ test('URLSync.dispose stops a later setParam from re-arming the flush', () => {
     sync.dispose();
     sync.setParam('resolution', 'high'); // a stale reference writing into a discarded page
     sync.schedule();
-    mock.timers.tick(200);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
 
     assert.equal(calls.length, 0, 'a disposed writer never touches history');
   } finally {
@@ -1022,12 +1022,12 @@ test('URLSync auto-flushes a tracked-key change once after the debounce', () => 
     const s = new AppState({ effect: 'Voronoi' });
     new URLSync(s, ['effect']);
 
-    s.set('effect', 'Moire'); // arms the 200 ms debounce
+    s.set('effect', 'Moire'); // arms the debounce
     assert.equal(calls.length, 0, 'no synchronous write on set');
-    mock.timers.tick(199);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS - 1);
     assert.equal(calls.length, 0, 'nothing before the debounce elapses');
     mock.timers.tick(1);
-    assert.equal(calls.length, 1, 'exactly one debounced write at 200 ms');
+    assert.equal(calls.length, 1, 'exactly one write once the debounce elapses');
     const params = new URLSearchParams(calls[0].split('?')[1]);
     assert.equal(params.get('effect'), 'Moire', 'the new value is written');
   } finally {
@@ -1078,7 +1078,7 @@ test('URLSync corrects a URL advertising a rejected value, and converges', () =>
     new URLSync(s, ['effect'], { effect: (v) => v === 'Voronoi' });
 
     assert.equal(calls.length, 0, 'no synchronous write on construction');
-    mock.timers.tick(200);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
     assert.equal(calls.length, 1, 'exactly one corrective write');
     const search = `?${calls[0].split('?')[1]}`;
     const params = new URLSearchParams(search);
@@ -1088,7 +1088,7 @@ test('URLSync corrects a URL advertising a rejected value, and converges', () =>
     getActiveURLSync().dispose();
     const reloaded = installRecordingWindow(search, '/sim');
     new URLSync(new AppState({ effect: 'Voronoi' }), ['effect'], { effect: (v) => v === 'Voronoi' });
-    mock.timers.tick(200);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
     assert.equal(reloaded.length, 0, 'the corrected URL rewrites nothing on reload');
   } finally {
     mock.timers.reset();
@@ -1102,7 +1102,7 @@ test('URLSync rewrites a URL value it accepted in a non-canonical form', () => {
     const s = new AppState({ flag: false, count: 0 });
     new URLSync(s, ['flag', 'count']);
 
-    mock.timers.tick(200);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
     assert.equal(calls.length, 1, 'exactly one corrective write');
     const params = new URLSearchParams(calls[0].split('?')[1]);
     assert.equal(params.get('flag'), 'true');
@@ -1119,7 +1119,7 @@ test('URLSync writes nothing when the URL already matches state', () => {
     const s = new AppState({ effect: 'Voronoi', count: 0 });
     new URLSync(s, ['effect', 'count']);
 
-    mock.timers.tick(200);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
     assert.equal(calls.length, 0, 'a faithful URL is left alone');
   } finally {
     mock.timers.reset();
@@ -1156,11 +1156,11 @@ test('URLSync.reset collapses into the pending debounced flush', () => {
     const s = new AppState({ effect: 'Voronoi' });
     const sync = new URLSync(s, ['effect']);
 
-    s.set('effect', 'Moire'); // arms the 200 ms debounce
+    s.set('effect', 'Moire'); // arms the debounce
     sync.reset();
     assert.equal(calls.length, 0, 'no write outside the debounce');
 
-    mock.timers.tick(200);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
     assert.equal(calls.length, 1, 'the reset and the pending change share one write');
     const params = new URLSearchParams(calls[0].split('?')[1]);
     assert.equal(params.get('effect'), 'Moire', 'reset re-asserted current state');
@@ -1185,7 +1185,7 @@ test('a burst of resets costs a single URL write', () => {
       s.set('effect', effect);
       sync.reset(['effect']);
     }
-    mock.timers.tick(200);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
 
     assert.equal(calls.length, 1);
     const params = new URLSearchParams(calls[0].split('?')[1]);
