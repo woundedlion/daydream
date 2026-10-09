@@ -262,7 +262,8 @@ function checkedGroup(group, members, required, defaults = /** @type {D} */ ({})
  *   value-stream slot. A change rebuilds the panel.
  * @param {(message: string, error?: any) => void} [deps.host.logWarn] - Console sink.
  * @returns {{active: () => Object|null, liveParamValues: () => ArrayLike<number>|null,
- *   movePreset: (delta: number) => boolean, build: () => void,
+ *   movePreset: (delta: number) => boolean,
+ *   build: (options?: {restoreStored?: boolean}) => void,
  *   applyAnimationPause: () => void, mount: () => void,
  *   sync: (advanced?: boolean) => void,
  *   destroy: () => void}}
