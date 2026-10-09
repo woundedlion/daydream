@@ -18,14 +18,8 @@ import { applyOp, meshOpFailure, requireMeshResult } from './solid_codegen.js';
 /** @typedef {import('./solid_codegen.js').MeshWrapper} MeshWrapper */
 /** @typedef {import('./solid_codegen.js').WasmModule} WasmModule */
 
-/**
- * A mesh vertex, as much of THREE.Vector3's shape as the page's readers need.
- * @typedef {Object<string, any>} Vertex
- */
-
-/**
- * @typedef {{vertices: Vertex[], faces: Array<Array<number>>}} SolidMeshData
- */
+/** @typedef {import('./solid_render.js').Vertex} Vertex */
+/** @typedef {import('./solid_render.js').SolidMeshData} SolidMeshData */
 
 /**
  * The live wiring one build runs against. Read per call: an engine trap nulls
