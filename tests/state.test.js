@@ -685,8 +685,8 @@ test('overlayUrlParam serializes a boolean through String(val)', () => {
 
 test('overlayUrlParam rounds numbers and deletes values with no URL form', () => {
   const params = new URLSearchParams('keep=1&speed=9');
-  overlayUrlParam(params, 'speed', 1.234567);
-  assert.equal(params.get('speed'), '1.234567', 'a float is cut to 7 significant digits');
+  overlayUrlParam(params, 'speed', 1.23456789);
+  assert.equal(params.get('speed'), '1.234568', 'a float is cut to 7 significant digits');
   overlayUrlParam(params, 'count', 42);
   assert.equal(params.get('count'), '42', 'an integer keeps no decimal tail');
   for (const empty of [null, undefined, NaN, Infinity]) {
