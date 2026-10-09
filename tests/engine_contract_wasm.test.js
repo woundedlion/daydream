@@ -40,6 +40,7 @@ const chainCall = (target, method, payload) => callWorkbenchBinding(target, 'get
 const engine = new M.HolosphereEngine();
 assert.equal(M.HolosphereEngine.isLive(), true);
 const initialDisplayAngles = [engine.getDisplayNorthPhi(), engine.getDisplaySouthPhi()];
+const initialPoleLod = engine.getPoleLod();
 
 test('typed authoring handles track effect incarnations and reject unsupported effects', () => {
   engine.setEffect('Comets');
@@ -980,7 +981,7 @@ test('getParamGeneration and setPoleLod stay exported', () => {
 
   assert.equal(typeof engine.setPoleLod, 'function',
     'setPoleLod must stay callable (pole_lod.js binds the Pole LOD slider to it)');
-  assert.equal(engine.getPoleLod(), 0,
+  assert.equal(initialPoleLod, 0,
     'a fresh engine must start undecimated (HS_POLE_LOD_DEFAULT)');
   // The Pole LOD setting reads back across [0, 2].
   for (const v of [0, 1, 2]) {
