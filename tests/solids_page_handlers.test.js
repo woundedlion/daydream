@@ -7,6 +7,35 @@ import { fakeElement } from './helpers/fake_dom.js';
 
 const handler = pageHandlers(new URL('../src/workbench/solids/solids_page.js', import.meta.url));
 
+test('star thumbnails are load buttons while base solids retain radio selection', () => {
+  const state = { base: 'cube' };
+  const configure = handler('configureBaseSolidThumbnail', {
+    state, islamicStarPatterns: ['cube_hankin'], handleBaseSolidKeyDown() {}, selectBaseSolid() {},
+  });
+  const cube = fakeElement('button');
+  const tetrahedron = fakeElement('button');
+  const star = fakeElement('button');
+  configure(cube, 'cube');
+  configure(tetrahedron, 'tetrahedron');
+  configure(star, 'cube_hankin');
+  assert.equal(cube.getAttribute('role'), 'radio');
+  assert.equal(cube.getAttribute('aria-checked'), 'true');
+  assert.equal(tetrahedron.getAttribute('aria-checked'), 'false');
+  assert.equal(star.getAttribute('role'), null);
+  assert.equal(star.getAttribute('aria-checked'), null);
+  assert.equal(star.tabIndex, 0);
+  state.base = 'tetrahedron';
+  handler('highlightBaseSolid', {
+    state, document: { querySelectorAll(selector) {
+      assert.equal(selector, '.thumb-btn[role="radio"]');
+      return [cube, tetrahedron];
+    } },
+  })();
+  assert.equal(cube.getAttribute('aria-checked'), 'false');
+  assert.equal(tetrahedron.getAttribute('aria-checked'), 'true');
+  assert.equal(star.getAttribute('aria-checked'), null);
+});
+
 test('status messages retain failures and clear confirmations', () => {
   const status = { innerText: '' };
   const timers = new Map();

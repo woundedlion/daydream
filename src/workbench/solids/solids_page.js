@@ -293,14 +293,15 @@ function handleBaseSolidKeyDown(event) {
     : ['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 0;
   if (!delta) return;
   event.preventDefault();
-  const choices = [...document.querySelectorAll('.thumb-btn')];
+  const choices = [...document.querySelectorAll('.thumb-btn[role="radio"]')];
   const next = choices[(choices.indexOf(event.currentTarget) + delta + choices.length) % choices.length];
   choices.forEach(choice => { choice.tabIndex = choice === next ? 0 : -1; });
   next.focus();
 }
 
 async function generateThumbnails(signal) {
-  const footer = document.getElementById('footer');
+  const baseSolids = document.getElementById('baseSolids');
+  const starPatterns = document.getElementById('starPatterns');
 
   const thumbKeys = [...simpleSolids, ...islamicStarPatterns];
 
@@ -366,15 +367,7 @@ async function generateThumbnails(signal) {
       offRenderer.render(offScene, offCamera);
 
       const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = `thumb-btn ${state.base === key ? 'active' : ''}`;
-      if (islamicStarPatterns.includes(key)) btn.classList.add('thumb-star');
-      btn.setAttribute('role', 'radio');
-      btn.setAttribute('aria-checked', state.base === key ? 'true' : 'false');
-      btn.tabIndex = state.base === key ? 0 : -1;
-      btn.addEventListener('keydown', handleBaseSolidKeyDown);
-      btn.dataset.solid = key; // identify the base so restoreSolid can re-highlight it
-      btn.addEventListener('click', () => selectBaseSolid(key, btn));
+      configureBaseSolidThumbnail(btn, key);
 
       const img = document.createElement('img');
       img.alt = '';
@@ -400,7 +393,7 @@ async function generateThumbnails(signal) {
       btn.appendChild(img);
       btn.appendChild(span);
       btn.appendChild(fullName);
-      footer.appendChild(btn);
+      (islamicStarPatterns.includes(key) ? starPatterns : baseSolids).appendChild(btn);
 
       // Free the per-iteration geometry GPU buffers.
       geo.dispose();
@@ -412,6 +405,27 @@ async function generateThumbnails(signal) {
     offRenderer.dispose();
     offRenderer.forceContextLoss();
   }
+}
+
+/**
+ * Configures a base-solid radio or a star-pattern load button.
+ * @param {HTMLButtonElement} btn - Thumbnail button.
+ * @param {string} key - Registry solid name.
+ * @returns {void}
+ */
+function configureBaseSolidThumbnail(btn, key) {
+  btn.type = 'button';
+  btn.className = `thumb-btn ${state.base === key ? 'active' : ''}`;
+  if (islamicStarPatterns.includes(key)) {
+    btn.classList.add('thumb-star');
+  } else {
+    btn.setAttribute('role', 'radio');
+    btn.setAttribute('aria-checked', state.base === key ? 'true' : 'false');
+    btn.tabIndex = state.base === key ? 0 : -1;
+    btn.addEventListener('keydown', handleBaseSolidKeyDown);
+  }
+  btn.dataset.solid = key;
+  btn.addEventListener('click', () => selectBaseSolid(key, btn));
 }
 
 /**
@@ -953,7 +967,7 @@ function applyRestore(item) {
 }
 
 function highlightBaseSolid() {
-  document.querySelectorAll('.thumb-btn').forEach(b => {
+  document.querySelectorAll('.thumb-btn[role="radio"]').forEach(b => {
     const selected = b.dataset.solid === state.base;
     b.classList.toggle('active', selected);
     b.setAttribute('aria-checked', selected ? 'true' : 'false');
