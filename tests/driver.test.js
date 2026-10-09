@@ -189,6 +189,14 @@ test('setCanvasSize switches to the compact layout at the breakpoint', () => {
   assert.equal(narrow.compactViewport, true);
 });
 
+test('the page stylesheet switches layout at the mobile breakpoint', () => {
+  const css = readFileSync(new URL('../styles/index.css', import.meta.url), 'utf8');
+  const queries = [...css.matchAll(/@media[^{]*\(width\s*(<=|>)\s*(\d+)px\)/g)]
+    .map(([, op, width]) => [op, Number(width)]);
+  assert.deepEqual(queries.map(([op]) => op).sort(), ['<=', '>']);
+  for (const [, width] of queries) assert.equal(width, MOBILE_BREAKPOINT_PX);
+});
+
 test('setCanvasSize anchors a square PiP to the bottom-left corner', () => {
   const ctx = sizeCtx(1200, 800);
   resize(ctx, 1200, 800);

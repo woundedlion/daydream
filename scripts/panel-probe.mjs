@@ -565,8 +565,9 @@ export async function probeWarningNote(tab, layout) {
   const { failures, check } = checks();
 
   await tab.evaluate(async () => {
-    const [{ createEffectGui }, { GUI }] = await Promise.all([
+    const [{ createEffectGui }, { GUI }, { MOBILE_BREAKPOINT_PX }] = await Promise.all([
       import('./src/ui/effect_gui.js'), import('./src/ui/gui.js'),
+      import('./src/shared/layout.js'),
     ]);
     let value = 1;
     const container = document.getElementById('gui-container');
@@ -585,7 +586,7 @@ export async function probeWarningNote(tab, layout) {
       segments: { ownsDisplay: () => false, paramValues: () => null, setParam: () => {} },
       host: {
         createGui: () => new GUI({ autoPlace: false }, 'warning-probe'),
-        container: () => container, isMobile: () => matchMedia('(max-width: 900px)').matches,
+        container: () => container, isMobile: () => matchMedia(`(max-width: ${MOBILE_BREAKPOINT_PX}px)`).matches,
         applyEffect: () => {}, dragTarget: window,
       },
     });

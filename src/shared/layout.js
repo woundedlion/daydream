@@ -5,6 +5,7 @@
 
 /**
  * Width at or below which the mobile layout applies: the viewport for page
- * layout, the canvas container for the renderer.
+ * layout, the canvas container for the renderer. CSS media queries cannot read
+ * it, so the styles/index.css breakpoints repeat it.
  */
 export const MOBILE_BREAKPOINT_PX = 900;
