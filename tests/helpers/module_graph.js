@@ -1,4 +1,3 @@
-//
 // The static import graph of a repo module, read from source text.
 import { readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';

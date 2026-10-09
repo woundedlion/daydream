@@ -1,4 +1,3 @@
-//
 // Builds daydream.js's composition root against injected seams (document, page
 // target, navigator, driver, GUI factory, module loader).
 import { fakeElement, installDocument } from './fake_dom.js';

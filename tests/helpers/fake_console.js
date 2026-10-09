@@ -1,4 +1,3 @@
-//
 // Console capture: records each call's argument list and the same call joined
 // into one string.
 import { mock } from 'node:test';

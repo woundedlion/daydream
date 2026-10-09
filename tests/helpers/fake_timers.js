@@ -1,4 +1,3 @@
-//
 // Timer doubles the app's injected schedule/cancel pairs are driven through.
 import assert from 'node:assert/strict';
 

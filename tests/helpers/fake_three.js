@@ -1,4 +1,3 @@
-//
 // Stand-in for three + three/addons/controls/OrbitControls.js, plus the
 // buffer-attribute doubles. three_loader_hooks.js redirects both specifiers here.
 

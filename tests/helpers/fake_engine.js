@@ -1,4 +1,3 @@
-//
 // Single source of truth for the HolosphereEngine method surface the tests
 // stand in for, pinned against the real WASM module.
 import { readFileSync } from 'node:fs';
