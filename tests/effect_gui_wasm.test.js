@@ -124,7 +124,7 @@ test('preset values survive URL reload after flushed or pending parameter edits'
       panel.active().controllerByName.get('Speed').setValue(0.01);
       const edited = speed();
       if (flushEdit) sync.flush();
-      panel.active().preset.controller.setValue(1);
+      new Map(panel.active().actions.focusTargets()).get('presetIndex').setValue(1);
       const presetSpeed = speed();
       assert.notEqual(presetSpeed, edited);
       sync.flush();

@@ -3,12 +3,8 @@ import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
-import {
-  createEffectGui,
-  EXPORT_COPIED,
-  EXPORT_FAILED,
-  FLASH_MS,
-} from '../src/ui/effect_gui.js';
+import { createEffectGui } from '../src/ui/effect_gui.js';
+import { EXPORT_COPIED, EXPORT_FAILED, FLASH_MS } from '../src/ui/effect_actions.js';
 import {
   chainSnapshot,
   chainSnapshotParams,
