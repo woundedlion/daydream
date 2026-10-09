@@ -563,6 +563,18 @@ function directedTurnDelta(delta, direction) {
 
 /**
  * @param {PaletteRecipe} recipe - A V4 palette recipe.
+ * @returns {number} The sweep with the recipe's direction.
+ */
+function directedSweepTurns(recipe) {
+  if (recipe.hue.direction === PaletteV4.direction.CLOCKWISE)
+    return -Math.abs(recipe.hue.sweepTurns);
+  if (recipe.hue.direction === PaletteV4.direction.COUNTERCLOCKWISE)
+    return Math.abs(recipe.hue.sweepTurns);
+  return recipe.hue.sweepTurns;
+}
+
+/**
+ * @param {PaletteRecipe} recipe - A V4 palette recipe.
  * @returns {number[]} The harmony's anchor offsets, in turns.
  */
 // Offsets, not absolute hues: differencing base-shifted hues rounds a
@@ -654,11 +666,7 @@ export function hueKeyState(recipe) {
   if (recipe.hue.mode === PaletteV4.hueMode.CUSTOM)
     return hueKeyStateFromTurns(recipe.hue.customTurns.slice(0, 3));
   if (recipe.hue.mode === PaletteV4.hueMode.SWEEP) {
-    let sweep = recipe.hue.sweepTurns;
-    if (recipe.hue.direction === PaletteV4.direction.CLOCKWISE)
-      sweep = -Math.abs(sweep);
-    else if (recipe.hue.direction === PaletteV4.direction.COUNTERCLOCKWISE)
-      sweep = Math.abs(sweep);
+    const sweep = directedSweepTurns(recipe);
     const end = recipe.domain === PaletteV4.domain.LOOP ? sweep * 0.5 : sweep;
     return hueKeyStateFromTurns([recipe.hue.baseTurns, recipe.hue.baseTurns + end]);
   }
@@ -681,11 +689,7 @@ export function customHueKeyState(recipe) {
   if (recipe.hue.mode === PaletteV4.hueMode.CUSTOM) {
     turns = recipe.hue.customTurns.slice(0, 3);
   } else if (recipe.hue.mode === PaletteV4.hueMode.SWEEP) {
-    const sweep = recipe.hue.direction === PaletteV4.direction.CLOCKWISE
-      ? -Math.abs(recipe.hue.sweepTurns)
-      : recipe.hue.direction === PaletteV4.direction.COUNTERCLOCKWISE
-        ? Math.abs(recipe.hue.sweepTurns)
-        : recipe.hue.sweepTurns;
+    const sweep = directedSweepTurns(recipe);
     // Three-key spacing mirrors core/color/generative_palette.h resolve_hues.
     const step = sweep / (recipe.domain === PaletteV4.domain.LOOP ? 3 : 2);
     turns = [recipe.hue.baseTurns, recipe.hue.baseTurns + step,
