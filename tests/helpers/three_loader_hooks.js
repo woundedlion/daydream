@@ -1,4 +1,3 @@
-//
 // Module-resolution hooks, registered with module.register(), that redirect
 // three and its OrbitControls addon to the fake for every importer in the
 // process.

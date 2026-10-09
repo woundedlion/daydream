@@ -1,4 +1,3 @@
-//
 // Harness shared by the cases that drive a script as a subprocess against a
 // throwaway fixture repo under the OS temp dir, so no case touches the real
 // working tree.
