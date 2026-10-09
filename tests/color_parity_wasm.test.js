@@ -348,6 +348,7 @@ test('PaletteOps publishes every effect-owned GenerativePalette recipe', () => {
       'Dynamo',
       'GSReactionDiffusion',
       'MobiusRings',
+      'HyperLattice',
       'MindSplatter',
     ]);
     for (const preset of presets) {
