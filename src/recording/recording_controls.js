@@ -13,6 +13,15 @@ import { createRecordingSettings } from "./recording_settings.js";
 import { errorDetail } from "../shared/banner.js";
 
 /**
+ * @param {unknown} err - Value a recorder hook received.
+ * @returns {string} The bare message for a plain `Error`, else `errorDetail`.
+ */
+function recorderReason(err) {
+  return err?.name === 'Error' && typeof err.message === 'string'
+    ? err.message : errorDetail(err);
+}
+
+/**
  * Build the recording controls: the Recording folder and its settings, the
  * record toggle, and the duration overlay the frame loop writes. The recorder
  * does not exist yet; attach() hands it over once built.
@@ -149,14 +158,14 @@ export function createRecordingControls({
       };
       // A fault ends the session on its own; drop the recording UI and report why.
       recorder.onError = (err) => {
-        const detail = errorDetail(err);
+        const detail = recorderReason(err);
         showNotice(recordingShown
           ? `Recording stopped: ${detail}`
           : `Recording failed to start: ${detail}`);
         showRecording(false);
       };
       recorder.onSaveFallback = (err) => {
-        showNotice(errorDetail(err));
+        showNotice(recorderReason(err));
       };
       recorder.onSaveError = (err, filename) => {
         showNotice(`Recording save failed for ${filename}: ${errorDetail(err)}`);

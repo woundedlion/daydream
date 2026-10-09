@@ -319,17 +319,29 @@ test('a recorder fault reports its reason and stops offering to stop', () => {
   const recorder = rig.attach(fakeRecorder());
 
   recorder.onError(new Error('the encoder died'));
-  assert.match(rig.notices.at(-1), /^Recording failed to start: .*the encoder died/,
+  assert.equal(rig.notices.at(-1), 'Recording failed to start: the encoder died',
     'the hook also fires for a start that never produced a session, where '
     + '"Recording stopped" names something that never happened');
 
   rig.button.object.record();
   recorder.onError(new Error('the encoder died'));
 
-  assert.match(rig.notices.at(-1), /^Recording stopped: .*the encoder died/);
+  assert.equal(rig.notices.at(-1), 'Recording stopped: the encoder died');
   assert.equal(rig.canvasEl.classList.contains('recording'), false,
     'the session is already gone: the button must stop offering to stop it');
   assert.equal(rig.button.label, '\u25cf Record');
+});
+
+test('recorder notices name only typed causes', () => {
+  const rig = recordingRig();
+  const recorder = rig.attach(fakeRecorder());
+
+  recorder.onSaveFallback(new Error('saving to Downloads instead.'));
+  assert.equal(rig.notices.at(-1), 'saving to Downloads instead.');
+
+  rig.button.object.record();
+  recorder.onError(new DOMException('disk full', 'QuotaExceededError'));
+  assert.equal(rig.notices.at(-1), 'Recording stopped: QuotaExceededError: disk full');
 });
 
 test('recording memory notices follow the selected bitrate', () => {
