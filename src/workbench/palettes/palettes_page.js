@@ -17,20 +17,18 @@ import {
   paletteGradientCss, prettyPaletteName, paletteAdjustmentSummary,
 } from './palette_math.js';
 import {
-  createPaletteViewport, axisFromEndpoints,
+  createPaletteViewport,
   axisControlState, PALETTE_AXIS_CONTROLS,
   lockedGroupMove,
   paletteTabFromSearch, paletteTabUrl, tablistKeyTarget,
-  defaultPaletteRecipe, paletteRecipeFromControls, PaletteV4,
-  PALETTE_CONTROL_IDS, paletteControlReadings, paletteControlsFromRecipe,
+  PaletteV4, PALETTE_CONTROL_IDS,
   PALETTE_RECIPE_PRESETS, paletteRecipeAvailability,
-  clampRecipeWindow, zoomRecipeWindow, paletteStripView, waveGraphLabel,
+  zoomRecipeWindow, paletteStripView, waveGraphLabel,
   stripDragIntent,
-  wrapTurns,
   hitTestHueKeyMarker,
-  hueKeyState, customHueKeyState, customHueSweepRepresentable, moveCustomHueKey,
-  loopSweepTurns, paletteEnumOrdinal, paletteEnumName,
+  hueKeyState, customHueKeyState, customHueSweepRepresentable,
 } from './palette_controls.js';
+import { PaletteRecipeModel } from './palette_recipe_model.js';
 import { createColorStripPainter, drawWaveGraph } from './palette_canvas.js';
 import {
   createHueKeyWheelPainter, canvasPoint, wheelTurnAt,
@@ -81,9 +79,7 @@ let parameters = { ...defaultParams };
 let palette;
 let paletteOps = null;
 let wasmModule = null;
-let recipeTemplate = defaultPaletteRecipe();
-let customHueOffsets = [0, 0.07, 0.14];
-let previousHueMode = PaletteV4.hueMode.HARMONY;
+const recipeModel = new PaletteRecipeModel();
 let effectPalettePresets = [];
 const paletteViewport = createPaletteViewport();
 
@@ -101,37 +97,25 @@ let hueKeyHandles = [];
 
 const fullViewport = Object.freeze({ start: 0, end: 1 });
 
-function customBaseTurns() {
-  return Number(document.getElementById(PALETTE_CONTROL_IDS.baseHueDegrees).value) / 360;
-}
-
-function setCustomBaseTurns(turns) {
-  const degrees = wrapTurns(turns) * 360;
-  document.getElementById(PALETTE_CONTROL_IDS.baseHueDegrees).value = degrees;
-  document.getElementById('gen_base_hue_value').textContent =
-    `${Number(degrees.toFixed(1))}°`;
-}
-
 function clearHueKeyStatus() {
   document.getElementById('hue_key_status').textContent = '';
 }
 
 /**
- * Switch the controls into CUSTOM hue mode, authoring the three keys the
+ * Switch the recipe into CUSTOM hue mode, authoring the three keys the
  * handoff starts from.
- * @param {Object} sourceRecipe - The recipe the keys are resampled from.
  * @returns {boolean} False when resampling cannot preserve the selected hue
  *   key or the LOOP sweep's closing hue.
  */
-function activateCustomHue(sourceRecipe) {
+function activateCustomHue() {
+  const sourceRecipe = recipeModel.recipe();
   if (!customHueSweepRepresentable(sourceRecipe)) {
     document.getElementById('hue_key_status').textContent =
       'This loop sweep cannot be preserved by three custom hue keys. Reduce the sweep before switching to CUSTOM.';
     return false;
   }
-  const state = customHueKeyState(sourceRecipe);
-  const handoff = hueKeyHandoff(
-    hueKeyState(sourceRecipe), state, selectedHueKey, activeHueKey);
+  const handoff = hueKeyHandoff(hueKeyState(sourceRecipe),
+    customHueKeyState(sourceRecipe), selectedHueKey, activeHueKey);
   selectedHueKey = handoff.selectedKey;
   if (!handoff.kept) {
     document.getElementById('hue_key_status').textContent =
@@ -139,18 +123,15 @@ function activateCustomHue(sourceRecipe) {
     return false;
   }
   clearHueKeyStatus();
-  customHueOffsets = state.offsets;
+  recipeModel.activateCustomHues();
   activeHueKey = handoff.activeKey;
-  setCustomBaseTurns(state.baseTurns);
-  document.getElementById(PALETTE_CONTROL_IDS.hueMode).value = 'CUSTOM';
-  previousHueMode = PaletteV4.hueMode.CUSTOM;
-  syncRecipeControlAvailability();
+  renderRecipeControls();
   return true;
 }
 
 function currentHueKeyState(recipe) {
   if (recipe.hue.mode === PaletteV4.hueMode.CUSTOM) {
-    return { baseTurns: customBaseTurns(), offsets: [...customHueOffsets] };
+    return { baseTurns: recipeModel.baseHueTurns, offsets: recipeModel.customHueOffsets() };
   }
   return hueKeyState(recipe);
 }
@@ -227,8 +208,7 @@ function updateHueKeyFromPointer(event) {
   const position = wheelPointerPosition(event);
   const pointerTurn = wheelTurnAt(position.x, position.y,
     hueKeyWheelCanvas.width, hueKeyWheelCanvas.height);
-  customHueOffsets = moveCustomHueKey(
-    customBaseTurns(), customHueOffsets, activeHueKey, pointerTurn);
+  recipeModel.moveHueKey(activeHueKey, pointerTurn);
   scheduleUpdate();
 }
 
@@ -243,9 +223,8 @@ function handleHueWheelPointerDown(event) {
 }
 
 function handleHueWheelPointerMove(event) {
-  const recipe = readPaletteRecipe();
-  if (recipe.hue.mode !== PaletteV4.hueMode.CUSTOM
-      && !activateCustomHue(recipe)) {
+  if (recipeModel.recipe().hue.mode !== PaletteV4.hueMode.CUSTOM
+      && !activateCustomHue()) {
     hueKeyDrag.stop();
     return;
   }
@@ -276,9 +255,8 @@ function handleHueKeyNudge(event, keyIndex) {
   if (delta === null) return;
   selectedHueKey = keyIndex;
 
-  const recipe = readPaletteRecipe();
-  if (recipe.hue.mode !== PaletteV4.hueMode.CUSTOM
-      && !activateCustomHue(recipe)) {
+  if (recipeModel.recipe().hue.mode !== PaletteV4.hueMode.CUSTOM
+      && !activateCustomHue()) {
     // CUSTOM cannot preserve the sweep's closing hue or the selected key;
     // redraw without nudging.
     scheduleUpdate();
@@ -286,29 +264,18 @@ function handleHueKeyNudge(event, keyIndex) {
     return;
   }
   if (selectedHueKey !== keyIndex) {
-    drawHueKeyWheel(readPaletteRecipe());
+    drawHueKeyWheel(recipeModel.recipe());
     hueKeyHandles[selectedHueKey].focus();
   }
-  const base = customBaseTurns();
-  const current = base + customHueOffsets[selectedHueKey];
-  customHueOffsets = moveCustomHueKey(
-    base, customHueOffsets, selectedHueKey, wrapTurns(current + delta));
+  recipeModel.nudgeHueKey(selectedHueKey, delta);
   scheduleUpdate();
   event.preventDefault();
 }
 
-function recipeWindow() {
-  return {
-    offset: Number(document.getElementById(PALETTE_CONTROL_IDS.offset).value),
-    span: Number(document.getElementById(PALETTE_CONTROL_IDS.span).value),
-  };
-}
-
-function syncRecipeWindowControls() {
+function renderRecipeWindow() {
   const offsetSlider = document.getElementById(PALETTE_CONTROL_IDS.offset);
   const spanSlider = document.getElementById(PALETTE_CONTROL_IDS.span);
-  const { offset, span } = clampRecipeWindow(
-    Number(offsetSlider.value), Number(spanSlider.value));
+  const { offset, span } = recipeModel.window;
   spanSlider.value = span;
   offsetSlider.max = String(1 - span);
   offsetSlider.value = offset;
@@ -316,25 +283,17 @@ function syncRecipeWindowControls() {
   document.getElementById('gen_span_value').textContent = span.toFixed(3);
 }
 
-function setRecipeWindow(offset, span) {
-  const spanSlider = document.getElementById(PALETTE_CONTROL_IDS.span);
-  const offsetSlider = document.getElementById(PALETTE_CONTROL_IDS.offset);
-  spanSlider.value = span;
-  offsetSlider.max = String(1 - Number(spanSlider.value));
-  offsetSlider.value = offset;
-  syncRecipeWindowControls();
-}
-
 function zoomRecipeWindowControls(startPosition, endPosition) {
   const { offset, span } = zoomRecipeWindow(
-    recipeWindow(), startPosition, endPosition);
-  setRecipeWindow(offset, span);
+    recipeModel.window, startPosition, endPosition);
+  recipeModel.setWindow(offset, span);
+  renderRecipeWindow();
   scheduleUpdate();
 }
 
 function visiblePhaseRange() {
   if (activeTab === 'procedural') return paletteViewport.value;
-  const { offset, span } = palette?.canonicalRecipe?.input ?? recipeWindow();
+  const { offset, span } = palette?.canonicalRecipe?.input ?? recipeModel.window;
   return { start: offset, end: offset + span };
 }
 
@@ -356,18 +315,23 @@ function axisControlElements(axisName) {
   };
 }
 
-function readAxisEndpoints(axisName) {
-  const { minimum, maximum } = axisControlElements(axisName);
-  return { minimum: Number(minimum.value), maximum: Number(maximum.value) };
-}
+// The model reading each axis' curve select carries.
+const AXIS_CURVE_READINGS = { lightness: 'lightnessCurve', chroma: 'chromaCurve' };
 
-function syncAxisEndpointControls(axisName) {
+function renderAxisControls(axisName) {
   const {
     label, shortLabel, curve, minimum, maximum, minimumLabel, maximumLabel,
     minimumValue, maximumValue,
   } = axisControlElements(axisName);
+  const endpoints = recipeModel.axisEndpoints(axisName);
+  const curveName = recipeModel.reading(AXIS_CURVE_READINGS[axisName]);
+  curve.value = curveName;
+  minimum.min = maximum.min = '0';
+  minimum.max = maximum.max = '1';
+  minimum.value = endpoints.minimum;
+  maximum.value = endpoints.maximum;
   const state = axisControlState({
-    curve: curve.value, minimum: minimum.value, maximum: maximum.value,
+    curve: curveName, minimum: endpoints.minimum, maximum: endpoints.maximum,
     label, shortLabel,
   });
 
@@ -388,77 +352,57 @@ function syncAxisEndpointControls(axisName) {
   maximumValue.textContent = state.maximumText;
 }
 
-function setAxisEndpoints(axisName, endpoints) {
-  const { minimum, maximum } = axisControlElements(axisName);
-  minimum.min = maximum.min = '0';
-  minimum.max = maximum.max = '1';
-  minimum.value = endpoints.minimum;
-  maximum.value = endpoints.maximum;
-  syncAxisEndpointControls(axisName);
-}
-
-function handleAxisEndpointInput(axisName, event) {
-  const { curve } = axisControlElements(axisName);
-  if (curve.value === 'CONSTANT') {
-    setAxisEndpoints(axisName,
-      { minimum: event.target.value, maximum: event.target.value });
-  } else {
-    syncAxisEndpointControls(axisName);
-  }
-  syncRecipeControlAvailability();
+function handleAxisEndpointInput(axisName, end, event) {
+  const value = Number(event.target.value);
+  const { minimum, maximum } = recipeModel.axisEndpoints(axisName);
+  if (end === 'minimum') recipeModel.setAxisEndpoints(axisName, value, maximum);
+  else recipeModel.setAxisEndpoints(axisName, minimum, value);
+  renderRecipeControls();
   scheduleUpdate();
 }
 
-function handleAxisCurveChange(axisName) {
-  const { curve } = axisControlElements(axisName);
-  if (curve.value === 'CONSTANT') {
-    const { minimum, maximum } = readAxisEndpoints(axisName);
-    const { center } = axisFromEndpoints(minimum, maximum);
-    setAxisEndpoints(axisName, { minimum: center, maximum: center });
-  } else {
-    syncAxisEndpointControls(axisName);
-  }
-  syncRecipeControlAvailability();
+function handleAxisCurveChange(axisName, event) {
+  recipeModel.setAxisCurve(axisName, event.target.value);
+  renderRecipeControls();
   scheduleUpdate();
 }
 
-// Recipe fields read straight off a slider: its element, how many decimals
-// the mirror label shows, and the unit it is labelled in.
+// Recipe readings shown on a slider: its element, the factor from the
+// reading's unit to the slider's, how many decimals the mirror label shows,
+// and the unit it is labelled in.
 const recipeSliderDefinitions = [
-  { id: PALETTE_CONTROL_IDS.spreadDegrees, digits: 1, suffix: '°' },
-  { id: PALETTE_CONTROL_IDS.sweepTurns, digits: 1, suffix: '' },
-  { id: PALETTE_CONTROL_IDS.hueTorsion, digits: 1, suffix: '' },
-  { id: PALETTE_CONTROL_IDS.headroom, digits: 2, suffix: '' },
-  { id: PALETTE_CONTROL_IDS.falloffStart, digits: 2, suffix: '' },
+  { reading: 'spreadTurns', id: PALETTE_CONTROL_IDS.spreadDegrees, scale: 360, digits: 1, suffix: '°' },
+  { reading: 'sweepTurns', id: PALETTE_CONTROL_IDS.sweepTurns, scale: 1, digits: 1, suffix: '' },
+  { reading: 'hueTorsion', id: PALETTE_CONTROL_IDS.hueTorsion, scale: 1, digits: 1, suffix: '' },
+  { reading: 'headroom', id: PALETTE_CONTROL_IDS.headroom, scale: 1, digits: 2, suffix: '' },
+  { reading: 'falloffStart', id: PALETTE_CONTROL_IDS.falloffStart, scale: 1, digits: 2, suffix: '' },
 ];
 
-function recipeSliderValue(id) {
-  return Number(document.getElementById(id).value);
-}
+// Recipe readings shown on a select, in the order they are written.
+const RECIPE_SELECT_READINGS = [
+  'domain', 'hueMode', 'harmony', 'direction', 'colorPath', 'easing',
+];
 
-function syncRecipeSliderLabels() {
-  const sweep = document.getElementById(PALETTE_CONTROL_IDS.sweepTurns);
-  const loopSweep = document.getElementById(PALETTE_CONTROL_IDS.domain).value === 'LOOP'
-    && document.getElementById(PALETTE_CONTROL_IDS.hueMode).value === 'SWEEP';
-  sweep.step = loopSweep ? '1' : '0.5';
-  if (loopSweep) sweep.value = String(loopSweepTurns(Number(sweep.value)));
-  for (const { id, digits, suffix } of recipeSliderDefinitions) {
-    document.getElementById(`${id}_value`).textContent =
-      `${recipeSliderValue(id).toFixed(digits)}${suffix}`;
+function renderRecipeSliders() {
+  const loopSweep = recipeModel.reading('domain') === 'LOOP'
+    && recipeModel.reading('hueMode') === 'SWEEP';
+  document.getElementById(PALETTE_CONTROL_IDS.sweepTurns).step = loopSweep ? '1' : '0.5';
+  for (const { reading, id, scale, digits, suffix } of recipeSliderDefinitions) {
+    const value = recipeModel.reading(reading) * scale;
+    document.getElementById(id).value = value;
+    document.getElementById(`${id}_value`).textContent = `${value.toFixed(digits)}${suffix}`;
   }
 }
 
-const controlValue = (id) => document.getElementById(id)?.value;
-
-function readPaletteRecipe() {
-  return paletteRecipeFromControls(recipeTemplate,
-    paletteControlReadings(controlValue, customHueOffsets));
+function renderBaseHue() {
+  const degrees = recipeModel.baseHueTurns * 360;
+  document.getElementById(PALETTE_CONTROL_IDS.baseHueDegrees).value = degrees;
+  document.getElementById('gen_base_hue_value').textContent =
+    `${Number(degrees.toFixed(1))}°`;
 }
 
-function syncRecipeControlAvailability() {
-  syncRecipeSliderLabels();
-  const recipe = readPaletteRecipe();
-  const availability = paletteRecipeAvailability(recipe);
+function renderRecipeAvailability() {
+  const availability = paletteRecipeAvailability(recipeModel.recipe());
   const controls = [
     ['gen_base_hue_field', PALETTE_CONTROL_IDS.baseHueDegrees, availability.baseHue],
     ['gen_hue_mode_field', PALETTE_CONTROL_IDS.hueMode, availability.hueMode],
@@ -486,34 +430,21 @@ function syncRecipeControlAvailability() {
   }
 }
 
+/** Writes every generative control from the recipe model. */
+function renderRecipeControls() {
+  for (const reading of RECIPE_SELECT_READINGS)
+    document.getElementById(PALETTE_CONTROL_IDS[reading]).value = recipeModel.reading(reading);
+  renderRecipeSliders();
+  renderBaseHue();
+  renderRecipeWindow();
+  for (const axisName of Object.keys(PALETTE_AXIS_CONTROLS)) renderAxisControls(axisName);
+  renderRecipeAvailability();
+}
+
 function loadRecipe(recipe) {
   clearHueKeyStatus();
-  recipeTemplate = structuredClone(recipe);
-  const controls = paletteControlsFromRecipe(recipe);
-  const write = (name, value) => {
-    document.getElementById(PALETTE_CONTROL_IDS[name]).value = value;
-  };
-  write('domain', controls.domain);
-  write('hueMode', controls.hueMode);
-  write('harmony', controls.harmony);
-  write('direction', controls.direction);
-  write('colorPath', controls.colorPath);
-  write('lightnessCurve', controls.lightnessCurve);
-  write('chromaCurve', controls.chromaCurve);
-  write('easing', controls.easing);
-  write('spreadDegrees', controls.spreadTurns * 360);
-  write('sweepTurns', controls.sweepTurns);
-  write('hueTorsion', controls.hueTorsion);
-  write('headroom', controls.headroom);
-  write('falloffStart', controls.falloffStart);
-  syncRecipeSliderLabels();
-  customHueOffsets = controls.customHueOffsets;
-  previousHueMode = recipe.hue.mode;
-  setCustomBaseTurns(controls.baseTurns);
-  setRecipeWindow(controls.window.offset, controls.window.span);
-  setAxisEndpoints('lightness', controls.lightness);
-  setAxisEndpoints('chroma', controls.chroma);
-  syncRecipeControlAvailability();
+  recipeModel.loadRecipe(recipe);
+  renderRecipeControls();
   scheduleUpdate();
 }
 
@@ -891,7 +822,8 @@ function handleResetZoom() {
     paletteViewport.reset();
     redrawForViewport();
   } else {
-    setRecipeWindow(0, 1);
+    recipeModel.setWindow(0, 1);
+    renderRecipeWindow();
     scheduleUpdate();
   }
 }
@@ -953,7 +885,7 @@ function updatePaletteCodeOutput() {
       proceduralParamsForViewport(parameters, paletteViewport.value));
   } else {
     codeOutput.textContent = generativePaletteCpp(
-      palette?.canonicalRecipe ?? readPaletteRecipe());
+      palette?.canonicalRecipe ?? recipeModel.recipe());
   }
 }
 
@@ -1014,7 +946,7 @@ function updatePalette() {
     palette = new ProceduralPalette(A, B, C, D);
   } else {
     try {
-      palette = new GenerativePalette(readPaletteRecipe());
+      palette = new GenerativePalette(recipeModel.recipe());
       const adjusted = paletteAdjustmentSummary(palette.status);
       const status = document.getElementById('gen_status');
       status.dataset.status = 'valid';
@@ -1138,61 +1070,51 @@ async function init() {
 
   // Generative palette controls.
   const baseHueSlider = document.getElementById(PALETTE_CONTROL_IDS.baseHueDegrees);
-  const baseHueValue = document.getElementById('gen_base_hue_value');
-  if (baseHueSlider && baseHueValue) {
-    baseHueSlider.addEventListener('keydown', handleBaseHueKeyDown);
-    baseHueSlider.addEventListener('input', () => {
-      baseHueValue.textContent = `${Number(Number(baseHueSlider.value).toFixed(1))}°`;
+  baseHueSlider.addEventListener('keydown', handleBaseHueKeyDown);
+  baseHueSlider.addEventListener('input', handleBaseHueInput);
+
+  for (const reading of RECIPE_SELECT_READINGS) {
+    document.getElementById(PALETTE_CONTROL_IDS[reading]).addEventListener('change', (event) => {
+      clearHueKeyStatus();
+      if (reading === 'hueMode') handleHueModeChange(event.target.value);
+      else recipeModel.setChoice(reading, event.target.value);
+      renderRecipeControls();
       scheduleUpdate();
     });
   }
-
-  const dropdowns = [
-    PALETTE_CONTROL_IDS.hueMode, PALETTE_CONTROL_IDS.harmony, PALETTE_CONTROL_IDS.domain, PALETTE_CONTROL_IDS.colorPath, PALETTE_CONTROL_IDS.direction,
-    PALETTE_CONTROL_IDS.easing,
-  ];
-  dropdowns.forEach(id => {
-    const el = document.getElementById(id);
-    el?.addEventListener('change', () => {
-      clearHueKeyStatus();
-      if (id === PALETTE_CONTROL_IDS.hueMode) {
-        handleHueModeChange(el);
-      }
-      syncRecipeControlAvailability();
-      scheduleUpdate();
-    });
-  });
 
   for (const axisName of Object.keys(PALETTE_AXIS_CONTROLS)) {
     const { curve, minimum, maximum } = axisControlElements(axisName);
-    curve.addEventListener('change', () => handleAxisCurveChange(axisName));
-    minimum.addEventListener('input', (event) => handleAxisEndpointInput(axisName, event));
-    maximum.addEventListener('input', (event) => handleAxisEndpointInput(axisName, event));
-    syncAxisEndpointControls(axisName);
+    curve.addEventListener('change', (event) => handleAxisCurveChange(axisName, event));
+    minimum.addEventListener('input', (event) => handleAxisEndpointInput(axisName, 'minimum', event));
+    maximum.addEventListener('input', (event) => handleAxisEndpointInput(axisName, 'maximum', event));
   }
 
-  for (const id of [PALETTE_CONTROL_IDS.offset, PALETTE_CONTROL_IDS.span]) {
-    document.getElementById(id).addEventListener('input', () => {
-      syncRecipeWindowControls();
-      scheduleUpdate();
-    });
-  }
-  syncRecipeWindowControls();
+  document.getElementById(PALETTE_CONTROL_IDS.offset).addEventListener('input', (event) => {
+    recipeModel.setWindow(Number(event.target.value), recipeModel.window.span);
+    renderRecipeWindow();
+    scheduleUpdate();
+  });
+  document.getElementById(PALETTE_CONTROL_IDS.span).addEventListener('input', (event) => {
+    recipeModel.setWindow(recipeModel.window.offset, Number(event.target.value));
+    renderRecipeWindow();
+    scheduleUpdate();
+  });
 
-  for (const { id } of recipeSliderDefinitions) {
-    document.getElementById(id).addEventListener('input', () => {
+  for (const { reading, id, scale } of recipeSliderDefinitions) {
+    document.getElementById(id).addEventListener('input', (event) => {
       clearHueKeyStatus();
-      syncRecipeSliderLabels();
+      recipeModel.setAmount(reading, Number(event.target.value) / scale);
+      renderRecipeControls();
       scheduleUpdate();
     });
   }
-  syncRecipeSliderLabels();
 
   document.querySelectorAll('[data-recipe-preset]').forEach((button) => {
     button.addEventListener('click', () => loadRecipePreset(button.dataset.recipePreset));
   });
 
-  syncRecipeControlAvailability();
+  renderRecipeControls();
 
   window.addEventListener('resize', scheduleViewportRedraw);
 
@@ -1238,7 +1160,7 @@ async function init() {
     paletteOps = null;
     wasmModule = null;
     teardownExportFlyout();
-    baseHueSlider?.removeEventListener('keydown', handleBaseHueKeyDown);
+    baseHueSlider.removeEventListener('keydown', handleBaseHueKeyDown);
     scheduleUpdate.cancel();
     scheduleViewportRedraw.cancel();
     window.removeEventListener('resize', scheduleViewportRedraw);
@@ -1254,29 +1176,33 @@ async function init() {
 
 bootstrapTool(init, 'palette tool');
 
+function handleBaseHueInput(event) {
+  recipeModel.setBaseHue(Number(event.target.value) / 360);
+  renderBaseHue();
+  scheduleUpdate();
+}
+
 function handleBaseHueKeyDown(event) {
   const delta = hueKeyNudgeTurns(event.key, event.shiftKey);
   if (delta === null) return;
   event.preventDefault();
-  const slider = event.currentTarget;
-  slider.value = wrapTurns(Number(slider.value) / 360 + delta) * 360;
-  slider.dispatchEvent(new Event('input', {bubbles: true}));
+  recipeModel.nudgeBaseHue(delta);
+  renderBaseHue();
+  scheduleUpdate();
 }
 
-function handleHueModeChange(el) {
-  const nextMode = paletteEnumOrdinal('hueMode', el.value);
-  if (nextMode === PaletteV4.hueMode.CUSTOM &&
-      previousHueMode !== PaletteV4.hueMode.CUSTOM) {
-    const sourceRecipe = paletteRecipeFromControls(recipeTemplate, {
-      ...paletteControlReadings(controlValue, customHueOffsets),
-      hueMode: paletteEnumName('hueMode', previousHueMode),
-    });
-    sourceRecipe.hue.baseTurns = customBaseTurns();
+/**
+ * Apply the hue distribution the select chose. Entering CUSTOM resamples the
+ * keys from the first one; a refused handoff keeps the previous mode.
+ * @param {string} mode - A PaletteV4.hueMode member name.
+ * @returns {void}
+ */
+function handleHueModeChange(mode) {
+  if (mode === 'CUSTOM' && recipeModel.reading('hueMode') !== 'CUSTOM') {
     selectedHueKey = 0;
     activeHueKey = null;
-    if (!activateCustomHue(sourceRecipe))
-      el.value = paletteEnumName('hueMode', previousHueMode);
+    activateCustomHue();
   } else {
-    previousHueMode = nextMode;
+    recipeModel.applyHueModeTransition(mode);
   }
 }

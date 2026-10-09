@@ -2,9 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pageHandlers } from './helpers/page_handlers.js';
 import { fakeElement } from './helpers/fake_dom.js';
-import { hueKeyNudgeTurns } from '../src/workbench/palettes/palette_wheel.js';
+import { hueKeyNudgeTurns, hueKeyHandoff } from '../src/workbench/palettes/palette_wheel.js';
 import { replaceUrl } from '../src/app/state.js';
-import { PaletteV4, defaultPaletteRecipe, paletteRecipeFromControls, paletteControlsFromRecipe, paletteEnumName, paletteEnumOrdinal, customHueKeyState, customHueSweepRepresentable } from '../src/workbench/palettes/palette_controls.js';
+import { PaletteV4, defaultPaletteRecipe, hueKeyState, customHueKeyState, customHueSweepRepresentable } from '../src/workbench/palettes/palette_controls.js';
+import { PaletteRecipeModel } from '../src/workbench/palettes/palette_recipe_model.js';
 import { captureConsole } from './helpers/fake_console.js';
 
 const handler = pageHandlers(new URL('../src/workbench/palettes/palettes_page.js', import.meta.url));
@@ -162,9 +163,9 @@ test('a dropped hue selection is redrawn without nudging its replacement', () =>
   let prevented = 0;
   const context = {
     hueKeyNudgeTurns: () => 0.01, selectedHueKey: 0,
-    readPaletteRecipe: () => ({ hue: { mode: 'TRIAD' } }),
+    recipeModel: { recipe: () => ({ hue: { mode: 'TRIAD' } }), nudgeHueKey: assert.fail },
     PaletteV4: { hueMode: { CUSTOM: 'CUSTOM' } }, activateCustomHue: () => false,
-    scheduleUpdate: () => { scheduled++; }, customBaseTurns: assert.fail,
+    scheduleUpdate: () => { scheduled++; },
   };
   handler('handleHueKeyNudge', context)({ preventDefault: () => { prevented++; } }, 2);
   assert.equal(scheduled, 1);
@@ -172,20 +173,21 @@ test('a dropped hue selection is redrawn without nudging its replacement', () =>
   assert.equal(context.selectedHueKey, 2);
 });
 
-test('the hue dropdown restores its previous mode after a refused handoff', () => {
-  const select = { value: 'CUSTOM' };
+test('the hue dropdown keeps the previous mode after a refused handoff', () => {
+  let attempts = 0;
   const context = {
-    PaletteV4: { hueMode: { HARMONY: 0, CUSTOM: 1, SWEEP: 2 }, domain: { LOOP: 1 } },
-    previousHueMode: 0, selectedHueKey: 0, activeHueKey: null, paletteEnumOrdinal: () => 1,
-    paletteRecipeFromControls: () => ({ hue: {}, domain: 0 }),
-    recipeTemplate: {}, paletteControlReadings: () => ({}), controlValue: () => {}, customHueOffsets: [],
-    customBaseTurns: () => 0,
-    activateCustomHue: () => false,
-    paletteEnumName: () => 'HARMONY',
+    recipeModel: new PaletteRecipeModel(), selectedHueKey: 2, activeHueKey: 1,
+    activateCustomHue: () => { attempts++; return false; },
   };
-  handler('handleHueModeChange', context)(select);
-  assert.equal(select.value, 'HARMONY');
-  assert.equal(context.previousHueMode, 0);
+  const change = handler('handleHueModeChange', context);
+  change('CUSTOM');
+  assert.equal(attempts, 1);
+  assert.equal(context.recipeModel.reading('hueMode'), 'HARMONY');
+  assert.equal(context.selectedHueKey, 0);
+  assert.equal(context.activeHueKey, null);
+  change('SWEEP');
+  assert.equal(attempts, 1);
+  assert.equal(context.recipeModel.reading('hueMode'), 'SWEEP');
 });
 
 
@@ -208,21 +210,25 @@ test('the hue wheel uses authored custom lightness instead of canonical center',
 });
 
 test('base hue arrow keys step in useful degrees without changing the recipe mode', () => {
-  const slider = {value: '359.25', dispatchEvent(event) { assert.equal(event.type, 'input'); }};
+  const recipeModel = new PaletteRecipeModel();
+  recipeModel.setBaseHue(359.25 / 360);
+  let rendered = 0;
   const keydown = handler('handleBaseHueKeyDown', {
-    hueKeyNudgeTurns: (key, shift) => key === 'ArrowRight' ? (shift ? 10 : 1) / 360 : key === 'ArrowLeft' ? -1 / 360 : null,
-    wrapTurns: (value) => ((value % 1) + 1) % 1, Event,
+    hueKeyNudgeTurns, recipeModel, renderBaseHue: () => { rendered++; }, scheduleUpdate: () => {},
   });
   let prevented = 0;
-  const press = (key, shiftKey = false) => keydown({key, shiftKey, currentTarget: slider, preventDefault() { prevented++; }});
+  const press = (key, shiftKey = false) => keydown({key, shiftKey, preventDefault() { prevented++; }});
+  const degrees = () => recipeModel.baseHueTurns * 360;
   press('ArrowRight');
-  assert.ok(Math.abs(Number(slider.value) - 0.25) < 1e-8);
+  assert.ok(Math.abs(degrees() - 0.25) < 1e-8);
   press('ArrowRight', true);
-  assert.ok(Math.abs(Number(slider.value) - 10.25) < 1e-8);
+  assert.ok(Math.abs(degrees() - 10.25) < 1e-8);
   press('ArrowLeft');
-  assert.ok(Math.abs(Number(slider.value) - 9.25) < 1e-8);
+  assert.ok(Math.abs(degrees() - 9.25) < 1e-8);
   press('Enter');
   assert.equal(prevented, 3);
+  assert.equal(rendered, 3);
+  assert.equal(recipeModel.reading('hueMode'), 'HARMONY');
 });
 
 test('a keyboard resample follows the selected hue key through later nudges', () => {
@@ -230,15 +236,15 @@ test('a keyboard resample follows the selected hue key through later nudges', ()
   let focused = 1;
   const moved = [];
   const context = {
-    selectedHueKey: 1, customHueOffsets: [0, 0.25, 0.5],
-    hueKeyNudgeTurns, wrapTurns: value => value % 1,
+    selectedHueKey: 1, hueKeyNudgeTurns,
     PaletteV4: { hueMode: { CUSTOM: 'CUSTOM' } },
-    readPaletteRecipe: () => ({ hue: { mode } }),
+    recipeModel: {
+      recipe: () => ({ hue: { mode } }),
+      nudgeHueKey: (index) => { moved.push(index); },
+    },
     activateCustomHue: () => { context.selectedHueKey = 2; mode = 'CUSTOM'; return true; },
     drawHueKeyWheel: () => {},
     hueKeyHandles: [0, 1, 2].map(index => ({ focus: () => { focused = index; } })),
-    customBaseTurns: () => 0,
-    moveCustomHueKey: (base, offsets, index) => { moved.push(index); return offsets; },
     scheduleUpdate: () => {},
   };
   const nudge = handler('handleHueKeyNudge', context);
@@ -252,28 +258,21 @@ test('a keyboard resample follows the selected hue key through later nudges', ()
   assert.equal(context.selectedHueKey, 2);
 });
 
-test('loading a recipe clears a stale hue-key refusal', () => {
+test('loading a recipe clears a stale hue-key refusal and renders the loaded recipe', () => {
   const status = { textContent: 'Choose another key.' };
-  const fields = new Map();
+  const recipeModel = new PaletteRecipeModel();
+  let rendered;
   const context = {
-    document: {
-      getElementById: (id) => {
-        if (id === 'hue_key_status') return status;
-        if (!fields.has(id)) fields.set(id, {});
-        return fields.get(id);
-      },
-    },
-    structuredClone, recipeTemplate: null, customHueOffsets: null, previousHueMode: null,
-    PALETTE_CONTROL_IDS: new Proxy({}, { get: (_, name) => String(name) }),
-    paletteControlsFromRecipe: () => ({
-      spreadTurns: 0, customHueOffsets: [], baseTurns: 0, window: { offset: 0, span: 1 },
-    }),
-    syncRecipeSliderLabels: () => {}, setCustomBaseTurns: () => {}, setRecipeWindow: () => {},
-    setAxisEndpoints: () => {}, syncRecipeControlAvailability: () => {}, scheduleUpdate: () => {},
+    document: { getElementById: (id) => id === 'hue_key_status' ? status : assert.fail(id) },
+    recipeModel, scheduleUpdate: () => {},
+    renderRecipeControls: () => { rendered = recipeModel.reading('domain'); },
   };
   context.clearHueKeyStatus = handler('clearHueKeyStatus', context);
-  handler('loadRecipe', context)({ hue: { mode: 0 } });
+  const recipe = defaultPaletteRecipe();
+  recipe.domain = PaletteV4.domain.MIRROR;
+  handler('loadRecipe', context)(recipe);
   assert.equal(status.textContent, '');
+  assert.equal(rendered, 'MIRROR');
 });
 
 test('the hue dropdown resamples authored harmony and rejects a multi-turn loop sweep', () => {
@@ -284,26 +283,30 @@ test('the hue dropdown resamples authored harmony and rejects a multi-turn loop 
       sweepTurns: 3, baseTurns: 0.25,
     });
     if (mode === PaletteV4.hueMode.SWEEP) recipe.domain = PaletteV4.domain.LOOP;
-    const controls = { ...paletteControlsFromRecipe(recipe), hueMode: 'CUSTOM' };
-    const select = { value: 'CUSTOM' };
-    let source;
+    const status = { textContent: '' };
+    let rendered = 0;
     const context = {
-      PaletteV4, paletteRecipeFromControls, paletteEnumName, paletteEnumOrdinal,
-      recipeTemplate: recipe, paletteControlReadings: () => controls,
-      controlValue: () => {}, customHueOffsets: [], previousHueMode: mode,
-      customBaseTurns: () => recipe.hue.baseTurns, selectedHueKey: 2, activeHueKey: 1,
-      activateCustomHue: value => { source = value; return customHueSweepRepresentable(value); },
+      PaletteV4, hueKeyState, customHueKeyState, customHueSweepRepresentable, hueKeyHandoff,
+      recipeModel: new PaletteRecipeModel(recipe), selectedHueKey: 2, activeHueKey: 1,
+      document: { getElementById: () => status },
+      renderRecipeControls: () => { rendered++; },
     };
-    handler('handleHueModeChange', context)(select);
-    assert.equal(source.hue.mode, mode);
-    assert.equal(source.hue.baseTurns, recipe.hue.baseTurns);
+    context.clearHueKeyStatus = handler('clearHueKeyStatus', context);
+    context.activateCustomHue = handler('activateCustomHue', context);
+    handler('handleHueModeChange', context)('CUSTOM');
+    const model = context.recipeModel;
     if (mode === PaletteV4.hueMode.HARMONY) {
-      assert.deepEqual(customHueKeyState(source), customHueKeyState(recipe));
-      assert.equal(source.hue.spreadTurns, 0.2);
-      assert.equal(select.value, 'CUSTOM');
+      const expected = customHueKeyState(recipe);
+      assert.equal(model.reading('hueMode'), 'CUSTOM');
+      assert.deepEqual([...model.customHueOffsets()], expected.offsets);
+      assert.equal(model.baseHueTurns, expected.baseTurns);
+      assert.equal(status.textContent, '');
+      assert.equal(rendered, 1);
     } else {
-      assert.equal(source.hue.sweepTurns, 3);
-      assert.equal(select.value, 'SWEEP');
+      assert.equal(model.reading('hueMode'), 'SWEEP');
+      assert.equal(model.reading('sweepTurns'), 3);
+      assert.match(status.textContent, /loop sweep cannot be preserved/);
+      assert.equal(rendered, 0);
     }
   }
 });

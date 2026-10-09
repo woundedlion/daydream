@@ -13,12 +13,13 @@ const {
   STRIP_DRAG_THRESHOLD,
   lockedGroupMove,
   PaletteV4, defaultPaletteRecipe, paletteRecipeFromControls,
-  PALETTE_CONTROL_IDS, paletteControlReadings, paletteControlsFromRecipe,
+  PALETTE_CONTROL_IDS, paletteControlsFromRecipe, applyPaletteControls,
   paletteEnumName, paletteEnumOrdinal,
   PALETTE_RECIPE_PRESETS, loopSweepTurns,
   paletteRecipeAvailability, wrapTurns, signedTurnDelta, equivalentTurnNear,
   hitTestHueKeyMarker, oklchLinearRgb, maxSrgbGamutChroma,
   hueKeyState, customHueKeyState, customHueSweepRepresentable, customHueTurns, moveCustomHueKey,
+  movedHueKeyOffset,
 } =
   await import('../src/workbench/palettes/palette_controls.js');
 
@@ -533,7 +534,7 @@ test('the generative tab carries every control the readings name', () => {
   }
 });
 
-/** The tab reads its recipe off the controls. */
+/** The markup's control values are the default recipe's. */
 test('the generative tab opens on the default recipe', () => {
   const values = new Map();
   for (const id of Object.values(PALETTE_CONTROL_IDS)) {
@@ -547,11 +548,12 @@ test('the generative tab opens on the default recipe', () => {
       values.set(id, (options.find((option) => /\bselected\b/.test(option[2])) ?? options[0])[1]);
     }
   }
-  const defaults = paletteControlsFromRecipe(defaultPaletteRecipe());
-  const actual = paletteControlReadings((id) => values.get(id), defaults.customHueOffsets);
-  assert.ok(Math.abs(actual.spreadTurns - defaults.spreadTurns) < 1e-12);
-  actual.spreadTurns = defaults.spreadTurns;
-  assert.deepEqual(actual, defaults);
+  const expected = controlsFor(defaultPaletteRecipe()).values;
+  assert.deepEqual([...values.keys()].sort(), Object.keys(expected).sort());
+  for (const [id, value] of values) {
+    if (Number.isNaN(Number(value))) assert.equal(value, expected[id], id);
+    else assert.ok(Math.abs(Number(value) - Number(expected[id])) < 1e-12, id);
+  }
 });
 
 /** The recipe sent to the engine carries defaults for inactive controls. */
@@ -716,11 +718,8 @@ function controlsFor(recipe) {
 test('every preset survives the trip out to the controls and back', () => {
   for (const [name, preset] of Object.entries(PALETTE_RECIPE_PRESETS)) {
     const recipe = preset();
-    const { values, customHueOffsets } = controlsFor(recipe);
-    const readings = paletteControlReadings((id) => values[id], customHueOffsets);
-
-    assertRecipeClose(
-      paletteRecipeFromControls(defaultPaletteRecipe(), readings), recipe, name);
+    assertRecipeClose(paletteRecipeFromControls(defaultPaletteRecipe(),
+      paletteControlsFromRecipe(recipe)), recipe, name);
   }
 });
 
@@ -728,51 +727,43 @@ test('an authored custom-hue recipe keeps its keys through the controls', () => 
   const recipe = defaultPaletteRecipe();
   recipe.hue.mode = PaletteV4.hueMode.CUSTOM;
   recipe.hue.customTurns = [0.98, 1.02, 0.73, 0.4];
-  const { values, customHueOffsets } = controlsFor(recipe);
   // The wheel carries three keys; the fourth rides the template across.
   const template = defaultPaletteRecipe();
   template.hue.customTurns = [0, 0, 0, 0.4];
-  const back = paletteRecipeFromControls(template,
-    paletteControlReadings((id) => values[id], customHueOffsets));
+  const back = paletteRecipeFromControls(template, paletteControlsFromRecipe(recipe));
 
   assertRecipeClose(back.hue.customTurns, recipe.hue.customTurns, 'customTurns');
   assert.equal(back.hue.baseTurns, 0,
     'the keys carry the base hue, so the field stays on the engine default');
 });
 
-test('the readings convert the units the controls are labelled in', () => {
-  const { values, customHueOffsets } = controlsFor(defaultPaletteRecipe());
-  values[PALETTE_CONTROL_IDS.baseHueDegrees] = '90';
-  values[PALETTE_CONTROL_IDS.spreadDegrees] = '36';
-  const readings = paletteControlReadings((id) => values[id], customHueOffsets);
-
-  assert.equal(readings.baseTurns, 0.25, 'degrees read as turns');
-  assert.equal(readings.spreadTurns, 0.1);
-  assert.deepEqual(readings.window, { offset: 0, span: 1 });
-  assert.equal(readings.customHueOffsets, customHueOffsets,
-    'the wheel keys are page state, not a control reading');
-});
-
-test('a control the page does not carry is refused rather than read as NaN', () => {
-  const { values, customHueOffsets } = controlsFor(defaultPaletteRecipe());
-  delete values[PALETTE_CONTROL_IDS.headroom];
-
-  assert.throws(() => paletteControlReadings((id) => values[id], customHueOffsets),
-    /Palette control gen_headroom is missing/);
-});
-
-test('every control on the roster is read, and no control is read twice', () => {
+test('no two readings share a control', () => {
   const ids = Object.values(PALETTE_CONTROL_IDS);
-  assert.equal(new Set(ids).size, ids.length, 'two readings cannot share a control');
+  assert.equal(new Set(ids).size, ids.length);
+});
 
-  const { values, customHueOffsets } = controlsFor(defaultPaletteRecipe());
-  const asked = [];
-  paletteControlReadings((id) => {
-    asked.push(id);
-    return values[id];
-  }, customHueOffsets);
-  assert.deepEqual([...asked].sort(), [...ids].sort(),
-    'a rostered control the readings never ask for is decorative');
+test('the in-place marshal rewrites a template copy into the same recipe', () => {
+  const template = defaultPaletteRecipe();
+  template.hue.customTurns = [0, 0, 0, 0.4];
+  const readings = { ...CONTROL_READINGS, hueMode: 'CUSTOM', domain: 'LOOP' };
+  const target = structuredClone(template);
+  const { customTurns } = target.hue;
+  assert.equal(applyPaletteControls(target, readings), target);
+  assert.deepEqual(target, paletteRecipeFromControls(template, readings));
+  assert.equal(target.hue.customTurns, customTurns, 'the key array is rewritten, not replaced');
+  assert.equal(customTurns[3], 0.4);
+});
+
+test('the axis and key writers fill the object they are handed', () => {
+  const axis = { center: 0, range: 0, curve: 1 };
+  assert.equal(axisFromEndpoints(0.9, 0.1, axis), axis);
+  assert.ok(Math.abs(axis.center - 0.5) < 1e-12 && Math.abs(axis.range - 0.8) < 1e-12);
+  assert.equal(axis.curve, 1);
+  const turns = [9, 9, 9, 0.4];
+  assert.equal(customHueTurns(1.25, [0, 0.1, -0.1], turns, turns), turns);
+  assert.deepEqual(turns, [0.25, 0.35, 0.15, 0.4]);
+  assert.ok(Math.abs(movedHueKeyOffset(0.98, 0, 0.02) - 0.04) < 1e-12, 'nearest across the seam');
+  assert.equal(movedHueKeyOffset(0, 2, 0.4), 2, 'clamped to two turns');
 });
 
 test('enum ordinals name the option that carries them', () => {
