@@ -11,6 +11,8 @@
 
 import { formatFloatCpp } from '../../shared/cpp_format.js';
 
+export const MOBIUS_GRID_SCALE_R = 1.5;
+
 // --- Complex arithmetic ---------------------------------------------------
 // Complex numbers are plain { re, im } objects.
 
@@ -207,8 +209,7 @@ export function elliptic(t) {
  * @returns {{A:{re:number,im:number}, B:{re:number,im:number}, C:{re:number,im:number}, D:{re:number,im:number}}} The Mobius coefficients {A, B, C, D}.
  */
 export function hyperbolic(t) {
-  const gridScaleR = 1.5;
-  const logPeriod = 1.0 / gridScaleR;
+  const logPeriod = 1.0 / MOBIUS_GRID_SCALE_R;
   const speed = 0.4;
   const flowParam = (t * speed) % logPeriod;
   const scale = Math.exp(flowParam);
@@ -228,8 +229,7 @@ export function hyperbolic(t) {
  */
 export function loxodromic(t) {
   const angle = t * 0.3;
-  const gridScaleR = 1.5;
-  const logPeriod = 1.0 / gridScaleR;
+  const logPeriod = 1.0 / MOBIUS_GRID_SCALE_R;
   const speed = 0.3;
   const flowParam = (t * speed) % logPeriod;
   const scale = Math.exp(flowParam);
