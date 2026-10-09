@@ -616,8 +616,8 @@ function invStereo(w) {
 
 /**
  * Maps a sphere point through the tool's own complex arithmetic: project, apply
- * f(z) = (Az + B) / (Cz + D), unproject. Runs the shader's own stereo and
- * projectDiv, which carry the engine's point-at-infinity conventions.
+ * f(z) = (Az + B) / (Cz + D), unproject. Runs the tool's JS stereo and
+ * projectDiv with the engine's point-at-infinity conventions; GLSL has its own port.
  * @param {number[]} p - Unit sphere point as [x, y, z].
  * @param {{A:{re:number,im:number}, B:{re:number,im:number}, C:{re:number,im:number}, D:{re:number,im:number}}} coeffs - The Mobius coefficients.
  * @returns {{x:number, y:number, z:number}} The transformed sphere point.
