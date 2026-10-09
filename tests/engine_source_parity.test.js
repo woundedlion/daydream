@@ -156,6 +156,7 @@ const ENGINE_CPP_TO_JS = [
   [/\bsqrtf\(/g, 'Math.sqrt('],
   [/\bmath::Complex\b/g, 'Complex'],
   [/\b(?:projections::)?stereographic_detail::radial_scale\b/g, 'radial_scale'],
+  [/\bmobius_detail::saturated_quotient\b/g, 'saturated_quotient'],
   [/\bprojections::(STEREO_[A-Z_]+)\b/g, '$1'],
   [/(\d)f\b/g, '$1'],
 ];
@@ -199,17 +200,18 @@ const STEREO_POINTS = (() => {
   return points;
 })();
 
-// Numerator/divisor pairs spanning project_div's branches: ordinary quotients, a
-// numerator that saturates on the relative test, a divisor small enough that an
-// absolute-guard division would zero it out, the 0/0 indeterminate form,
-// magnitudes whose square leaves the representable range, and a nonzero divisor
-// whose square underflows to zero, which the lift branch divides rather than
-// reads as the pole.
+// Numerator/divisor pairs spanning project_div's branches: ordinary quotients,
+// numerators that saturate on the relative test over real and non-real
+// divisors, a divisor small enough that an absolute-guard division would zero it
+// out, the 0/0 indeterminate form, magnitudes whose square leaves the
+// representable range, and a nonzero divisor whose square underflows to zero,
+// which the lift branch divides rather than reads as the pole.
 const PROJECT_DIV_PAIRS = [
   [{ re: 4, im: 2 }, { re: 2, im: 0 }],
   [{ re: 1, im: -3 }, { re: -0.5, im: 0.25 }],
   [{ re: 1e5, im: 0 }, { re: 1, im: 0 }],
   [{ re: 1e5, im: 1e5 }, { re: 1, im: 0 }],
+  [{ re: 1e4, im: 0 }, { re: 0, im: -1 }],
   [{ re: 1e-6, im: 0 }, { re: 4e-4, im: 0 }],
   [{ re: 0, im: 0 }, { re: 0, im: 0 }],
   [{ re: 1, im: 1 }, { re: 0, im: 0 }],
@@ -240,8 +242,11 @@ test('stereo and projectDiv match their engine projection and Mobius headers', {
   assert.equal(MB.STEREO_UNDERFLOW_LIFT, lift);
   const bindings = { ...constants, radial_scale, COMPLEX_UNDERFLOW_LIFT: lift };
   const engineStereo = transpileEngineComplex(src, 'stereo', ['v'], bindings);
+  const mobiusSrc = header(MOBIUS_H);
+  const saturated_quotient = transpileEngineComplex(
+    mobiusSrc, 'saturated_quotient', ['num', 'den'], bindings);
   const engineProjectDiv = transpileEngineComplex(
-    header(MOBIUS_H), 'project_div', ['num', 'den'], bindings);
+    mobiusSrc, 'project_div', ['num', 'den'], { ...bindings, saturated_quotient });
 
   for (const v of STEREO_POINTS) {
     const want = engineStereo(v);

@@ -213,12 +213,15 @@ test('projectDiv saturates on the relative magnitude, not an absolute divisor', 
   const ordinary = projectDiv({ re: 4, im: 2 }, { re: 2, im: 0 });
   assertComplex(ordinary, 2, 1, 'projectDiv ordinary');
 
-  // |num| / |den| = 1e5 > STEREO_INF -> clamped along the numerator direction.
+  // |num| / |den| = 1e5 > STEREO_INF -> clamped along the quotient direction.
   const big = projectDiv({ re: 1e5, im: 0 }, { re: 1, im: 0 });
   assertComplex(big, STEREO_INF, 0, 'projectDiv saturated');
   const bigDiag = projectDiv({ re: 1e5, im: 1e5 }, { re: 1, im: 0 });
   assert.ok(Math.abs(Math.hypot(bigDiag.re, bigDiag.im) - STEREO_INF) < 1e-6);
   assert.ok(Math.abs(Math.atan2(bigDiag.im, bigDiag.re) - Math.PI / 4) < 1e-12);
+  // 1e4 / -i = 1e4 i: a non-real divisor turns the saturated direction.
+  assertComplex(projectDiv({ re: 1e4, im: 0 }, { re: 0, im: -1 }), 0, STEREO_INF,
+    'projectDiv saturated over a non-real divisor');
 
   // A divisor an absolute |den|^2 < 1e-6 guard would zero out still divides.
   const tiny = { re: 4e-4, im: 0 };
