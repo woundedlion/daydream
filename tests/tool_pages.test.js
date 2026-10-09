@@ -761,6 +761,14 @@ test('shared keyboard rings outrank Firefox preflight without changing styleshee
   }
 });
 
+test('tool canvases draw the keyboard ring inset', () => {
+  const css = rules(read('tools', 'tools.css'));
+  const shared = css.findIndex(([names]) => names.split(/,\s*/).includes(':root :focus-visible'));
+  const canvas = css.findIndex(([names]) => names === ':root canvas:focus-visible');
+  assert.ok(canvas > shared && shared >= 0, 'the canvas ring must follow the shared ring');
+  assert.match(css[canvas][1], /outline-offset: -2px/);
+});
+
 
 test('the rendered solids remove glyph clears AA against its op-row fill', () => {
   const row = buildOpRow({op: 'dual', params: {}}, 0, {opDef: {params: {}}, count: 1,

@@ -224,6 +224,10 @@ input[type=range]:disabled::-moz-range-thumb {
   outline-offset: 2px;
 }
 
+:root canvas:focus-visible {
+  outline-offset: -2px;
+}
+
 input[type=checkbox] {
   accent-color: var(--blue-500);
 }
