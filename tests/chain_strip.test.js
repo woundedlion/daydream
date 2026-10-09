@@ -183,7 +183,7 @@ test('endomorphisms carry controls; sockets carry only valid selectors', async (
 
 test('a socket names the function by the carrier its crossing produces', async () => {
   const h = await makeStrip();
-  // camera, lens, sample (sphere to field), colorize: the one shipped crossing
+  // camera, lens, sample (sphere to field), colorize: a shipped crossing
   // that skips the plane band entirely.
   assert.equal(h.store.replaceSpan(PROJECT, 3,
     [{ operator: 'sample.spherical-noise.v3' }]).ok, true);
