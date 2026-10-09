@@ -11,6 +11,8 @@ node_modules/
 
 # The Holosphere checkout CI drops here for the engine-parity cases.
 /engine/
+
+# Verified engine bundle CI downloads and installs from.
 /engine-bundle/
 
 # Engine runtime assets installed from Holosphere.
@@ -55,5 +57,6 @@ Thumbs.db
 # Recoverable scratch files from interrupted engine installs.
 /.hs-tmp-*/
 
+# Documentation mirrored from Holosphere by the engine install.
 /README.md
 /docs/screenshots/
