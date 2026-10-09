@@ -120,7 +120,8 @@ export function exportStatus(h) {
  * @param {boolean} [options.pauseAccessor] - False models a module that does not
  *   export getAnimationsPaused.
  * @param {Function} [options.onEngineParam] - Optional engine-side reaction to
- *   a parameter write, used to model a dynamic descriptor rebind.
+ *   a parameter write, used to model a dynamic descriptor rebind; returning
+ *   false models an engine refusal.
  * @param {boolean} [options.rebuildOnApply] - Makes the injected applyEffect run
  *   the app's real destroy/build/mount sequence instead of only recording the
  *   call, which is what the Reset button drives.
