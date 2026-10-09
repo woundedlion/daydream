@@ -5,7 +5,7 @@
 
 /** @typedef {{property: string, domElement: HTMLElement, $select?: HTMLSelectElement, $input?: HTMLInputElement, $button?: HTMLButtonElement}} PanelController */
 /** @typedef {{domElement: HTMLElement, closed: boolean, open: (open?: boolean) => void, close: () => void}} PanelFolder */
-/** @typedef {{gui: PanelFolder, controllerByName?: Map<string, PanelController>, pause: {controller?: PanelController|null}, actionControllers?: PanelController[], stageFolders?: Map<string, PanelFolder>}} PanelRecord */
+/** @typedef {{gui: PanelFolder, controllerByName?: Map<string, PanelController>, pause: {controller?: PanelController|null}, actions?: {focusTargets: () => Array<[string, PanelController]>}, stageFolders?: Map<string, PanelFolder>}} PanelRecord */
 
 /**
  * The key one of the panel's own controls is remembered under across a rebuild,
@@ -50,8 +50,8 @@ export function createEffectPanelView({ focusedElement, guiContainer, isMobile }
     if (!fx) return [];
     const pairs = [...(fx.controllerByName ?? [])];
     if (fx.pause.controller) pairs.push([panelControlKey('pause'), fx.pause.controller]);
-    for (const controller of fx.actionControllers ?? []) {
-      pairs.push([panelControlKey(controller.property), controller]);
+    for (const [key, controller] of fx.actions?.focusTargets() ?? []) {
+      pairs.push([panelControlKey(key), controller]);
     }
     return pairs;
   }

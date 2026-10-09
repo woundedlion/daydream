@@ -4,13 +4,12 @@
  */
 
 /**
- * The effect panel's whole lifecycle — build, mount, per-frame value sync,
- * Export, and teardown — with lil-gui, the engine, the worker pool, the
+ * The effect panel's coordinator — build, mount, per-frame sync, schema
+ * rebuild, and teardown — with lil-gui, the engine, the worker pool, the
  * copy operation, and the document injected.
  */
 
 import {
-  enumChoices,
   paramControlKind,
   engineParamValue,
   acceptedParamValue,
@@ -30,12 +29,13 @@ import {
   stageGrouping,
 } from './effect_param_controls.js';
 import { createParamValueSync } from './effect_param_values.js';
+import { createEffectActions } from './effect_actions.js';
 import { formatExportParams } from "../shared/export_params.js";
 
 /** @typedef {import("./effect_param_controls.js").ParameterDefinition} ParameterDefinition */
 /** @typedef {import("./effect_param_controls.js").GuiController} GuiController */
 /** @typedef {import("./effect_param_controls.js").Gui} Gui */
-/** @typedef {{animationState: {pause: boolean}, controller: GuiController|null, setPaused: (value: boolean) => void}} PauseToggle */
+/** @typedef {{animationState: {pause: boolean}, controller: GuiController|null, setPaused: (value: boolean) => void, show: (paused: boolean|undefined) => void}} PauseToggle */
 /**
  * One built effect panel.
  * @typedef {Object} EffectRecord
@@ -53,28 +53,13 @@ import { formatExportParams } from "../shared/export_params.js";
  * @property {boolean} paramsExternal - Whether parameters render outside the panel.
  * @property {Map<string, Gui>} stageFolders - Pipeline stage folders.
  * @property {PauseToggle} pause - The pause toggle.
+ * @property {import("./effect_actions.js").EffectActions} actions - The action row.
  * @property {boolean} hydrating - True until construction finishes.
  * @property {boolean} animationPauseApplied - Whether pause transitions reach
  *   the engine.
  * @property {boolean} warningsDirty - Whether the warnings must be re-read.
- * @property {HTMLElement|null} actionRow - The action button row.
- * @property {GuiController[]} actionControllers - Action row controllers.
- * @property {ReturnType<typeof setTimeout>|undefined} exportFlashTimer -
- *   Pending Export label revert.
- * @property {{state: {presetIndex?: number}, controller: GuiController}} [preset] -
- *   The preset selector, on an effect with presets.
- * @property {(delta: number) => boolean} [movePreset] - Relative preset selection.
  */
 
-// How long a transient button label (Export status) stays before reverting.
-export const FLASH_MS = 1500;
-// Transient Export button labels.
-export const EXPORT_COPIED = '\u2713 Copied!';
-export const EXPORT_FAILED = '\u2717 Copy failed';
-const EXPORT_ICON = '\u29c9';
-const RESET_ICON = '\u21ba';
-const PREVIOUS_ICON = '\u25c0';
-const NEXT_ICON = '\u25b6';
 const RESERVED_CONTROL_NAMES = new Set(['pause']);
 
 const ENGINE_MEMBERS = [
@@ -279,31 +264,6 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
   }
 
   /**
-   * Update the pause controller without writing back to the engine.
-   * @param {EffectRecord} fx
-   * @param {boolean|undefined} paused
-   */
-  function adoptPauseDisplay(fx, paused) {
-    if (paused === undefined || paused === fx.pause.animationState.pause) return;
-    fx.pause.animationState.pause = paused;
-    fx.pause.controller?.updateDisplay();
-    fx.gui.writeStoredValue('pause', paused);
-  }
-
-  /**
-   * Mirror the live preset index into the preset control.
-   * @param {EffectRecord} fx
-   * @param {number} count
-   * @param {number} index
-   */
-  function adoptPresetDisplay(fx, count, index) {
-    if (!fx.preset || count <= 0) return;
-    if (fx.preset.state.presetIndex === index) return;
-    fx.preset.state.presetIndex = index;
-    fx.preset.controller.updateDisplay();
-  }
-
-  /**
    * Bring the panel up to date with the engine: follow a preset change,
    * rebuild a stale schema, then push the live parameter values into the
    * controllers without clobbering an active edit.
@@ -313,10 +273,11 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    */
   function sync(advanced = true) {
     if (!activeEffect || !activeEffect.controllerByName) return;
-    const presetIndex = activeEffect.preset ? getPresetIndex() : null;
-    const presetAdvanced = activeEffect.preset !== undefined
-      && activeEffect.preset.state.presetIndex !== presetIndex;
-    const presetSynced = !activeEffect.preset || synchronizePreset(/** @type {number} */ (presetIndex));
+    const hasPresets = activeEffect.actions.hasPresets();
+    const presetIndex = hasPresets ? getPresetIndex() : null;
+    const presetAdvanced = hasPresets
+      && activeEffect.actions.displayedPresetIndex() !== presetIndex;
+    const presetSynced = !hasPresets || synchronizePreset(/** @type {number} */ (presetIndex));
     const filterStale =
       (paramFilter() !== null) !== (activeEffect.paramsExternal === true);
     const warningsStale = paramWarningsStale(activeEffect);
@@ -326,55 +287,27 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       if (!rebuildSchema()) return;
     }
     if (!presetSynced) return;
-    adoptPauseDisplay(activeEffect, engineAnimationsPaused());
-    if (activeEffect.preset) adoptPresetDisplay(activeEffect, getPresetCount(), getPresetIndex());
+    activeEffect.pause.show(engineAnimationsPaused());
+    if (activeEffect.actions.hasPresets()) {
+      activeEffect.actions.showPreset(getPresetCount(), getPresetIndex());
+    }
     valueSync.syncValues(activeEffect, advanced, presetAdvanced);
   }
 
   /**
-   * Copy text to the clipboard and report the outcome on the Export label.
-   * @param {EffectRecord} fx - The effect record owning the Export button. A copy that
-   *   lands after the effect changed reports nothing.
-   * @param {string} text - The text to copy.
-   * @param {(label: string) => void} flashExport - Shows a transient Export label.
-   * @returns {Promise<void>} Clipboard completion.
-   */
-  function copyAndFlash(fx, text, flashExport) {
-    return /** @type {(text: string) => Promise<boolean>} */ (copyText)(text).then((copied) => {
-      if (activeEffect !== fx) return;
-      if (copied) {
-        flashExport(EXPORT_COPIED);
-      } else {
-        logWarn('Export: clipboard copy failed');
-        flashExport(EXPORT_FAILED);
-      }
-    }).catch((err) => {
-      logWarn('Export: clipboard copy failed', err);
-      if (activeEffect === fx) flashExport(EXPORT_FAILED);
-    });
-  }
-
-  /**
-   * Copy typed parameters as a C++ brace-init list, or the full config as JSON.
+   * The text Export copies: the chain snapshot as JSON on a snapshot effect,
+   * else the typed parameters as a C++ brace-init list.
    * @param {EffectRecord} fx - The effect record owning the Export button.
    * @param {Array<ParameterDefinition>} params - The engine's parameter definitions.
-   * @param {(label: string) => void} flashExport - Shows a transient Export label.
-   * @returns {Promise<void>|void} Clipboard completion, or nothing when blocked.
+   * @returns {import("./effect_actions.js").ExportResult} The text, or why
+   *   there is none.
    */
-  function exportParams(fx, params, flashExport) {
+  function buildExport(fx, params) {
     if (usesChainSnapshot()) {
       const snapshot = getSnapshot();
-      if (!snapshot) {
-        logWarn('Export: Shader Workbench chain snapshot is unavailable');
-        flashExport(EXPORT_FAILED);
-        return;
-      }
-      if (typeof copyText !== 'function') {
-        logWarn('Export: clipboard copy unavailable');
-        flashExport(EXPORT_FAILED);
-        return;
-      }
-      return copyAndFlash(fx, JSON.stringify(snapshot, null, 2), flashExport);
+      if (!snapshot) return { error: 'Export: Shader Workbench chain snapshot is unavailable' };
+      if (typeof copyText !== 'function') return { error: 'Export: clipboard copy unavailable' };
+      return { text: JSON.stringify(snapshot, null, 2) };
     }
     let values = liveParamValues();
     if ((!values || values.length === 0) && !fx.paramsExternal
@@ -384,148 +317,63 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
     }
     const blocked = paramExportBlocker(
       values, fx.paramNames.length, typeof copyText === 'function');
-    if (blocked) {
-      logWarn(blocked);
-      flashExport(EXPORT_FAILED);
-      return;
-    }
-
-    let text;
+    if (blocked) return { error: blocked };
     try {
-      text = formatExportParams(params, /** @type {ArrayLike<number>} */ (values));
+      return { text: formatExportParams(params, /** @type {ArrayLike<number>} */ (values)) };
     } catch (err) {
-      logWarn('Export: parameter formatting failed', err);
-      flashExport(EXPORT_FAILED);
-      return;
+      return { error: 'Export: parameter formatting failed', cause: err };
     }
-
-    return copyAndFlash(fx, text, flashExport);
   }
 
   /**
-   * Add the effect GUI's Reset, Export, and preset navigation buttons.
-   * @param {EffectRecord} fx - The effect record being built.
-   * @param {Array<ParameterDefinition>} params - The engine's parameter definitions.
+   * Adopt a preset selection the engine accepted: re-read warnings, drop the
+   * stored values the preset replaced, persist, and re-seat the displays.
+   * @param {EffectRecord} fx - The effect record whose preset changed.
+   * @param {number} count - The live preset count.
+   * @param {number} index - The selected preset.
    * @returns {void}
    */
-  function addEffectActions(fx, params) {
-    const ownerDocument = fx.gui.domElement.ownerDocument;
-    const actionRow = ownerDocument.createElement('div');
-    actionRow.classList.add('effect-action-row');
-    fx.gui.appendElement(actionRow);
-    fx.actionRow = actionRow;
-    const exportStatus = ownerDocument.createElement('span');
-    exportStatus.className = 'visually-hidden';
-    exportStatus.setAttribute('role', 'status');
-    exportStatus.setAttribute('aria-live', 'polite');
-    actionRow.appendChild(exportStatus);
-    fx.actionControllers = [];
-    /** @param {GuiController} controller @param {string} icon @param {string} label */
-    const presentAction = (controller, icon, label) => {
-      controller.name(icon);
-      const button = controller.$button ?? controller.domElement;
-      button.setAttribute('aria-label', label);
-      button.setAttribute('title', label);
-    };
-    /** @param {Record<string, any>} actions @param {string} property @param {string} icon @param {string} label @param {string} className */
-    const addAction = (actions, property, icon, label, className) => {
-      const controller = fx.gui.add(actions, property);
-      controller.domElement.classList.add('effect-action', className);
-      presentAction(controller, icon, label);
-      actionRow.appendChild(controller.domElement);
-      fx.actionControllers.push(controller);
-      return controller;
-    };
-
-    /**
-     * Flash a transient status label on the Export button and announce it in the
-     * action row's live region, restoring the default label after the flash
-     * window. Supersedes any flash still pending for this GUI.
-     * @param {string} label - The transient button label to show.
-     * @returns {void}
-     */
-    const flashExport = (label) => {
-      clearTimeout(fx.exportFlashTimer);
-      presentAction(exportCtrl, label === EXPORT_COPIED ? '\u2713' : '\u2717', label);
-      // A changed live-region string re-announces repeated messages.
-      exportStatus.textContent = exportStatus.textContent === label
-        ? `${label}\u200B` : label;
-      fx.exportFlashTimer = setTimeout(() => {
-        presentAction(exportCtrl, EXPORT_ICON, 'Export');
-        exportStatus.textContent = '';
-      }, FLASH_MS);
-    };
-
-    /** @type {{reset: () => void, export: () => Promise<void>|void, presetIndex?: number, previousPreset?: () => boolean, nextPreset?: () => boolean}} */
-    const effectActions = {
-      /**
-       * Reinstall the active effect at defaults, clear its URL params, and
-       * rebuild the panel, carrying keyboard focus and scroll offset across.
-       * @returns {void}
-       */
-      reset() {
-        const captured = view.capture(fx);
-        view.rebuild(captured.closed, applyEffect);
-        view.restore(activeEffect, captured);
-      },
-      /**
-       * Copy typed parameters as a C++ brace-init list, or the full config as
-       * JSON, then flash the outcome on the Export button.
-       * @returns {Promise<void>|void} Clipboard completion, or nothing when blocked.
-       */
-      export() { return exportParams(fx, params, flashExport); }
-    };
-    addAction(effectActions, 'reset', RESET_ICON, 'Reset', 'effect-action-reset');
-    const exportCtrl = addAction(
-      effectActions, 'export', EXPORT_ICON, 'Export', 'effect-action-export');
-    const presetCount = getPresetCount();
-    if (presetCount > 0) {
-      effectActions.presetIndex = getPresetIndex();
-      const presetOptions = enumChoices(
-        Array.from({ length: presetCount }, (_, index) => String(index + 1)));
-      const preset = fx.gui
-        .addSession(effectActions, 'presetIndex', presetOptions)
-        .name('Preset');
-      fx.preset = { state: effectActions, controller: preset };
-      /** @param {number} index */
-      const choose = (index) => {
-        const count = getPresetCount();
-        if (count <= 0 || !selectPreset(index)) {
-          adoptPresetDisplay(fx, count, getPresetIndex());
-          return false;
-        }
-        fx.warningsDirty = true;
-        if (!usesChainSnapshot()) {
-          for (const parameter of getParameterDefinitions()) {
-            if (!parameter.readonly) fx.gui.writeStoredValue(parameter.name, null);
-          }
-        }
-        persistence.persist(fx.gui);
-        adoptPresetDisplay(fx, count, index);
-        adoptPauseDisplay(fx, engineAnimationsPaused() ?? true);
-        valueSync.adoptRequestedEnums(fx, focusedElement() ?? null);
-        return true;
-      };
-      preset.onChange(choose);
-      /** @param {number} delta */
-      const move = (delta) => {
-        const count = getPresetCount();
-        if (count <= 0) return false;
-        return choose((getPresetIndex() + delta + count) % count);
-      };
-      fx.movePreset = move;
-      effectActions.previousPreset = () => move(-1);
-      effectActions.nextPreset = () => move(1);
-      addAction(effectActions, 'previousPreset', PREVIOUS_ICON, 'Previous Preset',
-        'preset-nav-previous');
-      preset.domElement.classList.add('effect-action', 'preset-nav-selector');
-      actionRow.appendChild(preset.domElement);
-      fx.actionControllers.push(preset);
-      addAction(effectActions, 'nextPreset', NEXT_ICON, 'Next Preset',
-        'preset-nav-next');
+  function adoptPresetChange(fx, count, index) {
+    fx.warningsDirty = true;
+    if (!usesChainSnapshot()) {
+      for (const parameter of getParameterDefinitions()) {
+        if (!parameter.readonly) fx.gui.writeStoredValue(parameter.name, null);
+      }
     }
-    actionRow.style.gridTemplateColumns =
-      `repeat(${fx.actionControllers.length}, minmax(0, 1fr))`;
+    persistence.persist(fx.gui);
+    fx.actions.showPreset(count, index);
+    fx.pause.show(engineAnimationsPaused() ?? true);
+    valueSync.adoptRequestedEnums(fx, focusedElement() ?? null);
+  }
+
+  /**
+   * Reinstall the active effect at defaults, clear its URL params, and rebuild
+   * the panel, carrying keyboard focus and scroll offset across.
+   * @param {EffectRecord} fx - The record whose Reset button was pressed.
+   * @returns {void}
+   */
+  function resetEffect(fx) {
+    const captured = view.capture(fx);
+    view.rebuild(captured.closed, applyEffect);
+    view.restore(activeEffect, captured);
+  }
+
+  /**
+   * Build the action row onto a record under construction.
+   * @param {EffectRecord} fx - The effect record being built.
+   * @param {Array<ParameterDefinition>} params - The engine's parameter definitions.
+   * @returns {import("./effect_actions.js").EffectActions} The action row handle.
+   */
+  function addEffectActions(fx, params) {
+    return createEffectActions(fx, {
+      presets: { count: getPresetCount, index: getPresetIndex, select: selectPreset },
+      onPresetChange: (count, index) => adoptPresetChange(fx, count, index),
+      onReset: () => resetEffect(fx),
+      buildExport: () => buildExport(fx, params),
+      copyText: (text) => /** @type {(text: string) => Promise<boolean>} */ (copyText)(text),
+      isActive: (record) => activeEffect === record,
+      logWarn,
+    });
   }
 
   /**
@@ -535,9 +383,9 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    * @param {Array<ParameterDefinition>} params - The engine's parameter definitions.
    * @param {boolean} [initialPause=false] - Initial pause state.
    * @param {boolean} [hydrate=true] - Read the stored pause value while constructing the toggle.
-   * @returns {{animationState: {pause: boolean}, controller: GuiController|null,
-   *   setPaused: (v: boolean) => void}} The toggle's state, its controller (null
-   *   when neither animation surface is available), and its state transition.
+   * @returns {PauseToggle} The toggle's state, its controller (null when
+   *   neither animation surface is available), its state transition, and its
+   *   display-only update.
    */
   function addPauseToggle(fx, params, initialPause = false, hydrate = true) {
     const animationState = { pause: Boolean(initialPause) };
@@ -562,6 +410,17 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
         transitionPaused(paused);
       }
     };
+    /**
+     * Show a pause state on the toggle without writing back to the engine.
+     * @param {boolean|undefined} paused - The state to show; undefined shows nothing.
+     * @returns {void}
+     */
+    const show = (paused) => {
+      if (paused === undefined || paused === animationState.pause) return;
+      animationState.pause = paused;
+      controller?.updateDisplay();
+      fx.gui.writeStoredValue('pause', paused);
+    };
     if (params.some(p => p.animated) || getPresetCount() > 0) {
       const add = hydrate
         ? (/** @type {any[]} */ ...args) => fx.gui.add(...args)
@@ -569,7 +428,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       controller = add(animationState, 'pause').name('Pause Animation');
       controller?.onChange(transitionPaused);
     }
-    return { animationState, controller, setPaused };
+    return { animationState, controller, setPaused, show };
   }
 
   /**
@@ -751,7 +610,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
       // URL hydration can advance the generation while attaching controls.
       fx.paramGeneration = paramGeneration();
 
-      addEffectActions(fx, params);
+      fx.actions = addEffectActions(fx, params);
       const pause = addPauseToggle(fx, params, initialPause, hydratePause);
       addParamControllers(fx, params, pause, previousParamNames);
       fx.pause = pause;
@@ -771,19 +630,11 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
    */
   function disposeEffect(fx) {
     if (!fx?.gui) return;
-    clearTimeout(fx.exportFlashTimer);
-    fx.exportFlashTimer = undefined;
+    fx.actions?.cancel();
     fx.edits.dispose();
     const dom = fx.gui.domElement;
     if (dom?.parentNode) dom.parentNode.removeChild(dom);
-    // Controller.destroy() removes each domElement from the GUI's own children
-    // container; one parented elsewhere throws NotFoundError mid-destroy.
-    for (const controller of fx.actionControllers ?? []) {
-      fx.gui.appendElement(controller.domElement);
-    }
-    fx.actionControllers = [];
-    fx.actionRow?.remove();
-    fx.actionRow = null;
+    fx.actions?.detach();
     try {
       fx.gui.destroy();
     } catch (e) {
@@ -854,7 +705,7 @@ export function createEffectGui({ engine, segments, config, host, moduleDead = (
      * @returns {boolean} Whether the preset was selected.
      */
     movePreset(delta) {
-      return activeEffect?.movePreset?.(delta) ?? false;
+      return activeEffect?.actions.movePreset(delta) ?? false;
     },
 
     /**

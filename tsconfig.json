@@ -91,6 +91,7 @@
     "src/ui/effect_gui.js",
     "src/ui/effect_param_controls.js",
     "src/ui/effect_param_values.js",
+    "src/ui/effect_actions.js",
     "src/recording/recording_controls.js",
     "src/ui/effect_panel_view.js",
     "src/effects/effect_roster.js"

@@ -366,6 +366,24 @@ test('a schema rebuild hands keyboard focus back to the same control', () => {
   assert.equal(h.gui().ctrl('Bonne Parallel').$input.focusCalls, 0);
 });
 
+test('a schema rebuild hands keyboard focus back to the same action control', () => {
+  const h = makeHarness({
+    params: [SPEED], engineValues: [0.1], generation: 7, presetCount: 3,
+  });
+  h.panel.build();
+  h.panel.mount();
+  const stale = h.gui();
+  h.state.focused = stale.ctrl('nextPreset').$button;
+
+  h.state.generation = 8;
+  h.panel.sync();
+
+  assert.notEqual(h.gui(), stale, 'the panel was rebuilt');
+  assert.equal(h.gui().ctrl('nextPreset').$button.focusCalls, 1);
+  assert.equal(h.gui().ctrl('previousPreset').$button.focusCalls, 0);
+  assert.equal(h.gui().ctrl('Speed').$input.focusCalls, 0);
+});
+
 test('a schema rebuild moves focus nowhere when the panel never held it', () => {
   const projection = {
     name: 'Projection', value: 0, options: ['Stereographic', 'Bonne'], animated: true,
