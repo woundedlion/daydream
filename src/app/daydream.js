@@ -320,9 +320,6 @@ export function start({
 
       if (!syncResolutionOptions(module)) return;
 
-      // applyResolution(true) applies the hydrated resolution and validates the
-      // hydrated effect against its allow-list, before first paint.
-
       const renderAdapter = createRenderAdapter({
         host,
         driver: daydream,
@@ -336,6 +333,8 @@ export function start({
 
       const loadingOverlay = doc.getElementById('loading-overlay');
       try {
+        // applyResolution(true) applies the hydrated resolution and validates the
+        // hydrated effect against its allow-list, before first paint.
         applyInitialState(
           () => apply.applyResolution(true),
           () => loadingOverlay?.remove(),
