@@ -43,8 +43,10 @@ test('sRGB transfer parity (srgb_to_linear / linear_to_srgb)', () => {
   for (const s of [0, 0.01, 0.04045, 0.05, 0.2, 0.5, 0.8, 1]) {
     assert.ok(near(M.srgb_to_linear_float(s), C.srgbToLinearFloat(s)),
       `srgb_to_linear(${s})`);
-    assert.ok(near(M.linear_to_srgb_float(s), C.linearToSrgbFloat(s)),
-      `linear_to_srgb(${s})`);
+  }
+  for (const l of [0, 0.001, 0.003, 0.0031308, 0.01, 0.05, 0.2, 0.5, 0.8, 1]) {
+    assert.ok(near(M.linear_to_srgb_float(l), C.linearToSrgbFloat(l)),
+      `linear_to_srgb(${l})`);
   }
 });
 
