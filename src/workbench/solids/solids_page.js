@@ -113,13 +113,11 @@ let islamicStarPatterns = [];
 let registrySolidNames = new Set();
 
 async function init() {
-  // Load WASM
   try {
     ({ default: createHolosphereModule } = await import('../../../generated/holosphere_wasm.js'));
     wasmModule = await createHolosphereModule();
     meshOpsWasm = wasmModule.MeshOps;
 
-    // Populate Registry from WASM
     const registry = meshOpsWasm.getRegistry();
     // registry is array of {name, category}
     simpleSolids = [];
@@ -147,7 +145,6 @@ async function init() {
     return;
   }
 
-  // Start Memory Metrics Loop.
   let arenaMetricsTimer = null;
   function updateArenaMetrics() {
     if (!meshOpsWasm) return;
@@ -166,7 +163,7 @@ async function init() {
       if (engineTrapped(error)) return;
       console.warn('Arena metrics unavailable:', error);
     }
-    arenaMetricsTimer = setTimeout(updateArenaMetrics, 500); // 2fps update is enough
+    arenaMetricsTimer = setTimeout(updateArenaMetrics, 500);
   }
   const thumbnailAbort = new AbortController();
   onPageTeardown(() => {
@@ -305,10 +302,9 @@ function handleBaseSolidKeyDown(event) {
 async function generateThumbnails(signal) {
   const footer = document.getElementById('footer');
 
-  // Gather all solid names from exported lists
   const thumbKeys = [...simpleSolids, ...islamicStarPatterns];
 
-  const width = 256; // High-res for larger thumbs
+  const width = 256;
   const height = 256;
   const offRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   offRenderer.setSize(width, height);
@@ -347,7 +343,6 @@ async function generateThumbnails(signal) {
       const meshData = buildBaseMesh(key, `Thumbnail for "${key}"`, buildContext(showThumbnailError));
       if (!meshData) continue;
 
-      // Triangulate
       const vertices = [];
       const emitTri = (a, b, c) => {
         vertices.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
@@ -360,7 +355,6 @@ async function generateThumbnails(signal) {
       const mesh = new THREE.Mesh(geo, mat);
       offScene.add(mesh);
 
-      // Edges
       const linePoints = [];
       for (const [ai, bi] of uniqueEdges(meshData.faces, meshData.vertices.length)) {
         linePoints.push(meshData.vertices[ai], meshData.vertices[bi]);
@@ -369,7 +363,6 @@ async function generateThumbnails(signal) {
       const lines = new THREE.LineSegments(lineGeo, lineMat);
       offScene.add(lines);
 
-      // Render
       offRenderer.render(offScene, offCamera);
 
       const btn = document.createElement('button');
@@ -696,7 +689,6 @@ function saveSolid() {
   let iCount = 0;
   currentMesh.faces.forEach(f => iCount += f.length);
 
-  // Generate summary
   const opsSummary = state.ops.map(o => {
     if (o.op === 'truncate') return `Tr(${o.params.t})`;
     if (o.op === 'hankin') return `Hk(${o.params.angle.toFixed(2)})`;
@@ -953,7 +945,6 @@ function applyRestore(item) {
   updateToggles();
   renderOps();
 
-  // Highlight active base in footer
   highlightBaseSolid();
 
   update();
