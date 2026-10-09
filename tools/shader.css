@@ -289,6 +289,11 @@
   color: var(--bright-text);
 }
 
+.chain-chip:focus-visible {
+  outline: 3px solid var(--bright-text);
+  outline-offset: 3px;
+}
+
 .chain-chip--socket {
   align-self: flex-start;
   margin-top: 0.3125rem;
@@ -520,11 +525,6 @@ select.chain-param-control {
   color-scheme: dark;
   color: var(--text-color);
   background-color: var(--background-color);
-}
-
-.chain-chip:focus-visible {
-  outline: 3px solid var(--bright-text);
-  outline-offset: 3px;
 }
 
 #canvas:focus-visible:not(.keyboard-focus) {
