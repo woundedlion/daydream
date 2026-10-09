@@ -4,7 +4,7 @@
 //
 // Cases that read the source anchor on the call site and name the failure they
 // stand in for.
-import { afterEach, test } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
@@ -20,26 +20,13 @@ import { createSegmentPoolSpawner, createSegmentedPovControls } from '../src/ui/
 import {
   fakeGui,
   fakeWasmModule,
-  startApp as startUntrackedApp,
+  noticeText,
+  trackedStartApp,
   segmentCountControl,
 } from './helpers/fake_app.js';
 
 restoreDocumentAfterEach();
-const startedApps = [];
-afterEach(() => {
-  while (startedApps.length > 0) {
-    const app = startedApps.pop();
-    app.teardown.dispose();
-    app.restore();
-  }
-});
-
-/** Starts an app registered for per-case cleanup. @returns {Object} The app fakes. */
-function startApp(options) {
-  const app = startUntrackedApp(options);
-  startedApps.push(app);
-  return app;
-}
+const startApp = trackedStartApp();
 
 /**
  * Blanks a source's comments to spaces, leaving every other offset where it
@@ -133,11 +120,6 @@ test('the boot double mocks only methods the engine has', () => {
   const { HolosphereEngine } = fakeWasmModule();
   assert.deepEqual(unpinnedEngineMethods(new HolosphereEngine()), []);
 });
-
-/** @returns {string} The text the shared notice element is showing. */
-function noticeText(app) {
-  return app.elements.get('apply-notice-text').textContent;
-}
 
 /** @returns {Array<string>} The effects the sidebar is offering. */
 function offeredEffects(app) {

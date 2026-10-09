@@ -1,5 +1,6 @@
 // Builds daydream.js's composition root against injected seams (document, page
 // target, navigator, driver, GUI factory, module loader).
+import { afterEach } from 'node:test';
 import { fakeElement, installDocument } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
 import { EffectSetResult, ParamSetResult, ResolutionSetResult } from './fake_engine.js';
@@ -487,6 +488,35 @@ export function startApp({
     teardown, driver, guis, listeners, docListeners, elements, queried, win,
     replaced, urlWrites, restore,
   };
+}
+
+/**
+ * Registers an afterEach that disposes every app started through the returned
+ * function and restores the globals each start replaced, newest first.
+ * @returns {(options?: Object) => Object} startApp(), tracked for cleanup.
+ */
+export function trackedStartApp() {
+  const started = [];
+  afterEach(() => {
+    while (started.length > 0) {
+      const app = started.pop();
+      app.teardown.dispose();
+      app.restore();
+    }
+  });
+  return (options) => {
+    const app = startApp(options);
+    started.push(app);
+    return app;
+  };
+}
+
+/**
+ * @param {Object} app - A startApp() result.
+ * @returns {string} The text the shared notice element is showing.
+ */
+export function noticeText(app) {
+  return app.elements.get('apply-notice-text').textContent;
 }
 
 /**

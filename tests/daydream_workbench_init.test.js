@@ -1,6 +1,6 @@
 // The composition root's handling of a rejected shader-workbench init, with the
 // document controller replaced by a module mock.
-import { afterEach, mock, test } from 'node:test';
+import { mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { restoreDocumentAfterEach } from './helpers/fake_dom.js';
 import { installConsoleCapture } from './helpers/fake_console.js';
@@ -20,17 +20,10 @@ mock.module('../src/workbench/shader/shader_documents.js', {
     },
   },
 });
-const { fakeWasmModule, startApp } = await import('./helpers/fake_app.js');
+const { fakeWasmModule, noticeText, trackedStartApp } = await import('./helpers/fake_app.js');
 
 restoreDocumentAfterEach();
-const started = [];
-afterEach(() => {
-  while (started.length > 0) {
-    const app = started.pop();
-    app.teardown.dispose();
-    app.restore();
-  }
-});
+const startApp = trackedStartApp();
 
 /**
  * Boots the workbench page with a document controller whose init() rejects
@@ -47,7 +40,6 @@ async function bootRejectedWorkbench(fail) {
     const app = startApp({
       daydreamMode: 'shader-workbench', loadModule: () => Promise.resolve(module),
     });
-    started.push(app);
     await app.teardown.ready;
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(controllers, before + 1, 'the workbench page builds its controller');
@@ -57,7 +49,6 @@ async function bootRejectedWorkbench(fail) {
   }
 }
 
-const noticeText = (app) => app.elements.get('apply-notice-text').textContent;
 const fatalBanner = () => globalThis.document.body.children
   .find((child) => child.id === 'fatal-error-overlay');
 
