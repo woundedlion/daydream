@@ -1259,6 +1259,8 @@ for (const bitrate of [1, 0]) {
       assert.equal(notified.length, 1, 'the host is told the session ended');
       assert.match(captured.messages.join(' '), /Save dialog/,
         'the stop is reported, not silent');
+      assert.doesNotMatch(captured.messages.join(' '), /recording stopped/i,
+        'the notice prefix already says the session stopped');
 
       recorder.ondataavailable({ data: { size: 3_000_000 } });
       recorder.onstop();
@@ -1366,6 +1368,8 @@ test('the in-memory fallback sink stops the session at its byte bound', () => {
     assert.equal(notified.length, 1, 'the host is told the session ended');
     assert.match(captured.messages.join(' '), /held in memory/,
       'the stop is reported, not silent');
+    assert.doesNotMatch(captured.messages.join(' '), /recording stopped/i,
+      'the notice prefix already says the session stopped');
 
     recorder.ondataavailable({ data: { size: CHUNK_BYTES } });
     recorder.onstop();
@@ -1411,6 +1415,8 @@ test('a streaming session with no file handle bounds its in-memory fallback', as
     assert.equal(notified.length, 1, 'the host is told the session ended');
     assert.match(captured.messages.join(' '), /held in memory/,
       'the stop is reported, not silent');
+    assert.doesNotMatch(captured.messages.join(' '), /recording stopped/i,
+      'the notice prefix already says the session stopped');
 
     recorder.ondataavailable({ data: { size: CHUNK_BYTES } });
     recorder.onstop();

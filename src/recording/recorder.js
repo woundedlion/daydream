@@ -527,8 +527,8 @@ export class VideoRecorder {
         if (this.mediaRecorder === recorder) {
           this.stop();
           this.reportFailure(
-            `${cause}, so the whole video is held in memory; `
-            + `recording stopped at ${Math.round(MEMORY_BUFFER_LIMIT_BYTES / 1_000_000)} MB. `
+            `${cause}, so the whole video is held in memory and reached `
+            + `${Math.round(MEMORY_BUFFER_LIMIT_BYTES / 1_000_000)} MB. `
             + 'What was captured up to that point is saved.');
         }
         return;
@@ -619,7 +619,7 @@ export class VideoRecorder {
             this.reportFailure(
               `${picked ? 'the streaming save could not keep up' : 'the Save dialog was left unanswered'} `
               + `while ${Math.round(maxBacklogBytes / 1_000_000)} MB of video `
-              + `(${PICKER_GRACE_SECONDS}s at ${bitrateMbps} Mbps) piled up in memory; recording stopped. `
+              + `(${PICKER_GRACE_SECONDS}s at ${bitrateMbps} Mbps) piled up in memory. `
               + (picked ? 'Queued video will be saved if writing completes.'
                 : 'Choose a file to save what was captured.'));
           }
