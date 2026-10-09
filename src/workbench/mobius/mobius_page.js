@@ -5,6 +5,7 @@
  * Page module for tools/mobius.html.
  */
 import * as THREE from 'three';
+import { formatFloatCpp } from '../../shared/cpp_format.js';
 import { initScene, bootstrapTool, wireCopyBlock } from '../shared.js';
 import { onPageTeardown } from '../../shared/page_lifecycle.js';
 import { createPointerDrag, innerRect } from '../../shared/pointer_drag.js';
@@ -13,6 +14,7 @@ import {
   elliptic, hyperbolic, loxodromic, parabolic,
   inversion, tumble, cayley, snapCoefficientComponent,
   glslComplexFunctions, glslProjectionFunctions, mobiusCodeString,
+  MOBIUS_GRID_SCALE_R,
 } from './mobius_transforms.js';
 
 const config = {
@@ -50,7 +52,7 @@ const fragmentShader = `
     uniform CNum u_d;
     varying vec3 vPosition;
 
-    const float GRID_SCALE_R = 1.5;
+    const float GRID_SCALE_R = ${formatFloatCpp(MOBIUS_GRID_SCALE_R).replace(/f$/, '')};
     const float GRID_SCALE_THETA = 12.0;
 
     float pattern(float val, float thickness) {

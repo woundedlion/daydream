@@ -8,6 +8,7 @@ const {
   glslComplexFunctions, glslProjectionFunctions, mobiusCodeString,
   stereo, projectDiv, STEREO_INF, STEREO_POLE_EPS, STEREO_AZIMUTH_EPS,
   STEREO_UNDERFLOW_LIFT,
+  MOBIUS_GRID_SCALE_R,
 } = await import('../src/workbench/mobius/mobius_transforms.js');
 
 const EPS = 1e-12;
@@ -311,7 +312,7 @@ test('every preset generator is the identity at t=0', () => {
  * Loxodromic keeps rotating, so only the magnitudes are periodic.
  */
 test('the scaling presets repeat their magnitudes one flow period later', () => {
-  const logPeriod = 1 / 1.5;
+  const logPeriod = 1 / MOBIUS_GRID_SCALE_R;
   for (const [name, gen, speed] of [['hyperbolic', hyperbolic, 0.4], ['loxodromic', loxodromic, 0.3]]) {
     const period = logPeriod / speed;
     for (const t of [0, 0.37, 1.4, 5, 42]) {
