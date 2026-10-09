@@ -511,9 +511,14 @@ test('a segmented-POV failure is announced and returns the toggle', async (t) =>
 
   // lil-gui writes the bound object before firing the handler.
   enabled.object[enabled.property] = true;
-  let settled;
-  captureConsole(() => { settled = enabled.changed(true); });
-  await settled;
+  const capture = installConsoleCapture('error', 'warn');
+  try {
+    await enabled.changed(true);
+  } finally {
+    capture.restore();
+  }
+  assert.ok(capture.messages.some((message) =>
+    /Segmented POV: enable failed;.*would not start/.test(message)));
 
   assert.match(notices.at(-1), /Segmented POV enable failed:.*would not start/,
     'a console-only failure is invisible: the user sees the toggle flip back '
