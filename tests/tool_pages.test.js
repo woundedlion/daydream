@@ -423,7 +423,8 @@ const CONTRAST_SURFACES = {
     '.complex-plane-label': '.param-group',
   },
   'palettes.css': {
-    '#gen_status': '.tab-content',
+    '#gen_status, #hue_key_status': '.tab-content',
+    '#gen_status[data-status="error"], #hue_key_status': '.tab-content',
     '.recipe-preset': '.recipe-preset',
     '.recipe-preset-select': '.recipe-preset-select',
     '.recipe-field > label': '.param-group',

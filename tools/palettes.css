@@ -83,7 +83,7 @@ body {
 
 #gen_status[data-status="error"],
 #hue_key_status {
-  color: var(--error-text);
+  color: var(--error-text, #e66);
 }
 
 .recipe-preset {
