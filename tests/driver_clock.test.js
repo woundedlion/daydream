@@ -27,10 +27,11 @@ function fixture({ delta, paused = false, timeAccumulator = 0 }) {
 }
 const advance = (ctx) => Daydream.prototype.advanceFrameClock.call(ctx);
 
-test('paused clock neither advances nor accrues backlog', () => {
-  const ctx = fixture({ delta: 1, paused: true });
+test('paused clock neither advances nor accrues backlog, and keeps its partial interval', () => {
+  const ctx = fixture({ delta: 1, paused: true, timeAccumulator: FRAME_INTERVAL / 2 });
   assert.equal(advance(ctx), false, 'a paused clock advanced a frame');
-  assert.equal(ctx.timeAccumulator, 0, 'a paused clock accrued backlog');
+  assert.equal(ctx.timeAccumulator, FRAME_INTERVAL / 2,
+    'a paused clock accrued backlog or dropped its partial interval');
   assert.equal(ctx.updateCalls, 1, 'the timer was not updated exactly once');
   assert.equal(ctx.getDeltaCalls, 1, 'the elapsed time was not drained exactly once');
 });
