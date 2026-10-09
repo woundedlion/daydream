@@ -34,7 +34,8 @@ export const BOOT_WATCHDOG_MS = 10000;
 // reports while `pending > 0`, not the whole render.
 export const RENDER_WATCHDOG_MS = 5000;
 
-// Retry message-less worker error Events with bounded backoff.
+// Pre-ready pool rebuilds for a message-less worker error Event or a rejected
+// shared module: at most MAX_BOOT_RETRIES, BOOT_RETRY_DELAY_MS apart.
 export const MAX_BOOT_RETRIES = 3;
 export const BOOT_RETRY_DELAY_MS = 250;
 
