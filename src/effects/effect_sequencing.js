@@ -412,7 +412,7 @@ export function createApplyPipeline({
 
     effectGui.destroy();
     if (!preserveParams) clearEffectParamUrl();
-    if (getEngine()) effectGui.build();
+    if (getEngine()) effectGui.build({ restoreStored: !chainSnapshot });
     effectGui.mount();
 
     // Gated on segmented mode, not on a live pool: a faulted pool can hold no
