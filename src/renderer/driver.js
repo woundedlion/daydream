@@ -342,7 +342,7 @@ export class Daydream {
       overlay.style.display = "flex";
       overlay.focus({ preventScroll: true });
       // The canvas feeds no more frames into the capture stream.
-      this.recorder?.abort(`WebGL context lost (${reason}); recording stopped.`);
+      this.recorder?.abort(`WebGL context lost (${reason}).`);
     };
 
     this.onContextRestored = () => {
