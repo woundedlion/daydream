@@ -291,6 +291,17 @@ async function init() {
   renderBaseSolid();
 }
 
+function handleBaseSolidKeyDown(event) {
+  const delta = ['ArrowRight', 'ArrowDown'].includes(event.key) ? 1
+    : ['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 0;
+  if (!delta) return;
+  event.preventDefault();
+  const choices = [...document.querySelectorAll('.thumb-btn')];
+  const next = choices[(choices.indexOf(event.currentTarget) + delta + choices.length) % choices.length];
+  choices.forEach(choice => { choice.tabIndex = choice === next ? 0 : -1; });
+  next.focus();
+}
+
 async function generateThumbnails(signal) {
   const footer = document.getElementById('footer');
 
@@ -368,16 +379,7 @@ async function generateThumbnails(signal) {
       btn.setAttribute('role', 'radio');
       btn.setAttribute('aria-checked', state.base === key ? 'true' : 'false');
       btn.tabIndex = state.base === key ? 0 : -1;
-      btn.addEventListener('keydown', (event) => {
-        const delta = ['ArrowRight', 'ArrowDown'].includes(event.key) ? 1
-          : ['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 0;
-        if (!delta) return;
-        event.preventDefault();
-        const choices = [...document.querySelectorAll('.thumb-btn')];
-        const next = choices[(choices.indexOf(btn) + delta + choices.length) % choices.length];
-        next.focus();
-        next.click();
-      });
+      btn.addEventListener('keydown', handleBaseSolidKeyDown);
       btn.dataset.solid = key; // identify the base so restoreSolid can re-highlight it
       btn.addEventListener('click', () => selectBaseSolid(key, btn));
 
