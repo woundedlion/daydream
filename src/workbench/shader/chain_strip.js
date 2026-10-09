@@ -686,11 +686,11 @@ export function createChainStrip({
   };
 
   /**
-   * The expanded chip's own controls, one row per parameter the document
-   * declares for the instance, labeled by the field segment alone: the chip
-   * already names the instance.
+   * The expanded chip's own controls, one row per parameter the store reports
+   * for the instance (authored declarations plus undeclared catalog fields),
+   * labeled by the field segment alone: the chip already names the instance.
    * @param {ChainEntry} entry - The expanded chain entry.
-   * @param {ParameterDeclaration[]} declared - The instance's declarations.
+   * @param {ParameterDeclaration[]} declared - The instance's parameters.
    * @returns {*} The parameter region.
    */
   const paramsElement = (entry, declared) => {
