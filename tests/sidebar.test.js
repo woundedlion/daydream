@@ -468,7 +468,7 @@ test('updateScrollArrows reflects scroll geometry', () => {
   assert.ok(!sidebar.arrowRight.classList.contains('visible'));
 });
 
-test('sort controls expose the current order in their accessible name', () => {
+test('sort controls expose the current order in their accessible name and announce a re-sort', () => {
   const { sidebar } = makeSidebar();
   const glyph = (btn) => btn.querySelector('.sort-glyph');
 
@@ -491,6 +491,11 @@ test('sort controls expose the current order in their accessible name', () => {
   assert.equal(glyph(sidebar.nameBtn).textContent, '⇅');
   assert.equal(glyph(sidebar.sizeBtn).textContent, '▼');
   assert.equal(sidebar.listEl.getAttribute('aria-label'), 'Effects, sorted by size descending');
+  const status = sidebar.sortStatus;
+  assert.equal(status.parentNode, sidebar.sortRow);
+  assert.equal(status.getAttribute('role'), 'status');
+  assert.ok(status.classList.contains('visually-hidden'));
+  assert.equal(status.textContent, 'Effects, sorted by size descending');
 });
 
 test('dispose detaches every listener/observer and clears refs', () => {
