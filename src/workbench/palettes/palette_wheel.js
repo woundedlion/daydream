@@ -71,9 +71,12 @@ export function paintHueWheelRaster(data, width, height, lightness) {
       const dx = x + 0.5 - centerX;
       const distance = Math.hypot(dx, dy);
       const offset = (y * width + x) * 4;
-      oklchLinearRgb(lightness, distance * chromaPerPixel,
-        wrapTurns(Math.atan2(-dy, dx) * turnsPerRadian), rgb);
-      const inGamut = distance <= radius && linearRgbInGamut(rgb);
+      let inGamut = false;
+      if (distance <= radius) {
+        oklchLinearRgb(lightness, distance * chromaPerPixel,
+          wrapTurns(Math.atan2(-dy, dx) * turnsPerRadian), rgb);
+        inGamut = linearRgbInGamut(rgb);
+      }
       for (let channel = 0; channel < 3; channel++) {
         data[offset + channel] = inGamut
           ? Math.round(
