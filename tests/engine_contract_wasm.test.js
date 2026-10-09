@@ -1235,7 +1235,7 @@ test('MeshOps exposes the method surface the solids tool drives', () => {
   assert.equal(typeof M.MeshOps, 'function', 'the module must export MeshOps');
   for (const name of [
     'clearToolingMemory', 'fromSolidName', 'getRegistry', 'getArenaMetrics',
-    'getLastResult',
+    'getLastResult', 'getLastAdjusted',
   ]) {
     assert.equal(typeof M.MeshOps[name], 'function',
       `MeshOps is missing class function ${name} (solids.html calls it)`);
