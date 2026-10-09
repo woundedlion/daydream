@@ -294,7 +294,7 @@ test('refresh() re-fetches and re-notifies when the held view has detached', () 
   let notified = null;
   const host = new EngineHost((view) => { notified = view; });
   host.pixelView = stale;
-  host.engine = { getPixels: () => fresh };
+  host.engine = pixelEngine(() => fresh, () => fresh.length);
 
   host.refresh();
 

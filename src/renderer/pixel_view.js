@@ -26,13 +26,11 @@ export function isViewLive(view) {
  * reallocating, so an old view stays attached at the wrong length.
  * @param {Uint16Array|null} view - The currently held pixel view.
  * @param {() => Uint16Array} getPixels - Fetches a fresh zero-copy view from the engine.
- * @param {number} [expectedLength] - The engine's current buffer length. Omitted
- *   on a module without the accessor, which leaves detachment the only trigger.
+ * @param {number} expectedLength - The engine's current buffer length.
  * @returns {{view: Uint16Array, refreshed: boolean}} The view to use and whether it was re-fetched.
  */
 export function refreshPixelView(view, getPixels, expectedLength) {
-  const stale = !isViewLive(view)
-    || (typeof expectedLength === 'number' && view.length !== expectedLength);
+  const stale = !isViewLive(view) || view.length !== expectedLength;
   if (stale) return { view: getPixels(), refreshed: true };
   return { view, refreshed: false };
 }

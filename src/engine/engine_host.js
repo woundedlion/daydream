@@ -82,7 +82,7 @@ export class EngineHost {
     if (!engine) return false;
     const { view, refreshed } = computePixelView(
       this.pixelView, () => engine.getPixels(),
-      engine.getBufferLength?.());
+      engine.getBufferLength());
     if (refreshed) {
       this.pixelView = view;
       this.onViewRefreshed(view);

@@ -21,7 +21,7 @@ test('isViewLive: an attached view is live', () => {
 test('refreshPixelView: a null view is re-fetched', () => {
   const fresh = new Uint16Array(4);
   let calls = 0;
-  const r = refreshPixelView(null, () => { calls++; return fresh; });
+  const r = refreshPixelView(null, () => { calls++; return fresh; }, 4);
   assert.equal(r.refreshed, true, 'the re-fetch went unreported');
   assert.equal(r.view, fresh);
   assert.equal(calls, 1, 'the null view was not re-fetched exactly once');
@@ -29,18 +29,9 @@ test('refreshPixelView: a null view is re-fetched', () => {
 
 test('refreshPixelView: a detached view is re-fetched', () => {
   const fresh = new Uint16Array(4);
-  const r = refreshPixelView(detachedView(), () => fresh);
+  const r = refreshPixelView(detachedView(), () => fresh, 4);
   assert.equal(r.refreshed, true, 'the re-fetch went unreported');
   assert.equal(r.view, fresh, 'the detached view was handed back');
-});
-
-test('refreshPixelView: a live view is reused without re-fetching', () => {
-  const live = new Uint16Array(4);
-  let calls = 0;
-  const r = refreshPixelView(live, () => { calls++; return new Uint16Array(4); });
-  assert.equal(r.refreshed, false, 'a reused view was reported as re-fetched');
-  assert.equal(r.view, live, 'the live view was replaced');
-  assert.equal(calls, 0, 'a live view was re-fetched from the engine');
 });
 
 test('refreshPixelView: a live view of the expected length is reused', () => {
@@ -70,13 +61,4 @@ test('refreshPixelView: a shrunk buffer re-fetches an over-long view', () => {
   const r = refreshPixelView(stale, () => fresh, 5760);
   assert.equal(r.refreshed, true, 'the re-fetch went unreported');
   assert.equal(r.view, fresh, 'the over-long view survived the shrink');
-});
-
-test('refreshPixelView: a non-number length leaves detachment the only trigger', () => {
-  const live = new Uint16Array(4);
-  let calls = 0;
-  const r = refreshPixelView(live, () => { calls++; return new Uint16Array(8); }, null);
-  assert.equal(r.refreshed, false, 'a non-number length was treated as a mismatch');
-  assert.equal(r.view, live, 'the live view was replaced');
-  assert.equal(calls, 0, 'a non-number length triggered a re-fetch');
 });
