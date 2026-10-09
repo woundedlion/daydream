@@ -15,7 +15,7 @@ import {
   uniqueEdges,
   geodesicSegments,
   geodesicTriangleVertices,
-} from './solid_codegen.js';
+} from './solid_geometry.js';
 
 /**
  * Vertex count at which the index overlay stops being built: one DOM node per
