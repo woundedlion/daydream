@@ -312,7 +312,8 @@ export const PLATONIC_SOLIDS = SIMPLE_SEEDS.slice(0, 5);
 
 /**
  * The Catalan seeds, mirrored from `namespace Catalan` in procedural_solids.h.
- * A generated registry entry on a Catalan base must qualify with `Catalan::`.
+ * A generated recipe function on a Catalan base qualifies its seed call with
+ * `Catalan::`; registry generation refuses Catalan seeds.
  */
 export const CATALAN_BASES = new Set([
   'triakisTetrahedron', 'rhombicDodecahedron', 'triakisOctahedron',
