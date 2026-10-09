@@ -111,7 +111,7 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
       data[index] = rInt;
       data[index + 1] = gInt;
       data[index + 2] = bInt;
-      data[index + 3] = 255; // Alpha
+      data[index + 3] = 255;
     }
     cacheCtx.putImageData(imageData, 0, 0);
     cachedViewStart = view.start;
@@ -164,7 +164,6 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
     },
   };
 }
-// Red, Green, Blue.
 const WAVE_COLORS = ['#EF4444', '#22C55E', '#3B82F6'];
 
 /**
@@ -199,7 +198,6 @@ export function drawWaveGraph({ canvas, ctx, palette }) {
   }
   ctx.stroke();
 
-  // Draw center line (0.5 reference)
   const yCenter = toY(0.5);
   ctx.strokeStyle = '#475569';
   ctx.setLineDash([5, 5]);

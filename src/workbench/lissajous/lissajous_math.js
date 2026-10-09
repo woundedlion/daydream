@@ -56,10 +56,9 @@ const closingRatio = (ratio, maxTerm, tol = 1e-9) => {
  * @returns {{x: number, y: number, z: number}} Point on the unit sphere.
  */
 export const lissajous = (m1, m2, a, t) => {
-  const phase = a;
-  const x = Math.sin(m2 * t) * Math.cos(m1 * t - phase);
+  const x = Math.sin(m2 * t) * Math.cos(m1 * t - a);
   const y = Math.cos(m2 * t);
-  const z = Math.sin(m2 * t) * Math.sin(m1 * t - phase);
+  const z = Math.sin(m2 * t) * Math.sin(m1 * t - a);
   // Already unit-length: sin²(m2·t)(cos²+sin²) + cos²(m2·t) = 1.
   return { x, y, z };
 };

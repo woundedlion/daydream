@@ -34,7 +34,7 @@ const state = {
   A: config.A.default,
   Duration: config.Duration.default,
   Samples: config.Samples.default,
-  isRationalLocked: false // whether the rational-ratio constraint is locked
+  isRationalLocked: false
 };
 
 let scene, line;
@@ -45,7 +45,7 @@ const lineMaterial = new THREE.LineBasicMaterial({
   transparent: true,
   opacity: 0.9,
   depthWrite: false,
-  depthTest: false // Always on top effect
+  depthTest: false
 });
 
 const initThree = () => {
