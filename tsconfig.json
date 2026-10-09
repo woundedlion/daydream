@@ -73,6 +73,7 @@
     "src/workbench/lissajous/lissajous_math.js",
     "src/workbench/mobius/mobius_transforms.js",
     "src/shared/page_lifecycle.js",
+    "src/workbench/palettes/hue_key_wheel_controller.js",
     "src/workbench/palettes/palette_canvas.js",
     "src/workbench/palettes/palette_controls.js",
     "src/workbench/palettes/palette_math.js",
