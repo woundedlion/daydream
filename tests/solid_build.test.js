@@ -351,7 +351,7 @@ for (const error of [new Error('base refused'), 'base refused']) {
     const { Mod } = fakeModule({ onOp: () => { throw error; } });
     const { ctx, errors } = context(Mod);
     assert.equal(quietly(() => buildChainMesh('cube', [], ctx)), null);
-    assert.deepEqual(errors, ['Base solid failed: base refused']);
+    assert.deepEqual(errors, ['Base solid "cube" failed: base refused']);
   });
 }
 
