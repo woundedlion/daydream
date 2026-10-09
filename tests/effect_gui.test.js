@@ -4,11 +4,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement, restoreDocumentAfterEach } from './helpers/fake_dom.js';
 
-import {
-  createEffectGui,
-  addParamControl,
-  sliderDecimals,
-} from '../src/ui/effect_gui.js';
+import { createEffectGui } from '../src/ui/effect_gui.js';
+import { addParamControl, sliderDecimals } from '../src/ui/effect_param_controls.js';
 import {
   LATTICE_MELT_STAGE_ORDER,
   KALEIDOSCOPE_SMOOTH_STAGE_ORDER,
