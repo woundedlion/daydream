@@ -232,8 +232,8 @@ export function deliverFrame(controller, segId, overrides = {}) {
       presetCount: overrides.presetCount ?? null,
       presetIndex: overrides.presetIndex ?? null,
       fullFrame: overrides.fullFrame ?? false,
-      // Left undefined unless a case supplies one: a worker that reports no
-      // divergence omits the field entirely.
+      // Left undefined unless a case supplies one, as the worker posts
+      // `warnings: undefined` when it saw no divergence.
       warnings: overrides.warnings,
     },
   });
