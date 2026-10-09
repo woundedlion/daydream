@@ -136,7 +136,7 @@ test('the strip lays the chain out as editable carrier bands with sockets betwee
   assert.deepEqual(all.filter((chip) => chip.getAttribute('tabindex') === '0')
     .map((chip) => chip.dataset.label), ['camera']);
   assert.equal(h.container.querySelectorAll('.chain-band-add').length, 3,
-    'a band + is the only insertion affordance the strip offers');
+    'each band carries one + insertion control');
   assert.deepEqual(bands.map((band) => band.querySelector('.chain-band-add')
     ?.getAttribute('aria-label') ?? null),
   ['Add a Sphere stage', 'Add a Plane stage', 'Add a Field stage']);
