@@ -101,8 +101,11 @@ function fakeController(owner, object, property, args = [], optionsReplaces = fa
   return controller;
 }
 
-const supportedProperty = (target, property, choices) =>
-  Object(choices) === choices || ['number', 'boolean', 'string', 'function'].includes(typeof target[property]);
+/** Throws DeepLinkGUI's unsupported-property TypeError unless the property can back a control. */
+function rejectUnsupported(target, property, choices) {
+  if (Object(choices) === choices || ['number', 'boolean', 'string', 'function'].includes(typeof target[property])) return;
+  throw new TypeError(`DeepLinkGUI: unsupported property "${property}"`);
+}
 
 /**
  * @param {string} [namespace=''] - Root namespace.
@@ -140,7 +143,7 @@ function buildGui(namespace, optionsReplaces, panel, hydrated, stored) {
     closed: false,
     ctrl(property) { return this.controllers.find((c) => c.property === property); },
     add(target, property, ...args) {
-      if (!supportedProperty(target, property, args[0])) throw new TypeError(`Unsupported GUI property: ${property}`);
+      rejectUnsupported(target, property, args[0]);
       const replay = Object.hasOwn(hydrated, property);
       if (replay) target[property] = hydrated[property];
       const c = fakeController(gui, target, property, args, optionsReplaces);
@@ -151,7 +154,7 @@ function buildGui(namespace, optionsReplaces, panel, hydrated, stored) {
     },
     // Session controls carry no deep link, so the two are told apart here.
     addSession(target, property, ...args) {
-      if (!supportedProperty(target, property, args[0])) throw new TypeError(`DeepLinkGUI: unsupported property "${property}"`);
+      rejectUnsupported(target, property, args[0]);
       const c = fakeController(gui, target, property, args, optionsReplaces);
       c.session = true;
       gui.controllers.push(c);
@@ -159,7 +162,7 @@ function buildGui(namespace, optionsReplaces, panel, hydrated, stored) {
       return c;
     },
     addUnhydrated(target, property, ...args) {
-      if (!supportedProperty(target, property, args[0])) throw new TypeError(`Unsupported GUI property: ${property}`);
+      rejectUnsupported(target, property, args[0]);
       const c = fakeController(gui, target, property, args, optionsReplaces);
       gui.controllers.push(c);
       childrenElement.appendChild(c.domElement);
