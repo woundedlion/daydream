@@ -1212,7 +1212,8 @@ test('heap growth detaches a held pixel view and the re-fetch is live and identi
     'if it no longer does, nothing exercises the detachment contract daydream.js ' +
     'guards against every frame');
 
-  const { refreshed, view } = refreshPixelView(held, () => engine.getPixels());
+  const { refreshed, view } = refreshPixelView(
+    held, () => engine.getPixels(), engine.getBufferLength());
   assert.equal(refreshed, true, 'a detached view must be re-fetched');
   assert.equal(isViewLive(view), true, 'the re-fetched view must alias live memory');
   assert.equal(view.length, snapshot.length,
