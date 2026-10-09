@@ -25,6 +25,7 @@ src/ui/segmented_pov_controls.js
 src/app/daydream.js
 src/renderer/driver.js
 src/ui/effect_gui.js
+src/ui/effect_param_controls.js
 src/effects/effect_persistence.js
 src/ui/effect_panel_view.js
 src/ui/effect_panel_edits.js
