@@ -87,3 +87,36 @@ test('FakeChainEngine refuses invalid snapshot writes and runtime atomically', (
   assert.equal(bindings.restoreSnapshot(target), ChainSnapshotRestoreResult.APPLIED);
   assert.deepEqual(bindings.getSnapshot(), target);
 });
+
+test('an injected APPLIED cannot report success without applying the chain', () => {
+  const engine = new FakeChainEngine();
+  engine.setEffect('ShaderChain');
+  const generation = engine.getParamGeneration();
+  const program = engine.program;
+  const definitions = engine.definitions;
+  engine.nextChainResult = { code: 'APPLIED', entryIndex: -1 };
+  assert.throws(() => engine.bindings.setShaderChain(CHAIN.slice(1)
+    .map(({ label, operator }) => ({ instance: label, operator }))),
+  /Injected chain results must be refusals/);
+  assert.equal(engine.getParamGeneration(), generation);
+  assert.equal(engine.program, program);
+  assert.equal(engine.definitions, definitions);
+});
+
+test('the fake chain engine advances generations after repeated application', () => {
+  const engine = new FakeChainEngine();
+  engine.setEffect('ShaderChain');
+  const installed = CHAIN.reduce((count, { operator: id }) =>
+    count + engine.catalog.operators.find(operator => operator.id === id).params.length, 0);
+  assert.ok(installed > 0);
+  assert.equal(engine.getParameterDefinitions().length, installed);
+  const chain = CHAIN.map(({ label, operator }) => ({ instance: label, operator }));
+  let generation = engine.getParamGeneration();
+  for (let i = 0; i < 2; i++) {
+    assert.equal(engine.bindings.setShaderChain(chain).status, ChainStatus.OK);
+    assert.notEqual(engine.getParamGeneration(), generation);
+    assert.ok(engine.getParameterDefinitions()
+      .some(definition => definition.name === 'sample.pattern-freq'));
+    generation = engine.getParamGeneration();
+  }
+});

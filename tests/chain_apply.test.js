@@ -120,21 +120,6 @@ test('a setShaderChain refusal is surfaced verbatim and stops the apply', () => 
     'a refused chain writes no values and repaints nothing');
 });
 
-test('an injected APPLIED cannot report success without applying the chain', () => {
-  const { engine, order, run } = harness();
-  const generation = engine.generation;
-  const program = engine.program;
-  const definitions = engine.definitions;
-  const compiled = compiledDocument();
-  compiled.document.descriptor.chain.shift();
-  engine.nextChainResult = { code: 'APPLIED', entryIndex: -1 };
-  assert.throws(() => run(compiled), /Injected chain results must be refusals/);
-  assert.equal(engine.generation, generation);
-  assert.equal(engine.program, program);
-  assert.equal(engine.definitions, definitions);
-  assert.deepEqual(order, ['setShaderChain']);
-});
-
 test('an entry-level refusal names the offending chain entry', () => {
   for (const index of [0, 1]) {
     const { run } = harness();
@@ -197,29 +182,6 @@ test('a non-numeric value is refused before the first write', () => {
   }));
   assert.match(refusal, /"camera\.wander" has no numeric value/);
   assert.deepEqual(engine.writes, []);
-});
-
-test('the fake chain engine advances generations after repeated application', () => {
-  const { engine, run } = harness();
-  const before = engine.getParamGeneration();
-  const installed = ['sphere.rotate.v2', 'project.stereographic.v2', 'sample.grid.v3',
-    'colorize.generated-palette.v3'].reduce((count, id) =>
-    count + engine.catalog.operators.find((operator) => operator.id === id).params.length, 0);
-  assert.ok(installed > 0);
-  assert.equal(engine.getParameterDefinitions().length, installed,
-    'the default chain installs its definitions');
-
-  assert.equal(run(compiledDocument({ 'sample.pattern-freq': 3 })), null);
-  const after = engine.getParamGeneration();
-  assert.notEqual(after, before,
-    'an APPLIED setShaderChain must move the generation');
-  assert.ok(engine.getParameterDefinitions()
-    .some((definition) => definition.name === 'sample.pattern-freq'),
-  'the fake exposes definitions after accepting the chain');
-
-  assert.equal(run(compiledDocument({ 'sample.pattern-freq': 5 })), null);
-  assert.notEqual(engine.getParamGeneration(), after,
-    'a re-chain bumps the generation again');
 });
 
 test('an inadmissible preset is submitted together and reports native refusal', () => {
