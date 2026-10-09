@@ -379,9 +379,9 @@ export function createApplyPipeline({
   function selectEngineEffect() {
     const engine = getEngine();
     const effect = appState.get('effect');
+    if (!engine) return false;
     // Compare against the enum value, never by truthiness (every
     // Module.EffectSetResult value is a truthy object).
-    if (!engine) return false;
     const applied =
       engine.setEffect(effect) === getModule().EffectSetResult.INSTALLED;
     driver.setStrobeColumns(engine.strobeColumns());
